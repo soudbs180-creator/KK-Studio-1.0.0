@@ -37,9 +37,6 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     const fallbackStackZIndex = ((group.zIndex ?? 0) * 100) + (isDragging ? 30 : highlighted ? 20 : 10);
     const stackZIndex = stackZIndexOverride ?? fallbackStackZIndex;
     const effectiveStackZIndex = elevateCanvasStackZIndex(stackZIndex, isDragging);
-    const groupGlassFill = highlighted ? 'rgba(99, 102, 241, 0.10)' : isDragging ? 'rgba(20, 20, 24, 0.18)' : 'rgba(0, 0, 0, 0.10)';
-    const groupHeaderGlassFill = highlighted ? 'rgba(99, 102, 241, 0.15)' : isDragging ? 'rgba(20, 20, 24, 0.62)' : 'rgba(20, 20, 24, 0.45)';
-
     // Direct DOM Refs
     const containerRef = useRef<HTMLDivElement>(null);
     const localBoundsRef = useRef(computedBounds || group.bounds);
@@ -48,6 +45,37 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
     const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
+    const groupSurfaceStyle: React.CSSProperties = {
+        background: highlighted
+            ? 'color-mix(in srgb, var(--frost-card-framework-bg) 88%, var(--state-info-bg) 12%)'
+            : isDragging
+                ? 'var(--frost-card-main-bg)'
+                : 'var(--frost-card-framework-bg)',
+        borderColor: highlighted
+            ? 'var(--state-info-border)'
+            : 'var(--frost-card-framework-border)',
+        boxShadow: 'var(--frost-card-framework-shadow)',
+        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+    };
+    const groupHeaderSurfaceStyle: React.CSSProperties = {
+        background: highlighted
+            ? 'color-mix(in srgb, var(--frost-card-sub-bg) 88%, var(--state-info-bg) 12%)'
+            : 'var(--frost-card-sub-bg)',
+        borderColor: highlighted
+            ? 'var(--state-info-border)'
+            : 'var(--frost-card-sub-border)',
+        boxShadow: 'var(--frost-card-sub-shadow)',
+        WebkitBackdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
+        backdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
+    };
+    const groupInputSurfaceStyle: React.CSSProperties = {
+        background: 'var(--frost-input-bg)',
+        borderColor: 'var(--frost-input-border)',
+        boxShadow: 'var(--frost-input-shadow)',
+        WebkitBackdropFilter: 'blur(var(--frost-input-blur)) saturate(1.12)',
+        backdropFilter: 'blur(var(--frost-input-blur)) saturate(1.12)',
+    };
 
     // Rename state
     const [isEditing, setIsEditing] = useState(false);
@@ -198,11 +226,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
         <>
             <div
                 ref={containerRef}
-                className={`absolute border rounded-[32px] group-container backdrop-blur-[20px] transition-colors
-                    ${highlighted
-                        ? 'border-indigo-500/50 shadow-[0_0_40px_rgba(99,102,241,0.2)] z-10'
-                        : 'border-white/5 hover:border-white/10'
-                    } ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                className={`absolute border rounded-[32px] group-container transition-colors ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                 style={{
                     left: 0,
                     top: 0,
@@ -211,7 +235,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                     transform: `translate(${bounds.x}px, ${bounds.y}px)`,
                     zIndex: effectiveStackZIndex,
                     pointerEvents: 'auto',
-                    backgroundColor: groupGlassFill,
+                    ...groupSurfaceStyle,
                     willChange: isDragging ? 'width, height' : 'auto',
                     // Disable transition during drag to prevent rubber-banding
                     transition: isDragging ? 'none' : 'box-shadow 0.3s ease, transform 0.1s linear, width 0.1s linear, height 0.1s linear',
@@ -222,13 +246,10 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
             >
                 {/* Header / Drag Handle */}
                 <div
-                    className="absolute -top-10 left-0 flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-opacity opacity-100 backdrop-blur-[24px]"
-                    style={{
-                        backgroundColor: groupHeaderGlassFill,
-                        borderColor: highlighted ? 'rgba(99,102,241,0.3)' : 'rgba(255, 255, 255, 0.05)'
-                    }}
+                    className="absolute -top-10 left-0 flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-opacity opacity-100"
+                    style={groupHeaderSurfaceStyle}
                 >
-                    <GripHorizontal size={14} style={{ color: highlighted ? 'var(--accent-indigo)' : 'var(--text-tertiary)' }} />
+                    <GripHorizontal size={14} style={{ color: highlighted ? 'var(--state-info-text)' : 'var(--text-tertiary)' }} />
                     {isEditing ? (
                         <input
                             ref={inputRef}
@@ -245,13 +266,13 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                             onMouseDown={(e) => e.stopPropagation()} // Allow text alignment/cursor
                             className="w-32 text-xs font-medium border-none outline-none rounded px-1 transition-all"
                             style={{
-                                backgroundColor: 'transparent',
+                                ...groupInputSurfaceStyle,
                                 color: 'var(--text-primary)',
                                 fontSize: '16px',
                                 transitionDuration: 'var(--duration-fast)'
                             }}
                             onFocus={(e) => {
-                                e.currentTarget.style.boxShadow = '0 0 0 1px rgba(99, 102, 241, 0.5)';
+                                e.currentTarget.style.boxShadow = '0 0 0 1px var(--state-info-border)';
                             }}
                             onBlur={(e) => {
                                 e.currentTarget.style.boxShadow = 'none';
@@ -261,7 +282,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                     ) : (
                         <span
                             className="text-xs font-medium whitespace-nowrap"
-                            style={{ color: highlighted ? 'var(--accent-indigo)' : 'var(--text-secondary)' }}
+                            style={{ color: highlighted ? 'var(--state-info-text)' : 'var(--text-secondary)' }}
                         >
                             {group.label || 'Group'}
                         </span>
@@ -273,8 +294,16 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
             {contextMenu && createPortal(
                 <div
                     ref={menuRef}
-                    className="fixed z-[9999] bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-lg shadow-xl p-1 min-w-[140px] animate-fadeIn"
-                    style={{ left: (menuPosition?.x ?? contextMenu.x + 6), top: (menuPosition?.y ?? contextMenu.y + 6) }}
+                    className="fixed z-[9999] rounded-lg border p-1 min-w-[140px] animate-fadeIn"
+                    style={{
+                        left: (menuPosition?.x ?? contextMenu.x + 6),
+                        top: (menuPosition?.y ?? contextMenu.y + 6),
+                        background: 'var(--frost-card-framework-bg)',
+                        borderColor: 'var(--frost-card-framework-border)',
+                        boxShadow: 'var(--frost-card-framework-shadow)',
+                        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+                        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+                    }}
                     onClick={(e) => e.stopPropagation()}
                 >
                     <button
@@ -282,7 +311,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                             setContextMenu(null);
                             setIsEditing(true);
                         }}
-                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)] rounded transition-colors text-left"
+                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--frost-card-sub-bg)] hover:text-[var(--text-primary)] rounded transition-colors text-left"
                     >
                         <Type size={14} />
                         重命名
@@ -293,7 +322,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                             setContextMenu(null);
                             onUngroup(group.id);
                         }}
-                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-500 hover:bg-red-500/10 hover:text-red-400 rounded transition-colors text-left"
+                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-500 hover:bg-[rgba(255,107,90,0.10)] hover:text-red-400 rounded transition-colors text-left"
                     >
                         <Trash2 size={14} />
                         取消打组

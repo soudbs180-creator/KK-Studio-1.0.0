@@ -113,6 +113,24 @@ function extractCssVariables(block: string): Record<string, string> {
   return variables;
 }
 
+function extractThemeVariables(
+  source: string,
+  selector: string,
+  occurrence: 'first' | 'last' = 'last',
+): Record<string, string> {
+  return {
+    ...extractCssVariables(extractCssBlock(source, ':root', 'last')),
+    ...extractCssVariables(extractCssBlock(source, selector, occurrence)),
+  };
+}
+
+function assertNeutralDarkColor(value: string, variables: Record<string, string>, label: string): void {
+  const color = parseCssColor(value, variables);
+  assert.ok(Math.abs(color.r - color.g) <= 2, `${label} must stay neutral black-gray; got r/g ${color.r}/${color.g}`);
+  assert.ok(Math.abs(color.g - color.b) <= 2, `${label} must stay neutral black-gray; got g/b ${color.g}/${color.b}`);
+  assert.ok(color.r >= 8 && color.r <= 36, `${label} must remain in the controlled dark-gray range; got ${color.r}`);
+}
+
 function extractRuleProperty(source: string, selector: string, property: string): string {
   const block = extractCssBlock(source, selector);
   const escapedProperty = property.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -126,21 +144,21 @@ test('shared app and settings theme surfaces keep normal text contrast', () => {
   const themeCases = [
     {
       name: 'global light',
-      variables: extractCssVariables(extractCssBlock(cssSource, 'body:not(.dark-mode)')),
+      variables: extractThemeVariables(cssSource, 'body:not(.dark-mode)'),
       baseBackground: '#ffffff',
       surfaces: ['--bg-surface', '--bg-elevated', '--bg-overlay', '--bg-input', '--toolbar-bg', '--toolbar-bg-dark'],
       textTokens: ['--text-primary', '--text-secondary', '--text-tertiary'],
     },
     {
       name: 'global dark',
-      variables: extractCssVariables(extractCssBlock(cssSource, 'body.dark-mode', 'first')),
+      variables: extractThemeVariables(cssSource, 'body.dark-mode'),
       baseBackground: '#000000',
       surfaces: ['--bg-surface', '--bg-elevated', '--bg-overlay', '--bg-input', '--toolbar-bg', '--toolbar-bg-dark'],
       textTokens: ['--text-primary', '--text-secondary', '--text-tertiary'],
     },
     {
       name: 'settings light',
-      variables: extractCssVariables(extractCssBlock(cssSource, '.settings-panel')),
+      variables: extractThemeVariables(cssSource, '.settings-panel'),
       baseBackground: '#ffffff',
       surfaces: [
         '--settings-section-bg',
@@ -153,7 +171,7 @@ test('shared app and settings theme surfaces keep normal text contrast', () => {
     },
     {
       name: 'settings dark',
-      variables: extractCssVariables(extractCssBlock(cssSource, 'body.dark-mode .settings-panel')),
+      variables: extractThemeVariables(cssSource, 'body.dark-mode .settings-panel'),
       baseBackground: '#000000',
       surfaces: [
         '--settings-section-bg',
@@ -185,17 +203,88 @@ test('shared app and settings theme surfaces keep normal text contrast', () => {
   }
 });
 
+test('Clay theme tokens expose distinct readable light and dark surfaces', () => {
+  const cssSource = readSource('src/index.css');
+  const root = extractCssVariables(extractCssBlock(cssSource, ':root', 'last'));
+  const light = extractThemeVariables(cssSource, 'body:not(.dark-mode)');
+  const dark = extractThemeVariables(cssSource, 'body.dark-mode');
+  const settingsLight = extractThemeVariables(cssSource, '.settings-panel');
+  const settingsDark = extractThemeVariables(cssSource, 'body.dark-mode .settings-panel');
+
+  assert.equal(root['--clay-canvas'], '#fffaf0');
+  assert.equal(root['--clay-ink'], '#0a0a0a');
+  assert.equal(root['--clay-body'], '#3a3a3a');
+  assert.equal(root['--clay-muted'], '#6a6a6a');
+  assert.equal(root['--clay-brand-coral'], '#ff6b5a');
+  assert.equal(light['--bg-canvas'], 'var(--clay-canvas)');
+  assert.equal(light['--text-primary'], 'var(--clay-ink)');
+  assert.equal(root['--clay-dark-canvas'], '#0b0b0c');
+  assert.equal(root['--clay-dark-surface'], '#141414');
+  assert.equal(root['--clay-dark-elevated'], '#1f1f1f');
+  assert.equal(dark['--bg-canvas'], 'var(--clay-dark-canvas)');
+  assert.equal(dark['--text-primary'], '#fffaf0');
+  assert.equal(settingsLight['--settings-page-bg'], 'var(--clay-canvas)');
+  assert.equal(settingsDark['--settings-page-bg'], 'var(--clay-dark-canvas)');
+
+  for (const token of ['--clay-dark-canvas', '--clay-dark-surface', '--clay-dark-elevated']) {
+    assertNeutralDarkColor(root[token], root, token);
+  }
+});
+
+test('dark theme surface aliases stay neutral and old blue-black settings tokens do not return', () => {
+  const cssSource = readSource('src/index.css');
+  const dark = extractThemeVariables(cssSource, 'body.dark-mode');
+  const settingsDark = extractThemeVariables(cssSource, 'body.dark-mode .settings-panel');
+
+  const expectedDarkAliases: Record<string, string> = {
+    '--bg-base': 'var(--clay-dark-canvas)',
+    '--bg-surface': 'var(--clay-dark-surface)',
+    '--bg-elevated': 'var(--clay-dark-elevated)',
+    '--bg-overlay': 'var(--clay-dark-elevated)',
+    '--bg-input': 'var(--frost-input-bg)',
+    '--bg-canvas': 'var(--clay-dark-canvas)',
+    '--toolbar-bg': 'var(--clay-dark-surface)',
+    '--toolbar-bg-dark': 'var(--clay-dark-elevated)',
+  };
+
+  for (const [token, expected] of Object.entries(expectedDarkAliases)) {
+    assert.equal(dark[token], expected, `${token} must resolve through the neutral Clay dark stack`);
+  }
+
+  const expectedSettingsDarkAliases: Record<string, string> = {
+    '--settings-page-bg': 'var(--clay-dark-canvas)',
+    '--settings-canvas-bg': 'var(--clay-dark-canvas)',
+    '--settings-section-bg': 'var(--frost-card-main-bg)',
+    '--settings-surface-elevated': 'var(--frost-card-main-bg)',
+    '--settings-surface-overlay': 'var(--frost-card-sub-bg)',
+    '--settings-surface-muted': 'var(--frost-card-sub-bg)',
+    '--settings-input-bg': 'var(--frost-input-bg)',
+    '--settings-button-secondary-bg': 'var(--frost-card-sub-bg)',
+    '--settings-nav-glass-bg': 'var(--frost-card-framework-bg)',
+  };
+
+  for (const [token, expected] of Object.entries(expectedSettingsDarkAliases)) {
+    assert.equal(settingsDark[token], expected, `${token} must use the shared frosted neutral dark surface`);
+  }
+
+  assert.doesNotMatch(cssSource, /--bg-canvas:\s*#0b0f16;/i);
+  assert.doesNotMatch(cssSource, /--settings-page-bg:\s*#151b23;/i);
+  assert.doesNotMatch(cssSource, /--settings-section-bg:\s*#1d2530;/i);
+  assert.doesNotMatch(cssSource, /--settings-surface-elevated:\s*#2a3441;/i);
+  assert.doesNotMatch(cssSource, /--settings-accent-rgb:\s*10 132 255;/i);
+});
+
 test('settings navigation glass keeps all sidebar text readable', () => {
   const cssSource = readSource('src/index.css');
   const themeCases = [
     {
       name: 'settings light nav',
-      variables: extractCssVariables(extractCssBlock(cssSource, '.settings-panel')),
+      variables: extractThemeVariables(cssSource, '.settings-panel'),
       baseBackground: '#ffffff',
     },
     {
       name: 'settings dark nav',
-      variables: extractCssVariables(extractCssBlock(cssSource, 'body.dark-mode .settings-panel')),
+      variables: extractThemeVariables(cssSource, 'body.dark-mode .settings-panel'),
       baseBackground: '#000000',
     },
   ];

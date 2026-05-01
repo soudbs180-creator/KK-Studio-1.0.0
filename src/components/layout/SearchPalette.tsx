@@ -17,6 +17,18 @@ type SearchResultItem =
     | { type: 'node'; data: PromptNode }
     | { type: 'group'; data: CanvasGroup };
 
+const DESKTOP_SEARCH_SHORTCUTS = [
+    { key: '↑↓', label: '导航' },
+    { key: 'Enter', label: '定位' },
+    { key: 'Ctrl+M', label: '切换多选' },
+];
+
+const MOBILE_SEARCH_HINTS = [
+    '输入关键词筛选历史内容',
+    '点按结果定位到画布',
+    '使用多选整理多个条目',
+];
+
 const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNodes, groups = [], onNavigate, onMultiSelectConfirm }) => {
     const [query, setQuery] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
@@ -82,16 +94,16 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
     // Keyboard navigation
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (!isOpen) return;
+            if (!isOpen || isMobile) return;
 
             switch (e.key) {
                 case 'ArrowDown':
                     e.preventDefault();
-                    setSelectedIndex(prev => (prev + 1) % results.length);
+                    setSelectedIndex(prev => results.length > 0 ? (prev + 1) % results.length : 0);
                     break;
                 case 'ArrowUp':
                     e.preventDefault();
-                    setSelectedIndex(prev => (prev - 1 + results.length) % results.length);
+                    setSelectedIndex(prev => results.length > 0 ? (prev - 1 + results.length) % results.length : 0);
                     break;
                 case 'Enter':
                     e.preventDefault();
@@ -124,7 +136,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, results, selectedIndex, isMultiSelectMode, multiSelectedIds]);
+    }, [isOpen, isMobile, results, selectedIndex, isMultiSelectMode, multiSelectedIds]);
 
     // Scroll selected item into view
     useEffect(() => {
@@ -169,26 +181,37 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
     if (!isOpen) return null;
 
     return (
-        <div className={`fixed inset-0 z-[100] flex justify-center bg-black/45 backdrop-blur-sm animate-fadeIn ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-start px-4 pt-[15vh]'}`}>
+        <div
+            data-search-surface={isMobile ? 'mobile' : 'desktop'}
+            className={`fixed inset-0 z-[100] flex justify-center animate-fadeIn ${isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-start px-4 pt-[15vh]'}`}
+            style={{ background: 'var(--search-palette-overlay-bg)' }}
+        >
             {/* Click outside to close */}
             <div className="absolute inset-0" onClick={onClose} />
 
             <div
-                className={`relative w-full overflow-hidden border animate-slideDown flex flex-col ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-[var(--radius-panel-xl)] rounded-b-none' : 'max-w-2xl max-h-[60vh]'}`}
+                data-search-panel={isMobile ? 'mobile-bottom-sheet' : 'desktop-command-surface'}
+                className={`relative w-full overflow-hidden border animate-slideDown flex flex-col ${isMobile ? 'clay-mobile-search-sheet mobile-sheet-viewport' : 'max-w-2xl max-h-[60vh]'}`}
                 style={{
-                    background: 'var(--search-palette-bg)',
-                    borderColor: 'var(--search-palette-border)',
-                    boxShadow: 'var(--search-palette-shadow)',
-                    borderRadius: isMobile ? undefined : 'var(--radius-surface-lg)'
+                    background: 'var(--frost-card-framework-bg)',
+                    borderColor: 'var(--frost-card-framework-border)',
+                    boxShadow: 'var(--frost-card-framework-shadow)',
+                    borderRadius: isMobile ? 'var(--search-palette-mobile-radius)' : 'var(--search-palette-desktop-radius)',
+                    borderBottom: isMobile ? 'none' : undefined,
+                    outlineColor: 'var(--clay-brand-pink)',
+                    WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+                    backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)'
                 }}
             >
                 {/* Search Header */}
                 <div
                     className={`flex items-center px-4 border-b focus-within:ring-2 focus-within:ring-[var(--search-palette-focus-ring)] ${isMobile ? 'mobile-sheet-header-safe' : ''}`}
                     style={{
-                        background: 'var(--search-palette-header-bg)',
-                        borderColor: 'var(--search-palette-border)',
-                        boxShadow: 'inset 0 -1px 0 var(--search-palette-border)'
+                        background: 'var(--frost-input-bg)',
+                        borderColor: 'var(--frost-input-border)',
+                        boxShadow: 'inset 0 -1px 0 var(--frost-input-border)',
+                        WebkitBackdropFilter: 'blur(var(--frost-input-blur)) saturate(1.12)',
+                        backdropFilter: 'blur(var(--frost-input-blur)) saturate(1.12)'
                     }}
                 >
                     <Search className="text-[var(--text-tertiary)] w-5 h-5 mr-3" />
@@ -218,7 +241,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                             background: isMultiSelectMode ? 'var(--search-palette-selected-bg)' : 'var(--settings-button-secondary-bg)',
                             borderColor: isMultiSelectMode ? 'var(--search-palette-selected-border)' : 'var(--settings-button-secondary-border)',
                             boxShadow: isMultiSelectMode ? 'var(--search-palette-selected-shadow)' : 'none',
-                            color: isMultiSelectMode ? 'var(--state-info-text)' : 'var(--text-secondary)'
+                            color: isMultiSelectMode ? 'var(--search-palette-accent)' : 'var(--text-secondary)'
                         }}
                         title="多选模式 (Ctrl+M)"
                     >
@@ -303,8 +326,8 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                                         <div
                                             className="mt-1.5 flex h-4 w-4 items-center justify-center rounded border transition-colors"
                                             style={{
-                                                background: isSelected ? 'var(--state-info-text)' : 'transparent',
-                                                borderColor: isSelected ? 'var(--state-info-text)' : 'var(--text-tertiary)'
+                                                background: isSelected ? 'var(--search-palette-accent)' : 'transparent',
+                                                borderColor: isSelected ? 'var(--search-palette-accent)' : 'var(--text-tertiary)'
                                             }}
                                         >
                                             {isSelected && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="text-white"><polyline points="20 6 9 17 4 12"></polyline></svg>}
@@ -317,7 +340,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                                     <div className="flex-1 overflow-hidden">
                                         <div
                                             className="truncate text-sm font-medium"
-                                            style={{ color: isSelected ? 'var(--state-info-text)' : 'var(--text-primary)' }}
+                                            style={{ color: isSelected ? 'var(--search-palette-accent)' : 'var(--text-primary)' }}
                                         >
                                             {item.type === 'group' ? (item.data.label || '未命名分组') : item.data.prompt}
                                         </div>
@@ -375,26 +398,34 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                 >
                     <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between gap-4'}`}>
                         <div className="flex flex-wrap gap-4">
-                        <span className="flex items-center gap-1">
-                            <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">↑↓</kbd> 导航
-                        </span>
-                        {isMultiSelectMode ? (
+                        {isMobile ? (
                             <>
-                                <span className="flex items-center gap-1 font-medium text-[var(--state-info-text)]">
-                                    <kbd className="px-1.5 py-0.5 rounded border bg-[var(--state-info-bg)] border-[var(--state-info-border)] font-sans text-[var(--state-info-text)]">Shift+点击</kbd> 区间选择
-                                </span>
-                                <span className="flex items-center gap-1 font-medium text-[var(--state-info-text)]">
-                                    <kbd className="px-1.5 py-0.5 rounded border bg-[var(--state-info-bg)] border-[var(--state-info-border)] font-sans text-[var(--state-info-text)]">Ctrl+Enter</kbd> 确认整理 ({multiSelectedIds.size})
-                                </span>
+                                {MOBILE_SEARCH_HINTS.map((hint) => (
+                                    <span key={hint} className="flex items-center gap-1">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-[var(--search-palette-accent)]" />
+                                        {hint}
+                                    </span>
+                                ))}
                             </>
                         ) : (
-                            <span className="flex items-center gap-1">
-                                <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">Enter</kbd> 定位
-                            </span>
+                            <>
+                                {DESKTOP_SEARCH_SHORTCUTS.map((shortcut) => (
+                                    <span key={shortcut.key} className="flex items-center gap-1">
+                                        <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">{shortcut.key}</kbd> {shortcut.label}
+                                    </span>
+                                ))}
+                                {isMultiSelectMode && (
+                                    <>
+                                        <span className="flex items-center gap-1 font-medium text-[var(--search-palette-accent)]">
+                                            <kbd className="px-1.5 py-0.5 rounded border bg-[var(--state-info-bg)] border-[var(--search-palette-selected-border)] font-sans text-[var(--search-palette-accent)]">Shift+点击</kbd> 区间选择
+                                        </span>
+                                        <span className="flex items-center gap-1 font-medium text-[var(--search-palette-accent)]">
+                                            <kbd className="px-1.5 py-0.5 rounded border bg-[var(--state-info-bg)] border-[var(--search-palette-selected-border)] font-sans text-[var(--search-palette-accent)]">Ctrl+Enter</kbd> 确认整理 ({multiSelectedIds.size})
+                                        </span>
+                                    </>
+                                )}
+                            </>
                         )}
-                        <span className="flex items-center gap-1">
-                            <kbd className="px-1.5 py-0.5 bg-[var(--bg-primary)] rounded border border-[var(--border-light)] font-sans">Ctrl+M</kbd> 切换多选
-                        </span>
                         </div>
                         <div className={`flex shrink-0 items-center gap-2 ${isMobile ? 'justify-end' : ''}`}>
                             <span>{results.length} 个结果</span>
@@ -403,7 +434,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                                     type="button"
                                     className="inline-flex min-h-[32px] max-w-full items-center gap-1.5 overflow-hidden rounded-[var(--radius-control-md)] border px-3 py-1.5 text-xs font-medium text-white transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-px active:translate-y-0"
                                     style={{
-                                        background: 'var(--state-info-text)',
+                                        background: 'var(--search-palette-accent)',
                                         borderColor: 'var(--search-palette-selected-border)',
                                         boxShadow: 'var(--search-palette-selected-shadow)'
                                     }}

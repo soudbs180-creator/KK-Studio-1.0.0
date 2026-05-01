@@ -56,19 +56,19 @@ interface EcommerceAnalysisReviewPanelProps {
 }
 
 const containerStyle: React.CSSProperties = {
-  background: 'var(--bg-tertiary)',
-  borderColor: 'var(--border-light)',
+  background: 'var(--frost-card-framework-bg)',
+  borderColor: 'var(--frost-card-sub-border)',
 };
 
 const warningStyle: React.CSSProperties = {
-  borderColor: 'rgba(245, 158, 11, 0.35)',
-  background: 'rgba(245, 158, 11, 0.08)',
+  borderColor: 'var(--state-warning-border)',
+  background: 'var(--state-warning-bg)',
   color: 'var(--text-secondary)',
 };
 
 const cardStyle: React.CSSProperties = {
-  borderColor: 'var(--border-light)',
-  background: 'rgba(255, 255, 255, 0.02)',
+  borderColor: 'var(--frost-card-sub-border)',
+  background: 'var(--frost-card-sub-bg)',
 };
 
 const reviewViewportStyle: React.CSSProperties = {
@@ -275,8 +275,8 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
               data-testid="ecommerce-review-reference-upload"
               className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px]"
               style={{
-                borderColor: 'rgba(59, 130, 246, 0.24)',
-                background: 'rgba(59, 130, 246, 0.10)',
+                borderColor: 'var(--mobile-clay-active-border)',
+                background: 'var(--mobile-clay-active-bg)',
                 color: 'var(--text-primary)',
               }}
               onClick={() => openManualReferencePicker(itemKey)}
@@ -304,7 +304,7 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
               className="relative overflow-hidden rounded-xl border"
               style={cardStyle}
             >
-              <div className="aspect-square bg-[var(--bg-secondary)]">
+              <div className="aspect-square bg-[var(--frost-card-sub-bg)]">
                 {src ? (
                   <img src={src} alt={itemLabel} className="h-full w-full object-cover" />
                 ) : (
@@ -313,7 +313,7 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
                   </div>
                 )}
               </div>
-              <div className="border-t px-2 py-1.5 text-[10px] text-[var(--text-secondary)]" style={{ borderColor: 'var(--border-light)' }}>
+              <div className="border-t px-2 py-1.5 text-[10px] text-[var(--text-secondary)]" style={{ borderColor: 'var(--frost-card-sub-border)' }}>
                 <div className="truncate">{itemLabel}</div>
               </div>
               {removable && onRemoveManualReferenceFile ? (
@@ -362,7 +362,7 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
               className="relative overflow-hidden rounded-xl border"
               style={cardStyle}
             >
-              <div className="aspect-square bg-[var(--bg-secondary)]">
+              <div className="aspect-square bg-[var(--frost-card-sub-bg)]">
                 {urls[index] ? (
                   <img src={urls[index]} alt={itemLabel} className="h-full w-full object-cover" />
                 ) : (
@@ -371,7 +371,7 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
                   </div>
                 )}
               </div>
-              <div className="border-t px-2 py-1.5 text-[10px] text-[var(--text-secondary)]" style={{ borderColor: 'var(--border-light)' }}>
+              <div className="border-t px-2 py-1.5 text-[10px] text-[var(--text-secondary)]" style={{ borderColor: 'var(--frost-card-sub-border)' }}>
                 <div className="truncate">{itemLabel}</div>
                 <div className="truncate text-[9px] text-[var(--text-tertiary)]">{item.displayLabel || item.fileName}</div>
               </div>
@@ -483,7 +483,7 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
                 className="flex items-start gap-2 rounded-lg border px-3 py-2"
                 style={{
                   borderColor: isTaskActive ? accent : 'var(--border-light)',
-                  background: isTaskActive ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
+                  background: isTaskActive ? 'var(--mobile-clay-active-bg)' : 'var(--frost-card-sub-bg)',
                 }}
               >
                 <button
@@ -507,8 +507,8 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
                       <span
                         className="rounded-full border px-2 py-1 text-[10px]"
                         style={{
-                          borderColor: 'rgba(16, 185, 129, 0.22)',
-                          background: 'rgba(16, 185, 129, 0.10)',
+                          borderColor: 'var(--state-success-border)',
+                          background: 'var(--state-success-bg)',
                           color: 'var(--text-secondary)',
                         }}
                       >
@@ -519,8 +519,8 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
                       <span
                         className="rounded-full border px-2 py-1 text-[10px]"
                         style={{
-                          borderColor: 'rgba(59, 130, 246, 0.22)',
-                          background: 'rgba(59, 130, 246, 0.10)',
+                          borderColor: 'var(--mobile-clay-active-border)',
+                          background: 'var(--mobile-clay-active-bg)',
                           color: 'var(--text-secondary)',
                         }}
                       >
@@ -530,8 +530,8 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
                     <span
                       className="rounded-full border px-2 py-1 text-[10px]"
                       style={{
-                        borderColor: item.warnings.length > 0 ? 'rgba(245, 158, 11, 0.22)' : 'rgba(59, 130, 246, 0.20)',
-                        background: item.warnings.length > 0 ? 'rgba(245, 158, 11, 0.10)' : 'rgba(59, 130, 246, 0.08)',
+                        borderColor: item.warnings.length > 0 ? 'var(--state-warning-border)' : 'var(--mobile-clay-active-border)',
+                        background: item.warnings.length > 0 ? 'var(--state-warning-bg)' : 'var(--mobile-clay-active-bg)',
                         color: 'var(--text-secondary)',
                       }}
                     >
@@ -547,8 +547,8 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
                   type="button"
                   className="shrink-0 rounded-full border px-2 py-1 text-[10px]"
                   style={{
-                    borderColor: item.checked ? 'rgba(16, 185, 129, 0.24)' : 'var(--border-light)',
-                    background: item.checked ? 'rgba(16, 185, 129, 0.10)' : 'transparent',
+                    borderColor: item.checked ? 'var(--state-success-border)' : 'var(--frost-card-sub-border)',
+                    background: item.checked ? 'var(--state-success-bg)' : 'var(--frost-card-sub-bg)',
                     color: 'var(--text-secondary)',
                   }}
                   onClick={() => setActiveReviewItemKey(item.id)}
@@ -583,8 +583,8 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
           type="button"
           className="rounded-lg border px-3 py-2 text-xs font-medium"
           style={{
-            borderColor: 'rgba(16, 185, 129, 0.35)',
-            background: 'rgba(16, 185, 129, 0.12)',
+            borderColor: 'var(--state-success-border)',
+            background: 'var(--state-success-bg)',
             color: 'var(--text-primary)',
           }}
           onClick={() => { void onConfirm(); }}
@@ -615,8 +615,8 @@ const EcommerceAnalysisReviewPanel: React.FC<EcommerceAnalysisReviewPanelProps> 
             className="min-h-0 min-w-0 flex-1 overflow-y-auto custom-scrollbar pr-1"
           >
             <div className="space-y-4">
-              {renderReviewSection('主图卡', mainReviewItems, 'rgba(59, 130, 246, 0.35)')}
-              {renderReviewSection('A+ 模块卡', aPlusReviewItems, 'rgba(16, 185, 129, 0.35)')}
+              {renderReviewSection('主图卡', mainReviewItems, 'var(--mobile-clay-active-border)')}
+              {renderReviewSection('A+ 模块卡', aPlusReviewItems, 'var(--state-success-border)')}
             </div>
           </div>
         </div>

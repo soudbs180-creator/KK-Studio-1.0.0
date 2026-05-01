@@ -36,7 +36,7 @@ const MobileResultStandardEmptySkeleton: React.FC<{ columnCount: number }> = ({ 
   return (
     <div
       data-testid="mobile-result-empty-standard-skeleton"
-      className="min-h-0 flex-1 rounded-[24px] border border-[var(--border-light)] bg-[var(--bg-secondary)]/82 p-3 shadow-[0_18px_44px_rgba(0,0,0,0.14)] backdrop-blur-xl"
+      className="min-h-0 flex-1 rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-3"
     >
       <div
         className="grid h-full min-h-[190px] gap-2.5 overflow-hidden"
@@ -64,7 +64,7 @@ const MobileResultStandardEmptySkeleton: React.FC<{ columnCount: number }> = ({ 
 const MobileResultDetailEmptySkeleton: React.FC = () => (
   <div
     data-testid="mobile-result-empty-detail-skeleton"
-    className="min-h-0 flex-1 rounded-[24px] border border-[var(--border-light)] bg-[var(--bg-secondary)]/82 p-4 shadow-[0_18px_44px_rgba(0,0,0,0.14)] backdrop-blur-xl"
+    className="min-h-0 flex-1 rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-4"
   >
     <div className="flex h-full min-h-[190px] flex-col gap-3 overflow-hidden">
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-[18px] border border-white/8 bg-[var(--bg-tertiary)]/75">

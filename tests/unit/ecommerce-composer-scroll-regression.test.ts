@@ -23,7 +23,7 @@ test('ecommerce review and workbench panels stay viewport-bound with inner scrol
   assert.match(desktopWorkbenchSource, /const workbenchViewportStyle: React\.CSSProperties = \{\s*maxHeight: 'min\(calc\(100vh - 220px\), 720px\)',\s*\};/);
   assert.match(desktopWorkbenchSource, /className="flex min-h-0 flex-col gap-2 overflow-y-auto pr-1"/);
   assert.match(desktopWorkbenchSource, /className="mb-2 flex min-h-0 flex-col overflow-hidden rounded-xl border p-3"/);
-  assert.match(desktopWorkbenchSource, /style=\{\{ \.\.\.sectionCardStyle, \.\.\.workbenchViewportStyle \}\}/);
+  assert.match(desktopWorkbenchSource, /style=\{\{ \.\.\.shellSurfaceStyle, \.\.\.workbenchViewportStyle \}\}/);
   assert.match(desktopWorkbenchSource, /className="mt-3 min-h-0 flex-1 overflow-y-auto custom-scrollbar pr-1"/);
   assert.match(desktopWorkbenchSource, /className="mb-3 max-h-48 space-y-2 overflow-y-auto custom-scrollbar pr-1"/);
 });

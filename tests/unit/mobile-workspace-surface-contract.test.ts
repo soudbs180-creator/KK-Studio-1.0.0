@@ -61,3 +61,18 @@ test('mobile workspace keeps prompt optimization controls out of the dedicated s
   assert.doesNotMatch(appSource, /promptOptimizationSupported=\{/);
   assert.doesNotMatch(appSource, /onTogglePromptOptimization=\{/);
 });
+
+test('mobile detail and chrome surfaces use Clay frosted mobile tokens', () => {
+  const detailSource = readSource('src/components/mobile/MobileResultDetailScreen.tsx');
+  const cssSource = readSource('src/index.css');
+
+  assert.match(detailSource, /var\(--mobile-clay-surface-bg\)/);
+  assert.match(detailSource, /var\(--mobile-clay-muted-surface-bg\)/);
+  assert.match(detailSource, /var\(--mobile-clay-border\)/);
+  assert.doesNotMatch(detailSource, /var\(--bg-secondary\)|var\(--bg-tertiary\)|var\(--border-light\)/);
+
+  assert.match(cssSource, /\.ios-mobile-project-pill,[\s\S]*background:\s*var\(--mobile-clay-shell-bg\) !important;/);
+  assert.match(cssSource, /\.mobile-card-stream__empty,[\s\S]*background:\s*var\(--mobile-clay-shell-bg\) !important;/);
+  assert.match(cssSource, /\.mobile-card-group\.is-highlighted\s*\{[\s\S]*border-color:\s*var\(--mobile-clay-active-border\) !important;/);
+  assert.match(cssSource, /\.mobile-card-group-shell__action--download\s*\{[\s\S]*var\(--clay-brand-coral\)/);
+});

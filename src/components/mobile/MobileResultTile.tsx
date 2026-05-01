@@ -56,22 +56,18 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
   onUseAsSource,
 }) => {
   const promptSummary = normalizePromptSummary(entry.promptSummary);
-  const emphasisShadow =
-    entry.mobileLayout.emphasis === 'wide'
-      ? 'shadow-[0_24px_56px_rgba(15,23,42,0.28)]'
-      : 'shadow-[0_16px_36px_rgba(15,23,42,0.2)]';
   const imageAspectRatio = Number.isFinite(entry.mobileLayout.aspectRatio) && entry.mobileLayout.aspectRatio > 0
     ? entry.mobileLayout.aspectRatio
     : 1;
 
   return (
     <article
-      className={`relative ${emphasisShadow} min-w-0 overflow-hidden rounded-[20px] border bg-[var(--bg-secondary)]/92 transition-transform duration-200 ${
-        isActive ? 'border-blue-400/55 ring-1 ring-blue-400/35' : 'border-[var(--border-light)]'
-      } ${isSource ? 'border-amber-400/60 ring-1 ring-amber-400/30' : ''}`}
+      className="relative min-w-0 overflow-hidden rounded-[20px] border bg-[var(--mobile-clay-surface-bg)] transition-transform duration-200"
       style={{
         gridColumnEnd: `span ${gridMetrics.columnSpan}`,
         gridRowEnd: `span ${gridMetrics.rowSpan}`,
+        borderColor: isActive || isSource ? 'var(--mobile-clay-active-border)' : 'var(--mobile-clay-border)',
+        boxShadow: isActive || isSource ? 'var(--mobile-clay-active-ring)' : 'var(--mobile-clay-shadow)',
       }}
     >
       <button
@@ -97,7 +93,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
         )}
 
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2">
-          <span className="max-w-[65%] truncate rounded-full bg-black/55 px-2 py-1 text-[10px] font-medium text-white backdrop-blur-md">
+          <span className="max-w-[65%] truncate rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] px-2 py-1 text-[10px] font-medium text-[var(--text-primary)]">
             {formatTimestamp(entry.timestamp)}
           </span>
           {isSource ? (
@@ -112,7 +108,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
             <span className="line-clamp-2 text-[11px] font-medium leading-4 text-white/90">
               {promptSummary}
             </span>
-            <span className="max-w-[42%] shrink-0 truncate rounded-full border border-white/10 bg-black/35 px-2 py-1 text-[10px] font-medium text-white/80 backdrop-blur">
+            <span className="max-w-[42%] shrink-0 truncate rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] px-2 py-1 text-[10px] font-medium text-[var(--text-secondary)]">
               {entry.displayLabel || entry.aspectRatio}
             </span>
           </div>
@@ -137,7 +133,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
         <button
           type="button"
           onClick={() => onUseAsSource(entry.imageId)}
-          className="absolute right-2 top-10 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/12 bg-black/45 text-white shadow-lg backdrop-blur-md"
+          className="absolute right-2 top-10 inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--mobile-clay-active-border)] bg-[var(--accent-color)] text-[var(--text-inverse)]"
           title="继续创作"
           aria-label="继续创作"
         >

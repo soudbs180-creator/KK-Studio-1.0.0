@@ -115,8 +115,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
             key={item.id}
             className={thumbClass}
             style={{
-              borderColor: 'var(--border-light)',
-              background: 'rgba(148, 163, 184, 0.08)',
+              borderColor: 'var(--frost-card-sub-border)',
+              background: 'var(--frost-card-sub-bg)',
             }}
           >
             {urls[index] ? (
@@ -154,8 +154,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
       <div
         className="mb-2 rounded-[18px] border px-3 py-3"
         style={{
-          background: 'var(--bg-tertiary)',
-          borderColor: 'var(--border-light)',
+          background: 'var(--frost-card-framework-bg)',
+          borderColor: 'var(--frost-card-sub-border)',
         }}
       >
         <div className="flex flex-col gap-2.5">
@@ -164,8 +164,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
             <span
               className={chipClass}
               style={{
-                borderColor: 'var(--border-light)',
-                background: 'rgba(148, 163, 184, 0.08)',
+                borderColor: 'var(--frost-card-sub-border)',
+                background: 'var(--frost-card-sub-bg)',
                 color: 'var(--text-secondary)',
               }}
             >
@@ -174,8 +174,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
             <span
               className={chipClass}
               style={{
-                borderColor: isAnalyzing ? 'rgba(14, 165, 233, 0.22)' : 'rgba(59, 130, 246, 0.18)',
-                background: isAnalyzing ? 'rgba(14, 165, 233, 0.12)' : 'rgba(59, 130, 246, 0.08)',
+                borderColor: isAnalyzing ? 'var(--state-info-border)' : 'var(--mobile-clay-active-border)',
+                background: isAnalyzing ? 'var(--state-info-bg)' : 'var(--mobile-clay-active-bg)',
                 color: 'var(--text-primary)',
               }}
             >
@@ -192,8 +192,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
             <div
               className={cardClass}
               style={{
-                borderColor: hasRequirementFile ? 'rgba(59, 130, 246, 0.20)' : 'var(--border-light)',
-                background: hasRequirementFile ? 'rgba(59, 130, 246, 0.05)' : 'rgba(148, 163, 184, 0.04)',
+                borderColor: hasRequirementFile ? 'var(--mobile-clay-active-border)' : 'var(--frost-card-sub-border)',
+                background: hasRequirementFile ? 'var(--mobile-clay-active-bg)' : 'var(--frost-card-sub-bg)',
               }}
             >
               <button
@@ -205,8 +205,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                   <div
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border"
                     style={{
-                      borderColor: hasRequirementFile ? 'rgba(59, 130, 246, 0.20)' : 'var(--border-light)',
-                      background: hasRequirementFile ? 'rgba(59, 130, 246, 0.10)' : 'rgba(148, 163, 184, 0.08)',
+                      borderColor: hasRequirementFile ? 'var(--mobile-clay-active-border)' : 'var(--frost-card-sub-border)',
+                      background: hasRequirementFile ? 'var(--mobile-clay-active-bg)' : 'var(--frost-card-sub-bg)',
                       color: 'var(--text-primary)',
                     }}
                   >
@@ -219,8 +219,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                       <span
                         className={chipClass}
                         style={{
-                          borderColor: hasRequirementFile ? 'rgba(59, 130, 246, 0.18)' : 'var(--border-light)',
-                          background: hasRequirementFile ? 'rgba(59, 130, 246, 0.08)' : 'rgba(148, 163, 184, 0.08)',
+                          borderColor: hasRequirementFile ? 'var(--mobile-clay-active-border)' : 'var(--frost-card-sub-border)',
+                          background: hasRequirementFile ? 'var(--mobile-clay-active-bg)' : 'var(--frost-card-sub-bg)',
                           color: hasRequirementFile ? 'var(--text-primary)' : 'var(--text-secondary)',
                         }}
                       >
@@ -241,7 +241,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                     type="button"
                     className="inline-flex h-9 items-center justify-center rounded-[12px] border px-3 text-[11px] font-medium transition-all duration-200 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
                     style={{
-                      borderColor: 'var(--border-light)',
+                      borderColor: 'var(--frost-card-sub-border)',
                       color: 'var(--text-secondary)',
                     }}
                     onClick={() => onClearRequirementFile()}
@@ -255,8 +255,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                   type="button"
                   className="ml-auto inline-flex h-9 items-center justify-center gap-2 rounded-[12px] border px-3 text-sm font-semibold transition-all duration-200 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
                   style={{
-                    borderColor: 'var(--border-light)',
-                    background: 'rgba(148, 163, 184, 0.08)',
+                    borderColor: 'var(--frost-card-sub-border)',
+                    background: 'var(--frost-card-sub-bg)',
                     boxShadow: 'none',
                     color: 'var(--text-primary)',
                   }}
@@ -272,8 +272,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
             <div
               className={cardClass}
               style={{
-                borderColor: hasProductFiles ? 'rgba(59, 130, 246, 0.20)' : 'var(--border-light)',
-                background: hasProductFiles ? 'rgba(59, 130, 246, 0.05)' : 'rgba(148, 163, 184, 0.04)',
+                borderColor: hasProductFiles ? 'var(--mobile-clay-active-border)' : 'var(--frost-card-sub-border)',
+                background: hasProductFiles ? 'var(--mobile-clay-active-bg)' : 'var(--frost-card-sub-bg)',
               }}
             >
               <button
@@ -285,8 +285,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                   <div
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border"
                     style={{
-                      borderColor: hasProductFiles ? 'rgba(59, 130, 246, 0.20)' : 'var(--border-light)',
-                      background: hasProductFiles ? 'rgba(59, 130, 246, 0.10)' : 'rgba(148, 163, 184, 0.08)',
+                      borderColor: hasProductFiles ? 'var(--mobile-clay-active-border)' : 'var(--frost-card-sub-border)',
+                      background: hasProductFiles ? 'var(--mobile-clay-active-bg)' : 'var(--frost-card-sub-bg)',
                       color: 'var(--text-primary)',
                     }}
                   >
@@ -299,8 +299,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                       <span
                         className={chipClass}
                         style={{
-                          borderColor: hasProductFiles ? 'rgba(59, 130, 246, 0.18)' : 'var(--border-light)',
-                          background: hasProductFiles ? 'rgba(59, 130, 246, 0.08)' : 'rgba(148, 163, 184, 0.08)',
+                          borderColor: hasProductFiles ? 'var(--mobile-clay-active-border)' : 'var(--frost-card-sub-border)',
+                          background: hasProductFiles ? 'var(--mobile-clay-active-bg)' : 'var(--frost-card-sub-bg)',
                           color: hasProductFiles ? 'var(--text-primary)' : 'var(--text-secondary)',
                         }}
                       >
@@ -309,8 +309,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                       <span
                         className={chipClass}
                         style={{
-                          borderColor: 'rgba(59, 130, 246, 0.18)',
-                          background: 'rgba(59, 130, 246, 0.08)',
+                          borderColor: 'var(--mobile-clay-active-border)',
+                          background: 'var(--mobile-clay-active-bg)',
                           color: 'var(--text-primary)',
                         }}
                       >
@@ -333,8 +333,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
             <div
               className={cardClass}
               style={{
-                borderColor: hasExtraReferences ? 'rgba(59, 130, 246, 0.20)' : 'var(--border-light)',
-                background: hasExtraReferences ? 'rgba(59, 130, 246, 0.05)' : 'rgba(148, 163, 184, 0.04)',
+                borderColor: hasExtraReferences ? 'var(--mobile-clay-active-border)' : 'var(--frost-card-sub-border)',
+                background: hasExtraReferences ? 'var(--mobile-clay-active-bg)' : 'var(--frost-card-sub-bg)',
               }}
             >
               <button
@@ -346,8 +346,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                   <div
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border"
                     style={{
-                      borderColor: hasExtraReferences ? 'rgba(59, 130, 246, 0.20)' : 'var(--border-light)',
-                      background: hasExtraReferences ? 'rgba(59, 130, 246, 0.10)' : 'rgba(148, 163, 184, 0.08)',
+                      borderColor: hasExtraReferences ? 'var(--mobile-clay-active-border)' : 'var(--frost-card-sub-border)',
+                      background: hasExtraReferences ? 'var(--mobile-clay-active-bg)' : 'var(--frost-card-sub-bg)',
                       color: 'var(--text-primary)',
                     }}
                   >
@@ -360,8 +360,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                       <span
                         className={chipClass}
                         style={{
-                          borderColor: hasExtraReferences ? 'rgba(59, 130, 246, 0.18)' : 'var(--border-light)',
-                          background: hasExtraReferences ? 'rgba(59, 130, 246, 0.08)' : 'rgba(148, 163, 184, 0.08)',
+                          borderColor: hasExtraReferences ? 'var(--mobile-clay-active-border)' : 'var(--frost-card-sub-border)',
+                          background: hasExtraReferences ? 'var(--mobile-clay-active-bg)' : 'var(--frost-card-sub-bg)',
                           color: hasExtraReferences ? 'var(--text-primary)' : 'var(--text-secondary)',
                         }}
                       >
@@ -370,8 +370,8 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                       <span
                         className={chipClass}
                         style={{
-                          borderColor: 'rgba(59, 130, 246, 0.18)',
-                          background: 'rgba(59, 130, 246, 0.08)',
+                          borderColor: 'var(--mobile-clay-active-border)',
+                          background: 'var(--mobile-clay-active-bg)',
                           color: 'var(--text-primary)',
                         }}
                       >

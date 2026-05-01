@@ -97,20 +97,37 @@ interface DesktopComposerEcommercePanelProps {
   onTaskStateChange?: EcommerceTaskStateChangeHandler;
 }
 
-const sectionCardStyle: React.CSSProperties = {
-  background: 'var(--bg-tertiary)',
-  borderColor: 'var(--border-light)',
+const shellSurfaceStyle: React.CSSProperties = {
+  background: 'var(--frost-card-framework-bg)',
+  borderColor: 'var(--frost-card-framework-border)',
+  boxShadow: 'var(--frost-card-framework-shadow)',
+  WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+  backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
 };
 
-const chipStyle: React.CSSProperties = {
-  background: 'rgba(59, 130, 246, 0.10)',
-  borderColor: 'rgba(59, 130, 246, 0.20)',
+const panelSurfaceStyle: React.CSSProperties = {
+  background: 'var(--frost-card-main-bg)',
+  borderColor: 'var(--frost-card-main-border)',
+  boxShadow: 'var(--frost-card-main-shadow)',
+  WebkitBackdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
+  backdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
+};
+
+const subSurfaceStyle: React.CSSProperties = {
+  background: 'var(--frost-card-sub-bg)',
+  borderColor: 'var(--frost-card-sub-border)',
+  boxShadow: 'var(--frost-card-sub-shadow)',
+  WebkitBackdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
+  backdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
   color: 'var(--text-secondary)',
 };
 
+const chipStyle: React.CSSProperties = {
+  ...subSurfaceStyle,
+};
+
 const actionButtonStyle: React.CSSProperties = {
-  borderColor: 'var(--border-light)',
-  background: 'rgba(148, 163, 184, 0.08)',
+  ...subSurfaceStyle,
   color: 'var(--text-primary)',
 };
 
@@ -209,7 +226,7 @@ const FrameworkQueueCards: React.FC<{ frameworkSummary?: EcommerceFrameworkSumma
   return (
     <div className="grid gap-2 md:grid-cols-5" data-testid="ecommerce-framework-summary-card">
       {cards.map((card) => (
-        <div key={card.label} className="rounded-lg border px-3 py-2" style={sectionCardStyle}>
+        <div key={card.label} className="rounded-lg border px-3 py-2" style={subSurfaceStyle}>
           <div className="text-[11px] text-[var(--text-tertiary)]">{card.label}</div>
           <div className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{card.value}</div>
         </div>
@@ -307,7 +324,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
     return (
       <div
         className="mb-2 flex min-h-0 flex-col overflow-hidden rounded-xl border p-3"
-        style={{ ...sectionCardStyle, ...workbenchViewportStyle }}
+        style={{ ...shellSurfaceStyle, ...workbenchViewportStyle }}
         data-testid={workbenchMode === 'main-card-edit' ? 'ecommerce-main-card-edit-workbench' : 'ecommerce-module-edit-workbench'}
       >
         <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
@@ -334,7 +351,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
           {onActivateGroupSheet ? (
             <button
               type="button"
-              className="inline-flex items-center justify-center rounded-[12px] border px-3 py-2 text-[11px] font-medium transition-all duration-200 hover:bg-white/5"
+              className="inline-flex items-center justify-center rounded-[12px] border px-3 py-2 text-[11px] font-medium transition-all duration-200 hover:bg-[var(--toolbar-hover)]"
               style={actionButtonStyle}
               onClick={() => onActivateGroupSheet(activeTaskState.sourceSheet)}
             >
@@ -344,7 +361,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
           {onActivateTaskBySourceKey ? (
             <button
               type="button"
-              className="inline-flex items-center justify-center rounded-[12px] border px-3 py-2 text-[11px] font-medium transition-all duration-200 hover:bg-white/5"
+              className="inline-flex items-center justify-center rounded-[12px] border px-3 py-2 text-[11px] font-medium transition-all duration-200 hover:bg-[var(--toolbar-hover)]"
               style={actionButtonStyle}
               onClick={() => onActivateTaskBySourceKey(activeTaskState.sourceRowKey)}
             >
@@ -356,7 +373,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
               <button
                 type="button"
                 data-testid="ecommerce-slot-history-open-current"
-                className="inline-flex items-center justify-center rounded-[12px] border px-3 py-2 text-[11px] font-medium transition-all duration-200 hover:bg-white/5"
+                className="inline-flex items-center justify-center rounded-[12px] border px-3 py-2 text-[11px] font-medium transition-all duration-200 hover:bg-[var(--toolbar-hover)]"
                 style={actionButtonStyle}
                 onClick={() => onPreviewSlotHistory(
                   activeTaskState.sourceSheet,
@@ -370,7 +387,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
                 <button
                   type="button"
                   data-testid="ecommerce-slot-history-open-all"
-                  className="inline-flex items-center justify-center rounded-[12px] border px-3 py-2 text-[11px] font-medium transition-all duration-200 hover:bg-white/5"
+                  className="inline-flex items-center justify-center rounded-[12px] border px-3 py-2 text-[11px] font-medium transition-all duration-200 hover:bg-[var(--toolbar-hover)]"
                   style={actionButtonStyle}
                   onClick={() => setExpandedHistorySourceKey((previous) => (
                     previous === activeTaskState.sourceRowKey ? null : activeTaskState.sourceRowKey
@@ -390,7 +407,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
                 key={`${activeTaskState.sourceRowKey}-${historyEntry.imageId}-${index}`}
                 type="button"
                 className="flex w-full items-center justify-between rounded-md border px-2 py-2 text-left text-[10px]"
-                style={sectionCardStyle}
+                style={subSurfaceStyle}
                 onClick={() => onPreviewSlotHistory(
                   activeTaskState.sourceSheet,
                   activeTaskState.sourceRowKey,
@@ -462,7 +479,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
         <>
           <div
             className="rounded-xl border p-3"
-            style={sectionCardStyle}
+            style={shellSurfaceStyle}
             data-testid="ecommerce-framework-companion-panel"
           >
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -494,7 +511,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
 
           <div
             className="flex min-h-0 flex-col overflow-hidden rounded-xl border p-3"
-            style={{ ...sectionCardStyle, ...workbenchViewportStyle }}
+            style={{ ...shellSurfaceStyle, ...workbenchViewportStyle }}
             data-testid="ecommerce-group-overview-workbench"
           >
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -508,7 +525,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
                 {onActivateGroupSheet ? (
                   <button
                     type="button"
-                    className="inline-flex items-center justify-center rounded-[12px] border px-3 py-2 text-[11px] font-medium transition-all duration-200 hover:bg-white/5"
+                    className="inline-flex items-center justify-center rounded-[12px] border px-3 py-2 text-[11px] font-medium transition-all duration-200 hover:bg-[var(--toolbar-hover)]"
                     style={actionButtonStyle}
                     onClick={() => onActivateGroupSheet(resolvedGroupSheet)}
                   >
@@ -518,7 +535,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
                 {activeTaskState && onActivateTaskBySourceKey ? (
                   <button
                     type="button"
-                    className="inline-flex items-center justify-center rounded-[12px] border px-3 py-2 text-[11px] font-medium transition-all duration-200 hover:bg-white/5"
+                    className="inline-flex items-center justify-center rounded-[12px] border px-3 py-2 text-[11px] font-medium transition-all duration-200 hover:bg-[var(--toolbar-hover)]"
                     style={actionButtonStyle}
                     onClick={() => onActivateTaskBySourceKey(activeTaskState.sourceRowKey)}
                   >
@@ -529,19 +546,19 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
             </div>
 
             <div className="mt-3 grid gap-2 md:grid-cols-4">
-              <div className="rounded-lg border px-3 py-2" style={sectionCardStyle}>
+              <div className="rounded-lg border px-3 py-2" style={subSurfaceStyle}>
                 <div className="text-[11px] text-[var(--text-tertiary)]">Selected</div>
                 <div className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{selectedCount}</div>
               </div>
-              <div className="rounded-lg border px-3 py-2" style={sectionCardStyle}>
+              <div className="rounded-lg border px-3 py-2" style={subSurfaceStyle}>
                 <div className="text-[11px] text-[var(--text-tertiary)]">Skipped</div>
                 <div className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{skippedCount}</div>
               </div>
-              <div className="rounded-lg border px-3 py-2" style={sectionCardStyle}>
+              <div className="rounded-lg border px-3 py-2" style={subSurfaceStyle}>
                 <div className="text-[11px] text-[var(--text-tertiary)]">Section items</div>
                 <div className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{activeEntries.length}</div>
               </div>
-              <div className="rounded-lg border px-3 py-2" style={sectionCardStyle}>
+              <div className="rounded-lg border px-3 py-2" style={subSurfaceStyle}>
                 <div className="text-[11px] text-[var(--text-tertiary)]">Focused task</div>
                 <div className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
                   {activeTaskState?.displayLabel || activeTaskState?.outputTypeLabel || 'Canvas selection'}
@@ -555,10 +572,11 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
                   <div
                     key={entry.sourceKey}
                     className="flex items-start justify-between gap-3 rounded-lg border px-3 py-2"
-                    style={{
-                      borderColor: entry.isActive ? 'rgba(59, 130, 246, 0.35)' : 'var(--border-light)',
-                      background: entry.isActive ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
-                    }}
+                    style={entry.isActive ? {
+                      ...panelSurfaceStyle,
+                      borderColor: 'var(--clay-brand-pink)',
+                      background: 'var(--frost-card-main-bg)',
+                    } : subSurfaceStyle}
                   >
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-[var(--text-primary)]">{entry.title}</div>

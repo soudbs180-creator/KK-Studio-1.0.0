@@ -38,14 +38,22 @@ const UpdateNotification: React.FC = () => {
             onClick={handleApplyUpdate}
             className="group animate-in fade-in zoom-in duration-300 outline-none focus:outline-none"
         >
-            <div className="glass h-10 px-3 rounded-xl flex items-center gap-2 border border-indigo-500/50 bg-indigo-500/10 hover:bg-indigo-500/20 transition-all cursor-pointer shadow-[0_0_10px_rgba(99,102,241,0.2)]">
-                <Sparkles size={12} className="text-indigo-400 animate-pulse" />
-                <span className="text-xs font-semibold text-indigo-300">新版本可用</span>
-                <ArrowUp size={12} className="text-indigo-400" />
+            <div
+                className="flex h-10 cursor-pointer items-center gap-2 rounded-xl border px-3 transition-all"
+                style={{
+                    background: 'var(--frost-card-framework-bg)',
+                    borderColor: 'var(--frost-card-framework-border)',
+                    boxShadow: 'var(--frost-card-framework-shadow)',
+                    WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+                    backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)'
+                }}
+            >
+                <Sparkles size={12} className="animate-pulse" style={{ color: 'var(--clay-brand-pink)' }} />
+                <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>新版本可用</span>
+                <ArrowUp size={12} style={{ color: 'var(--clay-brand-coral)' }} />
             </div>
         </button>
     );
 };
-
 
 export default UpdateNotification;

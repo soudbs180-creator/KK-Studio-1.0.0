@@ -124,13 +124,13 @@ const getPptDeckStageLabel = (stage: NonNullable<PromptNode['pptDeck']>['stage']
 const getPptDeckStageTone = (stage: NonNullable<PromptNode['pptDeck']>['stage']) => {
     switch (stage) {
         case 'generating':
-            return 'border-blue-500/30 bg-blue-500/10 text-blue-200';
+            return 'border-[rgba(255,77,139,0.28)] bg-[rgba(255,77,139,0.10)] text-[var(--clay-brand-pink)]';
         case 'ready':
-            return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200';
+            return 'border-[rgba(26,58,58,0.28)] bg-[rgba(26,58,58,0.10)] text-[var(--clay-brand-teal)]';
         case 'failed':
             return 'border-rose-500/30 bg-rose-500/10 text-rose-200';
         case 'exported':
-            return 'border-indigo-500/30 bg-indigo-500/10 text-indigo-200';
+            return 'border-[rgba(255,107,90,0.28)] bg-[rgba(255,107,90,0.10)] text-[var(--clay-brand-coral)]';
         default:
             return 'border-[var(--border-light)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)]';
     }
@@ -139,13 +139,13 @@ const getPptDeckStageTone = (stage: NonNullable<PromptNode['pptDeck']>['stage'])
 const getPptPageStatusTone = (status: NonNullable<NonNullable<PromptNode['pptDeck']>['pages']>[number]['generationStatus']) => {
     switch (status) {
         case 'ready':
-            return 'border-emerald-500/25 bg-emerald-500/8 text-emerald-200';
+            return 'border-[rgba(26,58,58,0.24)] bg-[rgba(26,58,58,0.08)] text-[var(--clay-brand-teal)]';
         case 'generating':
-            return 'border-blue-500/25 bg-blue-500/8 text-blue-200';
+            return 'border-[rgba(255,77,139,0.24)] bg-[rgba(255,77,139,0.08)] text-[var(--clay-brand-pink)]';
         case 'error':
             return 'border-rose-500/25 bg-rose-500/8 text-rose-200';
         case 'queued':
-            return 'border-amber-500/25 bg-amber-500/8 text-amber-200';
+            return 'border-[rgba(255,176,132,0.24)] bg-[rgba(255,176,132,0.08)] text-[var(--clay-brand-peach)]';
         default:
             return 'border-[var(--border-light)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)]';
     }
@@ -1019,12 +1019,12 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             ? 1.016
             : (highlighted ? 1.01 : 1);
     const promptCardTransform = `scale(${promptCardScale})`;
-    const promptGlassFill = 'var(--bg-surface)';
+    const promptGlassFill = 'var(--frost-card-main-bg)';
     if (detailLevel === 'thumbnail-shell') {
         const shellStatusTone = showError
             ? 'text-red-400 bg-red-500/10 border-red-500/20'
             : node.isGenerating
-                ? 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+                ? 'text-[var(--clay-brand-pink)] bg-[rgba(255,77,139,0.10)] border-[rgba(255,77,139,0.20)]'
                 : 'text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border-[var(--border-light)]';
 
         return (
@@ -1049,7 +1049,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 <div
                     ref={cardRef}
                     data-canvas-surface="prompt"
-                    className={`relative flex flex-col rounded-2xl border border-white/5 overflow-hidden backdrop-blur-[24px]`}
+                    className={`relative flex flex-col rounded-2xl border border-[var(--frost-card-main-border)] overflow-hidden`}
                     style={{
                         width: isChatMode ? '100%' : cardWidth,
                         maxWidth: isMobile && !isChatMode ? 'calc(100vw - 24px)' : undefined,
@@ -1064,7 +1064,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 >
                     {onConnectStart && !isChatMode && (
                         <div
-                            className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 bg-transparent hover:bg-indigo-500/40 rounded-full z-50 cursor-crosshair transition-colors"
+                            className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 bg-transparent hover:bg-[rgba(255,77,139,0.22)] rounded-full z-50 cursor-crosshair transition-colors"
                             onMouseDown={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
@@ -1077,7 +1077,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                         />
                     )}
 
-                    <div className={`flex items-center justify-between gap-2 border-b border-[rgba(255,255,255,0.06)] ${isThumbnailShell ? 'px-3 py-2' : 'px-4 py-2.5'}`}>
+                    <div className={`flex items-center justify-between gap-2 border-b border-[var(--frost-card-main-border)] ${isThumbnailShell ? 'px-3 py-2' : 'px-4 py-2.5'}`}>
                         <div className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium ${shellStatusTone}`}>
                             {showError ? (
                                 <AlertTriangle size={12} />
@@ -1114,7 +1114,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                     return (
                                         <div
                                             key={img.id || index}
-                                            className={`${isThumbnailShell ? 'w-12 h-12' : 'w-14 h-14'} rounded-xl overflow-hidden border border-[var(--border-light)] bg-[var(--bg-tertiary)] shrink-0`}
+                                            className={`${isThumbnailShell ? 'w-12 h-12' : 'w-14 h-14'} rounded-xl overflow-hidden border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] shrink-0`}
                                         >
                                             {thumbSrc ? (
                                                 <img
@@ -1198,7 +1198,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             <div
                 ref={cardRef}
                 data-canvas-surface="prompt"
-                className="relative flex flex-col rounded-2xl border border-white/5 transition-all backdrop-blur-[24px]"
+                className="relative flex flex-col rounded-2xl border border-[var(--frost-card-main-border)] transition-all"
                 style={{
                     width: isChatMode ? '100%' : cardWidth,
                     maxWidth: isMobile && !isChatMode ? 'calc(100vw - 24px)' : undefined,
@@ -1214,7 +1214,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 {/* 🚀 [NEW] Connection Point - Bottom Center */}
                 {onConnectStart && !isChatMode && (
                     <div
-                        className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 bg-transparent hover:bg-indigo-500/50 rounded-full z-50 cursor-crosshair transition-colors"
+                            className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 bg-transparent hover:bg-[rgba(255,77,139,0.22)] rounded-full z-50 cursor-crosshair transition-colors"
                         onMouseDown={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
@@ -1250,10 +1250,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                             </>
                         ) : node.isGenerating ? (
                             <>
-                                <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-blue-500/15">
-                                    <Sparkles size={12} className="text-blue-400 animate-pulse" />
+                                <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[rgba(255,77,139,0.12)]">
+                                    <Sparkles size={12} className="text-[var(--clay-brand-pink)] animate-pulse" />
                                 </div>
-                                <span className="text-[13px] font-medium tracking-wide truncate text-blue-400">
+                                <span className="text-[13px] font-medium tracking-wide truncate text-[var(--clay-brand-pink)]">
                                     正在生成 {node.parallelCount || 1} 张
                                 </span>
                             </>
@@ -1289,7 +1289,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                     onExportEcommerceGroup(node);
                                 }}
                                 aria-label={node.ecommerce.sourceSheet === '主图' ? '打包主图' : '打包A+'}
-                                className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-300 transition-all hover:bg-emerald-500/16"
+                                className="inline-flex items-center gap-1 rounded-md border border-[rgba(26,58,58,0.30)] bg-[rgba(26,58,58,0.10)] px-2 py-1 text-[10px] font-bold text-[var(--clay-brand-teal)] transition-all hover:bg-[rgba(26,58,58,0.16)]"
                                 title={node.ecommerce.sourceSheet === '主图' ? '打包主图' : '打包A+'}
                             >
                                 <Download size={10} />
@@ -1306,8 +1306,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 aria-label={node.ecommerce.selectedForGeneration === false ? '确认生成' : '取消确认生成'}
                                 className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-bold transition-all ${
                                     node.ecommerce.selectedForGeneration === false
-                                        ? 'border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-blue-500/40'
-                                        : 'border-blue-500/35 bg-blue-500/12 text-blue-300 hover:bg-blue-500/18'
+                                        ? 'border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--clay-brand-pink)]'
+                                        : 'border-[rgba(255,77,139,0.28)] bg-[rgba(255,77,139,0.10)] text-[var(--clay-brand-pink)] hover:bg-[rgba(255,77,139,0.16)]'
                                 }`}
                                 title={node.ecommerce.selectedForGeneration === false ? '确认生成' : '取消确认'}
                             >
@@ -1330,7 +1330,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 <button
                                     onClick={(e) => { e.stopPropagation(); setActiveTab('opt'); }}
                                     className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all ${activeTab === 'opt'
-                                        ? 'bg-blue-500/15 text-blue-400 shadow-sm'
+                                        ? 'bg-[rgba(255,77,139,0.12)] text-[var(--clay-brand-pink)] shadow-sm'
                                         : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
                                         }`}
                                 >
@@ -1375,7 +1375,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                         {onPreviewEcommerceSlotHistory && ecommerceSlotState.currentImageId ? (
                             <button
                                 type="button"
-                                className="rounded-md border border-[var(--border-light)] px-2 py-1 text-[10px] text-[var(--text-primary)] transition-colors hover:border-blue-500/40 hover:text-blue-300"
+                                className="rounded-md border border-[var(--frost-card-sub-border)] px-2 py-1 text-[10px] text-[var(--text-primary)] transition-colors hover:border-[var(--clay-brand-pink)] hover:text-[var(--clay-brand-pink)]"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onPreviewEcommerceSlotHistory(node, ecommerceSlotState.currentImageId || undefined);
@@ -1387,7 +1387,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                         {onPreviewEcommerceSlotHistory && ecommerceSlotState.history.length > 1 ? (
                             <button
                                 type="button"
-                                className="rounded-md border border-[var(--border-light)] px-2 py-1 text-[10px] text-[var(--text-secondary)] transition-colors hover:border-blue-500/40 hover:text-blue-300"
+                                className="rounded-md border border-[var(--frost-card-sub-border)] px-2 py-1 text-[10px] text-[var(--text-secondary)] transition-colors hover:border-[var(--clay-brand-pink)] hover:text-[var(--clay-brand-pink)]"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onPreviewEcommerceSlotHistory(node);
@@ -1445,7 +1445,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 {/* Task Type Badge (if available) */}
                                 {node.promptOptimizerResult?.params?.task_type && (
                                     <div className="flex items-center gap-1.5 mb-1">
-                                        <div className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[9px] font-bold uppercase tracking-wider border border-blue-500/20">
+                                        <div className="px-1.5 py-0.5 rounded bg-[rgba(255,77,139,0.10)] text-[var(--clay-brand-pink)] text-[9px] font-bold uppercase tracking-wider border border-[rgba(255,77,139,0.20)]">
                                             {node.promptOptimizerResult.params.task_type.replace('_', ' ')}
                                         </div>
                                         {node.promptOptimizerResult?.params?.aspect_ratio && (
@@ -1456,7 +1456,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                         {String(
                                             (node.promptOptimizerResult?.meta as { route_title?: string } | undefined)?.route_title || '',
                                         ).trim() && (
-                                            <div className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 text-[9px] font-bold border border-emerald-500/20">
+                                        <div className="px-1.5 py-0.5 rounded bg-[rgba(26,58,58,0.10)] text-[var(--clay-brand-teal)] text-[9px] font-bold border border-[rgba(26,58,58,0.20)]">
                                                 自动策略 · {
                                                     String(
                                                         (node.promptOptimizerResult?.meta as { route_title?: string } | undefined)?.route_title || '',
@@ -1470,7 +1470,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                             </div>
                                         )}
                                         {node.promptOptimizerResult?.meta?.strategy && (
-                                            <div className="px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-300 text-[9px] font-bold border border-violet-500/20">
+                                        <div className="px-1.5 py-0.5 rounded bg-[rgba(255,176,132,0.10)] text-[var(--clay-brand-peach)] text-[9px] font-bold border border-[rgba(255,176,132,0.20)]">
                                                 {node.promptOptimizerResult.meta.strategy}
                                             </div>
                                         )}
@@ -1479,11 +1479,11 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
                                 {/* English - Professional Structure */}
                                 <div className="relative group/en">
-                                    <div className="text-[14px] leading-relaxed text-[var(--text-primary)] font-medium tracking-tight font-serif-ui whitespace-pre-wrap selection:bg-blue-500/30 pr-8">
+                                    <div className="text-[14px] leading-relaxed text-[var(--text-primary)] font-medium tracking-tight font-serif-ui whitespace-pre-wrap selection:bg-[rgba(255,77,139,0.24)] pr-8">
                                         {node.optimizedPromptEn || node.promptOptimizerResult?.optimized_prompt_en}
                                     </div>
                                     <button
-                                        className="absolute top-0 right-0 p-1.5 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-light)] text-[var(--text-tertiary)] hover:text-blue-400 hover:border-blue-500/50 opacity-0 group-hover/content:opacity-100 transition-all shadow-sm"
+                                        className="absolute top-0 right-0 p-1.5 rounded-md bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] text-[var(--text-tertiary)] hover:text-[var(--clay-brand-pink)] hover:border-[var(--clay-brand-pink)] opacity-0 group-hover/content:opacity-100 transition-all shadow-sm"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             const text = node.optimizedPromptEn || node.promptOptimizerResult?.optimized_prompt_en || '';
@@ -1516,7 +1516,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                         {node.optimizedPromptZh || node.promptOptimizerResult?.optimized_prompt_zh_display || 'AI 正在解析您的创意...'}
                                     </div>
                                     <button
-                                        className="absolute top-0 right-0 p-1.5 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-light)] text-[var(--text-tertiary)] hover:text-amber-400 hover:border-amber-500/50 opacity-0 group-hover/content:opacity-100 transition-all shadow-sm"
+                                        className="absolute top-0 right-0 p-1.5 rounded-md bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] text-[var(--text-tertiary)] hover:text-[var(--clay-brand-peach)] hover:border-[var(--clay-brand-peach)] opacity-0 group-hover/content:opacity-100 transition-all shadow-sm"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             const text = node.optimizedPromptZh || node.promptOptimizerResult?.optimized_prompt_zh_display || '';
@@ -1538,8 +1538,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
                                 {/* Assumptions / Tips */}
                                 {getOptimizerStrategySummaryZh(node) && (
-                                    <div className="mt-2 p-2 rounded-lg bg-violet-500/5 border border-violet-500/15">
-                                        <div className="flex items-center gap-1.5 text-[10px] font-semibold text-violet-300/90 mb-2">
+                                    <div className="mt-2 p-2 rounded-lg bg-[rgba(255,176,132,0.05)] border border-[rgba(255,176,132,0.15)]">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--clay-brand-peach)]/90 mb-2">
                                             <Sparkles size={12} />
                                             <span>自动策略说明</span>
                                         </div>
@@ -1550,9 +1550,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 )}
 
                                 {(node.promptOptimizerResult?.assumptions || []).length > 0 && (
-                                    <div className="mt-2 flex items-start gap-2 p-2 rounded-lg bg-blue-500/5 border border-blue-500/10">
-                                        <Info size={12} className="text-blue-400 mt-0.5 shrink-0" />
-                                        <div className="space-y-1 text-[10px] text-blue-300/80 leading-normal">
+                                    <div className="mt-2 flex items-start gap-2 p-2 rounded-lg bg-[rgba(255,77,139,0.05)] border border-[rgba(255,77,139,0.10)]">
+                                        <Info size={12} className="text-[var(--clay-brand-pink)] mt-0.5 shrink-0" />
+                                        <div className="space-y-1 text-[10px] text-[var(--clay-brand-pink)]/80 leading-normal">
                                             {(node.promptOptimizerResult?.assumptions || []).map((assumption, index) => (
                                                 <div key={`assumption-${index}`}>{assumption}</div>
                                             ))}
@@ -1580,8 +1580,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 )}
 
                                 {(node.promptOptimizerResult?.validation_checks || []).length > 0 && (
-                                    <div className="mt-2 p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/15">
-                                        <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-300/90 mb-2">
+                                    <div className="mt-2 p-2 rounded-lg bg-[rgba(26,58,58,0.05)] border border-[rgba(26,58,58,0.15)]">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--clay-brand-teal)]/90 mb-2">
                                             <CheckCircle2 size={12} />
                                             <span>校验清单</span>
                                         </div>
@@ -1613,7 +1613,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 )}
                             </div>
                         ) : (
-                            <div className="text-[15px] leading-7 text-[var(--text-primary)] font-normal selection:bg-blue-500/20 pr-2">
+                            <div className="text-[15px] leading-7 text-[var(--text-primary)] font-normal selection:bg-[rgba(255,77,139,0.18)] pr-2">
                                 {node.originalPrompt || node.prompt || (node.isDraft ? <span className="text-[var(--text-tertiary)] italic">输入提示词...</span> : '')}
                             </div>
                         )}
@@ -1731,7 +1731,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                             e.stopPropagation();
                                             onEditPptDeck(node);
                                         }}
-                                        className="px-2 py-1 rounded-md border text-[11px] leading-none bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20"
+                                        className="px-2 py-1 rounded-md border text-[11px] leading-none bg-[rgba(26,58,58,0.10)] text-[var(--clay-brand-teal)] border-[rgba(26,58,58,0.30)] hover:bg-[rgba(26,58,58,0.16)]"
                                         title={pickByDocumentLanguage('编辑分层 PPT 内容', 'Edit layered PPT content')}
                                     >
                                         {pickByDocumentLanguage('编辑页面包', 'Edit Deck')}
@@ -1743,7 +1743,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                             e.stopPropagation();
                                             onExportPpt(node);
                                         }}
-                                        className="px-2 py-1 rounded-md border text-[11px] leading-none bg-sky-500/10 text-sky-300 border-sky-500/30 hover:bg-sky-500/20"
+                                        className="px-2 py-1 rounded-md border text-[11px] leading-none bg-[rgba(255,176,132,0.10)] text-[var(--clay-brand-peach)] border-[rgba(255,176,132,0.30)] hover:bg-[rgba(255,176,132,0.16)]"
                                         title="导出该 PPT 项目的页面包"
                                     >
                                         导出页面包
@@ -1755,7 +1755,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                             e.stopPropagation();
                                             onExportPptx(node);
                                         }}
-                                        className="px-2 py-1 rounded-md border text-[11px] leading-none bg-indigo-500/10 text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/20"
+                                        className="px-2 py-1 rounded-md border text-[11px] leading-none bg-[rgba(255,77,139,0.10)] text-[var(--clay-brand-pink)] border-[rgba(255,77,139,0.30)] hover:bg-[rgba(255,77,139,0.16)]"
                                         title="导出 PPTX 文档"
                                     >
                                         导出 PPTX
@@ -1773,7 +1773,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                         <div className="flex items-start gap-2.5">
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex flex-wrap items-center gap-2">
-                                                    <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-[9px] text-sky-200">
+                                                    <span className="rounded-full border border-[rgba(255,176,132,0.20)] bg-[rgba(255,176,132,0.10)] px-1.5 py-0.5 text-[9px] text-[var(--clay-brand-peach)]">
                                                         P{page.pageNumber}
                                                     </span>
                                                     <div className="min-w-0 truncate text-[11px] font-medium text-[var(--text-primary)]" title={page.title}>
@@ -1810,7 +1810,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                         <div className="mt-2 flex flex-wrap gap-1">
                                             {onRetryPptPage && (
                                                 <button
-                                                    className="px-1.5 py-0.5 rounded border text-[10px] border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-white/5"
+                                                    className="px-1.5 py-0.5 rounded border text-[10px] border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--frost-card-sub-bg)]"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         onRetryPptPage(node, page.pageIndex);
@@ -1822,7 +1822,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                             )}
                                             {onExportPptPage && page.imageId && (
                                                 <button
-                                                    className="px-1.5 py-0.5 rounded border text-[10px] border-sky-500/30 text-sky-300 hover:bg-sky-500/10"
+                                                    className="px-1.5 py-0.5 rounded border text-[10px] border-[rgba(255,77,139,0.28)] text-[var(--clay-brand-pink)] hover:bg-[rgba(255,77,139,0.10)]"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         onExportPptPage(node, page.pageIndex);
@@ -1834,7 +1834,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                             )}
                                             {onEditPptDeck && (
                                                 <button
-                                                    className="px-1.5 py-0.5 rounded border text-[10px] border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+                                                    className="px-1.5 py-0.5 rounded border text-[10px] border-[rgba(26,58,58,0.30)] text-[var(--clay-brand-teal)] hover:bg-[rgba(26,58,58,0.10)]"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         onEditPptDeck(node);
@@ -2010,8 +2010,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                             >
                                                 <defs>
                                                     {/* 发光滤镜 - Scoped ID */}
-                                                    <filter id={`glow-${node.id}-${i}`} x="-50%" y="-50%" width="200%" height="200%">
-                                                        <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                                                    <filter id={`energy-trail-${node.id}-${i}`} x="-50%" y="-50%" width="200%" height="200%">
+                                                        <feGaussianBlur stdDeviation="2" result="coloredBlur" />
                                                         <feMerge>
                                                             <feMergeNode in="coloredBlur" />
                                                             <feMergeNode in="SourceGraphic" />
@@ -2020,16 +2020,16 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
                                                     {/* 能量流动渐变 - Scoped ID */}
                                                     <linearGradient id={`energy-gradient-${node.id}-${i}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                                                        <stop offset="0%" stopColor="#6366f1" stopOpacity="0">
+                                                        <stop offset="0%" stopColor="#ff4d8b" stopOpacity="0">
                                                             <animate attributeName="offset" values="0;0.3;0" dur="1.5s" repeatCount="indefinite" />
                                                         </stop>
-                                                        <stop offset="30%" stopColor="#8b5cf6" stopOpacity="1">
+                                                        <stop offset="30%" stopColor="#ff6b5a" stopOpacity="1">
                                                             <animate attributeName="offset" values="0.3;0.7;0.3" dur="1.5s" repeatCount="indefinite" />
                                                         </stop>
-                                                        <stop offset="60%" stopColor="#a855f7" stopOpacity="0.8">
+                                                        <stop offset="60%" stopColor="#ffb084" stopOpacity="0.8">
                                                             <animate attributeName="offset" values="0.6;1;0.6" dur="1.5s" repeatCount="indefinite" />
                                                         </stop>
-                                                        <stop offset="100%" stopColor="#c084fc" stopOpacity="0" />
+                                                        <stop offset="100%" stopColor="#b8a4ed" stopOpacity="0" />
                                                     </linearGradient>
                                                 </defs>
 
@@ -2037,17 +2037,17 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                 <path
                                                     d={`M0,0 C0,${offsetY * 0.5} ${offsetX},${offsetY * 0.5} ${offsetX},${offsetY}`}
                                                     fill="none"
-                                                    stroke="#8b5cf6"
+                                                    stroke="#ff6b5a"
                                                     strokeWidth="8"
                                                     opacity="0.1"
-                                                    filter={`url(#glow-${node.id}-${i})`}
+                                                    filter={`url(#energy-trail-${node.id}-${i})`}
                                                 />
 
                                                 {/* 基础线条(脉冲效果) */}
                                                 <path
                                                     d={`M0,0 C0,${offsetY * 0.5} ${offsetX},${offsetY * 0.5} ${offsetX},${offsetY}`}
                                                     fill="none"
-                                                    stroke="#6366f1"
+                                                    stroke="#ff4d8b"
                                                     strokeWidth="2"
                                                     opacity="0.3"
                                                 >
@@ -2061,11 +2061,11 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                     stroke={`url(#energy-gradient-${node.id}-${i})`}
                                                     strokeWidth="4"
                                                     strokeLinecap="round"
-                                                    filter={`url(#glow-${node.id}-${i})`}
+                                                    filter={`url(#energy-trail-${node.id}-${i})`}
                                                 />
 
                                                 {/* 能量粒子1 - 快速 */}
-                                                <circle r="4" fill="#a855f7" opacity="0" filter={`url(#glow-${node.id}-${i})`}>
+                                                <circle r="4" fill="#ff4d8b" opacity="0" filter={`url(#energy-trail-${node.id}-${i})`}>
                                                     <animateMotion
                                                         dur="1.5s"
                                                         repeatCount="indefinite"
@@ -2076,7 +2076,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                 </circle>
 
                                                 {/* 能量粒子2 - 中速 */}
-                                                <circle r="3" fill="#8b5cf6" opacity="0" filter={`url(#glow-${node.id}-${i})`}>
+                                                <circle r="3" fill="#ff6b5a" opacity="0" filter={`url(#energy-trail-${node.id}-${i})`}>
                                                     <animateMotion
                                                         dur="1.8s"
                                                         repeatCount="indefinite"
@@ -2087,7 +2087,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                 </circle>
 
                                                 {/* 能量粒子3 - 慢速 */}
-                                                <circle r="2.5" fill="#6366f1" opacity="0" filter={`url(#glow-${node.id}-${i})`}>
+                                                <circle r="2.5" fill="#b8a4ed" opacity="0" filter={`url(#energy-trail-${node.id}-${i})`}>
                                                     <animateMotion
                                                         dur="2s"
                                                         repeatCount="indefinite"

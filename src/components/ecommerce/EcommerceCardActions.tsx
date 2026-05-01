@@ -39,6 +39,44 @@ interface EcommerceCardActionsProps {
 }
 
 const actionClass = 'rounded-md border px-2 py-1 text-[11px] leading-none transition-colors';
+const clayCoralBorder = 'var(--clay-brand-coral)';
+const clayPeachBorder = 'var(--clay-brand-peach)';
+const clayPinkBorder = 'var(--clay-brand-pink)';
+
+const actionSurfaceStyle: React.CSSProperties = {
+  background: 'var(--frost-card-sub-bg)',
+  borderColor: 'var(--frost-card-sub-border)',
+  boxShadow: 'var(--frost-card-sub-shadow)',
+  color: 'var(--text-primary)',
+};
+
+const frameworkChipStyle: React.CSSProperties = {
+  background: 'var(--frost-card-sub-bg)',
+  borderColor: 'var(--frost-card-sub-border)',
+  boxShadow: 'var(--frost-card-sub-shadow)',
+  color: 'var(--text-secondary)',
+};
+
+const coralActionStyle: React.CSSProperties = {
+  ...actionSurfaceStyle,
+  borderColor: clayCoralBorder,
+};
+
+const peachActionStyle: React.CSSProperties = {
+  ...actionSurfaceStyle,
+  borderColor: clayPeachBorder,
+};
+
+const pinkActionStyle: React.CSSProperties = {
+  ...actionSurfaceStyle,
+  borderColor: clayPinkBorder,
+};
+
+const selectedActionStyle: React.CSSProperties = {
+  ...actionSurfaceStyle,
+  background: 'var(--frost-card-main-bg)',
+  borderColor: clayPinkBorder,
+};
 
 const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
   node,
@@ -90,19 +128,19 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
       <div className="mt-2 flex flex-col gap-2">
         {frameworkStatus ? (
           <div className="flex flex-wrap gap-1 text-[10px] text-[var(--text-secondary)]">
-            <span className="rounded-full border border-[var(--border-light)] px-2 py-1">
+            <span className="rounded-full border px-2 py-1" style={frameworkChipStyle}>
               {frameworkStatus.paused ? 'Paused' : 'Running'}
             </span>
-            <span className="rounded-full border border-[var(--border-light)] px-2 py-1">
+            <span className="rounded-full border px-2 py-1" style={frameworkChipStyle}>
               Queue {frameworkStatus.queued}
             </span>
-            <span className="rounded-full border border-[var(--border-light)] px-2 py-1">
+            <span className="rounded-full border px-2 py-1" style={frameworkChipStyle}>
               Active {frameworkStatus.dispatching + frameworkStatus.running}
             </span>
-            <span className="rounded-full border border-[var(--border-light)] px-2 py-1">
+            <span className="rounded-full border px-2 py-1" style={frameworkChipStyle}>
               Done {frameworkStatus.completed}
             </span>
-            <span className="rounded-full border border-[var(--border-light)] px-2 py-1">
+            <span className="rounded-full border px-2 py-1" style={frameworkChipStyle}>
               Failed {frameworkStatus.failed}
             </span>
           </div>
@@ -111,7 +149,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
           <button
             type="button"
             className={actionClass}
-            style={{ borderColor: 'rgba(16, 185, 129, 0.35)', color: 'var(--text-primary)' }}
+            style={coralActionStyle}
             onClick={(event) => {
               event.stopPropagation();
               onGenerateFramework?.(node);
@@ -122,7 +160,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
           <button
             type="button"
             className={actionClass}
-            style={{ borderColor: 'rgba(245, 158, 11, 0.35)', color: 'var(--text-primary)' }}
+            style={peachActionStyle}
             onClick={(event) => {
               event.stopPropagation();
               if (frameworkStatus?.paused) {
@@ -146,9 +184,9 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
           type="button"
           className={actionClass}
           style={{
-            borderColor: selected ? 'rgba(59, 130, 246, 0.35)' : 'var(--border-light)',
-            background: selected ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
-            color: 'var(--text-primary)',
+            ...actionSurfaceStyle,
+            borderColor: selected ? clayPinkBorder : 'var(--frost-card-sub-border)',
+            background: selected ? 'var(--frost-card-main-bg)' : 'var(--frost-card-sub-bg)',
           }}
           onClick={(event) => {
             event.stopPropagation();
@@ -163,11 +201,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
         <button
           type="button"
           className={actionClass}
-          style={{
-            borderColor: taskIsActive ? 'rgba(59, 130, 246, 0.35)' : 'var(--border-light)',
-            background: taskIsActive ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
-            color: 'var(--text-primary)',
-          }}
+          style={taskIsActive ? selectedActionStyle : actionSurfaceStyle}
           onClick={(event) => {
             event.stopPropagation();
             onActivateTask?.(node);
@@ -182,7 +216,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
         <button
           type="button"
           className={actionClass}
-          style={{ borderColor: 'rgba(245, 158, 11, 0.35)', color: 'var(--text-primary)' }}
+          style={peachActionStyle}
           onClick={(event) => {
             event.stopPropagation();
             onCancelNodeQueue(node);
@@ -196,7 +230,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
         <button
           type="button"
           className={actionClass}
-          style={{ borderColor: 'rgba(16, 185, 129, 0.35)', color: 'var(--text-primary)' }}
+          style={coralActionStyle}
           onClick={(event) => {
             event.stopPropagation();
             onGenerateNode(node);
@@ -213,7 +247,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
               <button
                 type="button"
                 className={actionClass}
-                style={{ borderColor: 'rgba(59, 130, 246, 0.35)', color: 'var(--text-primary)' }}
+                style={pinkActionStyle}
                 onClick={(event) => {
                   event.stopPropagation();
                   onSetGroupSelection(node, true);
@@ -224,7 +258,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
               <button
                 type="button"
                 className={actionClass}
-                style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
+                style={actionSurfaceStyle}
                 onClick={(event) => {
                   event.stopPropagation();
                   onSetGroupSelection(node, false);
@@ -238,7 +272,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
             <button
               type="button"
               className={actionClass}
-              style={{ borderColor: 'rgba(16, 185, 129, 0.35)', color: 'var(--text-primary)' }}
+              style={coralActionStyle}
               onClick={(event) => {
                 event.stopPropagation();
                 onGenerateGroup(node, 'desktop');
@@ -251,7 +285,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
               <button
                 type="button"
                 className={actionClass}
-                style={{ borderColor: 'rgba(16, 185, 129, 0.35)', color: 'var(--text-primary)' }}
+                style={coralActionStyle}
                 onClick={(event) => {
                   event.stopPropagation();
                   onGenerateGroup(node, 'desktop');
@@ -262,7 +296,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
               <button
                 type="button"
                 className={actionClass}
-                style={{ borderColor: 'rgba(245, 158, 11, 0.35)', color: 'var(--text-primary)' }}
+                style={peachActionStyle}
                 onClick={(event) => {
                   event.stopPropagation();
                   onGenerateGroup(node, 'mobile');
@@ -280,7 +314,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
           <button
             type="button"
             className={actionClass}
-            style={{ borderColor: 'rgba(16, 185, 129, 0.35)', color: 'var(--text-primary)' }}
+            style={coralActionStyle}
             onClick={(event) => {
               event.stopPropagation();
               onGenerateNode(node);
@@ -293,7 +327,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
               <button
                 type="button"
                 className={actionClass}
-                style={{ borderColor: 'rgba(59, 130, 246, 0.35)', color: 'var(--text-primary)' }}
+                style={pinkActionStyle}
                 disabled={!desktopReadyToConfirm}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -305,7 +339,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
               <button
                 type="button"
                 className={actionClass}
-                style={{ borderColor: 'rgba(245, 158, 11, 0.35)', color: 'var(--text-primary)' }}
+                style={peachActionStyle}
                 disabled={!mobileReady}
                 onClick={(event) => {
                   event.stopPropagation();

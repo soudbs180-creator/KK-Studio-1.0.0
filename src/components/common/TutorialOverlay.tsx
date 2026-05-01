@@ -84,7 +84,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
         typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false
     );
     const [tooltipSize, setTooltipSize] = useState({ width: 360, height: 320 });
-    const overlayColor = 'rgba(0, 0, 0, 0.82)';
+    const overlayColor = 'var(--tutorial-overlay-bg)';
     const tutorialSurface: TutorialSurface = isMobile ? 'mobile' : 'desktop';
     const STEPS = React.useMemo(() => getTutorialSteps(tutorialSurface), [tutorialSurface]);
 
@@ -369,9 +369,9 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
                             top: spotlightBounds.top,
                             width: spotlightBounds.width,
                             height: spotlightBounds.height,
-                            border: '1px solid rgba(129, 140, 248, 0.9)',
-                            background: 'rgba(99, 102, 241, 0.05)',
-                            boxShadow: '0 0 0 1px rgba(99,102,241,0.25), 0 0 32px rgba(99,102,241,0.22), inset 0 0 0 1px rgba(255,255,255,0.04)',
+                            border: '1px solid var(--tutorial-spotlight-border)',
+                            background: 'var(--tutorial-spotlight-bg)',
+                            boxShadow: 'var(--tutorial-spotlight-ring)',
                             transition: 'left 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), top 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), width 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), height 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease'
                         }}
                     />
@@ -390,8 +390,11 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
                 }}
             >
                 <div
-                    className="overflow-y-auto bg-[var(--bg-secondary)]/90 backdrop-blur-2xl border border-[var(--border-light)] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.1)] rounded-[28px] p-6 animate-in fade-in zoom-in-95 duration-300"
+                    className="overflow-y-auto border rounded-[28px] p-6 animate-in fade-in zoom-in-95 duration-300"
                     style={{
+                        background: 'var(--tutorial-card-bg)',
+                        borderColor: 'var(--tutorial-card-border)',
+                        boxShadow: 'var(--tutorial-card-shadow)',
                         maxHeight: isMobile
                             ? 'calc(100dvh - max(16px, env(safe-area-inset-top, 0px)) - max(16px, env(safe-area-inset-bottom, 0px)))'
                             : 'calc(100vh - 32px)',
@@ -402,7 +405,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
                 >
                     <div className="flex justify-between items-start mb-5">
                         <div className="flex items-center gap-2">
-                            <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                            <div className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: 'var(--tutorial-dot-bg)' }} />
                             <span className="text-[10px] font-bold tracking-widest text-[var(--text-tertiary)] uppercase">
                                 Step {displayStepIndex + 1} of {STEPS.length}
                             </span>
@@ -434,7 +437,11 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
 
                         <button
                             onClick={handleNext}
-                            className="flex-1 flex items-center justify-center gap-2 h-11 rounded-full bg-[var(--text-primary)] text-[14px] font-bold leading-none text-[var(--bg-primary)] transition-transform shadow-lg active:scale-[0.98]"
+                            className="flex-1 flex items-center justify-center gap-2 h-11 rounded-full text-[14px] font-bold leading-none transition-transform active:scale-[0.98]"
+                            style={{
+                                background: 'var(--tutorial-action-bg)',
+                                color: 'var(--tutorial-action-text)',
+                            }}
                         >
                             {displayStepIndex === STEPS.length - 1 ? (
                                 <>

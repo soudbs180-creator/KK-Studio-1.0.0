@@ -92,6 +92,35 @@ describe('responsive surface utilities', () => {
     assert.doesNotMatch(desktopSteps, /mobile-tab-bar/);
   });
 
+  test('Clay settings shell keeps separate mobile and desktop surface tokens', () => {
+    const cssSource = readFileSync('src/index.css', 'utf8');
+    const settingsSource = readFileSync('src/components/settings/SettingsPanel.localized.tsx', 'utf8');
+
+    assert.match(settingsSource, /settings-shell-page--desktop/);
+    assert.match(settingsSource, /settings-shell-page--mobile/);
+    assert.match(cssSource, /--clay-desktop-shell-padding:\s*16px 28px 18px;/);
+    assert.match(cssSource, /--clay-mobile-shell-padding:\s*12px 12px calc\(env\(safe-area-inset-bottom, 0px\) \+ 14px\);/);
+    assert.match(cssSource, /\.settings-panel \.settings-shell-page--desktop[\s\S]*padding:\s*var\(--clay-desktop-shell-padding\);/);
+    assert.match(cssSource, /\.settings-panel \.settings-shell-page--mobile[\s\S]*padding:\s*var\(--clay-mobile-shell-padding\);/);
+  });
+
+  test('Clay search palette keeps distinct mobile sheet and desktop command surface', () => {
+    const source = readFileSync('src/components/layout/SearchPalette.tsx', 'utf8');
+
+    assert.match(source, /const DESKTOP_SEARCH_SHORTCUTS/);
+    assert.match(source, /const MOBILE_SEARCH_HINTS/);
+    assert.match(source, /isPhoneResponsiveWidth\(window\.innerWidth\)/);
+    assert.match(source, /data-search-surface=\{isMobile \? 'mobile' : 'desktop'\}/);
+    assert.match(source, /data-search-panel=\{isMobile \? 'mobile-bottom-sheet' : 'desktop-command-surface'\}/);
+    assert.match(source, /var\(--search-palette-desktop-radius\)/);
+    assert.match(source, /var\(--search-palette-mobile-radius\)/);
+    assert.match(source, /isMobile \? \(\s*<>\s*\{MOBILE_SEARCH_HINTS\.map/);
+    assert.match(source, /\) : \(\s*<>\s*\{DESKTOP_SEARCH_SHORTCUTS\.map/);
+    assert.match(source, /if \(!isOpen \|\| isMobile\) return;/);
+    assert.doesNotMatch(source, /rounded-t-\[var\(--radius-panel-xl\)\]/);
+    assert.doesNotMatch(source, /borderRadius:\s*isMobile \? undefined : 'var\(--radius-surface-lg\)'/);
+  });
+
   test('caps standard result columns by compact surface while detail mode is single column', () => {
     assert.equal(getAdaptiveResultColumnCount({ surface: 'phone', width: 320, viewMode: 'standard' }), 2);
     assert.equal(getAdaptiveResultColumnCount({ surface: 'phone', width: 520, viewMode: 'standard' }), 3);

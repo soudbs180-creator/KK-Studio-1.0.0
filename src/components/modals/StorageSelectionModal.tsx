@@ -134,6 +134,8 @@ const StorageSelectionModal: React.FC<StorageSelectionModalProps> = ({ isOpen, o
           background: 'var(--storage-selection-card-bg)',
           borderColor: 'var(--storage-selection-border)',
           boxShadow: 'var(--storage-selection-shadow)',
+          WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+          backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
         }}
       >
         <div className={`${isMobile ? 'mobile-sheet-header-safe px-4 pb-4 pt-4 text-center' : 'mb-5 text-center'}`}>

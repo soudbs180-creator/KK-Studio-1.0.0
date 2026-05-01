@@ -1213,8 +1213,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const showSelectedAccent = isSelected;
     const showHighlightedAccent = highlighted && !showActiveAccent && !showSelectedAccent;
     const showSelectionBorder = showSelectedAccent || showHighlightedAccent;
-    const selectedBorderColor = 'rgba(59, 130, 246, 0.78)';
-    const highlightedBorderColor = 'rgba(59, 130, 246, 0.46)';
+    const selectedBorderColor = 'color-mix(in srgb, var(--accent-coral) 72%, var(--frost-card-main-border))';
+    const highlightedBorderColor = 'color-mix(in srgb, var(--accent-coral) 46%, var(--frost-card-main-border))';
     const activeBorderColor = 'rgba(245, 158, 11, 0.72)';
     const cardBorderColor = image.error && !image.isGenerating
         ? 'rgb(239, 68, 68)'
@@ -1229,16 +1229,16 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         ? 'red'
         : showActiveAccent
             ? 'gold'
-            : (showSelectionBorder ? 'blue' : undefined);
+            : (showSelectionBorder ? 'coral' : undefined);
     const baseCardShadow = getCanvasCardShadow({ accent: imageCardAccent, boost: shadowBoost, zoomScale });
     const activeRingWidth = Math.max(1, 1.25 / borderScale);
     const selectionRingWidth = Math.max(1.25, 1.7 / borderScale);
     const accentRingShadow = image.error && !image.isGenerating
         ? ''
         : showSelectionBorder && showActiveAccent
-            ? `0 0 0 ${activeRingWidth}px rgba(245, 158, 11, 0.26), 0 0 0 ${activeRingWidth + selectionRingWidth}px rgba(59, 130, 246, 0.18)`
+            ? `0 0 0 ${activeRingWidth}px color-mix(in srgb, var(--accent-ochre) 24%, transparent), 0 0 0 ${activeRingWidth + selectionRingWidth}px color-mix(in srgb, var(--accent-coral) 18%, transparent)`
             : showSelectionBorder
-                ? `0 0 0 ${selectionRingWidth}px rgba(59, 130, 246, 0.18)`
+                ? `0 0 0 ${selectionRingWidth}px color-mix(in srgb, var(--accent-coral) 18%, transparent)`
                 : showActiveAccent
                     ? `0 0 0 ${activeRingWidth}px rgba(245, 158, 11, 0.26)`
                     : '';
@@ -1266,7 +1266,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         const shellBadgeClass = image.error && !image.isGenerating
             ? 'text-red-400 bg-red-500/10 border-red-500/20'
             : image.isGenerating
-                ? 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+                ? 'text-[var(--accent-coral)] bg-[var(--frost-card-sub-bg)] border-[var(--frost-card-sub-border)]'
                 : 'text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border-[var(--border-light)]';
         const isVideoLike = image.mode === GenerationMode.VIDEO || displaySrc?.startsWith('data:video') || displaySrc?.endsWith('.mp4');
         const isAudioLike = image.mode === GenerationMode.AUDIO || displaySrc?.endsWith('.mp3') || displaySrc?.endsWith('.wav');
@@ -1301,7 +1301,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     data-canvas-surface="image"
                     className="relative w-full overflow-hidden rounded-[20px] border flex flex-col"
                     style={{
-                        backgroundColor: 'var(--bg-surface)',
+                        backgroundColor: 'var(--frost-card-main-bg)',
                         borderColor: cardBorderColor,
                         borderWidth: adaptiveBorderWidth,
                         boxShadow: cardSurfaceShadow,
@@ -1312,7 +1312,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     }}
                 >
                     <div
-                        className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-transparent hover:bg-indigo-500/50 rounded-full z-50 cursor-crosshair"
+                        className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-transparent hover:bg-[var(--accent-coral)] rounded-full z-50 cursor-crosshair"
                         onMouseUp={() => onConnectEnd?.(image.id)}
                     />
 
@@ -1322,17 +1322,17 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         onDoubleClick={handleImageClick}
                     >
                         <div
-                            className="relative w-full overflow-hidden rounded-[16px] border border-[var(--border-light)] bg-[var(--bg-tertiary)]"
+                            className="relative w-full overflow-hidden rounded-[16px] border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)]"
                             style={{
                                 aspectRatio: image.aspectRatio.replace(':', '/')
                             }}
                         >
                             {isAudioLike ? (
-                                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-indigo-950/90 to-slate-900/90 text-indigo-200">
+                                <div className="absolute inset-0 flex items-center justify-center bg-[var(--frost-card-framework-bg)] text-[var(--accent-coral)]">
                                     <Music size={28} />
                                 </div>
                             ) : isVideoLike ? (
-                                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900/90 to-indigo-950/90 text-white/85">
+                                <div className="absolute inset-0 flex items-center justify-center bg-[var(--frost-card-framework-bg)] text-[var(--text-primary)]">
                                     <Play size={26} />
                                 </div>
                             ) : displaySrc && !imgError ? (
@@ -1356,7 +1356,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     </div>
 
                     <div
-                        className={`${isThumbnailShell ? 'px-3 py-2.5' : 'px-3 py-3'} border-t border-[var(--border-light)] bg-[var(--bg-elevated)] cursor-pointer`}
+                        className={`${isThumbnailShell ? 'px-3 py-2.5' : 'px-3 py-3'} border-t border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] cursor-pointer`}
                         onClick={(e) => {
                             e.stopPropagation();
                             if (canHandleCardClick()) onClick?.(image.id);
@@ -1423,12 +1423,11 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     data-canvas-surface="image"
                     className={`
                         relative w-full overflow-hidden flex flex-col
-                        border shadow-xl
+                        border
                         ${isDragging ? '' : 'transition-shadow'}
-                        ${isSelected ? 'shadow-2xl' : 'hover:shadow-2xl'}
                     `}
                     style={{
-                        backgroundColor: 'var(--bg-surface)',
+                        backgroundColor: 'var(--frost-card-main-bg)',
                         borderColor: cardBorderColor,
                         borderRadius: 'var(--radius-lg)', // 12px
                         borderWidth: adaptiveBorderWidth,
@@ -1441,21 +1440,21 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 >
                     {/* Connection Point */}
                     <div
-                        className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-transparent hover:bg-indigo-500/50 rounded-full z-50 cursor-crosshair"
+                        className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-transparent hover:bg-[var(--accent-coral)] rounded-full z-50 cursor-crosshair"
                         onMouseUp={() => onConnectEnd?.(image.id)}
                     />
 
                     {/* 外层内边距容器 - 统一四周一缝隙 (p-1 = 4px) */}
                     <div className="w-full p-1 flex flex-col">
                         {/* 上模块：图片模块（完整圆角 + 边框） */}
-                        <div className="relative w-full overflow-hidden rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)]">
+                        <div className="relative w-full overflow-hidden rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)]">
                             {isPptSubCard && onPreviewPptStack && !image.isGenerating && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         onPreviewPptStack(image.id);
                                     }}
-                                    className="absolute left-2 top-2 z-20 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-medium text-white shadow-lg hover:bg-indigo-600/90 transition-colors"
+                                    className="absolute left-2 top-2 z-20 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-medium text-white hover:bg-[var(--accent-coral)] transition-colors"
                                     title="整屏查看"
                                 >
                                     整屏
@@ -1478,8 +1477,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                 对于新生成的图片 (isNew)，即便曾报错也不进入死循环错误 UI，给浏览器 1-2 次自动重传的机会。 */}
                                     {((!imgError || isNew) && displaySrc) ? (
                                         (image.mode === GenerationMode.AUDIO || displaySrc.endsWith('.mp3') || displaySrc.endsWith('.wav')) ? (
-                                            <div className="relative w-full h-full group/audio bg-gradient-to-br from-indigo-900/90 to-purple-900/90 flex flex-col items-center justify-center overflow-hidden">
-                                                <Music size={48} className="text-indigo-300/30 mb-4 z-10 pointer-events-none" />
+                                            <div className="relative w-full h-full group/audio bg-[var(--frost-card-framework-bg)] flex flex-col items-center justify-center overflow-hidden">
+                                                <Music size={48} className="text-[var(--accent-coral)] opacity-30 mb-4 z-10 pointer-events-none" />
                                                 <audio
                                                     src={displaySrc}
                                                     controls
@@ -1513,7 +1512,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                 {/* Play/Pause Overlay with smooth transitions */}
                                                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/video:opacity-100 transition-opacity duration-300 bg-black/0 hover:bg-black/20">
                                                     <button
-                                                        className="w-12 h-12 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-sm text-white transition-all duration-300 transform hover:scale-110 active:scale-95 shadow-lg border border-white/20"
+                                                        className="w-12 h-12 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-sm text-white transition-all duration-300 transform hover:scale-110 active:scale-95 border border-white/20"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             if (videoRef.current) {
@@ -1641,7 +1640,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     {/* Retry Button */}
                                                     <button
                                                         onClick={handleRetryLoad}
-                                                        className="mt-2 text-[10px] text-indigo-400 hover:text-indigo-300 underline"
+                                                        className="mt-2 text-[10px] text-[var(--accent-coral)] hover:text-[var(--accent-pink)] underline"
                                                     >
                                                         点击重试
                                                     </button>
@@ -1854,11 +1853,11 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     {aspectSizeLabel}
                                                 </span>
                                                 <div className="relative" ref={downloadMenuRef}>
-                                                    <button onClick={handleDownload} className={joinClasses('hover:text-[var(--accent-blue)] transition-colors', iconButtonPaddingClass)} title={isPptSubCard ? '下载选项' : '下载原图'}>
+                                                    <button onClick={handleDownload} className={joinClasses('hover:text-[var(--accent-coral)] transition-colors', iconButtonPaddingClass)} title={isPptSubCard ? '下载选项' : '下载原图'}>
                                                         <Download size={actionIconSize} />
                                                     </button>
                                                     {showDownloadMenu && isPptSubCard && (
-                                                        <div className="absolute right-0 top-full z-30 mt-1 w-28 rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] p-1 shadow-xl">
+                                                        <div className="absolute right-0 top-full z-30 mt-1 w-28 rounded-lg border border-[var(--frost-card-framework-border)] bg-[var(--frost-card-framework-bg)] p-1">
                                                             <button
                                                                 onClick={(e) => {
                                                                     setShowDownloadMenu(false);
@@ -1906,14 +1905,14 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                             style={primaryTextRenderStyle}
                                         >
                                             {image.generationTime ? (
-                                                <span title="耗时" className="text-blue-400 shrink-0">{footerTimeLabel}</span>
+                                                <span title="耗时" className="text-[var(--accent-coral)] shrink-0">{footerTimeLabel}</span>
                                             ) : (
-                                                <span className="text-blue-400/50 shrink-0">{footerTimeLabel}</span>
+                                                <span className="text-[var(--text-tertiary)] shrink-0">{footerTimeLabel}</span>
                                             )}
                                             {isCreditModel ? (
                                                 <>
                                                     <span className={footerSeparatorClass}>|</span>
-                                                    <span title="\u79ef\u5206\u6d88\u8017" className="text-blue-400 font-medium shrink-0">{creditFooterLabel}</span>
+                                                    <span title="\u79ef\u5206\u6d88\u8017" className="text-[var(--accent-coral)] font-medium shrink-0">{creditFooterLabel}</span>
                                                 </>
                                             ) : (
                                                 <>

@@ -20,12 +20,20 @@ const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
         <div className="fixed inset-0 z-[1001] flex flex-col justify-end">
             {/* Backdrop */}
             <div
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+                className="absolute inset-0 animate-in fade-in duration-200"
+                style={{ background: 'var(--mobile-clay-overlay-bg)' }}
                 onClick={onClose}
             />
 
             {/* Menu Sheet */}
-            <div className="relative bg-[#1c1c1e] rounded-t-3xl border-t border-white/10 p-4 pb-safe animate-in slide-in-from-bottom duration-300 shadow-2xl">
+            <div
+                className="relative rounded-t-3xl border-t p-4 pb-safe animate-in slide-in-from-bottom duration-300"
+                style={{
+                    background: 'var(--mobile-clay-shell-bg)',
+                    borderColor: 'var(--mobile-clay-border)',
+                    boxShadow: 'var(--mobile-clay-shadow)'
+                }}
+            >
                 <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-3">
                     <span className="text-white font-bold text-lg">更多功能</span>
                     <button onClick={onClose} className="min-w-[44px] min-h-[44px] p-2 flex items-center justify-center text-zinc-400 active:text-white active:scale-95 bg-white/5 rounded-lg transition-all">

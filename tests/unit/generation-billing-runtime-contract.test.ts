@@ -60,7 +60,12 @@ test('system proxy image generation preserves billing metadata through llm and b
   assert.match(generationHookSource, /const \{ refundCreditsByTransaction, refreshBilling, applyAuthoritativeBalance \} = useBilling\(\);/);
   assert.match(generationHookSource, /if \(typeof result\.balanceAfter === 'number'\) \{\s*applyAuthoritativeBalance\(result\.balanceAfter\);\s*\}/);
   assert.match(appSource, /const \{[\s\S]*applyAuthoritativeBalance,[\s\S]*\} = useBilling\(\);/);
-  assert.match(appSource, /if \(typeof result\.balanceAfter === 'number'\) \{\s*applyAuthoritativeBalance\(result\.balanceAfter\);\s*\}/);
+  assert.match(appSource, /useGenerationRuntime\(\{[\s\S]*applyAuthoritativeBalance,[\s\S]*\}\);/);
   assert.match(generationRuntimeSource, /if \(typeof params\.generatedMediaContext\.balanceAfter === 'number'\) \{\s*params\.applyAuthoritativeBalance\(params\.generatedMediaContext\.balanceAfter\);\s*\}/);
-  assert.match(appSource, /applyRetryGeneratedMediaAuthoritativeBalance\(\{[\s\S]*generatedMediaContext,[\s\S]*applyAuthoritativeBalance,[\s\S]*\}\);/);
+  assert.match(generationRuntimeSource, /if \(typeof result\.balanceAfter === 'number'\) \{\s*applyAuthoritativeBalance\(result\.balanceAfter\);\s*\}/);
+  assert.match(generationRuntimeSource, /applyRetryGeneratedMediaAuthoritativeBalance\(\{[\s\S]*generatedMediaContext: requestResult\.generatedMediaContext,[\s\S]*applyAuthoritativeBalance: params\.applyAuthoritativeBalance,[\s\S]*\}\);/);
+  assert.match(generationRuntimeSource, /runRetryGeneratedMediaAttempts\(\{[\s\S]*applyAuthoritativeBalance: params\.applyAuthoritativeBalance,[\s\S]*\}\);/);
+  assert.match(appSource, /completeRetryGeneratedMediaBatch\(\{[\s\S]*applyAuthoritativeBalance,[\s\S]*\}\);/);
+  assert.doesNotMatch(appSource, /runRetryGeneratedMediaAttempts\(\{/);
+  assert.doesNotMatch(appSource, /applyRetryGeneratedMediaAuthoritativeBalance\(\{/);
 });

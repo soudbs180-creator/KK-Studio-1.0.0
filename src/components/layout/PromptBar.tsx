@@ -162,7 +162,7 @@ const ReferenceThumbnail = React.memo(({
     if (loading || !data) {
         return (
             <div
-                className="w-12 h-12 rounded-lg border border-white/10 shadow-sm bg-[var(--bg-tertiary)] overflow-hidden flex items-center justify-center"
+                className="w-12 h-12 rounded-lg border border-white/10 shadow-sm bg-[var(--frost-input-bg)] overflow-hidden flex items-center justify-center"
                 aria-label="reference-thumbnail-skeleton"
             >
                 <div className="h-full w-full animate-pulse bg-[linear-gradient(135deg,rgba(255,255,255,0.10),rgba(255,255,255,0.04))] flex items-center justify-center">
@@ -183,7 +183,7 @@ const ReferenceThumbnail = React.memo(({
     return (
         <div
             onClick={(e) => onClick?.(e, src)}
-            className="w-12 h-12 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-white/80 transition-all"
+            className="w-12 h-12 rounded-lg overflow-hidden cursor-pointer transition-all hover:ring-2 hover:ring-[color:var(--frost-card-framework-border)]"
             title="点击放大查看"
         >
             <img
@@ -304,19 +304,45 @@ function getCreditModelSurfaceStyle(
     textColor: string | undefined,
     emphasized = false,
 ): React.CSSProperties {
+    const start = normalizeColor(colorStart, 'var(--accent-coral)');
+    const end = normalizeColor(colorEnd, 'var(--accent-pink)');
     const usesDarkText = isLightSeriesTextColor(textColor);
 
     return {
-        background: usesDarkText
-            ? `color-mix(in srgb, ${colorStart} ${emphasized ? 34 : 24}%, white ${emphasized ? 66 : 76}%)`
-            : `color-mix(in srgb, ${colorEnd} ${emphasized ? 92 : 78}%, #111827 ${emphasized ? 8 : 22}%)`,
-        border: usesDarkText
-            ? `1px solid color-mix(in srgb, ${colorStart} 48%, rgba(15, 23, 42, 0.18))`
-            : `1px solid color-mix(in srgb, ${colorStart} 76%, rgba(255, 255, 255, 0.18))`,
-        boxShadow: 'none',
+        background: emphasized
+            ? `linear-gradient(135deg, color-mix(in srgb, ${start} 26%, var(--frost-card-framework-bg)) 0%, color-mix(in srgb, ${end} 22%, var(--frost-card-framework-bg)) 100%)`
+            : 'var(--frost-card-sub-bg)',
+        border: `1px solid ${emphasized ? 'color-mix(in srgb, var(--accent-coral) 34%, var(--frost-card-framework-border))' : 'var(--frost-card-sub-border)'}`,
+        color: usesDarkText ? 'var(--clay-ink)' : undefined,
+        boxShadow: emphasized ? 'var(--frost-card-framework-shadow)' : 'var(--frost-card-sub-shadow)',
+        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
     };
 }
 
+const frostedFrameworkSurfaceStyle: React.CSSProperties = {
+    background: 'var(--frost-card-framework-bg)',
+    borderColor: 'var(--frost-card-framework-border)',
+    boxShadow: 'var(--frost-card-framework-shadow)',
+    WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+    backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+};
+
+const frostedInputSurfaceStyle: React.CSSProperties = {
+    background: 'var(--frost-input-bg)',
+    borderColor: 'var(--frost-input-border)',
+    boxShadow: 'var(--frost-input-shadow)',
+    WebkitBackdropFilter: 'blur(var(--frost-input-blur)) saturate(1.12)',
+    backdropFilter: 'blur(var(--frost-input-blur)) saturate(1.12)',
+};
+
+const frostedSubSurfaceStyle: React.CSSProperties = {
+    background: 'var(--frost-card-sub-bg)',
+    borderColor: 'var(--frost-card-sub-border)',
+    boxShadow: 'var(--frost-card-sub-shadow)',
+    WebkitBackdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
+    backdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
+};
 // 🚀 [添加] 积分专属发送按钮组件
 interface CreditSendButtonProps {
     isCreditModel: boolean;
@@ -354,8 +380,8 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     // 🚀 [积分模型专属] 使用模型主题色的渐变样式 - 更精致的玻璃态效果
     const getGradientStyle = () => {
         if (!isCreditModel || isDisabled) return {};
-        const start = normalizeColor(colorStart, '#3B82F6');
-        const end = normalizeColor(colorEnd, '#2563EB');
+        const start = normalizeColor(colorStart, 'var(--accent-coral)');
+        const end = normalizeColor(colorEnd, 'var(--accent-pink)');
         return {
             background: `linear-gradient(135deg, ${start} 0%, ${end} 100%)`,
             boxShadow: `0 2px 8px 0 ${start}50, inset 0 1px 0 0 rgba(255,255,255,0.2)`
@@ -365,7 +391,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     // 🚀 [普通模型/禁用状态] 样式
     const getDefaultStyle = () => {
         if (isDisabled) {
-            return { className: 'bg-gray-100 dark:bg-zinc-800/50 cursor-not-allowed opacity-50' };
+            return { className: 'bg-[var(--frost-card-sub-bg)] bg-[var(--frost-card-sub-bg)] cursor-not-allowed opacity-50' };
         }
         if (isInsufficient) {
             return { className: 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20' };
@@ -373,21 +399,25 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
 
         // 如果有自定义颜色，则使用自定义渐变，否则使用默认类
         if (colorStart || colorEnd) {
-            const start = normalizeColor(colorStart, '#3B82F6');
-            const end = normalizeColor(colorEnd, '#2563EB');
+            const start = normalizeColor(colorStart, 'var(--accent-coral)');
+            const end = normalizeColor(colorEnd, 'var(--accent-pink)');
             return {
-                className: `${textColor === 'black' ? 'text-black' : 'text-white'} shadow-md hover:shadow-lg transition-shadow border border-white/20 backdrop-blur-xl`,
+                className: `${textColor === 'black' ? 'text-black' : 'text-white'} transition-colors border`,
                 style: {
                     background: `linear-gradient(135deg, color-mix(in srgb, ${start} 72%, rgba(255,255,255,0.18)) 0%, color-mix(in srgb, ${end} 82%, rgba(255,255,255,0.08)) 100%)`,
-                    boxShadow: `0 16px 32px -18px ${start}85, inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 rgba(255,255,255,0.08)`
+                    borderColor: 'var(--frost-card-main-border)',
+                    boxShadow: 'var(--frost-card-main-shadow)',
+                    backdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
                 }
             };
         }
         return {
-            className: `${textColor === 'black' ? 'text-black' : 'text-white'} shadow-md hover:shadow-lg transition-shadow border border-white/20 backdrop-blur-xl`,
+            className: `${textColor === 'black' ? 'text-black' : 'text-white'} transition-colors border`,
             style: {
-                background: 'linear-gradient(135deg, rgba(96, 165, 250, 0.92) 0%, rgba(59, 130, 246, 0.88) 45%, rgba(29, 78, 216, 0.82) 100%)',
-                boxShadow: '0 16px 32px -18px rgba(37, 99, 235, 0.88), inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 rgba(255,255,255,0.08)'
+                background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent-coral) 86%, white 14%) 0%, var(--mobile-clay-active-bg) 45%, var(--accent-pink) 100%)',
+                borderColor: 'var(--frost-card-main-border)',
+                boxShadow: 'var(--frost-card-main-shadow)',
+                backdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
             }
         };
     };
@@ -464,7 +494,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                 className={`
                     ${className} group relative flex h-10 max-w-full min-w-0 shrink flex-row items-center whitespace-nowrap rounded-full px-1 py-1 overflow-hidden
                     transition-colors duration-200 ease-out focus-visible:outline-none
-                    ${!isDisabled && !isInsufficient ? 'focus-visible:ring-2 focus-visible:ring-blue-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent' : ''}
+                    ${!isDisabled && !isInsufficient ? 'focus-visible:ring-2 focus-visible:ring-[color:var(--accent-coral)] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent' : ''}
                     ${defaultStyleProps.className || ''}
                 `}
                 style={{
@@ -491,7 +521,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                             </span>
                         </div>
                     ) : (
-                        <span className={`text-sm font-bold tracking-[0.01em] ${isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : textColor === 'black' ? 'text-black drop-shadow-[0_1px_10px_rgba(0,0,0,0.28)]' : 'text-white drop-shadow-[0_1px_10px_rgba(255,255,255,0.28)]'}`}>
+                        <span className={`text-sm font-bold tracking-[0.01em] ${isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : textColor === 'black' ? 'text-black' : 'text-white'}`}>
                             {ecommerceConfirmedMode ? '补充修改' : '发送'}
                         </span>
                     )}
@@ -501,10 +531,10 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                 <div className={`
                     relative z-[1] flex h-8 w-8 items-center justify-center overflow-hidden rounded-full transition-colors duration-200
                     ${isDisabled
-                        ? 'bg-gray-300 dark:bg-zinc-700 text-gray-500'
+                        ? 'bg-[var(--frost-card-sub-bg)] bg-[var(--frost-card-sub-bg)] text-[var(--text-tertiary)]'
                         : isInsufficient
                             ? 'bg-red-500 text-white'
-                            : `border ${textColor === 'black' ? 'border-black/20 bg-black/10 text-black' : 'border-white/20 bg-white/22 text-white'} shadow-[inset_0_1px_0_rgba(255,255,255,0.36),inset_0_-1px_0_rgba(255,255,255,0.08),0_6px_14px_rgba(15,23,42,0.14)] backdrop-blur-md group-hover:bg-white/30`
+                            : `border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-primary)] shadow-[var(--frost-card-sub-shadow)] group-hover:bg-[var(--frost-card-main-bg)]`
                     }
                 `}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
@@ -669,8 +699,8 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
     const isPinned = model.isPinned;
     const displayName = model.displayName;
     const badgeInfo = getModelBadgeInfo({ id: model.id, label: model.label, provider: model.provider });
-    const colorStart = normalizeColor(model.colorStart, '#60a5fa');
-    const colorEnd = normalizeColor(model.colorEnd, '#2563eb');
+    const colorStart = normalizeColor(model.colorStart, 'var(--accent-coral)');
+    const colorEnd = normalizeColor(model.colorEnd, 'var(--accent-pink)');
     const modelTextColor = model.textColor || 'white';
     const textColorClass = modelTextColor === 'black' ? 'text-black' : 'text-white';
     const inactiveGradientStyle = getCreditModelSurfaceStyle(colorStart, colorEnd, model.textColor, false);
@@ -680,8 +710,8 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
         <button
             className={`group w-full transition-all duration-300 mx-auto cursor-pointer
             ${isExclusive
-                    ? `h-14 px-5 flex items-center justify-between rounded-full flex-shrink-0 ${textColorClass} active:scale-[0.98] ${isLast ? '' : 'mb-3'} ${selected ? 'ring-2 ring-white/20 scale-[1.02]' : 'hover:scale-[1.02] opacity-80 hover:opacity-100 grayscale-[0.15] hover:grayscale-0'}`
-                    : `px-3 py-2.5 text-left flex flex-col gap-1 hover:bg-black/5 dark:hover:bg-white/5 rounded-md transition-all border-2 ${selected ? 'bg-blue-50 dark:bg-white/10 ring-2 ring-blue-500 dark:ring-white/40 border-blue-500 dark:border-white/20 shadow-md' : 'border-transparent opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`}
+                    ? `h-14 px-5 flex items-center justify-between rounded-full flex-shrink-0 ${textColorClass} active:scale-[0.98] ${isLast ? '' : 'mb-3'} ${selected ? 'ring-2 ring-[color:var(--accent-coral)] scale-[1.02]' : 'hover:scale-[1.02] opacity-80 hover:opacity-100 grayscale-[0.15] hover:grayscale-0'}`
+                    : `px-3 py-2.5 text-left flex flex-col gap-1 hover:bg-black/5 dark:hover:bg-[var(--toolbar-hover)] rounded-md transition-all border-2 ${selected ? 'bg-[var(--frost-card-sub-bg)] ring-2 ring-[color:var(--accent-coral)] border-[color:var(--accent-coral)]' : 'border-transparent opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`}
             `}
             style={isExclusive ? (selected ? activeGradientStyle : inactiveGradientStyle) : undefined}
             onMouseEnter={(event) => {
@@ -2575,14 +2605,14 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const resolvedCurrentSystemDisplay = selectedModelMeta.resolvedCurrentSystemDisplay;
     const currentModelPrimaryColor = normalizeColor(
         resolvedCurrentSystemDisplay?.colorStart || currentModel?.colorStart,
-        '#3B82F6'
+        'var(--accent-coral)'
     );
     const currentModelSecondaryColor = normalizeColor(
         resolvedCurrentSystemDisplay?.colorSecondary
             || resolvedCurrentSystemDisplay?.colorEnd
             || currentModel?.colorSecondary
             || currentModel?.colorEnd,
-        '#2563EB'
+        'var(--accent-pink)'
     );
     const currentModelUsesLightSurface = isLightSeriesTextColor(
         resolvedCurrentSystemDisplay?.textColor || currentModel?.textColor
@@ -2763,7 +2793,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     />
 
                     {showPptOutlinePanel && config.mode === GenerationMode.PPT && (
-                        <div className="absolute bottom-full right-0 mb-2 z-40 w-[min(38rem,92vw)] rounded-2xl border shadow-xl p-2" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)' }}>
+                        <div className="absolute bottom-full right-0 mb-2 z-40 w-[min(38rem,92vw)] rounded-2xl border  p-2" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)' }}>
                             <div className="flex items-center justify-between gap-2 mb-2">
                                 <div>
                                     <div className="text-xs font-semibold text-[var(--text-primary)]">PPT页纲（每行一页）</div>
@@ -2771,13 +2801,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 </div>
                                 <div className="text-[10px] text-[var(--text-tertiary)]">{Math.min(20, parsePptSlides(pptOutlineDraft).length)} / 20 页，生成结果按图1~图N命名</div>
                             </div>
-                            <div className="mb-2 rounded-xl border px-2.5 py-2 text-[10px] text-[var(--text-secondary)]" style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-tertiary)' }}>
+                            <div className="mb-2 rounded-xl border px-2.5 py-2 text-[10px] text-[var(--text-secondary)]" style={{ borderColor: 'var(--frost-card-sub-border)', backgroundColor: 'var(--frost-card-sub-bg)' }}>
                                 <div>Markdown / JSON 页纲导入</div>
                                 <div className="mt-1">页面描述列表会直接进入 deck 模块，生成前检查会同步页数、风格锁定和主题一致性。</div>
                             </div>
                             <div className="flex items-center gap-2 mb-2">
                                 <button
-                                    className={`px-2 py-1 rounded-md text-[11px] border ${config.pptStyleLocked !== false ? 'border-sky-500/40 bg-sky-500/10 text-sky-300' : 'border-[var(--border-light)] text-[var(--text-secondary)]'}`}
+                                    className={`px-2 py-1 rounded-md text-[11px] border ${config.pptStyleLocked !== false ? 'border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--accent-coral)]' : 'border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)]'}`}
                                     onClick={() => setConfig(prev => ({ ...prev, pptStyleLocked: !(prev.pptStyleLocked !== false) }))}
                                     title="锁定整套PPT视觉风格一致性"
                                 >
@@ -2786,16 +2816,16 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 <div className="text-[10px] text-[var(--text-tertiary)]">ON 更偏向整套视觉一致，OFF 允许单页变化</div>
                             </div>
                             <div className="flex items-center gap-1 mb-2">
-                                <button className="px-2 py-1 rounded-md text-[10px] border border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-white/5" onClick={() => appendPptTemplateSlide('cover')}>+封面</button>
-                                <button className="px-2 py-1 rounded-md text-[10px] border border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-white/5" onClick={() => appendPptTemplateSlide('agenda')}>+目录</button>
-                                <button className="px-2 py-1 rounded-md text-[10px] border border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-white/5" onClick={() => appendPptTemplateSlide('section')}>+章节</button>
-                                <button className="px-2 py-1 rounded-md text-[10px] border border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-white/5" onClick={() => appendPptTemplateSlide('summary')}>+总结</button>
+                                <button className="px-2 py-1 rounded-md text-[10px] border border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]" onClick={() => appendPptTemplateSlide('cover')}>+封面</button>
+                                <button className="px-2 py-1 rounded-md text-[10px] border border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]" onClick={() => appendPptTemplateSlide('agenda')}>+目录</button>
+                                <button className="px-2 py-1 rounded-md text-[10px] border border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]" onClick={() => appendPptTemplateSlide('section')}>+章节</button>
+                                <button className="px-2 py-1 rounded-md text-[10px] border border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]" onClick={() => appendPptTemplateSlide('summary')}>+总结</button>
                             </div>
                             <textarea
                                 value={pptOutlineDraft}
                                 onChange={(e) => setPptOutlineDraft(e.target.value)}
                                 className="w-full h-44 rounded-lg border p-2 text-xs outline-none resize-none"
-                                style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
+                                style={{ backgroundColor: 'var(--frost-card-sub-bg)', borderColor: 'var(--frost-card-sub-border)', color: 'var(--text-primary)' }}
                                 placeholder="示例：\n封面：AI产品季度汇报\n市场洞察\n产品路线图\n关键案例\n总结与下一步"
                             />
                             {parsePptSlides(pptOutlineDraft).length > 0 && (
@@ -2806,10 +2836,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             className="relative flex items-center gap-1 rounded-md border px-2 py-1"
                                             style={{
                                                 borderColor: (pptDropIndex === idx && pptDragIndex !== null && pptDragIndex !== idx)
-                                                    ? 'rgba(56,189,248,0.45)'
+                                                    ? 'var(--mobile-clay-active-border)'
                                                     : 'var(--border-light)',
                                                 backgroundColor: (pptDropIndex === idx && pptDragIndex !== null && pptDragIndex !== idx)
-                                                    ? 'rgba(14,165,233,0.12)'
+                                                    ? 'var(--state-info-bg)'
                                                     : 'var(--bg-tertiary)',
                                                 opacity: pptDragIndex === idx ? 0.65 : 1
                                             }}
@@ -2833,19 +2863,19 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             }}
                                         >
                                             {(pptDropIndex === idx && pptDragIndex !== null && pptDragIndex !== idx) && (
-                                                <div className="absolute left-1 right-1 -top-[1px] h-[2px] rounded-full bg-sky-400/80 pointer-events-none" />
+                                                <div className="absolute left-1 right-1 -top-[1px] h-[2px] rounded-full bg-[var(--accent-coral)] pointer-events-none" />
                                             )}
                                             <span className="text-[10px] w-4 shrink-0 text-[var(--text-tertiary)] cursor-grab">⋮</span>
-                                            <span className="text-[10px] text-sky-400 w-8 shrink-0">图{idx + 1}</span>
+                                            <span className="text-[10px] text-[var(--accent-coral)] w-8 shrink-0">图{idx + 1}</span>
                                             <span className="text-[11px] text-[var(--text-secondary)] truncate flex-1" title={line}>{line}</span>
                                             <button
-                                                className="text-[10px] px-1 py-0.5 rounded border border-[var(--border-light)]"
+                                                className="text-[10px] px-1 py-0.5 rounded border border-[color:var(--frost-card-sub-border)]"
                                                 style={{ color: 'var(--text-secondary)' }}
                                                 onClick={() => movePptSlide(idx, -1)}
                                                 title="上移"
                                             >↑</button>
                                             <button
-                                                className="text-[10px] px-1 py-0.5 rounded border border-[var(--border-light)]"
+                                                className="text-[10px] px-1 py-0.5 rounded border border-[color:var(--frost-card-sub-border)]"
                                                 style={{ color: 'var(--text-secondary)' }}
                                                 onClick={() => movePptSlide(idx, 1)}
                                                 title="下移"
@@ -2857,7 +2887,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 title="删除此页"
                                             >删</button>
                                             <button
-                                                className="text-[10px] px-1 py-0.5 rounded border border-sky-500/30"
+                                                className="text-[10px] px-1 py-0.5 rounded border border-[color:var(--frost-card-sub-border)]"
                                                 style={{ color: '#7dd3fc' }}
                                                 onClick={() => insertPptSlideAfter(idx)}
                                                 title="在后方插入新页"
@@ -2875,35 +2905,35 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     onChange={handlePptOutlineImportFile}
                                 />
                                 <button
-                                    className="px-2 py-1 rounded-md text-[11px] border border-[var(--border-light)] hover:bg-white/5"
+                                    className="px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                     style={{ color: 'var(--text-secondary)' }}
                                     onClick={openPptOutlineImport}
                                 >
                                     导入 Markdown / JSON
                                 </button>
                                 <button
-                                    className="px-2 py-1 rounded-md text-[11px] border border-[var(--border-light)] hover:bg-white/5"
+                                    className="px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                     style={{ color: 'var(--text-secondary)' }}
                                     onClick={generatePptOutlineByTopic}
                                 >
                                     按主题拆页
                                 </button>
                                 <button
-                                    className="px-2 py-1 rounded-md text-[11px] border border-[var(--border-light)] hover:bg-white/5"
+                                    className="px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                     style={{ color: 'var(--text-secondary)' }}
                                     onClick={exportPptOutlineJson}
                                 >
                                     导出JSON
                                 </button>
                                 <button
-                                    className="px-2 py-1 rounded-md text-[11px] border border-[var(--border-light)] hover:bg-white/5"
+                                    className="px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                     style={{ color: 'var(--text-secondary)' }}
                                     onClick={() => setPptOutlineDraft('')}
                                 >
                                     清空
                                 </button>
                                 <button
-                                    className="ml-auto px-2 py-1 rounded-md text-[11px] border border-sky-400/40 bg-sky-500/10"
+                                    className="ml-auto px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)]"
                                     style={{ color: '#38bdf8' }}
                                     onClick={applyPptOutlineDraft}
                                 >
@@ -2968,11 +2998,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
         >
             {shouldRenderInlineMobileUploadButton && (
                 <button
-                    className="mb-1 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-dashed opacity-60 transition-all duration-200 hover:bg-white/5 hover:opacity-100"
+                    className="mb-1 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-dashed opacity-60 transition-all duration-200 hover:bg-[var(--toolbar-hover)] hover:opacity-100"
                     style={{
                         color: 'var(--text-secondary)',
-                        borderColor: 'var(--border-light)',
-                        backgroundColor: 'var(--bg-tertiary)'
+                        borderColor: 'var(--frost-card-sub-border)',
+                        backgroundColor: 'var(--frost-card-sub-bg)'
                     }}
                     onClick={() => fileInputRef.current?.click()}
                     title="上传参考图"
@@ -3041,8 +3071,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     key={`ecommerce-options-summary-${sheet}`}
                     className="rounded-full border px-2 py-0.5 text-[10px] leading-none"
                     style={{
-                        borderColor: activeEcommerceFooterSheet === sheet ? 'rgba(59, 130, 246, 0.35)' : 'var(--border-light)',
-                        background: activeEcommerceFooterSheet === sheet ? 'rgba(59, 130, 246, 0.10)' : 'rgba(148, 163, 184, 0.08)',
+                        borderColor: activeEcommerceFooterSheet === sheet ? 'var(--mobile-clay-active-bg)' : 'var(--border-light)',
+                        background: activeEcommerceFooterSheet === sheet ? 'var(--mobile-clay-active-bg)' : 'rgba(148, 163, 184, 0.08)',
                         color: activeEcommerceFooterSheet === sheet ? 'var(--text-primary)' : 'var(--text-secondary)',
                     }}
                 >
@@ -3066,7 +3096,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
             }}
             summaryContent={ecommerceOptionsSummary}
             optionsPanelContent={config.mode === GenerationMode.AUDIO ? (
-                <div className="w-56 p-3 rounded-xl border shadow-xl animate-scaleIn origin-bottom" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)' }}>
+                <div className="w-56 p-3 rounded-xl border  animate-scaleIn origin-bottom" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)' }}>
                     <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">音频时长</div>
                     <div className="flex flex-wrap gap-1.5">
                         {['自动', '30s', '60s', '120s', '240s'].map(dur => (
@@ -3074,7 +3104,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 key={dur}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${(config.audioDuration || '自动') === dur
                                     ? 'bg-pink-500/20 text-pink-400 border-pink-500/30'
-                                    : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-pink-500/30'
+                                    : 'bg-[var(--frost-input-bg)] text-[var(--text-secondary)] border-[color:var(--frost-card-sub-border)] hover:border-pink-500/30'
                                     }`}
                                 onClick={() => updateConfigFields({ audioDuration: dur === '自动' ? undefined : dur })}
                             >
@@ -3140,11 +3170,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
         <>
             {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
                 <div
-                    className="mb-2 rounded-2xl border p-2.5 shadow-xl max-w-[calc(100vw-24px)]"
+                    className="mb-2 rounded-2xl border p-2.5  max-w-[calc(100vw-24px)]"
                     style={{
                         width: 'min(22rem, calc(100vw - 24px))',
                         background: 'color-mix(in srgb, var(--bg-overlay) 96%, transparent)',
-                        borderColor: 'var(--border-medium)',
+                        borderColor: 'var(--frost-card-framework-border)',
                         backdropFilter: 'blur(20px) saturate(160%)',
                         WebkitBackdropFilter: 'blur(20px) saturate(160%)',
                     }}
@@ -3159,7 +3189,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             onChange={(e) => setModelSearch(e.target.value)}
                             onClick={(e) => e.stopPropagation()}
                             placeholder="搜索模型..."
-                            className="w-full bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-transparent focus:border-indigo-500/50 placeholder-[var(--text-tertiary)]"
+                            className="w-full bg-[var(--frost-input-bg)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-transparent focus:border-[var(--frost-input-border)] placeholder-[var(--text-tertiary)]"
                             autoFocus
                         />
                         {modelSearch && (
@@ -3187,9 +3217,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 ref={modelListScrollRef}
                 className="dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] max-h-[50vh] overflow-y-auto scrollbar-thin origin-bottom p-4"
                 style={{
-                    background: 'color-mix(in srgb, var(--bg-overlay) 97%, transparent)',
-                    borderColor: 'var(--border-medium)',
-                    boxShadow: 'var(--shadow-xl)',
+                    background: 'var(--frost-card-framework-bg)',
+                    borderColor: 'var(--frost-card-framework-border)',
+                    boxShadow: 'var(--frost-card-framework-shadow)',
                     borderRadius: '1rem',
                     backdropFilter: 'blur(22px) saturate(165%)',
                     WebkitBackdropFilter: 'blur(22px) saturate(165%)',
@@ -3260,7 +3290,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         <>
             <div
                 id="prompt-bar-container"
-                className={`input-bar ${isMobile ? 'ios-mobile-prompt' : ''} transition-all duration-300 !overflow-visible ${isMobile && mobileShellMode === 'embedded' ? 'w-full max-w-full' : 'w-[calc(100vw-32px)] max-w-[760px]'} ${isDragging ? 'ring-2 ring-white/80 shadow-[0_0_36px_rgba(255,255,255,0.22)]' : ''}`}
+                className={`input-bar ${isMobile ? 'ios-mobile-prompt' : ''} transition-all duration-300 !overflow-visible ${isMobile && mobileShellMode === 'embedded' ? 'w-full max-w-full' : 'w-[calc(100vw-32px)] max-w-[760px]'}`}
                 onDragEnter={handleDragEnter}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -3269,20 +3299,31 @@ const PromptBar: React.FC<PromptBarProps> = ({
             >
                 {/* Drag Overlay */}
                 {isDragging && (
-                    <div className="absolute inset-0 z-50 rounded-[inherit] border border-white/65 bg-white/55 backdrop-blur-md flex items-center justify-center animate-fadeIn pointer-events-none">
-                        <span className="font-bold text-sm text-slate-900 drop-shadow-[0_1px_8px_rgba(255,255,255,0.45)]">{dragOverlayLabel}</span>
+                    <div
+                        className="absolute inset-0 z-50 rounded-[inherit] flex items-center justify-center animate-fadeIn pointer-events-none"
+                        style={{
+                            border: '1px solid var(--frost-card-framework-border)',
+                            background: 'var(--frost-card-framework-bg)',
+                            boxShadow: 'var(--frost-card-framework-shadow)',
+                            backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+                        }}
+                    >
+                        <span className="font-bold text-sm text-[var(--text-primary)]">{dragOverlayLabel}</span>
                     </div>
                 )}
 
                 {/* [NEW] Flying Image Animation */}
                 {flyingImage && (
                     <div
-                        className="fixed z-[9999] w-12 h-12 rounded-lg border-2 border-white shadow-[0_10px_30px_rgba(255,255,255,0.35)] overflow-hidden pointer-events-none transition-all ease-in-out duration-500"
+                        className="fixed z-[9999] w-12 h-12 rounded-lg overflow-hidden pointer-events-none transition-all ease-in-out duration-500"
                         style={{
                             left: 0,
                             top: 0,
                             backgroundImage: `url(${flyingImage.url})`,
                             backgroundSize: 'cover',
+                            border: '1px solid var(--frost-card-framework-border)',
+                            boxShadow: 'var(--frost-card-framework-shadow)',
+                            backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
                             transform: `translate(${flyingImage.targetX}px, ${flyingImage.targetY}px) scale(1)`,
                             animation: `flyToTarget 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards`,
                         }}
@@ -3369,7 +3410,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 />
 
                                 {showPptOutlinePanel && config.mode === GenerationMode.PPT && (
-                                    <div className="absolute bottom-full right-0 mb-2 z-40 w-[min(38rem,92vw)] rounded-2xl border shadow-xl p-2" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)' }}>
+                                    <div className="absolute bottom-full right-0 mb-2 z-40 w-[min(38rem,92vw)] rounded-2xl border  p-2" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)' }}>
                                     <div className="flex items-center justify-between gap-2 mb-2">
                                         <div>
                                             <div className="text-xs font-semibold text-[var(--text-primary)]">PPT页纲（每行一页）</div>
@@ -3377,13 +3418,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         </div>
                                         <div className="text-[10px] text-[var(--text-tertiary)]">{Math.min(20, parsePptSlides(pptOutlineDraft).length)} / 20 页，生成结果按图1~图N命名</div>
                                     </div>
-                                    <div className="mb-2 rounded-xl border px-2.5 py-2 text-[10px] text-[var(--text-secondary)]" style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-tertiary)' }}>
+                                    <div className="mb-2 rounded-xl border px-2.5 py-2 text-[10px] text-[var(--text-secondary)]" style={{ borderColor: 'var(--frost-card-sub-border)', backgroundColor: 'var(--frost-card-sub-bg)' }}>
                                         <div>Markdown / JSON 页纲导入</div>
                                         <div className="mt-1">页面描述列表会直接进入 deck 模块，生成前检查会同步页数、风格锁定和主题一致性。</div>
                                     </div>
                                     <div className="flex items-center gap-2 mb-2">
                                         <button
-                                            className={`px-2 py-1 rounded-md text-[11px] border ${config.pptStyleLocked !== false ? 'border-sky-500/40 bg-sky-500/10 text-sky-300' : 'border-[var(--border-light)] text-[var(--text-secondary)]'}`}
+                                            className={`px-2 py-1 rounded-md text-[11px] border ${config.pptStyleLocked !== false ? 'border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--accent-coral)]' : 'border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)]'}`}
                                             onClick={() => setConfig(prev => ({ ...prev, pptStyleLocked: !(prev.pptStyleLocked !== false) }))}
                                             title="锁定整套PPT视觉风格一致性"
                                         >
@@ -3392,16 +3433,16 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         <div className="text-[10px] text-[var(--text-tertiary)]">ON 更偏向整套视觉一致，OFF 允许单页变化</div>
                                     </div>
                                     <div className="flex items-center gap-1 mb-2">
-                                        <button className="px-2 py-1 rounded-md text-[10px] border border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-white/5" onClick={() => appendPptTemplateSlide('cover')}>+封面</button>
-                                        <button className="px-2 py-1 rounded-md text-[10px] border border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-white/5" onClick={() => appendPptTemplateSlide('agenda')}>+目录</button>
-                                        <button className="px-2 py-1 rounded-md text-[10px] border border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-white/5" onClick={() => appendPptTemplateSlide('section')}>+章节</button>
-                                        <button className="px-2 py-1 rounded-md text-[10px] border border-[var(--border-light)] text-[var(--text-secondary)] hover:bg-white/5" onClick={() => appendPptTemplateSlide('summary')}>+总结</button>
+                                        <button className="px-2 py-1 rounded-md text-[10px] border border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]" onClick={() => appendPptTemplateSlide('cover')}>+封面</button>
+                                        <button className="px-2 py-1 rounded-md text-[10px] border border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]" onClick={() => appendPptTemplateSlide('agenda')}>+目录</button>
+                                        <button className="px-2 py-1 rounded-md text-[10px] border border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]" onClick={() => appendPptTemplateSlide('section')}>+章节</button>
+                                        <button className="px-2 py-1 rounded-md text-[10px] border border-[color:var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]" onClick={() => appendPptTemplateSlide('summary')}>+总结</button>
                                     </div>
                                     <textarea
                                         value={pptOutlineDraft}
                                         onChange={(e) => setPptOutlineDraft(e.target.value)}
                                         className="w-full h-44 rounded-lg border p-2 text-xs outline-none resize-none"
-                                        style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
+                                        style={{ backgroundColor: 'var(--frost-card-sub-bg)', borderColor: 'var(--frost-card-sub-border)', color: 'var(--text-primary)' }}
                                         placeholder="示例：\n封面：AI产品季度汇报\n市场洞察\n产品路线图\n关键案例\n总结与下一步"
                                     />
                                     {parsePptSlides(pptOutlineDraft).length > 0 && (
@@ -3412,10 +3453,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     className="relative flex items-center gap-1 rounded-md border px-2 py-1"
                                                     style={{
                                                         borderColor: (pptDropIndex === idx && pptDragIndex !== null && pptDragIndex !== idx)
-                                                            ? 'rgba(56,189,248,0.45)'
+                                                            ? 'var(--mobile-clay-active-border)'
                                                             : 'var(--border-light)',
                                                         backgroundColor: (pptDropIndex === idx && pptDragIndex !== null && pptDragIndex !== idx)
-                                                            ? 'rgba(14,165,233,0.12)'
+                                                            ? 'var(--state-info-bg)'
                                                             : 'var(--bg-tertiary)',
                                                         opacity: pptDragIndex === idx ? 0.65 : 1
                                                     }}
@@ -3439,19 +3480,19 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     }}
                                                 >
                                                     {(pptDropIndex === idx && pptDragIndex !== null && pptDragIndex !== idx) && (
-                                                        <div className="absolute left-1 right-1 -top-[1px] h-[2px] rounded-full bg-sky-400/80 pointer-events-none" />
+                                                        <div className="absolute left-1 right-1 -top-[1px] h-[2px] rounded-full bg-[var(--accent-coral)] pointer-events-none" />
                                                     )}
                                                     <span className="text-[10px] w-4 shrink-0 text-[var(--text-tertiary)] cursor-grab">⋮</span>
-                                                    <span className="text-[10px] text-sky-400 w-8 shrink-0">图{idx + 1}</span>
+                                                    <span className="text-[10px] text-[var(--accent-coral)] w-8 shrink-0">图{idx + 1}</span>
                                                     <span className="text-[11px] text-[var(--text-secondary)] truncate flex-1" title={line}>{line}</span>
                                                     <button
-                                                        className="text-[10px] px-1 py-0.5 rounded border border-[var(--border-light)]"
+                                                        className="text-[10px] px-1 py-0.5 rounded border border-[color:var(--frost-card-sub-border)]"
                                                         style={{ color: 'var(--text-secondary)' }}
                                                         onClick={() => movePptSlide(idx, -1)}
                                                         title="上移"
                                                     >↑</button>
                                                     <button
-                                                        className="text-[10px] px-1 py-0.5 rounded border border-[var(--border-light)]"
+                                                        className="text-[10px] px-1 py-0.5 rounded border border-[color:var(--frost-card-sub-border)]"
                                                         style={{ color: 'var(--text-secondary)' }}
                                                         onClick={() => movePptSlide(idx, 1)}
                                                         title="下移"
@@ -3463,7 +3504,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                         title="删除此页"
                                                     >删</button>
                                                     <button
-                                                        className="text-[10px] px-1 py-0.5 rounded border border-sky-500/30"
+                                                        className="text-[10px] px-1 py-0.5 rounded border border-[color:var(--frost-card-sub-border)]"
                                                         style={{ color: '#7dd3fc' }}
                                                         onClick={() => insertPptSlideAfter(idx)}
                                                         title="在后方插入新页"
@@ -3481,35 +3522,35 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             onChange={handlePptOutlineImportFile}
                                         />
                                         <button
-                                            className="px-2 py-1 rounded-md text-[11px] border border-[var(--border-light)] hover:bg-white/5"
+                                            className="px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                             style={{ color: 'var(--text-secondary)' }}
                                             onClick={openPptOutlineImport}
                                         >
                                             导入 Markdown / JSON
                                         </button>
                                         <button
-                                            className="px-2 py-1 rounded-md text-[11px] border border-[var(--border-light)] hover:bg-white/5"
+                                            className="px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                             style={{ color: 'var(--text-secondary)' }}
                                             onClick={generatePptOutlineByTopic}
                                         >
                                             按主题拆页
                                         </button>
                                         <button
-                                            className="px-2 py-1 rounded-md text-[11px] border border-[var(--border-light)] hover:bg-white/5"
+                                            className="px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                             style={{ color: 'var(--text-secondary)' }}
                                             onClick={exportPptOutlineJson}
                                         >
                                             导出JSON
                                         </button>
                                         <button
-                                            className="px-2 py-1 rounded-md text-[11px] border border-[var(--border-light)] hover:bg-white/5"
+                                            className="px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                             style={{ color: 'var(--text-secondary)' }}
                                             onClick={() => setPptOutlineDraft('')}
                                         >
                                             清空
                                         </button>
                                         <button
-                                            className="ml-auto px-2 py-1 rounded-md text-[11px] border border-sky-400/40 bg-sky-500/10"
+                                            className="ml-auto px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)]"
                                             style={{ color: '#38bdf8' }}
                                             onClick={applyPptOutlineDraft}
                                         >
@@ -3684,8 +3725,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                                 {/* [NEW] Uploading Skeletons */}
                                 {Array.from({ length: uploadingSkeletonCount }).map((_, idx) => (
-                                    <div key={`uploading-${idx}`} className="relative w-12 h-12 rounded-lg border-2 border-dashed border-gray-400/30 dark:border-zinc-500/30 flex items-center justify-center bg-gray-100/50 dark:bg-zinc-800/50 overflow-hidden flex-shrink-0 animate-pulse">
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin text-gray-500 dark:text-zinc-400">
+                                    <div key={`uploading-${idx}`} className="relative w-12 h-12 rounded-lg border-2 border-dashed border-[color:var(--frost-card-sub-border)] border-[color:var(--frost-card-sub-border)] flex items-center justify-center bg-[var(--frost-card-sub-bg)] bg-[var(--frost-card-sub-bg)] overflow-hidden flex-shrink-0 animate-pulse">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin text-[var(--text-tertiary)] dark:text-zinc-400">
                                             <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                                         </svg>
                                     </div>
@@ -3700,11 +3741,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                                 {/* Upload Button - At the end of reference images row - 始终显示 */}
                                 <button
-                                    className="w-12 h-12 rounded-md transition-all duration-200 border hover:bg-white/5 flex items-center justify-center flex-shrink-0 opacity-60 hover:opacity-100"
+                                    className="w-12 h-12 rounded-md transition-all duration-200 border hover:bg-[var(--toolbar-hover)] flex items-center justify-center flex-shrink-0 opacity-60 hover:opacity-100"
                                     style={{
-                                        backgroundColor: 'var(--bg-tertiary)',
+                                        backgroundColor: 'var(--frost-card-sub-bg)',
                                         color: 'var(--text-secondary)',
-                                        borderColor: 'var(--border-light)'
+                                        borderColor: 'var(--frost-card-sub-border)'
                                     }}
                                     onClick={() => fileInputRef.current?.click()}
                                     title="上传参考图"
@@ -3722,10 +3763,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         {shouldRenderStandaloneUploadRow && (
                             <div className="flex items-center p-2 px-3 mt-1">
                                 <button
-                                    className="w-12 h-12 rounded-lg transition-all border-2 border-dashed hover:bg-white/5 flex items-center justify-center flex-shrink-0 opacity-40 hover:opacity-80"
+                                    className="w-12 h-12 rounded-lg transition-all border-2 border-dashed hover:bg-[var(--toolbar-hover)] flex items-center justify-center flex-shrink-0 opacity-40 hover:opacity-80"
                                     style={{
                                         color: 'var(--text-secondary)',
-                                        borderColor: 'var(--border-light)'
+                                        borderColor: 'var(--frost-card-sub-border)'
                                     }}
                                     onClick={() => fileInputRef.current?.click()}
                                     title="上传参考图"
@@ -3788,11 +3829,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         >
                             {shouldRenderInlineMobileUploadButton && (
                                 <button
-                                    className="mb-1 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-dashed opacity-60 transition-all duration-200 hover:bg-white/5 hover:opacity-100"
+                                    className="mb-1 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-dashed opacity-60 transition-all duration-200 hover:bg-[var(--toolbar-hover)] hover:opacity-100"
                                     style={{
                                         color: 'var(--text-secondary)',
-                                        borderColor: 'var(--border-light)',
-                                        backgroundColor: 'var(--bg-tertiary)'
+                                        borderColor: 'var(--frost-card-sub-border)',
+                                        backgroundColor: 'var(--frost-card-sub-bg)'
                                     }}
                                     onClick={() => fileInputRef.current?.click()}
                                     title="上传参考图"
@@ -3843,7 +3884,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             >
                                 <button
                                     className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? (isEmbeddedMobileComposer ? 'w-full max-w-full justify-start' : 'w-full max-w-full justify-center') : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
-                                        ? 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed border-[var(--border-light)]'
+                                        ? 'bg-[var(--frost-input-bg)] text-[var(--text-tertiary)] cursor-not-allowed border-[color:var(--frost-card-sub-border)]'
                                         : 'text-[var(--text-secondary)] !opacity-100 hover:border-[var(--prompt-bar-shell-border-strong)]'
                                         }`}
                                     style={(() => {
@@ -3931,7 +3972,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     >
                                         {/* 🔍 Search Input Module - Above the list - 只在多个模型时显示 */}
                                         {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
-                                            <div className="mb-2 p-2.5 bg-[var(--bg-secondary)] border border-[var(--border-medium)] rounded-2xl shadow-xl animate-scaleIn origin-bottom max-w-[calc(100vw-24px)]" style={{ width: 'min(22rem, calc(100vw - 24px))' }}>
+                                            <div className="mb-2 p-2.5 bg-[var(--frost-card-framework-bg)] border border-[var(--border-medium)] rounded-2xl  animate-scaleIn origin-bottom max-w-[calc(100vw-24px)]" style={{ width: 'min(22rem, calc(100vw - 24px))' }}>
                                                 <div className="relative flex items-center">
                                                     <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -3942,7 +3983,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                         onChange={(e) => setModelSearch(e.target.value)}
                                                         onClick={(e) => e.stopPropagation()}
                                                         placeholder="搜索模型..."
-                                                        className="w-full bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-transparent focus:border-indigo-500/50 placeholder-[var(--text-tertiary)]"
+                                                        className="w-full bg-[var(--frost-input-bg)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-transparent focus:border-[var(--frost-input-border)] placeholder-[var(--text-tertiary)]"
                                                         autoFocus
                                                     />
                                                     {modelSearch && (
@@ -3969,7 +4010,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         <div
                                             ref={modelListScrollRef}
                                             className="dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] max-h-[50vh] overflow-y-auto scrollbar-thin animate-scaleIn origin-bottom p-4"
-                                            style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)', boxShadow: 'var(--shadow-xl)', borderRadius: '1rem' }}
+                                            style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)', boxShadow: 'var(--frost-card-framework-shadow)', borderRadius: '1rem' }}
                                             onScroll={(e) => {
                                                 const nextTop = e.currentTarget.scrollTop;
                                                 modelListScrollPos.current = nextTop;
@@ -4056,7 +4097,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 }}
                                 summaryContent={ecommerceOptionsSummary}
                                 optionsPanelContent={config.mode === GenerationMode.AUDIO ? (
-                                    <div className="w-56 p-3 rounded-xl border shadow-xl animate-scaleIn origin-bottom" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)' }}>
+                                    <div className="w-56 p-3 rounded-xl border  animate-scaleIn origin-bottom" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)' }}>
                                         <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">音频时长</div>
                                         <div className="flex flex-wrap gap-1.5">
                                             {['自动', '30s', '60s', '120s', '240s'].map(dur => (
@@ -4064,7 +4105,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     key={dur}
                                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${(config.audioDuration || '自动') === dur
                                                         ? 'bg-pink-500/20 text-pink-400 border-pink-500/30'
-                                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-pink-500/30'
+                                                        : 'bg-[var(--frost-input-bg)] text-[var(--text-secondary)] border-[color:var(--frost-card-sub-border)] hover:border-pink-500/30'
                                                         }`}
                                                     onClick={() => updateConfigFields({ audioDuration: dur === '自动' ? undefined : dur })}
                                                 >
@@ -4119,7 +4160,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 )}
                                 networkControls={!isMobile && (groundingSupported || imageSearchSupported) ? (
                                     <div
-                                        className="prompt-bar-liquid-group flex min-w-0 max-w-full shrink items-center gap-1 overflow-hidden rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-1 py-0.5 h-10 transition-all duration-200"
+                                        className="prompt-bar-liquid-group flex min-w-0 max-w-full shrink items-center gap-1 overflow-hidden rounded-lg border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-input-bg)] px-1 py-0.5 h-10 transition-all duration-200"
                                         style={{
                                             opacity: (config.mode === GenerationMode.VIDEO || config.mode === GenerationMode.AUDIO) ? 0 : 1,
                                             visibility: (config.mode === GenerationMode.VIDEO || config.mode === GenerationMode.AUDIO) ? 'hidden' : 'visible',
@@ -4187,7 +4228,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     {/* Parallel Count */}
                                     <div className="relative h-full w-[58px]">
                                         <button
-                                            className="prompt-bar-liquid-button flex w-full items-center justify-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-white/5"
+                                            className="prompt-bar-liquid-button flex w-full items-center justify-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-[var(--toolbar-hover)]"
                                             style={{ color: 'var(--text-secondary)' }}
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -4201,7 +4242,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         {
                                             activeMenu === 'count' && (
                                                 <div className="absolute bottom-full mb-2 z-20" style={{ left: '50%', transform: 'translateX(-50%)' }}>
-                                                    <div className="dropdown static w-24 animate-scaleIn origin-bottom p-1 flex flex-col gap-1" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-medium)', boxShadow: 'var(--shadow-lg)' }}>
+                                                    <div className="dropdown static w-24 animate-scaleIn origin-bottom p-1 flex flex-col gap-1" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)', boxShadow: 'var(--frost-card-sub-shadow)' }}>
                                                         {(config.mode === GenerationMode.PPT
                                                             ? Array.from({ length: 20 }, (_, i) => i + 1)
                                                             : [1, 2, 3, 4]
@@ -4231,7 +4272,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     left: contextMenu.x,
                                                     background: 'var(--prompt-bar-shell-bg)',
                                                     borderColor: 'var(--prompt-bar-shell-border)',
-                                                    boxShadow: 'var(--shadow-lg)',
+                                                    boxShadow: 'var(--frost-card-sub-shadow)',
                                                 }}
                                             >
                                                 <button
@@ -4278,9 +4319,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 <div
                                                     className="w-full max-w-md rounded-[20px] border p-5 space-y-4"
                                                     style={{
-                                                        background: 'var(--bg-overlay)',
+                                                        background: 'var(--frost-card-framework-bg)',
                                                         borderColor: 'var(--prompt-bar-shell-border)',
-                                                        boxShadow: 'var(--shadow-xl)',
+                                                        boxShadow: 'var(--frost-card-framework-shadow)',
                                                     }}
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
@@ -4303,7 +4344,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                             placeholder="留空则使用默认名称"
                                                             className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
                                                             style={{
-                                                                background: 'var(--bg-input)',
+                                                                background: 'var(--frost-input-bg)',
                                                                 borderColor: 'var(--prompt-bar-shell-border)',
                                                                 color: 'var(--text-primary)',
                                                             }}
@@ -4318,7 +4359,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                             rows={2}
                                                             className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
                                                             style={{
-                                                                background: 'var(--bg-input)',
+                                                                background: 'var(--frost-input-bg)',
                                                                 borderColor: 'var(--prompt-bar-shell-border)',
                                                                 color: 'var(--text-primary)',
                                                             }}

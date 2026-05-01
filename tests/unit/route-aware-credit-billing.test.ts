@@ -24,9 +24,10 @@ test('generation and result billing logic stays route-aware for user-owned keys'
     /selectedKeyForBilling\?\.id \|\| preferredKeyIdForBilling/,
   );
   assert.match(
-    appSource,
-    /const selectedKeyForBilling = billingStateContext\.selectedKeyForBilling;/,
+    generationRuntimeSource,
+    /selectedKeyForBilling: initialSubmissionContext\.selectedKeyForBilling,/,
   );
+  assert.doesNotMatch(appSource, /const selectedKeyForBilling = initialSubmissionContext\.selectedKeyForBilling;/);
   assert.match(
     billingSource,
     /if \(target\.keySlotId && !routeResolvedAsCredits\) \{\s*return false;\s*\}/,

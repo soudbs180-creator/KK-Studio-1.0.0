@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AspectRatio } from '../../types';
 import { getCardDimensions } from '../../utils/styleUtils';
@@ -25,6 +25,14 @@ interface PendingNodeProps {
     onDisconnect?: () => void;
 }
 
+const pendingPromptSurfaceStyle: React.CSSProperties = {
+    background: 'var(--frost-card-main-bg)',
+    borderColor: 'var(--frost-card-main-border)',
+    boxShadow: 'var(--frost-card-main-shadow)',
+    WebkitBackdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
+    backdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
+};
+
 const PendingNode: React.FC<PendingNodeProps> = ({
     prompt,
     parallelCount,
@@ -43,15 +51,15 @@ const PendingNode: React.FC<PendingNodeProps> = ({
     const dragStartPos = useRef({ x: 0, y: 0 });
     const stackZIndex = elevateCanvasStackZIndex(40, isDragging);
 
-    // 生成计时器
+    // 鐢熸垚璁℃椂鍣?
     const [elapsedTime, setElapsedTime] = useState(0);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // 预览卡30秒超时销毁
+    // 棰勮鍗?0绉掕秴鏃堕攢姣?
     const [idleTime, setIdleTime] = useState(0);
     const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // 计时器逻辑 (生成中计时)
+    // 璁℃椂鍣ㄩ€昏緫 (鐢熸垚涓鏃?
     useEffect(() => {
         if (isGenerating) {
             setElapsedTime(0);
@@ -71,7 +79,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
         };
     }, [isGenerating]);
 
-    // 30秒无操作自动销毁预览卡
+    // 30绉掓棤鎿嶄綔鑷姩閿€姣侀瑙堝崱
     useEffect(() => {
         if (!isGenerating && prompt) {
             setIdleTime(0);
@@ -147,7 +155,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
         };
     }, [isDragging, dragOffset, position, canvasTransform.scale, onPositionChange]);
 
-    // 如果不在生成中,显示预览模式
+    // 濡傛灉涓嶅湪鐢熸垚涓?鏄剧ず棰勮妯″紡
     if (!isGenerating) {
         return (
             <div
@@ -164,21 +172,17 @@ const PendingNode: React.FC<PendingNodeProps> = ({
             >
                 <div
                     className="rounded-xl p-3 border min-w-[280px] max-w-[320px]"
-                    style={{
-                        background: 'var(--bg-secondary)',
-                        borderColor: 'var(--border-default)',
-                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
-                    }}
+                    style={pendingPromptSurfaceStyle}
                 >
                     <div className="flex items-center gap-2 text-[var(--text-tertiary)] mb-2">
                         <Loader2 size={12} className="animate-spin" />
-                        <span className="text-[10px] font-medium">图像正在准备...</span>
+                        <span className="text-[10px] font-medium">鍥惧儚姝ｅ湪鍑嗗...</span>
                         {onDisconnect && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); onDisconnect(); }}
                                 className="ml-auto w-4 h-4 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-colors"
                             >
-                                <span className="text-red-400 text-[10px]">×</span>
+                                <span className="text-red-400 text-[10px]">脳</span>
                             </button>
                         )}
                     </div>
@@ -189,11 +193,11 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                     key={img.id || idx}
                                     src={toReferenceImageDataUrl(img.data, img.mimeType)}
                                     alt="Reference"
-                                    className="w-8 h-8 object-cover rounded border border-[var(--border-light)]"
+                                    className="w-8 h-8 object-cover rounded border border-[color:var(--frost-card-sub-border)]"
                                 />
                             ))}
                             {referenceImages.length > 3 && (
-                                <div className="w-8 h-8 rounded border border-[var(--border-light)] bg-[var(--bg-tertiary)] flex items-center justify-center text-[10px] text-[var(--text-tertiary)]">
+                                <div className="w-8 h-8 rounded border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] flex items-center justify-center text-[10px] text-[var(--text-tertiary)]">
                                     +{referenceImages.length - 3}
                                 </div>
                             )}
@@ -205,12 +209,12 @@ const PendingNode: React.FC<PendingNodeProps> = ({
         );
     }
 
-    // 生成中状态 - 显示主卡和副占位卡
+    // 鐢熸垚涓姸鎬?- 鏄剧ず涓诲崱鍜屽壇鍗犱綅鍗?
     const cardWidth = w;
     const cardHeight = h;
-    const gapToPlaceholders = 80; // 主卡到副卡的间距
+    const gapToPlaceholders = 80; // 涓诲崱鍒板壇鍗＄殑闂磋窛
 
-    // 2x2 宫格布局参数
+    // 2x2 瀹牸甯冨眬鍙傛暟
     const COLS = 2;
     const GAP = 16;
 
@@ -227,14 +231,10 @@ const PendingNode: React.FC<PendingNodeProps> = ({
             onMouseDown={handleMouseDown}
             onTouchStart={handleMouseDown}
         >
-            {/* 主Prompt卡 */}
+            {/* 涓籔rompt鍗?*/}
             <div
                 className="rounded-xl p-3 border min-w-[280px] max-w-[320px]"
-                style={{
-                    background: 'var(--bg-secondary)',
-                    borderColor: 'var(--border-default)',
-                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
-                }}
+                style={pendingPromptSurfaceStyle}
             >
                 <div className="flex items-center gap-2 text-[var(--text-tertiary)] mb-2">
                     <div className="w-2 h-2 rounded-full bg-[var(--text-tertiary)] animate-pulse" />
@@ -247,11 +247,11 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                 key={img.id || idx}
                                 src={toReferenceImageDataUrl(img.data, img.mimeType)}
                                 alt="Reference"
-                                className="w-8 h-8 object-cover rounded border border-[var(--border-light)]"
+                                className="w-8 h-8 object-cover rounded border border-[color:var(--frost-card-sub-border)]"
                             />
                         ))}
                         {referenceImages.length > 3 && (
-                            <div className="w-8 h-8 rounded border border-[var(--border-light)] bg-[var(--bg-tertiary)] flex items-center justify-center text-[10px] text-[var(--text-tertiary)]">
+                            <div className="w-8 h-8 rounded border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] flex items-center justify-center text-[10px] text-[var(--text-tertiary)]">
                                 +{referenceImages.length - 3}
                             </div>
                         )}
@@ -260,30 +260,30 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                 <p className="text-[var(--text-secondary)] text-xs leading-relaxed line-clamp-3">{prompt}</p>
             </div>
 
-            {/* 副占位卡 - 2x2 宫格布局 */}
+            {/* Secondary placeholder cards in a 2x2 grid */}
             <div className="relative" style={{ height: 0 }}>
                 {Array.from({ length: parallelCount }).map((_, i) => {
                     const row = Math.floor(i / COLS);
                     const indexInRow = i - row * COLS;
 
-                    // 计算居中: 实际列数 = min(COLS, parallelCount)
+                    // 璁＄畻灞呬腑: 瀹為檯鍒楁暟 = min(COLS, parallelCount)
                     const actualCols = Math.min(COLS, parallelCount - row * COLS);
                     const totalW = actualCols * cardWidth + (actualCols - 1) * GAP;
 
-                    // 每个卡片的left偏移 (相对于中心点)
+                    // 姣忎釜鍗＄墖鐨刲eft鍋忕Щ (鐩稿浜庝腑蹇冪偣)
                     const offsetX = -totalW / 2 + indexInRow * (cardWidth + GAP) + cardWidth / 2;
 
-                    // 每个卡片的top偏移
+                    // 姣忎釜鍗＄墖鐨則op鍋忕Щ
                     const offsetY = gapToPlaceholders + row * (cardHeight + GAP);
 
-                    // 格式化计时
+                    // 鏍煎紡鍖栬鏃?
                     const mins = Math.floor(elapsedTime / 60);
                     const secs = elapsedTime % 60;
                     const timeStr = mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
 
                     return (
                         <React.Fragment key={i}>
-                            {/* 连接线 */}
+                            {/* 杩炴帴绾?*/}
                             <svg
                                 className="pointer-events-none"
                                 style={{
@@ -303,7 +303,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                 />
                             </svg>
 
-                            {/* 副占位卡 - 适配主题背景 + 扫光动画 */}
+                            {/* Secondary placeholder card with frosted motion */}
                             <div
                                 style={{
                                     position: 'absolute',
@@ -314,9 +314,11 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                     transform: 'translateX(-50%)',
                                     borderRadius: '16px',
                                     overflow: 'hidden',
-                                    boxShadow: 'var(--shadow-xl, 0 8px 32px rgba(0,0,0,0.3))',
-                                    border: '1px solid var(--border-medium)',
-                                    background: 'var(--bg-secondary)',
+                                    boxShadow: 'var(--frost-card-main-shadow)',
+                                    border: '1px solid var(--frost-card-main-border)',
+                                    background: 'var(--frost-card-main-bg)',
+                                    WebkitBackdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
+                                    backdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
                                     display: 'flex',
                                     flexDirection: 'column',
                                     alignItems: 'center',
@@ -324,7 +326,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                     zIndex: 10
                                 }}
                             >
-                                {/* 45°倾斜扫光动画 + 磨砂效果 */}
+                                {/* 45掳鍊炬枩鎵厜鍔ㄧ敾 + 纾ㄧ爞鏁堟灉 */}
                                 <div
                                     style={{
                                         position: 'absolute',
@@ -340,9 +342,9 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                     }}
                                 />
 
-                                {/* 流体光晕动画底座 */}
+                                {/* 娴佷綋鍏夋檿鍔ㄧ敾搴曞骇 */}
                                 <div style={{ position: 'absolute', left: '50%', top: '50%', pointerEvents: 'none', zIndex: 1 }}>
-                                    {/* 外层流体 */}
+                                    {/* 澶栧眰娴佷綋 */}
                                     <div
                                         style={{
                                             position: 'absolute',
@@ -350,13 +352,13 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                             height: '140px',
                                             marginLeft: '-70px',
                                             marginTop: '-70px',
-                                            background: 'linear-gradient(45deg, rgba(99,102,241,0.15) 0%, rgba(168,85,247,0.15) 100%)',
+                                            background: 'linear-gradient(45deg, rgb(255 77 139 / 0.14) 0%, rgb(255 176 132 / 0.14) 100%)',
                                             animation: 'fluid-shape 8s ease-in-out infinite, spin-slow 15s linear infinite',
                                             filter: 'blur(8px)',
                                             mixBlendMode: 'screen'
                                         }}
                                     />
-                                    {/* 内层交错流体 */}
+                                    {/* Inner accent glow */}
                                     <div
                                         style={{
                                             position: 'absolute',
@@ -364,7 +366,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                             height: '100px',
                                             marginLeft: '-50px',
                                             marginTop: '-50px',
-                                            background: 'linear-gradient(135deg, rgba(56,189,248,0.2) 0%, rgba(99,102,241,0.2) 100%)',
+                                            background: 'linear-gradient(135deg, rgb(255 176 132 / 0.16) 0%, rgb(255 107 90 / 0.16) 100%)',
                                             animation: 'fluid-shape 6s ease-in-out infinite reverse, spin-slow 10s linear infinite reverse',
                                             filter: 'blur(4px)',
                                             mixBlendMode: 'screen'
@@ -372,7 +374,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                     />
                                 </div>
 
-                                {/* 内容 */}
+                                {/* 鍐呭 */}
                                 <div style={{
                                     position: 'relative',
                                     zIndex: 10,
@@ -385,22 +387,22 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                         width: 52,
                                         height: 52,
                                         borderRadius: '50%',
-                                        background: 'var(--bg-tertiary)',
-                                        border: '1px solid rgba(99,102,241,0.3)',
-                                        boxShadow: '0 0 16px rgba(99,102,241,0.2) inset',
+                                        background: 'var(--frost-card-sub-bg)',
+                                        border: '1px solid var(--frost-card-sub-border)',
+                                        boxShadow: 'var(--frost-card-sub-shadow)',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         animation: 'float-up-down 4s ease-in-out infinite'
                                     }}>
-                                        <Loader2 size={24} style={{ color: 'var(--accent-primary, #818cf8)' }} className="animate-spin" />
+                                        <Loader2 size={24} style={{ color: 'var(--accent-coral)' }} className="animate-spin" />
                                     </div>
                                     <span style={{
                                         fontSize: '24px',
                                         color: 'var(--text-primary)',
                                         fontWeight: 700,
                                         fontFamily: 'monospace',
-                                        textShadow: '0 0 12px rgba(99,102,241,0.4)',
+                                        textShadow: 'none',
                                         letterSpacing: '1px',
                                         marginTop: '4px'
                                     }}>
@@ -412,7 +414,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                         textTransform: 'uppercase',
                                         letterSpacing: '1px'
                                     }}>
-                                        生成中 #{i + 1}
+                                        Generating #{i + 1}
                                     </span>
                                 </div>
                             </div>
@@ -421,7 +423,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                 })}
             </div>
 
-            {/* 动画CSS */}
+            {/* 鍔ㄧ敾CSS */}
             <style>{`
                 @keyframes shimmer-move {
                     0% { background-position: 200% 200%; }

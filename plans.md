@@ -1,19 +1,21 @@
-# KK-Studio v1.4.2 Refactor Plan
+# KK-Studio v1.4.2 Clay UI Audit Plan
 
-Last updated: 2026-04-29
+Last updated: 2026-05-01
 Branch policy: continue on the current branch unless the user explicitly asks for a branch or worktree.
 
 ## Summary
 
-The current execution line is the KK-Studio v1.4.2 progressive refactor. The goal is to reduce the largest legacy front-end files without interrupting the existing `src/` runtime, then migrate stabilized modules to `apps/web/`.
+The active execution lane is the KK-Studio Clay UI audit. Stage One PPT/runtime extraction is paused in this thread and remains dirty work only; keep its files out of the UI audit commit. Browser inspection applies to this UI lane.
 
-The refactor must not become a rewrite. Each milestone is a small, verifiable extraction or cleanup with a scoped commit. `apps/api/` is structurally healthy and is only checked for compatibility when front-end contracts touch API behavior.
+The work must remain surgical. Reconcile `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces without redesigning flows or folding in unrelated runtime/PPT WIP.
 
-Current user override: execute the Airtable-inspired global UI refit before continuing the staged refactor milestones. This UI refit keeps the same execution loop: failing source contracts first, scoped UI/doc implementation second, validation third, status update fourth, then one scoped commit.
+Current user override: inputs, main cards, sub cards, and framework cards must use controlled frosted material. Dark mode must use neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Keep Clay brand colors for emphasis only.
+
+Commit boundary: UI audit files and tests only. Existing dirty runtime/PPT files such as `src/App.tsx`, `src/app/useGenerationRuntime.ts`, `src/app/usePptRuntime.ts`, and PPT/generation runtime tests must not be staged into the UI commit; they remain paused until a separate runtime pass resumes them.
 
 ## Current Baseline
 
-- `src/App.tsx`: 10395 lines.
+- `src/App.tsx`: 6961 lines in the current mixed worktree; runtime/PPT edits remain paused and outside the UI commit boundary.
 - `src/app/useConnectorRenderer.ts`: 272 lines, already extracted and awaiting hardening.
 - `src/context/CanvasContext.tsx`: 5434 lines.
 - `src/services/auth/keyManager.ts`: 5280 lines.
@@ -36,26 +38,29 @@ Every milestone follows this order:
 
 ## Milestones
 
-### 0. Airtable-Inspired Global UI Refit
+### 0. Clay Frosted UI Audit
 
-Goal: replace the older Apple/dark-heavy UI rules with a light-first Airtable-style system while keeping controlled frosted glass on key shells and cards.
+Goal: replace the older Apple/dark-heavy/Airtable UI drift with a Clay system: warm cream light theme, neutral black-gray dark theme, controlled frosted material for inputs/main cards/sub cards/framework cards, near-black or cream readable text, saturated color blocks for emphasis, no blue/teal dark canvas, and no whole-page theme flicker.
+
+Current status: active in this thread. PPT/runtime work is paused and must keep its own future commit boundary.
 
 Scope:
-- Create the root `DESIGN.md` Airtable reference from the cached `getdesign` Airtable guidance without running unconfirmed external code.
-- Rewrite `docs/DESIGN.md` and `.agent/rules/skills/SKILL.md` so Airtable clarity is canonical.
-- Refactor `src/index.css` tokens toward deep navy text `#181d26`, Airtable Blue `#1b61c9`, subtle borders, low blue-tinted shadows, and capped glass depth.
-- Rework `SearchPalette.tsx`, `SettingsScaffold.tsx`, `src/components/settings/ui/index.tsx`, and `ApiSettingsView.tsx` around shared motion, focus, selected-state, and operation-weighting rules.
+- Create the root `DESIGN.md` Clay reference from the cached `getdesign` Clay guidance.
+- Rewrite `docs/DESIGN.md` and `.agent/rules/skills/SKILL.md` so Clay is canonical.
+- Refactor `src/index.css` tokens toward Clay canvas `#fffaf0`, ink `#0a0a0a`, neutral dark canvas `#0b0b0c`, neutral dark surfaces `#141414` / `#1f1f1f`, controlled frosted surface tokens, and Clay pink/coral/teal accents.
+- Rework `SearchPalette.tsx`, `ThemeContext.tsx`, canvas-card shadow helpers, settings surface tokens, and responsive surface contracts around shared Clay tokens.
+- Apply frosted tokens to search palette, sidebar, mobile shell, prompt/composer input, settings inputs/cards/shells, storage/tag/image option modals, prompt/image/framework canvas cards, and ecommerce panels where those surfaces already exist.
 - Preserve unrelated billing/API backend work and do not stage unrelated paths.
 
 Acceptance:
-- New UI contract tests cover the manual/rule presence, search palette constraints, settings primitive behavior, API default weighting, and shadow/glass depth.
-- Search palette has no heavy Tailwind shadows, no local indigo selected state, no inline focus mutation, and no overflow-prone floating confirmation.
-- Settings controls share the same motion scale and overflow-safe control sizing.
-- API settings default view emphasizes add/edit/refresh actions over repeated status/explanatory blocks.
-- Documentation and agent rules name Airtable as the canonical UI system and preserve existing governance-required rule sections.
+- UI contract tests cover Clay manual/rule presence, light/dark contrast, dark canvas neutrality, flat card depth, search palette constraints, responsive settings/search surfaces, and no whole-document theme transition.
+- Search palette has no heavy Tailwind shadows, no local indigo selected state, no inline focus mutation, and uses separate desktop command-surface and mobile bottom-sheet geometry.
+- Settings and onboarding keep separate mobile and desktop logic.
+- Infinite canvas dark background is `#0b0b0c`, not blue/teal; main/sub/framework surfaces use tokenized frosted material with readable solid fallbacks.
+- Documentation and agent rules name Clay as the canonical UI system and preserve existing governance-required rule sections.
 
 Validation:
-- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/settings-ui-density-regression.test.ts tests/unit/api-settings-provider-compact-ui-contract.test.ts tests/unit/api-settings-simple-mode-contract.test.ts tests/unit/airtable-global-ui-refit-contract.test.ts`
+- `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/clay-global-ui-refit-contract.test.ts tests/unit/clay-frosted-surface-contract.test.ts tests/unit/theme-contrast-contract.test.ts tests/unit/responsive-surface.test.ts tests/unit/theme-system-adaptation.test.ts tests/unit/settings-entry-surface-style-regression.test.ts`
 - `npm.cmd run verify:mobile-settings-smoke`
 - `npm.cmd run verify:desktop-settings-smoke`
 - `npm.cmd run typecheck`
@@ -64,7 +69,7 @@ Validation:
 - `npm.cmd run check:encoding`
 
 Commit:
-- `refactor: apply airtable global ui refit`
+- `refactor: audit clay frosted ui surfaces`
 
 ### 1. Refactor Ledger Alignment
 
@@ -149,7 +154,9 @@ Acceptance:
 Commit:
 - `refactor: extract generation runtime`
 
-### 5. Stage One M4: PPT Runtime
+### 5. Stage One M5: PPT Runtime
+
+Status: paused while the Clay UI audit is active. Keep the PPT commit boundary separate from the UI audit lane.
 
 Goal: extract PPT editing, preview, export, and deck child image management from `src/App.tsx`.
 
@@ -166,7 +173,7 @@ Acceptance:
 Commit:
 - `refactor: extract ppt runtime`
 
-### 6. Stage One M5: Ecommerce Runtime
+### 6. Stage One M6: Ecommerce Runtime
 
 Goal: extract ecommerce framework/runtime logic last because it has the highest cross-reference count.
 

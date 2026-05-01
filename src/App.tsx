@@ -5,7 +5,7 @@ import PromptNodeComponent from './components/canvas/PromptNodeComponent';
 import PendingNode from './components/canvas/PendingNode';
 // KeyManagerModal removed - integrated into UserProfileModal
 import ChatSidebar from './components/layout/ChatSidebar';
-import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, ReferenceImage, type PartialRedrawRequest, type AgentWorkflowNode, type PreviewWorkflowNode, type SaveWorkflowNode, type PptEditableImageLayer, type PptEditablePage, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceAPlusControlMode, type EcommerceEditableTaskState, type EcommerceTaskAssetRoleBinding, type EcommerceGroupSheet, type EcommerceImageRef, type EcommerceSheetSetting, type EcommerceSheetSettingPatch, type EcommerceFrameworkRuntimeState, type EcommerceFrameworkQueueItem } from './types';
+import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, ReferenceImage, type PartialRedrawRequest, type AgentWorkflowNode, type PreviewWorkflowNode, type SaveWorkflowNode, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceAPlusControlMode, type EcommerceEditableTaskState, type EcommerceTaskAssetRoleBinding, type EcommerceGroupSheet, type EcommerceImageRef, type EcommerceSheetSetting, type EcommerceSheetSettingPatch, type EcommerceFrameworkRuntimeState, type EcommerceFrameworkQueueItem } from './types';
 import { Image as ImageIcon, MessageSquare, Plus, Trash2, Shield, FileText, CheckCircle2, History, CreditCard, ChevronDown, Wand2, RefreshCw, Star, Coins, Settings } from 'lucide-react';
 import { SelectionMenu } from './components/canvas/SelectionMenu';
 import { CanvasGroupComponent } from './components/canvas/CanvasGroupComponent';
@@ -56,7 +56,7 @@ import { clampGenerationDurationMs } from './utils/timeUtils';
 import { resolveModelDisplayName } from './utils/modelDisplayName';
 import { resolveProviderIdentity } from './utils/providerDisplay';
 import { pickByDocumentLanguage } from './utils/localeText';
-import { base64ToBlob, generateDownloadFilename, triggerDownload } from './utils/downloadUtils';
+import { generateDownloadFilename, triggerDownload } from './utils/downloadUtils';
 import {
   getReferenceImageLookupIds,
   normalizeReferenceImagesStorage,
@@ -83,15 +83,10 @@ import { buildSoftConnectorPath, getSoftConnectorPointAt } from './canvas/connec
 import AppDesktopChrome from './app/AppDesktopChrome';
 import AppCanvasOverlays from './app/AppCanvasOverlays';
 import AppMobileWorkspace from './app/AppMobileWorkspace';
-import { buildPptSlidesPreviewHtml } from './app/buildPptSlidesPreviewHtml';
-import { buildPptxSlideRelationshipsXml, buildPptxSlideXml } from './app/buildPptxSlideDocuments';
 import { buildCompletedPromptNodePatch } from './app/buildCompletedPromptNodePatch';
-import { prepareRetriedExecutionNode } from './app/prepareRetriedExecutionNode';
-import { buildRetryExecutionNode } from './app/buildRetryExecutionNode';
 import { optimizeGenerationPrompt } from './app/optimizeGenerationPrompt';
 import { resolveFollowUpDraftPosition } from './app/followUpDraftPosition';
 import { buildPromptGroupRenderLayout } from './app/promptGroupRenderLayout';
-import { writePptxPackageSkeleton } from './app/writePptxPackageSkeleton';
 import { useAppPromptBarProps } from './app/useAppPromptBarProps';
 import { useCanvasDragConnection } from './app/useCanvasDragConnection';
 import { useCanvasSelectionBox } from './app/useCanvasSelectionBox';
@@ -108,6 +103,7 @@ import { useWorkflowActions } from './app/useWorkflowActions';
 import { useConnectorRenderer } from './app/useConnectorRenderer';
 import { usePromptGroupLayout, usePromptGroupStacking } from './app/usePromptGroupLayout';
 import { useGenerationRuntime } from './app/useGenerationRuntime';
+import { usePptRuntime } from './app/usePptRuntime';
 import { resolveProviderKeyType } from './services/api/providerStrategy.ts';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
@@ -312,17 +308,6 @@ import { saveImage, saveOriginalImage, normalizePersistableMediaSource } from '.
 import { cancelImageLoad, loadImage } from './services/image/imageLoader';
 import { ImageQuality } from './services/image/imageQuality';
 import { calculateImageHash } from './utils/imageUtils';
-import { normalizePptSlidesForCount, buildAutoPptSlides } from './utils/pptUtils';
-import {
-  PPT_EDITABLE_CANVAS,
-  buildPptEditablePages,
-  getPromptPptImageNodes,
-  getPptTextLayer,
-  patchPptTextLayer,
-  sortPptLayers,
-  syncPptSlidesFromEditablePages,
-} from './utils/pptEditable';
-import { buildPptDeckModuleState } from './utils/pptDeckModules';
 import { useImageGeneration } from './hooks/useImageGeneration';
 import { useWorkspaceSurface, type SettingsSurfaceView } from './hooks/useWorkspaceSurface';
 import { WorkspaceSurfacePanels } from './components/workspace/WorkspaceSurfacePanels';
@@ -553,11 +538,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     return separatorIndex !== -1 && rawModelId.slice(separatorIndex + 1).trim().length > 0;
   }, []);
 
-  const showNoPptPagesWarning = useCallback(() => {
-    import('./services/system/notificationService').then(({ notify }) => {
-      notify.warning('无可导出页面', '当前主卡还没有生成副卡页面');
-    });
-  }, []);
 
   // Track reserved regions for rapid-fire generation to prevent overlaps (before React update reflects)
   const reservedRegionsRef = useRef<{ bounds: { x: number; y: number; width: number; height: number }; timestamp: number; }[]>([]);
@@ -570,15 +550,38 @@ const AppContent: React.FC<AppContentProps> = () => {
   const [pptStackPreview, setPptStackPreview] = useState<{ images: GeneratedImage[]; initialIndex: number } | null>(null);
   const [pptDeckEditor, setPptDeckEditor] = useState<{ nodeId: string; initialIndex: number } | null>(null);
   const [showMigrateModal, setShowMigrateModal] = useState(false); // 🎯 迁移弹窗状态
+  const {
+    buildPptPageAlias,
+    getOrderedPptNodeBundle,
+    resolvePptImageBlob,
+    tryOpenPptPreview,
+    handleExportPptPackageEditable,
+    handleExportPptxEditable,
+    handleDownloadPptComposite,
+    handleExportPptSinglePage,
+    handleEditPptTextFromLightbox,
+    handleSavePptEditablePages,
+    handleOpenPptDeckEditor,
+    handleOpenPptDeckEditorFromImage,
+    handleOpenPptStackPreview,
+    isPptDeckChildImageNode,
+    resolveCurrentPromptChildImages,
+  } = usePptRuntime({
+    activeCanvasRef,
+    pickByDocumentLanguage,
+    setPreviewImages,
+    setPreviewInitialIndex,
+    setPptDeckEditor,
+    setPptStackPreview,
+    updateImageNode,
+    updatePromptNode,
+  });
 
   const handleOpenPreview = useCallback((imageId: string) => {
     const canvas = activeCanvasRef.current;
     if (!canvas) return;
 
-    const pptBundle = getOrderedPptPreviewBundle(imageId);
-    if (pptBundle) {
-      setPreviewImages(pptBundle.images);
-      setPreviewInitialIndex(pptBundle.currentIndex);
+    if (tryOpenPptPreview(imageId)) {
       return;
     }
 
@@ -636,7 +639,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       setPreviewImages(list);
       setPreviewInitialIndex(idx >= 0 ? idx : 0);
     }
-  }, [getOrderedPptPreviewBundle]);
+  }, [activeCanvasRef, tryOpenPptPreview]);
 
   // Reactively track KeyManager state
   const [keyStats, setKeyStats] = useState(() => keyManager.getStats());
@@ -3292,33 +3295,12 @@ const AppContent: React.FC<AppContentProps> = () => {
 
   const {
     handleCancelGeneration,
+    handleRetryPptSinglePage,
     ensureCreditAttemptCharged,
-    prepareInitialCreditSettlement,
-    prepareGenerationDraftContext,
-    prepareInitialBillingAttemptContext,
-    prepareGenerationBillingStateContext,
-    prepareInitialGeneratingPromptNode,
-    persistInitialGeneratingPromptNode,
-    prepareInitialGenerationPromptOptimization,
-    completeInitialGenerationPromptSubmission,
-    commitRetryGenerationFailure,
-    executeInitialGenerationPromptNode,
-    reportInitialGenerationFailure,
-    runRetryGeneratedMediaAttemptWithGuard,
-    prepareRetryGeneratedMediaAttemptContext,
-    commitRetryGenerationStart,
-    reportRetryRecoveryResult,
-    prepareRetryGenerationRequestContext,
-    commitRetryGeneratedMediaSuccess,
-    prepareRetryGenerationTaskPromptContext,
-    resolveRetryGeneratedMediaGenerationTime,
-    executeRetryGeneratedMediaRequest,
-    applyRetryGeneratedMediaAuthoritativeBalance,
-    prepareRetryGeneratedMediaPersistence,
-    scheduleRetryGeneratedMediaCloudSync,
-    resolveRetryGeneratedMediaDimensions,
-    buildRetryGeneratedMediaResultFromContext,
-    prepareRetryGeneratedMediaSuccessCommitContext,
+    prepareInitialGenerationSubmissionContext,
+    runInitialGenerationSubmissionTransaction,
+    prepareRetryGeneratedMediaExecutionContext,
+    completeRetryGeneratedMediaBatch,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
@@ -3326,6 +3308,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     updatePromptNode,
     cancelGenerationRequest: cancelGeneration,
     cancelSystemProxyTask: cancelSecureSystemProxyTask,
+    updateImageNode,
     authLoading,
     user,
     isTempUser,
@@ -3336,6 +3319,14 @@ const AppContent: React.FC<AppContentProps> = () => {
     refundCreditsByTransaction,
     refreshBilling,
     adjustBalanceOptimistically,
+    applyAuthoritativeBalance,
+    rememberPreferredKeyForMode,
+    buildPptPageAlias,
+    resolveProviderDisplay,
+    resolveModelDisplayName,
+    resolveNodeRouteState,
+    resolveCreditCostForModel,
+    generateImage,
   });
 
 
@@ -3447,223 +3438,6 @@ const AppContent: React.FC<AppContentProps> = () => {
       return undefined;
     }
     return details;
-  }, []);
-
-  const parsePptOutlineLine = useCallback((raw?: string) => {
-    const text = String(raw || '').trim();
-    if (!text) return { title: '', subtitle: '' };
-
-    const splitBy = (token: string) => {
-      const idx = text.indexOf(token);
-      if (idx <= 0) return null;
-      const title = text.slice(0, idx).trim();
-      const subtitle = text.slice(idx + token.length).trim();
-      return { title, subtitle };
-    };
-
-    const byColon = splitBy('：') || splitBy(':');
-    if (byColon) return byColon;
-
-    const byDash = splitBy(' - ') || splitBy(' — ') || splitBy(' – ');
-    if (byDash) return byDash;
-
-    return { title: text, subtitle: '' };
-  }, []);
-
-  const buildPptPageAlias = useCallback((raw: string | undefined, pageIndex: number) => {
-    const parsed = parsePptOutlineLine(raw);
-    const title = parsed.title || parsed.subtitle || String(raw || '').trim();
-    return title || `第 ${pageIndex + 1} 页`;
-  }, [parsePptOutlineLine]);
-
-  function getOrderedPptPreviewBundle(imageId: string) {
-    const canvas = activeCanvasRef.current;
-    if (!canvas) return null;
-
-    const target = canvas.imageNodes.find((img) => img.id === imageId);
-    if (!target || target.mode !== GenerationMode.PPT || !target.parentPromptId) {
-      return null;
-    }
-
-    const promptNode = canvas.promptNodes.find((node) => node.id === target.parentPromptId);
-    if (!promptNode) return null;
-
-    const orderedIds = (promptNode.childImageIds || []).filter(Boolean) as string[];
-    const fallbackOrder = getPromptPptImageNodes(canvas.imageNodes, promptNode.id).map((img) => img.id);
-    const finalOrder = orderedIds.length > 0 ? orderedIds : fallbackOrder;
-
-    const images = finalOrder
-      .map((id) => canvas.imageNodes.find((img) => img.id === id))
-      .filter((img): img is GeneratedImage => !!img);
-
-    if (images.length === 0) return null;
-
-    const currentIndex = Math.max(0, images.findIndex((img) => img.id === imageId));
-    return {
-      promptNode,
-      images,
-      currentIndex,
-    };
-  }
-
-  const getOrderedPptNodeBundle = useCallback((nodeOrId: PromptNode | string) => {
-    const canvas = activeCanvasRef.current;
-    if (!canvas) return null;
-
-    const promptNode = typeof nodeOrId === 'string'
-      ? canvas.promptNodes.find((node) => node.id === nodeOrId)
-      : canvas.promptNodes.find((node) => node.id === nodeOrId.id) || nodeOrId;
-
-    if (!promptNode || promptNode.mode !== GenerationMode.PPT) return null;
-
-    const orderedIds = (promptNode.childImageIds || []).filter(Boolean) as string[];
-    const fallbackImages = getPromptPptImageNodes(canvas.imageNodes, promptNode.id);
-
-    const images = orderedIds.length > 0
-      ? orderedIds
-          .map((id) => canvas.imageNodes.find((img) => img.id === id))
-          .filter((img): img is GeneratedImage => !!img)
-      : fallbackImages;
-
-    if (images.length === 0) return null;
-
-    return {
-      promptNode,
-      images,
-    };
-  }, []);
-
-  const handleOpenPptDeckEditor = useCallback((nodeOrId: PromptNode | string, initialIndex = 0) => {
-    const bundle = getOrderedPptNodeBundle(nodeOrId);
-    if (!bundle) return;
-
-    setPptDeckEditor({
-      nodeId: bundle.promptNode.id,
-      initialIndex: Math.max(0, Math.min(initialIndex, bundle.images.length - 1)),
-    });
-  }, [getOrderedPptNodeBundle]);
-
-  const handleOpenPptDeckEditorFromImage = useCallback((image: GeneratedImage) => {
-    const bundle = getOrderedPptPreviewBundle(image.id);
-    if (!bundle) return;
-    handleOpenPptDeckEditor(bundle.promptNode, bundle.currentIndex);
-  }, [getOrderedPptPreviewBundle, handleOpenPptDeckEditor]);
-
-  const handleSavePptEditablePages = useCallback((nodeId: string, pages: PptEditablePage[]) => {
-    const canvas = activeCanvasRef.current;
-    if (!canvas) return;
-
-    const promptNode = canvas.promptNodes.find((node) => node.id === nodeId);
-    if (!promptNode) return;
-
-    const nextSlides = syncPptSlidesFromEditablePages(pages);
-    updatePromptNode({
-      ...promptNode,
-      pptEditablePages: pages,
-      pptSlides: nextSlides,
-      parallelCount: Math.max(promptNode.parallelCount || 1, nextSlides.length || 1),
-    });
-
-    const bundle = getOrderedPptNodeBundle(nodeId);
-    bundle?.images.forEach((image, index) => {
-      const alias = buildPptPageAlias(nextSlides[index], index);
-      updateImageNode(image.id, { alias });
-    });
-
-    setPreviewImages((prev) => {
-      if (!prev) return prev;
-      return prev.map((image, index) => {
-        const alias = nextSlides[index] ? buildPptPageAlias(nextSlides[index], index) : image.alias;
-        return alias ? { ...image, alias } : image;
-      });
-    });
-
-    setPptStackPreview((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        images: prev.images.map((image, index) => {
-          const alias = nextSlides[index] ? buildPptPageAlias(nextSlides[index], index) : image.alias;
-          return alias ? { ...image, alias } : image;
-        }),
-      };
-    });
-
-    import('./services/system/notificationService').then(({ notify }) => {
-      notify.success(
-        pickByDocumentLanguage('页面包已更新', 'Deck updated'),
-        pickByDocumentLanguage(
-          `已保存 ${pages.length} 页可编辑 PPT 页面。`,
-          `Saved ${pages.length} editable PPT page${pages.length === 1 ? '' : 's'}.`
-        )
-      );
-    });
-  }, [buildPptPageAlias, getOrderedPptNodeBundle, updateImageNode, updatePromptNode]);
-
-  const getPptEditableExportBundle = useCallback((node: PromptNode) => {
-    const bundle = getOrderedPptNodeBundle(node);
-    if (!bundle) return null;
-
-    const images = bundle.images.slice(0, 20);
-    const pages = buildPptEditablePages(bundle.promptNode, images);
-
-    return {
-      promptNode: bundle.promptNode,
-      images,
-      pages,
-      imageById: new Map(images.map((image) => [image.id, image] as const)),
-    };
-  }, [getOrderedPptNodeBundle]);
-
-  const requirePptEditableExportBundle = useCallback((node: PromptNode) => {
-    const exportBundle = getPptEditableExportBundle(node);
-    if (!exportBundle) {
-      showNoPptPagesWarning();
-      return null;
-    }
-
-    return exportBundle;
-  }, [getPptEditableExportBundle, showNoPptPagesWarning]);
-
-  const sanitizePptFileSegment = useCallback((value: string, fallback: string) => {
-    const normalized = String(value || '')
-      .replace(/[\\/:*?"<>|]/g, '_')
-      .replace(/\s+/g, ' ')
-      .trim();
-    return normalized || fallback;
-  }, []);
-
-  const resolvePptImageBlob = useCallback(async (image: GeneratedImage): Promise<{ blob: Blob; isOriginal: boolean }> => {
-    const { getStrictOriginalImage } = await import('./services/storage/imageStorage');
-
-    let isOriginal = true;
-    let source = await getStrictOriginalImage(image.id);
-    if (!source && image.storageId && image.storageId !== image.id) {
-      source = await getStrictOriginalImage(image.storageId);
-    }
-    if (!source) {
-      source = image.originalUrl || image.url;
-      isOriginal = false;
-    }
-    if (!source) {
-      throw new Error('未找到可用的图片源');
-    }
-
-    let blob: Blob;
-    if (source.startsWith('data:')) {
-      blob = base64ToBlob(source);
-    } else if (source.startsWith('blob:')) {
-      const response = await fetch(source);
-      if (!response.ok) throw new Error('无法读取本地图片数据');
-      blob = await response.blob();
-    } else {
-      const response = await fetch(source);
-      if (!response.ok) {
-        throw new Error(`下载图片失败：HTTP ${response.status}`);
-      }
-      blob = await response.blob();
-    }
-    return { blob, isOriginal };
   }, []);
 
   const sanitizeEcommerceExportName = useCallback((value: string, fallback: string) => {
@@ -3922,319 +3696,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
   }, [ecommerceState.groupSlots, resolveLatestEcommerceSlotImage, resolvePptImageBlob, sanitizeEcommerceExportName]);
 
-  const renderBlobIntoImage = useCallback((blob: Blob) => (
-    new Promise<HTMLImageElement>((resolve, reject) => {
-      const objectUrl = URL.createObjectURL(blob);
-      const image = new Image();
-      image.onload = () => {
-        URL.revokeObjectURL(objectUrl);
-        resolve(image);
-      };
-      image.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
-        reject(new Error('图片解码失败'));
-      };
-      image.src = objectUrl;
-    })
-  ), []);
-
-  const convertBlobToPng = useCallback(async (blob: Blob) => {
-    const image = await renderBlobIntoImage(blob);
-    const canvas = document.createElement('canvas');
-    canvas.width = image.naturalWidth || image.width;
-    canvas.height = image.naturalHeight || image.height;
-
-    const context = canvas.getContext('2d');
-    if (!context) {
-      throw new Error('无法创建导出画布');
-    }
-
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-
-    const pngBlob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, 'image/png', 1);
-    });
-
-    if (!pngBlob) {
-      throw new Error('无法转换图片格式');
-    }
-
-    return pngBlob;
-  }, [renderBlobIntoImage]);
-
-  const resolvePptExportImageAsset = useCallback(async (image: GeneratedImage) => {
-    const { blob } = await resolvePptImageBlob(image);
-    const type = String(blob.type || '').toLowerCase();
-
-    if (type.includes('png')) {
-      return { blob, ext: 'png' as const, mime: 'image/png' };
-    }
-    if (type.includes('jpeg') || type.includes('jpg')) {
-      return { blob, ext: 'jpg' as const, mime: 'image/jpeg' };
-    }
-
-    const pngBlob = await convertBlobToPng(blob);
-    return { blob: pngBlob, ext: 'png' as const, mime: 'image/png' };
-  }, [convertBlobToPng, resolvePptImageBlob]);
-
-  const renderPptEditablePagePreviewBlob = useCallback(async (
-    page: PptEditablePage,
-    imageById: Map<string, GeneratedImage>,
-  ) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = PPT_EDITABLE_CANVAS.width;
-    canvas.height = PPT_EDITABLE_CANVAS.height;
-
-    const context = canvas.getContext('2d');
-    if (!context) {
-      throw new Error('无法创建页面预览画布');
-    }
-
-    context.fillStyle = '#020617';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.textBaseline = 'top';
-
-    const normalizeColor = (value?: string, fallback = '#FFFFFF') => {
-      const raw = String(value || '').trim();
-      if (/^#[0-9a-fA-F]{3}$/.test(raw) || /^#[0-9a-fA-F]{6}$/.test(raw)) {
-        return raw;
-      }
-      return fallback;
-    };
-
-    for (const layer of sortPptLayers(page.layers)) {
-      if (!layer.visible) continue;
-
-      if (layer.type === 'image') {
-        const sourceImageId = layer.imageNodeId || page.backgroundImageId;
-        const sourceImage = sourceImageId ? imageById.get(sourceImageId) : undefined;
-        const sourceBlob = sourceImage ? (await resolvePptImageBlob(sourceImage)).blob : null;
-        const imageElement = sourceBlob ? await renderBlobIntoImage(sourceBlob) : null;
-
-        if (!imageElement) continue;
-
-        context.save();
-        context.globalAlpha = Math.max(0, Math.min(1, layer.opacity ?? 1));
-        context.drawImage(imageElement, layer.x, layer.y, layer.width, layer.height);
-        context.restore();
-        continue;
-      }
-
-      if (!layer.text.trim()) continue;
-
-      const backgroundOpacity = Math.max(0, Math.min(1, (layer.backgroundOpacity ?? 0) * (layer.opacity ?? 1)));
-      if (layer.backgroundColor && backgroundOpacity > 0) {
-        context.save();
-        context.globalAlpha = backgroundOpacity;
-        context.fillStyle = normalizeColor(layer.backgroundColor, '#111827');
-        context.fillRect(layer.x, layer.y, layer.width, layer.height);
-        context.restore();
-      }
-
-      const paddingX = 24;
-      const paddingY = 18;
-      const availableWidth = Math.max(0, layer.width - paddingX * 2);
-      const lines = layer.text.split(/\r?\n/);
-
-      context.save();
-      context.globalAlpha = Math.max(0, Math.min(1, layer.opacity ?? 1));
-      context.fillStyle = normalizeColor(layer.color, '#FFFFFF');
-      context.font = `${layer.fontWeight || 500} ${layer.fontSize}px "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif`;
-      context.textAlign = layer.align || 'left';
-
-      const baseX = layer.align === 'center'
-        ? layer.x + layer.width / 2
-        : layer.align === 'right'
-          ? layer.x + layer.width - paddingX
-          : layer.x + paddingX;
-      const lineHeight = Math.round(layer.fontSize * 1.3);
-
-      lines.forEach((line, lineIndex) => {
-        const y = layer.y + paddingY + lineIndex * lineHeight;
-        if (y > layer.y + layer.height - lineHeight) return;
-        const text = line || ' ';
-
-        if (availableWidth > 0 && context.measureText(text).width > availableWidth && layer.align !== 'center') {
-          context.save();
-          context.beginPath();
-          context.rect(layer.x + paddingX, layer.y + paddingY, availableWidth, layer.height - paddingY * 2);
-          context.clip();
-          context.fillText(text, baseX, y);
-          context.restore();
-        } else {
-          context.fillText(text, baseX, y);
-        }
-      });
-
-      context.restore();
-    }
-
-    const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, 'image/png', 1);
-    });
-
-    if (!blob) {
-      throw new Error('无法生成页面预览');
-    }
-
-    return blob;
-  }, [renderBlobIntoImage, resolvePptImageBlob]);
-
-  const stitchPptImagesToBlob = useCallback(async (images: GeneratedImage[]) => {
-    const loaded = await Promise.all(images.map(async (image) => {
-      const { blob } = await resolvePptImageBlob(image);
-      const objectUrl = URL.createObjectURL(blob);
-      try {
-        const element = await new Promise<HTMLImageElement>((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = () => reject(new Error('图片加载失败'));
-          img.src = objectUrl;
-        });
-        return {
-          width: element.naturalWidth,
-          height: element.naturalHeight,
-          element,
-        };
-      } finally {
-        URL.revokeObjectURL(objectUrl);
-      }
-    }));
-
-    const maxWidth = Math.max(...loaded.map((item) => item.width));
-    const scaledHeights = loaded.map((item) => Math.round(item.height * (maxWidth / item.width)));
-    const rawTotalHeight = scaledHeights.reduce((sum, value) => sum + value, 0);
-    const maxCanvasHeight = 32000;
-    const downscale = rawTotalHeight > maxCanvasHeight ? maxCanvasHeight / rawTotalHeight : 1;
-    const targetWidth = Math.max(1, Math.round(maxWidth * downscale));
-    const finalHeights = scaledHeights.map((value) => Math.max(1, Math.round(value * downscale)));
-    const totalHeight = finalHeights.reduce((sum, value) => sum + value, 0);
-
-    const canvas = document.createElement('canvas');
-    canvas.width = targetWidth;
-    canvas.height = totalHeight;
-
-    const context = canvas.getContext('2d');
-    if (!context) {
-      throw new Error('无法创建整屏导出画布');
-    }
-
-    context.fillStyle = '#ffffff';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    let offsetY = 0;
-    loaded.forEach((item, index) => {
-      const height = finalHeights[index];
-      context.drawImage(item.element, 0, offsetY, targetWidth, height);
-      offsetY += height;
-    });
-
-    const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, 'image/png', 1);
-    });
-
-    if (!blob) {
-      throw new Error('整屏导出失败');
-    }
-
-    return blob;
-  }, [resolvePptImageBlob]);
-
-  const handleOpenPptStackPreview = useCallback((imageId: string) => {
-    const bundle = getOrderedPptPreviewBundle(imageId);
-    if (!bundle) return;
-
-    setPptStackPreview({
-      images: bundle.images,
-      initialIndex: bundle.currentIndex,
-    });
-  }, [getOrderedPptPreviewBundle]);
-
-  const handleDownloadPptComposite = useCallback(async (imageId: string) => {
-    const bundle = getOrderedPptPreviewBundle(imageId);
-    if (!bundle) return;
-
-    try {
-      const blob = await stitchPptImagesToBlob(bundle.images);
-      saveAs(blob, `ppt-full-screen-${Date.now()}.png`);
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.success('导出完成', `已导出 ${bundle.images.length} 页整屏长图`);
-      });
-    } catch (error: any) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.error('整屏导出失败', error?.message || '请稍后重试');
-      });
-    }
-  }, [getOrderedPptPreviewBundle, stitchPptImagesToBlob]);
-
-  const handleEditPptTextFromLightbox = useCallback((image: GeneratedImage) => {
-    const bundle = getOrderedPptPreviewBundle(image.id);
-    if (!bundle) return;
-
-    const currentText = bundle.promptNode.pptSlides?.[bundle.currentIndex]
-      || image.alias
-      || buildPptPageAlias(undefined, bundle.currentIndex);
-    const nextText = window.prompt(`编辑第 ${bundle.currentIndex + 1} 页文字`, currentText);
-    if (nextText === null) return;
-
-    const trimmed = nextText.trim();
-    if (!trimmed) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning('内容为空', '请输入当前页面的标题或描述');
-      });
-      return;
-    }
-
-    const nextSlides = [...(bundle.promptNode.pptSlides || [])];
-    while (nextSlides.length < bundle.images.length) {
-      nextSlides.push(buildPptPageAlias(undefined, nextSlides.length));
-    }
-    nextSlides[bundle.currentIndex] = trimmed;
-
-    const nextPages = buildPptEditablePages(bundle.promptNode, bundle.images);
-    const parsed = parsePptOutlineLine(trimmed);
-    const currentPage = nextPages[bundle.currentIndex];
-    if (currentPage) {
-      let patchedPage = patchPptTextLayer(
-        currentPage,
-        'title',
-        parsed.title || buildPptPageAlias(trimmed, bundle.currentIndex),
-      );
-      patchedPage = patchPptTextLayer(patchedPage, 'subtitle', parsed.subtitle || '');
-      nextPages[bundle.currentIndex] = patchedPage;
-    }
-
-    updatePromptNode({
-      ...bundle.promptNode,
-      pptSlides: nextSlides,
-      pptEditablePages: nextPages,
-      parallelCount: Math.max(bundle.promptNode.parallelCount || 1, nextSlides.length),
-    });
-
-    updateImageNode(image.id, {
-      alias: buildPptPageAlias(trimmed, bundle.currentIndex),
-    });
-
-    setPreviewImages((prev) => prev?.map((item) => (
-      item.id === image.id
-        ? { ...item, alias: buildPptPageAlias(trimmed, bundle.currentIndex) }
-        : item
-    )) || prev);
-
-    setPptStackPreview((prev) => prev ? {
-      ...prev,
-      images: prev.images.map((item) => (
-        item.id === image.id
-          ? { ...item, alias: buildPptPageAlias(trimmed, bundle.currentIndex) }
-          : item
-      )),
-    } : prev);
-
-    import('./services/system/notificationService').then(({ notify }) => {
-      notify.success('页面文案已更新', `第 ${bundle.currentIndex + 1} 页已同步到主卡设置`);
-    });
-  }, [buildPptPageAlias, getOrderedPptPreviewBundle, parsePptOutlineLine, updateImageNode, updatePromptNode]);
-
   const getNodeIoTrace = useCallback((nodeId: string) => {
     const node = activeCanvas?.promptNodes.find(n => n.id === nodeId);
     const inputStorageIds = (node?.referenceImages || []).map(ref => ref.storageId || ref.id).filter(Boolean) as string[];
@@ -4269,133 +3730,37 @@ const AppContent: React.FC<AppContentProps> = () => {
     // Real billing guard and deduction flow
     // Route-aware billing: when the request resolves to a user-owned key/channel,
     // it must never enter the system-credit deduction flow.
-    const billingStateContext = prepareGenerationBillingStateContext({
+    const initialSubmissionContext = await prepareInitialGenerationSubmissionContext({
       config,
+      activeCanvasRef,
+      activeSourceImage,
+      draftNodeId,
       getPreferredKeyForMode,
       hasExplicitModelRoute,
       resolveCreditCostForModel,
     });
-    const selectedKeyForBilling = billingStateContext.selectedKeyForBilling;
-    const generationBillingState = billingStateContext.generationBillingState;
 
-    const draftContext = prepareGenerationDraftContext({
-      activeCanvasRef,
-      activeSourceImage,
-      draftNodeId,
-    });
-    const isFollowUp = draftContext.isFollowUp;
-    const hasReusablePromptDraft = draftContext.hasReusablePromptDraft;
-    let promptNodeId = draftContext.promptNodeId;
-
-    let requiredCredits = generationBillingState.requiredCredits;
-    let perImageCreditCost = generationBillingState.perImageCreditCost;
-    let paymentTransactionId: string | undefined = undefined;
-    const billingAttemptContext = prepareInitialBillingAttemptContext({
-      generationBillingState,
-      imageSize: config.imageSize,
-      modelId: config.model,
-      promptNodeId,
-    });
-    const resolvedCreditRoute = billingAttemptContext.resolvedCreditRoute;
-    const resolvedCreditSpecId = billingAttemptContext.resolvedCreditSpecId;
-    const billingAttempt = billingAttemptContext.billingAttempt;
-    const executionLane = billingAttemptContext.executionLane;
-    const useServerSideCreditSettlement = billingAttemptContext.useServerSideCreditSettlement;
-    const initialCreditSettlement = await prepareInitialCreditSettlement({
-      isCreditModel: generationBillingState.isCreditModel,
-      modelId: config.model,
-      modelLabel: config.model,
-      providerId: generationBillingState.resolvedProvider || selectedKeyForBilling?.id || 'managed',
-      provider: generationBillingState.resolvedProvider,
-      requiredCredits,
-      useServerSideCreditSettlement,
-      billingAttempt,
-    });
-
-    if (!initialCreditSettlement.allowed) {
+    if (!initialSubmissionContext.allowed) {
       return;
     }
 
-    paymentTransactionId = initialCreditSettlement.paymentTransactionId;
-    // setIsGenerating(true); // Removed, handled by hook
-    try {
-
-      // 4. Calculate Position
-      // Normal mode uses the current viewport center; follow-up mode keeps the existing linked placement flow.
-      const placement = resolveGenerationPlacement({
-        isFollowUp,
-        promptNodeId,
-        hasReusablePromptDraft,
-      });
-      promptNodeId = placement.promptNodeId;
-      let currentPos = placement.currentPos;
-
-      // setDraftNodeId(null); // Moved to end to prevent flicker
-
-      // 立即创建卡片，参考图异步加载。
-      const finalReferenceImages = prepareGenerationReferenceImages(config.referenceImages);
-
-      const rawPrompt = trimmedPrompt;
-      const initialPromptOptimization = await prepareInitialGenerationPromptOptimization({
-        config,
-        rawPrompt,
-        finalReferenceImages,
-      });
-      const optimizedPromptEn = initialPromptOptimization.optimizedPromptEn;
-      const optimizedPromptZh = initialPromptOptimization.optimizedPromptZh;
-      const promptOptimizerResult = initialPromptOptimization.promptOptimizerResult;
-
-      const initialGeneratingNode = prepareInitialGeneratingPromptNode({
-        activeSourceImage,
-        billingAttempt,
-        config,
-        currentPos,
-        executionLane,
-        finalReferenceImages,
-        generationBillingState,
-        optimizedPromptEn,
-        optimizedPromptZh,
-        paymentTransactionId,
-        perImageCreditCost,
-        promptNodeId,
-        promptOptimizerResult,
-        rawPrompt,
-        requiredCredits,
-        resolvedCreditRoute,
-        resolvedCreditSpecId,
-        selectedKeyForBilling,
-        useServerSideCreditSettlement,
-      });
-      const generatingNode = initialGeneratingNode.generatingNode;
-
-      const persistedGeneration = await persistInitialGeneratingPromptNode({
-        generatingNode,
-        getCanvas: () => activeCanvasRef.current || undefined,
-        addPromptNode,
-        updateImageNodePosition,
-        deletePromptNode,
-      });
-      const persistedGeneratingNode = persistedGeneration.persistedGeneratingNode;
-
-      completeInitialGenerationPromptSubmission({
-        setActiveSourceImage,
-        setConfig,
-        setDraftNodeId,
-      });
-
-      await executeInitialGenerationPromptNode({
-        persistedGeneratingNode,
-        requiredCredits,
-        useServerSideCreditSettlement,
-        executeGeneration,
-      });
-    } catch (e: any) {
-      reportInitialGenerationFailure({ error: e });
-    } finally {
-      // executeGeneration manages isGenerating internally; avoid resetting it here.
-      // Request throttling is controlled by the generation submit guard instead of waiting for the full run to settle.
-    }
-  }, [config, draftNodeId, addPromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialCreditSettlement, prepareGenerationDraftContext, prepareInitialBillingAttemptContext, prepareGenerationBillingStateContext, prepareInitialGeneratingPromptNode, persistInitialGeneratingPromptNode, prepareInitialGenerationPromptOptimization, completeInitialGenerationPromptSubmission, executeInitialGenerationPromptNode, reportInitialGenerationFailure, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
+    await runInitialGenerationSubmissionTransaction({
+      activeSourceImage,
+      addPromptNode,
+      config,
+      deletePromptNode,
+      executeGeneration,
+      getCanvas: () => activeCanvasRef.current || undefined,
+      initialSubmissionContext,
+      prepareGenerationReferenceImages,
+      rawPrompt: trimmedPrompt,
+      resolveGenerationPlacement,
+      setActiveSourceImage,
+      setConfig,
+      setDraftNodeId,
+      updateImageNodePosition,
+    });
+  }, [config, draftNodeId, addPromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialGenerationSubmissionContext, runInitialGenerationSubmissionTransaction, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {
@@ -4522,436 +3887,47 @@ const AppContent: React.FC<AppContentProps> = () => {
 
   // Retry Logic (In-Place Regeneration)
   const handleRetryNode = useCallback(async (node: PromptNode) => {
-    let executionNode = buildRetryExecutionNode({
-      node,
-      resolveNodeRouteState,
-    });
-
-    const recovered = await recoverFailedSyncBridgeGeneration(executionNode);
-    if (recovered.recoveredCount > 0 || recovered.pendingCount > 0) {
-      reportRetryRecoveryResult({ recoveredCount: recovered.recoveredCount, pendingCount: recovered.pendingCount });
-      return;
-    }
-
-    const { currentNodeId, count } = prepareRetryGenerationRequestContext({
+    const retryExecutionContext = await prepareRetryGeneratedMediaExecutionContext({
       node,
       defaultParallelCount: config.parallelCount,
-    });
-    const preparedRetry = await prepareRetriedExecutionNode({
-      executionNode,
-      nodeId: currentNodeId,
-      parallelCount: count,
-      phase: 'retry',
-      resolveCreditCostForModel,
-      ensureCreditAttemptCharged,
-    });
-
-    if (!preparedRetry) {
-      return;
-    }
-
-    const { billingAttempt: retryBillingAttempt, billingState: retryBillingState } = preparedRetry;
-    executionNode = preparedRetry.executionNode;
-
-    commitRetryGenerationStart({
-      executionNode,
-      retryBillingState,
-      resolveModelDisplayName,
-    });
-
-    const startTime = Date.now();
-
-    try {
-      const results = await Promise.all(Array.from({ length: count }).map(async (_, index) => {
-        const { requestId, timeoutGuard } = prepareRetryGeneratedMediaAttemptContext({
-          currentNodeId,
-          executionNode,
-          index,
-          timeoutMs: GENERATE_TIMEOUT_MS,
-        });
-
-        const { currentMode, taskPrompt } = prepareRetryGenerationTaskPromptContext({
-          count,
-          executionNode,
-          index,
-          sourcePrompt: node.prompt,
-        });
-
-        const { generatedMediaContext } = await runRetryGeneratedMediaAttemptWithGuard({
-          timeoutGuard,
-          run: async () => {
-            const { generatedMediaContext } = await executeRetryGeneratedMediaRequest({
-              currentMode,
-              executionNode,
-              generateImage,
-              generateVideo: (videoRequest) => llmService.generateVideo(videoRequest),
-              requestId,
-              resolveModelDisplayName,
-              taskPrompt,
-            });
-            applyRetryGeneratedMediaAuthoritativeBalance({
-              generatedMediaContext,
-              applyAuthoritativeBalance,
-            });
-            return { generatedMediaContext };
-          },
-        });
-        const { apiDurationMs, b64 } = generatedMediaContext;
-
-        const mediaPersistence = await prepareRetryGeneratedMediaPersistence({
-          b64,
-          currentMode,
-          normalizePersistableMediaSource,
-          calculateImageHash,
-          saveOriginalImage,
-        });
-
-        scheduleRetryGeneratedMediaCloudSync({
-          b64,
-          currentMode,
-          index,
-        });
-
-        const generationTime = resolveRetryGeneratedMediaGenerationTime({
-          apiDurationMs,
-          startedAtMs: startTime,
-        });
-
-        const mediaDimensions = await resolveRetryGeneratedMediaDimensions({
-          b64,
-          executionNode,
-          url: mediaPersistence.url,
-        });
-
-        const generatedResult = buildRetryGeneratedMediaResultFromContext({
-          buildPptPageAlias,
-          canvasId: activeCanvasRef.current?.id,
-          currentMode,
-          executionNode,
-          generatedMediaContext,
-          generationTime,
-          index,
-          mediaDimensions,
-          mediaPersistence,
-          prompt: taskPrompt,
-        });
-        return generatedResult;
-      }));
-
-      const { alignedImageNodes, retryCompletedPromptPatch } = prepareRetryGeneratedMediaSuccessCommitContext({
-        canvasSnapshot: activeCanvasRef.current,
-        buildGeneratedImageBatchPositions,
-        count,
-        executionNode,
-        getCardDimensions,
-        isMobile,
-        resolveModelDisplayName,
-        results,
-      });
-
-      await commitRetryGeneratedMediaSuccess({
-        addImageNodes,
-        executionNode,
-        alignedImageNodes,
-        parentNodeId: node.id,
-        results,
-        retryCompletedPromptPatch,
-      });
-
-    } catch (error: any) {
-      await commitRetryGenerationFailure({
-        executionNode,
-        error,
-        extractErrorDetails,
-      });
-    }
-  }, [config.parallelCount, isMobile, addImageNodes, extractErrorDetails, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, ensureCreditAttemptCharged, applyAuthoritativeBalance, resolveCreditCostForModel, commitRetryGenerationFailure, runRetryGeneratedMediaAttemptWithGuard, prepareRetryGeneratedMediaAttemptContext, commitRetryGenerationStart, reportRetryRecoveryResult, prepareRetryGenerationRequestContext, commitRetryGeneratedMediaSuccess, prepareRetryGenerationTaskPromptContext, resolveRetryGeneratedMediaGenerationTime, executeRetryGeneratedMediaRequest, applyRetryGeneratedMediaAuthoritativeBalance, prepareRetryGeneratedMediaPersistence, scheduleRetryGeneratedMediaCloudSync, resolveRetryGeneratedMediaDimensions, buildRetryGeneratedMediaResultFromContext, prepareRetryGeneratedMediaSuccessCommitContext, buildPptPageAlias, resolveModelDisplayName]);
-
-  const handleExportPptPackage = useCallback(async (node: PromptNode) => {
-    if (!activeCanvas) return;
-    const childImages = getPromptPptImageNodes(activeCanvas.imageNodes, node.id);
-
-    if (childImages.length === 0) {
-      showNoPptPagesWarning();
-      return;
-    }
-
-    const zip = new JSZip();
-    const pagesMeta: Array<any> = [];
-
-    for (let i = 0; i < childImages.length; i++) {
-      const img = childImages[i];
-      const pageNo = i + 1;
-      const pageName = img.alias || `图${pageNo}`;
-      const outlineRaw = node.pptSlides?.[i] || img.alias || '';
-      const { title: outlineTitle, subtitle: outlineSubtitle } = parsePptOutlineLine(outlineRaw);
-      const fileName = `pages/${String(pageNo).padStart(2, '0')}-${pageName.replace(/[\\/:*?"<>|]/g, '_')}.png`;
-      const src = img.originalUrl || img.url;
-
-      try {
-        const res = await fetch(src);
-        const blob = await res.blob();
-        zip.file(fileName, blob);
-      } catch {
-        // Skip broken pages but keep metadata
-      }
-
-      pagesMeta.push({
-        page: pageNo,
-        title: pageName,
-        outlineTitle,
-        outlineSubtitle,
-        prompt: img.prompt,
-        model: img.model,
-        provider: img.providerLabel || img.provider,
-        keySlotId: img.keySlotId,
-        dimensions: img.dimensions,
-        imageSize: img.imageSize,
-        timestamp: img.timestamp,
-        file: fileName
-      });
-    }
-
-    const outlinePages = (node.pptSlides || []).map((text, idx) => ({
-      page: idx + 1,
-      text
-    }));
-
-    zip.file('meta/manifest.json', JSON.stringify({
-      exportedAt: new Date().toISOString(),
-      nodeId: node.id,
-      nodePrompt: node.prompt,
-      pageCount: childImages.length,
-      pages: pagesMeta
-    }, null, 2));
-
-    zip.file('outline/ppt-outline.json', JSON.stringify({
-      topic: node.prompt,
-      pageCount: Math.max(childImages.length, outlinePages.length),
-      styleLocked: node.pptStyleLocked !== false,
-      pages: outlinePages
-    }, null, 2));
-
-    zip.file('meta/node-meta.json', JSON.stringify({
-      nodeId: node.id,
-      model: node.model,
-      modelLabel: node.modelLabel,
-      provider: node.provider,
-      providerLabel: node.providerLabel,
-      keySlotId: node.keySlotId,
-      aspectRatio: node.aspectRatio,
-      imageSize: node.imageSize,
-      parallelCount: node.parallelCount,
-      styleLocked: node.pptStyleLocked !== false,
-      referenceStorageIds: (node.referenceImages || []).map(ref => ref.storageId || ref.id).filter(Boolean)
-    }, null, 2));
-
-    const slidesHtml = buildPptSlidesPreviewHtml({
-      title: node.prompt || 'PPT 导出',
-      items: pagesMeta.map((pageMeta) => ({
-        page: pageMeta.page,
-        title: String(pageMeta.title || ''),
-        imageSrc: `../${String(pageMeta.file || '')}`,
-        description: String(pageMeta.prompt || ''),
-      })),
-    });
-    zip.file('outline/slides-preview.html', slidesHtml);
-
-    const blob = await zip.generateAsync({ type: 'blob' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ppt-pages-${Date.now()}.zip`;
-    a.click();
-    URL.revokeObjectURL(url);
-
-    import('./services/system/notificationService').then(({ notify }) => {
-      notify.success('导出完成', `已导出 ${childImages.length} 页与 pages/outline/meta 目录`);
-    });
-  }, [activeCanvas, parsePptOutlineLine, showNoPptPagesWarning]);
-
-  const handleRetryPptSinglePage = useCallback(async (node: PromptNode, pageIndex: number) => {
-    if (!activeCanvas) return;
-    if (node.mode !== GenerationMode.PPT) return;
-    let executionNode = buildRetryExecutionNode({
-      node,
       resolveNodeRouteState,
-    });
-
-    const ordered = getPromptPptImageNodes(activeCanvas.imageNodes, node.id);
-
-    const target = ordered[pageIndex];
-    if (!target) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning('页面不存在', `未找到图 ${pageIndex + 1}`);
-      });
-      return;
-    }
-
-    const preparedPageRetry = await prepareRetriedExecutionNode({
-      executionNode,
-      nodeId: node.id,
-      parallelCount: 1,
-      phase: 'ppt-single',
-      pageIndex,
+      recoverFailedSyncBridgeGeneration,
       resolveCreditCostForModel,
-      ensureCreditAttemptCharged,
     });
 
-    if (!preparedPageRetry) {
+    if (!retryExecutionContext.prepared) {
       return;
     }
 
-    const { billingAttempt: pageRetryBillingAttempt, billingState: pageRetryBillingState } = preparedPageRetry;
-    executionNode = preparedPageRetry.executionNode;
+    const { currentNodeId, count, retryBillingState } = retryExecutionContext;
+    const executionNode = retryExecutionContext.executionNode;
 
-    updatePromptNode(executionNode);
-
-    const slides = normalizePptSlidesForCount(
-      executionNode.pptSlides,
-      executionNode.prompt,
-      Math.max(pageIndex + 1, executionNode.parallelCount || 1, ordered.length)
-    );
-    const slideText = slides[pageIndex]
-      || `主题：${node.prompt}。保持同一套视觉风格，页面内容独立不重复。`;
-    const layoutDirective = (() => {
-      const t = slideText.toLowerCase();
-      if (/封面|cover|title/.test(t)) return '采用封面版式：大标题 + 副标题 + 视觉主图，信息精简。';
-      if (/目录|agenda|contents?/.test(t)) return '采用目录版式：清晰列出 4-6 个章节条目，层级分明。';
-      if (/总结|结论|行动|summary|conclusion/.test(t)) return '采用总结版式：突出结论要点和行动建议，重点高亮。';
-      if (/章节|section|transition/.test(t)) return '采用章节过渡页版式：突出章节标题，并配合关键词。';
-      return '采用内容页版式：标题 + 3-5 个信息块，层次清晰。';
-    })();
-    const styleDirective = executionNode.pptStyleLocked !== false
-      ? '与整套 PPT 保持完全统一的视觉语言'
-      : '保持整体风格统一，但允许当前页面有适度变化';
-    const previousVisualHint = (() => {
-      const raw = (target.prompt || '').replace(/PPT第\d+\/?\d*页。?/g, '').trim();
-      if (!raw) return '';
-      const compact = raw.length > 120 ? `${raw.slice(0, 120)}...` : raw;
-      return `参考上一版视觉关键词：${compact}。`;
-    })();
-    const taskPrompt = `PPT 第 ${pageIndex + 1}/${Math.max(1, node.childImageIds.length)} 页。${slideText}。16:9。${styleDirective}。${layoutDirective}${previousVisualHint}`;
-
-    updateImageNode(target.id, {
-      isGenerating: true,
-      error: undefined,
-      model: executionNode.model,
-      modelLabel: resolveModelDisplayName(executionNode.model, executionNode.modelLabel || executionNode.model),
+    await completeRetryGeneratedMediaBatch({
+      addImageNodes,
+      applyAuthoritativeBalance,
+      buildPptPageAlias,
+      buildGeneratedImageBatchPositions,
+      calculateImageHash,
+      canvasSnapshot: activeCanvasRef.current,
+      canvasId: activeCanvasRef.current?.id,
+      count,
+      currentNodeId,
+      executionNode,
+      extractErrorDetails,
+      generateImage,
+      generateVideo: (videoRequest) => llmService.generateVideo(videoRequest),
+      getCardDimensions,
+      isMobile,
+      normalizePersistableMediaSource,
+      parentNodeId: node.id,
+      resolveModelDisplayName,
+      retryBillingState,
+      saveOriginalImage,
+      sourcePrompt: node.prompt,
+      timeoutMs: GENERATE_TIMEOUT_MS,
     });
+  }, [config.parallelCount, isMobile, addImageNodes, extractErrorDetails, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, applyAuthoritativeBalance, resolveCreditCostForModel, prepareRetryGeneratedMediaExecutionContext, completeRetryGeneratedMediaBatch, buildPptPageAlias, resolveModelDisplayName, buildGeneratedImageBatchPositions, calculateImageHash, generateImage, getCardDimensions, normalizePersistableMediaSource, saveOriginalImage]);
 
-    applyOptimisticServerCreditDebit(
-      pageRetryBillingState.requiredCredits,
-      pageRetryBillingState.useServerSideCreditSettlement,
-    );
-
-    const startTime = Date.now();
-    try {
-      const result = await generateImage(
-        taskPrompt,
-        executionNode.aspectRatio,
-        executionNode.imageSize,
-        executionNode.referenceImages || [],
-        executionNode.model,
-        '',
-        buildGenerationAttemptRequestId(pageRetryBillingAttempt.attemptId, 0),
-        !!executionNode.enableGrounding || !!executionNode.enableImageSearch,
-        {
-          preferredKeyId: executionNode.keySlotId,
-          enableWebSearch: !!executionNode.enableGrounding,
-          enableImageSearch: !!executionNode.enableImageSearch,
-          thinkingMode: executionNode.thinkingMode || 'minimal'
-        }
-      );
-
-      if (typeof result.balanceAfter === 'number') {
-        applyAuthoritativeBalance(result.balanceAfter);
-      }
-
-      let storageId = target.storageId;
-      const persistableResultSource = normalizePersistableMediaSource(
-        result.url,
-        target.mimeType || 'image/png'
-      );
-      if (persistableResultSource) {
-        try {
-          const hash = await calculateImageHash(persistableResultSource);
-          storageId = hash;
-          await saveOriginalImage(hash, persistableResultSource);
-        } catch {
-          // ignore storage failures, keep in-memory preview
-        }
-      }
-
-      const refreshedPageImage: GeneratedImage = {
-        ...target,
-        ...resolveProviderDisplay(result.keySlotId || executionNode.keySlotId, result.providerName || target.providerLabel, result.provider || target.provider),
-        url: result.url,
-        originalUrl: result.url.startsWith('data:') ? result.url : undefined,
-        apiResultUrl: /^https?:\/\//i.test(result.url) ? result.url : undefined,
-        prompt: taskPrompt,
-        timestamp: Date.now(),
-        generationTime: clampGenerationDurationMs(Date.now() - startTime),
-        model: result.model || executionNode.model,
-        modelLabel: resolveModelDisplayName(result.model || executionNode.model, result.modelName || target.modelLabel),
-        modelColorStart: target.modelColorStart,
-        modelColorEnd: target.modelColorEnd,
-        modelColorSecondary: target.modelColorSecondary,
-        modelTextColor: target.modelTextColor,
-        billingMode: executionNode.billingMode,
-        creditCost: executionNode.creditCost,
-        tokens: typeof result.tokens === 'number' && Number.isFinite(result.tokens) ? result.tokens : undefined,
-        promptTokens: typeof result.promptTokens === 'number' && Number.isFinite(result.promptTokens) ? result.promptTokens : undefined,
-        completionTokens: typeof result.completionTokens === 'number' && Number.isFinite(result.completionTokens) ? result.completionTokens : undefined,
-        cost: typeof result.cost === 'number' && Number.isFinite(result.cost) ? result.cost : undefined,
-        costSource: typeof result.cost === 'number' && Number.isFinite(result.cost) ? 'explicit' : 'none',
-        keySlotId: result.keySlotId || executionNode.keySlotId,
-        imageSize: result.imageSize || executionNode.imageSize,
-        aspectRatio: result.aspectRatio || executionNode.aspectRatio,
-        dimensions: result.dimensions ? `${result.dimensions.width}x${result.dimensions.height}` : target.dimensions,
-        exactDimensions: result.dimensions || target.exactDimensions,
-        sourceReferenceStorageIds: (executionNode.referenceImages || []).map(ref => ref.storageId || ref.id).filter(Boolean),
-        alias: buildPptPageAlias(slideText, pageIndex),
-        storageId,
-        isGenerating: false,
-        error: undefined
-      };
-      updateImageNode(target.id, refreshedPageImage);
-
-      rememberPreferredKeyForMode(executionNode.mode, result.keySlotId || executionNode.keySlotId);
-      const refreshedDeckImages = ordered.map((imageNode, index) => (
-        index === pageIndex ? refreshedPageImage : imageNode
-      ));
-      updatePromptNode({
-        ...executionNode,
-        ...buildCompletedPromptNodePatch(),
-        childImageIds: node.childImageIds,
-        pptDeck: buildPptDeckModuleState({
-          ...executionNode,
-          ...buildCompletedPromptNodePatch(),
-          childImageIds: node.childImageIds,
-          pptDeck: node.pptDeck,
-        }, refreshedDeckImages),
-      });
-
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.success('单页重绘完成', `已更新图${pageIndex + 1}`);
-      });
-    } catch (error: any) {
-      const failedBillingState = await resolveFailedCreditAttempt(executionNode);
-      updatePromptNode({
-        ...executionNode,
-        ...failedBillingState
-      });
-      updateImageNode(target.id, {
-        isGenerating: false,
-        error: error?.message || '单页重绘失败'
-      });
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.error('单页重绘失败', error?.message || '请稍后重试');
-      });
-    }
-  }, [activeCanvas, updateImageNode, rememberPreferredKeyForMode, normalizePptSlidesForCount, resolveNodeRouteState, resolveProviderDisplay, ensureCreditAttemptCharged, applyOptimisticServerCreditDebit, resolveCreditCostForModel, updatePromptNode, resolveFailedCreditAttempt]);
 
   const updateEcommerceNodeState = useCallback((nodeId: string, patch: Partial<NonNullable<PromptNode['ecommerce']>>, nodePatch: Partial<PromptNode> = {}) => {
     const latestNode = activeCanvasRef.current?.promptNodes.find((node) => node.id === nodeId);
@@ -5471,511 +4447,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     pumpEcommerceFrameworkQueue(frameworkId);
   }, [enqueueEcommerceFrameworkNodes, handleGenerateEcommerceNode, handleRetryEcommerceModule, pumpEcommerceFrameworkQueue, syncEcommerceFrameworkView]);
 
-  const handleExportPptSinglePage = useCallback(async (node: PromptNode, pageIndex: number) => {
-    if (!activeCanvas) return;
-    if (node.mode !== GenerationMode.PPT) return;
-
-    const ordered = getPromptPptImageNodes(activeCanvas.imageNodes, node.id);
-
-    const target = ordered[pageIndex];
-    if (!target) return;
-
-    try {
-      const res = await fetch(target.originalUrl || target.url);
-      const blob = await res.blob();
-      const name = `ppt-page-${String(pageIndex + 1).padStart(2, '0')}.png`;
-      saveAs(blob, name);
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.success('导出完成', `已导出图 ${pageIndex + 1}`);
-      });
-    } catch (e: any) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.error('导出失败', e?.message || '无法导出该页面');
-      });
-    }
-  }, [activeCanvas]);
-
-  const handleExportPptx = useCallback(async (node: PromptNode) => {
-    if (!activeCanvas) return;
-    if (node.mode !== GenerationMode.PPT) return;
-
-    const ordered = getPromptPptImageNodes(activeCanvas.imageNodes, node.id).slice(0, 20);
-
-    if (ordered.length === 0) {
-      showNoPptPagesWarning();
-      return;
-    }
-
-    const escapeXml = (s: string) => String(s || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
-
-    const zip = new JSZip();
-    writePptxPackageSkeleton({
-      zip,
-      slideCount: ordered.length,
-      title: node.prompt || 'KK Studio PPT 导出',
-    });
-
-    for (let i = 0; i < ordered.length; i++) {
-      const img = ordered[i];
-      const outlineRaw = node.pptSlides?.[i] || img.alias || `第 ${i + 1} 页`;
-      const { title: outlineTitle, subtitle: outlineSubtitle } = parsePptOutlineLine(outlineRaw);
-      const titleText = outlineTitle || `第 ${i + 1} 页`;
-      const subtitleText = outlineSubtitle || '';
-      const src = img.originalUrl || img.url;
-      const res = await fetch(src);
-      const blob = await res.blob();
-      const mime = blob.type || 'image/png';
-      const ext = mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : 'png';
-      const mediaPath = `ppt/media/image${i + 1}.${ext}`;
-      zip.file(mediaPath, blob);
-
-      zip.file(`ppt/slides/slide${i + 1}.xml`, buildPptxSlideXml({
-        bodyXml: `      <p:pic>
-        <p:nvPicPr>
-          <p:cNvPr id="2" name="${escapeXml(img.alias || `Slide ${i + 1}`)}"/>
-          <p:cNvPicPr/>
-          <p:nvPr/>
-        </p:nvPicPr>
-        <p:blipFill>
-          <a:blip r:embed="rId1"/>
-          <a:stretch><a:fillRect/></a:stretch>
-        </p:blipFill>
-        <p:spPr>
-          <a:xfrm><a:off x="0" y="0"/><a:ext cx="12192000" cy="6858000"/></a:xfrm>
-          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
-        </p:spPr>
-      </p:pic>
-      <p:sp>
-        <p:nvSpPr>
-          <p:cNvPr id="3" name="Title Box"/>
-          <p:cNvSpPr txBox="1"/>
-          <p:nvPr/>
-        </p:nvSpPr>
-        <p:spPr>
-          <a:xfrm><a:off x="457200" y="228600"/><a:ext cx="11277600" cy="731520"/></a:xfrm>
-          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
-          <a:solidFill><a:srgbClr val="111827"><a:alpha val="42000"/></a:srgbClr></a:solidFill>
-          <a:ln><a:noFill/></a:ln>
-        </p:spPr>
-        <p:txBody>
-          <a:bodyPr lIns="114300" tIns="57150" rIns="114300" bIns="57150"/>
-          <a:lstStyle/>
-          <a:p>
-            <a:r>
-              <a:rPr lang="zh-CN" b="1" sz="3200"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:rPr>
-              <a:t>${escapeXml(titleText)}</a:t>
-            </a:r>
-            <a:endParaRPr lang="zh-CN" sz="3200"/>
-          </a:p>
-        </p:txBody>
-      </p:sp>
-      ${subtitleText ? `<p:sp>
-        <p:nvSpPr>
-          <p:cNvPr id="4" name="Subtitle Box"/>
-          <p:cNvSpPr txBox="1"/>
-          <p:nvPr/>
-        </p:nvSpPr>
-        <p:spPr>
-          <a:xfrm><a:off x="457200" y="1005840"/><a:ext cx="11277600" cy="548640"/></a:xfrm>
-          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
-          <a:solidFill><a:srgbClr val="0F172A"><a:alpha val="28000"/></a:srgbClr></a:solidFill>
-          <a:ln><a:noFill/></a:ln>
-        </p:spPr>
-        <p:txBody>
-          <a:bodyPr lIns="114300" tIns="38100" rIns="114300" bIns="38100"/>
-          <a:lstStyle/>
-          <a:p>
-            <a:r>
-              <a:rPr lang="zh-CN" sz="1800"><a:solidFill><a:srgbClr val="E5E7EB"/></a:solidFill></a:rPr>
-              <a:t>${escapeXml(subtitleText)}</a:t>
-            </a:r>
-            <a:endParaRPr lang="zh-CN" sz="1800"/>
-          </a:p>
-        </p:txBody>
-      </p:sp>` : ''}
-`,
-      }));
-
-      zip.file(`ppt/slides/_rels/slide${i + 1}.xml.rels`, buildPptxSlideRelationshipsXml([
-        `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image${i + 1}.${ext}"/>`,
-        '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>',
-      ]));
-    }
-
-    const pptxBlob = await zip.generateAsync({ type: 'blob' });
-    saveAs(pptxBlob, `ppt-slides-${Date.now()}.pptx`);
-    import('./services/system/notificationService').then(({ notify }) => {
-      notify.success('PPTX 导出完成', `已导出 ${ordered.length} 页的 .pptx 文件`);
-    });
-  }, [activeCanvas, parsePptOutlineLine, showNoPptPagesWarning]);
-
-  const handleExportPptPackageEditable = useCallback(async (node: PromptNode) => {
-    const exportBundle = requirePptEditableExportBundle(node);
-    if (!exportBundle) return;
-
-    const zip = new JSZip();
-    const { promptNode, images, pages, imageById } = exportBundle;
-    const outlinePages = syncPptSlidesFromEditablePages(pages);
-    const pageSummaries: Array<Record<string, unknown>> = [];
-    const assetFileByImageId = new Map<string, string>();
-    const uniqueImageIds = Array.from(new Set(
-      pages.flatMap((page) => page.layers
-        .map((layer) => layer.type === 'image' ? (layer.imageNodeId || page.backgroundImageId || null) : null)
-        .filter((id): id is string => Boolean(id))),
-    ));
-
-    for (let assetIndex = 0; assetIndex < uniqueImageIds.length; assetIndex += 1) {
-      const imageId = uniqueImageIds[assetIndex];
-      const image = imageById.get(imageId);
-      if (!image) continue;
-
-      const asset = await resolvePptExportImageAsset(image);
-      const assetSlug = sanitizePptFileSegment(
-        image.alias || `slide-${assetIndex + 1}`,
-        `slide-${assetIndex + 1}`,
-      );
-      const assetFile = `editable/assets/${String(assetIndex + 1).padStart(2, '0')}-${assetSlug}.${asset.ext}`;
-      zip.file(assetFile, asset.blob);
-      assetFileByImageId.set(imageId, assetFile);
-    }
-
-    for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
-      const page = pages[pageIndex];
-      const pageNo = pageIndex + 1;
-      const pageTitle = getPptTextLayer(page, 'title')?.text.trim() || page.name || `Slide ${pageNo}`;
-      const pageSlug = sanitizePptFileSegment(pageTitle, `slide-${pageNo}`);
-      const previewFile = `pages/${String(pageNo).padStart(2, '0')}-${pageSlug}.png`;
-      const backgroundImageId = page.backgroundImageId
-        || page.layers.find((layer): layer is PptEditableImageLayer => layer.type === 'image')?.imageNodeId;
-      zip.file(previewFile, await renderPptEditablePagePreviewBlob(page, imageById));
-
-      const slideFile = `editable/slides/slide-${String(pageNo).padStart(2, '0')}.json`;
-      const subtitle = getPptTextLayer(page, 'subtitle')?.text.trim() || '';
-      const layerPayload = page.layers.map((layer) => {
-        if (layer.type === 'image') {
-          const layerImageId = layer.imageNodeId || page.backgroundImageId;
-          return {
-            ...layer,
-            sourceUrl: undefined,
-            assetFile: layerImageId ? assetFileByImageId.get(layerImageId) : undefined,
-          };
-        }
-
-        return layer;
-      });
-
-      zip.file(slideFile, JSON.stringify({
-        id: page.id,
-        page: pageNo,
-        name: page.name,
-        outline: outlinePages[pageIndex] || page.outline,
-        notes: page.notes || '',
-        backgroundImageId: backgroundImageId || null,
-        previewFile,
-        layers: layerPayload,
-      }, null, 2));
-
-      pageSummaries.push({
-        page: pageNo,
-        id: page.id,
-        title: pageTitle,
-        subtitle,
-        outline: outlinePages[pageIndex] || page.outline,
-        prompt: images[pageIndex]?.prompt || promptNode.prompt,
-        model: images[pageIndex]?.model || promptNode.model,
-        provider: images[pageIndex]?.providerLabel || images[pageIndex]?.provider || promptNode.providerLabel || promptNode.provider,
-        keySlotId: images[pageIndex]?.keySlotId || promptNode.keySlotId,
-        dimensions: images[pageIndex]?.dimensions,
-        imageSize: images[pageIndex]?.imageSize || promptNode.imageSize,
-        timestamp: images[pageIndex]?.timestamp || promptNode.timestamp,
-        previewFile,
-        editableFile: slideFile,
-        backgroundAsset: backgroundImageId ? assetFileByImageId.get(backgroundImageId) : undefined,
-        layerCount: page.layers.length,
-        visibleLayerCount: page.layers.filter((layer) => layer.visible).length,
-      });
-    }
-
-    zip.file('editable/deck.json', JSON.stringify({
-      exportedAt: new Date().toISOString(),
-      format: 'kk-studio-ppt-editable/v1',
-      canvas: PPT_EDITABLE_CANVAS,
-      node: {
-        id: promptNode.id,
-        prompt: promptNode.prompt,
-        mode: promptNode.mode,
-        model: promptNode.model,
-        modelLabel: promptNode.modelLabel,
-        provider: promptNode.provider,
-        providerLabel: promptNode.providerLabel,
-        keySlotId: promptNode.keySlotId,
-        aspectRatio: promptNode.aspectRatio,
-        imageSize: promptNode.imageSize,
-        styleLocked: promptNode.pptStyleLocked !== false,
-      },
-      pages: pages.map((page, index) => ({
-        id: page.id,
-        page: index + 1,
-        name: page.name,
-        outline: outlinePages[index] || page.outline,
-        previewFile: `pages/${String(index + 1).padStart(2, '0')}-${sanitizePptFileSegment(
-          getPptTextLayer(page, 'title')?.text.trim() || page.name || `slide-${index + 1}`,
-          `slide-${index + 1}`,
-        )}.png`,
-        editableFile: `editable/slides/slide-${String(index + 1).padStart(2, '0')}.json`,
-      })),
-      assets: Object.fromEntries(assetFileByImageId.entries()),
-      notes: [
-        pickByDocumentLanguage(
-          '这个包会保留分层 PPT 场景数据，便于继续在线编辑或导出 PPTX。',
-          'This package preserves layered PPT scene data for online editing and PPTX export.'
-        ),
-        pickByDocumentLanguage(
-          'PSD 无法从扁平化 AI 图片自动还原，若要导出 PSD，需要基于这些图层重新构建。',
-          'PSD export is not reconstructed automatically from a flat AI image; it must be rebuilt from these layers.'
-        ),
-      ],
-    }, null, 2));
-
-    zip.file('meta/manifest.json', JSON.stringify({
-      exportedAt: new Date().toISOString(),
-      nodeId: promptNode.id,
-      nodePrompt: promptNode.prompt,
-      pageCount: pages.length,
-      pages: pageSummaries,
-    }, null, 2));
-
-    zip.file('outline/ppt-outline.json', JSON.stringify({
-      topic: promptNode.prompt,
-      pageCount: pages.length,
-      styleLocked: promptNode.pptStyleLocked !== false,
-      pages: outlinePages.map((text, index) => ({
-        page: index + 1,
-        text,
-      })),
-    }, null, 2));
-
-    zip.file('meta/node-meta.json', JSON.stringify({
-      nodeId: promptNode.id,
-      model: promptNode.model,
-      modelLabel: promptNode.modelLabel,
-      provider: promptNode.provider,
-      providerLabel: promptNode.providerLabel,
-      keySlotId: promptNode.keySlotId,
-      aspectRatio: promptNode.aspectRatio,
-      imageSize: promptNode.imageSize,
-      parallelCount: promptNode.parallelCount,
-      styleLocked: promptNode.pptStyleLocked !== false,
-      referenceStorageIds: (promptNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
-    }, null, 2));
-
-    zip.file('editable/README.md', [
-      pickByDocumentLanguage('# 可编辑 PPT 页面包', '# Editable PPT Package'),
-      '',
-      pickByDocumentLanguage('- `editable/deck.json`：KK Studio 使用的分层页面包清单。', '- `editable/deck.json`: layered deck manifest used by KK Studio.'),
-      pickByDocumentLanguage('- `editable/slides/*.json`：每一页的可编辑图层数据。', '- `editable/slides/*.json`: per-slide editable layer data.'),
-      pickByDocumentLanguage('- `editable/assets/*`：页面 JSON 引用到的图像图层素材。', '- `editable/assets/*`: image layer assets referenced by the slide JSON.'),
-      pickByDocumentLanguage('- `pages/*`：用于快速查看的预览 PNG。', '- `pages/*`: preview PNGs for quick inspection.'),
-      '',
-      pickByDocumentLanguage(
-        '当你希望保留可编辑文字和图层顺序，并继续导出 PPTX 或后续重建 PSD 时，请使用这个包。',
-        'Use this package when you want to keep editable text and layer ordering, then export to PPTX now or rebuild PSD later.'
-      ),
-    ].join('\n'));
-
-    const slidesHtml = buildPptSlidesPreviewHtml({
-      title: promptNode.prompt || 'PPT 导出预览',
-      items: pageSummaries.map((page) => ({
-        page: String(page.page || ''),
-        title: String(page.title || ''),
-        imageSrc: `../${String(page.previewFile || '')}`,
-        description: String(page.outline || ''),
-      })),
-    });
-    zip.file('outline/slides-preview.html', slidesHtml);
-
-    const blob = await zip.generateAsync({ type: 'blob' });
-    saveAs(blob, `ppt-editable-package-${Date.now()}.zip`);
-
-    import('./services/system/notificationService').then(({ notify }) => {
-      notify.success('导出完成', `已导出 ${pages.length} 页，以及 editable 图层包、预览页和素材目录`);
-    });
-  }, [requirePptEditableExportBundle, renderPptEditablePagePreviewBlob, resolvePptExportImageAsset, sanitizePptFileSegment]);
-
-  const handleExportPptxEditable = useCallback(async (node: PromptNode) => {
-    const exportBundle = requirePptEditableExportBundle(node);
-    if (!exportBundle) return;
-
-    const { promptNode, pages, imageById } = exportBundle;
-    const slideWidth = 12192000;
-    const slideHeight = 6858000;
-    const emuPerPx = Math.round(slideWidth / PPT_EDITABLE_CANVAS.width);
-    const escapeXml = (value: string) => String(value || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
-    const normalizeColor = (value?: string, fallback = 'FFFFFF') => {
-      const raw = String(value || '').trim().replace(/^#/, '');
-      if (/^[0-9a-fA-F]{6}$/.test(raw)) return raw.toUpperCase();
-      if (/^[0-9a-fA-F]{3}$/.test(raw)) {
-        return raw.split('').map((part) => `${part}${part}`).join('').toUpperCase();
-      }
-      return fallback;
-    };
-    const toAlphaValue = (opacity: number) => Math.max(0, Math.min(100000, Math.round(opacity * 100000)));
-    const toEmu = (value: number) => Math.max(0, Math.round(value * emuPerPx));
-    const alignMap = {
-      left: 'l',
-      center: 'ctr',
-      right: 'r',
-    } as const;
-    const makeColorXml = (value: string | undefined, fallback: string, opacity = 1) => (
-      `<a:srgbClr val="${normalizeColor(value, fallback)}">${opacity < 1 ? `<a:alpha val="${toAlphaValue(opacity)}"/>` : ''}</a:srgbClr>`
-    );
-
-    const zip = new JSZip();
-    const visibleImageIds = Array.from(new Set(
-      pages.flatMap((page) => page.layers.reduce<string[]>((ids, layer) => {
-        if (!layer.visible || layer.type !== 'image') {
-          return ids;
-        }
-
-        const imageId = layer.imageNodeId || page.backgroundImageId;
-        if (imageId) {
-          ids.push(imageId);
-        }
-
-        return ids;
-      }, [])),
-    ));
-    const mediaByImageId = new Map<string, { fileName: string; ext: 'png' | 'jpg' }>();
-
-    for (let mediaIndex = 0; mediaIndex < visibleImageIds.length; mediaIndex += 1) {
-      const imageId = visibleImageIds[mediaIndex];
-      const image = imageById.get(imageId);
-      if (!image) continue;
-
-      const asset = await resolvePptExportImageAsset(image);
-      const fileName = `image${mediaIndex + 1}.${asset.ext}`;
-      zip.file(`ppt/media/${fileName}`, asset.blob);
-      mediaByImageId.set(imageId, { fileName, ext: asset.ext });
-    }
-    writePptxPackageSkeleton({
-      zip,
-      slideCount: pages.length,
-      title: promptNode.prompt || 'KK Studio PPT',
-      slideWidth,
-      slideHeight,
-    });
-
-    for (let slideIndex = 0; slideIndex < pages.length; slideIndex += 1) {
-      const page = pages[slideIndex];
-      const visibleLayers = sortPptLayers(page.layers).filter((layer) => layer.visible);
-      const slideLayerXml: string[] = [];
-      const slideRelationships: string[] = [];
-      let nextShapeId = 2;
-      let nextRelationshipId = 1;
-
-      visibleLayers.forEach((layer) => {
-        if (layer.type === 'image') {
-          const imageId = layer.imageNodeId || page.backgroundImageId;
-          if (!imageId) return;
-
-          const media = mediaByImageId.get(imageId);
-          if (!media) return;
-
-          const relationshipId = `rId${nextRelationshipId}`;
-          nextRelationshipId += 1;
-          slideRelationships.push(
-            `<Relationship Id="${relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/${media.fileName}"/>`,
-          );
-
-          const opacity = Math.max(0, Math.min(1, layer.opacity ?? 1));
-          const pictureXml = `      <p:pic>
-        <p:nvPicPr>
-          <p:cNvPr id="${nextShapeId}" name="${escapeXml(layer.name || `Image ${nextShapeId}`)}"/>
-          <p:cNvPicPr/>
-          <p:nvPr/>
-        </p:nvPicPr>
-        <p:blipFill>
-          <a:blip r:embed="${relationshipId}">${opacity < 1 ? `<a:alphaModFix amt="${toAlphaValue(opacity)}"/>` : ''}</a:blip>
-          <a:stretch><a:fillRect/></a:stretch>
-        </p:blipFill>
-        <p:spPr>
-          <a:xfrm><a:off x="${toEmu(layer.x)}" y="${toEmu(layer.y)}"/><a:ext cx="${toEmu(layer.width)}" cy="${toEmu(layer.height)}"/></a:xfrm>
-          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
-        </p:spPr>
-      </p:pic>`;
-          slideLayerXml.push(pictureXml);
-          nextShapeId += 1;
-          return;
-        }
-
-        if (!layer.text.trim()) return;
-
-        const fontSize = Math.max(100, Math.round(layer.fontSize * 100));
-        const textOpacity = Math.max(0, Math.min(1, layer.opacity ?? 1));
-        const backgroundOpacity = Math.max(0, Math.min(1, (layer.backgroundOpacity ?? 0) * textOpacity));
-        const paragraphs = layer.text.split(/\r?\n/).map((line) => (
-          `          <a:p>
-            <a:pPr algn="${alignMap[layer.align || 'left']}"/>
-            <a:r>
-              <a:rPr lang="zh-CN"${(layer.fontWeight || 0) >= 600 ? ' b="1"' : ''} sz="${fontSize}">
-                <a:solidFill>${makeColorXml(layer.color, 'FFFFFF', textOpacity)}</a:solidFill>
-              </a:rPr>
-              <a:t>${escapeXml(line || ' ')}</a:t>
-            </a:r>
-            <a:endParaRPr lang="zh-CN" sz="${fontSize}"/>
-          </a:p>`
-        )).join('\n');
-        const textXml = `      <p:sp>
-        <p:nvSpPr>
-          <p:cNvPr id="${nextShapeId}" name="${escapeXml(layer.name || `Text ${nextShapeId}`)}"/>
-          <p:cNvSpPr txBox="1"/>
-          <p:nvPr/>
-        </p:nvSpPr>
-        <p:spPr>
-          <a:xfrm><a:off x="${toEmu(layer.x)}" y="${toEmu(layer.y)}"/><a:ext cx="${toEmu(layer.width)}" cy="${toEmu(layer.height)}"/></a:xfrm>
-          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
-          ${layer.backgroundColor && backgroundOpacity > 0 ? `<a:solidFill>${makeColorXml(layer.backgroundColor, '111827', backgroundOpacity)}</a:solidFill>` : '<a:noFill/>'}
-          <a:ln><a:noFill/></a:ln>
-        </p:spPr>
-        <p:txBody>
-          <a:bodyPr wrap="square" lIns="114300" tIns="57150" rIns="114300" bIns="57150"/>
-          <a:lstStyle/>
-${paragraphs}
-        </p:txBody>
-      </p:sp>`;
-        slideLayerXml.push(textXml);
-        nextShapeId += 1;
-      });
-
-      slideRelationships.push(
-        `<Relationship Id="rId${nextRelationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>`,
-      );
-
-      zip.file(`ppt/slides/slide${slideIndex + 1}.xml`, buildPptxSlideXml({
-        bodyXml: slideLayerXml.join('\n'),
-      }));
-
-      zip.file(`ppt/slides/_rels/slide${slideIndex + 1}.xml.rels`, buildPptxSlideRelationshipsXml(slideRelationships));
-    }
-
-    const pptxBlob = await zip.generateAsync({ type: 'blob' });
-    saveAs(pptxBlob, `ppt-layered-${Date.now()}.pptx`);
-
-    import('./services/system/notificationService').then(({ notify }) => {
-      notify.success('PPTX 导出完成', `已导出 ${pages.length} 页的可编辑图层 PPTX`);
-    });
-  }, [requirePptEditableExportBundle, resolvePptExportImageAsset]);
-
   // Auto-Recover Interrupted Tasks
   useEffect(() => {
     if (activeCanvas) {
@@ -6476,79 +4947,6 @@ ${paragraphs}
       height: (maxY - minY) + PADDING + TOP_EXTRA + BOTTOM_EXTRA
     };
   }, [activeCanvas, imageNodesById, promptNodesById]);
-
-  const isPptDeckChildImageNode = useCallback((imageNode: GeneratedImage) => {
-    if (!imageNode.parentPromptId) {
-      return false;
-    }
-
-    const canvas = activeCanvasRef.current;
-    if (!canvas) {
-      return false;
-    }
-
-    const parentPrompt = canvas.promptNodes.find((promptNode) => promptNode.id === imageNode.parentPromptId);
-    return Boolean(parentPrompt && parentPrompt.mode === GenerationMode.PPT);
-  }, []);
-
-  const resolveCurrentPromptChildImages = useCallback((
-    promptNode: PromptNode | undefined | null,
-    imageNodes: GeneratedImage[],
-  ) => {
-    if (!promptNode) return [] as GeneratedImage[];
-    if (promptNode.mode === GenerationMode.PPT) return [] as GeneratedImage[];
-
-    const promptId = promptNode.id;
-    const sourceImageId = promptNode.sourceImageId;
-    const orderedIds = (promptNode.childImageIds || []).filter((id): id is string => Boolean(id));
-    const imageNodeById = new Map(imageNodes.map((imageNode) => [imageNode.id, imageNode] as const));
-    const strongOwnedImages = imageNodes.filter((imageNode) => (
-      imageNode.parentPromptId === promptId && imageNode.id !== sourceImageId
-    ));
-
-    if (strongOwnedImages.length > 0) {
-      const orderedOwnedImages: GeneratedImage[] = [];
-      const seenIds = new Set<string>();
-
-      orderedIds.forEach((imageId) => {
-        const imageNode = imageNodeById.get(imageId);
-        if (!imageNode || imageNode.id === sourceImageId || imageNode.parentPromptId !== promptId || seenIds.has(imageNode.id)) {
-          return;
-        }
-        seenIds.add(imageNode.id);
-        orderedOwnedImages.push(imageNode);
-      });
-
-      strongOwnedImages.forEach((imageNode) => {
-        if (seenIds.has(imageNode.id)) return;
-        seenIds.add(imageNode.id);
-        orderedOwnedImages.push(imageNode);
-      });
-
-      return orderedOwnedImages;
-    }
-
-    if (promptNode.error) {
-      return [] as GeneratedImage[];
-    }
-
-    if (sourceImageId) {
-      return [] as GeneratedImage[];
-    }
-
-    const legacyOwnedImages: GeneratedImage[] = [];
-    const seenIds = new Set<string>();
-    orderedIds.forEach((imageId) => {
-      const imageNode = imageNodeById.get(imageId);
-      if (!imageNode || imageNode.id === sourceImageId || imageNode.parentPromptId || seenIds.has(imageNode.id)) {
-        return;
-      }
-      seenIds.add(imageNode.id);
-      legacyOwnedImages.push(imageNode);
-    });
-
-    return legacyOwnedImages;
-  }, []);
 
   const generatingGroupStateSignatureRef = useRef('');
   useEffect(() => {

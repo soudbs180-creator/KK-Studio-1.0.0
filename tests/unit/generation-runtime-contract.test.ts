@@ -4,6 +4,7 @@ import path from 'node:path';
 import { describe, test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
+const APP_RETRY_NODE_END_MARKER = 'const updateEcommerceNodeState = useCallback';
 
 function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
@@ -94,6 +95,14 @@ describe('generation runtime extraction contract', () => {
   test('initial generation credit settlement is owned by useGenerationRuntime', () => {
     const appSource = readSource('src/App.tsx');
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const handleGenerateSource = appSource.slice(
+      appSource.indexOf('const handleGenerate = useCallback'),
+      appSource.indexOf('const handleFilesDrop = useCallback'),
+    );
+    const preflightSource = hookSource.slice(
+      hookSource.indexOf('const prepareInitialGenerationSubmissionContext = useCallback'),
+      hookSource.indexOf('const prepareInitialGeneratingPromptNode = useCallback'),
+    );
 
     assert.match(hookSource, /prepareInitialCreditSettlement: \(params: PrepareInitialCreditSettlementParams\) => Promise<PrepareInitialCreditSettlementResult>;/);
     assert.match(hookSource, /const prepareInitialCreditSettlement = useCallback\(async \(params: PrepareInitialCreditSettlementParams\)/);
@@ -102,9 +111,12 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /const chargeAttempt = await ensureCreditAttemptCharged\(\{/);
     assert.match(hookSource, /paymentTransactionId: chargeAttempt\.transactionId,/);
 
-    assert.match(appSource, /const initialCreditSettlement = await prepareInitialCreditSettlement\(\{/);
-    assert.match(appSource, /if \(!initialCreditSettlement\.allowed\) \{/);
-    assert.match(appSource, /paymentTransactionId = initialCreditSettlement\.paymentTransactionId;/);
+    assert.match(preflightSource, /const initialCreditSettlement = await prepareInitialCreditSettlement\(\{/);
+    assert.match(preflightSource, /if \(!initialCreditSettlement\.allowed\) \{/);
+    assert.match(preflightSource, /paymentTransactionId: initialCreditSettlement\.paymentTransactionId,/);
+    assert.match(handleGenerateSource, /const initialSubmissionContext = await prepareInitialGenerationSubmissionContext\(\{/);
+    assert.match(handleGenerateSource, /if \(!initialSubmissionContext\.allowed\) \{/);
+    assert.doesNotMatch(handleGenerateSource, /const initialCreditSettlement = await prepareInitialCreditSettlement\(\{/);
     assert.doesNotMatch(appSource, /if \(generationBillingState\.isCreditModel\) \{\s*if \(authLoading\)/);
     assert.doesNotMatch(appSource, /const chargeAttempt = await ensureCreditAttemptCharged\(\{\s*modelId: config\.model,/);
   });
@@ -112,6 +124,14 @@ describe('generation runtime extraction contract', () => {
   test('initial generation draft context is owned by useGenerationRuntime', () => {
     const appSource = readSource('src/App.tsx');
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const handleGenerateSource = appSource.slice(
+      appSource.indexOf('const handleGenerate = useCallback'),
+      appSource.indexOf('const handleFilesDrop = useCallback'),
+    );
+    const preflightSource = hookSource.slice(
+      hookSource.indexOf('const prepareInitialGenerationSubmissionContext = useCallback'),
+      hookSource.indexOf('const prepareInitialGeneratingPromptNode = useCallback'),
+    );
 
     assert.match(hookSource, /prepareGenerationDraftContext: \(args: PrepareGenerationDraftContextArgs\) => PrepareGenerationDraftContextResult;/);
     assert.match(hookSource, /const createGenerationPromptNodeId = \(\) => `node_\$\{Date\.now\(\)\}_\$\{Math\.random\(\)\.toString\(16\)\.slice\(2, 8\)\}`;/);
@@ -121,10 +141,16 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /activeCanvasRef\.current\?\.promptNodes\.find\(\(node\) => node\.id === existingPromptDraftId\)/);
     assert.match(hookSource, /const hasReusablePromptDraft = Boolean\(isFollowUp && existingPromptDraft\);/);
 
-    assert.match(appSource, /const draftContext = prepareGenerationDraftContext\(\{/);
-    assert.match(appSource, /let promptNodeId = draftContext\.promptNodeId;/);
-    assert.match(appSource, /const isFollowUp = draftContext\.isFollowUp;/);
-    assert.match(appSource, /const hasReusablePromptDraft = draftContext\.hasReusablePromptDraft;/);
+    assert.match(preflightSource, /const draftContext = prepareGenerationDraftContext\(\{/);
+    assert.match(preflightSource, /promptNodeId: draftContext\.promptNodeId,/);
+    assert.match(preflightSource, /isFollowUp: draftContext\.isFollowUp,/);
+    assert.match(preflightSource, /hasReusablePromptDraft: draftContext\.hasReusablePromptDraft,/);
+    assert.match(handleGenerateSource, /await runInitialGenerationSubmissionTransaction\(\{/);
+    assert.match(handleGenerateSource, /initialSubmissionContext,/);
+    assert.doesNotMatch(handleGenerateSource, /let promptNodeId = initialSubmissionContext\.promptNodeId;/);
+    assert.doesNotMatch(handleGenerateSource, /const isFollowUp = initialSubmissionContext\.isFollowUp;/);
+    assert.doesNotMatch(handleGenerateSource, /const hasReusablePromptDraft = initialSubmissionContext\.hasReusablePromptDraft;/);
+    assert.doesNotMatch(handleGenerateSource, /const draftContext = prepareGenerationDraftContext\(\{/);
     assert.doesNotMatch(appSource, /const existingPromptDraftId = String\(draftNodeId \|\| ''\)\.trim\(\);/);
     assert.doesNotMatch(appSource, /const existingPromptDraft = existingPromptDraftId/);
     assert.doesNotMatch(appSource, /let promptNodeId = hasReusablePromptDraft/);
@@ -133,6 +159,14 @@ describe('generation runtime extraction contract', () => {
   test('initial generation billing attempt context is owned by useGenerationRuntime', () => {
     const appSource = readSource('src/App.tsx');
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const handleGenerateSource = appSource.slice(
+      appSource.indexOf('const handleGenerate = useCallback'),
+      appSource.indexOf('const handleFilesDrop = useCallback'),
+    );
+    const preflightSource = hookSource.slice(
+      hookSource.indexOf('const prepareInitialGenerationSubmissionContext = useCallback'),
+      hookSource.indexOf('const prepareInitialGeneratingPromptNode = useCallback'),
+    );
 
     assert.match(hookSource, /prepareInitialBillingAttemptContext: \(params: PrepareInitialBillingAttemptContextParams\) => PrepareInitialBillingAttemptContextResult;/);
     assert.match(hookSource, /const prepareInitialBillingAttemptContext = useCallback\(\(params: PrepareInitialBillingAttemptContextParams\)/);
@@ -143,10 +177,17 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /phase: 'initial',/);
     assert.match(hookSource, /useServerSideCreditSettlement: params\.generationBillingState\.useServerSideCreditSettlement,/);
 
-    assert.match(appSource, /const billingAttemptContext = prepareInitialBillingAttemptContext\(\{/);
-    assert.match(appSource, /const resolvedCreditRoute = billingAttemptContext\.resolvedCreditRoute;/);
-    assert.match(appSource, /const billingAttempt = billingAttemptContext\.billingAttempt;/);
-    assert.match(appSource, /const useServerSideCreditSettlement = billingAttemptContext\.useServerSideCreditSettlement;/);
+    assert.match(preflightSource, /const billingAttemptContext = prepareInitialBillingAttemptContext\(\{/);
+    assert.match(preflightSource, /resolvedCreditRoute: billingAttemptContext\.resolvedCreditRoute,/);
+    assert.match(preflightSource, /billingAttempt: billingAttemptContext\.billingAttempt,/);
+    assert.match(preflightSource, /useServerSideCreditSettlement: billingAttemptContext\.useServerSideCreditSettlement,/);
+    assert.match(hookSource, /resolvedCreditRoute: initialSubmissionContext\.resolvedCreditRoute,/);
+    assert.match(hookSource, /billingAttempt: initialSubmissionContext\.billingAttempt,/);
+    assert.match(hookSource, /useServerSideCreditSettlement: initialSubmissionContext\.useServerSideCreditSettlement,/);
+    assert.doesNotMatch(handleGenerateSource, /const resolvedCreditRoute = initialSubmissionContext\.resolvedCreditRoute;/);
+    assert.doesNotMatch(handleGenerateSource, /const billingAttempt = initialSubmissionContext\.billingAttempt;/);
+    assert.doesNotMatch(handleGenerateSource, /const useServerSideCreditSettlement = initialSubmissionContext\.useServerSideCreditSettlement;/);
+    assert.doesNotMatch(handleGenerateSource, /const billingAttemptContext = prepareInitialBillingAttemptContext\(\{/);
     assert.doesNotMatch(appSource, /const resolvedCreditRoute = generationBillingState\.isCreditModel/);
     assert.doesNotMatch(appSource, /adminModelService\.getCreditRouteSnapshot\(config\.model, config\.imageSize\)/);
     assert.doesNotMatch(appSource, /const billingAttempt = buildGenerationBillingAttempt\(\{/);
@@ -155,6 +196,14 @@ describe('generation runtime extraction contract', () => {
   test('initial generation billing state context is owned by useGenerationRuntime', () => {
     const appSource = readSource('src/App.tsx');
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const handleGenerateSource = appSource.slice(
+      appSource.indexOf('const handleGenerate = useCallback'),
+      appSource.indexOf('const handleFilesDrop = useCallback'),
+    );
+    const preflightSource = hookSource.slice(
+      hookSource.indexOf('const prepareInitialGenerationSubmissionContext = useCallback'),
+      hookSource.indexOf('const prepareInitialGeneratingPromptNode = useCallback'),
+    );
 
     assert.match(hookSource, /prepareGenerationBillingStateContext: \(params: PrepareGenerationBillingStateContextParams\) => PrepareGenerationBillingStateContextResult;/);
     assert.match(hookSource, /const prepareGenerationBillingStateContext = useCallback\(\(params: PrepareGenerationBillingStateContextParams\)/);
@@ -164,17 +213,61 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /resolveGenerationBillingState\(\{/);
     assert.match(hookSource, /console\.log\('\[handleGenerate\] 计费检查'/);
 
-    assert.match(appSource, /const billingStateContext = prepareGenerationBillingStateContext\(\{/);
-    assert.match(appSource, /const selectedKeyForBilling = billingStateContext\.selectedKeyForBilling;/);
-    assert.match(appSource, /const generationBillingState = billingStateContext\.generationBillingState;/);
+    assert.match(preflightSource, /const billingStateContext = prepareGenerationBillingStateContext\(\{/);
+    assert.match(preflightSource, /const selectedKeyForBilling = billingStateContext\.selectedKeyForBilling;/);
+    assert.match(preflightSource, /const generationBillingState = billingStateContext\.generationBillingState;/);
+    assert.match(hookSource, /selectedKeyForBilling: initialSubmissionContext\.selectedKeyForBilling,/);
+    assert.match(hookSource, /generationBillingState: initialSubmissionContext\.generationBillingState,/);
+    assert.doesNotMatch(handleGenerateSource, /const selectedKeyForBilling = initialSubmissionContext\.selectedKeyForBilling;/);
+    assert.doesNotMatch(handleGenerateSource, /const generationBillingState = initialSubmissionContext\.generationBillingState;/);
+    assert.doesNotMatch(handleGenerateSource, /const billingStateContext = prepareGenerationBillingStateContext\(\{/);
     assert.doesNotMatch(appSource, /localStorage\.getItem\('kk_model_customizations'\)/);
     assert.doesNotMatch(appSource, /const selectedKeyForBilling = keyManager\.getNextKey\(config\.model, preferredKeyIdForBilling\);/);
     assert.doesNotMatch(appSource, /const generationBillingState = resolveGenerationBillingState\(\{/);
   });
 
+  test('initial generation submission preflight is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const handleGenerateSource = appSource.slice(
+      appSource.indexOf('const handleGenerate = useCallback'),
+      appSource.indexOf('const handleFilesDrop = useCallback'),
+    );
+    const preflightSource = hookSource.slice(
+      hookSource.indexOf('const prepareInitialGenerationSubmissionContext = useCallback'),
+      hookSource.indexOf('const prepareInitialGeneratingPromptNode = useCallback'),
+    );
+
+    assert.match(hookSource, /export interface PrepareInitialGenerationSubmissionContextParams extends PrepareGenerationDraftContextArgs \{/);
+    assert.match(hookSource, /export type PrepareInitialGenerationSubmissionContextResult =/);
+    assert.match(hookSource, /prepareInitialGenerationSubmissionContext: \(params: PrepareInitialGenerationSubmissionContextParams\) => Promise<PrepareInitialGenerationSubmissionContextResult>;/);
+    assert.match(preflightSource, /const billingStateContext = prepareGenerationBillingStateContext\(\{/);
+    assert.match(preflightSource, /const draftContext = prepareGenerationDraftContext\(\{/);
+    assert.match(preflightSource, /const billingAttemptContext = prepareInitialBillingAttemptContext\(\{/);
+    assert.match(preflightSource, /const initialCreditSettlement = await prepareInitialCreditSettlement\(\{/);
+    assert.match(preflightSource, /if \(!initialCreditSettlement\.allowed\) \{/);
+    assert.match(preflightSource, /paymentTransactionId: initialCreditSettlement\.paymentTransactionId,/);
+    assert.doesNotMatch(preflightSource, /prepareInitialGenerationPromptOptimization|persistInitialGeneratingPromptNode|executeInitialGenerationPromptNode/);
+
+    assert.match(handleGenerateSource, /const initialSubmissionContext = await prepareInitialGenerationSubmissionContext\(\{/);
+    assert.match(handleGenerateSource, /if \(!initialSubmissionContext\.allowed\) \{/);
+    assert.match(handleGenerateSource, /await runInitialGenerationSubmissionTransaction\(\{/);
+    assert.match(handleGenerateSource, /initialSubmissionContext,/);
+    assert.doesNotMatch(handleGenerateSource, /let promptNodeId = initialSubmissionContext\.promptNodeId;/);
+    assert.doesNotMatch(handleGenerateSource, /const generationBillingState = initialSubmissionContext\.generationBillingState;/);
+    assert.doesNotMatch(handleGenerateSource, /const billingStateContext = prepareGenerationBillingStateContext\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /const draftContext = prepareGenerationDraftContext\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /const billingAttemptContext = prepareInitialBillingAttemptContext\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /const initialCreditSettlement = await prepareInitialCreditSettlement\(\{/);
+  });
+
   test('initial generating prompt node assembly is owned by useGenerationRuntime', () => {
     const appSource = readSource('src/App.tsx');
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const handleGenerateSource = appSource.slice(
+      appSource.indexOf('const handleGenerate = useCallback'),
+      appSource.indexOf('const handleFilesDrop = useCallback'),
+    );
 
     assert.match(hookSource, /prepareInitialGeneratingPromptNode: \(params: PrepareInitialGeneratingPromptNodeParams\) => PrepareInitialGeneratingPromptNodeResult;/);
     assert.match(hookSource, /const prepareInitialGeneratingPromptNode = useCallback\(\(params: PrepareInitialGeneratingPromptNodeParams\)/);
@@ -185,8 +278,13 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /paymentTransactionId: params\.paymentTransactionId,/);
     assert.match(hookSource, /billingMode: params\.generationBillingState\.isCreditModel \? 'credits' : 'currency',/);
 
-    assert.match(appSource, /const initialGeneratingNode = prepareInitialGeneratingPromptNode\(\{/);
-    assert.match(appSource, /const generatingNode = initialGeneratingNode\.generatingNode;/);
+    assert.match(hookSource, /const initialGeneratingNode = await prepareInitialGeneratingPromptNodeContext\(\{/);
+    assert.match(hookSource, /const generatingNode = initialGeneratingNode\.generatingNode;/);
+    assert.match(appSource, /const \{[\s\S]*runInitialGenerationSubmissionTransaction,[\s\S]*\} = useGenerationRuntime\(\{/);
+    assert.match(handleGenerateSource, /await runInitialGenerationSubmissionTransaction\(\{/);
+    assert.doesNotMatch(appSource, /const \{[\s\S]*prepareInitialGeneratingPromptNodeContext,[\s\S]*\} = useGenerationRuntime\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /const initialGeneratingNode = await prepareInitialGeneratingPromptNodeContext\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /const initialGeneratingNode = prepareInitialGeneratingPromptNode\(\{/);
     assert.doesNotMatch(appSource, /const generationPreviewState = resolveGenerationPreviewState\(\{/);
     assert.doesNotMatch(appSource, /const generatingNode = buildGeneratingPromptNode\(\{/);
   });
@@ -194,6 +292,10 @@ describe('generation runtime extraction contract', () => {
   test('initial generating prompt node persistence is owned by useGenerationRuntime', () => {
     const appSource = readSource('src/App.tsx');
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const handleGenerateSource = appSource.slice(
+      appSource.indexOf('const handleGenerate = useCallback'),
+      appSource.indexOf('const handleFilesDrop = useCallback'),
+    );
 
     assert.match(hookSource, /persistInitialGeneratingPromptNode: \(params: PersistInitialGeneratingPromptNodeParams\) => Promise<PersistInitialGeneratingPromptNodeResult>;/);
     assert.match(hookSource, /const persistInitialGeneratingPromptNode = useCallback\(async \(params: PersistInitialGeneratingPromptNodeParams\)/);
@@ -205,14 +307,23 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /updateImageNodePosition: params\.updateImageNodePosition,/);
     assert.match(hookSource, /deletePromptNode: params\.deletePromptNode,/);
 
-    assert.match(appSource, /const persistedGeneration = await persistInitialGeneratingPromptNode\(\{/);
-    assert.match(appSource, /const persistedGeneratingNode = persistedGeneration\.persistedGeneratingNode;/);
+    assert.match(hookSource, /const persistedGeneration = await persistInitialGeneratingPromptNode\(\{/);
+    assert.match(hookSource, /const persistedGeneratingNode = persistedGeneration\.persistedGeneratingNode;/);
+    assert.match(hookSource, /await persistAndExecuteInitialGenerationSubmission\(\{/);
+    assert.match(handleGenerateSource, /await runInitialGenerationSubmissionTransaction\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /persistInitialGeneratingPromptNode\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /persistedGeneratingNode/);
+    assert.doesNotMatch(handleGenerateSource, /await persistAndExecuteInitialGenerationSubmission\(\{/);
     assert.doesNotMatch(appSource, /const persistedGeneratingNode = await persistGeneratingPromptNode\(\{/);
   });
 
   test('initial prompt optimization context is owned by useGenerationRuntime', () => {
     const appSource = readSource('src/App.tsx');
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const handleGenerateSource = appSource.slice(
+      appSource.indexOf('const handleGenerate = useCallback'),
+      appSource.indexOf('const handleFilesDrop = useCallback'),
+    );
 
     assert.match(hookSource, /prepareInitialGenerationPromptOptimization: \(params: PrepareInitialGenerationPromptOptimizationParams\) => Promise<PrepareInitialGenerationPromptOptimizationResult>;/);
     assert.match(hookSource, /const prepareInitialGenerationPromptOptimization = useCallback\(async \(params: PrepareInitialGenerationPromptOptimizationParams\)/);
@@ -222,40 +333,205 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /supportsThinking: !!getModelCapabilities\(params\.config\.model\)\?\.supportsThinking,/);
     assert.match(hookSource, /notify\.error\('Prompt optimization failed'/);
 
-    assert.match(appSource, /const initialPromptOptimization = await prepareInitialGenerationPromptOptimization\(\{/);
-    assert.match(appSource, /const optimizedPromptEn = initialPromptOptimization\.optimizedPromptEn;/);
+    assert.match(hookSource, /prepareInitialGeneratingPromptNodeContext\(\{/);
+    assert.match(handleGenerateSource, /runInitialGenerationSubmissionTransaction\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /const initialPromptOptimization = await prepareInitialGenerationPromptOptimization\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /const optimizedPromptEn = initialPromptOptimization\.optimizedPromptEn;/);
     assert.doesNotMatch(appSource, /enabled: \(config\.mode === GenerationMode\.IMAGE \|\| config\.mode === GenerationMode\.PPT\)/);
     assert.doesNotMatch(appSource, /supportsThinking: !!getModelCapabilities\(config\.model\)\?\.supportsThinking,/);
+  });
+
+  test('initial prompt optimization and node assembly are composed by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const handleGenerateSource = appSource.slice(
+      appSource.indexOf('const handleGenerate = useCallback'),
+      appSource.indexOf('const handleFilesDrop = useCallback'),
+    );
+    const composedStart = hookSource.indexOf('const prepareInitialGeneratingPromptNodeContext = useCallback');
+    const composedEnd = hookSource.indexOf('const persistInitialGeneratingPromptNode = useCallback');
+    const composedSource = composedStart === -1 ? '' : hookSource.slice(composedStart, composedEnd);
+
+    assert.match(hookSource, /export interface PrepareInitialGeneratingPromptNodeContextParams extends Omit</);
+    assert.match(hookSource, /prepareGenerationReferenceImages: \(referenceImages: ReferenceImage\[\]\) => ReferenceImage\[\];/);
+    assert.match(hookSource, /prepareInitialGeneratingPromptNodeContext: \(params: PrepareInitialGeneratingPromptNodeContextParams\) => Promise<PrepareInitialGeneratingPromptNodeContextResult>;/);
+    assert.match(hookSource, /const prepareInitialGeneratingPromptNodeContext = useCallback\(async \(params: PrepareInitialGeneratingPromptNodeContextParams\): Promise<PrepareInitialGeneratingPromptNodeContextResult> => \{/);
+    assert.match(hookSource, /return \{[\s\S]*prepareInitialGeneratingPromptNodeContext,[\s\S]*\};\s*\}/);
+
+    assert.match(composedSource, /const finalReferenceImages = params\.prepareGenerationReferenceImages\(params\.config\.referenceImages (?:\?\?|\|\|) \[\]\);/);
+    assert.match(composedSource, /const initialPromptOptimization = await prepareInitialGenerationPromptOptimization\(\{/);
+    assert.match(composedSource, /rawPrompt: params\.rawPrompt,/);
+    assert.match(composedSource, /finalReferenceImages,/);
+    assert.match(composedSource, /const initialGeneratingNode = prepareInitialGeneratingPromptNode\(\{/);
+    assert.match(composedSource, /optimizedPromptEn: initialPromptOptimization\.optimizedPromptEn,/);
+    assert.match(composedSource, /optimizedPromptZh: initialPromptOptimization\.optimizedPromptZh,/);
+    assert.match(composedSource, /promptOptimizerResult: initialPromptOptimization\.promptOptimizerResult,/);
+    assert.match(composedSource, /return initialGeneratingNode;/);
+    assert.doesNotMatch(composedSource, /persistInitialGeneratingPromptNode|completeAndExecuteInitialGenerationSubmission|executeGeneration|resolveGenerationPlacement/);
+
+    assert.match(hookSource, /const initialGeneratingNode = await prepareInitialGeneratingPromptNodeContext\(\{/);
+    assert.match(appSource, /const \{[\s\S]*runInitialGenerationSubmissionTransaction,[\s\S]*\} = useGenerationRuntime\(\{/);
+    assert.match(handleGenerateSource, /await runInitialGenerationSubmissionTransaction\(\{/);
+    assert.match(handleGenerateSource, /prepareGenerationReferenceImages,/);
+    assert.match(handleGenerateSource, /rawPrompt: trimmedPrompt,/);
+    assert.doesNotMatch(appSource, /const \{[\s\S]*prepareInitialGeneratingPromptNodeContext,[\s\S]*\} = useGenerationRuntime\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /const initialGeneratingNode = await prepareInitialGeneratingPromptNodeContext\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /const finalReferenceImages = prepareGenerationReferenceImages/);
+    assert.doesNotMatch(handleGenerateSource, /const initialPromptOptimization = await prepareInitialGenerationPromptOptimization/);
+    assert.doesNotMatch(handleGenerateSource, /\boptimizedPromptEn\b|\boptimizedPromptZh\b|\bpromptOptimizerResult\b/);
+    assert.doesNotMatch(handleGenerateSource, /prepareInitialGeneratingPromptNode\(\{/);
+  });
+
+  test('initial generation persistence and execution handoff is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const handleGenerateSource = appSource.slice(
+      appSource.indexOf('const handleGenerate = useCallback'),
+      appSource.indexOf('const handleFilesDrop = useCallback'),
+    );
+    const persistExecuteSource = hookSource.slice(
+      hookSource.indexOf('const persistAndExecuteInitialGenerationSubmission = useCallback'),
+      hookSource.indexOf('const runInitialGenerationSubmissionTransaction = useCallback'),
+    );
+
+    assert.match(hookSource, /export interface PersistAndExecuteInitialGenerationSubmissionParams[\s\S]*extends PersistInitialGeneratingPromptNodeParams,/);
+    assert.match(hookSource, /persistAndExecuteInitialGenerationSubmission: \(params: PersistAndExecuteInitialGenerationSubmissionParams\) => Promise<PersistAndExecuteInitialGenerationSubmissionResult>;/);
+    assert.match(hookSource, /const persistAndExecuteInitialGenerationSubmission = useCallback\(async \(\s*params: PersistAndExecuteInitialGenerationSubmissionParams,?\s*\): Promise<PersistAndExecuteInitialGenerationSubmissionResult> => \{/);
+    assert.match(hookSource, /return \{[\s\S]*persistAndExecuteInitialGenerationSubmission,[\s\S]*\};\s*\}/);
+
+    assert.match(persistExecuteSource, /const persistedGeneration = await persistInitialGeneratingPromptNode\(\{/);
+    assert.match(persistExecuteSource, /generatingNode: params\.generatingNode,/);
+    assert.match(persistExecuteSource, /getCanvas: params\.getCanvas,/);
+    assert.match(persistExecuteSource, /const persistedGeneratingNode = persistedGeneration\.persistedGeneratingNode;/);
+    assert.match(persistExecuteSource, /await completeAndExecuteInitialGenerationSubmission\(\{/);
+    assert.match(persistExecuteSource, /persistedGeneratingNode,/);
+    assert.match(persistExecuteSource, /requiredCredits: params\.requiredCredits,/);
+    assert.match(persistExecuteSource, /useServerSideCreditSettlement: params\.useServerSideCreditSettlement,/);
+    assert.match(persistExecuteSource, /return \{ persistedGeneratingNode \};/);
+    assert.doesNotMatch(persistExecuteSource, /resolveGenerationPlacement|prepareInitialGeneratingPromptNodeContext|completeRetryGeneratedMediaBatch|handleRetryPptSinglePage|runEcommerce/);
+
+    assert.match(hookSource, /await persistAndExecuteInitialGenerationSubmission\(\{/);
+    assert.match(hookSource, /generatingNode,/);
+    assert.match(hookSource, /getCanvas: params\.getCanvas,/);
+    assert.match(hookSource, /addPromptNode: params\.addPromptNode,/);
+    assert.match(hookSource, /updateImageNodePosition: params\.updateImageNodePosition,/);
+    assert.match(hookSource, /deletePromptNode: params\.deletePromptNode,/);
+    assert.match(hookSource, /const placement = params\.resolveGenerationPlacement\(\{/);
+    assert.match(hookSource, /const initialGeneratingNode = await prepareInitialGeneratingPromptNodeContext\(\{/);
+    assert.match(appSource, /const \{[\s\S]*runInitialGenerationSubmissionTransaction,[\s\S]*\} = useGenerationRuntime\(\{/);
+    assert.match(handleGenerateSource, /await runInitialGenerationSubmissionTransaction\(\{/);
+    assert.match(handleGenerateSource, /getCanvas: \(\) => activeCanvasRef\.current \|\| undefined,/);
+    assert.match(handleGenerateSource, /addPromptNode,/);
+    assert.match(handleGenerateSource, /updateImageNodePosition,/);
+    assert.match(handleGenerateSource, /deletePromptNode,/);
+    assert.doesNotMatch(appSource, /const \{[\s\S]*persistAndExecuteInitialGenerationSubmission,[\s\S]*\} = useGenerationRuntime\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /await persistAndExecuteInitialGenerationSubmission\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /const placement = resolveGenerationPlacement\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /const initialGeneratingNode = await prepareInitialGeneratingPromptNodeContext\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /persistInitialGeneratingPromptNode\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /completeAndExecuteInitialGenerationSubmission\(\{/);
+  });
+
+  test('initial generation submission transaction is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const handleGenerateSource = appSource.slice(
+      appSource.indexOf('const handleGenerate = useCallback'),
+      appSource.indexOf('const handleFilesDrop = useCallback'),
+    );
+    const transactionSource = hookSource.slice(
+      hookSource.indexOf('const runInitialGenerationSubmissionTransaction = useCallback'),
+      hookSource.indexOf('const handleCancelGeneration = useCallback'),
+    );
+
+    assert.match(hookSource, /type PreparedInitialGenerationSubmissionContext = Extract<PrepareInitialGenerationSubmissionContextResult, \{ allowed: true \}>;/);
+    assert.match(hookSource, /export interface RunInitialGenerationSubmissionTransactionParams/);
+    assert.match(hookSource, /initialSubmissionContext: PreparedInitialGenerationSubmissionContext;/);
+    assert.match(hookSource, /runInitialGenerationSubmissionTransaction: \(params: RunInitialGenerationSubmissionTransactionParams\) => Promise<void>;/);
+    assert.match(hookSource, /const runInitialGenerationSubmissionTransaction = useCallback\(async \(\s*params: RunInitialGenerationSubmissionTransactionParams,?\s*\): Promise<void> => \{/);
+    assert.match(hookSource, /return \{[\s\S]*runInitialGenerationSubmissionTransaction,[\s\S]*\};\s*\}/);
+
+    assert.match(transactionSource, /try \{/);
+    assert.match(transactionSource, /const placement = params\.resolveGenerationPlacement\(\{/);
+    assert.match(transactionSource, /isFollowUp: params\.initialSubmissionContext\.isFollowUp,/);
+    assert.match(transactionSource, /hasReusablePromptDraft: params\.initialSubmissionContext\.hasReusablePromptDraft,/);
+    assert.match(transactionSource, /const initialGeneratingNode = await prepareInitialGeneratingPromptNodeContext\(\{/);
+    assert.match(transactionSource, /promptNodeId: placement\.promptNodeId,/);
+    assert.match(transactionSource, /currentPos: placement\.currentPos,/);
+    assert.match(transactionSource, /rawPrompt: params\.rawPrompt,/);
+    assert.match(transactionSource, /await persistAndExecuteInitialGenerationSubmission\(\{/);
+    assert.match(transactionSource, /generatingNode,/);
+    assert.match(transactionSource, /requiredCredits: params\.initialSubmissionContext\.requiredCredits,/);
+    assert.match(transactionSource, /useServerSideCreditSettlement: params\.initialSubmissionContext\.useServerSideCreditSettlement,/);
+    assert.match(transactionSource, /catch \(error\) \{/);
+    assert.match(transactionSource, /reportInitialGenerationFailure\(\{ error \}\);/);
+    assert.doesNotMatch(transactionSource, /prepareInitialGenerationSubmissionContext\(\{/);
+
+    assert.match(appSource, /const \{[\s\S]*runInitialGenerationSubmissionTransaction,[\s\S]*\} = useGenerationRuntime\(\{/);
+    assert.match(handleGenerateSource, /const initialSubmissionContext = await prepareInitialGenerationSubmissionContext\(\{/);
+    assert.match(handleGenerateSource, /if \(!initialSubmissionContext\.allowed\) \{/);
+    assert.match(handleGenerateSource, /await runInitialGenerationSubmissionTransaction\(\{/);
+    assert.match(handleGenerateSource, /initialSubmissionContext,/);
+    assert.match(handleGenerateSource, /resolveGenerationPlacement,/);
+    assert.doesNotMatch(handleGenerateSource, /const placement = resolveGenerationPlacement\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /const initialGeneratingNode = await prepareInitialGeneratingPromptNodeContext\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /await persistAndExecuteInitialGenerationSubmission\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /reportInitialGenerationFailure\(\{ error: e \}\);/);
   });
 
   test('initial post-persist prompt cleanup is owned by useGenerationRuntime', () => {
     const appSource = readSource('src/App.tsx');
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const handleGenerateSource = appSource.slice(
+      appSource.indexOf('const handleGenerate = useCallback'),
+      appSource.indexOf('const handleFilesDrop = useCallback'),
+    );
+    const completionHandoffSource = hookSource.slice(
+      hookSource.indexOf('const completeAndExecuteInitialGenerationSubmission = useCallback'),
+      hookSource.indexOf('const handleCancelGeneration = useCallback'),
+    );
 
     assert.match(hookSource, /completeInitialGenerationPromptSubmission: \(params: CompleteInitialGenerationPromptSubmissionParams\) => void;/);
     assert.match(hookSource, /const completeInitialGenerationPromptSubmission = useCallback\(\(params: CompleteInitialGenerationPromptSubmissionParams\)/);
     assert.match(hookSource, /params\.setDraftNodeId\(null\);/);
     assert.match(hookSource, /params\.setConfig\(prev => \(\{ \.\.\.prev, prompt: '', referenceImages: \[\] \}\)\);/);
     assert.match(hookSource, /params\.setActiveSourceImage\(null\);/);
+    assert.match(hookSource, /completeAndExecuteInitialGenerationSubmission: \(params: CompleteAndExecuteInitialGenerationSubmissionParams\) => Promise<void>;/);
+    assert.match(hookSource, /const completeAndExecuteInitialGenerationSubmission = useCallback\(async \(params: CompleteAndExecuteInitialGenerationSubmissionParams\): Promise<void> => \{/);
+    assert.match(hookSource, /persistAndExecuteInitialGenerationSubmission: \(params: PersistAndExecuteInitialGenerationSubmissionParams\) => Promise<PersistAndExecuteInitialGenerationSubmissionResult>;/);
+    assert.match(hookSource, /return \{[\s\S]*completeAndExecuteInitialGenerationSubmission,[\s\S]*\};\s*\}/);
+    assert.match(completionHandoffSource, /completeInitialGenerationPromptSubmission\(\{/);
+    assert.match(completionHandoffSource, /await executeInitialGenerationPromptNode\(\{/);
 
-    assert.match(appSource, /completeInitialGenerationPromptSubmission\(\{/);
-    assert.match(appSource, /setDraftNodeId,/);
-    assert.match(appSource, /setConfig,/);
-    assert.match(appSource, /setActiveSourceImage,/);
+    assert.match(appSource, /const \{[\s\S]*runInitialGenerationSubmissionTransaction,[\s\S]*\} = useGenerationRuntime\(\{/);
+    assert.match(handleGenerateSource, /runInitialGenerationSubmissionTransaction\(\{/);
+    assert.match(hookSource, /completeAndExecuteInitialGenerationSubmission\(\{[\s\S]*persistedGeneratingNode,[\s\S]*\}\);/);
+    assert.match(hookSource, /requiredCredits: params\.initialSubmissionContext\.requiredCredits,/);
+    assert.match(hookSource, /useServerSideCreditSettlement: params\.initialSubmissionContext\.useServerSideCreditSettlement,/);
+    assert.doesNotMatch(appSource, /const \{[\s\S]*persistAndExecuteInitialGenerationSubmission,[\s\S]*\} = useGenerationRuntime\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /persistAndExecuteInitialGenerationSubmission\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /completeInitialGenerationPromptSubmission\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /completeAndExecuteInitialGenerationSubmission\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /await executeInitialGenerationPromptNode\(\{/);
+    assert.doesNotMatch(appSource, /\bcompleteInitialGenerationPromptSubmission\b/);
+    assert.doesNotMatch(appSource, /\bexecuteInitialGenerationPromptNode\b/);
     assert.doesNotMatch(
       appSource,
       /setDraftNodeId\(null\); \/\/ Detach status NOW[\s\S]*setConfig\(prev => \(\{ \.\.\.prev, prompt: '', referenceImages: \[\] \}\)\);[\s\S]*setActiveSourceImage\(null\);/,
     );
   });
 
-  test('retry generation failure commit is owned by useGenerationRuntime', () => {
+  test('retry generation failure commit is finalized by complete retry batch runtime', () => {
     const appSource = readSource('src/App.tsx');
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
     );
-
+    const completeBatchSource = hookSource.slice(
+      hookSource.indexOf('const completeRetryGeneratedMediaBatch = useCallback'),
+      hookSource.indexOf('const prepareGenerationDraftContext = useCallback'),
+    );
     assert.match(hookSource, /commitRetryGenerationFailure: \(params: CommitRetryGenerationFailureParams\) => Promise<void>;/);
     assert.match(hookSource, /const commitRetryGenerationFailure = useCallback\(async \(params: CommitRetryGenerationFailureParams\)/);
     assert.match(hookSource, /const failedBillingState = await resolveFailedCreditAttempt\(params\.executionNode\);/);
@@ -265,9 +541,19 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /errorDetails: params\.extractErrorDetails\(params\.error, params\.executionNode\.model\),/);
     assert.match(hookSource, /notify\.error\('重试失败', notifyMessage\);/);
 
-    assert.match(appSource, /await commitRetryGenerationFailure\(\{/);
-    assert.match(appSource, /executionNode,/);
-    assert.match(appSource, /extractErrorDetails,/);
+    assert.match(hookSource, /extractErrorDetails: CommitRetryGenerationFailureParams\['extractErrorDetails'\];/);
+    assert.match(completeBatchSource, /try \{\s*const startedAtMs = Date\.now\(\);/);
+    assert.match(completeBatchSource, /const results = await runRetryGeneratedMediaAttempts\(\{/);
+    assert.match(completeBatchSource, /await commitRetryGeneratedMediaBatchSuccess\(\{/);
+    assert.match(completeBatchSource, /catch \(error: unknown\) \{/);
+    assert.match(completeBatchSource, /await commitRetryGenerationFailure\(\{/);
+    assert.match(completeBatchSource, /executionNode: params\.executionNode,/);
+    assert.match(completeBatchSource, /error,/);
+    assert.match(completeBatchSource, /extractErrorDetails: params\.extractErrorDetails,/);
+
+    assert.doesNotMatch(appSource, /const \{[\s\S]*commitRetryGenerationFailure,[\s\S]*\} = useGenerationRuntime\(\{/);
+    assert.match(retryNodeSource, /extractErrorDetails,/);
+    assert.doesNotMatch(retryNodeSource, /await commitRetryGenerationFailure\(\{/);
     assert.doesNotMatch(retryNodeSource, /const failedBillingState = await resolveFailedCreditAttempt\(executionNode\);/);
     assert.doesNotMatch(retryNodeSource, /notify\.error\('重试失败', error\.message\);/);
   });
@@ -281,11 +567,15 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /applyOptimisticServerCreditDebit\(params\.requiredCredits, params\.useServerSideCreditSettlement\);/);
     assert.match(hookSource, /await params\.executeGeneration\(params\.persistedGeneratingNode\);/);
 
-    assert.match(appSource, /await executeInitialGenerationPromptNode\(\{/);
-    assert.match(appSource, /persistedGeneratingNode,/);
-    assert.match(appSource, /requiredCredits,/);
-    assert.match(appSource, /useServerSideCreditSettlement,/);
+    assert.match(appSource, /await runInitialGenerationSubmissionTransaction\(\{/);
+    assert.match(hookSource, /await persistAndExecuteInitialGenerationSubmission\(\{/);
+    assert.match(hookSource, /completeAndExecuteInitialGenerationSubmission\(\{[\s\S]*persistedGeneratingNode,[\s\S]*\}\);/);
+    assert.match(hookSource, /requiredCredits: params\.initialSubmissionContext\.requiredCredits,/);
+    assert.match(hookSource, /useServerSideCreditSettlement: params\.initialSubmissionContext\.useServerSideCreditSettlement,/);
     assert.match(appSource, /executeGeneration,/);
+    assert.doesNotMatch(appSource, /await persistAndExecuteInitialGenerationSubmission\(\{/);
+    assert.doesNotMatch(appSource, /await completeAndExecuteInitialGenerationSubmission\(\{/);
+    assert.doesNotMatch(appSource, /await executeInitialGenerationPromptNode\(\{/);
     assert.doesNotMatch(
       appSource,
       /\/\/ Execute immediately after save completed\s*applyOptimisticServerCreditDebit\(requiredCredits, useServerSideCreditSettlement\);\s*await executeGeneration\(persistedGeneratingNode\);/,
@@ -306,7 +596,9 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /notify\.error\('发送失败', message\);/);
     assert.match(hookSource, /String\(\(params\.error as \{ message\?: unknown \} \| null \| undefined\)\?\.message \|\| '请重试'\)/);
 
-    assert.match(handleGenerateSource, /reportInitialGenerationFailure\(\{ error: e \}\);/);
+    assert.match(hookSource, /reportInitialGenerationFailure\(\{ error \}\);/);
+    assert.match(handleGenerateSource, /runInitialGenerationSubmissionTransaction\(\{/);
+    assert.doesNotMatch(handleGenerateSource, /reportInitialGenerationFailure\(\{ error: e \}\);/);
     assert.doesNotMatch(handleGenerateSource, /console\.error\('\[handleGenerate\] failed:', e\);/);
     assert.doesNotMatch(handleGenerateSource, /notify\.error\('发送失败', e\?\.message \|\| '请重试'\);/);
   });
@@ -316,7 +608,11 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const attemptRequestSource = hookSource.slice(
+      hookSource.indexOf('const executeRetryGeneratedMediaAttemptRequest = useCallback'),
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
     );
 
     assert.match(hookSource, /createRetryGenerationTimeoutGuard: \(params: CreateRetryGenerationTimeoutGuardParams\) => CreateRetryGenerationTimeoutGuardResult;/);
@@ -328,8 +624,10 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /markFinished: \(\) => \{/);
     assert.match(hookSource, /clear: \(\) => clearTimeout\(timer\),/);
 
-    assert.match(retryNodeSource, /const \{ requestId, timeoutGuard \} = prepareRetryGeneratedMediaAttemptContext\(\{/);
+    assert.match(attemptRequestSource, /const \{ requestId, timeoutGuard \} = prepareRetryGeneratedMediaAttemptContext\(\{/);
+    assert.match(attemptRequestSource, /timeoutMs: params\.timeoutMs,/);
     assert.match(retryNodeSource, /timeoutMs: GENERATE_TIMEOUT_MS,/);
+    assert.doesNotMatch(retryNodeSource, /prepareRetryGeneratedMediaAttemptContext/);
     assert.doesNotMatch(retryNodeSource, /const timeoutGuard = createRetryGenerationTimeoutGuard\(\{/);
     assert.doesNotMatch(retryNodeSource, /const timer = setTimeout\(\(\) => \{/);
     assert.doesNotMatch(retryNodeSource, /cancelGeneration\(requestId\);/);
@@ -341,15 +639,15 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
     );
     const guardRunnerSource = hookSource.slice(
       hookSource.indexOf('const runRetryGeneratedMediaAttemptWithGuard = useCallback'),
       hookSource.indexOf('const commitRetryGenerationStart = useCallback'),
     );
-    const guardedAttemptSource = retryNodeSource.slice(
-      retryNodeSource.indexOf('const { currentMode, taskPrompt, generatedMediaContext } = await runRetryGeneratedMediaAttemptWithGuard'),
-      retryNodeSource.indexOf('const { apiDurationMs, b64 } = generatedMediaContext;'),
+    const attemptRequestSource = hookSource.slice(
+      hookSource.indexOf('const executeRetryGeneratedMediaAttemptRequest = useCallback'),
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
     );
 
     assert.match(hookSource, /finalizeRetryGeneratedMediaAttemptGuard: \(params: FinalizeRetryGeneratedMediaAttemptGuardParams\) => void;/);
@@ -365,9 +663,11 @@ describe('generation runtime extraction contract', () => {
     assert.match(guardRunnerSource, /const result = await params\.run\(\);[\s\S]*finalizeRetryGeneratedMediaAttemptGuard\(\{ timeoutGuard: params\.timeoutGuard \}\);[\s\S]*return result;/);
     assert.match(guardRunnerSource, /catch \(e\) \{[\s\S]*finalizeRetryGeneratedMediaAttemptGuard\(\{ timeoutGuard: params\.timeoutGuard \}\);[\s\S]*throw e;/);
 
-    assert.match(retryNodeSource, /runRetryGeneratedMediaAttemptWithGuard\(\{[\s\S]*timeoutGuard,[\s\S]*run: async \(\) => \{/);
-    assert.match(retryNodeSource, /runRetryGeneratedMediaAttemptWithGuard\(\{[\s\S]*\}\);\s*const \{ apiDurationMs, b64 \} = generatedMediaContext;/);
-    assert.doesNotMatch(guardedAttemptSource, /prepareRetryGeneratedMediaPersistence|resolveRetryGeneratedMediaDimensions/);
+    assert.match(attemptRequestSource, /return runRetryGeneratedMediaAttemptWithGuard\(\{[\s\S]*timeoutGuard,[\s\S]*run: async \(\) => \{/);
+    assert.match(attemptRequestSource, /const requestResult = await executeRetryGeneratedMediaRequest\(\{/);
+    assert.match(attemptRequestSource, /return requestResult;/);
+    assert.doesNotMatch(attemptRequestSource, /prepareRetryGeneratedMediaPersistence|resolveRetryGeneratedMediaDimensions|assembleRetryGeneratedMediaAttemptResult/);
+    assert.doesNotMatch(retryNodeSource, /runRetryGeneratedMediaAttemptWithGuard/);
     assert.doesNotMatch(retryNodeSource, /finalizeRetryGeneratedMediaAttemptGuard\(\{ timeoutGuard \}\);/);
     assert.doesNotMatch(retryNodeSource, /catch \(e: any\)/);
     assert.doesNotMatch(retryNodeSource, /timeoutGuard\.markFinished\(\);/);
@@ -379,7 +679,11 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const attemptRequestSource = hookSource.slice(
+      hookSource.indexOf('const executeRetryGeneratedMediaAttemptRequest = useCallback'),
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
     );
 
     assert.match(hookSource, /prepareRetryGeneratedMediaAttemptContext: \(params: PrepareRetryGeneratedMediaAttemptContextParams\) => PrepareRetryGeneratedMediaAttemptContextResult;/);
@@ -388,8 +692,10 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /params\.executionNode\.billingAttemptId \|\| params\.currentNodeId,/);
     assert.match(hookSource, /timeoutGuard: createRetryGenerationTimeoutGuard\(\{/);
 
-    assert.match(retryNodeSource, /const \{ requestId, timeoutGuard \} = prepareRetryGeneratedMediaAttemptContext\(\{/);
+    assert.match(attemptRequestSource, /const \{ requestId, timeoutGuard \} = prepareRetryGeneratedMediaAttemptContext\(\{/);
+    assert.match(attemptRequestSource, /timeoutMs: params\.timeoutMs,/);
     assert.match(retryNodeSource, /timeoutMs: GENERATE_TIMEOUT_MS,/);
+    assert.doesNotMatch(retryNodeSource, /prepareRetryGeneratedMediaAttemptContext/);
     assert.doesNotMatch(retryNodeSource, /const requestId = buildGenerationAttemptRequestId\(/);
     assert.doesNotMatch(retryNodeSource, /const timeoutGuard = createRetryGenerationTimeoutGuard\(\{/);
   });
@@ -399,10 +705,14 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const completeBatchSource = hookSource.slice(
+      hookSource.indexOf('const completeRetryGeneratedMediaBatch = useCallback'),
+      hookSource.indexOf('const prepareGenerationDraftContext = useCallback'),
     );
 
-    assert.match(hookSource, /commitRetryGenerationStart: \(params: CommitRetryGenerationStartParams\) => void;/);
+    assert.doesNotMatch(hookSource, /commitRetryGenerationStart: \(params: CommitRetryGenerationStartParams\) => void;/);
     assert.match(hookSource, /const commitRetryGenerationStart = useCallback\(\(params: CommitRetryGenerationStartParams\)/);
     assert.match(hookSource, /updatePromptNode\(\{/);
     assert.match(hookSource, /\.\.\.params\.executionNode,/);
@@ -410,8 +720,12 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /isGenerating: true,/);
     assert.match(hookSource, /timestamp: Date\.now\(\)/);
     assert.match(hookSource, /applyOptimisticServerCreditDebit\(\s*params\.retryBillingState\.requiredCredits,\s*params\.retryBillingState\.useServerSideCreditSettlement,\s*\);/);
+    assert.match(hookSource, /retryBillingState: CommitRetryGenerationStartParams\['retryBillingState'\];/);
+    assert.match(completeBatchSource, /commitRetryGenerationStart\(\{[\s\S]*executionNode: params\.executionNode,[\s\S]*retryBillingState: params\.retryBillingState,[\s\S]*resolveModelDisplayName: params\.resolveModelDisplayName,[\s\S]*\}\);\s*try \{/);
 
-    assert.match(retryNodeSource, /commitRetryGenerationStart\(\{/);
+    assert.doesNotMatch(appSource, /const \{[\s\S]*commitRetryGenerationStart,[\s\S]*\} = useGenerationRuntime\(\{/);
+    assert.doesNotMatch(retryNodeSource, /commitRetryGenerationStart\(\{/);
+    assert.match(retryNodeSource, /retryBillingState,/);
     assert.match(retryNodeSource, /executionNode,/);
     assert.match(retryNodeSource, /retryBillingState,/);
     assert.match(retryNodeSource, /resolveModelDisplayName,/);
@@ -426,7 +740,19 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const pptSingleRetrySource = hookSource.slice(
+      hookSource.indexOf('const handleRetryPptSinglePage = useCallback'),
+      hookSource.indexOf('const handleCancelGeneration = useCallback'),
+    );
+    const retryRecoverySource = hookSource.slice(
+      hookSource.indexOf('const recoverRetryGenerationBridge = useCallback'),
+      hookSource.indexOf('const prepareRetryGenerationRequestContext = useCallback'),
+    );
+    const retryPreparationSource = hookSource.slice(
+      hookSource.indexOf('const prepareRetryGeneratedMediaExecutionContext = useCallback'),
+      hookSource.indexOf('const reportRetryGenerationSuccess = useCallback'),
     );
 
     assert.match(hookSource, /reportRetryRecoveryResult: \(params: ReportRetryRecoveryResultParams\) => void;/);
@@ -434,10 +760,31 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /if \(params\.recoveredCount <= 0 && params\.pendingCount <= 0\) \{/);
     assert.match(hookSource, /const message = params\.pendingCount > 0/);
     assert.match(hookSource, /notify\.info\('恢复历史结果', message\);/);
+    assert.match(hookSource, /recoverRetryGenerationBridge: \(params: RecoverRetryGenerationBridgeParams\) => Promise<RecoverRetryGenerationBridgeResult>;/);
+    assert.match(hookSource, /const recoverRetryGenerationBridge = useCallback\(async \(params: RecoverRetryGenerationBridgeParams\): Promise<RecoverRetryGenerationBridgeResult> => \{/);
+    assert.match(retryRecoverySource, /const recovered = await params\.recoverFailedSyncBridgeGeneration\(params\.executionNode\);/);
+    assert.match(retryRecoverySource, /const shouldShortCircuit = recovered\.recoveredCount > 0 \|\| recovered\.pendingCount > 0;/);
+    assert.match(retryRecoverySource, /if \(shouldShortCircuit\) \{/);
+    assert.match(retryRecoverySource, /reportRetryRecoveryResult\(\{ recoveredCount: recovered\.recoveredCount, pendingCount: recovered\.pendingCount \}\);/);
 
-    assert.match(retryNodeSource, /reportRetryRecoveryResult\(\{ recoveredCount: recovered\.recoveredCount, pendingCount: recovered\.pendingCount \}\);/);
+    assert.match(retryPreparationSource, /const retryRecovery = await recoverRetryGenerationBridge\(\{/);
+    assert.match(retryPreparationSource, /executionNode: retryExecutionNode,/);
+    assert.match(retryPreparationSource, /recoverFailedSyncBridgeGeneration: params\.recoverFailedSyncBridgeGeneration,/);
+    assert.match(retryPreparationSource, /if \(retryRecovery\.shouldShortCircuit\) \{/);
+    assert.match(retryNodeSource, /recoverFailedSyncBridgeGeneration,/);
+    assert.doesNotMatch(retryNodeSource, /const retryRecovery = await recoverRetryGenerationBridge\(\{/);
+    assert.doesNotMatch(retryNodeSource, /if \(retryRecovery\.shouldShortCircuit\) \{/);
+    assert.doesNotMatch(retryNodeSource, /const recovered = await recoverFailedSyncBridgeGeneration\(executionNode\);/);
+    assert.doesNotMatch(retryNodeSource, /reportRetryRecoveryResult\(\{/);
     assert.doesNotMatch(retryNodeSource, /notify\.info\('恢复历史结果', message\);/);
     assert.doesNotMatch(retryNodeSource, /已重新接管 \$\{recovered\.pendingCount\}/);
+    assert.match(hookSource, /handleRetryPptSinglePage: \(node: PromptNode, pageIndex: number\) => Promise<void>;/);
+    assert.match(hookSource, /const handleRetryPptSinglePage = useCallback\(async \(node: PromptNode, pageIndex: number\) => \{/);
+    assert.match(appSource, /const \{[\s\S]*handleRetryPptSinglePage,[\s\S]*\} = useGenerationRuntime\(\{/);
+    assert.doesNotMatch(appSource, /const handleRetryPptSinglePage = useCallback\(async \(node: PromptNode, pageIndex: number\) => \{/);
+    assert.match(pptSingleRetrySource, /buildRetryExecutionNode\(\{/);
+    assert.match(pptSingleRetrySource, /prepareRetriedExecutionNode\(\{/);
+    assert.doesNotMatch(pptSingleRetrySource, /prepareRetryGeneratedMediaExecutionContext\(\{/);
   });
 
   test('retry generation request context is owned by useGenerationRuntime', () => {
@@ -445,7 +792,11 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const retryPreparationSource = hookSource.slice(
+      hookSource.indexOf('const prepareRetryGeneratedMediaExecutionContext = useCallback'),
+      hookSource.indexOf('const reportRetryGenerationSuccess = useCallback'),
     );
 
     assert.match(hookSource, /prepareRetryGenerationRequestContext: \(params: PrepareRetryGenerationRequestContextParams\) => PrepareRetryGenerationRequestContextResult;/);
@@ -454,11 +805,50 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /const requestedCount = params\.node\.parallelCount \|\| params\.defaultParallelCount \|\| 1;/);
     assert.match(hookSource, /const count = params\.node\.mode === GenerationMode\.PPT \? Math\.min\(20, Math\.max\(1, requestedCount\)\) : requestedCount;/);
 
-    assert.match(retryNodeSource, /const \{ currentNodeId, count \} = prepareRetryGenerationRequestContext\(\{/);
-    assert.match(retryNodeSource, /defaultParallelCount: config\.parallelCount,/);
+    assert.match(retryPreparationSource, /const \{ currentNodeId, requestedCount, count \} = prepareRetryGenerationRequestContext\(\{/);
+    assert.match(retryPreparationSource, /defaultParallelCount: params\.defaultParallelCount,/);
+    assert.match(retryNodeSource, /prepareRetryGeneratedMediaExecutionContext\(\{[\s\S]*defaultParallelCount: config\.parallelCount,[\s\S]*\}\);/);
+    assert.doesNotMatch(retryNodeSource, /const \{ currentNodeId, count \} = prepareRetryGenerationRequestContext\(\{/);
     assert.doesNotMatch(retryNodeSource, /const currentNodeId = node\.id;/);
     assert.doesNotMatch(retryNodeSource, /const requestedCount = node\.parallelCount \|\| config\.parallelCount \|\| 1;/);
     assert.doesNotMatch(retryNodeSource, /const count = node\.mode === GenerationMode\.PPT \? Math\.min\(20, Math\.max\(1, requestedCount\)\) : requestedCount;/);
+  });
+
+  test('retry generated media execution preparation is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const retryPreparationSource = hookSource.slice(
+      hookSource.indexOf('const prepareRetryGeneratedMediaExecutionContext = useCallback'),
+      hookSource.indexOf('const reportRetryGenerationSuccess = useCallback'),
+    );
+
+    assert.match(hookSource, /export interface PrepareRetryGeneratedMediaExecutionContextParams \{/);
+    assert.match(hookSource, /export type PrepareRetryGeneratedMediaExecutionContextResult =/);
+    assert.match(hookSource, /prepareRetryGeneratedMediaExecutionContext: \(params: PrepareRetryGeneratedMediaExecutionContextParams\) => Promise<PrepareRetryGeneratedMediaExecutionContextResult>;/);
+    assert.match(retryPreparationSource, /const preparedRetry = await prepareRetriedExecutionNode\(\{/);
+    assert.match(retryPreparationSource, /phase: 'retry',/);
+    assert.match(retryPreparationSource, /ensureCreditAttemptCharged,/);
+    assert.match(retryPreparationSource, /const retryExecutionNode = buildRetryExecutionNode\(\{/);
+    assert.match(retryPreparationSource, /node: params\.node,/);
+    assert.match(retryPreparationSource, /resolveNodeRouteState: params\.resolveNodeRouteState,/);
+    assert.match(retryPreparationSource, /const retryRecovery = await recoverRetryGenerationBridge\(\{/);
+    assert.match(retryPreparationSource, /return \{\s*prepared: false as const,\s*\};/);
+    assert.match(retryPreparationSource, /return \{[\s\S]*prepared: true as const,[\s\S]*executionNode: preparedRetry\.executionNode,[\s\S]*retryBillingState: preparedRetry\.billingState,[\s\S]*\};/);
+
+    assert.match(retryNodeSource, /const retryExecutionContext = await prepareRetryGeneratedMediaExecutionContext\(\{/);
+    assert.match(retryNodeSource, /resolveNodeRouteState,/);
+    assert.match(retryNodeSource, /recoverFailedSyncBridgeGeneration,/);
+    assert.match(retryNodeSource, /if \(!retryExecutionContext\.prepared\) \{/);
+    assert.match(retryNodeSource, /const \{ currentNodeId, count, retryBillingState \} = retryExecutionContext;/);
+    assert.match(retryNodeSource, /executionNode = retryExecutionContext\.executionNode;/);
+    assert.doesNotMatch(retryNodeSource, /buildRetryExecutionNode\(\{/);
+    assert.doesNotMatch(retryNodeSource, /recoverRetryGenerationBridge\(\{/);
+    assert.doesNotMatch(retryNodeSource, /prepareRetriedExecutionNode\(\{/);
+    assert.doesNotMatch(retryNodeSource, /const \{ billingAttempt: retryBillingAttempt, billingState: retryBillingState \} = preparedRetry;/);
   });
 
   test('retry generation success side effects are owned by useGenerationRuntime', () => {
@@ -466,7 +856,7 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
     );
 
     assert.match(hookSource, /reportRetryGenerationSuccess: \(params: ReportRetryGenerationSuccessParams\) => void;/);
@@ -476,7 +866,7 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /recordCost\(/);
     assert.match(hookSource, /notify\.success\('生成完成', '重新生成成功'\);/);
 
-    assert.match(retryNodeSource, /commitRetryGeneratedMediaSuccess\(\{[\s\S]*executionNode,[\s\S]*alignedImageNodes,[\s\S]*results,[\s\S]*\}\);/);
+    assert.match(retryNodeSource, /completeRetryGeneratedMediaBatch\(\{[\s\S]*executionNode,[\s\S]*\}\);/);
     assert.doesNotMatch(retryNodeSource, /const effectiveSize = alignedImageNodes\[0\]\?\.imageSize \|\| executionNode\.imageSize;/);
     assert.doesNotMatch(retryNodeSource, /import\('\.\/services\/billing\/costService'\)/);
     assert.doesNotMatch(retryNodeSource, /notify\.success\('生成完成', '重新生成成功'\);/);
@@ -487,7 +877,7 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
     );
     const commitSuccessSource = hookSource.slice(
       hookSource.indexOf('const commitRetryGeneratedMediaSuccess = useCallback'),
@@ -501,8 +891,10 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /reportRetryGenerationSuccess\(\{/);
     assert.match(commitSuccessSource, /await params\.addImageNodes\([\s\S]*reportRetryGenerationSuccess\(\{/);
 
-    assert.match(retryNodeSource, /await commitRetryGeneratedMediaSuccess\(\{/);
-    assert.match(retryNodeSource, /retryCompletedPromptPatch,/);
+    assert.match(retryNodeSource, /await completeRetryGeneratedMediaBatch\(\{/);
+    assert.match(retryNodeSource, /parentNodeId: node\.id,/);
+    assert.doesNotMatch(retryNodeSource, /await commitRetryGeneratedMediaSuccess\(\{/);
+    assert.doesNotMatch(retryNodeSource, /retryCompletedPromptPatch,/);
     assert.doesNotMatch(retryNodeSource, /addImageNodes\(alignedImageNodes, \{/);
     assert.doesNotMatch(retryNodeSource, /reportRetryGenerationSuccess\(\{/);
   });
@@ -512,7 +904,11 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const attemptRequestSource = hookSource.slice(
+      hookSource.indexOf('const executeRetryGeneratedMediaAttemptRequest = useCallback'),
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
     );
 
     assert.match(hookSource, /prepareRetryGenerationTaskPromptContext: \(params: PrepareRetryGenerationTaskPromptContextParams\) => PrepareRetryGenerationTaskPromptContextResult;/);
@@ -522,8 +918,10 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /params\.executionNode\.pptStyleLocked !== false/);
     assert.match(hookSource, /PPT 第 \$\{params\.index \+ 1\}\/\$\{params\.count\} 页/);
 
-    assert.match(retryNodeSource, /const \{ currentMode, taskPrompt \} = prepareRetryGenerationTaskPromptContext\(\{/);
+    assert.match(attemptRequestSource, /const \{ currentMode, taskPrompt \} = prepareRetryGenerationTaskPromptContext\(\{/);
+    assert.match(attemptRequestSource, /sourcePrompt: params\.sourcePrompt,/);
     assert.match(retryNodeSource, /sourcePrompt: node\.prompt,/);
+    assert.doesNotMatch(retryNodeSource, /prepareRetryGenerationTaskPromptContext/);
     assert.doesNotMatch(retryNodeSource, /const currentMode: GenerationMode = executionNode\.mode \|\| GenerationMode\.IMAGE;/);
     assert.doesNotMatch(retryNodeSource, /const taskPrompt = currentMode === GenerationMode\.PPT/);
     assert.doesNotMatch(retryNodeSource, /const styleDirective = executionNode\.pptStyleLocked !== false/);
@@ -534,13 +932,16 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
     );
     const executeRequestSource = hookSource.slice(
       hookSource.indexOf('const executeRetryGeneratedMediaRequest = useCallback'),
       hookSource.indexOf('const applyRetryGeneratedMediaAuthoritativeBalance = useCallback'),
     );
-
+    const retryAttemptsSource = hookSource.slice(
+      hookSource.indexOf('const runRetryGeneratedMediaAttempts = useCallback'),
+      hookSource.indexOf('const prepareGenerationDraftContext = useCallback'),
+    );
     assert.match(hookSource, /prepareRetryVideoGenerationRequest: \(params: PrepareRetryVideoGenerationRequestParams\) => PrepareRetryVideoGenerationRequestResult;/);
     assert.match(hookSource, /const prepareRetryVideoGenerationRequest = useCallback\(\(params: PrepareRetryVideoGenerationRequestParams\)/);
     assert.match(hookSource, /if \(params\.executionNode\.videoResolution\) return params\.executionNode\.videoResolution;/);
@@ -562,11 +963,19 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
     );
     const executeRequestSource = hookSource.slice(
       hookSource.indexOf('const executeRetryGeneratedMediaRequest = useCallback'),
       hookSource.indexOf('const applyRetryGeneratedMediaAuthoritativeBalance = useCallback'),
+    );
+    const assembleAttemptResultSource = hookSource.slice(
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
+      hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
+    );
+    const attemptRequestSource = hookSource.slice(
+      hookSource.indexOf('const executeRetryGeneratedMediaAttemptRequest = useCallback'),
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
     );
 
     assert.match(hookSource, /buildRetryVideoGenerationResultContext: \(params: BuildRetryVideoGenerationResultContextParams\) => BuildRetryVideoGenerationResultContextResult;/);
@@ -578,7 +987,8 @@ describe('generation runtime extraction contract', () => {
 
     assert.match(executeRequestSource, /generatedMediaContext = buildRetryVideoGenerationResultContext\(\{/);
     assert.match(executeRequestSource, /videoResult,/);
-    assert.match(retryNodeSource, /const \{ apiDurationMs, b64 \} = generatedMediaContext;/);
+    assert.match(assembleAttemptResultSource, /const \{ apiDurationMs, b64 \} = params\.generatedMediaContext;/);
+    assert.doesNotMatch(retryNodeSource, /const \{ apiDurationMs, b64 \} = generatedMediaContext;/);
     assert.doesNotMatch(retryNodeSource, /buildRetryVideoGenerationResultContext\(\{/);
     assert.doesNotMatch(retryNodeSource, /actualKeySlotId = videoResult\.keySlotId \|\| actualKeySlotId;/);
     assert.doesNotMatch(retryNodeSource, /actualProvider = videoResult\.provider \|\| actualProvider;/);
@@ -590,7 +1000,7 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
     );
     const executeRequestSource = hookSource.slice(
       hookSource.indexOf('const executeRetryGeneratedMediaRequest = useCallback'),
@@ -618,11 +1028,19 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
     );
     const executeRequestSource = hookSource.slice(
       hookSource.indexOf('const executeRetryGeneratedMediaRequest = useCallback'),
       hookSource.indexOf('const applyRetryGeneratedMediaAuthoritativeBalance = useCallback'),
+    );
+    const assembleAttemptResultSource = hookSource.slice(
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
+      hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
+    );
+    const attemptRequestSource = hookSource.slice(
+      hookSource.indexOf('const executeRetryGeneratedMediaAttemptRequest = useCallback'),
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
     );
 
     assert.match(hookSource, /buildRetryImageGenerationResultContext: \(params: BuildRetryImageGenerationResultContextParams\) => BuildRetryImageGenerationResultContextResult;/);
@@ -636,8 +1054,10 @@ describe('generation runtime extraction contract', () => {
 
     assert.match(executeRequestSource, /generatedMediaContext = buildRetryImageGenerationResultContext\(\{/);
     assert.match(executeRequestSource, /resolveModelDisplayName: params\.resolveModelDisplayName,/);
-    assert.match(retryNodeSource, /const \{ apiDurationMs, b64 \} = generatedMediaContext;/);
-    assert.match(retryNodeSource, /applyRetryGeneratedMediaAuthoritativeBalance\(\{/);
+    assert.match(assembleAttemptResultSource, /const \{ apiDurationMs, b64 \} = params\.generatedMediaContext;/);
+    assert.match(attemptRequestSource, /applyRetryGeneratedMediaAuthoritativeBalance\(\{/);
+    assert.doesNotMatch(retryNodeSource, /applyRetryGeneratedMediaAuthoritativeBalance\(\{/);
+    assert.doesNotMatch(retryNodeSource, /const \{ apiDurationMs, b64 \} = generatedMediaContext;/);
     assert.doesNotMatch(retryNodeSource, /buildRetryImageGenerationResultContext\(\{/);
     assert.doesNotMatch(retryNodeSource, /actualProvider = result\.provider \|\| actualProvider;/);
     assert.doesNotMatch(retryNodeSource, /actualModel = result\.effectiveModel \|\| actualModel;/);
@@ -649,15 +1069,19 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
     );
     const executeRequestSource = hookSource.slice(
       hookSource.indexOf('const executeRetryGeneratedMediaRequest = useCallback'),
       hookSource.indexOf('const applyRetryGeneratedMediaAuthoritativeBalance = useCallback'),
     );
-    const pptSingleRetrySource = appSource.slice(
-      appSource.indexOf('const handleRetryPptSinglePage = useCallback'),
-      appSource.indexOf('const handleExportPptSinglePage = useCallback'),
+    const attemptRequestSource = hookSource.slice(
+      hookSource.indexOf('const executeRetryGeneratedMediaAttemptRequest = useCallback'),
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
+    );
+    const pptSingleRetrySource = hookSource.slice(
+      hookSource.indexOf('const handleRetryPptSinglePage = useCallback'),
+      hookSource.indexOf('const handleCancelGeneration = useCallback'),
     );
 
     assert.match(hookSource, /export interface ExecuteRetryGeneratedMediaRequestParams \{/);
@@ -675,10 +1099,12 @@ describe('generation runtime extraction contract', () => {
     assert.match(executeRequestSource, /return \{\s*currentMode: params\.currentMode,\s*taskPrompt: params\.taskPrompt,\s*generatedMediaContext,\s*\};/);
     assert.doesNotMatch(executeRequestSource, /prepareRetryGenerationTaskPromptContext|applyRetryGeneratedMediaAuthoritativeBalance|prepareRetryGeneratedMediaPersistence|scheduleRetryGeneratedMediaCloudSync|resolveRetryGeneratedMediaDimensions|buildRetryGeneratedMediaResultFromContext|prepareRetryGeneratedMediaSuccessCommitContext|commitRetryGeneratedMediaSuccess|addImageNodes/);
 
-    assert.match(retryNodeSource, /const \{ currentMode, taskPrompt \} = prepareRetryGenerationTaskPromptContext\(\{/);
-    assert.match(retryNodeSource, /const \{ generatedMediaContext \} = await executeRetryGeneratedMediaRequest\(\{/);
+    assert.match(attemptRequestSource, /const \{ currentMode, taskPrompt \} = prepareRetryGenerationTaskPromptContext\(\{/);
+    assert.match(attemptRequestSource, /const requestResult = await executeRetryGeneratedMediaRequest\(\{/);
+    assert.match(retryNodeSource, /completeRetryGeneratedMediaBatch\(\{/);
     assert.match(retryNodeSource, /generateImage,/);
     assert.match(retryNodeSource, /generateVideo: \(videoRequest\) => llmService\.generateVideo\(videoRequest\),/);
+    assert.doesNotMatch(retryNodeSource, /executeRetryGeneratedMediaRequest/);
     assert.doesNotMatch(retryNodeSource, /let generatedMediaContext: RetryGeneratedMediaResultContext;/);
     assert.doesNotMatch(retryNodeSource, /prepareRetryVideoGenerationRequest/);
     assert.doesNotMatch(retryNodeSource, /buildRetryVideoGenerationResultContext/);
@@ -695,7 +1121,11 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const attemptRequestSource = hookSource.slice(
+      hookSource.indexOf('const executeRetryGeneratedMediaAttemptRequest = useCallback'),
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
     );
 
     assert.match(hookSource, /applyRetryGeneratedMediaAuthoritativeBalance: \(params: ApplyRetryGeneratedMediaAuthoritativeBalanceParams\) => void;/);
@@ -703,7 +1133,9 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /typeof params\.generatedMediaContext\.balanceAfter === 'number'/);
     assert.match(hookSource, /params\.applyAuthoritativeBalance\(params\.generatedMediaContext\.balanceAfter\);/);
 
-    assert.match(retryNodeSource, /applyRetryGeneratedMediaAuthoritativeBalance\(\{[\s\S]*generatedMediaContext,[\s\S]*applyAuthoritativeBalance,[\s\S]*\}\);/);
+    assert.match(attemptRequestSource, /applyRetryGeneratedMediaAuthoritativeBalance\(\{[\s\S]*generatedMediaContext: requestResult\.generatedMediaContext,[\s\S]*applyAuthoritativeBalance: params\.applyAuthoritativeBalance,[\s\S]*\}\);/);
+    assert.match(retryNodeSource, /applyAuthoritativeBalance,/);
+    assert.doesNotMatch(retryNodeSource, /applyRetryGeneratedMediaAuthoritativeBalance/);
     assert.doesNotMatch(retryNodeSource, /typeof generatedMediaContext\.balanceAfter === 'number'/);
     assert.doesNotMatch(retryNodeSource, /applyAuthoritativeBalance\(generatedMediaContext\.balanceAfter\);/);
   });
@@ -713,11 +1145,19 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
     );
     const executeRequestSource = hookSource.slice(
       hookSource.indexOf('const executeRetryGeneratedMediaRequest = useCallback'),
       hookSource.indexOf('const applyRetryGeneratedMediaAuthoritativeBalance = useCallback'),
+    );
+    const assembleAttemptResultSource = hookSource.slice(
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
+      hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
+    );
+    const retryAttemptsSource = hookSource.slice(
+      hookSource.indexOf('const runRetryGeneratedMediaAttempts = useCallback'),
+      hookSource.indexOf('const prepareGenerationDraftContext = useCallback'),
     );
 
     assert.match(hookSource, /export interface RetryGeneratedMediaResultContext \{/);
@@ -729,8 +1169,10 @@ describe('generation runtime extraction contract', () => {
     assert.match(executeRequestSource, /let generatedMediaContext: RetryGeneratedMediaResultContext;/);
     assert.match(executeRequestSource, /generatedMediaContext = buildRetryVideoGenerationResultContext\(\{/);
     assert.match(executeRequestSource, /generatedMediaContext = buildRetryImageGenerationResultContext\(\{/);
-    assert.match(retryNodeSource, /const \{ apiDurationMs, b64 \} = generatedMediaContext;/);
-    assert.match(retryNodeSource, /generatedMediaContext,/);
+    assert.match(assembleAttemptResultSource, /const \{ apiDurationMs, b64 \} = params\.generatedMediaContext;/);
+    assert.match(retryAttemptsSource, /generatedMediaContext,/);
+    assert.doesNotMatch(retryNodeSource, /generatedMediaContext,/);
+    assert.doesNotMatch(retryNodeSource, /const \{ apiDurationMs, b64 \} = generatedMediaContext;/);
     assert.doesNotMatch(retryNodeSource, /let generatedMediaContext: RetryGeneratedMediaResultContext;/);
     assert.doesNotMatch(retryNodeSource, /buildRetryVideoGenerationResultContext\(\{/);
     assert.doesNotMatch(retryNodeSource, /buildRetryImageGenerationResultContext\(\{/);
@@ -744,12 +1186,116 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(retryNodeSource, /resultMetadata: \{[\s\S]*actualKeySlotId[\s\S]*\}/);
   });
 
+  test('retry generated media attempts batch is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const retryAttemptsSource = hookSource.slice(
+      hookSource.indexOf('const runRetryGeneratedMediaAttempts = useCallback'),
+      hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
+    );
+    const completeBatchSource = hookSource.slice(
+      hookSource.indexOf('const completeRetryGeneratedMediaBatch = useCallback'),
+      hookSource.indexOf('const prepareGenerationDraftContext = useCallback'),
+    );
+
+    assert.match(hookSource, /export interface RunRetryGeneratedMediaAttemptsParams \{/);
+    assert.match(hookSource, /runRetryGeneratedMediaAttempts: \(params: RunRetryGeneratedMediaAttemptsParams\) => Promise<RetryGeneratedMediaResult\[\]>;/);
+    assert.match(retryAttemptsSource, /return Promise\.all\(Array\.from\(\{ length: params\.count \}\)\.map\(async \(_, index\) => \{/);
+    assert.match(retryAttemptsSource, /const \{ currentMode, taskPrompt, generatedMediaContext \} = await executeRetryGeneratedMediaAttemptRequest\(\{/);
+    assert.match(retryAttemptsSource, /const generatedResult = await assembleRetryGeneratedMediaAttemptResult\(\{/);
+    assert.match(retryAttemptsSource, /return generatedResult;/);
+    assert.doesNotMatch(retryAttemptsSource, /commitRetryGeneratedMediaSuccess|addImageNodes|prepareRetryGeneratedMediaSuccessCommitContext|prepareRetryGeneratedMediaAttemptContext|runRetryGeneratedMediaAttemptWithGuard|executeRetryGeneratedMediaRequest|applyRetryGeneratedMediaAuthoritativeBalance/);
+
+    assert.match(completeBatchSource, /const results = await runRetryGeneratedMediaAttempts\(\{/);
+    assert.match(retryNodeSource, /count,/);
+    assert.match(retryNodeSource, /currentNodeId,/);
+    assert.match(retryNodeSource, /executionNode,/);
+    assert.match(retryNodeSource, /timeoutMs: GENERATE_TIMEOUT_MS,/);
+    assert.match(retryNodeSource, /generateImage,/);
+    assert.match(retryNodeSource, /generateVideo: \(videoRequest\) => llmService\.generateVideo\(videoRequest\),/);
+    assert.match(retryNodeSource, /sourcePrompt: node\.prompt,/);
+    assert.doesNotMatch(retryNodeSource, /const \{ requestId, timeoutGuard \} = prepareRetryGeneratedMediaAttemptContext\(\{/);
+    assert.doesNotMatch(retryNodeSource, /const \{ currentMode, taskPrompt \} = prepareRetryGenerationTaskPromptContext\(\{/);
+    assert.doesNotMatch(retryNodeSource, /runRetryGeneratedMediaAttemptWithGuard\(\{/);
+    assert.doesNotMatch(retryNodeSource, /executeRetryGeneratedMediaRequest\(\{/);
+    assert.doesNotMatch(retryNodeSource, /applyRetryGeneratedMediaAuthoritativeBalance\(\{/);
+    assert.doesNotMatch(retryNodeSource, /assembleRetryGeneratedMediaAttemptResult\(\{/);
+  });
+
+  test('retry generated media attempt result assembly is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const assembleAttemptResultSource = hookSource.slice(
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
+      hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
+    );
+    const retryAttemptsSource = hookSource.slice(
+      hookSource.indexOf('const runRetryGeneratedMediaAttempts = useCallback'),
+      hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
+    );
+    const completeBatchSource = hookSource.slice(
+      hookSource.indexOf('const completeRetryGeneratedMediaBatch = useCallback'),
+      hookSource.indexOf('const prepareGenerationDraftContext = useCallback'),
+    );
+
+    assert.match(hookSource, /export interface AssembleRetryGeneratedMediaAttemptResultParams \{/);
+    assert.match(hookSource, /assembleRetryGeneratedMediaAttemptResult: \(params: AssembleRetryGeneratedMediaAttemptResultParams\) => Promise<RetryGeneratedMediaResult>;/);
+    assert.match(assembleAttemptResultSource, /const \{ apiDurationMs, b64 \} = params\.generatedMediaContext;/);
+    assert.match(assembleAttemptResultSource, /const mediaPersistence = await prepareRetryGeneratedMediaPersistence\(\{/);
+    assert.match(assembleAttemptResultSource, /scheduleRetryGeneratedMediaCloudSync\(\{/);
+    assert.match(assembleAttemptResultSource, /const generationTime = resolveRetryGeneratedMediaGenerationTime\(\{/);
+    assert.match(assembleAttemptResultSource, /const mediaDimensions = await resolveRetryGeneratedMediaDimensions\(\{/);
+    assert.match(assembleAttemptResultSource, /const generatedResult = buildRetryGeneratedMediaResultFromContext\(\{/);
+    assert.match(assembleAttemptResultSource, /return generatedResult;/);
+    assert.doesNotMatch(assembleAttemptResultSource, /addImageNodes|commitRetryGeneratedMediaSuccess|reportRetryGenerationSuccess|applyRetryGeneratedMediaAuthoritativeBalance/);
+
+    assert.match(retryAttemptsSource, /const generatedResult = await assembleRetryGeneratedMediaAttemptResult\(\{/);
+    assert.match(retryAttemptsSource, /buildPptPageAlias: params\.buildPptPageAlias,/);
+    assert.match(retryAttemptsSource, /canvasId: params\.canvasId,/);
+    assert.match(retryAttemptsSource, /generatedMediaContext,/);
+    assert.match(retryAttemptsSource, /normalizePersistableMediaSource: params\.normalizePersistableMediaSource,/);
+    assert.match(retryAttemptsSource, /saveOriginalImage: params\.saveOriginalImage,/);
+    assert.match(retryAttemptsSource, /startedAtMs: params\.startedAtMs,/);
+    assert.match(retryAttemptsSource, /prompt: taskPrompt,/);
+    assert.match(retryNodeSource, /buildPptPageAlias,/);
+    assert.match(retryNodeSource, /canvasId: activeCanvasRef\.current\?\.id,/);
+    assert.match(retryNodeSource, /normalizePersistableMediaSource,/);
+    assert.match(retryNodeSource, /saveOriginalImage,/);
+    assert.match(completeBatchSource, /startedAtMs,/);
+    assert.doesNotMatch(retryNodeSource, /startedAtMs: startTime,/);
+    assert.doesNotMatch(retryNodeSource, /assembleRetryGeneratedMediaAttemptResult\(\{/);
+    assert.doesNotMatch(retryNodeSource, /const \{ apiDurationMs, b64 \} = generatedMediaContext;/);
+    assert.doesNotMatch(retryNodeSource, /const mediaPersistence = await prepareRetryGeneratedMediaPersistence\(\{/);
+    assert.doesNotMatch(retryNodeSource, /const generationTime = resolveRetryGeneratedMediaGenerationTime\(\{/);
+    assert.doesNotMatch(retryNodeSource, /const mediaDimensions = await resolveRetryGeneratedMediaDimensions\(\{/);
+  });
+
   test('retry generated media timing is owned by useGenerationRuntime', () => {
     const appSource = readSource('src/App.tsx');
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const assembleAttemptResultSource = hookSource.slice(
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
+      hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
+    );
+    const retryAttemptsSource = hookSource.slice(
+      hookSource.indexOf('const runRetryGeneratedMediaAttempts = useCallback'),
+      hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
+    );
+    const completeBatchSource = hookSource.slice(
+      hookSource.indexOf('const completeRetryGeneratedMediaBatch = useCallback'),
+      hookSource.indexOf('const prepareGenerationDraftContext = useCallback'),
     );
 
     assert.match(hookSource, /resolveRetryGeneratedMediaGenerationTime: \(params: ResolveRetryGeneratedMediaGenerationTimeParams\) => number;/);
@@ -757,9 +1303,13 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /return clampGenerationDurationMs\(/);
     assert.match(hookSource, /apiDurationMs && apiDurationMs > 0/);
 
-    assert.match(retryNodeSource, /const generationTime = resolveRetryGeneratedMediaGenerationTime\(\{/);
-    assert.match(retryNodeSource, /apiDurationMs,/);
-    assert.match(retryNodeSource, /startedAtMs: startTime,/);
+    assert.match(assembleAttemptResultSource, /const generationTime = resolveRetryGeneratedMediaGenerationTime\(\{/);
+    assert.match(assembleAttemptResultSource, /apiDurationMs,/);
+    assert.match(assembleAttemptResultSource, /startedAtMs: params\.startedAtMs,/);
+    assert.match(completeBatchSource, /const startedAtMs = Date\.now\(\);/);
+    assert.match(completeBatchSource, /startedAtMs,/);
+    assert.doesNotMatch(retryNodeSource, /startedAtMs: startTime,/);
+    assert.doesNotMatch(retryNodeSource, /const generationTime = resolveRetryGeneratedMediaGenerationTime\(\{/);
     assert.doesNotMatch(retryNodeSource, /const generationTime = clampGenerationDurationMs\(/);
     assert.doesNotMatch(retryNodeSource, /Date\.now\(\) - startTime/);
   });
@@ -769,7 +1319,11 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const assembleAttemptResultSource = hookSource.slice(
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
+      hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
     );
 
     assert.match(hookSource, /prepareRetryGeneratedMediaPersistence: \(params: PrepareRetryGeneratedMediaPersistenceParams\) => Promise<PrepareRetryGeneratedMediaPersistenceResult>;/);
@@ -780,10 +1334,11 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /void params\.saveOriginalImage\(storageId, normalizedOriginalSource\)\.catch\(\(\) => undefined\);/);
     assert.match(hookSource, /const mimeType = params\.currentMode === GenerationMode\.VIDEO \? 'video\/mp4' : 'image\/png';/);
 
-    assert.match(retryNodeSource, /const mediaPersistence = await prepareRetryGeneratedMediaPersistence\(\{/);
+    assert.match(assembleAttemptResultSource, /const mediaPersistence = await prepareRetryGeneratedMediaPersistence\(\{/);
     assert.match(retryNodeSource, /normalizePersistableMediaSource,/);
     assert.match(retryNodeSource, /calculateImageHash,/);
     assert.match(retryNodeSource, /saveOriginalImage,/);
+    assert.doesNotMatch(retryNodeSource, /const mediaPersistence = await prepareRetryGeneratedMediaPersistence\(\{/);
     assert.doesNotMatch(retryNodeSource, /const normalizedOriginalSource = normalizePersistableMediaSource\(/);
     assert.doesNotMatch(retryNodeSource, /const storageId = await calculateImageHash\(normalizedOriginalSource \|\| url\);/);
     assert.doesNotMatch(retryNodeSource, /void saveOriginalImage\(storageId, normalizedOriginalSource\)\.catch\(\(\) => undefined\);/);
@@ -794,7 +1349,11 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const assembleAttemptResultSource = hookSource.slice(
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
+      hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
     );
 
     assert.match(hookSource, /resolveRetryGeneratedMediaDimensions: \(params: ResolveRetryGeneratedMediaDimensionsParams\) => Promise<ResolveRetryGeneratedMediaDimensionsResult>;/);
@@ -805,9 +1364,10 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /const maxDim = Math\.max\(actualWidth, actualHeight\);/);
     assert.match(hookSource, /computedImageSize = ImageSize\.SIZE_4K;/);
 
-    assert.match(retryNodeSource, /const mediaDimensions = await resolveRetryGeneratedMediaDimensions\(\{/);
-    assert.match(retryNodeSource, /executionNode,/);
-    assert.match(retryNodeSource, /url,/);
+    assert.match(assembleAttemptResultSource, /const mediaDimensions = await resolveRetryGeneratedMediaDimensions\(\{/);
+    assert.match(assembleAttemptResultSource, /executionNode: params\.executionNode,/);
+    assert.match(assembleAttemptResultSource, /url: mediaPersistence\.url,/);
+    assert.doesNotMatch(retryNodeSource, /const mediaDimensions = await resolveRetryGeneratedMediaDimensions\(\{/);
     assert.doesNotMatch(retryNodeSource, /let actualWidth = 1024;/);
     assert.doesNotMatch(retryNodeSource, /const bitmap = await createImageBitmap\(blob\);/);
     assert.doesNotMatch(retryNodeSource, /const maxDim = Math\.max\(actualWidth, actualHeight\);/);
@@ -818,7 +1378,11 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const assembleAttemptResultSource = hookSource.slice(
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
+      hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
     );
 
     assert.match(hookSource, /scheduleRetryGeneratedMediaCloudSync: \(params: ScheduleRetryGeneratedMediaCloudSyncParams\) => void;/);
@@ -831,9 +1395,10 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /import\('\.\.\/services\/system\/syncService'\)\.then/);
     assert.match(hookSource, /await syncService\.uploadImagePair\(id, blob\);/);
 
-    assert.match(retryNodeSource, /scheduleRetryGeneratedMediaCloudSync\(\{/);
-    assert.match(retryNodeSource, /currentMode,/);
-    assert.match(retryNodeSource, /index,/);
+    assert.match(assembleAttemptResultSource, /scheduleRetryGeneratedMediaCloudSync\(\{/);
+    assert.match(assembleAttemptResultSource, /currentMode: params\.currentMode,/);
+    assert.match(assembleAttemptResultSource, /index: params\.index,/);
+    assert.doesNotMatch(retryNodeSource, /scheduleRetryGeneratedMediaCloudSync\(\{/);
     assert.doesNotMatch(retryNodeSource, /import\('\.\/services\/system\/syncService'\)/);
     assert.doesNotMatch(retryNodeSource, /await syncService\.uploadImagePair\(id, blob\);/);
     assert.doesNotMatch(retryNodeSource, /Already captured in mediaPersistence for persisted result metadata/);
@@ -844,7 +1409,11 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const assembleAttemptResultSource = hookSource.slice(
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
+      hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
     );
 
     assert.match(hookSource, /buildRetryGeneratedMediaResult: \(params: BuildRetryGeneratedMediaResultParams\) => RetryGeneratedMediaResult;/);
@@ -855,11 +1424,13 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /id: `\$\{Date\.now\(\)\}_\$\{params\.index\}_\$\{Math\.random\(\)\.toString\(36\)\.substr\(2, 5\)\}`/);
     assert.match(hookSource, /mimeType: params\.mediaPersistence\.mimeType,/);
 
-    assert.match(retryNodeSource, /const generatedResult = buildRetryGeneratedMediaResultFromContext\(\{/);
-    assert.match(retryNodeSource, /mediaDimensions,/);
-    assert.match(retryNodeSource, /mediaPersistence,/);
+    assert.match(assembleAttemptResultSource, /const generatedResult = buildRetryGeneratedMediaResultFromContext\(\{/);
+    assert.match(assembleAttemptResultSource, /mediaDimensions,/);
+    assert.match(assembleAttemptResultSource, /mediaPersistence,/);
+    assert.match(assembleAttemptResultSource, /canvasId: params\.canvasId,/);
+    assert.match(assembleAttemptResultSource, /return generatedResult;/);
     assert.match(retryNodeSource, /canvasId: activeCanvasRef\.current\?\.id,/);
-    assert.match(retryNodeSource, /return generatedResult;/);
+    assert.doesNotMatch(retryNodeSource, /const generatedResult = buildRetryGeneratedMediaResultFromContext\(\{/);
     assert.doesNotMatch(retryNodeSource, /const generatedResult = buildRetryGeneratedMediaResult\(\{/);
     assert.doesNotMatch(retryNodeSource, /canvasId: activeCanvas\?\.id,/);
     assert.doesNotMatch(retryNodeSource, /sourceReferenceStorageIds: \(executionNode\.referenceImages \|\| \[\]\)\.map/);
@@ -871,7 +1442,15 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const assembleAttemptResultSource = hookSource.slice(
+      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
+      hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
+    );
+    const retryAttemptsSource = hookSource.slice(
+      hookSource.indexOf('const runRetryGeneratedMediaAttempts = useCallback'),
+      hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
     );
 
     assert.match(hookSource, /buildRetryGeneratedMediaResultFromContext: \(params: BuildRetryGeneratedMediaResultFromContextParams\) => RetryGeneratedMediaResult;/);
@@ -880,8 +1459,11 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /requestTrace: params\.generatedMediaContext\.requestTrace,/);
     assert.match(hookSource, /resultMetadata: params\.generatedMediaContext\.resultMetadata,/);
 
-    assert.match(retryNodeSource, /const generatedResult = buildRetryGeneratedMediaResultFromContext\(\{/);
-    assert.match(retryNodeSource, /generatedMediaContext,/);
+    assert.match(assembleAttemptResultSource, /const generatedResult = buildRetryGeneratedMediaResultFromContext\(\{/);
+    assert.match(assembleAttemptResultSource, /generatedMediaContext: params\.generatedMediaContext,/);
+    assert.match(retryAttemptsSource, /generatedMediaContext,/);
+    assert.doesNotMatch(retryNodeSource, /generatedMediaContext,/);
+    assert.doesNotMatch(retryNodeSource, /const generatedResult = buildRetryGeneratedMediaResultFromContext\(\{/);
     assert.doesNotMatch(retryNodeSource, /const generatedResult = buildRetryGeneratedMediaResult\(\{/);
     assert.doesNotMatch(retryNodeSource, /alias: currentMode === GenerationMode\.PPT \? buildPptPageAlias/);
     assert.doesNotMatch(retryNodeSource, /requestTrace,/);
@@ -893,7 +1475,11 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const commitBatchSuccessSource = hookSource.slice(
+      hookSource.indexOf('const commitRetryGeneratedMediaBatchSuccess = useCallback'),
+      hookSource.indexOf('const completeRetryGeneratedMediaBatch = useCallback'),
     );
 
     assert.match(hookSource, /buildRetryCompletedPromptPatch: \(params: BuildRetryCompletedPromptPatchParams\) => Partial<PromptNode>;/);
@@ -902,8 +1488,9 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /\.\.\.buildCompletedPromptNodePatch\(\),/);
     assert.match(hookSource, /modelLabel: params\.resolveModelDisplayName\(/);
 
-    assert.match(retryNodeSource, /const \{ alignedImageNodes, retryCompletedPromptPatch \} = prepareRetryGeneratedMediaSuccessCommitContext\(\{/);
-    assert.match(retryNodeSource, /commitRetryGeneratedMediaSuccess\(\{[\s\S]*retryCompletedPromptPatch,[\s\S]*\}\);/);
+    assert.match(commitBatchSuccessSource, /const \{ alignedImageNodes, retryCompletedPromptPatch \} = prepareRetryGeneratedMediaSuccessCommitContext\(\{/);
+    assert.match(commitBatchSuccessSource, /commitRetryGeneratedMediaSuccess\(\{[\s\S]*retryCompletedPromptPatch,[\s\S]*\}\);/);
+    assert.match(retryNodeSource, /await completeRetryGeneratedMediaBatch\(\{/);
     assert.doesNotMatch(retryNodeSource, /childImageIds: alignedImageNodes\.map\(n => n\.id\),/);
     assert.doesNotMatch(retryNodeSource, /\.\.\.buildCompletedPromptNodePatch\(\),/);
     assert.doesNotMatch(retryNodeSource, /modelLabel: resolveModelDisplayName\(/);
@@ -914,7 +1501,7 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
     );
 
     assert.match(hookSource, /buildRetryGeneratedMediaLayout: \(params: BuildRetryGeneratedMediaLayoutParams\) => RetryGeneratedMediaLayoutNode\[\];/);
@@ -924,9 +1511,10 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /const generatedPositions = params\.buildGeneratedImageBatchPositions\(\{/);
     assert.match(hookSource, /basePosition: \(params\.latestLayoutPrompt \|\| params\.executionNode\)\.position \|\| params\.executionNode\.position,/);
 
-    assert.match(retryNodeSource, /prepareRetryGeneratedMediaSuccessCommitContext\(\{[\s\S]*buildGeneratedImageBatchPositions,[\s\S]*getCardDimensions,[\s\S]*results,[\s\S]*\}\);/);
+    assert.match(retryNodeSource, /completeRetryGeneratedMediaBatch\(\{[\s\S]*buildGeneratedImageBatchPositions,[\s\S]*getCardDimensions,[\s\S]*\}\);/);
     assert.match(retryNodeSource, /buildGeneratedImageBatchPositions,/);
     assert.match(retryNodeSource, /getCardDimensions,/);
+    assert.doesNotMatch(retryNodeSource, /prepareRetryGeneratedMediaSuccessCommitContext\(\{/);
     assert.doesNotMatch(retryNodeSource, /const latestLayoutPrompt = resolveRetryGeneratedMediaLayoutPrompt\(\{/);
     assert.doesNotMatch(retryNodeSource, /const alignedImageNodes = buildRetryGeneratedMediaLayout\(\{/);
     assert.doesNotMatch(retryNodeSource, /const newImageNodes = results\.map\(\(img, i\) => \{/);
@@ -939,11 +1527,11 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const prepareSuccessCommitContextSource = hookSource.slice(
       hookSource.indexOf('const prepareRetryGeneratedMediaSuccessCommitContext = useCallback'),
-      hookSource.indexOf('const prepareGenerationDraftContext = useCallback'),
+      hookSource.indexOf('const commitRetryGeneratedMediaBatchSuccess = useCallback'),
     );
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
     );
 
     assert.match(hookSource, /export interface PrepareRetryGeneratedMediaSuccessCommitContextParams extends Omit</);
@@ -957,15 +1545,90 @@ describe('generation runtime extraction contract', () => {
     assert.doesNotMatch(prepareSuccessCommitContextSource, /addImageNodes|commitRetryGeneratedMediaSuccess|reportRetryGenerationSuccess/);
     assert.match(hookSource, /prepareRetryGeneratedMediaSuccessCommitContext,/);
 
-    assert.match(retryNodeSource, /const \{ alignedImageNodes, retryCompletedPromptPatch \} = prepareRetryGeneratedMediaSuccessCommitContext\(\{/);
+    assert.match(retryNodeSource, /await completeRetryGeneratedMediaBatch\(\{/);
     assert.match(retryNodeSource, /canvasSnapshot: activeCanvasRef\.current,/);
     assert.match(retryNodeSource, /buildGeneratedImageBatchPositions,/);
     assert.match(retryNodeSource, /getCardDimensions,/);
     assert.match(retryNodeSource, /resolveModelDisplayName,/);
-    assert.match(retryNodeSource, /results,/);
+    assert.doesNotMatch(retryNodeSource, /prepareRetryGeneratedMediaSuccessCommitContext\(\{/);
     assert.doesNotMatch(retryNodeSource, /resolveRetryGeneratedMediaLayoutPrompt\(\{/);
     assert.doesNotMatch(retryNodeSource, /buildRetryGeneratedMediaLayout\(\{/);
     assert.doesNotMatch(retryNodeSource, /buildRetryCompletedPromptPatch\(\{/);
+  });
+
+  test('retry generated media batch success finalization is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const commitBatchSuccessSource = hookSource.slice(
+      hookSource.indexOf('const commitRetryGeneratedMediaBatchSuccess = useCallback'),
+      hookSource.indexOf('const completeRetryGeneratedMediaBatch = useCallback'),
+    );
+
+    assert.match(hookSource, /export interface CommitRetryGeneratedMediaBatchSuccessParams extends Omit</);
+    assert.match(hookSource, /commitRetryGeneratedMediaBatchSuccess: \(params: CommitRetryGeneratedMediaBatchSuccessParams\) => Promise<void>;/);
+    assert.match(commitBatchSuccessSource, /const \{ alignedImageNodes, retryCompletedPromptPatch \} = prepareRetryGeneratedMediaSuccessCommitContext\(\{/);
+    assert.match(commitBatchSuccessSource, /await commitRetryGeneratedMediaSuccess\(\{/);
+    assert.match(commitBatchSuccessSource, /addImageNodes: params\.addImageNodes,/);
+    assert.match(commitBatchSuccessSource, /parentNodeId: params\.parentNodeId,/);
+    assert.match(commitBatchSuccessSource, /retryCompletedPromptPatch,/);
+    assert.match(commitBatchSuccessSource, /alignedImageNodes,/);
+    assert.doesNotMatch(commitBatchSuccessSource, /runRetryGeneratedMediaAttempts|commitRetryGenerationFailure/);
+
+    assert.match(retryNodeSource, /await completeRetryGeneratedMediaBatch\(\{/);
+    assert.match(retryNodeSource, /addImageNodes,/);
+    assert.match(retryNodeSource, /parentNodeId: node\.id,/);
+    assert.doesNotMatch(retryNodeSource, /results,/);
+    assert.doesNotMatch(retryNodeSource, /await commitRetryGeneratedMediaBatchSuccess\(\{/);
+    assert.doesNotMatch(retryNodeSource, /const \{ alignedImageNodes, retryCompletedPromptPatch \} = prepareRetryGeneratedMediaSuccessCommitContext\(\{/);
+    assert.doesNotMatch(retryNodeSource, /await commitRetryGeneratedMediaSuccess\(\{/);
+  });
+
+  test('retry generated media batch transaction is owned by useGenerationRuntime', () => {
+    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const retryNodeSource = appSource.slice(
+      appSource.indexOf('const handleRetryNode = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
+    );
+    const completeBatchSource = hookSource.slice(
+      hookSource.indexOf('const completeRetryGeneratedMediaBatch = useCallback'),
+      hookSource.indexOf('const prepareGenerationDraftContext = useCallback'),
+    );
+
+    assert.match(hookSource, /export interface CompleteRetryGeneratedMediaBatchParams extends Omit</);
+    assert.match(hookSource, /completeRetryGeneratedMediaBatch: \(params: CompleteRetryGeneratedMediaBatchParams\) => Promise<void>;/);
+    assert.match(hookSource, /return \{[\s\S]*completeRetryGeneratedMediaBatch,[\s\S]*\};\s*\}/);
+    assert.match(hookSource, /retryBillingState: CommitRetryGenerationStartParams\['retryBillingState'\];/);
+    assert.match(completeBatchSource, /commitRetryGenerationStart\(\{[\s\S]*\}\);\s*try \{/);
+    assert.match(completeBatchSource, /const startedAtMs = Date\.now\(\);/);
+    assert.match(completeBatchSource, /const results = await runRetryGeneratedMediaAttempts\(\{/);
+    assert.match(completeBatchSource, /startedAtMs,/);
+    assert.match(completeBatchSource, /await commitRetryGeneratedMediaBatchSuccess\(\{/);
+    assert.match(completeBatchSource, /canvasSnapshot: params\.canvasSnapshot,/);
+    assert.match(completeBatchSource, /parentNodeId: params\.parentNodeId,/);
+    assert.match(completeBatchSource, /await commitRetryGenerationFailure\(\{/);
+    assert.doesNotMatch(completeBatchSource, /prepareRetriedExecutionNode|recoverFailedSyncBridgeGeneration|handleRetryPptSinglePage/);
+
+    assert.match(appSource, /const \{[\s\S]*completeRetryGeneratedMediaBatch,[\s\S]*\} = useGenerationRuntime\(\{/);
+    assert.match(retryNodeSource, /await completeRetryGeneratedMediaBatch\(\{/);
+    assert.match(retryNodeSource, /canvasId: activeCanvasRef\.current\?\.id,/);
+    assert.match(retryNodeSource, /canvasSnapshot: activeCanvasRef\.current,/);
+    assert.match(retryNodeSource, /extractErrorDetails,/);
+    assert.match(retryNodeSource, /retryBillingState,/);
+    assert.match(retryNodeSource, /sourcePrompt: node\.prompt,/);
+    assert.match(retryNodeSource, /parentNodeId: node\.id,/);
+    assert.doesNotMatch(appSource, /\bcommitRetryGenerationStart\b/);
+    assert.doesNotMatch(retryNodeSource, /const startTime = Date\.now\(\);/);
+    assert.doesNotMatch(retryNodeSource, /const results = await runRetryGeneratedMediaAttempts\(\{/);
+    assert.doesNotMatch(retryNodeSource, /await commitRetryGeneratedMediaBatchSuccess\(\{/);
+    assert.doesNotMatch(retryNodeSource, /await commitRetryGenerationFailure\(\{/);
+    assert.doesNotMatch(retryNodeSource, /startedAtMs: startTime,/);
+    assert.doesNotMatch(appSource, /\brunRetryGeneratedMediaAttempts\b/);
+    assert.doesNotMatch(appSource, /\bcommitRetryGeneratedMediaBatchSuccess\b/);
   });
 
   test('retry generated media layout prompt resolution is owned by useGenerationRuntime', () => {
@@ -973,7 +1636,7 @@ describe('generation runtime extraction contract', () => {
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
-      appSource.indexOf('const handleExportPptPackage = useCallback'),
+      appSource.indexOf(APP_RETRY_NODE_END_MARKER),
     );
 
     assert.match(hookSource, /export interface ResolveRetryGeneratedMediaLayoutPromptParams \{/);
@@ -982,7 +1645,7 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /const resolveRetryGeneratedMediaLayoutPrompt = useCallback\(\(params: ResolveRetryGeneratedMediaLayoutPromptParams\): ResolveRetryGeneratedMediaLayoutPromptResult => \{/);
     assert.match(hookSource, /params\.canvasSnapshot\?\.promptNodes\.find/);
 
-    assert.match(retryNodeSource, /prepareRetryGeneratedMediaSuccessCommitContext\(\{[\s\S]*canvasSnapshot: activeCanvasRef\.current,[\s\S]*\}\);/);
+    assert.match(retryNodeSource, /completeRetryGeneratedMediaBatch\(\{[\s\S]*canvasSnapshot: activeCanvasRef\.current,[\s\S]*\}\);/);
     assert.match(retryNodeSource, /executionNode,/);
     assert.doesNotMatch(retryNodeSource, /const latestLayoutPrompt = resolveRetryGeneratedMediaLayoutPrompt\(\{/);
     assert.doesNotMatch(retryNodeSource, /activeCanvasRef\.current\?\.promptNodes\.find/);

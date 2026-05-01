@@ -120,10 +120,10 @@ test('prompt cards use the same theme surface fill as image cards in dark and li
 
   assert.match(
     source,
-    /const promptGlassFill = 'var\(--bg-surface\)';/,
+    /const promptGlassFill = 'var\(--frost-card-main-bg\)';/,
   );
   assert.match(source, /backgroundColor:\s*promptGlassFill,/);
-  assert.match(imageCardSource, /backgroundColor:\s*'var\(--bg-surface\)'/);
+  assert.match(imageCardSource, /backgroundColor:\s*'var\(--frost-card-main-bg\)'/);
 });
 
 test('prompt card theme surface text tokens meet normal text contrast in light and dark themes', () => {
@@ -177,17 +177,17 @@ test('canvas groups avoid transform-only will-change hints while dragging their 
   );
 });
 
-test('canvas groups thicken both shell and label frosted fills while dragging to avoid a washed-out overlay', () => {
+test('canvas groups use shared frosted shell and label material tokens', () => {
   const source = readSource('src/components/canvas/CanvasGroupComponent.tsx');
 
   assert.match(
     source,
-    /const groupGlassFill = highlighted\s*\?\s*'rgba\(99,\s*102,\s*241,\s*0\.10\)'\s*:\s*isDragging\s*\?\s*'rgba\(20,\s*20,\s*24,\s*0\.18\)'\s*:\s*'rgba\(0,\s*0,\s*0,\s*0\.10\)';/,
+    /const groupSurfaceStyle: React\.CSSProperties = \{[\s\S]*var\(--frost-card-framework-bg\)[\s\S]*var\(--frost-card-main-bg\)[\s\S]*var\(--frost-card-framework-border\)[\s\S]*var\(--frost-card-framework-shadow\)[\s\S]*blur\(var\(--frost-card-framework-blur\)\)/,
   );
   assert.match(
     source,
-    /const groupHeaderGlassFill = highlighted\s*\?\s*'rgba\(99,\s*102,\s*241,\s*0\.15\)'\s*:\s*isDragging\s*\?\s*'rgba\(20,\s*20,\s*24,\s*0\.62\)'\s*:\s*'rgba\(20,\s*20,\s*24,\s*0\.45\)';/,
+    /const groupHeaderSurfaceStyle: React\.CSSProperties = \{[\s\S]*var\(--frost-card-sub-bg\)[\s\S]*var\(--frost-card-sub-border\)[\s\S]*var\(--frost-card-sub-shadow\)[\s\S]*blur\(var\(--frost-card-sub-blur\)\)/,
   );
-  assert.match(source, /backgroundColor:\s*groupGlassFill,/);
-  assert.match(source, /backgroundColor:\s*groupHeaderGlassFill,/);
+  assert.match(source, /\.\.\.groupSurfaceStyle,/);
+  assert.match(source, /style=\{groupHeaderSurfaceStyle\}/);
 });

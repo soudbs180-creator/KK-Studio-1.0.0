@@ -12,6 +12,8 @@ function readSource(relativePath: string): string {
 test('PPT prompt nodes expose a deck module state and stop rendering PPT child pages as canvas sub-cards', () => {
   const typesSource = readSource('src/types.ts');
   const appSource = readSource('src/App.tsx');
+  const hookSource = readSource('src/app/usePptRuntime.ts');
+  const helperSource = readSource('src/app/pptRuntimeHelpers.ts');
   const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
   const deckSource = readSource('src/utils/pptDeckModules.ts');
 
@@ -20,8 +22,9 @@ test('PPT prompt nodes expose a deck module state and stop rendering PPT child p
   assert.match(typesSource, /pptDeck\?: PptDeckModuleState/);
 
   assert.match(deckSource, /export const buildPptDeckModuleState =/);
-  assert.match(appSource, /const isPptDeckChildImageNode =/);
-  assert.match(appSource, /if \(promptNode\.mode === GenerationMode\.PPT\) return \[\] as GeneratedImage\[\];/);
+  assert.match(hookSource, /const isPptDeckChildImageNode =/);
+  assert.match(hookSource, /return isPptDeckChildImageNodeFromCanvas\(imageNode, activeCanvasRef\.current\);/);
+  assert.match(helperSource, /if \(promptNode\.mode === GenerationMode\.PPT\) return \[\] as GeneratedImage\[\];/);
   assert.match(appSource, /if \(isPptDeckChildImageNode\(n\)\) \{\s*return false;\s*\}/);
 
   assert.match(promptNodeSource, /data-testid="ppt-deck-container"/);

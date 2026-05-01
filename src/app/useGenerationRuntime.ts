@@ -16,10 +16,18 @@ import { GenerationMode, ImageSize, type Canvas, type GeneratedImage, type Gener
 import { buildCancelledPromptNodePatch } from './buildCancelledPromptNodePatch';
 import { buildCompletedPromptNodePatch } from './buildCompletedPromptNodePatch';
 import { buildGeneratingPromptNode } from './buildGeneratingPromptNode';
+import { buildRetryExecutionNode } from './buildRetryExecutionNode';
 import { optimizeGenerationPrompt } from './optimizeGenerationPrompt';
+import { prepareRetriedExecutionNode } from './prepareRetriedExecutionNode';
 import { persistGeneratingPromptNode } from './persistGeneratingPromptNode';
 import { resolveGenerationBillingState } from './resolveGenerationBillingState';
 import { resolveGenerationPreviewState } from './resolveGenerationPreviewState';
+import { getPromptPptImageNodes } from '../utils/pptEditable';
+import { buildPptDeckModuleState } from '../utils/pptDeckModules';
+import { normalizePptSlidesForCount } from '../utils/pptUtils';
+import { calculateImageHash } from '../utils/imageUtils';
+import { normalizePersistableMediaSource, saveOriginalImage } from '../services/storage/imageStorage';
+import { resolveModelDisplayName } from '../utils/modelDisplayName';
 import { clampGenerationDurationMs } from '../utils/timeUtils';
 
 type CreditBillingAttempt = {
@@ -116,6 +124,35 @@ export interface PrepareGenerationBillingStateContextResult {
   generationBillingState: ReturnType<typeof resolveGenerationBillingState>;
 }
 
+export interface PrepareInitialGenerationSubmissionContextParams extends PrepareGenerationDraftContextArgs {
+  config: PrepareGenerationBillingStateContextParams['config'];
+  getPreferredKeyForMode: PrepareGenerationBillingStateContextParams['getPreferredKeyForMode'];
+  hasExplicitModelRoute: PrepareGenerationBillingStateContextParams['hasExplicitModelRoute'];
+  resolveCreditCostForModel: PrepareGenerationBillingStateContextParams['resolveCreditCostForModel'];
+}
+
+export type PrepareInitialGenerationSubmissionContextResult =
+  | { allowed: false }
+  | {
+    allowed: true;
+    billingAttempt: CreditBillingAttempt;
+    draftContext: PrepareGenerationDraftContextResult;
+    executionLane: ModelExecutionLane;
+    generationBillingState: ReturnType<typeof resolveGenerationBillingState>;
+    hasReusablePromptDraft: boolean;
+    isFollowUp: boolean;
+    paymentTransactionId: string | undefined;
+    perImageCreditCost: number;
+    promptNodeId: string;
+    requiredCredits: number;
+    resolvedCreditRoute: ReturnType<typeof adminModelService.getCreditRouteSnapshot> | null;
+    resolvedCreditSpecId: string | undefined;
+    selectedKeyForBilling: ReturnType<typeof keyManager.getNextKey>;
+    useServerSideCreditSettlement: boolean;
+  };
+
+type PreparedInitialGenerationSubmissionContext = Extract<PrepareInitialGenerationSubmissionContextResult, { allowed: true }>;
+
 export interface PrepareInitialGeneratingPromptNodeParams {
   activeSourceImage?: string | null;
   billingAttempt: CreditBillingAttempt;
@@ -173,10 +210,55 @@ export interface PrepareInitialGenerationPromptOptimizationParams {
 
 export type PrepareInitialGenerationPromptOptimizationResult = Awaited<ReturnType<typeof optimizeGenerationPrompt>>;
 
+export interface PrepareInitialGeneratingPromptNodeContextParams extends Omit<
+  PrepareInitialGeneratingPromptNodeParams,
+  'finalReferenceImages' | 'optimizedPromptEn' | 'optimizedPromptZh' | 'promptOptimizerResult'
+> {
+  prepareGenerationReferenceImages: (referenceImages: ReferenceImage[]) => ReferenceImage[];
+}
+
+export interface PrepareInitialGeneratingPromptNodeContextResult extends PrepareInitialGeneratingPromptNodeResult {
+}
+
 export interface CompleteInitialGenerationPromptSubmissionParams {
   setActiveSourceImage: (id: string | null) => void;
   setConfig: (updater: (prev: GenerationConfig) => GenerationConfig) => void;
   setDraftNodeId: (id: string | null) => void;
+}
+
+export interface CompleteAndExecuteInitialGenerationSubmissionParams
+  extends CompleteInitialGenerationPromptSubmissionParams,
+  ExecuteInitialGenerationPromptNodeParams {
+}
+
+export interface PersistAndExecuteInitialGenerationSubmissionParams
+  extends PersistInitialGeneratingPromptNodeParams,
+  CompleteInitialGenerationPromptSubmissionParams,
+  Pick<ExecuteInitialGenerationPromptNodeParams, 'executeGeneration' | 'requiredCredits' | 'useServerSideCreditSettlement'> {
+}
+
+export interface PersistAndExecuteInitialGenerationSubmissionResult extends PersistInitialGeneratingPromptNodeResult {
+}
+
+export interface RunInitialGenerationSubmissionTransactionParams {
+  activeSourceImage?: string | null;
+  addPromptNode: PersistInitialGeneratingPromptNodeParams['addPromptNode'];
+  config: GenerationConfig;
+  deletePromptNode: PersistInitialGeneratingPromptNodeParams['deletePromptNode'];
+  executeGeneration: ExecuteInitialGenerationPromptNodeParams['executeGeneration'];
+  getCanvas: PersistInitialGeneratingPromptNodeParams['getCanvas'];
+  initialSubmissionContext: PreparedInitialGenerationSubmissionContext;
+  prepareGenerationReferenceImages: PrepareInitialGeneratingPromptNodeContextParams['prepareGenerationReferenceImages'];
+  rawPrompt: string;
+  resolveGenerationPlacement: (params: {
+    isFollowUp: boolean;
+    promptNodeId: string;
+    hasReusablePromptDraft: boolean;
+  }) => { currentPos: PromptNode['position']; promptNodeId: string };
+  setActiveSourceImage: CompleteInitialGenerationPromptSubmissionParams['setActiveSourceImage'];
+  setConfig: CompleteInitialGenerationPromptSubmissionParams['setConfig'];
+  setDraftNodeId: CompleteInitialGenerationPromptSubmissionParams['setDraftNodeId'];
+  updateImageNodePosition: PersistInitialGeneratingPromptNodeParams['updateImageNodePosition'];
 }
 
 export interface CommitRetryGenerationFailureParams {
@@ -239,6 +321,20 @@ export interface ReportRetryRecoveryResultParams {
   pendingCount: number;
 }
 
+export interface RecoverRetryGenerationBridgeParams {
+  executionNode: PromptNode;
+  recoverFailedSyncBridgeGeneration: (
+    node: PromptNode,
+  ) => Promise<{ checkedCount?: number; recoveredCount: number; pendingCount: number }>;
+}
+
+export interface RecoverRetryGenerationBridgeResult {
+  checkedCount?: number;
+  recoveredCount: number;
+  pendingCount: number;
+  shouldShortCircuit: boolean;
+}
+
 export interface PrepareRetryGenerationRequestContextParams {
   node: Pick<PromptNode, 'id' | 'mode' | 'parallelCount'>;
   defaultParallelCount: number;
@@ -249,6 +345,24 @@ export interface PrepareRetryGenerationRequestContextResult {
   requestedCount: number;
   count: number;
 }
+
+export interface PrepareRetryGeneratedMediaExecutionContextParams {
+  defaultParallelCount: number;
+  node: PromptNode;
+  recoverFailedSyncBridgeGeneration: RecoverRetryGenerationBridgeParams['recoverFailedSyncBridgeGeneration'];
+  resolveNodeRouteState: Parameters<typeof buildRetryExecutionNode>[0]['resolveNodeRouteState'];
+  resolveCreditCostForModel: (modelId: string, imageSize?: ImageSize | string) => number;
+}
+
+export type PrepareRetryGeneratedMediaExecutionContextResult =
+  | {
+    prepared: false;
+  }
+  | (PrepareRetryGenerationRequestContextResult & {
+    prepared: true;
+    executionNode: PromptNode;
+    retryBillingState: ReturnType<typeof resolveGenerationBillingState>;
+  });
 
 export interface RetryGenerationSuccessDebugResult {
   requestPath?: string;
@@ -412,6 +526,21 @@ export interface ExecuteRetryGeneratedMediaRequestResult {
   taskPrompt: string;
 }
 
+export interface ExecuteRetryGeneratedMediaAttemptRequestParams {
+  applyAuthoritativeBalance: ApplyRetryGeneratedMediaAuthoritativeBalanceParams['applyAuthoritativeBalance'];
+  count: number;
+  currentNodeId: string;
+  executionNode: PrepareRetryGeneratedMediaAttemptContextParams['executionNode']
+    & PrepareRetryGenerationTaskPromptContextParams['executionNode']
+    & ExecuteRetryGeneratedMediaRequestParams['executionNode'];
+  generateImage: ExecuteRetryGeneratedMediaRequestParams['generateImage'];
+  generateVideo: ExecuteRetryGeneratedMediaRequestParams['generateVideo'];
+  index: number;
+  resolveModelDisplayName: ExecuteRetryGeneratedMediaRequestParams['resolveModelDisplayName'];
+  sourcePrompt: string;
+  timeoutMs: number;
+}
+
 export interface PrepareRetryGeneratedMediaPersistenceParams {
   b64: string;
   calculateImageHash: (source: string) => Promise<string>;
@@ -481,6 +610,39 @@ export type RetryGeneratedMediaResult = Omit<GeneratedImage, 'position'> & {
   width: number;
 };
 
+export interface AssembleRetryGeneratedMediaAttemptResultParams {
+  buildPptPageAlias: BuildRetryGeneratedMediaResultFromContextParams['buildPptPageAlias'];
+  calculateImageHash: PrepareRetryGeneratedMediaPersistenceParams['calculateImageHash'];
+  canvasId?: string;
+  currentMode: GenerationMode;
+  executionNode: BuildRetryGeneratedMediaResultFromContextParams['executionNode']
+    & ResolveRetryGeneratedMediaDimensionsParams['executionNode'];
+  generatedMediaContext: RetryGeneratedMediaResultContext;
+  index: number;
+  normalizePersistableMediaSource: PrepareRetryGeneratedMediaPersistenceParams['normalizePersistableMediaSource'];
+  prompt: string;
+  saveOriginalImage: PrepareRetryGeneratedMediaPersistenceParams['saveOriginalImage'];
+  startedAtMs: number;
+}
+
+export interface RunRetryGeneratedMediaAttemptsParams {
+  applyAuthoritativeBalance: ApplyRetryGeneratedMediaAuthoritativeBalanceParams['applyAuthoritativeBalance'];
+  buildPptPageAlias: BuildRetryGeneratedMediaResultFromContextParams['buildPptPageAlias'];
+  calculateImageHash: PrepareRetryGeneratedMediaPersistenceParams['calculateImageHash'];
+  canvasId?: string;
+  count: number;
+  currentNodeId: string;
+  executionNode: PromptNode;
+  generateImage: RetryGeneratedMediaGenerateImage;
+  generateVideo: RetryGeneratedMediaGenerateVideo;
+  normalizePersistableMediaSource: PrepareRetryGeneratedMediaPersistenceParams['normalizePersistableMediaSource'];
+  resolveModelDisplayName: BuildRetryImageGenerationResultContextParams['resolveModelDisplayName'];
+  saveOriginalImage: PrepareRetryGeneratedMediaPersistenceParams['saveOriginalImage'];
+  sourcePrompt: string;
+  startedAtMs: number;
+  timeoutMs: number;
+}
+
 export interface ResolveRetryGeneratedMediaLayoutPromptParams {
   canvasSnapshot?: Pick<Canvas, 'promptNodes'> | null;
   executionNode: Pick<PromptNode, 'id' | 'position'>;
@@ -540,6 +702,31 @@ export interface PrepareRetryGeneratedMediaSuccessCommitContextResult {
   retryCompletedPromptPatch: Partial<PromptNode>;
 }
 
+export interface CommitRetryGeneratedMediaBatchSuccessParams extends Omit<
+  PrepareRetryGeneratedMediaSuccessCommitContextParams,
+  'executionNode' | 'results'
+> {
+  addImageNodes: CommitRetryGeneratedMediaSuccessParams['addImageNodes'];
+  executionNode: PrepareRetryGeneratedMediaSuccessCommitContextParams['executionNode']
+    & CommitRetryGeneratedMediaSuccessParams['executionNode'];
+  parentNodeId: CommitRetryGeneratedMediaSuccessParams['parentNodeId'];
+  results: RetryGeneratedMediaResult[];
+}
+
+export interface CompleteRetryGeneratedMediaBatchParams extends Omit<
+  RunRetryGeneratedMediaAttemptsParams,
+  'startedAtMs'
+> {
+  addImageNodes: CommitRetryGeneratedMediaBatchSuccessParams['addImageNodes'];
+  buildGeneratedImageBatchPositions: CommitRetryGeneratedMediaBatchSuccessParams['buildGeneratedImageBatchPositions'];
+  canvasSnapshot?: CommitRetryGeneratedMediaBatchSuccessParams['canvasSnapshot'];
+  extractErrorDetails: CommitRetryGenerationFailureParams['extractErrorDetails'];
+  getCardDimensions: CommitRetryGeneratedMediaBatchSuccessParams['getCardDimensions'];
+  isMobile: CommitRetryGeneratedMediaBatchSuccessParams['isMobile'];
+  parentNodeId: CommitRetryGeneratedMediaBatchSuccessParams['parentNodeId'];
+  retryBillingState: CommitRetryGenerationStartParams['retryBillingState'];
+}
+
 interface RefreshBillingOptions {
   includeTransactions?: boolean;
   silent?: boolean;
@@ -552,8 +739,9 @@ const resolveFiniteNumber = (value: unknown): number | undefined => (
 );
 
 export interface UseGenerationRuntimeDeps {
-  activeCanvas?: Pick<Canvas, 'promptNodes'> | null;
+  activeCanvas?: Pick<Canvas, 'promptNodes' | 'imageNodes'> | null;
   updatePromptNode: (node: PromptNode) => void | Promise<void>;
+  updateImageNode: (id: string, updates: Partial<GeneratedImage>) => void | Promise<void>;
   cancelGenerationRequest: (requestId: string) => void;
   cancelSystemProxyTask: (jobId: string) => Promise<unknown>;
   authLoading: boolean;
@@ -570,19 +758,36 @@ export interface UseGenerationRuntimeDeps {
   refundCreditsByTransaction: (transactionId: string, reason: string) => Promise<CreditRefundResult>;
   refreshBilling: (options?: RefreshBillingOptions) => Promise<void>;
   adjustBalanceOptimistically: (delta: number) => void;
+  applyAuthoritativeBalance: (balance: number) => void;
+  rememberPreferredKeyForMode: (mode: GenerationMode | undefined, keySlotId?: string) => void;
+  buildPptPageAlias: (raw: string | undefined, pageIndex: number) => string;
+  resolveModelDisplayName: (modelId: string, fallbackLabel?: string) => string;
+  resolveNodeRouteState: Parameters<typeof buildRetryExecutionNode>[0]['resolveNodeRouteState'];
+  resolveCreditCostForModel: (modelId: string, imageSize?: ImageSize | string) => number;
+  resolveProviderDisplay: (keySlotId?: string, fallbackProviderLabel?: string, fallbackProvider?: string) => {
+    provider?: string;
+    providerLabel?: string;
+  };
+  generateImage: RetryGeneratedMediaGenerateImage;
 }
 
 export interface UseGenerationRuntimeResult {
   handleCancelGeneration: (id?: string) => Promise<void>;
+  handleRetryPptSinglePage: (node: PromptNode, pageIndex: number) => Promise<void>;
   ensureCreditAttemptCharged: (params: EnsureCreditAttemptChargedParams) => Promise<EnsureCreditAttemptChargedResult>;
   prepareInitialCreditSettlement: (params: PrepareInitialCreditSettlementParams) => Promise<PrepareInitialCreditSettlementResult>;
   prepareGenerationDraftContext: (args: PrepareGenerationDraftContextArgs) => PrepareGenerationDraftContextResult;
   prepareInitialBillingAttemptContext: (params: PrepareInitialBillingAttemptContextParams) => PrepareInitialBillingAttemptContextResult;
   prepareGenerationBillingStateContext: (params: PrepareGenerationBillingStateContextParams) => PrepareGenerationBillingStateContextResult;
+  prepareInitialGenerationSubmissionContext: (params: PrepareInitialGenerationSubmissionContextParams) => Promise<PrepareInitialGenerationSubmissionContextResult>;
   prepareInitialGeneratingPromptNode: (params: PrepareInitialGeneratingPromptNodeParams) => PrepareInitialGeneratingPromptNodeResult;
   persistInitialGeneratingPromptNode: (params: PersistInitialGeneratingPromptNodeParams) => Promise<PersistInitialGeneratingPromptNodeResult>;
   prepareInitialGenerationPromptOptimization: (params: PrepareInitialGenerationPromptOptimizationParams) => Promise<PrepareInitialGenerationPromptOptimizationResult>;
+  prepareInitialGeneratingPromptNodeContext: (params: PrepareInitialGeneratingPromptNodeContextParams) => Promise<PrepareInitialGeneratingPromptNodeContextResult>;
   completeInitialGenerationPromptSubmission: (params: CompleteInitialGenerationPromptSubmissionParams) => void;
+  completeAndExecuteInitialGenerationSubmission: (params: CompleteAndExecuteInitialGenerationSubmissionParams) => Promise<void>;
+  persistAndExecuteInitialGenerationSubmission: (params: PersistAndExecuteInitialGenerationSubmissionParams) => Promise<PersistAndExecuteInitialGenerationSubmissionResult>;
+  runInitialGenerationSubmissionTransaction: (params: RunInitialGenerationSubmissionTransactionParams) => Promise<void>;
   commitRetryGenerationFailure: (params: CommitRetryGenerationFailureParams) => Promise<void>;
   executeInitialGenerationPromptNode: (params: ExecuteInitialGenerationPromptNodeParams) => Promise<void>;
   reportInitialGenerationFailure: (params: ReportInitialGenerationFailureParams) => void;
@@ -590,9 +795,10 @@ export interface UseGenerationRuntimeResult {
   finalizeRetryGeneratedMediaAttemptGuard: (params: FinalizeRetryGeneratedMediaAttemptGuardParams) => void;
   runRetryGeneratedMediaAttemptWithGuard: <T>(params: RunRetryGeneratedMediaAttemptWithGuardParams<T>) => Promise<T>;
   prepareRetryGeneratedMediaAttemptContext: (params: PrepareRetryGeneratedMediaAttemptContextParams) => PrepareRetryGeneratedMediaAttemptContextResult;
-  commitRetryGenerationStart: (params: CommitRetryGenerationStartParams) => void;
   reportRetryRecoveryResult: (params: ReportRetryRecoveryResultParams) => void;
+  recoverRetryGenerationBridge: (params: RecoverRetryGenerationBridgeParams) => Promise<RecoverRetryGenerationBridgeResult>;
   prepareRetryGenerationRequestContext: (params: PrepareRetryGenerationRequestContextParams) => PrepareRetryGenerationRequestContextResult;
+  prepareRetryGeneratedMediaExecutionContext: (params: PrepareRetryGeneratedMediaExecutionContextParams) => Promise<PrepareRetryGeneratedMediaExecutionContextResult>;
   reportRetryGenerationSuccess: (params: ReportRetryGenerationSuccessParams) => void;
   commitRetryGeneratedMediaSuccess: (params: CommitRetryGeneratedMediaSuccessParams) => Promise<void>;
   prepareRetryGenerationTaskPromptContext: (params: PrepareRetryGenerationTaskPromptContextParams) => PrepareRetryGenerationTaskPromptContextResult;
@@ -603,15 +809,20 @@ export interface UseGenerationRuntimeResult {
   buildRetryImageGenerationResultContext: (params: BuildRetryImageGenerationResultContextParams) => BuildRetryImageGenerationResultContextResult;
   executeRetryGeneratedMediaRequest: (params: ExecuteRetryGeneratedMediaRequestParams) => Promise<ExecuteRetryGeneratedMediaRequestResult>;
   applyRetryGeneratedMediaAuthoritativeBalance: (params: ApplyRetryGeneratedMediaAuthoritativeBalanceParams) => void;
+  executeRetryGeneratedMediaAttemptRequest: (params: ExecuteRetryGeneratedMediaAttemptRequestParams) => Promise<ExecuteRetryGeneratedMediaRequestResult>;
   prepareRetryGeneratedMediaPersistence: (params: PrepareRetryGeneratedMediaPersistenceParams) => Promise<PrepareRetryGeneratedMediaPersistenceResult>;
   scheduleRetryGeneratedMediaCloudSync: (params: ScheduleRetryGeneratedMediaCloudSyncParams) => void;
   resolveRetryGeneratedMediaDimensions: (params: ResolveRetryGeneratedMediaDimensionsParams) => Promise<ResolveRetryGeneratedMediaDimensionsResult>;
   buildRetryGeneratedMediaResult: (params: BuildRetryGeneratedMediaResultParams) => RetryGeneratedMediaResult;
   buildRetryGeneratedMediaResultFromContext: (params: BuildRetryGeneratedMediaResultFromContextParams) => RetryGeneratedMediaResult;
+  assembleRetryGeneratedMediaAttemptResult: (params: AssembleRetryGeneratedMediaAttemptResultParams) => Promise<RetryGeneratedMediaResult>;
+  runRetryGeneratedMediaAttempts: (params: RunRetryGeneratedMediaAttemptsParams) => Promise<RetryGeneratedMediaResult[]>;
   resolveRetryGeneratedMediaLayoutPrompt: (params: ResolveRetryGeneratedMediaLayoutPromptParams) => ResolveRetryGeneratedMediaLayoutPromptResult;
   buildRetryGeneratedMediaLayout: (params: BuildRetryGeneratedMediaLayoutParams) => RetryGeneratedMediaLayoutNode[];
   buildRetryCompletedPromptPatch: (params: BuildRetryCompletedPromptPatchParams) => Partial<PromptNode>;
   prepareRetryGeneratedMediaSuccessCommitContext: (params: PrepareRetryGeneratedMediaSuccessCommitContextParams) => PrepareRetryGeneratedMediaSuccessCommitContextResult;
+  commitRetryGeneratedMediaBatchSuccess: (params: CommitRetryGeneratedMediaBatchSuccessParams) => Promise<void>;
+  completeRetryGeneratedMediaBatch: (params: CompleteRetryGeneratedMediaBatchParams) => Promise<void>;
   resolveFailedCreditAttempt: (node: GenerationCreditAttemptNode) => Promise<GenerationCreditAttemptFailurePatch>;
   applyOptimisticServerCreditDebit: (requiredCredits: number, useServerSideCreditSettlement: boolean) => void;
 }
@@ -619,6 +830,7 @@ export interface UseGenerationRuntimeResult {
 export function useGenerationRuntime({
   activeCanvas,
   updatePromptNode,
+  updateImageNode,
   cancelGenerationRequest,
   cancelSystemProxyTask,
   authLoading,
@@ -631,6 +843,14 @@ export function useGenerationRuntime({
   refundCreditsByTransaction,
   refreshBilling,
   adjustBalanceOptimistically,
+  applyAuthoritativeBalance,
+  rememberPreferredKeyForMode,
+  buildPptPageAlias,
+  resolveModelDisplayName,
+  resolveNodeRouteState,
+  resolveCreditCostForModel,
+  resolveProviderDisplay,
+  generateImage,
 }: UseGenerationRuntimeDeps): UseGenerationRuntimeResult {
   const ensureCreditAttemptCharged = useCallback(async (params: EnsureCreditAttemptChargedParams) => {
     if (params.requiredCredits <= 0) {
@@ -907,12 +1127,70 @@ export function useGenerationRuntime({
     });
   }, []);
 
+  const recoverRetryGenerationBridge = useCallback(async (params: RecoverRetryGenerationBridgeParams): Promise<RecoverRetryGenerationBridgeResult> => {
+    const recovered = await params.recoverFailedSyncBridgeGeneration(params.executionNode);
+    const shouldShortCircuit = recovered.recoveredCount > 0 || recovered.pendingCount > 0;
+    if (shouldShortCircuit) {
+      reportRetryRecoveryResult({ recoveredCount: recovered.recoveredCount, pendingCount: recovered.pendingCount });
+    }
+    return {
+      ...recovered,
+      shouldShortCircuit,
+    };
+  }, [reportRetryRecoveryResult]);
+
   const prepareRetryGenerationRequestContext = useCallback((params: PrepareRetryGenerationRequestContextParams) => {
     const currentNodeId = params.node.id;
     const requestedCount = params.node.parallelCount || params.defaultParallelCount || 1;
     const count = params.node.mode === GenerationMode.PPT ? Math.min(20, Math.max(1, requestedCount)) : requestedCount;
     return { currentNodeId, requestedCount, count };
   }, []);
+
+  const prepareRetryGeneratedMediaExecutionContext = useCallback(async (
+    params: PrepareRetryGeneratedMediaExecutionContextParams,
+  ): Promise<PrepareRetryGeneratedMediaExecutionContextResult> => {
+    const retryExecutionNode = buildRetryExecutionNode({
+      node: params.node,
+      resolveNodeRouteState: params.resolveNodeRouteState,
+    });
+    const retryRecovery = await recoverRetryGenerationBridge({
+      executionNode: retryExecutionNode,
+      recoverFailedSyncBridgeGeneration: params.recoverFailedSyncBridgeGeneration,
+    });
+    if (retryRecovery.shouldShortCircuit) {
+      return {
+        prepared: false as const,
+      };
+    }
+
+    const { currentNodeId, requestedCount, count } = prepareRetryGenerationRequestContext({
+      node: params.node,
+      defaultParallelCount: params.defaultParallelCount,
+    });
+    const preparedRetry = await prepareRetriedExecutionNode({
+      executionNode: retryExecutionNode,
+      nodeId: currentNodeId,
+      parallelCount: count,
+      phase: 'retry',
+      resolveCreditCostForModel: params.resolveCreditCostForModel,
+      ensureCreditAttemptCharged,
+    });
+
+    if (!preparedRetry) {
+      return {
+        prepared: false as const,
+      };
+    }
+
+    return {
+      prepared: true as const,
+      currentNodeId,
+      requestedCount,
+      count,
+      executionNode: preparedRetry.executionNode,
+      retryBillingState: preparedRetry.billingState,
+    };
+  }, [ensureCreditAttemptCharged, prepareRetryGenerationRequestContext, recoverRetryGenerationBridge]);
 
   const reportRetryGenerationSuccess = useCallback((params: ReportRetryGenerationSuccessParams) => {
     const effectiveSize = params.alignedImageNodes[0]?.imageSize || params.executionNode.imageSize;
@@ -1306,6 +1584,138 @@ export function useGenerationRuntime({
     });
   }, [buildRetryGeneratedMediaResult]);
 
+  const executeRetryGeneratedMediaAttemptRequest = useCallback(async (
+    params: ExecuteRetryGeneratedMediaAttemptRequestParams,
+  ): Promise<ExecuteRetryGeneratedMediaRequestResult> => {
+    const { requestId, timeoutGuard } = prepareRetryGeneratedMediaAttemptContext({
+      currentNodeId: params.currentNodeId,
+      executionNode: params.executionNode,
+      index: params.index,
+      timeoutMs: params.timeoutMs,
+    });
+
+    const { currentMode, taskPrompt } = prepareRetryGenerationTaskPromptContext({
+      count: params.count,
+      executionNode: params.executionNode,
+      index: params.index,
+      sourcePrompt: params.sourcePrompt,
+    });
+
+    return runRetryGeneratedMediaAttemptWithGuard({
+      timeoutGuard,
+      run: async () => {
+        const requestResult = await executeRetryGeneratedMediaRequest({
+          currentMode,
+          executionNode: params.executionNode,
+          generateImage: params.generateImage,
+          generateVideo: params.generateVideo,
+          requestId,
+          resolveModelDisplayName: params.resolveModelDisplayName,
+          taskPrompt,
+        });
+        applyRetryGeneratedMediaAuthoritativeBalance({
+          generatedMediaContext: requestResult.generatedMediaContext,
+          applyAuthoritativeBalance: params.applyAuthoritativeBalance,
+        });
+        return requestResult;
+      },
+    });
+  }, [
+    applyRetryGeneratedMediaAuthoritativeBalance,
+    executeRetryGeneratedMediaRequest,
+    prepareRetryGeneratedMediaAttemptContext,
+    prepareRetryGenerationTaskPromptContext,
+    runRetryGeneratedMediaAttemptWithGuard,
+  ]);
+
+  const assembleRetryGeneratedMediaAttemptResult = useCallback(async (
+    params: AssembleRetryGeneratedMediaAttemptResultParams,
+  ): Promise<RetryGeneratedMediaResult> => {
+    const { apiDurationMs, b64 } = params.generatedMediaContext;
+
+    const mediaPersistence = await prepareRetryGeneratedMediaPersistence({
+      b64,
+      currentMode: params.currentMode,
+      normalizePersistableMediaSource: params.normalizePersistableMediaSource,
+      calculateImageHash: params.calculateImageHash,
+      saveOriginalImage: params.saveOriginalImage,
+    });
+
+    scheduleRetryGeneratedMediaCloudSync({
+      b64,
+      currentMode: params.currentMode,
+      index: params.index,
+    });
+
+    const generationTime = resolveRetryGeneratedMediaGenerationTime({
+      apiDurationMs,
+      startedAtMs: params.startedAtMs,
+    });
+
+    const mediaDimensions = await resolveRetryGeneratedMediaDimensions({
+      b64,
+      executionNode: params.executionNode,
+      url: mediaPersistence.url,
+    });
+
+    const generatedResult = buildRetryGeneratedMediaResultFromContext({
+      buildPptPageAlias: params.buildPptPageAlias,
+      canvasId: params.canvasId,
+      currentMode: params.currentMode,
+      executionNode: params.executionNode,
+      generatedMediaContext: params.generatedMediaContext,
+      generationTime,
+      index: params.index,
+      mediaDimensions,
+      mediaPersistence,
+      prompt: params.prompt,
+    });
+    return generatedResult;
+  }, [
+    buildRetryGeneratedMediaResultFromContext,
+    prepareRetryGeneratedMediaPersistence,
+    resolveRetryGeneratedMediaDimensions,
+    resolveRetryGeneratedMediaGenerationTime,
+    scheduleRetryGeneratedMediaCloudSync,
+  ]);
+
+  const runRetryGeneratedMediaAttempts = useCallback(async (
+    params: RunRetryGeneratedMediaAttemptsParams,
+  ): Promise<RetryGeneratedMediaResult[]> => {
+    return Promise.all(Array.from({ length: params.count }).map(async (_, index) => {
+      const { currentMode, taskPrompt, generatedMediaContext } = await executeRetryGeneratedMediaAttemptRequest({
+        applyAuthoritativeBalance: params.applyAuthoritativeBalance,
+        count: params.count,
+        currentNodeId: params.currentNodeId,
+        executionNode: params.executionNode,
+        generateImage: params.generateImage,
+        generateVideo: params.generateVideo,
+        index,
+        resolveModelDisplayName: params.resolveModelDisplayName,
+        sourcePrompt: params.sourcePrompt,
+        timeoutMs: params.timeoutMs,
+      });
+
+      const generatedResult = await assembleRetryGeneratedMediaAttemptResult({
+        buildPptPageAlias: params.buildPptPageAlias,
+        canvasId: params.canvasId,
+        calculateImageHash: params.calculateImageHash,
+        currentMode,
+        executionNode: params.executionNode,
+        generatedMediaContext,
+        index,
+        normalizePersistableMediaSource: params.normalizePersistableMediaSource,
+        prompt: taskPrompt,
+        saveOriginalImage: params.saveOriginalImage,
+        startedAtMs: params.startedAtMs,
+      });
+      return generatedResult;
+    }));
+  }, [
+    assembleRetryGeneratedMediaAttemptResult,
+    executeRetryGeneratedMediaAttemptRequest,
+  ]);
+
   const resolveRetryGeneratedMediaLayoutPrompt = useCallback((params: ResolveRetryGeneratedMediaLayoutPromptParams): ResolveRetryGeneratedMediaLayoutPromptResult => {
     return params.canvasSnapshot?.promptNodes.find((promptNode) => promptNode.id === params.executionNode.id)
       || params.executionNode;
@@ -1459,6 +1869,80 @@ export function useGenerationRuntime({
     };
   }, [buildRetryCompletedPromptPatch, buildRetryGeneratedMediaLayout, resolveRetryGeneratedMediaLayoutPrompt]);
 
+  const commitRetryGeneratedMediaBatchSuccess = useCallback(async (
+    params: CommitRetryGeneratedMediaBatchSuccessParams,
+  ): Promise<void> => {
+    const { alignedImageNodes, retryCompletedPromptPatch } = prepareRetryGeneratedMediaSuccessCommitContext({
+      canvasSnapshot: params.canvasSnapshot,
+      buildGeneratedImageBatchPositions: params.buildGeneratedImageBatchPositions,
+      count: params.count,
+      executionNode: params.executionNode,
+      getCardDimensions: params.getCardDimensions,
+      isMobile: params.isMobile,
+      resolveModelDisplayName: params.resolveModelDisplayName,
+      results: params.results,
+    });
+
+    await commitRetryGeneratedMediaSuccess({
+      addImageNodes: params.addImageNodes,
+      executionNode: params.executionNode,
+      alignedImageNodes,
+      parentNodeId: params.parentNodeId,
+      results: params.results,
+      retryCompletedPromptPatch,
+    });
+  }, [commitRetryGeneratedMediaSuccess, prepareRetryGeneratedMediaSuccessCommitContext]);
+
+  const completeRetryGeneratedMediaBatch = useCallback(async (
+    params: CompleteRetryGeneratedMediaBatchParams,
+  ): Promise<void> => {
+    commitRetryGenerationStart({
+      executionNode: params.executionNode,
+      retryBillingState: params.retryBillingState,
+      resolveModelDisplayName: params.resolveModelDisplayName,
+    });
+
+    try {
+      const startedAtMs = Date.now();
+      const results = await runRetryGeneratedMediaAttempts({
+        applyAuthoritativeBalance: params.applyAuthoritativeBalance,
+        buildPptPageAlias: params.buildPptPageAlias,
+        calculateImageHash: params.calculateImageHash,
+        canvasId: params.canvasId,
+        count: params.count,
+        currentNodeId: params.currentNodeId,
+        executionNode: params.executionNode,
+        generateImage: params.generateImage,
+        generateVideo: params.generateVideo,
+        normalizePersistableMediaSource: params.normalizePersistableMediaSource,
+        resolveModelDisplayName: params.resolveModelDisplayName,
+        saveOriginalImage: params.saveOriginalImage,
+        sourcePrompt: params.sourcePrompt,
+        startedAtMs,
+        timeoutMs: params.timeoutMs,
+      });
+
+      await commitRetryGeneratedMediaBatchSuccess({
+        addImageNodes: params.addImageNodes,
+        canvasSnapshot: params.canvasSnapshot,
+        buildGeneratedImageBatchPositions: params.buildGeneratedImageBatchPositions,
+        count: params.count,
+        executionNode: params.executionNode,
+        getCardDimensions: params.getCardDimensions,
+        isMobile: params.isMobile,
+        parentNodeId: params.parentNodeId,
+        resolveModelDisplayName: params.resolveModelDisplayName,
+        results,
+      });
+    } catch (error: unknown) {
+      await commitRetryGenerationFailure({
+        executionNode: params.executionNode,
+        error,
+        extractErrorDetails: params.extractErrorDetails,
+      });
+    }
+  }, [commitRetryGeneratedMediaBatchSuccess, commitRetryGenerationFailure, commitRetryGenerationStart, runRetryGeneratedMediaAttempts]);
+
   const prepareGenerationDraftContext = useCallback(({
     activeCanvasRef,
     activeSourceImage,
@@ -1539,6 +2023,71 @@ export function useGenerationRuntime({
     };
   }, []);
 
+  const prepareInitialGenerationSubmissionContext = useCallback(async (
+    params: PrepareInitialGenerationSubmissionContextParams,
+  ): Promise<PrepareInitialGenerationSubmissionContextResult> => {
+    const billingStateContext = prepareGenerationBillingStateContext({
+      config: params.config,
+      getPreferredKeyForMode: params.getPreferredKeyForMode,
+      hasExplicitModelRoute: params.hasExplicitModelRoute,
+      resolveCreditCostForModel: params.resolveCreditCostForModel,
+    });
+    const selectedKeyForBilling = billingStateContext.selectedKeyForBilling;
+    const generationBillingState = billingStateContext.generationBillingState;
+
+    const draftContext = prepareGenerationDraftContext({
+      activeCanvasRef: params.activeCanvasRef,
+      activeSourceImage: params.activeSourceImage,
+      draftNodeId: params.draftNodeId,
+    });
+
+    const billingAttemptContext = prepareInitialBillingAttemptContext({
+      generationBillingState,
+      imageSize: params.config.imageSize,
+      modelId: params.config.model,
+      promptNodeId: draftContext.promptNodeId,
+    });
+
+    const requiredCredits = generationBillingState.requiredCredits;
+    const initialCreditSettlement = await prepareInitialCreditSettlement({
+      isCreditModel: generationBillingState.isCreditModel,
+      modelId: params.config.model,
+      modelLabel: params.config.model,
+      providerId: generationBillingState.resolvedProvider || selectedKeyForBilling?.id || 'managed',
+      provider: generationBillingState.resolvedProvider,
+      requiredCredits,
+      useServerSideCreditSettlement: billingAttemptContext.useServerSideCreditSettlement,
+      billingAttempt: billingAttemptContext.billingAttempt,
+    });
+
+    if (!initialCreditSettlement.allowed) {
+      return { allowed: false };
+    }
+
+    return {
+      allowed: true,
+      billingAttempt: billingAttemptContext.billingAttempt,
+      draftContext,
+      executionLane: billingAttemptContext.executionLane,
+      generationBillingState,
+      hasReusablePromptDraft: draftContext.hasReusablePromptDraft,
+      isFollowUp: draftContext.isFollowUp,
+      paymentTransactionId: initialCreditSettlement.paymentTransactionId,
+      perImageCreditCost: generationBillingState.perImageCreditCost,
+      promptNodeId: draftContext.promptNodeId,
+      requiredCredits,
+      resolvedCreditRoute: billingAttemptContext.resolvedCreditRoute,
+      resolvedCreditSpecId: billingAttemptContext.resolvedCreditSpecId,
+      selectedKeyForBilling,
+      useServerSideCreditSettlement: billingAttemptContext.useServerSideCreditSettlement,
+    };
+  }, [
+    prepareGenerationBillingStateContext,
+    prepareGenerationDraftContext,
+    prepareInitialBillingAttemptContext,
+    prepareInitialCreditSettlement,
+  ]);
+
   const prepareInitialGeneratingPromptNode = useCallback((params: PrepareInitialGeneratingPromptNodeParams) => {
     const generationPreviewState = resolveGenerationPreviewState({
       config: params.config,
@@ -1581,19 +2130,6 @@ export function useGenerationRuntime({
     return { generatingNode };
   }, []);
 
-  const persistInitialGeneratingPromptNode = useCallback(async (params: PersistInitialGeneratingPromptNodeParams) => {
-    const persistedGeneratingNode = await persistGeneratingPromptNode({
-      generatingNode: params.generatingNode,
-      getCanvas: params.getCanvas,
-      updatePromptNode,
-      addPromptNode: params.addPromptNode,
-      updateImageNodePosition: params.updateImageNodePosition,
-      deletePromptNode: params.deletePromptNode,
-    });
-
-    return { persistedGeneratingNode };
-  }, [updatePromptNode]);
-
   const prepareInitialGenerationPromptOptimization = useCallback(async (params: PrepareInitialGenerationPromptOptimizationParams) => {
     return optimizeGenerationPrompt({
       enabled: (params.config.mode === GenerationMode.IMAGE || params.config.mode === GenerationMode.PPT)
@@ -1619,11 +2155,349 @@ export function useGenerationRuntime({
     });
   }, []);
 
+  const prepareInitialGeneratingPromptNodeContext = useCallback(async (params: PrepareInitialGeneratingPromptNodeContextParams): Promise<PrepareInitialGeneratingPromptNodeContextResult> => {
+    const finalReferenceImages = params.prepareGenerationReferenceImages(params.config.referenceImages ?? []);
+    const initialPromptOptimization = await prepareInitialGenerationPromptOptimization({
+      config: params.config,
+      rawPrompt: params.rawPrompt,
+      finalReferenceImages,
+    });
+
+    const initialGeneratingNode = prepareInitialGeneratingPromptNode({
+      activeSourceImage: params.activeSourceImage,
+      billingAttempt: params.billingAttempt,
+      config: params.config,
+      currentPos: params.currentPos,
+      executionLane: params.executionLane,
+      finalReferenceImages,
+      generationBillingState: params.generationBillingState,
+      optimizedPromptEn: initialPromptOptimization.optimizedPromptEn,
+      optimizedPromptZh: initialPromptOptimization.optimizedPromptZh,
+      paymentTransactionId: params.paymentTransactionId,
+      perImageCreditCost: params.perImageCreditCost,
+      promptNodeId: params.promptNodeId,
+      promptOptimizerResult: initialPromptOptimization.promptOptimizerResult,
+      rawPrompt: params.rawPrompt,
+      requiredCredits: params.requiredCredits,
+      resolvedCreditRoute: params.resolvedCreditRoute,
+      resolvedCreditSpecId: params.resolvedCreditSpecId,
+      selectedKeyForBilling: params.selectedKeyForBilling,
+      useServerSideCreditSettlement: params.useServerSideCreditSettlement,
+    });
+
+    return initialGeneratingNode;
+  }, [prepareInitialGeneratingPromptNode, prepareInitialGenerationPromptOptimization]);
+
+  const persistInitialGeneratingPromptNode = useCallback(async (params: PersistInitialGeneratingPromptNodeParams) => {
+    const persistedGeneratingNode = await persistGeneratingPromptNode({
+      generatingNode: params.generatingNode,
+      getCanvas: params.getCanvas,
+      updatePromptNode,
+      addPromptNode: params.addPromptNode,
+      updateImageNodePosition: params.updateImageNodePosition,
+      deletePromptNode: params.deletePromptNode,
+    });
+
+    return { persistedGeneratingNode };
+  }, [updatePromptNode]);
+
   const completeInitialGenerationPromptSubmission = useCallback((params: CompleteInitialGenerationPromptSubmissionParams) => {
     params.setDraftNodeId(null);
     params.setConfig(prev => ({ ...prev, prompt: '', referenceImages: [] }));
     params.setActiveSourceImage(null);
   }, []);
+
+  const completeAndExecuteInitialGenerationSubmission = useCallback(async (params: CompleteAndExecuteInitialGenerationSubmissionParams): Promise<void> => {
+    completeInitialGenerationPromptSubmission({
+      setActiveSourceImage: params.setActiveSourceImage,
+      setConfig: params.setConfig,
+      setDraftNodeId: params.setDraftNodeId,
+    });
+
+    await executeInitialGenerationPromptNode({
+      persistedGeneratingNode: params.persistedGeneratingNode,
+      requiredCredits: params.requiredCredits,
+      useServerSideCreditSettlement: params.useServerSideCreditSettlement,
+      executeGeneration: params.executeGeneration,
+    });
+  }, [completeInitialGenerationPromptSubmission, executeInitialGenerationPromptNode]);
+
+  const persistAndExecuteInitialGenerationSubmission = useCallback(async (
+    params: PersistAndExecuteInitialGenerationSubmissionParams,
+  ): Promise<PersistAndExecuteInitialGenerationSubmissionResult> => {
+    const persistedGeneration = await persistInitialGeneratingPromptNode({
+      generatingNode: params.generatingNode,
+      getCanvas: params.getCanvas,
+      addPromptNode: params.addPromptNode,
+      updateImageNodePosition: params.updateImageNodePosition,
+      deletePromptNode: params.deletePromptNode,
+    });
+    const persistedGeneratingNode = persistedGeneration.persistedGeneratingNode;
+
+    await completeAndExecuteInitialGenerationSubmission({
+      setActiveSourceImage: params.setActiveSourceImage,
+      setConfig: params.setConfig,
+      setDraftNodeId: params.setDraftNodeId,
+      persistedGeneratingNode,
+      requiredCredits: params.requiredCredits,
+      useServerSideCreditSettlement: params.useServerSideCreditSettlement,
+      executeGeneration: params.executeGeneration,
+    });
+
+    return { persistedGeneratingNode };
+  }, [completeAndExecuteInitialGenerationSubmission, persistInitialGeneratingPromptNode]);
+
+  const runInitialGenerationSubmissionTransaction = useCallback(async (
+    params: RunInitialGenerationSubmissionTransactionParams,
+  ): Promise<void> => {
+    const initialSubmissionContext = params.initialSubmissionContext;
+
+    try {
+      const placement = params.resolveGenerationPlacement({
+        isFollowUp: params.initialSubmissionContext.isFollowUp,
+        promptNodeId: params.initialSubmissionContext.promptNodeId,
+        hasReusablePromptDraft: params.initialSubmissionContext.hasReusablePromptDraft,
+      });
+
+      const initialGeneratingNode = await prepareInitialGeneratingPromptNodeContext({
+        activeSourceImage: params.activeSourceImage,
+        billingAttempt: initialSubmissionContext.billingAttempt,
+        config: params.config,
+        currentPos: placement.currentPos,
+        executionLane: initialSubmissionContext.executionLane,
+        generationBillingState: initialSubmissionContext.generationBillingState,
+        paymentTransactionId: initialSubmissionContext.paymentTransactionId,
+        perImageCreditCost: initialSubmissionContext.perImageCreditCost,
+        prepareGenerationReferenceImages: params.prepareGenerationReferenceImages,
+        promptNodeId: placement.promptNodeId,
+        rawPrompt: params.rawPrompt,
+        requiredCredits: initialSubmissionContext.requiredCredits,
+        resolvedCreditRoute: initialSubmissionContext.resolvedCreditRoute,
+        resolvedCreditSpecId: initialSubmissionContext.resolvedCreditSpecId,
+        selectedKeyForBilling: initialSubmissionContext.selectedKeyForBilling,
+        useServerSideCreditSettlement: initialSubmissionContext.useServerSideCreditSettlement,
+      });
+      const generatingNode = initialGeneratingNode.generatingNode;
+
+      await persistAndExecuteInitialGenerationSubmission({
+        generatingNode,
+        getCanvas: params.getCanvas,
+        addPromptNode: params.addPromptNode,
+        updateImageNodePosition: params.updateImageNodePosition,
+        deletePromptNode: params.deletePromptNode,
+        setActiveSourceImage: params.setActiveSourceImage,
+        setConfig: params.setConfig,
+        setDraftNodeId: params.setDraftNodeId,
+        requiredCredits: params.initialSubmissionContext.requiredCredits,
+        useServerSideCreditSettlement: params.initialSubmissionContext.useServerSideCreditSettlement,
+        executeGeneration: params.executeGeneration,
+      });
+    } catch (error) {
+      reportInitialGenerationFailure({ error });
+    }
+  }, [
+    persistAndExecuteInitialGenerationSubmission,
+    prepareInitialGeneratingPromptNodeContext,
+    reportInitialGenerationFailure,
+  ]);
+
+  const handleRetryPptSinglePage = useCallback(async (node: PromptNode, pageIndex: number) => {
+    if (!activeCanvas) return;
+    if (node.mode !== GenerationMode.PPT) return;
+
+    let executionNode = buildRetryExecutionNode({
+      node,
+      resolveNodeRouteState,
+    });
+
+    const ordered = getPromptPptImageNodes(activeCanvas.imageNodes, node.id);
+    const target = ordered[pageIndex];
+    if (!target) {
+      import('../services/system/notificationService').then(({ notify }) => {
+        notify.warning('é¡µé¢ä¸å­˜åœ¨', `æœªæ‰¾åˆ°å›¾ ${pageIndex + 1}`);
+      });
+      return;
+    }
+
+    const preparedPageRetry = await prepareRetriedExecutionNode({
+      executionNode,
+      nodeId: node.id,
+      parallelCount: 1,
+      phase: 'ppt-single',
+      pageIndex,
+      resolveCreditCostForModel,
+      ensureCreditAttemptCharged,
+    });
+
+    if (!preparedPageRetry) {
+      return;
+    }
+
+    const { billingAttempt: pageRetryBillingAttempt, billingState: pageRetryBillingState } = preparedPageRetry;
+    executionNode = preparedPageRetry.executionNode;
+
+    updatePromptNode(executionNode);
+
+    const slides = normalizePptSlidesForCount(
+      executionNode.pptSlides,
+      executionNode.prompt,
+      Math.max(pageIndex + 1, executionNode.parallelCount || 1, ordered.length),
+    );
+    const slideText = slides[pageIndex]
+      || `ä¸»é¢˜ï¼š${node.prompt}ã€‚ä¿æŒåŒä¸€å¥—è§†è§‰é£Žæ ¼ï¼Œé¡µé¢å†…å®¹ç‹¬ç«‹ä¸é‡å¤ã€‚`;
+    const layoutDirective = (() => {
+      const t = slideText.toLowerCase();
+      if (/å°é¢|cover|title/.test(t)) return 'é‡‡ç”¨å°é¢ç‰ˆå¼ï¼šå¤§æ ‡é¢˜ + å‰¯æ ‡é¢˜ + è§†è§‰ä¸»å›¾ï¼Œä¿¡æ¯ç²¾ç®€ã€‚';
+      if (/ç›®å½•|agenda|contents?/.test(t)) return 'é‡‡ç”¨ç›®å½•ç‰ˆå¼ï¼šæ¸…æ™°åˆ—å‡º 4-6 ä¸ªç« èŠ‚æ¡ç›®ï¼Œå±‚çº§åˆ†æ˜Žã€‚';
+      if (/æ€»ç»“|ç»“è®º|è¡ŒåŠ¨|summary|conclusion/.test(t)) return 'é‡‡ç”¨æ€»ç»“ç‰ˆå¼ï¼šçªå‡ºç»“è®ºè¦ç‚¹å’Œè¡ŒåŠ¨å»ºè®®ï¼Œé‡ç‚¹é«˜äº®ã€‚';
+      if (/ç« èŠ‚|section|transition/.test(t)) return 'é‡‡ç”¨ç« èŠ‚è¿‡æ¸¡é¡µç‰ˆå¼ï¼šçªå‡ºç« èŠ‚æ ‡é¢˜ï¼Œå¹¶é…åˆå…³é”®è¯ã€‚';
+      return 'é‡‡ç”¨å†…å®¹é¡µç‰ˆå¼ï¼šæ ‡é¢˜ + 3-5 ä¸ªä¿¡æ¯å—ï¼Œå±‚æ¬¡æ¸…æ™°ã€‚';
+    })();
+    const styleDirective = executionNode.pptStyleLocked !== false
+      ? 'ä¸Žæ•´å¥— PPT ä¿æŒå®Œå…¨ç»Ÿä¸€çš„è§†è§‰è¯­è¨€'
+      : 'ä¿æŒæ•´ä½“é£Žæ ¼ç»Ÿä¸€ï¼Œä½†å…è®¸å½“å‰é¡µé¢æœ‰é€‚åº¦å˜åŒ–';
+    const previousVisualHint = (() => {
+      const raw = (target.prompt || '').replace(/PPTç¬¬\d+\/?\d*é¡µã€‚?/g, '').trim();
+      if (!raw) return '';
+      const compact = raw.length > 120 ? `${raw.slice(0, 120)}...` : raw;
+      return `å‚è€ƒä¸Šä¸€ç‰ˆè§†è§‰å…³é”®è¯ï¼š${compact}ã€‚`;
+    })();
+    const taskPrompt = `PPT ç¬¬ ${pageIndex + 1}/${Math.max(1, node.childImageIds.length)} é¡µã€‚${slideText}ã€‚16:9ã€‚${styleDirective}ã€‚${layoutDirective}${previousVisualHint}`;
+
+    updateImageNode(target.id, {
+      isGenerating: true,
+      error: undefined,
+      model: executionNode.model,
+      modelLabel: resolveModelDisplayName(executionNode.model, executionNode.modelLabel || executionNode.model),
+    });
+
+    applyOptimisticServerCreditDebit(
+      pageRetryBillingState.requiredCredits,
+      pageRetryBillingState.useServerSideCreditSettlement,
+    );
+
+    const startTime = Date.now();
+    try {
+      const result = await generateImage(
+        taskPrompt,
+        executionNode.aspectRatio,
+        executionNode.imageSize,
+        executionNode.referenceImages || [],
+        executionNode.model,
+        '',
+        buildGenerationAttemptRequestId(pageRetryBillingAttempt.attemptId, 0),
+        !!executionNode.enableGrounding || !!executionNode.enableImageSearch,
+        {
+          preferredKeyId: executionNode.keySlotId,
+          enableWebSearch: !!executionNode.enableGrounding,
+          enableImageSearch: !!executionNode.enableImageSearch,
+          thinkingMode: executionNode.thinkingMode || 'minimal',
+        }
+      );
+
+      if (typeof result.balanceAfter === 'number') {
+        applyAuthoritativeBalance(result.balanceAfter);
+      }
+
+      let storageId = target.storageId;
+      const persistableResultSource = normalizePersistableMediaSource(
+        result.url,
+        target.mimeType || 'image/png',
+      );
+      if (persistableResultSource) {
+        try {
+          const hash = await calculateImageHash(persistableResultSource);
+          storageId = hash;
+          await saveOriginalImage(hash, persistableResultSource);
+        } catch {
+          // ignore storage failures, keep in-memory preview
+        }
+      }
+
+      const refreshedPageImage: GeneratedImage = {
+        ...target,
+        ...resolveProviderDisplay(result.keySlotId || executionNode.keySlotId, result.providerName || target.providerLabel, result.provider || target.provider),
+        url: result.url,
+        originalUrl: result.url.startsWith('data:') ? result.url : undefined,
+        apiResultUrl: /^https?:\/\//i.test(result.url) ? result.url : undefined,
+        prompt: taskPrompt,
+        timestamp: Date.now(),
+        generationTime: clampGenerationDurationMs(Date.now() - startTime),
+        model: result.model || executionNode.model,
+        modelLabel: resolveModelDisplayName(result.model || executionNode.model, result.modelName || target.modelLabel),
+        modelColorStart: target.modelColorStart,
+        modelColorEnd: target.modelColorEnd,
+        modelColorSecondary: target.modelColorSecondary,
+        modelTextColor: target.modelTextColor,
+        billingMode: executionNode.billingMode,
+        creditCost: executionNode.creditCost,
+        tokens: typeof result.tokens === 'number' && Number.isFinite(result.tokens) ? result.tokens : undefined,
+        promptTokens: typeof result.promptTokens === 'number' && Number.isFinite(result.promptTokens) ? result.promptTokens : undefined,
+        completionTokens: typeof result.completionTokens === 'number' && Number.isFinite(result.completionTokens) ? result.completionTokens : undefined,
+        cost: typeof result.cost === 'number' && Number.isFinite(result.cost) ? result.cost : undefined,
+        costSource: typeof result.cost === 'number' && Number.isFinite(result.cost) ? 'explicit' : 'none',
+        keySlotId: result.keySlotId || executionNode.keySlotId,
+        imageSize: result.imageSize || executionNode.imageSize,
+        aspectRatio: result.aspectRatio || executionNode.aspectRatio,
+        dimensions: result.dimensions ? `${result.dimensions.width}x${result.dimensions.height}` : target.dimensions,
+        exactDimensions: result.dimensions || target.exactDimensions,
+        sourceReferenceStorageIds: (executionNode.referenceImages || []).map(ref => ref.storageId || ref.id).filter(Boolean),
+        alias: buildPptPageAlias(slideText, pageIndex),
+        storageId,
+        isGenerating: false,
+        error: undefined,
+      };
+      updateImageNode(target.id, refreshedPageImage);
+
+      rememberPreferredKeyForMode(executionNode.mode, result.keySlotId || executionNode.keySlotId);
+      const refreshedDeckImages = ordered.map((imageNode, index) => (
+        index === pageIndex ? refreshedPageImage : imageNode
+      ));
+      updatePromptNode({
+        ...executionNode,
+        ...buildCompletedPromptNodePatch(),
+        childImageIds: node.childImageIds,
+        pptDeck: buildPptDeckModuleState({
+          ...executionNode,
+          ...buildCompletedPromptNodePatch(),
+          childImageIds: node.childImageIds,
+          pptDeck: node.pptDeck,
+        }, refreshedDeckImages),
+      });
+
+      import('../services/system/notificationService').then(({ notify }) => {
+        notify.success('å•é¡µé‡ç»˜å®Œæˆ', `å·²æ›´æ–°å›¾${pageIndex + 1}`);
+      });
+    } catch (error: any) {
+      const failedBillingState = await resolveFailedCreditAttempt(executionNode);
+      updatePromptNode({
+        ...executionNode,
+        ...failedBillingState,
+      });
+      updateImageNode(target.id, {
+        isGenerating: false,
+        error: error?.message || 'å•é¡µé‡ç»˜å¤±è´¥',
+      });
+      import('../services/system/notificationService').then(({ notify }) => {
+        notify.error('å•é¡µé‡ç»˜å¤±è´¥', error?.message || 'è¯·ç¨åŽé‡è¯•');
+      });
+    }
+  }, [
+    activeCanvas,
+    applyAuthoritativeBalance,
+    applyOptimisticServerCreditDebit,
+    buildPptPageAlias,
+    ensureCreditAttemptCharged,
+    generateImage,
+    rememberPreferredKeyForMode,
+    resolveCreditCostForModel,
+    resolveFailedCreditAttempt,
+    resolveModelDisplayName,
+    resolveNodeRouteState,
+    resolveProviderDisplay,
+    updateImageNode,
+    updatePromptNode,
+  ]);
 
   const handleCancelGeneration = useCallback(async (id?: string) => {
     const promptNodes = activeCanvas?.promptNodes ?? [];
@@ -1674,15 +2548,21 @@ export function useGenerationRuntime({
 
   return {
     handleCancelGeneration,
+    handleRetryPptSinglePage,
     ensureCreditAttemptCharged,
     prepareInitialCreditSettlement,
     prepareGenerationDraftContext,
     prepareInitialBillingAttemptContext,
     prepareGenerationBillingStateContext,
+    prepareInitialGenerationSubmissionContext,
     prepareInitialGeneratingPromptNode,
     persistInitialGeneratingPromptNode,
     prepareInitialGenerationPromptOptimization,
+    prepareInitialGeneratingPromptNodeContext,
     completeInitialGenerationPromptSubmission,
+    completeAndExecuteInitialGenerationSubmission,
+    persistAndExecuteInitialGenerationSubmission,
+    runInitialGenerationSubmissionTransaction,
     commitRetryGenerationFailure,
     executeInitialGenerationPromptNode,
     reportInitialGenerationFailure,
@@ -1690,9 +2570,10 @@ export function useGenerationRuntime({
     finalizeRetryGeneratedMediaAttemptGuard,
     runRetryGeneratedMediaAttemptWithGuard,
     prepareRetryGeneratedMediaAttemptContext,
-    commitRetryGenerationStart,
     reportRetryRecoveryResult,
+    recoverRetryGenerationBridge,
     prepareRetryGenerationRequestContext,
+    prepareRetryGeneratedMediaExecutionContext,
     reportRetryGenerationSuccess,
     commitRetryGeneratedMediaSuccess,
     prepareRetryGenerationTaskPromptContext,
@@ -1703,15 +2584,20 @@ export function useGenerationRuntime({
     buildRetryImageGenerationResultContext,
     executeRetryGeneratedMediaRequest,
     applyRetryGeneratedMediaAuthoritativeBalance,
+    executeRetryGeneratedMediaAttemptRequest,
     prepareRetryGeneratedMediaPersistence,
     scheduleRetryGeneratedMediaCloudSync,
     resolveRetryGeneratedMediaDimensions,
     buildRetryGeneratedMediaResult,
     buildRetryGeneratedMediaResultFromContext,
+    assembleRetryGeneratedMediaAttemptResult,
+    runRetryGeneratedMediaAttempts,
     resolveRetryGeneratedMediaLayoutPrompt,
     buildRetryGeneratedMediaLayout,
     buildRetryCompletedPromptPatch,
     prepareRetryGeneratedMediaSuccessCommitContext,
+    commitRetryGeneratedMediaBatchSuccess,
+    completeRetryGeneratedMediaBatch,
     resolveFailedCreditAttempt,
     applyOptimisticServerCreditDebit,
   };

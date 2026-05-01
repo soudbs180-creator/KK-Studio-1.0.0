@@ -51,7 +51,7 @@ export interface MobileWorkspaceSurfaceProps {
 }
 
 const moreSheetActionClass =
-  'rounded-[22px] border border-white/10 bg-white/6 p-3.5 text-left text-white backdrop-blur-xl transition-all active:scale-[0.985]';
+  'rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-3.5 text-left text-[var(--text-primary)] transition-all active:scale-[0.985]';
 
 const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   activeScreen,
@@ -156,7 +156,11 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
       />
 
       {showMoreSheet ? (
-        <div data-testid="mobile-more-sheet" className="fixed inset-0 z-[985] flex flex-col justify-end bg-black/55 backdrop-blur-sm">
+        <div
+          data-testid="mobile-more-sheet"
+          className="fixed inset-0 z-[985] flex flex-col justify-end"
+          style={{ background: 'var(--mobile-clay-overlay-bg)' }}
+        >
           <button
             type="button"
             className="absolute inset-0 cursor-default"
@@ -164,10 +168,17 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             aria-label="关闭更多菜单"
           />
 
-          <div className="relative rounded-t-[30px] border border-white/10 bg-[rgba(13,16,25,0.96)] px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 text-white shadow-[0_-24px_80px_rgba(2,6,23,0.48)]">
+          <div
+            className="relative rounded-t-[30px] border px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 text-[var(--text-primary)]"
+            style={{
+              background: 'var(--mobile-clay-shell-bg)',
+              borderColor: 'var(--mobile-clay-border)',
+              boxShadow: 'var(--mobile-clay-shadow)'
+            }}
+          >
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/55">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
                   工作区
                 </div>
                 <h2 className="mt-1 text-lg font-semibold">更多操作</h2>
@@ -175,7 +186,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               <button
                 type="button"
                 onClick={() => setShowProjectList((previous) => !previous)}
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-xs font-medium text-white/80"
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)]"
               >
                 <FolderOpen size={14} />
                 {resolvedProjectCount > 1 ? `项目 ${resolvedProjectCount}` : '当前项目'}
@@ -185,20 +196,20 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             <button
               type="button"
               onClick={() => setShowProjectList((previous) => !previous)}
-              className="mb-3 flex w-full items-center justify-between rounded-[24px] border border-white/10 bg-white/6 px-4 py-3 text-left"
+              className="mb-3 flex w-full items-center justify-between rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] px-4 py-3 text-left"
             >
               <div className="min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
                   当前项目
                 </div>
-                <div className="mt-1 truncate text-sm font-semibold text-white">{resolvedProjectName}</div>
+                <div className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">{resolvedProjectName}</div>
               </div>
               <div className="text-xs text-white/70">{showProjectList ? '收起' : '切换'}</div>
             </button>
 
             {showProjectList ? (
-              <div className="mb-4 rounded-[24px] border border-white/10 bg-white/6 p-2.5">
-                <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">
+              <div className="mb-4 rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-2.5">
+                <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
                   项目列表
                 </div>
                 <div className="space-y-2">
@@ -215,12 +226,12 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                         }}
                         className={`flex w-full items-center justify-between gap-3 rounded-[18px] px-3 py-3 text-left transition-all ${
                           isActive
-                            ? 'border border-sky-400/30 bg-sky-400/10 text-white'
-                            : 'border border-transparent bg-black/20 text-white/80'
+                            ? 'border border-[var(--mobile-clay-active-border)] bg-[var(--mobile-clay-active-bg)] text-[var(--text-primary)]'
+                            : 'border border-transparent bg-[var(--mobile-clay-muted-surface-bg)] text-[var(--text-secondary)]'
                         }`}
                       >
                         <span className="min-w-0 truncate text-sm font-medium">{canvas.name}</span>
-                        {isActive ? <Check size={16} className="shrink-0 text-sky-200" /> : null}
+                        {isActive ? <Check size={16} className="shrink-0 text-[var(--accent-color)]" /> : null}
                       </button>
                     );
                   })}
@@ -235,7 +246,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                     closeMoreSheet();
                   }}
                   disabled={!canCreateCanvas}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[18px] border border-dashed border-white/15 bg-black/15 px-3 py-3 text-sm font-medium text-white/80 disabled:opacity-45"
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[18px] border border-dashed border-[var(--mobile-clay-border-strong)] bg-[var(--mobile-clay-muted-surface-bg)] px-3 py-3 text-sm font-medium text-[var(--text-secondary)] disabled:opacity-45"
                 >
                   <Plus size={16} />
                   {canCreateCanvas ? '新建项目' : '项目已满'}

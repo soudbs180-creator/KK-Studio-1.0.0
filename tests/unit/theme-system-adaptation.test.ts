@@ -24,6 +24,14 @@ test('theme bootstrapping defaults to system preference and applies before app m
   assert.match(mainSource, /initializeThemeOnBoot\(\);/);
 });
 
+test('theme provider does not add programmatic transition classes that can flicker the UI', () => {
+  const themeSource = readSource('src/context/ThemeContext.tsx');
+
+  assert.doesNotMatch(themeSource, /theme-transitioning/);
+  assert.doesNotMatch(themeSource, /startThemeTransition/);
+  assert.doesNotMatch(themeSource, /setTimeout\(clearThemeTransition/);
+});
+
 test('theme-aware shells use resolved theme when preference is set to system', () => {
   const sidebarSource = readSource('src/components/layout/Sidebar.tsx');
   const projectManagerSource = readSource('src/components/settings/ProjectManager.tsx');
@@ -34,22 +42,30 @@ test('theme-aware shells use resolved theme when preference is set to system', (
   assert.match(sidebarSource, /const \{ theme, resolvedTheme, toggleTheme, setTheme \} = useTheme\(\);/);
   assert.match(sidebarSource, /const isDarkMode = resolvedTheme === 'dark';/);
   assert.match(sidebarSource, /const isLightMode = resolvedTheme === 'light';/);
-  assert.match(sidebarSource, /backgroundColor: isLightMode \? 'rgba\(255, 255, 255, 0.98\)' : 'var\(--toolbar-bg-dark\)'/);
-  assert.match(sidebarSource, /border: isLightMode \? '2px solid rgba\(0, 0, 0, 0.15\)' : '1px solid rgba\(255, 255, 255, 0.05\)'/);
-  assert.match(sidebarSource, /boxShadow: isLightMode \? '0 8px 32px rgba\(0, 0, 0, 0.15\)' : 'var\(--shadow-xl\)'/);
+  assert.match(sidebarSource, /data-theme-surface=\{isLightMode \? 'light-frosted' : 'dark-frosted'\}/);
+  assert.match(sidebarSource, /background:\s*'var\(--frost-card-framework-bg\)'/);
+  assert.match(sidebarSource, /border:\s*'1px solid var\(--frost-card-framework-border\)'/);
+  assert.match(sidebarSource, /boxShadow:\s*'var\(--frost-card-framework-shadow\)'/);
+  assert.match(sidebarSource, /backdropFilter:\s*'blur\(var\(--frost-card-framework-blur\)\) saturate\(1\.16\)'/);
+  assert.doesNotMatch(sidebarSource, /0 8px 32px|var\(--shadow-xl\)|from-indigo|to-purple/);
   assert.match(sidebarSource, /title=\{isDarkMode \? '切换到亮色模式' : '切换到暗色模式'\}/);
   assert.match(sidebarSource, /\{isDarkMode \? \(/);
 
   assert.match(projectManagerSource, /const \{ resolvedTheme, toggleTheme \} = useTheme\(\);/);
   assert.match(projectManagerSource, /const isDarkMode = resolvedTheme === 'dark';/);
-  assert.match(projectManagerSource, /background: isDarkMode \? '#27272a' : 'var\(--floating-shell-bg\)'/);
-  assert.match(projectManagerSource, /border: isDarkMode \? '1px solid rgba\(255,255,255,0.05\)' : '1px solid var\(--floating-shell-border\)'/);
-  assert.match(projectManagerSource, /boxShadow: isDarkMode[\s\S]*'var\(--floating-shell-shadow\)'/);
+  assert.match(projectManagerSource, /frostedProjectManagerShellStyle/);
+  assert.match(projectManagerSource, /frostedProjectManagerSubSurfaceStyle/);
+  assert.match(projectManagerSource, /var\(--frost-card-framework-bg\)/);
+  assert.match(projectManagerSource, /var\(--frost-card-framework-border\)/);
+  assert.match(projectManagerSource, /var\(--frost-card-framework-shadow\)/);
   assert.match(projectManagerSource, /title=\{isDarkMode \? '切换到浅色模式' : '切换到深色模式'\}/);
   assert.match(projectManagerSource, /\{isDarkMode \? <Moon size=\{20\} \/> : <Sun size=\{20\} \/>}/);
+  assert.doesNotMatch(projectManagerSource, /accent-indigo|text-sky|bg-indigo|#27272a|shadow-2xl/);
 
-  assert.match(notificationToastSource, /import \{ useTheme \} from '\.\.\/\.\.\/context\/ThemeContext';/);
-  assert.match(notificationToastSource, /const \{ isDarkMode \} = useTheme\(\);/);
+  assert.doesNotMatch(notificationToastSource, /import \{ useTheme \} from '\.\.\/\.\.\/context\/ThemeContext';/);
+  assert.doesNotMatch(notificationToastSource, /const \{ isDarkMode \} = useTheme\(\);/);
+  assert.match(notificationToastSource, /boxShadow: 'var\(--frost-card-framework-shadow\)'/);
+  assert.match(notificationToastSource, /background: 'var\(--frost-card-sub-bg\)'/);
   assert.doesNotMatch(notificationToastSource, /MutationObserver/);
   assert.doesNotMatch(notificationToastSource, /document\.body\.classList\.contains\('dark-mode'\)/);
 

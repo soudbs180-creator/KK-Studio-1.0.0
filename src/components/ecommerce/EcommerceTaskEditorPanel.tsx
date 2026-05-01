@@ -23,8 +23,10 @@ interface EcommerceTaskEditorPanelProps {
   defaultExpanded?: boolean;
 }
 
-const inputClassName = 'w-full rounded-lg border bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[rgba(59,130,246,0.45)]';
+const inputClassName = 'w-full rounded-lg border bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--clay-brand-pink)]';
 const toggleClassName = 'flex items-center justify-between rounded-lg border px-3 py-2 text-xs transition-colors';
+const clayPinkBorder = 'var(--clay-brand-pink)';
+const clayPeachBorder = 'var(--clay-brand-peach)';
 
 const toneOptions = ['专业冷静', '清新轻盈', '高级质感', '活力种草', '科技理性'];
 const effectOptions = ['无特效', '柔光氛围', '速度动势', '高光质感', '层次景深'];
@@ -48,21 +50,59 @@ const inheritanceToggles: Array<{
   { key: 'keepPalette', label: '继承配色基调', description: '尽量保持同系列颜色印象' },
 ];
 
-const fieldContainerStyle: React.CSSProperties = {
-  background: 'var(--bg-secondary)',
-  borderColor: 'var(--border-light)',
+const rootSurfaceStyle: React.CSSProperties = {
+  background: 'var(--frost-card-framework-bg)',
+  borderColor: 'var(--frost-card-framework-border)',
+  boxShadow: 'var(--frost-card-framework-shadow)',
+  WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+  backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+};
+
+const panelSurfaceStyle: React.CSSProperties = {
+  background: 'var(--frost-card-main-bg)',
+  borderColor: 'var(--frost-card-main-border)',
+  boxShadow: 'var(--frost-card-main-shadow)',
+  WebkitBackdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
+  backdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
+};
+
+const subSurfaceStyle: React.CSSProperties = {
+  background: 'var(--frost-card-sub-bg)',
+  borderColor: 'var(--frost-card-sub-border)',
+  boxShadow: 'var(--frost-card-sub-shadow)',
+  WebkitBackdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
+  backdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
+};
+
+const inputSurfaceStyle: React.CSSProperties = {
+  background: 'var(--frost-input-bg)',
+  borderColor: 'var(--frost-input-border)',
+  boxShadow: 'var(--frost-input-shadow)',
+  WebkitBackdropFilter: 'blur(var(--frost-input-blur)) saturate(1.12)',
+  backdropFilter: 'blur(var(--frost-input-blur)) saturate(1.12)',
 };
 
 const summaryChipStyle: React.CSSProperties = {
-  background: 'rgba(59, 130, 246, 0.10)',
-  borderColor: 'rgba(59, 130, 246, 0.20)',
+  ...subSurfaceStyle,
   color: 'var(--text-secondary)',
 };
 
 const selectedFieldContainerStyle: React.CSSProperties = {
-  background: 'rgba(59, 130, 246, 0.12)',
-  borderColor: 'rgba(59, 130, 246, 0.30)',
+  ...panelSurfaceStyle,
+  borderColor: clayPinkBorder,
   color: 'var(--text-primary)',
+};
+
+const warningChipStyle: React.CSSProperties = {
+  ...subSurfaceStyle,
+  borderColor: clayPeachBorder,
+  color: 'var(--clay-brand-peach)',
+};
+
+const infoChipStyle: React.CSSProperties = {
+  ...subSurfaceStyle,
+  borderColor: clayPinkBorder,
+  color: 'var(--clay-brand-pink)',
 };
 
 const aPlusOverrideOptions: Array<{ value: EcommerceAPlusControlMode | null; label: string }> = [
@@ -163,7 +203,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
   return (
     <div
       className={`rounded-xl border ${rootPaddingClassName}`}
-      style={{ background: 'rgba(15, 23, 42, 0.18)', borderColor: 'rgba(59, 130, 246, 0.16)' }}
+      style={rootSurfaceStyle}
     >
       <div className={headerClassName}>
         <div className="min-w-0 flex-1">
@@ -210,7 +250,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
       </div>
 
       {!isExpanded ? (
-        <div className="rounded-xl border p-3" style={fieldContainerStyle}>
+        <div className="rounded-xl border p-3" style={panelSurfaceStyle}>
           <div className="text-[11px] font-medium text-[var(--text-secondary)]">编辑摘要</div>
           <div className="mt-2 text-xs leading-5 text-[var(--text-primary)]">
             {collapsedSummary}
@@ -221,11 +261,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
                 <span
                   key={`collapsed-missing-${field}`}
                   className="rounded-full border px-2 py-1 text-[10px]"
-                  style={{
-                    background: 'rgba(245, 158, 11, 0.10)',
-                    borderColor: 'rgba(245, 158, 11, 0.22)',
-                    color: 'rgb(251, 191, 36)',
-                  }}
+                  style={warningChipStyle}
                 >
                   待补充：{field}
                 </span>
@@ -243,7 +279,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
             value={taskState.copy.headline}
             onChange={(event) => updateCopyField('headline', event.target.value)}
             className={inputClassName}
-            style={fieldContainerStyle}
+            style={inputSurfaceStyle}
             placeholder="例如：高效收纳，桌面更清爽"
           />
         </label>
@@ -255,7 +291,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
             value={taskState.copy.subheadline}
             onChange={(event) => updateCopyField('subheadline', event.target.value)}
             className={inputClassName}
-            style={fieldContainerStyle}
+            style={inputSurfaceStyle}
             placeholder="补充规格、优势或场景"
           />
         </label>
@@ -266,7 +302,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
             value={taskState.copy.highlight}
             onChange={(event) => updateCopyField('highlight', event.target.value)}
             className={textareaClassName}
-            style={fieldContainerStyle}
+            style={inputSurfaceStyle}
             placeholder="例如：防泼水面料、双层隔热、3 秒速开"
           />
         </label>
@@ -295,7 +331,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
               promptOverride: event.target.value,
             }))}
             className={textareaClassName}
-            style={fieldContainerStyle}
+            style={inputSurfaceStyle}
             placeholder="当前实际提示词，可直接人工重写后再生成"
           />
         </label>
@@ -306,7 +342,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
             value={taskState.style.tone}
             onChange={(event) => updateStyleField('tone', event.target.value)}
             className={inputClassName}
-            style={fieldContainerStyle}
+            style={inputSurfaceStyle}
           >
             {[taskState.style.tone, ...toneOptions]
               .filter((value, index, array) => value && array.indexOf(value) === index)
@@ -324,7 +360,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
             value={taskState.style.effect}
             onChange={(event) => updateStyleField('effect', event.target.value)}
             className={inputClassName}
-            style={fieldContainerStyle}
+            style={inputSurfaceStyle}
           >
             {[taskState.style.effect, ...effectOptions]
               .filter((value, index, array) => value && array.indexOf(value) === index)
@@ -345,7 +381,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
               event.target.value as EcommerceEditableTaskState['layout']['productSize'],
             )}
             className={inputClassName}
-            style={fieldContainerStyle}
+            style={inputSurfaceStyle}
           >
             {productSizeOptions.map((value) => (
               <option key={value} value={value}>
@@ -357,7 +393,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
       </div>
 
       {isAPlusModule ? (
-        <div className="mt-3 rounded-xl border p-3" style={fieldContainerStyle}>
+        <div className="mt-3 rounded-xl border p-3" style={panelSurfaceStyle}>
           <div className="mb-2 text-[11px] font-medium text-[var(--text-secondary)]">A+ 尺寸覆盖</div>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             {aPlusOverrideOptions.map((option) => {
@@ -367,7 +403,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
                   key={option.label}
                   type="button"
                   className="rounded-lg border px-3 py-2 text-[11px] transition-colors"
-                  style={isSelected ? selectedFieldContainerStyle : fieldContainerStyle}
+                  style={isSelected ? selectedFieldContainerStyle : subSurfaceStyle}
                   onClick={() => updateTaskState((previous) => ({
                     ...previous,
                     sizeControlOverride: option.value,
@@ -390,9 +426,9 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
               type="button"
               className={toggleClassName}
               style={{
-                ...fieldContainerStyle,
-                borderColor: enabled ? 'rgba(16, 185, 129, 0.28)' : 'var(--border-light)',
-                background: enabled ? 'rgba(16, 185, 129, 0.10)' : 'var(--bg-secondary)',
+                ...panelSurfaceStyle,
+                borderColor: enabled ? clayPeachBorder : 'var(--frost-card-main-border)',
+                background: enabled ? 'var(--frost-card-main-bg)' : 'var(--frost-card-sub-bg)',
               }}
               onClick={() => updateInheritField(toggle.key, !enabled)}
             >
@@ -407,8 +443,8 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
               <span
                 className="ml-3 rounded-full border px-2 py-1 text-[10px]"
                 style={{
-                  borderColor: enabled ? 'rgba(16, 185, 129, 0.28)' : 'var(--border-light)',
-                  color: enabled ? 'rgb(52, 211, 153)' : 'var(--text-tertiary)',
+                  borderColor: enabled ? clayPeachBorder : 'var(--frost-card-sub-border)',
+                  color: enabled ? 'var(--clay-brand-peach)' : 'var(--text-tertiary)',
                 }}
               >
                 {enabled ? '已开启' : '关闭'}
@@ -424,11 +460,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
             <span
               key={`missing-${field}`}
               className="rounded-full border px-2 py-1 text-[10px]"
-              style={{
-                background: 'rgba(245, 158, 11, 0.10)',
-                borderColor: 'rgba(245, 158, 11, 0.22)',
-                color: 'rgb(251, 191, 36)',
-              }}
+              style={warningChipStyle}
             >
               待补充：{field}
             </span>
@@ -437,11 +469,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
             <span
               key={`check-${check}`}
               className="rounded-full border px-2 py-1 text-[10px]"
-              style={{
-                background: 'rgba(59, 130, 246, 0.10)',
-                borderColor: 'rgba(59, 130, 246, 0.22)',
-                color: 'rgb(147, 197, 253)',
-              }}
+              style={infoChipStyle}
             >
               校验：{check}
             </span>

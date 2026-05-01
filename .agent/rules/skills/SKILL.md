@@ -1,11 +1,11 @@
 ---
 trigger: glob
-description: KK Studio 完整规则总纲 - Airtable 风 UI、工程验证、供应商与 Cadence 规则入口
+description: KK Studio 完整规则总纲 - Clay UI、工程验证、供应商与 Cadence 规则入口
 ---
 
 # KK Studio 设计系统 v3.0
 
-本文档定义 KK Studio 的完整工程与 UI 规则。所有 AI 代码助手在修改 UI 时，必须优先遵循下方 Airtable 风设计系统；后续历史 UI 章节只作为旧代码识别参考，不再作为新 UI 的决策来源。
+本文档定义 KK Studio 的完整工程与 UI 规则。所有 AI 代码助手在修改 UI 时，必须优先遵循下方 Clay 设计系统；后续历史 UI 章节只作为旧代码识别参考，不再作为新 UI 的决策来源。
 
 ---
 
@@ -27,58 +27,74 @@ description: KK Studio 完整规则总纲 - Airtable 风 UI、工程验证、供
 
 ---
 
-## 🎨 Airtable 风 UI 规则（强制）
+## 🎨 Clay UI 规则（强制）
 
-当前 UI 方向是完整 Airtable 风，亮色优先、暗色兼容，并在关键容器和卡片保留受控磨砂玻璃。新的 UI 改动必须使用这一套规则替代旧的 Apple / dark-heavy 规则。
+当前 UI 方向是完整 Clay 风：暖奶油画布、近黑主文字、饱和色块建立重点，亮色和暗色都必须清晰可读。新的 UI 改动必须使用这一套规则替代旧的 Apple / dark-heavy / blue-glass 规则。
+
+当前用户覆盖规则：输入框、主卡、副卡、框架卡必须呈现受控磨砂状态。受控磨砂是半透明背景、明确 hairline、轻量 blur、可读文字和低阴影 token 的组合；它不是重玻璃拟态、蓝色 glow 或电影感阴影。
 
 ### 颜色与信息层级
 
 ```css
---airtable-navy: #181d26;   /* 主文字 */
---airtable-blue: #1b61c9;   /* 主交互、选中、焦点 */
---airtable-border: #e0e2e6; /* 轻边框 */
---airtable-canvas: #f7f8fb;
---airtable-surface: #ffffff;
+--clay-canvas: #fffaf0;
+--clay-ink: #0a0a0a;
+--clay-body: #3a3a3a;
+--clay-muted: #6a6a6a;
+--clay-surface-soft: #faf5e8;
+--clay-surface-card: #f5f0e0;
+--clay-dark-canvas: #0b0b0c;
+--clay-dark-surface: #141414;
+--clay-dark-elevated: #1f1f1f;
+--clay-brand-pink: #ff4d8b;
+--clay-brand-teal: #1a3a3a;
+--clay-brand-lavender: #b8a4ed;
+--clay-brand-peach: #ffb084;
+--clay-brand-ochre: #e8b94a;
+--clay-brand-coral: #ff6b5a;
 ```
 
-- 主文字使用深海军蓝 `#181d26`；辅助文字使用同色透明度。
-- 主按钮、链接、选中态、焦点环统一使用 Airtable Blue `#1b61c9`。
+- 主文字使用 Clay Ink `#0a0a0a`；正文使用 `#3a3a3a`，辅助文字使用 `#6a6a6a`。
+- 深色模式使用中性黑灰 `#0b0b0c` / `#141414` / `#1f1f1f`，不能回退到青黑、蓝黑或靛蓝底色。
+- 主按钮优先使用近黑或 Clay coral/pink；普通选中态不能回退到泛蓝色。
 - 只有成功、警告、危险等语义状态可以使用绿色、橙色、红色。
-- 禁止把普通选中态写成局部 `indigo`、`purple` 或随意蓝色。
+- 禁止把普通选中态写成局部 `indigo`、`purple` 或随意蓝色；应使用 Clay pink/coral/teal 语义。
 - 设置页和管理页要把操作区放大，把重复说明、状态摘要和低权重信息压缩或放进高级区。
 
 ### 圆角 radius
 
-- 按钮、输入框、分段控件、开关：`10-12px`。
+- 按钮、输入框、分段控件、开关：`12px`。
 - 普通卡片：`16px`。
-- 重要卡片、面板、shell：`20-24px`。
+- 重要卡片、面板、shell：`24px`。
 - 标签、徽章：`6-8px`。
 - 只有真实圆形头像或图标按钮使用 full radius。
 - 不再使用 980px 胶囊按钮作为默认主按钮。
 
-### 阴影 shadow 与受控磨砂玻璃
+### 阴影 shadow 与受控磨砂层级
 
-受控磨砂玻璃只允许出现在应用 shell、搜索 shell、重要设置面板、选中/高权重卡片。输入框、表格、密集列表、低权重模块和卡片内部的小模块必须保持实底或近实底。
+Clay 的重点来自暖色画布、受控磨砂表面、饱和 color block 和清晰边框，不来自重阴影或蓝光。输入框、主卡、副卡、框架卡必须使用共享磨砂 token；表格、密集列表和低权重模块可以使用近实底 fallback 保持可读。
 
 ```css
---ui-glass-shell-shadow: 0 16px 36px rgb(24 29 38 / 0.10);
---ui-glass-card-shadow: 0 10px 24px rgb(24 29 38 / 0.08);
---settings-subcard-shadow: 0 4px 12px rgb(24 29 38 / 0.06);
+--frost-input-bg: rgb(255 255 255 / 0.68);
+--frost-card-main-bg: rgb(250 245 232 / 0.74);
+--frost-card-sub-bg: rgb(255 255 255 / 0.58);
+--frost-card-framework-bg: rgb(250 245 232 / 0.78);
+--clay-hairline: #e5e5e5;
 ```
 
 - 禁止在卡片内部再叠完整卡片阴影。
-- 悬停最多上移 1px，并使用轻量阴影或边框变化。
+- 悬停最多上移 1px，并优先使用边框、背景或色块变化。
 - 不使用 `shadow-2xl` / `shadow-xl` / `shadow-lg` 作为常规 UI 深度。
 
 ### 焦点、选中、输入
 
-- 焦点必须同时有边框和蓝色 focus ring，不能通过 JS inline 改父容器样式。
-- 输入框背景使用白色或近白色，避免彩色块。
-- 选中行、选中卡、分段控件 active 态使用 `#1b61c9` tint、蓝色边框和低阴影。
+- 焦点必须同时有边框和 Clay accent focus ring，不能通过 JS inline 改父容器样式。
+- 输入框背景使用受控磨砂或近实底 fallback，避免低对比色块。
+- 选中行、选中卡、分段控件 active 态使用 Clay accent tint、清晰边框和无重阴影。
 - 多选、拖动、回收/恢复、开关、分段控件的反馈方式要一致。
 
 ### 字体比例
 
+- Display 标题优先使用 `Plain Black`，不可用时使用 `Inter` 500，并使用轻微负字距。
 - 页面标题：`24px`。
 - 区块标题：`17-20px`。
 - 正文：`14-15px`。
@@ -90,19 +106,19 @@ description: KK Studio 完整规则总纲 - Airtable 风 UI、工程验证、供
 
 ```css
 --motion-duration-fast: 120ms;
---motion-duration-standard: 180ms;
+--motion-duration-standard: 160ms;
 --motion-duration-panel: 240ms;
---motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+--motion-ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
 ```
 
-- 按钮、开关、分段控件、选择、拖动、回收/恢复使用同一套 180ms 标准动效。
+- 按钮、开关、分段控件、选择、拖动、回收/恢复使用同一套 160ms 标准动效。
 - 只改 opacity 的按钮反馈不够；必须有颜色、边框、阴影或轻微位移变化。
 - 动效必须尊重 `prefers-reduced-motion` 的既有降级规则。
 
 ### 关键页面规则
 
-- 全局搜索：保留轻磨砂 shell，去除重阴影、本地 indigo、inline focus mutation；确认整理按钮放在 footer/action 区，不能漂出容器。
-- 设置页：操作区视觉权重大于信息模块；卡片和容器保持统一圆角与层级磨砂；重复状态说明放入高级 disclosure。
+- 全局搜索：桌面是 command surface，手机是 bottom sheet；去除重阴影、本地 indigo、inline focus mutation；确认整理按钮放在 footer/action 区，不能漂出容器。
+- 设置页：操作区视觉权重大于信息模块；桌面和手机使用两套 spacing/布局逻辑；重复状态说明放入高级 disclosure。
 - API 设置：默认页只展示添加入口和已配置供应商；诊断、OCR、平台工具、路由池细节留在高级模式。
 
 ---
@@ -149,9 +165,11 @@ description: KK Studio 完整规则总纲 - Airtable 风 UI、工程验证、供
 
 ---
 
-## 🎨 颜色系统 (Color System)
+## 历史颜色系统参考（非当前 UI 规则）
 
-### 暗色模式 (Dark Mode) - 主要
+> 以下旧颜色系统只用于识别历史代码和迁移风险，不再作为新 UI 决策来源。新的 UI 修改必须以上方 Clay UI 规则为准：通用选中态不得使用蓝色 / indigo / purple 光晕，暗色画布不得回退到蓝黑背景，卡片默认不得使用重阴影。
+
+### 旧暗色模式（禁止作为新 UI 主规范）
 
 ```css
 /* ===== 背景层级 ===== */
@@ -194,7 +212,7 @@ description: KK Studio 完整规则总纲 - Airtable 风 UI、工程验证、供
 --selected-border: rgba(59, 130, 246, 0.5);   /* 选中边框 */
 ```
 
-### 亮色模式 (Light Mode) - 自动反推
+### 旧亮色模式（禁止作为新 UI 主规范）
 
 ```css
 /* ===== 背景层级 ===== */
@@ -392,7 +410,9 @@ text-3xs     → 10px (0.625rem)
 
 ---
 
-## 🌑 阴影规范 (Shadows)
+## 历史阴影规范（非当前 UI 规则）
+
+> 以下阴影值仅用于迁移旧代码时识别 heavy-shadow drift。Clay 当前规则要求普通卡片、设置面板、搜索面板和教程面板默认使用 `none` 或 hairline 层级，不得把 `shadow-lg` / `shadow-xl` / 蓝色 glow 作为常规深度。
 
 ### 暗色模式阴影
 
@@ -412,7 +432,7 @@ text-3xs     → 10px (0.625rem)
 --shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.2);
 ```
 
-### 选中/聚焦光晕
+### 旧选中/聚焦光晕（禁止作为新 UI 主规范）
 
 ```css
 /* 蓝色光晕 - 选中状态 */
@@ -461,8 +481,8 @@ text-3xs     → 10px (0.625rem)
 |---------|---------|------|---------|
 | **Hover 悬停** | 背景变亮 `bg-hover`，轻微上移 `translateY(-2px)` | 150ms | ⚪ 轻度 |
 | **Click 点击** | 缩放至 `scale(0.97)`，颜色加深 | 100ms | 🔵 明显 |
-| **Focus 聚焦** | 蓝色边框 + 淡蓝光晕 `--shadow-glow-blue` | 200ms | 🔵 明显 |
-| **Selected 选中** | 淡蓝背景 + 蓝边框 + 持续光晕脉冲 | 250ms | 🔵 明显 |
+| **Focus 聚焦** | Clay accent 边框 + 低透明 focus ring，避免蓝色 glow | 160ms | 🔵 明显 |
+| **Selected 选中** | Clay pink/coral/teal tint + 清晰边框，无持续蓝色光晕 | 160ms | 🔵 明显 |
 | **Loading 加载** | 骨架屏闪烁 `pulse` 或旋转图标 | 持续 | 🔵 明显 |
 | **Generating 生成** | 渐变流光 `shimmer` + 边框脉冲 | 持续 | 🔴 重要 |
 | **Number 数字变化** | 数字滚动 `countUp` | 400ms | 🔵 明显 |
@@ -1813,10 +1833,13 @@ Last updated: 2026-04-29
 
 ## 📋 变更日志
 
+### v3.1 (2026-05-01)
+- 将 UI 总纲切换为 Clay：`#fffaf0` 暖奶油画布、`#0a0a0a` 近黑文字、饱和 color block 和扁平卡片。
+- 明确 light / dark 是两套可读主题，暗色画布使用中性黑灰 `#0b0b0c` / `#141414` / `#1f1f1f`，不继承蓝色或青黑工作区背景。
+- 新增 Plain Black / Inter、Clay 色板、无重阴影、搜索面板移动/桌面分离和设置页响应式分离规则。
+
 ### v3.0 (2026-04-29)
-- 将 UI 总纲切换为 Airtable 风：亮色优先、`#181d26` 深海军蓝文字、`#1b61c9` 主交互色。
-- 明确受控磨砂玻璃只用于关键 shell、重要面板和高权重卡片，限制嵌套阴影。
-- 新增 radius、shadow、focus ring、selected state、输入背景、设置页权重和 motion 强制规则。
+- 旧蓝色/玻璃 UI 总纲已降级为历史参考，不再作为新 UI 决策来源。
 
 ### v2.9 (2026-04-03)
 - 新增 `.agent/rules/skills/vendor-routing/SKILL.md` 作为供应商路由专项规则文件

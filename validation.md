@@ -1,233 +1,59 @@
-# KK-Studio v1.4.2 Refactor Validation Matrix
+# KK-Studio v1.4.2 Clay UI Validation Matrix
 
-Last updated: 2026-04-30
+Last updated: 2026-05-01
 
 Use `npm.cmd` for npm scripts on Windows.
 
-## Baseline Gates
+## Active Clay UI Gate
 
-Documentation and agent-rule changes:
+Run the Clay UI contract suite for every UI-lane change:
 
 ```powershell
-npm.cmd run governance:agent-docs
-npm.cmd run check:encoding
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/clay-global-ui-refit-contract.test.ts" `
+  "tests/unit/clay-frosted-surface-contract.test.ts" `
+  "tests/unit/theme-contrast-contract.test.ts" `
+  "tests/unit/responsive-surface.test.ts" `
+  "tests/unit/theme-system-adaptation.test.ts" `
+  "tests/unit/settings-entry-surface-style-regression.test.ts"
 ```
 
-Code changes:
+Run the additional surface regressions when the touched area overlaps them:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/ecommerce-frosted-surface-contract.test.ts" `
+  "tests/unit/mobile-workspace-surface-contract.test.ts"
+```
+
+## Browser Requirement
+
+Browser QA is mandatory for Clay UI changes.
+
+Preferred flow:
+1. `npm.cmd run dev:restart`
+2. If Vite is unhealthy, run `npm.cmd run build` and serve `dist/` through a stable local static server.
+3. Open the app in the Codex in-app Browser and verify both desktop and mobile viewports.
+
+Required browser checks:
+- Light theme uses warm cream surfaces with readable dark text.
+- Dark theme uses neutral black/gray surfaces, not blue, teal, or indigo canvas.
+- Inputs, main cards, sub cards, and framework cards render as controlled frosted material with readable contrast and no heavy shadow.
+- SearchPalette, settings/API workbench, `.theme-transitioning === 0`, and no stale chunk text are all confirmed.
+- Record the URL, route or surface, viewport, theme, and any visual issues or pass result in `status.md`.
+
+## Release Gate
+
+Run these before sign-off:
 
 ```powershell
 npm.cmd run typecheck
 npm.cmd run test:unit
-npm.cmd run build
-npm.cmd run check:encoding
-```
-
-UI or visual changes:
-
-```powershell
-npm.cmd run build
-npm.cmd run dev
-```
-
-Then open the local app in the Codex in-app Browser and inspect the changed surface directly. For responsive UI work, check a desktop viewport and a mobile-sized viewport. Record the browser URL, viewport/surface checked, and any visual issues or pass result in `status.md` before committing.
-
-Full local gate when feasible:
-
-```powershell
-npm.cmd run verify:changes
-```
-
-## Milestone 0: Airtable-Inspired Global UI Refit
-
-Targeted UI contract tests:
-
-```powershell
-node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
-  "tests/unit/settings-ui-density-regression.test.ts" `
-  "tests/unit/api-settings-provider-compact-ui-contract.test.ts" `
-  "tests/unit/api-settings-simple-mode-contract.test.ts" `
-  "tests/unit/airtable-global-ui-refit-contract.test.ts"
-```
-
-Browser smoke checks:
-
-```powershell
-npm.cmd run verify:mobile-settings-smoke
-npm.cmd run verify:desktop-settings-smoke
-```
-
-Final gate:
-
-```powershell
-npm.cmd run typecheck
 npm.cmd run build
 npm.cmd run governance:agent-docs
 npm.cmd run check:encoding
 ```
 
-## Milestone 1: Refactor Ledger Alignment
+## Paused Lane
 
-Commands:
-
-```powershell
-npm.cmd run governance:agent-docs
-npm.cmd run check:encoding
-```
-
-Expected result:
-- Both commands exit 0.
-- If governance does not inspect root ledger files directly, the command still must pass.
-
-## Milestone 2: Connector Renderer Extraction Hardening
-
-Targeted tests:
-
-```powershell
-node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
-  "tests/unit/canvas-connector-throttling-contract.test.ts" `
-  "tests/unit/canvas-local-performance-trace-contract.test.ts" `
-  "tests/unit/canvas-live-scene-contract.test.ts"
-```
-
-Milestone gate:
-
-```powershell
-npm.cmd run typecheck
-npm.cmd run test:unit
-npm.cmd run build
-npm.cmd run check:encoding
-```
-
-## Milestone 3: Prompt Group Layout Runtime
-
-Targeted tests:
-
-```powershell
-node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
-  "tests/unit/prompt-group-regroup-behavior.test.ts" `
-  "tests/unit/canvas-live-scene-contract.test.ts" `
-  "tests/unit/canvas-connector-throttling-contract.test.ts"
-```
-
-Milestone gate:
-
-```powershell
-npm.cmd run typecheck
-npm.cmd run test:unit
-npm.cmd run build
-npm.cmd run check:encoding
-```
-
-## Milestone 4: Generation Runtime
-
-Targeted tests:
-
-```powershell
-node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
-  "tests/unit/generation-runtime-contract.test.ts" `
-  "tests/unit/billing-remaining-balance-contract.test.ts"
-```
-
-If a listed test does not exist yet, create focused contract coverage before moving production logic.
-
-Milestone gate:
-
-```powershell
-npm.cmd run typecheck
-npm.cmd run test:unit
-npm.cmd run build
-npm.cmd run check:encoding
-```
-
-## Milestone 5: PPT Runtime
-
-Targeted tests:
-
-```powershell
-node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
-  "tests/unit/ppt-deck-module-contract.test.ts" `
-  "tests/unit/pptx-export-contract.test.ts"
-```
-
-If a listed test does not exist yet, create focused contract coverage before moving production logic.
-
-Milestone gate:
-
-```powershell
-npm.cmd run typecheck
-npm.cmd run test:unit
-npm.cmd run build
-npm.cmd run check:encoding
-```
-
-## Milestone 6: Ecommerce Runtime
-
-Targeted tests:
-
-```powershell
-node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
-  "tests/unit/ecommerce-framework-contract.test.ts" `
-  "tests/unit/ecommerce-import-review-contract.test.ts"
-```
-
-If a listed test does not exist yet, create focused contract coverage before moving production logic.
-
-Milestone gate:
-
-```powershell
-npm.cmd run typecheck
-npm.cmd run test:unit
-npm.cmd run build
-npm.cmd run check:encoding
-```
-
-## Milestone 7: CanvasContext and keyManager Split
-
-Targeted tests:
-
-```powershell
-npm.cmd run typecheck
-npm.cmd run test:unit
-```
-
-Add focused tests around the public API being split before moving implementation code.
-
-Milestone gate:
-
-```powershell
-npm.cmd run build
-npm.cmd run check:encoding
-```
-
-## Milestone 8: Global Quality Governance
-
-Commands:
-
-```powershell
-npm.cmd run typecheck
-npm.cmd run test:unit
-npm.cmd run build
-npm.cmd run check:encoding
-```
-
-Add narrower targeted tests when a cleanup touches a behavior boundary.
-
-## Milestone 9: apps/web Migration
-
-Commands:
-
-```powershell
-npm.cmd run architecture:check
-npm.cmd run typecheck
-npm.cmd run test:unit
-npm.cmd run build
-npm.cmd run check:encoding
-```
-
-Run any available smoke tests for moved UI surfaces before committing a migration batch.
-
-## Failure Policy
-
-- New failures introduced by the current milestone must be fixed before commit.
-- Historical failures may be recorded only with command output and a narrow risk note.
-- Do not continue to the next milestone while a new failure remains open.
+The runtime/PPT lane is paused and excluded from the Clay UI matrix. Do not mix its tests or files into the UI validation path.

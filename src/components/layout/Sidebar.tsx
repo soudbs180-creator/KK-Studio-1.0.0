@@ -18,6 +18,14 @@ interface SidebarProps {
     onOpenBilling: () => void;
 }
 
+const frostedSidebarSubSurfaceStyle: React.CSSProperties = {
+    background: 'var(--frost-card-sub-bg)',
+    border: '1px solid var(--frost-card-sub-border)',
+    boxShadow: 'var(--frost-card-sub-shadow)',
+    WebkitBackdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
+    backdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
+};
+
 const Sidebar: React.FC<SidebarProps> = ({
     isOpen,
     onClose,
@@ -48,26 +56,28 @@ const Sidebar: React.FC<SidebarProps> = ({
             {/* Overlay for mobile */}
             {isOpen && (
                 <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity"
+                    className="fixed inset-0 z-40 md:hidden transition-opacity"
+                    style={{ background: 'var(--search-palette-overlay-bg)' }}
                     onClick={onClose}
                 />
             )}
 
-            {/* Sidebar - VisionOS Floating Panel */}
+            {/* Sidebar - Clay frosted framework panel */}
             <aside
                 id="sidebar-container"
+                data-theme-surface={isLightMode ? 'light-frosted' : 'dark-frosted'}
                 className={`sidebar fixed z-50 transition-all duration-300 md:translate-x-0 hidden md:flex flex-col ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
                 style={{
                     top: '16px',
                     left: '16px',
                     height: 'calc(100vh - 32px)',
                     width: '260px',
-                    backgroundColor: isLightMode ? 'rgba(255, 255, 255, 0.98)' : 'var(--toolbar-bg-dark)',
-                    backdropFilter: 'blur(40px) saturate(180%)',
-                    WebkitBackdropFilter: 'blur(40px) saturate(180%)',
-                    border: isLightMode ? '2px solid rgba(0, 0, 0, 0.15)' : '1px solid rgba(255, 255, 255, 0.05)',
+                    background: 'var(--frost-card-framework-bg)',
+                    backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+                    WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+                    border: '1px solid var(--frost-card-framework-border)',
                     borderRadius: '24px',
-                    boxShadow: isLightMode ? '0 8px 32px rgba(0, 0, 0, 0.15)' : 'var(--shadow-xl)'
+                    boxShadow: 'var(--frost-card-framework-shadow)'
                 }}
             >
                 {/* Header */}
@@ -131,7 +141,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                             </svg>
                             <span className="font-medium text-sm">历史记录</span>
                             {generatedCount > 0 && (
-                                <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: 'var(--accent-indigo)', color: 'white' }}>
+                                <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: 'var(--accent-color)', color: 'var(--text-inverse)' }}>
                                     {generatedCount}
                                 </span>
                             )}
@@ -144,7 +154,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                             <div className="px-3 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-tertiary)' }}>
                                 最近生成
                             </div>
-                            <div className="px-3 py-12 text-center flex flex-col items-center justify-center rounded-2xl" style={{ backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-muted)' }}>
+                            <div className="px-3 py-12 text-center flex flex-col items-center justify-center rounded-2xl" style={{ ...frostedSidebarSubSurfaceStyle, color: 'var(--text-muted)' }}>
                                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mb-3 opacity-50">
                                     <path d="M12 8v4l3 3" />
                                     <circle cx="12" cy="12" r="9" />
@@ -158,7 +168,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {/* Footer */}
                 <div className="sidebar-footer pt-4 mt-2">
                     {/* UI Mode */}
-                    <div className="p-3 rounded-xl mb-3" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                    <div className="p-3 rounded-xl mb-3" style={frostedSidebarSubSurfaceStyle}>
                         <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-tertiary)' }}>
                             画面 UI 模式
                         </p>
@@ -203,13 +213,16 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </div>
 
                     {/* User Section */}
-                    <div className="p-2 rounded-xl mb-2 transition-colors" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                    <div className="p-2 rounded-xl mb-2 transition-colors" style={frostedSidebarSubSurfaceStyle}>
                         <div className="flex items-center gap-3 mb-3 p-1">
                             <div className="sidebar-avatar relative shrink-0 overflow-hidden cursor-pointer hover:scale-105 transition-transform" onClick={onOpenProfile} role="button">
                                 {avatarUrl ? (
                                     <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold">
+                                    <div
+                                        className="w-full h-full flex items-center justify-center text-white font-bold"
+                                        style={{ background: 'linear-gradient(135deg, var(--clay-brand-coral), var(--clay-brand-pink))' }}
+                                    >
                                         {user?.email?.[0].toUpperCase() || 'K'}
                                     </div>
                                 )}
@@ -230,12 +243,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                             onClick={(e) => { e.currentTarget.blur(); onOpenBilling(); }}
                             className="w-full flex items-center justify-between p-3 rounded-lg transition-all active:scale-95 group"
                             style={{
-                                backgroundColor: 'var(--bg-secondary)',
+                                backgroundColor: 'var(--frost-card-sub-bg)',
                                 color: 'var(--text-primary)',
+                                border: '1px solid var(--frost-card-sub-border)',
                                 borderRadius: 'var(--radius-md)'
                             }}
-                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-hover)')}
-                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-secondary)')}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--toolbar-hover)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--frost-card-sub-bg)')}
                         >
                             <span className="flex items-center gap-3 text-sm font-medium">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500">

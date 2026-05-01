@@ -69,6 +69,20 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     } = useCanvas();
     const { resolvedTheme, toggleTheme } = useTheme();
     const isDarkMode = resolvedTheme === 'dark';
+    const frostedProjectManagerShellStyle: React.CSSProperties = {
+        background: 'var(--frost-card-framework-bg)',
+        border: '1px solid var(--frost-card-framework-border)',
+        boxShadow: 'var(--frost-card-framework-shadow)',
+        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+    };
+    const frostedProjectManagerSubSurfaceStyle: React.CSSProperties = {
+        background: 'var(--frost-card-sub-bg)',
+        border: '1px solid var(--frost-card-sub-border)',
+        boxShadow: 'var(--frost-card-sub-shadow)',
+        WebkitBackdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
+        backdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
+    };
 
     const [showDropdown, setShowDropdown] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
@@ -357,8 +371,8 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                 }}
             />
             <div
-                className={`absolute ${isMobile ? '' : 'left-full top-0 ml-3 w-64'} glass-strong z-50 overflow-hidden rounded-2xl border border-white/5 shadow-2xl`}
-                style={dropdownPositionStyle}
+                className={`absolute ${isMobile ? '' : 'left-full top-0 ml-3 w-64'} z-50 overflow-hidden rounded-2xl border`}
+                style={{ ...frostedProjectManagerShellStyle, ...dropdownPositionStyle }}
             >
                 <div
                     className="flex items-center justify-between border-b px-4 py-3"
@@ -382,7 +396,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                 className="flex items-center gap-2 px-3 py-2.5 transition-colors"
                                 style={{
                                     backgroundColor: isActive ? 'var(--toolbar-active)' : 'transparent',
-                                    color: isActive ? 'var(--accent-indigo)' : 'var(--text-secondary)',
+                                    color: isActive ? 'var(--accent-coral)' : 'var(--text-secondary)',
                                 }}
                                 onClick={(event) => {
                                     event.stopPropagation();
@@ -412,8 +426,9 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                         onBlur={saveEdit}
                                         className="flex-1 rounded-md border px-2 py-1 text-sm focus:outline-none"
                                         style={{
-                                            backgroundColor: 'rgba(15, 23, 42, 0.46)',
-                                            borderColor: 'var(--accent-blue)',
+                                            backgroundColor: 'var(--frost-input-bg)',
+                                            borderColor: 'var(--frost-input-border)',
+                                            boxShadow: 'var(--frost-input-shadow)',
                                             color: 'var(--text-primary)',
                                         }}
                                         autoFocus
@@ -467,7 +482,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                             handleCreateProject();
                         }}
                         className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${canCreateCanvas ? 'hover:bg-[var(--toolbar-hover)]' : 'cursor-not-allowed opacity-60'}`}
-                        style={{ color: canCreateCanvas ? 'var(--accent-indigo)' : 'var(--text-secondary)' }}
+                        style={{ color: canCreateCanvas ? 'var(--accent-coral)' : 'var(--text-secondary)' }}
                     >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <line x1="12" y1="5" x2="12" y2="19" />
@@ -544,7 +559,8 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                 onClick={() => setShowDeleteConfirm(null)}
             >
                 <div
-                    className="glass-strong mx-4 w-[90%] max-w-sm rounded-2xl border border-white/10 p-6 shadow-2xl"
+                    className="mx-4 w-[90%] max-w-sm rounded-2xl border p-6"
+                    style={frostedProjectManagerShellStyle}
                     onClick={(event) => event.stopPropagation()}
                 >
                     <div className="mb-5 flex items-center gap-4">
@@ -580,7 +596,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                 setShowDeleteConfirm(null);
                                 setShowDropdown(false);
                             }}
-                            className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-red-500/20 transition-all hover:bg-red-600 active:scale-95"
+                            className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white shadow-none transition-all hover:bg-red-600 active:scale-95"
                         >
                             删除
                         </button>
@@ -599,7 +615,8 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                 onClick={() => !mergingCanvasId && setShowMergeModal(false)}
             >
                 <div
-                    className="glass-strong mx-4 w-[92%] max-w-lg rounded-2xl border border-white/10 p-5 shadow-2xl"
+                    className="mx-4 w-[92%] max-w-lg rounded-2xl border p-5"
+                    style={frostedProjectManagerShellStyle}
                     onClick={(event) => event.stopPropagation()}
                 >
                     <div className="flex items-start justify-between gap-3">
@@ -637,7 +654,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                             {canvas.promptNodes.length} 个主卡，{canvas.imageNodes.length} 个子卡
                                         </div>
                                     </div>
-                                    <div className="text-xs text-sky-500">
+                                    <div className="text-xs text-[var(--accent-coral)]">
                                         {mergingCanvasId === canvas.id ? '合并中...' : '合并'}
                                     </div>
                                 </button>
@@ -713,11 +730,11 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                 <div
                     className={`flex cursor-grab flex-col items-center gap-2 rounded-2xl p-1.5 transition-all duration-300 active:cursor-grabbing ${isDragging ? 'scale-[0.98]' : ''}`}
                     style={{
-                        background: isDarkMode ? '#27272a' : 'var(--floating-shell-bg)',
-                        border: isDarkMode ? '1px solid rgba(255,255,255,0.05)' : '1px solid var(--floating-shell-border)',
-                        boxShadow: isDarkMode
-                            ? '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)'
-                            : 'var(--floating-shell-shadow)',
+                        background: 'var(--frost-card-framework-bg)',
+                        border: '1px solid var(--frost-card-framework-border)',
+                        boxShadow: 'var(--frost-card-framework-shadow)',
+                        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+                        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
                     }}
                     onMouseDown={handleDragStart}
                     onTouchStart={handleDragStart}
@@ -733,12 +750,12 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                 event.stopPropagation();
                                 setShowDropdown((prev) => !prev);
                             }}
-                            className={`${desktopIconButtonClass} ${showDropdown ? 'bg-[var(--toolbar-hover)] text-[var(--accent-indigo)]' : ''}`}
+                            className={`${desktopIconButtonClass} ${showDropdown ? 'bg-[var(--toolbar-hover)] text-[var(--accent-coral)]' : ''}`}
                             title={activeProjectName}
                             tabIndex={-1}
                         >
                             <Layers size={20} />
-                            <div className={`absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-indigo-500 border ${isDarkMode ? 'border-[#27272a]' : 'border-white'}`} />
+                            <div className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-[var(--accent-coral)] border border-[var(--frost-card-framework-border)]" />
                         </button>
                         {projectDropdown}
                     </div>
@@ -755,7 +772,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         <Search size={20} />
                     </button>
 
-                    <div className="my-1 h-px w-full" style={{ backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'var(--floating-shell-border)' }} />
+                    <div className="my-1 h-px w-full" style={{ backgroundColor: 'var(--frost-card-framework-border)' }} />
 
                     <button
                         onClick={(event) => {
@@ -805,7 +822,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         <LayoutDashboard size={20} />
                     </button>
 
-                    <div className="my-1 h-px w-full" style={{ backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'var(--floating-shell-border)' }} />
+                    <div className="my-1 h-px w-full" style={{ backgroundColor: 'var(--frost-card-framework-border)' }} />
 
                     <button
                         onClick={(event) => {

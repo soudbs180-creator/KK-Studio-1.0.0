@@ -929,7 +929,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             {/* Canvas Container */}
             <div
                 ref={containerRef}
-                className={`canvas-container outline-none focus:outline-none gpu-accelerated ${isDragging ? 'is-dragging' : ''} ${isZooming ? 'is-zooming' : ''} ${isImageDragOver ? 'ring-4 ring-indigo-500' : ''}`}
+                className={`canvas-container outline-none focus:outline-none gpu-accelerated ${isDragging ? 'is-dragging' : ''} ${isZooming ? 'is-zooming' : ''} ${isImageDragOver ? 'ring-4 ring-[color:var(--clay-brand-pink)]' : ''}`}
                 tabIndex={-1}
                 onMouseDownCapture={handleMouseDownCapture}
                 onMouseDown={handleMouseDown}

@@ -32,7 +32,7 @@ interface MobileResultDetailScreenProps {
 }
 
 const iconButtonClass =
-  'inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)]/90 disabled:opacity-40';
+  'inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/90 disabled:opacity-40';
 
 const resolveReferenceImageSource = (
   referenceImage: MobileResultEntry['referenceImages'][number],
@@ -97,7 +97,7 @@ const ActionButton: React.FC<{
       ? 'border-red-400/30 bg-red-500/10 text-red-300'
       : tone === 'primary'
         ? 'border-white/10 bg-white/6 text-[var(--text-primary)]'
-        : 'border-[var(--border-light)] bg-[var(--bg-secondary)] text-[var(--text-primary)]';
+        : 'border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] text-[var(--text-primary)]';
 
   return (
     <button
@@ -117,7 +117,7 @@ const stageToneClassMap: Record<
   string
 > = {
   amber: 'border-amber-400/30 bg-amber-500/10 text-amber-200',
-  blue: 'border-blue-400/30 bg-blue-500/10 text-blue-200',
+  blue: 'border-[var(--mobile-clay-stage-info-border)] bg-[var(--mobile-clay-stage-info-bg)] text-[var(--mobile-clay-stage-info-text)]',
   emerald: 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200',
   rose: 'border-rose-400/30 bg-rose-500/10 text-rose-200',
 };
@@ -230,7 +230,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
       </div>
 
       <div className="relative flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+136px)]">
-        <div className="relative overflow-hidden rounded-[24px] border border-[var(--border-light)] bg-[var(--bg-secondary)]">
+        <div className="relative overflow-hidden rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]">
           {entry.displaySrc ? (
             <img src={entry.displaySrc} alt={promptSummary} className="h-auto w-full object-cover" />
           ) : (
@@ -248,7 +248,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
           {metadataItems.map((item) => (
             <div
               key={`${item.label}-${item.value}`}
-              className="shrink-0 rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)]/75 px-3 py-1.5 text-xs text-[var(--text-secondary)]"
+              className="shrink-0 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/75 px-3 py-1.5 text-xs text-[var(--text-secondary)]"
             >
               {item.label}：<span className="font-medium text-[var(--text-primary)]">{item.value}</span>
             </div>
@@ -258,7 +258,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
         {ecommerceContinuation ? (
           <div
             data-testid="mobile-ecommerce-continuation-panel"
-            className="mt-3 rounded-[22px] border border-[var(--border-light)] bg-[var(--bg-secondary)]/85 p-3.5"
+            className="mt-3 rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3.5"
           >
             <div data-testid="mobile-ecommerce-stage-card" className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
@@ -284,7 +284,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
             </div>
 
             {frameworkStatus ? (
-              <div className="mt-3 rounded-[18px] border border-[var(--border-light)] bg-[var(--bg-tertiary)]/45 p-3">
+              <div className="mt-3 rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]/45 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
@@ -328,7 +328,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
               </div>
             ) : null}
 
-            <div className="mt-3 rounded-[18px] border border-[var(--border-light)] bg-[var(--bg-tertiary)]/45 p-3">
+            <div className="mt-3 rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]/45 p-3">
               <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
                 当前需求
               </div>
@@ -337,7 +337,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
               </div>
             </div>
 
-            <div className="mt-3 rounded-[18px] border border-[var(--border-light)] bg-[var(--bg-tertiary)]/45 p-3">
+            <div className="mt-3 rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]/45 p-3">
               <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
                 素材角色
               </div>
@@ -346,7 +346,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
                   {ecommerceContinuation.assetRoles.map((assetRole) => (
                     <span
                       key={`${assetRole.assetId}-${assetRole.role}`}
-                      className="rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)]/85 px-2.5 py-1 text-[11px] text-[var(--text-secondary)]"
+                      className="rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 px-2.5 py-1 text-[11px] text-[var(--text-secondary)]"
                     >
                       {resolveAssetRoleLabel(assetRole)}
                     </span>
@@ -365,12 +365,12 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
           </div>
         ) : null}
 
-        <div className="mt-3 rounded-[22px] border border-[var(--border-light)] bg-[var(--bg-secondary)]/85 p-3.5">
+        <div className="mt-3 rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3.5">
           <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">提示词</div>
           <div className="mt-2 whitespace-pre-wrap text-sm leading-6">{fullPrompt}</div>
         </div>
 
-        <div className="mt-3 rounded-[22px] border border-[var(--border-light)] bg-[var(--bg-secondary)]/85 p-3.5">
+        <div className="mt-3 rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3.5">
           <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
             参考图 ({entry.referenceImages.length})
           </div>
@@ -381,7 +381,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
                 return (
                   <div
                     key={referenceImage.id}
-                    className="h-16 w-16 shrink-0 overflow-hidden rounded-[16px] border border-[var(--border-light)] bg-[var(--bg-tertiary)]"
+                    className="h-16 w-16 shrink-0 overflow-hidden rounded-[16px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]"
                   >
                     {src ? (
                       <img src={src} alt="Reference" className="h-full w-full object-cover" />
@@ -400,7 +400,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
         </div>
       </div>
 
-      <div className="sticky bottom-0 border-t border-[var(--border-light)] bg-[var(--bg-overlay)]/95 px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 backdrop-blur-xl">
+      <div className="sticky bottom-0 border-t border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-bottom-bar-bg)] px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_48px] gap-2">
           <ActionButton
             label="继续创作"
@@ -417,7 +417,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
           <button
             type="button"
             onClick={() => setShowSecondaryActions((next) => !next)}
-            className="inline-flex min-h-[44px] items-center justify-center rounded-[16px] border border-[var(--border-light)] bg-[var(--bg-secondary)] text-[var(--text-primary)] transition active:scale-[0.99]"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-[16px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] text-[var(--text-primary)] transition active:scale-[0.99]"
             aria-label="更多操作"
             aria-expanded={showSecondaryActions}
           >

@@ -1,28 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info, Copy, Check } from 'lucide-react';
 import { notificationService, Notification, NotificationType } from '../../services/system/notificationService';
 import { writeTextToClipboard } from '../../utils/clipboard';
 import { useLocale } from '../../context/LocaleContext';
-import { useTheme } from '../../context/ThemeContext';
 
 const NotificationToast: React.FC = () => {
     const { pick } = useLocale();
-    const { isDarkMode } = useTheme();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
 
     useEffect(() => {
-        // Initial load
         setNotifications(notificationService.getAll());
-
-        // Subscribe to changes
-        const unsubscribe = notificationService.subscribe(setNotifications);
-        return unsubscribe;
+        return notificationService.subscribe(setNotifications);
     }, []);
 
     const handleCopyDetails = async (notification: Notification) => {
-        const text = `[${notification.type.toUpperCase()}] ${notification.title}\n${notification.message}${notification.details ? `\n\n${pick('详情', 'Details')}: ` + notification.details : ''}`;
+        const text = `[${notification.type.toUpperCase()}] ${notification.title}\n${notification.message}${notification.details ? `\n\n${pick('详情', 'Details')}: ${notification.details}` : ''}`;
         try {
             await writeTextToClipboard(text);
             setCopiedId(notification.id);
@@ -48,114 +42,82 @@ const NotificationToast: React.FC = () => {
 
     const getIconColor = (type: NotificationType): string => {
         switch (type) {
-            case 'success': return 'var(--accent-green)';
-            case 'error': return 'var(--accent-red)';
-            case 'warning': return 'var(--accent-gold)';
-            case 'info': return 'var(--accent-blue)';
-            case 'alipay': return '#3b82f6'; // 支付宝蓝
-            case 'wechat': return '#22c55e'; // 微信绿
-            case 'paypal': return '#f59e0b'; // 国际金/琥珀色
+            case 'success': return 'var(--clay-brand-mint)';
+            case 'error': return 'var(--clay-brand-coral)';
+            case 'warning': return 'var(--clay-brand-ochre)';
+            case 'info': return 'var(--clay-brand-pink)';
+            case 'alipay': return 'var(--clay-brand-lavender)';
+            case 'wechat': return 'var(--clay-brand-teal)';
+            case 'paypal': return 'var(--clay-brand-peach)';
         }
     };
 
     const getStyles = (type: NotificationType) => {
         switch (type) {
-            case 'success': return { borderColor: 'rgba(34, 197, 94, 0.3)', backgroundColor: 'rgba(34, 197, 94, 0.1)' };
-            case 'error': return { borderColor: 'rgba(220, 38, 38, 0.3)', backgroundColor: 'rgba(220, 38, 38, 0.1)' };
-            case 'warning': return { borderColor: 'rgba(217, 119, 6, 0.3)', backgroundColor: 'rgba(217, 119, 6, 0.1)' };
-            case 'info': return { borderColor: 'rgba(37, 99, 235, 0.3)', backgroundColor: 'rgba(37, 99, 235, 0.1)' };
-            case 'alipay': return { borderColor: 'rgba(59, 130, 246, 0.4)', backgroundColor: 'rgba(59, 130, 246, 0.12)' }; // 支付宝蓝
-            case 'wechat': return { borderColor: 'rgba(34, 197, 94, 0.4)', backgroundColor: 'rgba(34, 197, 94, 0.12)' }; // 微信绿
-            case 'paypal': return { borderColor: 'rgba(245, 158, 11, 0.4)', backgroundColor: 'rgba(245, 158, 11, 0.12)' }; // 国际金/琥珀色
+            case 'success': return { borderColor: 'color-mix(in srgb, var(--clay-brand-mint) 32%, var(--frost-card-framework-border))', backgroundColor: 'color-mix(in srgb, var(--clay-brand-mint) 12%, var(--frost-card-framework-bg))' };
+            case 'error': return { borderColor: 'color-mix(in srgb, var(--clay-brand-coral) 32%, var(--frost-card-framework-border))', backgroundColor: 'color-mix(in srgb, var(--clay-brand-coral) 12%, var(--frost-card-framework-bg))' };
+            case 'warning': return { borderColor: 'color-mix(in srgb, var(--clay-brand-ochre) 32%, var(--frost-card-framework-border))', backgroundColor: 'color-mix(in srgb, var(--clay-brand-ochre) 12%, var(--frost-card-framework-bg))' };
+            case 'info': return { borderColor: 'color-mix(in srgb, var(--clay-brand-pink) 32%, var(--frost-card-framework-border))', backgroundColor: 'color-mix(in srgb, var(--clay-brand-pink) 12%, var(--frost-card-framework-bg))' };
+            case 'alipay': return { borderColor: 'color-mix(in srgb, var(--clay-brand-lavender) 32%, var(--frost-card-framework-border))', backgroundColor: 'color-mix(in srgb, var(--clay-brand-lavender) 12%, var(--frost-card-framework-bg))' };
+            case 'wechat': return { borderColor: 'color-mix(in srgb, var(--clay-brand-teal) 32%, var(--frost-card-framework-border))', backgroundColor: 'color-mix(in srgb, var(--clay-brand-teal) 12%, var(--frost-card-framework-bg))' };
+            case 'paypal': return { borderColor: 'color-mix(in srgb, var(--clay-brand-peach) 32%, var(--frost-card-framework-border))', backgroundColor: 'color-mix(in srgb, var(--clay-brand-peach) 12%, var(--frost-card-framework-bg))' };
         }
     };
 
     const sortedNotifications = [...notifications].sort((a, b) => {
-        const score = (t: string) => t === 'error' ? 3 : t === 'warning' ? 2 : 1;
+        const score = (t: string) => (t === 'error' ? 3 : t === 'warning' ? 2 : 1);
         return score(a.type) - score(b.type) || a.timestamp - b.timestamp;
     });
 
     return (
         <>
-            {/* 统一通知消息 - 左下角（滑块上方） */}
             {sortedNotifications.length > 0 && (
-                <div
-                    className="fixed z-[99999] flex gap-3 pointer-events-none w-full max-w-[400px]
-                    /* Mobile: Top Centered / Full Width */
-                    top-[max(16px,env(safe-area-inset-top))] left-4 right-4 bottom-auto flex-col
-                    /* Desktop: Bottom Left, Above Slider (留出180px给滑块+版本号) */
-                    md:top-auto md:bottom-20 md:left-4 md:right-auto md:flex-col-reverse"
-                >
-                    <div
-                        className="flex gap-3 flex-col md:flex-col-reverse pointer-events-auto"
-                        onMouseEnter={() => setIsExpanded(true)}
-                        onMouseLeave={() => setIsExpanded(false)}
-                    >
+                <div className="fixed z-[99999] flex w-full max-w-[400px] flex-col gap-3 pointer-events-none top-[max(16px,env(safe-area-inset-top))] left-4 right-4 bottom-auto md:top-auto md:bottom-20 md:left-4 md:right-auto md:flex-col-reverse">
+                    <div className="flex flex-col gap-3 pointer-events-auto md:flex-col-reverse" onMouseEnter={() => setIsExpanded(true)} onMouseLeave={() => setIsExpanded(false)}>
                         {sortedNotifications.map((notification, index) => {
                             const isTop = index === sortedNotifications.length - 1;
                             const isCollapsed = !isExpanded && !isTop;
-
-                            // Inline styles to guarantee contrast regardless of CSS conflicts
-                            const textColor = isDarkMode ? '#FFFFFF' : '#000000';
-                            const secondaryColor = isDarkMode ? '#d4d4d8' : '#3f3f46';
-                            const mutedColor = isDarkMode ? '#a1a1aa' : '#52525b';
-
                             const styles = getStyles(notification.type);
+
                             return (
                                 <div
                                     key={notification.id}
-                                    className={`backdrop-blur-xl border shadow-xl 
-                                        animate-slide-in-right
-                                        transition-all ease-out
-                                        ${isCollapsed ? '-mb-20 scale-[0.95] opacity-85 pointer-events-none' : 'mb-2 scale-100 opacity-100'}
-                                        ${isTop && !isExpanded ? '!mb-0 !opacity-100 !scale-100 pointer-events-auto' : ''}
-                                        hover:!scale-[1.02] brightness-100
-                                    `}
+                                    className={`animate-slide-in-right overflow-hidden transition-all ease-out ${isCollapsed ? '-mb-20 scale-[0.95] opacity-85 pointer-events-none' : 'mb-2 scale-100 opacity-100'} ${isTop && !isExpanded ? '!mb-0 !opacity-100 !scale-100 pointer-events-auto' : ''} hover:!scale-[1.02]`}
                                     style={{
-                                        borderRadius: 'var(--radius-md)', // 8px
+                                        borderRadius: 'var(--radius-md)',
+                                        borderWidth: '1px',
                                         borderColor: styles.borderColor,
                                         backgroundColor: styles.backgroundColor,
-                                        boxShadow: 'var(--shadow-xl)',
+                                        boxShadow: 'var(--frost-card-framework-shadow)',
+                                        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+                                        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
                                         transitionDuration: 'var(--duration-normal)'
                                     }}
                                 >
-                                    <div className="flex items-start p-4 gap-3 bg-gradient-to-b from-white/5 to-transparent">
-                                        <div className={`shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-white/10 mt-0.5 shadow-inner`}>
+                                    <div className="flex items-start gap-3 p-4">
+                                        <div className="shrink-0 mt-0.5 flex h-8 w-8 items-center justify-center rounded-full border" style={{ background: 'var(--frost-card-sub-bg)', borderColor: 'var(--frost-card-sub-border)' }}>
                                             {getIcon(notification.type)}
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div
-                                                className="font-bold text-sm leading-snug tracking-wide"
-                                                style={{ color: textColor }}
-                                            >
+                                        <div className="min-w-0 flex-1">
+                                            <div className="text-sm font-bold leading-snug tracking-wide" style={{ color: 'var(--text-primary)' }}>
                                                 {notification.title}
                                             </div>
-                                            <div
-                                                className="text-xs mt-1.5 leading-relaxed break-words font-medium opacity-90"
-                                                style={{ color: secondaryColor }}
-                                            >
+                                            <div className="mt-1.5 text-xs font-medium leading-relaxed break-words opacity-90" style={{ color: 'var(--text-secondary)' }}>
                                                 {notification.message}
                                             </div>
                                             {notification.details && (
-                                                <div
-                                                    className="mt-2 text-[10px] font-mono bg-black/5 dark:bg-black/40 rounded p-2 overflow-hidden line-clamp-3 border border-black/5 dark:border-white/5"
-                                                    style={{ color: mutedColor }}
-                                                >
+                                                <div className="mt-2 overflow-hidden rounded border p-2 text-[10px] font-mono line-clamp-3" style={{ color: 'var(--text-tertiary)', background: 'var(--frost-card-sub-bg)', borderColor: 'var(--frost-card-sub-border)' }}>
                                                     {notification.details}
                                                 </div>
                                             )}
                                         </div>
 
-                                        <div className="flex flex-col gap-1 shrink-0">
+                                        <div className="flex shrink-0 flex-col gap-1">
                                             <button
                                                 onClick={() => notificationService.dismiss(notification.id)}
                                                 className="p-1.5 transition-all active:scale-95"
-                                                style={{
-                                                    color: mutedColor,
-                                                    borderRadius: 'var(--radius-sm)',
-                                                    transitionDuration: 'var(--duration-fast)'
-                                                }}
-                                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-hover)')}
+                                                style={{ color: 'var(--text-tertiary)', borderRadius: 'var(--radius-sm)', transitionDuration: 'var(--duration-fast)' }}
+                                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--frost-card-sub-bg)')}
                                                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                             >
                                                 <X size={14} />
@@ -164,19 +126,12 @@ const NotificationToast: React.FC = () => {
                                                 <button
                                                     onClick={() => handleCopyDetails(notification)}
                                                     className="p-1.5 transition-all active:scale-95"
-                                                    style={{
-                                                        color: mutedColor,
-                                                        borderRadius: 'var(--radius-sm)',
-                                                        transitionDuration: 'var(--duration-fast)'
-                                                    }}
+                                                    style={{ color: 'var(--text-tertiary)', borderRadius: 'var(--radius-sm)', transitionDuration: 'var(--duration-fast)' }}
                                                     title={pick('复制详细信息', 'Copy details')}
-                                                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-hover)')}
+                                                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--frost-card-sub-bg)')}
                                                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                                 >
-                                                    {copiedId === notification.id ?
-                                                        <Check size={14} style={{ color: 'var(--accent-green)' }} /> :
-                                                        <Copy size={14} />
-                                                    }
+                                                    {copiedId === notification.id ? <Check size={14} style={{ color: 'var(--clay-brand-mint)' }} /> : <Copy size={14} />}
                                                 </button>
                                             )}
                                         </div>

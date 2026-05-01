@@ -51,12 +51,15 @@ describe('credit route classification', () => {
 
     assert.match(generationRuntimeSource, /import \{ resolveGenerationBillingState \} from '\.\/resolveGenerationBillingState';/);
     assert.match(generationRuntimeSource, /const generationBillingState = resolveGenerationBillingState\(/);
-    assert.match(appSource, /const billingStateContext = prepareGenerationBillingStateContext\(\{/);
+    assert.match(generationRuntimeSource, /const billingStateContext = prepareGenerationBillingStateContext\(\{/);
+    assert.match(appSource, /const initialSubmissionContext = await prepareInitialGenerationSubmissionContext\(\{/);
     assert.match(resolveBillingStateSource, /import \{ type ModelExecutionLane, resolveModelExecutionLane \} from '\.\.\/services\/model\/modelExecutionLane';/);
     assert.match(resolveBillingStateSource, /const executionLane = resolveModelExecutionLane\(/);
-    assert.match(appSource, /executionLane,/);
+    assert.match(generationRuntimeSource, /executionLane: initialSubmissionContext\.executionLane,/);
     assert.match(generationRuntimeSource, /executionLane: params\.generationBillingState\.executionLane,/);
-    assert.match(appSource, /const executionLane = billingAttemptContext\.executionLane;/);
+    assert.match(generationRuntimeSource, /executionLane: billingAttemptContext\.executionLane,/);
+    assert.match(generationRuntimeSource, /executionLane: initialSubmissionContext\.executionLane,/);
+    assert.doesNotMatch(appSource, /const executionLane = initialSubmissionContext\.executionLane;/);
     assert.match(generationRuntimeSource, /creditRouteSpecId: params\.resolvedCreditSpecId,/);
     assert.match(generationRuntimeSource, /creditRouteUnitId: params\.resolvedCreditRoute\?\.routeUnitId,/);
     assert.match(geminiServiceSource, /executionLane: options\?\.executionLane,/);
