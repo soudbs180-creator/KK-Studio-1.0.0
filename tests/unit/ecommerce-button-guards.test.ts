@@ -16,11 +16,11 @@ test('ecommerce workbench only shows current-version preview when a slot has a c
 });
 
 test('ecommerce batch generation warns instead of silently no-oping when no eligible cards remain', () => {
-  const appSource = readSource('src/App.tsx');
+  const runtimeSource = readSource('src/app/useEcommerceRuntime.ts');
 
-  assert.match(appSource, /const queuedCount = enqueueEcommerceFrameworkNodes\(node\.id, targetNodes\);/);
-  assert.match(appSource, /if \(queuedCount === 0\) \{/);
-  assert.match(appSource, /notify\.warning\('No eligible cards', 'There are no ecommerce cards ready to enqueue\.'\);/);
+  assert.match(runtimeSource, /const queuedCount = enqueueEcommerceFrameworkNodes\(node\.id, targetNodes\);/);
+  assert.match(runtimeSource, /if \(queuedCount === 0\) \{/);
+  assert.match(runtimeSource, /notify\.warning\('No eligible cards', 'There are no ecommerce cards ready to enqueue\.'\);/);
 });
 
 test('ecommerce card selection button labels describe the next action instead of the current state', () => {

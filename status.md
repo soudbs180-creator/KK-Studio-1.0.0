@@ -4,21 +4,30 @@ Last updated: 2026-05-01
 
 ## Active State
 
-- Active lane in this thread: Stage One runtime/PPT follow-up.
+- Active lane in this thread: Stage One M6 ecommerce runtime extraction.
 - Parallel UI lane: `codex://threads/019de168-0c09-7a03-8e64-124f722fa2fc` owns Clay UI audit, browser evidence, and UI-only commits.
 - Current branch: `main`.
 - Original `.git` remains blocked by deny ACLs for this session, so commits are recorded through the writable full Git metadata copy at `node_modules/.codex-git-full` with `git --git-dir=node_modules/.codex-git-full --work-tree=.`.
 - Current worktree is mixed with Clay UI edits plus runtime/PPT files. Staging must remain path-limited.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: commit the non-UI PPT runtime export-ordering hardening, then continue Stage One M6 ecommerce runtime.
+- Current focus: commit the non-UI ecommerce framework scheduler runtime slice, then continue the next ecommerce runtime slice with a reference map and contract test first.
 
-## Current Runtime/PPT Pass
+## Current Ecommerce Runtime Pass
 
-- Implemented in the working tree: `src/app/usePptRuntime.ts` routes `handleExportPptx`, `handleExportPptPackage`, and `handleExportPptSinglePage` through `getOrderedPptNodeBundle`.
-- Contract hardening: `tests/unit/ppt-runtime-contract.test.ts` rejects direct `getPromptPptImageNodes` usage in the hook and asserts ordered-bundle export paths.
-- Browser QA: skipped for this slice because it is non-UI runtime/export logic. Parallel UI thread owns browser evidence for Clay surfaces.
-- Commit include scope for this runtime slice: `plans.md`, `implement.md`, `validation.md`, `status.md`, `src/app/usePptRuntime.ts`, and `tests/unit/ppt-runtime-contract.test.ts`.
+- Implemented in the working tree: `src/app/useEcommerceRuntime.ts` owns the ecommerce framework scheduler actions previously inline in `src/App.tsx`.
+- Extracted actions: `resolveEcommerceFrameworkQueuePhases`, `enqueueEcommerceFrameworkNodes`, `pumpEcommerceFrameworkQueue`, `handleGenerateEcommerceFramework`, `handlePauseEcommerceFramework`, `handleResumeEcommerceFramework`, `handleCancelEcommerceFrameworkNodeQueue`, and `handleGenerateEcommerceGroup`.
+- Contract hardening: `tests/unit/ecommerce-runtime-contract.test.ts` asserts hook ownership, explicit `UseEcommerceRuntimeDeps` / `UseEcommerceRuntimeResult`, and App wiring; `tests/unit/ecommerce-button-guards.test.ts` now follows the no-eligible-card warning contract from the hook.
+- RED evidence: the new ecommerce runtime ownership contract was added before the hook existed/wiring was complete and failed until the extraction was implemented.
+- Line counts after extraction: `src/App.tsx` 6716 lines; `src/app/useEcommerceRuntime.ts` 341 lines; `tests/unit/ecommerce-runtime-contract.test.ts` 44 lines.
+- Browser QA: skipped for this slice because it is non-UI runtime/scheduler logic. Parallel UI thread owns browser evidence for Clay surfaces.
+- Commit include scope for this runtime slice: `status.md`, `src/App.tsx`, `src/app/useEcommerceRuntime.ts`, `tests/unit/ecommerce-runtime-contract.test.ts`, and `tests/unit/ecommerce-button-guards.test.ts`.
 - Explicitly excluded dirty UI paths: `src/app/AppDesktopChrome.tsx`, `src/components/**`, `src/index.css`, `src/main.tsx`, `src/workflow/nodes/WorkflowUtilityCard.tsx`, and Clay UI tests.
+
+## Completed In `92abdacf`
+
+- Hardened PPT runtime export ordering so `handleExportPptx`, `handleExportPptPackage`, and `handleExportPptSinglePage` route through `getOrderedPptNodeBundle`.
+- Updated `tests/unit/ppt-runtime-contract.test.ts` to reject direct `getPromptPptImageNodes` usage in `src/app/usePptRuntime.ts`.
+- Validation passed before commit: targeted PPT/runtime contracts, `npm.cmd run typecheck`, `npm.cmd run test:unit` (1064/1064), `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and `git diff --check` with CRLF normalization warnings only.
 
 ## Completed In `4c448660`
 
@@ -63,6 +72,16 @@ Fresh validation for this runtime/PPT follow-up pass is tracked below:
 - Re-run after ledger correction: `npm.cmd run governance:agent-docs` passed.
 - Re-run after ledger correction: `npm.cmd run check:encoding` passed.
 
+Fresh validation for the current ecommerce runtime slice is tracked below:
+
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-runtime-contract.test.ts tests/unit/ecommerce-framework-runtime.test.ts tests/unit/ecommerce-framework-contract.test.ts tests/unit/ecommerce-button-guards.test.ts` (10/10).
+- Passed: `npm.cmd run typecheck`.
+- Passed: `npm.cmd run test:unit` (1065/1065).
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed: `git diff --check -- src/App.tsx src/app/useEcommerceRuntime.ts tests/unit/ecommerce-runtime-contract.test.ts tests/unit/ecommerce-button-guards.test.ts status.md plans.md implement.md validation.md` with CRLF normalization warnings only.
+
 ## Browser QA
 
 - Browser QA is not required for this non-UI runtime/PPT slice.
@@ -70,8 +89,8 @@ Fresh validation for this runtime/PPT follow-up pass is tracked below:
 
 ## Remaining Work
 
-1. Stage only the current runtime/PPT slice through `node_modules/.codex-git-full`.
-2. Create the scoped runtime/PPT commit.
+1. Stage only the current ecommerce runtime slice through `node_modules/.codex-git-full`.
+2. Create the scoped ecommerce runtime commit.
 3. Continue Stage One M6 ecommerce runtime with a reference map and contract tests before extraction.
 4. Keep the parallel Clay UI files out of runtime/PPT commits.
 

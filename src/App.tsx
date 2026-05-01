@@ -5,7 +5,7 @@ import PromptNodeComponent from './components/canvas/PromptNodeComponent';
 import PendingNode from './components/canvas/PendingNode';
 // KeyManagerModal removed - integrated into UserProfileModal
 import ChatSidebar from './components/layout/ChatSidebar';
-import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, ReferenceImage, type PartialRedrawRequest, type AgentWorkflowNode, type PreviewWorkflowNode, type SaveWorkflowNode, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceAPlusControlMode, type EcommerceEditableTaskState, type EcommerceTaskAssetRoleBinding, type EcommerceGroupSheet, type EcommerceImageRef, type EcommerceSheetSetting, type EcommerceSheetSettingPatch, type EcommerceFrameworkRuntimeState, type EcommerceFrameworkQueueItem } from './types';
+import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, ReferenceImage, type PartialRedrawRequest, type AgentWorkflowNode, type PreviewWorkflowNode, type SaveWorkflowNode, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceAPlusControlMode, type EcommerceEditableTaskState, type EcommerceTaskAssetRoleBinding, type EcommerceGroupSheet, type EcommerceImageRef, type EcommerceSheetSetting, type EcommerceSheetSettingPatch, type EcommerceFrameworkRuntimeState } from './types';
 import { Image as ImageIcon, MessageSquare, Plus, Trash2, Shield, FileText, CheckCircle2, History, CreditCard, ChevronDown, Wand2, RefreshCw, Star, Coins, Settings } from 'lucide-react';
 import { SelectionMenu } from './components/canvas/SelectionMenu';
 import { CanvasGroupComponent } from './components/canvas/CanvasGroupComponent';
@@ -33,17 +33,10 @@ import {
 } from './services/ecommerce/groupSlotState.ts';
 import { mergeEcommerceTaskState } from './services/ecommerce/taskMerger.ts';
 import {
-  cancelEcommerceFrameworkNodeQueue,
   createDefaultEcommerceFrameworkSchedulerConfig,
   createEcommerceFrameworkRuntimeState,
-  enqueueEcommerceFrameworkItems,
-  markEcommerceFrameworkQueueItemStatus,
   migrateLegacyEcommerceFrameworkCanvas,
-  pauseEcommerceFrameworkRuntime,
-  resolveEcommerceFrameworkDispatchPlan,
   resolveEcommerceFrameworkSummary,
-  resolveFrameworkLane,
-  resumeEcommerceFrameworkRuntime,
 } from './services/ecommerce/frameworkRuntime.ts';
 import { llmService } from './services/llm/LLMService';
 import { cancelSecureSystemProxyTask } from './services/model/secureModelProxy';
@@ -104,7 +97,7 @@ import { useConnectorRenderer } from './app/useConnectorRenderer';
 import { usePromptGroupLayout, usePromptGroupStacking } from './app/usePromptGroupLayout';
 import { useGenerationRuntime } from './app/useGenerationRuntime';
 import { usePptRuntime } from './app/usePptRuntime';
-import { resolveProviderKeyType } from './services/api/providerStrategy.ts';
+import { useEcommerceRuntime } from './app/useEcommerceRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
 const GENERATE_TIMEOUT_MS = 600000;
@@ -4189,263 +4182,24 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
   }, [runEcommerceNodeGeneration]);
 
-  const resolveEcommerceFrameworkQueuePhases = useCallback((
-    node: PromptNode,
-    phasePreference?: 'desktop' | 'mobile',
-  ): EcommerceFrameworkQueueItem['phase'][] => {
-    const ecommerce = node.ecommerce;
-    if (!ecommerce || ecommerce.selectedForGeneration === false) {
-      return [];
-    }
-
-    if (ecommerce.kind === 'main-image') {
-      if (phasePreference === 'mobile') {
-        return [];
-      }
-
-      return (ecommerce.stage === 'analysis_ready' || ecommerce.stage === 'ready' || ecommerce.stage === 'failed')
-        ? ['sheet']
-        : [];
-    }
-
-    if (ecommerce.kind !== 'a-plus-module') {
-      return [];
-    }
-
-    const effectiveSizePolicy = ecommerce.effectiveSizePolicy || ecommerce.sizePolicy;
-    const requiresMobileFollowUp = effectiveSizePolicy === 'desktop-then-mobile';
-
-    if (phasePreference === 'mobile') {
-      return ecommerce.desktopStage === 'confirmed'
-        && (ecommerce.mobileStage === 'pending' || ecommerce.mobileStage === 'failed' || ecommerce.mobileStage === 'locked')
-        ? ['mobile']
-        : [];
-    }
-
-    if (phasePreference === 'desktop') {
-      if (requiresMobileFollowUp) {
-        return ecommerce.desktopStage === 'pending' || ecommerce.desktopStage === 'failed'
-          ? ['desktop']
-          : [];
-      }
-
-      return ecommerce.stage === 'analysis_ready' || ecommerce.stage === 'ready' || ecommerce.stage === 'failed'
-        ? ['sheet']
-        : [];
-    }
-
-    if (requiresMobileFollowUp) {
-      if (ecommerce.desktopStage === 'confirmed' && (ecommerce.mobileStage === 'pending' || ecommerce.mobileStage === 'failed')) {
-        return ['mobile'];
-      }
-
-      return ecommerce.desktopStage === 'pending' || ecommerce.desktopStage === 'failed'
-        ? ['desktop']
-        : [];
-    }
-
-    return (ecommerce.stage === 'analysis_ready' || ecommerce.stage === 'ready' || ecommerce.stage === 'failed')
-      ? ['sheet']
-      : [];
-  }, []);
-
-  const enqueueEcommerceFrameworkNodes = useCallback((
-    frameworkId: string,
-    nodes: PromptNode[],
-    phasePreference?: 'desktop' | 'mobile',
-  ): number => {
-    const queueItems: Array<Pick<EcommerceFrameworkQueueItem, 'queueId' | 'nodeId' | 'phase' | 'laneKey' | 'laneType' | 'sourceSheet'>> = [];
-
-    nodes.forEach((node) => {
-      const ecommerce = node.ecommerce;
-      if (!ecommerce) {
-        return;
-      }
-
-      const phases = resolveEcommerceFrameworkQueuePhases(node, phasePreference);
-      if (phases.length === 0) {
-        return;
-      }
-
-      const resolvedKey = keyManager.getNextKey(node.model, node.keySlotId);
-      const provider = resolvedKey?.provider || node.provider;
-      const baseUrl = resolvedKey?.baseUrl || resolvedKey?.providerConfig?.baseUrl;
-      const providerKeyType = resolveProviderKeyType(provider, baseUrl);
-      const lane = resolveFrameworkLane({
-        keySlotId: resolvedKey?.id || node.keySlotId || providerKeyType,
-        provider,
-        baseUrl,
-      });
-
-      phases.forEach((phase) => {
-        queueItems.push({
-          queueId: frameworkId + ':' + node.id + ':' + phase + ':' + Date.now() + ':' + queueItems.length,
-          nodeId: node.id,
-          phase,
-          laneKey: lane.laneKey,
-          laneType: lane.laneType,
-          sourceSheet: ecommerce.sourceSheet,
-        });
-      });
-    });
-
-    if (queueItems.length === 0) {
-      return 0;
-    }
-
-    updateEcommerceFrameworkRuntime(frameworkId, (currentRuntime) => enqueueEcommerceFrameworkItems(currentRuntime, queueItems));
-    return queueItems.length;
-  }, [resolveEcommerceFrameworkQueuePhases, updateEcommerceFrameworkRuntime]);
-
-  const pumpEcommerceFrameworkQueue = useCallback((frameworkId: string) => {
-    const currentRuntime = ecommerceFrameworkRuntimeRef.current[frameworkId];
-    if (!currentRuntime || currentRuntime.paused) {
-      return;
-    }
-
-    const starters = resolveEcommerceFrameworkDispatchPlan(currentRuntime);
-    if (starters.length === 0) {
-      return;
-    }
-
-    updateEcommerceFrameworkRuntime(frameworkId, (runtime) => {
-      let nextRuntime = runtime;
-      starters.forEach((item) => {
-        nextRuntime = markEcommerceFrameworkQueueItemStatus(nextRuntime, item.queueId, 'dispatching');
-      });
-      return nextRuntime;
-    });
-
-    starters.forEach((item) => {
-      void (async () => {
-        updateEcommerceFrameworkRuntime(frameworkId, (runtime) => markEcommerceFrameworkQueueItemStatus(runtime, item.queueId, 'running', {
-          startedAt: Date.now(),
-          error: undefined,
-        }));
-
-        try {
-          const latestNode = activeCanvasRef.current?.promptNodes.find((promptNode) => promptNode.id === item.nodeId);
-          if (!latestNode?.ecommerce) {
-            throw new Error('Missing ecommerce node');
-          }
-
-          if (item.phase === 'mobile') {
-            await handleRetryEcommerceModule(latestNode);
-          } else {
-            await handleGenerateEcommerceNode(latestNode);
-          }
-
-          updateEcommerceFrameworkRuntime(frameworkId, (runtime) => markEcommerceFrameworkQueueItemStatus(runtime, item.queueId, 'completed', {
-            finishedAt: Date.now(),
-            error: undefined,
-          }));
-        } catch (error: any) {
-          updateEcommerceFrameworkRuntime(frameworkId, (runtime) => markEcommerceFrameworkQueueItemStatus(runtime, item.queueId, 'failed', {
-            finishedAt: Date.now(),
-            error: error?.message || 'Queue item failed',
-          }));
-        } finally {
-          setTimeout(() => {
-            pumpEcommerceFrameworkQueue(frameworkId);
-          }, 0);
-        }
-      })();
-    });
-  }, [handleGenerateEcommerceNode, handleRetryEcommerceModule, updateEcommerceFrameworkRuntime]);
-
-  const handleGenerateEcommerceFramework = useCallback(async (node: PromptNode) => {
-    if (!node.ecommerce || node.ecommerce.kind !== 'framework') return;
-
-    const targetNodes = (activeCanvasRef.current?.promptNodes || []).filter((item) => (
-      item.mode === GenerationMode.ECOMMERCE
-      && !!item.ecommerce
-      && item.ecommerce.kind !== 'framework'
-      && item.ecommerce.kind !== 'a-plus-group'
-      && item.ecommerce.frameworkId === node.id
-      && item.ecommerce.selectedForGeneration !== false
-    ));
-
-    const queuedCount = enqueueEcommerceFrameworkNodes(node.id, targetNodes);
-    if (queuedCount === 0) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning('No eligible cards', 'There are no ecommerce cards ready to enqueue.');
-      });
-      return;
-    }
-
-    const nextSheet = node.ecommerce.frameworkMeta?.activeSheet || ecommerceState.activeGroupSheet || '主图';
-    syncEcommerceFrameworkView(node.id, nextSheet);
-    pumpEcommerceFrameworkQueue(node.id);
-  }, [ecommerceState.activeGroupSheet, enqueueEcommerceFrameworkNodes, pumpEcommerceFrameworkQueue, syncEcommerceFrameworkView]);
-
-  const handlePauseEcommerceFramework = useCallback((node: PromptNode) => {
-    const frameworkId = resolveEcommerceFrameworkId(node);
-    if (!frameworkId) {
-      return;
-    }
-
-    updateEcommerceFrameworkRuntime(frameworkId, (runtime) => pauseEcommerceFrameworkRuntime(runtime));
-  }, [resolveEcommerceFrameworkId, updateEcommerceFrameworkRuntime]);
-
-  const handleResumeEcommerceFramework = useCallback((node: PromptNode) => {
-    const frameworkId = resolveEcommerceFrameworkId(node);
-    if (!frameworkId) {
-      return;
-    }
-
-    updateEcommerceFrameworkRuntime(frameworkId, (runtime) => resumeEcommerceFrameworkRuntime(runtime));
-    pumpEcommerceFrameworkQueue(frameworkId);
-  }, [pumpEcommerceFrameworkQueue, resolveEcommerceFrameworkId, updateEcommerceFrameworkRuntime]);
-
-  const handleCancelEcommerceFrameworkNodeQueue = useCallback((node: PromptNode) => {
-    const frameworkId = resolveEcommerceFrameworkId(node);
-    if (!frameworkId) {
-      return;
-    }
-
-    updateEcommerceFrameworkRuntime(frameworkId, (runtime) => cancelEcommerceFrameworkNodeQueue(runtime, node.id));
-  }, [resolveEcommerceFrameworkId, updateEcommerceFrameworkRuntime]);
-
-  const handleGenerateEcommerceGroup = useCallback(async (node: PromptNode, phase: 'desktop' | 'mobile') => {
-    if (!node.ecommerce || node.ecommerce.kind !== 'a-plus-group') return;
-
-    const frameworkId = node.ecommerce.frameworkId;
-    const targetNodes = (activeCanvasRef.current?.promptNodes || []).filter((item) => (
-      item.mode === GenerationMode.ECOMMERCE
-      && !!item.ecommerce
-      && item.ecommerce.kind !== 'framework'
-      && item.ecommerce.kind !== 'a-plus-group'
-      && item.ecommerce.groupId === node.id
-      && item.ecommerce.selectedForGeneration !== false
-    ));
-
-    if (!frameworkId) {
-      for (const targetNode of targetNodes) {
-        if (phase === 'mobile') {
-          await handleRetryEcommerceModule(targetNode);
-        } else {
-          await handleGenerateEcommerceNode(targetNode);
-        }
-      }
-      return;
-    }
-
-    const queuedCount = enqueueEcommerceFrameworkNodes(frameworkId, targetNodes, phase);
-    if (queuedCount === 0) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning(
-          'No eligible cards',
-          phase === 'mobile'
-            ? 'There are no confirmed mobile follow-up cards ready to enqueue.'
-            : 'There are no ecommerce cards ready to enqueue for this group.',
-        );
-      });
-      return;
-    }
-
-    syncEcommerceFrameworkView(frameworkId, node.ecommerce.sourceSheet);
-    pumpEcommerceFrameworkQueue(frameworkId);
-  }, [enqueueEcommerceFrameworkNodes, handleGenerateEcommerceNode, handleRetryEcommerceModule, pumpEcommerceFrameworkQueue, syncEcommerceFrameworkView]);
+  const {
+    enqueueEcommerceFrameworkNodes,
+    pumpEcommerceFrameworkQueue,
+    handleGenerateEcommerceFramework,
+    handlePauseEcommerceFramework,
+    handleResumeEcommerceFramework,
+    handleCancelEcommerceFrameworkNodeQueue,
+    handleGenerateEcommerceGroup,
+  } = useEcommerceRuntime({
+    activeCanvasRef,
+    ecommerceFrameworkRuntimeRef,
+    ecommerceState,
+    updateEcommerceFrameworkRuntime,
+    resolveEcommerceFrameworkId,
+    syncEcommerceFrameworkView,
+    handleGenerateEcommerceNode,
+    handleRetryEcommerceModule,
+  });
 
   // Auto-Recover Interrupted Tasks
   useEffect(() => {
