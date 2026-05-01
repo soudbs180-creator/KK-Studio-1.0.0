@@ -23,10 +23,8 @@ import { isEcommerceAllowedModel, normalizeEcommerceModelId, resolveEcommerceAsp
 import type { EcommerceAnalysisAsset, EcommerceAnalysisAPlusModule, EcommerceAnalysisMainImageItem, EcommerceAnalysisResult } from './services/ecommerce/types.ts';
 import { buildEcommerceRenderTask } from './services/ecommerce/renderTaskBuilder.ts';
 import { buildEcommerceCanvasGroupLayout } from './services/ecommerce/groupCanvasLayout.ts';
-import { buildEcommerceGroupExportManifest } from './services/ecommerce/groupExportManifest.ts';
 import { buildEcommerceAssetRoleBindings } from './services/ecommerce/assetRoleBindings.ts';
 import {
-  applyEcommerceSlotResult,
   buildInitialEcommerceGroupSlotState,
   type EcommerceGroupSlotState,
 } from './services/ecommerce/groupSlotState.ts';
@@ -104,6 +102,7 @@ import {
   type EcommerceUploadReferenceBundle,
   type SetEcommerceUploadReferenceState,
 } from './app/useEcommerceUploadReferenceRuntime';
+import { useEcommerceGroupExportRuntime, type SetEcommerceGroupExportState } from './app/useEcommerceGroupExportRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
 const GENERATE_TIMEOUT_MS = 600000;
@@ -282,8 +281,6 @@ import {
 } from './services/api/capabilityRouteAssignments';
 
 
-import { saveAs } from 'file-saver';
-import JSZip from 'jszip';
 // import { syncService } from './services/system/syncService'; // [FIX] Dynamic Import
 import { saveImage, saveOriginalImage, normalizePersistableMediaSource } from './services/storage/imageStorage';
 import { cancelImageLoad, loadImage } from './services/image/imageLoader';
@@ -1098,6 +1095,17 @@ const AppContent: React.FC<AppContentProps> = () => {
   const updateEcommerceFrameworkRuntimeState = useCallback<SetEcommerceFrameworkRuntimeState>((updater) => {
     setEcommerceState((previousState) => {
       const patch = updater(previousState);
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
+
+  const updateEcommerceGroupExportState = useCallback<SetEcommerceGroupExportState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        analysisConfirmed: previousState.analysisConfirmed,
+        selectedItems: previousState.selectedItems,
+        groupSlots: previousState.groupSlots,
+      });
       return patch ? { ...previousState, ...patch } : previousState;
     });
   }, []);
@@ -3058,261 +3066,13 @@ const AppContent: React.FC<AppContentProps> = () => {
     return details;
   }, []);
 
-  const sanitizeEcommerceExportName = useCallback((value: string, fallback: string) => {
-    const normalized = String(value || '')
-      .replace(/[\\/:*?"<>|]+/g, '-')
-      .replace(/\s+/g, '-')
-      .trim();
-    return normalized || fallback;
-  }, []);
-
-  const resolveLatestEcommerceSlotImage = useCallback((node: PromptNode, deliveryKind?: 'default' | 'desktop' | 'mobile') => {
-    const canvas = activeCanvasRef.current;
-    const taskId = node.ecommerce?.editableTask?.taskId;
-    if (!canvas || !node.ecommerce) {
-      return null;
-    }
-
-    const candidatePromptIds = new Set<string>([node.id]);
-    if (taskId) {
-      canvas.promptNodes.forEach((promptNode) => {
-        if (promptNode.partialRedraw?.inheritedTaskState?.taskId === taskId) {
-          candidatePromptIds.add(promptNode.id);
-        }
-      });
-    }
-
-    const latestImage = canvas.imageNodes
-      .filter((imageNode) => {
-        if (!imageNode.parentPromptId || !candidatePromptIds.has(imageNode.parentPromptId)) {
-          return false;
-        }
-
-        if (!deliveryKind) {
-          return true;
-        }
-
-        if (deliveryKind === 'default') {
-          return !imageNode.ecommerceDeliveryKind || imageNode.ecommerceDeliveryKind === 'default';
-        }
-
-        return imageNode.ecommerceDeliveryKind === deliveryKind;
-      })
-      .sort((left, right) => (right.timestamp || 0) - (left.timestamp || 0))[0];
-
-    if (!latestImage) {
-      return null;
-    }
-
-    return {
-      image: latestImage,
-      latestSource: latestImage.parentPromptId === node.id ? 'generated' as const : 'redraw' as const,
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!ecommerceState.analysisConfirmed) {
-      return;
-    }
-
-    setEcommerceState((previousState) => {
-      const nextGroupSlots: Record<EcommerceGroupSheet, EcommerceGroupSlotState[]> = {
-        '主图': previousState.groupSlots['主图'].map((slot) => ({
-          ...slot,
-          selected: previousState.selectedItems[slot.sourceKey] !== false,
-        })),
-        'A+': previousState.groupSlots['A+'].map((slot) => ({
-          ...slot,
-          selected: previousState.selectedItems[slot.sourceKey] !== false,
-        })),
-      };
-
-      (activeCanvas?.promptNodes || []).forEach((promptNode) => {
-        if (!promptNode.ecommerce || promptNode.ecommerce.kind === 'a-plus-group') {
-          return;
-        }
-
-        const sheet = promptNode.ecommerce.sourceSheet;
-        const slot = nextGroupSlots[sheet].find((entry) => entry.sourceKey === promptNode.ecommerce?.sourceRowKey);
-        if (!slot) {
-          return;
-        }
-
-        const latest = resolveLatestEcommerceSlotImage(promptNode);
-        if (!latest) {
-          return;
-        }
-
-        nextGroupSlots[sheet] = applyEcommerceSlotResult(nextGroupSlots[sheet], {
-          slotId: slot.slotId,
-          imageId: latest.image.id,
-          source: latest.latestSource,
-        });
-
-        slot.deliveries.forEach((delivery) => {
-          const latestForDelivery = resolveLatestEcommerceSlotImage(promptNode, delivery.deliveryKind);
-          if (!latestForDelivery) {
-            return;
-          }
-
-          nextGroupSlots[sheet] = applyEcommerceSlotResult(nextGroupSlots[sheet], {
-            slotId: slot.slotId,
-            deliveryKind: delivery.deliveryKind,
-            imageId: latestForDelivery.image.id,
-            source: latestForDelivery.latestSource,
-          });
-        });
-      });
-
-      const previousSignature = JSON.stringify(previousState.groupSlots);
-      const nextSignature = JSON.stringify(nextGroupSlots);
-      if (previousSignature === nextSignature) {
-        return previousState;
-      }
-
-      return {
-        ...previousState,
-        groupSlots: nextGroupSlots,
-      };
-    });
-  }, [activeCanvas, ecommerceState.analysisConfirmed, ecommerceState.selectedItems, resolveLatestEcommerceSlotImage]);
-
-  const handleExportEcommerceGroup = useCallback(async (groupNode: PromptNode) => {
-    if (!groupNode.ecommerce || groupNode.ecommerce.kind !== 'a-plus-group') {
-      return;
-    }
-
-    const canvas = activeCanvasRef.current;
-    if (!canvas) {
-      return;
-    }
-
-    const moduleNodes = canvas.promptNodes.filter((promptNode) => (
-      !!promptNode.ecommerce
-      && promptNode.ecommerce.kind !== 'a-plus-group'
-      && promptNode.ecommerce.groupId === groupNode.id
-    ));
-    const slotStateBySourceKey = new Map(
-      ecommerceState.groupSlots[groupNode.ecommerce.sourceSheet].map((slot) => [slot.sourceKey, slot] as const),
-    );
-
-    const packageType = groupNode.ecommerce.sourceSheet === '主图' ? 'main-image-group' : 'a-plus-group';
-    const packageLabel = groupNode.ecommerce.sourceSheet === '主图' ? '主图包' : 'A+包';
-    const zip = new JSZip();
-    const exportables: Array<{ fileName: string; image: GeneratedImage }> = [];
-
-    const manifest = buildEcommerceGroupExportManifest({
-      packageType,
-      groupId: groupNode.id,
-      groupLabel: groupNode.ecommerce.sourceSheet,
-      sourcePromptId: groupNode.id,
-      slots: moduleNodes.map((promptNode, index) => {
-        const latest = resolveLatestEcommerceSlotImage(promptNode);
-        const slotLabel = promptNode.ecommerce?.displayLabel || promptNode.ecommerce?.sourceRowKey || `${groupNode.ecommerce?.sourceSheet} 模块`;
-        const slotState = promptNode.ecommerce
-          ? slotStateBySourceKey.get(promptNode.ecommerce.sourceRowKey)
-          : undefined;
-        const slotId = slotState?.slotId || `${groupNode.id}-slot-${index + 1}`;
-        const isSelected = slotState?.selected ?? (promptNode.ecommerce?.selectedForGeneration !== false);
-        if (!promptNode.ecommerce || !isSelected) {
-          return {
-            slotId,
-            slotLabel,
-            selectedForGeneration: false,
-          };
-        }
-
-        if ((promptNode.ecommerce.effectiveSizePolicy || promptNode.ecommerce.sizePolicy) === 'desktop-then-mobile') {
-          const deliverables = (['desktop', 'mobile'] as const).map((deliveryKind) => {
-            const latestForDelivery = resolveLatestEcommerceSlotImage(promptNode, deliveryKind);
-            if (!latestForDelivery) {
-              return { deliveryKind };
-            }
-
-            const extension = latestForDelivery.image.mimeType?.includes('jpeg') || latestForDelivery.image.mimeType?.includes('jpg')
-              ? 'jpg'
-              : latestForDelivery.image.mimeType?.includes('webp')
-                ? 'webp'
-                : 'png';
-            const fileName = `${String(index + 1).padStart(2, '0')}-${sanitizeEcommerceExportName(slotLabel, `slot-${index + 1}`)}-${deliveryKind}.${extension}`;
-            exportables.push({ fileName, image: latestForDelivery.image });
-
-            return {
-              deliveryKind,
-              latestImageId: latestForDelivery.image.id,
-              latestSource: latestForDelivery.latestSource,
-              fileName,
-            };
-          });
-
-          if (!deliverables.some((deliverable) => 'latestImageId' in deliverable)) {
-            return {
-              slotId,
-              slotLabel,
-              selectedForGeneration: true,
-            };
-          }
-
-          return {
-            slotId,
-            slotLabel,
-            selectedForGeneration: true,
-            deliverables,
-          };
-        }
-
-        if (!latest) {
-          return {
-            slotId,
-            slotLabel,
-            selectedForGeneration: true,
-          };
-        }
-
-        const extension = latest.image.mimeType?.includes('jpeg') || latest.image.mimeType?.includes('jpg')
-          ? 'jpg'
-          : latest.image.mimeType?.includes('webp')
-            ? 'webp'
-            : 'png';
-        const fileName = `${String(index + 1).padStart(2, '0')}-${sanitizeEcommerceExportName(slotLabel, `slot-${index + 1}`)}.${extension}`;
-        exportables.push({ fileName, image: latest.image });
-
-        return {
-          slotId,
-          slotLabel,
-          selectedForGeneration: true,
-          latestImageId: latest.image.id,
-          latestSource: latest.latestSource,
-          fileName,
-        };
-      }),
-    });
-
-    if (exportables.length === 0) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning('无可导出图片', `${packageLabel}当前没有已生成的图片可打包。`);
-      });
-      return;
-    }
-
-    zip.file('manifest.json', JSON.stringify(manifest, null, 2));
-
-    const fallbackQualityFiles: string[] = [];
-    for (const exportItem of exportables) {
-      const { blob, isOriginal } = await resolvePptImageBlob(exportItem.image);
-      if (!isOriginal) fallbackQualityFiles.push(exportItem.fileName);
-      zip.file(exportItem.fileName, blob);
-    }
-
-    const content = await zip.generateAsync({ type: 'blob' });
-    saveAs(content, `${sanitizeEcommerceExportName(packageLabel, packageLabel)}-${Date.now()}.zip`);
-    import('./services/system/notificationService').then(({ notify }) => {
-      if (fallbackQualityFiles.length > 0) {
-        notify.warning('部分图片非原始质量', `${fallbackQualityFiles.length} 张图片使用了回退源：${fallbackQualityFiles.slice(0, 3).join('、')}${fallbackQualityFiles.length > 3 ? '…' : ''}`);
-      }
-      notify.success('导出完成', `${packageLabel}已导出，共 ${exportables.length} 张图片。`);
-    });
-  }, [ecommerceState.groupSlots, resolveLatestEcommerceSlotImage, resolvePptImageBlob, sanitizeEcommerceExportName]);
+  const { handleExportEcommerceGroup } = useEcommerceGroupExportRuntime({
+    activeCanvas,
+    activeCanvasRef,
+    ecommerceState,
+    setEcommerceGroupExportState: updateEcommerceGroupExportState,
+    resolvePptImageBlob,
+  });
 
   const getNodeIoTrace = useCallback((nodeId: string) => {
     const node = activeCanvas?.promptNodes.find(n => n.id === nodeId);

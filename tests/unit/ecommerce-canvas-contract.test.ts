@@ -14,6 +14,7 @@ test('prompt nodes expose ecommerce state and the generation flow handles ecomme
   const generationHookSource = readSource('src/hooks/useImageGeneration.ts');
   const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
   const appSource = readSource('src/App.tsx');
+  const groupExportRuntimeSource = readSource('src/app/useEcommerceGroupExportRuntime.ts');
 
   assert.match(typesSource, /ecommerce\?:\s*EcommercePromptState/);
   assert.match(typesSource, /export interface EcommercePromptState/);
@@ -26,5 +27,5 @@ test('prompt nodes expose ecommerce state and the generation flow handles ecomme
   assert.match(promptNodeSource, /node\.ecommerce/);
   assert.match(promptNodeSource, /onRetryEcommerceModule/);
   assert.match(appSource, /handleRetryEcommerceModule/);
-  assert.match(appSource, /selectedForGeneration !== false/);
+  assert.match(groupExportRuntimeSource, /selectedForGeneration !== false/);
 });
