@@ -163,11 +163,13 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
         width,
         minHeight: height,
         zIndex: stackZIndex,
-        background: 'linear-gradient(180deg, rgba(15,23,42,0.94) 0%, rgba(15,23,42,0.86) 100%)',
-        borderColor: isSelected ? 'rgba(96, 165, 250, 0.72)' : 'rgba(148, 163, 184, 0.18)',
+        background: 'var(--frost-card-main-bg)',
+        borderColor: isSelected ? 'var(--accent-coral)' : 'var(--frost-card-main-border)',
         boxShadow: isSelected
-          ? getCanvasCardShadow({ accent: 'blue', boost: true, zoomScale })
-          : getCanvasCardShadow({ boost: true, zoomScale }),
+          ? 'var(--frost-card-main-shadow)'
+          : getCanvasCardShadow({ accent: 'coral', boost: true, zoomScale }),
+        backdropFilter: 'blur(var(--frost-card-main-blur)) saturate(160%)',
+        WebkitBackdropFilter: 'blur(var(--frost-card-main-blur)) saturate(160%)',
       }}
       onMouseDown={(event) => {
         event.stopPropagation();
@@ -180,23 +182,23 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
     >
       <div
         className="flex items-start justify-between gap-3 rounded-t-[22px] border-b px-4 py-3"
-        style={{ borderColor: 'rgba(148, 163, 184, 0.16)' }}
+        style={{ borderColor: 'var(--frost-card-main-border)' }}
         onMouseDown={handleDragStart}
         onTouchStart={handleDragStart}
       >
         <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--frost-card-sub-bg)] text-[var(--accent-coral)]">
             {icon}
           </div>
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-white">{title}</div>
-            <div className="mt-1 text-xs leading-5 text-slate-300">{subtitle}</div>
+            <div className="truncate text-sm font-semibold text-[var(--text-primary)]">{title}</div>
+            <div className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{subtitle}</div>
           </div>
         </div>
 
         <button
           type="button"
-          className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-white/6 hover:text-red-300"
+          className="rounded-xl p-2 text-[var(--text-tertiary)] transition-colors hover:bg-[var(--toolbar-hover)] hover:text-red-400"
           onClick={(event) => {
             event.stopPropagation();
             onDelete?.(node.id);
@@ -213,8 +215,14 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
             {contentRows.map((row) => (
               <div
                 key={row}
-                className="rounded-2xl border px-3 py-2 text-xs leading-5 text-slate-300"
-                style={{ borderColor: 'rgba(148, 163, 184, 0.14)', backgroundColor: 'rgba(15, 23, 42, 0.36)' }}
+                className="rounded-2xl border px-3 py-2 text-xs leading-5 text-[var(--text-secondary)]"
+                style={{
+                  borderColor: 'var(--frost-card-sub-border)',
+                  background: 'var(--frost-card-sub-bg)',
+                  boxShadow: 'var(--frost-card-sub-shadow)',
+                  backdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(150%)',
+                  WebkitBackdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(150%)',
+                }}
               >
                 {row}
               </div>
@@ -227,8 +235,8 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
             type="button"
             className="w-full rounded-2xl px-4 py-2.5 text-sm font-medium text-white transition-transform active:scale-[0.99]"
             style={{
-              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.92) 0%, rgba(14, 165, 233, 0.88) 100%)',
-              boxShadow: '0 14px 32px rgba(14, 165, 233, 0.18)',
+              background: 'linear-gradient(135deg, var(--accent-coral) 0%, var(--clay-brand-peach) 100%)',
+              boxShadow: '0 10px 24px rgb(255 107 90 / 0.16)',
             }}
             onClick={(event) => {
               event.stopPropagation();

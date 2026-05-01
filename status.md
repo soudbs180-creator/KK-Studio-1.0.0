@@ -4,14 +4,14 @@ Last updated: 2026-05-02
 
 ## Active State
 
-- Active lane in this thread: Stage One M6 ecommerce runtime extraction, current slice `useEcommerceGroupExportRuntime`.
-- Parallel UI lane: `codex://threads/019de168-0c09-7a03-8e64-124f722fa2fc` owns Clay UI audit, controlled frosted-surface cleanup, browser evidence, and UI-only commits.
+- Active lane in this thread: Clay UI audit closure for controlled frosted inputs/cards and neutral black-gray dark mode.
+- Runtime/PPT/ecommerce extraction work is paused while this UI slice is reviewed, validated, and committed separately.
 - Current branch: `main`.
 - Plain `.git` still reports `4c448660`; the writable full Git metadata copy at `node_modules/.codex-git-full` had `cf34f12b` as the runtime baseline before this slice. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
-- Current worktree is mixed with Clay UI edits plus runtime/PPT files. Staging must remain path-limited.
+- Plain `.git` and the writable full Git metadata copy can both show mixed historical runtime/PPT/ecommerce work during this thread. Staging must remain path-limited and use the writable metadata copy.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
-- Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: close the ecommerce group export runtime slice with full validation and a path-limited runtime commit. Clay UI files remain excluded from this commit.
+- Runtime source of truth, when resumed later: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
+- Current focus: close the Clay UI audit slice with ledger consistency, browser evidence, full validation records, and a path-limited UI-only commit. Paused runtime/PPT/ecommerce files remain excluded from this UI commit.
 
 ## Current Clay UI Audit Pass
 
@@ -20,8 +20,8 @@ Last updated: 2026-05-02
 - Light-theme readability was hardened by adding readable Clay emphasis text tokens (`--clay-brand-pink-ink`, `--clay-brand-coral-ink`) while keeping brand pink/coral for tinted fills and borders.
 - Contract coverage now includes frosted input/main/sub/framework tokens, neutral black-gray dark variables, readable light emphasis text on tinted states, toolbar selected tokens, ProjectManager sub surfaces, ChatSidebar message/attachment surfaces, TagInputModal frosted tokens, PromptBar stale blue/white-glass regressions, mobile shell and mobile badge/index regressions, ecommerce hover token use, SearchPalette multi-select token use, RechargeModal CTA readability, API Workspace reduced nesting, ChatSidebar active-state token use, and PromptNode badge color regressions.
 - Browser QA for this lane is complete and tracked below.
-- Commit include scope for the UI slice: `plans.md`, `implement.md`, `status.md`, `validation.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, `src/index.css`, touched UI components, and Clay UI tests.
-- Explicitly excluded dirty runtime/PPT/ecommerce paths for the UI commit include `src/app/usePptRuntime.ts`, `tests/unit/ppt-runtime-contract.test.ts`, ecommerce runtime extraction files/tests, and any runtime-only WIP unless included solely to keep the current mixed tree compiling.
+- Commit include scope for the UI slice: currently dirty ledger/rule files, `src/index.css`, touched UI components, and Clay UI tests. `DESIGN.md` and `docs/DESIGN.md` remain source-of-truth references but are not dirty in the current writable metadata status.
+- Runtime/PPT/ecommerce paths remain excluded from the UI commit, including `src/App.tsx`, `src/app/usePptRuntime.ts`, `src/app/useEcommerceSheetSettingsRuntime.ts`, `tests/unit/ppt-runtime-contract.test.ts`, ecommerce runtime extraction files/tests, and any runtime-only WIP unless included solely to keep the current mixed tree compiling.
 
 ## Completed In `ec434f94` (Paused Runtime/Ecommerce Lane)
 
@@ -47,7 +47,7 @@ Last updated: 2026-05-02
 - Browser QA: skipped for this slice because it is non-UI runtime upload/reference glue. The active Clay UI lane owns browser evidence for Clay surfaces.
 - Commit include scope was `status.md`, `src/App.tsx`, `src/app/useEcommerceUploadReferenceRuntime.ts`, `tests/unit/ecommerce-upload-references-contract.test.ts`, `tests/unit/ecommerce-upload-removal-contract.test.ts`, and `tests/unit/ecommerce-runtime-upload-sync-contract.test.ts`.
 
-## Current Ecommerce Group Export Runtime Pass
+## Paused Ecommerce Group Export Runtime WIP
 
 - Extracted ecommerce group export and slot-result synchronization into `src/app/useEcommerceGroupExportRuntime.ts`.
 - New hook owns `sanitizeEcommerceExportName`, latest slot image resolution, group slot sync via `applyEcommerceSlotResult`, manifest construction via `buildEcommerceGroupExportManifest`, zip packaging, dynamic file-saver invocation, no-export warning, fallback-quality warning, and success notification.
@@ -57,7 +57,7 @@ Last updated: 2026-05-02
 - Contract updates: `tests/unit/ecommerce-group-export-runtime-contract.test.ts` covers hook ownership and pure helper behavior. Existing export entry, slot integration, ecommerce canvas, and no-export guard tests were retargeted from App inline ownership to hook ownership.
 - Line counts after extraction: `src/App.tsx` 6062 lines; `src/app/useEcommerceGroupExportRuntime.ts` 365 lines; `tests/unit/ecommerce-group-export-runtime-contract.test.ts` 182 lines.
 - Subagent review: governance review confirmed this slice should stay path-limited and avoid UI lane files. Code-quality review found no P1/P2 blockers, noted the default delivery semantics and runtime nullish hardening, and left a P3 follow-up to upgrade the no-export guard from source regex to behavior-level coverage later. The default behavior was kept as historical behavior, and the nullish hardening was applied.
-- Browser QA: skipped for this slice because it is non-UI runtime export glue. The parallel Clay UI lane owns browser evidence for visual surfaces.
+- Browser QA: skipped for this slice because it is non-UI runtime export glue. The active Clay UI lane owns browser evidence for visual surfaces.
 - Commit include scope for this runtime slice: `status.md`, `src/App.tsx`, `src/app/useEcommerceGroupExportRuntime.ts`, `tests/unit/ecommerce-group-export-runtime-contract.test.ts`, `tests/unit/ecommerce-group-export-entry.test.ts`, `tests/unit/ecommerce-group-slot-integration.test.ts`, `tests/unit/ecommerce-canvas-contract.test.ts`, and `tests/unit/ecommerce-export-button-guards.test.ts`.
 - Explicitly excluded dirty UI paths: `plans.md`, `implement.md`, `validation.md`, `.agent/rules/skills/SKILL.md`, `src/app/AppDesktopChrome.tsx`, `src/components/**`, `src/index.css`, `src/main.tsx`, `src/workflow/nodes/WorkflowUtilityCard.tsx`, and Clay/theme UI tests.
 
@@ -189,17 +189,19 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Browser QA
 
-- Browser QA is mandatory for the active Clay UI lane before a UI commit.
-- Current browser target: `http://127.0.0.1:3000/?clayVerify=requestlog20260501` served from built `dist/` after `npm.cmd run dev:restart` left Vite unhealthy.
-- In-app Browser screenshot capture is currently timing out through `Page.captureScreenshot`; DOM snapshots and visible DOM checks are available and must be used as evidence if screenshots remain blocked.
-- Browser evidence still needs final refresh after the latest UI fixes and production build.
+- Browser QA is complete for the active Clay UI lane before the UI commit.
+- Current browser target: `http://127.0.0.1:3000/?clayVerify=requestlog20260501` served from the local production/static path after `npm.cmd run build`.
+- Theme and viewport checked: dark theme, mobile-width in-app Browser viewport; final refresh captured a visible viewport of about `872x985`; desktop/settings/search/API workbench surfaces were also inspected during the same pass.
+- Verified surfaces: mobile shell, prompt/composer, SearchPalette default and multi-select states, settings overview, and API Workspace.
+- Browser findings: dark mode reads as neutral black/gray; SearchPalette multi-select is readable; API Workspace Add API/Setup Status no longer render as nested stacked cards; `.theme-transitioning === 0`; stale chunk text count `0`.
+- Light-theme readability is covered by the Clay emphasis contrast contract because the in-app Browser pass could not switch theme through the blocked `javascript:` injection path.
 
 ## Remaining Work
 
-1. Close the ecommerce group export runtime slice with a path-limited commit, then continue Stage One M6 with the next ecommerce runtime reference map.
-2. Keep the Clay UI lane coordinated through this status file while avoiding mixed UI/runtime commits.
-3. Parallel UI lane owns any remaining browser QA and UI-only commit path.
-4. Before every commit, review `git --git-dir=node_modules/.codex-git-full --work-tree=. status --short` and stage only the documented include scope.
+1. Re-run lightweight ledger/governance checks after this status correction.
+2. Review `git --git-dir=node_modules/.codex-git-full --work-tree=. status --short` and keep the UI commit path-limited to documented UI/doc/test files.
+3. Do not include paused runtime/PPT/ecommerce extraction files in the UI commit.
+4. After the UI commit boundary is clean, resume Stage One runtime/ecommerce work in a separate commit lane.
 
 ## Risks
 

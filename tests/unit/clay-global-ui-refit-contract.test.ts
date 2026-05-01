@@ -53,13 +53,15 @@ test('global tokens use Clay light and dark palettes with bold color-block hiera
   assert.match(cssSource, /--clay-brand-peach:\s*#ffb084;/);
   assert.match(cssSource, /--clay-brand-ochre:\s*#e8b94a;/);
   assert.match(cssSource, /--clay-brand-coral:\s*#ff6b5a;/);
+  assert.match(cssSource, /--clay-brand-pink-ink:\s*#8a123f;/);
+  assert.match(cssSource, /--clay-brand-coral-ink:\s*#7a1f16;/);
   assert.match(cssSource, /--font-display:\s*'Plain Black',\s*'Inter'/);
   assert.match(cssSource, /--font-sans:\s*'Inter'/);
   assert.match(cssSource, /--bg-canvas:\s*var\(--clay-canvas\);/);
   assert.match(cssSource, /--text-primary:\s*var\(--clay-ink\);/);
   assert.match(cssSource, /--accent-color:\s*var\(--clay-brand-coral\);/);
   assert.match(cssSource, /--settings-accent-rgb:\s*255 107 90;/);
-  assert.match(cssSource, /--search-palette-accent:\s*var\(--clay-brand-pink\);/);
+  assert.match(cssSource, /--search-palette-accent:\s*var\(--clay-brand-pink-ink\);/);
   assert.match(cssSource, /--search-palette-overlay-bg:\s*rgb\(10 10 10 \/ 0\.18\);/);
   assert.match(cssSource, /--search-palette-shadow:\s*var\(--frost-card-framework-shadow\);/);
   assert.match(cssSource, /--clay-shadow-card:\s*none;/);

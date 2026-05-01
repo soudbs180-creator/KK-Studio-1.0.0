@@ -24,6 +24,7 @@ description: KK Studio 完整规则总纲 - Clay UI、工程验证、供应商�
 - 不允许为追求“好看”而大幅改动既有 UI 动线；优先稳定、兼容、专业、可维护。
 - Windows PowerShell 默认 `cp936` 会把 UTF-8 中文规则文件误显示成乱码；读取 `.agent`、`docs` 与治理脚本时，优先使用 UTF-8 显式读取或直接运行校验脚本。
 - 修改完成后，默认执行：`npm run typecheck`、`npm run check:encoding`、`npm run build`。
+- UI changes also require Codex in-app Browser evidence before a UI commit: record URL, viewport, theme, checked surfaces, `.theme-transitioning`, and stale chunk status in `status.md`.
 
 ---
 

@@ -68,20 +68,28 @@ class ErrorBoundary extends Component<Props, State> {
             const language = getBoundaryLanguage();
 
             return (
-                <div className="min-h-screen bg-[#09090b] flex items-center justify-center p-4">
-                    <div className="bg-[#18181b] border border-red-500/20 rounded-2xl p-8 max-w-md">
+                <div className="min-h-screen bg-[var(--bg-canvas)] flex items-center justify-center p-4">
+                    <div
+                        className="border border-red-500/20 rounded-2xl p-8 max-w-md"
+                        style={{
+                            background: 'var(--frost-card-framework-bg)',
+                            boxShadow: 'var(--frost-card-framework-shadow)',
+                            backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                            WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                        }}
+                    >
                         <h2 className="text-xl font-bold text-red-500 mb-4">
                             {pickBoundaryText(language, '应用错误', 'Application Error')}
                         </h2>
-                        <p className="dark:text-zinc-300 mb-4">
+                        <p className="mb-4 text-[var(--text-secondary)]">
                             {pickBoundaryText(language, '页面发生异常，请刷新后重试。', 'Something went wrong. Please refresh the page.')}
                         </p>
-                        <pre className="text-xs dark:text-zinc-500 bg-black/30 p-3 rounded overflow-auto max-h-40">
+                        <pre className="text-xs text-[var(--text-tertiary)] bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] p-3 rounded overflow-auto max-h-40">
                             {localizeBoundaryErrorText(language, this.state.error?.message)}
                         </pre>
                         <button
                             onClick={() => window.location.reload()}
-                            className="mt-4 w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg transition-colors"
+                            className="mt-4 w-full bg-[var(--accent-coral)] hover:opacity-90 text-white py-2 rounded-lg transition"
                         >
                             {pickBoundaryText(language, '刷新页面', 'Reload Page')}
                         </button>

@@ -203,6 +203,37 @@ test('shared app and settings theme surfaces keep normal text contrast', () => {
   }
 });
 
+test('light Clay emphasis text remains readable on tinted frosted states', () => {
+  const cssSource = readSource('src/index.css');
+  const light = extractThemeVariables(cssSource, 'body:not(.dark-mode)');
+  const settingsLight = extractThemeVariables(cssSource, '.settings-panel');
+  const lightBase = '#fffaf0';
+
+  for (const [textToken, surfaceToken] of [
+    ['--state-info-text', '--state-info-bg'],
+    ['--search-palette-accent', '--search-palette-selected-bg'],
+    ['--mobile-clay-stage-info-text', '--mobile-clay-stage-info-bg'],
+    ['--accent-blue', '--selected-bg'],
+  ] as const) {
+    const contrast = contrastRatio(light[textToken], light[surfaceToken], light, lightBase);
+    assert.ok(
+      contrast >= MIN_NORMAL_TEXT_CONTRAST,
+      `light ${textToken} must stay readable on ${surfaceToken}; got ${contrast.toFixed(2)}`,
+    );
+  }
+
+  const settingsInfoContrast = contrastRatio(
+    settingsLight['--settings-state-info-text'],
+    settingsLight['--settings-state-info-bg'],
+    settingsLight,
+    lightBase,
+  );
+  assert.ok(
+    settingsInfoContrast >= MIN_NORMAL_TEXT_CONTRAST,
+    `settings light --settings-state-info-text must stay readable; got ${settingsInfoContrast.toFixed(2)}`,
+  );
+});
+
 test('Clay theme tokens expose distinct readable light and dark surfaces', () => {
   const cssSource = readSource('src/index.css');
   const root = extractCssVariables(extractCssBlock(cssSource, ':root', 'last'));

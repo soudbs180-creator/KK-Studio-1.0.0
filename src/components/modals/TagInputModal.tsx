@@ -124,11 +124,13 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
             onClick={onClose}
         >
             <div
-                className={`w-full shadow-2xl overflow-hidden animate-modal-in flex flex-col ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-[26px] rounded-b-none' : 'mx-4 max-w-md rounded-xl max-h-[85vh]'}`}
+                className={`tag-input-modal w-full overflow-hidden animate-modal-in flex flex-col ${isMobile ? 'ios-mobile-sheet mobile-sheet-viewport rounded-t-[26px] rounded-b-none' : 'mx-4 max-w-md rounded-xl max-h-[85vh]'}`}
                 style={{
-                    backgroundColor: 'var(--bg-surface)',
-                    border: '1px solid var(--border-default)',
-                    boxShadow: 'var(--shadow-xl)'
+                    background: 'var(--frost-card-framework-bg)',
+                    border: '1px solid var(--frost-card-framework-border)',
+                    boxShadow: 'var(--frost-card-framework-shadow)',
+                    WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+                    backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)'
                 }}
                 onClick={e => e.stopPropagation()}
             >
@@ -136,8 +138,8 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
                 <div
                     className={`flex items-center justify-between border-b p-4 ${isMobile ? 'mobile-sheet-header-safe' : ''}`}
                     style={{
-                        backgroundColor: 'var(--bg-secondary)',
-                        borderColor: 'var(--border-default)'
+                        background: 'var(--frost-card-sub-bg)',
+                        borderColor: 'var(--frost-card-sub-border)'
                     }}
                 >
                     <h3 className="text-sm font-medium flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
@@ -239,23 +241,18 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
                             onChange={e => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
                             placeholder="输入标签并回车..."
-                            className="flex-1 px-3 py-2 text-sm transition-all"
+                            className="flex-1 px-3 py-2 text-sm transition-all focus:border-[color:var(--settings-focus-border)] focus:ring-2 focus:ring-[color:var(--settings-focus-ring)]"
                             style={{
-                                backgroundColor: 'var(--bg-input)',
-                                border: '1px solid var(--border-default)',
+                                background: 'var(--frost-input-bg)',
+                                border: '1px solid var(--frost-input-border)',
                                 borderRadius: 'var(--radius-md)',
+                                boxShadow: 'var(--frost-input-shadow)',
                                 color: 'var(--text-primary)',
                                 outline: 'none',
                                 fontSize: '16px',
-                                transitionDuration: 'var(--duration-fast)'
-                            }}
-                            onFocus={(e) => {
-                                e.currentTarget.style.borderColor = 'var(--accent-blue)';
-                                e.currentTarget.style.boxShadow = 'var(--glow-blue)';
-                            }}
-                            onBlur={(e) => {
-                                e.currentTarget.style.borderColor = 'var(--border-default)';
-                                e.currentTarget.style.boxShadow = 'none';
+                                transitionDuration: 'var(--duration-fast)',
+                                WebkitBackdropFilter: 'blur(var(--frost-input-blur)) saturate(1.12)',
+                                backdropFilter: 'blur(var(--frost-input-blur)) saturate(1.12)'
                             }}
                         />
                         <button
@@ -263,18 +260,18 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
                             disabled={!input.trim()}
                             className="px-3 transition-all active:scale-95"
                             style={{
-                                backgroundColor: 'var(--bg-secondary)',
+                                backgroundColor: 'var(--frost-card-sub-bg)',
                                 color: 'var(--text-primary)',
                                 borderRadius: 'var(--radius-md)',
-                                border: '1px solid var(--border-subtle)',
+                                border: '1px solid var(--frost-card-sub-border)',
                                 opacity: !input.trim() ? 0.5 : 1,
                                 cursor: !input.trim() ? 'not-allowed' : 'pointer',
                                 transitionDuration: 'var(--duration-fast)'
                             }}
                             onMouseEnter={(e) => {
-                                if (input.trim()) e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
+                                if (input.trim()) e.currentTarget.style.backgroundColor = 'var(--frost-card-main-bg)';
                             }}
-                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-secondary)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--frost-card-sub-bg)')}
                         >
                             <Plus size={18} />
                         </button>
@@ -320,8 +317,8 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
                 <div
                     className={`border-t p-4 flex justify-end gap-2 ${isMobile ? 'mobile-sheet-footer-safe' : ''}`}
                     style={{
-                        backgroundColor: 'var(--bg-secondary)',
-                        borderColor: 'var(--border-default)'
+                        background: 'var(--frost-card-sub-bg)',
+                        borderColor: 'var(--frost-card-sub-border)'
                     }}
                 >
                     <button
@@ -334,7 +331,7 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
                         }}
                         onMouseEnter={(e) => {
                             e.currentTarget.style.color = 'var(--text-primary)';
-                            e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
+                            e.currentTarget.style.backgroundColor = 'var(--frost-card-sub-bg)';
                         }}
                         onMouseLeave={(e) => {
                             e.currentTarget.style.color = 'var(--text-tertiary)';
@@ -347,10 +344,10 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
                         onClick={handleSave}
                         className="px-4 py-2 text-sm font-medium transition-all active:scale-95"
                         style={{
-                            backgroundColor: 'var(--accent-blue)',
+                            background: 'linear-gradient(180deg, var(--clay-brand-pink) 0%, var(--clay-brand-coral) 100%)',
                             color: 'white',
                             borderRadius: 'var(--radius-md)',
-                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)',
+                            boxShadow: 'var(--frost-card-main-shadow)',
                             transitionDuration: 'var(--duration-fast)'
                         }}
                         onMouseEnter={(e) => (e.currentTarget.style.filter = 'brightness(1.1)')}

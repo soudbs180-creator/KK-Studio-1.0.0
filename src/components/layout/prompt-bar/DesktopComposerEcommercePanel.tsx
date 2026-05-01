@@ -576,6 +576,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
                       ...panelSurfaceStyle,
                       borderColor: 'var(--clay-brand-pink)',
                       background: 'var(--frost-card-main-bg)',
+                      boxShadow: 'inset 0 0 0 1px var(--prompt-bar-shell-border-strong), var(--frost-card-main-shadow)',
                     } : subSurfaceStyle}
                   >
                     <div className="min-w-0 flex-1">

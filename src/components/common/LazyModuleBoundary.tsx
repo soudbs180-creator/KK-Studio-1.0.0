@@ -45,15 +45,24 @@ class LazyModuleBoundary extends Component<LazyModuleBoundaryProps, LazyModuleBo
 
     const isOverlay = this.props.variant !== 'inline';
     const wrapperClassName = isOverlay
-      ? 'absolute inset-0 z-[130] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm'
+      ? 'absolute inset-0 z-[130] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm'
       : 'flex min-h-[280px] items-center justify-center';
     const panelClassName = isOverlay
-      ? 'w-full max-w-xl rounded-3xl border border-white/10 bg-[#111217] p-6 shadow-2xl'
-      : 'w-full rounded-3xl border border-[var(--state-danger-border)] bg-[var(--state-danger-bg)] p-5';
+      ? 'w-full max-w-xl rounded-3xl border p-6'
+      : 'w-full rounded-3xl border p-5';
 
     return (
       <div className={wrapperClassName}>
-        <div className={panelClassName}>
+        <div
+          className={panelClassName}
+          style={{
+            background: 'var(--frost-card-framework-bg)',
+            borderColor: isOverlay ? 'var(--frost-card-framework-border)' : 'var(--state-danger-border)',
+            boxShadow: 'var(--frost-card-framework-shadow)',
+            backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+            WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+          }}
+        >
           <div className="text-sm font-medium text-[var(--text-secondary)]">模块加载失败</div>
           <div className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
             {this.props.moduleName} 暂时打不开
@@ -61,14 +70,14 @@ class LazyModuleBoundary extends Component<LazyModuleBoundaryProps, LazyModuleBo
           <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
             这通常发生在本地开发服务器重启、端口断开，或热更新过程中模块文件暂时不可用时。主界面数据不会丢失。
           </p>
-          <pre className="mt-4 max-h-40 overflow-auto rounded-2xl border border-white/10 bg-black/25 p-3 text-xs leading-6 text-zinc-300">
+          <pre className="mt-4 max-h-40 overflow-auto rounded-2xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] p-3 text-xs leading-6 text-[var(--text-secondary)]">
             {this.state.error.message}
           </pre>
           <div className="mt-5 flex flex-wrap gap-3">
             <button
               type="button"
               onClick={this.handleRetry}
-              className="rounded-xl border border-indigo-400/30 bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-400"
+              className="rounded-xl border border-[var(--accent-coral)]/30 bg-[var(--accent-coral)] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
             >
               重新尝试
             </button>
@@ -76,7 +85,7 @@ class LazyModuleBoundary extends Component<LazyModuleBoundaryProps, LazyModuleBo
               <button
                 type="button"
                 onClick={this.props.onClose}
-                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+                className="rounded-xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--toolbar-hover)]"
               >
                 关闭这个面板
               </button>
@@ -84,7 +93,7 @@ class LazyModuleBoundary extends Component<LazyModuleBoundaryProps, LazyModuleBo
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="rounded-xl border border-white/10 bg-transparent px-4 py-2 text-sm font-medium text-zinc-200 transition hover:bg-white/5"
+              className="rounded-xl border border-[var(--frost-card-sub-border)] bg-transparent px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--toolbar-hover)]"
             >
               刷新页面
             </button>

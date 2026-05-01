@@ -8,6 +8,7 @@ interface DesktopComposerModePanelProps {
   optionsPanelRef: React.RefObject<HTMLDivElement | null>;
   mobileFloatingSheetBottom: string;
   mobileFloatingSheetMaxHeight: string;
+  embeddedMobileDrawer?: boolean;
   onToggleOptionsPanel: () => void;
   optionsPanelContent: React.ReactNode;
   networkControls?: React.ReactNode;
@@ -70,6 +71,7 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
   optionsPanelRef,
   mobileFloatingSheetBottom,
   mobileFloatingSheetMaxHeight,
+  embeddedMobileDrawer = false,
   onToggleOptionsPanel,
   optionsPanelContent,
   networkControls,
@@ -135,13 +137,14 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
   })();
 
   const shouldRenderDesktopPanel = !isMobile && (showOptionsPanel || isDesktopPanelVisible);
+  const isEmbeddedMobileDrawer = isMobile && embeddedMobileDrawer;
 
   return (
     <>
       <div className={`relative inline-flex ${isMobile ? 'row-start-2 min-w-0' : 'min-w-fit flex-shrink-0'}`}>
         <button
           data-options-toggle
-          className={`${isMobile ? '' : 'prompt-bar-liquid-button'} flex w-full items-center justify-center gap-1.5 h-10 rounded-lg border transition-all text-xs font-medium whitespace-nowrap ${isMobile ? 'px-2.5 max-w-none' : 'px-3.5 flex-shrink-0'}`}
+          className={`${isMobile ? '' : 'prompt-bar-liquid-button'} flex w-full items-center justify-center gap-1.5 h-10 rounded-lg border transition-all text-xs font-medium whitespace-nowrap ${isMobile ? (isEmbeddedMobileDrawer ? 'px-3 justify-between max-w-none' : 'px-2.5 max-w-none') : 'px-3.5 flex-shrink-0'}`}
           style={{
             background: showOptionsPanel ? 'var(--prompt-bar-shell-hover)' : 'var(--prompt-bar-shell-bg)',
             color: 'var(--text-secondary)',
@@ -161,15 +164,18 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
 
         {showOptionsPanel && isMobile ? (
           <div
-            className={isMobile ? 'fixed left-3 right-3 z-[1005] ios-mobile-floating-sheet p-2 animate-fadeIn overflow-hidden' : 'absolute bottom-full mb-2 z-30 animate-fadeIn origin-bottom'}
+            className={isEmbeddedMobileDrawer ? 'mt-2 w-full animate-fadeIn overflow-y-auto' : 'fixed left-3 right-3 z-[1005] ios-mobile-floating-sheet p-2 animate-fadeIn overflow-hidden'}
             style={
-              isMobile
+              isEmbeddedMobileDrawer
                 ? {
+                    maxHeight: mobileFloatingSheetMaxHeight,
+                    overscrollBehavior: 'contain',
+                  }
+                : {
                     bottom: mobileFloatingSheetBottom,
                     maxHeight: mobileFloatingSheetMaxHeight,
                     overscrollBehavior: 'contain',
                   }
-                : { left: '50%', transform: 'translateX(-50%)' }
             }
           >
             <div ref={optionsPanelRef}>{optionsPanelContent}</div>

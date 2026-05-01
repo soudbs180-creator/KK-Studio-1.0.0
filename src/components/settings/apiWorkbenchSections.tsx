@@ -143,7 +143,7 @@ export const ApiWorkbenchOverviewSection: React.FC<ApiWorkbenchOverviewSectionPr
             </div>
           ) : null}
           {isHydratingRuntimeUserApis ? (
-            <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 text-[var(--text-secondary)]" style={SETTINGS_ELEVATED_STYLE}>
+            <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 text-[var(--text-secondary)]" style={SETTINGS_OVERLAY_STYLE}>
               {snapshotHydrationHelper}
             </div>
           ) : null}
@@ -241,7 +241,7 @@ export const ApiWorkbenchCurrentViewSection: React.FC<ApiWorkbenchCurrentViewSec
             ))}
           </div>
         ) : (
-          <div className="rounded-[18px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
+          <div className="rounded-[18px] border p-4" style={SETTINGS_OVERLAY_STYLE}>
             <div className="text-[15px] font-semibold text-[var(--text-primary)]">
               {pick('全局延迟概览', 'Global latency summary')}
             </div>
@@ -522,7 +522,7 @@ export const ApiWorkbenchRoutePoolSection: React.FC<ApiWorkbenchRoutePoolSection
   >
     <div className="grid gap-3 lg:grid-cols-2">
       {items.map((item) => (
-        <div key={item.id} className="rounded-[18px] border p-3" style={SETTINGS_ELEVATED_STYLE}>
+        <div key={item.id} className="rounded-[18px] border p-3" style={SETTINGS_OVERLAY_STYLE}>
           <div className="flex flex-wrap items-center gap-2">
             <div className="text-[14px] font-semibold text-[var(--text-primary)]">{item.name}</div>
             <SettingsBadge tone="neutral">{item.routeKind}</SettingsBadge>
@@ -584,7 +584,7 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
     >
       <div className="settings-capability-grid">
         {items.map((item) => (
-          <div key={item.role} className="settings-capability-card settings-reference-card--soft" style={SETTINGS_ELEVATED_STYLE}>
+          <div key={item.role} className="settings-capability-card settings-reference-card--soft" style={SETTINGS_OVERLAY_STYLE}>
             <div className="settings-capability-card__header">
               <div className="settings-capability-card__identity">
                 <div className="settings-capability-card__avatar" style={SETTINGS_OVERLAY_STYLE}>
@@ -685,7 +685,7 @@ export const ApiWorkbenchOcrSection: React.FC<ApiWorkbenchOcrSectionProps> = ({
     action={<SettingsBadge tone="neutral">{pick('OCR service', 'OCR service')}</SettingsBadge>}
   >
     <div className="grid gap-3 lg:grid-cols-[1.2fr,1fr]">
-      <div className="space-y-3 rounded-[18px] border p-3" style={SETTINGS_ELEVATED_STYLE}>
+      <div className="space-y-3 rounded-[18px] border p-3" style={SETTINGS_OVERLAY_STYLE}>
         <SettingToggle
           label={pick('启用 OCR 服务', 'Enable OCR service')}
           checked={enabled}

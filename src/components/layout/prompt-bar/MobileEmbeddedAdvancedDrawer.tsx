@@ -14,9 +14,9 @@ const MobileEmbeddedAdvancedDrawer: React.FC<MobileEmbeddedAdvancedDrawerProps> 
   return (
     <details
       data-mobile-composer-section="advanced-drawer"
-      className="w-full rounded-[20px] border border-white/8 bg-black/10 px-1.5 py-1 text-[var(--text-primary)]"
+      className="w-full min-w-0 text-[var(--text-primary)]"
     >
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-[16px] px-2.5 py-2 text-left marker:hidden">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-[16px] px-2.5 py-2 text-left transition-colors hover:bg-[var(--toolbar-hover)] marker:hidden">
         <div className="min-w-0">
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
             高级设置
@@ -25,19 +25,19 @@ const MobileEmbeddedAdvancedDrawer: React.FC<MobileEmbeddedAdvancedDrawerProps> 
             {summaryText}
           </div>
         </div>
-        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-[var(--text-secondary)]">
+        <span className="rounded-full border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-2 py-1 text-[10px] font-medium text-[var(--text-secondary)]">
           展开
         </span>
       </summary>
 
       <div
         data-mobile-secondary-menu="promptbar-low-frequency-actions"
-        className="space-y-2 px-2.5 pb-2 pt-1"
+        className="mt-1 space-y-2 border-t border-[var(--frost-card-sub-border)] px-2.5 pb-2 pt-2"
       >
         <div className="flex flex-wrap items-center gap-2">
           {promptTools}
         </div>
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="w-full min-w-0">
           {modePanel}
         </div>
       </div>

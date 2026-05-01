@@ -162,13 +162,13 @@ const ReferenceThumbnail = React.memo(({
     if (loading || !data) {
         return (
             <div
-                className="w-12 h-12 rounded-lg border border-white/10 shadow-sm bg-[var(--frost-input-bg)] overflow-hidden flex items-center justify-center"
+                className="w-12 h-12 rounded-lg border border-[var(--frost-input-border)] bg-[var(--frost-input-bg)] overflow-hidden flex items-center justify-center"
                 aria-label="reference-thumbnail-skeleton"
             >
-                <div className="h-full w-full animate-pulse bg-[linear-gradient(135deg,rgba(255,255,255,0.10),rgba(255,255,255,0.04))] flex items-center justify-center">
+                <div className="h-full w-full animate-pulse bg-[var(--frost-card-sub-bg)] flex items-center justify-center">
                     <div className="flex flex-col gap-1.5 opacity-70">
-                        <div className="h-1.5 w-6 rounded-full bg-white/20" />
-                        <div className="h-1.5 w-4 rounded-full bg-white/12" />
+                        <div className="h-1.5 w-6 rounded-full bg-[var(--text-tertiary)] opacity-30" />
+                        <div className="h-1.5 w-4 rounded-full bg-[var(--text-tertiary)] opacity-20" />
                     </div>
                 </div>
             </div>
@@ -2713,12 +2713,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
             maxWidth: '100%',
             margin: 0,
             borderRadius: '22px',
-            border: '1px solid var(--mobile-glass-border, rgba(255,255,255,0.16))',
+            border: '1px solid var(--frost-card-framework-border)',
             padding: 0,
             WebkitBackdropFilter: 'blur(26px) saturate(170%)',
             backdropFilter: 'blur(26px) saturate(170%)',
-            background: 'var(--mobile-glass-bg, rgba(20, 20, 23, 0.84))',
-            boxShadow: '0 18px 44px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.15)',
+            background: 'var(--frost-card-framework-bg)',
+            boxShadow: 'var(--frost-card-framework-shadow)',
             contain: 'layout style paint',
         }
         : {
@@ -2730,13 +2730,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
             maxWidth: 'min(960px, calc(100vw - 20px))',
             margin: 0,
             borderRadius: '22px',
-            border: '1px solid var(--mobile-glass-border, rgba(255,255,255,0.16))',
+            border: '1px solid var(--frost-card-framework-border)',
             zIndex: 960,
             padding: 0,
             WebkitBackdropFilter: 'blur(26px) saturate(170%)',
             backdropFilter: 'blur(26px) saturate(170%)',
-            background: 'var(--mobile-glass-bg, rgba(20, 20, 23, 0.84))',
-            boxShadow: '0 24px 56px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.15)',
+            background: 'var(--frost-card-framework-bg)',
+            boxShadow: 'var(--frost-card-framework-shadow)',
             willChange: 'transform',
             contain: 'layout style paint'
         }) : {
@@ -2934,7 +2934,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 </button>
                                 <button
                                     className="ml-auto px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)]"
-                                    style={{ color: '#38bdf8' }}
+                                    style={{ color: 'var(--accent-coral)' }}
                                     onClick={applyPptOutlineDraft}
                                 >
                                     生成前检查
@@ -2992,7 +2992,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
             className={[
                 shouldRenderInlineMobileUploadButton ? 'mt-1 flex items-end gap-2 px-3' : '',
                 isEmbeddedMobileComposer
-                    ? 'mt-2 flex items-end gap-2 rounded-[22px] border border-white/8 bg-black/15 px-3 py-2.5'
+                    ? 'mt-2 flex items-end gap-2 rounded-[22px] border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-3 py-2.5'
                     : '',
             ].filter(Boolean).join(' ')}
         >
@@ -3090,6 +3090,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
             optionsPanelRef={optionsPanelRef}
             mobileFloatingSheetBottom={mobileFloatingSheetBottom}
             mobileFloatingSheetMaxHeight={mobileFloatingSheetMaxHeight}
+            embeddedMobileDrawer={isEmbeddedMobileComposer}
             onToggleOptionsPanel={() => {
                 setActiveMenu(null);
                 setShowOptionsPanel(prev => !prev);
@@ -3103,8 +3104,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             <button
                                 key={dur}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${(config.audioDuration || '自动') === dur
-                                    ? 'bg-pink-500/20 text-pink-400 border-pink-500/30'
-                                    : 'bg-[var(--frost-input-bg)] text-[var(--text-secondary)] border-[color:var(--frost-card-sub-border)] hover:border-pink-500/30'
+                                    ? 'bg-[var(--prompt-bar-shell-hover)] text-[var(--text-primary)] border-[var(--prompt-bar-shell-border-strong)]'
+                                    : 'bg-[var(--frost-input-bg)] text-[var(--text-secondary)] border-[color:var(--frost-card-sub-border)] hover:border-[var(--prompt-bar-shell-border-strong)]'
                                     }`}
                                 onClick={() => updateConfigFields({ audioDuration: dur === '自动' ? undefined : dur })}
                             >
@@ -3244,7 +3245,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             {Array.from({ length: MODEL_MENU_SKELETON_COUNT }).map((_, index) => (
                                 <div
                                     key={`prompt-bar-model-loading-${index}`}
-                                    className="h-12 rounded-xl bg-white/5 border border-white/5 animate-pulse"
+                                    className="h-12 rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] animate-pulse"
                                 />
                             ))}
                         </div>
@@ -3551,7 +3552,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         </button>
                                         <button
                                             className="ml-auto px-2 py-1 rounded-md text-[11px] border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)]"
-                                            style={{ color: '#38bdf8' }}
+                                            style={{ color: 'var(--accent-coral)' }}
                                             onClick={applyPptOutlineDraft}
                                         >
                                             生成前检查
@@ -3686,7 +3687,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 className={`transition-all duration-300 ease-[cubic-bezier(0.25, 1, 0.5, 1)] rounded-lg overflow-hidden ${showSpacer ? 'w-12 opacity-100 mr-2' : 'w-0 opacity-0 mr-0'}`}
                                                 style={{ height: showSpacer ? '48px' : '0px' }}
                                             >
-                                                <div className="w-12 h-12 rounded-lg border-2 border-dashed border-white/60 bg-white/12"></div>
+                                                <div className="w-12 h-12 rounded-lg border-2 border-dashed border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)]"></div>
                                             </div>
 
                                             <div
@@ -3725,8 +3726,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                                 {/* [NEW] Uploading Skeletons */}
                                 {Array.from({ length: uploadingSkeletonCount }).map((_, idx) => (
-                                    <div key={`uploading-${idx}`} className="relative w-12 h-12 rounded-lg border-2 border-dashed border-[color:var(--frost-card-sub-border)] border-[color:var(--frost-card-sub-border)] flex items-center justify-center bg-[var(--frost-card-sub-bg)] bg-[var(--frost-card-sub-bg)] overflow-hidden flex-shrink-0 animate-pulse">
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin text-[var(--text-tertiary)] dark:text-zinc-400">
+                                    <div key={`uploading-${idx}`} className="relative w-12 h-12 rounded-lg border-2 border-dashed border-[color:var(--frost-card-sub-border)] flex items-center justify-center bg-[var(--frost-card-sub-bg)] overflow-hidden flex-shrink-0 animate-pulse">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin text-[var(--text-tertiary)]">
                                             <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                                         </svg>
                                     </div>
@@ -3736,7 +3737,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     id="spacer"
                                     className={`transition-all duration-300 ease-[cubic-bezier(0.25, 1, 0.5, 1)] rounded-lg overflow-hidden ${dropTargetIndex === config.referenceImages.length ? 'w-12 opacity-100 h-12' : 'w-0 opacity-0 h-0'}`}
                                 >
-                                    <div className="w-12 h-12 rounded-lg border-2 border-dashed border-white/60 bg-white/12"></div>
+                                    <div className="w-12 h-12 rounded-lg border-2 border-dashed border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)]"></div>
                                 </div>
 
                                 {/* Upload Button - At the end of reference images row - 始终显示 */}
@@ -3823,7 +3824,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             className={[
                                 shouldRenderInlineMobileUploadButton ? 'mt-1 flex items-end gap-2 px-3' : '',
                                 isEmbeddedMobileComposer
-                                    ? 'mt-2 flex items-end gap-2 rounded-[22px] border border-white/8 bg-black/15 px-3 py-2.5'
+                                    ? 'mt-2 flex items-end gap-2 rounded-[22px] border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-3 py-2.5'
                                     : '',
                             ].filter(Boolean).join(' ')}
                         >
@@ -4031,7 +4032,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                         {Array.from({ length: MODEL_MENU_SKELETON_COUNT }).map((_, index) => (
                                                             <div
                                                                 key={`prompt-bar-model-loading-${index}`}
-                                                                className="h-12 rounded-xl bg-white/5 border border-white/5 animate-pulse"
+                                                                className="h-12 rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] animate-pulse"
                                                             />
                                                         ))}
                                                     </div>
@@ -4104,8 +4105,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 <button
                                                     key={dur}
                                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${(config.audioDuration || '自动') === dur
-                                                        ? 'bg-pink-500/20 text-pink-400 border-pink-500/30'
-                                                        : 'bg-[var(--frost-input-bg)] text-[var(--text-secondary)] border-[color:var(--frost-card-sub-border)] hover:border-pink-500/30'
+                                                        ? 'bg-[var(--prompt-bar-shell-hover)] text-[var(--text-primary)] border-[var(--prompt-bar-shell-border-strong)]'
+                                                        : 'bg-[var(--frost-input-bg)] text-[var(--text-secondary)] border-[color:var(--frost-card-sub-border)] hover:border-[var(--prompt-bar-shell-border-strong)]'
                                                         }`}
                                                     onClick={() => updateConfigFields({ audioDuration: dur === '自动' ? undefined : dur })}
                                                 >

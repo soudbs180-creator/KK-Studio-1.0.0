@@ -123,8 +123,8 @@ function FatalScreen({ error }: { error: FatalError }) {
     <div
       style={{
         minHeight: '100vh',
-        background: '#09090b',
-        color: '#f4f4f5',
+        background: 'var(--bg-canvas, #0b0b0c)',
+        color: 'var(--text-primary, #fffaf0)',
         fontFamily: 'Inter, system-ui, sans-serif',
         display: 'flex',
         alignItems: 'center',
@@ -136,35 +136,36 @@ function FatalScreen({ error }: { error: FatalError }) {
         style={{
           width: '100%',
           maxWidth: '920px',
-          background: '#111217',
-          border: '1px solid #27272a',
-          borderRadius: '16px',
+          background: 'var(--frost-card-framework-bg, #141414)',
+          border: '1px solid var(--frost-card-framework-border, rgba(255,250,240,0.14))',
+          borderRadius: '24px',
           padding: '28px',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+          boxShadow: 'var(--frost-card-framework-shadow, 0 12px 28px rgba(0,0,0,0.24))',
+          backdropFilter: 'blur(var(--frost-card-framework-blur, 24px)) saturate(160%)',
         }}
       >
         <div style={{ marginBottom: '18px' }}>
-          <div style={{ fontSize: '14px', color: '#a1a1aa', marginBottom: '8px' }}>
+          <div style={{ fontSize: '14px', color: 'var(--text-secondary, #d6d0c4)', marginBottom: '8px' }}>
             {pickByResolvedLanguage(language, 'KK Studio 启动诊断', 'KK Studio Startup Diagnostics')}
           </div>
-          <h1 style={{ fontSize: '28px', lineHeight: 1.2, color: '#f87171', margin: 0 }}>
+          <h1 style={{ fontSize: '28px', lineHeight: 1.2, color: 'var(--state-danger-text, #f87171)', margin: 0 }}>
             {pickByResolvedLanguage(language, '应用启动失败，已拦截白屏', 'The app failed to start and the blank screen was blocked')}
           </h1>
         </div>
 
         <div
           style={{
-            background: '#18181b',
-            border: '1px solid #27272a',
+            background: 'var(--frost-card-sub-bg, #1f1f1f)',
+            border: '1px solid var(--frost-card-sub-border, rgba(255,250,240,0.12))',
             borderRadius: '12px',
             padding: '16px',
             marginBottom: '16px',
           }}
         >
-          <div style={{ fontSize: '14px', color: '#a1a1aa', marginBottom: '6px' }}>
+          <div style={{ fontSize: '14px', color: 'var(--text-secondary, #d6d0c4)', marginBottom: '6px' }}>
             {pickByResolvedLanguage(language, '错误信息', 'Error details')}
           </div>
-          <div style={{ fontSize: '16px', color: '#fafafa', fontWeight: 600, marginBottom: '10px' }}>
+          <div style={{ fontSize: '16px', color: 'var(--text-primary, #fffaf0)', fontWeight: 600, marginBottom: '10px' }}>
             {localizeStartupErrorText(error.message)}
           </div>
           {error.details && (
@@ -175,7 +176,7 @@ function FatalScreen({ error }: { error: FatalError }) {
                 wordBreak: 'break-word',
                 fontSize: '12px',
                 lineHeight: 1.6,
-                color: '#d4d4d8',
+                color: 'var(--text-secondary, #d6d0c4)',
                 maxHeight: '320px',
                 overflow: 'auto',
               }}
@@ -211,7 +212,7 @@ function FatalScreen({ error }: { error: FatalError }) {
             onClick={() => window.location.reload()}
             style={{
               border: 'none',
-              background: '#4f46e5',
+              background: 'var(--accent-coral, #ff6b5a)',
               color: '#fff',
               borderRadius: '10px',
               padding: '10px 16px',
@@ -227,9 +228,9 @@ function FatalScreen({ error }: { error: FatalError }) {
               window.location.reload();
             }}
             style={{
-              border: '1px solid #3f3f46',
-              background: '#18181b',
-              color: '#fff',
+              border: '1px solid var(--frost-card-sub-border, rgba(255,250,240,0.12))',
+              background: 'var(--frost-card-sub-bg, #1f1f1f)',
+              color: 'var(--text-primary, #fff)',
               borderRadius: '10px',
               padding: '10px 16px',
               cursor: 'pointer',

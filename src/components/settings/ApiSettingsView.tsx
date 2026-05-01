@@ -154,13 +154,15 @@ const buildOfficialDraft = (provider: OfficialProvider = 'Google'): OfficialForm
   name: provider,
 });
 
+const DEFAULT_PROVIDER_COLOR = 'var(--text-secondary)';
+
 const providerDefaults: ProviderForm = {
   name: '',
   baseUrl: '',
   apiKey: '',
   format: 'auto',
   group: '',
-  color: '#60A5FA',
+  color: DEFAULT_PROVIDER_COLOR,
   isActive: true,
   mode: 'unlimited',
   value: '',
@@ -443,7 +445,7 @@ function toReadonlyProvider(rawValue: unknown): ThirdPartyProvider | null {
     }),
     format: providerFormat,
     group: normalizeString(raw.group) || undefined,
-    providerColor: normalizeString(raw.providerColor ?? raw.color) || '#60A5FA',
+    providerColor: normalizeString(raw.providerColor ?? raw.color) || DEFAULT_PROVIDER_COLOR,
     isActive:
       typeof raw.isActive === 'boolean'
         ? raw.isActive
@@ -745,7 +747,7 @@ const toProviderForm = (provider: ThirdPartyProvider): ProviderForm => ({
   apiKey: provider.apiKey,
   format: provider.format,
   group: provider.group || '',
-  color: provider.providerColor || '#60A5FA',
+  color: provider.providerColor || DEFAULT_PROVIDER_COLOR,
   isActive: provider.isActive,
   mode: getMode(provider.budgetLimit, provider.tokenLimit, provider.customCostMode || 'unlimited'),
   value:
@@ -2863,7 +2865,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                 ? thirdPartyProviders.map((provider) => {
                     const status = getProviderStatus(provider);
                     const avatar = (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border text-[13px] font-semibold" style={{ ...SETTINGS_OVERLAY_STYLE, color: provider.providerColor || '#60A5FA' }}>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border text-[13px] font-semibold" style={{ ...SETTINGS_OVERLAY_STYLE, color: provider.providerColor || DEFAULT_PROVIDER_COLOR }}>
                         {provider.name.charAt(0).toUpperCase()}
                       </div>
                     );
@@ -2952,7 +2954,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                 const prioritizedMetrics: ConsoleEndpointCardMetric[] = [];
 
                 const avatar = (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border text-[13px] font-semibold" style={{ ...SETTINGS_OVERLAY_STYLE, color: provider.providerColor || '#60A5FA' }}>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border text-[13px] font-semibold" style={{ ...SETTINGS_OVERLAY_STYLE, color: provider.providerColor || DEFAULT_PROVIDER_COLOR }}>
                     {provider.name.charAt(0).toUpperCase()}
                   </div>
                 );
@@ -3175,7 +3177,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                 label={pick('主题颜色', 'Theme color')}
                 value={providerForm.color}
                 onChange={(value) => setProviderForm((current) => ({ ...current, color: value }))}
-                placeholder="#60A5FA"
+                placeholder={DEFAULT_PROVIDER_COLOR}
                 helper={pick('用于列表卡片的识别色，不影响真实请求。', 'Used as the list accent color and does not affect real requests.')}
                 disabled={providerEditorReadOnly}
               />
@@ -3223,7 +3225,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                 helper={pick('用于组织和筛选供应商，不影响请求协议。', 'Used for organization and filtering, without affecting request behavior.')}
                 disabled={providerEditorReadOnly}
               />
-              <div className="rounded-[22px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
+              <div className="rounded-[22px] border p-4" style={SETTINGS_OVERLAY_STYLE}>
                 <SettingToggle
                   label={pick('参与调度', 'Include in routing')}
                   helper={pick('关闭后，供应商会保留配置，但不会再参与自动调度。', 'When disabled, the provider stays configured but is removed from automatic routing.')}
@@ -3234,7 +3236,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               </div>
             </div>
 
-            <div className="rounded-[24px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
+            <div className="rounded-[24px] border p-4" style={SETTINGS_OVERLAY_STYLE}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="text-[15px] font-semibold text-[var(--text-primary)]">{pick('高级抓取', 'Advanced fetch tools')}</div>

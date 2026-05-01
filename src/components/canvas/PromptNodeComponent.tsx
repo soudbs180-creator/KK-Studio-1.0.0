@@ -1543,7 +1543,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                             <Sparkles size={12} />
                                             <span>自动策略说明</span>
                                         </div>
-                                        <div className="text-[10px] text-violet-100/80 leading-normal">
+                                        <div className="text-[10px] text-[var(--clay-brand-lavender)] leading-normal">
                                             {getOptimizerStrategySummaryZh(node)}
                                         </div>
                                     </div>
@@ -1641,9 +1641,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                             }
                                             : badge.tone === 'blue'
                                                 ? {
-                                                    background: 'rgba(59, 130, 246, 0.12)',
-                                                    borderColor: 'rgba(59, 130, 246, 0.28)',
-                                                    color: 'rgb(147, 197, 253)',
+                                                    background: 'var(--state-info-bg)',
+                                                    borderColor: 'var(--state-info-border)',
+                                                    color: 'var(--state-info-text)',
                                                 }
                                                 : {
                                                     background: 'rgba(245, 158, 11, 0.12)',

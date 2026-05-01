@@ -238,8 +238,8 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                         onClick={() => setIsMultiSelectMode(!isMultiSelectMode)}
                         className="mr-2 min-h-[32px] rounded-[var(--radius-control-sm)] border px-2.5 py-1 text-xs font-medium transition-[background-color,border-color,color,box-shadow] hover:bg-[var(--toolbar-hover)]"
                         style={{
-                            background: isMultiSelectMode ? 'var(--search-palette-selected-bg)' : 'var(--settings-button-secondary-bg)',
-                            borderColor: isMultiSelectMode ? 'var(--search-palette-selected-border)' : 'var(--settings-button-secondary-border)',
+                            background: isMultiSelectMode ? 'var(--search-palette-selected-bg)' : 'var(--frost-card-sub-bg)',
+                            borderColor: isMultiSelectMode ? 'var(--search-palette-selected-border)' : 'var(--frost-card-sub-border)',
                             boxShadow: isMultiSelectMode ? 'var(--search-palette-selected-shadow)' : 'none',
                             color: isMultiSelectMode ? 'var(--search-palette-accent)' : 'var(--text-secondary)'
                         }}
