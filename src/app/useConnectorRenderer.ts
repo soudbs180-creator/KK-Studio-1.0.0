@@ -7,7 +7,7 @@ import { resolveLiveSceneNodePosition } from '../canvas/liveScene';
 import type { CanvasPerformanceProfile } from '../canvas/performanceProfile';
 import { traceLocalPerformance } from '../services/system/localPerformanceTrace';
 
-type ConnectorRenderSnapshot = {
+export type ConnectorRenderSnapshot = {
   promptIds: string[];
   imageIds: string[];
   workflowUtilityIds: string[];
@@ -21,7 +21,7 @@ const EMPTY_CONNECTOR_RENDER_SNAPSHOT: ConnectorRenderSnapshot = {
   positionByNodeId: {},
 };
 
-interface UseConnectorRendererDeps {
+export interface UseConnectorRendererDeps {
   liveSceneState: LiveSceneSnapshot;
   liveSceneRef: React.RefObject<LiveSceneSnapshot>;
   visiblePromptNodes: PromptNode[];
@@ -33,7 +33,7 @@ interface UseConnectorRendererDeps {
   canvasPerformanceProfile: CanvasPerformanceProfile;
 }
 
-interface UseConnectorRendererResult {
+export interface UseConnectorRendererResult {
   connectorRenderSnapshot: ConnectorRenderSnapshot;
   connectorRenderPromptNodes: PromptNode[];
   connectorRenderVisibleImageNodes: GeneratedImage[];

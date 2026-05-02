@@ -23,6 +23,7 @@
     "include": [
         "tests/contract/**/*.ts",
         "tests/integration/**/*.ts",
+        "tests/unit/canvas-connector-throttling-contract.test.ts",
         "tests/unit/encoding-check-contract.test.ts",
         "tests/unit/ecommerce-display-label-surface.test.ts",
         "tests/unit/ecommerce-analysis-button-gate.test.ts",

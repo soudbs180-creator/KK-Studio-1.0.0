@@ -4,7 +4,7 @@ Last updated: 2026-05-02
 
 ## Active State
 
-- Active lane in this thread: single-line Stage One convergence. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; the current slice is Stage One Backfill M1 `useConnectorRenderer` hardening.
+- Active lane in this thread: single-line Stage One convergence. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is complete and ready to commit.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
 - Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and is currently at `d12731ce refactor: extract ecommerce partial redraw runtime`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
@@ -12,9 +12,9 @@ Last updated: 2026-05-02
 - Alternate-git worktree was clean before this ledger-only correction.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: commit the ledger alignment to `d12731ce`, then begin Stage One Backfill M1 by auditing `src/App.tsx` and `src/app/useConnectorRenderer.ts`.
-- Current ledger-only commit scope: `plans.md`, `implement.md`, `status.md`, and `validation.md`.
-- Browser QA: skipped for this ledger-only correction because no UI runtime or visual surface changed.
+- Current focus: commit the connector renderer hardening slice, then begin Stage One Backfill M2 `usePromptGroupLayout` closeout.
+- Current commit scope: `src/app/useConnectorRenderer.ts`, `tests/unit/canvas-connector-throttling-contract.test.ts`, `tsconfig.tests.json`, and `status.md`.
+- Browser QA: skipped for this runtime/type-boundary slice because no UI runtime or visual surface changed.
 
 ## Completed In `9e7ae2b5` (Clay UI Audit Closure)
 
@@ -59,6 +59,14 @@ Last updated: 2026-05-02
 - The `src/App.tsx` ecommerce state adapter block is hook state patch wiring, not an unextracted business runtime. It may become a future `useEcommerceRuntimeStateAdapters` cleanup, but it is not an M6 blocker.
 - Deferred non-M6 quality debt: duplicate ecommerce framework child hide predicates, prompt-click empty-prompt policy cleanup, and ecommerce thinking-mode resolver relocation.
 - Browser QA: skipped because the closeout scan and ledger correction do not change UI behavior or visual surfaces.
+
+## Completed Stage One Backfill M1 (Connector Renderer Hardening)
+
+- Exported `ConnectorRenderSnapshot`, `UseConnectorRendererDeps`, and `UseConnectorRendererResult` from `src/app/useConnectorRenderer.ts` so the hook boundary is explicit and reusable for later App split work.
+- Added `tests/unit/canvas-connector-throttling-contract.test.ts` coverage that asserts exported connector boundary types and prevents `App.tsx` from reintroducing connector snapshot builder/commit/scheduler helpers.
+- Added the connector throttling contract test to `tsconfig.tests.json`; `npm.cmd run typecheck` now semantically checks 32 test files.
+- Line counts after this slice: `src/App.tsx` 4904, `src/app/useConnectorRenderer.ts` 253, `tests/unit/canvas-connector-throttling-contract.test.ts` 75, `tsconfig.tests.json` 61.
+- Browser QA: skipped because this is a non-UI hook type-boundary hardening and existing connector rendering behavior was not changed.
 
 ## Completed In `ccf965c3` (Ecommerce Source Selection Runtime)
 
@@ -287,6 +295,17 @@ Last updated: 2026-05-02
 
 ## Latest Recorded Validation
 
+Fresh validation for Stage One Backfill M1 connector renderer hardening:
+
+- RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-connector-throttling-contract.test.ts` failed because `ConnectorRenderSnapshot`, `UseConnectorRendererDeps`, and `UseConnectorRendererResult` were not exported.
+- Passed targeted gate: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-connector-throttling-contract.test.ts tests/unit/canvas-local-performance-trace-contract.test.ts tests/unit/canvas-live-scene-contract.test.ts` (14/14).
+- Passed: `npm.cmd run typecheck`; test semantic check now covers 32 files via `tsconfig.tests.json`.
+- Passed: `npm.cmd run test:unit` (1114/1114).
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed tracked diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/app/useConnectorRenderer.ts tests/unit/canvas-connector-throttling-contract.test.ts tsconfig.tests.json status.md` with LF/CRLF normalization warnings only.
+
 Fresh validation for the completed ecommerce partial redraw runtime pass in `d12731ce`:
 
 - Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-partial-redraw-runtime-contract.test.ts tests/unit/ecommerce-structured-task-source-contract.test.ts tests/unit/partial-redraw-pipeline-contract.test.ts tests/unit/mobile-result-feed-app-contract.test.ts` (6/6).
@@ -433,9 +452,9 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-1. Validate and commit this ledger-only correction through `git --git-dir=node_modules/.codex-git-full --work-tree=.` with only `plans.md`, `implement.md`, `status.md`, and `validation.md`.
-2. Start Stage One Backfill M1: audit `src/App.tsx` and `src/app/useConnectorRenderer.ts`, verify connector renderer ownership, tighten hook types if needed, and run targeted connector/live-scene tests before full validation.
-3. Continue Stage One backfill in this order: `usePromptGroupLayout` closeout, `useGenerationRuntime` quality check, `usePptRuntime` quality check.
+1. Commit the connector renderer hardening slice through `git --git-dir=node_modules/.codex-git-full --work-tree=.` with only `src/app/useConnectorRenderer.ts`, `tests/unit/canvas-connector-throttling-contract.test.ts`, `tsconfig.tests.json`, and `status.md`.
+2. Start Stage One Backfill M2: audit `src/App.tsx` and `src/app/usePromptGroupLayout.ts`, verify prompt group layout ownership, and run targeted prompt-group/live-scene tests before full validation.
+3. Continue Stage One backfill in this order: `useGenerationRuntime` quality check, `usePptRuntime` quality check.
 4. After Stage One backfill, enter Stage Two giant-file split in this priority order: `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`.
 5. Defer release metadata realignment until final packaging/publish, then rerun the full release gate including `npm.cmd run governance:check`.
 

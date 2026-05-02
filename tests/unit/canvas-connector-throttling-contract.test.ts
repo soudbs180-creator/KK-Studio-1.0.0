@@ -10,6 +10,18 @@ function readSource(relativePath: string) {
 }
 
 describe('canvas connector throttling contract', () => {
+  test('connector renderer exposes explicit hook boundary types', () => {
+    const hookSource = readSource('src/app/useConnectorRenderer.ts')
+    const appSource = readSource('src/App.tsx')
+
+    assert.match(hookSource, /export type ConnectorRenderSnapshot = \{/)
+    assert.match(hookSource, /export interface UseConnectorRendererDeps \{/)
+    assert.match(hookSource, /export interface UseConnectorRendererResult \{/)
+    assert.doesNotMatch(appSource, /buildConnectorRenderSnapshot/)
+    assert.doesNotMatch(appSource, /commitConnectorRenderSnapshot/)
+    assert.doesNotMatch(appSource, /scheduleConnectorRenderSnapshot/)
+  })
+
   test('App throttles connector snapshots from the performance profile', () => {
     const hookSource = readSource('src/app/useConnectorRenderer.ts')
 
