@@ -4,26 +4,18 @@ Last updated: 2026-05-02
 
 Use `npm.cmd` for npm scripts on Windows.
 
-## Active Ecommerce Node Generation Runtime Gate
+## Active Ecommerce Mobile Continuation Runtime Gate
 
-Use this gate for the active ecommerce node generation runtime extraction while preserving build, post-build sync, scheduler, and structured-task boundary coverage:
+Use this gate for the active ecommerce mobile continuation runtime extraction while preserving mobile selectors, surface wiring, node generation, and scheduler boundary coverage:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/ecommerce-build-runtime-contract.test.ts" `
+  "tests/unit/ecommerce-mobile-continuation-runtime-contract.test.ts" `
   "tests/unit/ecommerce-node-generation-runtime-contract.test.ts" `
-  "tests/unit/ecommerce-confirm-build-flow.test.ts" `
-  "tests/unit/ecommerce-post-build-sync-runtime-contract.test.ts" `
-  "tests/unit/ecommerce-runtime-upload-sync-contract.test.ts" `
-  "tests/unit/ecommerce-group-slot-integration.test.ts" `
-  "tests/unit/ecommerce-group-shell-contract.test.ts" `
-  "tests/unit/ecommerce-group-shell-app-contract.test.ts" `
-  "tests/unit/ecommerce-analysis-selection-contract.test.ts" `
-  "tests/unit/ecommerce-upload-references-contract.test.ts" `
-  "tests/unit/ecommerce-model-policy.test.ts" `
-  "tests/unit/ecommerce-task-services.test.ts" `
   "tests/unit/ecommerce-runtime-contract.test.ts" `
-  "tests/unit/ecommerce-structured-task-source-contract.test.ts"
+  "tests/unit/mobile-ecommerce-continuation-surface.test.ts" `
+  "tests/unit/mobile-feed-selectors.test.ts"
 ```
 
 Runtime commits also require `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and a path-limited `git diff --check` unless `status.md` records a specific blocker.

@@ -115,6 +115,7 @@ import {
   useEcommerceNodeGenerationRuntime,
   type SetEcommerceNodeGenerationRuntimeState,
 } from './app/useEcommerceNodeGenerationRuntime';
+import { useEcommerceMobileContinuationRuntime } from './app/useEcommerceMobileContinuationRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
 const GENERATE_TIMEOUT_MS = 600000;
@@ -2844,83 +2845,26 @@ const AppContent: React.FC<AppContentProps> = () => {
     handlePartialRedrawRequest(imageNode, request);
   }, [activeCanvas, handlePartialRedrawRequest]);
 
-  const resolveMobileResultPromptNode = useCallback((entry: MobileResultEntry) => {
-    const promptNodeId = entry.ecommerceContinuation?.promptNodeId
-      || entry.detailEntry?.promptId
-      || entry.parentPromptId;
-    if (!promptNodeId) {
-      return null;
-    }
-
-    return activeCanvasRef.current?.promptNodes.find((node) => node.id === promptNodeId) || null;
-  }, []);
-
-  const handleMobileEditEcommerceTask = useCallback((entry: MobileResultEntry) => {
-    if (!entry.ecommerceContinuation?.canEditTask) {
-      return;
-    }
-
-    const promptNode = resolveMobileResultPromptNode(entry);
-    if (!promptNode || promptNode.mode !== GenerationMode.ECOMMERCE) {
-      return;
-    }
-
-    void handlePromptClick(promptNode, false);
-    focusWorkspace();
-    setMobileScreen('home');
-  }, [focusWorkspace, handlePromptClick, resolveMobileResultPromptNode]);
-
-  const handleMobileToggleEcommerceSelected = useCallback((entry: MobileResultEntry, selected: boolean) => {
-    if (!entry.ecommerceContinuation?.canToggleSelection) {
-      return;
-    }
-
-    const promptNode = resolveMobileResultPromptNode(entry);
-    if (!promptNode || promptNode.mode !== GenerationMode.ECOMMERCE) {
-      return;
-    }
-
-    handleToggleEcommerceSelected(promptNode, selected);
-  }, [handleToggleEcommerceSelected, resolveMobileResultPromptNode]);
-
-  const handleMobileConfirmEcommerceDesktop = useCallback((entry: MobileResultEntry) => {
-    if (!entry.ecommerceContinuation?.canConfirmDesktop) {
-      return;
-    }
-
-    const promptNode = resolveMobileResultPromptNode(entry);
-    if (!promptNode || promptNode.mode !== GenerationMode.ECOMMERCE) {
-      return;
-    }
-
-    handleConfirmEcommerceDesktop(promptNode);
-  }, [handleConfirmEcommerceDesktop, resolveMobileResultPromptNode]);
-
-  const handleMobileGenerateEcommerceMobile = useCallback((entry: MobileResultEntry) => {
-    if (!entry.ecommerceContinuation?.canGenerateMobile) {
-      return;
-    }
-
-    const promptNode = resolveMobileResultPromptNode(entry);
-    if (!promptNode || promptNode.mode !== GenerationMode.ECOMMERCE) {
-      return;
-    }
-
-    const frameworkId = promptNode.ecommerce?.frameworkId;
-    if (frameworkId) {
-      const queuedCount = enqueueEcommerceFrameworkNodes(frameworkId, [promptNode], 'mobile');
-      if (queuedCount > 0) {
-        syncEcommerceFrameworkView(
-          frameworkId,
-          (promptNode.ecommerce?.sourceSheet || ecommerceState.activeGroupSheet || 'A+') as EcommerceGroupSheet,
-        );
-        pumpEcommerceFrameworkQueue(frameworkId);
-        return;
-      }
-    }
-
-    void handleRetryEcommerceModule(promptNode);
-  }, [ecommerceState.activeGroupSheet, enqueueEcommerceFrameworkNodes, handleRetryEcommerceModule, pumpEcommerceFrameworkQueue, resolveMobileResultPromptNode, syncEcommerceFrameworkView]);
+  const {
+    handleMobileEditEcommerceTask,
+    handleMobileToggleEcommerceSelected,
+    handleMobileConfirmEcommerceDesktop,
+    handleMobileGenerateEcommerceMobile,
+  } = useEcommerceMobileContinuationRuntime({
+    activeCanvasRef,
+    activeGroupSheet: ecommerceState.activeGroupSheet,
+    focusWorkspace,
+    setMobileScreen,
+    activatePromptNode: (promptNode) => {
+      void handlePromptClick(promptNode, false);
+    },
+    handleToggleEcommerceSelected,
+    handleConfirmEcommerceDesktop,
+    handleRetryEcommerceModule,
+    enqueueEcommerceFrameworkNodes,
+    pumpEcommerceFrameworkQueue,
+    syncEcommerceFrameworkView,
+  });
 
   // Dynamic Group Bounds Calculation
   const getComputedGroupBounds = useCallback((group: CanvasGroup) => {
