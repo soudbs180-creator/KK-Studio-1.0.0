@@ -3,14 +3,44 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 
+import type {
+  CompleteRetryGeneratedMediaBatchParams,
+  PrepareInitialGenerationSubmissionContextResult,
+  RetryGeneratedMediaResultContext,
+  UseGenerationRuntimeDeps,
+  UseGenerationRuntimeResult,
+} from '../../src/app/useGenerationRuntime.ts';
+
 const ROOT_DIR = process.cwd();
 const APP_RETRY_NODE_END_MARKER = 'const {\n    updateEcommerceNodeState,';
+
+type GenerationRuntimePublicBoundary = {
+  deps: UseGenerationRuntimeDeps;
+  result: UseGenerationRuntimeResult;
+  initialSubmission: PrepareInitialGenerationSubmissionContextResult;
+  retryContext: RetryGeneratedMediaResultContext;
+  completeRetryBatch: CompleteRetryGeneratedMediaBatchParams;
+}
 
 function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
 describe('generation runtime extraction contract', () => {
+  test('generation runtime public boundary types are semantically checked', () => {
+    const generationRuntimeSource = readSource('src/app/useGenerationRuntime.ts');
+    const testConfigSource = readSource('tsconfig.tests.json');
+    const boundaryIsTypechecked: GenerationRuntimePublicBoundary | null = null;
+
+    assert.equal(boundaryIsTypechecked, null);
+    assert.match(generationRuntimeSource, /export interface UseGenerationRuntimeDeps \{/);
+    assert.match(generationRuntimeSource, /export interface UseGenerationRuntimeResult \{/);
+    assert.match(generationRuntimeSource, /export type PrepareInitialGenerationSubmissionContextResult =/);
+    assert.match(generationRuntimeSource, /export interface RetryGeneratedMediaResultContext \{/);
+    assert.match(generationRuntimeSource, /export interface CompleteRetryGeneratedMediaBatchParams extends Omit</);
+    assert.match(testConfigSource, /tests\/unit\/generation-runtime-contract\.test\.ts/);
+  });
+
   test('cancel generation ownership lives in useGenerationRuntime', () => {
     const hookPath = path.join(ROOT_DIR, 'src/app/useGenerationRuntime.ts');
     assert.equal(existsSync(hookPath), true, 'src/app/useGenerationRuntime.ts should exist');

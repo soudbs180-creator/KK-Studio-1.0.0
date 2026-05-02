@@ -18,18 +18,20 @@ The active execution model for this thread has resumed Stage One convergence:
 - Ecommerce partial redraw closed in `d12731ce`.
 - Stage One M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`; remaining ecommerce references are hook wiring, state adapters, UI prop forwarding, and render predicates.
 - Connector renderer boundary hardening closed in `5f5b76e0`; the connector public-type review follow-up closed in `f06f1880`.
-- Stage One Backfill M2 `usePromptGroupLayout` boundary hardening is completed by this prompt-group commit.
-- Current active slice after this commit is Stage One Backfill M3: `useGenerationRuntime` quality check.
+- Stage One Backfill M2 `usePromptGroupLayout` boundary hardening is completed in `8a458cd4`.
+- Stage One Backfill M3 `useGenerationRuntime` boundary hardening is completed by this generation-runtime commit.
+- Current active slice after this commit is Stage One Backfill M5: `usePptRuntime` quality check.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
-Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release metadata, and review follow-ups must be staged separately. The next generation-runtime slice should include only generation runtime code/tests or scan-only ledger updates.
+Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release metadata, and review follow-ups must be staged separately. The next PPT-runtime slice should include only PPT runtime code/tests or scan-only ledger updates.
 
 ## Current Baseline
 
 - `src/App.tsx`: 4904 lines after `f06f1880`.
 - `src/app/useConnectorRenderer.ts`: 253 lines, boundary hardened in `5f5b76e0` and review-follow-up typechecked in `f06f1880`.
-- `src/app/usePromptGroupLayout.ts`: 1348 lines, extracted and boundary-hardened in the prompt-group commit.
+- `src/app/usePromptGroupLayout.ts`: 1348 lines, extracted and boundary-hardened in `8a458cd4`.
+- `src/app/useGenerationRuntime.ts`: 2604 lines, extracted and boundary-hardened in the generation-runtime commit.
 - `src/context/CanvasContext.tsx`: 5433 lines.
 - `src/services/auth/keyManager.ts`: 5279 lines.
 - `src/components/layout/PromptBar.tsx`: 4437 lines.
@@ -180,18 +182,20 @@ Validation:
 Commit:
 - `refactor: harden prompt group layout boundary`
 
-### 5. Stage One Backfill M3: Generation Runtime Quality Check
+### 5. Stage One Backfill M3: Generation Runtime Quality Check (Completed In Generation-Runtime Commit)
 
 Goal: verify the already extracted generation execution runtime remains clean and does not need immediate follow-up before Stage Two.
 
 Scope:
-- Move generation start, billing attempt coordination, cancellation, retry, failure state, result node persistence, and preview state wiring into `src/app/useGenerationRuntime.ts`.
+- Confirm generation start, billing attempt coordination, cancellation, retry, failure state, result node persistence, and preview state wiring remain in `src/app/useGenerationRuntime.ts`.
+- Semantically typecheck the public generation runtime boundary through `tests/unit/generation-runtime-contract.test.ts`.
 - Preserve current billing, API, storage, and generation service contracts.
 
 Acceptance:
 - Generation lifecycle behavior remains unchanged.
 - Cancellation, retry, balance consume/refund, and result placement tests stay green.
 - No API or billing protocol changes are introduced.
+- `UseGenerationRuntimeDeps`, `UseGenerationRuntimeResult`, and retry/submission public boundary types are imported by a semantic test included in `tsconfig.tests.json`.
 
 Commit:
 - `refactor: harden generation runtime` if code changes.

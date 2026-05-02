@@ -43,6 +43,7 @@
         "tests/unit/ecommerce-task-state-runtime-contract.test.ts",
         "tests/unit/ecommerce-upload-references-contract.test.ts",
         "tests/unit/ecommerce-upload-removal-contract.test.ts",
+        "tests/unit/generation-runtime-contract.test.ts",
         "tests/unit/governance-contract.test.ts",
         "tests/unit/hosted-release-guardrails.test.ts",
         "tests/unit/payment-runtime-hardening.test.ts",

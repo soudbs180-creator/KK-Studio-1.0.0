@@ -94,6 +94,18 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/generation-billing-runtime-contract.test.ts"
 ```
 
+## Stage One Backfill Generation Gate
+
+Use this gate for the completed `useGenerationRuntime` boundary-hardening slice:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/generation-runtime-contract.test.ts" `
+  "tests/unit/generation-billing-runtime-contract.test.ts"
+```
+
+This slice also requires `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and a path-limited alternate-git `diff --check`.
+
 ## Stage One Backfill Prompt Group Gate
 
 Use this gate for the active `usePromptGroupLayout` boundary-hardening slice:

@@ -8,7 +8,7 @@ This is a long-running execution. Plain `.git` still reports baseline commit `4c
 
 The active workstream is a single merged line. Thread `019dd551...` is the main refactor history and `019de168...` is continuation history; both belong to Stage One M6 ecommerce runtime extraction. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; ecommerce source selection closed in `ccf965c3`; ecommerce partial redraw closed in `d12731ce`; connector renderer boundary hardening closed in `5f5b76e0`; connector review follow-up closed in `f06f1880`; the M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`.
 
-The prompt-group commit completes Stage One Backfill M2 by hardening `src/app/usePromptGroupLayout.ts` without re-creating the hook. The next active slice is Stage One Backfill M3 `useGenerationRuntime` quality check.
+Stage One Backfill M2 completed in `8a458cd4` by hardening `src/app/usePromptGroupLayout.ts` without re-creating the hook. The generation-runtime commit completes Stage One Backfill M3 by semantically checking the public `useGenerationRuntime` boundary. The next active slice is Stage One Backfill M5 `usePptRuntime` quality check.
 
 The active plan is `plans.md`. The current status and next exact step are tracked in `status.md`. Validation commands and expected gates are tracked in `validation.md`.
 

@@ -4,17 +4,17 @@ Last updated: 2026-05-02
 
 ## Active State
 
-- Active lane in this thread: single-line Stage One convergence. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`, with public-type review follow-up committed in `f06f1880`; Stage One Backfill M2 `usePromptGroupLayout` hardening is completed by this prompt-group commit; the next active slice is Stage One Backfill M3 `useGenerationRuntime` quality check.
+- Active lane in this thread: single-line Stage One convergence. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`, with public-type review follow-up committed in `f06f1880`; Stage One Backfill M2 `usePromptGroupLayout` hardening is committed in `8a458cd4`; Stage One Backfill M3 `useGenerationRuntime` hardening is completed by this generation-runtime commit; the next active slice is Stage One Backfill M5 `usePptRuntime` quality check.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and is currently at `f06f1880 test: strengthen connector renderer boundary contract` before the prompt-group commit. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and is currently at `8a458cd4 refactor: harden prompt group layout boundary` before the generation-runtime commit. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Thread merge state: `019dd551...` is the main refactor history and `019de168...` is continuation history; both are part of the same Stage One M6 ecommerce runtime line.
-- Alternate-git worktree currently has only the prompt-group boundary hardening slice plus ledger updates.
+- Alternate-git worktree currently has only the generation-runtime boundary hardening slice plus ledger updates.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus after this prompt-group commit: begin Stage One Backfill M3 `useGenerationRuntime` quality check.
-- Most recent prompt-group commit scope: `src/app/usePromptGroupLayout.ts`, `tests/unit/prompt-group-regroup-behavior.test.ts`, `tsconfig.tests.json`, `plans.md`, `implement.md`, `validation.md`, and `status.md`.
-- Next active slice after this commit: Stage One Backfill M3 `useGenerationRuntime` quality check.
+- Current focus after this generation-runtime commit: begin Stage One Backfill M5 `usePptRuntime` quality check.
+- Most recent generation-runtime commit scope: `tests/unit/generation-runtime-contract.test.ts`, `tsconfig.tests.json`, `plans.md`, `implement.md`, `validation.md`, and `status.md`.
+- Next active slice after this commit: Stage One Backfill M5 `usePptRuntime` quality check.
 - Browser QA: skipped for these runtime/type-boundary slices because no UI runtime or visual surface changed.
 
 ## Completed In `9e7ae2b5` (Clay UI Audit Closure)
@@ -85,6 +85,17 @@ Last updated: 2026-05-02
 - Passed during the slice: `npm.cmd run check:encoding`.
 - Passed during the slice: path-limited alternate-git `diff --check` for `src/app/usePromptGroupLayout.ts`, `tests/unit/prompt-group-regroup-behavior.test.ts`, `tsconfig.tests.json`, and ledger files with LF/CRLF normalization warnings only.
 - Browser QA: skipped because this is a non-UI hook type-boundary hardening and no visual surface changed.
+
+## Completed Stage One Backfill M3 (Generation Runtime Boundary)
+
+- Audited `src/App.tsx` generation wiring and `src/app/useGenerationRuntime.ts`; generation-owned start, billing attempt coordination, cancellation, retry, failure state, result persistence, and retry batch transaction ownership remain inside `useGenerationRuntime`.
+- Strengthened `tests/unit/generation-runtime-contract.test.ts` with `import type` coverage for `UseGenerationRuntimeDeps`, `UseGenerationRuntimeResult`, `PrepareInitialGenerationSubmissionContextResult`, `RetryGeneratedMediaResultContext`, and `CompleteRetryGeneratedMediaBatchParams`.
+- Added the generation runtime contract test to `tsconfig.tests.json`; `npm.cmd run typecheck` now semantically checks 34 test files.
+- Line counts for this slice before commit: `src/App.tsx` 4904, `src/app/useGenerationRuntime.ts` 2604, `tests/unit/generation-runtime-contract.test.ts` 1683, `tsconfig.tests.json` 63.
+- RED evidence from this slice: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts` failed because `tests/unit/generation-runtime-contract.test.ts` was not included in `tsconfig.tests.json`.
+- Targeted GREEN validation: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts` passed (52/52).
+- Passed during the slice: `npm.cmd run typecheck`; test semantic check covers 34 files via `tsconfig.tests.json`.
+- Browser QA: skipped because this is a non-UI runtime/type-boundary hardening and no visual surface changed.
 
 ## Completed In `ccf965c3` (Ecommerce Source Selection Runtime)
 
@@ -470,15 +481,14 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-1. Start Stage One Backfill M3: audit `src/app/useGenerationRuntime.ts`, `src/App.tsx`, and generation runtime contracts; either make one minimal hardening change with tests or record a scan-only completion.
-2. Continue Stage One backfill with `usePptRuntime` quality check.
-3. After Stage One backfill, enter Stage Two giant-file split in this priority order: `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`.
-4. Defer release metadata realignment until final packaging/publish, then rerun the full release gate including `npm.cmd run governance:check`.
+1. Start Stage One Backfill M5: audit `src/app/usePptRuntime.ts`, `src/app/pptRuntimeHelpers.ts`, `src/App.tsx`, and PPT runtime contracts; either make one minimal hardening change with tests or record a scan-only completion.
+2. After Stage One backfill, enter Stage Two giant-file split in this priority order: `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`.
+3. Defer release metadata realignment until final packaging/publish, then rerun the full release gate including `npm.cmd run governance:check`.
 
 ## Risks
 
 - Original `.git` does not match the writable metadata copy in this session. Use the full writable metadata copy at `node_modules/.codex-git-full` for local commits unless the ACL is fixed outside the sandbox.
 - Plain `.git` may show stale dirty state and must not be used as the commit-readiness source.
-- The alternate-git worktree was clean at `f06f1880` before the prompt-group slice, but any staging must still be explicit path-based and reviewed before commit.
+- The alternate-git worktree was clean at `8a458cd4` before the generation-runtime slice, but any staging must still be explicit path-based and reviewed before commit.
 - Do not delete locks, change `.git` ACLs, revert paused runtime/PPT work, or stage unrelated runtime files without explicit user confirmation.
 - Do not mix UI, PPT, runtime extraction, release metadata, and quality-debt cleanup in one commit.
