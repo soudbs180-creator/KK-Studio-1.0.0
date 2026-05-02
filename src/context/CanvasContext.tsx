@@ -45,6 +45,7 @@ import {
     type SubCardLayout,
 } from './canvasContextState';
 import { syncCanvasCompatibility } from './canvasCompatibility';
+import { resolveCanvasSelectionIds, type CanvasSelectionMode } from './canvasSelection';
 import { resolveModelDisplayName } from '../utils/modelDisplayName';
 import { isPhoneResponsiveWidth } from '../utils/responsiveSurface';
 import { getAllTasks, type PersistedTask } from '../services/persistence/taskPersistence';
@@ -4288,46 +4289,12 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     /**
      * Get the next available position for a new card (to the right of existing cards)
      */
-    const selectNodes = useCallback((ids: string[], mode: 'replace' | 'add' | 'remove' | 'toggle' = 'replace') => {
+    const selectNodes = useCallback((ids: string[], mode: CanvasSelectionMode = 'replace') => {
         setState(prev => {
-            const current = new Set(prev.selectedNodeIds || []);
-            let newSelectedIds: string[] = [];
-
-            switch (mode) {
-                case 'replace':
-                    // Replace the current selection.
-                    newSelectedIds = ids;
-                    break;
-
-                case 'add':
-                    // Add to selection (Shift + marquee).
-                    ids.forEach(id => current.add(id));
-                    newSelectedIds = Array.from(current);
-                    break;
-
-                case 'remove':
-                    // Remove from selection (Alt + marquee).
-                    ids.forEach(id => current.delete(id));
-                    newSelectedIds = Array.from(current);
-                    break;
-
-                case 'toggle':
-                    // Toggle selection (Ctrl + click).
-                    ids.forEach(id => {
-                        if (current.has(id)) {
-                            current.delete(id);
-                        } else {
-                            current.add(id);
-                        }
-                    });
-                    newSelectedIds = Array.from(current);
-                    break;
-
-                default:
-                    newSelectedIds = ids;
-            }
-
-            return { ...prev, selectedNodeIds: newSelectedIds };
+            return {
+                ...prev,
+                selectedNodeIds: resolveCanvasSelectionIds(prev.selectedNodeIds, ids, mode)
+            };
         });
     }, []);
 

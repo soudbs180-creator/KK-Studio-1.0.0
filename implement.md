@@ -4,11 +4,11 @@ Last updated: 2026-05-03
 
 ## Operating Mode
 
-This is a long-running execution. Plain `.git` still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`; the latest committed baseline before the CanvasContext state-boundary slice is `569383aa refactor: harden ppt runtime boundary`.
+This is a long-running execution. Plain `.git` still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`; the latest committed baseline before the Canvas selection reducer slice is `92a9dc41 refactor: extract canvas context state boundary`.
 
 The active workstream is a single merged line. Thread `019dd551...` is the main refactor history and `019de168...` is continuation history; both belong to Stage One M6 ecommerce runtime extraction. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; ecommerce source selection closed in `ccf965c3`; ecommerce partial redraw closed in `d12731ce`; connector renderer boundary hardening closed in `5f5b76e0`; connector review follow-up closed in `f06f1880`; the M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`.
 
-Stage One Backfill M2 completed in `8a458cd4` by hardening `src/app/usePromptGroupLayout.ts` without re-creating the hook. Stage One Backfill M3 completed in `ab719c4a` by semantically checking the public `useGenerationRuntime` boundary. The generation billing follow-up completed in `083db7f8`. Stage One Backfill M5 completed in `569383aa` by semantically checking `usePptRuntime` and the PPT helper boundary. The current slice is Stage Two M1, the first narrow `CanvasContext.tsx` split, extracting state/default/context boundary ownership into `src/context/canvasContextState.ts` and compatibility syncing into `src/context/canvasCompatibility.ts`.
+Stage One Backfill M2 completed in `8a458cd4` by hardening `src/app/usePromptGroupLayout.ts` without re-creating the hook. Stage One Backfill M3 completed in `ab719c4a` by semantically checking the public `useGenerationRuntime` boundary. The generation billing follow-up completed in `083db7f8`. Stage One Backfill M5 completed in `569383aa` by semantically checking `usePptRuntime` and the PPT helper boundary. Stage Two M1 completed in `92a9dc41` by extracting state/default/context boundary ownership into `src/context/canvasContextState.ts` and compatibility syncing into `src/context/canvasCompatibility.ts`. The current slice is Stage Two M2, extracting the pure Canvas selection reducer into `src/context/canvasSelection.ts`.
 
 The active plan is `plans.md`. The current status and next exact step are tracked in `status.md`. Validation commands and expected gates are tracked in `validation.md`.
 
@@ -17,7 +17,7 @@ For Clay UI work, use `C:/Users/Administrator/Downloads/DESIGN-clay.md` as the v
 Current convergence order:
 1. Keep the ledger files aligned with the alternate-git HEAD and the merged single execution line.
 2. Treat Stage One M6 ecommerce extraction and Stage One backfill boundaries as complete unless a new concrete regression proves otherwise.
-3. For Stage Two, split one responsibility at a time from the largest files; after the state-boundary slice, the next CanvasContext slice is the selection reducer only.
+3. For Stage Two, split one responsibility at a time from the largest files; the active CanvasContext slice is the selection reducer only.
 4. Write/update focused source contracts before each extraction when behavior or ownership changes.
 5. Move domain helpers and side effects into focused modules while preserving compatibility exports.
 6. Verify with the targeted gate for the touched slice, typecheck, full unit suite, build or architecture check as required, docs governance, encoding checks, and path-limited `git diff --check`.
