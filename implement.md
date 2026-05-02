@@ -6,7 +6,7 @@ Last updated: 2026-05-02
 
 This is a long-running execution. Plain `.git` still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries`; the writable metadata copy for this session is currently at `cc24e19d refactor: extract ecommerce runtime activation`.
 
-The active workstream in this thread is Stage One M6 ecommerce runtime extraction, current slice `useEcommerceSourceSelectionRuntime`. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; current runtime commits must stay separate from completed UI/doc/UI-test paths.
+The active workstream in this thread is Stage One M6 ecommerce runtime extraction, current slice `useEcommercePartialRedrawRuntime`. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; current runtime commits must stay separate from completed UI/doc/UI-test paths.
 
 The active plan is `plans.md`. The current status and next exact step are tracked in `status.md`. Validation commands and expected gates are tracked in `validation.md`.
 
@@ -17,7 +17,7 @@ Current ecommerce runtime order:
 2. Write/update focused source contracts before each extraction.
 3. Move ecommerce domain helpers and side effects into `src/app/` hooks with explicit deps/result interfaces.
 4. Verify with targeted ecommerce tests, typecheck, full unit suite, build, docs governance, and encoding checks.
-5. Stage only ecommerce source selection runtime files and ledger updates; leave completed UI files and unrelated PPT/runtime WIP out of the commit.
+5. Stage only ecommerce partial redraw runtime files and ledger updates; leave completed UI files and unrelated PPT/runtime WIP out of the commit.
 
 Browser inspection may be skipped for non-UI runtime/docs slices after recording the skip reason in `status.md`. Record which lane is active, which dirty files are excluded from the current commit, and the validation results.
 

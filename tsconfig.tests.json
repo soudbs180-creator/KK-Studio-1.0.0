@@ -31,6 +31,7 @@
         "tests/unit/ecommerce-mode-runtime-contract.test.ts",
         "tests/unit/ecommerce-mobile-continuation-runtime-contract.test.ts",
         "tests/unit/ecommerce-node-generation-runtime-contract.test.ts",
+        "tests/unit/ecommerce-partial-redraw-runtime-contract.test.ts",
         "tests/unit/ecommerce-prompt-activation-runtime-contract.test.ts",
         "tests/unit/ecommerce-source-selection-runtime-contract.test.ts",
         "tests/unit/ecommerce-post-build-sync-runtime-contract.test.ts",

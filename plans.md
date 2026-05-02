@@ -17,7 +17,7 @@ Commit boundary going forward: UI fixes and runtime/PPT/ecommerce fixes must be 
 
 ## Current Baseline
 
-- `src/App.tsx`: 4400 lines after the current ecommerce source selection runtime WIP.
+- `src/App.tsx`: 4389 lines after the current ecommerce partial redraw runtime WIP.
 - `src/app/useConnectorRenderer.ts`: 272 lines, already extracted and awaiting hardening.
 - `src/context/CanvasContext.tsx`: 5434 lines.
 - `src/services/auth/keyManager.ts`: 5280 lines.
@@ -195,7 +195,8 @@ Scope:
 - Completed slice in `184b158c`: extract source-key ecommerce task activation fallback and prompt-node activation into `src/app/useEcommerceTaskActivationRuntime.ts`.
 - Completed slice: extract the ecommerce submit branch in `handleGenerate` into `src/app/useEcommerceSubmitRuntime.ts`.
 - Completed slice in `cc24e19d`: extract the ecommerce mode guard/reset and prompt activation branches into `src/app/useEcommerceModeRuntime.ts` and `src/app/useEcommercePromptActivationRuntime.ts`.
-- Current slice: extract the image-source ecommerce reset branch in `handleImageClick` into `src/app/useEcommerceSourceSelectionRuntime.ts`.
+- Completed slice in `ccf965c3`: extract the image-source ecommerce reset branch in `handleImageClick` into `src/app/useEcommerceSourceSelectionRuntime.ts`.
+- Current slice: extract the ecommerce partial-redraw inheritance and result-finalization branch in `handlePartialRedrawRequest` into `src/app/useEcommercePartialRedrawRuntime.ts`.
 
 Acceptance:
 - Ecommerce references are routed through an explicit hook interface.
@@ -213,9 +214,10 @@ Acceptance:
 - Ecommerce mode runtime exposes explicit deps/result interfaces; App no longer owns the ecommerce mode guard/reset effect.
 - Ecommerce prompt activation runtime exposes explicit deps/result interfaces; App no longer owns the ecommerce prompt activation state block or prompt-node framework status callback.
 - Ecommerce source selection runtime exposes explicit deps/result interfaces; App no longer owns the image-source ecommerce reset block inside `handleImageClick`.
+- Ecommerce partial redraw runtime exposes explicit deps/result interfaces; App no longer owns the ecommerce inherited redraw context resolution or ecommerce redraw result finalization branch inside `handlePartialRedrawRequest`.
 
 Commit:
-- `refactor: extract ecommerce source selection runtime`
+- `refactor: extract ecommerce partial redraw runtime`
 
 ### 7. Stage Two: Secondary Giant File Split
 

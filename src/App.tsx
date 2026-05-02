@@ -126,6 +126,7 @@ import {
 import {
   useEcommerceSourceSelectionRuntime,
 } from './app/useEcommerceSourceSelectionRuntime';
+import { useEcommercePartialRedrawRuntime } from './app/useEcommercePartialRedrawRuntime';
 import { useEcommerceModeRuntime, type SetEcommerceModeRuntimeState } from './app/useEcommerceModeRuntime';
 import { useEcommerceSubmitRuntime } from './app/useEcommerceSubmitRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
@@ -2696,6 +2697,15 @@ const AppContent: React.FC<AppContentProps> = () => {
   const handleMobileUseImageAsSource = useCallback((imageId: string) => {
     handleImageClick(imageId);
   }, [handleImageClick]);
+  const {
+    resolveEcommercePartialRedrawContext,
+    finalizeEcommercePartialRedrawResult,
+  } = useEcommercePartialRedrawRuntime({
+    activeCanvasRef,
+    updateImageNode,
+    updatePromptNode,
+    deletePromptNode,
+  });
 
   const handlePartialRedrawRequest = useCallback((image: GeneratedImage, request: PartialRedrawRequest) => {
     void (async () => {
@@ -2706,14 +2716,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         const parentPromptId = sourceImage.parentPromptId;
         const parentPrompt = canvas?.promptNodes.find((promptNode) => promptNode.id === parentPromptId);
         const sourceImageUrl = sourceImage.originalUrl || sourceImage.apiResultUrl || sourceImage.url;
-        const inheritedTaskState = parentPrompt?.ecommerce?.editableTask
-          || sourceImage.partialRedraw?.inheritedTaskState
-          || undefined;
-        const inheritedDisplayLabel = parentPrompt?.ecommerce?.displayLabel
-          || sourceImage.partialRedraw?.inheritedDisplayLabel;
-        const inheritedDeliveryKind = sourceImage.ecommerceDeliveryKind
-          || sourceImage.partialRedraw?.inheritedDeliveryKind
-          || parentPrompt?.ecommerce?.activeDeliveryKind;
+        const ecommercePartialRedrawContext = resolveEcommercePartialRedrawContext(sourceImage, parentPrompt);
 
         const croppedSourceReference = await buildPartialRedrawReferenceImage(
           sourceImageUrl,
@@ -2759,9 +2762,9 @@ const AppContent: React.FC<AppContentProps> = () => {
             generationRect: request.generationRect,
             targetAspectRatio: request.aspectRatio,
             extraReferenceImageIds: request.referenceImages.map((ref) => ref.storageId || ref.id),
-            inheritedDisplayLabel,
-            inheritedTaskState,
-            inheritedDeliveryKind,
+            inheritedDisplayLabel: ecommercePartialRedrawContext.inheritedDisplayLabel,
+            inheritedTaskState: ecommercePartialRedrawContext.inheritedTaskState,
+            inheritedDeliveryKind: ecommercePartialRedrawContext.inheritedDeliveryKind,
             compositeVersion: 1,
           },
           tags: [],
@@ -2775,29 +2778,13 @@ const AppContent: React.FC<AppContentProps> = () => {
           ?.childImageIds?.[0];
 
         if (latestRedrawResultId) {
-          const redrawResultImage = activeCanvasRef.current?.imageNodes.find((img) => img.id === latestRedrawResultId);
-          if (parentPrompt?.mode === GenerationMode.ECOMMERCE && redrawResultImage) {
-            await updateImageNode(redrawResultImage.id, {
-              parentPromptId: parentPrompt.id,
-              position: { ...sourceImage.position },
-              ecommerceDeliveryKind: inheritedDeliveryKind || redrawResultImage.ecommerceDeliveryKind,
-            });
-
-            const latestParentPrompt = activeCanvasRef.current?.promptNodes.find((promptNode) => promptNode.id === parentPrompt.id) || parentPrompt;
-            if (!latestParentPrompt.childImageIds.includes(latestRedrawResultId)) {
-              await updatePromptNode({
-                ...latestParentPrompt,
-                childImageIds: [...latestParentPrompt.childImageIds, latestRedrawResultId],
-              });
-            }
-
-            const latestRedrawPrompt = activeCanvasRef.current?.promptNodes.find((promptNode) => promptNode.id === redrawNode.id) || redrawNode;
-            await updatePromptNode({
-              ...latestRedrawPrompt,
-              childImageIds: [],
-            });
-            deletePromptNode(redrawNode.id);
-          }
+          await finalizeEcommercePartialRedrawResult({
+            parentPrompt,
+            sourceImage,
+            redrawNode,
+            latestRedrawResultId,
+            inheritedDeliveryKind: ecommercePartialRedrawContext.inheritedDeliveryKind,
+          });
 
           handleOpenPreview(latestRedrawResultId);
         } else {
@@ -2810,7 +2797,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         });
       }
     })();
-  }, [addPromptNode, config.aspectRatio, config.imageSize, config.model, executeGeneration, handleOpenPreview]);
+  }, [addPromptNode, config.aspectRatio, config.imageSize, config.model, executeGeneration, finalizeEcommercePartialRedrawResult, handleOpenPreview, resolveEcommercePartialRedrawContext]);
 
   const handleMobileResultPartialRedraw = useCallback((entry: MobileResultEntry, request: PartialRedrawRequest) => {
     const imageNode = activeCanvas?.imageNodes.find((image) => image.id === entry.imageId);

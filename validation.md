@@ -4,19 +4,16 @@ Last updated: 2026-05-02
 
 Use `npm.cmd` for npm scripts on Windows.
 
-## Active Ecommerce Source Selection Gate
+## Active Ecommerce Partial Redraw Gate
 
-Use this gate for the active ecommerce source selection extraction while preserving activation, submit, requirement-analysis, and generation runtime boundaries:
+Use this gate for the active ecommerce partial redraw extraction while preserving structured-task, mobile redraw entry, and redraw pipeline boundaries:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
-  "tests/unit/ecommerce-mode-runtime-contract.test.ts" `
-  "tests/unit/ecommerce-prompt-activation-runtime-contract.test.ts" `
-  "tests/unit/ecommerce-source-selection-runtime-contract.test.ts" `
-  "tests/unit/ecommerce-submit-runtime-contract.test.ts" `
-  "tests/unit/ecommerce-task-activation-runtime-contract.test.ts" `
-  "tests/unit/ecommerce-requirement-analysis-runtime-contract.test.ts" `
-  "tests/unit/generation-runtime-contract.test.ts"
+  "tests/unit/ecommerce-partial-redraw-runtime-contract.test.ts" `
+  "tests/unit/ecommerce-structured-task-source-contract.test.ts" `
+  "tests/unit/partial-redraw-pipeline-contract.test.ts" `
+  "tests/unit/mobile-result-feed-app-contract.test.ts"
 ```
 
 Runtime commits also require `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and a path-limited `git diff --check` unless `status.md` records a specific blocker.
