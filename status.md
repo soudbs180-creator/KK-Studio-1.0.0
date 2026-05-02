@@ -41,6 +41,26 @@ Last updated: 2026-05-02
 - Commit include scope for this runtime slice: `status.md`, `plans.md`, `implement.md`, `validation.md`, `tsconfig.tests.json`, `src/App.tsx`, `src/app/useEcommerceSubmitRuntime.ts`, `tests/unit/ecommerce-submit-runtime-contract.test.ts`, and `tests/unit/ecommerce-requirement-analysis-runtime-contract.test.ts`.
 - Explicitly excluded scope: Clay UI docs/styles/components, PPT/generation runtime files, and unrelated ecommerce runtime slices not touched by the ecommerce submit extraction.
 
+## Completed In `184b158c` (Ecommerce Task Activation Runtime)
+
+- Added `src/app/useEcommerceTaskActivationRuntime.ts` for source-key ecommerce task activation lookup and fallback activation state restoration.
+- `src/App.tsx` now wires the task activation hook through `updateEcommerceTaskActivationRuntimeState`; App no longer owns inline `handleActivateEcommerceTaskBySourceKey`.
+- The hook receives all dependencies through `UseEcommerceTaskActivationRuntimeDeps`: active canvas ref, ecommerce task-state map, task activation state adapter, and prompt activation callback.
+- New contract coverage in `tests/unit/ecommerce-task-activation-runtime-contract.test.ts` covers hook ownership, explicit deps/result interfaces, App wiring, PromptBar activation callback threading, source-row matching, and fallback active-task/group-sheet restoration.
+- `tsconfig.tests.json` now semantically checks 26 test files.
+- Line counts after extraction: `src/App.tsx` 4931 physical lines; `src/app/useEcommerceTaskActivationRuntime.ts` 62 physical lines; `tests/unit/ecommerce-task-activation-runtime-contract.test.ts` 33 physical lines; `tsconfig.tests.json` 55 physical lines.
+- Working-tree note: this slice was already present as an uncommitted hook/test pair when I picked up the next step, so there is no separate RED reproduction in this turn; the first local targeted run passed and the slice was reviewed from the current working tree forward.
+- Targeted validation: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-task-activation-runtime-contract.test.ts tests/unit/ecommerce-mobile-continuation-runtime-contract.test.ts tests/unit/ecommerce-runtime-contract.test.ts` passed (3/3).
+- Passed: `npm.cmd run typecheck`; test semantic check now covers 26 files via `tsconfig.tests.json`.
+- Passed: `npm.cmd run test:unit` (1102/1102).
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed tracked diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/App.tsx src/app/useEcommerceTaskActivationRuntime.ts tests/unit/ecommerce-task-activation-runtime-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
+- Browser QA: skipped for this slice because it is non-UI runtime activation glue that preserves existing PromptBar/mobile component contracts. The Clay UI lane browser evidence remains recorded below.
+- Commit include scope for this runtime slice: `status.md`, `plans.md`, `implement.md`, `validation.md`, `tsconfig.tests.json`, `src/App.tsx`, `src/app/useEcommerceTaskActivationRuntime.ts`, and `tests/unit/ecommerce-task-activation-runtime-contract.test.ts`.
+- Explicitly excluded scope: Clay UI docs/styles/components, PPT/generation runtime files, and unrelated ecommerce runtime slices not touched by the task activation extraction.
+
 ## Completed In `782d30d3` (Ecommerce Mobile Continuation Runtime)
 
 - Added `src/app/useEcommerceMobileContinuationRuntime.ts` for mobile ecommerce prompt-node lookup, task editing activation, mobile selection toggles, desktop confirmation forwarding, and mobile generation queue fallback handlers.
@@ -233,16 +253,16 @@ Last updated: 2026-05-02
 
 ## Latest Recorded Validation
 
-Fresh validation for the current ecommerce task activation runtime pass:
+Fresh validation for the current ecommerce submit runtime pass:
 
 - Working-tree note: this slice was already present as an uncommitted hook/test pair when I picked up the next step, so there is no separate RED reproduction in this turn; the first local targeted run passed and the slice was reviewed from the current working tree forward.
-- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-task-activation-runtime-contract.test.ts tests/unit/ecommerce-mobile-continuation-runtime-contract.test.ts tests/unit/ecommerce-runtime-contract.test.ts` (3/3).
-- Passed: `npm.cmd run typecheck`; test semantic check now covers 26 files via `tsconfig.tests.json`.
-- Passed: `npm.cmd run test:unit` (1102/1102).
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-submit-runtime-contract.test.ts tests/unit/ecommerce-requirement-analysis-runtime-contract.test.ts tests/unit/generation-runtime-contract.test.ts` (64/64).
+- Passed: `npm.cmd run typecheck`; test semantic check now covers 27 files via `tsconfig.tests.json`.
+- Passed: `npm.cmd run test:unit` (1104/1104).
 - Passed: `npm.cmd run build`.
 - Passed: `npm.cmd run governance:agent-docs`.
 - Passed: `npm.cmd run check:encoding`.
-- Passed tracked diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/App.tsx src/app/useEcommerceTaskActivationRuntime.ts tests/unit/ecommerce-task-activation-runtime-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
+- Passed tracked diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/App.tsx src/app/useEcommerceSubmitRuntime.ts tests/unit/ecommerce-submit-runtime-contract.test.ts tests/unit/ecommerce-requirement-analysis-runtime-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
 
 Historical validation for `017bb3a2` ecommerce requirement analysis runtime pass:
 
@@ -373,9 +393,9 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-1. Run the scoped diff check for the current task activation runtime slice, then stage and commit only those files through `git --git-dir=node_modules/.codex-git-full --work-tree=.`.
-2. Keep completed Clay UI files and unrelated runtime/PPT work out of the task activation runtime commit.
-3. Continue Stage One M6 with the next ecommerce runtime slice after this commit lands; current likely follow-up is the `handleGenerate` ecommerce submit branch or shared ecommerce asset-role assembly, after a fresh reference map.
+1. Stage and commit only the current submit runtime slice files plus ledger updates through `git --git-dir=node_modules/.codex-git-full --work-tree=.`.
+2. Keep completed Clay UI files and unrelated runtime/PPT work out of the submit runtime commit.
+3. Continue Stage One M6 with the next ecommerce runtime slice after this commit lands; current likely follow-up is shared ecommerce asset-role assembly or any remaining `handleGenerate` cleanup after a fresh reference map.
 
 ## Risks
 
