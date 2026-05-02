@@ -4,14 +4,14 @@ Last updated: 2026-05-02
 
 ## Active State
 
-- Active lane in this thread: Stage One M6 ecommerce runtime extraction, current slice `useEcommerceModeRuntime` and `useEcommercePromptActivationRuntime`.
+- Active lane in this thread: Stage One M6 ecommerce runtime extraction, current slice `useEcommerceSourceSelectionRuntime`.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports `4c448660`; the writable full Git metadata copy at `node_modules/.codex-git-full` is ahead of plain metadata and is currently at `813885d8 docs: refresh ecommerce submit runtime status`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports `4c448660`; the writable full Git metadata copy at `node_modules/.codex-git-full` is ahead of plain metadata and is currently at `cc24e19d refactor: extract ecommerce runtime activation`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Plain `.git` and the writable full Git metadata copy can both show mixed historical runtime/PPT/ecommerce work during this thread. Staging must remain path-limited and use the writable metadata copy.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: close the ecommerce runtime activation slice with full validation and a path-limited runtime commit. Clay UI files remain excluded from this runtime commit.
+- Current focus: close the ecommerce source selection runtime slice with full validation and a path-limited runtime commit. Clay UI files remain excluded from this runtime commit.
 
 ## Completed In `9e7ae2b5` (Clay UI Audit Closure)
 
@@ -22,25 +22,32 @@ Last updated: 2026-05-02
 - Browser QA for this lane is complete and tracked below.
 - Commit scope was UI/doc/test only and explicitly excluded runtime/PPT/ecommerce extraction WIP.
 
-## Current Ecommerce Runtime Activation Pass
+## Current Ecommerce Source Selection Runtime Pass
+
+- Added `src/app/useEcommerceSourceSelectionRuntime.ts` for the ecommerce state reset that runs when an image is selected as the next source.
+- `src/App.tsx` now wires the source-selection hook through `resetEcommerceSourceSelectionState`; App no longer owns the inline image-source ecommerce reset block in `handleImageClick`.
+- The hook receives dependencies through `UseEcommerceSourceSelectionRuntimeDeps`: the ecommerce ratio override setter and the shared active-focus state patch adapter for `activeTaskNodeId`, `activeTaskState`, `activeFrameworkId`, and `activeGroupSheet`.
+- New contract coverage in `tests/unit/ecommerce-source-selection-runtime-contract.test.ts` covers hook ownership, explicit deps/result interfaces, App wiring, and the extracted reset behavior. The mode and prompt-activation contracts were rerun as adjacent regression guards without new source edits in those files.
+- `tsconfig.tests.json` now semantically checks 30 test files.
+- Line counts after extraction: `src/App.tsx` 4400 physical lines; `src/app/useEcommerceSourceSelectionRuntime.ts` 35 physical lines; `tests/unit/ecommerce-source-selection-runtime-contract.test.ts` 47 physical lines; `tsconfig.tests.json` 59 physical lines.
+- Targeted validation: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-mode-runtime-contract.test.ts tests/unit/ecommerce-prompt-activation-runtime-contract.test.ts tests/unit/ecommerce-source-selection-runtime-contract.test.ts tests/unit/ecommerce-submit-runtime-contract.test.ts tests/unit/ecommerce-task-activation-runtime-contract.test.ts tests/unit/ecommerce-requirement-analysis-runtime-contract.test.ts tests/unit/generation-runtime-contract.test.ts` passed (72/72).
+- Passed: `npm.cmd run typecheck`; test semantic check now covers 30 files via `tsconfig.tests.json`.
+- Passed: `npm.cmd run test:unit` (1110/1110).
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed tracked diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/App.tsx src/app/useEcommerceSourceSelectionRuntime.ts tests/unit/ecommerce-source-selection-runtime-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
+- Browser QA: skipped for this slice because it is non-UI runtime glue that preserves the existing workspace and prompt surfaces. The Clay UI lane browser evidence remains recorded below.
+- Commit include scope for this runtime slice: `status.md`, `plans.md`, `implement.md`, `validation.md`, `tsconfig.tests.json`, `src/App.tsx`, `src/app/useEcommerceSourceSelectionRuntime.ts`, and `tests/unit/ecommerce-source-selection-runtime-contract.test.ts`.
+- Explicitly excluded scope: Clay UI docs/styles/components, PPT/generation runtime files, and unrelated ecommerce runtime slices not touched by the current source-selection extraction.
+
+## Completed In `cc24e19d` (Ecommerce Runtime Activation)
 
 - Added `src/app/useEcommerceModeRuntime.ts` for the ecommerce mode guard/reset effect that clears active task state and forces high thinking mode in ecommerce mode.
 - Added `src/app/useEcommercePromptActivationRuntime.ts` for prompt-click ecommerce activation and framework summary resolution.
 - `src/App.tsx` now wires the new mode and prompt-activation hooks alongside the existing submit hook; App no longer owns the mode guard/reset effect, the prompt activation state block in `handlePromptClick`, or the prompt-node framework status callback.
 - The new hooks receive all dependencies through `UseEcommerceModeRuntimeDeps` and `UseEcommercePromptActivationRuntimeDeps`.
-- New contract coverage in `tests/unit/ecommerce-mode-runtime-contract.test.ts` and `tests/unit/ecommerce-prompt-activation-runtime-contract.test.ts` covers hook ownership, explicit deps/result interfaces, App wiring, and the extracted ecommerce activation branches. The submit and task-activation contracts were rerun as regression guards without new source edits in those files.
-- `tsconfig.tests.json` now semantically checks 29 test files.
-- Line counts after extraction: `src/App.tsx` 4398 physical lines; `src/app/useEcommerceModeRuntime.ts` 50 physical lines; `src/app/useEcommercePromptActivationRuntime.ts` 93 physical lines; `tests/unit/ecommerce-mode-runtime-contract.test.ts` 31 physical lines; `tests/unit/ecommerce-prompt-activation-runtime-contract.test.ts` 60 physical lines; `tsconfig.tests.json` 58 physical lines.
-- Targeted validation: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-mode-runtime-contract.test.ts tests/unit/ecommerce-prompt-activation-runtime-contract.test.ts tests/unit/ecommerce-submit-runtime-contract.test.ts tests/unit/ecommerce-task-activation-runtime-contract.test.ts` passed (6/6).
-- Passed: `npm.cmd run typecheck`; test semantic check now covers 29 files via `tsconfig.tests.json`.
-- Passed: `npm.cmd run test:unit` (1107/1107).
-- Passed: `npm.cmd run build`.
-- Passed: `npm.cmd run governance:agent-docs`.
-- Passed: `npm.cmd run check:encoding`.
-- Passed tracked diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/App.tsx src/app/useEcommerceModeRuntime.ts src/app/useEcommercePromptActivationRuntime.ts tests/unit/ecommerce-mode-runtime-contract.test.ts tests/unit/ecommerce-prompt-activation-runtime-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
-- Browser QA: skipped for this slice because it is non-UI runtime glue that preserves the existing workspace and prompt surfaces. The Clay UI lane browser evidence remains recorded below.
-- Commit include scope for this runtime slice: `status.md`, `plans.md`, `implement.md`, `validation.md`, `tsconfig.tests.json`, `src/App.tsx`, `src/app/useEcommerceModeRuntime.ts`, `src/app/useEcommercePromptActivationRuntime.ts`, `tests/unit/ecommerce-mode-runtime-contract.test.ts`, and `tests/unit/ecommerce-prompt-activation-runtime-contract.test.ts`.
-- Explicitly excluded scope: Clay UI docs/styles/components, PPT/generation runtime files, and unrelated ecommerce runtime slices not touched by the current ecommerce activation extraction.
+- New contract coverage in `tests/unit/ecommerce-mode-runtime-contract.test.ts` and `tests/unit/ecommerce-prompt-activation-runtime-contract.test.ts` covers hook ownership, explicit deps/result interfaces, App wiring, and the extracted ecommerce activation branches.
 
 ## Completed In `184b158c` (Ecommerce Task Activation Runtime)
 
@@ -254,16 +261,16 @@ Last updated: 2026-05-02
 
 ## Latest Recorded Validation
 
-Fresh validation for the current ecommerce runtime activation pass:
+Fresh validation for the current ecommerce source selection runtime pass:
 
-- Working-tree note: the prompt-activation runtime seam was already partially present in the mixed worktree, so this pass finished the extraction and aligned it with the new mode/runtime contracts before running the full validation set.
-- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-mode-runtime-contract.test.ts tests/unit/ecommerce-prompt-activation-runtime-contract.test.ts tests/unit/ecommerce-submit-runtime-contract.test.ts tests/unit/ecommerce-task-activation-runtime-contract.test.ts` (6/6).
-- Passed: `npm.cmd run typecheck`; test semantic check now covers 29 files via `tsconfig.tests.json`.
-- Passed: `npm.cmd run test:unit` (1107/1107).
+- Working-tree note: the source-selection runtime seam was already present in the mixed worktree when this pass resumed, so this turn validated it, aligned the ledgers, and is carrying it through the full release gate before commit.
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-source-selection-runtime-contract.test.ts tests/unit/ecommerce-mode-runtime-contract.test.ts tests/unit/ecommerce-prompt-activation-runtime-contract.test.ts` (7/7).
+- Passed: `npm.cmd run typecheck`; test semantic check now covers 30 files via `tsconfig.tests.json`.
+- Passed: `npm.cmd run test:unit` (1110/1110).
 - Passed: `npm.cmd run build`.
 - Passed: `npm.cmd run governance:agent-docs`.
 - Passed: `npm.cmd run check:encoding`.
-- Passed tracked diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/App.tsx src/app/useEcommerceModeRuntime.ts src/app/useEcommercePromptActivationRuntime.ts tests/unit/ecommerce-mode-runtime-contract.test.ts tests/unit/ecommerce-prompt-activation-runtime-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
+- Passed tracked diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/App.tsx src/app/useEcommerceSourceSelectionRuntime.ts tests/unit/ecommerce-source-selection-runtime-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
 - Validation window complete; the remaining work is staging, commit, and the next runtime seam.
 
 Historical validation for `017bb3a2` ecommerce requirement analysis runtime pass:
@@ -395,9 +402,9 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-1. Stage and commit only the current ecommerce runtime activation slice files plus ledger updates through `git --git-dir=node_modules/.codex-git-full --work-tree=.`.
-2. Keep completed Clay UI files and unrelated runtime/PPT work out of the runtime activation commit.
-3. Continue Stage One M6 with the next remaining ecommerce seam after this commit lands; current smallest candidates are the ecommerce mode-adjacent reset path in `handleImageClick`, the partial-redraw ecommerce branch, or any remaining App-owned framework-status glue after a fresh reference map.
+1. Stage and commit only the current ecommerce source selection runtime slice files plus ledger updates through `git --git-dir=node_modules/.codex-git-full --work-tree=.`.
+2. Keep completed Clay UI files and unrelated runtime/PPT work out of the source selection runtime commit.
+3. Continue Stage One M6 with the next remaining ecommerce seam after this commit lands; current smallest candidates are the partial-redraw ecommerce branch or any remaining App-owned framework-status glue after a fresh reference map.
 
 ## Risks
 

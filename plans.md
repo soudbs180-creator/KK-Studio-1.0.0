@@ -5,19 +5,19 @@ Branch policy: continue on the current branch unless the user explicitly asks fo
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries`. The writable metadata copy used for this session is ahead at `813885d8 docs: refresh ecommerce submit runtime status`; use that writable metadata copy for status, staging, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries`. The writable metadata copy used for this session is ahead at `cc24e19d refactor: extract ecommerce runtime activation`; use that writable metadata copy for status, staging, and commits in this session.
 
 The active execution model for this thread has resumed Stage One runtime extraction:
 - Clay UI surface cleanup and browser evidence closed in `9e7ae2b5`.
-- Current active slice is Stage One M6 ecommerce runtime activation extraction in `src/app/useEcommerceModeRuntime.ts` and `src/app/useEcommercePromptActivationRuntime.ts`.
+- Current active slice is Stage One M6 ecommerce source selection runtime extraction in `src/app/useEcommerceSourceSelectionRuntime.ts`.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
-Commit boundary going forward: UI fixes and runtime/PPT/ecommerce fixes must be staged separately even though the working tree is mixed. Current runtime staging must use `git --git-dir=node_modules/.codex-git-full --work-tree=.` and include only the active ecommerce runtime activation files plus ledger updates.
+Commit boundary going forward: UI fixes and runtime/PPT/ecommerce fixes must be staged separately even though the working tree is mixed. Current runtime staging must use `git --git-dir=node_modules/.codex-git-full --work-tree=.` and include only the active ecommerce source selection runtime files plus ledger updates.
 
 ## Current Baseline
 
-- `src/App.tsx`: 4398 lines after the current ecommerce runtime activation WIP.
+- `src/App.tsx`: 4400 lines after the current ecommerce source selection runtime WIP.
 - `src/app/useConnectorRenderer.ts`: 272 lines, already extracted and awaiting hardening.
 - `src/context/CanvasContext.tsx`: 5434 lines.
 - `src/services/auth/keyManager.ts`: 5280 lines.
@@ -194,7 +194,8 @@ Scope:
 - Completed slice in `782d30d3`: extract mobile ecommerce continuation lookup/edit/toggle/confirm/mobile-generate handlers into `src/app/useEcommerceMobileContinuationRuntime.ts`.
 - Completed slice in `184b158c`: extract source-key ecommerce task activation fallback and prompt-node activation into `src/app/useEcommerceTaskActivationRuntime.ts`.
 - Completed slice: extract the ecommerce submit branch in `handleGenerate` into `src/app/useEcommerceSubmitRuntime.ts`.
-- Current slice: extract the ecommerce mode guard/reset and prompt activation branches into `src/app/useEcommerceModeRuntime.ts` and `src/app/useEcommercePromptActivationRuntime.ts`.
+- Completed slice in `cc24e19d`: extract the ecommerce mode guard/reset and prompt activation branches into `src/app/useEcommerceModeRuntime.ts` and `src/app/useEcommercePromptActivationRuntime.ts`.
+- Current slice: extract the image-source ecommerce reset branch in `handleImageClick` into `src/app/useEcommerceSourceSelectionRuntime.ts`.
 
 Acceptance:
 - Ecommerce references are routed through an explicit hook interface.
@@ -211,9 +212,10 @@ Acceptance:
 - Ecommerce submit runtime exposes explicit deps/result interfaces; App no longer owns the ecommerce-specific submit guard branch inside `handleGenerate`.
 - Ecommerce mode runtime exposes explicit deps/result interfaces; App no longer owns the ecommerce mode guard/reset effect.
 - Ecommerce prompt activation runtime exposes explicit deps/result interfaces; App no longer owns the ecommerce prompt activation state block or prompt-node framework status callback.
+- Ecommerce source selection runtime exposes explicit deps/result interfaces; App no longer owns the image-source ecommerce reset block inside `handleImageClick`.
 
 Commit:
-- `refactor: extract ecommerce activation runtimes`
+- `refactor: extract ecommerce source selection runtime`
 
 ### 7. Stage Two: Secondary Giant File Split
 

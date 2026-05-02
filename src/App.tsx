@@ -123,6 +123,9 @@ import {
   useEcommercePromptActivationRuntime,
   type SetEcommercePromptActivationRuntimeState,
 } from './app/useEcommercePromptActivationRuntime';
+import {
+  useEcommerceSourceSelectionRuntime,
+} from './app/useEcommerceSourceSelectionRuntime';
 import { useEcommerceModeRuntime, type SetEcommerceModeRuntimeState } from './app/useEcommerceModeRuntime';
 import { useEcommerceSubmitRuntime } from './app/useEcommerceSubmitRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
@@ -1220,6 +1223,12 @@ const AppContent: React.FC<AppContentProps> = () => {
     setEcommerceRatioOverride,
     resolveEcommerceFrameworkId,
     syncEcommerceFrameworkView,
+  });
+  const {
+    resetEcommerceSourceSelectionState,
+  } = useEcommerceSourceSelectionRuntime({
+    setEcommerceRatioOverride,
+    setEcommerceSourceSelectionRuntimeState: updateEcommercePromptActivationRuntimeState,
   });
 
   const resolveEffectiveEcommerceThinkingMode = useCallback((): 'minimal' | 'high' => (
@@ -2642,14 +2651,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     // Set this image as source for continuing conversation
     setActiveSourceImage(imageId);
-    setEcommerceRatioOverride(undefined);
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      activeTaskNodeId: null,
-      activeTaskState: null,
-      activeFrameworkId: null,
-      activeGroupSheet: null,
-    }));
+    resetEcommerceSourceSelectionState();
     // Clear prompt and existing references to start fresh continue-conversation
     setConfig(prev => ({ ...prev, prompt: '', referenceImages: [] }));
 
@@ -2689,7 +2691,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       });
       setDraftNodeId(newId);
     }
-  }, [selectNodes, setConfig, draftNodeId, deletePromptNode, activeCanvas, addPromptNode, config, imageNodesById, promptNodesById]);
+  }, [selectNodes, setConfig, draftNodeId, deletePromptNode, activeCanvas, addPromptNode, config, imageNodesById, promptNodesById, resetEcommerceSourceSelectionState]);
 
   const handleMobileUseImageAsSource = useCallback((imageId: string) => {
     handleImageClick(imageId);

@@ -4,14 +4,15 @@ Last updated: 2026-05-02
 
 Use `npm.cmd` for npm scripts on Windows.
 
-## Active Ecommerce Runtime Activation Gate
+## Active Ecommerce Source Selection Gate
 
-Use this gate for the active ecommerce runtime activation extraction while preserving submit, activation, requirement-analysis, and generation runtime boundaries:
+Use this gate for the active ecommerce source selection extraction while preserving activation, submit, requirement-analysis, and generation runtime boundaries:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/ecommerce-mode-runtime-contract.test.ts" `
   "tests/unit/ecommerce-prompt-activation-runtime-contract.test.ts" `
+  "tests/unit/ecommerce-source-selection-runtime-contract.test.ts" `
   "tests/unit/ecommerce-submit-runtime-contract.test.ts" `
   "tests/unit/ecommerce-task-activation-runtime-contract.test.ts" `
   "tests/unit/ecommerce-requirement-analysis-runtime-contract.test.ts" `
