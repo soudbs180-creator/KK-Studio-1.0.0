@@ -3,7 +3,31 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
+import type {
+  OrderedPptNodeBundle,
+  OrderedPptPreviewBundle,
+  PptDeckEditorState,
+  PptEditableExportBundle,
+  PptOutlineLineParts,
+  PptStackPreviewState,
+  UsePptRuntimeDeps,
+  UsePptRuntimeResult,
+} from '../../src/app/usePptRuntime.ts';
+import type { PptRuntimeCanvasSnapshot } from '../../src/app/pptRuntimeHelpers.ts';
+
 const ROOT_DIR = process.cwd();
+
+type PptRuntimePublicBoundary = {
+  deps: UsePptRuntimeDeps;
+  result: UsePptRuntimeResult;
+  outline: PptOutlineLineParts;
+  previewBundle: OrderedPptPreviewBundle;
+  nodeBundle: OrderedPptNodeBundle;
+  exportBundle: PptEditableExportBundle;
+  deckEditor: PptDeckEditorState;
+  stackPreview: PptStackPreviewState;
+  canvasSnapshot: PptRuntimeCanvasSnapshot;
+}
 
 function readSource(relativePath: string): string {
   const fullPath = path.join(ROOT_DIR, relativePath);
@@ -21,9 +45,15 @@ test('PPT runtime helpers and exports are owned by usePptRuntime', () => {
   const appSource = readSource('src/App.tsx');
   const hookSource = readSource('src/app/usePptRuntime.ts');
   const helperSource = readSource('src/app/pptRuntimeHelpers.ts');
+  const testConfigSource = readSource('tsconfig.tests.json');
+  const boundaryIsTypechecked: PptRuntimePublicBoundary | null = null;
 
+  assert.equal(boundaryIsTypechecked, null);
   assert.match(hookSource, /export interface UsePptRuntimeDeps/);
   assert.match(hookSource, /export interface UsePptRuntimeResult/);
+  assert.match(testConfigSource, /tests\/unit\/ppt-runtime-contract\.test\.ts/);
+  assert.match(testConfigSource, /tests\/unit\/ppt-runtime-helper-contract\.test\.ts/);
+  assert.match(testConfigSource, /tests\/unit\/ppt-deck-single-container-contract\.test\.ts/);
   assert.match(hookSource, /setPptDeckEditor: Dispatch<SetStateAction<PptDeckEditorState \| null>>;/);
   assert.match(hookSource, /type UpdatePromptNode = \(promptNode: PromptNode\) => void \| Promise<unknown>;/);
   assert.match(hookSource, /type UpdateImageNode = \(id: string, updates: Partial<GeneratedImage>\) => void \| Promise<unknown>;/);

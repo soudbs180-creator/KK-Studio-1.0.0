@@ -1,11 +1,11 @@
 # KK-Studio v1.4.2 Single-Line Convergence Plan
 
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 Branch policy: continue on the current branch and current workspace unless the user explicitly asks for a branch or worktree.
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline before the generation billing follow-up is `ab719c4a refactor: harden generation runtime boundary`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline before the PPT boundary slice is `083db7f8 refactor: tighten generation billing boundary`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -19,19 +19,22 @@ The active execution model for this thread has resumed Stage One convergence:
 - Stage One M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`; remaining ecommerce references are hook wiring, state adapters, UI prop forwarding, and render predicates.
 - Connector renderer boundary hardening closed in `5f5b76e0`; the connector public-type review follow-up closed in `f06f1880`.
 - Stage One Backfill M2 `usePromptGroupLayout` boundary hardening is completed in `8a458cd4`.
-- Stage One Backfill M3 `useGenerationRuntime` boundary hardening is completed in `ab719c4a`; the current follow-up removes stale App billing coupling and adds generation billing contract semantic coverage.
-- Current active slice after this commit is Stage One Backfill M5: `usePptRuntime` quality check.
+- Stage One Backfill M3 `useGenerationRuntime` boundary hardening is completed in `ab719c4a`; the generation billing follow-up is completed in `083db7f8`.
+- Stage One Backfill M5 `usePptRuntime` quality check is the current slice being committed: it adds semantic public-boundary coverage for PPT runtime contracts and includes all PPT contract tests in `tsconfig.tests.json`.
+- Current active slice after this commit is Stage Two M1: split the first narrow responsibility out of `src/context/CanvasContext.tsx`.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
-Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release metadata, and review follow-ups must be staged separately. The next PPT-runtime slice should include only PPT runtime code/tests or scan-only ledger updates.
+Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release metadata, and Stage Two architecture splits must be staged separately. The next Stage Two slice should include only `CanvasContext.tsx` and the new focused module/tests needed for one responsibility.
 
 ## Current Baseline
 
-- `src/App.tsx`: 4904 lines after `f06f1880`.
+- `src/App.tsx`: 4900 lines after `083db7f8`.
 - `src/app/useConnectorRenderer.ts`: 253 lines, boundary hardened in `5f5b76e0` and review-follow-up typechecked in `f06f1880`.
 - `src/app/usePromptGroupLayout.ts`: 1348 lines, extracted and boundary-hardened in `8a458cd4`.
-- `src/app/useGenerationRuntime.ts`: 2604 lines, extracted and boundary-hardened in `ab719c4a`.
+- `src/app/useGenerationRuntime.ts`: 2604 lines, extracted and boundary-hardened in `ab719c4a`; generation billing cleanup completed in `083db7f8`.
+- `src/app/usePptRuntime.ts`: 1289 lines, extracted in `4c448660` and semantically boundary-checked in the current PPT slice.
+- `src/app/pptRuntimeHelpers.ts`: 152 lines, semantically boundary-checked in the current PPT slice.
 - `src/context/CanvasContext.tsx`: 5433 lines.
 - `src/services/auth/keyManager.ts`: 5279 lines.
 - `src/components/layout/PromptBar.tsx`: 4437 lines.
@@ -182,7 +185,7 @@ Validation:
 Commit:
 - `refactor: harden prompt group layout boundary`
 
-### 5. Stage One Backfill M3: Generation Runtime Quality Check (Completed In `ab719c4a`, Follow-Up Active)
+### 5. Stage One Backfill M3: Generation Runtime Quality Check (Completed In `ab719c4a`, Follow-Up In `083db7f8`)
 
 Goal: verify the already extracted generation execution runtime remains clean and does not need immediate follow-up before Stage Two.
 
@@ -205,19 +208,22 @@ Commit:
 
 ### 6. Stage One Backfill M5: PPT Runtime Quality Check
 
-Status: paused while the active Clay UI audit is closed. The first pass landed in `4c448660`; any follow-up must remain in a later runtime/PPT commit and stay separate from Clay UI files.
+Status: active slice being committed. The first extraction pass landed in `4c448660`; this follow-up stays separate from Clay UI files and hardens the semantic public boundary through contract tests.
 
 Goal: verify the already extracted PPT editing, preview, export, and deck child image management boundaries remain clean and do not need immediate follow-up before Stage Two.
 
 Scope:
-- Create `src/app/usePptRuntime.ts`.
-- Move PPT editable page building, slide synchronization, PPTX export, PPT preview, and deck child filtering orchestration into the hook.
+- Keep `src/app/usePptRuntime.ts` as owner of PPT editable page building, slide synchronization, PPTX export, PPT preview, and deck child filtering orchestration.
+- Keep `src/app/pptRuntimeHelpers.ts` as owner of PPT image ordering, stale child fallback, parent prompt rejection, deck child detection, and nullish image array guards.
+- Semantically typecheck the public PPT runtime boundary through `tests/unit/ppt-runtime-contract.test.ts`.
+- Add all three PPT contract tests to `tsconfig.tests.json`: `tests/unit/ppt-runtime-contract.test.ts`, `tests/unit/ppt-runtime-helper-contract.test.ts`, and `tests/unit/ppt-deck-single-container-contract.test.ts`.
 - Preserve existing helper modules such as PPTX skeleton and slide document builders.
 
 Acceptance:
 - PPT preview and editable export behavior remains unchanged.
 - Deck child image filtering remains compatible with canvas rendering.
-- PPT-related tests and build pass.
+- `UsePptRuntimeDeps`, `UsePptRuntimeResult`, PPT bundle/editor/preview public boundary types, and `PptRuntimeCanvasSnapshot` are imported by a semantic test included in `tsconfig.tests.json`.
+- PPT-related targeted tests, typecheck, unit suite, build, agent-doc governance, encoding check, and path-limited `diff --check` pass.
 
 Commit:
 - `refactor: harden ppt runtime` if code changes.
@@ -272,6 +278,7 @@ Commit:
 Goal: split the next largest files while preserving public behavior.
 
 Scope:
+- Active first slice: map `src/context/CanvasContext.tsx` and split one narrow responsibility, starting with the least cross-cutting state model or helper boundary that can be protected by existing canvas/workspace tests.
 - Split `src/context/CanvasContext.tsx` by state model, selection/drag events, node mutations, and persistence sync.
 - Split `src/services/auth/keyManager.ts` by key storage, permission checks, encryption helpers, and provider credential management.
 - Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.

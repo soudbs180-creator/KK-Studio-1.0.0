@@ -1,6 +1,6 @@
 # KK-Studio v1.4.2 Single-Line Validation Matrix
 
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 
 Use `npm.cmd` for npm scripts on Windows.
 
@@ -92,6 +92,37 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/ppt-deck-single-container-contract.test.ts" `
   "tests/unit/generation-runtime-contract.test.ts" `
   "tests/unit/generation-billing-runtime-contract.test.ts"
+```
+
+This PPT boundary slice also requires `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and a path-limited alternate-git `diff --check`.
+
+## Stage Two CanvasContext Split Gate
+
+Use this gate for the first `src/context/CanvasContext.tsx` split. Add or narrow targeted tests after the responsibility map identifies the exact boundary; do not use one broad commit for state model, mutations, drag/selection, and persistence at the same time.
+
+Minimum architecture split gate:
+
+```powershell
+npm.cmd run architecture:check
+npm.cmd run typecheck
+npm.cmd run test:unit
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/context/CanvasContext.tsx" "src/context" "tests/unit" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+If the touched CanvasContext slice affects persistence or workspace layout, include:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/workspace-layout-contract.test.ts"
+```
+
+If the touched CanvasContext slice affects live scene, connector positions, or prompt grouping, include:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/canvas-live-scene-contract.test.ts" `
+  "tests/unit/canvas-connector-throttling-contract.test.ts" `
+  "tests/unit/prompt-group-regroup-behavior.test.ts"
 ```
 
 ## Stage One Backfill Generation Gate

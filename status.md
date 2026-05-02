@@ -1,20 +1,20 @@
 # KK-Studio v1.4.2 Coordination Status
 
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 
 ## Active State
 
-- Active lane in this thread: single-line Stage One convergence. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`, with public-type review follow-up committed in `f06f1880`; Stage One Backfill M2 `usePromptGroupLayout` hardening is committed in `8a458cd4`; Stage One Backfill M3 `useGenerationRuntime` hardening is committed in `ab719c4a`; the current follow-up removes stale App generation-billing coupling and typechecks the billing contract; the next active slice is Stage One Backfill M5 `usePptRuntime` quality check.
+- Active lane in this thread: single-line Stage One convergence. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`, with public-type review follow-up committed in `f06f1880`; Stage One Backfill M2 `usePromptGroupLayout` hardening is committed in `8a458cd4`; Stage One Backfill M3 `useGenerationRuntime` hardening is committed in `ab719c4a`; the generation billing follow-up is committed in `083db7f8`; the current slice hardens Stage One Backfill M5 `usePptRuntime` public type-boundary coverage.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and is currently at `ab719c4a refactor: harden generation runtime boundary` before the generation billing follow-up. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and is currently at `083db7f8 refactor: tighten generation billing boundary` before the PPT boundary slice. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Thread merge state: `019dd551...` is the main refactor history and `019de168...` is continuation history; both are part of the same Stage One M6 ecommerce runtime line.
-- Alternate-git worktree currently has only the generation billing follow-up slice plus ledger updates.
+- Alternate-git worktree currently has only the PPT boundary slice plus ledger updates.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus after this generation billing follow-up commit: begin Stage One Backfill M5 `usePptRuntime` quality check.
-- Most recent generation billing follow-up scope: `src/App.tsx`, `tests/unit/generation-runtime-contract.test.ts`, `tests/unit/generation-billing-runtime-contract.test.ts`, `tsconfig.tests.json`, `plans.md`, `implement.md`, `validation.md`, and `status.md`.
-- Next active slice after this commit: Stage One Backfill M5 `usePptRuntime` quality check.
+- Current focus after this PPT boundary commit: begin Stage Two M1, a narrow `src/context/CanvasContext.tsx` split.
+- Most recent PPT boundary scope: `tests/unit/ppt-runtime-contract.test.ts`, `tsconfig.tests.json`, `plans.md`, `implement.md`, `validation.md`, and `status.md`.
+- Next active slice after this commit: map `src/context/CanvasContext.tsx` responsibilities and split one minimal, testable boundary without touching `keyManager.ts`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`, UI, or release metadata.
 - Browser QA: skipped for these runtime/type-boundary slices because no UI runtime or visual surface changed.
 
 ## Completed In `9e7ae2b5` (Clay UI Audit Closure)
@@ -47,7 +47,7 @@ Last updated: 2026-05-02
 
 ## Current Quality Baseline
 
-- Current giant tracked files after `f06f1880`: `src/context/CanvasContext.tsx` 5433 lines, `src/services/auth/keyManager.ts` 5279 lines, `src/App.tsx` 4904 lines, `src/components/layout/PromptBar.tsx` 4437 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 4517 lines.
+- Current giant tracked files after `083db7f8`: `src/context/CanvasContext.tsx` 5433 lines, `src/services/auth/keyManager.ts` 5279 lines, `src/App.tsx` 4900 lines, `src/components/layout/PromptBar.tsx` 4437 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 4517 lines.
 - Current tracked TS/TSX debt scan: direct `as any` matches 167, explicit any-type pattern matches 484, `@ts-ignore` / `@ts-expect-error` matches 133, and `console.log` matches 251. These are refactor debt indicators, not release blockers by themselves.
 - Quality rule going forward: reduce `any`, TypeScript suppressions, and bare `console.log` inside touched files when local and safe; do not perform a whole-repo cleanup inside one runtime or architecture extraction.
 - Architecture status from the last recorded full check: `npm.cmd run architecture:check` passed with known allowlisted migration and legacy bridge exceptions; `npm.cmd run spec:check` passed.
@@ -106,6 +106,19 @@ Last updated: 2026-05-02
 - RED evidence from this follow-up: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-billing-runtime-contract.test.ts` failed while App still imported `generationBillingCoordinator`.
 - Targeted GREEN validation: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/generation-runtime-contract.test.ts tests/unit/generation-billing-runtime-contract.test.ts` passed (52/52).
 - Browser QA: skipped because this is non-UI runtime cleanup and semantic test coverage; no visual surface changed.
+
+## Completed Stage One Backfill M5 (PPT Runtime Boundary)
+
+- Strengthened `tests/unit/ppt-runtime-contract.test.ts` with `import type` coverage for `UsePptRuntimeDeps`, `UsePptRuntimeResult`, `PptOutlineLineParts`, ordered PPT preview/node bundles, editable export bundle, deck editor state, stack preview state, and `PptRuntimeCanvasSnapshot`.
+- Added `tests/unit/ppt-runtime-contract.test.ts`, `tests/unit/ppt-runtime-helper-contract.test.ts`, and `tests/unit/ppt-deck-single-container-contract.test.ts` to `tsconfig.tests.json`; `npm.cmd run typecheck` now semantically checks 38 test files.
+- Line counts for this slice before commit: `src/App.tsx` 4900, `src/app/usePptRuntime.ts` 1289, `src/app/pptRuntimeHelpers.ts` 152, `tests/unit/ppt-runtime-contract.test.ts` 269, `tsconfig.tests.json` 67.
+- RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ppt-runtime-contract.test.ts` failed because `tsconfig.tests.json` did not include `tests/unit/ppt-runtime-contract.test.ts`.
+- Targeted GREEN validation: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ppt-runtime-contract.test.ts tests/unit/ppt-runtime-helper-contract.test.ts tests/unit/ppt-deck-single-container-contract.test.ts` passed (6/6).
+- Full validation passed: `npm.cmd run typecheck` with semantic checks for 38 test files, `npm.cmd run test:unit` (1116/1116), `npm.cmd run build`, `npm.cmd run governance:agent-docs`, and `npm.cmd run check:encoding`.
+- Path-limited diff check passed: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- tests/unit/ppt-runtime-contract.test.ts tsconfig.tests.json` with LF/CRLF normalization warnings only before ledger edits.
+- Independent review by subagent `019de8f6-54b8-7d23-8bf0-6f9effd102f1` approved the slice with no findings; residual risk was limited to not rerunning the full suite inside the review subagent.
+- Touched-file debt check found no `as any`, `@ts-ignore` / `@ts-expect-error`, or bare `console.log` in `tests/unit/ppt-runtime-contract.test.ts` or `tsconfig.tests.json`.
+- Browser QA: skipped because this is a non-UI runtime/type-boundary and test configuration slice; no visual surface, CSS, or browser behavior changed.
 
 ## Completed In `ccf965c3` (Ecommerce Source Selection Runtime)
 
@@ -334,6 +347,18 @@ Last updated: 2026-05-02
 
 ## Latest Recorded Validation
 
+Fresh validation for Stage One Backfill M5 PPT runtime boundary:
+
+- RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ppt-runtime-contract.test.ts` failed because `tests/unit/ppt-runtime-contract.test.ts` was not included in `tsconfig.tests.json`.
+- Passed targeted gate: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ppt-runtime-contract.test.ts tests/unit/ppt-runtime-helper-contract.test.ts tests/unit/ppt-deck-single-container-contract.test.ts` (6/6).
+- Passed: `npm.cmd run typecheck`; test semantic check now covers 38 files via `tsconfig.tests.json`.
+- Passed: `npm.cmd run test:unit` (1116/1116).
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed tracked diff check before ledger edits: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- tests/unit/ppt-runtime-contract.test.ts tsconfig.tests.json` with LF/CRLF normalization warnings only.
+- Passed final ledger validation after ledger edits: `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- tests/unit/ppt-runtime-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
+
 Fresh validation for Stage One Backfill M1 connector renderer hardening:
 
 - RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-connector-throttling-contract.test.ts` failed because `ConnectorRenderSnapshot`, `UseConnectorRendererDeps`, and `UseConnectorRendererResult` were not exported.
@@ -491,14 +516,14 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-1. Start Stage One Backfill M5: audit `src/app/usePptRuntime.ts`, `src/app/pptRuntimeHelpers.ts`, `src/App.tsx`, and PPT runtime contracts; either make one minimal hardening change with tests or record a scan-only completion.
-2. After Stage One backfill, enter Stage Two giant-file split in this priority order: `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`.
+1. Start Stage Two M1: map `src/context/CanvasContext.tsx` responsibilities and split one narrow, testable boundary first. Preferred first pass is the least cross-cutting state-model/helper extraction, not selection/drag/persistence all at once.
+2. Continue Stage Two giant-file split in this priority order after the first CanvasContext slice: `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`.
 3. Defer release metadata realignment until final packaging/publish, then rerun the full release gate including `npm.cmd run governance:check`.
 
 ## Risks
 
 - Original `.git` does not match the writable metadata copy in this session. Use the full writable metadata copy at `node_modules/.codex-git-full` for local commits unless the ACL is fixed outside the sandbox.
 - Plain `.git` may show stale dirty state and must not be used as the commit-readiness source.
-- The alternate-git worktree was clean at `ab719c4a` before the generation billing follow-up, but any staging must still be explicit path-based and reviewed before commit.
+- The alternate-git worktree was clean at `083db7f8` before the PPT boundary slice, but any staging must still be explicit path-based and reviewed before commit.
 - Do not delete locks, change `.git` ACLs, revert paused runtime/PPT work, or stage unrelated runtime files without explicit user confirmation.
 - Do not mix UI, PPT, runtime extraction, release metadata, and quality-debt cleanup in one commit.

@@ -1,26 +1,27 @@
 # KK-Studio v1.4.2 Implementation Rules
 
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 
 ## Operating Mode
 
-This is a long-running execution. Plain `.git` still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`; the latest committed baseline before the generation billing follow-up is `ab719c4a refactor: harden generation runtime boundary`.
+This is a long-running execution. Plain `.git` still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`; the latest committed baseline before the PPT boundary slice is `083db7f8 refactor: tighten generation billing boundary`.
 
 The active workstream is a single merged line. Thread `019dd551...` is the main refactor history and `019de168...` is continuation history; both belong to Stage One M6 ecommerce runtime extraction. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; ecommerce source selection closed in `ccf965c3`; ecommerce partial redraw closed in `d12731ce`; connector renderer boundary hardening closed in `5f5b76e0`; connector review follow-up closed in `f06f1880`; the M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`.
 
-Stage One Backfill M2 completed in `8a458cd4` by hardening `src/app/usePromptGroupLayout.ts` without re-creating the hook. Stage One Backfill M3 completed in `ab719c4a` by semantically checking the public `useGenerationRuntime` boundary. The current follow-up removes stale App generation-billing coupling and semantically checks the generation billing contract. The next active slice is Stage One Backfill M5 `usePptRuntime` quality check.
+Stage One Backfill M2 completed in `8a458cd4` by hardening `src/app/usePromptGroupLayout.ts` without re-creating the hook. Stage One Backfill M3 completed in `ab719c4a` by semantically checking the public `useGenerationRuntime` boundary. The generation billing follow-up completed in `083db7f8`. The current PPT boundary slice semantically checks `usePptRuntime` and the PPT helper boundary; the next active slice after this commit is Stage Two M1, the first narrow `CanvasContext.tsx` split.
 
 The active plan is `plans.md`. The current status and next exact step are tracked in `status.md`. Validation commands and expected gates are tracked in `validation.md`.
 
 For Clay UI work, use `C:/Users/Administrator/Downloads/DESIGN-clay.md` as the visual base with these overrides: inputs, main cards, sub cards, and framework cards use controlled frosted material; dark mode uses neutral black-gray surfaces; Clay brand colors are emphasis only. That lane is not active unless the user reports a new visual issue.
 
-Current runtime order:
+Current convergence order:
 1. Keep the ledger files aligned with the alternate-git HEAD and the merged single execution line.
-2. Treat Stage One M6 ecommerce extraction as complete unless a new concrete regression proves otherwise.
-3. Write/update focused source contracts before each extraction when behavior or ownership changes.
-4. Move domain helpers and side effects into `src/app/` hooks with explicit deps/result interfaces.
-5. Verify with the targeted gate for the touched slice, typecheck, full unit suite, build, docs governance, encoding checks, and path-limited `git diff --check`.
-6. Stage only files in the active slice through `git --git-dir=node_modules/.codex-git-full --work-tree=.`.
+2. Treat Stage One M6 ecommerce extraction and Stage One backfill boundaries as complete unless a new concrete regression proves otherwise.
+3. For Stage Two, split one responsibility at a time from the largest files, starting with `src/context/CanvasContext.tsx`.
+4. Write/update focused source contracts before each extraction when behavior or ownership changes.
+5. Move domain helpers and side effects into focused modules while preserving compatibility exports.
+6. Verify with the targeted gate for the touched slice, typecheck, full unit suite, build or architecture check as required, docs governance, encoding checks, and path-limited `git diff --check`.
+7. Stage only files in the active slice through `git --git-dir=node_modules/.codex-git-full --work-tree=.`.
 
 Browser inspection may be skipped for non-UI runtime/docs slices after recording the skip reason in `status.md`. Record which lane is active, which dirty files are excluded from the current commit, and the validation results.
 
@@ -51,12 +52,13 @@ For every milestone:
 - For UI surfaces, use shared tokens instead of one-off inline glass, blue/indigo selected states, or heavy shadows.
 - Controlled frosted surfaces require a translucent background, readable contrast, hairline border, low tokenized shadow, `backdrop-filter` where supported, and a solid fallback where unsupported.
 - Keep `src/` as the active runtime until boundaries are stable.
-- Do not migrate to `apps/web/` during Stage One.
+- Do not migrate to `apps/web/` during Stage Two giant-file splits.
 - Do not change `apps/api/` unless a compatibility check proves it is required.
 - Every new custom hook must live in `src/app/` and expose explicit `UseXxxDeps` and `UseXxxResult` interfaces.
 - Hooks may receive dependencies through parameters only. Do not make hooks reach into `App.tsx` top-level state implicitly.
 - Optional arrays, maps, and objects must be defaulted inside the hook.
 - `App.tsx` should retain orchestration, rendering, and prop/event wiring, not domain business logic.
+- `CanvasContext.tsx` should retain provider orchestration and public context shape while state-model, mutation, selection/drag, or persistence helpers move behind focused modules.
 - Delete only the code made redundant by the current extraction.
 - Reduce `any`, `@ts-ignore` / `@ts-expect-error`, and bare `console.log` in touched files when doing so is local and safe. Do not attempt a whole-repo cleanup inside a runtime extraction.
 
