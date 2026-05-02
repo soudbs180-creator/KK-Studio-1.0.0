@@ -111,11 +111,13 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /refreshBilling,/);
     assert.match(hookSource, /adjustBalanceOptimistically\(-requiredCredits\)/);
 
-    assert.match(appSource, /ensureCreditAttemptCharged,[\s\S]*?resolveFailedCreditAttempt,[\s\S]*?applyOptimisticServerCreditDebit,/);
     assert.match(appSource, /consumeCreditsDetailed,/);
     assert.match(appSource, /refundCreditsByTransaction,/);
     assert.match(appSource, /refreshBilling,/);
     assert.match(appSource, /adjustBalanceOptimistically,/);
+    assert.doesNotMatch(appSource, /\bensureCreditAttemptCharged\b/);
+    assert.doesNotMatch(appSource, /\bresolveFailedCreditAttempt\b/);
+    assert.doesNotMatch(appSource, /\bapplyOptimisticServerCreditDebit\b/);
     assert.doesNotMatch(appSource, /const ensureCreditAttemptCharged = useCallback\(async/);
     assert.doesNotMatch(appSource, /const resolveFailedCreditAttempt = useCallback\(async/);
     assert.doesNotMatch(appSource, /const applyOptimisticServerCreditDebit = useCallback\(/);

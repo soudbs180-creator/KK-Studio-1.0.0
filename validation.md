@@ -106,6 +106,8 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
 
 This slice also requires `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and a path-limited alternate-git `diff --check`.
 
+Generation billing follow-ups use the same generation gate and must keep stale App-side generation billing imports out of `src/App.tsx`.
+
 ## Stage One Backfill Prompt Group Gate
 
 Use this gate for the active `usePromptGroupLayout` boundary-hardening slice:

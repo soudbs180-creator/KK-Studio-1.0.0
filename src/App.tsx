@@ -249,7 +249,6 @@ import { useAuth } from './context/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { BillingProvider, useBilling } from './context/BillingContext';
 import { formatRemainingCredits } from './services/billing/remainingBalance';
-import { buildGenerationAttemptRequestId } from './services/billing/generationBillingCoordinator';
 import {
   isCapabilityRouteAssignmentRouteDisabled,
   resolveEnabledCapabilityRouteAssignment,
@@ -2083,13 +2082,10 @@ const AppContent: React.FC<AppContentProps> = () => {
   const {
     handleCancelGeneration,
     handleRetryPptSinglePage,
-    ensureCreditAttemptCharged,
     prepareInitialGenerationSubmissionContext,
     runInitialGenerationSubmissionTransaction,
     prepareRetryGeneratedMediaExecutionContext,
     completeRetryGeneratedMediaBatch,
-    resolveFailedCreditAttempt,
-    applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
     activeCanvas,
     updatePromptNode,

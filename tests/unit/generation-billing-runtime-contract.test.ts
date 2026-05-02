@@ -3,7 +3,19 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
+import type {
+  EnsureCreditAttemptChargedParams,
+  EnsureCreditAttemptChargedResult,
+  GenerationCreditAttemptNode,
+} from '../../src/app/useGenerationRuntime.ts';
+
 const ROOT_DIR = process.cwd();
+
+type GenerationBillingRuntimePublicBoundary = {
+  attemptParams: EnsureCreditAttemptChargedParams;
+  attemptResult: EnsureCreditAttemptChargedResult;
+  attemptNode: GenerationCreditAttemptNode;
+}
 
 function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
@@ -15,13 +27,15 @@ test('frontend generation flow uses the shared billing coordinator and persists 
   const retryHelperSource = readSource('src/app/prepareRetriedExecutionNode.ts');
   const generationHookSource = readSource('src/hooks/useImageGeneration.ts');
   const billingContextSource = readSource('src/context/BillingContext.tsx');
+  const testConfigSource = readSource('tsconfig.tests.json');
   const typesSource = readSource('src/types.ts');
+  const boundaryIsTypechecked: GenerationBillingRuntimePublicBoundary | null = null;
   const billingAttemptCallCount =
-    (appSource.split('buildGenerationBillingAttempt(').length - 1)
-    + (generationRuntimeSource.split('buildGenerationBillingAttempt(').length - 1)
+    (generationRuntimeSource.split('buildGenerationBillingAttempt(').length - 1)
     + (retryHelperSource.split('buildGenerationBillingAttempt(').length - 1);
 
-  assert.match(appSource, /from '\.\/services\/billing\/generationBillingCoordinator';/);
+  assert.equal(boundaryIsTypechecked, null);
+  assert.doesNotMatch(appSource, /from '\.\/services\/billing\/generationBillingCoordinator';/);
   assert.ok(billingAttemptCallCount >= 2);
   assert.match(generationRuntimeSource, /billingAttemptId: params\.billingAttempt\.attemptId,/);
   assert.match(retryHelperSource, /from '\.\.\/services\/billing\/generationBillingCoordinator';/);
@@ -37,6 +51,10 @@ test('frontend generation flow uses the shared billing coordinator and persists 
 
   assert.match(billingContextSource, /const attemptId = String\(details\?\.attemptId \|\| ''\)\.trim\(\);/);
   assert.match(billingContextSource, /buildGenerationAttemptIdempotencyKey\(attemptId\)/);
+  assert.match(generationRuntimeSource, /export interface EnsureCreditAttemptChargedParams \{/);
+  assert.match(generationRuntimeSource, /export type EnsureCreditAttemptChargedResult =/);
+  assert.match(generationRuntimeSource, /export type GenerationCreditAttemptNode = Pick</);
+  assert.match(testConfigSource, /tests\/unit\/generation-billing-runtime-contract\.test\.ts/);
   assert.match(typesSource, /billingAttemptId\?: string;/);
 });
 

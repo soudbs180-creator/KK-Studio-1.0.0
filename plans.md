@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline before the prompt-group slice is `f06f1880 test: strengthen connector renderer boundary contract`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline before the generation billing follow-up is `ab719c4a refactor: harden generation runtime boundary`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -19,7 +19,7 @@ The active execution model for this thread has resumed Stage One convergence:
 - Stage One M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`; remaining ecommerce references are hook wiring, state adapters, UI prop forwarding, and render predicates.
 - Connector renderer boundary hardening closed in `5f5b76e0`; the connector public-type review follow-up closed in `f06f1880`.
 - Stage One Backfill M2 `usePromptGroupLayout` boundary hardening is completed in `8a458cd4`.
-- Stage One Backfill M3 `useGenerationRuntime` boundary hardening is completed by this generation-runtime commit.
+- Stage One Backfill M3 `useGenerationRuntime` boundary hardening is completed in `ab719c4a`; the current follow-up removes stale App billing coupling and adds generation billing contract semantic coverage.
 - Current active slice after this commit is Stage One Backfill M5: `usePptRuntime` quality check.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
@@ -31,7 +31,7 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/App.tsx`: 4904 lines after `f06f1880`.
 - `src/app/useConnectorRenderer.ts`: 253 lines, boundary hardened in `5f5b76e0` and review-follow-up typechecked in `f06f1880`.
 - `src/app/usePromptGroupLayout.ts`: 1348 lines, extracted and boundary-hardened in `8a458cd4`.
-- `src/app/useGenerationRuntime.ts`: 2604 lines, extracted and boundary-hardened in the generation-runtime commit.
+- `src/app/useGenerationRuntime.ts`: 2604 lines, extracted and boundary-hardened in `ab719c4a`.
 - `src/context/CanvasContext.tsx`: 5433 lines.
 - `src/services/auth/keyManager.ts`: 5279 lines.
 - `src/components/layout/PromptBar.tsx`: 4437 lines.
@@ -182,13 +182,15 @@ Validation:
 Commit:
 - `refactor: harden prompt group layout boundary`
 
-### 5. Stage One Backfill M3: Generation Runtime Quality Check (Completed In Generation-Runtime Commit)
+### 5. Stage One Backfill M3: Generation Runtime Quality Check (Completed In `ab719c4a`, Follow-Up Active)
 
 Goal: verify the already extracted generation execution runtime remains clean and does not need immediate follow-up before Stage Two.
 
 Scope:
 - Confirm generation start, billing attempt coordination, cancellation, retry, failure state, result node persistence, and preview state wiring remain in `src/app/useGenerationRuntime.ts`.
 - Semantically typecheck the public generation runtime boundary through `tests/unit/generation-runtime-contract.test.ts`.
+- Semantically typecheck generation billing boundary coverage through `tests/unit/generation-billing-runtime-contract.test.ts`.
+- Remove stale App-side generation billing imports/destructures after ownership has moved into the runtime hook.
 - Preserve current billing, API, storage, and generation service contracts.
 
 Acceptance:
