@@ -5,15 +5,15 @@ Branch policy: continue on the current branch unless the user explicitly asks fo
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries`. The writable metadata copy used for this session is ahead at `ec434f94 refactor: extract ecommerce framework runtime state`; those runtime/ecommerce commits are historical for this UI audit and must not be mixed into the UI commit.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries`. The writable metadata copy used for this session is ahead at `9e7ae2b5 Refine Clay frosted UI surfaces`; use that writable metadata copy for status, staging, and commits in this session.
 
-The active execution model for this thread is Clay UI audit first:
-- This thread now owns Clay UI surface cleanup, browser evidence, and the UI-only commit.
-- Stage One runtime/PPT and ecommerce runtime extraction are paused until the Clay UI commit is closed.
+The active execution model for this thread has resumed Stage One runtime extraction:
+- Clay UI surface cleanup and browser evidence closed in `9e7ae2b5`.
+- Current active slice is Stage One M6 ecommerce sheet settings runtime extraction in `src/app/useEcommerceSheetSettingsRuntime.ts`.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
-Commit boundary going forward: UI fixes and runtime/PPT/ecommerce fixes must be staged separately even though the working tree is mixed. Current UI staging must use `git --git-dir=node_modules/.codex-git-full --work-tree=.` and exclude paused runtime/PPT WIP such as `src/app/usePptRuntime.ts`, `tests/unit/ppt-runtime-contract.test.ts`, and unrelated ecommerce runtime extraction files unless they are only needed to keep the mixed tree compiling.
+Commit boundary going forward: UI fixes and runtime/PPT/ecommerce fixes must be staged separately even though the working tree is mixed. Current runtime staging must use `git --git-dir=node_modules/.codex-git-full --work-tree=.` and include only the active ecommerce sheet settings runtime files plus ledger updates.
 
 ## Current Baseline
 
@@ -40,11 +40,11 @@ Every milestone follows this order:
 
 ## Milestones
 
-### 0. Clay Frosted UI Audit (Active UI Lane)
+### 0. Clay Frosted UI Audit (Completed In `9e7ae2b5`)
 
 Goal: replace the older Apple/dark-heavy/Airtable UI drift with a Clay system: warm cream light theme, neutral black-gray dark theme, controlled frosted material for inputs/main cards/sub cards/framework cards, near-black or cream readable text, saturated color blocks for emphasis, no blue/teal dark canvas, and no whole-page theme flicker.
 
-Current status: active in this thread. Runtime/PPT work is paused and must not be staged into the UI commit.
+Current status: completed in this thread. Runtime/PPT/ecommerce work has resumed and must stay in separate runtime commits.
 
 Scope:
 - Create the root `DESIGN.md` Clay reference from the cached `getdesign` Clay guidance.
@@ -185,14 +185,16 @@ Scope:
 - Build an ecommerce reference map before editing.
 - Add source contract tests for framework cards, import/review flows, scheduler state, and product image result binding.
 - Create `src/app/useEcommerceRuntime.ts`.
+- Current slice: extract ecommerce sheet defaults, A+ sizing policy resolution, node generation setting resolution, and sheet-setting update propagation into `src/app/useEcommerceSheetSettingsRuntime.ts`.
 
 Acceptance:
 - Ecommerce references are routed through an explicit hook interface.
 - Existing ecommerce contract tests do not regress.
 - No unrelated generation or PPT behavior changes.
+- Sheet settings runtime exposes explicit deps/result interfaces and App no longer owns inline sheet settings helpers.
 
 Commit:
-- `refactor: extract ecommerce runtime`
+- `refactor: extract ecommerce sheet settings runtime`
 
 ### 7. Stage Two: Secondary Giant File Split
 

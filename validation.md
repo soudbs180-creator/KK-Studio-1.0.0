@@ -4,9 +4,22 @@ Last updated: 2026-05-02
 
 Use `npm.cmd` for npm scripts on Windows.
 
-## Active Clay UI Gate
+## Active Ecommerce Sheet Settings Runtime Gate
 
-Use this gate for the active Clay UI audit in this thread:
+Use this gate for the active ecommerce sheet settings runtime extraction:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/ecommerce-sheet-settings-runtime-contract.test.ts" `
+  "tests/unit/prompt-bar-ecommerce-footer-controls.test.ts" `
+  "tests/unit/prompt-optimizer-service-source-contract.test.ts"
+```
+
+Runtime commits also require `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, and `npm.cmd run check:encoding` unless `status.md` records a specific blocker.
+
+## Completed Clay UI Gate
+
+Use this gate if the completed Clay UI audit lane is touched again:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
@@ -18,7 +31,7 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/settings-entry-surface-style-regression.test.ts"
 ```
 
-Clay UI commits also require `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, and `npm.cmd run check:encoding` unless `status.md` records a specific blocker.
+Clay UI commits also require browser QA plus `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, and `npm.cmd run check:encoding` unless `status.md` records a specific blocker.
 
 ## Clay UI Contract Suite
 
@@ -59,9 +72,9 @@ Required browser checks:
 - `.theme-transitioning === 0` and no stale chunk text are confirmed.
 - Record the URL, route or surface, viewport, theme, and any visual issues or pass result in `status.md`.
 
-## Paused Runtime / PPT / Ecommerce Gate
+## Runtime / PPT / Ecommerce Gate
 
-Runtime/PPT/ecommerce follow-up stays paused while the Clay UI audit is active. When that lane resumes, use the runtime/PPT/ecommerce gate documented here and keep its commits separate from the Clay UI commit.
+Use this broader gate for runtime/PPT/ecommerce follow-up slices when their touched area overlaps generation or PPT runtime. Keep those commits separate from Clay UI commits.
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `

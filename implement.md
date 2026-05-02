@@ -4,22 +4,22 @@ Last updated: 2026-05-02
 
 ## Operating Mode
 
-This is a long-running execution. Plain `.git` still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries`; the writable metadata copy for this session is currently at `ec434f94 refactor: extract ecommerce framework runtime state`.
+This is a long-running execution. Plain `.git` still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries`; the writable metadata copy for this session is currently at `9e7ae2b5 Refine Clay frosted UI surfaces`.
 
-The active workstream in this thread is the Clay UI audit and frosted-surface cleanup. Stage One runtime/PPT and ecommerce runtime extraction are paused until the UI commit is closed. The shared ledgers cover both lines, but this thread must stage and commit only UI/docs/UI-test paths plus minimal compile-restoring runtime files that are explicitly documented in `status.md`.
+The active workstream in this thread is Stage One M6 ecommerce runtime extraction, current slice `useEcommerceSheetSettingsRuntime`. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; current runtime commits must stay separate from completed UI/doc/UI-test paths.
 
 The active plan is `plans.md`. The current status and next exact step are tracked in `status.md`. Validation commands and expected gates are tracked in `validation.md`.
 
-For Clay UI work, use `C:/Users/Administrator/Downloads/DESIGN-clay.md` as the visual base with these overrides: inputs, main cards, sub cards, and framework cards use controlled frosted material; dark mode uses neutral black-gray surfaces; Clay brand colors are emphasis only.
+For Clay UI work, use `C:/Users/Administrator/Downloads/DESIGN-clay.md` as the visual base with these overrides: inputs, main cards, sub cards, and framework cards use controlled frosted material; dark mode uses neutral black-gray surfaces; Clay brand colors are emphasis only. That lane is not active unless the user reports a new visual issue.
 
-Clay UI audit order:
-1. Keep the ledger files aligned with the active UI lane and paused runtime/PPT lane.
-2. Reconcile Clay docs/rules with `DESIGN-clay.md` and the controlled frosted override.
-3. Fix UI surfaces with shared tokens: input, main-card, sub-card, and framework-card primitives.
-4. Verify with Clay UI contracts, typecheck, unit tests, build, docs governance, encoding, and Codex in-app Browser evidence.
-5. Stage only UI/docs/UI-test files plus explicitly documented compile-restoring runtime files; leave paused PPT/runtime WIP out of the UI commit.
+Current ecommerce runtime order:
+1. Keep the ledger files aligned with the active runtime slice and completed UI lane.
+2. Write/update focused source contracts before each extraction.
+3. Move ecommerce domain helpers into `src/app/` hooks with explicit deps/result interfaces.
+4. Verify with targeted ecommerce tests, typecheck, full unit suite, build, docs governance, and encoding checks.
+5. Stage only runtime-slice files and ledger updates; leave completed UI files and unrelated PPT/runtime WIP out of the commit.
 
-Do not resume runtime/PPT work until Clay UI browser closure is recorded. Record which lane is active, which dirty files are excluded from the current commit, and what browser surfaces/themes were inspected.
+Browser inspection may be skipped for non-UI runtime/docs slices after recording the skip reason in `status.md`. Record which lane is active, which dirty files are excluded from the current commit, and the validation results.
 
 ## Milestone Loop
 

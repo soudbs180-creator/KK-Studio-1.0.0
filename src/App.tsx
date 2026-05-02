@@ -5,7 +5,7 @@ import PromptNodeComponent from './components/canvas/PromptNodeComponent';
 import PendingNode from './components/canvas/PendingNode';
 // KeyManagerModal removed - integrated into UserProfileModal
 import ChatSidebar from './components/layout/ChatSidebar';
-import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, ReferenceImage, type PartialRedrawRequest, type AgentWorkflowNode, type PreviewWorkflowNode, type SaveWorkflowNode, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceAPlusControlMode, type EcommerceEditableTaskState, type EcommerceTaskAssetRoleBinding, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceSheetSettingPatch, type EcommerceFrameworkRuntimeState } from './types';
+import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, ReferenceImage, type PartialRedrawRequest, type AgentWorkflowNode, type PreviewWorkflowNode, type SaveWorkflowNode, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceEditableTaskState, type EcommerceTaskAssetRoleBinding, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceFrameworkRuntimeState } from './types';
 import { Image as ImageIcon, MessageSquare, Plus, Trash2, Shield, FileText, CheckCircle2, History, CreditCard, ChevronDown, Wand2, RefreshCw, Star, Coins, Settings } from 'lucide-react';
 import { SelectionMenu } from './components/canvas/SelectionMenu';
 import { CanvasGroupComponent } from './components/canvas/CanvasGroupComponent';
@@ -103,6 +103,11 @@ import {
   type SetEcommerceUploadReferenceState,
 } from './app/useEcommerceUploadReferenceRuntime';
 import { useEcommerceGroupExportRuntime, type SetEcommerceGroupExportState } from './app/useEcommerceGroupExportRuntime';
+import {
+  createDefaultEcommerceSheetSettings,
+  useEcommerceSheetSettingsRuntime,
+  type SetEcommerceSheetSettingsState,
+} from './app/useEcommerceSheetSettingsRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
 const GENERATE_TIMEOUT_MS = 600000;
@@ -243,22 +248,6 @@ const createEcommerceAnalysisResetPatch = (
   }
 
   return patch;
-};
-
-const createDefaultEcommerceSheetSettings = (modelId: string): Record<EcommerceGroupSheet, EcommerceSheetSetting> => {
-  const preferredImageSize = resolvePreferredEcommerceImageSize(normalizeEcommerceModelId(modelId) || modelId) as ImageSize;
-
-  return {
-    '主图': {
-      aspectRatio: AspectRatio.AUTO,
-      imageSize: preferredImageSize,
-    },
-    'A+': {
-      aspectRatio: AspectRatio.LANDSCAPE_16_9,
-      imageSize: ImageSize.SIZE_4K,
-      aPlusControlMode: 'auto',
-    },
-  };
 };
 
 // Lucide icons replaced with SVGs
@@ -1110,6 +1099,17 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
   }, []);
 
+  const updateEcommerceSheetSettingsState = useCallback<SetEcommerceSheetSettingsState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        sheetSettings: previousState.sheetSettings,
+        taskStates: previousState.taskStates,
+        activeTaskState: previousState.activeTaskState,
+      });
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
+
   const frameworkStateView = useEcommerceFrameworkRuntimeState({
     activeCanvas,
     activeCanvasRef,
@@ -1129,76 +1129,20 @@ const AppContent: React.FC<AppContentProps> = () => {
     config.mode === GenerationMode.ECOMMERCE ? 'high' : (config.thinkingMode || 'minimal')
   ), [config.mode, config.thinkingMode]);
 
-  const resolveEcommerceAPlusControlMode = useCallback((sheetSetting?: EcommerceSheetSetting): EcommerceAPlusControlMode => (
-    sheetSetting?.aPlusControlMode || 'auto'
-  ), []);
-
-  const applyEffectiveSizingToTaskState = useCallback((
-    taskState: EcommerceEditableTaskState,
-    options?: { controlMode?: EcommerceAPlusControlMode },
-  ): EcommerceEditableTaskState => {
-    if (taskState.sourceSheet !== 'A+' || taskState.sourceKind !== 'a-plus-module') {
-      return {
-        ...taskState,
-        effectiveSizePolicy: taskState.effectiveSizePolicy,
-        effectiveSizeTier: taskState.effectiveSizeTier || taskState.sizeTier,
-      };
-    }
-
-    const activeSheetSetting = ecommerceState.sheetSettings['A+'] || createDefaultEcommerceSheetSettings(config.model)['A+'];
-    const effectivePolicy = resolveEffectiveEcommerceAPlusPolicy({
-      detectedSizeTier: taskState.sizeTier,
-      controlMode: taskState.sizeControlOverride ?? options?.controlMode ?? resolveEcommerceAPlusControlMode(activeSheetSetting),
-    });
-
-    return {
-      ...taskState,
-      effectiveSizePolicy: effectivePolicy.effectiveSizePolicy,
-      effectiveSizeTier: effectivePolicy.effectiveSizeTier,
-    };
-  }, [config.model, ecommerceState.sheetSettings, resolveEcommerceAPlusControlMode]);
-
-  const resolveEcommerceNodeGenerationSettings = useCallback((
-    node: PromptNode,
-    generationTarget?: 'sheet' | 'desktop' | 'mobile',
-  ) => {
-    const fallbackSheetSettings = createDefaultEcommerceSheetSettings(node.model);
-    const sheetSettings = node.ecommerce
-      ? (ecommerceState.sheetSettings[node.ecommerce.sourceSheet] || fallbackSheetSettings[node.ecommerce.sourceSheet])
-      : fallbackSheetSettings['主图'];
-
-    if (!node.ecommerce) {
-      return {
-        aspectRatio: node.aspectRatio || sheetSettings.aspectRatio,
-        imageSize: node.imageSize || sheetSettings.imageSize,
-      };
-    }
-
-    if (generationTarget === 'mobile') {
-      return {
-        aspectRatio: (node.ecommerce.mobileAspectRatio || AspectRatio.LANDSCAPE_4_3) as AspectRatio,
-        imageSize: sheetSettings.imageSize,
-      };
-    }
-
-    const effectiveSizePolicy = node.ecommerce.effectiveSizePolicy || node.ecommerce.sizePolicy;
-
-    if (node.ecommerce.kind === 'a-plus-module' && effectiveSizePolicy === 'desktop-then-mobile') {
-      return {
-        aspectRatio: (node.ecommerce.desktopAspectRatio || node.ecommerce.currentAspectRatio || node.aspectRatio || AspectRatio.LANDSCAPE_21_9) as AspectRatio,
-        imageSize: sheetSettings.imageSize,
-      };
-    }
-
-    return {
-      aspectRatio: (
-        node.ecommerce.kind === 'a-plus-module'
-          ? (node.ecommerce.currentAspectRatio || node.aspectRatio || AspectRatio.LANDSCAPE_16_9)
-          : (sheetSettings.aspectRatio || node.ecommerce.currentAspectRatio || node.aspectRatio || AspectRatio.SQUARE)
-      ) as AspectRatio,
-      imageSize: sheetSettings.imageSize || node.imageSize || (resolvePreferredEcommerceImageSize(node.model) as ImageSize),
-    };
-  }, [ecommerceState.sheetSettings]);
+  const {
+    resolveEcommerceAPlusControlMode,
+    applyEffectiveSizingToTaskState,
+    resolveEcommerceNodeGenerationSettings,
+    handleUpdateEcommerceSheetSetting,
+  } = useEcommerceSheetSettingsRuntime({
+    activeCanvasRef,
+    configMode: config.mode,
+    configModel: config.model,
+    ecommerceState,
+    setConfig,
+    setEcommerceSheetSettingsState: updateEcommerceSheetSettingsState,
+    updatePromptNode,
+  });
 
   useEffect(() => {
     if (config.mode !== GenerationMode.ECOMMERCE) {
@@ -1804,135 +1748,6 @@ const AppContent: React.FC<AppContentProps> = () => {
       ...createEcommerceAnalysisResetPatch({ isAnalyzing: false }),
     }));
   }, []);
-
-  const handleUpdateEcommerceSheetSetting = useCallback((
-    sheet: EcommerceGroupSheet,
-    patch: EcommerceSheetSettingPatch,
-  ) => {
-    const previousSetting = ecommerceState.sheetSettings[sheet] || createDefaultEcommerceSheetSettings(config.model)[sheet];
-    const mergedSetting: EcommerceSheetSetting = {
-      ...previousSetting,
-      ...patch,
-    };
-    const nextSetting: EcommerceSheetSetting = sheet === 'A+'
-      ? { ...mergedSetting, imageSize: ImageSize.SIZE_4K }
-      : mergedSetting;
-
-    if (
-      previousSetting.aspectRatio === nextSetting.aspectRatio
-      && previousSetting.imageSize === nextSetting.imageSize
-      && previousSetting.aPlusControlMode === nextSetting.aPlusControlMode
-    ) {
-      return;
-    }
-
-    setEcommerceState((previousState) => {
-      const nextTaskStates = Object.fromEntries(
-        Object.entries(previousState.taskStates).map(([rowKey, taskState]) => [
-          rowKey,
-          taskState && taskState.sourceSheet === sheet
-            ? applyEffectiveSizingToTaskState(taskState, { controlMode: nextSetting.aPlusControlMode })
-            : taskState,
-        ]),
-      ) as Record<string, EcommerceEditableTaskState>;
-
-      const nextActiveTaskState = previousState.activeTaskState && previousState.activeTaskState.sourceSheet === sheet
-        ? applyEffectiveSizingToTaskState(previousState.activeTaskState, { controlMode: nextSetting.aPlusControlMode })
-        : previousState.activeTaskState;
-
-      return {
-        ...previousState,
-        taskStates: nextTaskStates,
-        activeTaskState: nextActiveTaskState,
-        sheetSettings: {
-          ...previousState.sheetSettings,
-          [sheet]: nextSetting,
-        },
-      };
-    });
-
-    if (config.mode === GenerationMode.ECOMMERCE) {
-      setConfig((previousConfig) => ({
-        ...previousConfig,
-        aspectRatio: sheet !== 'A+' ? nextSetting.aspectRatio : previousConfig.aspectRatio,
-        imageSize: nextSetting.imageSize,
-        thinkingMode: 'high',
-      }));
-    }
-
-    startTransition(() => {
-      const promptNodes = activeCanvasRef.current?.promptNodes || [];
-      promptNodes
-        .filter((node) => (
-          node.mode === GenerationMode.ECOMMERCE
-          && node.ecommerce?.sourceSheet === sheet
-          && node.ecommerce.kind !== 'a-plus-group'
-        ))
-        .forEach((node) => {
-          if (!node.ecommerce) {
-            return;
-          }
-
-          const effectivePolicy = node.ecommerce.kind === 'a-plus-module'
-            ? resolveEffectiveEcommerceAPlusPolicy({
-                detectedSizeTier: node.ecommerce.sizeTier,
-                controlMode: node.ecommerce.sizeControlOverride ?? nextSetting.aPlusControlMode,
-              })
-            : null;
-          const nextNodeAspectRatio = node.ecommerce.sourceSheet === 'A+'
-            ? (effectivePolicy?.runtimeAspectRatio || node.ecommerce.currentAspectRatio || node.aspectRatio)
-            : nextSetting.aspectRatio;
-          const nextNodeImageSize = nextSetting.imageSize;
-          const nextEffectiveSizePolicy = effectivePolicy?.effectiveSizePolicy || node.ecommerce.sizePolicy;
-          const nextTaskState = node.ecommerce.editableTask
-            ? applyEffectiveSizingToTaskState(node.ecommerce.editableTask, { controlMode: nextSetting.aPlusControlMode })
-            : node.ecommerce.editableTask;
-          const nextRenderTask = nextTaskState && node.ecommerce.seriesTemplate
-            ? buildEcommerceRenderTask({
-                taskState: nextTaskState,
-                seriesTemplate: node.ecommerce.seriesTemplate,
-                aspectRatio: String(nextNodeAspectRatio),
-                imageSize: String(nextNodeImageSize),
-                productName: node.ecommerce.productImageRef?.label || node.ecommerce.theme || '',
-              })
-            : null;
-
-          updatePromptNode({
-            ...node,
-            prompt: nextRenderTask?.prompt || node.prompt,
-            originalPrompt: nextRenderTask?.prompt || node.originalPrompt,
-            aspectRatio: nextNodeAspectRatio as AspectRatio,
-            imageSize: nextNodeImageSize,
-            ecommerce: {
-              ...node.ecommerce,
-              aPlusControlMode: node.ecommerce.sourceSheet === 'A+' ? resolveEcommerceAPlusControlMode(nextSetting) : node.ecommerce.aPlusControlMode,
-              currentAspectRatio: nextNodeAspectRatio as AspectRatio,
-              sizePolicy: nextEffectiveSizePolicy,
-              effectiveSizePolicy: effectivePolicy?.effectiveSizePolicy || node.ecommerce.effectiveSizePolicy,
-              effectiveSizeTier: effectivePolicy?.effectiveSizeTier || node.ecommerce.effectiveSizeTier,
-              allowedAspectRatios: (effectivePolicy?.allowedAspectRatios || node.ecommerce.allowedAspectRatios) as AspectRatio[] | undefined,
-              activeDeliveryKind: nextEffectiveSizePolicy === 'desktop-then-mobile'
-                ? (node.ecommerce.activeDeliveryKind === 'mobile' ? 'mobile' : 'desktop')
-                : 'default',
-              desktopStage: nextEffectiveSizePolicy === 'desktop-then-mobile'
-                ? node.ecommerce.desktopStage
-                : 'not_applicable',
-              mobileStage: nextEffectiveSizePolicy === 'desktop-then-mobile'
-                ? node.ecommerce.mobileStage
-                : 'not_applicable',
-              desktopAspectRatio: node.ecommerce.kind === 'a-plus-module' && nextEffectiveSizePolicy === 'desktop-then-mobile'
-                ? nextNodeAspectRatio as AspectRatio
-                : undefined,
-              mobileAspectRatio: nextEffectiveSizePolicy === 'desktop-then-mobile'
-                ? ((effectivePolicy?.mobileAspectRatio || node.ecommerce.mobileAspectRatio) as AspectRatio | undefined)
-                : undefined,
-              editableTask: nextRenderTask?.taskState || nextTaskState,
-              displayLabel: nextRenderTask?.displayLabel || node.ecommerce.displayLabel,
-            },
-          });
-        });
-    });
-  }, [activeCanvasRef, applyEffectiveSizingToTaskState, config.mode, config.model, ecommerceState.sheetSettings, resolveEcommerceAPlusControlMode, setConfig, updatePromptNode]);
 
   const handleAnalyzeEcommerceRequirement = useCallback(async () => {
     if (!ecommerceState.requirementFile) {

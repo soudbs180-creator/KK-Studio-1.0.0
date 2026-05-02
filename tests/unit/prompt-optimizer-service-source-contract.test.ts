@@ -50,10 +50,12 @@ test('prompt optimizer service prioritizes autoroute-specific missing hints ahea
   assert.doesNotMatch(serviceSource, /const detectMissingInputs =/);
 });
 
-test('app prompt optimization branch no longer checks ecommerce after the dedicated early return', () => {
+test('app prompt optimization branch no longer checks ecommerce after the dedicated submit-guard early return', () => {
   const appSource = readSource('src/App.tsx');
 
-  assert.match(appSource, /if \(config\.mode === GenerationMode\.ECOMMERCE\) \{/);
+  assert.match(appSource, /if \(submitGuard\.isEcommerce\) \{/);
+  assert.match(appSource, /await handleAnalyzeEcommerceRequirement\(\);/);
+  assert.match(appSource, /await handleConfirmEcommerceAnalysis\(\);/);
   assert.doesNotMatch(
     appSource,
     /\(config\.mode === GenerationMode\.IMAGE \|\| config\.mode === GenerationMode\.PPT \|\| config\.mode === GenerationMode\.ECOMMERCE\) && config\.enablePromptOptimization && rawPrompt/,

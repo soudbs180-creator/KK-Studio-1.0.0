@@ -4,24 +4,35 @@ Last updated: 2026-05-02
 
 ## Active State
 
-- Active lane in this thread: Clay UI audit closure for controlled frosted inputs/cards and neutral black-gray dark mode.
-- Runtime/PPT/ecommerce extraction work is paused while this UI slice is reviewed, validated, and committed separately.
+- Active lane in this thread: Stage One M6 ecommerce runtime extraction, current slice `useEcommerceSheetSettingsRuntime`.
+- Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports `4c448660`; the writable full Git metadata copy at `node_modules/.codex-git-full` had `cf34f12b` as the runtime baseline before this slice. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports `4c448660`; the writable full Git metadata copy at `node_modules/.codex-git-full` is ahead at `9e7ae2b5` after the Clay UI commit. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Plain `.git` and the writable full Git metadata copy can both show mixed historical runtime/PPT/ecommerce work during this thread. Staging must remain path-limited and use the writable metadata copy.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
-- Runtime source of truth, when resumed later: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: close the Clay UI audit slice with ledger consistency, browser evidence, full validation records, and a path-limited UI-only commit. Paused runtime/PPT/ecommerce files remain excluded from this UI commit.
+- Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
+- Current focus: close the ecommerce sheet settings runtime slice with full validation and a path-limited runtime commit. Clay UI files remain excluded from this runtime commit.
 
-## Current Clay UI Audit Pass
+## Completed In `9e7ae2b5` (Clay UI Audit Closure)
 
 - User override remains active: inputs, main cards, sub cards, and framework cards must use controlled frosted material; dark mode must use neutral black/gray surfaces, not teal/blue/indigo canvas.
 - Fixed in this pass: Profile Modal action list/security surfaces, toolbar selected tokens, TagInputModal shell/input/footer, ProjectManager dropdown/modal sub surfaces, ChatSidebar message/attachment sub surfaces, PromptBar sky/white-glass skeleton and drag placeholder surfaces, mobile framework shell glass aliases, mobile advanced drawer white-glass utilities, mobile card index/empty/badge blue surfaces, EcommerceImportPanel hover glass, SearchPalette multi-select readability, RechargeModal dark CTA readability, API Workspace nested-card reduction, ChatSidebar agent active state, and PromptNode violet/blue badge drift.
 - Light-theme readability was hardened by adding readable Clay emphasis text tokens (`--clay-brand-pink-ink`, `--clay-brand-coral-ink`) while keeping brand pink/coral for tinted fills and borders.
 - Contract coverage now includes frosted input/main/sub/framework tokens, neutral black-gray dark variables, readable light emphasis text on tinted states, toolbar selected tokens, ProjectManager sub surfaces, ChatSidebar message/attachment surfaces, TagInputModal frosted tokens, PromptBar stale blue/white-glass regressions, mobile shell and mobile badge/index regressions, ecommerce hover token use, SearchPalette multi-select token use, RechargeModal CTA readability, API Workspace reduced nesting, ChatSidebar active-state token use, and PromptNode badge color regressions.
 - Browser QA for this lane is complete and tracked below.
-- Commit include scope for the UI slice: currently dirty ledger/rule files, `src/index.css`, touched UI components, and Clay UI tests. `DESIGN.md` and `docs/DESIGN.md` remain source-of-truth references but are not dirty in the current writable metadata status.
-- Runtime/PPT/ecommerce paths remain excluded from the UI commit, including `src/App.tsx`, `src/app/usePptRuntime.ts`, `src/app/useEcommerceSheetSettingsRuntime.ts`, `tests/unit/ppt-runtime-contract.test.ts`, ecommerce runtime extraction files/tests, and any runtime-only WIP unless included solely to keep the current mixed tree compiling.
+- Commit scope was UI/doc/test only and explicitly excluded runtime/PPT/ecommerce extraction WIP.
+
+## Current Ecommerce Sheet Settings Runtime Pass
+
+- Extracted ecommerce sheet defaults, A+ control mode resolution, effective task sizing, node generation settings, and sheet-setting updates into `src/app/useEcommerceSheetSettingsRuntime.ts`.
+- `src/App.tsx` now wires the hook through `useEcommerceSheetSettingsRuntime` and adapts `setEcommerceState` through `updateEcommerceSheetSettingsState`, keeping App as orchestration and prop wiring.
+- Existing prompt bar ecommerce footer contract was retargeted so sheet settings defaults and A+ 4K enforcement are owned by the hook instead of inline App helpers.
+- New contract coverage in `tests/unit/ecommerce-sheet-settings-runtime-contract.test.ts` covers hook ownership, explicit deps/result interfaces, default sheet settings, A+ sizing policy behavior, and desktop/mobile generation target resolution. Existing prompt-bar and prompt-optimizer source contracts were retargeted away from removed inline App helpers.
+- Line counts after extraction: `src/App.tsx` 5877 physical lines; `src/app/useEcommerceSheetSettingsRuntime.ts` 351 physical lines; `tests/unit/ecommerce-sheet-settings-runtime-contract.test.ts` 168 physical lines.
+- Review note: `App.tsx` still imports the hook file's exported `createDefaultEcommerceSheetSettings` helper for initial state and node-build fallbacks because those paths run before or outside the hook invocation. The inline App implementations were removed; strict helper-call removal is deferred until a broader ecommerce analysis/node-build runtime boundary owns those call sites.
+- Browser QA: skipped for this slice because it is non-UI runtime sheet-setting glue. The Clay UI lane browser evidence remains recorded below.
+- Commit include scope for this runtime slice: `status.md`, `plans.md`, `implement.md`, `validation.md`, `src/App.tsx`, `src/app/useEcommerceSheetSettingsRuntime.ts`, `tests/unit/ecommerce-sheet-settings-runtime-contract.test.ts`, `tests/unit/prompt-bar-ecommerce-footer-controls.test.ts`, and `tests/unit/prompt-optimizer-service-source-contract.test.ts`.
+- Explicitly excluded dirty UI paths: none in the writable metadata after `9e7ae2b5`; if plain `.git` still reports UI files, those belong to the metadata mismatch and must not be staged through plain `.git`.
 
 ## Completed In `ec434f94` (Paused Runtime/Ecommerce Lane)
 
@@ -47,7 +58,7 @@ Last updated: 2026-05-02
 - Browser QA: skipped for this slice because it is non-UI runtime upload/reference glue. The active Clay UI lane owns browser evidence for Clay surfaces.
 - Commit include scope was `status.md`, `src/App.tsx`, `src/app/useEcommerceUploadReferenceRuntime.ts`, `tests/unit/ecommerce-upload-references-contract.test.ts`, `tests/unit/ecommerce-upload-removal-contract.test.ts`, and `tests/unit/ecommerce-runtime-upload-sync-contract.test.ts`.
 
-## Paused Ecommerce Group Export Runtime WIP
+## Completed In `9b0f7dd3` (Ecommerce Group Export Runtime)
 
 - Extracted ecommerce group export and slot-result synchronization into `src/app/useEcommerceGroupExportRuntime.ts`.
 - New hook owns `sanitizeEcommerceExportName`, latest slot image resolution, group slot sync via `applyEcommerceSlotResult`, manifest construction via `buildEcommerceGroupExportManifest`, zip packaging, dynamic file-saver invocation, no-export warning, fallback-quality warning, and success notification.
@@ -103,6 +114,16 @@ Last updated: 2026-05-02
 - PPT and generation runtime contracts were expanded in the same committed baseline.
 
 ## Latest Recorded Validation
+
+Fresh validation for the current ecommerce sheet settings runtime pass:
+
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-optimizer-service-source-contract.test.ts tests/unit/ecommerce-sheet-settings-runtime-contract.test.ts tests/unit/prompt-bar-ecommerce-footer-controls.test.ts tests/unit/ecommerce-model-policy.test.ts tests/unit/ecommerce-task-services.test.ts` (34/34).
+- Passed: `npm.cmd run typecheck`.
+- Passed: `npm.cmd run test:unit` (1078/1078).
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/App.tsx src/app/useEcommerceSheetSettingsRuntime.ts tests/unit/ecommerce-sheet-settings-runtime-contract.test.ts tests/unit/prompt-bar-ecommerce-footer-controls.test.ts tests/unit/prompt-optimizer-service-source-contract.test.ts status.md plans.md implement.md validation.md` with LF/CRLF normalization warnings only.
 
 Fresh validation for the current Clay UI audit closure:
 
@@ -198,10 +219,10 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-1. Re-run lightweight ledger/governance checks after this status correction.
-2. Review `git --git-dir=node_modules/.codex-git-full --work-tree=. status --short` and keep the UI commit path-limited to documented UI/doc/test files.
-3. Do not include paused runtime/PPT/ecommerce extraction files in the UI commit.
-4. After the UI commit boundary is clean, resume Stage One runtime/ecommerce work in a separate commit lane.
+1. Finish the current `useEcommerceSheetSettingsRuntime` closure with fresh targeted tests, typecheck, unit suite, build, governance docs, encoding, and path-limited diff checks.
+2. Stage and commit only the current runtime slice files plus ledger updates through `git --git-dir=node_modules/.codex-git-full --work-tree=.`.
+3. Keep completed Clay UI files and unrelated runtime/PPT WIP out of the sheet settings commit.
+4. Continue Stage One M6 with the next ecommerce runtime slice after the sheet settings commit lands; current likely candidates are ecommerce analysis/confirmation flow or per-node generation runtime, pending subagent review.
 
 ## Risks
 
