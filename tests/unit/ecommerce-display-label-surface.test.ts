@@ -10,14 +10,14 @@ function readSource(relativePath: string): string {
 }
 
 test('ecommerce business display labels propagate to desktop and mobile result surfaces', () => {
-  const appSource = readSource('src/App.tsx');
+  const postBuildSyncSource = readSource('src/app/useEcommercePostBuildSyncRuntime.ts');
   const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
   const mobileSelectorSource = readSource('src/components/mobile/mobileFeedSelectors.ts');
   const mobileFeedSource = readSource('src/components/mobile/MobileResultFeed.tsx');
   const mobileTileSource = readSource('src/components/mobile/MobileResultTile.tsx');
   const mobileDetailSource = readSource('src/components/mobile/MobileResultDetailScreen.tsx');
 
-  assert.match(appSource, /displayLabel:\s*renderTask\.displayLabel/);
+  assert.match(postBuildSyncSource, /displayLabel:\s*renderTask\.displayLabel/);
   assert.match(promptNodeSource, /getPromptBusinessDisplayLabel/);
   assert.match(mobileSelectorSource, /displayLabel:\s*resolveDisplayLabel\(imageNode,\s*promptNode\)/);
   assert.match(mobileFeedSource, /<MobileResultTile/);

@@ -4,9 +4,9 @@ Last updated: 2026-05-02
 
 ## Operating Mode
 
-This is a long-running execution. Plain `.git` still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries`; the writable metadata copy for this session is currently at `017bb3a2 refactor: extract ecommerce requirement analysis runtime`.
+This is a long-running execution. Plain `.git` still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries`; the writable metadata copy for this session is currently at `d0a95f79 refactor: extract ecommerce build runtime`.
 
-The active workstream in this thread is Stage One M6 ecommerce runtime extraction, current slice `useEcommerceBuildRuntime`. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; current runtime commits must stay separate from completed UI/doc/UI-test paths.
+The active workstream in this thread is Stage One M6 ecommerce runtime extraction, current slice `useEcommercePostBuildSyncRuntime`. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; current runtime commits must stay separate from completed UI/doc/UI-test paths.
 
 The active plan is `plans.md`. The current status and next exact step are tracked in `status.md`. Validation commands and expected gates are tracked in `validation.md`.
 
@@ -15,9 +15,9 @@ For Clay UI work, use `C:/Users/Administrator/Downloads/DESIGN-clay.md` as the v
 Current ecommerce runtime order:
 1. Keep the ledger files aligned with the active runtime slice and completed UI lane.
 2. Write/update focused source contracts before each extraction.
-3. Move ecommerce domain helpers into `src/app/` hooks with explicit deps/result interfaces.
+3. Move ecommerce domain helpers and side effects into `src/app/` hooks with explicit deps/result interfaces.
 4. Verify with targeted ecommerce tests, typecheck, full unit suite, build, docs governance, and encoding checks.
-5. Stage only runtime-slice files and ledger updates; leave completed UI files and unrelated PPT/runtime WIP out of the commit.
+5. Stage only post-build sync runtime files and ledger updates; leave completed UI files and unrelated PPT/runtime WIP out of the commit.
 
 Browser inspection may be skipped for non-UI runtime/docs slices after recording the skip reason in `status.md`. Record which lane is active, which dirty files are excluded from the current commit, and the validation results.
 

@@ -5,15 +5,15 @@ Branch policy: continue on the current branch unless the user explicitly asks fo
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries`. The writable metadata copy used for this session is ahead at `017bb3a2 refactor: extract ecommerce requirement analysis runtime`; use that writable metadata copy for status, staging, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries`. The writable metadata copy used for this session is ahead at `d0a95f79 refactor: extract ecommerce build runtime`; use that writable metadata copy for status, staging, and commits in this session.
 
 The active execution model for this thread has resumed Stage One runtime extraction:
 - Clay UI surface cleanup and browser evidence closed in `9e7ae2b5`.
-- Current active slice is Stage One M6 ecommerce confirmation/build runtime extraction in `src/app/useEcommerceBuildRuntime.ts`.
+- Current active slice is Stage One M6 ecommerce post-build sync runtime extraction in `src/app/useEcommercePostBuildSyncRuntime.ts`.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
-Commit boundary going forward: UI fixes and runtime/PPT/ecommerce fixes must be staged separately even though the working tree is mixed. Current runtime staging must use `git --git-dir=node_modules/.codex-git-full --work-tree=.` and include only the active ecommerce build runtime files plus ledger updates.
+Commit boundary going forward: UI fixes and runtime/PPT/ecommerce fixes must be staged separately even though the working tree is mixed. Current runtime staging must use `git --git-dir=node_modules/.codex-git-full --work-tree=.` and include only the active ecommerce post-build sync runtime files plus ledger updates.
 
 ## Current Baseline
 
@@ -188,7 +188,8 @@ Scope:
 - Completed slice: extract ecommerce sheet defaults, A+ sizing policy resolution, node generation setting resolution, and sheet-setting update propagation into `src/app/useEcommerceSheetSettingsRuntime.ts`.
 - Completed slice: extract initial ecommerce task-state building and task edit synchronization into `src/app/useEcommerceTaskStateRuntime.ts`.
 - Completed slice: extract requirement-file pick/clear/reset and requirement analysis execution into `src/app/useEcommerceRequirementAnalysisRuntime.ts`.
-- Current slice: extract ecommerce confirmation, framework/group/task node building, initial group slot creation, and framework runtime bootstrapping into `src/app/useEcommerceBuildRuntime.ts`.
+- Completed slice in `d0a95f79`: extract ecommerce confirmation, framework/group/task node building, initial group slot creation, and framework runtime bootstrapping into `src/app/useEcommerceBuildRuntime.ts`.
+- Current slice: extract active task prompt/display synchronization and post-confirm built-card upload/reference rehydration into `src/app/useEcommercePostBuildSyncRuntime.ts`.
 
 Acceptance:
 - Ecommerce references are routed through an explicit hook interface.
@@ -198,9 +199,10 @@ Acceptance:
 - Task state runtime exposes explicit deps/result interfaces; App no longer owns inline task-state sizing/edit callbacks.
 - Requirement analysis runtime exposes explicit deps/result interfaces; App no longer owns inline requirement reset/analyze callbacks.
 - Build runtime exposes explicit deps/result interfaces; App no longer owns inline ecommerce framework/group/task builders or confirmation flow.
+- Post-build sync runtime exposes explicit deps/result interfaces; App no longer owns active ecommerce task prompt/display synchronization or built-card upload/reference rehydration effects.
 
 Commit:
-- `refactor: extract ecommerce build runtime`
+- `refactor: extract ecommerce post-build sync runtime`
 
 ### 7. Stage Two: Secondary Giant File Split
 

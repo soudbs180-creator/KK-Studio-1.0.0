@@ -12,19 +12,21 @@ function readSource(relativePath: string): string {
 test('ecommerce runtime sync rehydrates built cards when product, extra, or per-item manual reference uploads change', () => {
   const appSource = readSource('src/App.tsx');
   const buildRuntimeSource = readSource('src/app/useEcommerceBuildRuntime.ts');
+  const syncRuntimeSource = readSource('src/app/useEcommercePostBuildSyncRuntime.ts');
   const uploadReferenceHookSource = readSource('src/app/useEcommerceUploadReferenceRuntime.ts');
 
   assert.match(appSource, /useEcommerceUploadReferenceRuntime\(\{/);
   assert.match(appSource, /useEcommerceBuildRuntime\(\{/);
-  assert.match(appSource, /extractEcommerceManualReferenceBindings/);
-  assert.match(appSource, /manualReferences: manualReferences/);
-  assert.match(appSource, /const manualReferences = extractEcommerceManualReferenceBindings\(taskStateSeed\)/);
+  assert.match(appSource, /useEcommercePostBuildSyncRuntime\(\{/);
+  assert.match(syncRuntimeSource, /extractEcommerceManualReferenceBindings/);
+  assert.match(syncRuntimeSource, /manualReferences(?:: manualReferences)?[,}]/);
+  assert.match(syncRuntimeSource, /const manualReferences = extractEcommerceManualReferenceBindings\(taskStateSeed\)/);
   assert.match(
-    appSource,
+    syncRuntimeSource,
     /const nextReferenceImages = \[\.\.\.rowReferences, \.\.\.manualReferences\.map\(\(reference\) => reference\.referenceImage\), \.\.\.nextProductReferences, \.\.\.nextExtraReferences\]/,
   );
-  assert.match(appSource, /referenceImages: nextReferenceImages/);
-  assert.match(appSource, /productImageRef: nextProductImageRef/);
+  assert.match(syncRuntimeSource, /referenceImages: nextReferenceImages/);
+  assert.match(syncRuntimeSource, /productImageRef: nextProductImageRef/);
   assert.match(buildRuntimeSource, /const taskManualReferences = extractEcommerceManualReferenceBindings\(taskStateSeed\)/);
   assert.match(buildRuntimeSource, /manualReferences: taskManualReferences/);
   assert.match(

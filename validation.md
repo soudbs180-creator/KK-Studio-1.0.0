@@ -4,14 +4,15 @@ Last updated: 2026-05-02
 
 Use `npm.cmd` for npm scripts on Windows.
 
-## Active Ecommerce Build Runtime Gate
+## Active Ecommerce Post-Build Sync Runtime Gate
 
-Use this gate for the active ecommerce confirmation/build runtime extraction:
+Use this gate for the active ecommerce post-build sync runtime extraction while preserving build/runtime boundary coverage:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/ecommerce-build-runtime-contract.test.ts" `
   "tests/unit/ecommerce-confirm-build-flow.test.ts" `
+  "tests/unit/ecommerce-post-build-sync-runtime-contract.test.ts" `
   "tests/unit/ecommerce-runtime-upload-sync-contract.test.ts" `
   "tests/unit/ecommerce-group-slot-integration.test.ts" `
   "tests/unit/ecommerce-group-shell-contract.test.ts" `

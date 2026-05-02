@@ -43,9 +43,13 @@ test('ecommerce build runtime owns confirmation and node builders', () => {
 test('ecommerce build runtime remains separate from upload sync and generation runtime', () => {
   const appSource = readSource('src/App.tsx');
   const hookSource = readSource('src/app/useEcommerceBuildRuntime.ts');
+  const postBuildSyncSource = readSource('src/app/useEcommercePostBuildSyncRuntime.ts');
 
-  assert.match(appSource, /if \(!ecommerceState\.analysisConfirmed \|\| !analysis \|\| !activeCanvas\?\.promptNodes\.length\) \{/);
+  assert.match(appSource, /useEcommercePostBuildSyncRuntime\(\{/);
+  assert.match(postBuildSyncSource, /if \(!ecommerceState\.analysisConfirmed \|\| !analysis \|\| !activeCanvas\?\.promptNodes\.length\) \{/);
   assert.match(appSource, /const runEcommerceNodeGeneration = useCallback/);
   assert.doesNotMatch(hookSource, /activeCanvas\?\.promptNodes/);
   assert.doesNotMatch(hookSource, /runEcommerceNodeGeneration/);
+  assert.doesNotMatch(appSource, /const ecommercePromptNodes = activeCanvas\.promptNodes\.filter/);
+  assert.doesNotMatch(postBuildSyncSource, /runEcommerceNodeGeneration/);
 });
