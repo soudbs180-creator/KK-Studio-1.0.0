@@ -4,14 +4,14 @@ Last updated: 2026-05-02
 
 ## Active State
 
-- Active lane in this thread: Stage One M6 ecommerce runtime extraction, current slice `useEcommerceSheetSettingsRuntime`.
+- Active lane in this thread: Stage One M6 ecommerce runtime extraction, current slice `useEcommerceTaskStateRuntime`.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports `4c448660`; the writable full Git metadata copy at `node_modules/.codex-git-full` is ahead at `9e7ae2b5` after the Clay UI commit. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports `4c448660`; the writable full Git metadata copy at `node_modules/.codex-git-full` is ahead at `9cb4d2c4` after the ecommerce sheet settings commit. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Plain `.git` and the writable full Git metadata copy can both show mixed historical runtime/PPT/ecommerce work during this thread. Staging must remain path-limited and use the writable metadata copy.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: close the ecommerce sheet settings runtime slice with full validation and a path-limited runtime commit. Clay UI files remain excluded from this runtime commit.
+- Current focus: close the ecommerce task state runtime slice with full validation and a path-limited runtime commit. Clay UI files remain excluded from this runtime commit.
 
 ## Completed In `9e7ae2b5` (Clay UI Audit Closure)
 
@@ -22,7 +22,18 @@ Last updated: 2026-05-02
 - Browser QA for this lane is complete and tracked below.
 - Commit scope was UI/doc/test only and explicitly excluded runtime/PPT/ecommerce extraction WIP.
 
-## Current Ecommerce Sheet Settings Runtime Pass
+## Current Ecommerce Task State Runtime Pass
+
+- Extracted initial ecommerce task-state building and task edit synchronization into `src/app/useEcommerceTaskStateRuntime.ts`.
+- `src/App.tsx` now wires `useEcommerceTaskStateRuntime` through the narrow `updateEcommerceTaskStateRuntimeState` adapter; App no longer owns the inline `buildInitialEcommerceTaskStates` or `handleChangeEcommerceTaskState` callbacks.
+- New contract coverage in `tests/unit/ecommerce-task-state-runtime-contract.test.ts` covers hook ownership, explicit deps/result interfaces, source-row keyed initial state, effective sizing application, stored task updates by row key or task id, active draft updates by task id, and no-op behavior when nothing matches.
+- The new contract test is included in `tsconfig.tests.json`, so `npm.cmd run typecheck` now semantically checks 14 test files instead of 13.
+- Line counts after extraction: `src/App.tsx` 5843 physical lines; `src/app/useEcommerceTaskStateRuntime.ts` 124 physical lines; `tests/unit/ecommerce-task-state-runtime-contract.test.ts` 232 physical lines.
+- Subagent review: spec compliance review passed with no findings. Code-quality review found no runtime blockers; its P2 staging warning is addressed by including the new hook/test in the same commit, and its P3 test-typecheck warning was fixed by adding the test to `tsconfig.tests.json`.
+- Browser QA: skipped for this slice because it is non-UI runtime task-state glue. The Clay UI lane browser evidence remains recorded below.
+- Commit include scope for this runtime slice: `status.md`, `plans.md`, `implement.md`, `validation.md`, `tsconfig.tests.json`, `src/App.tsx`, `src/app/useEcommerceTaskStateRuntime.ts`, and `tests/unit/ecommerce-task-state-runtime-contract.test.ts`.
+
+## Completed In `9cb4d2c4` (Ecommerce Sheet Settings Runtime)
 
 - Extracted ecommerce sheet defaults, A+ control mode resolution, effective task sizing, node generation settings, and sheet-setting updates into `src/app/useEcommerceSheetSettingsRuntime.ts`.
 - `src/App.tsx` now wires the hook through `useEcommerceSheetSettingsRuntime` and adapts `setEcommerceState` through `updateEcommerceSheetSettingsState`, keeping App as orchestration and prop wiring.
@@ -115,7 +126,19 @@ Last updated: 2026-05-02
 
 ## Latest Recorded Validation
 
-Fresh validation for the current ecommerce sheet settings runtime pass:
+Fresh validation for the current ecommerce task state runtime pass:
+
+- Passed RED first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-task-state-runtime-contract.test.ts` failed on missing `src/app/useEcommerceTaskStateRuntime.ts`.
+- Passed after implementation: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-task-state-runtime-contract.test.ts` (4/4).
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-task-state-runtime-contract.test.ts tests/unit/ecommerce-sheet-settings-runtime-contract.test.ts tests/unit/ecommerce-model-policy.test.ts tests/unit/ecommerce-task-services.test.ts tests/unit/ecommerce-confirm-build-flow.test.ts tests/unit/ecommerce-runtime-contract.test.ts` (33/33).
+- Passed: `npm.cmd run typecheck`; test semantic check now covers 14 files via `tsconfig.tests.json`.
+- Passed: `npm.cmd run test:unit` (1082/1082).
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/App.tsx src/app/useEcommerceTaskStateRuntime.ts tests/unit/ecommerce-task-state-runtime-contract.test.ts tsconfig.tests.json status.md plans.md implement.md validation.md` with LF/CRLF normalization warnings only.
+
+Historical validation for `9cb4d2c4` ecommerce sheet settings runtime pass:
 
 - Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-optimizer-service-source-contract.test.ts tests/unit/ecommerce-sheet-settings-runtime-contract.test.ts tests/unit/prompt-bar-ecommerce-footer-controls.test.ts tests/unit/ecommerce-model-policy.test.ts tests/unit/ecommerce-task-services.test.ts` (34/34).
 - Passed: `npm.cmd run typecheck`.
@@ -219,10 +242,10 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-1. Finish the current `useEcommerceSheetSettingsRuntime` closure with fresh targeted tests, typecheck, unit suite, build, governance docs, encoding, and path-limited diff checks.
+1. Finish the current `useEcommerceTaskStateRuntime` closure with fresh targeted tests, typecheck, unit suite, build, governance docs, encoding, and path-limited diff checks.
 2. Stage and commit only the current runtime slice files plus ledger updates through `git --git-dir=node_modules/.codex-git-full --work-tree=.`.
-3. Keep completed Clay UI files and unrelated runtime/PPT WIP out of the sheet settings commit.
-4. Continue Stage One M6 with the next ecommerce runtime slice after the sheet settings commit lands; current likely candidates are ecommerce analysis/confirmation flow or per-node generation runtime, pending subagent review.
+3. Keep completed Clay UI files and unrelated runtime/PPT WIP out of the task state commit.
+4. Continue Stage One M6 with the next ecommerce runtime slice after the task state commit lands; current likely next candidate is ecommerce requirement analysis/reset flow, followed by confirmation/build flow.
 
 ## Risks
 

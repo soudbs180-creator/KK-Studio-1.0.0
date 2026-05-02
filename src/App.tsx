@@ -108,6 +108,10 @@ import {
   useEcommerceSheetSettingsRuntime,
   type SetEcommerceSheetSettingsState,
 } from './app/useEcommerceSheetSettingsRuntime';
+import {
+  useEcommerceTaskStateRuntime,
+  type SetEcommerceTaskStateRuntimeState,
+} from './app/useEcommerceTaskStateRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
 const GENERATE_TIMEOUT_MS = 600000;
@@ -1110,6 +1114,16 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
   }, []);
 
+  const updateEcommerceTaskStateRuntimeState = useCallback<SetEcommerceTaskStateRuntimeState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        taskStates: previousState.taskStates,
+        activeTaskState: previousState.activeTaskState,
+      });
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
+
   const frameworkStateView = useEcommerceFrameworkRuntimeState({
     activeCanvas,
     activeCanvasRef,
@@ -1142,6 +1156,14 @@ const AppContent: React.FC<AppContentProps> = () => {
     setConfig,
     setEcommerceSheetSettingsState: updateEcommerceSheetSettingsState,
     updatePromptNode,
+  });
+
+  const {
+    buildInitialEcommerceTaskStates,
+    handleChangeEcommerceTaskState,
+  } = useEcommerceTaskStateRuntime({
+    applyEffectiveSizingToTaskState,
+    setEcommerceTaskStateRuntimeState: updateEcommerceTaskStateRuntimeState,
   });
 
   useEffect(() => {
@@ -1648,67 +1670,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     readBlobAsDataUrl,
   });
 
-  const buildInitialEcommerceTaskStates = useCallback((analysis: EcommerceAnalysisResult): Record<string, EcommerceEditableTaskState> => {
-    const nextStateMap: Record<string, EcommerceEditableTaskState> = {};
-
-    analysis.mainImageItems.forEach((item) => {
-      if (item.editableTask) {
-        nextStateMap[item.itemId] = applyEffectiveSizingToTaskState(item.editableTask);
-      }
-    });
-    analysis.aPlusGroup.modules.forEach((item) => {
-      if (item.editableTask) {
-        nextStateMap[item.moduleId] = applyEffectiveSizingToTaskState(item.editableTask);
-      }
-    });
-
-    return nextStateMap;
-  }, [applyEffectiveSizingToTaskState]);
-
   const findEcommerceAnalysisItemBySourceKey = useCallback((analysis: EcommerceAnalysisResult, sourceKey: string) => {
     return analysis.mainImageItems.find((item) => item.itemId === sourceKey)
       || analysis.aPlusGroup.modules.find((item) => item.moduleId === sourceKey)
       || null;
   }, []);
-
-  const handleChangeEcommerceTaskState = useCallback((
-    taskId: string,
-    updater:
-      | EcommerceEditableTaskState
-      | ((previous: EcommerceEditableTaskState) => EcommerceEditableTaskState),
-  ) => {
-    setEcommerceState((previousState) => {
-      const nextTaskStates = { ...previousState.taskStates };
-      let didUpdate = false;
-
-      Object.entries(nextTaskStates).forEach(([rowKey, taskState]) => {
-        if (!taskState) return;
-        if (taskState.taskId !== taskId && rowKey !== taskId) return;
-        const updatedTaskState = typeof updater === 'function' ? updater(taskState) : updater;
-        nextTaskStates[rowKey] = applyEffectiveSizingToTaskState(updatedTaskState);
-        didUpdate = true;
-      });
-
-      let nextActiveTaskState = previousState.activeTaskState;
-      if (previousState.activeTaskState && previousState.activeTaskState.taskId === taskId) {
-        const updatedActiveTaskState = typeof updater === 'function'
-          ? updater(previousState.activeTaskState)
-          : updater;
-        nextActiveTaskState = applyEffectiveSizingToTaskState(updatedActiveTaskState);
-        didUpdate = true;
-      }
-
-      if (!didUpdate) {
-        return previousState;
-      }
-
-      return {
-        ...previousState,
-        taskStates: nextTaskStates,
-        activeTaskState: nextActiveTaskState,
-      };
-    });
-  }, [applyEffectiveSizingToTaskState]);
 
   const buildRuntimeEcommerceAssetRoles = useCallback((params: {
     rowAssets: EcommerceAnalysisAsset[];

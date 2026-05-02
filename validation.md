@@ -4,18 +4,21 @@ Last updated: 2026-05-02
 
 Use `npm.cmd` for npm scripts on Windows.
 
-## Active Ecommerce Sheet Settings Runtime Gate
+## Active Ecommerce Task State Runtime Gate
 
-Use this gate for the active ecommerce sheet settings runtime extraction:
+Use this gate for the active ecommerce task state runtime extraction:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/ecommerce-task-state-runtime-contract.test.ts" `
   "tests/unit/ecommerce-sheet-settings-runtime-contract.test.ts" `
-  "tests/unit/prompt-bar-ecommerce-footer-controls.test.ts" `
-  "tests/unit/prompt-optimizer-service-source-contract.test.ts"
+  "tests/unit/ecommerce-model-policy.test.ts" `
+  "tests/unit/ecommerce-task-services.test.ts" `
+  "tests/unit/ecommerce-confirm-build-flow.test.ts" `
+  "tests/unit/ecommerce-runtime-contract.test.ts"
 ```
 
-Runtime commits also require `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, and `npm.cmd run check:encoding` unless `status.md` records a specific blocker.
+Runtime commits also require `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and a path-limited `git diff --check` unless `status.md` records a specific blocker.
 
 ## Completed Clay UI Gate
 
