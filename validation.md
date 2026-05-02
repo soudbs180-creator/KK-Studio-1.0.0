@@ -94,6 +94,20 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/generation-billing-runtime-contract.test.ts"
 ```
 
+## Stage One Backfill Prompt Group Gate
+
+Use this gate for the active `usePromptGroupLayout` boundary-hardening slice:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/prompt-group-regroup-behavior.test.ts" `
+  "tests/unit/prompt-group-drag-layout.test.ts" `
+  "tests/unit/canvas-live-scene-contract.test.ts" `
+  "tests/unit/canvas-local-performance-trace-contract.test.ts"
+```
+
+This slice also requires `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and a path-limited alternate-git `diff --check`.
+
 ## Release Gate
 
 Run these before final sign-off:

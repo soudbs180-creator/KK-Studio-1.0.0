@@ -23,7 +23,7 @@ import type {
   WorkflowUtilityCanvasNode,
 } from './appCanvasTypes';
 
-type PromptGroupBounds = { x: number; y: number; width: number; height: number };
+export type PromptGroupBounds = { x: number; y: number; width: number; height: number };
 type SelectNodes = (ids: string[], mode?: 'replace' | 'add' | 'remove' | 'toggle') => void;
 type UpdatePromptNode = (promptNode: PromptNode) => void | Promise<unknown>;
 
@@ -60,7 +60,7 @@ const boundsIntersect = (
   || right.y + right.height <= left.y
 );
 
-interface UsePromptGroupLayoutDeps {
+export interface UsePromptGroupLayoutDeps {
   activeCanvas: { id: string; promptNodes: PromptNode[]; imageNodes: GeneratedImage[] } | null | undefined;
   canvasInteractionPhase: CanvasInteractionPhase;
   focusedGroupId: string | null | undefined;
@@ -102,7 +102,7 @@ interface UsePromptGroupLayoutDeps {
   workflowUtilityNodesById: Map<string, WorkflowUtilityCanvasNode> | null | undefined;
 }
 
-interface UsePromptGroupLayoutResult {
+export interface UsePromptGroupLayoutResult {
   liveSceneInteractionPhase: CanvasInteractionPhase;
   liveSceneState: LiveSceneSnapshot;
   liveSceneRef: RefObject<LiveSceneSnapshot>;
@@ -149,7 +149,7 @@ interface UsePromptGroupLayoutResult {
   clearPromptGroupRegroup: (groupId: string) => void;
 }
 
-interface UsePromptGroupStackingDeps {
+export interface UsePromptGroupStackingDeps {
   activeCanvas: { id: string; promptNodes: PromptNode[]; imageNodes: GeneratedImage[] } | null | undefined;
   focusedGroupId: string | null | undefined;
   floatingStackBandSize: number;
@@ -157,7 +157,7 @@ interface UsePromptGroupStackingDeps {
   groupOverlapMap: Record<string, string[]> | null | undefined;
 }
 
-interface UsePromptGroupStackingResult {
+export interface UsePromptGroupStackingResult {
   promptGroupLayerById: Map<string, number>;
   promptGroupStackZIndexById: Map<string, number>;
 }
