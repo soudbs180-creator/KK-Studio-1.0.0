@@ -25,6 +25,7 @@
         "tests/integration/**/*.ts",
         "tests/unit/canvas-context-state-boundary.test.ts",
         "tests/unit/canvas-connector-throttling-contract.test.ts",
+        "tests/unit/canvas-prompt-child-images-runtime-contract.test.ts",
         "tests/unit/canvas-selection-runtime-contract.test.ts",
         "tests/unit/encoding-check-contract.test.ts",
         "tests/unit/ecommerce-display-label-surface.test.ts",

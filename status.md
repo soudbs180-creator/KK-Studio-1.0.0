@@ -4,16 +4,16 @@ Last updated: 2026-05-03
 
 ## Active State
 
-- Active lane in this thread: single-line Stage Two giant-file split. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`, with public-type review follow-up committed in `f06f1880`; Stage One Backfill M2 `usePromptGroupLayout` hardening is committed in `8a458cd4`; Stage One Backfill M3 `useGenerationRuntime` hardening is committed in `ab719c4a`; the generation billing follow-up is committed in `083db7f8`; Stage One Backfill M5 `usePptRuntime` public type-boundary coverage is committed in `569383aa`; Stage Two M1 `CanvasContext` state/default/context boundary extraction is committed in `92a9dc41`; the current slice is Stage Two M2 `CanvasContext` selection reducer extraction.
+- Active lane in this thread: single-line Stage Two giant-file split. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`, with public-type review follow-up committed in `f06f1880`; Stage One Backfill M2 `usePromptGroupLayout` hardening is committed in `8a458cd4`; Stage One Backfill M3 `useGenerationRuntime` hardening is committed in `ab719c4a`; the generation billing follow-up is committed in `083db7f8`; Stage One Backfill M5 `usePptRuntime` public type-boundary coverage is committed in `569383aa`; Stage Two M1 `CanvasContext` state/default/context boundary extraction is committed in `92a9dc41`; Stage Two M2 `CanvasContext` selection reducer extraction is committed in `e0f1b583`; the current slice is Stage Two M3 `CanvasContext` prompt child image resolver extraction.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and is currently at `92a9dc41 refactor: extract canvas context state boundary` before the Canvas selection reducer slice. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and is currently at `e0f1b583 refactor: extract canvas selection reducer` before the prompt child image resolver slice. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Thread merge state: `019dd551...` is the main refactor history and `019de168...` is continuation history; both are part of the same Stage One M6 ecommerce runtime line.
-- Alternate-git worktree currently has only the Stage Two M2 Canvas selection reducer slice plus ledger updates.
+- Alternate-git worktree currently has only the Stage Two M3 prompt child image resolver slice plus ledger updates.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: finish and commit Stage Two M2, the Canvas selection reducer extraction.
-- Most recent CanvasContext M2 scope: `src/context/CanvasContext.tsx`, `src/context/canvasSelection.ts`, `tests/unit/canvas-selection-runtime-contract.test.ts`, `tsconfig.tests.json`, `plans.md`, `implement.md`, `validation.md`, and `status.md`.
+- Current focus: finish and commit Stage Two M3, the prompt child image resolver extraction.
+- Most recent CanvasContext M3 scope: `src/context/CanvasContext.tsx`, `src/context/canvasPromptChildImages.ts`, `tests/unit/canvas-prompt-child-images-runtime-contract.test.ts`, `tsconfig.tests.json`, `plans.md`, `implement.md`, `validation.md`, and `status.md`.
 - Next active slice after this commit: identify the next smallest remaining `CanvasContext.tsx` responsibility, with selection, drag, persistence, node mutations, UI, release metadata, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` excluded unless explicitly selected.
 - Browser QA: skipped for these runtime/type-boundary slices because no UI runtime or visual surface changed.
 
@@ -47,7 +47,7 @@ Last updated: 2026-05-03
 
 ## Current Quality Baseline
 
-- Current giant tracked files after `92a9dc41` and the current Canvas selection reducer WIP: `src/context/CanvasContext.tsx` 5271 text lines in the working tree, `src/services/auth/keyManager.ts` 4606 lines, `src/App.tsx` 4385 lines, `src/components/layout/PromptBar.tsx` 4075 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 3980 lines.
+- Current giant tracked files after `e0f1b583` and the current prompt child image resolver WIP: `src/context/CanvasContext.tsx` 5218 text lines in the working tree, `src/services/auth/keyManager.ts` 4606 lines, `src/App.tsx` 4385 lines, `src/components/layout/PromptBar.tsx` 4075 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 3980 lines.
 - Current tracked TS/TSX debt scan: direct `as any` matches 167, explicit any-type pattern matches 484, `@ts-ignore` / `@ts-expect-error` matches 133, and `console.log` matches 251. These are refactor debt indicators, not release blockers by themselves.
 - Quality rule going forward: reduce `any`, TypeScript suppressions, and bare `console.log` inside touched files when local and safe; do not perform a whole-repo cleanup inside one runtime or architecture extraction.
 - Architecture status from the last recorded full check: `npm.cmd run architecture:check` passed with known allowlisted migration and legacy bridge exceptions; `npm.cmd run spec:check` passed.
@@ -135,7 +135,7 @@ Last updated: 2026-05-03
 - Browser QA: skipped because this is a non-UI architecture/state-boundary split and no visual surface, CSS, or browser behavior changed.
 - Independent review by subagent `019de9c3-294d-7653-8bb5-e8de23521fe9` flagged three boundary concerns. The P2 issues were fixed by moving the React context object into `canvasContextState.ts` and making `clearAllData` reset via `DEFAULT_STATE`; the P3 design concern was addressed by moving compatibility syncing to `canvasCompatibility.ts`.
 
-## Current Stage Two M2 (Canvas Selection Reducer)
+## Completed Stage Two M2 (Canvas Selection Reducer)
 
 - Added `src/context/canvasSelection.ts` for the pure `resolveCanvasSelectionIds` helper and `CanvasSelectionMode` type.
 - `src/context/CanvasContext.tsx` now delegates `selectNodes` replace/add/remove/toggle semantics to `resolveCanvasSelectionIds`; provider orchestration and public context shape stay in `CanvasContext.tsx`.
@@ -150,6 +150,24 @@ Last updated: 2026-05-03
 - Passed: `npm.cmd run build`.
 - Independent review by subagent `019de9d3-cc3d-76c3-9378-3b4842f6aa0b` found no blocking issues. Residual note: the new contract test does not explicitly cover duplicate collapse from an already-duplicated current selection for add/remove/toggle, but the implementation matches the old Set-based reducer.
 - Browser QA: skipped because this is a non-UI reducer extraction and no visual surface, CSS, or browser behavior changed.
+
+## Current Stage Two M3 (Prompt Child Image Resolver)
+
+- Added `src/context/canvasPromptChildImages.ts` for the pure `resolvePromptChildImageIds` helper.
+- `src/context/CanvasContext.tsx` now imports the helper and retains only provider orchestration plus existing recovery/persistence call sites.
+- Added `tests/unit/canvas-prompt-child-images-runtime-contract.test.ts` to guard ownership transfer, strong prompt ownership ordering, duplicate and missing ID filtering, `sourceImageId` exclusion, and legacy fallback behavior.
+- Added the new prompt-child-image resolver contract test to `tsconfig.tests.json`; `npm.cmd run typecheck` now semantically checks 41 test files.
+- Line counts for this slice before commit: `src/context/CanvasContext.tsx` 5218 text lines, `src/context/canvasPromptChildImages.ts` 55 text lines, `tests/unit/canvas-prompt-child-images-runtime-contract.test.ts` 93 text lines, `tsconfig.tests.json` 70 physical lines.
+- RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-prompt-child-images-runtime-contract.test.ts` failed first with `ERR_MODULE_NOT_FOUND` for `src/context/canvasPromptChildImages.ts`.
+- Targeted validation passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-prompt-child-images-runtime-contract.test.ts tests/unit/canvas-context-state-boundary.test.ts tests/unit/canvas-startup-local-restore.test.ts tests/unit/canvas-cloud-sync-signature.test.ts` passed (7/7).
+- Passed: `npm.cmd run typecheck`; test semantic check now covers 41 files via `tsconfig.tests.json`.
+- Passed: `npm.cmd run architecture:check` with existing allowlisted migration and legacy bridge exceptions.
+- Passed: `npm.cmd run test:unit` (1123/1123).
+- Passed: `npm.cmd run build`.
+- Passed final docs/encoding validation: `npm.cmd run governance:agent-docs` and `npm.cmd run check:encoding`.
+- Passed path-limited diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/context/CanvasContext.tsx src/context/canvasPromptChildImages.ts tests/unit/canvas-prompt-child-images-runtime-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
+- Independent review by subagent `019de9e0-f398-77f0-b779-1eea29494009` found no blocking issues and confirmed behavior-preserving extraction.
+- Browser QA: skipped because this is a non-UI pure helper extraction and no visual surface, CSS, or browser behavior changed.
 
 ## Completed In `ccf965c3` (Ecommerce Source Selection Runtime)
 
@@ -388,6 +406,17 @@ Fresh validation for Stage Two M2 Canvas selection reducer:
 - Passed final docs/encoding validation: `npm.cmd run governance:agent-docs` and `npm.cmd run check:encoding`.
 - Passed path-limited diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/context/CanvasContext.tsx src/context/canvasSelection.ts tests/unit/canvas-selection-runtime-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
 
+Fresh validation for Stage Two M3 prompt child image resolver:
+
+- RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-prompt-child-images-runtime-contract.test.ts` failed first with `ERR_MODULE_NOT_FOUND` for `src/context/canvasPromptChildImages.ts`.
+- Passed targeted gate: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-prompt-child-images-runtime-contract.test.ts tests/unit/canvas-context-state-boundary.test.ts tests/unit/canvas-startup-local-restore.test.ts tests/unit/canvas-cloud-sync-signature.test.ts` (7/7).
+- Passed: `npm.cmd run architecture:check` with the existing allowlisted migration and legacy bridge exceptions.
+- Passed: `npm.cmd run typecheck`; test semantic check now covers 41 files via `tsconfig.tests.json`.
+- Passed: `npm.cmd run test:unit` (1123/1123).
+- Passed: `npm.cmd run build`.
+- Passed final docs/encoding validation: `npm.cmd run governance:agent-docs` and `npm.cmd run check:encoding`.
+- Passed path-limited diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/context/CanvasContext.tsx src/context/canvasPromptChildImages.ts tests/unit/canvas-prompt-child-images-runtime-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
+
 Fresh validation for Stage Two M1 CanvasContext state boundary:
 
 - RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-context-state-boundary.test.ts` failed while `src/context/CanvasContext.tsx` still contained `LegacyInlineCanvas` residue, and failed again after review hardening while the React context object still lived inline.
@@ -569,8 +598,8 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-1. Finish Stage Two M2 final docs/encoding/diff validation and commit `refactor: extract canvas selection reducer`.
-2. Identify and start the next narrow `CanvasContext.tsx` responsibility after selection, based on a source map and targeted contract first.
+1. Finish Stage Two M3 ledger validation and commit `refactor: extract canvas prompt child resolver`.
+2. Identify and start the next narrow `CanvasContext.tsx` responsibility after prompt-child-image resolution, based on a source map and targeted contract first.
 3. Continue Stage Two giant-file split in this priority order after remaining CanvasContext slices: `keyManager.ts`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`.
 4. Defer release metadata realignment until final packaging/publish, then rerun the full release gate including `npm.cmd run governance:check`.
 
@@ -578,6 +607,6 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 - Original `.git` does not match the writable metadata copy in this session. Use the full writable metadata copy at `node_modules/.codex-git-full` for local commits unless the ACL is fixed outside the sandbox.
 - Plain `.git` may show stale dirty state and must not be used as the commit-readiness source.
-- The alternate-git worktree was clean at `92a9dc41` before the Canvas selection reducer slice, but any staging must still be explicit path-based and reviewed before commit.
+- The alternate-git worktree was clean at `e0f1b583` before the prompt child image resolver slice, but any staging must still be explicit path-based and reviewed before commit.
 - Do not delete locks, change `.git` ACLs, revert paused runtime/PPT work, or stage unrelated runtime files without explicit user confirmation.
 - Do not mix UI, PPT, runtime extraction, release metadata, and quality-debt cleanup in one commit.
