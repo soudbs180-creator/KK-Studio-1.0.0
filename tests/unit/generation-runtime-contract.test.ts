@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
-const APP_RETRY_NODE_END_MARKER = 'const updateEcommerceNodeState = useCallback';
+const APP_RETRY_NODE_END_MARKER = 'const {\n    updateEcommerceNodeState,';
 
 function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');

@@ -4,13 +4,14 @@ Last updated: 2026-05-02
 
 Use `npm.cmd` for npm scripts on Windows.
 
-## Active Ecommerce Post-Build Sync Runtime Gate
+## Active Ecommerce Node Generation Runtime Gate
 
-Use this gate for the active ecommerce post-build sync runtime extraction while preserving build/runtime boundary coverage:
+Use this gate for the active ecommerce node generation runtime extraction while preserving build, post-build sync, scheduler, and structured-task boundary coverage:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/ecommerce-build-runtime-contract.test.ts" `
+  "tests/unit/ecommerce-node-generation-runtime-contract.test.ts" `
   "tests/unit/ecommerce-confirm-build-flow.test.ts" `
   "tests/unit/ecommerce-post-build-sync-runtime-contract.test.ts" `
   "tests/unit/ecommerce-runtime-upload-sync-contract.test.ts" `
@@ -21,7 +22,8 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/ecommerce-upload-references-contract.test.ts" `
   "tests/unit/ecommerce-model-policy.test.ts" `
   "tests/unit/ecommerce-task-services.test.ts" `
-  "tests/unit/ecommerce-runtime-contract.test.ts"
+  "tests/unit/ecommerce-runtime-contract.test.ts" `
+  "tests/unit/ecommerce-structured-task-source-contract.test.ts"
 ```
 
 Runtime commits also require `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and a path-limited `git diff --check` unless `status.md` records a specific blocker.

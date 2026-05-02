@@ -36,8 +36,10 @@ test('ecommerce framework scheduler actions are owned by useEcommerceRuntime', (
   assert.match(hookSource, /resolveFrameworkLane/);
 
   assert.match(appSource, /import \{ useEcommerceRuntime, type UpdateEcommerceSelectionState \} from '\.\/app\/useEcommerceRuntime';/);
+  assert.match(appSource, /import \{[\s\S]*?useEcommerceNodeGenerationRuntime,[\s\S]*?\} from '\.\/app\/useEcommerceNodeGenerationRuntime';/);
   assert.match(appSource, /import \{ useEcommerceFrameworkRuntimeState,[\s\S]*?\} from '\.\/app\/useEcommerceFrameworkRuntimeState';/);
   assert.match(appSource, /import \{ useEcommerceSlotHistoryRuntime \} from '\.\/app\/useEcommerceSlotHistoryRuntime';/);
+  assert.match(appSource, /const \{[\s\S]*?handleGenerateEcommerceNode,[\s\S]*?handleConfirmEcommerceDesktop,[\s\S]*?handleRetryEcommerceModule,[\s\S]*?\} = useEcommerceNodeGenerationRuntime\(\{/);
   assert.match(appSource, /const \{[\s\S]*?handleGenerateEcommerceFramework,[\s\S]*?handleGenerateEcommerceGroup,[\s\S]*?handleToggleEcommerceAnalysisSelection,[\s\S]*?handleToggleEcommerceSelected,[\s\S]*?handleSetEcommerceGroupSelection,[\s\S]*?\} = useEcommerceRuntime\(\{/);
   assert.match(appSource, /const frameworkStateView = useEcommerceFrameworkRuntimeState\(\{/);
   assert.match(appSource, /const \{[\s\S]*?resolveEcommerceSlotState,[\s\S]*?handlePreviewEcommerceSlotHistory,[\s\S]*?handlePreviewEcommerceSlotHistoryForNode,[\s\S]*?\} = useEcommerceSlotHistoryRuntime\(\{/);
