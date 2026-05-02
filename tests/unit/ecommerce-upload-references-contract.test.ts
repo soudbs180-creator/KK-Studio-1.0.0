@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
+import type { EcommerceManualReferenceBinding } from '../../src/app/useEcommerceUploadReferenceRuntime.ts';
 import type { EcommerceAnalysisAsset } from '../../src/services/ecommerce/types.ts';
 import type { EcommerceEditableTaskState, ReferenceImage } from '../../src/types.ts';
 
@@ -25,7 +26,8 @@ test('ecommerce upload reference runtime owns upload helpers and handlers', () =
   const appSource = readSource('src/App.tsx');
   const hookSource = readSource('src/app/useEcommerceUploadReferenceRuntime.ts');
 
-  assert.match(appSource, /import \{[\s\S]*?useEcommerceUploadReferenceRuntime,[\s\S]*?type EcommerceManualReferenceBinding,[\s\S]*?type EcommerceUploadReferenceBundle[\s\S]*?\} from '\.\/app\/useEcommerceUploadReferenceRuntime';/);
+  assert.match(appSource, /import \{[\s\S]*?useEcommerceUploadReferenceRuntime,[\s\S]*?type EcommerceManualReferenceBinding,[\s\S]*?type SetEcommerceUploadReferenceState[\s\S]*?\} from '\.\/app\/useEcommerceUploadReferenceRuntime';/);
+  assert.doesNotMatch(appSource, /type EcommerceUploadReferenceBundle,/);
 
   const depsBlock = readInterfaceBlock(hookSource, 'UseEcommerceUploadReferenceRuntimeDeps');
   const resultBlock = readInterfaceBlock(hookSource, 'UseEcommerceUploadReferenceRuntimeResult');
@@ -153,7 +155,7 @@ test('ecommerce upload helper functions preserve identity, signatures, and manua
     referenceImage.url,
   ].join('|'));
 
-  const manualReference = {
+  const manualReference: EcommerceManualReferenceBinding = {
     assetId: 'manual-1',
     label: 'manual',
     fileName: 'manual.png',
@@ -192,7 +194,7 @@ test('ecommerce upload removal helpers avoid no-op state churn and clean empty m
     mimeType: 'image/png',
     url: 'data:image/png;base64,YQ==',
   };
-  const manualReference = {
+  const manualReference: EcommerceManualReferenceBinding = {
     assetId: 'manual-1',
     label: 'manual',
     fileName: 'manual.png',

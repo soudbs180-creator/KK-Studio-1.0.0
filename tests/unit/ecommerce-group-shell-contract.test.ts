@@ -9,15 +9,14 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('ecommerce analysis confirmation creates both main-image and A+ group shells before child module cards', () => {
-  const appSource = readSource('src/App.tsx');
+test('ecommerce build runtime creates both main-image and A+ group shells before child module cards', () => {
+  const buildRuntimeSource = readSource('src/app/useEcommerceBuildRuntime.ts');
 
-  assert.match(appSource, /const buildEcommerceGroupNode = useCallback\(\(/);
-  assert.match(appSource, /sourceSheet: '主图' \| 'A\+'/);
-  assert.match(appSource, /const mainGroupNode = buildEcommerceGroupNode/);
-  assert.match(appSource, /const aPlusGroupNode = buildEcommerceGroupNode/);
-  assert.match(appSource, /'主图'/);
-  assert.match(appSource, /'A\+'/);
-  assert.match(appSource, /groupId: mainGroupNode\.id/);
-  assert.match(appSource, /groupId: aPlusGroupNode\.id/);
+  assert.match(buildRuntimeSource, /const buildEcommerceGroupNode = useCallback\(\(/);
+  assert.match(buildRuntimeSource, /sourceSheet: '[^']+' \| 'A\+'/);
+  assert.match(buildRuntimeSource, /const mainGroupNode = buildEcommerceGroupNode/);
+  assert.match(buildRuntimeSource, /const aPlusGroupNode = buildEcommerceGroupNode/);
+  assert.match(buildRuntimeSource, /groupId: mainGroupNode\.id/);
+  assert.match(buildRuntimeSource, /groupId: aPlusGroupNode\.id/);
+  assert.match(buildRuntimeSource, /groupIds: \{[\s\S]*mainGroupNode\.id,[\s\S]*'A\+': aPlusGroupNode\.id,/);
 });

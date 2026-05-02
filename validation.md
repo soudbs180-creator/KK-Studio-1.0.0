@@ -4,22 +4,23 @@ Last updated: 2026-05-02
 
 Use `npm.cmd` for npm scripts on Windows.
 
-## Active Ecommerce Requirement Analysis Runtime Gate
+## Active Ecommerce Build Runtime Gate
 
-Use this gate for the active ecommerce requirement analysis runtime extraction:
+Use this gate for the active ecommerce confirmation/build runtime extraction:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
-  "tests/unit/ecommerce-requirement-analysis-runtime-contract.test.ts" `
-  "tests/unit/ecommerce-analysis-button-gate.test.ts" `
-  "tests/unit/ecommerce-upload-removal-contract.test.ts" `
-  "tests/unit/ecommerce-task-state-runtime-contract.test.ts" `
-  "tests/unit/ecommerce-sheet-settings-runtime-contract.test.ts" `
+  "tests/unit/ecommerce-build-runtime-contract.test.ts" `
+  "tests/unit/ecommerce-confirm-build-flow.test.ts" `
+  "tests/unit/ecommerce-runtime-upload-sync-contract.test.ts" `
+  "tests/unit/ecommerce-group-slot-integration.test.ts" `
+  "tests/unit/ecommerce-group-shell-contract.test.ts" `
+  "tests/unit/ecommerce-group-shell-app-contract.test.ts" `
+  "tests/unit/ecommerce-analysis-selection-contract.test.ts" `
+  "tests/unit/ecommerce-upload-references-contract.test.ts" `
   "tests/unit/ecommerce-model-policy.test.ts" `
   "tests/unit/ecommerce-task-services.test.ts" `
-  "tests/unit/ecommerce-confirm-build-flow.test.ts" `
-  "tests/unit/ecommerce-runtime-contract.test.ts" `
-  "tests/unit/prompt-optimizer-service-source-contract.test.ts"
+  "tests/unit/ecommerce-runtime-contract.test.ts"
 ```
 
 Runtime commits also require `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and a path-limited `git diff --check` unless `status.md` records a specific blocker.
