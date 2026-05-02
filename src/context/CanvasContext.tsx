@@ -47,6 +47,7 @@ import {
 import { syncCanvasCompatibility } from './canvasCompatibility';
 import { resolvePromptChildImageIds } from './canvasPromptChildImages';
 import { resolveCanvasSelectionIds, type CanvasSelectionMode } from './canvasSelection';
+import { getWorkflowSourceNodeIds } from './canvasWorkflowSourceNodeIds';
 import { resolveModelDisplayName } from '../utils/modelDisplayName';
 import { isPhoneResponsiveWidth } from '../utils/responsiveSurface';
 import { getAllTasks, type PersistedTask } from '../services/persistence/taskPersistence';
@@ -494,23 +495,6 @@ const buildPersistedImageRecoverySignature = (canvases: Canvas[] = []): string =
     });
 
     return tokens.join('|');
-};
-
-const getWorkflowSourceNodeIds = (node: WorkflowNode): string[] => {
-    if (!isWorkflowUtilityNodeKind(node.kind)) {
-        return [];
-    }
-
-    const rawSourceIds = (node.data as { sourceNodeIds?: unknown } | undefined)?.sourceNodeIds;
-    if (!Array.isArray(rawSourceIds)) {
-        return [];
-    }
-
-    return Array.from(new Set(
-        rawSourceIds.filter((sourceId): sourceId is string => (
-            typeof sourceId === 'string' && sourceId.trim().length > 0
-        ))
-    ));
 };
 
 const normalizeRecoveredPromptNode = (

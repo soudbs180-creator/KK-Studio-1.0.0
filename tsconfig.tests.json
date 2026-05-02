@@ -27,6 +27,7 @@
         "tests/unit/canvas-connector-throttling-contract.test.ts",
         "tests/unit/canvas-prompt-child-images-runtime-contract.test.ts",
         "tests/unit/canvas-selection-runtime-contract.test.ts",
+        "tests/unit/canvas-workflow-source-node-ids-contract.test.ts",
         "tests/unit/encoding-check-contract.test.ts",
         "tests/unit/ecommerce-display-label-surface.test.ts",
         "tests/unit/ecommerce-analysis-button-gate.test.ts",
