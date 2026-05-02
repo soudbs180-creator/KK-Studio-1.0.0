@@ -21,7 +21,6 @@ import type { EcommerceAnalysisResult } from './services/ecommerce/types.ts';
 import type { EcommerceGroupSlotState } from './services/ecommerce/groupSlotState.ts';
 import {
   migrateLegacyEcommerceFrameworkCanvas,
-  resolveEcommerceFrameworkSummary,
 } from './services/ecommerce/frameworkRuntime.ts';
 import { llmService } from './services/llm/LLMService';
 import { cancelSecureSystemProxyTask } from './services/model/secureModelProxy';
@@ -120,6 +119,11 @@ import {
   useEcommerceTaskActivationRuntime,
   type SetEcommerceTaskActivationRuntimeState,
 } from './app/useEcommerceTaskActivationRuntime';
+import {
+  useEcommercePromptActivationRuntime,
+  type SetEcommercePromptActivationRuntimeState,
+} from './app/useEcommercePromptActivationRuntime';
+import { useEcommerceModeRuntime, type SetEcommerceModeRuntimeState } from './app/useEcommerceModeRuntime';
 import { useEcommerceSubmitRuntime } from './app/useEcommerceSubmitRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
@@ -1171,6 +1175,26 @@ const AppContent: React.FC<AppContentProps> = () => {
       return patch ? { ...previousState, ...patch } : previousState;
     });
   }, []);
+  const updateEcommerceModeRuntimeState = useCallback<SetEcommerceModeRuntimeState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        activeTaskNodeId: previousState.activeTaskNodeId,
+        activeTaskState: previousState.activeTaskState,
+      });
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
+  const updateEcommercePromptActivationRuntimeState = useCallback<SetEcommercePromptActivationRuntimeState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        activeTaskNodeId: previousState.activeTaskNodeId,
+        activeTaskState: previousState.activeTaskState,
+        activeFrameworkId: previousState.activeFrameworkId,
+        activeGroupSheet: previousState.activeGroupSheet,
+      });
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
 
   const frameworkStateView = useEcommerceFrameworkRuntimeState({
     activeCanvas,
@@ -1186,6 +1210,17 @@ const AppContent: React.FC<AppContentProps> = () => {
     syncEcommerceFrameworkView,
     handleActivateEcommerceGroupSheet,
   } = frameworkStateView;
+  const {
+    syncPromptNodeEcommerceSelection,
+    resolvePromptNodeFrameworkStatus,
+  } = useEcommercePromptActivationRuntime({
+    activeCanvasRef,
+    ecommerceFrameworkRuntimeRef,
+    setEcommercePromptActivationRuntimeState: updateEcommercePromptActivationRuntimeState,
+    setEcommerceRatioOverride,
+    resolveEcommerceFrameworkId,
+    syncEcommerceFrameworkView,
+  });
 
   const resolveEffectiveEcommerceThinkingMode = useCallback((): 'minimal' | 'high' => (
     config.mode === GenerationMode.ECOMMERCE ? 'high' : (config.thinkingMode || 'minimal')
@@ -1214,25 +1249,13 @@ const AppContent: React.FC<AppContentProps> = () => {
     setEcommerceTaskStateRuntimeState: updateEcommerceTaskStateRuntimeState,
   });
 
-  useEffect(() => {
-    if (config.mode !== GenerationMode.ECOMMERCE) {
-      setEcommerceRatioOverride(undefined);
-      setEcommerceState((previousState) => ({
-        ...previousState,
-        activeTaskNodeId: null,
-        activeTaskState: null,
-      }));
-      return;
-    }
-
-    if (config.thinkingMode !== 'high') {
-      setConfig((previousConfig) => (
-        previousConfig.mode === GenerationMode.ECOMMERCE && previousConfig.thinkingMode !== 'high'
-          ? { ...previousConfig, thinkingMode: 'high' }
-          : previousConfig
-      ));
-    }
-  }, [config.mode, config.thinkingMode, setConfig]);
+  useEcommerceModeRuntime({
+    configMode: config.mode,
+    configThinkingMode: config.thinkingMode,
+    setConfig,
+    setEcommerceRatioOverride,
+    setEcommerceModeRuntimeState: updateEcommerceModeRuntimeState,
+  });
 
   const [modePreferredKeyMap, setModePreferredKeyMap] = useState<Partial<Record<GenerationMode, string>>>(() => {
     try {
@@ -2511,9 +2534,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     traceLocalPerformance('canvas-interaction.prompt-click', () => {
       setActiveSourceImage(null);
 
-      const ecommerceTaskState = clickedNode.ecommerce?.editableTask
-        || clickedNode.partialRedraw?.inheritedTaskState
-        || null;
       const textToCopy = clickedNode.mode === GenerationMode.ECOMMERCE
         ? ''
         : ((isOptimizedView && clickedNode.optimizedPromptEn?.trim())
@@ -2531,31 +2551,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         mode: clickedNode.mode || GenerationMode.IMAGE, // 🎯 Sync Mode (Image/Video)
       }));
 
-      const nextFrameworkId = clickedNode.mode === GenerationMode.ECOMMERCE
-        ? resolveEcommerceFrameworkId(clickedNode)
-        : null;
-      const nextActiveSheet = clickedNode.mode === GenerationMode.ECOMMERCE
-        ? (clickedNode.ecommerce?.kind === 'framework'
-          ? (clickedNode.ecommerce.frameworkMeta?.activeSheet || clickedNode.ecommerce.sourceSheet || null)
-          : (clickedNode.ecommerce?.sourceSheet || null))
-        : null;
-
-      setEcommerceRatioOverride(clickedNode.ecommerce?.allowedAspectRatios);
-      setEcommerceState((previousState) => ({
-        ...previousState,
-        activeTaskNodeId: clickedNode.mode === GenerationMode.ECOMMERCE && clickedNode.ecommerce?.kind !== 'framework'
-          ? clickedNode.id
-          : null,
-        activeTaskState: clickedNode.mode === GenerationMode.ECOMMERCE && clickedNode.ecommerce?.kind !== 'framework'
-          ? ecommerceTaskState
-          : null,
-        activeFrameworkId: nextFrameworkId,
-        activeGroupSheet: nextActiveSheet,
-      }));
-
-      if (nextFrameworkId && nextActiveSheet) {
-        syncEcommerceFrameworkView(nextFrameworkId, nextActiveSheet);
-      }
+      syncPromptNodeEcommerceSelection(clickedNode);
 
       // [Draft Logic] Resume Draft if clicked on a draft node
       if (clickedNode.isDraft) {
@@ -2569,20 +2565,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       nodeId: clickedNode.id,
       referenceImageCount: clickedNode.referenceImages?.length || 0,
     });
-  }, [resolveEcommerceFrameworkId, setConfig, syncEcommerceFrameworkView]);
-
-  const resolvePromptNodeFrameworkStatus = useCallback((node: PromptNode) => {
-    const frameworkId = resolveEcommerceFrameworkId(node);
-    if (!frameworkId) {
-      return null;
-    }
-
-    return resolveEcommerceFrameworkSummary(
-      activeCanvasRef.current?.promptNodes || [],
-      frameworkId,
-      ecommerceFrameworkRuntimeRef.current[frameworkId],
-    );
-  }, [resolveEcommerceFrameworkId]);
+  }, [setConfig, syncPromptNodeEcommerceSelection]);
 
   const getSharedPromptNodeActionProps = useCallback((node: PromptNode): SharedPromptNodeActionProps => ({
     onCancel: handleCancelGeneration,
