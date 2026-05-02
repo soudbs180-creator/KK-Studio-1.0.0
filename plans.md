@@ -5,19 +5,19 @@ Branch policy: continue on the current branch unless the user explicitly asks fo
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries`. The writable metadata copy used for this session is ahead at `6dc8e391 refactor: extract ecommerce node generation runtime`; use that writable metadata copy for status, staging, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries`. The writable metadata copy used for this session is ahead at `ee2987b7 docs: finalize mobile continuation milestone status`; use that writable metadata copy for status, staging, and commits in this session.
 
 The active execution model for this thread has resumed Stage One runtime extraction:
 - Clay UI surface cleanup and browser evidence closed in `9e7ae2b5`.
-- Current active slice is Stage One M6 ecommerce mobile continuation runtime extraction in `src/app/useEcommerceMobileContinuationRuntime.ts`.
+- Current active slice is Stage One M6 ecommerce task activation runtime extraction in `src/app/useEcommerceTaskActivationRuntime.ts`.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
-Commit boundary going forward: UI fixes and runtime/PPT/ecommerce fixes must be staged separately even though the working tree is mixed. Current runtime staging must use `git --git-dir=node_modules/.codex-git-full --work-tree=.` and include only the active ecommerce mobile continuation runtime files plus ledger updates.
+Commit boundary going forward: UI fixes and runtime/PPT/ecommerce fixes must be staged separately even though the working tree is mixed. Current runtime staging must use `git --git-dir=node_modules/.codex-git-full --work-tree=.` and include only the active ecommerce task activation runtime files plus ledger updates.
 
 ## Current Baseline
 
-- `src/App.tsx`: 4931 lines after the current ecommerce mobile continuation runtime WIP.
+- `src/App.tsx`: 4409 lines after the current ecommerce task activation runtime WIP.
 - `src/app/useConnectorRenderer.ts`: 272 lines, already extracted and awaiting hardening.
 - `src/context/CanvasContext.tsx`: 5434 lines.
 - `src/services/auth/keyManager.ts`: 5280 lines.
@@ -191,7 +191,8 @@ Scope:
 - Completed slice in `d0a95f79`: extract ecommerce confirmation, framework/group/task node building, initial group slot creation, and framework runtime bootstrapping into `src/app/useEcommerceBuildRuntime.ts`.
 - Completed slice in `5acf9c27`: extract active task prompt/display synchronization and post-confirm built-card upload/reference rehydration into `src/app/useEcommercePostBuildSyncRuntime.ts`.
 - Completed slice in `6dc8e391`: extract ecommerce node generation execution, desktop confirmation, and mobile retry callbacks into `src/app/useEcommerceNodeGenerationRuntime.ts`.
-- Current slice: extract mobile ecommerce continuation lookup/edit/toggle/confirm/mobile-generate handlers into `src/app/useEcommerceMobileContinuationRuntime.ts`.
+- Completed slice in `782d30d3`: extract mobile ecommerce continuation lookup/edit/toggle/confirm/mobile-generate handlers into `src/app/useEcommerceMobileContinuationRuntime.ts`.
+- Current slice: extract source-key ecommerce task activation fallback and prompt-node activation into `src/app/useEcommerceTaskActivationRuntime.ts`.
 
 Acceptance:
 - Ecommerce references are routed through an explicit hook interface.
@@ -204,9 +205,10 @@ Acceptance:
 - Post-build sync runtime exposes explicit deps/result interfaces; App no longer owns active ecommerce task prompt/display synchronization or built-card upload/reference rehydration effects.
 - Node generation runtime exposes explicit deps/result interfaces; App no longer owns ecommerce node state patching, prompt optimization execution, single-card generation, desktop confirmation, or mobile retry callbacks.
 - Mobile continuation runtime exposes explicit deps/result interfaces; App no longer owns mobile ecommerce prompt-node resolution, task editing activation, selection toggles, desktop confirmation forwarding, or mobile generation queue fallback handlers.
+- Task activation runtime exposes explicit deps/result interfaces; App no longer owns source-key ecommerce task activation lookup or fallback active-task/group-sheet restoration.
 
 Commit:
-- `refactor: extract ecommerce mobile continuation runtime`
+- `refactor: extract ecommerce task activation runtime`
 
 ### 7. Stage Two: Secondary Giant File Split
 

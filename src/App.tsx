@@ -116,6 +116,10 @@ import {
   type SetEcommerceNodeGenerationRuntimeState,
 } from './app/useEcommerceNodeGenerationRuntime';
 import { useEcommerceMobileContinuationRuntime } from './app/useEcommerceMobileContinuationRuntime';
+import {
+  useEcommerceTaskActivationRuntime,
+  type SetEcommerceTaskActivationRuntimeState,
+} from './app/useEcommerceTaskActivationRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
 const GENERATE_TIMEOUT_MS = 600000;
@@ -1152,6 +1156,16 @@ const AppContent: React.FC<AppContentProps> = () => {
       const patch = updater({
         activeTaskNodeId: previousState.activeTaskNodeId,
         activeTaskState: previousState.activeTaskState,
+      });
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
+  const updateEcommerceTaskActivationRuntimeState = useCallback<SetEcommerceTaskActivationRuntimeState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        activeTaskNodeId: previousState.activeTaskNodeId,
+        activeTaskState: previousState.activeTaskState,
+        activeGroupSheet: previousState.activeGroupSheet,
       });
       return patch ? { ...previousState, ...patch } : previousState;
     });
@@ -2635,30 +2649,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     updatePromptNode,
   ]);
 
-  const handleActivateEcommerceTaskBySourceKey = useCallback((sourceKey: string) => {
-    const targetNode = activeCanvas?.promptNodes.find((node) => (
-      node.mode === GenerationMode.ECOMMERCE
-      && node.ecommerce?.sourceRowKey === sourceKey
-    ));
-
-    if (targetNode) {
-      void handlePromptClick(targetNode, false);
-      return;
-    }
-
-    const fallbackTask = ecommerceState.taskStates[sourceKey];
-    if (!fallbackTask) {
-      return;
-    }
-
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      activeTaskNodeId: null,
-      activeTaskState: fallbackTask,
-      activeGroupSheet: fallbackTask.sourceSheet,
-    }));
-  }, [activeCanvas, ecommerceState.taskStates, handlePromptClick]);
-
   const handleImageClick = useCallback((imageId: string) => {
     // 🎯 Shift=切换（向后兼容），无修饰键=替换
     const sourceImage = imageNodesById.get(imageId);
@@ -2864,6 +2854,16 @@ const AppContent: React.FC<AppContentProps> = () => {
     enqueueEcommerceFrameworkNodes,
     pumpEcommerceFrameworkQueue,
     syncEcommerceFrameworkView,
+  });
+  const {
+    handleActivateEcommerceTaskBySourceKey,
+  } = useEcommerceTaskActivationRuntime({
+    activeCanvasRef,
+    ecommerceTaskStates: ecommerceState.taskStates,
+    setEcommerceTaskActivationRuntimeState: updateEcommerceTaskActivationRuntimeState,
+    activatePromptNode: (promptNode) => {
+      void handlePromptClick(promptNode, false);
+    },
   });
 
   // Dynamic Group Bounds Calculation

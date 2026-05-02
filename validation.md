@@ -4,13 +4,13 @@ Last updated: 2026-05-02
 
 Use `npm.cmd` for npm scripts on Windows.
 
-## Active Ecommerce Mobile Continuation Runtime Gate
+## Active Ecommerce Task Activation Runtime Gate
 
-Use this gate for the active ecommerce mobile continuation runtime extraction while preserving mobile selectors, surface wiring, node generation, and scheduler boundary coverage:
+Use this gate for the active ecommerce task activation runtime extraction while preserving prompt-bar activation wiring, mobile continuation ownership, and scheduler/node-generation boundaries:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
-  "tests/unit/ecommerce-build-runtime-contract.test.ts" `
+  "tests/unit/ecommerce-task-activation-runtime-contract.test.ts" `
   "tests/unit/ecommerce-mobile-continuation-runtime-contract.test.ts" `
   "tests/unit/ecommerce-node-generation-runtime-contract.test.ts" `
   "tests/unit/ecommerce-runtime-contract.test.ts" `
