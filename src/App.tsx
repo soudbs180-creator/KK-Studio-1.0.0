@@ -112,6 +112,11 @@ import {
   useEcommerceTaskStateRuntime,
   type SetEcommerceTaskStateRuntimeState,
 } from './app/useEcommerceTaskStateRuntime';
+import {
+  createEmptyEcommerceGroupSlots,
+  useEcommerceRequirementAnalysisRuntime,
+  type SetEcommerceRequirementAnalysisState,
+} from './app/useEcommerceRequirementAnalysisRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
 const GENERATE_TIMEOUT_MS = 600000;
@@ -218,41 +223,6 @@ const ConnectorDisconnectButton: React.FC<ConnectorDisconnectButtonProps> = ({ x
     </div>
   </foreignObject>
 );
-
-const createEmptyEcommerceGroupSlots = (): Record<EcommerceGroupSheet, EcommerceGroupSlotState[]> => ({
-  '主图': [],
-  'A+': [],
-});
-
-const createEcommerceAnalysisResetPatch = (
-  options: {
-    isAnalyzing?: boolean;
-    requirementFile?: File | null;
-  } = {},
-): Partial<EcommerceRuntimeState> => {
-  const patch: Partial<EcommerceRuntimeState> = {
-    itemReferenceFiles: {},
-    analysis: null,
-    analysisConfirmed: false,
-    selectedItems: {},
-    taskStates: {},
-    groupSlots: createEmptyEcommerceGroupSlots(),
-    activeTaskNodeId: null,
-    activeTaskState: null,
-    activeGroupSheet: null,
-    isConfirmingAnalysis: false,
-  };
-
-  if ('requirementFile' in options) {
-    patch.requirementFile = options.requirementFile ?? null;
-  }
-
-  if ('isAnalyzing' in options) {
-    patch.isAnalyzing = options.isAnalyzing ?? false;
-  }
-
-  return patch;
-};
 
 // Lucide icons replaced with SVGs
 import { CanvasProvider, useCanvas } from './context/CanvasContext';
@@ -1124,6 +1094,27 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
   }, []);
 
+  const updateEcommerceRequirementAnalysisState = useCallback<SetEcommerceRequirementAnalysisState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        requirementFile: previousState.requirementFile,
+        productFiles: previousState.productFiles,
+        itemReferenceFiles: previousState.itemReferenceFiles,
+        analysis: previousState.analysis,
+        analysisConfirmed: previousState.analysisConfirmed,
+        selectedItems: previousState.selectedItems,
+        taskStates: previousState.taskStates,
+        groupSlots: previousState.groupSlots,
+        activeTaskNodeId: previousState.activeTaskNodeId,
+        activeTaskState: previousState.activeTaskState,
+        activeGroupSheet: previousState.activeGroupSheet,
+        isAnalyzing: previousState.isAnalyzing,
+        isConfirmingAnalysis: previousState.isConfirmingAnalysis,
+      });
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
+
   const frameworkStateView = useEcommerceFrameworkRuntimeState({
     activeCanvas,
     activeCanvasRef,
@@ -1670,6 +1661,20 @@ const AppContent: React.FC<AppContentProps> = () => {
     readBlobAsDataUrl,
   });
 
+  const {
+    handlePickEcommerceRequirementFile,
+    handleClearEcommerceRequirementFile,
+    handleResetEcommerceAnalysis,
+    handleAnalyzeEcommerceRequirement,
+  } = useEcommerceRequirementAnalysisRuntime({
+    ecommerceState,
+    enablePromptOptimization: Boolean(config.enablePromptOptimization),
+    readBlobAsDataUrl,
+    analyzeRequirementFile: analyzeEcommerceRequirementFile,
+    buildInitialEcommerceTaskStates,
+    setEcommerceRequirementAnalysisState: updateEcommerceRequirementAnalysisState,
+  });
+
   const findEcommerceAnalysisItemBySourceKey = useCallback((analysis: EcommerceAnalysisResult, sourceKey: string) => {
     return analysis.mainImageItems.find((item) => item.itemId === sourceKey)
       || analysis.aPlusGroup.modules.find((item) => item.moduleId === sourceKey)
@@ -1691,94 +1696,6 @@ const AppContent: React.FC<AppContentProps> = () => {
       extraReferences: params.extraReferences,
     });
   }, []);
-
-  const handlePickEcommerceRequirementFile = useCallback((files: FileList | File[]) => {
-    const [file] = Array.from(files);
-    if (!file) return;
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      ...createEcommerceAnalysisResetPatch({ requirementFile: file }),
-    }));
-  }, []);
-
-  const handleClearEcommerceRequirementFile = useCallback(() => {
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      ...createEcommerceAnalysisResetPatch({ requirementFile: null, isAnalyzing: false }),
-    }));
-  }, []);
-
-  const handleResetEcommerceAnalysis = useCallback(() => {
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      ...createEcommerceAnalysisResetPatch({ isAnalyzing: false }),
-    }));
-  }, []);
-
-  const handleAnalyzeEcommerceRequirement = useCallback(async () => {
-    if (!ecommerceState.requirementFile) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning('缺少需求单', '请先上传运营需求文件。');
-      });
-      return;
-    }
-
-    setEcommerceState((previousState) => ({ ...previousState, isAnalyzing: true }));
-    try {
-      let analysis = await analyzeEcommerceRequirementFile(ecommerceState.requirementFile);
-
-      if (config.enablePromptOptimization && ecommerceState.productFiles.length > 0) {
-        try {
-          const { enhanceAnalysisWithAI } = await import('./services/ecommerce/ecommerceAnalysisEnhancer');
-          const productImageData = await Promise.all(
-            ecommerceState.productFiles.map(async (file) => {
-              const dataUrl = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(String(reader.result || ''));
-                reader.onerror = () => reject(new Error('读取产品图失败'));
-                reader.readAsDataURL(file);
-              });
-              const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-              return { mimeType: match?.[1] || file.type || 'image/png', data: match?.[2] || dataUrl };
-            }),
-          );
-          analysis = await enhanceAnalysisWithAI(analysis, productImageData);
-        } catch (enhanceError) {
-          console.warn('[ecommerce] AI enhancement failed, using template analysis', enhanceError);
-        }
-      }
-
-      const selectedItems: Record<string, boolean> = {};
-      analysis.mainImageItems.forEach((item) => {
-        selectedItems[item.itemId] = true;
-      });
-      analysis.aPlusGroup.modules.forEach((module) => {
-        selectedItems[module.moduleId] = true;
-      });
-      setEcommerceState((previousState) => ({
-        ...previousState,
-        analysis,
-        itemReferenceFiles: previousState.itemReferenceFiles,
-        analysisConfirmed: false,
-        selectedItems,
-        taskStates: buildInitialEcommerceTaskStates(analysis),
-        groupSlots: createEmptyEcommerceGroupSlots(),
-        activeTaskNodeId: null,
-        activeTaskState: null,
-        activeGroupSheet: null,
-        isAnalyzing: false,
-        isConfirmingAnalysis: false,
-      }));
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.success('分析完成', `已解析主图 ${analysis.mainImageItems.length} 条，A+ ${analysis.aPlusGroup.modules.length} 条。`);
-      });
-    } catch (error: any) {
-      setEcommerceState((previousState) => ({ ...previousState, isAnalyzing: false, isConfirmingAnalysis: false }));
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.error('分析失败', error?.message || '请稍后重试。');
-      });
-    }
-  }, [buildInitialEcommerceTaskStates, ecommerceState.requirementFile]);
 
   useEffect(() => {
     if (!ecommerceState.activeTaskNodeId || !ecommerceState.activeTaskState) {
@@ -2919,7 +2836,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       setDraftNodeId,
       updateImageNodePosition,
     });
-  }, [config, draftNodeId, addPromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialGenerationSubmissionContext, runInitialGenerationSubmissionTransaction, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
+  }, [config, draftNodeId, addPromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialGenerationSubmissionContext, runInitialGenerationSubmissionTransaction, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission, ecommerceState.analysis, handleAnalyzeEcommerceRequirement, handleConfirmEcommerceAnalysis]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {

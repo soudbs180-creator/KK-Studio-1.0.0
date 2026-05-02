@@ -5,15 +5,15 @@ Branch policy: continue on the current branch unless the user explicitly asks fo
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries`. The writable metadata copy used for this session is ahead at `9cb4d2c4 refactor: extract ecommerce sheet settings runtime`; use that writable metadata copy for status, staging, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries`. The writable metadata copy used for this session is ahead at `bd265ec9 refactor: extract ecommerce task state runtime`; use that writable metadata copy for status, staging, and commits in this session.
 
 The active execution model for this thread has resumed Stage One runtime extraction:
 - Clay UI surface cleanup and browser evidence closed in `9e7ae2b5`.
-- Current active slice is Stage One M6 ecommerce task state runtime extraction in `src/app/useEcommerceTaskStateRuntime.ts`.
+- Current active slice is Stage One M6 ecommerce requirement analysis runtime extraction in `src/app/useEcommerceRequirementAnalysisRuntime.ts`.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
-Commit boundary going forward: UI fixes and runtime/PPT/ecommerce fixes must be staged separately even though the working tree is mixed. Current runtime staging must use `git --git-dir=node_modules/.codex-git-full --work-tree=.` and include only the active ecommerce task state runtime files plus ledger updates.
+Commit boundary going forward: UI fixes and runtime/PPT/ecommerce fixes must be staged separately even though the working tree is mixed. Current runtime staging must use `git --git-dir=node_modules/.codex-git-full --work-tree=.` and include only the active ecommerce requirement analysis runtime files plus ledger updates.
 
 ## Current Baseline
 
@@ -186,7 +186,8 @@ Scope:
 - Add source contract tests for framework cards, import/review flows, scheduler state, and product image result binding.
 - Create `src/app/useEcommerceRuntime.ts`.
 - Completed slice: extract ecommerce sheet defaults, A+ sizing policy resolution, node generation setting resolution, and sheet-setting update propagation into `src/app/useEcommerceSheetSettingsRuntime.ts`.
-- Current slice: extract initial ecommerce task-state building and task edit synchronization into `src/app/useEcommerceTaskStateRuntime.ts`.
+- Completed slice: extract initial ecommerce task-state building and task edit synchronization into `src/app/useEcommerceTaskStateRuntime.ts`.
+- Current slice: extract requirement-file pick/clear/reset and requirement analysis execution into `src/app/useEcommerceRequirementAnalysisRuntime.ts`.
 
 Acceptance:
 - Ecommerce references are routed through an explicit hook interface.
@@ -194,9 +195,10 @@ Acceptance:
 - No unrelated generation or PPT behavior changes.
 - Sheet settings runtime exposes explicit deps/result interfaces and App no longer owns inline sheet settings helpers.
 - Task state runtime exposes explicit deps/result interfaces; App no longer owns inline task-state sizing/edit callbacks.
+- Requirement analysis runtime exposes explicit deps/result interfaces; App no longer owns inline requirement reset/analyze callbacks.
 
 Commit:
-- `refactor: extract ecommerce task state runtime`
+- `refactor: extract ecommerce requirement analysis runtime`
 
 ### 7. Stage Two: Secondary Giant File Split
 

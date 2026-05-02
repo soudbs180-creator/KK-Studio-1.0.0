@@ -11,9 +11,11 @@ function readSource(relativePath: string): string {
 
 test('ecommerce analysis button unlocks once a requirement file is present', () => {
   const appSource = readSource('src/App.tsx');
+  const requirementRuntimeSource = readSource('src/app/useEcommerceRequirementAnalysisRuntime.ts');
   const importPanelSource = readSource('src/components/ecommerce/EcommerceImportPanel.tsx');
 
-  assert.match(appSource, /if \(!ecommerceState\.requirementFile\) \{/);
+  assert.match(appSource, /useEcommerceRequirementAnalysisRuntime\(\{/);
+  assert.match(requirementRuntimeSource, /if \(!requirementFile\) \{/);
   assert.match(importPanelSource, /const hasRequirementFile = Boolean\(requirementFileName\);/);
   assert.match(importPanelSource, /disabled=\{isAnalyzing \|\| !hasRequirementFile\}/);
   assert.doesNotMatch(importPanelSource, /disabled=\{isAnalyzing \|\| !hasRequirementFile \|\| !hasProductFiles\}/);
