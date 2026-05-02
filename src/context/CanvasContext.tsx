@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
+﻿import React, { useContext, useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
 import { Canvas, PromptNode, GeneratedImage, AspectRatio, CanvasGroup, CanvasDrawing, GenerationMode, KnownModel, PromptPendingSyncRequest, type WorkflowNode } from '../types';
 import { startTransition } from 'react';
 import { shouldEnableWorkspaceCloudSync } from '../app/kkaiFeatureFlags';
@@ -13,9 +13,7 @@ import { traceLocalPerformance } from '../services/system/localPerformanceTrace'
 import { logError, logInfo } from '../services/system/systemLogService';
 import { ImageQuality, QUALITY_CONFIGS, compressImageToQuality, getQualityStorageId } from '../services/image/imageQuality';
 import { getLocalFolderHandle, getStorageMode, restoreLocalFolderConnection, setLocalFolderHandle } from '../services/storage/storagePreference';
-import { featureFlags } from '../config/featureFlags';
-import { createEmptyWorkflowGraph } from '../workflow/types';
-import { canvasToWorkflow, syncCanvasWorkflow } from '../workflow/adapters/canvasToWorkflow';
+import { canvasToWorkflow } from '../workflow/adapters/canvasToWorkflow';
 import { workflowToLegacyCanvas } from '../workflow/adapters/workflowToLegacy';
 import { dedupeWorkflowEdges, isWorkflowUtilityNodeKind } from '../workflow/schema';
 import { clampGenerationDurationMs } from '../utils/timeUtils';
@@ -34,10 +32,22 @@ import {
 import { useCanvasCloudSync } from './useCanvasCloudSync';
 import { useCanvasFileSystemPersistence } from './useCanvasFileSystemPersistence';
 import { useCanvasLocalPersistence } from './useCanvasLocalPersistence';
+import {
+    DEFAULT_CANVAS,
+    DEFAULT_STATE,
+    MAX_CANVASES,
+    CanvasContext,
+    createCanvasWorkflow,
+    generateId,
+    type ArrangeMode,
+    type CanvasContextType,
+    type CanvasState,
+    type SubCardLayout,
+} from './canvasContextState';
+import { syncCanvasCompatibility } from './canvasCompatibility';
 import { resolveModelDisplayName } from '../utils/modelDisplayName';
 import { isPhoneResponsiveWidth } from '../utils/responsiveSurface';
 import { getAllTasks, type PersistedTask } from '../services/persistence/taskPersistence';
-import { migrateLegacyEcommerceFrameworkCanvas } from '../services/ecommerce/frameworkRuntime.ts';
 import {
     buildImageResultIdentity,
     buildTaskResultIdentity,
@@ -49,147 +59,12 @@ import {
 import { useAuth } from './AuthContext';
 import { useAppStartup } from './AppStartupContext';
 
-const MAX_CANVASES = 10;
-
-
-// 副卡排列模式: 横向 | 宫格 | 纵向
-export type SubCardLayout = 'row' | 'grid' | 'column';
-
-// 整理模式: 宫格(6列) | 横向 | 纵向
-export type ArrangeMode = 'grid' | 'row' | 'column';
-
-
-interface CanvasState {
-    canvases: Canvas[];
-    activeCanvasId: string;
-    // History is keyed by canvasId. Each entry has past/future stacks of the *specific canvas content* (Canvas object)
-    history: {
-        [key: string]: {
-            past: Canvas[];
-            future: Canvas[];
-        }
-    };
-    // Local File System Support
-    fileSystemHandle: FileSystemDirectoryHandle | null;
-    folderName: string | null;
-    selectedNodeIds: string[];
-    // 副卡排列模式 (轮换: row -> grid -> column -> row)
-    subCardLayoutMode: SubCardLayout;
-    // 🎯 视口中心位置（动态优先级加载）
-    viewportCenter: { x: number; y: number };
-}
-
-interface CanvasContextType {
-    state: CanvasState;
-    activeCanvas: Canvas | undefined;
-    createCanvas: () => string | null; // Returns new canvas ID or null if max reached
-    switchCanvas: (id: string) => void;
-    deleteCanvas: (id: string) => void;
-    renameCanvas: (id: string, newName: string) => void;
-    addPromptNode: (node: PromptNode) => Promise<void>;
-    updatePromptNode: (node: PromptNode) => Promise<void>;
-    addImageNodes: (nodes: GeneratedImage[], parentUpdates?: Record<string, Partial<PromptNode>>) => Promise<void>;
-    updatePromptNodePosition: (id: string, pos: { x: number; y: number }, options?: { moveChildren?: boolean; ignoreSelection?: boolean }) => void;
-    updateImageNodePosition: (id: string, pos: { x: number; y: number }, options?: { ignoreSelection?: boolean }) => void;
-    updateImageNodeDimensions: (id: string, dimensions: string) => void;
-    updateImageNode: (id: string, updates: Partial<GeneratedImage>) => void; // 🎯 [New] Generic Update
-    deleteImageNode: (id: string) => void;
-    deletePromptNode: (id: string) => void;
-    linkNodes: (promptId: string, imageId: string) => void;
-    unlinkNodes: (promptId: string, imageId: string) => void;
-    clearAllData: () => void;
-    canCreateCanvas: boolean;
-    undo: () => void;
-    redo: () => void;
-    pushToHistory: () => void;
-    canUndo: boolean;
-    canRedo: boolean;
-    arrangeAllNodes: (mode?: ArrangeMode) => void; // Auto-layout cards: grid(6列) | row | column
-    getNextCardPosition: () => { x: number; y: number }; // Get next available position for new card
-    // File System
-    connectLocalFolder: () => Promise<void>;
-    disconnectLocalFolder: () => Promise<void>;
-    changeLocalFolder: () => Promise<void>;
-    refreshLocalFolder: () => Promise<void>;
-    isConnectedToLocal: boolean;
-    currentFolderName: string | null;
-    selectedNodeIds: string[];
-    selectNodes: (ids: string[], mode?: 'replace' | 'add' | 'remove' | 'toggle') => void;
-    clearSelection: () => void;
-    bringNodesToFront: (nodeIds: string[]) => void;
-    moveSelectedNodes: (delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => void;
-    moveSelectedNodesImmediate: (delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => void;
-    findSmartPosition: (x: number, y: number, width: number, height: number, buffer?: number) => { x: number; y: number };
-    findNextGroupPosition: () => { x: number; y: number }; // Grid-based Card Group placement
-    addGroup: (group: CanvasGroup) => void;
-    removeGroup: (id: string) => void;
-    updateGroup: (group: CanvasGroup) => void;
-    setNodeTags: (ids: string[], tags: string[]) => void;
-    isReady: boolean;
-    // 🎯 设置视口中心（动态优先级加载）
-    setViewportCenter: (center: { x: number; y: number }) => void;
-    // 🎯 迁移选中节点到其他项目
-    migrateNodes: (nodeIds: string[], targetCanvasId: string) => void;
-    mergeCanvasInto: (sourceCanvasId: string, targetCanvasId: string, options?: { deleteSource?: boolean }) => {
-        movedPrompts: number;
-        movedImages: number;
-        deletedSource: boolean;
-    };
-    cleanupInvalidCards: (canvasId?: string) => {
-        removedPrompts: number;
-        removedImages: number;
-        removedGroups: number;
-    };
-    // 🎯 [Persistence] Urgent state saving for generation tasks
-    urgentUpdatePromptNode: (node: PromptNode) => void;
-    // 🎯 [Batch Update] Atomic update for multiple nodes (e.g. stacking)
-    updateNodes: (updates: {
-        promptNodes?: { id: string, updates: Partial<PromptNode> }[],
-        imageNodes?: { id: string, updates: Partial<GeneratedImage> }[]
-    }) => void;
-    addWorkflowNode: (node: WorkflowNode) => void;
-    updateWorkflowNode: (id: string, updates: Partial<WorkflowNode>) => void;
-    updateWorkflowNodePosition: (id: string, pos: { x: number; y: number }) => void;
-    deleteWorkflowNode: (id: string) => void;
-}
-
-const CanvasContext = createContext<CanvasContextType | undefined>(undefined);
+export type { ArrangeMode, CanvasContextType, CanvasState, SubCardLayout } from './canvasContextState';
 
 const STORAGE_KEY = 'kk_studio_canvas_state';
 const LOCAL_FOLDER_REFRESH_INTERVAL_MS = 60000;
 const LOCAL_FOLDER_IDLE_GRACE_MS = 45000;
 const SYNC_GENERATION_INTERRUPTED_ERROR = '页面刷新或离开时中断了同步生成请求，供应商可能已完成出图，但当前项目没有收到最终响应。';
-
-const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
-
-const createCanvasWorkflow = (): Canvas['workflow'] | undefined =>
-    featureFlags.experimentalWorkflowGraph ? createEmptyWorkflowGraph<WorkflowNode>() : undefined;
-
-const DEFAULT_CANVAS: Canvas = {
-    id: 'default',
-    name: '项目1',
-    promptNodes: [],
-    imageNodes: [],
-    groups: [] as CanvasGroup[],
-    drawings: [] as CanvasDrawing[],
-    workflow: createCanvasWorkflow(),
-    lastModified: Date.now()
-};
-const DEFAULT_STATE: CanvasState = {
-    canvases: [DEFAULT_CANVAS],
-    activeCanvasId: 'default',
-    history: { 'default': { past: [], future: [] } },
-    fileSystemHandle: null,
-    folderName: null,
-    selectedNodeIds: [],
-    subCardLayoutMode: 'row', // 默认横向排列
-    viewportCenter: { x: 0, y: 0 } // 默认画布中心
-};
-
-const syncCanvasCompatibility = (canvas: Canvas): Canvas =>
-    migrateLegacyEcommerceFrameworkCanvas(
-        syncCanvasWorkflow(canvas, featureFlags.experimentalWorkflowGraph)
-    );
 
 type LocalMediaCacheEntry = {
     url?: string;
@@ -2785,14 +2660,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         clearAllImages();
         // Reset to default state
         setState({
+            ...DEFAULT_STATE,
             canvases: [DEFAULT_CANVAS],
             activeCanvasId: DEFAULT_CANVAS.id,
-            history: {},
-            fileSystemHandle: null,
-            folderName: null,
-            selectedNodeIds: [],
-            subCardLayoutMode: 'row',
-            viewportCenter: { x: 0, y: 0 }
+            history: {}
         });
     }, [state.canvases]);
 

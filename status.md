@@ -4,17 +4,17 @@ Last updated: 2026-05-03
 
 ## Active State
 
-- Active lane in this thread: single-line Stage One convergence. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`, with public-type review follow-up committed in `f06f1880`; Stage One Backfill M2 `usePromptGroupLayout` hardening is committed in `8a458cd4`; Stage One Backfill M3 `useGenerationRuntime` hardening is committed in `ab719c4a`; the generation billing follow-up is committed in `083db7f8`; the current slice hardens Stage One Backfill M5 `usePptRuntime` public type-boundary coverage.
+- Active lane in this thread: single-line Stage Two giant-file split. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`, with public-type review follow-up committed in `f06f1880`; Stage One Backfill M2 `usePromptGroupLayout` hardening is committed in `8a458cd4`; Stage One Backfill M3 `useGenerationRuntime` hardening is committed in `ab719c4a`; the generation billing follow-up is committed in `083db7f8`; Stage One Backfill M5 `usePptRuntime` public type-boundary coverage is committed in `569383aa`; the current slice is Stage Two M1 `CanvasContext` state/default/context boundary extraction.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and is currently at `083db7f8 refactor: tighten generation billing boundary` before the PPT boundary slice. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and is currently at `569383aa refactor: harden ppt runtime boundary` before the CanvasContext state-boundary slice. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Thread merge state: `019dd551...` is the main refactor history and `019de168...` is continuation history; both are part of the same Stage One M6 ecommerce runtime line.
-- Alternate-git worktree currently has only the PPT boundary slice plus ledger updates.
+- Alternate-git worktree currently has only the Stage Two M1 CanvasContext state-boundary slice plus ledger updates.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus after this PPT boundary commit: begin Stage Two M1, a narrow `src/context/CanvasContext.tsx` split.
-- Most recent PPT boundary scope: `tests/unit/ppt-runtime-contract.test.ts`, `tsconfig.tests.json`, `plans.md`, `implement.md`, `validation.md`, and `status.md`.
-- Next active slice after this commit: map `src/context/CanvasContext.tsx` responsibilities and split one minimal, testable boundary without touching `keyManager.ts`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`, UI, or release metadata.
+- Current focus after this CanvasContext M1 commit: begin Stage Two M2, the Canvas selection reducer extraction.
+- Most recent CanvasContext M1 scope: `src/context/CanvasContext.tsx`, `src/context/canvasContextState.ts`, `src/context/canvasCompatibility.ts`, `tests/unit/canvas-context-state-boundary.test.ts`, `tsconfig.tests.json`, `plans.md`, `implement.md`, `validation.md`, and `status.md`.
+- Next active slice after this commit: extract a pure Canvas selection reducer helper without touching drag, persistence, node mutations, `keyManager.ts`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`, UI, or release metadata.
 - Browser QA: skipped for these runtime/type-boundary slices because no UI runtime or visual surface changed.
 
 ## Completed In `9e7ae2b5` (Clay UI Audit Closure)
@@ -47,7 +47,7 @@ Last updated: 2026-05-03
 
 ## Current Quality Baseline
 
-- Current giant tracked files after `083db7f8`: `src/context/CanvasContext.tsx` 5433 lines, `src/services/auth/keyManager.ts` 5279 lines, `src/App.tsx` 4900 lines, `src/components/layout/PromptBar.tsx` 4437 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 4517 lines.
+- Current giant tracked files after `569383aa` and the current CanvasContext state-boundary WIP: `src/context/CanvasContext.tsx` 4606 lines, `src/services/auth/keyManager.ts` 4606 lines, `src/App.tsx` 4385 lines, `src/components/layout/PromptBar.tsx` 4075 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 3980 lines.
 - Current tracked TS/TSX debt scan: direct `as any` matches 167, explicit any-type pattern matches 484, `@ts-ignore` / `@ts-expect-error` matches 133, and `console.log` matches 251. These are refactor debt indicators, not release blockers by themselves.
 - Quality rule going forward: reduce `any`, TypeScript suppressions, and bare `console.log` inside touched files when local and safe; do not perform a whole-repo cleanup inside one runtime or architecture extraction.
 - Architecture status from the last recorded full check: `npm.cmd run architecture:check` passed with known allowlisted migration and legacy bridge exceptions; `npm.cmd run spec:check` passed.
@@ -119,6 +119,21 @@ Last updated: 2026-05-03
 - Independent review by subagent `019de8f6-54b8-7d23-8bf0-6f9effd102f1` approved the slice with no findings; residual risk was limited to not rerunning the full suite inside the review subagent.
 - Touched-file debt check found no `as any`, `@ts-ignore` / `@ts-expect-error`, or bare `console.log` in `tests/unit/ppt-runtime-contract.test.ts` or `tsconfig.tests.json`.
 - Browser QA: skipped because this is a non-UI runtime/type-boundary and test configuration slice; no visual surface, CSS, or browser behavior changed.
+
+## Completed Stage Two M1 (CanvasContext State Boundary)
+
+- Extracted `CanvasState`, `CanvasContextType`, `CanvasContext`, `SubCardLayout`, `ArrangeMode`, `MAX_CANVASES`, `generateId`, `createCanvasWorkflow`, `DEFAULT_CANVAS`, and `DEFAULT_STATE` into `src/context/canvasContextState.ts`.
+- Moved canvas workflow/ecommerce compatibility syncing into `src/context/canvasCompatibility.ts` so the state model module does not own migration behavior.
+- `src/context/CanvasContext.tsx` now imports and re-exports the state/context boundary from `canvasContextState.ts`, imports compatibility syncing from `canvasCompatibility.ts`, preserves existing public type import paths, and removes inline state/context/default definitions.
+- Added `tests/unit/canvas-context-state-boundary.test.ts` to guard that `CanvasContext.tsx` delegates state/default/context ownership, no `LegacyInlineCanvas*` or `LEGACY_INLINE_DEFAULT_*` residue remains, `clearAllData` resets via `DEFAULT_STATE`, and compatibility syncing does not live in the state module.
+- Added the new boundary test to `tsconfig.tests.json`; `npm.cmd run typecheck` now semantically checks 39 test files.
+- Line counts for this slice before commit: `src/context/CanvasContext.tsx` 4606, `src/context/canvasContextState.ts` 114, `src/context/canvasCompatibility.ts` 8, `tests/unit/canvas-context-state-boundary.test.ts` 48, `tsconfig.tests.json` 68.
+- RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-context-state-boundary.test.ts` failed while `CanvasContext` still created the React context inline and again while `LegacyInlineCanvas` residue remained in `src/context/CanvasContext.tsx`.
+- Targeted GREEN validation: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-context-state-boundary.test.ts tests/unit/canvas-startup-local-restore.test.ts tests/unit/canvas-cloud-sync-signature.test.ts` passed (3/3).
+- Full validation passed: `npm.cmd run architecture:check`, `npm.cmd run typecheck`, `npm.cmd run test:unit` (1117/1117), `npm.cmd run build`, `npm.cmd run governance:agent-docs`, and `npm.cmd run check:encoding`.
+- Path-limited diff check passed before final ledger edits: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/context/CanvasContext.tsx src/context/canvasContextState.ts tests/unit/canvas-context-state-boundary.test.ts tsconfig.tests.json` with LF/CRLF normalization warnings only.
+- Browser QA: skipped because this is a non-UI architecture/state-boundary split and no visual surface, CSS, or browser behavior changed.
+- Independent review by subagent `019de9c3-294d-7653-8bb5-e8de23521fe9` flagged three boundary concerns. The P2 issues were fixed by moving the React context object into `canvasContextState.ts` and making `clearAllData` reset via `DEFAULT_STATE`; the P3 design concern was addressed by moving compatibility syncing to `canvasCompatibility.ts`.
 
 ## Completed In `ccf965c3` (Ecommerce Source Selection Runtime)
 
@@ -347,6 +362,18 @@ Last updated: 2026-05-03
 
 ## Latest Recorded Validation
 
+Fresh validation for Stage Two M1 CanvasContext state boundary:
+
+- RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-context-state-boundary.test.ts` failed while `src/context/CanvasContext.tsx` still contained `LegacyInlineCanvas` residue, and failed again after review hardening while the React context object still lived inline.
+- Passed targeted gate: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-context-state-boundary.test.ts tests/unit/canvas-startup-local-restore.test.ts tests/unit/canvas-cloud-sync-signature.test.ts` (3/3).
+- Passed: `npm.cmd run architecture:check` with the existing 5 allowlisted migration exceptions and 2 legacy bridge exceptions.
+- Passed: `npm.cmd run typecheck`; test semantic check now covers 39 files via `tsconfig.tests.json`.
+- Passed: `npm.cmd run test:unit` (1117/1117).
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed tracked diff check before final ledger edits: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/context/CanvasContext.tsx src/context/canvasContextState.ts src/context/canvasCompatibility.ts tests/unit/canvas-context-state-boundary.test.ts tsconfig.tests.json` with LF/CRLF normalization warnings only.
+
 Fresh validation for Stage One Backfill M5 PPT runtime boundary:
 
 - RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ppt-runtime-contract.test.ts` failed because `tests/unit/ppt-runtime-contract.test.ts` was not included in `tsconfig.tests.json`.
@@ -516,14 +543,14 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-1. Start Stage Two M1: map `src/context/CanvasContext.tsx` responsibilities and split one narrow, testable boundary first. Preferred first pass is the least cross-cutting state-model/helper extraction, not selection/drag/persistence all at once.
-2. Continue Stage Two giant-file split in this priority order after the first CanvasContext slice: `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`.
+1. Start Stage Two M2: extract the Canvas selection reducer from `src/context/CanvasContext.tsx` into a focused pure helper. Preserve current replace/add/remove/toggle ordering and duplicate semantics; do not touch drag, persistence, node mutations, UI, or release metadata.
+2. Continue Stage Two giant-file split in this priority order after CanvasContext selection: remaining `CanvasContext.tsx` responsibilities, `keyManager.ts`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`.
 3. Defer release metadata realignment until final packaging/publish, then rerun the full release gate including `npm.cmd run governance:check`.
 
 ## Risks
 
 - Original `.git` does not match the writable metadata copy in this session. Use the full writable metadata copy at `node_modules/.codex-git-full` for local commits unless the ACL is fixed outside the sandbox.
 - Plain `.git` may show stale dirty state and must not be used as the commit-readiness source.
-- The alternate-git worktree was clean at `083db7f8` before the PPT boundary slice, but any staging must still be explicit path-based and reviewed before commit.
+- The alternate-git worktree was clean at `569383aa` before the CanvasContext state-boundary slice, but any staging must still be explicit path-based and reviewed before commit.
 - Do not delete locks, change `.git` ACLs, revert paused runtime/PPT work, or stage unrelated runtime files without explicit user confirmation.
 - Do not mix UI, PPT, runtime extraction, release metadata, and quality-debt cleanup in one commit.

@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline before the PPT boundary slice is `083db7f8 refactor: tighten generation billing boundary`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline before the CanvasContext state-boundary slice is `569383aa refactor: harden ppt runtime boundary`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -20,8 +20,9 @@ The active execution model for this thread has resumed Stage One convergence:
 - Connector renderer boundary hardening closed in `5f5b76e0`; the connector public-type review follow-up closed in `f06f1880`.
 - Stage One Backfill M2 `usePromptGroupLayout` boundary hardening is completed in `8a458cd4`.
 - Stage One Backfill M3 `useGenerationRuntime` boundary hardening is completed in `ab719c4a`; the generation billing follow-up is completed in `083db7f8`.
-- Stage One Backfill M5 `usePptRuntime` quality check is the current slice being committed: it adds semantic public-boundary coverage for PPT runtime contracts and includes all PPT contract tests in `tsconfig.tests.json`.
-- Current active slice after this commit is Stage Two M1: split the first narrow responsibility out of `src/context/CanvasContext.tsx`.
+- Stage One Backfill M5 `usePptRuntime` quality check is completed in `569383aa`.
+- Stage Two M1 `CanvasContext` state/default/context boundary extraction is the current slice being committed: it moves state model/defaults/context into `src/context/canvasContextState.ts` and canvas compatibility syncing into `src/context/canvasCompatibility.ts`.
+- Current active slice after this commit is Stage Two M2: extract the Canvas selection reducer into a focused helper, without touching drag, persistence, or mutation ownership.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
@@ -29,16 +30,18 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 
 ## Current Baseline
 
-- `src/App.tsx`: 4900 lines after `083db7f8`.
+- `src/App.tsx`: 4385 lines after `569383aa`.
 - `src/app/useConnectorRenderer.ts`: 253 lines, boundary hardened in `5f5b76e0` and review-follow-up typechecked in `f06f1880`.
 - `src/app/usePromptGroupLayout.ts`: 1348 lines, extracted and boundary-hardened in `8a458cd4`.
 - `src/app/useGenerationRuntime.ts`: 2604 lines, extracted and boundary-hardened in `ab719c4a`; generation billing cleanup completed in `083db7f8`.
-- `src/app/usePptRuntime.ts`: 1289 lines, extracted in `4c448660` and semantically boundary-checked in the current PPT slice.
-- `src/app/pptRuntimeHelpers.ts`: 152 lines, semantically boundary-checked in the current PPT slice.
-- `src/context/CanvasContext.tsx`: 5433 lines.
-- `src/services/auth/keyManager.ts`: 5279 lines.
-- `src/components/layout/PromptBar.tsx`: 4437 lines.
-- `src/services/llm/OpenAICompatibleAdapter.ts`: 4517 lines.
+- `src/app/usePptRuntime.ts`: 1289 lines, extracted in `4c448660` and semantically boundary-checked in `569383aa`.
+- `src/app/pptRuntimeHelpers.ts`: 152 lines, semantically boundary-checked in `569383aa`.
+- `src/context/CanvasContext.tsx`: 4606 lines after the Stage Two M1 state-boundary split.
+- `src/context/canvasContextState.ts`: 114 lines, new Stage Two M1 state/default/context boundary module.
+- `src/context/canvasCompatibility.ts`: 8 lines, new Stage Two M1 canvas workflow/ecommerce compatibility helper.
+- `src/services/auth/keyManager.ts`: 4606 lines.
+- `src/components/layout/PromptBar.tsx`: 4075 lines.
+- `src/services/llm/OpenAICompatibleAdapter.ts`: 3980 lines.
 - `apps/web/`: migration target, not the first edit location.
 - `apps/api/`: DDD back-end structure, not part of this refactor unless compatibility checks require it.
 
@@ -206,9 +209,9 @@ Commit:
 - `refactor: harden generation runtime` if code changes.
 - `docs: record generation runtime backfill` if scan-only.
 
-### 6. Stage One Backfill M5: PPT Runtime Quality Check
+### 6. Stage One Backfill M5: PPT Runtime Quality Check (Completed In `569383aa`)
 
-Status: active slice being committed. The first extraction pass landed in `4c448660`; this follow-up stays separate from Clay UI files and hardens the semantic public boundary through contract tests.
+Status: completed in `569383aa`. The first extraction pass landed in `4c448660`; this follow-up stayed separate from Clay UI files and hardened the semantic public boundary through contract tests.
 
 Goal: verify the already extracted PPT editing, preview, export, and deck child image management boundaries remain clean and do not need immediate follow-up before Stage Two.
 
@@ -278,7 +281,8 @@ Commit:
 Goal: split the next largest files while preserving public behavior.
 
 Scope:
-- Active first slice: map `src/context/CanvasContext.tsx` and split one narrow responsibility, starting with the least cross-cutting state model or helper boundary that can be protected by existing canvas/workspace tests.
+- Completed M1 slice: extracted `CanvasState`, `CanvasContextType`, `CanvasContext`, layout mode types, `MAX_CANVASES`, default canvas/state construction, id generation, and workflow creation into `src/context/canvasContextState.ts`; canvas compatibility syncing lives in `src/context/canvasCompatibility.ts`.
+- Active next M2 slice: extract the Canvas selection reducer from `src/context/CanvasContext.tsx` into a pure focused helper, preserving current selection ordering and duplicate semantics.
 - Split `src/context/CanvasContext.tsx` by state model, selection/drag events, node mutations, and persistence sync.
 - Split `src/services/auth/keyManager.ts` by key storage, permission checks, encryption helpers, and provider credential management.
 - Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.
@@ -287,6 +291,7 @@ Scope:
 
 Acceptance:
 - Public context/service APIs remain compatible.
+- `CanvasContext.tsx` continues re-exporting public context types for existing import paths.
 - Typecheck and related unit tests pass after each sub-split.
 - Commits are scoped per submodule, not one large batch.
 
