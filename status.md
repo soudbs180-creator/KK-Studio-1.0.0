@@ -4,14 +4,14 @@ Last updated: 2026-05-02
 
 ## Active State
 
-- Active lane in this thread: Stage One M6 ecommerce runtime extraction, current slice `useEcommerceTaskActivationRuntime`.
+- Active lane in this thread: Stage One M6 ecommerce runtime extraction, current slice `useEcommerceSubmitRuntime`.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports `4c448660`; the writable full Git metadata copy at `node_modules/.codex-git-full` is ahead of plain metadata and is currently at `ee2987b7 docs: finalize mobile continuation milestone status` before this task activation runtime commit. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports `4c448660`; the writable full Git metadata copy at `node_modules/.codex-git-full` is ahead of plain metadata and is currently at `184b158c refactor: extract ecommerce task activation runtime` before this ecommerce submit runtime commit. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Plain `.git` and the writable full Git metadata copy can both show mixed historical runtime/PPT/ecommerce work during this thread. Staging must remain path-limited and use the writable metadata copy.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: close the ecommerce task activation runtime slice with full validation and a path-limited runtime commit. Clay UI files remain excluded from this runtime commit.
+- Current focus: close the ecommerce submit runtime slice with full validation and a path-limited runtime commit. Clay UI files remain excluded from this runtime commit.
 
 ## Completed In `9e7ae2b5` (Clay UI Audit Closure)
 
@@ -22,25 +22,24 @@ Last updated: 2026-05-02
 - Browser QA for this lane is complete and tracked below.
 - Commit scope was UI/doc/test only and explicitly excluded runtime/PPT/ecommerce extraction WIP.
 
-## Current Ecommerce Task Activation Runtime Pass
+## Current Ecommerce Submit Runtime Pass
 
-- Added `src/app/useEcommerceTaskActivationRuntime.ts` for source-key ecommerce task activation lookup and fallback activation state restoration.
-- `src/App.tsx` now wires the task activation hook through `updateEcommerceTaskActivationRuntimeState`; App no longer owns inline `handleActivateEcommerceTaskBySourceKey`.
-- The hook receives all dependencies through `UseEcommerceTaskActivationRuntimeDeps`: active canvas ref, ecommerce task-state map, task activation state adapter, and prompt activation callback.
-- New contract coverage in `tests/unit/ecommerce-task-activation-runtime-contract.test.ts` covers hook ownership, explicit deps/result interfaces, App wiring, PromptBar activation callback threading, source-row matching, and fallback active-task/group-sheet restoration.
-- `tsconfig.tests.json` now semantically checks 26 test files.
-- Line counts after extraction: `src/App.tsx` 4409 physical lines; `src/app/useEcommerceTaskActivationRuntime.ts` 51 physical lines; `tests/unit/ecommerce-task-activation-runtime-contract.test.ts` 26 physical lines; `tsconfig.tests.json` 55 physical lines.
-- Targeted validation: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-task-activation-runtime-contract.test.ts tests/unit/ecommerce-mobile-continuation-runtime-contract.test.ts tests/unit/ecommerce-runtime-contract.test.ts` passed (3/3).
-- Active ecommerce task activation gate: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-task-activation-runtime-contract.test.ts tests/unit/ecommerce-mobile-continuation-runtime-contract.test.ts tests/unit/ecommerce-node-generation-runtime-contract.test.ts tests/unit/ecommerce-runtime-contract.test.ts tests/unit/mobile-ecommerce-continuation-surface.test.ts tests/unit/mobile-feed-selectors.test.ts` passed (12/12).
-- Passed: `npm.cmd run typecheck`; test semantic check now covers 26 files via `tsconfig.tests.json`.
-- Passed: `npm.cmd run test:unit` (1102/1102).
+- Added `src/app/useEcommerceSubmitRuntime.ts` for the ecommerce-only submit guard branch in `handleGenerate`.
+- `src/App.tsx` now wires the submit hook through `handleEcommerceSubmitGuard`; App no longer owns the inline `submitGuard.isEcommerce` branch or the direct `ecommerceState.analysis` guard inside `handleGenerate`.
+- The hook receives all dependencies through `UseEcommerceSubmitRuntimeDeps`: `hasEcommerceAnalysis`, `handleAnalyzeEcommerceRequirement`, and `handleConfirmEcommerceAnalysis`.
+- New contract coverage in `tests/unit/ecommerce-submit-runtime-contract.test.ts` covers hook ownership, explicit deps/result interfaces, App wiring, the extracted ecommerce submit branch, and the updated `handleGenerate` dependency boundary. `tests/unit/ecommerce-requirement-analysis-runtime-contract.test.ts` now asserts the submit branch through the hook instead of the old inline App logic.
+- `tsconfig.tests.json` now semantically checks 27 test files.
+- Line counts after extraction: `src/App.tsx` 4932 physical lines; `src/app/useEcommerceSubmitRuntime.ts` 39 physical lines; `tests/unit/ecommerce-submit-runtime-contract.test.ts` 37 physical lines; `tests/unit/ecommerce-requirement-analysis-runtime-contract.test.ts` 457 physical lines; `tsconfig.tests.json` 56 physical lines.
+- Targeted validation: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-submit-runtime-contract.test.ts tests/unit/ecommerce-requirement-analysis-runtime-contract.test.ts tests/unit/generation-runtime-contract.test.ts` passed (64/64).
+- Passed: `npm.cmd run typecheck`; test semantic check now covers 27 files via `tsconfig.tests.json`.
+- Passed: `npm.cmd run test:unit` (1104/1104).
 - Passed: `npm.cmd run build`.
 - Passed: `npm.cmd run governance:agent-docs`.
 - Passed: `npm.cmd run check:encoding`.
-- Passed tracked diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/App.tsx src/app/useEcommerceTaskActivationRuntime.ts tests/unit/ecommerce-task-activation-runtime-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
-- Browser QA: skipped for this slice because it is non-UI runtime activation glue that preserves existing PromptBar/mobile component contracts. The Clay UI lane browser evidence remains recorded below.
-- Commit include scope for this runtime slice: `status.md`, `plans.md`, `implement.md`, `validation.md`, `tsconfig.tests.json`, `src/App.tsx`, `src/app/useEcommerceTaskActivationRuntime.ts`, and `tests/unit/ecommerce-task-activation-runtime-contract.test.ts`.
-- Explicitly excluded scope: Clay UI docs/styles/components, PPT/generation runtime files, and unrelated ecommerce runtime slices not touched by the task activation extraction.
+- Passed tracked diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/App.tsx src/app/useEcommerceSubmitRuntime.ts tests/unit/ecommerce-submit-runtime-contract.test.ts tests/unit/ecommerce-requirement-analysis-runtime-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
+- Browser QA: skipped for this slice because it is non-UI ecommerce submit glue that preserves the existing workspace and PromptBar surfaces. The Clay UI lane browser evidence remains recorded below.
+- Commit include scope for this runtime slice: `status.md`, `plans.md`, `implement.md`, `validation.md`, `tsconfig.tests.json`, `src/App.tsx`, `src/app/useEcommerceSubmitRuntime.ts`, `tests/unit/ecommerce-submit-runtime-contract.test.ts`, and `tests/unit/ecommerce-requirement-analysis-runtime-contract.test.ts`.
+- Explicitly excluded scope: Clay UI docs/styles/components, PPT/generation runtime files, and unrelated ecommerce runtime slices not touched by the ecommerce submit extraction.
 
 ## Completed In `782d30d3` (Ecommerce Mobile Continuation Runtime)
 

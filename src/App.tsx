@@ -120,6 +120,7 @@ import {
   useEcommerceTaskActivationRuntime,
   type SetEcommerceTaskActivationRuntimeState,
 } from './app/useEcommerceTaskActivationRuntime';
+import { useEcommerceSubmitRuntime } from './app/useEcommerceSubmitRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
 const GENERATE_TIMEOUT_MS = 600000;
@@ -1748,6 +1749,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     applyEffectiveSizingToTaskState,
     resolveEcommerceAPlusControlMode,
   });
+  const { handleEcommerceSubmitGuard } = useEcommerceSubmitRuntime({
+    hasEcommerceAnalysis: Boolean(ecommerceState.analysis),
+    handleAnalyzeEcommerceRequirement,
+    handleConfirmEcommerceAnalysis,
+  });
 
   useEcommercePostBuildSyncRuntime({
     activeCanvas,
@@ -2216,12 +2222,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
     if (!submitGuard.allowed) return;
 
-    if (submitGuard.isEcommerce) {
-      if (!ecommerceState.analysis) {
-        await handleAnalyzeEcommerceRequirement();
-        return;
-      }
-      await handleConfirmEcommerceAnalysis();
+    if (await handleEcommerceSubmitGuard(submitGuard)) {
       return;
     }
 
@@ -2260,7 +2261,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       setDraftNodeId,
       updateImageNodePosition,
     });
-  }, [config, draftNodeId, addPromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialGenerationSubmissionContext, runInitialGenerationSubmissionTransaction, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission, ecommerceState.analysis, handleAnalyzeEcommerceRequirement, handleConfirmEcommerceAnalysis]);
+  }, [config, draftNodeId, addPromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialGenerationSubmissionContext, runInitialGenerationSubmissionTransaction, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission, handleEcommerceSubmitGuard]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {

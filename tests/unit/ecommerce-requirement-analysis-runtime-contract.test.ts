@@ -81,18 +81,20 @@ test('ecommerce requirement analysis runtime owns reset, file, and analyze callb
 
 test('ecommerce submit callback refreshes when analysis runtime state changes', () => {
   const appSource = readSource('src/App.tsx');
+  const submitHookSource = readSource('src/app/useEcommerceSubmitRuntime.ts');
   const handleGenerateSource = appSource.slice(
     appSource.indexOf('const handleGenerate = useCallback'),
     appSource.indexOf('const handleFilesDrop = useCallback'),
   );
   const dependencyList = handleGenerateSource.slice(handleGenerateSource.lastIndexOf('}, ['));
 
-  assert.match(handleGenerateSource, /if \(!ecommerceState\.analysis\) \{/);
-  assert.match(handleGenerateSource, /await handleAnalyzeEcommerceRequirement\(\);/);
-  assert.match(handleGenerateSource, /await handleConfirmEcommerceAnalysis\(\);/);
-  assert.match(dependencyList, /ecommerceState\.analysis/);
-  assert.match(dependencyList, /handleAnalyzeEcommerceRequirement/);
-  assert.match(dependencyList, /handleConfirmEcommerceAnalysis/);
+  assert.match(appSource, /import \{ useEcommerceSubmitRuntime \} from '\.\/app\/useEcommerceSubmitRuntime';/);
+  assert.match(appSource, /const \{ handleEcommerceSubmitGuard \} = useEcommerceSubmitRuntime\(\{/);
+  assert.match(handleGenerateSource, /if \(await handleEcommerceSubmitGuard\(submitGuard\)\) \{/);
+  assert.match(submitHookSource, /hasEcommerceAnalysis/);
+  assert.match(submitHookSource, /await handleAnalyzeEcommerceRequirement\(\);/);
+  assert.match(submitHookSource, /await handleConfirmEcommerceAnalysis\(\);/);
+  assert.match(dependencyList, /handleEcommerceSubmitGuard/);
 });
 
 test('requirement analysis reset patch clears derived ecommerce analysis state', () => {

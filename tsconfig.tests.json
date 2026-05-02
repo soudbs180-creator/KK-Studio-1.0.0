@@ -32,6 +32,7 @@
         "tests/unit/ecommerce-node-generation-runtime-contract.test.ts",
         "tests/unit/ecommerce-post-build-sync-runtime-contract.test.ts",
         "tests/unit/ecommerce-requirement-analysis-runtime-contract.test.ts",
+        "tests/unit/ecommerce-submit-runtime-contract.test.ts",
         "tests/unit/ecommerce-structured-task-source-contract.test.ts",
         "tests/unit/ecommerce-task-activation-runtime-contract.test.ts",
         "tests/unit/ecommerce-task-state-runtime-contract.test.ts",
