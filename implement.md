@@ -4,18 +4,18 @@ Last updated: 2026-05-02
 
 ## Operating Mode
 
-This is a long-running execution. Plain `.git` still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`, currently at `d12731ce refactor: extract ecommerce partial redraw runtime`.
+This is a long-running execution. Plain `.git` still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`, currently at `5f5b76e0 refactor: harden connector renderer boundary`.
 
-The active workstream is a single merged line. Thread `019dd551...` is the main refactor history and `019de168...` is continuation history; both belong to Stage One M6 ecommerce runtime extraction. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; ecommerce source selection closed in `ccf965c3`; ecommerce partial redraw closed in `d12731ce`; the M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`.
+The active workstream is a single merged line. Thread `019dd551...` is the main refactor history and `019de168...` is continuation history; both belong to Stage One M6 ecommerce runtime extraction. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; ecommerce source selection closed in `ccf965c3`; ecommerce partial redraw closed in `d12731ce`; connector renderer boundary hardening closed in `5f5b76e0`; the M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`.
 
-The current active slice is Stage One Backfill M1: harden `src/app/useConnectorRenderer.ts` without re-creating the hook.
+The current active slice is Stage One Backfill M2: harden `src/app/usePromptGroupLayout.ts` without re-creating the hook.
 
 The active plan is `plans.md`. The current status and next exact step are tracked in `status.md`. Validation commands and expected gates are tracked in `validation.md`.
 
 For Clay UI work, use `C:/Users/Administrator/Downloads/DESIGN-clay.md` as the visual base with these overrides: inputs, main cards, sub cards, and framework cards use controlled frosted material; dark mode uses neutral black-gray surfaces; Clay brand colors are emphasis only. That lane is not active unless the user reports a new visual issue.
 
 Current runtime order:
-1. Keep the ledger files aligned with `d12731ce` and the merged single execution line.
+1. Keep the ledger files aligned with the alternate-git HEAD and the merged single execution line.
 2. Treat Stage One M6 ecommerce extraction as complete unless a new concrete regression proves otherwise.
 3. Write/update focused source contracts before each extraction when behavior or ownership changes.
 4. Move domain helpers and side effects into `src/app/` hooks with explicit deps/result interfaces.

@@ -4,17 +4,18 @@ Last updated: 2026-05-02
 
 ## Active State
 
-- Active lane in this thread: single-line Stage One convergence. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is complete and ready to commit.
+- Active lane in this thread: single-line Stage One convergence. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`; the current active slice is Stage One Backfill M2 `usePromptGroupLayout` hardening.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and is currently at `d12731ce refactor: extract ecommerce partial redraw runtime`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and is currently at `5f5b76e0 refactor: harden connector renderer boundary`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Thread merge state: `019dd551...` is the main refactor history and `019de168...` is continuation history; both are part of the same Stage One M6 ecommerce runtime line.
-- Alternate-git worktree was clean before this ledger-only correction.
+- Alternate-git worktree currently has prompt-group boundary hardening WIP plus a connector review follow-up test update.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: commit the connector renderer hardening slice, then begin Stage One Backfill M2 `usePromptGroupLayout` closeout.
-- Current commit scope: `src/app/useConnectorRenderer.ts`, `tests/unit/canvas-connector-throttling-contract.test.ts`, `tsconfig.tests.json`, and `status.md`.
-- Browser QA: skipped for this runtime/type-boundary slice because no UI runtime or visual surface changed.
+- Current focus: first land the connector review follow-up and ledger advancement, then complete Stage One Backfill M2 `usePromptGroupLayout` hardening.
+- Current connector review follow-up commit scope: `tests/unit/canvas-connector-throttling-contract.test.ts`, `plans.md`, `implement.md`, and `status.md`.
+- Prompt-group WIP scope, not staged with the connector review follow-up: `src/app/usePromptGroupLayout.ts` and `tests/unit/prompt-group-regroup-behavior.test.ts`.
+- Browser QA: skipped for these runtime/type-boundary slices because no UI runtime or visual surface changed.
 
 ## Completed In `9e7ae2b5` (Clay UI Audit Closure)
 
@@ -46,7 +47,7 @@ Last updated: 2026-05-02
 
 ## Current Quality Baseline
 
-- Current giant tracked files after `d12731ce`: `src/context/CanvasContext.tsx` 5433 lines, `src/services/auth/keyManager.ts` 5279 lines, `src/App.tsx` 4904 lines, `src/components/layout/PromptBar.tsx` 4437 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 4517 lines.
+- Current giant tracked files after `5f5b76e0`: `src/context/CanvasContext.tsx` 5433 lines, `src/services/auth/keyManager.ts` 5279 lines, `src/App.tsx` 4904 lines, `src/components/layout/PromptBar.tsx` 4437 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 4517 lines.
 - Current tracked TS/TSX debt scan: direct `as any` matches 167, explicit any-type pattern matches 484, `@ts-ignore` / `@ts-expect-error` matches 133, and `console.log` matches 251. These are refactor debt indicators, not release blockers by themselves.
 - Quality rule going forward: reduce `any`, TypeScript suppressions, and bare `console.log` inside touched files when local and safe; do not perform a whole-repo cleanup inside one runtime or architecture extraction.
 - Architecture status from the last recorded full check: `npm.cmd run architecture:check` passed with known allowlisted migration and legacy bridge exceptions; `npm.cmd run spec:check` passed.
@@ -64,6 +65,7 @@ Last updated: 2026-05-02
 
 - Exported `ConnectorRenderSnapshot`, `UseConnectorRendererDeps`, and `UseConnectorRendererResult` from `src/app/useConnectorRenderer.ts` so the hook boundary is explicit and reusable for later App split work.
 - Added `tests/unit/canvas-connector-throttling-contract.test.ts` coverage that asserts exported connector boundary types and prevents `App.tsx` from reintroducing connector snapshot builder/commit/scheduler helpers.
+- Review follow-up: the connector boundary test now imports `ConnectorRenderSnapshot`, `UseConnectorRendererDeps`, and `UseConnectorRendererResult` as public types, so `npm.cmd run typecheck` validates the exported boundary instead of relying only on source regex.
 - Added the connector throttling contract test to `tsconfig.tests.json`; `npm.cmd run typecheck` now semantically checks 32 test files.
 - Line counts after this slice: `src/App.tsx` 4904, `src/app/useConnectorRenderer.ts` 253, `tests/unit/canvas-connector-throttling-contract.test.ts` 75, `tsconfig.tests.json` 61.
 - Browser QA: skipped because this is a non-UI hook type-boundary hardening and existing connector rendering behavior was not changed.

@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`, currently at `d12731ce refactor: extract ecommerce partial redraw runtime`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`, currently at `5f5b76e0 refactor: harden connector renderer boundary`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -17,16 +17,18 @@ The active execution model for this thread has resumed Stage One convergence:
 - Ecommerce source selection closed in `ccf965c3`.
 - Ecommerce partial redraw closed in `d12731ce`.
 - Stage One M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`; remaining ecommerce references are hook wiring, state adapters, UI prop forwarding, and render predicates.
-- Current active slice is Stage One Backfill M1: harden `src/app/useConnectorRenderer.ts`.
+- Connector renderer boundary hardening closed in `5f5b76e0`.
+- Current active slice is Stage One Backfill M2: harden `src/app/usePromptGroupLayout.ts` without re-creating the hook.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
-Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release metadata, and ledger-only corrections must be staged separately. The current ledger correction includes only `plans.md`, `implement.md`, `status.md`, and `validation.md`.
+Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release metadata, and review follow-ups must be staged separately. The current connector review follow-up includes only the connector public-type contract and ledger alignment; prompt-group WIP stays unstaged until its own validation passes.
 
 ## Current Baseline
 
-- `src/App.tsx`: 4904 lines after `d12731ce`.
-- `src/app/useConnectorRenderer.ts`: 272 lines, already extracted and awaiting hardening.
+- `src/App.tsx`: 4904 lines after `5f5b76e0`.
+- `src/app/useConnectorRenderer.ts`: 253 lines, boundary hardened in `5f5b76e0`.
+- `src/app/usePromptGroupLayout.ts`: 1348 lines, already extracted and awaiting boundary hardening.
 - `src/context/CanvasContext.tsx`: 5433 lines.
 - `src/services/auth/keyManager.ts`: 5279 lines.
 - `src/components/layout/PromptBar.tsx`: 4437 lines.
@@ -90,7 +92,7 @@ Commit:
 Goal: make `plans.md`, `implement.md`, `status.md`, and `validation.md` describe the v1.4.2 refactor line.
 
 Acceptance:
-- The four ledger files identify `d12731ce` as the current alternate-git baseline, name plain `.git` as stale/historical, and describe the single merged execution line.
+- The four ledger files identify `d12731ce` as the then-current alternate-git baseline, name plain `.git` as stale/historical, and describe the single merged execution line.
 - The previous recovery stream and dual-thread state remain acknowledged as history, not the active plan.
 - The next active step is Stage One Backfill M1 `useConnectorRenderer` hardening.
 - Documentation validation and encoding checks pass.
@@ -126,7 +128,7 @@ Commit:
 - `docs: close ecommerce runtime extraction map` if scan-only.
 - `refactor: extract ecommerce <slice> runtime` if code changes.
 
-### 3. Stage One Backfill M1: Connector Renderer Extraction Hardening
+### 3. Stage One Backfill M1: Connector Renderer Extraction Hardening (Completed In `5f5b76e0`)
 
 Goal: finish the already-started connector renderer extraction without re-creating the hook.
 
@@ -151,15 +153,15 @@ Validation:
 - `npm.cmd run check:encoding`
 
 Commit:
-- `refactor: harden connector renderer extraction`
+- `refactor: harden connector renderer boundary`
 
 ### 4. Stage One Backfill M2: Prompt Group Layout Runtime
 
-Goal: extract prompt group layout, bounds, overlap, regroup, and live scene derivation from `src/App.tsx` into `src/app/usePromptGroupLayout.ts`.
+Goal: harden the already extracted prompt group layout, bounds, overlap, regroup, and live scene derivation runtime in `src/app/usePromptGroupLayout.ts`.
 
 Scope:
-- Define `UsePromptGroupLayoutDeps` and `UsePromptGroupLayoutResult`.
-- Move prompt group bounds, visible group views, regroup presentation state coordination, and live scene derivation into the hook.
+- Export `PromptGroupBounds`, `UsePromptGroupLayoutDeps`, `UsePromptGroupLayoutResult`, `UsePromptGroupStackingDeps`, and `UsePromptGroupStackingResult`.
+- Confirm prompt group bounds, visible group views, regroup presentation state coordination, and live scene derivation remain in the hook.
 - Keep drag handler hooks and rendering code compatible through explicit returned methods and state.
 
 Acceptance:
