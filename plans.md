@@ -1,26 +1,36 @@
-# KK-Studio v1.4.2 Dual-Lane Refactor Plan
+# KK-Studio v1.4.2 Single-Line Convergence Plan
 
 Last updated: 2026-05-02
-Branch policy: continue on the current branch unless the user explicitly asks for a branch or worktree.
+Branch policy: continue on the current branch and current workspace unless the user explicitly asks for a branch or worktree.
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries`. The writable metadata copy used for this session is ahead at `cc24e19d refactor: extract ecommerce runtime activation`; use that writable metadata copy for status, staging, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`, currently at `d12731ce refactor: extract ecommerce partial redraw runtime`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
-The active execution model for this thread has resumed Stage One runtime extraction:
+The two prior execution threads are merged into one line:
+- `019dd551...` remains the main refactor history.
+- `019de168...` is treated as continuation work.
+- Both are part of `Stage One M6 ecommerce runtime extraction`.
+
+The active execution model for this thread has resumed Stage One convergence:
 - Clay UI surface cleanup and browser evidence closed in `9e7ae2b5`.
-- Current active slice is Stage One M6 ecommerce source selection runtime extraction in `src/app/useEcommerceSourceSelectionRuntime.ts`.
+- Ecommerce source selection closed in `ccf965c3`.
+- Ecommerce partial redraw closed in `d12731ce`.
+- Stage One M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`; remaining ecommerce references are hook wiring, state adapters, UI prop forwarding, and render predicates.
+- Current active slice is Stage One Backfill M1: harden `src/app/useConnectorRenderer.ts`.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
-Commit boundary going forward: UI fixes and runtime/PPT/ecommerce fixes must be staged separately even though the working tree is mixed. Current runtime staging must use `git --git-dir=node_modules/.codex-git-full --work-tree=.` and include only the active ecommerce source selection runtime files plus ledger updates.
+Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release metadata, and ledger-only corrections must be staged separately. The current ledger correction includes only `plans.md`, `implement.md`, `status.md`, and `validation.md`.
 
 ## Current Baseline
 
-- `src/App.tsx`: 4389 lines after the current ecommerce partial redraw runtime WIP.
+- `src/App.tsx`: 4904 lines after `d12731ce`.
 - `src/app/useConnectorRenderer.ts`: 272 lines, already extracted and awaiting hardening.
-- `src/context/CanvasContext.tsx`: 5434 lines.
-- `src/services/auth/keyManager.ts`: 5280 lines.
+- `src/context/CanvasContext.tsx`: 5433 lines.
+- `src/services/auth/keyManager.ts`: 5279 lines.
+- `src/components/layout/PromptBar.tsx`: 4437 lines.
+- `src/services/llm/OpenAICompatibleAdapter.ts`: 4517 lines.
 - `apps/web/`: migration target, not the first edit location.
 - `apps/api/`: DDD back-end structure, not part of this refactor unless compatibility checks require it.
 
@@ -80,8 +90,9 @@ Commit:
 Goal: make `plans.md`, `implement.md`, `status.md`, and `validation.md` describe the v1.4.2 refactor line.
 
 Acceptance:
-- The four ledger files identify the current baseline, execution loop, milestone list, validation commands, and recovery context.
-- The previous recovery stream remains acknowledged as history, not the active plan.
+- The four ledger files identify `d12731ce` as the current alternate-git baseline, name plain `.git` as stale/historical, and describe the single merged execution line.
+- The previous recovery stream and dual-thread state remain acknowledged as history, not the active plan.
+- The next active step is Stage One Backfill M1 `useConnectorRenderer` hardening.
 - Documentation validation and encoding checks pass.
 
 Validation:
@@ -91,7 +102,31 @@ Validation:
 Commit:
 - `docs: align v1.4.2 refactor plan`
 
-### 2. Stage One M1: Connector Renderer Extraction Hardening
+### 2. Stage One M6 Closeout: Remaining Ecommerce Branch Scan (Completed)
+
+Goal: finish Stage One M6 by proving whether any ecommerce-owned branch remains in `src/App.tsx`.
+
+Scope:
+- Scan `src/App.tsx` for remaining ecommerce-owned handlers, state branches, redraw/source-selection branches, and framework-status glue.
+- If a clear remaining ecommerce branch exists, split exactly one smallest runtime hook and contract test.
+- If no clear branch exists, update the ledger to mark Stage One M6 complete and move to Stage One backfill.
+- Do not mix this scan with connector, prompt-group, generation, PPT, UI, or release metadata work.
+- Result: no new M6 runtime slice is required. Remaining ecommerce hits in `src/App.tsx` are orchestration-only: source selection calls `resetEcommerceSourceSelectionState`, partial redraw calls `resolveEcommercePartialRedrawContext` and `finalizeEcommercePartialRedrawResult`, submit uses `handleEcommerceSubmitGuard`, and the state adapter block only patches hook state.
+
+Acceptance:
+- A source map records every remaining ecommerce reference category in `src/App.tsx`.
+- The next action is explicit: either one named smallest hook slice with tests, or M6 completion.
+- Browser QA is skipped only if no UI surface changed, with the reason recorded in `status.md`.
+
+Validation:
+- If docs/scan-only: `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and path-limited `git diff --check`.
+- If runtime code changes: the active ecommerce targeted tests, `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and path-limited `git diff --check`.
+
+Commit:
+- `docs: close ecommerce runtime extraction map` if scan-only.
+- `refactor: extract ecommerce <slice> runtime` if code changes.
+
+### 3. Stage One Backfill M1: Connector Renderer Extraction Hardening
 
 Goal: finish the already-started connector renderer extraction without re-creating the hook.
 
@@ -118,7 +153,7 @@ Validation:
 Commit:
 - `refactor: harden connector renderer extraction`
 
-### 3. Stage One M2: Prompt Group Layout Runtime
+### 4. Stage One Backfill M2: Prompt Group Layout Runtime
 
 Goal: extract prompt group layout, bounds, overlap, regroup, and live scene derivation from `src/App.tsx` into `src/app/usePromptGroupLayout.ts`.
 
@@ -142,9 +177,9 @@ Validation:
 Commit:
 - `refactor: extract prompt group layout runtime`
 
-### 4. Stage One M3: Generation Runtime
+### 5. Stage One Backfill M3: Generation Runtime Quality Check
 
-Goal: extract generation execution orchestration from `src/App.tsx`.
+Goal: verify the already extracted generation execution runtime remains clean and does not need immediate follow-up before Stage Two.
 
 Scope:
 - Move generation start, billing attempt coordination, cancellation, retry, failure state, result node persistence, and preview state wiring into `src/app/useGenerationRuntime.ts`.
@@ -156,13 +191,14 @@ Acceptance:
 - No API or billing protocol changes are introduced.
 
 Commit:
-- `refactor: extract generation runtime`
+- `refactor: harden generation runtime` if code changes.
+- `docs: record generation runtime backfill` if scan-only.
 
-### 5. Stage One M5: PPT Runtime
+### 6. Stage One Backfill M5: PPT Runtime Quality Check
 
 Status: paused while the active Clay UI audit is closed. The first pass landed in `4c448660`; any follow-up must remain in a later runtime/PPT commit and stay separate from Clay UI files.
 
-Goal: extract PPT editing, preview, export, and deck child image management from `src/App.tsx`.
+Goal: verify the already extracted PPT editing, preview, export, and deck child image management boundaries remain clean and do not need immediate follow-up before Stage Two.
 
 Scope:
 - Create `src/app/usePptRuntime.ts`.
@@ -175,9 +211,10 @@ Acceptance:
 - PPT-related tests and build pass.
 
 Commit:
-- `refactor: extract ppt runtime`
+- `refactor: harden ppt runtime` if code changes.
+- `docs: record ppt runtime backfill` if scan-only.
 
-### 6. Stage One M6: Ecommerce Runtime
+### 7. Stage One M6: Ecommerce Runtime
 
 Goal: extract ecommerce framework/runtime logic last because it has the highest cross-reference count.
 
@@ -196,7 +233,8 @@ Scope:
 - Completed slice: extract the ecommerce submit branch in `handleGenerate` into `src/app/useEcommerceSubmitRuntime.ts`.
 - Completed slice in `cc24e19d`: extract the ecommerce mode guard/reset and prompt activation branches into `src/app/useEcommerceModeRuntime.ts` and `src/app/useEcommercePromptActivationRuntime.ts`.
 - Completed slice in `ccf965c3`: extract the image-source ecommerce reset branch in `handleImageClick` into `src/app/useEcommerceSourceSelectionRuntime.ts`.
-- Current slice: extract the ecommerce partial-redraw inheritance and result-finalization branch in `handlePartialRedrawRequest` into `src/app/useEcommercePartialRedrawRuntime.ts`.
+- Completed slice in `d12731ce`: extract the ecommerce partial-redraw inheritance and result-finalization branch in `handlePartialRedrawRequest` into `src/app/useEcommercePartialRedrawRuntime.ts`.
+- Closeout scan: completed. No remaining ecommerce-owned business branch blocks M6 completion; remaining App references are hook orchestration, state adapter wiring, UI prop forwarding, and duplicated render predicates to handle later.
 
 Acceptance:
 - Ecommerce references are routed through an explicit hook interface.
@@ -217,15 +255,18 @@ Acceptance:
 - Ecommerce partial redraw runtime exposes explicit deps/result interfaces; App no longer owns the ecommerce inherited redraw context resolution or ecommerce redraw result finalization branch inside `handlePartialRedrawRequest`.
 
 Commit:
-- `refactor: extract ecommerce partial redraw runtime`
+- `refactor: extract ecommerce partial redraw runtime` completed in `d12731ce`.
+- M6 is complete after the closeout ledger update.
 
-### 7. Stage Two: Secondary Giant File Split
+### 8. Stage Two: Secondary Giant File Split
 
 Goal: split the next largest files while preserving public behavior.
 
 Scope:
 - Split `src/context/CanvasContext.tsx` by state model, selection/drag events, node mutations, and persistence sync.
 - Split `src/services/auth/keyManager.ts` by key storage, permission checks, encryption helpers, and provider credential management.
+- Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.
+- Split `src/services/llm/OpenAICompatibleAdapter.ts` by request building, response parsing, provider quirks, and image/video/audio compatibility.
 - Keep compatibility exports for existing import paths.
 
 Acceptance:
@@ -233,12 +274,13 @@ Acceptance:
 - Typecheck and related unit tests pass after each sub-split.
 - Commits are scoped per submodule, not one large batch.
 
-### 8. Stage Three: Global Quality Governance
+### 9. Stage Three: Global Quality Governance
 
 Goal: reduce type ambiguity and repeated logic after the main extractions create stable seams.
 
 Scope:
 - Remove or narrow `any` only where it is touched by the current refactor.
+- Reduce `@ts-ignore` / `@ts-expect-error` and bare `console.log` only in touched files unless a dedicated cleanup milestone is created.
 - Consolidate repeated domain types into existing type files or focused domain files.
 - Remove dead code introduced by the refactor.
 - Extract repeated UI fragments only when the duplication is local and obvious.
@@ -248,7 +290,7 @@ Acceptance:
 - Core UI contract tests do not regress.
 - The cleanup does not alter visual flow or product behavior.
 
-### 9. Stage Four: apps/web Migration
+### 10. Stage Four: apps/web Migration
 
 Goal: migrate stabilized front-end modules into `apps/web/` after boundaries are proven in `src/`.
 

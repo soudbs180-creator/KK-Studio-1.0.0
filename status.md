@@ -4,14 +4,17 @@ Last updated: 2026-05-02
 
 ## Active State
 
-- Active lane in this thread: Stage One M6 ecommerce runtime extraction, current slice `useEcommercePartialRedrawRuntime`.
+- Active lane in this thread: single-line Stage One convergence. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; the current slice is Stage One Backfill M1 `useConnectorRenderer` hardening.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports `4c448660`; the writable full Git metadata copy at `node_modules/.codex-git-full` is ahead of plain metadata and is currently at `ccf965c3 refactor: extract ecommerce source selection runtime`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
-- Plain `.git` and the writable full Git metadata copy can both show mixed historical runtime/PPT/ecommerce work during this thread. Staging must remain path-limited and use the writable metadata copy.
+- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and is currently at `d12731ce refactor: extract ecommerce partial redraw runtime`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Thread merge state: `019dd551...` is the main refactor history and `019de168...` is continuation history; both are part of the same Stage One M6 ecommerce runtime line.
+- Alternate-git worktree was clean before this ledger-only correction.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: close the ecommerce partial redraw runtime slice with full validation and a path-limited runtime commit. Clay UI files remain excluded from this runtime commit.
+- Current focus: commit the ledger alignment to `d12731ce`, then begin Stage One Backfill M1 by auditing `src/App.tsx` and `src/app/useConnectorRenderer.ts`.
+- Current ledger-only commit scope: `plans.md`, `implement.md`, `status.md`, and `validation.md`.
+- Browser QA: skipped for this ledger-only correction because no UI runtime or visual surface changed.
 
 ## Completed In `9e7ae2b5` (Clay UI Audit Closure)
 
@@ -22,7 +25,7 @@ Last updated: 2026-05-02
 - Browser QA for this lane is complete and tracked below.
 - Commit scope was UI/doc/test only and explicitly excluded runtime/PPT/ecommerce extraction WIP.
 
-## Current Ecommerce Partial Redraw Runtime Pass
+## Completed In `d12731ce` (Ecommerce Partial Redraw Runtime)
 
 - Added `src/app/useEcommercePartialRedrawRuntime.ts` for ecommerce inherited redraw context resolution and ecommerce redraw result finalization.
 - `src/App.tsx` now wires the partial-redraw hook through `resolveEcommercePartialRedrawContext` and `finalizeEcommercePartialRedrawResult`; App no longer owns the inline ecommerce inherited redraw context branch or the ecommerce redraw result re-parent/finalization branch inside `handlePartialRedrawRequest`.
@@ -40,6 +43,22 @@ Last updated: 2026-05-02
 - Browser QA: skipped for this slice because it is non-UI runtime glue that preserves the existing workspace and prompt surfaces. The Clay UI lane browser evidence remains recorded below.
 - Commit include scope for this runtime slice: `status.md`, `plans.md`, `implement.md`, `validation.md`, `tsconfig.tests.json`, `src/App.tsx`, `src/app/useEcommercePartialRedrawRuntime.ts`, and `tests/unit/ecommerce-partial-redraw-runtime-contract.test.ts`.
 - Explicitly excluded scope: Clay UI docs/styles/components, non-ecommerce redraw UI surfaces, PPT/generation runtime files, and unrelated ecommerce runtime slices not touched by the current partial-redraw extraction.
+
+## Current Quality Baseline
+
+- Current giant tracked files after `d12731ce`: `src/context/CanvasContext.tsx` 5433 lines, `src/services/auth/keyManager.ts` 5279 lines, `src/App.tsx` 4904 lines, `src/components/layout/PromptBar.tsx` 4437 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 4517 lines.
+- Current tracked TS/TSX debt scan: direct `as any` matches 167, explicit any-type pattern matches 484, `@ts-ignore` / `@ts-expect-error` matches 133, and `console.log` matches 251. These are refactor debt indicators, not release blockers by themselves.
+- Quality rule going forward: reduce `any`, TypeScript suppressions, and bare `console.log` inside touched files when local and safe; do not perform a whole-repo cleanup inside one runtime or architecture extraction.
+- Architecture status from the last recorded full check: `npm.cmd run architecture:check` passed with known allowlisted migration and legacy bridge exceptions; `npm.cmd run spec:check` passed.
+- Version governance status from the last recorded full check: `npm.cmd run governance:check` fails at `governance:version` because portable release metadata build times are not aligned. This is deferred to final packaging/publish.
+
+## Stage One M6 Closeout Scan
+
+- Result: M6 can be marked complete. No clear ecommerce-owned business branch remains in `src/App.tsx` that should be extracted as another M6 runtime slice.
+- Remaining ecommerce references are orchestration/state wiring: `handleGenerate` calls `handleEcommerceSubmitGuard`, `handleImageClick` calls `resetEcommerceSourceSelectionState`, and `handlePartialRedrawRequest` delegates ecommerce inheritance/finalization to `resolveEcommercePartialRedrawContext` / `finalizeEcommercePartialRedrawResult`.
+- The `src/App.tsx` ecommerce state adapter block is hook state patch wiring, not an unextracted business runtime. It may become a future `useEcommerceRuntimeStateAdapters` cleanup, but it is not an M6 blocker.
+- Deferred non-M6 quality debt: duplicate ecommerce framework child hide predicates, prompt-click empty-prompt policy cleanup, and ecommerce thinking-mode resolver relocation.
+- Browser QA: skipped because the closeout scan and ledger correction do not change UI behavior or visual surfaces.
 
 ## Completed In `ccf965c3` (Ecommerce Source Selection Runtime)
 
@@ -268,17 +287,22 @@ Last updated: 2026-05-02
 
 ## Latest Recorded Validation
 
-Fresh validation for the current ecommerce source selection runtime pass:
+Fresh validation for the completed ecommerce partial redraw runtime pass in `d12731ce`:
 
-- Working-tree note: the source-selection runtime seam was already present in the mixed worktree when this pass resumed, so this turn validated it, aligned the ledgers, and is carrying it through the full release gate before commit.
-- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-source-selection-runtime-contract.test.ts tests/unit/ecommerce-mode-runtime-contract.test.ts tests/unit/ecommerce-prompt-activation-runtime-contract.test.ts` (7/7).
-- Passed: `npm.cmd run typecheck`; test semantic check now covers 30 files via `tsconfig.tests.json`.
-- Passed: `npm.cmd run test:unit` (1110/1110).
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-partial-redraw-runtime-contract.test.ts tests/unit/ecommerce-structured-task-source-contract.test.ts tests/unit/partial-redraw-pipeline-contract.test.ts tests/unit/mobile-result-feed-app-contract.test.ts` (6/6).
+- Passed: `npm.cmd run typecheck`; test semantic check covered 31 files via `tsconfig.tests.json`.
+- Passed: `npm.cmd run test:unit` (1113/1113).
 - Passed: `npm.cmd run build`.
 - Passed: `npm.cmd run governance:agent-docs`.
 - Passed: `npm.cmd run check:encoding`.
-- Passed tracked diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/App.tsx src/app/useEcommerceSourceSelectionRuntime.ts tests/unit/ecommerce-source-selection-runtime-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
-- Validation window complete; the remaining work is staging, commit, and the next runtime seam.
+- Passed tracked diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/App.tsx src/app/useEcommercePartialRedrawRuntime.ts tests/unit/ecommerce-partial-redraw-runtime-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
+- Additional recorded health gates after `d12731ce`: `npm.cmd run architecture:check` passed, `npm.cmd run spec:check` passed, and `npm.cmd run governance:check` failed only at the deferred portable metadata `governance:version` mismatch.
+
+Fresh validation for the current ledger-only correction:
+
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- plans.md implement.md status.md validation.md` with LF/CRLF normalization warnings only.
 
 Historical validation for `017bb3a2` ecommerce requirement analysis runtime pass:
 
@@ -409,12 +433,16 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-1. Stage and commit only the current ecommerce partial redraw runtime slice files plus ledger updates through `git --git-dir=node_modules/.codex-git-full --work-tree=.`.
-2. Keep completed Clay UI files and unrelated runtime/PPT work out of the partial redraw runtime commit.
-3. Continue Stage One M6 with the next remaining ecommerce seam after this commit lands; current smallest candidates are any remaining App-owned framework-status glue or a broader non-ecommerce partial-redraw runtime boundary after a fresh reference map.
+1. Validate and commit this ledger-only correction through `git --git-dir=node_modules/.codex-git-full --work-tree=.` with only `plans.md`, `implement.md`, `status.md`, and `validation.md`.
+2. Start Stage One Backfill M1: audit `src/App.tsx` and `src/app/useConnectorRenderer.ts`, verify connector renderer ownership, tighten hook types if needed, and run targeted connector/live-scene tests before full validation.
+3. Continue Stage One backfill in this order: `usePromptGroupLayout` closeout, `useGenerationRuntime` quality check, `usePptRuntime` quality check.
+4. After Stage One backfill, enter Stage Two giant-file split in this priority order: `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`.
+5. Defer release metadata realignment until final packaging/publish, then rerun the full release gate including `npm.cmd run governance:check`.
 
 ## Risks
 
 - Original `.git` does not match the writable metadata copy in this session. Use the full writable metadata copy at `node_modules/.codex-git-full` for local commits unless the ACL is fixed outside the sandbox.
-- The worktree remains mixed, so any staging must be explicit path-based and reviewed before commit.
+- Plain `.git` may show stale dirty state and must not be used as the commit-readiness source.
+- The alternate-git worktree was clean before this ledger-only correction, but any staging must still be explicit path-based and reviewed before commit.
 - Do not delete locks, change `.git` ACLs, revert paused runtime/PPT work, or stage unrelated runtime files without explicit user confirmation.
+- Do not mix UI, PPT, runtime extraction, release metadata, and quality-debt cleanup in one commit.

@@ -1,12 +1,12 @@
-# KK-Studio v1.4.2 Dual-Lane Validation Matrix
+# KK-Studio v1.4.2 Single-Line Validation Matrix
 
 Last updated: 2026-05-02
 
 Use `npm.cmd` for npm scripts on Windows.
 
-## Active Ecommerce Partial Redraw Gate
+## Active Stage One M6 Closeout Gate
 
-Use this gate for the active ecommerce partial redraw extraction while preserving structured-task, mobile redraw entry, and redraw pipeline boundaries:
+Use this gate while scanning or extending the remaining ecommerce runtime extraction. The partial redraw slice is already committed in `d12731ce`; rerun this set when the touched area overlaps redraw, source selection, or mobile result feed boundaries:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
@@ -16,7 +16,15 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/mobile-result-feed-app-contract.test.ts"
 ```
 
-Runtime commits also require `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and a path-limited `git diff --check` unless `status.md` records a specific blocker.
+Runtime commits also require `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and a path-limited alternate-git `diff --check` unless `status.md` records a specific blocker.
+
+Ledger-only closeout commits require:
+
+```powershell
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "plans.md" "implement.md" "status.md" "validation.md"
+```
 
 ## Completed Clay UI Gate
 
@@ -73,7 +81,7 @@ Required browser checks:
 - `.theme-transitioning === 0` and no stale chunk text are confirmed.
 - Record the URL, route or surface, viewport, theme, and any visual issues or pass result in `status.md`.
 
-## Runtime / PPT / Ecommerce Gate
+## Stage One Backfill Runtime / PPT / Ecommerce Gate
 
 Use this broader gate for runtime/PPT/ecommerce follow-up slices when their touched area overlaps generation or PPT runtime. Keep those commits separate from Clay UI commits.
 
@@ -88,12 +96,15 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
 
 ## Release Gate
 
-Run these before sign-off:
+Run these before final sign-off:
 
 ```powershell
+npm.cmd run governance:check
+npm.cmd run spec:check
 npm.cmd run typecheck
 npm.cmd run test:unit
 npm.cmd run build
-npm.cmd run governance:agent-docs
 npm.cmd run check:encoding
 ```
+
+Current known non-code blocker: `npm.cmd run governance:check` fails inside `governance:version` until portable packaging/publish metadata is regenerated so `release/publish/stable/manifest.json` and `release/KK-Studio-Portable/app/dist/app-version.json` have matching `buildTime`. Handle this in the final packaging/publish phase, not inside the current runtime refactor slice.
