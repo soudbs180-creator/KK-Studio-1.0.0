@@ -48,6 +48,7 @@ import { resolveCanvasSelectionIds, type CanvasSelectionMode } from './canvasSel
 import { hydrateRecoveredMediaCacheEntry, resolveOriginalPersistSourceForDisk } from './canvasMediaRecovery';
 import { mergeCanvases, resolvePreferredActiveCanvasId } from './canvasMerge';
 import { mergeCanvasIntoState } from './canvasMergeInto';
+import { arrangeSingleSelectedPromptChildren } from './canvasArrangeSelection';
 import { cleanupInvalidCanvasCardsForCanvas, type CleanupInvalidCardsSummary } from './canvasCleanup';
 import { resolveNextCardPosition, resolveNextGroupPosition, resolveSmartCanvasPosition } from './canvasPlacement';
 import { bringCanvasNodesToFront } from './canvasLayering';
@@ -1727,80 +1728,17 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const isPromptOnly = selectedPrompts.length > 0 && selectedImages.length === 0;
                 const isImageOnly = selectedPrompts.length === 0 && selectedImages.length > 0;
 
-                // [New] When only a prompt is selected, rotate its child-card layout mode.
-                if (isPromptOnly && selectedPrompts.length === 1) {
-                    const prompt = selectedPrompts[0];
-                    const childImages = currentCanvas.imageNodes.filter(img => img.parentPromptId === prompt.id);
-
-                    if (childImages.length > 0) {
-                        const targetMode: SubCardLayout = prompt.mode === GenerationMode.PPT ? 'column' : mode;
-                        const SUB_GAP = AUTO_ARRANGE_SUB_IMAGE_GAP;
-                        const PROMPT_TO_SUB_GAP = AUTO_ARRANGE_PROMPT_TO_SUB_GAP;
-
-                        // Compute child-card bounds.
-                        const imageDims = childImages.map(img => getImageDims(img.aspectRatio, img.dimensions));
-                        const avgWidth = imageDims.reduce((sum, d) => sum + d.w, 0) / imageDims.length;
-                        const avgHeight = imageDims.reduce((sum, d) => sum + d.h, 0) / imageDims.length;
-
-                        const newImagePositions: Record<string, { x: number, y: number }> = {};
-                        const promptCenterX = prompt.position.x;
-                        const promptBottom = prompt.position.y;
-
-                        if (targetMode === 'row') {
-                            // Horizontal layout: arrange child cards in a single centered row.
-                            const totalWidth = childImages.length * avgWidth + (childImages.length - 1) * SUB_GAP;
-                            let currentX = promptCenterX - totalWidth / 2 + avgWidth / 2;
-                            const y = promptBottom + PROMPT_TO_SUB_GAP + avgHeight;
-
-                            childImages.forEach((img, i) => {
-                                const dims = imageDims[i];
-                                newImagePositions[img.id] = { x: currentX, y };
-                                currentX += dims.w + SUB_GAP;
-                            });
-                        } else if (targetMode === 'grid') {
-                            // Grid layout: use a 4-column grid with centered alignment.
-                            const columns = Math.min(AUTO_ARRANGE_SUB_COLUMNS, childImages.length);
-                            const rows = Math.ceil(childImages.length / columns);
-                            const totalWidth = columns * avgWidth + (columns - 1) * SUB_GAP;
-                            const startX = promptCenterX - totalWidth / 2 + avgWidth / 2;
-                            const startY = promptBottom + PROMPT_TO_SUB_GAP + avgHeight;
-
-                            childImages.forEach((img, i) => {
-                                const col = i % columns;
-                                const row = Math.floor(i / columns);
-                                newImagePositions[img.id] = {
-                                    x: startX + col * (avgWidth + SUB_GAP),
-                                    y: startY + row * (avgHeight + SUB_GAP)
-                                };
-                            });
-                        } else {
-                            // Vertical layout: stack child cards in one centered column.
-                            let currentY = promptBottom + PROMPT_TO_SUB_GAP + avgHeight;
-
-                            childImages.forEach((img, i) => {
-                                const dims = imageDims[i];
-                                newImagePositions[img.id] = { x: promptCenterX, y: currentY };
-                                currentY += dims.h + SUB_GAP;
-                            });
-                        }
-
-                        // Rotate to the next layout mode.
-
-                        // Apply the position changes.
-                        const newCanvases = state.canvases.map(c => {
-                            if (c.id !== state.activeCanvasId) return c;
-                            return {
-                                ...c,
-                                imageNodes: c.imageNodes.map(img =>
-                                    newImagePositions[img.id] ? { ...img, position: newImagePositions[img.id] } : img
-                                ),
-                                lastModified: Date.now()
-                            };
-                        });
-
-                        setState(prev => ({ ...prev, canvases: newCanvases, subCardLayoutMode: targetMode }));
-                        return;
-                    }
+                const singlePromptArrange = arrangeSingleSelectedPromptChildren(currentCanvas, selectedIds, mode);
+                if (singlePromptArrange) {
+                    const newCanvases = state.canvases.map(c =>
+                        c.id === state.activeCanvasId ? singlePromptArrange.canvas : c
+                    );
+                    setState(prev => ({
+                        ...prev,
+                        canvases: newCanvases,
+                        subCardLayoutMode: singlePromptArrange.subCardLayoutMode
+                    }));
+                    return;
                 }
 
                 // 2. Identify Roots & Sync Mode

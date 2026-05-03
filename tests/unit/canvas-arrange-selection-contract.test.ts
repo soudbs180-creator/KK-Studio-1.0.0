@@ -1,0 +1,165 @@
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { test } from 'node:test';
+
+import {
+  AspectRatio,
+  GenerationMode,
+  ImageSize,
+  KnownModel,
+  type Canvas,
+  type GeneratedImage,
+  type PromptNode,
+} from '../../src/types.ts';
+
+const ROOT_DIR = process.cwd();
+
+type CanvasArrangeSelectionModule = {
+  arrangeSingleSelectedPromptChildren: (
+    canvas: Canvas,
+    selectedIds: string[],
+    mode: 'row' | 'grid' | 'column',
+    options?: { now?: () => number }
+  ) => { canvas: Canvas; subCardLayoutMode: 'row' | 'grid' | 'column' } | null;
+};
+
+function readSource(relativePath: string): string {
+  const fullPath = path.join(ROOT_DIR, relativePath);
+  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
+}
+
+async function loadCanvasArrangeSelectionModule(): Promise<CanvasArrangeSelectionModule> {
+  const fullPath = path.join(ROOT_DIR, 'src/context/canvasArrangeSelection.ts');
+  assert.equal(existsSync(fullPath), true, 'src/context/canvasArrangeSelection.ts must exist');
+  return await import('../../src/context/canvasArrangeSelection.ts') as CanvasArrangeSelectionModule;
+}
+
+function promptNode(input: Partial<PromptNode> & Pick<PromptNode, 'id'>): PromptNode {
+  return {
+    id: input.id,
+    prompt: input.prompt ?? input.id,
+    position: input.position ?? { x: 0, y: 0 },
+    aspectRatio: input.aspectRatio ?? AspectRatio.SQUARE,
+    imageSize: input.imageSize ?? ImageSize.SIZE_1K,
+    model: input.model ?? KnownModel.IMAGEN_4,
+    childImageIds: input.childImageIds ?? [],
+    timestamp: input.timestamp ?? 1,
+    ...input,
+  };
+}
+
+function imageNode(input: Partial<GeneratedImage> & Pick<GeneratedImage, 'id'>): GeneratedImage {
+  return {
+    id: input.id,
+    url: input.url ?? `https://cdn.example.com/${input.id}.png`,
+    prompt: input.prompt ?? input.id,
+    aspectRatio: input.aspectRatio ?? AspectRatio.SQUARE,
+    timestamp: input.timestamp ?? 1,
+    model: input.model ?? KnownModel.IMAGEN_4,
+    canvasId: input.canvasId ?? 'canvas-1',
+    parentPromptId: input.parentPromptId ?? '',
+    position: input.position ?? { x: 0, y: 0 },
+    ...input,
+  };
+}
+
+function canvas(input: Partial<Canvas> & Pick<Canvas, 'id'>): Canvas {
+  return {
+    id: input.id,
+    name: input.name ?? input.id,
+    promptNodes: input.promptNodes ?? [],
+    imageNodes: input.imageNodes ?? [],
+    groups: input.groups ?? [],
+    drawings: input.drawings ?? [],
+    lastModified: input.lastModified ?? 0,
+    ...input,
+  };
+}
+
+test('single prompt child arrange boundary lives outside CanvasContext', () => {
+  const contextSource = readSource('src/context/CanvasContext.tsx');
+  const helperSource = readSource('src/context/canvasArrangeSelection.ts');
+  const testConfigSource = readSource('tsconfig.tests.json');
+
+  assert.match(testConfigSource, /tests\/unit\/canvas-arrange-selection-contract\.test\.ts/);
+  assert.match(contextSource, /from '\.\/canvasArrangeSelection';/);
+  assert.match(helperSource, /export function arrangeSingleSelectedPromptChildren/);
+
+  const wrapperSource = contextSource.slice(
+    contextSource.indexOf('const arrangeAllNodes = useCallback'),
+    contextSource.indexOf('// 2. Identify Roots & Sync Mode')
+  );
+  assert.match(wrapperSource, /arrangeSingleSelectedPromptChildren\(currentCanvas, selectedIds, mode\)/);
+  assert.doesNotMatch(wrapperSource, /const childImages = currentCanvas\.imageNodes\.filter\(img => img\.parentPromptId === prompt\.id\)/);
+  assert.doesNotMatch(wrapperSource, /newImagePositions/);
+});
+
+test('arrangeSingleSelectedPromptChildren lays out one selected prompt children in a row', async () => {
+  const { arrangeSingleSelectedPromptChildren } = await loadCanvasArrangeSelectionModule();
+  const source = canvas({
+    id: 'canvas-1',
+    promptNodes: [promptNode({ id: 'prompt-1', position: { x: 500, y: 100 }, childImageIds: ['image-1', 'image-2'] })],
+    imageNodes: [
+      imageNode({ id: 'image-1', parentPromptId: 'prompt-1', position: { x: 0, y: 0 } }),
+      imageNode({ id: 'image-2', parentPromptId: 'prompt-1', position: { x: 0, y: 0 } }),
+      imageNode({ id: 'image-3', parentPromptId: '', position: { x: 1, y: 2 } }),
+    ],
+    lastModified: 10,
+  });
+
+  const result = arrangeSingleSelectedPromptChildren(source, ['prompt-1'], 'row', { now: () => 123 });
+
+  assert.equal(result?.subCardLayoutMode, 'row');
+  assert.equal(result?.canvas.lastModified, 123);
+  assert.deepEqual(result?.canvas.imageNodes.map((image) => [image.id, image.position]), [
+    ['image-1', { x: 344, y: 476 }],
+    ['image-2', { x: 656, y: 476 }],
+    ['image-3', { x: 1, y: 2 }],
+  ]);
+});
+
+test('arrangeSingleSelectedPromptChildren forces PPT prompts into column layout', async () => {
+  const { arrangeSingleSelectedPromptChildren } = await loadCanvasArrangeSelectionModule();
+  const source = canvas({
+    id: 'canvas-1',
+    promptNodes: [
+      promptNode({
+        id: 'prompt-1',
+        mode: GenerationMode.PPT,
+        position: { x: 500, y: 100 },
+        childImageIds: ['image-1', 'image-2'],
+      }),
+    ],
+    imageNodes: [
+      imageNode({ id: 'image-1', parentPromptId: 'prompt-1', position: { x: 0, y: 0 } }),
+      imageNode({ id: 'image-2', parentPromptId: 'prompt-1', position: { x: 0, y: 0 } }),
+    ],
+    lastModified: 10,
+  });
+
+  const result = arrangeSingleSelectedPromptChildren(source, ['prompt-1'], 'row', { now: () => 124 });
+
+  assert.equal(result?.subCardLayoutMode, 'column');
+  assert.deepEqual(result?.canvas.imageNodes.map((image) => [image.id, image.position]), [
+    ['image-1', { x: 500, y: 476 }],
+    ['image-2', { x: 500, y: 828 }],
+  ]);
+});
+
+test('arrangeSingleSelectedPromptChildren returns null outside the single-prompt child case', async () => {
+  const { arrangeSingleSelectedPromptChildren } = await loadCanvasArrangeSelectionModule();
+  const source = canvas({
+    id: 'canvas-1',
+    promptNodes: [
+      promptNode({ id: 'prompt-1', position: { x: 0, y: 0 } }),
+      promptNode({ id: 'prompt-2', position: { x: 10, y: 10 } }),
+    ],
+    imageNodes: [imageNode({ id: 'image-1', parentPromptId: 'prompt-1' })],
+    lastModified: 10,
+  });
+
+  assert.equal(arrangeSingleSelectedPromptChildren(source, ['image-1'], 'grid'), null);
+  assert.equal(arrangeSingleSelectedPromptChildren(source, ['prompt-1', 'prompt-2'], 'grid'), null);
+  assert.equal(arrangeSingleSelectedPromptChildren(source, ['prompt-2'], 'grid'), null);
+});

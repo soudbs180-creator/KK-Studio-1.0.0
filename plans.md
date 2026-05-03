@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the active Stage Two M21 Canvas unused-code cleanup is `943af671 refactor: extract canvas merge-into helper`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the active Stage Two M22 Canvas arrange-selection helper extraction is `c0c37736 refactor: prune unused canvas context code`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -43,7 +43,8 @@ The active execution model for this thread has resumed Stage One convergence:
 - Stage Two M18 `CanvasContext` workflow update helper extraction completed in `fbe26764`: it moved workflow utility node transforms into `src/context/canvasWorkflowUpdates.ts`, preserving public workflow wrappers, the legacy-node warning/guard, history side effects, and `updateCanvas` ownership.
 - Stage Two M19 `CanvasContext` image deletion helper extraction completed in `16d805cb`: it extended `src/context/canvasPromptImageLinks.ts` with the pure image deletion transform, preserving storage deletion, Blob URL revocation, urgent-save, history, and `updateCanvas` ownership in `CanvasContext.tsx`.
 - Stage Two M20 `CanvasContext` merge-into helper extraction completed in `943af671`: it moved the pure `mergeCanvasInto` state transform into `src/context/canvasMergeInto.ts`, preserving the public wrapper, `setState` ownership, summary return shape, duplicate skipping, position offsets, source delete/empty behavior, and selection clearing.
-- The active Stage Two M21 slice removes source-proven unused `CanvasContext.tsx` imports, unused auto-arrange constants, and write-only layout variables, with a focused source contract.
+- Stage Two M21 `CanvasContext` unused-code cleanup completed in `c0c37736`: it removed source-proven unused imports, unused auto-arrange constants, and write-only layout variables.
+- The active Stage Two M22 slice extracts the single selected prompt child-card arrangement branch into `src/context/canvasArrangeSelection.ts`, preserving row/grid/column math, PPT column forcing, `lastModified`, and `subCardLayoutMode` behavior.
 - The project is functionally green after the latest audit gates, but not final-complete while `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain giant-file split targets.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
@@ -58,8 +59,9 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/app/useGenerationRuntime.ts`: 2604 lines, extracted and boundary-hardened in `ab719c4a`; generation billing cleanup completed in `083db7f8`.
 - `src/app/usePptRuntime.ts`: 1289 lines, extracted in `4c448660` and semantically boundary-checked in `569383aa`.
 - `src/app/pptRuntimeHelpers.ts`: 152 lines, semantically boundary-checked in `569383aa`.
-- `src/context/CanvasContext.tsx`: 3633 physical lines after the active Stage Two M21 unused-code cleanup, down from 5218 text lines at the start of Stage Two.
+- `src/context/CanvasContext.tsx`: 3571 physical lines after the active Stage Two M22 arrange-selection helper extraction, down from 5218 text lines at the start of Stage Two.
 - `src/context/canvasContextState.ts`: 114 lines, new Stage Two M1 state/default/context boundary module.
+- `src/context/canvasArrangeSelection.ts`: 102 lines, active Stage Two M22 single prompt child-card arrange helper.
 - `src/context/canvasCompatibility.ts`: 8 lines, new Stage Two M1 canvas workflow/ecommerce compatibility helper.
 - `src/context/canvasSelection.ts`: 35 lines, new Stage Two M2 selection reducer helper.
 - `src/context/canvasPromptChildImages.ts`: 55 lines, new Stage Two M3 prompt child image resolver helper.
@@ -342,7 +344,8 @@ Scope:
 - Completed M18 slice in `fbe26764`: extracted workflow utility node update helpers into `src/context/canvasWorkflowUpdates.ts`, preserving utility add duplicate checks, source-control edge creation, update ID/kind preservation, source-edge rebuilding, position updates, delete edge pruning, and `updateCanvas` `lastModified` ownership.
 - Completed M19 slice in `16d805cb`: extracted the image-node deletion transform into `src/context/canvasPromptImageLinks.ts`, preserving image removal, parent `childImageIds` pruning, `sourceImageId` clearing, and Context-owned storage deletion / Blob revoke side effects.
 - Completed M20 slice in `943af671`: extracted `mergeCanvasInto` pure state merging into `src/context/canvasMergeInto.ts`, preserving target duplicate filtering, card offset behavior, group filtering, optional source emptying, active canvas reassignment, selection clearing, and summary counts.
-- Active M21 slice: remove source-proven unused `CanvasContext.tsx` imports, unused initial auto-arrange constants, and write-only layout variables; keep this as a cleanup-only commit.
+- Completed M21 slice in `c0c37736`: removed source-proven unused `CanvasContext.tsx` imports, unused initial auto-arrange constants, and write-only layout variables.
+- Active M22 slice: extract the single selected prompt child-card arrangement branch into `src/context/canvasArrangeSelection.ts`, preserving row/grid/column positions and PPT column behavior.
 - Split `src/context/CanvasContext.tsx` by state model, selection/drag events, node mutations, and persistence sync.
 - Split `src/services/auth/keyManager.ts` by key storage, permission checks, encryption helpers, and provider credential management.
 - Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.
