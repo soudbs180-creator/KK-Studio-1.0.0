@@ -655,32 +655,28 @@ type ApiWorkbenchOcrSectionProps = {
   pick: LocalePick;
   enabled: boolean;
   defaultLanguage: string;
-  apiKey: string;
   keySourceLabel: string;
   healthLabel: string;
   onEnabledChange: (enabled: boolean) => void;
   onDefaultLanguageChange: (value: string) => void;
-  onApiKeyChange: (value: string) => void;
 };
 
 export const ApiWorkbenchOcrSection: React.FC<ApiWorkbenchOcrSectionProps> = ({
   pick,
   enabled,
   defaultLanguage,
-  apiKey,
   keySourceLabel,
   healthLabel,
   onEnabledChange,
   onDefaultLanguageChange,
-  onApiKeyChange,
 }) => (
   <SettingsSection
     testId="settings-workbench-ocr"
     title={pick('OCR 服务', 'OCR service')}
     eyebrow={pick('文档解析', 'Document parsing')}
     description={pick(
-      'OCR 单独配置，不混进普通 LLM 链路。优先使用服务端环境变量，缺失时再走本地 BYOK。',
-      'OCR stays isolated from generic LLM routes. Server env keys come first, then local BYOK.',
+      'OCR 单独配置，不混进普通 LLM 链路。密钥只从服务端环境变量读取。',
+      'OCR stays isolated from generic LLM routes. Keys are read only from server env.',
     )}
     action={<SettingsBadge tone="neutral">{pick('OCR service', 'OCR service')}</SettingsBadge>}
   >
@@ -699,18 +695,9 @@ export const ApiWorkbenchOcrSection: React.FC<ApiWorkbenchOcrSectionProps> = ({
           placeholder="chi_sim"
           disabled={!enabled}
         />
-        <SettingInput
-          label={pick('Nutrient API Key（可选）', 'Nutrient API Key (optional)')}
-          value={apiKey}
-          onChange={onApiKeyChange}
-          placeholder={pick('优先读取 NUTRIENT_API_KEY / NUTRIENT_DWS_API_KEY', 'Prefer NUTRIENT_API_KEY / NUTRIENT_DWS_API_KEY')}
-          type="password"
-          disabled={!enabled}
-          helper={pick('如果服务端环境变量已配置，这里可以留空。', 'Leave this empty when the server env already provides the key.')}
-        />
       </div>
       <div className="grid gap-3">
-        <InfoCell label={pick('密钥来源', 'Key source')} value={keySourceLabel} helper={pick('先看服务端环境变量，再看本地 OCR 配置。', 'Server env is preferred before local OCR config.')} />
+        <InfoCell label={pick('密钥来源', 'Key source')} value={keySourceLabel} helper={pick('只读取服务端 NUTRIENT_API_KEY / NUTRIENT_DWS_API_KEY。', 'Only server NUTRIENT_API_KEY / NUTRIENT_DWS_API_KEY is used.')} />
         <InfoCell label={pick('健康状态', 'Health state')} value={healthLabel} helper={pick('当前 OCR 请求仍然走 /api/nutrient-document。', 'OCR requests still use /api/nutrient-document.')} />
       </div>
     </div>

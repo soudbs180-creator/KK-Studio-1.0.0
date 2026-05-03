@@ -1307,9 +1307,6 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     if (ocrSettings.keySource === 'environment') {
       return pick('服务端环境变量', 'Server environment');
     }
-    if (ocrSettings.keySource === 'user') {
-      return pick('本地 OCR 配置', 'Local OCR config');
-    }
     return pick('缺少密钥', 'Missing key');
   }, [ocrSettings.keySource, pick]);
 
@@ -2688,12 +2685,10 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                   pick={pick}
                   enabled={ocrSettings.enabled}
                   defaultLanguage={ocrSettings.defaultLanguage}
-                  apiKey={ocrSettings.apiKey || ''}
                   keySourceLabel={ocrKeySourceLabel}
                   healthLabel={ocrHealthLabel}
                   onEnabledChange={(enabled) => setOcrSettings(updateOcrServiceSettings({ enabled }))}
                   onDefaultLanguageChange={(defaultLanguage) => setOcrSettings(updateOcrServiceSettings({ defaultLanguage }))}
-                  onApiKeyChange={(apiKey) => setOcrSettings(updateOcrServiceSettings({ apiKey }))}
                 />
 
                 <ApiWorkbenchPlatformSection

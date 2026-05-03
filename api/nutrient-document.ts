@@ -108,10 +108,8 @@ export default async function handler(request: Request) {
   }
 
   try {
-    const formData = await request.formData();
     const apiKey = process.env.NUTRIENT_API_KEY
-      || process.env.NUTRIENT_DWS_API_KEY
-      || String(formData.get('apiKey') || '').trim();
+      || process.env.NUTRIENT_DWS_API_KEY;
     if (!apiKey) {
       return jsonResponse(
         {
@@ -121,6 +119,7 @@ export default async function handler(request: Request) {
       );
     }
 
+    const formData = await request.formData();
     const operationValue = String(formData.get('operation') || '').trim();
     const upload = formData.get('file');
     const requestedLanguage = String(formData.get('ocrLanguage') || '').trim();

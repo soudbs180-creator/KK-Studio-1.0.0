@@ -128,15 +128,12 @@ class NutrientDocumentService {
     ) {
         const upload = createUploadFile(source, options.fileName);
         const formData = new FormData();
-        const ocrSettings = getOcrServiceSettings();
         formData.append('operation', operation);
         formData.append('file', upload, upload.name);
-        if (ocrSettings.apiKey) {
-            formData.append('apiKey', ocrSettings.apiKey);
-        }
 
         if (operation === 'ocr-to-pdf') {
-            formData.append('ocrLanguage', options.ocrLanguage || DEFAULT_OCR_LANGUAGE);
+            const ocrSettings = getOcrServiceSettings();
+            formData.append('ocrLanguage', options.ocrLanguage || ocrSettings.defaultLanguage || DEFAULT_OCR_LANGUAGE);
         }
 
         const response = await fetch(DOCUMENT_ENDPOINT, {
