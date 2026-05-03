@@ -776,11 +776,6 @@ const DEFAULT_OPENAI_MODELS = ['dall-e-3', 'dall-e-2', 'gpt-4o', 'gpt-4o-mini'];
 
 const GOOGLE_HEADER_NAME = 'x-goog-api-key';
 
-const isLegacyGoogleModelList = (models: string[]) => {
-    if (models.length !== LEGACY_GOOGLE_MODELS.length) return false;
-    return models.every(m => LEGACY_GOOGLE_MODELS.includes(m));
-};
-
 type GlobalModelType = 'chat' | 'image' | 'video' | 'image+chat' | 'audio'; // multimodal support
 
 const GOOGLE_CHAT_MODELS = [
@@ -1194,16 +1189,6 @@ export class KeyManager {
         }
 
         // Return empty state if nothing found (Fresh user / Fresh storage)
-        return {
-            slots: [],
-            currentIndex: 0,
-            maxFailures: DEFAULT_MAX_FAILURES,
-            rotationStrategy: 'round-robin'
-        };
-    }
-
-    private migrateFromOldFormat(): KeyManagerState {
-        this.purgeAnonymousSensitiveLocalCaches();
         return {
             slots: [],
             currentIndex: 0,
@@ -4542,11 +4527,6 @@ export async function fetchGoogleModels(apiKey: string): Promise<string[]> {
         });
         throw new Error(buildUserFacingApiErrorMessage(failure));
     }
-}
-
-// Shared Google defaults used when no custom model list is available.
-function getDefaultGoogleModels(): string[] {
-    return DEFAULT_GOOGLE_MODELS;
 }
 
 export async function fetchGeminiCompatModels(apiKey: string, baseUrl?: string): Promise<string[]> {

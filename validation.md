@@ -481,6 +481,24 @@ Channel config secret-boundary slices should use this narrower path-limited diff
 git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerChannelConfigSecrets.ts" "tests/unit/key-manager-channel-config-secrets-contract.test.ts" "tests/unit/frontend-key-boundary-hardening.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
+Dead-code pruning slices should use this targeted gate:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/key-manager-dead-code-pruning-contract.test.ts" "tests/unit/key-manager-model-helpers-contract.test.ts" "tests/unit/official-route-default-models.test.ts" "tests/unit/governance-contract.test.ts"
+```
+
+Dead-code pruning slices should use this narrower path-limited diff check:
+
+```powershell
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "tests/unit/key-manager-dead-code-pruning-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+Browser-direct diagnostics guard slices should use this targeted gate:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/frontend-key-boundary-hardening.test.ts" "tests/unit/key-manager-dead-code-pruning-contract.test.ts" "tests/unit/key-manager-channel-config-secrets-contract.test.ts" "tests/unit/key-manager-runtime-fallback.test.ts" "tests/unit/official-route-default-models.test.ts"
+```
+
 Model ID compatibility facade slices should use this narrower path-limited diff check:
 
 ```powershell
