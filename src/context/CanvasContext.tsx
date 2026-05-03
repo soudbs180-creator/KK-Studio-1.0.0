@@ -2,7 +2,7 @@ import React, { useContext, useState, useEffect, useCallback, useRef, useLayoutE
 import { Canvas, PromptNode, GeneratedImage, AspectRatio, CanvasGroup, CanvasDrawing, GenerationMode, KnownModel, type WorkflowNode } from '../types';
 import { startTransition } from 'react';
 import { shouldEnableWorkspaceCloudSync } from '../app/kkaiFeatureFlags';
-import { saveImage, saveOriginalImage, getImage, getImageByQuality, deleteImage, getAllImages, clearAllImages, getImagesPage, normalizePersistableMediaSource } from '../services/storage/imageStorage';
+import { saveImage, saveOriginalImage, getImage, getImageByQuality, deleteImage, clearAllImages, normalizePersistableMediaSource } from '../services/storage/imageStorage';
 import { syncService } from '../services/system/syncService';
 import { fileSystemService } from '../services/storage/fileSystemService';
 import { dataURLToBlob as base64ToBlob, safeRevokeBlobUrl } from '../utils/blobUtils';
@@ -24,7 +24,6 @@ import {
 } from '../utils/referenceImageStorage';
 import {
     clearPersistedCanvasStorageSnapshot,
-    getCachedStrippedCanvases,
     persistCanvasStateToLocalStorage,
     restoreCanvasStateFromLocalStorage,
 } from './canvasPersistence';
@@ -1683,10 +1682,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         // --- Configuration ---
         const PROMPT_WIDTH = 320;
-        const PROMPT_HEIGHT = 160; // Base height, dynamic in reality but fixed for grid slot
-        const GAP_X = 100;  // Larger horizontal gap to prevent overlap.
-        const GAP_Y = 120;  // Larger vertical gap to prevent overlap.
-        const IMAGE_GAP = 40; // Larger gap between images.
         const AUTO_ARRANGE_GROUPS_PER_ROW = 20; // Wrap after a fixed 20 groups per row.
         const AUTO_ARRANGE_SUB_COLUMNS = 20; // Keep sub-cards laid out horizontally when possible.
         const AUTO_ARRANGE_GROUP_GAP_X = 56; // Extra horizontal spacing between auto-arranged groups.
@@ -2590,7 +2585,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             startX: number;
         }> = [];
 
-        let currentX = START_X;
         let currentRow: typeof rows[0] = { groups: [], maxPromptHeight: 0, maxTotalHeight: 0, startX: START_X };
 
         rootLayoutGroups.forEach((group) => {
@@ -2599,7 +2593,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             // Wrap only by group count, not by width.
             if (groupsInCurrentRow >= GROUPS_PER_ROW) {
                 rows.push(currentRow);
-                currentX = START_X;
                 currentRow = { groups: [], maxPromptHeight: 0, maxTotalHeight: 0, startX: START_X };
             }
 
@@ -2611,7 +2604,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             currentRow.maxPromptHeight = Math.max(currentRow.maxPromptHeight, promptHeight);
             currentRow.maxTotalHeight = Math.max(currentRow.maxTotalHeight, group.layoutHeight || group.height);
 
-            currentX += group.width + GROUP_GAP_X;
         });
 
         // Push the last row.
@@ -2887,7 +2879,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     // [NEW] Migration: Save currently loaded images (Temp) to the new Local Folder
                     // This ensures work done in Temp mode is not lost/abandoned when switching
                     if (handle) {
-                        // Do not call getAllImages; migrate only the assets required by the current state.
+                        // Migrate only the assets required by the current state.
 
                         // Helper to save base64/blob to disk
                         const saveToDisk = async (id: string, urlOrData: string, isVideo: boolean = false) => {
