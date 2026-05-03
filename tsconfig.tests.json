@@ -70,6 +70,7 @@
         "tests/unit/governance-contract.test.ts",
         "tests/unit/hosted-release-guardrails.test.ts",
         "tests/unit/key-manager-channel-config-secrets-contract.test.ts",
+        "tests/unit/key-manager-channel-capabilities-contract.test.ts",
         "tests/unit/key-manager-credential-sanitizer-contract.test.ts",
         "tests/unit/key-manager-dead-code-pruning-contract.test.ts",
         "tests/unit/key-manager-key-type-contract.test.ts",

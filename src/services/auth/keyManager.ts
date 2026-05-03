@@ -59,6 +59,7 @@ import {
 import { sanitizeAsciiApiKey } from './keyManagerCredentialSanitizer';
 import { getRedactedChannelConfigApiKey } from './keyManagerChannelConfigSecrets';
 import { buildSilentProviderPricingUrl } from './keyManagerPricingUrl';
+import { buildChannelCapabilities } from './keyManagerChannelCapabilities';
 import {
     applyOpenAICompatAuthToUrl,
     type ApiProtocolFormat,
@@ -3566,23 +3567,6 @@ export class KeyManager {
         return this.getProjectedSlots();
     }
 
-    private buildChannelCapabilities(models: string[], pricingSupport: ChannelConfig['pricingSupport'], managementSupport: ChannelConfig['managementSupport']) {
-        const normalizedModels = Array.isArray(models) ? models : [];
-        const hasWildcard = normalizedModels.includes('*');
-        const categorized = categorizeModels(normalizedModels.map((item) => parseModelString(item).id));
-        const lowerModels = normalizedModels.map((item) => parseModelString(item).id.toLowerCase());
-
-        return {
-            chat: hasWildcard || categorized.chatModels.length > 0 || normalizedModels.length === 0,
-            image: hasWildcard || categorized.imageModels.length > 0,
-            video: hasWildcard || categorized.videoModels.length > 0,
-            audio: hasWildcard || lowerModels.some((model) => /audio|tts|suno|lyria|minimax-t2a/i.test(model)),
-            modelDiscovery: true,
-            pricingDiscovery: pricingSupport === 'native',
-            managementApi: managementSupport === 'native',
-        };
-    }
-
     private buildSlotChannelConfig(slot: KeySlot): ChannelConfig {
         const slotBaseUrl = slot.baseUrl
             || (slot.provider === 'OpenAI' ? 'https://api.openai.com' : GOOGLE_API_BASE);
@@ -3620,7 +3604,7 @@ export class KeyManager {
                 headerName: slot.headerName || runtime.headerName,
                 authorizationValueFormat: runtime.authorizationValueFormat,
             },
-            capabilities: this.buildChannelCapabilities(effectiveSlotModels, pricingSupport, managementSupport),
+            capabilities: buildChannelCapabilities(effectiveSlotModels, pricingSupport, managementSupport),
             pricingSupport,
             managementSupport,
             supportedModels: effectiveSlotModels,
@@ -3663,7 +3647,7 @@ export class KeyManager {
                 headerName: runtime.headerName,
                 authorizationValueFormat: runtime.authorizationValueFormat,
             },
-            capabilities: this.buildChannelCapabilities(effectiveProviderModels, pricingSupport, managementSupport),
+            capabilities: buildChannelCapabilities(effectiveProviderModels, pricingSupport, managementSupport),
             pricingSupport,
             managementSupport,
             supportedModels: effectiveProviderModels,

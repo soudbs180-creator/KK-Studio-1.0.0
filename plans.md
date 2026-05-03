@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the current slice is `6cada9ad refactor: prune key manager 12ai base url wrapper`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the current slice is `eb3ac527 refactor: extract key manager google model predicate`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -68,12 +68,13 @@ The active execution model for this thread has resumed Stage One convergence:
 - Stage Two M43 `keyManager` silent pricing URL helper split is completed in `54cd8312`: it moves only the pure pricing endpoint URL normalization used by the non-blocking model-discovery pricing probe into `src/services/auth/keyManagerPricingUrl.ts`.
 - Stage Two M44 `keyManager` deprecated-model helper split is completed in `c435de27`: it moves only the pure `isDeprecatedModel` membership helper into `src/services/auth/keyManagerModelHelpers.ts`.
 - Stage Two M45 `keyManager` 12AI base URL dead-code pruning is completed in `6cada9ad`: it removes only the source-proven unused local `get12AIBaseUrl` wrapper and now-unused `RegionService` import from `src/services/auth/keyManager.ts`.
-- Stage Two M46 `keyManager` Google official model predicate split is the current slice: it moves only the pure `isGoogleOfficialModelId` predicate into `src/services/auth/keyManagerModelHelpers.ts`.
+- Stage Two M46 `keyManager` Google official model predicate split is completed in `eb3ac527`: it moves only the pure `isGoogleOfficialModelId` predicate into `src/services/auth/keyManagerModelHelpers.ts`.
+- Stage Two M47 `keyManager` channel capabilities helper split is the current slice: it moves only the pure `buildChannelCapabilities` builder into `src/services/auth/keyManagerChannelCapabilities.ts`.
 - The project is functionally green after the latest audit gates, but not final-complete while `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain giant-file split targets.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
-Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release metadata, final audit fixes, and Stage Two architecture splits must be staged separately. The active Stage Two slice moves only `isGoogleOfficialModelId` from `keyManager.ts` into `keyManagerModelHelpers.ts`; key storage, permission checks, encryption helpers, provider credential management, cloud sync, shared pricing cache construction, runtime routing, fetch/header behavior, model-list filtering call sites, 12AI runtime URL resolution, and channel config behavior remain excluded.
+Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release metadata, final audit fixes, and Stage Two architecture splits must be staged separately. The active Stage Two slice moves only `buildChannelCapabilities` from `keyManager.ts` into `keyManagerChannelCapabilities.ts`; key storage, permission checks, encryption helpers, provider credential management, cloud sync, provider persistence, shared pricing cache construction, runtime routing, fetch/header behavior, model-list filtering call sites, 12AI runtime URL resolution, and channel config behavior remain excluded.
 
 ## Current Baseline
 
@@ -106,7 +107,8 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/context/canvasPositionUpdates.ts`: 104 lines, Stage Two M16 position update helper.
 - `src/context/canvasPromptImageLinks.ts`: 62 lines, Stage Two M17 prompt-image relationship helper plus active Stage Two M19 image deletion transform.
 - `src/context/canvasWorkflowUpdates.ts`: 148 lines, Stage Two M18 workflow update helper.
-- `src/services/auth/keyManager.ts`: 4698 lines in the active M46 Google official model predicate split.
+- `src/services/auth/keyManager.ts`: 4682 lines in the active M47 channel capabilities helper split.
+- `src/services/auth/keyManagerChannelCapabilities.ts`: 23 lines, Stage Two M47 channel capabilities helper boundary.
 - `src/services/auth/keyManagerChannelConfigSecrets.ts`: 3 lines in the completed M36 channel config secret boundary.
 - `src/services/auth/keyManagerCredentialSanitizer.ts`: 3 lines in the active M35 credential sanitizer boundary.
 - `src/services/auth/keyManagerProviderLinks.ts`: 154 lines in the active M32 provider link helper boundary.
@@ -405,9 +407,10 @@ Scope:
 - Completed M43 slice in `54cd8312`: extracted only the pure silent provider pricing URL builder into `src/services/auth/keyManagerPricingUrl.ts`, preserving marketing-suffix stripping, trailing-slash trimming, `/v1` removal, and final `/pricing` endpoint behavior while leaving the fetch, headers, pricing cache, and provider persistence untouched.
 - Completed M44 slice in `c435de27`: extracted only the pure deprecated-model membership helper into `src/services/auth/keyManagerModelHelpers.ts`, preserving exact `DEPRECATED_MODELS.includes(modelId)` behavior and `keyManager.ts` compatibility re-export.
 - Completed M45 slice in `6cada9ad`: pruned only the source-proven unused local `get12AIBaseUrl` wrapper and unused `RegionService` import from `src/services/auth/keyManager.ts`, preserving the actual 12AI base URL source of truth in `src/services/system/RegionService.ts` and the live direct callers outside `keyManager.ts`.
-- Active M46 slice: extract only the pure `isGoogleOfficialModelId` predicate into `src/services/auth/keyManagerModelHelpers.ts`, preserving case-sensitive `models/` prefix stripping, lowercase prefix matching, no trimming, the three existing `keyManager.ts` call sites, and the compatibility facade re-export.
+- Completed M46 slice in `eb3ac527`: extracted only the pure `isGoogleOfficialModelId` predicate into `src/services/auth/keyManagerModelHelpers.ts`, preserving case-sensitive `models/` prefix stripping, lowercase prefix matching, no trimming, the three existing `keyManager.ts` call sites, and the compatibility facade re-export.
+- Active M47 slice: extract only the pure `buildChannelCapabilities` helper into `src/services/auth/keyManagerChannelCapabilities.ts`, preserving exact wildcard handling, parsed model category behavior, empty-list chat default, support-flag mapping, and the historical audio regex.
 - Continue `src/context/CanvasContext.tsx` only for another high-confidence narrow seam; defer `migrateNodes`, IndexedDB/local-folder movement, and persistence orchestration until they can be split safely.
-- Continue `src/services/auth/keyManager.ts` after M46 only after a fresh seam map. Defer key storage, permission checks, encryption helpers, provider credential management, cloud sync, shared pricing cache construction, runtime routing, and localStorage policy until smaller seams are mapped.
+- Continue `src/services/auth/keyManager.ts` after M47 only after a fresh seam map. Defer key storage, permission checks, encryption helpers, provider credential management, cloud sync, provider persistence, shared pricing cache construction, runtime routing, and localStorage policy until smaller seams are mapped.
 - Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.
 - Split `src/services/llm/OpenAICompatibleAdapter.ts` by request building, response parsing, provider quirks, and image/video/audio compatibility.
 - Keep compatibility exports for existing import paths.
