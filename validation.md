@@ -158,6 +158,17 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/canvas-cloud-sync-signature.test.ts"
 ```
 
+Persisted image recovery targeted gate:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/canvas-persisted-image-recovery-contract.test.ts" `
+  "tests/unit/canvas-persisted-image-hydration-guard.test.ts" `
+  "tests/unit/canvas-startup-local-restore.test.ts" `
+  "tests/unit/canvas-context-state-boundary.test.ts" `
+  "tests/unit/canvas-cloud-sync-signature.test.ts"
+```
+
 Minimum architecture split gate:
 
 ```powershell

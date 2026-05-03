@@ -4,17 +4,17 @@ Last updated: 2026-05-03
 
 ## Active State
 
-- Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`, with public-type review follow-up committed in `f06f1880`; Stage One Backfill M2 `usePromptGroupLayout` hardening is committed in `8a458cd4`; Stage One Backfill M3 `useGenerationRuntime` hardening is committed in `ab719c4a`; the generation billing follow-up is committed in `083db7f8`; Stage One Backfill M5 `usePptRuntime` public type-boundary coverage is committed in `569383aa`; Stage Two M1 `CanvasContext` state/default/context boundary extraction is committed in `92a9dc41`; Stage Two M2 `CanvasContext` selection reducer extraction is committed in `e0f1b583`; Stage Two M3 `CanvasContext` prompt child image resolver extraction is committed in `83cc8d7f`; Stage Two M4 `CanvasContext` workflow source node ID resolver extraction is committed in `9ec4dbb1`; Stage Two M5 `CanvasContext` media recovery extraction is committed in `002ee6fe`; the latest security/release cleanup commits are `4cdbf4cf`, `567f85aa`, `0c5cadde`, `333f2551`, and `b6620ef2`; the active slice is Stage Two M6 `CanvasContext` prompt recovery normalization extraction.
+- Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`, with public-type review follow-up committed in `f06f1880`; Stage One Backfill M2 `usePromptGroupLayout` hardening is committed in `8a458cd4`; Stage One Backfill M3 `useGenerationRuntime` hardening is committed in `ab719c4a`; the generation billing follow-up is committed in `083db7f8`; Stage One Backfill M5 `usePptRuntime` public type-boundary coverage is committed in `569383aa`; Stage Two M1 `CanvasContext` state/default/context boundary extraction is committed in `92a9dc41`; Stage Two M2 `CanvasContext` selection reducer extraction is committed in `e0f1b583`; Stage Two M3 `CanvasContext` prompt child image resolver extraction is committed in `83cc8d7f`; Stage Two M4 `CanvasContext` workflow source node ID resolver extraction is committed in `9ec4dbb1`; Stage Two M5 `CanvasContext` media recovery extraction is committed in `002ee6fe`; Stage Two M6 `CanvasContext` prompt recovery normalization extraction is committed in `53f80d80`; the latest security/release cleanup commits are `4cdbf4cf`, `567f85aa`, `0c5cadde`, `333f2551`, and `b6620ef2`; the active slice is Stage Two M7 `CanvasContext` persisted image recovery helper extraction.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and was clean at `bfd56ddc docs: tighten final audit ledger` before the active Stage Two M6 slice. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and was clean at `53f80d80 refactor: extract canvas prompt recovery helpers` before the active Stage Two M7 slice. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Thread merge state: `019dd551...` is the main refactor history and `019de168...` is continuation history; both are part of the same Stage One M6 ecommerce runtime line.
-- Alternate-git worktree was clean at `bfd56ddc`; current uncommitted work is the scoped, validated Stage Two M6 prompt recovery extraction.
+- Alternate-git worktree was clean at `53f80d80`; current uncommitted work is the scoped Stage Two M7 persisted image recovery helper extraction.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: commit the validated Stage Two M6 prompt recovery normalization extraction, then identify the next narrow `CanvasContext.tsx` responsibility.
-- Most recent code/security scopes: Stage Two M5 media recovery helpers in `002ee6fe`; protobuf override in `4cdbf4cf`; portable metadata refresh in `567f85aa`; Nutrient OCR server-key hardening in `0c5cadde`; PostCSS patch in `333f2551`; dead AI12 service pruning in `b6620ef2`.
-- Current M6 commit scope: `src/context/CanvasContext.tsx`, `src/context/canvasPromptRecovery.ts`, `tests/unit/canvas-prompt-recovery-contract.test.ts`, `tsconfig.tests.json`, `plans.md`, `implement.md`, `validation.md`, and `status.md`. Selection, drag, persistence writes, node mutations, UI, release metadata, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain excluded from this commit.
+- Current focus: finish and commit Stage Two M7 by extracting persisted image recovery helpers from `CanvasContext.tsx` into `src/context/canvasPersistedImageRecovery.ts`.
+- Most recent code/security scopes: Stage Two M6 prompt recovery helpers in `53f80d80`; Stage Two M5 media recovery helpers in `002ee6fe`; protobuf override in `4cdbf4cf`; portable metadata refresh in `567f85aa`; Nutrient OCR server-key hardening in `0c5cadde`; PostCSS patch in `333f2551`; dead AI12 service pruning in `b6620ef2`.
+- Current M7 commit scope: `src/context/CanvasContext.tsx`, `src/context/canvasPersistedImageRecovery.ts`, `tests/unit/canvas-persisted-image-recovery-contract.test.ts`, `tests/unit/canvas-persisted-image-hydration-guard.test.ts`, `tsconfig.tests.json`, `plans.md`, `implement.md`, `validation.md`, and `status.md`. Startup hydration effect orchestration stays in `CanvasContext.tsx`; selection, drag, persistence writes outside this recovery path, node mutations, UI, release metadata, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain excluded from this commit.
 - Browser QA: direct in-app Browser QA was attempted for the OCR/settings surface after the security fix, but the local Vite/preview server printed ready and then the listener disappeared. Fallback `verify:desktop-settings-smoke` and `verify:mobile-settings-smoke` passed with route checks; runtime/docs-only slices still skip browser QA when no visual surface changes.
 
 ## Completed In `9e7ae2b5` (Clay UI Audit Closure)
@@ -47,7 +47,7 @@ Last updated: 2026-05-03
 
 ## Current Quality Baseline
 
-- Current giant tracked files in the active Stage Two M6 working tree: `src/services/auth/keyManager.ts` 5279 lines, `src/context/CanvasContext.tsx` 4951 lines, `src/App.tsx` 4900 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 4517 lines, `src/components/layout/PromptBar.tsx` 4437 lines.
+- Current giant tracked files in the active Stage Two M7 working tree: `src/services/auth/keyManager.ts` 5279 lines, `src/App.tsx` 4900 lines, `src/context/CanvasContext.tsx` 4666 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 4517 lines, `src/components/layout/PromptBar.tsx` 4437 lines.
 - Current tracked TS/TSX debt scan by alternate-git `git grep` over `*.ts` / `*.tsx`: direct `as any` matches 156, explicit any-type pattern matches 370, `@ts-ignore` / `@ts-expect-error` matches 133, and `console.log` matches 251. These are refactor debt indicators, not release blockers by themselves.
 - Quality rule going forward: reduce `any`, TypeScript suppressions, and bare `console.log` inside touched files when local and safe; do not perform a whole-repo cleanup inside one runtime or architecture extraction.
 - Architecture status from the latest full check: `npm.cmd run architecture:check` passed with known allowlisted migration and legacy bridge exceptions; `npm.cmd run spec:check` passed.
@@ -83,12 +83,25 @@ Last updated: 2026-05-03
 
 - Extracted startup prompt recovery normalization into `src/context/canvasPromptRecovery.ts`.
 - `src/context/CanvasContext.tsx` now imports `normalizeCanvasPromptRecovery`, `markInterruptedSyncPromptGenerations`, and `hasUnrecoverableSyncGenerationInFlight`; it no longer owns `normalizeRecoveredPromptNode`, pending task parsing, interrupted sync-generation marking, or prompt recovery risk detection.
-- Kept the async persisted-result recovery path in `CanvasContext.tsx`: `PromptRecoveryEntry`, `buildPromptRecoveryEntries`, `resolveImageRecoveryUrlFromMetadata`, and startup hydration effects remain in place for a future smaller seam.
+- At M6 close, kept the async persisted-result recovery path in `CanvasContext.tsx` for a future smaller seam.
 - Added `tests/unit/canvas-prompt-recovery-contract.test.ts` to guard helper ownership, export shape, completed-prompt pending-state cleanup, interrupted sync-generation marking, before-unload persistence wiring, and executable helper behavior for completed recovered prompts and interrupted sync prompts.
 - Added the prompt recovery contract to `tsconfig.tests.json`; `npm.cmd run typecheck` now semantically checks 44 test files.
 - Line counts for this slice: `src/context/CanvasContext.tsx` 4951, `src/context/canvasPromptRecovery.ts` 184, `tests/unit/canvas-prompt-recovery-contract.test.ts` 228, `tsconfig.tests.json` 73.
 - RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-prompt-recovery-contract.test.ts` failed first with `ERR_MODULE_NOT_FOUND` for `src/context/canvasPromptRecovery.ts`.
 - The behavior tests execute the helper source through test-local TypeScript transpilation with dependency stubs because Node strip-only TS cannot directly import the helper's extensionless production dependency graph; the assertions call `normalizeCanvasPromptRecovery`, `markInterruptedSyncPromptGenerations`, and `hasUnrecoverableSyncGenerationInFlight`.
+- Browser QA: skipped because this is a non-UI context/helper extraction and no visual surface, CSS, route, or browser behavior changed.
+
+## Stage Two M7 Persisted Image Recovery Extraction
+
+- Extracted persisted task/result recovery helper ownership into `src/context/canvasPersistedImageRecovery.ts`.
+- `src/context/CanvasContext.tsx` now imports `buildPersistedImageRecoverySignature`, `buildPromptRecoveryEntries`, `resolveImageRecoveryUrlFromMetadata`, `resolvePromptRecoveryEntrySource`, and `PromptRecoveryEntry`; it no longer owns task result URL indexing, storage-id normalization, stored-result lookup, prompt recovery entry merge, image recovery URL resolution, or recovery-signature construction.
+- Kept the React hydration effect in `CanvasContext.tsx`: task loading, `tasksByPromptId`, cache write scheduling, recovered node construction, `updateNodes`, and `addImageNodes` remain in place for a future smaller seam.
+- Added `tests/unit/canvas-persisted-image-recovery-contract.test.ts` to guard helper ownership, export shape, completed/persisted task merge behavior, duplicate suppression, recovery-signature gating, storage-original preference, cached-source fallback, and stale blob URL rejection.
+- Updated `tests/unit/canvas-persisted-image-hydration-guard.test.ts` to preserve the startup guard contract after signature construction moved out of `CanvasContext.tsx`.
+- Added the persisted image recovery contract to `tsconfig.tests.json`; `npm.cmd run typecheck` now semantically checks 45 test files.
+- Line counts for this slice: `src/context/CanvasContext.tsx` 4666, `src/context/canvasPersistedImageRecovery.ts` 301, `tests/unit/canvas-persisted-image-recovery-contract.test.ts` 283, `tests/unit/canvas-persisted-image-hydration-guard.test.ts` 21, `tsconfig.tests.json` 74.
+- RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-persisted-image-recovery-contract.test.ts` failed first because `CanvasContext.tsx` had no `canvasPersistedImageRecovery` import and the helper exports did not exist.
+- Targeted GREEN validation already run during the slice: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-persisted-image-recovery-contract.test.ts tests/unit/canvas-persisted-image-hydration-guard.test.ts tests/unit/canvas-startup-local-restore.test.ts tests/unit/canvas-context-state-boundary.test.ts tests/unit/canvas-cloud-sync-signature.test.ts` passed (8/8).
 - Browser QA: skipped because this is a non-UI context/helper extraction and no visual surface, CSS, route, or browser behavior changed.
 
 ## Completed In `4cdbf4cf` (Dependency Security Audit Fix)
@@ -516,6 +529,20 @@ Fresh validation for Stage Two M6 prompt recovery extraction:
 - Spec review by subagent `019dec5d-7052-7f73-b08d-68b5ec64f2fc` found no findings and confirmed async hydration/persisted-result recovery remained in `CanvasContext.tsx`.
 - Re-review by subagents `019dec5d-7052-7f73-b08d-68b5ec64f2fc` and `019dec5d-b17d-7102-8ebf-18d6fa2fbf15` found no Critical or Important code findings after behavior coverage; the remaining action is explicit staging of the new helper and contract test.
 
+Fresh validation for Stage Two M7 persisted image recovery extraction:
+
+- RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-persisted-image-recovery-contract.test.ts` failed first before the helper existed and before `CanvasContext.tsx` imported it.
+- Passed targeted gate: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-persisted-image-recovery-contract.test.ts tests/unit/canvas-persisted-image-hydration-guard.test.ts tests/unit/canvas-startup-local-restore.test.ts tests/unit/canvas-context-state-boundary.test.ts tests/unit/canvas-cloud-sync-signature.test.ts` (8/8).
+- Passed: `npm.cmd run architecture:check` with the existing allowlisted migration and legacy bridge exceptions.
+- Passed: `npm.cmd run typecheck`; test semantic check covers 45 files via `tsconfig.tests.json`.
+- Passed: `npm.cmd run test:unit` (1140/1140).
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed path-limited diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/context/CanvasContext.tsx src/context/canvasPersistedImageRecovery.ts tests/unit/canvas-persisted-image-recovery-contract.test.ts tests/unit/canvas-persisted-image-hydration-guard.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
+- Browser QA: skipped because this is a non-UI context/helper extraction and no visual surface, CSS, route, or browser behavior changed.
+- Spec review by subagent `019dec5d-7052-7f73-b08d-68b5ec64f2fc` found no findings. Code-quality review by subagent `019dec5d-b17d-7102-8ebf-18d6fa2fbf15` found no Critical issues; its coverage suggestion for URL resolution was addressed by executable tests, and its untracked-file warning was resolved by explicit path-based staging.
+
 Fresh validation for Stage Two M2 Canvas selection reducer:
 
 - Passed targeted gate: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-selection-runtime-contract.test.ts tests/unit/prompt-group-drag-layout.test.ts tests/unit/prompt-group-regroup-behavior.test.ts` (44/44).
@@ -729,8 +756,8 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-1. Commit the validated Stage Two M6 slice as `refactor: extract canvas prompt recovery helpers`.
-2. Identify the next narrow `CanvasContext.tsx` responsibility after prompt recovery normalization, based on a source map and targeted contract first.
+1. Commit the validated Stage Two M7 slice as `refactor: extract canvas persisted image recovery helpers`.
+2. Identify the next narrow `CanvasContext.tsx` responsibility after persisted image recovery helpers, based on a source map and targeted contract first.
 3. Continue Stage Two giant-file split in this priority order after remaining CanvasContext slices: `keyManager.ts`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`.
 4. If release metadata changes again, rerun packaging/publish and the full release gate including `npm.cmd run governance:check`.
 
@@ -738,6 +765,6 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 - Original `.git` does not match the writable metadata copy in this session. Use the full writable metadata copy at `node_modules/.codex-git-full` for local commits unless the ACL is fixed outside the sandbox.
 - Plain `.git` may show stale dirty state and must not be used as the commit-readiness source.
-- The alternate-git worktree was clean at `bfd56ddc` before Stage Two M6 started, but any staging must still be explicit path-based and reviewed before commit.
+- The alternate-git worktree was clean at `53f80d80` before Stage Two M7 started, but any staging must still be explicit path-based and reviewed before commit.
 - Do not delete locks, change `.git` ACLs, revert paused runtime/PPT work, or stage unrelated runtime files without explicit user confirmation.
 - Do not mix UI, PPT, runtime extraction, release metadata, and quality-debt cleanup in one commit.
