@@ -74,6 +74,7 @@
         "tests/unit/key-manager-provider-links-contract.test.ts",
         "tests/unit/key-manager-provider-persistence-contract.test.ts",
         "tests/unit/key-manager-provider-usage-contract.test.ts",
+        "tests/unit/key-manager-route-ids-contract.test.ts",
         "tests/unit/model-id-normalization-parity-contract.test.ts",
         "tests/unit/payment-runtime-hardening.test.ts",
         "tests/unit/payment-server-settlement-bridge.test.ts",

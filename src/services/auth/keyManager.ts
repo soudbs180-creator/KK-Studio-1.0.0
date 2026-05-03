@@ -48,6 +48,15 @@ import {
     isUsageLimitExceeded,
 } from './keyManagerProviderUsage';
 import {
+    buildProviderRouteId,
+    buildStableSystemRouteId,
+    buildUserSlotRouteId,
+    decodeRouteSuffix,
+    extractSlotRouteTarget,
+    matchesProviderRouteSuffix,
+    matchesSlotRouteSuffix,
+} from './keyManagerRouteIds';
+import {
     applyOpenAICompatAuthToUrl,
     type ApiProtocolFormat,
     AuthMethod,
@@ -119,70 +128,6 @@ export type { ModelVariantMeta } from './keyManagerModelHelpers';
 export { determineKeyType } from './keyManagerKeyType';
 
 const PROVIDER_MARKETING_SUFFIX_RE = /(\/(pricing|models))(\/.*)?$/i;
-
-function extractSlotRouteTarget(suffix: string | null | undefined): string | null {
-    const decodedSuffix = (() => {
-        try {
-            return decodeURIComponent(String(suffix || '').trim().toLowerCase());
-        } catch {
-            return String(suffix || '').trim().toLowerCase();
-        }
-    })();
-
-    if (!decodedSuffix) return null;
-    if (decodedSuffix.startsWith('slot_key_')) return decodedSuffix.slice(5);
-    if (decodedSuffix.startsWith('slot_')) return decodedSuffix.slice(5);
-    if (decodedSuffix.startsWith('provider_')) return decodedSuffix;
-    return null;
-}
-
-function decodeRouteSuffix(suffix: string | null | undefined): string {
-    try {
-        return decodeURIComponent(String(suffix || '').trim().toLowerCase());
-    } catch {
-        return String(suffix || '').trim().toLowerCase();
-    }
-}
-
-function matchesSlotRouteSuffix(slot: Pick<KeySlot, 'id' | 'name' | 'provider' | 'proxyConfig'>, suffix: string | null | undefined): boolean {
-    const decodedSuffix = decodeRouteSuffix(suffix);
-    if (!decodedSuffix) return false;
-
-    const routeTarget = extractSlotRouteTarget(decodedSuffix);
-    const slotIdLower = String(slot.id || '').trim().toLowerCase();
-    const slotNameLower = String(slot.name || '').trim().toLowerCase();
-    const slotSuffixLower = String(slot.proxyConfig?.serverName || slot.provider || 'Custom').trim().toLowerCase();
-    const providerLower = String(slot.provider || '').trim().toLowerCase();
-
-    if (routeTarget) {
-        return slotIdLower === routeTarget;
-    }
-
-    return (
-        slotIdLower === decodedSuffix ||
-        slotNameLower === decodedSuffix ||
-        slotSuffixLower === decodedSuffix ||
-        providerLower === decodedSuffix
-    );
-}
-
-function matchesProviderRouteSuffix(
-    provider: Pick<ThirdPartyProvider, 'id' | 'name'>,
-    suffix: string | null | undefined
-): boolean {
-    const decodedSuffix = decodeRouteSuffix(suffix);
-    if (!decodedSuffix) return false;
-
-    const routeTarget = extractSlotRouteTarget(decodedSuffix);
-    const providerIdLower = String(provider.id || '').trim().toLowerCase();
-    const providerNameLower = String(provider.name || '').trim().toLowerCase();
-
-    if (routeTarget) {
-        return providerIdLower === routeTarget;
-    }
-
-    return providerIdLower === decodedSuffix || providerNameLower === decodedSuffix;
-}
 
 const RATE_LIMIT_COOLDOWN_MS = 30 * 1000;
 
@@ -927,29 +872,6 @@ export const getModelMetadata = (modelId: string): ModelMetadata | undefined => 
 
     return GOOGLE_MODEL_METADATA.get(baseId);
 };
-
-function buildStableSystemRouteId(baseModelId: string, providerId?: string, fallbackIndex?: number): string {
-    const normalizedBaseId = String(baseModelId || '').trim();
-    const normalizedProviderId = String(providerId || '').trim();
-    if (!normalizedProviderId) {
-        return fallbackIndex && fallbackIndex > 1
-            ? `${normalizedBaseId}@system_${fallbackIndex}`
-            : `${normalizedBaseId}@system`;
-    }
-    return `${normalizedBaseId}@system_${encodeURIComponent(normalizedProviderId)}`;
-}
-
-function buildUserSlotRouteId(baseModelId: string, slotId: string): string {
-    return `${String(baseModelId || '').trim()}@slot_${encodeURIComponent(String(slotId || '').trim())}`;
-}
-
-function buildProviderRouteId(baseModelId: string, providerId: string): string {
-    const normalizedProviderId = String(providerId || '').trim();
-    const routeProviderId = normalizedProviderId.startsWith('provider_')
-        ? normalizedProviderId
-        : `provider_${normalizedProviderId}`;
-    return `${String(baseModelId || '').trim()}@${encodeURIComponent(routeProviderId)}`;
-}
 
 const inferModelType = (modelId: string): GlobalModelType => {
     const id = modelId.toLowerCase();
