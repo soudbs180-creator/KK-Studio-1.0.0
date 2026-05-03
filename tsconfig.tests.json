@@ -26,6 +26,7 @@
         "tests/unit/canvas-context-state-boundary.test.ts",
         "tests/unit/canvas-connector-throttling-contract.test.ts",
         "tests/unit/canvas-cleanup-contract.test.ts",
+        "tests/unit/canvas-layering-contract.test.ts",
         "tests/unit/canvas-merge-contract.test.ts",
         "tests/unit/canvas-media-recovery-contract.test.ts",
         "tests/unit/canvas-placement-contract.test.ts",
