@@ -56,6 +56,11 @@ import { addCanvasGroupToCanvas, removeCanvasGroupFromCanvas, updateCanvasGroupI
 import { moveSelectedCanvasNodes } from './canvasMovement';
 import { setCanvasNodeTags } from './canvasTags';
 import {
+    applyCanvasNodeBatchUpdates,
+    updateCanvasImageNode,
+    updateCanvasImageNodeDimensions
+} from './canvasNodeUpdates';
+import {
     buildPersistedImageRecoverySignature,
     buildPromptRecoveryEntries,
     resolveImageRecoveryUrlFromMetadata,
@@ -1382,21 +1387,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, [updateCanvas, state.selectedNodeIds]);
 
     const updateImageNodeDimensions = useCallback((id: string, dimensions: string) => {
-        updateCanvas(c => ({
-            ...c,
-            imageNodes: c.imageNodes.map(img =>
-                img.id === id ? { ...img, dimensions } : img
-            )
-        }));
+        updateCanvas(canvas => updateCanvasImageNodeDimensions(canvas, id, dimensions));
     }, [updateCanvas]);
 
     const updateImageNode = useCallback((id: string, updates: Partial<GeneratedImage>) => {
-        updateCanvas(c => ({
-            ...c,
-            imageNodes: c.imageNodes.map(img =>
-                img.id === id ? { ...img, ...updates } : img
-            )
-        }));
+        updateCanvas(canvas => updateCanvasImageNode(canvas, id, updates));
     }, [updateCanvas]);
 
     // [Batch update] Support stacking and other large-move operations.
@@ -1404,37 +1399,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         promptNodes?: { id: string, updates: Partial<PromptNode> }[],
         imageNodes?: { id: string, updates: Partial<GeneratedImage> }[]
     }) => {
-        updateCanvas(c => {
-            let nextPromptNodes = [...c.promptNodes];
-            let nextImageNodes = [...c.imageNodes];
-            let changed = false;
-
-            if (batch.promptNodes && batch.promptNodes.length > 0) {
-                const updateMap = new Map(batch.promptNodes.map(u => [u.id, u.updates]));
-                nextPromptNodes = nextPromptNodes.map(n => {
-                    const u = updateMap.get(n.id);
-                    if (u) {
-                        changed = true;
-                        return { ...n, ...u };
-                    }
-                    return n;
-                });
-            }
-
-            if (batch.imageNodes && batch.imageNodes.length > 0) {
-                const updateMap = new Map(batch.imageNodes.map(u => [u.id, u.updates]));
-                nextImageNodes = nextImageNodes.map(img => {
-                    const u = updateMap.get(img.id);
-                    if (u) {
-                        changed = true;
-                        return { ...img, ...u };
-                    }
-                    return img;
-                });
-            }
-
-            return changed ? { ...c, promptNodes: nextPromptNodes, imageNodes: nextImageNodes } : c;
-        });
+        updateCanvas(canvas => applyCanvasNodeBatchUpdates(canvas, batch));
     }, [updateCanvas]);
 
     const persistedImageRecoverySignature = useMemo(

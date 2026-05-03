@@ -4,18 +4,18 @@ Last updated: 2026-05-03
 
 ## Active State
 
-- Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`, with public-type review follow-up committed in `f06f1880`; Stage One Backfill M2 `usePromptGroupLayout` hardening is committed in `8a458cd4`; Stage One Backfill M3 `useGenerationRuntime` hardening is committed in `ab719c4a`; the generation billing follow-up is committed in `083db7f8`; Stage One Backfill M5 `usePptRuntime` public type-boundary coverage is committed in `569383aa`; Stage Two M1 `CanvasContext` state/default/context boundary extraction is committed in `92a9dc41`; Stage Two M2 `CanvasContext` selection reducer extraction is committed in `e0f1b583`; Stage Two M3 `CanvasContext` prompt child image resolver extraction is committed in `83cc8d7f`; Stage Two M4 `CanvasContext` workflow source node ID resolver extraction is committed in `9ec4dbb1`; Stage Two M5 `CanvasContext` media recovery extraction is committed in `002ee6fe`; Stage Two M6 `CanvasContext` prompt recovery normalization extraction is committed in `53f80d80`; Stage Two M7 `CanvasContext` persisted image recovery helper extraction is committed in `0a5c2339`; Stage Two M8 `CanvasContext` canvas merge helper extraction is committed in `b68867dd`; Stage Two M9 `CanvasContext` invalid-card cleanup helper extraction is committed in `7d8a4331`; Stage Two M10 `CanvasContext` placement helper extraction is committed in `3abdd250`; Stage Two M11 `CanvasContext` layering helper extraction is committed in `c171de38`; Stage Two M12 `CanvasContext` group management helper extraction is committed in `5994c34b`; Stage Two M13 `CanvasContext` selected-node movement helper extraction is committed in `4722acbe`; the latest security/release cleanup commits are `4cdbf4cf`, `567f85aa`, `0c5cadde`, `333f2551`, `b6620ef2`, and `0603547a`; the active slice is Stage Two M14 `CanvasContext` node tag helper extraction.
+- Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`, with public-type review follow-up committed in `f06f1880`; Stage One Backfill M2 `usePromptGroupLayout` hardening is committed in `8a458cd4`; Stage One Backfill M3 `useGenerationRuntime` hardening is committed in `ab719c4a`; the generation billing follow-up is committed in `083db7f8`; Stage One Backfill M5 `usePptRuntime` public type-boundary coverage is committed in `569383aa`; Stage Two M1 `CanvasContext` state/default/context boundary extraction is committed in `92a9dc41`; Stage Two M2 `CanvasContext` selection reducer extraction is committed in `e0f1b583`; Stage Two M3 `CanvasContext` prompt child image resolver extraction is committed in `83cc8d7f`; Stage Two M4 `CanvasContext` workflow source node ID resolver extraction is committed in `9ec4dbb1`; Stage Two M5 `CanvasContext` media recovery extraction is committed in `002ee6fe`; Stage Two M6 `CanvasContext` prompt recovery normalization extraction is committed in `53f80d80`; Stage Two M7 `CanvasContext` persisted image recovery helper extraction is committed in `0a5c2339`; Stage Two M8 `CanvasContext` canvas merge helper extraction is committed in `b68867dd`; Stage Two M9 `CanvasContext` invalid-card cleanup helper extraction is committed in `7d8a4331`; Stage Two M10 `CanvasContext` placement helper extraction is committed in `3abdd250`; Stage Two M11 `CanvasContext` layering helper extraction is committed in `c171de38`; Stage Two M12 `CanvasContext` group management helper extraction is committed in `5994c34b`; Stage Two M13 `CanvasContext` selected-node movement helper extraction is committed in `4722acbe`; Stage Two M14 `CanvasContext` node tag helper extraction is committed in `d7a9d0a7`; the latest security/release cleanup commits are `4cdbf4cf`, `567f85aa`, `0c5cadde`, `333f2551`, `b6620ef2`, and `0603547a`; the active slice is Stage Two M15 `CanvasContext` node update helper extraction.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and was clean at `4722acbe refactor: extract canvas movement helpers` before the active Canvas tags helper extraction. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and was clean at `d7a9d0a7 refactor: extract canvas tag helpers` before the active Canvas node update helper extraction. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Thread merge state: `019dd551...` is the main refactor history and `019de168...` is continuation history; both are part of the same Stage One M6 ecommerce runtime line.
-- Alternate-git worktree was clean at `4722acbe`; current uncommitted work is the scoped Canvas node tag helper extraction.
+- Alternate-git worktree was clean at `d7a9d0a7`; current uncommitted work is the scoped Canvas node update helper extraction.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: finish and commit Stage Two M14 by moving node tag transforms into `src/context/canvasTags.ts` while leaving public `setNodeTags`, `updateCanvas`, and compatibility/`lastModified` ownership in `CanvasContext.tsx`.
-- Most recent code/security scopes: Stage Two M14 tag helpers in the active working tree; Stage Two M13 movement helpers in `4722acbe`; Stage Two M12 group helpers in `5994c34b`; Netlify raw-key endpoint cleanup in `0603547a`; Stage Two M11 layering helpers in `c171de38`; Stage Two M10 placement helpers in `3abdd250`; Stage Two M9 cleanup helpers in `7d8a4331`; Stage Two M8 canvas merge helpers in `b68867dd`; Stage Two M7 persisted image recovery helpers in `0a5c2339`; Stage Two M6 prompt recovery helpers in `53f80d80`; Stage Two M5 media recovery helpers in `002ee6fe`; protobuf override in `4cdbf4cf`; portable metadata refresh in `567f85aa`; Nutrient OCR server-key hardening in `0c5cadde`; PostCSS patch in `333f2551`; dead AI12 service pruning in `b6620ef2`.
-- Current commit scope: `src/context/CanvasContext.tsx`, `src/context/canvasTags.ts`, `tests/unit/canvas-tags-contract.test.ts`, `tsconfig.tests.json`, `plans.md`, `implement.md`, `validation.md`, and `status.md`. UI, release metadata, Netlify endpoint cleanup, movement/group helper code, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain excluded from this commit.
-- Browser QA: skipped for Stage Two M14 because this is a non-UI pure context/helper extraction. No visual surface, CSS, route component, or browser-visible workflow changed.
+- Current focus: finish and commit Stage Two M15 by moving image dimension updates, image shallow-merge updates, and batch prompt/image update transforms into `src/context/canvasNodeUpdates.ts` while leaving public context wrappers and `updateCanvas` ownership in `CanvasContext.tsx`.
+- Most recent code/security scopes: Stage Two M15 node update helpers in the active working tree; Stage Two M14 tag helpers in `d7a9d0a7`; Stage Two M13 movement helpers in `4722acbe`; Stage Two M12 group helpers in `5994c34b`; Netlify raw-key endpoint cleanup in `0603547a`; Stage Two M11 layering helpers in `c171de38`; Stage Two M10 placement helpers in `3abdd250`; Stage Two M9 cleanup helpers in `7d8a4331`; Stage Two M8 canvas merge helpers in `b68867dd`; Stage Two M7 persisted image recovery helpers in `0a5c2339`; Stage Two M6 prompt recovery helpers in `53f80d80`; Stage Two M5 media recovery helpers in `002ee6fe`; protobuf override in `4cdbf4cf`; portable metadata refresh in `567f85aa`; Nutrient OCR server-key hardening in `0c5cadde`; PostCSS patch in `333f2551`; dead AI12 service pruning in `b6620ef2`.
+- Current commit scope: `src/context/CanvasContext.tsx`, `src/context/canvasNodeUpdates.ts`, `tests/unit/canvas-node-updates-contract.test.ts`, `tsconfig.tests.json`, `plans.md`, `implement.md`, `validation.md`, and `status.md`. UI, release metadata, Netlify endpoint cleanup, tag/movement/group helper code, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain excluded from this commit.
+- Browser QA: skipped for Stage Two M15 because this is a non-UI pure context/helper extraction. No visual surface, CSS, route component, or browser-visible workflow changed.
 
 ## Completed In `9e7ae2b5` (Clay UI Audit Closure)
 
@@ -47,7 +47,7 @@ Last updated: 2026-05-03
 
 ## Current Quality Baseline
 
-- Current giant tracked files in the active Stage Two M14 working tree: `src/services/auth/keyManager.ts` 5279 lines, `src/App.tsx` 4900 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 4517 lines, `src/components/layout/PromptBar.tsx` 4437 lines, `src/context/CanvasContext.tsx` 4012 physical lines.
+- Current giant tracked files in the active Stage Two M15 working tree: `src/services/auth/keyManager.ts` 5279 lines, `src/App.tsx` 4900 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 4517 lines, `src/components/layout/PromptBar.tsx` 4437 lines, `src/context/CanvasContext.tsx` 3977 physical lines.
 - Current tracked TS/TSX debt scan by alternate-git `git grep` over `*.ts` / `*.tsx`: direct `as any` matches 156, explicit any-type pattern matches 370, `@ts-ignore` / `@ts-expect-error` matches 133, and `console.log` matches 251. These are refactor debt indicators, not release blockers by themselves.
 - Quality rule going forward: reduce `any`, TypeScript suppressions, and bare `console.log` inside touched files when local and safe; do not perform a whole-repo cleanup inside one runtime or architecture extraction.
 - Architecture status from the latest full check: `npm.cmd run architecture:check` passed with known allowlisted migration and legacy bridge exceptions; `npm.cmd run spec:check` passed.
@@ -255,7 +255,7 @@ Last updated: 2026-05-03
 - Seam review: Poincare confirmed the boundary should keep RAF batching and source resolution in `CanvasContext.tsx`; its recommended extra assertions for batching refs/source resolution and unchanged `lastModified` were added before the final gate.
 - Browser QA: skipped because this is a non-UI pure helper extraction and no visual surface, CSS, route component, or browser-visible workflow changed.
 
-## Stage Two M14 Canvas Tags Extraction
+## Completed In `d7a9d0a7` (Stage Two M14 Canvas Tags Extraction)
 
 - Extracted node tag helper ownership into `src/context/canvasTags.ts`.
 - `src/context/CanvasContext.tsx` now imports `setCanvasNodeTags`; it keeps the public `setNodeTags` callback and delegates tag replacement through `updateCanvas`.
@@ -274,6 +274,28 @@ Last updated: 2026-05-03
 - Passed: `npm.cmd run check:encoding`.
 - Passed tracked diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/context/CanvasContext.tsx src/context/canvasTags.ts tests/unit/canvas-tags-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
 - Code review: Godel confirmed the implementation preserves the old `setNodeTags` behavior and keeps the slice narrow; its staging and stale-status warnings are addressed by explicit path-based staging and this M14 ledger update.
+- Browser QA: skipped because this is a non-UI pure helper extraction and no visual surface, CSS, route component, or browser-visible workflow changed.
+
+## Stage Two M15 Canvas Node Updates Extraction
+
+- Extracted node update helper ownership into `src/context/canvasNodeUpdates.ts`.
+- `src/context/CanvasContext.tsx` now imports `updateCanvasImageNodeDimensions`, `updateCanvasImageNode`, and `applyCanvasNodeBatchUpdates`; it keeps the public `updateImageNodeDimensions`, `updateImageNode`, and `updateNodes` callbacks as wrappers around `updateCanvas`.
+- The helper owns image dimension updates, image shallow-merge updates, batch prompt/image updates, duplicate-ID last-write-wins semantics, and empty/no-match batch no-ops.
+- Kept `lastModified` and `syncCanvasCompatibility` ownership in `updateCanvas`, matching the previous node update paths.
+- Added `tests/unit/canvas-node-updates-contract.test.ts` to guard helper ownership, wrapper delegation, unchanged prompt/image references, empty update object behavior, duplicate update IDs, and original-canvas return for empty or unmatched batches.
+- Added the node update contract to `tsconfig.tests.json`.
+- Line counts for this slice: `src/context/CanvasContext.tsx` 3977, `src/context/canvasNodeUpdates.ts` 56, `tests/unit/canvas-node-updates-contract.test.ts` 197, `tsconfig.tests.json` 82.
+- RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-node-updates-contract.test.ts` failed first with 5/5 failures because `src/context/canvasNodeUpdates.ts` did not exist and `CanvasContext.tsx` did not import or delegate to `canvasNodeUpdates`.
+- Targeted GREEN validation: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-node-updates-contract.test.ts` passed (5/5).
+- Passed targeted gate: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-node-updates-contract.test.ts tests/unit/canvas-persisted-image-hydration-guard.test.ts tests/unit/canvas-context-state-boundary.test.ts` passed (7/7).
+- Passed: `npm.cmd run architecture:check` with existing allowlisted migration and legacy bridge exceptions only.
+- Passed: `npm.cmd run typecheck`; test semantic check covers 53 files via `tsconfig.tests.json`.
+- Passed: `npm.cmd run test:unit` (1177/1177).
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed tracked diff check after intent-to-add for new files: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/context/CanvasContext.tsx src/context/canvasNodeUpdates.ts tests/unit/canvas-node-updates-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
+- Code review note: a follow-up read-only subagent was requested but did not return before the validation gate; local diff review found the slice stayed within node update helper extraction and preserved `updateCanvas` ownership.
 - Browser QA: skipped because this is a non-UI pure helper extraction and no visual surface, CSS, route component, or browser-visible workflow changed.
 
 ## Completed In `4cdbf4cf` (Dependency Security Audit Fix)
@@ -928,8 +950,8 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-1. Commit Stage Two M14 Canvas tags helper extraction as a separate architecture commit.
-2. After M14 commit, start the next narrow `CanvasContext.tsx` responsibility from the reviewed M15 candidate: node update helpers around image dimensions, image updates, and prompt/image batch updates.
+1. Commit Stage Two M15 Canvas node update helper extraction as a separate architecture commit.
+2. Identify the next narrow `CanvasContext.tsx` responsibility after node updates, based on a source map and targeted contract first. Defer `migrateNodes` until async IndexedDB caching can be split safely.
 3. Continue Stage Two giant-file split in this priority order after remaining CanvasContext slices: `keyManager.ts`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`.
 4. If release metadata changes again, rerun packaging/publish and the full release gate including `npm.cmd run governance:check`.
 
