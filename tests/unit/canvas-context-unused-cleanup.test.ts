@@ -25,4 +25,8 @@ test('CanvasContext does not retain proven unused imports or local layout writes
   assert.doesNotMatch(contextSource, /let currentX = START_X/);
   assert.doesNotMatch(contextSource, /currentX = START_X/);
   assert.doesNotMatch(contextSource, /currentX \+= group\.width \+ GROUP_GAP_X/);
+  assert.doesNotMatch(contextSource, /Selection arrange: process the selection as card groups/);
+  assert.doesNotMatch(contextSource, /type SelectionGroup =/);
+  assert.doesNotMatch(contextSource, /\bprocessedImageIds\b/);
+  assert.doesNotMatch(contextSource, /Reserve prompt height for standalone images/);
 });
