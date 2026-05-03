@@ -65,6 +65,11 @@ import {
     updateCanvasPromptNodePosition
 } from './canvasPositionUpdates';
 import {
+    deleteCanvasPromptNode,
+    linkCanvasPromptToImage,
+    unlinkCanvasPromptFromImage
+} from './canvasPromptImageLinks';
+import {
     buildPersistedImageRecoverySignature,
     buildPromptRecoveryEntries,
     resolveImageRecoveryUrlFromMetadata,
@@ -1705,58 +1710,15 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         pushToHistory();
 
         urgentSaveRef.current = true; // 父节点删除后同步存盘
-        updateCanvas(c => {
-            // [Strict Logic] Delete Main Card -> Sub-cards become Lonely Sub Cards (Orphaned)
-            // DO NOT delete the images. Just clear their parentPromptId.
-
-            const newImageNodes = c.imageNodes.map(img => {
-                if (img.parentPromptId === id) {
-                    return { ...img, parentPromptId: '' }; // Orphan it (empty string)
-                }
-                return img;
-            });
-
-            // Filter out the deleted prompt node
-            const newPromptNodes = c.promptNodes.filter(n => n.id !== id);
-
-            return {
-                ...c,
-                promptNodes: newPromptNodes,
-                imageNodes: newImageNodes
-            };
-        });
+        updateCanvas(canvas => deleteCanvasPromptNode(canvas, id));
     }, [updateCanvas, pushToHistory]);
 
     const linkNodes = useCallback((promptId: string, imageId: string) => {
-        updateCanvas(c => {
-            // Avoid duplicates
-            const promptNode = c.promptNodes.find(p => p.id === promptId);
-            if (!promptNode || promptNode.childImageIds.includes(imageId)) return c;
-
-            return {
-                ...c,
-                promptNodes: c.promptNodes.map(p =>
-                    p.id === promptId ? { ...p, childImageIds: [...p.childImageIds, imageId] } : p
-                ),
-                imageNodes: c.imageNodes.map(img =>
-                    img.id === imageId ? { ...img, parentPromptId: promptId } : img
-                )
-            };
-        });
+        updateCanvas(canvas => linkCanvasPromptToImage(canvas, promptId, imageId));
     }, [updateCanvas]);
 
     const unlinkNodes = useCallback((promptId: string, imageId: string) => {
-        updateCanvas(c => {
-            return {
-                ...c,
-                promptNodes: c.promptNodes.map(p =>
-                    p.id === promptId ? { ...p, childImageIds: p.childImageIds.filter(id => id !== imageId) } : p
-                ),
-                imageNodes: c.imageNodes.map(img =>
-                    img.id === imageId ? { ...img, parentPromptId: '' } : img
-                )
-            };
-        });
+        updateCanvas(canvas => unlinkCanvasPromptFromImage(canvas, promptId, imageId));
     }, [updateCanvas]);
 
 

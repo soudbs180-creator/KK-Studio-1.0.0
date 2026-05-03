@@ -31,6 +31,7 @@
         "tests/unit/canvas-movement-contract.test.ts",
         "tests/unit/canvas-node-updates-contract.test.ts",
         "tests/unit/canvas-position-updates-contract.test.ts",
+        "tests/unit/canvas-prompt-image-links-contract.test.ts",
         "tests/unit/canvas-merge-contract.test.ts",
         "tests/unit/canvas-media-recovery-contract.test.ts",
         "tests/unit/canvas-placement-contract.test.ts",
