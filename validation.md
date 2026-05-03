@@ -370,6 +370,16 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/provider-image-routing-regression.test.ts"
 ```
 
+Silent pricing URL helper targeted gate:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/key-manager-pricing-url-contract.test.ts" `
+  "tests/unit/key-manager-runtime-fallback.test.ts" `
+  "tests/unit/user-route-pricing-endpoint-override.test.ts" `
+  "tests/unit/kk-api-client.test.ts"
+```
+
 Key type/cycle-break targeted gate:
 
 ```powershell
@@ -419,6 +429,12 @@ npm.cmd run build
 npm.cmd run governance:agent-docs
 npm.cmd run check:encoding
 git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerModelHelpers.ts" "src/services/auth/keyManagerKeyType.ts" "src/services/auth/keyManagerEffectiveSlot.ts" "tests/unit/key-manager-model-helpers-contract.test.ts" "tests/unit/key-manager-key-type-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+Silent pricing URL helper slices should use this narrower path-limited diff check:
+
+```powershell
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerPricingUrl.ts" "tests/unit/key-manager-pricing-url-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
 Provider runtime-state merge slices should use this narrower path-limited diff check:

@@ -74,6 +74,7 @@
         "tests/unit/key-manager-dead-code-pruning-contract.test.ts",
         "tests/unit/key-manager-key-type-contract.test.ts",
         "tests/unit/key-manager-model-helpers-contract.test.ts",
+        "tests/unit/key-manager-pricing-url-contract.test.ts",
         "tests/unit/key-manager-provider-links-contract.test.ts",
         "tests/unit/key-manager-provider-persistence-contract.test.ts",
         "tests/unit/key-manager-provider-usage-contract.test.ts",

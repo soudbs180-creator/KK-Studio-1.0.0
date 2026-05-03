@@ -58,6 +58,7 @@ import {
 } from './keyManagerRouteIds';
 import { sanitizeAsciiApiKey } from './keyManagerCredentialSanitizer';
 import { getRedactedChannelConfigApiKey } from './keyManagerChannelConfigSecrets';
+import { buildSilentProviderPricingUrl } from './keyManagerPricingUrl';
 import {
     applyOpenAICompatAuthToUrl,
     type ApiProtocolFormat,
@@ -133,8 +134,6 @@ export {
 } from './keyManagerModelHelpers';
 export type { ModelVariantMeta, GlobalModelType } from './keyManagerModelHelpers';
 export { determineKeyType } from './keyManagerKeyType';
-
-const PROVIDER_MARKETING_SUFFIX_RE = /(\/(pricing|models))(\/.*)?$/i;
 
 const RATE_LIMIT_COOLDOWN_MS = 30 * 1000;
 
@@ -2080,12 +2079,7 @@ export class KeyManager {
 
                             // Try to fetch /pricing in the background and refresh the cached pricing snapshot
                             try {
-                                const sanitizedPricingBase = cleanUrl.replace(PROVIDER_MARKETING_SUFFIX_RE, '') || cleanUrl;
-                                const normalizedPricingBase = sanitizedPricingBase.replace(/\/+$/, '') || cleanUrl;
-                                const pricingBase = normalizedPricingBase.endsWith('/v1')
-                                    ? normalizedPricingBase.replace(/\/v1$/, '')
-                                    : normalizedPricingBase;
-                                const pricingUrl = `${pricingBase}/pricing`;
+                                const pricingUrl = buildSilentProviderPricingUrl(cleanUrl);
                                 // We don't want to block the models return, so do this asynchronously but catch errors locally.
                                 // It runs in the background.
                                 fetch(pricingUrl, {
