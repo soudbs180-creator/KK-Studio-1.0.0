@@ -56,7 +56,9 @@ import { addCanvasGroupToCanvas, removeCanvasGroupFromCanvas, updateCanvasGroupI
 import { moveSelectedCanvasNodes } from './canvasMovement';
 import { setCanvasNodeTags } from './canvasTags';
 import {
+    addCanvasPromptNode,
     applyCanvasNodeBatchUpdates,
+    updateCanvasPromptNode,
     updateCanvasImageNode,
     updateCanvasImageNodeDimensions
 } from './canvasNodeUpdates';
@@ -876,23 +878,12 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         try {
             // [Defensive fix] Add the node to state first so the UI shows it immediately.
-            updateCanvas(c => {
-                const allZIndices = [
-                    ...c.promptNodes.map(n => n.zIndex ?? 0),
-                    ...c.imageNodes.map(n => n.zIndex ?? 0),
-                    ...(c.groups || []).map(g => g.zIndex ?? 0)
-                ];
-                let maxZ = allZIndices.length > 0 ? Math.max(...allZIndices) : 0;
-
-                // Give the new PromptNode the highest z-index so older cards do not cover it.
-                const nodeWithZIndex = { ...node, zIndex: maxZ + 1 };
-
-                return {
-                    ...c,
-                    promptNodes: c.promptNodes.some(n => n.id === node.id) ?
-                        (console.warn(`[CanvasContext] Skip duplicate promptNodeID: ${node.id}`), c.promptNodes) :
-                        [...c.promptNodes, nodeWithZIndex]
-                };
+            updateCanvas(canvas => {
+                const nextCanvas = addCanvasPromptNode(canvas, node);
+                if (nextCanvas === canvas) {
+                    console.warn(`[CanvasContext] Skip duplicate promptNodeID: ${node.id}`);
+                }
+                return nextCanvas;
             });
             console.log('[CanvasContext.addPromptNode] Prompt card added to canvas');
 
@@ -966,43 +957,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             await Promise.all(saveTasks);
         }
 
-        updateCanvas(c => ({
-            ...c,
-            promptNodes: c.promptNodes.map(n => {
-                if (n.id === node.id) {
-                    // [Defensive merge]
-                    // We must ensure we don't accidentally overwrite existing valid data with empty data
-                    // especially during rapid status updates (generating -> success)
-                    const merged: PromptNode = {
-                        ...n,
-                        ...node,
-                        // If the incoming node has empty prompt/refs but the existing one has them, keep the existing values.
-                        // Unless we are explicitly clearing them (which usually happens via setConfig/delete)
-                        // But updatePromptNode is mostly used for status updates.
-                        prompt: (node.prompt && node.prompt.length > 0) ? node.prompt : n.prompt,
-                        referenceImages: (node.referenceImages && node.referenceImages.length > 0) ? node.referenceImages : n.referenceImages
-                    };
-
-                    // [Bugfix] Prevent stale callbacks from flipping completed/failed cards back to "generating".
-                    // Typical case: ResizeObserver/onHeightChange races carry older node snapshots over newer state.
-                    const hasFinished = resolvePromptChildImageIds(n, c.imageNodes).length > 0;
-                    const hasFailed = !!n.error;
-
-                    if ((hasFinished || hasFailed) && node.isGenerating === true && n.isGenerating === false) {
-                        merged.isGenerating = false;
-                        // Also preserve error so stale undefined values do not overwrite it.
-                        // [Fix] Still allow callers to clear error explicitly with error: undefined.
-                        if (hasFailed && !merged.error && !('error' in node)) {
-                            merged.error = n.error;
-                            merged.errorDetails = n.errorDetails;
-                        }
-                    }
-
-                    return merged;
-                }
-                return n;
-            })
-        }));
+        updateCanvas(canvas => updateCanvasPromptNode(canvas, node));
     }, [updateCanvas]);
 
     const urgentUpdatePromptNode = useCallback((node: PromptNode) => {

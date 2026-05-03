@@ -1,9 +1,61 @@
 import type { Canvas, GeneratedImage, PromptNode } from '../types.ts';
+import { resolvePromptChildImageIds } from './canvasPromptChildImages.ts';
 
 export type CanvasNodeUpdateBatch = {
     promptNodes?: Array<{ id: string; updates: Partial<PromptNode> }>;
     imageNodes?: Array<{ id: string; updates: Partial<GeneratedImage> }>;
 };
+
+export function addCanvasPromptNode(canvas: Canvas, node: PromptNode): Canvas {
+    if (canvas.promptNodes.some(existing => existing.id === node.id)) {
+        return canvas;
+    }
+
+    const allZIndices = [
+        ...canvas.promptNodes.map(existing => existing.zIndex ?? 0),
+        ...canvas.imageNodes.map(image => image.zIndex ?? 0),
+        ...(canvas.groups || []).map(group => group.zIndex ?? 0)
+    ];
+    const maxZ = allZIndices.length > 0 ? Math.max(...allZIndices) : 0;
+
+    return {
+        ...canvas,
+        promptNodes: [...canvas.promptNodes, { ...node, zIndex: maxZ + 1 }]
+    };
+}
+
+export function updateCanvasPromptNode(canvas: Canvas, node: PromptNode): Canvas {
+    return {
+        ...canvas,
+        promptNodes: canvas.promptNodes.map(existing => {
+            if (existing.id !== node.id) {
+                return existing;
+            }
+
+            const merged: PromptNode = {
+                ...existing,
+                ...node,
+                prompt: node.prompt && node.prompt.length > 0 ? node.prompt : existing.prompt,
+                referenceImages: node.referenceImages && node.referenceImages.length > 0
+                    ? node.referenceImages
+                    : existing.referenceImages
+            };
+
+            const hasFinished = resolvePromptChildImageIds(existing, canvas.imageNodes).length > 0;
+            const hasFailed = !!existing.error;
+
+            if ((hasFinished || hasFailed) && node.isGenerating === true && existing.isGenerating === false) {
+                merged.isGenerating = false;
+                if (hasFailed && !merged.error && !('error' in node)) {
+                    merged.error = existing.error;
+                    merged.errorDetails = existing.errorDetails;
+                }
+            }
+
+            return merged;
+        })
+    };
+}
 
 export function updateCanvasImageNodeDimensions(canvas: Canvas, id: string, dimensions: string): Canvas {
     return {
