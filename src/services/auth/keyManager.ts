@@ -1049,10 +1049,6 @@ export class KeyManager {
         return USER_API_LOGIN_REQUIRED_MESSAGE;
     }
 
-    private getBrowserDirectProviderChecksDisabledMessage(): string {
-        return BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE;
-    }
-
     /**
      * Add token usage to a key and update cost
      * Track token usage for a key and keep its cost counters in sync.
@@ -1888,7 +1884,7 @@ export class KeyManager {
         if (isBrowserRuntime()) {
             return {
                 success: false,
-                message: this.getBrowserDirectProviderChecksDisabledMessage(),
+                message: BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE,
             };
         }
 
@@ -3025,7 +3021,7 @@ export class KeyManager {
         if (isBrowserRuntime()) {
             return {
                 valid: false,
-                error: this.getBrowserDirectProviderChecksDisabledMessage(),
+                error: BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE,
             };
         }
 
@@ -4245,7 +4241,7 @@ export class KeyManager {
         if (isBrowserRuntime()) {
             return {
                 ok: false,
-                message: this.getBrowserDirectProviderChecksDisabledMessage(),
+                message: BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE,
             };
         }
 
