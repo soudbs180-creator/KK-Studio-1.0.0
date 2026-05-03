@@ -98,7 +98,7 @@ PPT boundary slices also require `npm.cmd run typecheck`, `npm.cmd run test:unit
 
 ## Stage Two CanvasContext Split Gate
 
-Use this gate for `src/context/CanvasContext.tsx` splits. Add or narrow targeted tests after the responsibility map identifies the exact boundary; do not use one broad commit for state model, mutations, drag/selection, and persistence at the same time. Stage Two M1 used this gate for the state/default/context boundary plus the separated canvas compatibility helper. Stage Two M2 used the selection reducer contract below. Stage Two M3 used the prompt child image resolver contract below. Stage Two M4 used the workflow source node ID resolver contract below. Stage Two M5 used the media recovery contract below. Stage Two M10 used the placement contract below. Stage Two M11 used the layering contract below. Stage Two M12 used the group management contract below. Stage Two M13 used the movement contract below. Stage Two M14 used the tags contract below. Stage Two M15 used the node updates contract below. Stage Two M16 used the position updates contract below. Stage Two M17 used the prompt-image links contract below. Stage Two M18 used the workflow updates contract below. Stage Two M19 reused the prompt-image links contract below with the image deletion transform added. Stage Two M20 used the merge-into contract below. Stage Two M21 used the unused-code cleanup contract below. Stage Two M22 used the arrange-selection contract below. Stage Two M23 reused the unused-code cleanup contract below with the duplicate selected-arrange fallback guard added. Stage Two M24 used the arrange-selection contract below with selected-root cases added. Stage Two M25 used the arrange-selection contract below with selected grouped arrange and fallthrough cases added. Stage Two M26 uses the auto-arrange contract below.
+Use this gate for `src/context/CanvasContext.tsx` splits. Add or narrow targeted tests after the responsibility map identifies the exact boundary; do not use one broad commit for state model, mutations, drag/selection, and persistence at the same time. Stage Two M1 used this gate for the state/default/context boundary plus the separated canvas compatibility helper. Stage Two M2 used the selection reducer contract below. Stage Two M3 used the prompt child image resolver contract below. Stage Two M4 used the workflow source node ID resolver contract below. Stage Two M5 used the media recovery contract below. Stage Two M10 used the placement contract below. Stage Two M11 used the layering contract below. Stage Two M12 used the group management contract below. Stage Two M13 used the movement contract below. Stage Two M14 used the tags contract below. Stage Two M15 used the node updates contract below. Stage Two M16 used the position updates contract below. Stage Two M17 used the prompt-image links contract below. Stage Two M18 used the workflow updates contract below. Stage Two M19 reused the prompt-image links contract below with the image deletion transform added. Stage Two M20 used the merge-into contract below. Stage Two M21 used the unused-code cleanup contract below. Stage Two M22 used the arrange-selection contract below. Stage Two M23 reused the unused-code cleanup contract below with the duplicate selected-arrange fallback guard added. Stage Two M24 used the arrange-selection contract below with selected-root cases added. Stage Two M25 used the arrange-selection contract below with selected grouped arrange and fallthrough cases added. Stage Two M26 used the auto-arrange contract below and is committed in `7cbd7346`.
 
 State-boundary targeted gate:
 
@@ -351,6 +351,34 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/canvas-live-scene-contract.test.ts" `
   "tests/unit/canvas-connector-throttling-contract.test.ts" `
   "tests/unit/prompt-group-regroup-behavior.test.ts"
+```
+
+## Stage Two keyManager Split Gate
+
+Use this gate for `src/services/auth/keyManager.ts` splits. Start with pure helpers that can be contract-tested without touching storage, permissions, encryption, provider credential state, UI, or release metadata.
+
+Model parsing/normalization targeted gate:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/key-manager-model-helpers-contract.test.ts" `
+  "tests/unit/key-manager-runtime-fallback.test.ts" `
+  "tests/unit/official-route-default-models.test.ts" `
+  "tests/unit/model-display-name-regression.test.ts" `
+  "tests/unit/model-library-bootstrap-regression.test.ts" `
+  "tests/unit/provider-image-routing-regression.test.ts"
+```
+
+keyManager architecture slices also require:
+
+```powershell
+npm.cmd run architecture:check
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerModelHelpers.ts" "tests/unit/key-manager-model-helpers-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
 ## Stage One Backfill Generation Gate
