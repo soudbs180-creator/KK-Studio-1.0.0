@@ -1,5 +1,6 @@
 import { normalizeApiProtocolFormat, type ApiProtocolFormat, type AuthMethod } from "../api/apiConfig";
-import { determineKeyType, parseModelString } from "./keyManager";
+import { determineKeyType } from "./keyManager";
+import { parseModelString } from "./keyManagerModelHelpers";
 import { ProviderLinkProvider } from "./keyManagerProviderLinks";
 import type { Provider } from "../../types";
 

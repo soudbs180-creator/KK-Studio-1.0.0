@@ -69,6 +69,7 @@
         "tests/unit/generation-runtime-contract.test.ts",
         "tests/unit/governance-contract.test.ts",
         "tests/unit/hosted-release-guardrails.test.ts",
+        "tests/unit/key-manager-model-helpers-contract.test.ts",
         "tests/unit/payment-runtime-hardening.test.ts",
         "tests/unit/payment-server-settlement-bridge.test.ts",
         "tests/unit/payment-settlement-auth.test.ts",
