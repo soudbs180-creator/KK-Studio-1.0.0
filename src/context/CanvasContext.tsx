@@ -48,6 +48,7 @@ import { resolvePromptChildImageIds } from './canvasPromptChildImages';
 import { resolveCanvasSelectionIds, type CanvasSelectionMode } from './canvasSelection';
 import { getWorkflowSourceNodeIds } from './canvasWorkflowSourceNodeIds';
 import { hydrateRecoveredMediaCacheEntry, resolveOriginalPersistSourceForDisk } from './canvasMediaRecovery';
+import { mergeCanvases, resolvePreferredActiveCanvasId } from './canvasMerge';
 import {
     buildPersistedImageRecoverySignature,
     buildPromptRecoveryEntries,
@@ -444,7 +445,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                         // [Key fix] Merge disk project.json with the latest localStorage state.
                                         // A hard refresh usually leaves fresher state in localStorage via beforeunload.
                                         // project.json may lag behind due to async writes, so both sources must be merged carefully.
-                                        const mergedCanvases = mergeCanvases(prev.canvases, canvases);
+                                        const mergedCanvases = mergeCanvases(prev.canvases, canvases, normalizeCanvasPromptRecovery);
                                         const finalActiveId = resolvePreferredActiveCanvasId(
                                             prev.activeCanvasId,
                                             savedActiveCanvasId,
@@ -526,11 +527,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Helper: Strip image URLs for storage
 
 
-    const getCanvasCardCount = (canvas?: Canvas | null): number => {
-        if (!canvas) return 0;
-        return (canvas.promptNodes?.length || 0) + (canvas.imageNodes?.length || 0);
-    };
-
     const canLoadCloudLayout = Boolean(
         shouldEnableWorkspaceCloudSync()
         && user
@@ -546,112 +542,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         && isStageReady('workspace_ready')
     );
 
-    const isCanvasEffectivelyEmpty = (canvas?: Canvas | null): boolean => getCanvasCardCount(canvas) === 0;
-
-    const mergeItemsById = <T extends { id: string }>(localItems: T[] = [], diskItems: T[] = []): T[] => {
-        const map = new Map<string, T>();
-        diskItems.forEach(item => map.set(item.id, item));
-        localItems.forEach(item => {
-            const existing = map.get(item.id);
-            map.set(item.id, existing ? { ...existing, ...item } : item);
-        });
-        return Array.from(map.values());
-    };
-
-    const mergeSingleCanvas = (localCanvas: Canvas, diskCanvas: Canvas): Canvas => {
-        const localCount = getCanvasCardCount(localCanvas);
-        const diskCount = getCanvasCardCount(diskCanvas);
-
-        if (localCount === 0 && diskCount > 0) {
-            return normalizeCanvasPromptRecovery({
-                ...localCanvas,
-                ...diskCanvas,
-                name: diskCanvas.name || localCanvas.name,
-                folderName: diskCanvas.folderName || localCanvas.folderName,
-                promptNodes: diskCanvas.promptNodes || [],
-                imageNodes: diskCanvas.imageNodes || [],
-                groups: diskCanvas.groups || [],
-                drawings: diskCanvas.drawings || [],
-                lastModified: Math.max(localCanvas.lastModified || 0, diskCanvas.lastModified || 0)
-            });
-        }
-
-        if (diskCount === 0 && localCount > 0) {
-            return normalizeCanvasPromptRecovery({
-                ...diskCanvas,
-                ...localCanvas,
-                promptNodes: localCanvas.promptNodes || [],
-                imageNodes: localCanvas.imageNodes || [],
-                groups: localCanvas.groups || [],
-                drawings: localCanvas.drawings || [],
-                lastModified: Math.max(localCanvas.lastModified || 0, diskCanvas.lastModified || 0)
-            });
-        }
-
-        const preferLocal = (localCanvas.lastModified || 0) >= (diskCanvas.lastModified || 0);
-        const baseCanvas = preferLocal ? diskCanvas : localCanvas;
-        const overrideCanvas = preferLocal ? localCanvas : diskCanvas;
-
-        return normalizeCanvasPromptRecovery({
-            ...baseCanvas,
-            ...overrideCanvas,
-            name: overrideCanvas.name || baseCanvas.name,
-            folderName: overrideCanvas.folderName || baseCanvas.folderName,
-            promptNodes: mergeItemsById(localCanvas.promptNodes || [], diskCanvas.promptNodes || []),
-            imageNodes: mergeItemsById(localCanvas.imageNodes || [], diskCanvas.imageNodes || []),
-            groups: mergeItemsById(localCanvas.groups || [], diskCanvas.groups || []),
-            drawings: mergeItemsById(localCanvas.drawings || [], diskCanvas.drawings || []),
-            lastModified: Math.max(localCanvas.lastModified || 0, diskCanvas.lastModified || 0)
-        });
-    };
-
-    const mergeCanvases = (local: Canvas[], disk: Canvas[]): Canvas[] => {
-        const map = new Map<string, Canvas>();
-        disk.forEach(canvas => map.set(canvas.id, canvas));
-
-        local.forEach(localCanvas => {
-            const diskCanvas = map.get(localCanvas.id);
-            if (!diskCanvas) {
-                map.set(localCanvas.id, localCanvas);
-                return;
-            }
-
-            map.set(localCanvas.id, mergeSingleCanvas(localCanvas, diskCanvas));
-        });
-
-        return Array.from(map.values());
-    };
-
-    const resolvePreferredActiveCanvasId = (
-        localActiveId: string | undefined,
-        diskActiveId: string | null | undefined,
-        canvases: Canvas[]
-    ): string => {
-        const localActiveCanvas = localActiveId ? canvases.find(c => c.id === localActiveId) : undefined;
-        const diskActiveCanvas = diskActiveId ? canvases.find(c => c.id === diskActiveId) : undefined;
-
-        if (localActiveCanvas && !isCanvasEffectivelyEmpty(localActiveCanvas)) {
-            return localActiveCanvas.id;
-        }
-
-        if (diskActiveCanvas && !isCanvasEffectivelyEmpty(diskActiveCanvas)) {
-            return diskActiveCanvas.id;
-        }
-
-        if (localActiveCanvas && diskActiveCanvas && localActiveCanvas.id !== diskActiveCanvas.id) {
-            return diskActiveCanvas.id;
-        }
-
-        const firstNonEmptyCanvas = canvases.find(canvas => !isCanvasEffectivelyEmpty(canvas));
-        if (firstNonEmptyCanvas) {
-            return firstNonEmptyCanvas.id;
-        }
-
-        if (diskActiveCanvas) return diskActiveCanvas.id;
-        if (localActiveCanvas) return localActiveCanvas.id;
-        return canvases[0]?.id || 'default';
-    };
-
     // Cloud sync: load and merge on init.
     useEffect(() => {
         const loadCloud = async () => {
@@ -661,7 +551,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const cloudCanvases = await syncService.loadLayout();
                 if (cloudCanvases && cloudCanvases.length > 0) {
                     setState(prev => {
-                        const merged = mergeCanvases(prev.canvases, cloudCanvases);
+                        const merged = mergeCanvases(prev.canvases, cloudCanvases, normalizeCanvasPromptRecovery);
                         // Check if anything changed
                         if (JSON.stringify(merged) !== JSON.stringify(prev.canvases)) {
                             console.log('[CanvasContext] Merged cloud layout.', { local: prev.canvases.length, cloud: cloudCanvases.length, merged: merged.length });
@@ -3368,7 +3258,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     // If found existing project in the folder, MERGE instead of overwrite
                     if (canvases.length > 0) {
                         setState(prev => {
-                            const mergedCanvases = mergeCanvases(prev.canvases, canvases);
+                            const mergedCanvases = mergeCanvases(prev.canvases, canvases, normalizeCanvasPromptRecovery);
                             const finalCanvases = mergedCanvases.map(canvas => ({
                                 ...canvas,
                                 imageNodes: (canvas.imageNodes || []).map(img => {
@@ -3636,7 +3526,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         }))
                     }));
 
-                    const mergedCanvases = mergeCanvases(prev.canvases, hydratedDiskCanvases);
+                    const mergedCanvases = mergeCanvases(prev.canvases, hydratedDiskCanvases, normalizeCanvasPromptRecovery);
                     const finalActiveId = resolvePreferredActiveCanvasId(
                         prev.activeCanvasId,
                         null,
