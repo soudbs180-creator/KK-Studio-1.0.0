@@ -98,7 +98,7 @@ PPT boundary slices also require `npm.cmd run typecheck`, `npm.cmd run test:unit
 
 ## Stage Two CanvasContext Split Gate
 
-Use this gate for `src/context/CanvasContext.tsx` splits. Add or narrow targeted tests after the responsibility map identifies the exact boundary; do not use one broad commit for state model, mutations, drag/selection, and persistence at the same time. Stage Two M1 used this gate for the state/default/context boundary plus the separated canvas compatibility helper. Stage Two M2 used the selection reducer contract below. Stage Two M3 used the prompt child image resolver contract below. Stage Two M4 used the workflow source node ID resolver contract below. Stage Two M5 used the media recovery contract below. Stage Two M10 used the placement contract below. Stage Two M11 used the layering contract below. Stage Two M12 used the group management contract below. Stage Two M13 used the movement contract below. Stage Two M14 used the tags contract below. Stage Two M15 used the node updates contract below. Stage Two M16 used the position updates contract below. Stage Two M17 uses the prompt-image links contract below.
+Use this gate for `src/context/CanvasContext.tsx` splits. Add or narrow targeted tests after the responsibility map identifies the exact boundary; do not use one broad commit for state model, mutations, drag/selection, and persistence at the same time. Stage Two M1 used this gate for the state/default/context boundary plus the separated canvas compatibility helper. Stage Two M2 used the selection reducer contract below. Stage Two M3 used the prompt child image resolver contract below. Stage Two M4 used the workflow source node ID resolver contract below. Stage Two M5 used the media recovery contract below. Stage Two M10 used the placement contract below. Stage Two M11 used the layering contract below. Stage Two M12 used the group management contract below. Stage Two M13 used the movement contract below. Stage Two M14 used the tags contract below. Stage Two M15 used the node updates contract below. Stage Two M16 used the position updates contract below. Stage Two M17 used the prompt-image links contract below. Stage Two M18 uses the workflow updates contract below.
 
 State-boundary targeted gate:
 
@@ -274,13 +274,23 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/canvas-cleanup-contract.test.ts"
 ```
 
+Canvas workflow updates targeted gate:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/canvas-workflow-updates-contract.test.ts" `
+  "tests/unit/canvas-workflow-source-node-ids-contract.test.ts" `
+  "tests/unit/workflow-document-domain.test.ts" `
+  "tests/unit/canvas-cleanup-contract.test.ts"
+```
+
 Minimum architecture split gate:
 
 ```powershell
 npm.cmd run architecture:check
 npm.cmd run typecheck
 npm.cmd run test:unit
-git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/context/CanvasContext.tsx" "src/context/canvasContextState.ts" "src/context/canvasCompatibility.ts" "src/context/canvasGroups.ts" "src/context/canvasMovement.ts" "src/context/canvasTags.ts" "src/context/canvasNodeUpdates.ts" "src/context/canvasPositionUpdates.ts" "src/context/canvasPromptImageLinks.ts" "tests/unit" "plans.md" "implement.md" "validation.md" "status.md"
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/context/CanvasContext.tsx" "src/context/canvasContextState.ts" "src/context/canvasCompatibility.ts" "src/context/canvasGroups.ts" "src/context/canvasMovement.ts" "src/context/canvasTags.ts" "src/context/canvasNodeUpdates.ts" "src/context/canvasPositionUpdates.ts" "src/context/canvasPromptImageLinks.ts" "src/context/canvasWorkflowUpdates.ts" "src/workflow/adapters/canvasToWorkflow.ts" "src/workflow/persistence/workflowSerializer.ts" "tests/unit" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
 If the touched CanvasContext slice affects persistence or workspace layout, include:

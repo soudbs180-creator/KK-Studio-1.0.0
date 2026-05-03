@@ -32,12 +32,14 @@ function workflowNode(input: WorkflowNodeFixture): WorkflowNode {
 test('workflow source node id resolver boundary lives outside CanvasContext', () => {
   const contextSource = readSource('src/context/CanvasContext.tsx');
   const helperSource = readSource('src/context/canvasWorkflowSourceNodeIds.ts');
+  const workflowUpdatesSource = readSource('src/context/canvasWorkflowUpdates.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/canvas-workflow-source-node-ids-contract\.test\.ts/);
-  assert.match(contextSource, /from '\.\/canvasWorkflowSourceNodeIds';/);
+  assert.match(workflowUpdatesSource, /from '\.\/canvasWorkflowSourceNodeIds\.ts';/);
   assert.match(helperSource, /export function getWorkflowSourceNodeIds/);
   assert.doesNotMatch(contextSource, /const getWorkflowSourceNodeIds =/);
+  assert.doesNotMatch(contextSource, /from '\.\/canvasWorkflowSourceNodeIds';/);
 });
 
 test('utility workflow nodes preserve first source id order and filter invalid values', () => {

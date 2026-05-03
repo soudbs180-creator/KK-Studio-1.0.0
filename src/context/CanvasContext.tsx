@@ -14,7 +14,7 @@ import { logError, logInfo } from '../services/system/systemLogService';
 import { ImageQuality, QUALITY_CONFIGS, compressImageToQuality, getQualityStorageId } from '../services/image/imageQuality';
 import { getLocalFolderHandle, getStorageMode, restoreLocalFolderConnection, setLocalFolderHandle } from '../services/storage/storagePreference';
 import { canvasToWorkflow } from '../workflow/adapters/canvasToWorkflow';
-import { dedupeWorkflowEdges, isWorkflowUtilityNodeKind } from '../workflow/schema';
+import { isWorkflowUtilityNodeKind } from '../workflow/schema';
 import { clampGenerationDurationMs } from '../utils/timeUtils';
 import { buildGeneratedImageBatchPositions } from '../utils/generatedImageLayout';
 import {
@@ -46,7 +46,6 @@ import {
 import { syncCanvasCompatibility } from './canvasCompatibility';
 import { resolvePromptChildImageIds } from './canvasPromptChildImages';
 import { resolveCanvasSelectionIds, type CanvasSelectionMode } from './canvasSelection';
-import { getWorkflowSourceNodeIds } from './canvasWorkflowSourceNodeIds';
 import { hydrateRecoveredMediaCacheEntry, resolveOriginalPersistSourceForDisk } from './canvasMediaRecovery';
 import { mergeCanvases, resolvePreferredActiveCanvasId } from './canvasMerge';
 import { cleanupInvalidCanvasCardsForCanvas, type CleanupInvalidCardsSummary } from './canvasCleanup';
@@ -69,6 +68,12 @@ import {
     linkCanvasPromptToImage,
     unlinkCanvasPromptFromImage
 } from './canvasPromptImageLinks';
+import {
+    addCanvasWorkflowNode,
+    deleteCanvasWorkflowNode,
+    updateCanvasWorkflowNode,
+    updateCanvasWorkflowNodePosition
+} from './canvasWorkflowUpdates';
 import {
     buildPersistedImageRecoverySignature,
     buildPromptRecoveryEntries,
@@ -1526,144 +1531,20 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
 
         pushToHistory();
-        updateCanvas(c => {
-            const workflow = canvasToWorkflow(c);
-            const existingNode = workflow.nodes.find(existing => existing.id === node.id);
-            if (existingNode) {
-                return c;
-            }
-
-            return {
-                ...c,
-                workflow: {
-                    ...workflow,
-                    nodes: [...workflow.nodes, node],
-                    edges: dedupeWorkflowEdges([
-                        ...workflow.edges,
-                        ...getWorkflowSourceNodeIds(node)
-                            .filter(sourceId => workflow.nodes.some(existingNode => existingNode.id === sourceId))
-                            .map(sourceId => ({
-                                id: `edge:${sourceId}:control:${node.id}`,
-                                from: sourceId,
-                                to: node.id,
-                                role: 'control' as const,
-                            })),
-                    ]),
-                },
-            };
-        });
+        updateCanvas(canvas => addCanvasWorkflowNode(canvas, node));
     }, [pushToHistory, updateCanvas]);
 
     const updateWorkflowNode = useCallback((id: string, updates: Partial<WorkflowNode>) => {
-        updateCanvas(c => {
-            const workflow = canvasToWorkflow(c);
-            if (!workflow.nodes.length && !workflow.edges.length) return c;
-            let changed = false;
-
-            const nextNodes = workflow.nodes.map((node) => {
-                if (node.id !== id) return node;
-                changed = true;
-                return {
-                    ...node,
-                    ...updates,
-                    id: node.id,
-                    kind: node.kind,
-                } as WorkflowNode;
-            });
-
-            if (!changed) return c;
-
-            const updatedNode = nextNodes.find(node => node.id === id);
-            const validNodeIds = new Set(nextNodes.map(node => node.id));
-            const nextEdges = dedupeWorkflowEdges([
-                ...workflow.edges.filter((edge) => {
-                    if (!validNodeIds.has(edge.from) || !validNodeIds.has(edge.to)) {
-                        return false;
-                    }
-
-                    if (edge.to !== id) {
-                        return true;
-                    }
-
-                    return edge.from === id;
-                }),
-                ...(updatedNode
-                    ? getWorkflowSourceNodeIds(updatedNode)
-                        .filter(sourceId => validNodeIds.has(sourceId))
-                        .map(sourceId => ({
-                            id: `edge:${sourceId}:control:${id}`,
-                            from: sourceId,
-                            to: id,
-                            role: 'control' as const,
-                        }))
-                    : []),
-            ]);
-
-            return {
-                ...c,
-                workflow: {
-                    ...workflow,
-                    nodes: nextNodes,
-                    edges: nextEdges,
-                },
-            };
-        });
+        updateCanvas(canvas => updateCanvasWorkflowNode(canvas, id, updates));
     }, [updateCanvas]);
 
     const updateWorkflowNodePosition = useCallback((id: string, pos: { x: number; y: number }) => {
-        updateCanvas(c => {
-            if (!c.workflow) return c;
-            let changed = false;
-
-            const nextNodes = c.workflow.nodes.map((node) => {
-                if (node.id !== id) return node;
-                changed = true;
-                return {
-                    ...node,
-                    position: pos,
-                };
-            });
-
-            if (!changed) return c;
-
-            return {
-                ...c,
-                workflow: {
-                    ...c.workflow,
-                    nodes: nextNodes,
-                },
-            };
-        });
+        updateCanvas(canvas => updateCanvasWorkflowNodePosition(canvas, id, pos));
     }, [updateCanvas]);
 
     const deleteWorkflowNode = useCallback((id: string) => {
         pushToHistory();
-        updateCanvas(c => {
-            const workflow = canvasToWorkflow(c);
-            if (!workflow.nodes.length && !workflow.edges.length) return c;
-
-            const nextNodes = workflow.nodes.filter((node) => node.id !== id);
-            if (nextNodes.length === workflow.nodes.length) {
-                return c;
-            }
-
-            const validNodeIds = new Set(nextNodes.map((node) => node.id));
-            const nextEdges = workflow.edges.filter((edge) => (
-                edge.from !== id
-                && edge.to !== id
-                && validNodeIds.has(edge.from)
-                && validNodeIds.has(edge.to)
-            ));
-
-            return {
-                ...c,
-                workflow: {
-                    ...workflow,
-                    nodes: nextNodes,
-                    edges: nextEdges,
-                },
-            };
-        });
+        updateCanvas(canvas => deleteCanvasWorkflowNode(canvas, id));
     }, [pushToHistory, updateCanvas]);
 
 
