@@ -56,7 +56,7 @@ import {
     resolveApiProtocolFormat,
 } from '../api/apiConfig';
 import { buildUserFacingApiErrorMessage, classifyApiFailure, hasAuthErrorMarkers } from '../api/errorClassification';
-import { resolveProviderKeyType, resolveProviderModelCompatibilityIssue, resolveProviderRuntime } from '../api/providerStrategy';
+import { resolveProviderModelCompatibilityIssue, resolveProviderRuntime } from '../api/providerStrategy';
 import type { ChannelConfig } from '../api/channelConfig';
 import { buildChannelSurfaceView } from '../api/providerChannelSurfaceView.ts';
 import {
@@ -75,7 +75,7 @@ import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiC
 import { getPreferredKkApiAccessToken } from '../api/authAccessToken';
 import { MODEL_PRESETS, CHAT_MODEL_PRESETS } from '../model/modelPresets';
 import { RegionService } from '../system/RegionService';
-import { Provider } from '../../types';
+import type { Provider } from '../../types';
 import { getLatestRuntimeAuthState } from './runtimeAuthState';
 import { MODEL_REGISTRY } from '../model/modelRegistry';
 import { adminModelService } from '../model/adminModelService'; // 完成 [API Key 轮换历史记录清理]
@@ -100,6 +100,7 @@ import {
     parseModelString,
     parseModelVariantMeta,
 } from './keyManagerModelHelpers';
+import { determineKeyType } from './keyManagerKeyType';
 export {
     parseModelString,
     MODEL_MIGRATION_MAP,
@@ -109,16 +110,9 @@ export {
     appendModelVariantLabel,
 } from './keyManagerModelHelpers';
 export type { ModelVariantMeta } from './keyManagerModelHelpers';
+export { determineKeyType } from './keyManagerKeyType';
 
 const PROVIDER_MARKETING_SUFFIX_RE = /(\/(pricing|models))(\/.*)?$/i;
-
-/**
- * Helper: Determine Key Type based on Provider and Base URL
- * Strictly enforces "official" status only for Google provider with official endpoints.
- */
-export function determineKeyType(provider: string | Provider, baseUrl?: string): 'official' | 'proxy' | 'third-party' {
-    return resolveProviderKeyType(provider, baseUrl);
-}
 
 function extractSlotRouteTarget(suffix: string | null | undefined): string | null {
     const decodedSuffix = (() => {

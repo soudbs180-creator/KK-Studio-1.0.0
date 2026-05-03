@@ -52,8 +52,8 @@ test('keyManager model helper boundary lives outside the monolithic key manager'
   assert.doesNotMatch(keyManagerSource, /export function parseModelVariantMeta/);
   assert.doesNotMatch(keyManagerSource, /export function appendModelVariantLabel/);
   assert.match(effectiveSlotSource, /import \{ parseModelString \} from "\.\/keyManagerModelHelpers";/);
-  assert.match(effectiveSlotSource, /import \{ determineKeyType \} from "\.\/keyManager";/);
   assert.doesNotMatch(effectiveSlotSource, /import \{ determineKeyType, parseModelString \} from "\.\/keyManager";/);
+  assert.doesNotMatch(effectiveSlotSource, /from "\.\/keyManager"/);
 });
 
 test('keyManager model helpers preserve parsing, migration, and variant label behavior', async () => {
