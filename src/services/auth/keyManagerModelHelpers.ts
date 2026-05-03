@@ -120,6 +120,8 @@ export interface ModelVariantMeta {
     ratio?: string;
 }
 
+export type GlobalModelType = 'chat' | 'image' | 'video' | 'image+chat' | 'audio';
+
 /**
  * Parse vendor-specific suffix patterns and extract variant metadata.
  * - Keeps speed tier (fast/slow) as model-differentiating signal.
@@ -286,4 +288,46 @@ export function extractModelIdsFromPricingData(pricingData: unknown): string[] {
             })
             .filter((value): value is string => Boolean(value))
     ));
+}
+
+export function inferModelType(modelId: string): GlobalModelType {
+    const id = modelId.toLowerCase();
+
+    // OpenRouter Specific: "provider/model" format usually implies chat unless "flux", "sd", "ideogram" etc.
+    const isOpenRouter = id.includes('/') && !id.startsWith('models/');
+
+    const isVideo = id.includes('video') || id.includes('veo') || id.includes('kling') ||
+        id.includes('runway') || id.includes('gen-3') || id.includes('gen-2') ||
+        id.includes('luma') || id.includes('sora') || id.includes('pika') ||
+        id.includes('minimax-video') || id.includes('wan') || id.includes('pixverse') ||
+        id.includes('hailuo') || id.includes('seedance') || id.includes('viggle') ||
+        id.includes('higgsfield') || id.includes('vidu') || id.includes('ray-') ||
+        id.includes('jimeng') || id.includes('cogvideo') || id.includes('hunyuanvideo');
+    if (isVideo) return 'video';
+
+    // Treat image-specific model families as image models, not chat models
+    const isImage = id.includes('imagen') || id.includes('image') || id.includes('img') ||
+        id.includes('dall-e') || id.includes('dalle') || id.includes('midjourney') ||
+        id.includes('mj') || id.includes('nano') || id.includes('banana') ||
+        id.includes('flux') || id.includes('stable') || id.includes('sd-') ||
+        id.includes('stable-diffusion') || id.includes('diffusion') ||
+        id.includes('painting') || id.includes('draw') || id.includes('ideogram') ||
+        id.includes('recraft') || id.includes('seedream');
+    if (isImage) return 'image';
+
+    const isAudio = id.includes('lyria') || id.includes('audio') || id.includes('music') || id.includes('tts') ||
+        id.includes('suno') || id.includes('voicemod') || id.includes('elevenlabs') ||
+        id.includes('fish-audio');
+    if (isAudio) return 'audio';
+
+    const isChat = id.includes('gemini') || id.includes('gpt') || id.includes('claude') ||
+        id.includes('deepseek') || id.includes('qwen') || id.includes('llama') ||
+        id.includes('mistral') || id.includes('yi-') || id.includes(':free') ||
+        id.includes('moonshot') || id.includes('doubao');
+    if (isChat) return 'chat';
+
+    // Default OpenRouter to chat if ambivalent
+    if (isOpenRouter) return 'chat';
+
+    return 'chat';
 }

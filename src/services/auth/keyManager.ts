@@ -114,11 +114,13 @@ import {
     categorizeModels,
     DEPRECATED_MODELS,
     extractModelIdsFromPricingData,
+    inferModelType,
     MODEL_MIGRATION_MAP,
     normalizeModelId,
     parseModelString,
     parseModelVariantMeta,
 } from './keyManagerModelHelpers';
+import type { GlobalModelType } from './keyManagerModelHelpers';
 import { determineKeyType } from './keyManagerKeyType';
 export {
     parseModelString,
@@ -129,7 +131,7 @@ export {
     appendModelVariantLabel,
     categorizeModels,
 } from './keyManagerModelHelpers';
-export type { ModelVariantMeta } from './keyManagerModelHelpers';
+export type { ModelVariantMeta, GlobalModelType } from './keyManagerModelHelpers';
 export { determineKeyType } from './keyManagerKeyType';
 
 const PROVIDER_MARKETING_SUFFIX_RE = /(\/(pricing|models))(\/.*)?$/i;
@@ -776,8 +778,6 @@ const DEFAULT_OPENAI_MODELS = ['dall-e-3', 'dall-e-2', 'gpt-4o', 'gpt-4o-mini'];
 
 const GOOGLE_HEADER_NAME = 'x-goog-api-key';
 
-type GlobalModelType = 'chat' | 'image' | 'video' | 'image+chat' | 'audio'; // multimodal support
-
 const GOOGLE_CHAT_MODELS = [
     // Gemini 2.5 series - best value
     { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', icon: '\u{1F9E0}', description: '\u6700\u5F3A\u63A8\u7406\u6A21\u578B\uFF0C\u64C5\u957F\u4EE3\u7801\u3001\u6570\u5B66\u3001STEM \u590D\u6742\u4EFB\u52A1' },
@@ -869,49 +869,6 @@ export const getModelMetadata = (modelId: string): ModelMetadata | undefined => 
 
     return GOOGLE_MODEL_METADATA.get(baseId);
 };
-
-const inferModelType = (modelId: string): GlobalModelType => {
-    const id = modelId.toLowerCase();
-
-    // OpenRouter Specific: "provider/model" format usually implies chat unless "flux", "sd", "ideogram" etc.
-    const isOpenRouter = id.includes('/') && !id.startsWith('models/');
-
-    const isVideo = id.includes('video') || id.includes('veo') || id.includes('kling') ||
-        id.includes('runway') || id.includes('gen-3') || id.includes('gen-2') ||
-        id.includes('luma') || id.includes('sora') || id.includes('pika') ||
-        id.includes('minimax-video') || id.includes('wan') || id.includes('pixverse') ||
-        id.includes('hailuo') || id.includes('seedance') || id.includes('viggle') ||
-        id.includes('higgsfield') || id.includes('vidu') || id.includes('ray-') ||
-        id.includes('jimeng') || id.includes('cogvideo') || id.includes('hunyuanvideo');
-    if (isVideo) return 'video';
-
-    // Treat image-specific model families as image models, not chat models
-    const isImage = id.includes('imagen') || id.includes('image') || id.includes('img') ||
-        id.includes('dall-e') || id.includes('dalle') || id.includes('midjourney') ||
-        id.includes('mj') || id.includes('nano') || id.includes('banana') ||
-        id.includes('flux') || id.includes('stable') || id.includes('sd-') ||
-        id.includes('stable-diffusion') || id.includes('diffusion') ||
-        id.includes('painting') || id.includes('draw') || id.includes('ideogram') ||
-        id.includes('recraft') || id.includes('seedream');
-    if (isImage) return 'image';
-
-    const isAudio = id.includes('lyria') || id.includes('audio') || id.includes('music') || id.includes('tts') ||
-        id.includes('suno') || id.includes('voicemod') || id.includes('elevenlabs') ||
-        id.includes('fish-audio');
-    if (isAudio) return 'audio';
-
-    const isChat = id.includes('gemini') || id.includes('gpt') || id.includes('claude') ||
-        id.includes('deepseek') || id.includes('qwen') || id.includes('llama') ||
-        id.includes('mistral') || id.includes('yi-') || id.includes(':free') ||
-        id.includes('moonshot') || id.includes('doubao');
-    if (isChat) return 'chat';
-
-    // Default OpenRouter to chat if ambivalent
-    if (isOpenRouter) return 'chat';
-
-    return 'chat';
-};
-
 
 // Register Chat Model Presets
 CHAT_MODEL_PRESETS.forEach(preset => {

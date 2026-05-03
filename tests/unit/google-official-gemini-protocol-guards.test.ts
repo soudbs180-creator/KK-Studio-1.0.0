@@ -35,6 +35,7 @@ test("Google TTS presets and routing heuristics include current official model i
   const registrySource = readSource("src/services/model/modelRegistry.ts");
   const capabilitiesSource = readSource("src/services/model/modelCapabilities.ts");
   const keyManagerSource = readSource("src/services/auth/keyManager.ts");
+  const modelHelpersSource = readSource("src/services/auth/keyManagerModelHelpers.ts");
 
   assert.match(presetsSource, /gemini-2\.5-flash-preview-tts/);
   assert.match(presetsSource, /gemini-2\.5-pro-preview-tts/);
@@ -51,6 +52,7 @@ test("Google TTS presets and routing heuristics include current official model i
   assert.match(capabilitiesSource, /lyria-3-pro-preview/);
   assert.match(capabilitiesSource, /lyria-3-clip-preview/);
   assert.match(capabilitiesSource, /lowerModelId\.includes\('tts'\)/);
-  assert.match(keyManagerSource, /id\.includes\('tts'\)/);
+  assert.match(modelHelpersSource, /id\.includes\('tts'\)/);
+  assert.match(keyManagerSource, /inferModelType\(id\)/);
   assert.match(keyManagerSource, /normalizedModelId\.includes\('tts'\)/);
 });

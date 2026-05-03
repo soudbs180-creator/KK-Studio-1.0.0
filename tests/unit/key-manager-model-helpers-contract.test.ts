@@ -15,6 +15,7 @@ type KeyManagerModelHelpersModule = {
     otherModels: string[];
   };
   extractModelIdsFromPricingData: (pricingData: unknown) => string[];
+  inferModelType: (modelId: string) => 'chat' | 'image' | 'video' | 'image+chat' | 'audio';
   normalizeModelId: (modelId: string) => string;
   parseModelString: (input: string) => { id: string; name?: string; description?: string; provider?: string };
   parseModelVariantMeta: (modelId: string) => {
@@ -47,16 +48,19 @@ test('keyManager model helper boundary lives outside the monolithic key manager'
   assert.match(keyManagerSource, /from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /import \{[\s\S]*categorizeModels[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /import \{[\s\S]*extractModelIdsFromPricingData[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
+  assert.match(keyManagerSource, /import type \{[\s\S]*GlobalModelType[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /export \{[\s\S]*parseModelString[\s\S]*MODEL_MIGRATION_MAP[\s\S]*normalizeModelId[\s\S]*parseModelVariantMeta[\s\S]*appendModelVariantLabel[\s\S]*categorizeModels[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
-  assert.match(keyManagerSource, /export type \{[\s\S]*ModelVariantMeta[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
+  assert.match(keyManagerSource, /export type \{[\s\S]*ModelVariantMeta[\s\S]*GlobalModelType[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(helperSource, /export function parseModelString/);
   assert.match(helperSource, /export const MODEL_MIGRATION_MAP/);
   assert.match(helperSource, /export const DEPRECATED_MODELS/);
+  assert.match(helperSource, /export type GlobalModelType/);
   assert.match(helperSource, /export function normalizeModelId/);
   assert.match(helperSource, /export function parseModelVariantMeta/);
   assert.match(helperSource, /export function appendModelVariantLabel/);
   assert.match(helperSource, /export function categorizeModels/);
   assert.match(helperSource, /export function extractModelIdsFromPricingData/);
+  assert.match(helperSource, /export function inferModelType/);
   assert.doesNotMatch(keyManagerSource, /export function parseModelString/);
   assert.doesNotMatch(keyManagerSource, /export const MODEL_MIGRATION_MAP/);
   assert.doesNotMatch(keyManagerSource, /export function normalizeModelId/);
@@ -64,6 +68,7 @@ test('keyManager model helper boundary lives outside the monolithic key manager'
   assert.doesNotMatch(keyManagerSource, /export function appendModelVariantLabel/);
   assert.doesNotMatch(keyManagerSource, /export function categorizeModels/);
   assert.doesNotMatch(keyManagerSource, /function extractModelIdsFromPricingData/);
+  assert.doesNotMatch(keyManagerSource, /const inferModelType = /);
   assert.match(effectiveSlotSource, /import \{ parseModelString \} from "\.\/keyManagerModelHelpers";/);
   assert.doesNotMatch(effectiveSlotSource, /import \{ determineKeyType, parseModelString \} from "\.\/keyManager";/);
   assert.doesNotMatch(effectiveSlotSource, /from "\.\/keyManager"/);
@@ -162,4 +167,17 @@ test('keyManager model helpers preserve model category heuristics', async () => 
     chatModels: ['gemini-2.5-pro', 'gpt-4o', 'claude-3', 'chat-model'],
     otherModels: ['embedding-model'],
   });
+});
+
+test('keyManager model helpers preserve global model type inference behavior', async () => {
+  const { inferModelType } = await loadKeyManagerModelHelpers();
+
+  assert.equal(inferModelType('veo-3.1-generate-preview'), 'video');
+  assert.equal(inferModelType('provider/video-image-hybrid'), 'video');
+  assert.equal(inferModelType('imagen-4.0-generate-001'), 'image');
+  assert.equal(inferModelType('openai/dall-e-3'), 'image');
+  assert.equal(inferModelType('audio-tts-model'), 'audio');
+  assert.equal(inferModelType('openrouter/unknown-model'), 'chat');
+  assert.equal(inferModelType('unknown-model'), 'chat');
+  assert.equal(inferModelType('qwen-max'), 'chat');
 });
