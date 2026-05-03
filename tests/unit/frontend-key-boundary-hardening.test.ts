@@ -42,7 +42,8 @@ test('keyManager blocks browser-side provider diagnostics while allowing loopbac
   assert.match(source, /async updateKey\(id: string, updates: Partial<KeySlot>\): Promise<void> \{\s*const secureModeError = this\.ensureAuthenticatedUserApiMode\(\);\s*if \(secureModeError\) \{\s*throw new Error\(secureModeError\);\s*\}/);
   assert.match(source, /addProvider\(config: Omit<ThirdPartyProvider, 'id' \| 'usage' \| 'status' \| 'createdAt' \| 'updatedAt'>\): ThirdPartyProvider \{\s*const secureModeError = this\.ensureAuthenticatedUserApiMode\(\);\s*if \(secureModeError\) \{\s*throw new Error\(secureModeError\);\s*\}/);
   assert.match(source, /updateProvider\(id: string, updates: Partial<Omit<ThirdPartyProvider, 'id' \| 'createdAt'>>\): boolean \{\s*const secureModeError = this\.ensureAuthenticatedUserApiMode\(\);\s*if \(secureModeError\) \{\s*throw new Error\(secureModeError\);\s*\}/);
-  assert.match(source, /apiKey: '',/);
+  assert.match(source, /apiKey: getRedactedChannelConfigApiKey\(\),/);
+  assert.doesNotMatch(source, /apiKey: '',/);
   assert.match(source, /export async function fetchGoogleModels\(apiKey: string\): Promise<string\[]> \{\s*if \(isBrowserRuntime\(\)\) \{\s*throw createBrowserDirectProviderChecksDisabledError\(\);\s*\}/);
   assert.match(source, /export async function fetchGeminiCompatModels\(apiKey: string, baseUrl\?: string\): Promise<string\[]> \{\s*if \(isBrowserRuntime\(\)\) \{\s*throw createBrowserDirectProviderChecksDisabledError\(\);\s*\}/);
   assert.match(source, /export async function fetchOpenAICompatModels\(apiKey: string, baseUrl: string\): Promise<string\[]> \{\s*if \(isBrowserRuntime\(\)\) \{\s*throw createBrowserDirectProviderChecksDisabledError\(\);\s*\}/);

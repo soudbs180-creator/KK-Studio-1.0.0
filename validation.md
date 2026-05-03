@@ -469,6 +469,18 @@ Credential sanitizer slices should use this narrower path-limited diff check:
 git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerCredentialSanitizer.ts" "tests/unit/key-manager-credential-sanitizer-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
+Channel config secret-boundary slices should use this targeted gate:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/key-manager-channel-config-secrets-contract.test.ts" "tests/unit/frontend-key-boundary-hardening.test.ts" "tests/unit/key-manager-runtime-fallback.test.ts" "tests/unit/official-route-default-models.test.ts"
+```
+
+Channel config secret-boundary slices should use this narrower path-limited diff check:
+
+```powershell
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerChannelConfigSecrets.ts" "tests/unit/key-manager-channel-config-secrets-contract.test.ts" "tests/unit/frontend-key-boundary-hardening.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
 Model ID compatibility facade slices should use this narrower path-limited diff check:
 
 ```powershell

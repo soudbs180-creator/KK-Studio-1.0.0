@@ -57,6 +57,7 @@ import {
     matchesSlotRouteSuffix,
 } from './keyManagerRouteIds';
 import { sanitizeAsciiApiKey } from './keyManagerCredentialSanitizer';
+import { getRedactedChannelConfigApiKey } from './keyManagerChannelConfigSecrets';
 import {
     applyOpenAICompatAuthToUrl,
     type ApiProtocolFormat,
@@ -3694,7 +3695,7 @@ export class KeyManager {
             id: slot.id,
             name: slot.name || slot.provider || 'Unnamed Channel',
             baseUrl: slotBaseUrl,
-            apiKey: '',
+            apiKey: getRedactedChannelConfigApiKey(),
             provider: slot.provider,
             providerFamily: runtime.providerFamily,
             protocolHint: normalizeApiProtocolFormat(slot.format, runtime.resolvedFormat),
@@ -3737,7 +3738,7 @@ export class KeyManager {
             id: provider.id,
             name: provider.name,
             baseUrl: provider.baseUrl,
-            apiKey: '',
+            apiKey: getRedactedChannelConfigApiKey(),
             provider: runtime.uiProvider,
             providerFamily: runtime.providerFamily,
             protocolHint: normalizeApiProtocolFormat(provider.format, runtime.resolvedFormat),
