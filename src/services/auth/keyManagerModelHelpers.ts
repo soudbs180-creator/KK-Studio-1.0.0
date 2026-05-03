@@ -193,6 +193,68 @@ export function appendModelVariantLabel(baseName: string, modelId: string): stri
     return `${baseName} (${tags.join(' · ')})`;
 }
 
+/**
+ * Categorize model IDs into image, video, chat, or other buckets.
+ * This drives grouped rendering in the channel and provider editors.
+ */
+export function categorizeModels(models: string[]): {
+    imageModels: string[];
+    videoModels: string[];
+    chatModels: string[];
+    otherModels: string[];
+} {
+    const categories = {
+        imageModels: [] as string[],
+        videoModels: [] as string[],
+        chatModels: [] as string[],
+        otherModels: [] as string[]
+    };
+
+    models.forEach(model => {
+        const lowerModel = model.toLowerCase();
+
+        // Heuristic: video-oriented model families
+        if (lowerModel.includes('veo') ||
+            lowerModel.includes('runway') ||
+            lowerModel.includes('luma') ||
+            lowerModel.includes('dream-machine') ||
+            lowerModel.includes('kling') ||
+            lowerModel.includes('cogvideo') ||
+            lowerModel.includes('svd') ||
+            lowerModel.includes('video')) {
+            categories.videoModels.push(model);
+        }
+        // Heuristic: image-oriented model families
+        else if (lowerModel.includes('imagen') ||
+            lowerModel.includes('dall-e') ||
+            lowerModel.includes('midjourney') ||
+            lowerModel.includes('image') ||
+            lowerModel.includes('nano') ||
+            lowerModel.includes('banana') ||
+            lowerModel.includes('flux') ||
+            lowerModel.includes('stable') ||
+            lowerModel.includes('diffusion') ||
+            lowerModel.includes('painting') ||
+            lowerModel.includes('draw') ||
+            lowerModel.includes('img')) {
+            categories.imageModels.push(model);
+        }
+        // Heuristic: treat mainstream chat families as chat models
+        else if (lowerModel.includes('gemini') ||
+            lowerModel.includes('gpt') ||
+            lowerModel.includes('claude') ||
+            lowerModel.includes('chat')) {
+            categories.chatModels.push(model);
+        }
+        // Everything else falls into the catch-all category
+        else {
+            categories.otherModels.push(model);
+        }
+    });
+
+    return categories;
+}
+
 type PricingModelCandidate = {
     model?: unknown;
     modelId?: unknown;

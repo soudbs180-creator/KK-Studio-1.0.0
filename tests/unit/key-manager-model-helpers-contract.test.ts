@@ -8,6 +8,12 @@ const ROOT_DIR = process.cwd();
 type KeyManagerModelHelpersModule = {
   MODEL_MIGRATION_MAP: Record<string, string>;
   appendModelVariantLabel: (baseName: string, modelId: string) => string;
+  categorizeModels: (models: string[]) => {
+    imageModels: string[];
+    videoModels: string[];
+    chatModels: string[];
+    otherModels: string[];
+  };
   extractModelIdsFromPricingData: (pricingData: unknown) => string[];
   normalizeModelId: (modelId: string) => string;
   parseModelString: (input: string) => { id: string; name?: string; description?: string; provider?: string };
@@ -39,8 +45,9 @@ test('keyManager model helper boundary lives outside the monolithic key manager'
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-model-helpers-contract\.test\.ts/);
   assert.match(keyManagerSource, /from '\.\/keyManagerModelHelpers';/);
+  assert.match(keyManagerSource, /import \{[\s\S]*categorizeModels[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /import \{[\s\S]*extractModelIdsFromPricingData[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
-  assert.match(keyManagerSource, /export \{[\s\S]*parseModelString[\s\S]*MODEL_MIGRATION_MAP[\s\S]*normalizeModelId[\s\S]*parseModelVariantMeta[\s\S]*appendModelVariantLabel[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
+  assert.match(keyManagerSource, /export \{[\s\S]*parseModelString[\s\S]*MODEL_MIGRATION_MAP[\s\S]*normalizeModelId[\s\S]*parseModelVariantMeta[\s\S]*appendModelVariantLabel[\s\S]*categorizeModels[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /export type \{[\s\S]*ModelVariantMeta[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(helperSource, /export function parseModelString/);
   assert.match(helperSource, /export const MODEL_MIGRATION_MAP/);
@@ -48,12 +55,14 @@ test('keyManager model helper boundary lives outside the monolithic key manager'
   assert.match(helperSource, /export function normalizeModelId/);
   assert.match(helperSource, /export function parseModelVariantMeta/);
   assert.match(helperSource, /export function appendModelVariantLabel/);
+  assert.match(helperSource, /export function categorizeModels/);
   assert.match(helperSource, /export function extractModelIdsFromPricingData/);
   assert.doesNotMatch(keyManagerSource, /export function parseModelString/);
   assert.doesNotMatch(keyManagerSource, /export const MODEL_MIGRATION_MAP/);
   assert.doesNotMatch(keyManagerSource, /export function normalizeModelId/);
   assert.doesNotMatch(keyManagerSource, /export function parseModelVariantMeta/);
   assert.doesNotMatch(keyManagerSource, /export function appendModelVariantLabel/);
+  assert.doesNotMatch(keyManagerSource, /export function categorizeModels/);
   assert.doesNotMatch(keyManagerSource, /function extractModelIdsFromPricingData/);
   assert.match(effectiveSlotSource, /import \{ parseModelString \} from "\.\/keyManagerModelHelpers";/);
   assert.doesNotMatch(effectiveSlotSource, /import \{ determineKeyType, parseModelString \} from "\.\/keyManager";/);
@@ -130,4 +139,27 @@ test('keyManager model helpers preserve pricing catalog model ID extraction beha
     'legacyCamel',
     'fallback-name',
   ]);
+});
+
+test('keyManager model helpers preserve model category heuristics', async () => {
+  const { categorizeModels } = await loadKeyManagerModelHelpers();
+
+  assert.deepEqual(categorizeModels([
+    'veo-3',
+    'RUNWAY-gen',
+    'imagen-4',
+    'dall-e-3',
+    'nano-banana',
+    'gemini-2.5-pro',
+    'gpt-4o',
+    'claude-3',
+    'chat-model',
+    'embedding-model',
+    'video-image-hybrid',
+  ]), {
+    videoModels: ['veo-3', 'RUNWAY-gen', 'video-image-hybrid'],
+    imageModels: ['imagen-4', 'dall-e-3', 'nano-banana'],
+    chatModels: ['gemini-2.5-pro', 'gpt-4o', 'claude-3', 'chat-model'],
+    otherModels: ['embedding-model'],
+  });
 });
