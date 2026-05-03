@@ -15,6 +15,7 @@ import {
 const ROOT_DIR = process.cwd();
 
 type CanvasPromptImageLinksModule = {
+  deleteCanvasImageNode: (canvas: Canvas, id: string) => Canvas;
   deleteCanvasPromptNode: (canvas: Canvas, id: string) => Canvas;
   linkCanvasPromptToImage: (canvas: Canvas, promptId: string, imageId: string) => Canvas;
   unlinkCanvasPromptFromImage: (canvas: Canvas, promptId: string, imageId: string) => Canvas;
@@ -80,20 +81,57 @@ test('canvas prompt-image link boundary lives outside CanvasContext', () => {
 
   assert.match(testConfigSource, /tests\/unit\/canvas-prompt-image-links-contract\.test\.ts/);
   assert.match(contextSource, /from '\.\/canvasPromptImageLinks';/);
+  assert.match(helperSource, /export function deleteCanvasImageNode/);
   assert.match(helperSource, /export function deleteCanvasPromptNode/);
   assert.match(helperSource, /export function linkCanvasPromptToImage/);
   assert.match(helperSource, /export function unlinkCanvasPromptFromImage/);
 
+  const imageDeleteWrapperSource = contextSource.slice(
+    contextSource.indexOf('const deleteImageNode = useCallback'),
+    contextSource.indexOf('const deletePromptNode = useCallback')
+  );
   const relationshipWrapperSource = contextSource.slice(
     contextSource.indexOf('const deletePromptNode = useCallback'),
     contextSource.indexOf('const undo = useCallback')
   );
+  assert.match(imageDeleteWrapperSource, /deleteCanvasImageNode\(c, id\)/);
+  assert.doesNotMatch(imageDeleteWrapperSource, /imageNodes:\s*c\.imageNodes\.filter/);
+  assert.doesNotMatch(imageDeleteWrapperSource, /childImageIds:\s*p\.childImageIds\.filter/);
+  assert.doesNotMatch(imageDeleteWrapperSource, /sourceImageId:\s*p\.sourceImageId === id/);
   assert.match(relationshipWrapperSource, /deleteCanvasPromptNode\(canvas, id\)/);
   assert.match(relationshipWrapperSource, /linkCanvasPromptToImage\(canvas, promptId, imageId\)/);
   assert.match(relationshipWrapperSource, /unlinkCanvasPromptFromImage\(canvas, promptId, imageId\)/);
   assert.doesNotMatch(relationshipWrapperSource, /parentPromptId === id/);
   assert.doesNotMatch(relationshipWrapperSource, /childImageIds\.includes/);
   assert.doesNotMatch(relationshipWrapperSource, /childImageIds\.filter/);
+});
+
+test('deleteCanvasImageNode removes image references without changing persistence metadata', async () => {
+  const { deleteCanvasImageNode } = await loadPromptImageLinksModule();
+  const source = canvas({
+    id: 'canvas-1',
+    promptNodes: [
+      promptNode({ id: 'prompt-1', childImageIds: ['image-1', 'image-2'], sourceImageId: 'image-1' }),
+      promptNode({ id: 'prompt-2', childImageIds: ['image-3'], sourceImageId: 'image-2' }),
+    ],
+    imageNodes: [
+      imageNode({ id: 'image-1', parentPromptId: 'prompt-1' }),
+      imageNode({ id: 'image-2', parentPromptId: 'prompt-1' }),
+      imageNode({ id: 'image-3', parentPromptId: 'prompt-2' }),
+    ],
+    drawings: [{ id: 'drawing-1', type: 'pen', points: [], color: '#000', width: 1 }],
+    lastModified: 123,
+  });
+
+  const result = deleteCanvasImageNode(source, 'image-1');
+
+  assert.deepEqual(result.imageNodes.map((node) => node.id), ['image-2', 'image-3']);
+  assert.deepEqual(result.promptNodes.map((node) => [node.id, node.childImageIds, node.sourceImageId]), [
+    ['prompt-1', ['image-2'], undefined],
+    ['prompt-2', ['image-3'], 'image-2'],
+  ]);
+  assert.equal(result.drawings, source.drawings);
+  assert.equal(result.lastModified, source.lastModified);
 });
 
 test('deleteCanvasPromptNode removes the prompt and orphans child images without deleting images', async () => {

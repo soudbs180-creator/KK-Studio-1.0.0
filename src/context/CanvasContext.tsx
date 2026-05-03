@@ -64,6 +64,7 @@ import {
     updateCanvasPromptNodePosition
 } from './canvasPositionUpdates';
 import {
+    deleteCanvasImageNode,
     deleteCanvasPromptNode,
     linkCanvasPromptToImage,
     unlinkCanvasPromptFromImage
@@ -1573,17 +1574,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             if (node) {
                 safeRevokeBlobUrl(node.url);
             }
-            return {
-                ...c,
-                imageNodes: c.imageNodes.filter(n => n.id !== id),
-                // Also update parent prompt node to remove from child list
-                promptNodes: c.promptNodes.map(p => ({
-                    ...p,
-                    childImageIds: p.childImageIds.filter(cid => cid !== id),
-                    // [Ref Fix] Also clear sourceImageId if this image was a source for a follow-up
-                    sourceImageId: p.sourceImageId === id ? undefined : p.sourceImageId
-                }))
-            };
+            return deleteCanvasImageNode(c, id);
         });
     }, [updateCanvas]);
 

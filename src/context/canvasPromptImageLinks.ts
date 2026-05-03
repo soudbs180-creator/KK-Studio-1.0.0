@@ -1,5 +1,17 @@
 import type { Canvas } from '../types.ts';
 
+export function deleteCanvasImageNode(canvas: Canvas, id: string): Canvas {
+    return {
+        ...canvas,
+        imageNodes: canvas.imageNodes.filter(node => node.id !== id),
+        promptNodes: canvas.promptNodes.map(prompt => ({
+            ...prompt,
+            childImageIds: prompt.childImageIds.filter(childId => childId !== id),
+            sourceImageId: prompt.sourceImageId === id ? undefined : prompt.sourceImageId,
+        })),
+    };
+}
+
 export function deleteCanvasPromptNode(canvas: Canvas, id: string): Canvas {
     return {
         ...canvas,
