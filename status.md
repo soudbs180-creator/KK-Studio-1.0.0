@@ -4,18 +4,18 @@ Last updated: 2026-05-03
 
 ## Active State
 
-- Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`, with public-type review follow-up committed in `f06f1880`; Stage One Backfill M2 `usePromptGroupLayout` hardening is committed in `8a458cd4`; Stage One Backfill M3 `useGenerationRuntime` hardening is committed in `ab719c4a`; the generation billing follow-up is committed in `083db7f8`; Stage One Backfill M5 `usePptRuntime` public type-boundary coverage is committed in `569383aa`; Stage Two M1 `CanvasContext` state/default/context boundary extraction is committed in `92a9dc41`; Stage Two M2 `CanvasContext` selection reducer extraction is committed in `e0f1b583`; Stage Two M3 `CanvasContext` prompt child image resolver extraction is committed in `83cc8d7f`; Stage Two M4 `CanvasContext` workflow source node ID resolver extraction is committed in `9ec4dbb1`; the current slice is Stage Two M5 `CanvasContext` media recovery extraction.
+- Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`, with public-type review follow-up committed in `f06f1880`; Stage One Backfill M2 `usePromptGroupLayout` hardening is committed in `8a458cd4`; Stage One Backfill M3 `useGenerationRuntime` hardening is committed in `ab719c4a`; the generation billing follow-up is committed in `083db7f8`; Stage One Backfill M5 `usePptRuntime` public type-boundary coverage is committed in `569383aa`; Stage Two M1 `CanvasContext` state/default/context boundary extraction is committed in `92a9dc41`; Stage Two M2 `CanvasContext` selection reducer extraction is committed in `e0f1b583`; Stage Two M3 `CanvasContext` prompt child image resolver extraction is committed in `83cc8d7f`; Stage Two M4 `CanvasContext` workflow source node ID resolver extraction is committed in `9ec4dbb1`; Stage Two M5 `CanvasContext` media recovery extraction is committed in `002ee6fe`; the latest security/release cleanup commits are `4cdbf4cf`, `567f85aa`, `0c5cadde`, `333f2551`, and `b6620ef2`.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and is currently at `9ec4dbb1 refactor: extract canvas workflow source ids`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and is currently at `b6620ef2 refactor: prune dead ai12 service`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Thread merge state: `019dd551...` is the main refactor history and `019de168...` is continuation history; both are part of the same Stage One M6 ecommerce runtime line.
-- Alternate-git worktree was clean at `9ec4dbb1`; current uncommitted work is ledger-only finalization alignment until the next scoped code slice starts.
+- Alternate-git worktree was clean at `b6620ef2`; current uncommitted work is ledger-only finalization alignment until the next scoped code slice starts.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: finish and commit Stage Two M5 by extracting media recovery helpers from `CanvasContext.tsx` into `src/context/canvasMediaRecovery.ts`.
-- Most recent CanvasContext M4 committed scope: `src/context/CanvasContext.tsx`, `src/context/canvasWorkflowSourceNodeIds.ts`, `tests/unit/canvas-workflow-source-node-ids-contract.test.ts`, `tsconfig.tests.json`, `plans.md`, `implement.md`, `validation.md`, and `status.md`.
-- Next active slice after M5: startup prompt recovery helpers in `CanvasContext.tsx` unless source inspection identifies a smaller safer seam. Selection, drag, persistence writes, node mutations, UI, release metadata, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain excluded from that commit.
-- Browser QA: skipped for these runtime/type-boundary slices because no UI runtime or visual surface changed.
+- Current focus: commit this ledger alignment, then start the next narrow Stage Two `CanvasContext.tsx` slice.
+- Most recent code/security scopes: Stage Two M5 media recovery helpers in `002ee6fe`; protobuf override in `4cdbf4cf`; portable metadata refresh in `567f85aa`; Nutrient OCR server-key hardening in `0c5cadde`; PostCSS patch in `333f2551`; dead AI12 service pruning in `b6620ef2`.
+- Next active slice: startup prompt recovery helpers in `CanvasContext.tsx` unless source inspection identifies a smaller safer seam. Selection, drag, persistence writes, node mutations, UI, release metadata, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain excluded from that commit.
+- Browser QA: direct in-app Browser QA was attempted for the OCR/settings surface after the security fix, but the local Vite/preview server printed ready and then the listener disappeared. Fallback `verify:desktop-settings-smoke` and `verify:mobile-settings-smoke` passed with route checks; runtime/docs-only slices still skip browser QA when no visual surface changes.
 
 ## Completed In `9e7ae2b5` (Clay UI Audit Closure)
 
@@ -47,18 +47,18 @@ Last updated: 2026-05-03
 
 ## Current Quality Baseline
 
-- Current giant tracked files in the Stage Two M5 working tree: `src/context/CanvasContext.tsx` 4457 text lines, `src/services/auth/keyManager.ts` 4606 lines, `src/App.tsx` 4385 lines, `src/components/layout/PromptBar.tsx` 4075 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 3980 lines.
-- Current tracked TS/TSX debt scan: direct `as any` matches 167, explicit any-type pattern matches 484, `@ts-ignore` / `@ts-expect-error` matches 133, and `console.log` matches 251. These are refactor debt indicators, not release blockers by themselves.
+- Current giant tracked files after `b6620ef2`: `src/services/auth/keyManager.ts` 5279 lines, `src/context/CanvasContext.tsx` 5124 lines, `src/App.tsx` 4900 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 4517 lines, `src/components/layout/PromptBar.tsx` 4437 lines.
+- Current tracked TS/TSX debt scan: direct `as any` matches 156, explicit any-type pattern matches 346, `@ts-ignore` / `@ts-expect-error` matches 133, and `console.log` matches 245. These are refactor debt indicators, not release blockers by themselves.
 - Quality rule going forward: reduce `any`, TypeScript suppressions, and bare `console.log` inside touched files when local and safe; do not perform a whole-repo cleanup inside one runtime or architecture extraction.
-- Architecture status from the last recorded full check: `npm.cmd run architecture:check` passed with known allowlisted migration and legacy bridge exceptions; `npm.cmd run spec:check` passed.
-- Version governance status from the last recorded full check: `npm.cmd run governance:check` fails at `governance:version` because portable release metadata build times are not aligned. This is deferred to final packaging/publish.
+- Architecture status from the latest full check: `npm.cmd run architecture:check` passed with known allowlisted migration and legacy bridge exceptions; `npm.cmd run spec:check` passed.
+- Version governance status from the latest full check: `npm.cmd run governance:check` passed after `567f85aa` refreshed portable release metadata.
 
 ## Finalization Audit Plan
 
 1. Close the currently selected Stage Two `CanvasContext.tsx` seam first; do not run a final completion audit while an obvious giant-file split seam is active.
 2. Run high-confidence local audits for unused code, TypeScript debt, bare debug logging, TODO/FIXME markers, sensitive storage/logging, architecture boundaries, specs, build, unit tests, and UI contract coverage.
 3. Fix only narrow blockers found by the audits. Broad debt counts are tracked but are not safe to delete in one batch.
-4. Defer release metadata realignment to packaging/publish: regenerate portable artifacts, publish stable manifest, then rerun `npm.cmd run governance:check`.
+4. If packaging/publish metadata changes again, rerun `npm.cmd run package:portable`, `npm.cmd run publish:portable`, and `npm.cmd run governance:check` before final release sign-off.
 5. Final completion can only be claimed after the release gate and UI/browser checks required by touched surfaces pass.
 
 ## Stage Two M5 Media Recovery Extraction
@@ -87,6 +87,31 @@ Last updated: 2026-05-03
 - Verified local dependency state: `npm.cmd ls protobufjs` reports `protobufjs@7.5.5 overridden`.
 - Passed dependency audit after the fix: `npm.cmd audit --omit=dev --audit-level=moderate` reported `found 0 vulnerabilities`.
 - Passed after the dependency update: `npm.cmd run typecheck`, `npm.cmd run test:unit` (1129/1129), `npm.cmd run build`, `npm.cmd run governance:security`, and `npm.cmd run check:encoding`.
+
+## Completed In `567f85aa` (Portable Release Metadata Refresh)
+
+- Regenerated/published portable release metadata so `release/publish/stable/manifest.json` and `release/KK-Studio-Portable/app/dist/app-version.json` no longer have mismatched `buildTime` values.
+- The former `governance:version` blocker is cleared; `npm.cmd run governance:check` now passes in the latest full gate.
+- Commit scope was release metadata only and stayed separate from runtime/security code.
+
+## Completed In `0c5cadde` (Nutrient OCR Key Hardening)
+
+- Browser settings no longer store or submit a Nutrient OCR API key.
+- `/api/nutrient-document` now reads only server-side `NUTRIENT_API_KEY` / `NUTRIENT_DWS_API_KEY`; browser-supplied `apiKey` form data is ignored.
+- Settings/workbench copy now describes the server-key boundary instead of showing an editable client key field.
+- Targeted OCR/API validation passed: `tests/unit/ocr-service-settings-contract.test.ts`, `tests/unit/ecommerce-analysis-client-fallback.test.ts`, `tests/unit/api-settings-capability-routing-contract.test.ts`, and `tests/unit/portable-app-server-document-proxy-contract.test.ts`.
+- UI browser QA note: direct in-app Browser QA was attempted but blocked by the local server lifecycle; fallback desktop/mobile settings smoke checks passed.
+
+## Completed In `333f2551` (PostCSS Security Patch)
+
+- Updated `postcss` to `8.5.13` and refreshed the lockfile.
+- `npm.cmd audit --audit-level=moderate` and `npm.cmd audit --omit=dev --audit-level=moderate` both report zero vulnerabilities in the latest audit gate.
+
+## Completed In `b6620ef2` (Dead AI12 Service Pruning)
+
+- Deleted the unused `src/services/api/AI12APIService.ts` after import/reference proof showed the canonical service path no longer needs the dead shim.
+- Strengthened pruning coverage in `tests/unit/legacy-compatibility-pruning.test.ts`; `tests/unit/service-barrel-pruning.test.ts` was rerun with the pruning gate.
+- Commit scope was dead-code cleanup only and did not touch active provider routing behavior.
 
 ## Stage One M6 Closeout Scan
 
@@ -450,6 +475,14 @@ Last updated: 2026-05-03
 
 ## Latest Recorded Validation
 
+Fresh validation for the latest finalization/security cleanup line through `b6620ef2`:
+
+- Passed targeted OCR/API gate: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ocr-service-settings-contract.test.ts tests/unit/ecommerce-analysis-client-fallback.test.ts tests/unit/api-settings-capability-routing-contract.test.ts tests/unit/portable-app-server-document-proxy-contract.test.ts`.
+- Passed dead-code pruning gate: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/legacy-compatibility-pruning.test.ts tests/unit/service-barrel-pruning.test.ts`.
+- Passed settings smoke fallback checks: `npm.cmd run verify:desktop-settings-smoke` and `npm.cmd run verify:mobile-settings-smoke` in fallback mode with route checks returning 200. Direct in-app Browser QA was attempted but blocked by the local server listener disappearing after the server printed ready.
+- Passed full gates: `npm.cmd run architecture:check`, `npm.cmd run governance:check`, `npm.cmd run spec:check`, `npm.cmd audit --audit-level=moderate`, `npm.cmd audit --omit=dev --audit-level=moderate`, `npm.cmd run typecheck`, `npm.cmd run test:unit` (1131/1131), `npm.cmd run build`, `npm.cmd run check:encoding`, and `npm.cmd run governance:agent-docs`.
+- Passed path-limited alternate-git diff checks for touched code/security/release files with only LF/CRLF normalization warnings.
+
 Fresh validation for Stage Two M2 Canvas selection reducer:
 
 - Passed targeted gate: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-selection-runtime-contract.test.ts tests/unit/prompt-group-drag-layout.test.ts tests/unit/prompt-group-regroup-behavior.test.ts` (44/44).
@@ -526,7 +559,7 @@ Fresh validation for the completed ecommerce partial redraw runtime pass in `d12
 - Passed: `npm.cmd run governance:agent-docs`.
 - Passed: `npm.cmd run check:encoding`.
 - Passed tracked diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/App.tsx src/app/useEcommercePartialRedrawRuntime.ts tests/unit/ecommerce-partial-redraw-runtime-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
-- Additional recorded health gates after `d12731ce`: `npm.cmd run architecture:check` passed, `npm.cmd run spec:check` passed, and `npm.cmd run governance:check` failed only at the deferred portable metadata `governance:version` mismatch.
+- Additional recorded health gates after `d12731ce`: `npm.cmd run architecture:check` passed, `npm.cmd run spec:check` passed, and `npm.cmd run governance:check` had a portable metadata `governance:version` mismatch at that point; the mismatch was later cleared in `567f85aa`.
 
 Fresh validation for the current ledger-only correction:
 
@@ -663,15 +696,15 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-1. Finish Stage Two M4 ledger validation and commit `refactor: extract canvas workflow source ids`.
-2. Identify and start the next narrow `CanvasContext.tsx` responsibility after workflow source ID resolution, based on a source map and targeted contract first.
+1. Commit the current ledger-only alignment for completed release/security/dead-code cleanup through `b6620ef2`.
+2. Identify and start the next narrow `CanvasContext.tsx` responsibility after media recovery, based on a source map and targeted contract first.
 3. Continue Stage Two giant-file split in this priority order after remaining CanvasContext slices: `keyManager.ts`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`.
-4. Defer release metadata realignment until final packaging/publish, then rerun the full release gate including `npm.cmd run governance:check`.
+4. If release metadata changes again, rerun packaging/publish and the full release gate including `npm.cmd run governance:check`.
 
 ## Risks
 
 - Original `.git` does not match the writable metadata copy in this session. Use the full writable metadata copy at `node_modules/.codex-git-full` for local commits unless the ACL is fixed outside the sandbox.
 - Plain `.git` may show stale dirty state and must not be used as the commit-readiness source.
-- The alternate-git worktree was clean at `83cc8d7f` before the workflow source node ID resolver slice, but any staging must still be explicit path-based and reviewed before commit.
+- The alternate-git worktree was clean at `b6620ef2` before the current ledger-only alignment, but any staging must still be explicit path-based and reviewed before commit.
 - Do not delete locks, change `.git` ACLs, revert paused runtime/PPT work, or stage unrelated runtime files without explicit user confirmation.
 - Do not mix UI, PPT, runtime extraction, release metadata, and quality-debt cleanup in one commit.

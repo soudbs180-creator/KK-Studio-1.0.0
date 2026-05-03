@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline is `9ec4dbb1 refactor: extract canvas workflow source ids`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline is `b6620ef2 refactor: prune dead ai12 service`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -25,8 +25,9 @@ The active execution model for this thread has resumed Stage One convergence:
 - Stage Two M2 `CanvasContext` selection reducer extraction is completed in `e0f1b583`: it moves replace/add/remove/toggle selection semantics into `src/context/canvasSelection.ts`, without touching drag, persistence, or mutation ownership.
 - Stage Two M3 `CanvasContext` prompt child image resolver extraction is completed in `83cc8d7f`: it moves prompt-to-generated-image child ID resolution into `src/context/canvasPromptChildImages.ts`, without touching startup recovery, persistence writes, drag, node mutations, UI, or release metadata.
 - Stage Two M4 `CanvasContext` workflow source node ID resolver extraction is completed in `9ec4dbb1`: it moves utility workflow `data.sourceNodeIds` filtering/deduping into `src/context/canvasWorkflowSourceNodeIds.ts`, without touching workflow edge creation/pruning, drag, persistence, node mutations, UI, or release metadata.
-- Stage Two M5 `CanvasContext` media recovery extraction is the current slice being committed: it moves recovered media cache hydration and original-source resolution into `src/context/canvasMediaRecovery.ts`, without touching startup restore ordering, persisted task hydration, local folder refresh behavior, UI, release metadata, drag, or node mutations.
-- The active finalization lane is Stage Two M5 plus whole-project audit: close the next smallest `CanvasContext.tsx` responsibility first, then run architecture, security, UI, release, and quality gates. The project is not final-complete while `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain giant-file split targets and `governance:check` still has the known portable metadata mismatch.
+- Stage Two M5 `CanvasContext` media recovery extraction is completed in `002ee6fe`: it moves recovered media cache hydration and original-source resolution into `src/context/canvasMediaRecovery.ts`, without touching startup restore ordering, persisted task hydration, local folder refresh behavior, UI, release metadata, drag, or node mutations.
+- Security/release cleanup completed after M5: `4cdbf4cf` overrides `protobufjs` to `7.5.5`; `567f85aa` refreshes portable stable release metadata; `0c5cadde` keeps Nutrient OCR keys server-side; `333f2551` updates `postcss` to `8.5.13`; `b6620ef2` removes the dead AI12 service file after reference-proofed pruning.
+- The active finalization lane is now post-M5 ledger alignment plus the next smallest `CanvasContext.tsx` responsibility. The project is functionally green after the latest audit gates, but not final-complete while `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain giant-file split targets.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
@@ -34,22 +35,22 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 
 ## Current Baseline
 
-- `src/App.tsx`: 4385 lines after `569383aa`.
+- `src/App.tsx`: 4900 lines after the latest finalization/security cleanup line.
 - `src/app/useConnectorRenderer.ts`: 253 lines, boundary hardened in `5f5b76e0` and review-follow-up typechecked in `f06f1880`.
 - `src/app/usePromptGroupLayout.ts`: 1348 lines, extracted and boundary-hardened in `8a458cd4`.
 - `src/app/useGenerationRuntime.ts`: 2604 lines, extracted and boundary-hardened in `ab719c4a`; generation billing cleanup completed in `083db7f8`.
 - `src/app/usePptRuntime.ts`: 1289 lines, extracted in `4c448660` and semantically boundary-checked in `569383aa`.
 - `src/app/pptRuntimeHelpers.ts`: 152 lines, semantically boundary-checked in `569383aa`.
-- `src/context/CanvasContext.tsx`: 4457 text lines in the current Stage Two M5 working tree, down from 5218 text lines at the start of Stage Two.
+- `src/context/CanvasContext.tsx`: 5124 text lines after `002ee6fe` and the latest finalization/security cleanup line, down from 5218 text lines at the start of Stage Two.
 - `src/context/canvasContextState.ts`: 114 lines, new Stage Two M1 state/default/context boundary module.
 - `src/context/canvasCompatibility.ts`: 8 lines, new Stage Two M1 canvas workflow/ecommerce compatibility helper.
 - `src/context/canvasSelection.ts`: 35 lines, new Stage Two M2 selection reducer helper.
 - `src/context/canvasPromptChildImages.ts`: 55 lines, new Stage Two M3 prompt child image resolver helper.
 - `src/context/canvasWorkflowSourceNodeIds.ts`: 19 lines, Stage Two M4 workflow source ID resolver helper.
-- `src/context/canvasMediaRecovery.ts`: 69 lines, new Stage Two M5 media recovery helper.
-- `src/services/auth/keyManager.ts`: 4606 lines.
-- `src/components/layout/PromptBar.tsx`: 4075 lines.
-- `src/services/llm/OpenAICompatibleAdapter.ts`: 3980 lines.
+- `src/context/canvasMediaRecovery.ts`: 82 lines, Stage Two M5 media recovery helper.
+- `src/services/auth/keyManager.ts`: 5279 lines.
+- `src/components/layout/PromptBar.tsx`: 4437 lines.
+- `src/services/llm/OpenAICompatibleAdapter.ts`: 4517 lines.
 - `apps/web/`: migration target, not the first edit location.
 - `apps/api/`: DDD back-end structure, not part of this refactor unless compatibility checks require it.
 
@@ -293,7 +294,8 @@ Scope:
 - Completed M2 slice in `e0f1b583`: extracted the Canvas selection reducer from `src/context/CanvasContext.tsx` into a pure focused helper, preserving current selection ordering and duplicate semantics.
 - Completed M3 slice in `83cc8d7f`: extracted `resolvePromptChildImageIds` from `src/context/CanvasContext.tsx` into a pure focused helper, preserving strong ownership, listed-order, duplicate filtering, source-image exclusion, and legacy fallback semantics.
 - Completed M4 slice in `9ec4dbb1`: extracted `getWorkflowSourceNodeIds` from `src/context/CanvasContext.tsx` into a pure focused helper, preserving utility-only gating, first-seen string ID order, blank/non-string filtering, and non-trimming return semantics.
-- Current M5 slice: extract `hydrateRecoveredMediaCacheEntry` and `resolveOriginalPersistSourceForDisk` from `src/context/CanvasContext.tsx` into `src/context/canvasMediaRecovery.ts`, preserving protected original-slot behavior, video fallback behavior, and blob-source rejection.
+- Completed M5 slice in `002ee6fe`: extracted `hydrateRecoveredMediaCacheEntry` and `resolveOriginalPersistSourceForDisk` from `src/context/CanvasContext.tsx` into `src/context/canvasMediaRecovery.ts`, preserving protected original-slot behavior, video fallback behavior, and blob-source rejection.
+- Next slice: extract the smallest remaining `CanvasContext.tsx` startup prompt recovery responsibility unless source inspection identifies a safer seam.
 - Split `src/context/CanvasContext.tsx` by state model, selection/drag events, node mutations, and persistence sync.
 - Split `src/services/auth/keyManager.ts` by key storage, permission checks, encryption helpers, and provider credential management.
 - Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.

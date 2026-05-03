@@ -224,7 +224,7 @@ npm.cmd run build
 npm.cmd run check:encoding
 ```
 
-Current known non-code blocker: `npm.cmd run governance:check` fails inside `governance:version` until portable packaging/publish metadata is regenerated so `release/publish/stable/manifest.json` and `release/KK-Studio-Portable/app/dist/app-version.json` have matching `buildTime`. Handle this in the final packaging/publish phase, not inside the current runtime refactor slice.
+Current release status: the former `governance:version` portable metadata mismatch was cleared by `567f85aa`, and `npm.cmd run governance:check` passed in the latest full gate. Rerun this gate after any future packaging or publish metadata change.
 
 ## Finalization Audit Gate
 
@@ -234,6 +234,7 @@ Use this after the active Stage Two slice is closed and before claiming full pro
 npm.cmd run architecture:check
 npm.cmd run spec:check
 npm.cmd run governance:security
+npm.cmd audit --audit-level=moderate
 npm.cmd audit --omit=dev --audit-level=moderate
 npm.cmd run governance:agent-docs
 npm.cmd run typecheck
