@@ -79,6 +79,7 @@ For every milestone:
 - Use `npm.cmd` on Windows for npm scripts.
 - Documentation/rule changes require `npm.cmd run governance:agent-docs`.
 - Code changes require `npm.cmd run typecheck`.
+- Dependency security changes require `npm.cmd audit --omit=dev --audit-level=moderate` and a fresh install/lockfile consistency check.
 - Every completed milestone requires `npm.cmd run check:encoding`.
 - Code milestones also require targeted tests, `npm.cmd run test:unit`, and `npm.cmd run build` unless `validation.md` documents a known blocker.
 - Runtime slices require targeted contract tests, `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and a path-limited alternate-git `diff --check`.

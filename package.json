@@ -108,6 +108,7 @@
     "tar": "7.5.13",
     "minimatch": "9.0.7",
     "picomatch": "4.0.4",
+    "protobufjs": "7.5.5",
     "qs": "6.15.0",
     "rollup": "4.60.1"
   }

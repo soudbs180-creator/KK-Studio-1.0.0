@@ -234,6 +234,7 @@ Use this after the active Stage Two slice is closed and before claiming full pro
 npm.cmd run architecture:check
 npm.cmd run spec:check
 npm.cmd run governance:security
+npm.cmd audit --omit=dev --audit-level=moderate
 npm.cmd run governance:agent-docs
 npm.cmd run typecheck
 npm.cmd run test:unit
