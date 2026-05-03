@@ -98,7 +98,7 @@ PPT boundary slices also require `npm.cmd run typecheck`, `npm.cmd run test:unit
 
 ## Stage Two CanvasContext Split Gate
 
-Use this gate for `src/context/CanvasContext.tsx` splits. Add or narrow targeted tests after the responsibility map identifies the exact boundary; do not use one broad commit for state model, mutations, drag/selection, and persistence at the same time. Stage Two M1 used this gate for the state/default/context boundary plus the separated canvas compatibility helper. Stage Two M2 used the selection reducer contract below. Stage Two M3 used the prompt child image resolver contract below. Stage Two M4 used the workflow source node ID resolver contract below. Stage Two M5 used the media recovery contract below. Stage Two M10 used the placement contract below. Stage Two M11 used the layering contract below. Stage Two M12 used the group management contract below. Stage Two M13 used the movement contract below. Stage Two M14 used the tags contract below. Stage Two M15 used the node updates contract below. Stage Two M16 used the position updates contract below. Stage Two M17 used the prompt-image links contract below. Stage Two M18 used the workflow updates contract below. Stage Two M19 reuses the prompt-image links contract below with the image deletion transform added.
+Use this gate for `src/context/CanvasContext.tsx` splits. Add or narrow targeted tests after the responsibility map identifies the exact boundary; do not use one broad commit for state model, mutations, drag/selection, and persistence at the same time. Stage Two M1 used this gate for the state/default/context boundary plus the separated canvas compatibility helper. Stage Two M2 used the selection reducer contract below. Stage Two M3 used the prompt child image resolver contract below. Stage Two M4 used the workflow source node ID resolver contract below. Stage Two M5 used the media recovery contract below. Stage Two M10 used the placement contract below. Stage Two M11 used the layering contract below. Stage Two M12 used the group management contract below. Stage Two M13 used the movement contract below. Stage Two M14 used the tags contract below. Stage Two M15 used the node updates contract below. Stage Two M16 used the position updates contract below. Stage Two M17 used the prompt-image links contract below. Stage Two M18 used the workflow updates contract below. Stage Two M19 reused the prompt-image links contract below with the image deletion transform added. Stage Two M20 uses the merge-into contract below.
 
 State-boundary targeted gate:
 
@@ -177,6 +177,16 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/canvas-startup-local-restore.test.ts" `
   "tests/unit/canvas-context-state-boundary.test.ts" `
   "tests/unit/canvas-cloud-sync-signature.test.ts"
+```
+
+Canvas merge-into targeted gate:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/canvas-merge-into-contract.test.ts" `
+  "tests/unit/canvas-merge-contract.test.ts" `
+  "tests/unit/canvas-cleanup-contract.test.ts" `
+  "tests/unit/canvas-context-state-boundary.test.ts"
 ```
 
 Canvas cleanup targeted gate:

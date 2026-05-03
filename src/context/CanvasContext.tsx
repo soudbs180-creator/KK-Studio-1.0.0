@@ -48,6 +48,7 @@ import { resolvePromptChildImageIds } from './canvasPromptChildImages';
 import { resolveCanvasSelectionIds, type CanvasSelectionMode } from './canvasSelection';
 import { hydrateRecoveredMediaCacheEntry, resolveOriginalPersistSourceForDisk } from './canvasMediaRecovery';
 import { mergeCanvases, resolvePreferredActiveCanvasId } from './canvasMerge';
+import { mergeCanvasIntoState } from './canvasMergeInto';
 import { cleanupInvalidCanvasCardsForCanvas, type CleanupInvalidCardsSummary } from './canvasCleanup';
 import { resolveNextCardPosition, resolveNextGroupPosition, resolveSmartCanvasPosition } from './canvasPlacement';
 import { bringCanvasNodesToFront } from './canvasLayering';
@@ -3529,7 +3530,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, []);
 
     const mergeCanvasInto = useCallback((sourceCanvasId: string, targetCanvasId: string, options?: { deleteSource?: boolean }) => {
-        const deleteSource = options?.deleteSource !== false;
         let summary = {
             movedPrompts: 0,
             movedImages: 0,
@@ -3537,92 +3537,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         };
 
         setState(prev => {
-            if (sourceCanvasId === targetCanvasId) {
-                return prev;
-            }
-
-            const sourceCanvas = prev.canvases.find(c => c.id === sourceCanvasId);
-            const targetCanvas = prev.canvases.find(c => c.id === targetCanvasId);
-            if (!sourceCanvas || !targetCanvas) {
-                return prev;
-            }
-
-            const targetPromptIds = new Set(targetCanvas.promptNodes.map(node => node.id));
-            const targetImageIds = new Set(targetCanvas.imageNodes.map(node => node.id));
-            const targetGroupIds = new Set((targetCanvas.groups || []).map(group => group.id));
-            const targetMaxX = Math.max(
-                0,
-                ...targetCanvas.promptNodes.map(node => node.position.x || 0),
-                ...targetCanvas.imageNodes.map(node => node.position.x || 0)
-            );
-            const offsetX = targetCanvas.promptNodes.length > 0 || targetCanvas.imageNodes.length > 0 ? targetMaxX + 500 : 0;
-
-            const movedPrompts = sourceCanvas.promptNodes
-                .filter(node => !targetPromptIds.has(node.id))
-                .map(node => ({
-                    ...node,
-                    position: { x: node.position.x + offsetX, y: node.position.y }
-                }));
-
-            const movedImages = sourceCanvas.imageNodes
-                .filter(node => !targetImageIds.has(node.id))
-                .map(node => ({
-                    ...node,
-                    canvasId: targetCanvasId,
-                    position: { x: node.position.x + offsetX, y: node.position.y }
-                }));
-
-            const movedNodeIds = new Set<string>([
-                ...movedPrompts.map(node => node.id),
-                ...movedImages.map(node => node.id)
-            ]);
-
-            const movedGroups = (sourceCanvas.groups || [])
-                .filter(group => !targetGroupIds.has(group.id))
-                .map(group => ({
-                    ...group,
-                    nodeIds: (group.nodeIds || []).filter(nodeId => movedNodeIds.has(nodeId))
-                }))
-                .filter(group => group.nodeIds.length > 0);
-
-            summary = {
-                movedPrompts: movedPrompts.length,
-                movedImages: movedImages.length,
-                deletedSource: deleteSource
-            };
-
-            const updatedCanvases = prev.canvases
-                .map(canvas => {
-                    if (canvas.id === targetCanvasId) {
-                        return {
-                            ...canvas,
-                            promptNodes: [...canvas.promptNodes, ...movedPrompts],
-                            imageNodes: [...canvas.imageNodes, ...movedImages],
-                            groups: [...(canvas.groups || []), ...movedGroups],
-                            lastModified: Date.now()
-                        };
-                    }
-
-                    if (canvas.id === sourceCanvasId && !deleteSource) {
-                        return {
-                            ...canvas,
-                            promptNodes: [],
-                            imageNodes: [],
-                            groups: [],
-                            lastModified: Date.now()
-                        };
-                    }
-
-                    return canvas;
-                })
-                .filter(canvas => !(deleteSource && canvas.id === sourceCanvasId));
-
-            return {
-                ...prev,
-                canvases: updatedCanvases,
-                activeCanvasId: prev.activeCanvasId === sourceCanvasId && deleteSource ? targetCanvasId : prev.activeCanvasId,
-                selectedNodeIds: []
-            };
+            const result = mergeCanvasIntoState(prev, sourceCanvasId, targetCanvasId, options);
+            summary = result.summary;
+            return result.state;
         });
 
         return summary;
