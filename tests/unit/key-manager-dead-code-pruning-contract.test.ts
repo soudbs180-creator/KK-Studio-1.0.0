@@ -18,4 +18,6 @@ test('keyManager does not retain proven unused local helper definitions', () => 
   assert.doesNotMatch(source, /const isLegacyGoogleModelList = /);
   assert.doesNotMatch(source, /private migrateFromOldFormat\(\): KeyManagerState/);
   assert.doesNotMatch(source, /function getDefaultGoogleModels\(\): string\[]/);
+  assert.doesNotMatch(source, /import \{ RegionService \} from '\.\.\/system\/RegionService';/);
+  assert.doesNotMatch(source, /function get12AIBaseUrl\(\): string/);
 });

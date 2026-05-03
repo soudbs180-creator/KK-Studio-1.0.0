@@ -92,7 +92,6 @@ import {
 import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
 import { getPreferredKkApiAccessToken } from '../api/authAccessToken';
 import { MODEL_PRESETS, CHAT_MODEL_PRESETS } from '../model/modelPresets';
-import { RegionService } from '../system/RegionService';
 import type { Provider } from '../../types';
 import { getLatestRuntimeAuthState } from './runtimeAuthState';
 import { MODEL_REGISTRY } from '../model/modelRegistry';
@@ -611,13 +610,6 @@ export function resolveEffectiveProviderModels(input: {
     }
 
     return normalizeModelList(documentedModels, runtime.uiProvider || input.provider, input.baseUrl);
-}
-
-/**
- * Resolve the 12AI base URL from the region service so callers share one source of truth.
- */
-function get12AIBaseUrl(): string {
-    return RegionService.get12AIBaseUrl();
 }
 
 const DEFAULT_MAX_FAILURES = 3;
