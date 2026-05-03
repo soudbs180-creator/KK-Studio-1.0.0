@@ -1,4 +1,4 @@
-﻿import React, { useContext, useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
+import React, { useContext, useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
 import { Canvas, PromptNode, GeneratedImage, AspectRatio, CanvasGroup, CanvasDrawing, GenerationMode, KnownModel, type WorkflowNode } from '../types';
 import { startTransition } from 'react';
 import { shouldEnableWorkspaceCloudSync } from '../app/kkaiFeatureFlags';
@@ -52,6 +52,7 @@ import { mergeCanvases, resolvePreferredActiveCanvasId } from './canvasMerge';
 import { cleanupInvalidCanvasCardsForCanvas, type CleanupInvalidCardsSummary } from './canvasCleanup';
 import { resolveNextCardPosition, resolveNextGroupPosition, resolveSmartCanvasPosition } from './canvasPlacement';
 import { bringCanvasNodesToFront } from './canvasLayering';
+import { addCanvasGroupToCanvas, removeCanvasGroupFromCanvas, updateCanvasGroupInCanvas } from './canvasGroups';
 import {
     buildPersistedImageRecoverySignature,
     buildPromptRecoveryEntries,
@@ -3752,37 +3753,15 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     /** Group Management */
     const addGroup = useCallback((group: CanvasGroup) => {
-        updateCanvas((canvas) => ({
-            ...canvas,
-            groups: [
-                ...(canvas.groups || []),
-                group.zIndex !== undefined
-                    ? group
-                    : {
-                        ...group,
-                        zIndex: Math.max(
-                            0,
-                            ...canvas.promptNodes.map(node => node.zIndex ?? 0),
-                            ...canvas.imageNodes.map(node => node.zIndex ?? 0),
-                            ...(canvas.groups || []).map(existingGroup => existingGroup.zIndex ?? 0)
-                        ) + 1
-                    }
-            ]
-        }));
+        updateCanvas((canvas) => addCanvasGroupToCanvas(canvas, group));
     }, [updateCanvas]);
 
     const removeGroup = useCallback((id: string) => {
-        updateCanvas((canvas) => ({
-            ...canvas,
-            groups: (canvas.groups || []).filter(g => g.id !== id)
-        }));
+        updateCanvas((canvas) => removeCanvasGroupFromCanvas(canvas, id));
     }, [updateCanvas]);
 
     const updateGroup = useCallback((group: CanvasGroup) => {
-        updateCanvas((canvas) => ({
-            ...canvas,
-            groups: (canvas.groups || []).map(g => g.id === group.id ? group : g)
-        }));
+        updateCanvas((canvas) => updateCanvasGroupInCanvas(canvas, group));
     }, [updateCanvas]);
 
 
