@@ -48,7 +48,7 @@ Last updated: 2026-05-03
 ## Current Quality Baseline
 
 - Current giant tracked files after `b6620ef2`: `src/services/auth/keyManager.ts` 5279 lines, `src/context/CanvasContext.tsx` 5124 lines, `src/App.tsx` 4900 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 4517 lines, `src/components/layout/PromptBar.tsx` 4437 lines.
-- Current tracked TS/TSX debt scan: direct `as any` matches 156, explicit any-type pattern matches 346, `@ts-ignore` / `@ts-expect-error` matches 133, and `console.log` matches 245. These are refactor debt indicators, not release blockers by themselves.
+- Current tracked TS/TSX debt scan by alternate-git `git grep` over `*.ts` / `*.tsx`: direct `as any` matches 156, explicit any-type pattern matches 370, `@ts-ignore` / `@ts-expect-error` matches 133, and `console.log` matches 251. These are refactor debt indicators, not release blockers by themselves.
 - Quality rule going forward: reduce `any`, TypeScript suppressions, and bare `console.log` inside touched files when local and safe; do not perform a whole-repo cleanup inside one runtime or architecture extraction.
 - Architecture status from the latest full check: `npm.cmd run architecture:check` passed with known allowlisted migration and legacy bridge exceptions; `npm.cmd run spec:check` passed.
 - Version governance status from the latest full check: `npm.cmd run governance:check` passed after `567f85aa` refreshed portable release metadata.
@@ -79,7 +79,7 @@ Last updated: 2026-05-03
 - Passed tracked diff check: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/context/CanvasContext.tsx src/context/canvasMediaRecovery.ts tests/unit/canvas-media-recovery-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
 - Browser QA: skipped because this is a non-UI context/helper extraction and no visual surface, CSS, route, or browser behavior changed.
 
-## Dependency Security Audit Fix
+## Completed In `4cdbf4cf` (Dependency Security Audit Fix)
 
 - `npm.cmd audit --omit=dev --audit-level=moderate` initially reported one critical production vulnerability: `protobufjs <7.5.5` via `@google/genai@1.50.0`.
 - Added a root `overrides.protobufjs = "7.5.5"` entry and refreshed `package-lock.json`.
@@ -90,7 +90,7 @@ Last updated: 2026-05-03
 
 ## Completed In `567f85aa` (Portable Release Metadata Refresh)
 
-- Regenerated/published portable release metadata so `release/publish/stable/manifest.json` and `release/KK-Studio-Portable/app/dist/app-version.json` no longer have mismatched `buildTime` values.
+- Regenerated/published portable release metadata so the tracked stable manifest no longer reports the former portable metadata `buildTime` mismatch.
 - The former `governance:version` blocker is cleared; `npm.cmd run governance:check` now passes in the latest full gate.
 - Commit scope was release metadata only and stayed separate from runtime/security code.
 
@@ -100,7 +100,7 @@ Last updated: 2026-05-03
 - `/api/nutrient-document` now reads only server-side `NUTRIENT_API_KEY` / `NUTRIENT_DWS_API_KEY`; browser-supplied `apiKey` form data is ignored.
 - Settings/workbench copy now describes the server-key boundary instead of showing an editable client key field.
 - Targeted OCR/API validation passed: `tests/unit/ocr-service-settings-contract.test.ts`, `tests/unit/ecommerce-analysis-client-fallback.test.ts`, `tests/unit/api-settings-capability-routing-contract.test.ts`, and `tests/unit/portable-app-server-document-proxy-contract.test.ts`.
-- UI browser QA note: direct in-app Browser QA was attempted but blocked by the local server lifecycle; fallback desktop/mobile settings smoke checks passed.
+- UI browser QA note: direct in-app Browser QA for the OCR/settings surface was attempted but blocked by transient local server listener loss; fallback desktop/mobile settings smoke checks passed. This is not browser-complete evidence for future UI changes.
 
 ## Completed In `333f2551` (PostCSS Security Patch)
 
@@ -483,6 +483,12 @@ Fresh validation for the latest finalization/security cleanup line through `b662
 - Passed full gates: `npm.cmd run architecture:check`, `npm.cmd run governance:check`, `npm.cmd run spec:check`, `npm.cmd audit --audit-level=moderate`, `npm.cmd audit --omit=dev --audit-level=moderate`, `npm.cmd run typecheck`, `npm.cmd run test:unit` (1131/1131), `npm.cmd run build`, `npm.cmd run check:encoding`, and `npm.cmd run governance:agent-docs`.
 - Passed path-limited alternate-git diff checks for touched code/security/release files with only LF/CRLF normalization warnings.
 
+Fresh validation for the ledger review follow-up:
+
+- Passed: `npm.cmd run governance:agent-docs`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
+
 Fresh validation for Stage Two M2 Canvas selection reducer:
 
 - Passed targeted gate: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-selection-runtime-contract.test.ts tests/unit/prompt-group-drag-layout.test.ts tests/unit/prompt-group-regroup-behavior.test.ts` (44/44).
@@ -687,7 +693,7 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Browser QA
 
-- Browser QA is complete for the active Clay UI lane before the UI commit.
+- Browser QA was completed for the historical Clay UI lane before `9e7ae2b5`.
 - Current browser target: `http://127.0.0.1:3000/?clayVerify=requestlog20260501` served from the local production/static path after `npm.cmd run build`.
 - Theme and viewport checked: dark theme, mobile-width in-app Browser viewport; final refresh captured a visible viewport of about `872x985`; desktop/settings/search/API workbench surfaces were also inspected during the same pass.
 - Verified surfaces: mobile shell, prompt/composer, SearchPalette default and multi-select states, settings overview, and API Workspace.
