@@ -56,6 +56,7 @@ import {
     matchesProviderRouteSuffix,
     matchesSlotRouteSuffix,
 } from './keyManagerRouteIds';
+import { sanitizeAsciiApiKey } from './keyManagerCredentialSanitizer';
 import {
     applyOpenAICompatAuthToUrl,
     type ApiProtocolFormat,
@@ -1907,7 +1908,7 @@ export class KeyManager {
 
         try {
             // Sanitize input key before connectivity test
-            const cleanKey = key.replace(/[^\x00-\x7F]/g, "").trim();
+            const cleanKey = sanitizeAsciiApiKey(key);
             if (!cleanKey) return { success: false, message: 'API Key \u65E0\u6548\uFF08\u4EC5\u652F\u6301 ASCII / \u82F1\u6587\u5B57\u7B26\uFF09' };
 
             let targetUrl = url;
@@ -2879,7 +2880,7 @@ export class KeyManager {
         }
 
         // Sanitize the input key before validation: trim whitespace and remove non-ASCII noise
-        const trimmedKey = key.replace(/[^\x00-\x7F]/g, "").trim();
+        const trimmedKey = sanitizeAsciiApiKey(key);
 
         if (!trimmedKey) {
             return { success: false, error: '请输入有效的 API Key（仅保留 ASCII 字符）。' };
