@@ -44,6 +44,10 @@ import {
     resolveProviderTokenLimit,
 } from './keyManagerEffectiveSlot';
 import {
+    applyProviderUsageDeltaToProvider,
+    isUsageLimitExceeded,
+} from './keyManagerProviderUsage';
+import {
     applyOpenAICompatAuthToUrl,
     type ApiProtocolFormat,
     AuthMethod,
@@ -2276,60 +2280,13 @@ export class KeyManager {
         return resolveProviderTokenLimit(provider);
     }
 
-    private isUsageLimitExceeded(target: {
-        budgetLimit?: number;
-        totalCost?: number;
-        tokenLimit?: number;
-        usedTokens?: number;
-    }): boolean {
-        const budgetLimit = target.budgetLimit ?? -1;
-        const totalCost = target.totalCost ?? 0;
-        const tokenLimit = target.tokenLimit ?? -1;
-        const usedTokens = target.usedTokens ?? 0;
-
-        if (budgetLimit > 0 && totalCost >= budgetLimit) {
-            return true;
-        }
-
-        if (tokenLimit > 0 && usedTokens >= tokenLimit) {
-            return true;
-        }
-
-        return false;
-    }
-
     private applyProviderUsageDelta(providerId: string, tokenDelta: number, costDelta: number): ThirdPartyProvider | undefined {
         this.loadProviders();
 
         const provider = this.providers.find((entry) => entry.id === providerId);
         if (!provider) return undefined;
 
-        const now = Date.now();
-        if (!provider.usage) {
-            provider.usage = {
-                totalTokens: 0,
-                totalCost: 0,
-                dailyTokens: 0,
-                dailyCost: 0,
-                lastReset: now,
-            };
-        }
-
-        const lastResetDate = new Date(provider.usage.lastReset || 0);
-        const today = new Date(now);
-        if (lastResetDate.toDateString() !== today.toDateString()) {
-            provider.usage.dailyTokens = 0;
-            provider.usage.dailyCost = 0;
-            provider.usage.lastReset = now;
-        }
-
-        provider.usage.totalTokens = Math.max(0, (provider.usage.totalTokens || 0) + tokenDelta);
-        provider.usage.totalCost = Math.max(0, (provider.usage.totalCost || 0) + costDelta);
-        provider.usage.dailyTokens = Math.max(0, (provider.usage.dailyTokens || 0) + tokenDelta);
-        provider.usage.dailyCost = Math.max(0, (provider.usage.dailyCost || 0) + costDelta);
-        provider.updatedAt = now;
-
-        return provider;
+        return applyProviderUsageDeltaToProvider(provider, tokenDelta, costDelta);
     }
 
     /**
@@ -2476,7 +2433,7 @@ export class KeyManager {
 
         const isSlotHealthy = (slot: KeySlot) => {
             if (slot.disabled) return false;
-            if (this.isUsageLimitExceeded(slot)) return false;
+            if (isUsageLimitExceeded(slot)) return false;
             return true;
         };
 
@@ -2620,7 +2577,7 @@ export class KeyManager {
                 disabled.push(s);
                 continue;
             }
-            if (this.isUsageLimitExceeded(s)) {
+            if (isUsageLimitExceeded(s)) {
                 budgetExhausted.push(s);
                 continue;
             }
@@ -2635,7 +2592,7 @@ export class KeyManager {
                 const healingCandidates = this.state.slots.filter(s =>
                     (s.provider === 'Google' || (s.provider as string) === 'Gemini') &&
                     !s.disabled &&
-                    !this.isUsageLimitExceeded(s)
+                    !isUsageLimitExceeded(s)
                 );
 
                 if (healingCandidates.length > 0) {
@@ -3952,7 +3909,7 @@ export class KeyManager {
         const hasValidSlot = this.getProjectedSlots().some(s => {
             if (s.disabled || s.status === 'invalid') return false;
             // Budget check: if budget is set and exhausted, it's effectively invalid
-            if (this.isUsageLimitExceeded(s)) return false;
+            if (isUsageLimitExceeded(s)) return false;
 
             // Scenario 1: Exact model support in supportedModels array (or wildcard)
             const supported = s.supportedModels || [];
@@ -3974,7 +3931,7 @@ export class KeyManager {
         this.loadProviders();
         return this.providers.some(p => {
             if (!p.isActive) return false;
-            if (this.isUsageLimitExceeded({
+            if (isUsageLimitExceeded({
                 budgetLimit: this.resolveProviderBudgetLimit(p),
                 totalCost: p.usage?.totalCost,
                 tokenLimit: this.resolveProviderTokenLimit(p),

@@ -607,6 +607,29 @@ Last updated: 2026-05-04
 - Browser QA: skipped because this is a non-UI pure service/helper extraction with no visual surface, CSS, route component, or browser-visible workflow changed.
 - Explicitly excluded scope: slot mutation semantics, provider save/remove side effects, `saveState`, model/runtime/auth resolution, credential persistence, token refresh, cloud sync, localStorage policy, UI, release metadata, `CanvasContext.tsx`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts`.
 
+## Stage Two M33 keyManager Provider Usage Helper Extraction
+
+- Extracted `isUsageLimitExceeded` and provider usage delta math into `src/services/auth/keyManagerProviderUsage.ts`.
+- `src/services/auth/keyManager.ts` now delegates slot/provider usage limit checks and provider usage counter mutation to the helper.
+- The helper preserves budget/token limit checks, usage initialization, daily reset, total/daily clamping, and `updatedAt` mutation behavior.
+- `KeyManager` still owns provider lookup, provider loading, save/notify/cloud-sync orchestration, credential policy, token refresh, backoff, localStorage policy, slot mutation, and runtime/model resolution.
+- Added `tests/unit/key-manager-provider-usage-contract.test.ts` and included it in `tsconfig.tests.json`.
+- Line counts for this slice: `src/services/auth/keyManager.ts` 4948 lines; `src/services/auth/keyManagerProviderUsage.ts` 67 lines; `tests/unit/key-manager-provider-usage-contract.test.ts` 99 lines; `tsconfig.tests.json` 95 lines.
+- TDD evidence: RED was verified earlier in this slice by the contract failing before `src/services/auth/keyManagerProviderUsage.ts` existed and while `keyManager.ts` still owned the private usage helper; GREEN is refreshed below with the targeted provider/keyManager gate and full required validation.
+- Independent spec/code-quality review reported no M33 blockers and confirmed no secret-bearing persistence, API key/token logging, or provider lookup/save/cloud-sync movement was introduced.
+- Targeted GREEN validation passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/key-manager-provider-usage-contract.test.ts tests/unit/key-manager-provider-links-contract.test.ts tests/unit/key-manager-runtime-fallback.test.ts tests/unit/key-manager-provider-persistence-contract.test.ts` passed (17/17).
+- Architecture validation passed: `npm.cmd run architecture:check` with only the existing 5 allowlisted migration exceptions and 2 legacy-zone bridge exceptions.
+- Type validation passed: `npm.cmd run typecheck`; semantic test coverage now includes 66 test files.
+- Unit validation passed: `npm.cmd run test:unit` passed (1224/1224).
+- Build validation passed: `npm.cmd run build`.
+- Security validation passed: `npm.cmd run governance:security`.
+- Agent-doc validation passed: `npm.cmd run governance:agent-docs`.
+- Encoding validation passed: `npm.cmd run check:encoding`.
+- Path-limited diff check passed: `git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/services/auth/keyManager.ts src/services/auth/keyManagerProviderUsage.ts tests/unit/key-manager-provider-usage-contract.test.ts tsconfig.tests.json plans.md implement.md validation.md status.md` with LF/CRLF normalization warnings only.
+- Browser QA: skipped because M33 is a non-UI service/helper extraction with no component, CSS, route, or browser-visible workflow changes.
+- Active commit scope: `src/services/auth/keyManager.ts`, `src/services/auth/keyManagerProviderUsage.ts`, `tests/unit/key-manager-provider-usage-contract.test.ts`, `tsconfig.tests.json`, `plans.md`, `implement.md`, `validation.md`, and `status.md`.
+- Explicitly excluded scope: UI, release metadata, `CanvasContext.tsx`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`, provider persistence redesign, cloud sync movement, credential storage, token/backoff behavior, and broad dead-code cleanup.
+
 ## Completed In `4cdbf4cf` (Dependency Security Audit Fix)
 
 - `npm.cmd audit --omit=dev --audit-level=moderate` initially reported one critical production vulnerability: `protobufjs <7.5.5` via `@google/genai@1.50.0`.
@@ -1311,8 +1334,8 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-1. After the scoped Stage Two M32 commit lands, start the next highest-value keyManager seam: extract a narrow secret/persistence or provider-storage sync decision around `src/services/auth/keyManager.ts`, `keyManagerStorage.ts`, `keyManagerProviders.ts`, and `keyManagerCloudSync.ts`; verify with key boundary, cloud sync, user API cloud storage, auth-data route, architecture, security, typecheck, unit, build, and encoding gates.
-2. Keep the M32 commit scope limited to `src/services/auth/keyManager.ts`, `src/services/auth/keyManagerProviderLinks.ts`, `tests/unit/key-manager-provider-links-contract.test.ts`, `tsconfig.tests.json`, and the four ledger files.
+1. After the scoped Stage Two M33 commit lands, start the next highest-value keyManager seam: extract a narrow secret/persistence or provider-storage sync decision around `src/services/auth/keyManager.ts`, `keyManagerStorage.ts`, `keyManagerProviders.ts`, and `keyManagerCloudSync.ts`; verify with key boundary, cloud sync, user API cloud storage, auth-data route, architecture, security, typecheck, unit, build, and encoding gates.
+2. Keep the M33 commit scope limited to `src/services/auth/keyManager.ts`, `src/services/auth/keyManagerProviderUsage.ts`, `tests/unit/key-manager-provider-usage-contract.test.ts`, `tsconfig.tests.json`, and the four ledger files.
 3. Follow-up server seam: dedupe route auth/header/query-key logic between `apps/api/src/modules/auth/application/user-route-diagnostics-service.ts` and `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts`; verify provider auth/proxy and Gemini protocol guards plus API restart/probe on port `3001`.
 4. Follow-up adapter seam: split `src/services/llm/OpenAICompatibleAdapter.ts` provider image routing and safe diagnostic preview/redaction; verify provider image routing, provider strategy, async image proxy, probe matrix, security, typecheck, unit, and build.
 5. Follow-up UI seam: split `src/components/layout/PromptBar.tsx` paste/drop/reference-image ingestion and drag handling only with browser QA, because it touches file-input UI behavior.
@@ -1323,6 +1346,6 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 - Original `.git` does not match the writable metadata copy in this session. Use the full writable metadata copy at `node_modules/.codex-git-full` for local commits unless the ACL is fixed outside the sandbox.
 - Plain `.git` may show stale dirty state and must not be used as the commit-readiness source.
-- The alternate-git worktree was clean at `56debf21` before this M32 slice, but any staging must still be explicit path-based and reviewed before commit.
+- The alternate-git worktree was clean at `615b7969` before this M33 slice, but any staging must still be explicit path-based and reviewed before commit.
 - Do not delete locks, change `.git` ACLs, revert paused runtime/PPT work, or stage unrelated runtime files without explicit user confirmation.
 - Do not mix UI, PPT, runtime extraction, release metadata, and quality-debt cleanup in one commit.
