@@ -13,11 +13,20 @@ export type ArrangeSelectedRootNodesResult = {
     canvas: Canvas;
 };
 
+export type ArrangeSelectedGroupedNodesResult = {
+    canvas: Canvas;
+    subCardLayoutMode: CanvasSubCardLayout;
+};
+
 export type ArrangeSinglePromptChildrenOptions = {
     now?: () => number;
 };
 
 export type ArrangeSelectedRootNodesOptions = {
+    now?: () => number;
+};
+
+export type ArrangeSelectedGroupedNodesOptions = {
     now?: () => number;
 };
 
@@ -34,9 +43,35 @@ type ArrangeRoot = ArrangeRootSeed & {
     visualCy: number;
 };
 
+type SelectedGroup = {
+    prompt?: PromptNode;
+    images: GeneratedImage[];
+    originalX: number;
+    originalY: number;
+};
+
+type SelectedImagePlacement = {
+    id: string;
+    xOffset: number;
+    bottomOffset: number;
+};
+
+type SelectedGroupLayout = {
+    promptHeight: number;
+    width: number;
+    height: number;
+    imageLayoutHeight: number;
+    imagePlacements: SelectedImagePlacement[];
+};
+
+type PositionedSelectedGroup = SelectedGroup & { layout: SelectedGroupLayout };
+
 const PROMPT_WIDTH = 320;
 const SELECTED_ROOT_GAP = 120;
 const SELECTED_ROOT_GRID_COLUMNS = 6;
+const AUTO_ARRANGE_GROUPS_PER_ROW = 20;
+const AUTO_ARRANGE_GROUP_GAP_X = 56;
+const AUTO_ARRANGE_GROUP_GAP_Y = 120;
 const AUTO_ARRANGE_SUB_COLUMNS = 20;
 const AUTO_ARRANGE_SUB_IMAGE_GAP = 32;
 const AUTO_ARRANGE_PROMPT_TO_SUB_GAP = 56;
@@ -122,6 +157,234 @@ export function arrangeSingleSelectedPromptChildren(
             lastModified: (options.now ?? Date.now)(),
         },
         subCardLayoutMode: targetMode,
+    };
+}
+
+function buildSelectionImageLayout(
+    images: GeneratedImage[],
+    layoutMode: CanvasSubCardLayout
+): { width: number; height: number; placements: SelectedImagePlacement[] } {
+    if (images.length === 0) {
+        return { width: 0, height: 0, placements: [] };
+    }
+
+    const imageDims = images.map(image => getImageDims(image.aspectRatio));
+
+    if (layoutMode === 'column') {
+        const maxWidth = Math.max(...imageDims.map(dim => dim.w));
+        const totalHeight = imageDims.reduce((sum, dim) => sum + dim.h, 0) + (imageDims.length - 1) * AUTO_ARRANGE_SUB_IMAGE_GAP;
+        let currentTop = 0;
+        const placements = images.map((image, index) => {
+            const dims = imageDims[index];
+            const placement = {
+                id: image.id,
+                xOffset: 0,
+                bottomOffset: currentTop + dims.h,
+            };
+            currentTop += dims.h + AUTO_ARRANGE_SUB_IMAGE_GAP;
+            return placement;
+        });
+        return { width: maxWidth, height: totalHeight, placements };
+    }
+
+    if (layoutMode === 'row') {
+        const totalWidth = imageDims.reduce((sum, dim) => sum + dim.w, 0) + (imageDims.length - 1) * AUTO_ARRANGE_SUB_IMAGE_GAP;
+        const maxHeight = Math.max(...imageDims.map(dim => dim.h));
+        let currentLeft = -totalWidth / 2;
+        const placements = images.map((image, index) => {
+            const dims = imageDims[index];
+            const placement = {
+                id: image.id,
+                xOffset: currentLeft + dims.w / 2,
+                bottomOffset: dims.h,
+            };
+            currentLeft += dims.w + AUTO_ARRANGE_SUB_IMAGE_GAP;
+            return placement;
+        });
+        return { width: totalWidth, height: maxHeight, placements };
+    }
+
+    const maxWidth = Math.max(...imageDims.map(dim => dim.w));
+    const maxHeight = Math.max(...imageDims.map(dim => dim.h));
+    const columns = Math.min(AUTO_ARRANGE_SUB_COLUMNS, imageDims.length);
+    const totalWidth = columns * maxWidth + (columns - 1) * AUTO_ARRANGE_SUB_IMAGE_GAP;
+    const totalHeight = Math.ceil(imageDims.length / columns) * maxHeight + (Math.ceil(imageDims.length / columns) - 1) * AUTO_ARRANGE_SUB_IMAGE_GAP;
+    const startOffsetX = -totalWidth / 2;
+    const placements = images.map((image, index) => {
+        const dims = imageDims[index];
+        const col = index % columns;
+        const row = Math.floor(index / columns);
+        return {
+            id: image.id,
+            xOffset: startOffsetX + col * (maxWidth + AUTO_ARRANGE_SUB_IMAGE_GAP) + maxWidth / 2,
+            bottomOffset: row * (maxHeight + AUTO_ARRANGE_SUB_IMAGE_GAP) + dims.h,
+        };
+    });
+
+    return { width: totalWidth, height: totalHeight, placements };
+}
+
+export function arrangeSelectedGroupedNodes(
+    canvas: Canvas,
+    selectedIds: string[],
+    mode: CanvasSubCardLayout,
+    options: ArrangeSelectedGroupedNodesOptions = {}
+): ArrangeSelectedGroupedNodesResult | null {
+    if (selectedIds.length === 0) {
+        return null;
+    }
+
+    const selectedPrompts = canvas.promptNodes.filter(prompt => selectedIds.includes(prompt.id));
+    const selectedImages = canvas.imageNodes.filter(image => selectedIds.includes(image.id));
+    const selectedCount = selectedPrompts.length + selectedImages.length;
+    if (selectedCount <= 1) {
+        return null;
+    }
+
+    const selectedGroupsForArrange: SelectedGroup[] = [];
+    const groupedImageIds = new Set<string>();
+
+    selectedPrompts.forEach(prompt => {
+        const childImages = canvas.imageNodes.filter(image => image.parentPromptId === prompt.id);
+        childImages.forEach(image => groupedImageIds.add(image.id));
+        selectedGroupsForArrange.push({
+            prompt,
+            images: childImages,
+            originalX: prompt.position.x,
+            originalY: prompt.position.y,
+        });
+    });
+
+    selectedImages
+        .filter(image => !groupedImageIds.has(image.id))
+        .forEach(image => {
+            selectedGroupsForArrange.push({
+                images: [image],
+                originalX: image.position.x,
+                originalY: image.position.y,
+            });
+        });
+
+    if (selectedGroupsForArrange.length === 0) {
+        return null;
+    }
+
+    selectedGroupsForArrange.sort((a, b) => {
+        const rowDiff = Math.floor(a.originalY / 200) - Math.floor(b.originalY / 200);
+        if (rowDiff !== 0) return rowDiff;
+        return a.originalX - b.originalX;
+    });
+
+    const selectionCenterX = selectedGroupsForArrange.reduce((sum, group) => sum + group.originalX, 0) / selectedGroupsForArrange.length;
+    const selectionCenterY = selectedGroupsForArrange.reduce((sum, group) => sum + group.originalY, 0) / selectedGroupsForArrange.length;
+
+    const positionedSelectionGroups: PositionedSelectedGroup[] = selectedGroupsForArrange.map(group => {
+        const layoutMode: CanvasSubCardLayout = group.prompt?.mode === GenerationMode.PPT ? 'column' : mode;
+        const imageLayout = buildSelectionImageLayout(group.images, layoutMode);
+        const promptHeight = group.prompt?.height || 0;
+        const width = group.prompt ? Math.max(PROMPT_WIDTH, imageLayout.width) : imageLayout.width;
+        const height = group.prompt
+            ? promptHeight + (imageLayout.height > 0 ? AUTO_ARRANGE_PROMPT_TO_SUB_GAP + imageLayout.height : 0)
+            : imageLayout.height;
+
+        return {
+            ...group,
+            layout: {
+                promptHeight,
+                width,
+                height,
+                imageLayoutHeight: imageLayout.height,
+                imagePlacements: imageLayout.placements,
+            },
+        };
+    });
+
+    const selectionStrategy: 'matrix' | 'row' | 'column' = mode === 'grid' ? 'matrix' : mode;
+    const selectionRows: Array<{ groups: PositionedSelectedGroup[]; maxPromptHeight: number; maxTotalHeight: number; rowWidth: number }> = [];
+    const createSelectionRow = () => ({ groups: [] as PositionedSelectedGroup[], maxPromptHeight: 0, maxTotalHeight: 0, rowWidth: 0 });
+    const pushGroupIntoRow = (
+        row: { groups: PositionedSelectedGroup[]; maxPromptHeight: number; maxTotalHeight: number; rowWidth: number },
+        group: PositionedSelectedGroup
+    ) => {
+        row.rowWidth += (row.groups.length > 0 ? AUTO_ARRANGE_GROUP_GAP_X : 0) + group.layout.width;
+        row.groups.push(group);
+        row.maxPromptHeight = Math.max(row.maxPromptHeight, group.layout.promptHeight);
+        row.maxTotalHeight = Math.max(
+            row.maxTotalHeight,
+            group.prompt
+                ? row.maxPromptHeight + (group.layout.imageLayoutHeight > 0 ? AUTO_ARRANGE_PROMPT_TO_SUB_GAP + group.layout.imageLayoutHeight : 0)
+                : group.layout.height
+        );
+    };
+
+    if (selectionStrategy === 'row') {
+        const row = createSelectionRow();
+        positionedSelectionGroups.forEach(group => pushGroupIntoRow(row, group));
+        if (row.groups.length > 0) selectionRows.push(row);
+    } else if (selectionStrategy === 'column') {
+        positionedSelectionGroups.forEach(group => {
+            const row = createSelectionRow();
+            pushGroupIntoRow(row, group);
+            selectionRows.push(row);
+        });
+    } else {
+        const gridColumns = Math.min(AUTO_ARRANGE_GROUPS_PER_ROW, Math.max(1, positionedSelectionGroups.length));
+        let currentSelectionRow = createSelectionRow();
+        positionedSelectionGroups.forEach(group => {
+            if (currentSelectionRow.groups.length >= gridColumns) {
+                selectionRows.push(currentSelectionRow);
+                currentSelectionRow = createSelectionRow();
+            }
+            pushGroupIntoRow(currentSelectionRow, group);
+        });
+        if (currentSelectionRow.groups.length > 0) selectionRows.push(currentSelectionRow);
+    }
+
+    const totalSelectionHeight = selectionRows.reduce((sum, row) => sum + row.maxTotalHeight, 0) + (selectionRows.length - 1) * AUTO_ARRANGE_GROUP_GAP_Y;
+    let currentTopY = selectionCenterY - totalSelectionHeight / 2;
+    const arrangedPositions: Record<string, { x: number; y: number }> = {};
+
+    selectionRows.forEach(row => {
+        let currentLeftX = selectionCenterX - row.rowWidth / 2;
+        const rowTopY = currentTopY;
+        const rowSubCardsTopY = rowTopY + row.maxPromptHeight + AUTO_ARRANGE_PROMPT_TO_SUB_GAP;
+
+        row.groups.forEach(group => {
+            const groupCenterX = currentLeftX + group.layout.width / 2;
+
+            if (group.prompt) {
+                arrangedPositions[group.prompt.id] = {
+                    x: groupCenterX,
+                    y: rowTopY + group.layout.promptHeight,
+                };
+            }
+
+            const imageTopY = group.prompt ? rowSubCardsTopY : rowTopY;
+            group.layout.imagePlacements.forEach(placement => {
+                arrangedPositions[placement.id] = {
+                    x: groupCenterX + placement.xOffset,
+                    y: imageTopY + placement.bottomOffset,
+                };
+            });
+
+            currentLeftX += group.layout.width + AUTO_ARRANGE_GROUP_GAP_X;
+        });
+
+        currentTopY += row.maxTotalHeight + AUTO_ARRANGE_GROUP_GAP_Y;
+    });
+
+    return {
+        canvas: {
+            ...canvas,
+            promptNodes: canvas.promptNodes.map(prompt =>
+                arrangedPositions[prompt.id] ? { ...prompt, position: arrangedPositions[prompt.id] } : prompt
+            ),
+            imageNodes: canvas.imageNodes.map(image =>
+                arrangedPositions[image.id] ? { ...image, position: arrangedPositions[image.id] } : image
+            ),
+            lastModified: (options.now ?? Date.now)(),
+        },
+        subCardLayoutMode: mode,
     };
 }
 
