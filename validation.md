@@ -361,6 +361,7 @@ Model parsing/normalization targeted gate:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/model-id-normalization-parity-contract.test.ts" `
   "tests/unit/key-manager-model-helpers-contract.test.ts" `
   "tests/unit/key-manager-runtime-fallback.test.ts" `
   "tests/unit/official-route-default-models.test.ts" `
@@ -392,6 +393,12 @@ npm.cmd run build
 npm.cmd run governance:agent-docs
 npm.cmd run check:encoding
 git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerModelHelpers.ts" "src/services/auth/keyManagerKeyType.ts" "src/services/auth/keyManagerEffectiveSlot.ts" "tests/unit/key-manager-model-helpers-contract.test.ts" "tests/unit/key-manager-key-type-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+Model ID compatibility facade slices should use this narrower path-limited diff check:
+
+```powershell
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/utils/modelIdNormalization.ts" "src/services/auth/keyManagerModelHelpers.ts" "tests/unit/model-id-normalization-parity-contract.test.ts" "tests/unit/key-manager-model-helpers-contract.test.ts" "tests/unit/model-display-name-regression.test.ts" "tests/unit/provider-image-routing-regression.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
 ## Stage One Backfill Generation Gate
