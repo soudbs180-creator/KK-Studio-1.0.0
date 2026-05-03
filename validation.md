@@ -152,7 +152,7 @@ Startup prompt recovery targeted gate:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
-  "tests/unit/canvas-startup-prompt-recovery-contract.test.ts" `
+  "tests/unit/canvas-prompt-recovery-contract.test.ts" `
   "tests/unit/canvas-startup-local-restore.test.ts" `
   "tests/unit/canvas-context-state-boundary.test.ts" `
   "tests/unit/canvas-cloud-sync-signature.test.ts"
