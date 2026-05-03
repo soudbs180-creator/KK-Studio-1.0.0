@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the active Canvas movement helper extraction is `5994c34b refactor: extract canvas group helpers`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the active Canvas tags helper extraction is `4722acbe refactor: extract canvas movement helpers`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -35,7 +35,8 @@ The active execution model for this thread has resumed Stage One convergence:
 - Stage Two M11 `CanvasContext` layering helper extraction completed in `c171de38`: it moved bring-to-front z-index expansion and assignment into `src/context/canvasLayering.ts`, while leaving the public context callback in `CanvasContext.tsx`.
 - The legacy Netlify raw-key endpoint cleanup completed in `0603547a`: it removed public raw-key BYOK function endpoints and extended security governance while preserving the legitimate `pricing-proxy` function.
 - Stage Two M12 `CanvasContext` group management helper extraction completed in `5994c34b`: it moved `addGroup`, `removeGroup`, and `updateGroup` canvas transforms into `src/context/canvasGroups.ts`.
-- The active Stage Two M13 slice extracts selected-node movement transforms from `CanvasContext.tsx` into `src/context/canvasMovement.ts`, preserving RAF batching and public move callbacks in `CanvasContext.tsx`.
+- Stage Two M13 `CanvasContext` selected-node movement helper extraction completed in `4722acbe`: it moved pure movement transforms into `src/context/canvasMovement.ts`, while preserving RAF batching and public move callbacks in `CanvasContext.tsx`.
+- The active Stage Two M14 slice extracts node tag transforms from `CanvasContext.tsx` into `src/context/canvasTags.ts`, preserving public `setNodeTags` and `updateCanvas` ownership.
 - The project is functionally green after the latest audit gates, but not final-complete while `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain giant-file split targets.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
@@ -50,7 +51,7 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/app/useGenerationRuntime.ts`: 2604 lines, extracted and boundary-hardened in `ab719c4a`; generation billing cleanup completed in `083db7f8`.
 - `src/app/usePptRuntime.ts`: 1289 lines, extracted in `4c448660` and semantically boundary-checked in `569383aa`.
 - `src/app/pptRuntimeHelpers.ts`: 152 lines, semantically boundary-checked in `569383aa`.
-- `src/context/CanvasContext.tsx`: 4015 physical lines after the active Stage Two M13 movement helper extraction, down from 5218 text lines at the start of Stage Two.
+- `src/context/CanvasContext.tsx`: 4012 physical lines after the active Stage Two M14 tags helper extraction, down from 5218 text lines at the start of Stage Two.
 - `src/context/canvasContextState.ts`: 114 lines, new Stage Two M1 state/default/context boundary module.
 - `src/context/canvasCompatibility.ts`: 8 lines, new Stage Two M1 canvas workflow/ecommerce compatibility helper.
 - `src/context/canvasSelection.ts`: 35 lines, new Stage Two M2 selection reducer helper.
@@ -64,7 +65,8 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/context/canvasPlacement.ts`: 189 lines, Stage Two M10 placement helper.
 - `src/context/canvasLayering.ts`: 185 lines, Stage Two M11 layering helper.
 - `src/context/canvasGroups.ts`: 41 lines, Stage Two M12 group management helper.
-- `src/context/canvasMovement.ts`: 84 lines, active Stage Two M13 selected-node movement helper.
+- `src/context/canvasMovement.ts`: 84 lines, Stage Two M13 selected-node movement helper.
+- `src/context/canvasTags.ts`: 9 lines, active Stage Two M14 tag update helper.
 - `src/services/auth/keyManager.ts`: 5279 lines.
 - `src/components/layout/PromptBar.tsx`: 4437 lines.
 - `src/services/llm/OpenAICompatibleAdapter.ts`: 4517 lines.
@@ -320,7 +322,8 @@ Scope:
 - Completed M11 slice in `c171de38`: extracted layering helpers from `src/context/CanvasContext.tsx` into `src/context/canvasLayering.ts`, preserving prompt-group expansion, linked canvas group expansion, workflow node z-index promotion, and group z-index ordering.
 - Completed security slice in `0603547a`: removed legacy Netlify raw-key BYOK endpoints `netlify/functions/keys.ts` and `netlify/functions/generate.ts`, kept `netlify/functions/pricing-proxy.ts`, and extended security governance to scan `netlify/`.
 - Completed M12 slice in `5994c34b`: extracted Canvas group management helpers into `src/context/canvasGroups.ts`, preserving explicit z-index behavior, next z-index computation over prompt/image/group nodes only, remove-all matching group IDs, and replace-only update semantics.
-- Active M13 slice: extract selected-node movement helpers into `src/context/canvasMovement.ts`, preserving source override semantics, prompt-child image movement, direct image `userMoved` marking, workflow utility-only movement, no-op behavior for empty effective selection, and no `lastModified` mutation.
+- Completed M13 slice in `4722acbe`: extracted selected-node movement helpers into `src/context/canvasMovement.ts`, preserving source override semantics, prompt-child image movement, direct image `userMoved` marking, workflow utility-only movement, no-op behavior for empty effective selection, and no `lastModified` mutation.
+- Active M14 slice: extract node tag update helpers into `src/context/canvasTags.ts`, preserving prompt/image-only tag replacement, clear-tags behavior, untouched groups/drawings, and `updateCanvas` `lastModified` ownership.
 - Split `src/context/CanvasContext.tsx` by state model, selection/drag events, node mutations, and persistence sync.
 - Split `src/services/auth/keyManager.ts` by key storage, permission checks, encryption helpers, and provider credential management.
 - Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.

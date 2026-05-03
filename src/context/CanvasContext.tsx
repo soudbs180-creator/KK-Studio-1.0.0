@@ -54,6 +54,7 @@ import { resolveNextCardPosition, resolveNextGroupPosition, resolveSmartCanvasPo
 import { bringCanvasNodesToFront } from './canvasLayering';
 import { addCanvasGroupToCanvas, removeCanvasGroupFromCanvas, updateCanvasGroupInCanvas } from './canvasGroups';
 import { moveSelectedCanvasNodes } from './canvasMovement';
+import { setCanvasNodeTags } from './canvasTags';
 import {
     buildPersistedImageRecoverySignature,
     buildPromptRecoveryEntries,
@@ -3723,11 +3724,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
 
     const setNodeTags = useCallback((ids: string[], tags: string[]) => {
-        updateCanvas((canvas) => ({
-            ...canvas,
-            promptNodes: canvas.promptNodes.map(n => ids.includes(n.id) ? { ...n, tags } : n),
-            imageNodes: canvas.imageNodes.map(n => ids.includes(n.id) ? { ...n, tags } : n)
-        }));
+        updateCanvas((canvas) => setCanvasNodeTags(canvas, ids, tags));
     }, [updateCanvas]);
 
     // Track viewport-center updates with useCallback to avoid needless loops.
