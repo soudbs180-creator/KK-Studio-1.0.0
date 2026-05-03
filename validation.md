@@ -395,6 +395,20 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/auth-data-routes.test.ts"
 ```
 
+Provider linked-slot matching targeted gate:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/key-manager-provider-links-contract.test.ts" `
+  "tests/unit/key-manager-provider-persistence-contract.test.ts" `
+  "tests/unit/key-manager-runtime-fallback.test.ts" `
+  "tests/unit/provider-strategy.test.ts" `
+  "tests/unit/official-route-default-models.test.ts" `
+  "tests/unit/model-library-bootstrap-regression.test.ts" `
+  "tests/unit/provider-image-routing-regression.test.ts" `
+  "tests/unit/user-api-cloud-storage.test.ts"
+```
+
 keyManager architecture slices also require:
 
 ```powershell
@@ -411,6 +425,12 @@ Provider runtime-state merge slices should use this narrower path-limited diff c
 
 ```powershell
 git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerProviders.ts" "src/services/auth/keyManagerStorage.ts" "tests/unit/key-manager-provider-persistence-contract.test.ts" "tests/unit/key-manager-runtime-fallback.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+Provider linked-slot matching slices should use this narrower path-limited diff check:
+
+```powershell
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerProviderLinks.ts" "tests/unit/key-manager-provider-links-contract.test.ts" "tests/unit/key-manager-runtime-fallback.test.ts" "tests/unit/key-manager-provider-persistence-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
 Model ID compatibility facade slices should use this narrower path-limited diff check:

@@ -71,6 +71,7 @@
         "tests/unit/hosted-release-guardrails.test.ts",
         "tests/unit/key-manager-key-type-contract.test.ts",
         "tests/unit/key-manager-model-helpers-contract.test.ts",
+        "tests/unit/key-manager-provider-links-contract.test.ts",
         "tests/unit/key-manager-provider-persistence-contract.test.ts",
         "tests/unit/model-id-normalization-parity-contract.test.ts",
         "tests/unit/payment-runtime-hardening.test.ts",

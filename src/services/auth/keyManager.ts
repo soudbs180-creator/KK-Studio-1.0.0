@@ -34,6 +34,7 @@ import {
 } from './keyManagerProviders';
 import {
     findLinkedProviderForSlot,
+    findProviderLinkedSlots,
     normalizeProviderLinkValue,
     normalizeStoredProviders,
 } from './keyManagerProviderLinks';
@@ -4168,42 +4169,11 @@ export class KeyManager {
         previousProvider?: Partial<ThirdPartyProvider>,
         options?: { persistState?: boolean }
     ): boolean {
-        const candidateProviders = [provider, previousProvider]
-            .filter((item): item is Partial<ThirdPartyProvider> => !!item && !!item.baseUrl)
-            .map((item) => ({
-                baseUrl: normalizeProviderLinkValue(item.baseUrl),
-                apiKey: String(item.apiKey || '').trim(),
-                name: normalizeProviderLinkValue(item.name),
-            }))
-            .filter((item) => !!item.baseUrl);
-
-        if (candidateProviders.length === 0) return false;
-
-        const matchedSlots = this.state.slots.filter((slot) => {
-            const slotBaseUrl = normalizeProviderLinkValue(slot.baseUrl);
-            if (!slotBaseUrl) return false;
-
-            return candidateProviders.some((candidate) => {
-                if (slotBaseUrl !== candidate.baseUrl) return false;
-
-                const slotKey = String(slot.key || '').trim();
-                const slotName = normalizeProviderLinkValue(slot.name);
-
-                if (candidate.apiKey && slotKey && slotKey === candidate.apiKey) return true;
-                if (candidate.name && slotName && slotName === candidate.name) return true;
-                return false;
-            });
-        });
-
-        if (matchedSlots.length === 0) {
-            const currentBaseUrl = normalizeProviderLinkValue(provider.baseUrl);
-            if (currentBaseUrl) {
-                const sameBaseUrlSlots = this.state.slots.filter((slot) => normalizeProviderLinkValue(slot.baseUrl) === currentBaseUrl);
-                if (sameBaseUrlSlots.length === 1) {
-                    matchedSlots.push(sameBaseUrlSlots[0]);
-                }
-            }
-        }
+        const matchedSlots = findProviderLinkedSlots(
+            this.state.slots,
+            [provider, previousProvider],
+            { allowSingleBaseUrlFallback: true },
+        );
 
         if (matchedSlots.length === 0) return false;
 
@@ -4282,29 +4252,7 @@ export class KeyManager {
         provider: ThirdPartyProvider,
         options?: { persistState?: boolean }
     ): boolean {
-        const candidateProviders = [{
-            baseUrl: normalizeProviderLinkValue(provider.baseUrl),
-            apiKey: String(provider.apiKey || '').trim(),
-            name: normalizeProviderLinkValue(provider.name),
-        }].filter((item) => !!item.baseUrl);
-
-        if (candidateProviders.length === 0) return false;
-
-        const matchedSlots = this.state.slots.filter((slot) => {
-            const slotBaseUrl = normalizeProviderLinkValue(slot.baseUrl);
-            if (!slotBaseUrl) return false;
-
-            return candidateProviders.some((candidate) => {
-                if (slotBaseUrl !== candidate.baseUrl) return false;
-
-                const slotKey = String(slot.key || '').trim();
-                const slotName = normalizeProviderLinkValue(slot.name);
-
-                if (candidate.apiKey && slotKey && slotKey === candidate.apiKey) return true;
-                if (candidate.name && slotName && slotName === candidate.name) return true;
-                return false;
-            });
-        });
+        const matchedSlots = findProviderLinkedSlots(this.state.slots, [provider]);
 
         if (matchedSlots.length === 0) return false;
 
