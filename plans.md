@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the active invalid-card cleanup helper slice is `b68867dd refactor: extract canvas merge helpers`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the active canvas placement helper slice is `7d8a4331 refactor: extract canvas cleanup helpers`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -30,7 +30,8 @@ The active execution model for this thread has resumed Stage One convergence:
 - Stage Two M6 `CanvasContext` prompt recovery normalization extraction completed in `53f80d80`: it moved startup prompt recovery normalization into `src/context/canvasPromptRecovery.ts`, while leaving async persisted-result recovery and hydration effects in `CanvasContext.tsx`.
 - Stage Two M7 `CanvasContext` persisted image recovery helper extraction completed in `0a5c2339`: it moved persisted task/result recovery entries, URL resolution, and recovery-signature construction into `src/context/canvasPersistedImageRecovery.ts`, while leaving the React hydration effect in `CanvasContext.tsx`.
 - Stage Two M8 `CanvasContext` canvas merge helper extraction completed in `b68867dd`: it moved canvas card counting, snapshot merge, and preferred active-canvas selection into `src/context/canvasMerge.ts`, while leaving cloud/local-folder restore effects in `CanvasContext.tsx`.
-- The active finalization lane is Stage Two M9 `CanvasContext` invalid-card cleanup helper extraction: it moves invalid prompt/image cleanup, utility workflow pruning, group pruning, and selection filtering into `src/context/canvasCleanup.ts`, while leaving public context orchestration in `CanvasContext.tsx`.
+- Stage Two M9 `CanvasContext` invalid-card cleanup helper extraction completed in `7d8a4331`: it moved invalid prompt/image cleanup, utility workflow pruning, group pruning, and selection filtering into `src/context/canvasCleanup.ts`, while leaving public context orchestration in `CanvasContext.tsx`.
+- The active finalization lane is Stage Two M10 `CanvasContext` placement helper extraction: it moves next-card, smart-collision, and next-group position calculations into `src/context/canvasPlacement.ts`, while leaving public context callbacks in `CanvasContext.tsx`.
 - The project is functionally green after the latest audit gates, but not final-complete while `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain giant-file split targets.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
@@ -45,7 +46,7 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/app/useGenerationRuntime.ts`: 2604 lines, extracted and boundary-hardened in `ab719c4a`; generation billing cleanup completed in `083db7f8`.
 - `src/app/usePptRuntime.ts`: 1289 lines, extracted in `4c448660` and semantically boundary-checked in `569383aa`.
 - `src/app/pptRuntimeHelpers.ts`: 152 lines, semantically boundary-checked in `569383aa`.
-- `src/context/CanvasContext.tsx`: 4462 text lines in the active Stage Two M9 working tree, down from 5218 text lines at the start of Stage Two.
+- `src/context/CanvasContext.tsx`: 4263 text lines in the active Stage Two M10 working tree, down from 5218 text lines at the start of Stage Two.
 - `src/context/canvasContextState.ts`: 114 lines, new Stage Two M1 state/default/context boundary module.
 - `src/context/canvasCompatibility.ts`: 8 lines, new Stage Two M1 canvas workflow/ecommerce compatibility helper.
 - `src/context/canvasSelection.ts`: 35 lines, new Stage Two M2 selection reducer helper.
@@ -55,7 +56,8 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/context/canvasPromptRecovery.ts`: 184 lines, Stage Two M6 prompt recovery helper.
 - `src/context/canvasPersistedImageRecovery.ts`: 301 lines, Stage Two M7 persisted image recovery helper.
 - `src/context/canvasMerge.ts`: 122 lines, Stage Two M8 canvas merge helper.
-- `src/context/canvasCleanup.ts`: 155 lines, active Stage Two M9 invalid-card cleanup helper.
+- `src/context/canvasCleanup.ts`: 155 lines, Stage Two M9 invalid-card cleanup helper.
+- `src/context/canvasPlacement.ts`: 189 lines, active Stage Two M10 placement helper.
 - `src/services/auth/keyManager.ts`: 5279 lines.
 - `src/components/layout/PromptBar.tsx`: 4437 lines.
 - `src/services/llm/OpenAICompatibleAdapter.ts`: 4517 lines.
@@ -306,7 +308,8 @@ Scope:
 - Completed M6 slice in `53f80d80`: extracted startup prompt recovery normalization from `src/context/CanvasContext.tsx` into `src/context/canvasPromptRecovery.ts`, preserving completed-prompt cleanup, interrupted synchronous-generation marking, and before-unload risk detection.
 - Completed M7 slice in `0a5c2339`: extracted persisted image recovery helpers from `src/context/CanvasContext.tsx` into `src/context/canvasPersistedImageRecovery.ts`, preserving completed/persisted task entry merge, storage/original URL resolution order, recovery signature gating, and the existing React hydration effect.
 - Completed M8 slice in `b68867dd`: extracted canvas merge helpers from `src/context/CanvasContext.tsx` into `src/context/canvasMerge.ts`, preserving non-empty snapshot preference, local item override during ID merge, max `lastModified`, and preferred active-canvas fallback ordering.
-- Current M9 slice: extract invalid-card cleanup helpers from `src/context/CanvasContext.tsx` into `src/context/canvasCleanup.ts`, preserving invalid prompt/image removal, utility workflow source/output pruning, workflow edge pruning, group pruning, selection filtering, and summary reporting.
+- Completed M9 slice in `7d8a4331`: extracted invalid-card cleanup helpers from `src/context/CanvasContext.tsx` into `src/context/canvasCleanup.ts`, preserving invalid prompt/image removal, utility workflow source/output pruning, workflow edge pruning, group pruning, selection filtering, and summary reporting.
+- Current M10 slice: extract placement helpers from `src/context/CanvasContext.tsx` into `src/context/canvasPlacement.ts`, preserving fixed card-grid slots, smart collision shifts, utility workflow collision checks, and dynamic child-card group width accumulation.
 - Split `src/context/CanvasContext.tsx` by state model, selection/drag events, node mutations, and persistence sync.
 - Split `src/services/auth/keyManager.ts` by key storage, permission checks, encryption helpers, and provider credential management.
 - Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.

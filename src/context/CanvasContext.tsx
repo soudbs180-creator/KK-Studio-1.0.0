@@ -50,6 +50,7 @@ import { getWorkflowSourceNodeIds } from './canvasWorkflowSourceNodeIds';
 import { hydrateRecoveredMediaCacheEntry, resolveOriginalPersistSourceForDisk } from './canvasMediaRecovery';
 import { mergeCanvases, resolvePreferredActiveCanvasId } from './canvasMerge';
 import { cleanupInvalidCanvasCardsForCanvas, type CleanupInvalidCardsSummary } from './canvasCleanup';
+import { resolveNextCardPosition, resolveNextGroupPosition, resolveSmartCanvasPosition } from './canvasPlacement';
 import {
     buildPersistedImageRecoverySignature,
     buildPromptRecoveryEntries,
@@ -3918,218 +3919,18 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, []);
 
     const getNextCardPosition = useCallback((): { x: number; y: number } => {
-        const CARD_WIDTH = 280;
-        const CARD_HEIGHT = 320;
-        const GAP_X = 20;
-        const GAP_Y = 20;
-        const MAX_WIDTH = 1600;
-        const SLOT_WIDTH = CARD_WIDTH + GAP_X;
-        const SLOT_HEIGHT = CARD_HEIGHT + GAP_Y;
-        const columnsPerRow = Math.floor(MAX_WIDTH / SLOT_WIDTH);
-
         const currentCanvas = state.canvases.find(c => c.id === state.activeCanvasId);
-        if (!currentCanvas) return { x: 0, y: 0 };
-
-        const totalCards = currentCanvas.promptNodes.length + currentCanvas.imageNodes.length;
-        const col = totalCards % columnsPerRow;
-        const row = Math.floor(totalCards / columnsPerRow);
-
-        return { x: col * SLOT_WIDTH, y: row * SLOT_HEIGHT };
+        return resolveNextCardPosition(currentCanvas);
     }, [state]);
 
-    /**
-     * Find a smart position that doesn't overlap with existing nodes.
-     * Starts at target (x,y) and spirals/shifts out until free space found.
-     */
     const findSmartPosition = useCallback((targetX: number, targetY: number, width: number, height: number, buffer = 20): { x: number; y: number } => {
         const currentCanvas = state.canvases.find(c => c.id === state.activeCanvasId);
-        if (!currentCanvas) return { x: targetX, y: targetY };
-
-        // Helper: Check collision
-        const checkCollision = (cx: number, cy: number) => {
-            // Check groups first (Large blocks)
-            for (const g of currentCanvas.groups) {
-                const gX = g.bounds.x;
-                const gY = g.bounds.y;
-                const gW = g.bounds.width;
-                const gH = g.bounds.height;
-
-                const myX = cx - width / 2; // Anchor Center Helper
-                const myY = cy - height;    // Anchor Bottom Helper
-
-                // Check Overlap
-                // My: [myX, myY, width, height]
-                // Group: [gX, gY, gW, gH]
-                if (myX < gX + gW + buffer && myX + width + buffer > gX &&
-                    myY < gY + gH + buffer && myY + height + buffer > gY) {
-                    return true;
-                }
-            }
-
-            // Check prompts
-            for (const p of currentCanvas.promptNodes) {
-                // Approximate prompt dimensions (default width 320, height ~160+)
-                // Origin is Bottom Center, but stored pos is card bottom center?
-                // Wait, in `layoutTree`: "nodeX = x + width/2", "positions[node.id] = {x, y}"
-                // And App.tsx `getCardDimensions` logic implies stored pos is bottom center?
-                // Let's assume standard card calc:
-                const pW = 320;
-                const pH = 200; // Roughly
-                // Rect: [p.x - pW/2, p.y - pH, pW, pH]
-                const px = p.position.x - pW / 2;
-                const py = p.position.y - pH;
-
-                // My Candidate Rect: [cx - width/2, cy - height, width, height]
-                const myX = cx - width / 2;
-                const myY = cy - height;
-
-                if (myX < px + pW + buffer && myX + width + buffer > px &&
-                    myY < py + pH + buffer && myY + height + buffer > py) {
-                    return true;
-                }
-            }
-
-            // Check images
-            for (const img of currentCanvas.imageNodes) {
-                // Check dims
-                let iW = 280;
-                let iH = 320;
-                if (img.dimensions) {
-                    const [w, h] = img.dimensions.split('x').map(Number);
-                    if (w && h) {
-                        const ratio = w / h;
-                        iW = ratio > 1 ? 320 : (ratio < 1 ? 200 : 280);
-                        iH = (iW / ratio) + 40;
-                    }
-                }
-                const ix = img.position.x - iW / 2;
-                const iy = img.position.y - iH;
-
-                const myX = cx - width / 2;
-                const myY = cy - height;
-
-                if (myX < ix + iW + buffer && myX + width + buffer > ix &&
-                    myY < iy + iH + buffer && myY + height + buffer > iy) {
-                    return true;
-                }
-            }
-
-            for (const workflowNode of currentCanvas.workflow?.nodes || []) {
-                if (!isWorkflowUtilityNodeKind(workflowNode.kind)) continue;
-
-                const nodeWidth = workflowNode.width || 280;
-                const nodeHeight = workflowNode.height || 180;
-                const nodeX = workflowNode.position.x - nodeWidth / 2;
-                const nodeY = workflowNode.position.y - nodeHeight;
-                const myX = cx - width / 2;
-                const myY = cy - height;
-
-                if (myX < nodeX + nodeWidth + buffer && myX + width + buffer > nodeX &&
-                    myY < nodeY + nodeHeight + buffer && myY + height + buffer > nodeY) {
-                    return true;
-                }
-            }
-
-            return false;
-        };
-
-        // If no collision at target, return immediately
-        if (!checkCollision(targetX, targetY)) return { x: targetX, y: targetY };
-
-        // Simple Shift Strategy: Try moving Down, then Right, then Diagonal
-        // Iterating shifts
-        const shifts = [
-            { dx: 0, dy: height + buffer }, // Down 1 slot
-            { dx: width + buffer, dy: 0 },  // Right 1 slot
-            { dx: -(width + buffer), dy: 0 }, // Left 1 slot
-            { dx: 0, dy: -(height + buffer) }, // Up 1 slot
-
-            { dx: width + buffer, dy: height + buffer }, // Diagonal Right Down
-            { dx: -(width + buffer), dy: height + buffer }, // Diagonal Left Down
-
-            { dx: (width + buffer) * 2, dy: 0 }, // Right 2
-            { dx: 0, dy: (height + buffer) * 2 }, // Down 2
-        ];
-
-        for (const shift of shifts) {
-            const sx = targetX + shift.dx;
-            const sy = targetY + shift.dy;
-            if (!checkCollision(sx, sy)) return { x: sx, y: sy };
-        }
-
-        // Fallback: Just put it far below
-        return { x: targetX, y: targetY + height + buffer + 100 };
+        return resolveSmartCanvasPosition(currentCanvas, targetX, targetY, width, height, buffer);
     }, [state]);
 
-    /**
-     * Find the grid position for the next card group.
-     * Strategy: place groups left-to-right and wrap after 30 groups per row.
-     * Return the bottom-center anchor position of the main prompt card.
-     *
-     * Card Group Layout Strategy:
-     * - Each group consists of a Main Card (Prompt) and Sub Cards (Images)
-     * - Groups are arranged in a grid: 30 per row, then wrap to next row
-     * - Dynamic width calculation based on existing sub-cards
-     */
     const findNextGroupPosition = useCallback((): { x: number; y: number } => {
-        // Card-group layout constants.
-        const SUB_CARD_WIDTH = 280;      // Sub-card width.
-        const SUB_CARD_GAP = 16;         // Gap between sub-cards.
-        const GROUP_BASE_WIDTH = 380;   // Base width when a group has a single sub-card column.
-        const GROUP_HEIGHT = 600;        // Prompt height + gaps + sub-card height.
-        const GAP_X = 40;                // Horizontal gap between groups.
-        const GAP_Y = 80;                // Vertical gap between rows.
-        const GROUPS_PER_ROW = 30;       // Maximum groups per row.
-
         const currentCanvas = state.canvases.find(c => c.id === state.activeCanvasId);
-        if (!currentCanvas) return { x: 0, y: 200 };
-
-        const groupCount = currentCanvas.promptNodes.length;
-
-        // Return the initial position when there are no existing groups.
-        if (groupCount === 0) {
-            return { x: 0, y: 200 };
-        }
-
-        // Compute each existing group's actual width from its child-card count.
-        const getGroupWidth = (promptId: string): number => {
-            const childCount = currentCanvas.imageNodes.filter(
-                img => img.parentPromptId === promptId
-            ).length;
-
-            // Child cards use at most two columns.
-            const cols = Math.min(Math.max(childCount, 1), 2);
-            const width = cols * SUB_CARD_WIDTH + (cols - 1) * SUB_CARD_GAP + 40;
-            return Math.max(GROUP_BASE_WIDTH, width);
-        };
-
-        // Compute the current row and column index.
-        const row = Math.floor(groupCount / GROUPS_PER_ROW);
-        const col = groupCount % GROUPS_PER_ROW;
-
-        // Compute the accumulated X offset within the current row.
-        const startRowIdx = row * GROUPS_PER_ROW;
-        let xOffset = 0;
-
-        // Sum the width of every existing group in this row.
-        for (let i = startRowIdx; i < groupCount; i++) {
-            const prompt = currentCanvas.promptNodes[i];
-            if (prompt) {
-                xOffset += getGroupWidth(prompt.id) + GAP_X;
-            }
-        }
-
-        // Keep the layout left-aligned.
-        const startX = 0;
-
-        // New group position = startX + accumulated offset + half the new group width.
-        const newGroupWidth = GROUP_BASE_WIDTH;
-        const x = startX + xOffset + newGroupWidth / 2;
-
-        // Compute Y from the row index.
-        const y = 200 + row * (GROUP_HEIGHT + GAP_Y);
-
-        return { x, y };
+        return resolveNextGroupPosition(currentCanvas);
     }, [state]);
 
     /** Group Management */
