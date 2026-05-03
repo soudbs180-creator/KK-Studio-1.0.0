@@ -34,9 +34,12 @@ test('keyManager no longer skips local fixed users when hydrating or syncing pay
 
 test('keyManager preserves local provider pricing snapshots when cloud payloads refresh provider config', () => {
   const source = readSource('src/services/auth/keyManager.ts');
+  const providerSource = readSource('src/services/auth/keyManagerProviders.ts');
 
   assert.match(source, /mergeCloudProvidersWithLocalRuntimeState/);
-  assert.match(source, /pricingSnapshot:\s*provider\.pricingSnapshot\s*\|\|\s*localProvider\.pricingSnapshot/);
+  assert.doesNotMatch(source, /private mergeCloudProvidersWithLocalRuntimeState/);
+  assert.match(providerSource, /pricingSnapshot:\s*provider\.pricingSnapshot\s*\|\|\s*localProvider\.pricingSnapshot/);
+  assert.match(providerSource, /activitySummary:\s*provider\.activitySummary\s*\|\|\s*localProvider\.activitySummary/);
 });
 
 test('keyManager reapplies cloud provider state to linked legacy slots before rebuilding the model library', () => {

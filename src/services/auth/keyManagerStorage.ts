@@ -1,4 +1,4 @@
-import { shouldUseLegacyWebApiFallback } from "../api/kkApiClient";
+import { shouldUseLegacyWebApiFallback } from "../api/kkApiClient.ts";
 
 export const STORAGE_KEY = "kk_studio_key_manager";
 export const PROVIDERS_STORAGE_KEY = "kk_studio_third_party_providers";

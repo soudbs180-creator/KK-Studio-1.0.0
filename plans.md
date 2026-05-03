@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the current slice is `3ce7ae59 refactor: extract key manager key type helper`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the current slice is `08eb89d8 refactor: consolidate model id normalization`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -52,22 +52,23 @@ The active execution model for this thread has resumed Stage One convergence:
 - Stage Two M27 `CanvasContext` prompt node update extraction completed in `b16843ee`: it extends `src/context/canvasNodeUpdates.ts` with pure prompt add/update reducers while keeping reference-image persistence, logging, and user notifications in `CanvasContext.tsx`.
 - Stage Two M28 `keyManager` model helper extraction completed in `a174b557`: it moves model parsing, migration, normalization, variant parsing, and variant label helpers into `src/services/auth/keyManagerModelHelpers.ts` while preserving `keyManager.ts` compatibility exports.
 - Stage Two M29 `keyManager` key type helper extraction is completed in `3ce7ae59`: it moves `determineKeyType` into `src/services/auth/keyManagerKeyType.ts`, preserves `keyManager.ts` compatibility re-export, and removes the `keyManagerEffectiveSlot.ts -> keyManager.ts` back edge.
-- Stage Two M30 `modelIdNormalization` parity consolidation is the current slice: it makes `src/utils/modelIdNormalization.ts` a compatibility facade over `src/services/auth/keyManagerModelHelpers.ts` so the migration map, normalization, and variant parser have one source of truth.
+- Stage Two M30 `modelIdNormalization` parity consolidation is completed in `08eb89d8`: it makes `src/utils/modelIdNormalization.ts` a compatibility facade over `src/services/auth/keyManagerModelHelpers.ts` so the migration map, normalization, and variant parser have one source of truth.
+- Stage Two M31 `keyManager` provider runtime-state merge extraction is the current slice: it moves the pure cloud/local provider pricing and activity merge into `src/services/auth/keyManagerProviders.ts`, while leaving cloud persistence, localStorage policy, credential redaction, token refresh, and backoff behavior in their existing owners.
 - The project is functionally green after the latest audit gates, but not final-complete while `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain giant-file split targets.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
-Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release metadata, final audit fixes, and Stage Two architecture splits must be staged separately. The active Stage Two slice consolidates duplicated `src/utils/modelIdNormalization.ts` behavior; the next keyManager debt candidates after that are key storage, permission checks, encryption helpers, and provider credential management.
+Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release metadata, final audit fixes, and Stage Two architecture splits must be staged separately. The active Stage Two slice extracts only provider runtime-state merge logic from `keyManager.ts`; the next keyManager debt candidates after that are key storage, permission checks, encryption helpers, and provider credential management.
 
 ## Current Baseline
 
-- `src/App.tsx`: 4900 lines after the latest finalization/security cleanup line.
+- `src/App.tsx`: 4385 lines after the latest finalization/security cleanup line.
 - `src/app/useConnectorRenderer.ts`: 253 lines, boundary hardened in `5f5b76e0` and review-follow-up typechecked in `f06f1880`.
 - `src/app/usePromptGroupLayout.ts`: 1348 lines, extracted and boundary-hardened in `8a458cd4`.
 - `src/app/useGenerationRuntime.ts`: 2604 lines, extracted and boundary-hardened in `ab719c4a`; generation billing cleanup completed in `083db7f8`.
 - `src/app/usePptRuntime.ts`: 1289 lines, extracted in `4c448660` and semantically boundary-checked in `569383aa`.
 - `src/app/pptRuntimeHelpers.ts`: 152 lines, semantically boundary-checked in `569383aa`.
-- `src/context/CanvasContext.tsx`: 2518 physical lines after Stage Two M27 prompt-node update extraction, down from 5218 text lines at the start of Stage Two.
+- `src/context/CanvasContext.tsx`: 2198 physical lines after Stage Two M27 prompt-node update extraction, down from 5218 text lines at the start of Stage Two.
 - `src/context/canvasContextState.ts`: 114 lines, new Stage Two M1 state/default/context boundary module.
 - `src/context/canvasArrangeSelection.ts`: 601 lines, Stage Two M22/M24/M25 selected arrange helper.
 - `src/context/canvasAutoArrange.ts`: 360 lines, Stage Two M26 full-canvas auto-arrange position helper.
@@ -90,12 +91,14 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/context/canvasPositionUpdates.ts`: 104 lines, Stage Two M16 position update helper.
 - `src/context/canvasPromptImageLinks.ts`: 62 lines, Stage Two M17 prompt-image relationship helper plus active Stage Two M19 image deletion transform.
 - `src/context/canvasWorkflowUpdates.ts`: 148 lines, Stage Two M18 workflow update helper.
-- `src/services/auth/keyManager.ts`: 5070 lines after the completed M29 key type helper extraction.
-- `src/services/auth/keyManagerModelHelpers.ts`: 194 lines, Stage Two M28 pure model helper boundary.
-- `src/services/auth/keyManagerKeyType.ts`: 10 lines, Stage Two M29 key type helper boundary.
-- `src/utils/modelIdNormalization.ts`: 6 lines in the active M30 compatibility-facade slice, down from 84 duplicated helper lines.
-- `src/components/layout/PromptBar.tsx`: 4466 lines.
-- `src/services/llm/OpenAICompatibleAdapter.ts`: 4517 lines.
+- `src/services/auth/keyManager.ts`: 4408 lines in the active M31 provider runtime-state merge extraction.
+- `src/services/auth/keyManagerProviders.ts`: 102 lines in the active M31 provider helper boundary.
+- `src/services/auth/keyManagerStorage.ts`: 34 lines after the Node ESM import compatibility adjustment.
+- `src/services/auth/keyManagerModelHelpers.ts`: 168 lines, Stage Two M28/M30 pure model helper boundary.
+- `src/services/auth/keyManagerKeyType.ts`: 9 lines, Stage Two M29 key type helper boundary.
+- `src/utils/modelIdNormalization.ts`: 6 lines after M30 compatibility-facade consolidation, down from 84 duplicated helper lines.
+- `src/components/layout/PromptBar.tsx`: 4075 lines.
+- `src/services/llm/OpenAICompatibleAdapter.ts`: 3980 lines.
 - `apps/web/`: migration target, not the first edit location.
 - `apps/api/`: DDD back-end structure, not part of this refactor unless compatibility checks require it.
 
@@ -365,9 +368,10 @@ Scope:
 - Completed M27 slice in `b16843ee`: extracted prompt add/update canvas reducers into `src/context/canvasNodeUpdates.ts`, preserving prompt z-index promotion, duplicate skip behavior, defensive prompt/reference merges, stale generating guards, and Context-owned reference-image persistence side effects.
 - Completed M28 slice in `a174b557`: extracted `keyManager` model parsing/normalization helpers into `src/services/auth/keyManagerModelHelpers.ts`, preserved compatibility exports from `keyManager.ts`, and made `keyManagerEffectiveSlot.ts` import `parseModelString` directly from the helper.
 - Completed M29 slice in `3ce7ae59`: extracted `determineKeyType` into `src/services/auth/keyManagerKeyType.ts`, preserved `keyManager.ts` compatibility re-export, and made `keyManagerEffectiveSlot.ts` free of direct `keyManager.ts` imports.
-- Active M30 slice: parity-guard and consolidate duplicated `src/utils/modelIdNormalization.ts` behavior against `src/services/auth/keyManagerModelHelpers.ts`.
+- Completed M30 slice in `08eb89d8`: parity-guarded and consolidated duplicated `src/utils/modelIdNormalization.ts` behavior against `src/services/auth/keyManagerModelHelpers.ts`.
+- Active M31 slice: extract only `mergeCloudProvidersWithLocalRuntimeState` from `src/services/auth/keyManager.ts` into `src/services/auth/keyManagerProviders.ts`, preserving cloud-provider precedence and local runtime fallback for omitted pricing/activity fields.
 - Continue `src/context/CanvasContext.tsx` only for another high-confidence narrow seam; defer `migrateNodes`, IndexedDB/local-folder movement, and persistence orchestration until they can be split safely.
-- Continue `src/services/auth/keyManager.ts` after M30 by splitting key storage, permission checks, encryption helpers, and provider credential management.
+- Continue `src/services/auth/keyManager.ts` after M31 by splitting key storage, permission checks, encryption helpers, and provider credential management.
 - Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.
 - Split `src/services/llm/OpenAICompatibleAdapter.ts` by request building, response parsing, provider quirks, and image/video/audio compatibility.
 - Keep compatibility exports for existing import paths.

@@ -383,6 +383,18 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/provider-image-routing-regression.test.ts"
 ```
 
+Provider runtime-state merge targeted gate:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/key-manager-provider-persistence-contract.test.ts" `
+  "tests/unit/key-manager-cloud-sync.test.ts" `
+  "tests/unit/key-manager-runtime-fallback.test.ts" `
+  "tests/unit/user-api-cloud-storage.test.ts" `
+  "tests/unit/frontend-key-boundary-hardening.test.ts" `
+  "tests/unit/auth-data-routes.test.ts"
+```
+
 keyManager architecture slices also require:
 
 ```powershell
@@ -393,6 +405,12 @@ npm.cmd run build
 npm.cmd run governance:agent-docs
 npm.cmd run check:encoding
 git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerModelHelpers.ts" "src/services/auth/keyManagerKeyType.ts" "src/services/auth/keyManagerEffectiveSlot.ts" "tests/unit/key-manager-model-helpers-contract.test.ts" "tests/unit/key-manager-key-type-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+Provider runtime-state merge slices should use this narrower path-limited diff check:
+
+```powershell
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerProviders.ts" "src/services/auth/keyManagerStorage.ts" "tests/unit/key-manager-provider-persistence-contract.test.ts" "tests/unit/key-manager-runtime-fallback.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
 Model ID compatibility facade slices should use this narrower path-limited diff check:

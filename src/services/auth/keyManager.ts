@@ -29,6 +29,7 @@ import {
 } from './keyManagerStorage';
 import {
     loadProvidersFromLocal,
+    mergeCloudProvidersWithLocalRuntimeState,
     persistProvidersLocal,
 } from './keyManagerProviders';
 import {
@@ -1477,8 +1478,9 @@ export class KeyManager {
         }
     ) {
         const previousProviders = [...this.providers];
-        const cloudProviders = this.mergeCloudProvidersWithLocalRuntimeState(
-            this.normalizeStoredProviders(extractUserApiProvidersFromPayload(rawPayload))
+        const cloudProviders = mergeCloudProvidersWithLocalRuntimeState(
+            this.normalizeStoredProviders(extractUserApiProvidersFromPayload(rawPayload)),
+            this.providers,
         );
         const hasProviderEnvelope = isUserApisEnvelope(rawPayload) && 'providers' in rawPayload;
         const shouldPreserveLocalProviders =
@@ -4557,35 +4559,6 @@ export class KeyManager {
         } catch (e) {
             console.error('[KeyManager] Failed to save providers:', e);
         }
-    }
-
-    private mergeCloudProvidersWithLocalRuntimeState(
-        cloudProviders: ThirdPartyProvider[],
-    ): ThirdPartyProvider[] {
-        if (cloudProviders.length === 0 || this.providers.length === 0) {
-            return cloudProviders;
-        }
-
-        const localProvidersById = new Map<string, ThirdPartyProvider>();
-        this.providers.forEach((provider) => {
-            const normalizedId = String(provider.id || "").trim();
-            if (normalizedId) {
-                localProvidersById.set(normalizedId, provider);
-            }
-        });
-
-        return cloudProviders.map((provider) => {
-            const localProvider = localProvidersById.get(String(provider.id || "").trim());
-            if (!localProvider) {
-                return provider;
-            }
-
-            return {
-                ...provider,
-                pricingSnapshot: provider.pricingSnapshot || localProvider.pricingSnapshot,
-                activitySummary: provider.activitySummary || localProvider.activitySummary,
-            };
-        });
     }
 
     private loadProviders(force = false): void {
