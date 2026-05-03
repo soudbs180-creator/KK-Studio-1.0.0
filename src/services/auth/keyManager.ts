@@ -616,9 +616,6 @@ function get12AIBaseUrl(): string {
 
 const DEFAULT_MAX_FAILURES = 3;
 const CLOUD_SYNC_POLL_INTERVAL_MS = 60 * 1000;
-// Legacy Gemini model IDs kept for backward-compatible migrations
-const LEGACY_GOOGLE_MODELS = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash-exp'];
-
 /**
  * Blacklisted model patterns that should never surface in the UI.
  */

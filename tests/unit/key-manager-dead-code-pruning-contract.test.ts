@@ -14,6 +14,7 @@ test('keyManager does not retain proven unused local helper definitions', () => 
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-dead-code-pruning-contract\.test\.ts/);
+  assert.doesNotMatch(source, /const LEGACY_GOOGLE_MODELS = /);
   assert.doesNotMatch(source, /const isLegacyGoogleModelList = /);
   assert.doesNotMatch(source, /private migrateFromOldFormat\(\): KeyManagerState/);
   assert.doesNotMatch(source, /function getDefaultGoogleModels\(\): string\[]/);
