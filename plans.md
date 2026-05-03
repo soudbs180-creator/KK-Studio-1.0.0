@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the active Stage Two M25 Canvas selected-group arrange extraction is `c1a76a43 refactor: extract canvas selected root arrange helper`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the active Stage Two M26 Canvas auto-arrange extraction is `1318d84d refactor: extract canvas selected group arrange helper`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -47,7 +47,8 @@ The active execution model for this thread has resumed Stage One convergence:
 - Stage Two M22 `CanvasContext` arrange-selection helper extraction completed in `bfc6fb8a`: it moved the single selected prompt child-card arrangement branch into `src/context/canvasArrangeSelection.ts`.
 - Stage Two M23 `CanvasContext` duplicate selected-arrange cleanup completed in `9769ea7f`: it removed the unreachable duplicate selected-arrange fallback.
 - Stage Two M24 `CanvasContext` selected-root arrange extraction completed in `c1a76a43`: it moved multi-root selected arrange into `src/context/canvasArrangeSelection.ts`, preserving row/grid/column root positioning and child sync while removing the local `any[]` root list from `CanvasContext.tsx`.
-- The active Stage Two M25 slice extracts the remaining selected grouped arrange fallback into `src/context/canvasArrangeSelection.ts`, preserving prompt+child single-root layout, PPT column override, selected-count fallthrough, and `subCardLayoutMode` behavior.
+- Stage Two M25 `CanvasContext` selected-group arrange extraction completed in `1318d84d`: it moved the remaining selected grouped arrange fallback into `src/context/canvasArrangeSelection.ts`, preserving prompt+child single-root layout, PPT column override, selected-count fallthrough, and `subCardLayoutMode` behavior.
+- The active Stage Two M26 slice extracts full-canvas auto-arrange position calculation into `src/context/canvasAutoArrange.ts`, preserving normal/follow-up/orphan/error layout behavior while keeping `setState` and localStorage persistence in `CanvasContext.tsx`.
 - The project is functionally green after the latest audit gates, but not final-complete while `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain giant-file split targets.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
@@ -62,9 +63,10 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/app/useGenerationRuntime.ts`: 2604 lines, extracted and boundary-hardened in `ab719c4a`; generation billing cleanup completed in `083db7f8`.
 - `src/app/usePptRuntime.ts`: 1289 lines, extracted in `4c448660` and semantically boundary-checked in `569383aa`.
 - `src/app/pptRuntimeHelpers.ts`: 152 lines, semantically boundary-checked in `569383aa`.
-- `src/context/CanvasContext.tsx`: 2968 physical lines after the active Stage Two M25 selected-group arrange extraction, down from 5218 text lines at the start of Stage Two.
+- `src/context/CanvasContext.tsx`: 2563 physical lines after the active Stage Two M26 auto-arrange extraction, down from 5218 text lines at the start of Stage Two.
 - `src/context/canvasContextState.ts`: 114 lines, new Stage Two M1 state/default/context boundary module.
 - `src/context/canvasArrangeSelection.ts`: 601 lines, Stage Two M22/M24/M25 selected arrange helper.
+- `src/context/canvasAutoArrange.ts`: 360 lines, active Stage Two M26 full-canvas auto-arrange position helper.
 - `src/context/canvasCompatibility.ts`: 8 lines, new Stage Two M1 canvas workflow/ecommerce compatibility helper.
 - `src/context/canvasSelection.ts`: 35 lines, new Stage Two M2 selection reducer helper.
 - `src/context/canvasPromptChildImages.ts`: 55 lines, new Stage Two M3 prompt child image resolver helper.
@@ -351,7 +353,8 @@ Scope:
 - Completed M22 slice in `bfc6fb8a`: extracted the single selected prompt child-card arrangement branch into `src/context/canvasArrangeSelection.ts`, preserving row/grid/column positions and PPT column behavior.
 - Completed M23 slice in `9769ea7f`: removed the unreachable duplicate selected-arrange fallback from `CanvasContext.tsx` and extended the cleanup contract to keep it from returning.
 - Completed M24 slice in `c1a76a43`: extracted the multi-root selected arrange branch into `src/context/canvasArrangeSelection.ts`, preserving selected image-only row layout, prompt-root child syncing, and null behavior when selection collapses to one root.
-- Active M25 slice: extract the remaining selected grouped arrange fallback into `src/context/canvasArrangeSelection.ts`, preserving prompt+child grouped layout, selected-count fallthrough, PPT child column override, deterministic `lastModified`, and requested `subCardLayoutMode` behavior.
+- Completed M25 slice in `1318d84d`: extracted the remaining selected grouped arrange fallback into `src/context/canvasArrangeSelection.ts`, preserving prompt+child grouped layout, selected-count fallthrough, PPT child column override, deterministic `lastModified`, and requested `subCardLayoutMode` behavior.
+- Active M26 slice: extract full-canvas auto-arrange position calculation into `src/context/canvasAutoArrange.ts`, preserving normal prompt groups, follow-up source prompt placement, orphan prompt/image placement, error prompt rows, and Context-owned state/persistence side effects.
 - Split `src/context/CanvasContext.tsx` by state model, selection/drag events, node mutations, and persistence sync.
 - Split `src/services/auth/keyManager.ts` by key storage, permission checks, encryption helpers, and provider credential management.
 - Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.

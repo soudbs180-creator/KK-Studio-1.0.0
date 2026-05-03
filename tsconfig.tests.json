@@ -23,6 +23,7 @@
     "include": [
         "tests/contract/**/*.ts",
         "tests/integration/**/*.ts",
+        "tests/unit/canvas-auto-arrange-contract.test.ts",
         "tests/unit/canvas-arrange-selection-contract.test.ts",
         "tests/unit/canvas-context-state-boundary.test.ts",
         "tests/unit/canvas-context-unused-cleanup.test.ts",
