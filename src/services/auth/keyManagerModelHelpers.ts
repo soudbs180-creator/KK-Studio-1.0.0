@@ -192,3 +192,36 @@ export function appendModelVariantLabel(baseName: string, modelId: string): stri
     if (tags.length === 0) return baseName;
     return `${baseName} (${tags.join(' · ')})`;
 }
+
+type PricingModelCandidate = {
+    model?: unknown;
+    modelId?: unknown;
+    id?: unknown;
+    model_name?: unknown;
+    modelName?: unknown;
+    name?: unknown;
+};
+
+export function extractModelIdsFromPricingData(pricingData: unknown): string[] {
+    if (!Array.isArray(pricingData)) return [];
+
+    return Array.from(new Set(
+        pricingData
+            .map((item) => {
+                const candidate = item as PricingModelCandidate | null | undefined;
+                const candidates = [
+                    candidate?.model,
+                    candidate?.modelId,
+                    candidate?.id,
+                    candidate?.model_name,
+                    candidate?.modelName,
+                    candidate?.name,
+                ];
+
+                return candidates
+                    .map((value) => String(value || '').replace(/^models\//i, '').trim())
+                    .find(Boolean);
+            })
+            .filter((value): value is string => Boolean(value))
+    ));
+}

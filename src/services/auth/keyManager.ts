@@ -112,6 +112,7 @@ import { isStartupStageReady, type AppStartupStage } from '../system/appStartup'
 import { resolveModelDisplayName } from '../../utils/modelDisplayName';
 import {
     DEPRECATED_MODELS,
+    extractModelIdsFromPricingData,
     MODEL_MIGRATION_MAP,
     normalizeModelId,
     parseModelString,
@@ -4666,29 +4667,6 @@ export async function fetchOpenAICompatModels(apiKey: string, baseUrl: string): 
         console.error('[KeyManager] Error fetching proxy models:', error);
         return [];
     }
-}
-
-function extractModelIdsFromPricingData(pricingData: any[]): string[] {
-    if (!Array.isArray(pricingData)) return [];
-
-    return Array.from(new Set(
-        pricingData
-            .map((item) => {
-                const candidates = [
-                    item?.model,
-                    item?.modelId,
-                    item?.id,
-                    item?.model_name,
-                    item?.modelName,
-                    item?.name,
-                ];
-
-                return candidates
-                    .map((value) => String(value || '').replace(/^models\//i, '').trim())
-                    .find(Boolean);
-            })
-            .filter((value): value is string => Boolean(value))
-    ));
 }
 
 /**

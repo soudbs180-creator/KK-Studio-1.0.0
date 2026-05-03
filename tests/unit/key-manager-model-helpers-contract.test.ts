@@ -8,6 +8,7 @@ const ROOT_DIR = process.cwd();
 type KeyManagerModelHelpersModule = {
   MODEL_MIGRATION_MAP: Record<string, string>;
   appendModelVariantLabel: (baseName: string, modelId: string) => string;
+  extractModelIdsFromPricingData: (pricingData: unknown) => string[];
   normalizeModelId: (modelId: string) => string;
   parseModelString: (input: string) => { id: string; name?: string; description?: string; provider?: string };
   parseModelVariantMeta: (modelId: string) => {
@@ -38,6 +39,7 @@ test('keyManager model helper boundary lives outside the monolithic key manager'
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-model-helpers-contract\.test\.ts/);
   assert.match(keyManagerSource, /from '\.\/keyManagerModelHelpers';/);
+  assert.match(keyManagerSource, /import \{[\s\S]*extractModelIdsFromPricingData[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /export \{[\s\S]*parseModelString[\s\S]*MODEL_MIGRATION_MAP[\s\S]*normalizeModelId[\s\S]*parseModelVariantMeta[\s\S]*appendModelVariantLabel[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /export type \{[\s\S]*ModelVariantMeta[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(helperSource, /export function parseModelString/);
@@ -46,11 +48,13 @@ test('keyManager model helper boundary lives outside the monolithic key manager'
   assert.match(helperSource, /export function normalizeModelId/);
   assert.match(helperSource, /export function parseModelVariantMeta/);
   assert.match(helperSource, /export function appendModelVariantLabel/);
+  assert.match(helperSource, /export function extractModelIdsFromPricingData/);
   assert.doesNotMatch(keyManagerSource, /export function parseModelString/);
   assert.doesNotMatch(keyManagerSource, /export const MODEL_MIGRATION_MAP/);
   assert.doesNotMatch(keyManagerSource, /export function normalizeModelId/);
   assert.doesNotMatch(keyManagerSource, /export function parseModelVariantMeta/);
   assert.doesNotMatch(keyManagerSource, /export function appendModelVariantLabel/);
+  assert.doesNotMatch(keyManagerSource, /function extractModelIdsFromPricingData/);
   assert.match(effectiveSlotSource, /import \{ parseModelString \} from "\.\/keyManagerModelHelpers";/);
   assert.doesNotMatch(effectiveSlotSource, /import \{ determineKeyType, parseModelString \} from "\.\/keyManager";/);
   assert.doesNotMatch(effectiveSlotSource, /from "\.\/keyManager"/);
@@ -99,4 +103,31 @@ test('keyManager model helpers preserve parsing, migration, and variant label be
     ratio: '16x9',
   });
   assert.equal(appendModelVariantLabel('Imagen 4', 'imagen-4.0-fast-generate-001-4k'), 'Imagen 4 (4K)');
+});
+
+test('keyManager model helpers preserve pricing catalog model ID extraction behavior', async () => {
+  const { extractModelIdsFromPricingData } = await loadKeyManagerModelHelpers();
+
+  assert.deepEqual(extractModelIdsFromPricingData('not-an-array'), []);
+  assert.deepEqual(extractModelIdsFromPricingData([
+    { model: 'models/gpt-4.1' },
+    { model: ' trimmed-model ' },
+    { model: '', modelId: 'models/gpt-4.1-mini' },
+    { model: undefined, modelId: '', id: 'custom-id' },
+    { model_name: 'legacy_snake' },
+    { modelName: 'legacyCamel' },
+    { name: 'fallback-name' },
+    { model: 'gpt-4.1' },
+    { model: 'gpt-4.1-mini' },
+    null,
+    0,
+  ]), [
+    'gpt-4.1',
+    'trimmed-model',
+    'gpt-4.1-mini',
+    'custom-id',
+    'legacy_snake',
+    'legacyCamel',
+    'fallback-name',
+  ]);
 });
