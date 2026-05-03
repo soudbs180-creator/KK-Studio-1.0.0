@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const sourceRoots = ["src", "apps", "packages", "server", "api", "billing", "payment-server"];
+const sourceRoots = ["src", "apps", "packages", "server", "api", "billing", "payment-server", "netlify"];
 const includeExtensions = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".cjs", ".mjs"]);
 const failures = [];
 

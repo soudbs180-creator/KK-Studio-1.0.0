@@ -283,6 +283,23 @@ npm.cmd run build
 npm.cmd run check:encoding
 ```
 
+## Security Cleanup Gate
+
+Use this gate for narrow endpoint or secret-boundary cleanup slices:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/governance-contract.test.ts"
+npm.cmd run governance:security
+npm.cmd audit --omit=dev --audit-level=moderate
+npm.cmd run architecture:check
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+npm.cmd run governance:check
+```
+
 Current release status: the former `governance:version` portable metadata mismatch was cleared by `567f85aa`, and `npm.cmd run governance:check` passed in the latest full gate. Rerun this gate after any future packaging or publish metadata change.
 
 ## Finalization Audit Gate
