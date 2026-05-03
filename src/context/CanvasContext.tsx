@@ -48,7 +48,7 @@ import { resolveCanvasSelectionIds, type CanvasSelectionMode } from './canvasSel
 import { hydrateRecoveredMediaCacheEntry, resolveOriginalPersistSourceForDisk } from './canvasMediaRecovery';
 import { mergeCanvases, resolvePreferredActiveCanvasId } from './canvasMerge';
 import { mergeCanvasIntoState } from './canvasMergeInto';
-import { arrangeSingleSelectedPromptChildren } from './canvasArrangeSelection';
+import { arrangeSelectedRootNodes, arrangeSingleSelectedPromptChildren } from './canvasArrangeSelection';
 import { cleanupInvalidCanvasCardsForCanvas, type CleanupInvalidCardsSummary } from './canvasCleanup';
 import { resolveNextCardPosition, resolveNextGroupPosition, resolveSmartCanvasPosition } from './canvasPlacement';
 import { bringCanvasNodesToFront } from './canvasLayering';
@@ -1691,7 +1691,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const AUTO_ARRANGE_PROMPT_TO_SUB_GAP = 56; // Larger gap between the prompt card and its sub-cards.
 
         // --- Helper: Get dimensions ---
-        const getImageDims = (aspectRatio?: string, dimensions?: string) => {
+        const getImageDims = (aspectRatio?: string) => {
             // Using EXACT components dimensions to ensure perfect top alignment CSS logic
             const { width, totalHeight } = getCardDimensions(aspectRatio as AspectRatio, true);
             return { w: width, h: totalHeight };
@@ -1721,13 +1721,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         if (selectedIds.length > 0) {
             {
-                // 1. Analyze Selection Composition
-                const selectedPrompts = currentCanvas.promptNodes.filter(p => selectedIds.includes(p.id));
-                const selectedImages = currentCanvas.imageNodes.filter(img => selectedIds.includes(img.id));
-
-                const isPromptOnly = selectedPrompts.length > 0 && selectedImages.length === 0;
-                const isImageOnly = selectedPrompts.length === 0 && selectedImages.length > 0;
-
                 const singlePromptArrange = arrangeSingleSelectedPromptChildren(currentCanvas, selectedIds, mode);
                 if (singlePromptArrange) {
                     const newCanvases = state.canvases.map(c =>
@@ -1741,207 +1734,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     return;
                 }
 
-                // 2. Identify Roots & Sync Mode
-                let roots: any[] = [];
-                let syncChildren = false;
-
-                if (isPromptOnly) {
-                    // [Mode A] Prompt only: also sync child cards so the whole group arranges together.
-                    roots = selectedPrompts.map(p => ({
-                        id: p.id, type: 'prompt', obj: p,
-                        x: p.position.x, y: p.position.y,
-                        width: PROMPT_WIDTH, height: p.height || 200,
-                        visualCx: p.position.x, visualCy: p.position.y - (p.height || 200) / 2
-                    }));
-                    syncChildren = true; // Enable child-card sync so sub-cards follow the prompt during moves.
-                }
-                else if (isImageOnly) {
-                    // [MODE B] Image Only: Sort Images independent of parents
-                    roots = selectedImages.map(img => {
-                        const dims = getImageDims(img.aspectRatio, img.dimensions);
-                        return {
-                            id: img.id, type: 'image', obj: img,
-                            x: img.position.x, y: img.position.y,
-                            width: dims.w, height: dims.h,
-                            visualCx: img.position.x, visualCy: img.position.y - dims.h / 2
-                        };
-                    });
-                    syncChildren = false;
-                }
-                else {
-                    // [MODE C] Mixed/Group: Use Group Logic
-                    syncChildren = true;
-                    const uniqueRootsMap = new Map<string, { id: string, type: 'prompt' | 'image', obj: any }>();
-                    const getPrompt = (id: string) => currentCanvas.promptNodes.find(p => p.id === id);
-                    const getImage = (id: string) => currentCanvas.imageNodes.find(img => img.id === id);
-
-                    selectedIds.forEach(id => {
-                        const p = getPrompt(id);
-                        if (p) {
-                            uniqueRootsMap.set(p.id, { id: p.id, type: 'prompt', obj: p });
-                            return;
-                        }
-                        const img = getImage(id);
-                        if (img) {
-                            if (img.parentPromptId) {
-                                const parent = getPrompt(img.parentPromptId);
-                                if (parent) uniqueRootsMap.set(parent.id, { id: parent.id, type: 'prompt', obj: parent });
-                                else uniqueRootsMap.set(img.id, { id: img.id, type: 'image', obj: img });
-                            } else {
-                                uniqueRootsMap.set(img.id, { id: img.id, type: 'image', obj: img });
-                            }
-                        }
-                    });
-
-                    roots = Array.from(uniqueRootsMap.values()).map(r => {
-                        const node = r.obj;
-                        let width, height;
-
-                        if (r.type === 'prompt') {
-                            // [Fix] Calculate the bounding box of the prompt and all children.
-                            const children = currentCanvas.imageNodes.filter(img => img.parentPromptId === node.id);
-
-                            // 1. Initial Bounds (Prompt itself) - Anchor: Bottom Center
-                            const pH = node.height || 200;
-                            let minTop = node.position.y - pH;
-                            let maxBottom = node.position.y;
-                            let minLeft = node.position.x - PROMPT_WIDTH / 2;
-                            let maxRight = node.position.x + PROMPT_WIDTH / 2;
-
-                            // 2. Expand with Children
-                            children.forEach(child => {
-                                const dims = getImageDims(child.aspectRatio, child.dimensions);
-                                // Anchor: Bottom Center (Assuming consistent system)
-                                const cTop = child.position.y - dims.h;
-                                const cBottom = child.position.y;
-                                const cLeft = child.position.x - dims.w / 2;
-                                const cRight = child.position.x + dims.w / 2;
-
-                                if (cTop < minTop) minTop = cTop;
-                                if (cBottom > maxBottom) maxBottom = cBottom;
-                                if (cLeft < minLeft) minLeft = cLeft;
-                                if (cRight > maxRight) maxRight = cRight;
-                            });
-
-                            width = maxRight - minLeft;
-                            height = maxBottom - minTop;
-                        } else {
-                            const dims = getImageDims(node.aspectRatio, node.dimensions);
-                            width = dims.w;
-                            height = dims.h;
-                        }
-
-                        return {
-                            ...r,
-                            x: node.position.x, y: node.position.y,
-                            width, height,
-                            visualCx: node.position.x, visualCy: node.position.y - height / 2,
-                        };
-                    });
-                }
-
-                if (roots.length >= 2) {
-                    // 2. Use the requested mode to choose the layout strategy.
-                    const strategy: 'matrix' | 'row' | 'column' = mode === 'grid' ? 'matrix' : mode;
-                    const GAP = 120; // Larger gap between groups (was 80).
-                    const GRID_COLUMNS = 6; // Grid mode uses 6 fixed columns.
-
-                    // 3. Arrange
-                    const newPositions: Record<string, { x: number, y: number }> = {};
-
-                    if (strategy === 'matrix') {
-                        // Grid Sort: Rough Row-Major
-                        roots.sort((a, b) => {
-                            if (Math.abs(a.visualCy - b.visualCy) > 200) return a.visualCy - b.visualCy;
-                            return a.visualCx - b.visualCx;
-                        });
-
-                        // Use a fixed 6-column grid.
-                        const columns = GRID_COLUMNS;
-                        // Center around average center
-                        const avgX = roots.reduce((s, r) => s + r.x, 0) / roots.length;
-                        const avgY = roots.reduce((s, r) => s + r.y, 0) / roots.length;
-
-                        // Calculate grid total size
-                        const maxW = Math.max(...roots.map(r => r.width));
-                        const maxH = Math.max(...roots.map(r => r.height));
-                        const CELL_W = maxW + GAP;
-                        const CELL_H = maxH + GAP;
-
-                        const gridW = columns * CELL_W;
-                        const rows = Math.ceil(roots.length / columns);
-                        const gridH = rows * CELL_H;
-
-                        const startX = avgX - gridW / 2 + CELL_W / 2; // + Half cell because anchor is center
-                        const startY = avgY - gridH / 2 + CELL_H; // + Full cell H because anchor is bottom
-
-                        roots.forEach((r, i) => {
-                            const col = i % columns;
-                            const row = Math.floor(i / columns);
-                            newPositions[r.id] = {
-                                x: startX + col * CELL_W,
-                                y: startY + row * CELL_H
-                            };
-                        });
-
-                    } else if (strategy === 'column') {
-                        // Sort Top->Bottom
-                        roots.sort((a, b) => a.visualCy - b.visualCy);
-                        const avgX = roots.reduce((s, r) => s + r.x, 0) / roots.length;
-
-                        // Start Y = Top-most Top + First Height
-                        const topY = Math.min(...roots.map(r => r.visualCy - r.height / 2));
-                        let currentY = topY;
-
-                        roots.forEach((r) => {
-                            currentY += r.height; // Bottom Anchor
-                            newPositions[r.id] = { x: avgX, y: currentY };
-                            currentY += GAP;
-                        });
-
-                    } else {
-                        // Row (Default) - Sort Left->Right
-                        roots.sort((a, b) => a.visualCx - b.visualCx);
-                        // Align Centers Vertically
-                        const avgCy = roots.reduce((s, r) => s + r.visualCy, 0) / roots.length;
-
-                        let currentLeft = Math.min(...roots.map(r => r.visualCx - r.width / 2));
-
-                        roots.forEach((r) => {
-                            const newX = currentLeft + r.width / 2;
-                            newPositions[r.id] = { x: newX, y: avgCy + r.height / 2 };
-                            currentLeft += r.width + GAP;
-                        });
-                    }
-
-                    // 4. Apply & Sync Children
-                    const newCanvases = state.canvases.map(c => {
-                        if (c.id !== state.activeCanvasId) return c;
-
-                        const getRootDelta = (rid: string) => {
-                            const target = newPositions[rid];
-                            const original = roots.find(r => r.id === rid);
-                            if (!target || !original) return { x: 0, y: 0 };
-                            return { x: target.x - original.x, y: target.y - original.y };
-                        };
-
-                        return {
-                            ...c,
-                            promptNodes: c.promptNodes.map(pn => newPositions[pn.id] ? { ...pn, position: newPositions[pn.id] } : pn),
-                            imageNodes: c.imageNodes.map(img => {
-                                // If it's a Root
-                                if (newPositions[img.id]) return { ...img, position: newPositions[img.id] };
-                                // If it's a Child of a Root (Only if Sync Enabled)
-                                if (syncChildren && img.parentPromptId && newPositions[img.parentPromptId]) {
-                                    const delta = getRootDelta(img.parentPromptId);
-                                    return { ...img, position: { x: img.position.x + delta.x, y: img.position.y + delta.y } };
-                                }
-                                return img;
-                            }),
-                            lastModified: Date.now()
-                        };
-                    });
-
+                const selectedRootArrange = arrangeSelectedRootNodes(currentCanvas, selectedIds, mode);
+                if (selectedRootArrange) {
+                    const newCanvases = state.canvases.map(c =>
+                        c.id === state.activeCanvasId ? selectedRootArrange.canvas : c
+                    );
                     setState(prev => ({ ...prev, canvases: newCanvases }));
                     return;
                 }
@@ -1988,7 +1785,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             return { width: 0, height: 0, placements: [] };
                         }
 
-                        const imageDims = images.map(img => getImageDims(img.aspectRatio, img.dimensions));
+                        const imageDims = images.map(img => getImageDims(img.aspectRatio));
 
                         if (layoutMode === 'column') {
                             const maxWidth = Math.max(...imageDims.map(d => d.w));
@@ -2257,7 +2054,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             let maxSubWidth = 0;
             let maxSubHeight = 0;
             childImages.forEach(img => {
-                const dims = getImageDims(img.aspectRatio, img.dimensions);
+                const dims = getImageDims(img.aspectRatio);
                 maxSubWidth = Math.max(maxSubWidth, dims.w);
                 maxSubHeight = Math.max(maxSubHeight, dims.h);
             });
@@ -2306,7 +2103,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         // 2c. Orphan image cards.
         orphanImages.forEach(img => {
-            const dims = getImageDims(img.aspectRatio, img.dimensions);
+            const dims = getImageDims(img.aspectRatio);
             layoutGroups.push({
                 type: 'orphan-image',
                 images: [img],
@@ -2400,7 +2197,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 };
 
                 if (group.images.length > 0) {
-                    const imageDims = group.images.map(img => getImageDims(img.aspectRatio, img.dimensions));
+                    const imageDims = group.images.map(img => getImageDims(img.aspectRatio));
                     const maxWidth = Math.max(...imageDims.map(d => d.w));
                     const maxHeight = Math.max(...imageDims.map(d => d.h));
                     const actualColumns = Math.min(SUB_COLUMNS, group.images.length);
@@ -2426,7 +2223,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 };
             } else if (group.type === 'orphan-image' && group.images[0]) {
                 const img = group.images[0];
-                const dims = getImageDims(img.aspectRatio, img.dimensions);
+                const dims = getImageDims(img.aspectRatio);
                 positions[img.id] = {
                     x: groupCenterX,
                     y: subCardsStartY + dims.h
@@ -2523,7 +2320,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     let maxSubWidth = 0;
                     let maxSubHeight = 0;
                     childImages.forEach(img => {
-                        const dims = getImageDims(img.aspectRatio, img.dimensions);
+                        const dims = getImageDims(img.aspectRatio);
                         maxSubWidth = Math.max(maxSubWidth, dims.w);
                         maxSubHeight = Math.max(maxSubHeight, dims.h);
                     });
@@ -2556,7 +2353,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     const promptBottom = currentY + promptHeight + PROMPT_TO_SUB_GAP;
 
                     // Compute child-card bounds.
-                    const imageDims = childImages.map(img => getImageDims(img.aspectRatio, img.dimensions));
+                    const imageDims = childImages.map(img => getImageDims(img.aspectRatio));
                     const maxWidth = Math.max(...imageDims.map(d => d.w));
                     const maxHeight = Math.max(...imageDims.map(d => d.h));
 

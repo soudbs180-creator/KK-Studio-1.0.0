@@ -1,4 +1,4 @@
-import type { Canvas } from '../types.ts';
+import type { Canvas, GeneratedImage, PromptNode } from '../types.ts';
 import { GenerationMode, type AspectRatio } from '../types.ts';
 import { getCardDimensions } from '../utils/styleUtils.ts';
 
@@ -9,10 +9,34 @@ export type ArrangeSinglePromptChildrenResult = {
     subCardLayoutMode: CanvasSubCardLayout;
 };
 
+export type ArrangeSelectedRootNodesResult = {
+    canvas: Canvas;
+};
+
 export type ArrangeSinglePromptChildrenOptions = {
     now?: () => number;
 };
 
+export type ArrangeSelectedRootNodesOptions = {
+    now?: () => number;
+};
+
+type ArrangeRootSeed =
+    | { id: string; type: 'prompt'; obj: PromptNode }
+    | { id: string; type: 'image'; obj: GeneratedImage };
+
+type ArrangeRoot = ArrangeRootSeed & {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    visualCx: number;
+    visualCy: number;
+};
+
+const PROMPT_WIDTH = 320;
+const SELECTED_ROOT_GAP = 120;
+const SELECTED_ROOT_GRID_COLUMNS = 6;
 const AUTO_ARRANGE_SUB_COLUMNS = 20;
 const AUTO_ARRANGE_SUB_IMAGE_GAP = 32;
 const AUTO_ARRANGE_PROMPT_TO_SUB_GAP = 56;
@@ -98,5 +122,217 @@ export function arrangeSingleSelectedPromptChildren(
             lastModified: (options.now ?? Date.now)(),
         },
         subCardLayoutMode: targetMode,
+    };
+}
+
+export function arrangeSelectedRootNodes(
+    canvas: Canvas,
+    selectedIds: string[],
+    mode: CanvasSubCardLayout,
+    options: ArrangeSelectedRootNodesOptions = {}
+): ArrangeSelectedRootNodesResult | null {
+    if (selectedIds.length === 0) {
+        return null;
+    }
+
+    const selectedPrompts = canvas.promptNodes.filter(prompt => selectedIds.includes(prompt.id));
+    const selectedImages = canvas.imageNodes.filter(image => selectedIds.includes(image.id));
+    const isPromptOnly = selectedPrompts.length > 0 && selectedImages.length === 0;
+    const isImageOnly = selectedPrompts.length === 0 && selectedImages.length > 0;
+
+    let roots: ArrangeRoot[] = [];
+    let syncChildren = false;
+
+    if (isPromptOnly) {
+        roots = selectedPrompts.map(prompt => {
+            const height = prompt.height || 200;
+            return {
+                id: prompt.id,
+                type: 'prompt',
+                obj: prompt,
+                x: prompt.position.x,
+                y: prompt.position.y,
+                width: PROMPT_WIDTH,
+                height,
+                visualCx: prompt.position.x,
+                visualCy: prompt.position.y - height / 2,
+            };
+        });
+        syncChildren = true;
+    } else if (isImageOnly) {
+        roots = selectedImages.map(image => {
+            const dims = getImageDims(image.aspectRatio);
+            return {
+                id: image.id,
+                type: 'image',
+                obj: image,
+                x: image.position.x,
+                y: image.position.y,
+                width: dims.w,
+                height: dims.h,
+                visualCx: image.position.x,
+                visualCy: image.position.y - dims.h / 2,
+            };
+        });
+    } else {
+        syncChildren = true;
+        const promptById = new Map(canvas.promptNodes.map(prompt => [prompt.id, prompt]));
+        const imageById = new Map(canvas.imageNodes.map(image => [image.id, image]));
+        const uniqueRootsMap = new Map<string, ArrangeRootSeed>();
+
+        selectedIds.forEach(id => {
+            const prompt = promptById.get(id);
+            if (prompt) {
+                uniqueRootsMap.set(prompt.id, { id: prompt.id, type: 'prompt', obj: prompt });
+                return;
+            }
+
+            const image = imageById.get(id);
+            if (!image) {
+                return;
+            }
+
+            if (image.parentPromptId) {
+                const parentPrompt = promptById.get(image.parentPromptId);
+                if (parentPrompt) {
+                    uniqueRootsMap.set(parentPrompt.id, { id: parentPrompt.id, type: 'prompt', obj: parentPrompt });
+                    return;
+                }
+            }
+
+            uniqueRootsMap.set(image.id, { id: image.id, type: 'image', obj: image });
+        });
+
+        roots = Array.from(uniqueRootsMap.values()).map(root => {
+            let width: number;
+            let height: number;
+
+            if (root.type === 'prompt') {
+                const prompt = root.obj;
+                const children = canvas.imageNodes.filter(image => image.parentPromptId === prompt.id);
+                const promptHeight = prompt.height || 200;
+                let minTop = prompt.position.y - promptHeight;
+                let maxBottom = prompt.position.y;
+                let minLeft = prompt.position.x - PROMPT_WIDTH / 2;
+                let maxRight = prompt.position.x + PROMPT_WIDTH / 2;
+
+                children.forEach(child => {
+                    const dims = getImageDims(child.aspectRatio);
+                    const childTop = child.position.y - dims.h;
+                    const childBottom = child.position.y;
+                    const childLeft = child.position.x - dims.w / 2;
+                    const childRight = child.position.x + dims.w / 2;
+
+                    if (childTop < minTop) minTop = childTop;
+                    if (childBottom > maxBottom) maxBottom = childBottom;
+                    if (childLeft < minLeft) minLeft = childLeft;
+                    if (childRight > maxRight) maxRight = childRight;
+                });
+
+                width = maxRight - minLeft;
+                height = maxBottom - minTop;
+            } else {
+                const image = root.obj;
+                const dims = getImageDims(image.aspectRatio);
+                width = dims.w;
+                height = dims.h;
+            }
+
+            return {
+                ...root,
+                x: root.obj.position.x,
+                y: root.obj.position.y,
+                width,
+                height,
+                visualCx: root.obj.position.x,
+                visualCy: root.obj.position.y - height / 2,
+            };
+        });
+    }
+
+    if (roots.length < 2) {
+        return null;
+    }
+
+    const strategy: 'matrix' | 'row' | 'column' = mode === 'grid' ? 'matrix' : mode;
+    const newPositions: Record<string, { x: number; y: number }> = {};
+
+    if (strategy === 'matrix') {
+        roots.sort((a, b) => {
+            if (Math.abs(a.visualCy - b.visualCy) > 200) return a.visualCy - b.visualCy;
+            return a.visualCx - b.visualCx;
+        });
+
+        const avgX = roots.reduce((sum, root) => sum + root.x, 0) / roots.length;
+        const avgY = roots.reduce((sum, root) => sum + root.y, 0) / roots.length;
+        const maxWidth = Math.max(...roots.map(root => root.width));
+        const maxHeight = Math.max(...roots.map(root => root.height));
+        const cellWidth = maxWidth + SELECTED_ROOT_GAP;
+        const cellHeight = maxHeight + SELECTED_ROOT_GAP;
+        const gridWidth = SELECTED_ROOT_GRID_COLUMNS * cellWidth;
+        const rows = Math.ceil(roots.length / SELECTED_ROOT_GRID_COLUMNS);
+        const gridHeight = rows * cellHeight;
+        const startX = avgX - gridWidth / 2 + cellWidth / 2;
+        const startY = avgY - gridHeight / 2 + cellHeight;
+
+        roots.forEach((root, index) => {
+            const col = index % SELECTED_ROOT_GRID_COLUMNS;
+            const row = Math.floor(index / SELECTED_ROOT_GRID_COLUMNS);
+            newPositions[root.id] = {
+                x: startX + col * cellWidth,
+                y: startY + row * cellHeight,
+            };
+        });
+    } else if (strategy === 'column') {
+        roots.sort((a, b) => a.visualCy - b.visualCy);
+        const avgX = roots.reduce((sum, root) => sum + root.x, 0) / roots.length;
+        const topY = Math.min(...roots.map(root => root.visualCy - root.height / 2));
+        let currentY = topY;
+
+        roots.forEach(root => {
+            currentY += root.height;
+            newPositions[root.id] = { x: avgX, y: currentY };
+            currentY += SELECTED_ROOT_GAP;
+        });
+    } else {
+        roots.sort((a, b) => a.visualCx - b.visualCx);
+        const avgCy = roots.reduce((sum, root) => sum + root.visualCy, 0) / roots.length;
+        let currentLeft = Math.min(...roots.map(root => root.visualCx - root.width / 2));
+
+        roots.forEach(root => {
+            const newX = currentLeft + root.width / 2;
+            newPositions[root.id] = { x: newX, y: avgCy + root.height / 2 };
+            currentLeft += root.width + SELECTED_ROOT_GAP;
+        });
+    }
+
+    const rootById = new Map(roots.map(root => [root.id, root]));
+    const getRootDelta = (rootId: string) => {
+        const target = newPositions[rootId];
+        const original = rootById.get(rootId);
+        if (!target || !original) {
+            return { x: 0, y: 0 };
+        }
+        return { x: target.x - original.x, y: target.y - original.y };
+    };
+
+    return {
+        canvas: {
+            ...canvas,
+            promptNodes: canvas.promptNodes.map(prompt =>
+                newPositions[prompt.id] ? { ...prompt, position: newPositions[prompt.id] } : prompt
+            ),
+            imageNodes: canvas.imageNodes.map(image => {
+                if (newPositions[image.id]) {
+                    return { ...image, position: newPositions[image.id] };
+                }
+                if (syncChildren && image.parentPromptId && newPositions[image.parentPromptId]) {
+                    const delta = getRootDelta(image.parentPromptId);
+                    return { ...image, position: { x: image.position.x + delta.x, y: image.position.y + delta.y } };
+                }
+                return image;
+            }),
+            lastModified: (options.now ?? Date.now)(),
+        },
     };
 }

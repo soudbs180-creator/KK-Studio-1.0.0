@@ -22,6 +22,12 @@ type CanvasArrangeSelectionModule = {
     mode: 'row' | 'grid' | 'column',
     options?: { now?: () => number }
   ) => { canvas: Canvas; subCardLayoutMode: 'row' | 'grid' | 'column' } | null;
+  arrangeSelectedRootNodes: (
+    canvas: Canvas,
+    selectedIds: string[],
+    mode: 'row' | 'grid' | 'column',
+    options?: { now?: () => number }
+  ) => { canvas: Canvas } | null;
 };
 
 function readSource(relativePath: string): string {
@@ -88,11 +94,21 @@ test('single prompt child arrange boundary lives outside CanvasContext', () => {
 
   const wrapperSource = contextSource.slice(
     contextSource.indexOf('const arrangeAllNodes = useCallback'),
-    contextSource.indexOf('// 2. Identify Roots & Sync Mode')
+    contextSource.indexOf('const selectedRootArrange = arrangeSelectedRootNodes')
   );
   assert.match(wrapperSource, /arrangeSingleSelectedPromptChildren\(currentCanvas, selectedIds, mode\)/);
   assert.doesNotMatch(wrapperSource, /const childImages = currentCanvas\.imageNodes\.filter\(img => img\.parentPromptId === prompt\.id\)/);
   assert.doesNotMatch(wrapperSource, /newImagePositions/);
+});
+
+test('selected root arrange boundary lives outside CanvasContext without any roots', () => {
+  const contextSource = readSource('src/context/CanvasContext.tsx');
+  const helperSource = readSource('src/context/canvasArrangeSelection.ts');
+
+  assert.match(helperSource, /export function arrangeSelectedRootNodes/);
+  assert.match(contextSource, /arrangeSelectedRootNodes\(currentCanvas, selectedIds, mode\)/);
+  assert.doesNotMatch(contextSource, /let roots: any\[\] = \[\]/);
+  assert.doesNotMatch(contextSource, /uniqueRootsMap = new Map/);
 });
 
 test('arrangeSingleSelectedPromptChildren lays out one selected prompt children in a row', async () => {
@@ -162,4 +178,64 @@ test('arrangeSingleSelectedPromptChildren returns null outside the single-prompt
   assert.equal(arrangeSingleSelectedPromptChildren(source, ['image-1'], 'grid'), null);
   assert.equal(arrangeSingleSelectedPromptChildren(source, ['prompt-1', 'prompt-2'], 'grid'), null);
   assert.equal(arrangeSingleSelectedPromptChildren(source, ['prompt-2'], 'grid'), null);
+});
+
+test('arrangeSelectedRootNodes lays out selected standalone images in a row', async () => {
+  const { arrangeSelectedRootNodes } = await loadCanvasArrangeSelectionModule();
+  const source = canvas({
+    id: 'canvas-1',
+    imageNodes: [
+      imageNode({ id: 'image-1', position: { x: 0, y: 320 } }),
+      imageNode({ id: 'image-2', position: { x: 500, y: 320 } }),
+      imageNode({ id: 'image-3', position: { x: 900, y: 100 } }),
+    ],
+    lastModified: 10,
+  });
+
+  const result = arrangeSelectedRootNodes(source, ['image-1', 'image-2'], 'row', { now: () => 125 });
+
+  assert.equal(result?.canvas.lastModified, 125);
+  assert.deepEqual(result?.canvas.imageNodes.map((image) => [image.id, image.position]), [
+    ['image-1', { x: 0, y: 320 }],
+    ['image-2', { x: 400, y: 320 }],
+    ['image-3', { x: 900, y: 100 }],
+  ]);
+});
+
+test('arrangeSelectedRootNodes moves child images with selected prompt roots', async () => {
+  const { arrangeSelectedRootNodes } = await loadCanvasArrangeSelectionModule();
+  const source = canvas({
+    id: 'canvas-1',
+    promptNodes: [
+      promptNode({ id: 'prompt-1', position: { x: 0, y: 200 }, height: 200 }),
+      promptNode({ id: 'prompt-2', position: { x: 600, y: 200 }, height: 200, childImageIds: ['image-1'] }),
+    ],
+    imageNodes: [
+      imageNode({ id: 'image-1', parentPromptId: 'prompt-2', position: { x: 600, y: 600 } }),
+      imageNode({ id: 'image-2', position: { x: 1000, y: 600 } }),
+    ],
+    lastModified: 10,
+  });
+
+  const result = arrangeSelectedRootNodes(source, ['prompt-1', 'prompt-2'], 'row', { now: () => 126 });
+
+  assert.deepEqual(result?.canvas.promptNodes.map((prompt) => [prompt.id, prompt.position]), [
+    ['prompt-1', { x: 0, y: 200 }],
+    ['prompt-2', { x: 440, y: 200 }],
+  ]);
+  assert.deepEqual(result?.canvas.imageNodes.map((image) => [image.id, image.position]), [
+    ['image-1', { x: 440, y: 600 }],
+    ['image-2', { x: 1000, y: 600 }],
+  ]);
+});
+
+test('arrangeSelectedRootNodes returns null when selection collapses to one root', async () => {
+  const { arrangeSelectedRootNodes } = await loadCanvasArrangeSelectionModule();
+  const source = canvas({
+    id: 'canvas-1',
+    promptNodes: [promptNode({ id: 'prompt-1', position: { x: 0, y: 200 }, childImageIds: ['image-1'] })],
+    imageNodes: [imageNode({ id: 'image-1', parentPromptId: 'prompt-1', position: { x: 0, y: 600 } })],
+  });
+
+  assert.equal(arrangeSelectedRootNodes(source, ['prompt-1', 'image-1'], 'grid'), null);
 });
