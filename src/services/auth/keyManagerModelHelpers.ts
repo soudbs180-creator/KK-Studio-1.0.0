@@ -77,6 +77,10 @@ export const MODEL_MIGRATION_MAP: Record<string, string> = {
  */
 export const DEPRECATED_MODELS = Object.keys(MODEL_MIGRATION_MAP);
 
+export function isDeprecatedModel(modelId: string): boolean {
+    return DEPRECATED_MODELS.includes(modelId);
+}
+
 /**
  * Normalize a legacy model ID to the current canonical ID.
  * @param modelId - Raw model ID from persisted state or user input

@@ -16,6 +16,7 @@ type KeyManagerModelHelpersModule = {
   };
   extractModelIdsFromPricingData: (pricingData: unknown) => string[];
   inferModelType: (modelId: string) => 'chat' | 'image' | 'video' | 'image+chat' | 'audio';
+  isDeprecatedModel: (modelId: string) => boolean;
   normalizeModelId: (modelId: string) => string;
   parseModelString: (input: string) => { id: string; name?: string; description?: string; provider?: string };
   parseModelVariantMeta: (modelId: string) => {
@@ -48,8 +49,9 @@ test('keyManager model helper boundary lives outside the monolithic key manager'
   assert.match(keyManagerSource, /from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /import \{[\s\S]*categorizeModels[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /import \{[\s\S]*extractModelIdsFromPricingData[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
+  assert.match(keyManagerSource, /import \{[\s\S]*isDeprecatedModel[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /import type \{[\s\S]*GlobalModelType[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
-  assert.match(keyManagerSource, /export \{[\s\S]*parseModelString[\s\S]*MODEL_MIGRATION_MAP[\s\S]*normalizeModelId[\s\S]*parseModelVariantMeta[\s\S]*appendModelVariantLabel[\s\S]*categorizeModels[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
+  assert.match(keyManagerSource, /export \{[\s\S]*parseModelString[\s\S]*MODEL_MIGRATION_MAP[\s\S]*normalizeModelId[\s\S]*parseModelVariantMeta[\s\S]*appendModelVariantLabel[\s\S]*categorizeModels[\s\S]*isDeprecatedModel[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /export type \{[\s\S]*ModelVariantMeta[\s\S]*GlobalModelType[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(helperSource, /export function parseModelString/);
   assert.match(helperSource, /export const MODEL_MIGRATION_MAP/);
@@ -61,6 +63,7 @@ test('keyManager model helper boundary lives outside the monolithic key manager'
   assert.match(helperSource, /export function categorizeModels/);
   assert.match(helperSource, /export function extractModelIdsFromPricingData/);
   assert.match(helperSource, /export function inferModelType/);
+  assert.match(helperSource, /export function isDeprecatedModel/);
   assert.doesNotMatch(keyManagerSource, /export function parseModelString/);
   assert.doesNotMatch(keyManagerSource, /export const MODEL_MIGRATION_MAP/);
   assert.doesNotMatch(keyManagerSource, /export function normalizeModelId/);
@@ -69,6 +72,7 @@ test('keyManager model helper boundary lives outside the monolithic key manager'
   assert.doesNotMatch(keyManagerSource, /export function categorizeModels/);
   assert.doesNotMatch(keyManagerSource, /function extractModelIdsFromPricingData/);
   assert.doesNotMatch(keyManagerSource, /const inferModelType = /);
+  assert.doesNotMatch(keyManagerSource, /export function isDeprecatedModel/);
   assert.match(effectiveSlotSource, /import \{ parseModelString \} from "\.\/keyManagerModelHelpers";/);
   assert.doesNotMatch(effectiveSlotSource, /import \{ determineKeyType, parseModelString \} from "\.\/keyManager";/);
   assert.doesNotMatch(effectiveSlotSource, /from "\.\/keyManager"/);
@@ -180,4 +184,13 @@ test('keyManager model helpers preserve global model type inference behavior', a
   assert.equal(inferModelType('openrouter/unknown-model'), 'chat');
   assert.equal(inferModelType('unknown-model'), 'chat');
   assert.equal(inferModelType('qwen-max'), 'chat');
+});
+
+test('keyManager model helpers preserve deprecated model membership behavior', async () => {
+  const { isDeprecatedModel } = await loadKeyManagerModelHelpers();
+
+  assert.equal(isDeprecatedModel('gemini-1.5-pro'), true);
+  assert.equal(isDeprecatedModel('gemini-1.5-pro-latest'), true);
+  assert.equal(isDeprecatedModel('gemini-2.5-pro'), false);
+  assert.equal(isDeprecatedModel('Gemini-1.5-Pro'), false);
 });

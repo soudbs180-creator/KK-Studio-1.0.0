@@ -116,6 +116,7 @@ import {
     DEPRECATED_MODELS,
     extractModelIdsFromPricingData,
     inferModelType,
+    isDeprecatedModel,
     MODEL_MIGRATION_MAP,
     normalizeModelId,
     parseModelString,
@@ -131,6 +132,7 @@ export {
     parseModelVariantMeta,
     appendModelVariantLabel,
     categorizeModels,
+    isDeprecatedModel,
 } from './keyManagerModelHelpers';
 export type { ModelVariantMeta, GlobalModelType } from './keyManagerModelHelpers';
 export { determineKeyType } from './keyManagerKeyType';
@@ -630,13 +632,6 @@ export const BLACKLIST_MODELS = [
     // Older Imagen generate-001 aliases
     /^imagen-[34]\.0-.*generate-001$/,
 ];
-
-/**
- * Return whether a model is explicitly marked as deprecated.
- */
-export function isDeprecatedModel(modelId: string): boolean {
-    return DEPRECATED_MODELS.includes(modelId);
-}
 
 /**
  * Determine whether a model should be filtered from the available model list.
