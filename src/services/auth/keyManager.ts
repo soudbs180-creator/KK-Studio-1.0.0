@@ -116,6 +116,7 @@ import {
     extractModelIdsFromPricingData,
     inferModelType,
     isDeprecatedModel,
+    isGoogleOfficialModelId,
     MODEL_MIGRATION_MAP,
     normalizeModelId,
     parseModelString,
@@ -132,6 +133,7 @@ export {
     appendModelVariantLabel,
     categorizeModels,
     isDeprecatedModel,
+    isGoogleOfficialModelId,
 } from './keyManagerModelHelpers';
 export type { ModelVariantMeta, GlobalModelType } from './keyManagerModelHelpers';
 export { determineKeyType } from './keyManagerKeyType';
@@ -737,11 +739,6 @@ export const AUDIO_MODEL_WHITELIST = [
     'suno-v3.5',
     'minimax-t2a-01'
 ];
-
-const isGoogleOfficialModelId = (modelId: string): boolean => {
-    const id = String(modelId || '').replace(/^models\//, '').toLowerCase();
-    return id.startsWith('gemini-') || id.startsWith('imagen-') || id.startsWith('veo-');
-};
 
 // Default official Google model list
 export const DEFAULT_GOOGLE_MODELS = [

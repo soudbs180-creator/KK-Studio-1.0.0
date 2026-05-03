@@ -81,6 +81,11 @@ export function isDeprecatedModel(modelId: string): boolean {
     return DEPRECATED_MODELS.includes(modelId);
 }
 
+export function isGoogleOfficialModelId(modelId: string): boolean {
+    const id = String(modelId || '').replace(/^models\//, '').toLowerCase();
+    return id.startsWith('gemini-') || id.startsWith('imagen-') || id.startsWith('veo-');
+}
+
 /**
  * Normalize a legacy model ID to the current canonical ID.
  * @param modelId - Raw model ID from persisted state or user input

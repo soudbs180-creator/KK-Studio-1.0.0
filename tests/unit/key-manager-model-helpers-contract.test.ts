@@ -17,6 +17,7 @@ type KeyManagerModelHelpersModule = {
   extractModelIdsFromPricingData: (pricingData: unknown) => string[];
   inferModelType: (modelId: string) => 'chat' | 'image' | 'video' | 'image+chat' | 'audio';
   isDeprecatedModel: (modelId: string) => boolean;
+  isGoogleOfficialModelId: (modelId: string) => boolean;
   normalizeModelId: (modelId: string) => string;
   parseModelString: (input: string) => { id: string; name?: string; description?: string; provider?: string };
   parseModelVariantMeta: (modelId: string) => {
@@ -50,8 +51,9 @@ test('keyManager model helper boundary lives outside the monolithic key manager'
   assert.match(keyManagerSource, /import \{[\s\S]*categorizeModels[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /import \{[\s\S]*extractModelIdsFromPricingData[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /import \{[\s\S]*isDeprecatedModel[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
+  assert.match(keyManagerSource, /import \{[\s\S]*isGoogleOfficialModelId[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /import type \{[\s\S]*GlobalModelType[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
-  assert.match(keyManagerSource, /export \{[\s\S]*parseModelString[\s\S]*MODEL_MIGRATION_MAP[\s\S]*normalizeModelId[\s\S]*parseModelVariantMeta[\s\S]*appendModelVariantLabel[\s\S]*categorizeModels[\s\S]*isDeprecatedModel[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
+  assert.match(keyManagerSource, /export \{[\s\S]*parseModelString[\s\S]*MODEL_MIGRATION_MAP[\s\S]*normalizeModelId[\s\S]*parseModelVariantMeta[\s\S]*appendModelVariantLabel[\s\S]*categorizeModels[\s\S]*isDeprecatedModel[\s\S]*isGoogleOfficialModelId[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /export type \{[\s\S]*ModelVariantMeta[\s\S]*GlobalModelType[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(helperSource, /export function parseModelString/);
   assert.match(helperSource, /export const MODEL_MIGRATION_MAP/);
@@ -64,6 +66,7 @@ test('keyManager model helper boundary lives outside the monolithic key manager'
   assert.match(helperSource, /export function extractModelIdsFromPricingData/);
   assert.match(helperSource, /export function inferModelType/);
   assert.match(helperSource, /export function isDeprecatedModel/);
+  assert.match(helperSource, /export function isGoogleOfficialModelId/);
   assert.doesNotMatch(keyManagerSource, /export function parseModelString/);
   assert.doesNotMatch(keyManagerSource, /export const MODEL_MIGRATION_MAP/);
   assert.doesNotMatch(keyManagerSource, /export function normalizeModelId/);
@@ -73,6 +76,9 @@ test('keyManager model helper boundary lives outside the monolithic key manager'
   assert.doesNotMatch(keyManagerSource, /function extractModelIdsFromPricingData/);
   assert.doesNotMatch(keyManagerSource, /const inferModelType = /);
   assert.doesNotMatch(keyManagerSource, /export function isDeprecatedModel/);
+  assert.doesNotMatch(keyManagerSource, /const isGoogleOfficialModelId = /);
+  assert.doesNotMatch(keyManagerSource, /function isGoogleOfficialModelId/);
+  assert.doesNotMatch(helperSource, /from ['"]\.\/keyManager/);
   assert.match(effectiveSlotSource, /import \{ parseModelString \} from "\.\/keyManagerModelHelpers";/);
   assert.doesNotMatch(effectiveSlotSource, /import \{ determineKeyType, parseModelString \} from "\.\/keyManager";/);
   assert.doesNotMatch(effectiveSlotSource, /from "\.\/keyManager"/);
@@ -193,4 +199,17 @@ test('keyManager model helpers preserve deprecated model membership behavior', a
   assert.equal(isDeprecatedModel('gemini-1.5-pro-latest'), true);
   assert.equal(isDeprecatedModel('gemini-2.5-pro'), false);
   assert.equal(isDeprecatedModel('Gemini-1.5-Pro'), false);
+});
+
+test('keyManager model helpers preserve official Google model ID predicate behavior', async () => {
+  const { isGoogleOfficialModelId } = await loadKeyManagerModelHelpers();
+
+  assert.equal(isGoogleOfficialModelId('models/gemini-2.5-pro'), true);
+  assert.equal(isGoogleOfficialModelId('GEMINI-2.5-PRO'), true);
+  assert.equal(isGoogleOfficialModelId('imagen-4.0-generate-001'), true);
+  assert.equal(isGoogleOfficialModelId('veo-3.1-generate-preview'), true);
+  assert.equal(isGoogleOfficialModelId('models/gpt-4o'), false);
+  assert.equal(isGoogleOfficialModelId('gemma-3'), false);
+  assert.equal(isGoogleOfficialModelId('Models/gemini-2.5-pro'), false);
+  assert.equal(isGoogleOfficialModelId(' gemini-2.5-pro'), false);
 });
