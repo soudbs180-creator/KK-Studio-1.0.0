@@ -98,7 +98,7 @@ PPT boundary slices also require `npm.cmd run typecheck`, `npm.cmd run test:unit
 
 ## Stage Two CanvasContext Split Gate
 
-Use this gate for `src/context/CanvasContext.tsx` splits. Add or narrow targeted tests after the responsibility map identifies the exact boundary; do not use one broad commit for state model, mutations, drag/selection, and persistence at the same time. Stage Two M1 used this gate for the state/default/context boundary plus the separated canvas compatibility helper. Stage Two M2 used the selection reducer contract below. Stage Two M3 used the prompt child image resolver contract below. Stage Two M4 uses the workflow source node ID resolver contract below.
+Use this gate for `src/context/CanvasContext.tsx` splits. Add or narrow targeted tests after the responsibility map identifies the exact boundary; do not use one broad commit for state model, mutations, drag/selection, and persistence at the same time. Stage Two M1 used this gate for the state/default/context boundary plus the separated canvas compatibility helper. Stage Two M2 used the selection reducer contract below. Stage Two M3 used the prompt child image resolver contract below. Stage Two M4 used the workflow source node ID resolver contract below. Stage Two M5 should add a startup prompt recovery boundary contract before moving recovery helpers.
 
 State-boundary targeted gate:
 
@@ -134,6 +134,16 @@ Workflow-source-node-ID resolver targeted gate:
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/canvas-workflow-source-node-ids-contract.test.ts" `
   "tests/unit/canvas-prompt-child-images-runtime-contract.test.ts" `
+  "tests/unit/canvas-context-state-boundary.test.ts" `
+  "tests/unit/canvas-cloud-sync-signature.test.ts"
+```
+
+Startup prompt recovery targeted gate:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/canvas-startup-prompt-recovery-contract.test.ts" `
+  "tests/unit/canvas-startup-local-restore.test.ts" `
   "tests/unit/canvas-context-state-boundary.test.ts" `
   "tests/unit/canvas-cloud-sync-signature.test.ts"
 ```
@@ -205,3 +215,20 @@ npm.cmd run check:encoding
 ```
 
 Current known non-code blocker: `npm.cmd run governance:check` fails inside `governance:version` until portable packaging/publish metadata is regenerated so `release/publish/stable/manifest.json` and `release/KK-Studio-Portable/app/dist/app-version.json` have matching `buildTime`. Handle this in the final packaging/publish phase, not inside the current runtime refactor slice.
+
+## Finalization Audit Gate
+
+Use this after the active Stage Two slice is closed and before claiming full project completion:
+
+```powershell
+npm.cmd run architecture:check
+npm.cmd run spec:check
+npm.cmd run governance:security
+npm.cmd run governance:agent-docs
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run check:encoding
+```
+
+If UI files were touched since the last browser evidence, rerun the Clay UI contract suite and Codex in-app Browser QA before final sign-off. If only runtime/docs files were touched, record the browser skip reason in `status.md`.

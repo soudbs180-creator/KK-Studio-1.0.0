@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline before the Canvas workflow source node ID resolver slice is `83cc8d7f refactor: extract canvas prompt child resolver`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline is `9ec4dbb1 refactor: extract canvas workflow source ids`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -24,11 +24,12 @@ The active execution model for this thread has resumed Stage One convergence:
 - Stage Two M1 `CanvasContext` state/default/context boundary extraction is completed in `92a9dc41`: it moves state model/defaults/context into `src/context/canvasContextState.ts` and canvas compatibility syncing into `src/context/canvasCompatibility.ts`.
 - Stage Two M2 `CanvasContext` selection reducer extraction is completed in `e0f1b583`: it moves replace/add/remove/toggle selection semantics into `src/context/canvasSelection.ts`, without touching drag, persistence, or mutation ownership.
 - Stage Two M3 `CanvasContext` prompt child image resolver extraction is completed in `83cc8d7f`: it moves prompt-to-generated-image child ID resolution into `src/context/canvasPromptChildImages.ts`, without touching startup recovery, persistence writes, drag, node mutations, UI, or release metadata.
-- Stage Two M4 `CanvasContext` workflow source node ID resolver extraction is the current slice being committed: it moves utility workflow `data.sourceNodeIds` filtering/deduping into `src/context/canvasWorkflowSourceNodeIds.ts`, without touching workflow edge creation/pruning, drag, persistence, node mutations, UI, or release metadata.
+- Stage Two M4 `CanvasContext` workflow source node ID resolver extraction is completed in `9ec4dbb1`: it moves utility workflow `data.sourceNodeIds` filtering/deduping into `src/context/canvasWorkflowSourceNodeIds.ts`, without touching workflow edge creation/pruning, drag, persistence, node mutations, UI, or release metadata.
+- The active finalization lane is Stage Two M5 plus whole-project audit: close the next smallest `CanvasContext.tsx` responsibility first, then run architecture, security, UI, release, and quality gates. The project is not final-complete while `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain giant-file split targets and `governance:check` still has the known portable metadata mismatch.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
-Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release metadata, and Stage Two architecture splits must be staged separately. The next Stage Two slice should include only `CanvasContext.tsx` and the new focused module/tests needed for one responsibility.
+Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release metadata, final audit fixes, and Stage Two architecture splits must be staged separately. The next Stage Two slice should include only `CanvasContext.tsx` and the new focused module/tests needed for one responsibility.
 
 ## Current Baseline
 
@@ -38,12 +39,12 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/app/useGenerationRuntime.ts`: 2604 lines, extracted and boundary-hardened in `ab719c4a`; generation billing cleanup completed in `083db7f8`.
 - `src/app/usePptRuntime.ts`: 1289 lines, extracted in `4c448660` and semantically boundary-checked in `569383aa`.
 - `src/app/pptRuntimeHelpers.ts`: 152 lines, semantically boundary-checked in `569383aa`.
-- `src/context/CanvasContext.tsx`: 5202 text lines in the current Stage Two M4 working tree, down from 5218 text lines at `83cc8d7f`.
+- `src/context/CanvasContext.tsx`: 4522 text lines after `9ec4dbb1`, down from 5218 text lines at the start of Stage Two.
 - `src/context/canvasContextState.ts`: 114 lines, new Stage Two M1 state/default/context boundary module.
 - `src/context/canvasCompatibility.ts`: 8 lines, new Stage Two M1 canvas workflow/ecommerce compatibility helper.
 - `src/context/canvasSelection.ts`: 35 lines, new Stage Two M2 selection reducer helper.
 - `src/context/canvasPromptChildImages.ts`: 55 lines, new Stage Two M3 prompt child image resolver helper.
-- `src/context/canvasWorkflowSourceNodeIds.ts`: 19 lines, new Stage Two M4 workflow source ID resolver helper.
+- `src/context/canvasWorkflowSourceNodeIds.ts`: 19 lines, Stage Two M4 workflow source ID resolver helper.
 - `src/services/auth/keyManager.ts`: 4606 lines.
 - `src/components/layout/PromptBar.tsx`: 4075 lines.
 - `src/services/llm/OpenAICompatibleAdapter.ts`: 3980 lines.

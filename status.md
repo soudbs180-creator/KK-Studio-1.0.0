@@ -4,17 +4,17 @@ Last updated: 2026-05-03
 
 ## Active State
 
-- Active lane in this thread: single-line Stage Two giant-file split. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`, with public-type review follow-up committed in `f06f1880`; Stage One Backfill M2 `usePromptGroupLayout` hardening is committed in `8a458cd4`; Stage One Backfill M3 `useGenerationRuntime` hardening is committed in `ab719c4a`; the generation billing follow-up is committed in `083db7f8`; Stage One Backfill M5 `usePptRuntime` public type-boundary coverage is committed in `569383aa`; Stage Two M1 `CanvasContext` state/default/context boundary extraction is committed in `92a9dc41`; Stage Two M2 `CanvasContext` selection reducer extraction is committed in `e0f1b583`; Stage Two M3 `CanvasContext` prompt child image resolver extraction is committed in `83cc8d7f`; the current slice is Stage Two M4 `CanvasContext` workflow source node ID resolver extraction.
+- Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 ecommerce runtime extraction is complete after the closeout scan; Stage One Backfill M1 `useConnectorRenderer` hardening is committed in `5f5b76e0`, with public-type review follow-up committed in `f06f1880`; Stage One Backfill M2 `usePromptGroupLayout` hardening is committed in `8a458cd4`; Stage One Backfill M3 `useGenerationRuntime` hardening is committed in `ab719c4a`; the generation billing follow-up is committed in `083db7f8`; Stage One Backfill M5 `usePptRuntime` public type-boundary coverage is committed in `569383aa`; Stage Two M1 `CanvasContext` state/default/context boundary extraction is committed in `92a9dc41`; Stage Two M2 `CanvasContext` selection reducer extraction is committed in `e0f1b583`; Stage Two M3 `CanvasContext` prompt child image resolver extraction is committed in `83cc8d7f`; Stage Two M4 `CanvasContext` workflow source node ID resolver extraction is committed in `9ec4dbb1`.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and is currently at `83cc8d7f refactor: extract canvas prompt child resolver` before the workflow source node ID resolver slice. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source and is currently at `9ec4dbb1 refactor: extract canvas workflow source ids`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Thread merge state: `019dd551...` is the main refactor history and `019de168...` is continuation history; both are part of the same Stage One M6 ecommerce runtime line.
-- Alternate-git worktree currently has only the Stage Two M4 workflow source node ID resolver slice plus ledger updates.
+- Alternate-git worktree was clean at `9ec4dbb1`; current uncommitted work is ledger-only finalization alignment until the next scoped code slice starts.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: finish and commit Stage Two M4, the workflow source node ID resolver extraction.
-- Most recent CanvasContext M4 scope: `src/context/CanvasContext.tsx`, `src/context/canvasWorkflowSourceNodeIds.ts`, `tests/unit/canvas-workflow-source-node-ids-contract.test.ts`, `tsconfig.tests.json`, `plans.md`, `implement.md`, `validation.md`, and `status.md`.
-- Next active slice after this commit: identify the next smallest remaining `CanvasContext.tsx` responsibility, with selection, drag, persistence, node mutations, UI, release metadata, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` excluded unless explicitly selected.
+- Current focus: align the ledger to `9ec4dbb1`, then start Stage Two M5 by extracting the next smallest `CanvasContext.tsx` responsibility with focused tests.
+- Most recent CanvasContext M4 committed scope: `src/context/CanvasContext.tsx`, `src/context/canvasWorkflowSourceNodeIds.ts`, `tests/unit/canvas-workflow-source-node-ids-contract.test.ts`, `tsconfig.tests.json`, `plans.md`, `implement.md`, `validation.md`, and `status.md`.
+- Next active slice: startup prompt recovery helpers in `CanvasContext.tsx` unless source inspection identifies a smaller safer seam. Selection, drag, persistence writes, node mutations, UI, release metadata, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain excluded from that commit.
 - Browser QA: skipped for these runtime/type-boundary slices because no UI runtime or visual surface changed.
 
 ## Completed In `9e7ae2b5` (Clay UI Audit Closure)
@@ -47,11 +47,19 @@ Last updated: 2026-05-03
 
 ## Current Quality Baseline
 
-- Current giant tracked files after `83cc8d7f` and the current workflow source node ID resolver WIP: `src/context/CanvasContext.tsx` 5202 text lines in the working tree, `src/services/auth/keyManager.ts` 4606 lines, `src/App.tsx` 4385 lines, `src/components/layout/PromptBar.tsx` 4075 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 3980 lines.
+- Current giant tracked files after `9ec4dbb1`: `src/context/CanvasContext.tsx` 4522 text lines, `src/services/auth/keyManager.ts` 4606 lines, `src/App.tsx` 4385 lines, `src/components/layout/PromptBar.tsx` 4075 lines, `src/services/llm/OpenAICompatibleAdapter.ts` 3980 lines.
 - Current tracked TS/TSX debt scan: direct `as any` matches 167, explicit any-type pattern matches 484, `@ts-ignore` / `@ts-expect-error` matches 133, and `console.log` matches 251. These are refactor debt indicators, not release blockers by themselves.
 - Quality rule going forward: reduce `any`, TypeScript suppressions, and bare `console.log` inside touched files when local and safe; do not perform a whole-repo cleanup inside one runtime or architecture extraction.
 - Architecture status from the last recorded full check: `npm.cmd run architecture:check` passed with known allowlisted migration and legacy bridge exceptions; `npm.cmd run spec:check` passed.
 - Version governance status from the last recorded full check: `npm.cmd run governance:check` fails at `governance:version` because portable release metadata build times are not aligned. This is deferred to final packaging/publish.
+
+## Finalization Audit Plan
+
+1. Close the currently selected Stage Two `CanvasContext.tsx` seam first; do not run a final completion audit while an obvious giant-file split seam is active.
+2. Run high-confidence local audits for unused code, TypeScript debt, bare debug logging, TODO/FIXME markers, sensitive storage/logging, architecture boundaries, specs, build, unit tests, and UI contract coverage.
+3. Fix only narrow blockers found by the audits. Broad debt counts are tracked but are not safe to delete in one batch.
+4. Defer release metadata realignment to packaging/publish: regenerate portable artifacts, publish stable manifest, then rerun `npm.cmd run governance:check`.
+5. Final completion can only be claimed after the release gate and UI/browser checks required by touched surfaces pass.
 
 ## Stage One M6 Closeout Scan
 
