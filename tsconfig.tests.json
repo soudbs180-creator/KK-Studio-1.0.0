@@ -28,6 +28,7 @@
         "tests/unit/canvas-cleanup-contract.test.ts",
         "tests/unit/canvas-groups-contract.test.ts",
         "tests/unit/canvas-layering-contract.test.ts",
+        "tests/unit/canvas-movement-contract.test.ts",
         "tests/unit/canvas-merge-contract.test.ts",
         "tests/unit/canvas-media-recovery-contract.test.ts",
         "tests/unit/canvas-placement-contract.test.ts",

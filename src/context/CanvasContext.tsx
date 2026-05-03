@@ -53,6 +53,7 @@ import { cleanupInvalidCanvasCardsForCanvas, type CleanupInvalidCardsSummary } f
 import { resolveNextCardPosition, resolveNextGroupPosition, resolveSmartCanvasPosition } from './canvasPlacement';
 import { bringCanvasNodesToFront } from './canvasLayering';
 import { addCanvasGroupToCanvas, removeCanvasGroupFromCanvas, updateCanvasGroupInCanvas } from './canvasGroups';
+import { moveSelectedCanvasNodes } from './canvasMovement';
 import {
     buildPersistedImageRecoverySignature,
     buildPromptRecoveryEntries,
@@ -3616,64 +3617,19 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const applyMoveSelectedNodes = useCallback((delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => {
         setState(prev => {
-            let selectedIds = prev.selectedNodeIds || [];
-
-            if (Array.isArray(sourceNodeIdOrIds) && sourceNodeIdOrIds.length > 0) {
-                selectedIds = sourceNodeIdOrIds;
-            } else if (typeof sourceNodeIdOrIds === 'string' && sourceNodeIdOrIds) {
-                selectedIds = selectedIds.includes(sourceNodeIdOrIds) ? selectedIds : [sourceNodeIdOrIds];
-            }
-            if (selectedIds.length === 0) return prev;
-
             const currentCanvas = prev.canvases.find(c => c.id === prev.activeCanvasId);
             if (!currentCanvas) return prev;
 
-            // Simple set-based selection
-            const selectedSet = new Set(selectedIds);
-            const movedPromptIds = new Set(
-                currentCanvas.promptNodes
-                    .filter((node) => selectedSet.has(node.id))
-                    .map((node) => node.id)
-            );
-
-            // Move only selected nodes
-            const newPromptNodes = currentCanvas.promptNodes.map(n => {
-                if (selectedSet.has(n.id)) {
-                    return { ...n, position: { x: n.position.x + delta.x, y: n.position.y + delta.y }, userMoved: true };
-                }
-                return n;
+            const movedCanvas = moveSelectedCanvasNodes({
+                canvas: currentCanvas,
+                selectedNodeIds: prev.selectedNodeIds || [],
+                delta,
+                sourceNodeIdOrIds,
             });
-
-            const newImageNodes = currentCanvas.imageNodes.map(n => {
-                const isDirectlyMovedImage = selectedSet.has(n.id);
-                const isMovingWithPromptGroup = Boolean(n.parentPromptId && movedPromptIds.has(n.parentPromptId));
-                if (isDirectlyMovedImage || isMovingWithPromptGroup) {
-                    return {
-                        ...n,
-                        position: { x: n.position.x + delta.x, y: n.position.y + delta.y },
-                        userMoved: selectedSet.has(n.id) ? true : n.userMoved,
-                    };
-                }
-                return n;
-            });
-
-            const newWorkflow = currentCanvas.workflow
-                ? {
-                    ...currentCanvas.workflow,
-                    nodes: currentCanvas.workflow.nodes.map(node => {
-                        if (selectedSet.has(node.id) && isWorkflowUtilityNodeKind(node.kind)) {
-                            return {
-                                ...node,
-                                position: { x: node.position.x + delta.x, y: node.position.y + delta.y }
-                            };
-                        }
-                        return node;
-                    })
-                }
-                : currentCanvas.workflow;
+            if (movedCanvas === currentCanvas) return prev;
 
             const newCanvases = prev.canvases.map(c =>
-                c.id === prev.activeCanvasId ? { ...c, promptNodes: newPromptNodes, imageNodes: newImageNodes, workflow: newWorkflow } : c
+                c.id === prev.activeCanvasId ? movedCanvas : c
             );
 
             return { ...prev, canvases: newCanvases };
