@@ -61,6 +61,10 @@ import {
     updateCanvasImageNodeDimensions
 } from './canvasNodeUpdates';
 import {
+    updateCanvasImageNodePosition,
+    updateCanvasPromptNodePosition
+} from './canvasPositionUpdates';
+import {
     buildPersistedImageRecoverySignature,
     buildPromptRecoveryEntries,
     resolveImageRecoveryUrlFromMetadata,
@@ -1284,57 +1288,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         pos: { x: number; y: number },
         options?: { moveChildren?: boolean; ignoreSelection?: boolean }
     ) => {
-        updateCanvas(c => {
-            const node = c.promptNodes.find(n => n.id === id);
-            if (!node) return c;
-
-            const dx = pos.x - node.position.x;
-            const dy = pos.y - node.position.y;
-            const moveChildren = options?.moveChildren !== false;
-            const ignoreSelection = options?.ignoreSelection === true;
-
-            // GROUP MOVE LOGIC
-            if (!ignoreSelection) {
-                const selectedIds = new Set(state.selectedNodeIds || []);
-                if (selectedIds.has(id)) {
-                    const newPromptNodes = c.promptNodes.map(n => {
-                        if (selectedIds.has(n.id)) {
-                            return { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } };
-                        }
-                        return n;
-                    });
-
-                    const movedPromptIds = new Set(c.promptNodes.filter(n => selectedIds.has(n.id)).map(n => n.id));
-                    const newImageNodes = c.imageNodes.map(img => {
-                        if (selectedIds.has(img.id) || (img.parentPromptId && movedPromptIds.has(img.parentPromptId))) {
-                            return { ...img, position: { x: img.position.x + dx, y: img.position.y + dy } };
-                        }
-                        return img;
-                    });
-
-                    return { ...c, promptNodes: newPromptNodes, imageNodes: newImageNodes };
-                }
-            }
-
-            if (!moveChildren) {
-                return {
-                    ...c,
-                    promptNodes: c.promptNodes.map(n => n.id === id ? { ...n, position: pos } : n)
-                };
-            }
-
-            // [MODIFIED] Removed repulsion logic as per user request
-            // Freely update position without checking for overlap/pushing
-            return {
-                ...c,
-                promptNodes: c.promptNodes.map(n => n.id === id ? { ...n, position: pos } : n),
-                imageNodes: c.imageNodes.map((img) => (
-                    img.parentPromptId === id
-                        ? { ...img, position: { x: img.position.x + dx, y: img.position.y + dy } }
-                        : img
-                ))
-            };
-        });
+        updateCanvas(canvas => updateCanvasPromptNodePosition(canvas, state.selectedNodeIds || [], id, pos, options));
     }, [updateCanvas, state.selectedNodeIds]);
 
     const updateImageNodePosition = useCallback((
@@ -1342,48 +1296,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         pos: { x: number; y: number },
         options?: { ignoreSelection?: boolean }
     ) => {
-        updateCanvas(c => {
-            const node = c.imageNodes.find(n => n.id === id);
-            if (!node) return c;
-
-            const dx = pos.x - node.position.x;
-            const dy = pos.y - node.position.y;
-            const ignoreSelection = options?.ignoreSelection === true;
-
-            // GROUP MOVE LOGIC
-            if (!ignoreSelection) {
-                const selectedIds = new Set(state.selectedNodeIds || []);
-                if (selectedIds.has(id)) {
-                    // [MODIFIED] Removed repulsion hook
-
-                    const newPromptNodes = c.promptNodes.map(n => {
-                        if (selectedIds.has(n.id)) {
-                            return { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } };
-                        }
-                        return n;
-                    });
-
-                    const movedPromptIds = new Set(c.promptNodes.filter(n => selectedIds.has(n.id)).map(n => n.id));
-                    const newImageNodes = c.imageNodes.map(img => {
-                        if (selectedIds.has(img.id) || (img.parentPromptId && movedPromptIds.has(img.parentPromptId))) {
-                            return { ...img, position: { x: img.position.x + dx, y: img.position.y + dy } };
-                        }
-                        return img;
-                    });
-
-                    return { ...c, promptNodes: newPromptNodes, imageNodes: newImageNodes };
-                }
-            }
-
-            // SINGLE MOVE - Removed repulsion logic
-            return {
-                ...c,
-                promptNodes: c.promptNodes, // No changes to prompt nodes
-                imageNodes: c.imageNodes.map(img =>
-                    img.id === id ? { ...img, position: pos } : img
-                )
-            };
-        });
+        updateCanvas(canvas => updateCanvasImageNodePosition(canvas, state.selectedNodeIds || [], id, pos, options));
     }, [updateCanvas, state.selectedNodeIds]);
 
     const updateImageNodeDimensions = useCallback((id: string, dimensions: string) => {
