@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
@@ -7,6 +7,25 @@ const ROOT_DIR = process.cwd();
 
 function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
+}
+
+function listSourceFiles(relativeDirectory: string): string[] {
+  const directory = path.join(ROOT_DIR, relativeDirectory);
+  const files: string[] = [];
+
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const absolutePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...listSourceFiles(path.relative(ROOT_DIR, absolutePath)));
+      continue;
+    }
+
+    if (/\.[cm]?[tj]sx?$/.test(entry.name)) {
+      files.push(absolutePath);
+    }
+  }
+
+  return files;
 }
 
 test('pure utility modules do not retain source-proven unused locals', () => {
@@ -26,4 +45,16 @@ test('pure utility modules do not retain source-proven unused locals', () => {
   assert.doesNotMatch(modelSortingSource, /getModelWeight/);
   assert.doesNotMatch(modelSortingSource, /extractVersionNumber/);
   assert.doesNotMatch(modelSortingSource, /getSuffixWeight/);
+});
+
+test('pure image utilities do not retain orphaned imageCompression module imports', () => {
+  const removedServicePath = path.join(ROOT_DIR, 'src/services/image/imageCompression.ts');
+  assert.equal(existsSync(removedServicePath), false);
+
+  const sourceFiles = listSourceFiles('src');
+  for (const sourceFile of sourceFiles) {
+    const source = readFileSync(sourceFile, 'utf-8');
+    assert.doesNotMatch(source, /from ['"][^'"]*imageCompression(?:\.ts)?['"]/);
+    assert.doesNotMatch(source, /import\(['"][^'"]*imageCompression(?:\.ts)?['"]\)/);
+  }
 });

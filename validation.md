@@ -729,20 +729,21 @@ The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe
 
 ## Pure Utility Unused Cleanup Gate
 
-Use this gate for the pure utility compiler-source cleanup slice:
+Use this gate for the pure utility compiler-source cleanup and pure image orphan cleanup slices:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/pure-utility-unused-cleanup-contract.test.ts" "tests/unit/prompt-group-regroup-behavior.test.ts" "tests/unit/prompt-group-drag-layout.test.ts" "tests/unit/ui-unused-cleanup-contract.test.ts"
 npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true
+if ((rg -n "imageCompression" src -S) -ne $null) { throw "imageCompression source reference remains" }
 npm.cmd run typecheck
 npm.cmd run test:unit
 npm.cmd run build
 npm.cmd run governance:agent-docs
 npm.cmd run check:encoding
-git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/App.tsx" "src/app/promptGroupRenderLayout.ts" "src/utils/modelSorting.ts" "tests/unit/pure-utility-unused-cleanup-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/App.tsx" "src/app/promptGroupRenderLayout.ts" "src/utils/modelSorting.ts" "src/services/image/imageCompression.ts" "tests/unit/pure-utility-unused-cleanup-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
-The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/app/promptGroupRenderLayout.ts`, `src/utils/modelSorting.ts`, and `src/App.tsx` matches.
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/app/promptGroupRenderLayout.ts`, `src/utils/modelSorting.ts`, `src/App.tsx`, and `src/services/image/imageCompression.ts` matches. For the pure image orphan cleanup, the `rg` guard must find no `imageCompression` source references.
 
 ## ChatSidebar Unused Cleanup Gate
 
