@@ -29,3 +29,15 @@ test('storage preference keeps local-folder save arity while making the unused p
   assert.match(preferenceSource, /await saveOriginalToLocalFolder\(id, blob, undefined, timestamp\);/);
   assert.match(preferenceSource, /const filename = `\$\{year\}-\$\{month\}-\$\{imageId\}\.png`;/);
 });
+
+test('image storage cleanupOriginals does not retain an unread database handle', () => {
+  const imageStorageSource = readSource('src/services/storage/imageStorage.ts');
+  const cleanupStart = imageStorageSource.indexOf('export async function cleanupOriginals()');
+  const cleanupEnd = imageStorageSource.indexOf('export async function', cleanupStart + 1);
+  const cleanupSource = imageStorageSource.slice(cleanupStart, cleanupEnd);
+
+  assert.match(cleanupSource, /const totalImages = await getImageCount\(\);/);
+  assert.doesNotMatch(cleanupSource, /const db = await openDB\(\);/);
+  assert.match(cleanupSource, /const \{ images \} = await getImagesPage\(offset, BATCH_SIZE\);/);
+  assert.match(cleanupSource, /await saveImage\(id, compressedUrl\);/);
+});
