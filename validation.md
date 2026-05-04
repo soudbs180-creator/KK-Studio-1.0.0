@@ -130,6 +130,23 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/se
 
 The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/services/model/modelCapabilities.ts` matches. Do not change model/provider routing, admin model lookup, model-list bootstrapping, custom-label precedence, keyManager behavior, or API/settings surfaces in this cleanup slice.
 
+## Video Service Unused Cleanup Gate
+
+Use this gate for the video-service unused cleanup slice:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/video-service-unused-cleanup-contract.test.ts" "tests/unit/frontend-key-boundary-hardening.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/video/OpenAIVideoService.ts" "src/services/video/VeoVideoService.ts" "src/services/video/videoService.ts" "tests/unit/video-service-unused-cleanup-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/services/video` matches. Do not change browser fail-closed behavior, Veo request construction, API base normalization, progress labels, polling, download/auth headers, returned result shape, or provider routing in this cleanup slice.
+
 ## Stage Two CanvasContext Split Gate
 
 Use this gate for `src/context/CanvasContext.tsx` splits. Add or narrow targeted tests after the responsibility map identifies the exact boundary; do not use one broad commit for state model, mutations, drag/selection, and persistence at the same time. Stage Two M1 used this gate for the state/default/context boundary plus the separated canvas compatibility helper. Stage Two M2 used the selection reducer contract below. Stage Two M3 used the prompt child image resolver contract below. Stage Two M4 used the workflow source node ID resolver contract below. Stage Two M5 used the media recovery contract below. Stage Two M10 used the placement contract below. Stage Two M11 used the layering contract below. Stage Two M12 used the group management contract below. Stage Two M13 used the movement contract below. Stage Two M14 used the tags contract below. Stage Two M15 used the node updates contract below. Stage Two M16 used the position updates contract below. Stage Two M17 used the prompt-image links contract below. Stage Two M18 used the workflow updates contract below. Stage Two M19 reused the prompt-image links contract below with the image deletion transform added. Stage Two M20 used the merge-into contract below. Stage Two M21 used the unused-code cleanup contract below. Stage Two M22 used the arrange-selection contract below. Stage Two M23 reused the unused-code cleanup contract below with the duplicate selected-arrange fallback guard added. Stage Two M24 used the arrange-selection contract below with selected-root cases added. Stage Two M25 used the arrange-selection contract below with selected grouped arrange and fallthrough cases added. Stage Two M26 used the auto-arrange contract below and is committed in `7cbd7346`. Stage Two M27 used the node updates contract below with prompt add/update reducers and is committed in `b16843ee`. Stage Two M79 reused the unused-code cleanup contract below with a type-import-only guard for `CanvasContextType` and `SubCardLayout`.

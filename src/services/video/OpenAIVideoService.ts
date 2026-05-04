@@ -33,7 +33,7 @@ export const generateOpenAIVideo = async (
  * Helper to map standard aspect ratios to pixel types
  * or just return the ratio string if the API expects "16:9"
  */
-export const mapAspectRatioToSize = (ratio: AspectRatio, model: string): string => {
+export const mapAspectRatioToSize = (ratio: AspectRatio, _model: string): string => {
     // Apifox/NewAPI often expects "WxH" string
     switch (ratio) {
         case AspectRatio.LANDSCAPE_16_9: return "1280x720";

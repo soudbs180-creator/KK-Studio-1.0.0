@@ -6,7 +6,6 @@
  */
 
 import { AspectRatio } from '../../types';
-import { buildApiUrl, buildHeaders } from '../api/apiConfig';
 
 /**
  * Veo视频配置

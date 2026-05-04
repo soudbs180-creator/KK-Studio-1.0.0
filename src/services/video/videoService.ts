@@ -158,7 +158,7 @@ export async function generateVideo(
     // 确保包含版本号 (通常是 v1beta)
     const apiBase = cleanBase.includes('/v1') ? cleanBase : `${cleanBase}/v1beta`;
 
-    return await executeVideoGeneration(requestBody, apiKey, model, apiBase, onProgress, signal, startTime, mode, modeLabel);
+    return await executeVideoGeneration(requestBody, apiKey, model, apiBase, onProgress, signal, startTime, mode);
 }
 
 /**
@@ -172,8 +172,7 @@ async function executeVideoGeneration(
     onProgress: ((status: string) => void) | undefined,
     signal: AbortSignal | undefined,
     startTime: number,
-    mode: VideoGenerationResult['mode'],
-    modeLabel: string
+    mode: VideoGenerationResult['mode']
 ): Promise<VideoGenerationResult> {
 
     // 1. 发起生成请求
