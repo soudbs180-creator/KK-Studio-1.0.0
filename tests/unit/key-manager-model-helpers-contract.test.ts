@@ -45,16 +45,18 @@ test('keyManager model helper boundary lives outside the monolithic key manager'
   const helperSource = readSource('src/services/auth/keyManagerModelHelpers.ts');
   const effectiveSlotSource = readSource('src/services/auth/keyManagerEffectiveSlot.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
+  const helperImportBlock = keyManagerSource.match(/import \{([\s\S]*?)\} from '\.\/keyManagerModelHelpers';/)?.[1] ?? '';
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-model-helpers-contract\.test\.ts/);
   assert.match(keyManagerSource, /from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /import \{[\s\S]*categorizeModels[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /import \{[\s\S]*extractModelIdsFromPricingData[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
-  assert.match(keyManagerSource, /import \{[\s\S]*isDeprecatedModel[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /import \{[\s\S]*isGoogleOfficialModelId[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /import type \{[\s\S]*GlobalModelType[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /export \{[\s\S]*parseModelString[\s\S]*MODEL_MIGRATION_MAP[\s\S]*normalizeModelId[\s\S]*parseModelVariantMeta[\s\S]*appendModelVariantLabel[\s\S]*categorizeModels[\s\S]*isDeprecatedModel[\s\S]*isGoogleOfficialModelId[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
   assert.match(keyManagerSource, /export type \{[\s\S]*ModelVariantMeta[\s\S]*GlobalModelType[\s\S]*\} from '\.\/keyManagerModelHelpers';/);
+  assert.doesNotMatch(helperImportBlock, /\bDEPRECATED_MODELS\b/);
+  assert.doesNotMatch(helperImportBlock, /\bisDeprecatedModel\b/);
   assert.match(helperSource, /export function parseModelString/);
   assert.match(helperSource, /export const MODEL_MIGRATION_MAP/);
   assert.match(helperSource, /export const DEPRECATED_MODELS/);

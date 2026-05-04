@@ -20,7 +20,6 @@ import {
     BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE,
     createBrowserDirectProviderChecksDisabledError,
     getKeyManagerStorageKey,
-    getProviderStorageKey,
     isBrowserRuntime,
     purgeAnonymousSensitiveLocalCaches,
     shouldAllowSessionlessLocalUserApiStorage,
@@ -141,10 +140,8 @@ import { isStartupStageReady, type AppStartupStage } from '../system/appStartup'
 import { resolveModelDisplayName } from '../../utils/modelDisplayName';
 import {
     categorizeModels,
-    DEPRECATED_MODELS,
     extractModelIdsFromPricingData,
     inferModelType,
-    isDeprecatedModel,
     isGoogleOfficialModelId,
     MODEL_MIGRATION_MAP,
     parseModelString,
@@ -555,7 +552,6 @@ export class KeyManager {
     private state: KeyManagerState;
     private listeners: Set<() => void> = new Set();
     private userId: string | null = null;
-    private authHasSession = false;
     private authIsTempUser = false;
     private sessionlessLocalUserApiStorageEnabled = false;
     private isSyncing = false;
@@ -601,7 +597,6 @@ export class KeyManager {
         });
 
         subscribeAuthSessionChange((detail) => {
-            this.authHasSession = detail.hasSession;
             this.authIsTempUser = detail.isTempUser;
 
             if (detail.isTempUser || !detail.hasSession) {
@@ -654,10 +649,6 @@ export class KeyManager {
 
     private getStorageKey(): string {
         return getKeyManagerStorageKey(this.userId);
-    }
-
-    private getProviderStorageKey(targetUserId: string | null = this.userId): string {
-        return getProviderStorageKey(targetUserId);
     }
 
     private canUseSessionlessLocalUserApiStorage(): boolean {
@@ -1845,18 +1836,9 @@ export class KeyManager {
             normalizedModelId = MODEL_MIGRATION_MAP[normalizedModelId];
         }
 
-        // Model-driven routing: credit-billed internal models default to the built-in proxy
-        // unless the caller explicitly requested a different route suffix.
-        const isCreditModel = normalizedModelId.includes('nano-banana') ||
-            normalizedModelId.includes('gemini-3.1-flash-image') ||
-            normalizedModelId.includes('gemini-3-pro-image') ||
-            normalizedModelId === 'gemini-2.5-flash-image' ||
-            normalizedModelId.includes('lyria') ||
-            normalizedModelId.includes('tts');
-
         // Routing strategy:
         // 1. If a suffix is present, try to match that explicit route.
-        // 2. Without a suffix, credit models prefer the built-in proxy and normal models prefer user Google keys.
+        // 2. Without a suffix, prefer direct Google/Gemini keys.
 
         // Convert third-party providers into temporary KeySlot objects so routing stays unified.
         this.loadProviders();
@@ -3999,16 +3981,6 @@ export class KeyManager {
             markPendingProviderCloudSync(this.cloudSyncState);
             void this.flushPendingCloudSync();
         }
-    }
-
-    private flushPendingProviderCloudSync(): void {
-        if (!this.userId || !this.cloudSyncState.pendingProviderCloudSync) {
-            return;
-        }
-
-        void this.flushPendingCloudSync().catch((error) => {
-            console.error('[KeyManager] Failed to sync providers to cloud:', error);
-        });
     }
 
 }
