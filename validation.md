@@ -534,6 +534,18 @@ Provider usage helper slices should use this targeted gate:
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/key-manager-provider-usage-contract.test.ts" "tests/unit/key-manager-provider-links-contract.test.ts" "tests/unit/key-manager-runtime-fallback.test.ts" "tests/unit/key-manager-provider-persistence-contract.test.ts"
 ```
 
+Provider usage delegator-pruning slices may use this narrower targeted gate:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/key-manager-provider-usage-contract.test.ts" "tests/unit/key-manager-runtime-fallback.test.ts"
+```
+
+Provider usage delegator-pruning slices may use this narrower path-limited diff check:
+
+```powershell
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "tests/unit/key-manager-provider-usage-contract.test.ts" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
 Provider usage helper slices should use this narrower path-limited diff check:
 
 ```powershell

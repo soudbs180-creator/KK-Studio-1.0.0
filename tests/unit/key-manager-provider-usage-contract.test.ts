@@ -54,7 +54,11 @@ test('provider usage math lives outside the monolithic key manager', () => {
   assert.match(helperSource, /export function applyProviderUsageDeltaToProvider/);
   assert.match(keyManagerSource, /from '\.\/keyManagerProviderUsage';/);
   assert.doesNotMatch(keyManagerSource, /private isUsageLimitExceeded/);
+  assert.doesNotMatch(keyManagerSource, /private resolveProviderBudgetLimit/);
+  assert.doesNotMatch(keyManagerSource, /private resolveProviderTokenLimit/);
   assert.match(keyManagerSource, /applyProviderUsageDeltaToProvider\(provider, tokenDelta, costDelta\)/);
+  assert.match(keyManagerSource, /budgetLimit: resolveProviderBudgetLimit\(p\),/);
+  assert.match(keyManagerSource, /tokenLimit: resolveProviderTokenLimit\(p\),/);
 });
 
 test('provider usage helper preserves limit checks and daily reset behavior', async () => {

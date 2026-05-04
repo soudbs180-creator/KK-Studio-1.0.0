@@ -1803,14 +1803,6 @@ export class KeyManager {
         return this.state.rotationStrategy || 'round-robin'; // Default to round-robin
     }
 
-    private resolveProviderBudgetLimit(provider: ThirdPartyProvider): number {
-        return resolveProviderBudgetLimit(provider);
-    }
-
-    private resolveProviderTokenLimit(provider: ThirdPartyProvider): number {
-        return resolveProviderTokenLimit(provider);
-    }
-
     private applyProviderUsageDelta(providerId: string, tokenDelta: number, costDelta: number): ThirdPartyProvider | undefined {
         this.loadProviders();
 
@@ -1895,8 +1887,8 @@ export class KeyManager {
                 headerName: runtime.headerName,
                 group: p.group,
                 status: 'valid',
-                budgetLimit: this.resolveProviderBudgetLimit(p),
-                tokenLimit: this.resolveProviderTokenLimit(p),
+                budgetLimit: resolveProviderBudgetLimit(p),
+                tokenLimit: resolveProviderTokenLimit(p),
                 usedTokens: p.usage?.totalTokens || 0,
                 totalCost: p.usage?.totalCost || 0,
                 successCount: 0,
@@ -3442,9 +3434,9 @@ export class KeyManager {
         return this.providers.some(p => {
             if (!p.isActive) return false;
             if (isUsageLimitExceeded({
-                budgetLimit: this.resolveProviderBudgetLimit(p),
+                budgetLimit: resolveProviderBudgetLimit(p),
                 totalCost: p.usage?.totalCost,
-                tokenLimit: this.resolveProviderTokenLimit(p),
+                tokenLimit: resolveProviderTokenLimit(p),
                 usedTokens: p.usage?.totalTokens,
             })) return false;
 
