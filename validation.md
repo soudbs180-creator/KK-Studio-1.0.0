@@ -676,6 +676,25 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/co
 
 The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is expected to fail while broader TS6133 debt remains outside this slice; for this gate, filter the output and require zero `PromptBar.tsx`, `ImageCard2.tsx`, and `src/components/settings/views/DashboardView.tsx` matches for the touched file set.
 
+## File-System Compatibility Stub Cleanup Gate
+
+Use this gate for `fileSystemService.ts` tag/settings compatibility stub parameter cleanup:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/filesystem-tag-shortcut-compat-contract.test.ts" "tests/unit/canvas-filesystem-persistence-scope.test.ts" "tests/unit/filesystem-startup-consolidation-deferral.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true
+npm.cmd run architecture:check
+npm.cmd run governance:security
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/storage/fileSystemService.ts" "tests/unit/filesystem-tag-shortcut-compat-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is expected to fail while broader TS6133 debt remains outside this slice; for this gate, filter the output and require zero `src/services/storage/fileSystemService.ts` matches. Do not remove or implement the compatibility stubs in this cleanup slice.
+
 ## App Unused Cleanup Gate
 
 Use this gate for the App compiler-source cleanup slice:

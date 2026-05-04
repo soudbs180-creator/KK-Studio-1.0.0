@@ -67,6 +67,7 @@
         "tests/unit/ecommerce-task-state-runtime-contract.test.ts",
         "tests/unit/ecommerce-upload-references-contract.test.ts",
         "tests/unit/ecommerce-upload-removal-contract.test.ts",
+        "tests/unit/filesystem-tag-shortcut-compat-contract.test.ts",
         "tests/unit/generation-billing-runtime-contract.test.ts",
         "tests/unit/generation-runtime-contract.test.ts",
         "tests/unit/governance-contract.test.ts",
