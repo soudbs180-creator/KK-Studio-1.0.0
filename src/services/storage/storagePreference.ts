@@ -243,7 +243,7 @@ export async function selectLocalFolder(): Promise<FileSystemDirectoryHandle | n
 export async function saveOriginalToLocalFolder(
     imageId: string,
     blob: Blob,
-    prompt?: string,
+    _prompt?: string,
     existingTimestamp?: number
 ): Promise<boolean> {
     const handle = await getLocalFolderHandle();

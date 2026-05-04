@@ -20,3 +20,12 @@ test('storage adapter does not retain compiler-proven unused OPFS import or prom
   assert.match(adapterSource, /return new Promise\(\(resolve\) => \{/);
   assert.match(adapterSource, /img\.onerror = \(\) => \{\s*URL\.revokeObjectURL\(url\);\s*\/\/ 默认尺寸\s*resolve\(\{ width: 1024, height: 1024 \}\);/);
 });
+
+test('storage preference keeps local-folder save arity while making the unused prompt parameter explicit', () => {
+  const preferenceSource = readSource('src/services/storage/storagePreference.ts');
+
+  assert.match(preferenceSource, /export async function saveOriginalToLocalFolder\(\s*imageId: string,\s*blob: Blob,\s*_prompt\?: string,\s*existingTimestamp\?: number\s*\): Promise<boolean>/);
+  assert.doesNotMatch(preferenceSource, /\bprompt\?: string,/);
+  assert.match(preferenceSource, /await saveOriginalToLocalFolder\(id, blob, undefined, timestamp\);/);
+  assert.match(preferenceSource, /const filename = `\$\{year\}-\$\{month\}-\$\{imageId\}\.png`;/);
+});
