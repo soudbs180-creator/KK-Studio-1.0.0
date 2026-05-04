@@ -155,6 +155,7 @@ test('remaining balance display helper is shared across billing surfaces', () =>
 test('user api settings keep working when local API persistence degrades to memory mode', () => {
   const apiSettingsViewSource = readSource('src/components/settings/ApiSettingsView.tsx');
   const userApiCloudRecordStorageSource = readSource('src/services/api/userApiCloudRecordStorage.ts');
+  const userApiPayloadSource = readSource('src/services/api/userApiPayload.ts');
   const shimPath = path.join(ROOT_DIR, 'src/services/api/supabaseUserApiCloudStorage.ts');
 
   assert.ok(apiSettingsViewSource.includes('const providerActionsDisabled = userApiViewState.providerActionsDisabled;'));
@@ -188,5 +189,7 @@ test('user api settings keep working when local API persistence degrades to memo
   assert.ok(userApiCloudRecordStorageSource.includes('legacyWebApiClient.replaceUserApiEntries({'));
   assert.ok(userApiCloudRecordStorageSource.includes("const CLIENT_VISIBLE_SECRET_PLACEHOLDER = 'sk-readonly-0000'"));
   assert.ok(userApiCloudRecordStorageSource.includes('normalized === CLIENT_VISIBLE_SECRET_PLACEHOLDER'));
+  assert.doesNotMatch(userApiPayloadSource, /const CLIENT_VISIBLE_SECRET_PLACEHOLDER/);
+  assert.doesNotMatch(userApiPayloadSource, /const REDACTED_SECRET_PREFIX/);
   assert.doesNotMatch(userApiCloudRecordStorageSource, /\.from\('profiles'\)/);
 });

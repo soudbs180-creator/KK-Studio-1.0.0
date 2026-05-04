@@ -3,8 +3,6 @@ type JsonRecord = Record<string, unknown>;
 type LegacyArrayKind = 'slots' | 'entries' | 'unknown';
 
 const USER_APIS_PAYLOAD_SAFE_MAX_BYTES = 900 * 1024;
-const CLIENT_VISIBLE_SECRET_PLACEHOLDER = 'sk-readonly-0000';
-const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
 const SLOT_PERSISTED_KEYS = [
   "id",
   "key",
