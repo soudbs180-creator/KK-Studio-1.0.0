@@ -1,6 +1,6 @@
 
 import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Bot, Check, ChevronDown, ChevronRight, Copy, Eraser, FileText, Film, GitBranch, Image as ImageIcon, Layout, Loader2, MessageSquare, Mic, Paperclip, Pencil, Plus, RotateCcw, Square, User, X, Zap, Sparkles, Search, Download, Upload, Archive, Edit2, Trash2 } from 'lucide-react';
+import { ArrowUp, Bot, Check, ChevronDown, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2 } from 'lucide-react';
 import { generateImage } from '../../services/llm/geminiService';
 import { llmService } from '../../services/llm/LLMService';
 import { notify } from '../../services/system/notificationService';
@@ -661,7 +661,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
     // 3. Layout State
     const [keyboardHeight, setKeyboardHeight] = useState(0);
-    const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
     const [sidebarWidth, setSidebarWidth] = useState(() => {
         // [NEW] Added width sync
         setTimeout(() => onWidthChange && onWidthChange(
@@ -697,7 +696,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             if (vv) {
                 const heightDiff = window.innerHeight - vv.height;
                 setKeyboardHeight(heightDiff > 100 ? heightDiff : 0);
-                setViewportHeight(vv.height);
             }
         };
 
@@ -891,18 +889,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         return -1;
     }, [messages]);
 
-    const filteredSessions = useMemo(() => {
-        const sorted = sessions
-            .filter(session => showArchived || !session.archived)
-            .sort((a, b) => b.updatedAt - a.updatedAt);
-        if (!sessionSearch.trim()) return sorted;
-        const q = sessionSearch.trim().toLowerCase();
-        return sorted.filter(session => {
-            if ((session.title || '').toLowerCase().includes(q)) return true;
-            return session.messages.some(m => (m.content || '').toLowerCase().includes(q));
-        });
-    }, [sessionSearch, sessions, showArchived]);
-
     const pinnedModels = useMemo(() => getPinnedModels(), [pinnedUpdate]);
 
     const filteredModelMenuItems = useMemo<ChatSidebarModelMenuItem[]>(() => {
@@ -954,12 +940,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         }
         return trail;
     }, [activeSession, sessionMap]);
-
-    const activeChildren = useMemo(() => {
-        return sessions
-            .filter(s => s.parentSessionId === activeSessionId)
-            .sort((a, b) => b.updatedAt - a.updatedAt);
-    }, [sessions, activeSessionId]);
 
     const sessionTreeRows = useMemo(() => {
         const visibleSessions = sessions.filter(session => showArchived || !session.archived);
@@ -1084,14 +1064,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             window.removeEventListener('mouseup', handleMouseUp);
         };
     }, [isDragging]);
-
-    const startDrag = (e: React.MouseEvent) => {
-        if (isOpen) return;
-        e.preventDefault();
-        setIsDragging(true);
-        dragStartRef.current = { x: e.clientX, y: e.clientY };
-        startPosRef.current = { ...position };
-    };
 
     const appendFilesAsAttachments = useCallback(async (files: File[]) => {
         if (!files || files.length === 0) return;
@@ -1621,15 +1593,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         }));
     }, []);
 
-    const getBranchSourcePreview = useCallback((session: ChatSessionItem): string | null => {
-        if (!session.parentSessionId || !session.branchFromMessageId) return null;
-        const parent = sessionMap.get(session.parentSessionId);
-        if (!parent) return null;
-        const source = parent.messages.find(m => m.id === session.branchFromMessageId);
-        if (!source || !source.content) return null;
-        return source.content.replace(/\s+/g, ' ').slice(0, 40);
-    }, [sessionMap]);
-
     const handleToggleArchiveSession = useCallback((id: string) => {
         setSessions(prev => prev.map(session => {
             if (session.id !== id) return session;
@@ -1787,18 +1750,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         };
         reader.readAsText(file, 'utf-8');
     }, [sessions]);
-
-    const handleClear = () => {
-        if (confirm('确定要清空对话历史吗?')) {
-            setMessages([{ id: Date.now().toString(), role: 'assistant', content: '对话已重置。', timestamp: Date.now() }]);
-        }
-    };
-
-    const getTransformOrigin = () => {
-        const x = position.x < window.innerWidth / 2 ? 'left' : 'right';
-        const y = position.y < window.innerHeight / 2 ? 'bottom' : 'bottom';
-        return `${x} ${y} `;
-    };
 
     return (
         <>

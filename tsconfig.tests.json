@@ -46,6 +46,7 @@
         "tests/unit/canvas-tags-contract.test.ts",
         "tests/unit/canvas-workflow-updates-contract.test.ts",
         "tests/unit/canvas-workflow-source-node-ids-contract.test.ts",
+        "tests/unit/chat-sidebar-unused-cleanup-contract.test.ts",
         "tests/unit/encoding-check-contract.test.ts",
         "tests/unit/ecommerce-display-label-surface.test.ts",
         "tests/unit/ecommerce-analysis-button-gate.test.ts",
