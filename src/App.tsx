@@ -3614,13 +3614,11 @@ const AppContent: React.FC<AppContentProps> = () => {
       focusedGroupId,
       generatingGroupIds,
       canvasScale: canvasTransform.scale,
-      isMobile,
       promptGroupLayoutState,
       regroupLayoutsById: promptGroupRegroupLayoutsById.get(node.id) ?? new Map(),
       imageCardHeightById,
       resolveLivePromptPosition,
       resolveLiveImagePosition,
-      getPromptHeight,
     });
 
     return (
@@ -3774,7 +3772,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     promptGroupStackZIndexById,
     resolveLiveImagePosition,
     resolveLivePromptPosition,
-    getPromptHeight,
     selectedNodeIds,
     updatePromptNodePosition,
   ]);

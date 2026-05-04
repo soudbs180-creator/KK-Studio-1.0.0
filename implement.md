@@ -4,7 +4,7 @@ Last updated: 2026-05-04
 
 ## Operating Mode
 
-This is a long-running execution. Plain `.git` still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`; the latest committed baseline before selecting the current LLMService unused cleanup slice is `fafecef9 refactor: prune openai adapter unused code`.
+This is a long-running execution. Plain `.git` still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`; the latest committed baseline before selecting the current pure utility unused cleanup slice is `783fddeb refactor: prune llm service unused code`.
 
 The active workstream is a single merged line. Thread `019dd551...` is the main refactor history and `019de168...` is continuation history; both belong to Stage One M6 ecommerce runtime extraction. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; ecommerce source selection closed in `ccf965c3`; ecommerce partial redraw closed in `d12731ce`; connector renderer boundary hardening closed in `5f5b76e0`; connector review follow-up closed in `f06f1880`; the M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`.
 
@@ -12,14 +12,14 @@ Stage One Backfill M2 completed in `8a458cd4` by hardening `src/app/usePromptGro
 
 The active plan is `plans.md`. The current status and next exact step are tracked in `status.md`. Validation commands and expected gates are tracked in `validation.md`.
 
-Current slice override: `fafecef9` completed the OpenAI adapter unused cleanup; the active working-tree slice is the `src/services/llm/LLMService.ts` compiler/source-proven unused cleanup.
+Current slice override: `783fddeb` completed the LLMService unused cleanup; the active working-tree slice is the pure utility compiler/source-proven unused cleanup in `src/app/promptGroupRenderLayout.ts`, `src/utils/modelSorting.ts`, and the `src/App.tsx` call site.
 
 For Clay UI work, use `C:/Users/Administrator/Downloads/DESIGN-clay.md` as the visual base with these overrides: inputs, main cards, sub cards, and framework cards use controlled frosted material; dark mode uses neutral black-gray surfaces; Clay brand colors are emphasis only. That lane is not active unless the user reports a new visual issue.
 
 Current convergence order:
 1. Keep the ledger files aligned with the alternate-git HEAD and the merged single execution line.
 2. Treat Stage One M6 ecommerce extraction and Stage One backfill boundaries as complete unless a new concrete regression proves otherwise.
-3. For Stage Two, split or prune one responsibility at a time from the largest files; after the current LLMService unused cleanup, the next candidate is `ChatSidebar.tsx`, `PromptNodeComponent.tsx`, `fileSystemService.ts`, or another file-specific noUnused cleanup slice.
+3. For Stage Two, split or prune one responsibility at a time from the largest files; after the current pure utility cleanup, the next candidate is `ChatSidebar.tsx`, `PromptNodeComponent.tsx`, `fileSystemService.ts`, or another file-specific noUnused cleanup slice.
 4. Write/update focused source contracts before each extraction when behavior or ownership changes.
 5. Move domain helpers and side effects into focused modules while preserving compatibility exports.
 6. Verify with the targeted gate for the touched slice, typecheck, full unit suite, build or architecture check as required, docs governance, encoding checks, and path-limited `git diff --check`.

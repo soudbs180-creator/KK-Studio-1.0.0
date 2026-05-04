@@ -727,6 +727,23 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/se
 
 The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/services/llm/LLMService.ts` matches.
 
+## Pure Utility Unused Cleanup Gate
+
+Use this gate for the pure utility compiler-source cleanup slice:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/pure-utility-unused-cleanup-contract.test.ts" "tests/unit/prompt-group-regroup-behavior.test.ts" "tests/unit/prompt-group-drag-layout.test.ts" "tests/unit/ui-unused-cleanup-contract.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/App.tsx" "src/app/promptGroupRenderLayout.ts" "src/utils/modelSorting.ts" "tests/unit/pure-utility-unused-cleanup-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/app/promptGroupRenderLayout.ts`, `src/utils/modelSorting.ts`, and `src/App.tsx` matches.
+
 ## Stage One Backfill Prompt Group Gate
 
 Use this gate for the active `usePromptGroupLayout` boundary-hardening slice:

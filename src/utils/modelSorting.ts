@@ -1,22 +1,4 @@
 const PINNED_MODELS_KEY = 'kk_pinned_models';
-const NANO_BANANA_KEYWORDS = ['nano', 'banana'];
-
-// Suffix priority: Higher index = Higher priority (displayed first)
-// But standard sort is usually Ascending. We want "Best" first.
-// So let's assign weights. Higher weight = Top of list.
-const SUFFIX_WEIGHTS: Record<string, number> = {
-    'ultra': 50,
-    'pro': 40,
-    'max': 35,
-    'plus': 30,
-    'advanced': 25,
-    'turbo': 20,
-    'flash': 15,
-    'lite': 10,
-    'nano': 5,
-    'mini': 5,
-};
-
 export const getPinnedModels = (): string[] => {
     try {
         const stored = localStorage.getItem(PINNED_MODELS_KEY);
@@ -45,37 +27,6 @@ const normalizeSearchValue = (value: unknown): string => {
 
 const tokenizeSearch = (value: string): string[] => {
     return value.split(/\s+/).filter(token => token.length > 0);
-};
-
-const getModelWeight = (model: any, pinned: string[]): number => {
-    let weight = 0;
-    const modelId = typeof model === 'string' ? model : (model.id || '');
-    const lowerId = modelId.toLowerCase();
-
-    // 1. 系统内置模型优先级 (最高优先级)
-    if (model.isSystemInternal || NANO_BANANA_KEYWORDS.some(k => lowerId.includes(k))) {
-        weight += 1000000;
-    }
-
-    // 2. 用户顶置优先级
-    if (pinned.includes(modelId)) {
-        weight += 100000;
-    }
-
-    return weight;
-};
-
-const extractVersionNumber = (id: string): number => {
-    const match = id.match(/(\d+(\.\d+)?)/);
-    return match ? parseFloat(match[0]) : 0;
-};
-
-const getSuffixWeight = (id: string): number => {
-    const lower = id.toLowerCase();
-    for (const [suffix, weight] of Object.entries(SUFFIX_WEIGHTS)) {
-        if (lower.includes(suffix)) return weight;
-    }
-    return 0;
 };
 
 // 6. Search Logic with Weighted Priority & Fuzzy Matching

@@ -15,21 +15,11 @@ interface BuildPromptGroupRenderLayoutArgs {
   focusedGroupId: string | null;
   generatingGroupIds: string[];
   canvasScale: number;
-  isMobile: boolean;
   promptGroupLayoutState: PromptGroupLayoutPresentationState | undefined;
   regroupLayoutsById: Map<string, PromptGroupRegroupLayout>;
   imageCardHeightById: Record<string, number>;
   resolveLivePromptPosition: (promptNode: PromptNode | undefined | null) => Point | null;
   resolveLiveImagePosition: (imageNode: GeneratedImage | undefined | null) => Point | null;
-  getPromptHeight: (text: string) => number;
-}
-
-function resolvePromptCardWidth(isMobile: boolean) {
-  if (!isMobile) {
-    return 320;
-  }
-
-  return Math.min(320, Math.max(248, ((typeof window !== 'undefined' ? window.innerWidth : 320) - 24)));
 }
 
 function resolveChildImageHeight(childNode: GeneratedImage, renderedWidth: number) {
@@ -56,13 +46,11 @@ export function buildPromptGroupRenderLayout({
   focusedGroupId,
   generatingGroupIds,
   canvasScale,
-  isMobile,
   promptGroupLayoutState,
   regroupLayoutsById,
   imageCardHeightById,
   resolveLivePromptPosition,
   resolveLiveImagePosition,
-  getPromptHeight,
 }: BuildPromptGroupRenderLayoutArgs) {
   const { groupView } = item;
   const node = groupView.rootPrompt;
@@ -81,8 +69,6 @@ export function buildPromptGroupRenderLayout({
   )
     ? node
     : { ...node, position: promptConnectorPosition };
-  const promptCardHeight = node.height || getPromptHeight(node.prompt);
-  const promptCardWidth = resolvePromptCardWidth(isMobile);
   const shadowBoost = isGroupFocused || isGeneratingGroup || groupView.isOverlapping || Boolean(promptGroupLayoutState);
   const connectorCanvasPadding = 128;
 

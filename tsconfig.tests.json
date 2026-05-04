@@ -98,6 +98,7 @@
         "tests/unit/ppt-runtime-contract.test.ts",
         "tests/unit/ppt-runtime-helper-contract.test.ts",
         "tests/unit/prompt-group-regroup-behavior.test.ts",
+        "tests/unit/pure-utility-unused-cleanup-contract.test.ts",
         "tests/unit/payment-sidecar-service.test.ts",
         "tests/unit/runtime-governance-upgrade.test.ts",
         "tests/unit/app-unused-cleanup-contract.test.ts",
