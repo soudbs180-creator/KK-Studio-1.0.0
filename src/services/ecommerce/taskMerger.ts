@@ -35,7 +35,7 @@ function uniqueStrings(values: Array<string | undefined>): string[] {
 
 function buildTemplateCopySeed(
   baseCopy: EcommerceCopyTaskState,
-  seriesTemplate?: EcommerceSeriesTemplate,
+  _seriesTemplate?: EcommerceSeriesTemplate,
 ): EcommerceCopyTaskState {
   return {
     headline: baseCopy.headline,
