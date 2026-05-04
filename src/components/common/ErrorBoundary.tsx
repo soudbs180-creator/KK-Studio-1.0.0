@@ -41,7 +41,7 @@ const getBoundaryLanguage = (): ResolvedLanguage => {
 const pickBoundaryText = <T,>(language: ResolvedLanguage, zh: T, en: T): T =>
     pickByResolvedLanguage(language, zh, en);
 
-const localizeBoundaryErrorText = (language: ResolvedLanguage, value?: string | null): string | undefined => {
+const localizeBoundaryErrorText = (_language: ResolvedLanguage, value?: string | null): string | undefined => {
     if (value == null) {
         return value ?? undefined;
     }

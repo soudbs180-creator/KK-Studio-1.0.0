@@ -746,6 +746,23 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/ap
 
 The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/app/useWorkflowActions.ts` matches. Do not change template definitions, `App.tsx` template-list wiring, workflow card factories, or workflow UI behavior in this cleanup slice.
 
+## Common ErrorBoundary Unused Cleanup Gate
+
+Use this gate for `src/components/common/ErrorBoundary.tsx` unused-parameter cleanup:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/startup-error-localization.test.ts" "tests/unit/app-startup-screen-localization.test.ts" "tests/unit/clay-frosted-surface-contract.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/components/common/ErrorBoundary.tsx" "tests/unit/startup-error-localization.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/components/common/ErrorBoundary.tsx` matches. Do not change captured-error localization, frosted error UI, reload behavior, startup error rendering, or global error handling in this cleanup slice.
+
 ## App Unused Cleanup Gate
 
 Use this gate for the App compiler-source cleanup slice:

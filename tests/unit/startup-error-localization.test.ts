@@ -24,6 +24,14 @@ test('common error boundary localizes captured errors for both document language
     'utf-8',
   );
 
+  assert.match(
+    source,
+    /const localizeBoundaryErrorText = \(_language: ResolvedLanguage, value\?: string \| null\): string \| undefined =>/,
+  );
+  assert.doesNotMatch(
+    source,
+    /const localizeBoundaryErrorText = \(language: ResolvedLanguage, value\?: string \| null\): string \| undefined =>/,
+  );
   assert.doesNotMatch(
     source,
     /const localizeBoundaryErrorText[\s\S]*language === 'en-US'[\s\S]*return value \?\? undefined;/,
