@@ -37,10 +37,11 @@ test("12AI built-in presets include the current Nano Banana 2 model", () => {
 
 test("12AI model discovery falls back to documented presets instead of a remote models endpoint", () => {
   const keyManagerSource = readSource("src/services/auth/keyManager.ts");
+  const providerPresetsSource = readSource("src/services/auth/keyManagerProviderPresets.ts");
   const connectionTestSource = readSource("src/services/api/connectionTest.ts");
 
   assert.match(
-    keyManagerSource,
+    providerPresetsSource,
     /export function getDocumentedStaticModelsForProvider\(strategyId: string\)/,
   );
   assert.match(

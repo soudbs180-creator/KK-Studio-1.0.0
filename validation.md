@@ -403,6 +403,12 @@ Provider presets slices should use this narrower path-limited diff check:
 git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerProviderPresets.ts" "tests/unit/key-manager-provider-presets-contract.test.ts" "tests/unit/twelve-ai-doc-alignment.test.ts" "tests/unit/flow2api-provider-support.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
+Documented static provider model helper slices reuse the provider presets gate above and this narrower path-limited diff check:
+
+```powershell
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerProviderPresets.ts" "tests/unit/key-manager-provider-presets-contract.test.ts" "tests/unit/twelve-ai-doc-alignment.test.ts" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
 Silent pricing URL helper targeted gate:
 
 ```powershell

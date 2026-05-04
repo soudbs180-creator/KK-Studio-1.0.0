@@ -147,3 +147,14 @@ export const PROVIDER_PRESETS: Record<string, KeyManagerProviderPreset> = {
         icon: '\u2699\uFE0F'
     }
 };
+
+export function getDocumentedStaticModelsForProvider(strategyId: string): string[] {
+    if (strategyId !== '12ai') {
+        return [];
+    }
+
+    return Array.from(new Set([
+        ...(PROVIDER_PRESETS['12ai']?.models || []),
+        ...(PROVIDER_PRESETS['12ai-nanobanana']?.models || []),
+    ]));
+}

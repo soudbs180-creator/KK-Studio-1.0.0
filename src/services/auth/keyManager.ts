@@ -66,7 +66,7 @@ import {
     DEFAULT_OPENAI_MODELS,
     GOOGLE_IMAGE_WHITELIST,
 } from './keyManagerDefaultModels';
-import { PROVIDER_PRESETS } from './keyManagerProviderPresets';
+import { getDocumentedStaticModelsForProvider, PROVIDER_PRESETS } from './keyManagerProviderPresets';
 export {
     DEFAULT_GOOGLE_MODELS,
     DEFAULT_OPENAI_MODELS,
@@ -75,7 +75,7 @@ export {
     ADVANCED_IMAGE_MODEL_WHITELIST,
     AUDIO_MODEL_WHITELIST,
 } from './keyManagerDefaultModels';
-export { PROVIDER_PRESETS } from './keyManagerProviderPresets';
+export { getDocumentedStaticModelsForProvider, PROVIDER_PRESETS } from './keyManagerProviderPresets';
 import {
     applyOpenAICompatAuthToUrl,
     type ApiProtocolFormat,
@@ -434,17 +434,6 @@ export interface ThirdPartyProvider {
     // Metadata
     createdAt: number;
     updatedAt: number;
-}
-
-export function getDocumentedStaticModelsForProvider(strategyId: string): string[] {
-    if (strategyId !== '12ai') {
-        return [];
-    }
-
-    return Array.from(new Set([
-        ...(PROVIDER_PRESETS['12ai']?.models || []),
-        ...(PROVIDER_PRESETS['12ai-nanobanana']?.models || []),
-    ]));
 }
 
 function getDefaultOfficialModelsForRuntime(runtime: ReturnType<typeof resolveProviderRuntime>): string[] {

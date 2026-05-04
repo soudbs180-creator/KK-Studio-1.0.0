@@ -12,6 +12,7 @@ function readSource(relativePath: string): string {
 
 async function loadProviderPresets(): Promise<{
   PROVIDER_PRESETS: Record<string, { name: string; baseUrl: string; models: string[]; format: string; icon?: string; defaultApiKey?: string }>;
+  getDocumentedStaticModelsForProvider: (strategyId: string) => string[];
 }> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerProviderPresets.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerProviderPresets.ts must exist');
@@ -25,15 +26,19 @@ test('keyManager provider presets live outside the monolithic key manager', () =
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-provider-presets-contract\.test\.ts/);
   assert.match(keyManagerSource, /from '\.\/keyManagerProviderPresets';/);
+  assert.match(keyManagerSource, /import \{[\s\S]*getDocumentedStaticModelsForProvider[\s\S]*PROVIDER_PRESETS[\s\S]*\} from '\.\/keyManagerProviderPresets';/);
+  assert.match(keyManagerSource, /export \{[\s\S]*getDocumentedStaticModelsForProvider[\s\S]*PROVIDER_PRESETS[\s\S]*\} from '\.\/keyManagerProviderPresets';/);
   assert.match(keyManagerSource, /export \{[\s\S]*PROVIDER_PRESETS[\s\S]*\} from '\.\/keyManagerProviderPresets';/);
   assert.doesNotMatch(keyManagerSource, /export const PROVIDER_PRESETS: Record<[\s\S]*= \{/);
+  assert.doesNotMatch(keyManagerSource, /export function getDocumentedStaticModelsForProvider\(strategyId: string\)/);
   assert.match(helperSource, /export const PROVIDER_PRESETS: Record<string, KeyManagerProviderPreset> = \{/);
+  assert.match(helperSource, /export function getDocumentedStaticModelsForProvider\(strategyId: string\): string\[]/);
   assert.doesNotMatch(helperSource, /from ['"]\.\/keyManager(?:['"]|\.ts['"])/);
   assert.doesNotMatch(helperSource, /fetch\(|localStorage|providerPersistence|cloudSync|keyStorage|resolveProviderRuntime/);
 });
 
 test('provider presets preserve documented built-in routes and defaults', async () => {
-  const { PROVIDER_PRESETS } = await loadProviderPresets();
+  const { PROVIDER_PRESETS, getDocumentedStaticModelsForProvider } = await loadProviderPresets();
 
   assert.deepEqual(Object.keys(PROVIDER_PRESETS), [
     'zhipu',
@@ -61,4 +66,13 @@ test('provider presets preserve documented built-in routes and defaults', async 
   assert.equal(PROVIDER_PRESETS['12ai-nanobanana'].format, 'gemini');
   assert.equal(PROVIDER_PRESETS['12ai-nanobanana'].models.includes('gemini-3.1-flash-image-preview'), true);
   assert.equal(PROVIDER_PRESETS['wuyinkeji-nanobanana2'].models[0], 'image_nanoBanana2');
+
+  assert.deepEqual(getDocumentedStaticModelsForProvider('openai'), []);
+  assert.deepEqual(
+    getDocumentedStaticModelsForProvider('12ai'),
+    Array.from(new Set([
+      ...PROVIDER_PRESETS['12ai'].models,
+      ...PROVIDER_PRESETS['12ai-nanobanana'].models,
+    ])),
+  );
 });
