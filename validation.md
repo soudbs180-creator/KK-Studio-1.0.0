@@ -370,6 +370,28 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/provider-image-routing-regression.test.ts"
 ```
 
+Model-list normalization targeted gate:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/key-manager-model-list-contract.test.ts" `
+  "tests/unit/key-manager-model-helpers-contract.test.ts" `
+  "tests/unit/key-manager-default-models-contract.test.ts" `
+  "tests/unit/official-route-default-models.test.ts" `
+  "tests/unit/model-id-normalization-parity-contract.test.ts" `
+  "tests/unit/key-manager-runtime-fallback.test.ts" `
+  "tests/unit/provider-image-routing-regression.test.ts" `
+  "tests/unit/model-display-name-regression.test.ts" `
+  "tests/unit/model-library-bootstrap-regression.test.ts" `
+  "tests/unit/twelve-ai-doc-alignment.test.ts"
+```
+
+Model-list normalization slices should use this narrower path-limited diff check:
+
+```powershell
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerModelList.ts" "tests/unit/key-manager-model-list-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
 Default model constants targeted gate:
 
 ```powershell
