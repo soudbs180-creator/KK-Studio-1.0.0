@@ -28,7 +28,6 @@ import {
 import { kkWebApiClient, shouldUseLegacyWebApiFallback } from '../../services/api/kkApiClient';
 import {
   getKkApiServerHealth,
-  isKkApiUserDataPersistedInCloudFromHealth,
   type KkApiServerHealth,
 } from '../../services/api/kkApiServerHealth';
 import { isKkaiUserApiStorageReady } from '../../services/api/kkaiUserApiStorageMode';
@@ -112,10 +111,6 @@ const UI_LEGACY_TOKEN_LIMIT_LABEL = '令牌上限';
 const UI_BUDGET_OPTIONS = ['不限额', '金额预算', UI_TOKEN_LIMIT_LABEL] as const;
 const suspiciousLocaleCharSet = new Set('\u9359\u95c2\u59ab\u7487\u6dc7\u93c2\u8930\u7f02\u95b9\u93c6\u95b2\u68f0\u6e1a\u6d98\u7c32\u9350\u5a34\u7039\u95ab\u7ed7\u9422\u6d63');
 
-const TOKEN_UNIT_LABEL = '词元';
-const TOKEN_LIMIT_LABEL = '词元上限';
-const LEGACY_TOKEN_LIMIT_LABEL = '令牌上限';
-
 type OfficialForm = {
   id?: string;
   name: string;
@@ -137,8 +132,6 @@ type ProviderForm = {
   mode: CostMode;
   value: string;
 };
-
-const BUDGET_OPTIONS = ['不限额', '金额预算', TOKEN_LIMIT_LABEL] as const;
 
 const officialDefaults: OfficialForm = {
   name: '',
@@ -702,30 +695,6 @@ const getOfficialUsageSummary = (slot: KeySlot) => {
   return `累计消耗 ${formatUsd(slot.totalCost)}`;
 };
 
-const getProviderUsageSummary = (provider: ThirdPartyProvider) => {
-  const mode = getMode(provider.budgetLimit, provider.tokenLimit, provider.customCostMode || 'unlimited');
-  if (mode === 'amount' && typeof provider.budgetLimit === 'number' && provider.budgetLimit > -1) {
-    return `已用 ${formatUsd(provider.usage.totalCost)} / 预算 ${formatUsd(provider.budgetLimit)}`;
-  }
-  if (mode === 'tokens' && typeof provider.tokenLimit === 'number' && provider.tokenLimit > -1) {
-    return `已用 ${formatTokens(provider.usage.totalTokens)} / 上限 ${formatTokens(provider.tokenLimit)}`;
-  }
-  return `累计消耗 ${formatUsd(provider.usage.totalCost)}`;
-};
-
-const getProviderActivityLine = (provider: ThirdPartyProvider) => {
-  const summary = provider.activitySummary;
-  if (!summary?.lastLatencyMs) return '暂无最近调用数据';
-  const items = [`延迟 ${formatLatency(summary.lastLatencyMs)}`];
-  if (typeof summary.lastTokens === 'number' && summary.lastTokens > 0) {
-    items.push(formatTokens(summary.lastTokens));
-  }
-  if (typeof summary.lastAmount === 'number' && summary.lastAmount >= 0) {
-    items.push(formatUsd(summary.lastAmount));
-  }
-  return items.join(' · ');
-};
-
 const toOfficialForm = (slot: KeySlot): OfficialForm => ({
   id: slot.id,
   name: slot.provider === 'OpenAI' ? 'OpenAI' : 'Google',
@@ -860,7 +829,6 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     runtimeProviderCount: runtimeThirdPartyProviders.length,
     sessionlessWorkbenchActionsEnabled: canMutateSessionlessLocalWorkbench,
   });
-  const shouldUseReadonlyProfileFallback = userApiViewState.shouldUseReadonlyProfileFallback;
   const isHydratingRuntimeUserApis = userApiViewState.isHydratingRuntimeUserApis;
   const shouldUseReadonlySnapshotForDisplay = userApiViewState.shouldUseReadonlySnapshotForDisplay;
   const officialSlots = useMemo(
@@ -1068,12 +1036,6 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   });
   const diagnosticsRefreshDisabled = diagnosticsAvailability.refreshDisabled;
   const routeDiagnosticsActionDisabled = diagnosticsAvailability.routeActionsDisabled;
-  const userApiReadOnlyHelper = isUserApiPersistenceDegraded
-    ? pick(
-        '当前页面会优先保住账号云端记录里的配置，并在本地服务恢复后重新和本地状态对齐。',
-        'This page now prioritizes preserving the account-backed cloud record and will realign local state after the local service recovers.',
-      )
-    : null;
   const canMutateWorkbenchActions = hasAuthenticatedUser || canMutateSessionlessLocalWorkbench;
   const ensureUserApiActionsAllowed = (): boolean => {
     if (!canMutateWorkbenchActions) {

@@ -119,6 +119,7 @@
         "tests/unit/startup-error-localization.test.ts",
         "tests/unit/storage-service-unused-cleanup-contract.test.ts",
         "tests/unit/app-unused-cleanup-contract.test.ts",
+        "tests/unit/api-settings-unused-cleanup-contract.test.ts",
         "tests/unit/ui-unused-cleanup-contract.test.ts",
         "tests/unit/video-service-unused-cleanup-contract.test.ts",
         "tests/unit/workspace-layout-contract.test.ts",
