@@ -797,7 +797,7 @@ The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe
 
 ## Onboarding Unused Cleanup Gate
 
-Use this gate for the AchievementToast compiler-source cleanup slice:
+Use this gate for the AchievementToast and Onboarding residual compiler-source cleanup slices:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/onboarding-unused-cleanup-contract.test.ts"
@@ -807,10 +807,10 @@ npm.cmd run test:unit
 npm.cmd run build
 npm.cmd run governance:agent-docs
 npm.cmd run check:encoding
-git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/components/Onboarding/AchievementToast.tsx" "tests/unit/onboarding-unused-cleanup-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/components/Onboarding/AchievementToast.tsx" "src/components/Onboarding/OnboardingManager.tsx" "src/components/Onboarding/OnboardingOverlay.tsx" "src/components/Onboarding/useOnboardingProgress.ts" "tests/unit/onboarding-unused-cleanup-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
-The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/components/Onboarding/AchievementToast.tsx` matches. Because this touches a visible onboarding toast component, record browser smoke evidence after build even when the cleanup is intended to be visual-no-op.
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/components/Onboarding` matches. Because this touches visible onboarding components, record browser smoke evidence after build even when the cleanup is intended to be visual-no-op.
 
 ## Stage One Backfill Prompt Group Gate
 

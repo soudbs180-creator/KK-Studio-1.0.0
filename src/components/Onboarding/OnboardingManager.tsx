@@ -17,7 +17,6 @@ import { AchievementToast } from './AchievementToast';
 import { 
   OnboardingPhase, 
   OnboardingTask, 
-  OnboardingProgress,
   OnboardingContextType 
 } from './types';
 import { useOnboardingProgress } from './useOnboardingProgress';
@@ -42,7 +41,7 @@ export const OnboardingManager: React.FC<OnboardingManagerProps> = ({ children }
   const [showTaskPanel, setShowTaskPanel] = useState(false);
   const [achievement, setAchievement] = useState<string | null>(null);
   
-  const { progress, updateProgress, completeTask, skipOnboarding } = useOnboardingProgress();
+  const { progress, completeTask, skipOnboarding } = useOnboardingProgress();
 
   useEffect(() => {
     const isFirstVisit = !localStorage.getItem('kk_studio_visited');
@@ -124,7 +123,7 @@ export const OnboardingManager: React.FC<OnboardingManagerProps> = ({ children }
         <TaskPanel 
           progress={progress}
           onClose={closeTaskPanel}
-          onTaskClick={(task) => {}}
+          onTaskClick={() => {}}
         />
       )}
       
