@@ -25,7 +25,7 @@ describe("payment sidecar contract", () => {
   );
 
   const apiServer = createApiServer(0, {
-    creditAccountRepository: new InMemoryCreditAccountRepository(),
+    creditAccountRepository: new InMemoryCreditAccountRepository(100),
     resolveAccessToken,
     verifyTurnstileToken: async () => ({ success: true }),
   });

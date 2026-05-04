@@ -24,7 +24,7 @@ describe("api server contract", () => {
     ["profile-contract-token", { userId: "profile-contract-user", email: "profile-contract@example.com", role: "user" }],
   ]);
   const server = createApiServer(0, {
-    creditAccountRepository: new InMemoryCreditAccountRepository(),
+    creditAccountRepository: new InMemoryCreditAccountRepository(100),
     resolveAccessToken: (accessToken) => authenticatedTokens.get(accessToken),
     verifyTurnstileToken: async () => ({ success: true }),
   });

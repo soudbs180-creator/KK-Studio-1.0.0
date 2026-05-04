@@ -23,7 +23,7 @@ describe("release smoke e2e", () => {
   const resolveAccessToken = (accessToken: string) => runtimeAccessTokens.get(accessToken);
 
   const apiServer = createApiServer(0, {
-    creditAccountRepository: new InMemoryCreditAccountRepository(),
+    creditAccountRepository: new InMemoryCreditAccountRepository(100),
     resolveAccessToken,
     verifyTurnstileToken: async () => ({ success: true }),
   });
