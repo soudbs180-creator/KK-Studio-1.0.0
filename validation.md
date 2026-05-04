@@ -710,6 +710,23 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/se
 
 The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/services/llm/OpenAICompatibleAdapter.ts` matches.
 
+## LLMService Unused Cleanup Gate
+
+Use this gate for the LLMService compiler-source cleanup slice:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/llm-service-unused-cleanup-contract.test.ts" "tests/unit/frontend-key-boundary-hardening.test.ts" "tests/unit/user-route-proxy-routing.test.ts" "tests/unit/async-image-proxy-regression.test.ts" "tests/unit/secure-model-proxy-credit-contract.test.ts" "tests/unit/secure-model-proxy-trace-contract.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/llm/LLMService.ts" "tests/unit/llm-service-unused-cleanup-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/services/llm/LLMService.ts` matches.
+
 ## Stage One Backfill Prompt Group Gate
 
 Use this gate for the active `usePromptGroupLayout` boundary-hardening slice:
