@@ -392,6 +392,24 @@ Model-list normalization slices should use this narrower path-limited diff check
 git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerModelList.ts" "tests/unit/key-manager-model-list-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
+Effective provider model fallback targeted gate:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/key-manager-effective-provider-models-contract.test.ts" `
+  "tests/unit/official-route-default-models.test.ts" `
+  "tests/unit/key-manager-runtime-fallback.test.ts" `
+  "tests/unit/api-settings-view-source-guard.test.ts" `
+  "tests/unit/model-library-bootstrap-regression.test.ts" `
+  "tests/unit/key-manager-model-list-contract.test.ts"
+```
+
+Effective provider model fallback slices should use this narrower path-limited diff check:
+
+```powershell
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerEffectiveProviderModels.ts" "tests/unit/key-manager-effective-provider-models-contract.test.ts" "tests/unit/official-route-default-models.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
 Default model constants targeted gate:
 
 ```powershell

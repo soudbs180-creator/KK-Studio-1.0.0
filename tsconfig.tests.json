@@ -75,6 +75,7 @@
         "tests/unit/key-manager-credential-sanitizer-contract.test.ts",
         "tests/unit/key-manager-default-models-contract.test.ts",
         "tests/unit/key-manager-dead-code-pruning-contract.test.ts",
+        "tests/unit/key-manager-effective-provider-models-contract.test.ts",
         "tests/unit/key-manager-key-type-contract.test.ts",
         "tests/unit/key-manager-model-helpers-contract.test.ts",
         "tests/unit/key-manager-model-list-contract.test.ts",

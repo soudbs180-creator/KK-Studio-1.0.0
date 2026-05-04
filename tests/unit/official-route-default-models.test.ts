@@ -11,33 +11,34 @@ function readSource(relativePath: string): string {
 
 test("keyManager keeps built-in defaults for official Google routes when saved models are empty", () => {
   const source = readSource("src/services/auth/keyManager.ts");
+  const effectiveModelsSource = readSource("src/services/auth/keyManagerEffectiveProviderModels.ts");
   const defaultsSource = readSource("src/services/auth/keyManagerDefaultModels.ts");
 
-  assert.match(source, /DEFAULT_GOOGLE_MODELS,/);
+  assert.match(source, /from '\.\/keyManagerEffectiveProviderModels';/);
   assert.match(defaultsSource, /export const DEFAULT_GOOGLE_MODELS = \[/);
   assert.match(
-    source,
+    effectiveModelsSource,
     /const builtInOfficialModels = getDefaultOfficialModelsForRuntime\(runtime\);\s*if \(builtInOfficialModels\.length > 0\) \{\s*return normalizeModelList\(builtInOfficialModels, runtime\.uiProvider \|\| input\.provider, input\.baseUrl\);\s*\}/,
   );
 });
 
 test("keyManager keeps built-in defaults for official OpenAI routes when saved models are empty", () => {
-  const source = readSource("src/services/auth/keyManager.ts");
+  const effectiveModelsSource = readSource("src/services/auth/keyManagerEffectiveProviderModels.ts");
   const defaultsSource = readSource("src/services/auth/keyManagerDefaultModels.ts");
 
   assert.match(defaultsSource, /export const DEFAULT_OPENAI_MODELS = \['dall-e-3', 'dall-e-2', 'gpt-4o', 'gpt-4o-mini'\];/);
   assert.match(
-    source,
+    effectiveModelsSource,
     /runtime\.strategyId === 'openai' && \(!runtime\.baseUrl \|\| runtime\.host === 'api\.openai\.com'\)[\s\S]*return DEFAULT_OPENAI_MODELS;/,
   );
 });
 
 test("keyManager does not treat custom OpenAI-compatible proxy URLs as official default-model routes", () => {
-  const source = readSource("src/services/auth/keyManager.ts");
+  const effectiveModelsSource = readSource("src/services/auth/keyManagerEffectiveProviderModels.ts");
 
-  assert.match(source, /runtime\.host === 'api\.openai\.com'/);
+  assert.match(effectiveModelsSource, /runtime\.host === 'api\.openai\.com'/);
   assert.doesNotMatch(
-    source,
+    effectiveModelsSource,
     /runtime\.strategyId === 'openai'\) \{\s*return DEFAULT_OPENAI_MODELS;/,
   );
 });
