@@ -23,14 +23,14 @@ test("12AI Gemini native image payload keeps doc-specific snake_case request par
 });
 
 test("12AI built-in presets include the current Nano Banana 2 model", () => {
-  const keyManagerSource = readSource("src/services/auth/keyManager.ts");
+  const providerPresetsSource = readSource("src/services/auth/keyManagerProviderPresets.ts");
 
   assert.match(
-    keyManagerSource,
+    providerPresetsSource,
     /'12ai':\s*\{[\s\S]*?models:\s*\[[\s\S]*?'gemini-3\.1-flash-image-preview'/,
   );
   assert.match(
-    keyManagerSource,
+    providerPresetsSource,
     /'12ai-nanobanana':\s*\{[\s\S]*?models:\s*\[[\s\S]*?'gemini-3\.1-flash-image-preview'/,
   );
 });

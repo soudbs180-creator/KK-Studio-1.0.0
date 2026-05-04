@@ -386,6 +386,23 @@ Default model constants slices should use this narrower path-limited diff check:
 git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerDefaultModels.ts" "tests/unit/key-manager-default-models-contract.test.ts" "tests/unit/official-route-default-models.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
+Provider presets targeted gate:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/key-manager-provider-presets-contract.test.ts" `
+  "tests/unit/twelve-ai-doc-alignment.test.ts" `
+  "tests/unit/flow2api-provider-support.test.ts" `
+  "tests/unit/key-manager-runtime-fallback.test.ts" `
+  "tests/unit/official-route-default-models.test.ts"
+```
+
+Provider presets slices should use this narrower path-limited diff check:
+
+```powershell
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerProviderPresets.ts" "tests/unit/key-manager-provider-presets-contract.test.ts" "tests/unit/twelve-ai-doc-alignment.test.ts" "tests/unit/flow2api-provider-support.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
 Silent pricing URL helper targeted gate:
 
 ```powershell
