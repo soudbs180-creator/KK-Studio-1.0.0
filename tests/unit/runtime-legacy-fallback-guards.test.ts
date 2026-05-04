@@ -19,6 +19,7 @@ test('runtime-sensitive services keep legacy fallback guarded while routing gues
 
   assert.match(userApiCloudRecordSource, /shouldUseLegacyWebApiFallback/);
   assert.match(userApiCloudRecordSource, /if \(!shouldUseLegacyWebApiFallback\(\)\) \{/);
+  assert.doesNotMatch(userApiCloudRecordSource, /function getErrorMessage\(/);
   assert.match(userApiProfileSource, /const canUseLegacyWebApi = shouldUseLegacyWebApiFallback\(\);/);
   assert.match(userApiProfileSource, /if \(canUseLegacyWebApi\) \{\s*try \{\s*localEntries = await loadLocalUserApiEntriesViaApi\(\);/);
   assert.match(userApiProfileSource, /mergeUserApiEntrySets\(localEntries, cloudEntries, 'local'\)/);
