@@ -981,10 +981,6 @@ describe('generation runtime extraction contract', () => {
       hookSource.indexOf('const executeRetryGeneratedMediaRequest = useCallback'),
       hookSource.indexOf('const applyRetryGeneratedMediaAuthoritativeBalance = useCallback'),
     );
-    const retryAttemptsSource = hookSource.slice(
-      hookSource.indexOf('const runRetryGeneratedMediaAttempts = useCallback'),
-      hookSource.indexOf('const prepareGenerationDraftContext = useCallback'),
-    );
     assert.match(hookSource, /prepareRetryVideoGenerationRequest: \(params: PrepareRetryVideoGenerationRequestParams\) => PrepareRetryVideoGenerationRequestResult;/);
     assert.match(hookSource, /const prepareRetryVideoGenerationRequest = useCallback\(\(params: PrepareRetryVideoGenerationRequestParams\)/);
     assert.match(hookSource, /if \(params\.executionNode\.videoResolution\) return params\.executionNode\.videoResolution;/);
@@ -1016,11 +1012,6 @@ describe('generation runtime extraction contract', () => {
       hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
       hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
     );
-    const attemptRequestSource = hookSource.slice(
-      hookSource.indexOf('const executeRetryGeneratedMediaAttemptRequest = useCallback'),
-      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
-    );
-
     assert.match(hookSource, /buildRetryVideoGenerationResultContext: \(params: BuildRetryVideoGenerationResultContextParams\) => BuildRetryVideoGenerationResultContextResult;/);
     assert.match(hookSource, /const buildRetryVideoGenerationResultContext = useCallback\(\(\s*params: BuildRetryVideoGenerationResultContextParams,\s*\): BuildRetryVideoGenerationResultContextResult => \{/);
     assert.match(hookSource, /const usage = params\.videoResult\.usage as/);
@@ -1330,10 +1321,6 @@ describe('generation runtime extraction contract', () => {
     );
     const assembleAttemptResultSource = hookSource.slice(
       hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
-      hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
-    );
-    const retryAttemptsSource = hookSource.slice(
-      hookSource.indexOf('const runRetryGeneratedMediaAttempts = useCallback'),
       hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
     );
     const completeBatchSource = hookSource.slice(
