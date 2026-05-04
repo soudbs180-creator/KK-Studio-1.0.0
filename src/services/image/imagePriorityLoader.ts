@@ -1,4 +1,4 @@
-import { isElementInViewport, distanceFromViewportCenter } from '../../hooks/useLazyImage';
+import { distanceFromViewportCenter } from '../../hooks/useLazyImage';
 
 interface LoadTask {
     id: string;
@@ -12,7 +12,6 @@ class ImagePriorityLoader {
     private queue: LoadTask[] = [];
     private activeCount = 0;
     private maxConcurrent = 4; // Max concurrent loads
-    private intervalId: NodeJS.Timeout | null = null;
 
     constructor() {
         this.startLoop();
@@ -39,7 +38,7 @@ class ImagePriorityLoader {
 
     private startLoop() {
         // Re-evaluate priorities every 200ms (in case of scroll)
-        this.intervalId = setInterval(() => {
+        setInterval(() => {
             if (this.queue.length > 0) {
                 this.processQueue();
             }

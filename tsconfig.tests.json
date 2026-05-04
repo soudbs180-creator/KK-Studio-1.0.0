@@ -73,6 +73,7 @@
         "tests/unit/generation-runtime-contract.test.ts",
         "tests/unit/governance-contract.test.ts",
         "tests/unit/hosted-release-guardrails.test.ts",
+        "tests/unit/image-service-unused-cleanup-contract.test.ts",
         "tests/unit/import-only-unused-cleanup-contract.test.ts",
         "tests/unit/key-manager-api-type-contract.test.ts",
         "tests/unit/key-manager-channel-config-secrets-contract.test.ts",
