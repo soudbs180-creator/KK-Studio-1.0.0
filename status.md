@@ -62,7 +62,7 @@ Last updated: 2026-05-04
 4. If packaging/publish metadata changes again, rerun `npm.cmd run package:portable`, `npm.cmd run publish:portable`, and `npm.cmd run governance:check` before final release sign-off.
 5. Final completion can only be claimed after the release gate and UI/browser checks required by touched surfaces pass.
 
-## Current Dependency-Security Slice
+## Completed In `58be183d` (Dependency-Security Slice)
 
 - Fixed the separate `payment-server` dependency audit gap by overriding transitive `@hono/node-server` to `^1.19.14` and `hono` to `^4.12.16`; the payment lockfile now resolves `@hono/node-server 1.19.14` and `hono 4.12.16`.
 - Added root script `npm.cmd run audit:dependencies` to audit both the root lockfile and `payment-server`, and inserted it into `npm.cmd run verify:changes`.
