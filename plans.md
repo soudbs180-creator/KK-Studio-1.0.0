@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline before selecting the current ChatSidebar unused cleanup slice is `92ee7a4f refactor: prune pure utility unused code`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline before selecting the current PromptNode unused cleanup slice is `3108a29f refactor: prune chat sidebar unused code`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -82,6 +82,7 @@ The active execution model for this thread has resumed Stage One convergence:
 - Stage Two M56 `OpenAICompatibleAdapter` diagnostics preview extraction is completed in `0edb13f5`: it moves safe JSON/multipart request preview redaction into `src/services/llm/openAICompatibleDiagnostics.ts` without changing provider routing, endpoints, auth, fetch behavior, UI, or release metadata.
 - Stage Two M57 `OpenAICompatibleAdapter` image-routing error classifier extraction is completed in `8f878b3a`: it moves chat/images compatibility and quota fail-closed error classifiers into `src/services/llm/openAICompatibleImageRoutingErrors.ts` without changing provider routing, endpoints, auth, fetch behavior, UI, or release metadata.
 - Stage Two M58 `OpenAICompatibleAdapter` unreachable image fallback cleanup is completed in `96b94e5e`: it removes post-throw automatic fallback code that could not execute after billing-safe compatibility errors, without changing provider routing, endpoint selection, auth, fetch behavior, UI, or release metadata.
+- The source-proven unused cleanup line now includes `b9baa445` (PromptBar/ImageCard), `b6767e85` (App), `fafecef9` (OpenAI-compatible adapter), `783fddeb` (LLMService), `92ee7a4f` (pure utility), and `3108a29f` (ChatSidebar). The active working-tree slice is `PromptNodeComponent.tsx`.
 - The project is functionally green after the latest full gate, but not final-complete while `App.tsx`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`, `keyManager.ts`, and `CanvasContext.tsx` remain giant-file split targets.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
@@ -90,13 +91,13 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 
 ## Current Baseline
 
-- `src/App.tsx`: 4900 physical lines after the latest finalization/security cleanup line.
+- `src/App.tsx`: 4812 physical lines after the latest source-proven unused cleanup line.
 - `src/app/useConnectorRenderer.ts`: 253 lines, boundary hardened in `5f5b76e0` and review-follow-up typechecked in `f06f1880`.
 - `src/app/usePromptGroupLayout.ts`: 1348 lines, extracted and boundary-hardened in `8a458cd4`.
 - `src/app/useGenerationRuntime.ts`: 2604 lines, extracted and boundary-hardened in `ab719c4a`; generation billing cleanup completed in `083db7f8`.
 - `src/app/usePptRuntime.ts`: 1289 lines, extracted in `4c448660` and semantically boundary-checked in `569383aa`.
 - `src/app/pptRuntimeHelpers.ts`: 152 lines, semantically boundary-checked in `569383aa`.
-- `src/context/CanvasContext.tsx`: 2518 physical lines after Stage Two M27 prompt-node update extraction, down from 5218 text lines at the start of Stage Two.
+- `src/context/CanvasContext.tsx`: 2518 physical lines after Stage Two M27 prompt-node update extraction and later cleanup, down from 5218 text lines at the start of Stage Two.
 - `src/context/canvasContextState.ts`: 114 lines, new Stage Two M1 state/default/context boundary module.
 - `src/context/canvasArrangeSelection.ts`: 601 lines, Stage Two M22/M24/M25 selected arrange helper.
 - `src/context/canvasAutoArrange.ts`: 360 lines, Stage Two M26 full-canvas auto-arrange position helper.
@@ -137,8 +138,12 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/services/auth/keyManagerKeyType.ts`: 9 lines, Stage Two M29 key type helper boundary.
 - `src/services/auth/keyManagerPricingUrl.ts`: 12 lines, Stage Two M43 silent pricing URL helper boundary.
 - `src/utils/modelIdNormalization.ts`: 6 lines after M30 compatibility-facade consolidation, down from 84 duplicated helper lines.
-- `src/components/layout/PromptBar.tsx`: 4466 physical lines.
-- `src/services/llm/OpenAICompatibleAdapter.ts`: 4337 physical lines after the current unused cleanup working tree.
+- `src/components/layout/PromptBar.tsx`: 3965 physical lines.
+- `src/components/canvas/PromptNodeComponent.tsx`: 2241 physical lines after the current unused cleanup working tree.
+- `src/components/layout/ChatSidebar.tsx`: 2743 physical lines after `3108a29f`.
+- `src/components/settings/ApiSettingsView.tsx`: 3385 physical lines.
+- `src/services/storage/fileSystemService.ts`: 1577 physical lines.
+- `src/services/llm/OpenAICompatibleAdapter.ts`: 4337 physical lines after the current unused cleanup line.
 - `src/services/llm/openAICompatibleDiagnostics.ts`: 86 physical lines in the diagnostics preview helper boundary.
 - `src/services/llm/openAICompatibleImageRoutingErrors.ts`: 49 physical lines in the completed M57 image-routing error classifier boundary.
 - `apps/web/`: migration target, not the first edit location.
@@ -445,8 +450,9 @@ Scope:
 - Completed M61 slice in `fafecef9`: removed compiler/source-proven unused `OpenAICompatibleAdapter.ts` imports, an unused private 12AI gateway helper, an unused static URL normalizer, and unread chat-image locals; added `tests/unit/openai-compatible-unused-cleanup-contract.test.ts` so those stale symbols do not return.
 - Completed M62 slice in `783fddeb`: removed compiler/source-proven unused `LLMService.ts` imports, stale direct browser-call helper paths, unused adapter fields, and unread public parameters while preserving local user-route proxy first, secure proxy fallback, billing metadata, task-status routing, and browser-direct blocking contracts.
 - Completed M63 slice in `92ee7a4f`: removed source-proven unused locals from `src/app/promptGroupRenderLayout.ts` and unused private helpers/constants from `src/utils/modelSorting.ts`, with a small App call-site cleanup for the removed layout argument. The full noUnused probe had zero `promptGroupRenderLayout.ts`, `modelSorting.ts`, and `App.tsx` matches and 135 remaining diagnostics overall.
-- Completed M64 working-tree slice: removed compiler/source-proven unused imports, unused viewport state, stale derived session lists, and unused callbacks from `src/components/layout/ChatSidebar.tsx`; added `tests/unit/chat-sidebar-unused-cleanup-contract.test.ts`. The full noUnused probe now has zero `ChatSidebar.tsx` matches and 123 remaining diagnostics overall.
-- Next slice after M64 should be a separate proof for `PromptNodeComponent.tsx`, `fileSystemService.ts`, `ApiSettingsView.tsx`, `useImageGeneration.ts`, or another remaining noUnused hotspot; do not mix ChatSidebar cleanup with keyManager secret storage, provider routing redesign, or visible UI behavior changes.
+- Completed M64 slice in `3108a29f`: removed compiler/source-proven unused imports, unused viewport state, stale derived session lists, and unused callbacks from `src/components/layout/ChatSidebar.tsx`; added `tests/unit/chat-sidebar-unused-cleanup-contract.test.ts`. The full noUnused probe had zero `ChatSidebar.tsx` matches and 123 remaining diagnostics overall.
+- Active M65 working-tree slice: remove compiler/source-proven unused imports, destructured props, and write-only state from `src/components/canvas/PromptNodeComponent.tsx`; added `tests/unit/prompt-node-unused-cleanup-contract.test.ts`. The full noUnused probe now has zero `PromptNodeComponent.tsx` matches and 112 remaining diagnostics overall.
+- Next slice after M65 should be a separate proof for `fileSystemService.ts`, `ApiSettingsView.tsx`, `geminiService.ts`, `useImageGeneration.ts`, or another remaining noUnused hotspot; do not mix PromptNode cleanup with storage behavior, keyManager secret storage, provider routing redesign, or visible UI behavior changes.
 - Continue `src/context/CanvasContext.tsx` only for another high-confidence narrow seam; defer `migrateNodes`, IndexedDB/local-folder movement, and persistence orchestration until they can be split safely.
 - Continue `src/services/auth/keyManager.ts` after M55 only after a fresh seam map. Defer key storage, permission checks, encryption helpers, provider credential management, cloud sync, provider persistence, shared pricing cache construction, runtime routing, remote model fetch behavior, and localStorage policy until smaller seams are mapped.
 - Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.

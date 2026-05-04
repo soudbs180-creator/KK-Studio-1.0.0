@@ -761,6 +761,23 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/co
 
 The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/components/layout/ChatSidebar.tsx` matches.
 
+## PromptNode Unused Cleanup Gate
+
+Use this gate for the PromptNode compiler-source cleanup slice:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/prompt-node-unused-cleanup-contract.test.ts" "tests/unit/prompt-node-optimizer-display-contract.test.ts" "tests/unit/prompt-optimizer-service-source-contract.test.ts" "tests/unit/canvas-live-scene-contract.test.ts" "tests/unit/canvas-visual-regression.test.ts" "tests/unit/ppt-deck-single-container-contract.test.ts" "tests/unit/ecommerce-card-thumbnail-labels.test.ts" "tests/unit/ecommerce-canvas-contract.test.ts" "tests/unit/ecommerce-display-label-surface.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/components/canvas/PromptNodeComponent.tsx" "tests/unit/prompt-node-unused-cleanup-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/components/canvas/PromptNodeComponent.tsx` matches. Because this is a visible component file, record browser smoke evidence after build even when the source cleanup is intended to be visual-no-op.
+
 ## Stage One Backfill Prompt Group Gate
 
 Use this gate for the active `usePromptGroupLayout` boundary-hardening slice:

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { PromptNode, AspectRatio, GenerationMode, PromptGenerationMetadata, type EcommerceEditableTaskState } from '../../types';
 import type { EcommerceGroupSlotState } from '../../services/ecommerce/groupSlotState.ts';
-import { Sparkles, Loader2, Video, Image, Pin, Music, Copy, Check, Languages, Info, ChevronRight, Shield, CheckCircle2, AlertTriangle, Download } from 'lucide-react';
+import { Sparkles, Loader2, Video, Image, Music, Copy, Check, Languages, Info, Shield, CheckCircle2, AlertTriangle, Download } from 'lucide-react';
 import { getCardDimensions } from '../../utils/styleUtils';
 import { generateTagColor } from '../../utils/colorUtils';
 import { notify } from '../../services/system/notificationService';
@@ -520,7 +520,6 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     renderOrigin,
     actualChildImageCount = 0,
 
-    onPositionChange,
     isSelected,
     onSelect,
     onBringToFront,
@@ -529,10 +528,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     canvasTransform, // Optional now
     zoomScale = 1,
     isMobile = false,
-    sourcePosition,
     onCancel,
     onDelete,
-    onRetry,
     onEditPptDeck,
     onExportPpt,
     onExportPptx,
@@ -555,14 +552,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     onActivateEcommerceTask,
     onPreviewEcommerceSlotHistory,
     onEcommerceTaskStateChange,
-    ioTrace,
-    onOpenStorageSettings,
-    onDisconnect,
     onHeightChange,
     highlighted,
     shadowBoost = false,
     onLivePositionChange,
-    onPin,
     onRemoveTag,
     onDragDelta,
     onDragCommit,
@@ -591,8 +584,6 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const hasMoved = useRef(false);
     const [activeTab, setActiveTab] = useState<'raw' | 'opt'>('raw');
     const [copyStatus, setCopyStatus] = useState<'idle' | 'en' | 'zh'>('idle');
-    const [showErrorDetails, setShowErrorDetails] = useState(false);
-    const [showTraceDetails, setShowTraceDetails] = useState(false);
     const resolvedTimerStart = resolveGenerationTimerStart(node);
     const timerStartRef = useRef<number>(resolvedTimerStart ?? Date.now());
 
@@ -661,8 +652,6 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         } else {
             setActiveTab('raw');
         }
-        setShowErrorDetails(false);
-        setShowTraceDetails(false);
     }, [node.id]);
 
     useEffect(() => {
