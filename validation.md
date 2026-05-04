@@ -656,10 +656,10 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/se
 
 ## UI Unused Cleanup Gate
 
-Use this gate for the PromptBar/ImageCard compiler-source cleanup slice:
+Use this gate for PromptBar/ImageCard and legacy dashboard compiler-source cleanup slices:
 
 ```powershell
-node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/prompt-bar-*.test.ts" "tests/unit/canvas-live-scene-contract.test.ts" "tests/unit/canvas-visual-regression.test.ts" "tests/unit/ui-unused-cleanup-contract.test.ts"
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/prompt-bar-*.test.ts" "tests/unit/canvas-live-scene-contract.test.ts" "tests/unit/canvas-visual-regression.test.ts" "tests/unit/ui-unused-cleanup-contract.test.ts" "tests/unit/dashboard-settings-overview-regression.test.ts" "tests/unit/dashboard-settings-legacy-pruning.test.ts" "tests/unit/billing-remaining-balance-contract.test.ts"
 npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true
 npm.cmd run architecture:check
 npm.cmd run governance:security
@@ -671,10 +671,10 @@ npm.cmd run test:unit
 npm.cmd run build
 npm.cmd run governance:agent-docs
 npm.cmd run check:encoding
-git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/components/layout/PromptBar.tsx" "src/components/image/ImageCard2.tsx" "tests/unit/ui-unused-cleanup-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/components/layout/PromptBar.tsx" "src/components/image/ImageCard2.tsx" "src/components/settings/views/DashboardView.tsx" "tests/unit/ui-unused-cleanup-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
-The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is expected to fail while broader TS6133 debt remains outside this slice; for this gate, filter the output and require zero `PromptBar.tsx` / `ImageCard2.tsx` TS6133 matches.
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is expected to fail while broader TS6133 debt remains outside this slice; for this gate, filter the output and require zero `PromptBar.tsx`, `ImageCard2.tsx`, and `src/components/settings/views/DashboardView.tsx` matches for the touched file set.
 
 ## App Unused Cleanup Gate
 

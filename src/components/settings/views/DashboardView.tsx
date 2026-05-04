@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
-  AlertTriangle,
   ArrowRight,
   Coins,
   HardDrive,
@@ -9,8 +8,6 @@ import {
   LayoutDashboard,
   RefreshCw,
   ScrollText,
-  ShieldCheck,
-  Wallet,
 } from 'lucide-react';
 import { useBilling } from '../../../context/BillingContext';
 import keyManager from '../../../services/auth/keyManager';

@@ -55,3 +55,13 @@ test('ImageCard2 does not retain source-proven unused lightbox remnants', () => 
   assert.doesNotMatch(source, /wheelCleanupRef/);
   assert.doesNotMatch(source, /adaptiveSubBorderWidth/);
 });
+
+test('legacy DashboardView does not retain unused icon imports', () => {
+  const source = readSource('src/components/settings/views/DashboardView.tsx');
+  const localizedSource = readSource('src/components/settings/views/DashboardView.localized.tsx');
+
+  assert.doesNotMatch(source, /\bAlertTriangle,/);
+  assert.doesNotMatch(source, /\bShieldCheck,/);
+  assert.doesNotMatch(source, /\bWallet,/);
+  assert.match(localizedSource, /\bWallet,/);
+});
