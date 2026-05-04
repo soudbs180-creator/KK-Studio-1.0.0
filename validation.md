@@ -654,6 +654,28 @@ This slice also requires this path-limited diff check:
 git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/llm/OpenAICompatibleAdapter.ts" "src/services/llm/openAICompatibleDiagnostics.ts" "src/services/llm/openAICompatibleImageRoutingErrors.ts" "tests/unit/openai-compatible-diagnostics-contract.test.ts" "tests/unit/openai-compatible-image-routing-errors-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
+## UI Unused Cleanup Gate
+
+Use this gate for the PromptBar/ImageCard compiler-source cleanup slice:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/prompt-bar-*.test.ts" "tests/unit/canvas-live-scene-contract.test.ts" "tests/unit/canvas-visual-regression.test.ts" "tests/unit/ui-unused-cleanup-contract.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true
+npm.cmd run architecture:check
+npm.cmd run governance:security
+npm.cmd run audit:dependencies
+npm.cmd run spec:check
+npm.cmd run governance:check
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/components/layout/PromptBar.tsx" "src/components/image/ImageCard2.tsx" "tests/unit/ui-unused-cleanup-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is expected to fail while broader TS6133 debt remains outside this slice; for this gate, filter the output and require zero `PromptBar.tsx` / `ImageCard2.tsx` TS6133 matches.
+
 ## Stage One Backfill Prompt Group Gate
 
 Use this gate for the active `usePromptGroupLayout` boundary-hardening slice:

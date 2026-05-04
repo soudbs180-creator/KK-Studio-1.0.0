@@ -1,11 +1,9 @@
 ﻿import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
-import ReactDOM from 'react-dom';
-import { AspectRatio, GeneratedImage, GenerationMode, ImageSize } from '../../types';
+import { GeneratedImage, GenerationMode, ImageSize } from '../../types';
 import { Download, Trash2, Loader2, ImageOff, Play, Pause, Music } from 'lucide-react';
 import { getCardDimensions } from '../../utils/styleUtils';
 import { getLaunchTimelineByOffset, getPromptBarLaunchPoint } from '../../utils/cardLaunch';
 import { generateTagColor } from '../../utils/colorUtils';
-import { useLazyImage } from '../../hooks/useLazyImage';
 import { getImage, getStrictOriginalImage } from '../../services/storage/imageStorage';
 import { resolveImageCost } from '../../services/billing/costService';
 import { fileSystemService } from '../../services/storage/fileSystemService';
@@ -116,7 +114,6 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     onHeightChange,
     isActive = false,
     zoomScale = 1,
-    isMobile = false,
     isSelected = false,
     onSelect,
     onBringToFront,
@@ -373,20 +370,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         return () => observer.disconnect();
     }, [detailLevel, footerDensity, image.id, onHeightChange]);
 
-    const [showLightbox, setShowLightbox] = useState(false);
-    const [lightboxZoom, setLightboxZoom] = useState(1);
-    const [lightboxPan, setLightboxPan] = useState({ x: 0, y: 0 });
-    const [isPanning, setIsPanning] = useState(false);
-    const panStartRef = useRef({ x: 0, y: 0 });
-    const panStartPosRef = useRef({ x: 0, y: 0 });
-    const lightboxRef = useRef<HTMLDivElement>(null);
     const dragStartPos = useRef({ x: 0, y: 0 });
     const dragStartCanvasPos = useRef({ x: 0, y: 0 });
-    // Track when lightbox was opened to prevent instant closing on double-click
-    const openTimeRef = useRef(0);
-
-    // Stored reference for cleanup (persists across effect calls)
-    const wheelCleanupRef = useRef<(() => void) | null>(null);
 
     const [imgError, setImgError] = useState(false);
 
@@ -1188,7 +1173,6 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
     const borderScale = zoomScale || 1;
     const adaptiveBorderWidth = Math.max(1, 1.5 / borderScale);
-    const adaptiveSubBorderWidth = Math.max(1, 1.2 / borderScale);
     const renderPos = isDragging ? localPosRef.current : position;
     const stackZIndex = stackZIndexOverride ?? getImageStackZIndex(image, isSelected, isNew, isActive, groupLayerZIndex);
     const effectiveStackZIndex = elevateCanvasStackZIndex(stackZIndex, isDragging);
