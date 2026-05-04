@@ -73,6 +73,7 @@
         "tests/unit/key-manager-channel-config-secrets-contract.test.ts",
         "tests/unit/key-manager-channel-capabilities-contract.test.ts",
         "tests/unit/key-manager-credential-sanitizer-contract.test.ts",
+        "tests/unit/key-manager-default-models-contract.test.ts",
         "tests/unit/key-manager-dead-code-pruning-contract.test.ts",
         "tests/unit/key-manager-key-type-contract.test.ts",
         "tests/unit/key-manager-model-helpers-contract.test.ts",
