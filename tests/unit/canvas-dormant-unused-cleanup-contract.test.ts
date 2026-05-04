@@ -9,6 +9,10 @@ function readSource(absolutePath: string): string {
   return readFileSync(absolutePath, 'utf-8');
 }
 
+function readRelativeSource(relativePath: string): string {
+  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
+}
+
 function listSourceFiles(relativeDirectory: string): string[] {
   const directory = path.join(ROOT_DIR, relativeDirectory);
   const files: string[] = [];
@@ -39,4 +43,18 @@ test('dormant Pixi canvas renderer remains removed from source', () => {
     const source = readSource(sourceFile);
     assert.doesNotMatch(source, /\b(PixiCanvas|preloadPixi|isPixiAvailable)\b/);
   }
+});
+
+test('dormant canvas support files do not retain compiler-proven unused destructures', () => {
+  const canvasSource = readRelativeSource('src/components/canvas/Canvas.tsx');
+  const pendingNodeSource = readRelativeSource('src/components/canvas/PendingNode.tsx');
+
+  assert.doesNotMatch(canvasSource, /cardPositions\s*=\s*\[\],\s*onAutoArrange\s*\}\)/);
+  assert.match(canvasSource, /onAutoArrange\?: \(\) => void;/);
+
+  assert.doesNotMatch(pendingNodeSource, /isMobile\s*=\s*false,\s*\n/);
+  assert.doesNotMatch(pendingNodeSource, /sourcePosition,\s*\n\s*onDisconnect/);
+  assert.doesNotMatch(pendingNodeSource, /const \[idleTime, setIdleTime\] = useState\(0\);/);
+  assert.match(pendingNodeSource, /isMobile\?: boolean;/);
+  assert.match(pendingNodeSource, /sourcePosition\?: \{ x: number; y: number \};/);
 });

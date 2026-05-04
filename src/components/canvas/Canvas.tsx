@@ -15,7 +15,7 @@ interface Transform {
     scale: number;
 }
 
-const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ children, onTransformChange, onCanvasClick, cardPositions = [], onAutoArrange }) => {
+const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ children, onTransformChange, onCanvasClick, cardPositions = [] }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, scale: 1 });
     const [isDragging, setIsDragging] = useState(false);

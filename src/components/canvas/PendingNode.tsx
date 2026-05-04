@@ -40,10 +40,8 @@ const PendingNode: React.FC<PendingNodeProps> = ({
     position,
     aspectRatio,
     onPositionChange,
-    isMobile = false,
     canvasTransform = { x: 0, y: 0, scale: 1 },
     referenceImages = [],
-    sourcePosition,
     onDisconnect
 }) => {
     const [isDragging, setIsDragging] = useState(false);
@@ -56,7 +54,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     // 棰勮鍗?0绉掕秴鏃堕攢姣?
-    const [idleTime, setIdleTime] = useState(0);
+    const [, setIdleTime] = useState(0);
     const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // 璁℃椂鍣ㄩ€昏緫 (鐢熸垚涓鏃?
