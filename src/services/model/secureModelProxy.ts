@@ -829,6 +829,14 @@ async function invokeLocalUserRouteProxy(
   feature: string,
   body: Record<string, unknown>,
 ): Promise<any> {
+  if (!shouldUseLocalUserRouteApi()) {
+    throw buildSecureProxyBoundaryError('Local user-route proxy is disabled.', {
+      code: LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE,
+      status: 503,
+      feature,
+    });
+  }
+
   const session = await resolveCloudSession(feature, { routeKind: 'user-route' });
   let activeAccessToken = session.accessToken;
   const failureLabel = 'local KK API user-route proxy';
@@ -928,6 +936,13 @@ async function invokeLocalSystemProxy(
   feature: string,
   body: Record<string, unknown>,
 ): Promise<any> {
+  if (!shouldUseLocalSystemProxy()) {
+    throw buildSecureProxyBoundaryError('Local system proxy is disabled.', {
+      status: 503,
+      feature,
+    });
+  }
+
   const invokeWithToken = async (accessToken: string): Promise<LocalSystemProxyHttpResult> => {
     try {
       return await invokeLocalSystemProxyHttp(accessToken, body);

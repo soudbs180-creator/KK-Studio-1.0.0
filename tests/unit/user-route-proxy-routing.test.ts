@@ -15,6 +15,8 @@ test("user-owned API traffic defaults to the local KK API user-route endpoint", 
 
   assert.match(proxySource, /function shouldUseLocalSystemProxy\(\): boolean \{\s*return true;\s*\}/);
   assert.match(proxySource, /function shouldUseLocalUserRouteApi\(\): boolean \{\s*return true;\s*\}/);
+  assert.match(proxySource, /if \(!shouldUseLocalUserRouteApi\(\)\) \{[\s\S]*LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE/);
+  assert.match(proxySource, /if \(!shouldUseLocalSystemProxy\(\)\) \{[\s\S]*Local system proxy is disabled/);
   assert.doesNotMatch(proxySource, /async function buildInvocationError\(/);
   assert.match(proxySource, /\/api\/v1\/model-proxy\/user/);
   assert.doesNotMatch(proxySource, /function getSecureProxyEndpoint\(/);
