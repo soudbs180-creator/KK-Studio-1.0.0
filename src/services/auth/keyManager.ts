@@ -60,6 +60,7 @@ import { sanitizeAsciiApiKey } from './keyManagerCredentialSanitizer';
 import { getRedactedChannelConfigApiKey } from './keyManagerChannelConfigSecrets';
 import { buildSilentProviderPricingUrl } from './keyManagerPricingUrl';
 import { buildChannelCapabilities } from './keyManagerChannelCapabilities';
+import { detectApiType } from './keyManagerApiType';
 import {
     applyOpenAICompatAuthToUrl,
     type ApiProtocolFormat,
@@ -138,6 +139,7 @@ export {
 } from './keyManagerModelHelpers';
 export type { ModelVariantMeta, GlobalModelType } from './keyManagerModelHelpers';
 export { determineKeyType } from './keyManagerKeyType';
+export { detectApiType } from './keyManagerApiType';
 
 const RATE_LIMIT_COOLDOWN_MS = 30 * 1000;
 
@@ -4348,28 +4350,6 @@ export default keyManager;
 // ============================================================================
 // API type detection helpers
 // ============================================================================
-
-/**
- * Detect the general API type from the key prefix and base URL.
- */
-export function detectApiType(apiKey: string, baseUrl?: string): 'google-official' | 'openai' | 'proxy' | 'unknown' {
-    // Google official API
-    if (apiKey.startsWith('AIza') || baseUrl?.includes('googleapis.com') || baseUrl?.includes('generativelanguage.googleapis.com')) {
-        return 'google-official';
-    }
-
-    // OpenAI official API
-    if (apiKey.startsWith('sk-') && (!baseUrl || baseUrl.includes('api.openai.com'))) {
-        return 'openai';
-    }
-
-    // Other non-Google endpoints are treated as proxy-compatible APIs
-    if (baseUrl && !baseUrl.includes('googleapis.com') && baseUrl.length > 0) {
-        return 'proxy';
-    }
-
-    return 'unknown';
-}
 
 /**
  * Fetch available Google models using the official models endpoint.
