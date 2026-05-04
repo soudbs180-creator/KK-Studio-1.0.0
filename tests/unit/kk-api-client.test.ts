@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, test } from "node:test";
 
 import { createKkApiClient } from "../../packages/contracts/src/index.ts";
@@ -10,6 +12,27 @@ import {
 } from "../../src/services/api/kkApiClient.ts";
 
 describe("kk api client", () => {
+  test("keeps admin recharge DTO public while client avoids unused direct DTO imports", () => {
+    const contractsSourceRoot = path.join("packages", "contracts", "src");
+    const clientSource = readFileSync(
+      path.join(contractsSourceRoot, "client", "kk-api-client.ts"),
+      "utf8",
+    );
+    const billingDtoSource = readFileSync(
+      path.join(contractsSourceRoot, "dto", "billing.ts"),
+      "utf8",
+    );
+
+    assert.match(
+      billingDtoSource,
+      /export interface AdminRechargeSubmissionDto extends RechargeSubmissionDto/,
+    );
+    assert.doesNotMatch(clientSource, /\bAdminRechargeSubmissionDto,/);
+    assert.match(clientSource, /ListAdminRechargeSubmissionsResponseDto/);
+    assert.match(clientSource, /GetAdminRechargeSubmissionResponseDto/);
+    assert.match(clientSource, /ReviewRechargeSubmissionResponseDto/);
+  });
+
   test("detects loopback hosts for local-only Web API fallbacks", () => {
     assert.equal(isLoopbackHostname("localhost"), true);
     assert.equal(isLoopbackHostname("127.0.0.1"), true);
