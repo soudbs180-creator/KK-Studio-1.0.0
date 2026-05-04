@@ -118,6 +118,27 @@ test("model endpoint types flow from key metadata into image surface routing", (
   );
 });
 
+test("image compatibility fallback disables unreachable post-throw fallback code", () => {
+  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+
+  assert.match(
+    adapterSource,
+    /throw this\.buildImageCompatibilityModeError\('chat', chatErr, keySlot\);/,
+  );
+  assert.match(
+    adapterSource,
+    /throw this\.buildImageCompatibilityModeError\('standard', imagesErr, keySlot\);/,
+  );
+  assert.doesNotMatch(
+    adapterSource,
+    /Chat API 不兼容，回退 Images API/,
+  );
+  assert.doesNotMatch(
+    adapterSource,
+    /Images API 疑似不兼容，自动回退 Chat API/,
+  );
+});
+
 test("base64 image extraction preserves upstream mime types instead of forcing png", () => {
   const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
 

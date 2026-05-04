@@ -3052,7 +3052,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 }
                 console.warn(`[OpenAICompatibleAdapter] Chat API compatibility fallback disabled for billing safety -> ${keySlot.name}`);
                 throw this.buildImageCompatibilityModeError('chat', chatErr, keySlot);
-                console.warn(`[OpenAICompatibleAdapter] Chat API 不兼容，回退 Images API -> ${keySlot.name}`);
             }
         }
 
@@ -3072,12 +3071,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             }
             console.warn(`[OpenAICompatibleAdapter] Images compatibility fallback disabled for billing safety -> ${keySlot.name}`);
             throw this.buildImageCompatibilityModeError('standard', imagesErr, keySlot);
-            console.warn(`[OpenAICompatibleAdapter] Images API 疑似不兼容，自动回退 Chat API -> ${keySlot.name}`);
-            try {
-                return await this.generateImageViaChat(options, keySlot);
-            } catch (chatErr: any) {
-                throw new Error(`Images API 与 Chat API 均失败。imagesErr=${String(imagesErr?.message || imagesErr)}; chatErr=${String(chatErr?.message || chatErr)}`);
-            }
         }
     }
 

@@ -634,7 +634,7 @@ Generation billing follow-ups use the same generation gate and must keep stale A
 
 ## OpenAI-Compatible Adapter Gates
 
-Use this gate for the completed diagnostics preview helper extraction and the current image-routing error classifier extraction in `OpenAICompatibleAdapter`:
+Use this gate for the completed diagnostics preview helper extraction, image-routing error classifier extraction, and unreachable image fallback cleanup in `OpenAICompatibleAdapter`:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/openai-compatible-image-routing-errors-contract.test.ts" "tests/unit/openai-compatible-diagnostics-contract.test.ts" "tests/unit/provider-image-routing-regression.test.ts" "tests/unit/provider-surface-router.test.ts" "tests/unit/provider-strategy.test.ts" "tests/unit/async-image-proxy-regression.test.ts" "tests/unit/frontend-key-boundary-hardening.test.ts" "tests/unit/governance-contract.test.ts"
