@@ -712,6 +712,23 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/co
 
 The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is expected to fail while broader TS6133 debt remains outside this slice; for this gate, filter the output and require zero matches for the touched import-only file set.
 
+## Live Canvas Residual Cleanup Gate
+
+Use this gate for live `InfiniteCanvas.tsx` residual noUnused cleanup:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/canvas-live-unused-cleanup-contract.test.ts" "tests/unit/canvas-live-scene-contract.test.ts" "tests/unit/canvas-visual-regression.test.ts" "tests/unit/ecommerce-wheel-scroll-guard.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/components/canvas/InfiniteCanvas.tsx" "tests/unit/canvas-live-unused-cleanup-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is expected to fail while broader TS6133 debt remains outside this slice; for this gate, filter the output and require zero `src/components/canvas/InfiniteCanvas.tsx` matches. Do not narrow `InfiniteCanvasProps` or change JSX/interaction behavior in this cleanup slice.
+
 ## App Unused Cleanup Gate
 
 Use this gate for the App compiler-source cleanup slice:

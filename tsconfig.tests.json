@@ -32,6 +32,7 @@
         "tests/unit/canvas-cleanup-contract.test.ts",
         "tests/unit/canvas-groups-contract.test.ts",
         "tests/unit/canvas-layering-contract.test.ts",
+        "tests/unit/canvas-live-unused-cleanup-contract.test.ts",
         "tests/unit/canvas-movement-contract.test.ts",
         "tests/unit/canvas-node-updates-contract.test.ts",
         "tests/unit/canvas-position-updates-contract.test.ts",

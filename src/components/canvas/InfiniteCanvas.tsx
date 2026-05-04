@@ -83,7 +83,7 @@ const buildViewportTransform = (nextTransform: Transform, _preferGpu: boolean = 
     return `translate(${nextTransform.x}px, ${nextTransform.y}px) scale(${nextTransform.scale})`;
 };
 
-const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ children, showGrid = true, onTransformChange, onInteractionChange, onCanvasClick, onCanvasDoubleClick, onAutoArrange, onResetView, cardPositions, onMouseDown, onMouseMove, onMouseUp, onContextMenu, onImageDrop, id }, ref) => {
+const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ children, showGrid = true, onTransformChange, onInteractionChange, onCanvasClick, onCanvasDoubleClick, onResetView, cardPositions, onMouseDown, onMouseMove, onMouseUp, onContextMenu, onImageDrop }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const gridRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null); // 🚀 [性能优化] 直接操作DOM
