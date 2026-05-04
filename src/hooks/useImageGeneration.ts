@@ -20,10 +20,9 @@ import {
   buildGenerationAttemptRequestId,
   resolveGenerationAttemptFailureState,
 } from '../services/billing/generationBillingCoordinator';
-import { saveImage, saveOriginalImage, getImage, normalizePersistableMediaSource } from '../services/storage/imageStorage';
+import { saveOriginalImage, getImage, normalizePersistableMediaSource } from '../services/storage/imageStorage';
 import { fileSystemService } from '../services/storage/fileSystemService';
 import { keyManager, getModelMetadata } from '../services/auth/keyManager';
-import { isCreditBasedModel } from '../services/model/modelPricing';
 import { 
   normalizePptSlidesForCount, 
   buildAutoPptSlides, 
@@ -55,7 +54,6 @@ import {
   SECURE_PROXY_SESSION_REAUTH_MESSAGE,
 } from '../services/model/secureModelProxy';
 
-const GENERATE_TIMEOUT_MS = 600000;
 const SYNC_BRIDGE_RECOVERY_RETRY_MS = 2500;
 const SYNC_BRIDGE_RECOVERY_MAX_AGE_MS = 15 * 60 * 1000;
 const RETRO_RECOVERABLE_SYNC_BRIDGE_ERROR_CODES = new Set(['SYNC_REQUEST_INTERRUPTED', 'SYNC_BRIDGE_TIMEOUT']);
@@ -219,10 +217,7 @@ export const useImageGeneration = (options: {
     updatePromptNode, 
     urgentUpdatePromptNode, 
     addImageNodes, 
-    bringNodesToFront,
-    deleteImageNode,
-    updateImageNode,
-    updateImageNodePosition
+    bringNodesToFront
   } = useCanvas();
   
   const { refundCreditsByTransaction, refreshBilling, applyAuthoritativeBalance } = useBilling();
@@ -841,7 +836,7 @@ export const useImageGeneration = (options: {
       const recoveredGenerationTime = resolveSyncBridgeDurationMs(bridgeResult, pendingRequest.startedAt);
       const recoveredModelId = normalizeModelId(latestNode.model);
       const recoveredModelLabel = resolveModelDisplayName(recoveredModelId, latestNode.modelLabel);
-      const { completedTasks, preparedItems } = prepareCompletedTaskResults(nodeId, uniqueRecoveredUrls.map((url, index) => ({
+      const { completedTasks, preparedItems } = prepareCompletedTaskResults(nodeId, uniqueRecoveredUrls.map((url) => ({
         requestId: pendingRequest.requestId,
         url,
         originalUrl: url,
@@ -1112,7 +1107,6 @@ export const useImageGeneration = (options: {
 
       if (result && 'status' in result && (result.status === 'success' || result.status === 'failed')) {
         const latestNode = activeCanvasRef.current?.promptNodes.find(n => n.id === node.id) || node;
-        const pendingTaskIds = getPendingTaskIds(latestNode);
         const { nextPendingTaskIds, nextJobId, nextGenerationMetadata } = resolvePendingTaskState(latestNode, targetTaskId);
         const expectedCount = getExpectedGenerationCount(latestNode);
         const currentChildIds = Array.from(new Set((latestNode.childImageIds || []).filter(Boolean)));

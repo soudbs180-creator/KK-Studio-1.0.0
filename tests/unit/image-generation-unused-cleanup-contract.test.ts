@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { test } from 'node:test';
+
+const ROOT_DIR = process.cwd();
+
+function readSource(relativePath: string): string {
+  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
+}
+
+test('useImageGeneration does not retain compiler-proven unused locals', () => {
+  const source = readSource('src/hooks/useImageGeneration.ts');
+
+  assert.match(source, /import \{ saveOriginalImage, getImage, normalizePersistableMediaSource \} from '\.\.\/services\/storage\/imageStorage';/);
+  assert.doesNotMatch(source, /\bsaveImage\b/);
+  assert.doesNotMatch(source, /\bisCreditBasedModel\b/);
+  assert.doesNotMatch(source, /\bGENERATE_TIMEOUT_MS\b/);
+  assert.doesNotMatch(source, /\bdeleteImageNode\b/);
+  assert.doesNotMatch(source, /\bupdateImageNode\b/);
+  assert.doesNotMatch(source, /\bupdateImageNodePosition\b/);
+  assert.doesNotMatch(source, /uniqueRecoveredUrls\.map\(\(url, index\)/);
+  assert.match(source, /uniqueRecoveredUrls\.map\(\(url\) => \(\{/);
+  assert.doesNotMatch(source, /const pendingTaskIds = getPendingTaskIds\(latestNode\);/);
+  assert.match(source, /const \{ nextPendingTaskIds, nextJobId, nextGenerationMetadata \} = resolvePendingTaskState\(latestNode, targetTaskId\);/);
+});
