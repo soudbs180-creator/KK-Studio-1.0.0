@@ -50,10 +50,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     onToggleGrid,
     onAutoArrange,
     showGrid = true,
-    mobilePromptOptimizationEnabled = false,
-    mobilePromptOptimizationSupported = true,
-    onToggleMobilePromptOptimization,
-    onOpenMobilePromptLibrary,
 }) => {
     const {
         state,
