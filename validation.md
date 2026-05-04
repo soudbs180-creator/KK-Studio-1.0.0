@@ -652,6 +652,7 @@ Run these before final sign-off:
 
 ```powershell
 npm.cmd run governance:check
+npm.cmd run audit:dependencies
 npm.cmd run spec:check
 npm.cmd run typecheck
 npm.cmd run test:unit
@@ -666,7 +667,7 @@ Use this gate for narrow endpoint or secret-boundary cleanup slices:
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/governance-contract.test.ts"
 npm.cmd run governance:security
-npm.cmd audit --omit=dev --audit-level=moderate
+npm.cmd run audit:dependencies
 npm.cmd run architecture:check
 npm.cmd run typecheck
 npm.cmd run test:unit
@@ -686,8 +687,7 @@ Use this after the active Stage Two slice is closed and before claiming full pro
 npm.cmd run architecture:check
 npm.cmd run spec:check
 npm.cmd run governance:security
-npm.cmd audit --audit-level=moderate
-npm.cmd audit --omit=dev --audit-level=moderate
+npm.cmd run audit:dependencies
 npm.cmd run governance:agent-docs
 npm.cmd run typecheck
 npm.cmd run test:unit

@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the current slice is `dd2295d3 refactor: extract effective provider model fallback`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the current dependency-security slice is `ff419de9 test: align final gate fixtures`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -78,7 +78,8 @@ The active execution model for this thread has resumed Stage One convergence:
 - Stage Two M53 `keyManager` global-model dead-code cleanup is completed in `74d6345a`: it removes only the duplicate `getGlobalModelList` JSDoc block and the source-proven unused local `chatModelIds` allocation, preserving model list assembly, provider state, remote fetch behavior, and runtime routing.
 - Stage Two M54 `keyManager` effective provider model helper split is completed in `dd2295d3`: it moves only official-default and documented-provider model fallback selection into `src/services/auth/keyManagerEffectiveProviderModels.ts`, preserving `keyManager.ts` compatibility exports and existing call sites.
 - Stage Two M55 `keyManager` provider limit delegator pruning is the current slice: it removes only redundant private provider limit forwarding methods and calls the already extracted `keyManagerEffectiveSlot` helpers directly.
-- The project is functionally green after the latest audit gates, but not final-complete while `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain giant-file split targets.
+- The final-gate fixture repair closed in `ff419de9`; the current dependency-security slice fixes the separate `payment-server` audit gap and adds root script coverage for both production lockfiles.
+- The project is functionally green after the latest full gate, but not final-complete while `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain giant-file split targets and the separate `payment-server` audit gap is being closed.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
@@ -115,7 +116,7 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/context/canvasPositionUpdates.ts`: 104 lines, Stage Two M16 position update helper.
 - `src/context/canvasPromptImageLinks.ts`: 62 lines, Stage Two M17 prompt-image relationship helper plus Stage Two M19 image deletion transform.
 - `src/context/canvasWorkflowUpdates.ts`: 148 lines, Stage Two M18 workflow update helper.
-- `src/services/auth/keyManager.ts`: 4338 physical lines in the active M55 provider limit delegator pruning.
+- `src/services/auth/keyManager.ts`: 4338 physical lines after completed M55 provider limit delegator pruning.
 - `src/services/auth/keyManagerApiType.ts`: 23 lines, Stage Two M48 API type detector helper boundary.
 - `src/services/auth/keyManagerChannelCapabilities.ts`: 23 lines, Stage Two M47 channel capabilities helper boundary.
 - `src/services/auth/keyManagerDefaultModels.ts`: 53 lines, Stage Two M49 default model constants helper boundary.
@@ -429,7 +430,8 @@ Scope:
 - Completed M52 slice in `f5153811`: extracted only `BLACKLIST_MODELS`, the private model-filter predicate, and `normalizeModelList` into `src/services/auth/keyManagerModelList.ts`, preserving Google migration/filtering, 12AI compatibility filtering, and `keyManager.ts` compatibility re-export.
 - Completed M53 slice in `74d6345a`: pruned only the duplicate `getGlobalModelList` JSDoc block and the unused local `chatModelIds` allocation from `src/services/auth/keyManager.ts`, with the dead-code contract preventing reintroduction.
 - Completed M54 slice in `dd2295d3`: extracted only `resolveEffectiveProviderModels` and its official-default fallback selector into `src/services/auth/keyManagerEffectiveProviderModels.ts`, preserving `keyManager.ts` compatibility re-export and all existing call sites.
-- Active M55 slice: prune only private `resolveProviderBudgetLimit` / `resolveProviderTokenLimit` delegator methods from `src/services/auth/keyManager.ts`, leaving the existing helpers in `src/services/auth/keyManagerEffectiveSlot.ts` as the single source of truth.
+- Completed M55 slice in `6902b79b`: pruned only private `resolveProviderBudgetLimit` / `resolveProviderTokenLimit` delegator methods from `src/services/auth/keyManager.ts`, leaving the existing helpers in `src/services/auth/keyManagerEffectiveSlot.ts` as the single source of truth.
+- Current security slice: patch the `payment-server` transitive Hono audit gap by overriding `@hono/node-server` and `hono` to non-vulnerable versions, then make root verification run dependency audit for both the root package and the payment sidecar.
 - Continue `src/context/CanvasContext.tsx` only for another high-confidence narrow seam; defer `migrateNodes`, IndexedDB/local-folder movement, and persistence orchestration until they can be split safely.
 - Continue `src/services/auth/keyManager.ts` after M55 only after a fresh seam map. Defer key storage, permission checks, encryption helpers, provider credential management, cloud sync, provider persistence, shared pricing cache construction, runtime routing, remote model fetch behavior, and localStorage policy until smaller seams are mapped.
 - Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.

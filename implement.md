@@ -79,7 +79,7 @@ For every milestone:
 - Use `npm.cmd` on Windows for npm scripts.
 - Documentation/rule changes require `npm.cmd run governance:agent-docs`.
 - Code changes require `npm.cmd run typecheck`.
-- Dependency security changes require `npm.cmd audit --omit=dev --audit-level=moderate` and a fresh install/lockfile consistency check.
+- Dependency security changes require `npm.cmd run audit:dependencies`, which audits both the root lockfile and `payment-server`, plus a fresh install/lockfile consistency check for any touched package.
 - Every completed milestone requires `npm.cmd run check:encoding`.
 - Code milestones also require targeted tests, `npm.cmd run test:unit`, and `npm.cmd run build` unless `validation.md` documents a known blocker.
 - Runtime slices require targeted contract tests, `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and a path-limited alternate-git `diff --check`.
@@ -90,7 +90,7 @@ For every milestone:
 - If a command fails, classify it as either historical or introduced by the current milestone. New failures must be fixed before commit.
 - For shared v1.4.2 ledger updates, `status.md` must name the active lane(s), included commit paths, excluded dirty path groups, and browser inspection status.
 - For a UI audit lane commit, `status.md` must record browser URL, theme, viewport/surface checked, `.theme-transitioning` result, SearchPalette/settings/API workbench checks, and stale chunk findings.
-- The final release gate includes `npm.cmd run governance:check`, `npm.cmd run spec:check`, `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, and `npm.cmd run check:encoding`. The former `governance:version` portable metadata mismatch was cleared by `567f85aa`; rerun the gate after any future packaging/publish metadata change.
+- The final release gate includes `npm.cmd run governance:check`, `npm.cmd run audit:dependencies`, `npm.cmd run spec:check`, `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, and `npm.cmd run check:encoding`. The former `governance:version` portable metadata mismatch was cleared by `567f85aa`; rerun the gate after any future packaging/publish metadata change.
 
 ## Context Exhaustion Protocol
 
