@@ -116,6 +116,7 @@
         "tests/unit/payment-sidecar-service.test.ts",
         "tests/unit/runtime-governance-upgrade.test.ts",
         "tests/unit/startup-error-localization.test.ts",
+        "tests/unit/storage-service-unused-cleanup-contract.test.ts",
         "tests/unit/app-unused-cleanup-contract.test.ts",
         "tests/unit/ui-unused-cleanup-contract.test.ts",
         "tests/unit/video-service-unused-cleanup-contract.test.ts",

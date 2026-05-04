@@ -13,8 +13,7 @@ import {
     getOPFSBlobUrl,
     deleteFromOPFS,
     getOPFSUsage,
-    importToOPFS,
-    compressIfNeeded
+    importToOPFS
 } from './opfsService';
 
 import { fileSystemService } from './fileSystemService';
@@ -344,7 +343,7 @@ export async function getStorageStats(): Promise<StorageStats> {
 // ============================================
 
 async function getImageDimensionsFromFile(file: File): Promise<{ width: number; height: number }> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         const url = URL.createObjectURL(file);
         const img = new Image();
 
