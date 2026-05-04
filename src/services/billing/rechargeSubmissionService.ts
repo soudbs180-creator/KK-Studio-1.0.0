@@ -374,25 +374,6 @@ function buildDefaultRechargePaymentChannelConfigs(): RechargePaymentChannelConf
   }));
 }
 
-function normalizeRechargePaymentChannelConfig(
-  value: RechargePaymentChannelConfigDto,
-): RechargePaymentChannelConfig {
-  return {
-    channel: normalizeRechargeChannel(value.channel, 'manual'),
-    label: pickFirstString(value.label) || 'Manual',
-    qrImageDataUrl: pickFirstString(value.qrImageDataUrl) ?? null,
-    qrImagePath: pickFirstString(value.qrImagePath) ?? null,
-    instructionText: pickFirstString(value.instructionText) ?? null,
-    isActive: value.isActive !== false,
-    qrDisplay: normalizeQrDisplay({
-      title: value.label,
-      helperText: value.instructionText,
-      imageUrl: value.qrImageDataUrl,
-      codeValue: value.qrImagePath,
-    }),
-  };
-}
-
 export function sanitizeTransferReferenceLast4(value: string): string {
   return String(value || '')
     .toUpperCase()

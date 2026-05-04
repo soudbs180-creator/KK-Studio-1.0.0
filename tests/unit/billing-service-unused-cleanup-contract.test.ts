@@ -25,3 +25,13 @@ test('NewApiManagementService keeps balance refresh behavior without compiler-pr
     /this\.cache\.set\('channels', \{\s*data: updatedChannels,\s*timestamp: Date\.now\(\)\s*\}\);[\s\S]*return updatedChannels;/
   );
 });
+
+test('recharge submission service does not retain unused payment-channel config normalizer', () => {
+  const serviceSource = readSource('src/services/billing/rechargeSubmissionService.ts');
+
+  assert.doesNotMatch(serviceSource, /function normalizeRechargePaymentChannelConfig\(/);
+  assert.match(serviceSource, /function buildDefaultRechargePaymentChannelConfigs\(\): RechargePaymentChannelConfig\[\]/);
+  assert.match(serviceSource, /return defaults\.map\(\(item\) => \(\{/);
+  assert.match(serviceSource, /qrDisplay: normalizeQrDisplay\(\{/);
+  assert.match(serviceSource, /items: buildDefaultRechargePaymentChannelConfigs\(\),/);
+});
