@@ -23,3 +23,15 @@ test('small LLM adapters do not retain compiler-proven unused locals', () => {
   assert.match(volcengineAdapterSource, /supports\(_modelId: string\): boolean/);
   assert.doesNotMatch(volcengineAdapterSource, /supports\(modelId: string\): boolean/);
 });
+
+test('GoogleAdapter does not retain import-only compiler-proven unused symbols', () => {
+  const googleAdapterSource = readSource('src/services/llm/GoogleAdapter.ts');
+  const llmAdapterImport = googleAdapterSource.match(/^import \{[^;]+\} from '\.\/LLMAdapter';/m)?.[0] ?? '';
+  const loggerImport = googleAdapterSource.match(/^import \{[^;]+\} from '\.\.\/system\/systemLogService';/m)?.[0] ?? '';
+
+  assert.doesNotMatch(llmAdapterImport, /\bProviderConfig\b/);
+  assert.doesNotMatch(llmAdapterImport, /\bVideoGenerationOptions\b/);
+  assert.doesNotMatch(llmAdapterImport, /\bVideoGenerationResult\b/);
+  assert.equal(loggerImport, "import { logError } from '../system/systemLogService';");
+  assert.match(googleAdapterSource, /async generateVideo\(options: import\('\.\/LLMAdapter'\)\.VideoGenerationOptions, keySlot: KeySlot\): Promise<import\('\.\/LLMAdapter'\)\.VideoGenerationResult>/);
+});

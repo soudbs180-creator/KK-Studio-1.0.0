@@ -1,8 +1,8 @@
-import { LLMAdapter, ChatOptions, ImageGenerationOptions, ImageGenerationResult, ProviderConfig, extractRefImageData, AudioGenerationOptions, AudioGenerationResult, VideoGenerationOptions, VideoGenerationResult } from './LLMAdapter';
+import { LLMAdapter, ChatOptions, ImageGenerationOptions, ImageGenerationResult, extractRefImageData, AudioGenerationOptions, AudioGenerationResult } from './LLMAdapter';
 import { GenerationMode } from '../../types';
 import { KeySlot } from '../auth/keyManager';
 import { GOOGLE_API_BASE } from '../api/apiConfig';
-import { logError, logWarning } from '../system/systemLogService';
+import { logError } from '../system/systemLogService';
 
 /**
  * Helper: Convert image data (blob URL, data URL, or base64) to base64 string
