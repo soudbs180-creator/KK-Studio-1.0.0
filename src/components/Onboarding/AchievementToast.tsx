@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Trophy, Star, X, Sparkles } from 'lucide-react';
+import { Trophy, X, Sparkles } from 'lucide-react';
 
 interface AchievementToastProps {
   achievement: string;

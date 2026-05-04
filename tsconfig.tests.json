@@ -91,6 +91,7 @@
         "tests/unit/openai-compatible-diagnostics-contract.test.ts",
         "tests/unit/openai-compatible-image-routing-errors-contract.test.ts",
         "tests/unit/openai-compatible-unused-cleanup-contract.test.ts",
+        "tests/unit/onboarding-unused-cleanup-contract.test.ts",
         "tests/unit/payment-runtime-hardening.test.ts",
         "tests/unit/payment-server-settlement-bridge.test.ts",
         "tests/unit/payment-settlement-auth.test.ts",
