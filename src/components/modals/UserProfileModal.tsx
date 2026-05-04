@@ -116,7 +116,6 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const { isTempUser, tempUserExpiry } = useAuth();
   const { accountRole, checkingAdmin } = useAdminRole();
   const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
-  const billingFeatureEnabled = KKAI_FEATURE_FLAGS.billing;
   const {
     balance,
     billingLogs,

@@ -49,7 +49,8 @@ test('local runtime UI keeps billing management surfaces behind the feature flag
     profileModalSource,
     /import \{ KKAI_FEATURE_FLAGS \} from '\.\.\/\.\.\/app\/kkaiFeatureFlags';/,
   );
-  assert.match(profileModalSource, /const billingFeatureEnabled = KKAI_FEATURE_FLAGS\.billing;/);
+  assert.match(profileModalSource, /const billingUiEnabled = KKAI_FEATURE_FLAGS\.billing;/);
+  assert.doesNotMatch(profileModalSource, /billingFeatureEnabled/);
   assert.match(
     profileModalSource,
     /const canChangePassword = Boolean\(user\?\.email\) && !isTempUser && !isShadowWechatEmail;/,
