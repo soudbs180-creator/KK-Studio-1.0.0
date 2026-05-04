@@ -27,7 +27,6 @@ import { buildPptDeckModuleState } from '../utils/pptDeckModules';
 import { normalizePptSlidesForCount } from '../utils/pptUtils';
 import { calculateImageHash } from '../utils/imageUtils';
 import { normalizePersistableMediaSource, saveOriginalImage } from '../services/storage/imageStorage';
-import { resolveModelDisplayName } from '../utils/modelDisplayName';
 import { clampGenerationDurationMs } from '../utils/timeUtils';
 
 type CreditBillingAttempt = {

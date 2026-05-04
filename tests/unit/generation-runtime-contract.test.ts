@@ -41,6 +41,17 @@ describe('generation runtime extraction contract', () => {
     assert.match(testConfigSource, /tests\/unit\/generation-runtime-contract\.test\.ts/);
   });
 
+  test('generation runtime receives model display names through deps only', () => {
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+
+    assert.doesNotMatch(
+      hookSource,
+      /import\s+\{\s*resolveModelDisplayName\s*\}\s+from ['"]\.\.\/utils\/modelDisplayName['"];/,
+    );
+    assert.match(hookSource, /resolveModelDisplayName: \(modelId: string, fallbackLabel\?: string\) => string;/);
+    assert.match(hookSource, /modelLabel: params\.resolveModelDisplayName\(/);
+  });
+
   test('cancel generation ownership lives in useGenerationRuntime', () => {
     const hookPath = path.join(ROOT_DIR, 'src/app/useGenerationRuntime.ts');
     assert.equal(existsSync(hookPath), true, 'src/app/useGenerationRuntime.ts should exist');

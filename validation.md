@@ -763,6 +763,24 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/co
 
 The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/components/common/ErrorBoundary.tsx` matches. Do not change captured-error localization, frosted error UI, reload behavior, startup error rendering, or global error handling in this cleanup slice.
 
+## Generation Runtime Import Cleanup Gate
+
+Use this gate for `src/app/useGenerationRuntime.ts` import-only cleanup:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/generation-runtime-contract.test.ts"
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/generation-billing-runtime-contract.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/app/useGenerationRuntime.ts" "tests/unit/generation-runtime-contract.test.ts" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/app/useGenerationRuntime.ts` matches. Do not change generation execution, retry billing, model-label behavior, App runtime wiring, provider routing, or UI behavior in this cleanup slice.
+
 ## App Unused Cleanup Gate
 
 Use this gate for the App compiler-source cleanup slice:
