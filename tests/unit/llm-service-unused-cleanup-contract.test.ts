@@ -42,3 +42,20 @@ test('LLMService does not retain source-proven direct-call dead code', () => {
   assert.match(source, /_mode: GenerationMode,/);
   assert.match(source, /_modelId\?: string/);
 });
+
+test('geminiService does not retain compiler-proven unused imports and helpers', () => {
+  const source = readSource('src/services/llm/geminiService.ts');
+
+  assert.match(source, /import \{ AspectRatio, ImageSize, ModelType, ReferenceImage \} from "\.\.\/\.\.\/types";/);
+  assert.doesNotMatch(source, /GenerationMode/);
+  assert.doesNotMatch(source, /from '\.\.\/auth\/keyManager'/);
+  assert.doesNotMatch(source, /from '\.\.\/api\/apiConfig'/);
+  assert.doesNotMatch(source, /ProxyModelConfig/);
+  assert.doesNotMatch(source, /__fallbackFlagCache/);
+  assert.doesNotMatch(source, /getFallbackFlag/);
+  assert.doesNotMatch(source, /const isLocalDev =/);
+  assert.doesNotMatch(source, /function calculateImageTokens/);
+  assert.match(source, /_negativePrompt: string = '',/);
+  assert.match(source, /const result = await llmService\.generateImage\(llmOptions\);/);
+  assert.match(source, /const estimate = calculateCost\(/);
+});

@@ -1,9 +1,6 @@
-import { AspectRatio, ImageSize, ModelType, ReferenceImage, GenerationMode } from "../../types";
-import { keyManager, normalizeModelId } from '../auth/keyManager';
+import { AspectRatio, ImageSize, ModelType, ReferenceImage } from "../../types";
 import { calculateCost } from '../billing/costService';
-import { AuthMethod, buildApiUrl, buildHeaders, GOOGLE_API_BASE } from '../api/apiConfig';
 import { classifyApiFailure } from '../api/errorClassification';
-import { ProxyModelConfig } from '../model/proxyModelConfig';
 import { logError } from '../system/systemLogService';
 import { getImage } from '../storage/imageStorage';
 import { llmService } from './LLMService';
@@ -16,35 +13,6 @@ import {
   SECURE_PROXY_GUEST_MODE_MESSAGE,
   SECURE_PROXY_SESSION_REAUTH_MESSAGE,
 } from '../model/secureModelProxy';
-
-
-// Fallback control: allow config/env-driven auto-backoff when quota is exhausted
-let __fallbackFlagCache: boolean | null = null;
-async function getFallbackFlag(): Promise<boolean> {
-  if (__fallbackFlagCache !== null) return __fallbackFlagCache;
-  let flag = true;
-  try {
-    const envVal = (typeof process !== 'undefined' && (process as any).env?.GEMINI_FALLBACK_ON_QUOTA) ?? undefined;
-    if (typeof envVal === 'string') flag = envVal.toLowerCase() !== 'false';
-  } catch { }
-  try {
-    const cfgUrl = '/config/model_service_config.json';
-    if (typeof fetch === 'function') {
-      const resp = await fetch(cfgUrl, { cache: 'no-store' });
-      if (resp.ok) {
-        const cfg = await resp.json();
-        const v = cfg?.transit?.fallbackOnQuota;
-        if (typeof v === 'boolean') flag = v;
-        else if (typeof v === 'string') flag = v.toLowerCase() !== 'false';
-      }
-    }
-  } catch { }
-  __fallbackFlagCache = flag;
-  return flag;
-}
-
-const isLocalDev = typeof window !== 'undefined' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
 // AbortController map to track active requests
 const abortControllers = new Map<string, AbortController>();
@@ -77,18 +45,6 @@ export const cancelGeneration = (id: string) => {
   }
   void abortSyncImageBridgeRequest(id).catch(() => undefined);
 };
-
-/**
- * Calculate estimated token usage for image generation
- */
-function calculateImageTokens(model: ModelType): number {
-  const tokenMap: Record<string, number> = {
-    // Gemini Image
-    'gemini-2.5-flash-image': 1290,
-    'gemini-3-pro-image-preview': 1120,
-  };
-  return tokenMap[model] || 0;
-}
 
 function normalizeError(error: any): Error {
   // 🚀 [日志增强] 在归一化之前记录原始错误详情
@@ -253,7 +209,7 @@ export const generateImage = async (
   imageSize: ImageSize,
   referenceImages: ReferenceImage[] = [],
   model: ModelType = 'gemini-2.5-flash-image',
-  negativePrompt: string = '',
+  _negativePrompt: string = '',
   requestId?: string,
   grounding: boolean = false,
   options?: {
