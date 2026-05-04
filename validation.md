@@ -1,6 +1,6 @@
 # KK-Studio v1.4.2 Single-Line Validation Matrix
 
-Last updated: 2026-05-04
+Last updated: 2026-05-05
 
 Use `npm.cmd` for npm scripts on Windows.
 
@@ -282,6 +282,23 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/se
 ```
 
 The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/services/billing/costService.ts` matches. Do not change pricing tables, cost calculation formulas, key-slot pricing snapshot lookup, cost recording/sync behavior, provider routing, API/settings surfaces, endpoint/auth behavior, storage persistence, release metadata, or browser-visible UI in this cleanup slice.
+
+## Secure Model Proxy Unused-Helper Cleanup Gate
+
+Use this gate for the secure model proxy unused-helper cleanup slice:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/user-route-proxy-routing.test.ts" "tests/unit/secure-model-proxy-credit-contract.test.ts" "tests/unit/secure-model-proxy-trace-contract.test.ts" "tests/unit/async-image-proxy-regression.test.ts" "tests/unit/local-model-proxy-trace-contract.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/model/secureModelProxy.ts" "tests/unit/user-route-proxy-routing.test.ts" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, require that `src/services/model/secureModelProxy.ts` has no `buildInvocationError` diagnostic and only the two source-contracted local route gate diagnostics remain. Do not change local/system proxy endpoints, route-gate helper bodies, session/auth invalidation, retry behavior, provider routing, API/settings surfaces, billing/payment behavior, keyManager secret storage, storage persistence, release metadata, or browser-visible UI in this cleanup slice.
 
 ## Stage Two CanvasContext Split Gate
 
