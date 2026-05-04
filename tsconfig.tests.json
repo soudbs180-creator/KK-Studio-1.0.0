@@ -27,6 +27,7 @@
         "tests/unit/canvas-arrange-selection-contract.test.ts",
         "tests/unit/canvas-context-state-boundary.test.ts",
         "tests/unit/canvas-context-unused-cleanup.test.ts",
+        "tests/unit/canvas-dormant-unused-cleanup-contract.test.ts",
         "tests/unit/canvas-connector-throttling-contract.test.ts",
         "tests/unit/canvas-cleanup-contract.test.ts",
         "tests/unit/canvas-groups-contract.test.ts",

@@ -762,6 +762,24 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/co
 
 The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/components/layout/ChatSidebar.tsx` matches.
 
+## Dormant Canvas Unused Cleanup Gate
+
+Use this gate for source-proven dormant canvas support cleanup slices:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/canvas-dormant-unused-cleanup-contract.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true
+if ((rg -n "PixiCanvas|preloadPixi|isPixiAvailable" src -S) -ne $null) { throw "Pixi canvas source reference remains" }
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/components/canvas/PixiCanvas.tsx" "tests/unit/canvas-dormant-unused-cleanup-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/components/canvas/PixiCanvas` matches. Browser QA may be skipped when the slice deletes only a dormant canvas module with no production imports; record the skip reason in `status.md`.
+
 ## PromptNode Unused Cleanup Gate
 
 Use this gate for the PromptNode compiler-source cleanup slice:
