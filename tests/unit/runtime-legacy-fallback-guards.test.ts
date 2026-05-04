@@ -23,6 +23,7 @@ test('runtime-sensitive services keep legacy fallback guarded while routing gues
   assert.match(userApiProfileSource, /if \(canUseLegacyWebApi\) \{\s*try \{\s*localEntries = await loadLocalUserApiEntriesViaApi\(\);/);
   assert.match(userApiProfileSource, /mergeUserApiEntrySets\(localEntries, cloudEntries, 'local'\)/);
   assert.match(userApiProfileSource, /entries: mergedEntries,/);
+  assert.doesNotMatch(userApiProfileSource, /loadUserApisPayloadFromCloudRecord/);
   assert.match(keyManagerSource, /const canUseLegacyApi = shouldUseLegacyWebApiFallback\(\) \|\| this\.authIsTempUser;/);
   assert.match(keyManagerSource, /const response = await legacyWebApiClient\.getKeyManagerCloudState\(\{ accessToken \}\);/);
   assert.match(keyManagerSource, /legacyWebApiClient\.replaceKeyManagerCloudState\(\{/);
