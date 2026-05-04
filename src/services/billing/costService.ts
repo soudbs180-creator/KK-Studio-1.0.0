@@ -4,8 +4,8 @@
  * Includes 30-day history and recent 50 detailed entries.
  */
 
-import { ModelType, ImageSize } from '../../types';
-import { getModelPricing, getRefImageTokenEstimate, getImageTokenEstimate } from '../model/modelPricing';
+import { ImageSize } from '../../types';
+import { getModelPricing, getImageTokenEstimate } from '../model/modelPricing';
 import { determineKeyType, keyManager, type KeySlot } from '../auth/keyManager';
 import { tempUserService } from '../auth/tempUserService';
 import { registerCostSyncHandler } from './costSyncBridge';

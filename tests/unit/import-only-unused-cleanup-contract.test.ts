@@ -13,6 +13,7 @@ test('import-only unused cleanup stays limited to type/import lists', () => {
   const lightboxSource = readSource('src/components/image/GlobalLightbox.tsx');
   const imageQualityHookSource = readSource('src/hooks/useImageQuality.ts');
   const modelRegistrySource = readSource('src/services/model/modelRegistry.ts');
+  const costServiceSource = readSource('src/services/billing/costService.ts');
 
   assert.match(lightboxSource, /type PartialRedrawRequest/);
   assert.doesNotMatch(lightboxSource, /type NormalizedRect/);
@@ -27,4 +28,12 @@ test('import-only unused cleanup stays limited to type/import lists', () => {
   assert.doesNotMatch(modelRegistrySource, /\bImageSize\b/);
   assert.match(modelRegistrySource, /export const MODEL_REGISTRY/);
   assert.match(modelRegistrySource, /export interface ActiveModel/);
+
+  assert.match(costServiceSource, /import \{ ImageSize \} from '\.\.\/\.\.\/types';/);
+  assert.doesNotMatch(costServiceSource, /\bModelType\b/);
+  assert.doesNotMatch(costServiceSource, /\bgetRefImageTokenEstimate\b/);
+  assert.match(costServiceSource, /getModelPricing\(normalizedId\)/);
+  assert.match(costServiceSource, /getImageTokenEstimate\(normalizedId, size\)/);
+  assert.match(costServiceSource, /export const calculateCost = \(/);
+  assert.match(costServiceSource, /export function resolveImageCost/);
 });
