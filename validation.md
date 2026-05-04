@@ -693,6 +693,23 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/Ap
 
 The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/App.tsx` matches.
 
+## OpenAI-Compatible Unused Cleanup Gate
+
+Use this gate for the OpenAI-compatible compiler-source cleanup slice:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/openai-compatible-unused-cleanup-contract.test.ts" "tests/unit/openai-compatible-image-routing-errors-contract.test.ts" "tests/unit/openai-compatible-diagnostics-contract.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/llm/OpenAICompatibleAdapter.ts" "tests/unit/openai-compatible-unused-cleanup-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/services/llm/OpenAICompatibleAdapter.ts` matches.
+
 ## Stage One Backfill Prompt Group Gate
 
 Use this gate for the active `usePromptGroupLayout` boundary-hardening slice:

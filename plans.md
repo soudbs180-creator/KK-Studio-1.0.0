@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline before selecting the next slice is `96b94e5e refactor: prune openai unreachable image fallbacks`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline before selecting the current OpenAI-compatible unused cleanup slice is `b6767e85 refactor: prune source-proven app unused code`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -138,7 +138,7 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/services/auth/keyManagerPricingUrl.ts`: 12 lines, Stage Two M43 silent pricing URL helper boundary.
 - `src/utils/modelIdNormalization.ts`: 6 lines after M30 compatibility-facade consolidation, down from 84 duplicated helper lines.
 - `src/components/layout/PromptBar.tsx`: 4466 physical lines.
-- `src/services/llm/OpenAICompatibleAdapter.ts`: 4405 physical lines after the completed unreachable image fallback cleanup.
+- `src/services/llm/OpenAICompatibleAdapter.ts`: 4337 physical lines after the current unused cleanup working tree.
 - `src/services/llm/openAICompatibleDiagnostics.ts`: 86 physical lines in the diagnostics preview helper boundary.
 - `src/services/llm/openAICompatibleImageRoutingErrors.ts`: 49 physical lines in the completed M57 image-routing error classifier boundary.
 - `apps/web/`: migration target, not the first edit location.
@@ -441,8 +441,9 @@ Scope:
 - Completed M57 slice in `8f878b3a`: extracted OpenAI-compatible image-routing error classifiers into `src/services/llm/openAICompatibleImageRoutingErrors.ts`, preserving quota fail-closed behavior, chat/image compatibility signals, provider routing, request execution, auth, UI, and release metadata while adding direct coverage for extracted substring parity and historical message-only inputs.
 - Completed M58 slice in `96b94e5e`: removed source-proven unreachable image fallback code after `buildImageCompatibilityModeError` throws in `OpenAICompatibleAdapter.ts`, preserving the billing-safe fail-closed policy and adding source-contract coverage to prevent the old automatic fallback snippets from returning.
 - Completed M59 working-tree slice: removed compiler/source-proven unused imports, dead local helpers, unreachable JSX/state islands, stale lightbox remnants, and unused destructured parameters from `src/components/layout/PromptBar.tsx` and `src/components/image/ImageCard2.tsx`; added `tests/unit/ui-unused-cleanup-contract.test.ts` so the removed stale UI code does not return; kept `src/App.tsx` out of this slice despite fresh App TS6133 diagnostics.
-- Completed M60 working-tree slice: removed compiler-proven unused `src/App.tsx` imports, hook/context destructures, the stale pending prompt state tuple, unused connector/workflow/prompt-group resolver outputs, dormant cut-connection/image-pin callbacks, and unused callback parameters; added `tests/unit/app-unused-cleanup-contract.test.ts` so the App stale symbols do not return. The full noUnused probe now has zero `src/App.tsx` matches; remaining debt starts with `OpenAICompatibleAdapter.ts`, `LLMService.ts`, `ChatSidebar.tsx`, and `PromptNodeComponent.tsx`.
-- Next slice after M60 should be a separate proof for one remaining noUnused hotspot or a mapped Stage Two seam; do not mix App cleanup with OpenAI/keyManager/PromptBar architecture work.
+- Completed M60 slice in `b6767e85`: removed compiler-proven unused `src/App.tsx` imports, hook/context destructures, the stale pending prompt state tuple, unused connector/workflow/prompt-group resolver outputs, dormant cut-connection/image-pin callbacks, and unused callback parameters; added `tests/unit/app-unused-cleanup-contract.test.ts` so the App stale symbols do not return.
+- Completed M61 working-tree slice: removed compiler/source-proven unused `OpenAICompatibleAdapter.ts` imports, an unused private 12AI gateway helper, an unused static URL normalizer, and unread chat-image locals; added `tests/unit/openai-compatible-unused-cleanup-contract.test.ts` so those stale symbols do not return. The full noUnused probe now has zero `OpenAICompatibleAdapter.ts` matches and 154 remaining diagnostics overall.
+- Next slice after M61 should be a separate proof for `LLMService.ts`, `ChatSidebar.tsx`, `PromptNodeComponent.tsx`, or another remaining noUnused hotspot; do not mix OpenAI unused cleanup with provider routing extraction, keyManager work, or UI behavior changes.
 - Continue `src/context/CanvasContext.tsx` only for another high-confidence narrow seam; defer `migrateNodes`, IndexedDB/local-folder movement, and persistence orchestration until they can be split safely.
 - Continue `src/services/auth/keyManager.ts` after M55 only after a fresh seam map. Defer key storage, permission checks, encryption helpers, provider credential management, cloud sync, provider persistence, shared pricing cache construction, runtime routing, remote model fetch behavior, and localStorage policy until smaller seams are mapped.
 - Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.

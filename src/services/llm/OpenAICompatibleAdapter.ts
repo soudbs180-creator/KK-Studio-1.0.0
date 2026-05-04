@@ -1,4 +1,4 @@
-﻿import { LLMAdapter, ChatOptions, ImageGenerationOptions, ImageGenerationResult, AudioGenerationOptions, AudioGenerationResult, extractRefImageData } from './LLMAdapter';
+﻿import { LLMAdapter, ChatOptions, ImageGenerationOptions, ImageGenerationResult, extractRefImageData } from './LLMAdapter';
 import { KeySlot, getModelMetadata, keyManager } from '../auth/keyManager';
 import {
     type AuthMethod,
@@ -8,7 +8,6 @@ import {
     buildGeminiHeaders,
     buildProxyHeaders,
     formatAuthorizationHeaderValue,
-    normalizeApiProtocolFormat,
     normalizeGeminiBaseUrl,
     normalizeGeminiModelId,
 } from '../api/apiConfig';
@@ -24,9 +23,9 @@ import {
     resolveProviderRuntime,
     shouldBypassChatCompatibilityForImages,
 } from '../api/providerStrategy';
-import { ImageSize, AspectRatio, GenerationMode } from '../../types';
-import { logError, logWarning, addLog, LogLevel } from '../system/systemLogService';
-import { GoogleAdapter, convertImageToBase64, buildInlineImagePart, buildGeminiNativeGroundingTools } from './GoogleAdapter';
+import { AspectRatio, GenerationMode } from '../../types';
+import { logError } from '../system/systemLogService';
+import { buildInlineImagePart, buildGeminiNativeGroundingTools } from './GoogleAdapter';
 import { RegionService } from '../system/RegionService';
 import {
     SyncImageBridgeParserType,
@@ -159,7 +158,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
     id = 'openai-compatible-adapter';
     provider = 'OpenAI'; // Can be overridden or used for generic
 
-    supports(modelId: string): boolean {
+    supports(_modelId: string): boolean {
         // Supports basically everything that isn't strictly Google-only
         return true;
     }
@@ -543,28 +542,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         return Array.from(new Set(urls));
-    }
-
-    private is12AIGateway(baseUrl: string, keySlot?: KeySlot, modelId?: string): boolean {
-        // 1. Check KeySlot explicit metadata
-        if (keySlot) {
-            const provider = (keySlot.provider || '').toUpperCase();
-            const slotName = (keySlot.name || '').toLowerCase();
-            if (provider === '12AI' || provider === 'SYSTEMPROXY' || slotName.includes('12ai')) return true;
-        }
-
-        // 2. 🚀 [Critical Fix] 移除了仅根据模型名称的启发式判断
-        // 之前的逻辑：如果模型包含 'gemini-3.1-flash-image' 且 provider 是 Custom/OpenAI，就认为是 12AI
-        // 这是错误的！因为 suxi、newapi 等第三方供应商也可能提供同名模型，但它们使用 OpenAI 格式 Bearer 认证
-        // 只有 baseUrl 包含 12ai 域名或 keySlot 明确标记为 12AI 时才走 Gemini Native
-
-        // 3. Check Hostname — 这是唯一可靠的方式
-        try {
-            const host = new URL(baseUrl).hostname;
-            return /(^|\.)12ai\.org$/i.test(host) || /(^|\.)12ai\.(xyz|io|net)$/i.test(host);
-        } catch {
-            return false;
-        }
     }
 
     private normalizeGeminiImageSize(raw: string | undefined): '512px' | '1K' | '2K' | '4K' {
@@ -2236,41 +2213,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         return this.applyCustomHeaders(headers, keySlot);
     }
 
-    /**
-     * 🚀 [防错增强] 确保返回的是带协议头的完整基础 URL
-     * 注意：对于后端转发，应返回基础域名，由 Adapter 拼接具体路径
-     */
-    private static normalizeUrl(url: string | undefined | null): string {
-        const CN_GATEWAY = 'https://cdn.12ai.org';
-        const GLOBAL_GATEWAY = 'https://new.12ai.org';
-
-        if (!url || typeof url !== 'string') {
-            // RegionService.isChina() is not available here, so we'll use a default or assume global
-            // For a static method, it's better to avoid instance-specific logic like RegionService.isChina()
-            // unless it's passed as an argument or accessed via a static property.
-            // For now, let's default to GLOBAL_GATEWAY if RegionService isn't directly accessible here.
-            return GLOBAL_GATEWAY; // Or CN_GATEWAY if this context is known to be in China
-        }
-
-        let clean = url.trim().replace(/\/+$/, '');
-
-        // 如果没有协议头，强制加上 https
-        if (!clean.startsWith('http')) {
-            clean = 'https://' + clean;
-        }
-
-        // 🚀 [Critical Fix] 移除所有硬编码的路径后缀，只保留基础 Base URL
-        // 具体的 /api/v1/generate 或 /v1beta 等由具体的 Adapter 决定
-        const noisySuffixes = ['/api/pay', '/api/v1/generate', '/v1', '/v1beta'];
-        noisySuffixes.forEach(suffix => {
-            if (clean.toLowerCase().endsWith(suffix)) {
-                clean = clean.substring(0, clean.length - suffix.length).replace(/\/+$/, '');
-            }
-        });
-
-        return clean;
-    }
-
     private applyCustomFormData(formData: FormData, keySlot: KeySlot): FormData {
         const custom = keySlot.customBody;
         if (!custom || typeof custom !== 'object' || Array.isArray(custom)) {
@@ -2993,7 +2935,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const is12AI = channelRuntime.strategyId === '12ai' && channelRuntime.geminiNative;
         const isComfly = channelRuntime.strategyId === 'newapi';
         const isSuxiGateway = channelRuntime.strategyId === 'suxi';
-        const configuredFormat = normalizeApiProtocolFormat(keySlot.format, 'auto');
 
         if (imageSurface === 'gemini-native-image') {
             console.log(`[OpenAICompatibleAdapter] 使用原生 Gemini 图片协议 -> ${keySlot.name}`);
@@ -3081,14 +3022,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
         const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
         const url = `${cleanBase}/chat/completions`;
-        const isLegacyGateway = this.isLegacyGeminiChatGateway(baseUrl);
-        const requestedImageSize = this.normalizeGeminiImageSize(
-            options.providerConfig?.google?.imageConfig?.imageSize || options.imageSize
-        );
-        const aspectRatio = this.normalizeRequestedAspectRatio(
-            options.providerConfig?.google?.imageConfig?.aspectRatio || options.aspectRatio
-        );
-        const reportedImageSize = options.imageSize || requestedImageSize;
         const is4K = options.imageSize?.toUpperCase().includes('4K');
         const is2K = options.imageSize?.toUpperCase().includes('2K');
         const is05K = options.imageSize?.includes('0.5K') || options.imageSize?.includes('512');
@@ -3106,9 +3039,8 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         else if (ratio < 1) sizeString = `${Math.round(dim * ratio)}x${dim}`;
 
         let nativeQuality = 'standard';
-        let nativeImageSizeStr = '1024x1024';
-        if (is4K) { nativeQuality = 'hd'; nativeImageSizeStr = '3840x2160'; }
-        else if (is2K) { nativeQuality = 'medium'; nativeImageSizeStr = '2560x1440'; }
+        if (is4K) nativeQuality = 'hd';
+        else if (is2K) nativeQuality = 'medium';
 
         // 🚀 [Critical Fix] Multimodal Reference Image Support
         // Convert reference images to OpenAI Vision format
