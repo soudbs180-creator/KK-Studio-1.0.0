@@ -111,7 +111,8 @@
         "tests/unit/runtime-governance-upgrade.test.ts",
         "tests/unit/app-unused-cleanup-contract.test.ts",
         "tests/unit/ui-unused-cleanup-contract.test.ts",
-        "tests/unit/workspace-layout-contract.test.ts"
+        "tests/unit/workspace-layout-contract.test.ts",
+        "tests/unit/workflow-actions-unused-cleanup-contract.test.ts"
     ],
     "exclude": [
         "dist",

@@ -6,7 +6,6 @@ import { getViewportPreferredPosition } from '../utils/canvasUtils';
 import { getViewportOffsets } from '../utils/canvasCenter';
 import { normalizePptSlidesForCount } from '../utils/pptUtils';
 import {
-  WORKFLOW_TEMPLATES,
   type WorkflowTemplateId,
   createAgentWorkflowNode,
   createPreviewWorkflowNode,
