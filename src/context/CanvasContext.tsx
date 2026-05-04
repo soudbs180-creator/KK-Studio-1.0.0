@@ -37,9 +37,7 @@ import {
     createCanvasWorkflow,
     generateId,
     type ArrangeMode,
-    type CanvasContextType,
     type CanvasState,
-    type SubCardLayout,
 } from './canvasContextState';
 import { syncCanvasCompatibility } from './canvasCompatibility';
 import { resolvePromptChildImageIds } from './canvasPromptChildImages';

@@ -15,6 +15,15 @@ test('CanvasContext does not retain proven unused imports or local layout writes
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/canvas-context-unused-cleanup\.test\.ts/);
+  assert.match(contextSource, /export type \{ ArrangeMode, CanvasContextType, CanvasState, SubCardLayout \} from '\.\/canvasContextState';/);
+  assert.doesNotMatch(
+    contextSource,
+    /import\s+\{[\s\S]*\btype CanvasContextType\b[\s\S]*\}\s+from '\.\/canvasContextState';/,
+  );
+  assert.doesNotMatch(
+    contextSource,
+    /import\s+\{[\s\S]*\btype SubCardLayout\b[\s\S]*\}\s+from '\.\/canvasContextState';/,
+  );
   assert.doesNotMatch(contextSource, /\bgetAllImages\b/);
   assert.doesNotMatch(contextSource, /\bgetImagesPage\b/);
   assert.doesNotMatch(contextSource, /\bgetCachedStrippedCanvases\b/);
