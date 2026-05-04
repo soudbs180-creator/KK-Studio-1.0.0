@@ -30,7 +30,7 @@ test('ecommerce framework types and runtime helpers are wired as first-class sur
 
   assert.match(appSource, /handleGenerateEcommerceFramework/);
   assert.match(appSource, /pumpEcommerceFrameworkQueue/);
-  assert.match(appSource, /migrateLegacyEcommerceFrameworkCanvas/);
+  assert.doesNotMatch(appSource, /migrateLegacyEcommerceFrameworkCanvas/);
   assert.doesNotMatch(
     appSource,
     /await Promise\.allSettled\(targetModules\.map\(\(item\) => \(\s*phase === 'desktop' \? handleGenerateEcommerceNode\(item\) : handleRetryEcommerceModule\(item\)\s*\)\)\);/,

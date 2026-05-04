@@ -2,16 +2,11 @@
 import InfiniteCanvas, { InfiniteCanvasHandle } from './components/canvas/InfiniteCanvas';
 import ImageNode from './components/image/ImageCard';
 import PromptNodeComponent from './components/canvas/PromptNodeComponent';
-import PendingNode from './components/canvas/PendingNode';
 // KeyManagerModal removed - integrated into UserProfileModal
-import ChatSidebar from './components/layout/ChatSidebar';
-import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, type PartialRedrawRequest, type AgentWorkflowNode, type PreviewWorkflowNode, type SaveWorkflowNode, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceFrameworkRuntimeState } from './types';
-import { Image as ImageIcon, MessageSquare, Plus, Trash2, Shield, FileText, CheckCircle2, History, CreditCard, ChevronDown, Wand2, RefreshCw, Star, Coins, Settings } from 'lucide-react';
-import { SelectionMenu } from './components/canvas/SelectionMenu';
+import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, type PartialRedrawRequest, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceFrameworkRuntimeState } from './types';
 import { CanvasGroupComponent } from './components/canvas/CanvasGroupComponent';
 import { generateImage, cancelGeneration } from './services/llm/geminiService';
-import { modelCaller } from './services/model/modelCaller';
-import { getModelPricing, getModelCredits } from './services/model/modelPricing';
+import { getModelCredits } from './services/model/modelPricing';
 import { keyManager, getModelMetadata, normalizeModelId } from './services/auth/keyManager';
 import { adminModelService } from './services/model/adminModelService';
 import { unifiedModelService } from './services/model/unifiedModelService';
@@ -19,16 +14,11 @@ import { buildPartialRedrawReferenceImage } from './services/image/partialRedraw
 import { analyzeEcommerceRequirementFile } from './services/ecommerce/ecommerceAnalysisClient.ts';
 import type { EcommerceAnalysisResult } from './services/ecommerce/types.ts';
 import type { EcommerceGroupSlotState } from './services/ecommerce/groupSlotState.ts';
-import {
-  migrateLegacyEcommerceFrameworkCanvas,
-} from './services/ecommerce/frameworkRuntime.ts';
 import { llmService } from './services/llm/LLMService';
 import { cancelSecureSystemProxyTask } from './services/model/secureModelProxy';
 import { getCardDimensions } from './utils/styleUtils';
 import { buildGeneratedImageBatchPositions } from './utils/generatedImageLayout';
 import { getViewportPreferredPosition } from './utils/canvasUtils';
-import { getViewportOffsets } from './utils/canvasCenter';
-import { clampGenerationDurationMs } from './utils/timeUtils';
 import { resolveModelDisplayName } from './utils/modelDisplayName';
 import { resolveProviderIdentity } from './utils/providerDisplay';
 import { pickByDocumentLanguage } from './utils/localeText';
@@ -36,12 +26,8 @@ import { generateDownloadFilename, triggerDownload } from './utils/downloadUtils
 import {
   getReferenceImageLookupIds,
   normalizeReferenceImagesStorage,
-  toReferenceImageDataUrl,
 } from './utils/referenceImageStorage';
-import {
-  resolveLiveSceneNodePosition,
-  type CanvasInteractionPhase,
-} from './canvas/liveScene';
+import type { CanvasInteractionPhase } from './canvas/liveScene';
 import AppPromptComposer from './app/AppPromptComposer';
 import AppGlobalModals, { type AppGlobalModalsProps } from './app/AppGlobalModals';
 import {
@@ -59,7 +45,6 @@ import { buildSoftConnectorPath, getSoftConnectorPointAt } from './canvas/connec
 import AppDesktopChrome from './app/AppDesktopChrome';
 import AppCanvasOverlays from './app/AppCanvasOverlays';
 import AppMobileWorkspace from './app/AppMobileWorkspace';
-import { buildCompletedPromptNodePatch } from './app/buildCompletedPromptNodePatch';
 import { resolveFollowUpDraftPosition } from './app/followUpDraftPosition';
 import { buildPromptGroupRenderLayout } from './app/promptGroupRenderLayout';
 import { useAppPromptBarProps } from './app/useAppPromptBarProps';
@@ -243,7 +228,6 @@ import { AppStartupProvider, useAppStartup } from './context/AppStartupContext';
 import { AuthenticatedAppShell } from './app/AuthenticatedAppShell';
 import { KKAI_FEATURE_FLAGS } from './app/kkaiFeatureFlags';
 import { createAppRootMode } from './context/kkaiRuntimeContext';
-import ConnectionDot from './components/canvas/ConnectionDot';
 import type { UserProfileView } from './components/modals/UserProfileModal';
 import { useAuth } from './context/AuthContext';
 import { Loader2 } from 'lucide-react';
@@ -256,7 +240,7 @@ import {
 
 
 // import { syncService } from './services/system/syncService'; // [FIX] Dynamic Import
-import { saveImage, saveOriginalImage, normalizePersistableMediaSource } from './services/storage/imageStorage';
+import { saveOriginalImage, normalizePersistableMediaSource } from './services/storage/imageStorage';
 import { cancelImageLoad, loadImage } from './services/image/imageLoader';
 import { ImageQuality } from './services/image/imageQuality';
 import { calculateImageHash } from './utils/imageUtils';
@@ -267,7 +251,6 @@ import { WorkspaceSurfacePanels } from './components/workspace/WorkspaceSurfaceP
 
 // ProjectManager imported from components
 import ProjectManager from './components/settings/ProjectManager';
-import { Search } from 'lucide-react'; // Import Search icon
 import GpuBackground from './components/layout/GpuBackground';
 import type { Supplier } from './services/billing/supplierService';
 import { resolveAvatarUrl } from './utils/presetAvatars';
@@ -291,7 +274,6 @@ import {
 import { isWorkflowUtilityNodeKind } from './workflow/schema';
 import {
   getCanvasPerformanceProfile,
-  type CanvasCardDetailLevel,
 } from './canvas/performanceProfile';
 
 interface AppContentProps {
@@ -305,7 +287,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     isTempUser,
     signOut
   } = useAuth();
-  const { advanceTo, stage } = useAppStartup();
+  const { advanceTo } = useAppStartup();
   const [showTutorial, setShowTutorial] = useState(false);
   // [Draft Feature] Persistent Input Card State (Moved to top to avoid ReferenceError)
   const [draftNodeId, setDraftNodeId] = useState<string | null>(null);
@@ -330,9 +312,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     updatePromptNodePosition, updateImageNodePosition, updateImageNodeDimensions, updateImageNode, // canvas mutation helpers
     deletePromptNode,
     deleteImageNode,
-    urgentUpdatePromptNode, // hot-path prompt updates for transient generation state
     linkNodes,
-    unlinkNodes,
     undo,
     redo,
     canUndo,
@@ -348,10 +328,8 @@ const AppContent: React.FC<AppContentProps> = () => {
     updateGroup,
     setNodeTags,
     arrangeAllNodes,
-    moveSelectedNodes,
     moveSelectedNodesImmediate,
     addWorkflowNode,
-    updateWorkflowNode,
     updateWorkflowNodePosition,
     deleteWorkflowNode,
     isReady,
@@ -1436,7 +1414,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   // Pending generation state
   // Active source image for continuing conversation
   const [activeSourceImage, setActiveSourceImage] = useState<string | null>(null);
-  const [pendingPrompt, setPendingPrompt] = useState<string>('');
 
   // Persist Active Source Image
   useEffect(() => {
@@ -1682,8 +1659,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   const {
     isGenerating,
     executeGeneration,
-    pollTaskStatus,
-    cancelGeneration: cancelGen,
     recoverFailedSyncBridgeGeneration
   } = useImageGeneration({
     isMobile,
@@ -2327,10 +2302,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   }, [arrangeAllNodes]);
 
   // --- 连接管理 ---
-  const handleCutConnection = useCallback((promptId: string, imageId: string) => {
-    unlinkNodes(promptId, imageId);
-  }, [unlinkNodes]);
-
   // 🎯 [Strict Logic] Disconnect Parent -> Child Group becomes Normal Group
   const handleDisconnectPrompt = useCallback((id: string) => {
     const node = activeCanvas?.promptNodes.find(n => n.id === id);
@@ -2349,7 +2320,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   }, [activeCanvas, updatePromptNode, draftNodeId, setActiveSourceImage]);
 
   // 🎯 [Strict Logic] Pin Draft -> Create Lonely Main Card
-  const handlePinDraft = useCallback((id: string, mode: 'button' | 'drag') => {
+  const handlePinDraft = useCallback((id: string, _mode: 'button' | 'drag') => {
     const node = activeCanvas?.promptNodes.find(n => n.id === id);
     if (!node) return;
 
@@ -2373,47 +2344,6 @@ const AppContent: React.FC<AppContentProps> = () => {
       notify.success('已固定', '草稿已转换为独立卡片');
     });
   }, [activeCanvas, updatePromptNode, setDraftNodeId, setConfig]);
-
-  // 🎯 [New Feature] Pin Image -> Convert to Lonely Main Card (Idea Freeze)
-  const handlePinImage = useCallback(async (imageId: string) => {
-    const imageNode = activeCanvas?.imageNodes.find(n => n.id === imageId);
-    if (!imageNode) return;
-
-    // 1. Create New Prompt Node based on Image
-    const newPromptId = Date.now().toString();
-    const newPromptNode: PromptNode = {
-      id: newPromptId,
-      prompt: imageNode.prompt || '',
-      position: imageNode.position, // Take image's place
-      width: undefined as number | undefined, // Default width
-      height: undefined as number | undefined,
-      isDraft: false, // Lonely Main Card (Permanent)
-      model: imageNode.model,
-      imageSize: imageNode.imageSize || ImageSize.SIZE_1K,
-      aspectRatio: imageNode.aspectRatio,
-      childImageIds: [], // Initialize empty array for new prompt node
-      // 🎯 Use the image itself as a reference to preserve the "Idea"
-      referenceImages: [{
-        id: `ref-${newPromptId}`,
-        storageId: imageNode.storageId || imageNode.id,
-        url: imageNode.url, // Thumbnail
-        data: imageNode.url, // Base64/Blob
-        mimeType: imageNode.mimeType || 'image/png'
-      }],
-      timestamp: Date.now()
-    };
-
-    // 2. Add New Prompt Node
-    addPromptNode(newPromptNode);
-
-    // 3. Delete Original Image Node (Transformation complete)
-    deleteImageNode(imageId);
-
-    import('./services/system/notificationService').then(({ notify }) => {
-      notify.success('想法已定格', '图片已转换为独立主卡');
-    });
-
-  }, [activeCanvas, addPromptNode, deleteImageNode]);
 
   // Retry Logic (In-Place Regeneration)
   const handleRetryNode = useCallback(async (node: PromptNode) => {
@@ -3295,7 +3225,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     handlePromptGroupNodeHeightChange,
     handlePromptGroupTagRemove,
     beginPromptGroupRegroup,
-    settlePromptGroupRegroup,
     clearPromptGroupRegroup,
   } = usePromptGroupLayout({
     activeCanvas,
@@ -3332,15 +3261,8 @@ const AppContent: React.FC<AppContentProps> = () => {
     workflowUtilityNodesById,
   });
 
-  const visibleWorkflowUtilityNodesById = React.useMemo(
-    () => new Map(visibleWorkflowUtilityNodes.map((node) => [node.id, node])),
-    [visibleWorkflowUtilityNodes]
-  );
-
   const {
-    connectorRenderSnapshot,
     connectorRenderPromptNodes,
-    connectorRenderVisibleImageNodes,
     connectorRenderWorkflowUtilityNodesById,
     resolveLivePromptPosition,
     resolveLiveImagePosition,
@@ -3501,8 +3423,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   ]);
 
   const {
-    getSelectionScreenCenter,
-    selectNodeFromCurrentEvent,
     handleCanvasNodeSelect,
   } = useCanvasNodeSelection({
     activeCanvas,
@@ -3548,7 +3468,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   }, [handleSelectionMouseUp, handleDragConnectionMouseUp]);
 
   const {
-    getPromptChildrenForWorkflow,
     resolveWorkflowSourceIdsFromSelection,
     resolveCanvasNodePosition,
     resolvePrimaryWorkflowSourcePrompt,
@@ -3565,10 +3484,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   });
 
   const {
-    notifyWorkflowCard,
-    getWorkflowInsertPosition,
-    exportWorkflowImagesAsZip,
-    createTemplatePromptNode,
     handleWorkflowPreviewAction,
     handleWorkflowSaveAction,
     handleWorkflowAgentAction,
@@ -4022,7 +3937,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         stackZIndexOverride={canvasGroupStackZIndexById.get(group.id)}
         highlighted={highlightedId === group.id}
         onUngroup={removeGroup}
-        onDragStart={(id, event) => {
+        onDragStart={(_id, event) => {
           const nodeIds = group.nodeIds;
           const isMultiSelect = event.shiftKey || event.ctrlKey || event.metaKey;
           const alreadySelected = selectedNodeIds || [];
