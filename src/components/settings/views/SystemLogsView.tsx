@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, Download, Pause, Play, ScrollText, ShieldAlert, Trash2 } from 'lucide-react';
+import { Download, Pause, Play, ScrollText, ShieldAlert, Trash2 } from 'lucide-react';
 import {
   clearLogs,
   getTodayLogs,
@@ -157,17 +157,6 @@ export const SystemLogsView: React.FC = () => {
       .slice()
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [levelFilter, logs, sourceFilter]);
-
-  const importantLogs = useMemo(
-    () =>
-      logs.filter(
-        (item) =>
-          item.level === LogLevel.WARNING ||
-          item.level === LogLevel.ERROR ||
-          item.level === LogLevel.CRITICAL
-      ),
-    [logs]
-  );
 
   const errorLogs = useMemo(
     () => logs.filter((item) => item.level === LogLevel.ERROR || item.level === LogLevel.CRITICAL),

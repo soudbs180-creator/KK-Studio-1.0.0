@@ -778,6 +778,23 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/co
 
 The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/components/canvas/PromptNodeComponent.tsx` matches. Because this is a visible component file, record browser smoke evidence after build even when the source cleanup is intended to be visual-no-op.
 
+## SystemLogs Unused Cleanup Gate
+
+Use this gate for the SystemLogs compiler-source cleanup slice:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/system-logs-unused-cleanup-contract.test.ts" "tests/unit/settings-workbench-ui-refit.test.ts" "tests/unit/settings-canonical-entry-regression.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/components/settings/views/SystemLogsView.tsx" "src/components/settings/views/SystemLogsView.localized.tsx" "tests/unit/system-logs-unused-cleanup-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is still expected to fail while broader TS6133/TS619x debt remains outside this slice; for this gate, filter the output and require zero `src/components/settings/views/SystemLogsView` matches. Because this touches visible settings views, record browser smoke evidence after build even when the cleanup is intended to be visual-no-op.
+
 ## Stage One Backfill Prompt Group Gate
 
 Use this gate for the active `usePromptGroupLayout` boundary-hardening slice:

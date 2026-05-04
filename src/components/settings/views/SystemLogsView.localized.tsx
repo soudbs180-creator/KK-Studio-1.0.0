@@ -163,17 +163,6 @@ export const SystemLogsView: React.FC = () => {
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [levelFilter, logs, sourceFilter]);
 
-  const importantLogs = useMemo(
-    () =>
-      logs.filter(
-        (item) =>
-          item.level === LogLevel.WARNING ||
-          item.level === LogLevel.ERROR ||
-          item.level === LogLevel.CRITICAL
-      ),
-    [logs]
-  );
-
   const errorLogs = useMemo(
     () => logs.filter((item) => item.level === LogLevel.ERROR || item.level === LogLevel.CRITICAL),
     [logs]
