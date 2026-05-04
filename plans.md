@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the current dependency-security slice is `ff419de9 test: align final gate fixtures`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the current OpenAI-compatible diagnostics slice is `58be183d fix: audit payment sidecar dependencies`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -77,9 +77,10 @@ The active execution model for this thread has resumed Stage One convergence:
 - Stage Two M52 `keyManager` model-list normalization helper split is completed in `f5153811`: it moves only `BLACKLIST_MODELS`, the private model-filter predicate, and `normalizeModelList` into `src/services/auth/keyManagerModelList.ts`, preserving `keyManager.ts` compatibility exports and existing call sites.
 - Stage Two M53 `keyManager` global-model dead-code cleanup is completed in `74d6345a`: it removes only the duplicate `getGlobalModelList` JSDoc block and the source-proven unused local `chatModelIds` allocation, preserving model list assembly, provider state, remote fetch behavior, and runtime routing.
 - Stage Two M54 `keyManager` effective provider model helper split is completed in `dd2295d3`: it moves only official-default and documented-provider model fallback selection into `src/services/auth/keyManagerEffectiveProviderModels.ts`, preserving `keyManager.ts` compatibility exports and existing call sites.
-- Stage Two M55 `keyManager` provider limit delegator pruning is the current slice: it removes only redundant private provider limit forwarding methods and calls the already extracted `keyManagerEffectiveSlot` helpers directly.
-- The final-gate fixture repair closed in `ff419de9`; the current dependency-security slice fixes the separate `payment-server` audit gap and adds root script coverage for both production lockfiles.
-- The project is functionally green after the latest full gate, but not final-complete while `CanvasContext.tsx`, `keyManager.ts`, `PromptBar.tsx`, and `OpenAICompatibleAdapter.ts` remain giant-file split targets and the separate `payment-server` audit gap is being closed.
+- Stage Two M55 `keyManager` provider limit delegator pruning is completed in `6902b79b`: it removes only redundant private provider limit forwarding methods and calls the already extracted `keyManagerEffectiveSlot` helpers directly.
+- The final-gate fixture repair closed in `ff419de9`; the payment sidecar dependency audit gap closed in `58be183d`.
+- Stage Two M56 `OpenAICompatibleAdapter` diagnostics preview extraction is the current slice: it moves safe JSON/multipart request preview redaction into `src/services/llm/openAICompatibleDiagnostics.ts` without changing provider routing, endpoints, auth, fetch behavior, UI, or release metadata.
+- The project is functionally green after the latest full gate, but not final-complete while `App.tsx`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`, `keyManager.ts`, and `CanvasContext.tsx` remain giant-file split targets.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
@@ -87,7 +88,7 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 
 ## Current Baseline
 
-- `src/App.tsx`: 4900 lines after the latest finalization/security cleanup line.
+- `src/App.tsx`: 4900 physical lines after the latest finalization/security cleanup line.
 - `src/app/useConnectorRenderer.ts`: 253 lines, boundary hardened in `5f5b76e0` and review-follow-up typechecked in `f06f1880`.
 - `src/app/usePromptGroupLayout.ts`: 1348 lines, extracted and boundary-hardened in `8a458cd4`.
 - `src/app/useGenerationRuntime.ts`: 2604 lines, extracted and boundary-hardened in `ab719c4a`; generation billing cleanup completed in `083db7f8`.
@@ -134,8 +135,9 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/services/auth/keyManagerKeyType.ts`: 9 lines, Stage Two M29 key type helper boundary.
 - `src/services/auth/keyManagerPricingUrl.ts`: 12 lines, Stage Two M43 silent pricing URL helper boundary.
 - `src/utils/modelIdNormalization.ts`: 6 lines after M30 compatibility-facade consolidation, down from 84 duplicated helper lines.
-- `src/components/layout/PromptBar.tsx`: 4437 lines.
-- `src/services/llm/OpenAICompatibleAdapter.ts`: 4517 lines.
+- `src/components/layout/PromptBar.tsx`: 4437 physical lines.
+- `src/services/llm/OpenAICompatibleAdapter.ts`: 4451 physical lines after the current diagnostics preview extraction.
+- `src/services/llm/openAICompatibleDiagnostics.ts`: 86 physical lines in the current diagnostics preview helper boundary.
 - `apps/web/`: migration target, not the first edit location.
 - `apps/api/`: DDD back-end structure, not part of this refactor unless compatibility checks require it.
 
@@ -431,7 +433,8 @@ Scope:
 - Completed M53 slice in `74d6345a`: pruned only the duplicate `getGlobalModelList` JSDoc block and the unused local `chatModelIds` allocation from `src/services/auth/keyManager.ts`, with the dead-code contract preventing reintroduction.
 - Completed M54 slice in `dd2295d3`: extracted only `resolveEffectiveProviderModels` and its official-default fallback selector into `src/services/auth/keyManagerEffectiveProviderModels.ts`, preserving `keyManager.ts` compatibility re-export and all existing call sites.
 - Completed M55 slice in `6902b79b`: pruned only private `resolveProviderBudgetLimit` / `resolveProviderTokenLimit` delegator methods from `src/services/auth/keyManager.ts`, leaving the existing helpers in `src/services/auth/keyManagerEffectiveSlot.ts` as the single source of truth.
-- Current security slice: patch the `payment-server` transitive Hono audit gap by overriding `@hono/node-server` and `hono` to non-vulnerable versions, then make root verification run dependency audit for both the root package and the payment sidecar.
+- Completed security slice in `58be183d`: patched the `payment-server` transitive Hono audit gap by overriding `@hono/node-server` and `hono` to non-vulnerable versions, then made root verification run dependency audit for both the root package and the payment sidecar.
+- Current M56 slice: extract OpenAI-compatible request diagnostics preview redaction into `src/services/llm/openAICompatibleDiagnostics.ts`, preserving all provider image routing and request execution behavior while adding direct coverage for JSON and multipart redaction.
 - Continue `src/context/CanvasContext.tsx` only for another high-confidence narrow seam; defer `migrateNodes`, IndexedDB/local-folder movement, and persistence orchestration until they can be split safely.
 - Continue `src/services/auth/keyManager.ts` after M55 only after a fresh seam map. Defer key storage, permission checks, encryption helpers, provider credential management, cloud sync, provider persistence, shared pricing cache construction, runtime routing, remote model fetch behavior, and localStorage policy until smaller seams are mapped.
 - Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.

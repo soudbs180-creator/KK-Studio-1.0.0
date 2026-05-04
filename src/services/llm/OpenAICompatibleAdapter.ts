@@ -34,6 +34,7 @@ import {
     startSyncImageBridgeRequest,
     waitForSyncImageBridgeResult
 } from './syncImageBridge';
+import { buildSafeFormDataPreview, buildSafeRequestBodyPreview } from './openAICompatibleDiagnostics';
 
 type WuyinImageRoute = {
     endpointPath: string;
@@ -1525,7 +1526,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         const payload = this.applyCustomBody(body, keySlot);
-        const requestBodyPreview = this.buildSafeRequestBodyPreview(payload);
+        const requestBodyPreview = buildSafeRequestBodyPreview(payload);
         const response = await this.fetchWithTimeout(url, {
             method: 'POST',
             headers: this.build12AIAsyncImageHeaders(keySlot),
@@ -1758,7 +1759,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             includeAccept: true,
         });
         const payload = this.applyCustomBody(body, keySlot);
-        const requestBodyPreview = this.buildSafeRequestBodyPreview(payload);
+        const requestBodyPreview = buildSafeRequestBodyPreview(payload);
         const response = await this.fetchWithTimeout(target.url, {
             method: 'POST',
             headers: target.headers,
@@ -1899,7 +1900,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         });
         const payload = this.applyCustomBody(body, keySlot);
         const payloadStr = JSON.stringify(payload);
-        const requestBodyPreview = this.buildSafeRequestBodyPreview(payload);
+        const requestBodyPreview = buildSafeRequestBodyPreview(payload);
 
         const bridgedResult = await this.executeRecoverableSyncImageRequest({
             options,
@@ -2269,38 +2270,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         return clean;
     }
 
-    private buildSafeRequestBodyPreview(body: any): string {
-        const redact = (node: any): any => {
-            if (Array.isArray(node)) return node.map(redact);
-            if (node && typeof node === 'object') {
-                const out: Record<string, any> = {};
-                Object.entries(node).forEach(([k, v]) => {
-                    const lower = k.toLowerCase();
-                    if (['authorization', 'api_key', 'apikey', 'token', 'secret', 'key'].includes(lower)) {
-                        out[k] = '<omitted:sensitive>';
-                        return;
-                    }
-                    out[k] = redact(v);
-                });
-                return out;
-            }
-            if (typeof node === 'string') {
-                if (node.startsWith('data:')) return '<omitted:data-uri>';
-                if (/^https?:\/\//i.test(node) && node.length > 120) return '<omitted:url>';
-                if (/^[A-Za-z0-9+/=]+$/.test(node) && node.length > 200) return '<omitted:base64>';
-                if (node.length > 400) return node.slice(0, 200) + '...<truncated>';
-                return node;
-            }
-            return node;
-        };
-
-        try {
-            return JSON.stringify(redact(body), null, 2);
-        } catch {
-            return '{\n  "error": "preview_unavailable"\n}';
-        }
-    }
-
     private applyCustomFormData(formData: FormData, keySlot: KeySlot): FormData {
         const custom = keySlot.customBody;
         if (!custom || typeof custom !== 'object' || Array.isArray(custom)) {
@@ -2324,41 +2293,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         });
 
         return formData;
-    }
-
-    private buildSafeFormDataPreview(formData: FormData): string {
-        const preview: Record<string, any> = {};
-
-        for (const [key, value] of formData.entries()) {
-            let safeValue: any;
-
-            if (value instanceof Blob) {
-                safeValue = {
-                    kind: 'blob',
-                    type: value.type || 'application/octet-stream',
-                    size: value.size,
-                    name: value instanceof File ? value.name : undefined
-                };
-            } else if (typeof value === 'string') {
-                safeValue = value.startsWith('data:')
-                    ? '<omitted:data-uri>'
-                    : value.length > 400
-                        ? `${value.slice(0, 200)}...<truncated>`
-                        : value;
-            } else {
-                safeValue = String(value);
-            }
-
-            if (preview[key] === undefined) {
-                preview[key] = safeValue;
-            } else if (Array.isArray(preview[key])) {
-                preview[key].push(safeValue);
-            } else {
-                preview[key] = [preview[key], safeValue];
-            }
-        }
-
-        return JSON.stringify(preview, null, 2);
     }
 
     private getOpenAIImageProfile(modelId: string): 'gpt-image-1' | 'dall-e-2' | 'dall-e-3' | 'generic' {
@@ -2575,7 +2509,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
     ): Promise<any> {
         const rawText = await response.text().catch(() => '');
         const requestPath = this.getRequestPathFromUrl(url);
-        const requestBodyPreview = this.buildSafeRequestBodyPreview(requestBody);
+        const requestBodyPreview = buildSafeRequestBodyPreview(requestBody);
 
         if (!response.ok) {
             let errMsg = `HTTP ${response.status}`;
@@ -2729,7 +2663,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                     message: text || `HTTP ${response.status}`,
                     status: response.status,
                     requestPath: target.requestPath,
-                    requestBody: this.buildSafeRequestBodyPreview(body),
+                    requestBody: buildSafeRequestBodyPreview(body),
                     responseBody: text.slice(0, 1600),
                     provider: keySlot.provider,
                 });
@@ -3296,7 +3230,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         // 🚀 [12AI 对齐] 负载体积检查
         const requestBody = this.applyCustomBody(body, keySlot);
-        const requestBodyPreview = this.buildSafeRequestBodyPreview(requestBody);
+        const requestBodyPreview = buildSafeRequestBodyPreview(requestBody);
         const payloadStr = JSON.stringify(requestBody);
         if (payloadStr.length > 48 * 1024 * 1024) {
             console.error(`[OpenAICompatibleAdapter] Chat-Image 请求体积 (${(payloadStr.length / 1024 / 1024).toFixed(2)}MB) 接近 50MB 上限!`);
@@ -3516,7 +3450,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         headers = this.applyCustomHeaders(headers, keySlot);
 
         const requestBody = this.applyCustomBody(body, keySlot);
-        const requestBodyPreview = this.buildSafeRequestBodyPreview(requestBody);
+        const requestBodyPreview = buildSafeRequestBodyPreview(requestBody);
         const payloadStr = JSON.stringify(requestBody);
 
         const bridgedResult = await this.executeRecoverableSyncImageRequest({
@@ -3626,7 +3560,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 metadata: {
                     aspectRatio,
                     requestPath,
-                    requestBodyPreview: this.buildSafeRequestBodyPreview(requestBody),
+                    requestBodyPreview: buildSafeRequestBodyPreview(requestBody),
                     pythonSnippet
                 }
             };
@@ -4114,7 +4048,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             body: payloadStr,
             timeoutMs: requestTimeoutMs,
             requestPath,
-            requestBodyPreview: this.buildSafeRequestBodyPreview(payload),
+            requestBodyPreview: buildSafeRequestBodyPreview(payload),
             provider: keySlot.provider,
         });
         if (bridgedResult) {
@@ -4126,7 +4060,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 metadata: {
                     apiDurationMs: bridgedResult.apiDurationMs,
                     requestPath,
-                    requestBodyPreview: this.buildSafeRequestBodyPreview(payload)
+                    requestBodyPreview: buildSafeRequestBodyPreview(payload)
                 }
             };
         }
@@ -4179,7 +4113,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             metadata: {
                 requestPath,
                 apiDurationMs: duration,
-                requestBodyPreview: this.buildSafeRequestBodyPreview(payload)
+                requestBodyPreview: buildSafeRequestBodyPreview(payload)
             }
         };
     }
@@ -4333,7 +4267,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             includeAccept: true,
         });
         const requestBody = this.applyCustomFormData(formData, keySlot);
-        const requestBodyPreview = this.buildSafeFormDataPreview(requestBody);
+        const requestBodyPreview = buildSafeFormDataPreview(requestBody);
 
         const response = await this.fetchWithTimeout(target.url, {
             method: 'POST',
@@ -4412,7 +4346,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         const requestPath = this.getRequestPathFromUrl(url);
-        const requestBodyPreview = this.buildSafeRequestBodyPreview(body);
+        const requestBodyPreview = buildSafeRequestBodyPreview(body);
         const bridgedResult = await this.executeRecoverableSyncImageRequest({
             options,
             parserType: 'openai-compatible-image',
