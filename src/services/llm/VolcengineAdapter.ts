@@ -5,7 +5,7 @@ export class VolcengineAdapter implements LLMAdapter {
     id = 'volcengine-adapter';
     provider = 'Volcengine';
 
-    supports(modelId: string): boolean {
+    supports(_modelId: string): boolean {
         // Volcengine uses Endpoint IDs (e.g. ep-2024...) usually.
         // Or Doubao-* names if using a proxy.
         // We match broadly or specific prefix if we can, but since Endpoint IDs are custom,

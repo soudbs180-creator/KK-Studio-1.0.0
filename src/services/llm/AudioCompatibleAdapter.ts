@@ -1,8 +1,6 @@
 import type { KeySlot } from '../auth/keyManager.ts';
 import type { LLMAdapter, AudioGenerationOptions, AudioGenerationResult } from './LLMAdapter.ts';
 import { 
-    getAudioCapability, 
-    isAudioModel, 
     getMaxAudioDuration,
     supportsCustomLyrics,
     supportsInstrumental,
@@ -54,7 +52,6 @@ export class AudioCompatibleAdapter implements LLMAdapter {
         }
 
         // 获取模型音频能力
-        const audioCaps = getAudioCapability(options.modelId);
         const maxDuration = getMaxAudioDuration(options.modelId);
         
         // 构建请求体
