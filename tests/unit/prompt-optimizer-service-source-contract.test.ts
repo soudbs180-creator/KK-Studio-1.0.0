@@ -12,6 +12,10 @@ function readSource(relativePath: string): string {
 test('prompt optimizer service relies on autoroute helpers and neutral route naming instead of legacy template fields', () => {
   const serviceSource = readSource('src/services/llm/promptOptimizerService.ts');
 
+  assert.doesNotMatch(serviceSource, /const DEFAULT_TABS:/);
+  assert.doesNotMatch(serviceSource, /tabs: DEFAULT_TABS,/);
+  assert.match(serviceSource, /tabs: HUMAN_DEFAULT_TABS,/);
+
   assert.match(serviceSource, /buildAutomaticOptimizationInstruction/);
   assert.match(serviceSource, /resolveAutomaticOptimizationRoute/);
   assert.match(serviceSource, /route_id/);

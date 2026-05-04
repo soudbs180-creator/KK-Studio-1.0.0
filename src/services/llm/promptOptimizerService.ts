@@ -59,11 +59,6 @@ const OPTIMIZER_CACHE_KEY = 'kk_prompt_optimizer_cache_v4';
 const OPTIMIZER_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const CJK_PATTERN = /[\u3400-\u9fff]/;
 
-const DEFAULT_TABS: PromptOptimizerResult['ui_payload']['tabs'] = [
-    { id: 'raw', label_zh: '未优化', label_en: 'Raw' },
-    { id: 'opt', label_zh: '已优化', label_en: 'Optimized' },
-];
-
 const HUMAN_DEFAULT_TABS: PromptOptimizerResult['ui_payload']['tabs'] = [
     { id: 'raw', label_zh: '未优化', label_en: 'Raw' },
     { id: 'opt', label_zh: '已优化', label_en: 'Optimized' },
