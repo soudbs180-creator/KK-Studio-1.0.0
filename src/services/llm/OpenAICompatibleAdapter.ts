@@ -35,6 +35,7 @@ import {
     waitForSyncImageBridgeResult
 } from './syncImageBridge';
 import { buildSafeFormDataPreview, buildSafeRequestBodyPreview } from './openAICompatibleDiagnostics';
+import { isChatEndpointCompatibilityError, isImageEndpointCompatibilityError } from './openAICompatibleImageRoutingErrors';
 
 type WuyinImageRoute = {
     endpointPath: string;
@@ -2944,46 +2945,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const isGeminiImage = modelLower.includes('gemini') && modelLower.includes('image') ||
             modelLower.includes('nano-banana') ||
             modelLower.includes('banana');
-
-        const isQuotaLikeError = (err: any): boolean => {
-            const msg = String(err?.message || '').toLowerCase();
-            return msg.includes('quota') || msg.includes('no accounts available with quota') || msg.includes('insufficient_quota');
-        };
-
-        const isChatEndpointCompatibilityError = (err: any): boolean => {
-            const msg = String(err?.message || '').toLowerCase();
-            if (isQuotaLikeError(err)) return false;
-            const isNotSupported = msg.includes('not supported') || msg.includes('unsupported');
-            return (
-                msg.includes('chat-to-image error (400)') ||
-                msg.includes('chat-to-image error (404)') ||
-                msg.includes('chat-to-image error (405)') ||
-                msg.includes('chat-to-image error (422)') ||
-                (msg.includes('500') && isNotSupported) ||
-                isNotSupported ||
-                msg.includes('invalid request') ||
-                msg.includes('endpoint')
-            );
-        };
-
-        const isImageEndpointCompatibilityError = (err: any): boolean => {
-            const msg = String(err?.message || '').toLowerCase();
-            if (isQuotaLikeError(err)) return false;
-            const isNotSupported = msg.includes('not supported') || msg.includes('unsupported');
-            return (
-                msg.includes('openai image error: 400') ||
-                msg.includes('openai image error: 404') ||
-                msg.includes('openai image error: 405') ||
-                msg.includes('openai image error: 415') ||
-                msg.includes('openai image error: 422') ||
-                msg.includes('/images/generations') ||
-                msg.includes('invalid request') ||
-                msg.includes('invalid parameter') ||
-                msg.includes('unrecognized request argument') ||
-                msg.includes('unknown field') ||
-                isNotSupported
-            );
-        };
 
         // 🚀 [Protocol Routing]
         // 12AI + Gemini 图片模型：强制走 Gemini Native（严格对齐 12AI 文档），

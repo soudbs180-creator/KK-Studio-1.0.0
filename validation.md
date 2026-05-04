@@ -632,12 +632,12 @@ This slice also requires `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.
 
 Generation billing follow-ups use the same generation gate and must keep stale App-side generation billing imports out of `src/App.tsx`.
 
-## OpenAI-Compatible Diagnostics Gate
+## OpenAI-Compatible Adapter Gates
 
-Use this gate for the current `OpenAICompatibleAdapter` diagnostics preview helper extraction:
+Use this gate for the completed diagnostics preview helper extraction and the current image-routing error classifier extraction in `OpenAICompatibleAdapter`:
 
 ```powershell
-node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/openai-compatible-diagnostics-contract.test.ts" "tests/unit/provider-image-routing-regression.test.ts" "tests/unit/provider-surface-router.test.ts" "tests/unit/provider-strategy.test.ts" "tests/unit/async-image-proxy-regression.test.ts" "tests/unit/frontend-key-boundary-hardening.test.ts" "tests/unit/governance-contract.test.ts"
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/openai-compatible-image-routing-errors-contract.test.ts" "tests/unit/openai-compatible-diagnostics-contract.test.ts" "tests/unit/provider-image-routing-regression.test.ts" "tests/unit/provider-surface-router.test.ts" "tests/unit/provider-strategy.test.ts" "tests/unit/async-image-proxy-regression.test.ts" "tests/unit/frontend-key-boundary-hardening.test.ts" "tests/unit/governance-contract.test.ts"
 npm.cmd run architecture:check
 npm.cmd run governance:security
 npm.cmd run audit:dependencies
@@ -651,7 +651,7 @@ npm.cmd run check:encoding
 This slice also requires this path-limited diff check:
 
 ```powershell
-git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/llm/OpenAICompatibleAdapter.ts" "src/services/llm/openAICompatibleDiagnostics.ts" "tests/unit/openai-compatible-diagnostics-contract.test.ts" "tsconfig.tests.json" "plans.md" "validation.md" "status.md"
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/llm/OpenAICompatibleAdapter.ts" "src/services/llm/openAICompatibleDiagnostics.ts" "src/services/llm/openAICompatibleImageRoutingErrors.ts" "tests/unit/openai-compatible-diagnostics-contract.test.ts" "tests/unit/openai-compatible-image-routing-errors-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
 ## Stage One Backfill Prompt Group Gate

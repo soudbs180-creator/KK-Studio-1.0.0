@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest clean baseline before the current OpenAI-compatible diagnostics slice is `58be183d fix: audit payment sidecar dependencies`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline before the current OpenAI-compatible image-routing error classifier slice is `05fadc4f docs: align current refactor ledger`, after the diagnostics preview extraction landed in `0edb13f5`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -79,7 +79,8 @@ The active execution model for this thread has resumed Stage One convergence:
 - Stage Two M54 `keyManager` effective provider model helper split is completed in `dd2295d3`: it moves only official-default and documented-provider model fallback selection into `src/services/auth/keyManagerEffectiveProviderModels.ts`, preserving `keyManager.ts` compatibility exports and existing call sites.
 - Stage Two M55 `keyManager` provider limit delegator pruning is completed in `6902b79b`: it removes only redundant private provider limit forwarding methods and calls the already extracted `keyManagerEffectiveSlot` helpers directly.
 - The final-gate fixture repair closed in `ff419de9`; the payment sidecar dependency audit gap closed in `58be183d`.
-- Stage Two M56 `OpenAICompatibleAdapter` diagnostics preview extraction is the current slice: it moves safe JSON/multipart request preview redaction into `src/services/llm/openAICompatibleDiagnostics.ts` without changing provider routing, endpoints, auth, fetch behavior, UI, or release metadata.
+- Stage Two M56 `OpenAICompatibleAdapter` diagnostics preview extraction is completed in `0edb13f5`: it moves safe JSON/multipart request preview redaction into `src/services/llm/openAICompatibleDiagnostics.ts` without changing provider routing, endpoints, auth, fetch behavior, UI, or release metadata.
+- Stage Two M57 `OpenAICompatibleAdapter` image-routing error classifier extraction is the current slice: it moves chat/images compatibility and quota fail-closed error classifiers into `src/services/llm/openAICompatibleImageRoutingErrors.ts` without changing provider routing, endpoints, auth, fetch behavior, UI, or release metadata.
 - The project is functionally green after the latest full gate, but not final-complete while `App.tsx`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`, `keyManager.ts`, and `CanvasContext.tsx` remain giant-file split targets.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
@@ -117,7 +118,7 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/context/canvasPositionUpdates.ts`: 104 lines, Stage Two M16 position update helper.
 - `src/context/canvasPromptImageLinks.ts`: 62 lines, Stage Two M17 prompt-image relationship helper plus Stage Two M19 image deletion transform.
 - `src/context/canvasWorkflowUpdates.ts`: 148 lines, Stage Two M18 workflow update helper.
-- `src/services/auth/keyManager.ts`: 4338 physical lines after completed M55 provider limit delegator pruning.
+- `src/services/auth/keyManager.ts`: 4338 physical lines after completed M55 provider limit delegator pruning and later cleanup.
 - `src/services/auth/keyManagerApiType.ts`: 23 lines, Stage Two M48 API type detector helper boundary.
 - `src/services/auth/keyManagerChannelCapabilities.ts`: 23 lines, Stage Two M47 channel capabilities helper boundary.
 - `src/services/auth/keyManagerDefaultModels.ts`: 53 lines, Stage Two M49 default model constants helper boundary.
@@ -135,9 +136,10 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/services/auth/keyManagerKeyType.ts`: 9 lines, Stage Two M29 key type helper boundary.
 - `src/services/auth/keyManagerPricingUrl.ts`: 12 lines, Stage Two M43 silent pricing URL helper boundary.
 - `src/utils/modelIdNormalization.ts`: 6 lines after M30 compatibility-facade consolidation, down from 84 duplicated helper lines.
-- `src/components/layout/PromptBar.tsx`: 4437 physical lines.
-- `src/services/llm/OpenAICompatibleAdapter.ts`: 4451 physical lines after the current diagnostics preview extraction.
-- `src/services/llm/openAICompatibleDiagnostics.ts`: 86 physical lines in the current diagnostics preview helper boundary.
+- `src/components/layout/PromptBar.tsx`: 4466 physical lines.
+- `src/services/llm/OpenAICompatibleAdapter.ts`: 4412 physical lines after the current image-routing error classifier extraction.
+- `src/services/llm/openAICompatibleDiagnostics.ts`: 86 physical lines in the diagnostics preview helper boundary.
+- `src/services/llm/openAICompatibleImageRoutingErrors.ts`: 49 physical lines in the current image-routing error classifier boundary.
 - `apps/web/`: migration target, not the first edit location.
 - `apps/api/`: DDD back-end structure, not part of this refactor unless compatibility checks require it.
 
@@ -434,7 +436,8 @@ Scope:
 - Completed M54 slice in `dd2295d3`: extracted only `resolveEffectiveProviderModels` and its official-default fallback selector into `src/services/auth/keyManagerEffectiveProviderModels.ts`, preserving `keyManager.ts` compatibility re-export and all existing call sites.
 - Completed M55 slice in `6902b79b`: pruned only private `resolveProviderBudgetLimit` / `resolveProviderTokenLimit` delegator methods from `src/services/auth/keyManager.ts`, leaving the existing helpers in `src/services/auth/keyManagerEffectiveSlot.ts` as the single source of truth.
 - Completed security slice in `58be183d`: patched the `payment-server` transitive Hono audit gap by overriding `@hono/node-server` and `hono` to non-vulnerable versions, then made root verification run dependency audit for both the root package and the payment sidecar.
-- Current M56 slice: extract OpenAI-compatible request diagnostics preview redaction into `src/services/llm/openAICompatibleDiagnostics.ts`, preserving all provider image routing and request execution behavior while adding direct coverage for JSON and multipart redaction.
+- Completed M56 slice in `0edb13f5`: extracted OpenAI-compatible request diagnostics preview redaction into `src/services/llm/openAICompatibleDiagnostics.ts`, preserving all provider image routing and request execution behavior while adding direct coverage for JSON and multipart redaction.
+- Current M57 slice: extract OpenAI-compatible image-routing error classifiers into `src/services/llm/openAICompatibleImageRoutingErrors.ts`, preserving quota fail-closed behavior, chat/image compatibility signals, provider routing, request execution, auth, UI, and release metadata while adding direct coverage for extracted substring parity and historical message-only inputs.
 - Continue `src/context/CanvasContext.tsx` only for another high-confidence narrow seam; defer `migrateNodes`, IndexedDB/local-folder movement, and persistence orchestration until they can be split safely.
 - Continue `src/services/auth/keyManager.ts` after M55 only after a fresh seam map. Defer key storage, permission checks, encryption helpers, provider credential management, cloud sync, provider persistence, shared pricing cache construction, runtime routing, remote model fetch behavior, and localStorage policy until smaller seams are mapped.
 - Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.
