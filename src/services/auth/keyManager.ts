@@ -2912,9 +2912,6 @@ export class KeyManager {
 
     /**
      * Get validated global model list from all channels (Standard + Custom)
-     */
-    /**
-     * Get validated global model list from all channels (Standard + Custom)
      * SORTING ORDER: User Custom Models (Top) -> Standard Google Models (Bottom)
      */
     getGlobalModelList(): {
@@ -3029,7 +3026,6 @@ export class KeyManager {
             textColor?: 'white' | 'black';
             creditCost?: number; // Credit cost badge shown in the model picker UI
         }>();
-        const chatModelIds = new Set(GOOGLE_CHAT_MODELS.map(model => model.id));
         const normalizeUserSourceSignaturePart = (value?: string) =>
             String(value || '').trim().replace(/\/+$/, '').toLowerCase();
         const userSlotSourceSignatures = new Set(
