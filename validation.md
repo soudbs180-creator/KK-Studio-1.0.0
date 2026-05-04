@@ -695,6 +695,23 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/se
 
 The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is expected to fail while broader TS6133 debt remains outside this slice; for this gate, filter the output and require zero `src/services/storage/fileSystemService.ts` matches. Do not remove or implement the compatibility stubs in this cleanup slice.
 
+## Import-Only Unused Cleanup Gate
+
+Use this gate for import/type-list-only cleanup slices:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/import-only-unused-cleanup-contract.test.ts" "tests/unit/partial-redraw-lightbox-contract.test.ts" "tests/unit/responsive-surface.test.ts" "tests/unit/google-official-gemini-protocol-guards.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/components/image/GlobalLightbox.tsx" "src/hooks/useImageQuality.ts" "src/services/model/modelRegistry.ts" "tests/unit/import-only-unused-cleanup-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+The `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true` probe is expected to fail while broader TS6133 debt remains outside this slice; for this gate, filter the output and require zero matches for the touched import-only file set.
+
 ## App Unused Cleanup Gate
 
 Use this gate for the App compiler-source cleanup slice:
