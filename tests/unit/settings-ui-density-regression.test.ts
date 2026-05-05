@@ -148,7 +148,11 @@ test('settings workbench uses frosted glass tokens and blur layers', () => {
   );
   assert.match(
     cssSource,
-    /\.settings-panel \.settings-shell,[\s\S]*\.settings-panel \.settings-shell-desktop,[\s\S]*\.settings-panel \.settings-shell-page--desktop,[\s\S]*\.settings-panel \.settings-shell-mobile \{[\s\S]*backdrop-filter: blur\(30px\) saturate\(1\.22\);/,
+    /\.settings-panel \.settings-shell-desktop,[\s\S]*\.settings-panel \.settings-shell-mobile \{[\s\S]*backdrop-filter: blur\(30px\) saturate\(1\.22\);/,
+  );
+  assert.doesNotMatch(
+    cssSource,
+    /\.settings-panel \.settings-shell,[\s\S]*\.settings-panel \.settings-shell-page--desktop,[\s\S]*backdrop-filter: blur\(30px\) saturate\(1\.22\);/,
   );
   assert.match(
     cssSource,

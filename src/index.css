@@ -9032,12 +9032,10 @@ body.dark-mode .settings-panel {
   width: min(1480px, calc(100vw - 48px));
   height: min(calc(100dvh - 48px), 920px);
   isolation: isolate;
-  border: 1px solid var(--settings-shell-border);
+  border: 0;
   border-radius: var(--settings-radius-unified);
   background: color-mix(in srgb, var(--settings-shell-bg) 88%, transparent);
-  box-shadow:
-    0 0 0 1px rgb(255 255 255 / 0.025),
-    var(--settings-shell-shadow);
+  box-shadow: var(--settings-shell-shadow);
   backdrop-filter: blur(18px) saturate(130%);
   overflow: hidden;
 }
@@ -11023,12 +11021,10 @@ body.dark-mode .storage-selection-modal {
   box-shadow: var(--ui-shadow-control);
 }
 
-.settings-panel .settings-shell,
 .settings-panel .settings-shell-desktop,
-.settings-panel .settings-shell-page--desktop,
 .settings-panel .settings-shell-mobile {
   background: var(--settings-shell-bg) !important;
-  border: 1px solid var(--settings-shell-border) !important;
+  border: 0 !important;
   box-shadow: var(--settings-shell-shadow) !important;
   backdrop-filter: blur(18px) saturate(1.12);
   -webkit-backdrop-filter: blur(18px) saturate(1.12);
@@ -11899,10 +11895,7 @@ body.dark-mode .settings-panel {
   background: var(--settings-sidebar-bg);
 }
 
-.settings-panel .settings-shell,
 .settings-panel .settings-shell-desktop,
-.settings-panel .settings-shell-page--desktop,
-.settings-panel .settings-shell-main,
 .settings-panel .settings-shell-mobile {
   backdrop-filter: blur(30px) saturate(1.22);
   -webkit-backdrop-filter: blur(30px) saturate(1.22);
@@ -13176,8 +13169,7 @@ body.dark-mode .input-bar {
 .settings-panel .api-settings-view input:not([type="color"]):not([type="checkbox"]),
 .settings-panel .api-settings-view select,
 .settings-panel .api-settings-view textarea,
-.settings-panel .settings-shell-nav__search,
-.settings-panel .settings-shell-nav__search input {
+.settings-panel .settings-shell-nav__search {
   background: var(--frost-input-bg);
   border-color: var(--frost-input-border);
   box-shadow: var(--frost-input-shadow);
@@ -13185,17 +13177,48 @@ body.dark-mode .input-bar {
   backdrop-filter: blur(var(--frost-input-blur)) saturate(1.12);
 }
 
-.settings-panel .settings-shell,
 .settings-panel .settings-shell-desktop,
-.settings-panel .settings-shell-main,
-.settings-panel .settings-shell-nav,
 .settings-panel .settings-shell-mobile {
   background: var(--frost-card-framework-bg);
   background: var(--frost-card-framework-bg) !important;
-  border-color: var(--frost-card-framework-border) !important;
+  border: 0 !important;
   box-shadow: var(--frost-card-framework-shadow) !important;
   -webkit-backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(1.16);
   backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(1.16);
+}
+
+.settings-panel .settings-shell-main,
+.settings-panel .settings-shell-nav,
+.settings-panel .settings-shell-page--desktop {
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.settings-panel .settings-shell-nav__search input {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.settings-panel .settings-desktop-quick-actions {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.settings-panel .settings-desktop-quick-actions > button {
+  border-radius: var(--radius-control-md) !important;
+  box-shadow: none !important;
+}
+
+.settings-panel .settings-desktop-quick-actions > button:hover:not(:disabled),
+.settings-panel .settings-desktop-quick-actions > button:focus-visible {
+  box-shadow: none !important;
 }
 
 .settings-panel .settings-reference-card,
@@ -13285,6 +13308,53 @@ body.dark-mode .input-bar {
   grid-template-columns: 64px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
+}
+
+.settings-panel .settings-reference-toolbar--flat {
+  align-items: flex-end;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.settings-panel .settings-reference-toolbar--flat .settings-reference-toolbar__filters {
+  flex: 1 1 520px;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 0.72fr);
+  align-items: end;
+  gap: 12px;
+}
+
+.settings-panel .settings-reference-toolbar--flat .settings-reference-toolbar__filters > div {
+  min-width: 0 !important;
+}
+
+.settings-panel .settings-reference-rings--flat {
+  gap: 10px;
+}
+
+.settings-panel .settings-shell-page--desktop .settings-dashboard-overview-grid .settings-reference-ring-row {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.settings-panel .settings-reference-rings--flat .settings-reference-ring-row {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+@media (max-width: 767px) {
+  .settings-panel .settings-reference-toolbar--flat .settings-reference-toolbar__filters {
+    grid-template-columns: 1fr;
+  }
 }
 
 :where([data-canvas-surface="prompt"], [data-canvas-surface="image"], .mobile-card-main, .mobile-card-main__surface) {

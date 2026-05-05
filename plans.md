@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the current HEAD is `edb1e33c docs: sync post-ui closure ledgers`, after the latest code slices `da4ffc79 refactor: move ecommerce workbench to canvas`, `485a6bef style: flatten prompt bar mobile actions`, and `1ca080eb style: flatten settings workbench chrome`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the current HEAD is `9e4b409e refactor: extract local user-route task token helper`, after the latest code slices `74dbdbf1 refactor: extract wuyin route helper`, `dcf38e87 fix: harden local user-route task signing`, and `9e4b409e refactor: extract local user-route task token helper`. The current working tree is a post-M123 settings UI closure slice, not a new runtime/provider slice. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -101,13 +101,13 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 
 ## Current Baseline
 
-- `src/App.tsx`: 4837 physical lines after the latest ecommerce UI and settings closure line.
+- `src/App.tsx`: 4328 physical lines after the latest Stage Two cleanup line.
 - `src/app/useConnectorRenderer.ts`: 253 lines, boundary hardened in `5f5b76e0` and review-follow-up typechecked in `f06f1880`.
 - `src/app/usePromptGroupLayout.ts`: 1348 lines, extracted and boundary-hardened in `8a458cd4`.
 - `src/app/useGenerationRuntime.ts`: 2603 lines, extracted and boundary-hardened in `ab719c4a`; generation billing cleanup completed in `083db7f8`; unused import cleanup completed in `d4291729`.
 - `src/app/usePptRuntime.ts`: 1289 lines, extracted in `4c448660` and semantically boundary-checked in `569383aa`.
 - `src/app/pptRuntimeHelpers.ts`: 152 lines, semantically boundary-checked in `569383aa`.
-- `src/context/CanvasContext.tsx`: 2517 physical lines after Stage Two CanvasContext extractions and later cleanup, down from 5218 text lines at the start of Stage Two.
+- `src/context/CanvasContext.tsx`: 2197 physical lines after Stage Two CanvasContext extractions and later cleanup, down from 5218 text lines at the start of Stage Two.
 - `src/context/canvasContextState.ts`: 114 lines, new Stage Two M1 state/default/context boundary module.
 - `src/context/canvasArrangeSelection.ts`: 601 lines, Stage Two M22/M24/M25 selected arrange helper.
 - `src/context/canvasAutoArrange.ts`: 360 lines, Stage Two M26 full-canvas auto-arrange position helper.
@@ -130,7 +130,7 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/context/canvasPositionUpdates.ts`: 104 lines, Stage Two M16 position update helper.
 - `src/context/canvasPromptImageLinks.ts`: 62 lines, Stage Two M17 prompt-image relationship helper plus Stage Two M19 image deletion transform.
 - `src/context/canvasWorkflowUpdates.ts`: 148 lines, Stage Two M18 workflow update helper.
-- `src/services/auth/keyManager.ts`: 4100 physical lines after the M115 remote model discovery helper extraction.
+- `src/services/auth/keyManager.ts`: 3594 physical lines after the latest keyManager cleanup/extraction line.
 - `src/services/auth/keyManagerApiType.ts`: 23 lines, Stage Two M48 API type detector helper boundary.
 - `src/services/auth/keyManagerChannelCapabilities.ts`: 23 lines, Stage Two M47 channel capabilities helper boundary.
 - `src/services/auth/keyManagerDefaultModels.ts`: 53 lines, Stage Two M49 default model constants helper boundary.
@@ -150,10 +150,10 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/services/auth/keyManagerSharedPricing.ts`: 136 lines, Stage Two M114 shared pricing catalog/snapshot helper boundary.
 - `src/services/auth/keyManagerRemoteModelDiscovery.ts`: 130 lines, Stage Two M115 remote model discovery response parsing helper boundary.
 - `src/utils/modelIdNormalization.ts`: 6 lines after M30 compatibility-facade consolidation, down from 84 duplicated helper lines.
-- `src/components/layout/PromptBar.tsx`: 3965 physical lines.
-- `src/components/canvas/PromptNodeComponent.tsx`: 2271 physical lines after the latest ecommerce canvas-workbench wiring.
-- `src/components/layout/ChatSidebar.tsx`: 2743 physical lines after `3108a29f`.
-- `src/components/settings/ApiSettingsView.tsx`: 3347 physical lines.
+- `src/components/layout/PromptBar.tsx`: 3631 physical lines.
+- `src/components/canvas/PromptNodeComponent.tsx`: 2121 physical lines after the latest ecommerce canvas-workbench wiring and cleanup.
+- `src/components/layout/ChatSidebar.tsx`: 2477 physical lines after `3108a29f`.
+- `src/components/settings/ApiSettingsView.tsx`: 3071 physical lines.
 - `src/components/settings/views/SystemLogsView.tsx`: 421 physical lines after the current unused cleanup working tree.
 - `src/components/settings/views/SystemLogsView.localized.tsx`: 450 physical lines after the current unused cleanup working tree.
 - `src/components/Onboarding/AchievementToast.tsx`: 60 physical lines after the current unused cleanup working tree.
@@ -161,8 +161,8 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/components/Onboarding/OnboardingOverlay.tsx`: 200 physical lines after the current unused cleanup working tree.
 - `src/components/Onboarding/useOnboardingProgress.ts`: 137 physical lines after the current unused cleanup working tree.
 - `src/services/storage/fileSystemService.ts`: 1384 physical lines.
-- `src/services/llm/OpenAICompatibleAdapter.ts`: 3896 physical lines after the M120 chat payload helper extraction; `src/services/llm/openAICompatibleChatPayload.ts`: 66 physical lines; `src/services/llm/openAICompatibleGoogleExtraBody.ts`: 62 physical lines; `src/services/llm/openAICompatibleImageDispatch.ts`: 91 physical lines; `src/services/llm/openAICompatibleImagePayload.ts`: 141 physical lines; `src/services/llm/openAICompatibleImageSizing.ts`: 99 physical lines; `src/services/llm/openAICompatibleTaskPayload.ts`: 219 physical lines.
-- `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts`: 2184 physical lines after the M113 endpoint helper extraction; `apps/api/src/modules/model-proxy/application/local-user-route-auth.ts`: 370 physical lines; `apps/api/src/modules/model-proxy/application/local-user-route-endpoints.ts`: 46 physical lines.
+- `src/services/llm/OpenAICompatibleAdapter.ts`: 3148 physical lines after M121-M123 adjacent adapter/server cleanup; `src/services/llm/openAICompatibleChatPayload.ts`: 66 physical lines; `src/services/llm/openAICompatibleGoogleExtraBody.ts`: 62 physical lines; `src/services/llm/openAICompatibleImageDispatch.ts`: 91 physical lines; `src/services/llm/openAICompatibleImagePayload.ts`: 141 physical lines; `src/services/llm/openAICompatibleImageSizing.ts`: 99 physical lines; `src/services/llm/openAICompatibleTaskPayload.ts`: 219 physical lines.
+- `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts`: 1907 physical lines after the M123 task-token helper extraction; `apps/api/src/modules/model-proxy/application/local-user-route-auth.ts`: 370 physical lines; `apps/api/src/modules/model-proxy/application/local-user-route-endpoints.ts`: 46 physical lines; `apps/api/src/modules/model-proxy/application/local-user-route-task-token.ts`: 160 physical lines.
 - `src/services/llm/openAICompatibleDiagnostics.ts`: 86 physical lines in the diagnostics preview helper boundary.
 - `src/services/llm/openAICompatibleImageRoutingErrors.ts`: 49 physical lines in the completed M57 image-routing error classifier boundary.
 - `apps/web/`: migration target, not the first edit location.
@@ -531,8 +531,8 @@ Scope:
 - Completed the post-M120 UI closure line in `da4ffc79`, `485a6bef`, and `1ca080eb`: moved the ecommerce workbench onto the canvas, flattened the prompt bar mobile actions, and flattened the settings workbench chrome without reopening runtime/provider seams.
 - Completed M121 in `74dbdbf1`: moved pure Wuyin route/base-url/reference-image/task-status helpers from `OpenAICompatibleAdapter.ts` into `src/services/llm/openAICompatibleWuyinRoute.ts`, preserving endpoint selection, auth, fetch behavior, provider routing, fallback ordering, billing, UI, and release metadata.
 - Completed M122 in `dcf38e87`: hardened local user-route task signing so public default task-secret fallback is not used unless an explicit insecure local/test fallback flag is supplied.
-- Current M123 slice: extract local user-route task token signing/verification into `apps/api/src/modules/model-proxy/application/local-user-route-task-token.ts`, preserving provider endpoint selection, auth/header assembly, route config persistence, fetch response parsing, billing, UI, release metadata, and unrelated server runtime config behavior.
-- Next step after M123: resolve the unrelated settings UI WIP that currently blocks full `npm.cmd run test:unit`, then return to a fresh seam map or quality scan; do not mix auth/header behavior, endpoint call-site behavior, fetch behavior, fallback-order changes, keyManager secrets/cloud sync, provider routing, storage persistence, release metadata, unrelated UI behavior, or broad debt cleanup.
+- Completed M123 in `9e4b409e`: extracted local user-route task token signing/verification into `apps/api/src/modules/model-proxy/application/local-user-route-task-token.ts`, preserving provider endpoint selection, auth/header assembly, route config persistence, fetch response parsing, billing, UI, release metadata, and unrelated server runtime config behavior.
+- Current post-M123 settings UI closure: close the unrelated settings UI WIP by flattening nested settings shell/card/search chrome, aligning the Clay frosted-surface contract with the new desktop/mobile shell ownership, and updating trace contracts to follow the M123 helper split. Do not mix auth/header behavior, endpoint call-site behavior, fetch behavior, fallback-order changes, keyManager secrets/cloud sync, provider routing, storage persistence, release metadata, unrelated runtime behavior, or broad debt cleanup.
 - Continue `src/context/CanvasContext.tsx` only for another high-confidence narrow seam; defer `migrateNodes`, IndexedDB/local-folder movement, and persistence orchestration until they can be split safely.
 - Continue `src/services/auth/keyManager.ts` only after a fresh seam map. Defer key storage, permission checks, encryption helpers, provider credential management, cloud sync, provider persistence, shared pricing cache construction, runtime routing, fetch/auth behavior, endpoint selection, and localStorage policy until smaller seams are mapped.
 - Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.

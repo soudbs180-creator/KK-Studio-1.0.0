@@ -12,6 +12,7 @@ function readSource(relativePath: string): string {
 test('local model proxy services preserve request tracing metadata across hosted and local task paths', () => {
   const localSystemSource = readSource('apps/api/src/modules/model-proxy/application/local-system-proxy-service.ts');
   const localUserRouteSource = readSource('apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts');
+  const localUserRouteTaskTokenSource = readSource('apps/api/src/modules/model-proxy/application/local-user-route-task-token.ts');
 
   assert.match(localSystemSource, /requestId\?: string;/);
   assert.match(localSystemSource, /attemptId\?: string;/);
@@ -24,8 +25,8 @@ test('local model proxy services preserve request tracing metadata across hosted
 
   assert.match(localUserRouteSource, /requestId\?: string;/);
   assert.match(localUserRouteSource, /attemptId\?: string;/);
-  assert.match(localUserRouteSource, /type LocalTaskPayload = \{[\s\S]*requestId\?: string;[\s\S]*attemptId\?: string;[\s\S]*\};/);
-  assert.match(localUserRouteSource, /let decodedTask: LocalTaskPayload \| undefined;/);
+  assert.match(localUserRouteTaskTokenSource, /export type LocalUserRouteTaskPayload = \{[\s\S]*requestId\?: string;[\s\S]*attemptId\?: string;[\s\S]*\};/);
+  assert.match(localUserRouteSource, /let decodedTask: LocalUserRouteTaskPayload \| undefined;/);
   assert.match(localUserRouteSource, /const requestId = String\(input\.requestId \|\| decodedTask\?\.requestId \|\| ""\)\.trim\(\) \|\| undefined;/);
   assert.match(localUserRouteSource, /const attemptId = String\(input\.attemptId \|\| decodedTask\?\.attemptId \|\| ""\)\.trim\(\) \|\| undefined;/);
   assert.match(localUserRouteSource, /taskId: upstreamTaskId \|\| input\.taskId,[\s\S]*requestId,[\s\S]*attemptId,/);

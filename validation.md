@@ -4,7 +4,53 @@ Last updated: 2026-05-06
 
 Use `npm.cmd` for npm scripts on Windows.
 
-Current baseline before M123 at `dcf38e87`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
+Current baseline before the post-M123 settings UI closure at `9e4b409e`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor/UI slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
+
+## Post-M123 Settings UI Closure Gate
+
+Use this gate when touching the already-dirty settings workbench shell/search/card flattening and M123 trace-contract follow-up:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/clay-frosted-surface-contract.test.ts" `
+  "tests/unit/settings-desktop-workbench-regression.test.ts" `
+  "tests/unit/settings-shell-scroll-regression.test.ts" `
+  "tests/unit/settings-ui-density-regression.test.ts" `
+  "tests/unit/settings-workbench-ui-refit.test.ts"
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/local-model-proxy-trace-contract.test.ts" `
+  "tests/unit/secure-model-proxy-trace-contract.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+npm.cmd run architecture:check
+npm.cmd run spec:check
+npm.cmd run governance:security
+npm.cmd run audit:dependencies
+npm.cmd run governance:check
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+npm.cmd run verify:desktop-settings-smoke
+npm.cmd run verify:mobile-settings-smoke
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "src/components/settings/views/DashboardView.localized.tsx" `
+  "src/components/settings/views/SystemLogsView.localized.tsx" `
+  "src/index.css" `
+  "tests/unit/clay-frosted-surface-contract.test.ts" `
+  "tests/unit/local-model-proxy-trace-contract.test.ts" `
+  "tests/unit/secure-model-proxy-trace-contract.test.ts" `
+  "tests/unit/settings-desktop-workbench-regression.test.ts" `
+  "tests/unit/settings-shell-scroll-regression.test.ts" `
+  "tests/unit/settings-ui-density-regression.test.ts" `
+  "tests/unit/settings-workbench-ui-refit.test.ts" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA is required because this slice touches visible settings UI. Record the Codex in-app Browser route, theme/surface, rendered controls, console error count, and any smoke-script fallback reason in `status.md`.
 
 ## M123 Local User-Route Task Token Helper Gate
 

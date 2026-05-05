@@ -278,8 +278,9 @@ export const SystemLogsView: React.FC = () => {
             '统一控制级别、来源和流状态。',
             'Control severity, source, and stream state in one place.'
           )}
+          surface="plain"
         >
-          <div className="settings-reference-toolbar">
+          <div className="settings-reference-toolbar settings-reference-toolbar--flat">
             <div className="settings-reference-toolbar__filters">
               <div className="min-w-[280px] max-w-full">
                 <SegmentedControlMulti

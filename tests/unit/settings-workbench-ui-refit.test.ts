@@ -58,6 +58,22 @@ test('settings search copy now describes navigation filtering instead of page-co
   assert.doesNotMatch(registrySource, /Search routes, providers, or platform entry/);
 });
 
+test('logs filter controls stay as a plain toolbar instead of a large nested card', () => {
+  const logsSource = readSource('src/components/settings/views/SystemLogsView.localized.tsx');
+
+  assert.match(
+    logsSource,
+    /<SettingsSection[\s\S]*title=\{pick\([^,]+, 'Filters and stream control'\)\}[\s\S]*surface="plain"[\s\S]*>\s*<div className="settings-reference-toolbar settings-reference-toolbar--flat">/,
+  );
+
+  const filterSectionMatch = logsSource.match(
+    /<SettingsSection[\s\S]*title=\{pick\([^,]+, 'Filters and stream control'\)\}[\s\S]*?<\/SettingsSection>/,
+  );
+
+  assert.ok(filterSectionMatch);
+  assert.doesNotMatch(filterSectionMatch[0], /settings-reference-card|settings-section-card|rounded-\[|border p-/);
+});
+
 test('dashboard overview uses chart and health visual blocks instead of only route cards', () => {
   const dashboardSource = readSource('src/components/settings/views/DashboardView.localized.tsx');
 
@@ -65,6 +81,10 @@ test('dashboard overview uses chart and health visual blocks instead of only rou
   assert.match(dashboardSource, /className="settings-reference-chart"/);
   assert.match(dashboardSource, /DashboardRingRow/);
   assert.match(dashboardSource, /ProgressBar/);
+  assert.match(
+    dashboardSource,
+    /<SettingsSection[\s\S]*title=\{pick\([^,]+, 'Operational health'\)\}[\s\S]*surface="plain"[\s\S]*>\s*<div className="settings-reference-rings settings-reference-rings--flat">/,
+  );
 });
 
 test('destructive settings maintenance actions require confirmation before mutating local data', () => {

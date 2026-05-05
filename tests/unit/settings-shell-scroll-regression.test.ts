@@ -27,6 +27,15 @@ test('desktop settings shell keeps a real inner scroll container and viewport-sa
   assert.match(cssSource, /\.settings-shell-main \{[\s\S]*z-index: 1;/);
   assert.match(cssSource, /\.settings-shell-page \{[\s\S]*overflow-y: auto;[\s\S]*overscroll-behavior: contain;/);
   assert.match(cssSource, /\.settings-shell-mobile__topbar \{[\s\S]*backdrop-filter: saturate\(180%\) blur\(20px\);/);
+  assert.doesNotMatch(
+    cssSource,
+    /\.settings-panel \.settings-shell,[\s\S]*\.settings-panel \.settings-shell-page--desktop[\s\S]*border: 1px solid var\(--settings-shell-border\) !important;/,
+  );
+  const shellDesktopBlocks = cssSource.match(/(?:\.settings-panel\s+)?\.settings-shell-desktop\s*\{[^}]*\}/g) || [];
+  assert.ok(shellDesktopBlocks.length > 0);
+  for (const block of shellDesktopBlocks) {
+    assert.doesNotMatch(block, /0 0 0 1px rgb\(255 255 255 \/ 0\.025\)/);
+  }
   assert.doesNotMatch(sidebarSource, /backdropFilter:/);
   assert.doesNotMatch(headerSource, /backdropFilter:/);
   assert.doesNotMatch(
@@ -59,4 +68,19 @@ test('settings visual tokens use Apple blue accents and soft product-card shadow
   assert.match(cssSource, /\.settings-panel \.settings-reference-card \{[\s\S]*border-radius: var\(--settings-radius-unified\)/);
   assert.doesNotMatch(cssSource, /--settings-accent-rgb: 148 152 161;/);
   assert.match(cssSource, /\.settings-panel \.settings-reference-card \{[\s\S]*box-shadow: var\(--settings-card-shadow\);/);
+});
+
+test('settings sidebar search keeps the input visually transparent inside the search shell', () => {
+  const sidebarSource = readSource('src/components/settings/desktop/SettingsDesktopSidebar.tsx');
+  const cssSource = readSource('src/index.css');
+
+  assert.match(sidebarSource, /className="w-full min-w-0 bg-transparent text-sm outline-none"/);
+  assert.doesNotMatch(
+    cssSource,
+    /\.settings-panel \.settings-shell-nav__search,\s*[\r\n]+\.settings-panel \.settings-shell-nav__search input \{/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell-nav__search input \{[\s\S]*background: transparent !important;[\s\S]*border: 0 !important;[\s\S]*box-shadow: none !important;[\s\S]*backdrop-filter: none;/,
+  );
 });
