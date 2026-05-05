@@ -65,45 +65,13 @@ import {
     normalizeWuyinReferenceImage,
     resolveWuyinRequestRoute,
 } from './openAICompatibleWuyinRoute';
-
-type AceDataServiceId = 'flux' | 'nano-banana';
-
-type AceDataImageRoute = {
-    serviceId: AceDataServiceId;
-    endpointPath: string;
-    taskPath: string;
-    aliases: string[];
-};
-
-const ACEDATA_DEFAULT_BASE_URL = 'https://api.acedata.cloud';
-const ACEDATA_IMAGE_ROUTES: AceDataImageRoute[] = [
-    {
-        serviceId: 'flux',
-        endpointPath: '/flux/images',
-        taskPath: '/flux/tasks',
-        aliases: [
-            'flux',
-            'flux-dev',
-            'flux-schnell',
-            'flux-pro',
-            'flux-kontext',
-            'flux-kontext-pro',
-            'flux-kontext-max',
-        ],
-    },
-    {
-        serviceId: 'nano-banana',
-        endpointPath: '/nano-banana/images',
-        taskPath: '/nano-banana/tasks',
-        aliases: [
-            'nano-banana',
-            'nanobanana',
-            'banana',
-            'gemini-2.5-flash-image',
-            'gemini-2.0-flash-exp-image-generation',
-        ],
-    },
-];
+import {
+    normalizeAceDataBaseUrl,
+    normalizeAceDataReferenceImage,
+    resolveAceDataCandidateRoutes,
+    resolveAceDataImageRoute,
+    resolveAceDataImageSize,
+} from './openAICompatibleAceDataRoute';
 
 export class OpenAICompatibleAdapter implements LLMAdapter {
     id = 'openai-compatible-adapter';
@@ -402,145 +370,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         return err as Error;
     }
 
-    private normalizeAceDataBaseUrl(baseUrl: string): string {
-        const raw = String(baseUrl || '').trim();
-        if (!raw) return ACEDATA_DEFAULT_BASE_URL;
-
-        const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-
-        try {
-            const parsed = new URL(withProtocol);
-            if (/^api\.acedata\.cloud$/i.test(parsed.hostname)) {
-                return `${parsed.protocol}//${parsed.host}`;
-            }
-
-            const sanitizedPath = parsed.pathname
-                .replace(/\/+(flux|nano-banana)\/(images|tasks)$/i, '')
-                .replace(/\/+$/, '');
-            return `${parsed.protocol}//${parsed.host}${sanitizedPath}`;
-        } catch {
-            return ACEDATA_DEFAULT_BASE_URL;
-        }
-    }
-
-    private extractAceDataDirectRoute(baseUrl: string): AceDataImageRoute | null {
-        const raw = String(baseUrl || '').trim();
-        if (!raw) return null;
-
-        const candidates = /^https?:\/\//i.test(raw) ? [raw] : [`https://${raw}`];
-        for (const candidate of candidates) {
-            try {
-                const parsed = new URL(candidate);
-                const pathname = parsed.pathname.replace(/\/+$/, '').toLowerCase();
-                const matchedRoute = ACEDATA_IMAGE_ROUTES.find((route) =>
-                    pathname.endsWith(route.endpointPath) || pathname.endsWith(route.taskPath)
-                );
-                if (matchedRoute) {
-                    return matchedRoute;
-                }
-            } catch {
-                continue;
-            }
-        }
-
-        return null;
-    }
-
-    private normalizeAceDataAlias(value: string): string {
-        return String(value || '')
-            .trim()
-            .toLowerCase()
-            .replace(/^models\//i, '')
-            .replace(/\|.*$/, '')
-            .replace(/@.*$/, '')
-            .replace(/[^a-z0-9]+/g, '');
-    }
-
-    private resolveAceDataImageRoute(baseUrl: string, modelId?: string): AceDataImageRoute {
-        const directRoute = this.extractAceDataDirectRoute(baseUrl);
-        if (directRoute) {
-            return directRoute;
-        }
-
-        const normalized = this.normalizeAceDataAlias(modelId || '');
-        const matchedRoute = ACEDATA_IMAGE_ROUTES.find((route) =>
-            route.aliases.some((alias) => this.normalizeAceDataAlias(alias) === normalized)
-        );
-        if (matchedRoute) {
-            return matchedRoute;
-        }
-
-        if (normalized.includes('flux') || normalized.includes('kontext')) {
-            return ACEDATA_IMAGE_ROUTES[0];
-        }
-        if (normalized.includes('banana') || normalized.includes('gemini25flashimage') || normalized.includes('gemini20flashexpimagegeneration')) {
-            return ACEDATA_IMAGE_ROUTES[1];
-        }
-
-        throw new Error(`AceData provider does not know how to route image model "${modelId || ''}". Please use a Flux or Nano Banana model ID.`);
-    }
-
-    private resolveAceDataCandidateRoutes(baseUrl: string, modelId?: string): AceDataImageRoute[] {
-        const routes: AceDataImageRoute[] = [];
-        const pushUnique = (route: AceDataImageRoute | null | undefined) => {
-            if (!route) return;
-            if (routes.some((item) => item.serviceId === route.serviceId)) return;
-            routes.push(route);
-        };
-
-        pushUnique(this.extractAceDataDirectRoute(baseUrl));
-
-        try {
-            pushUnique(this.resolveAceDataImageRoute(baseUrl, modelId));
-        } catch {
-            // Fall back to probing known AceData task routes when the model is unavailable.
-        }
-
-        ACEDATA_IMAGE_ROUTES.forEach(pushUnique);
-        return routes;
-    }
-
-    private normalizeAceDataReferenceImage(
-        ref: string | { data: string; mimeType: string; url?: string },
-        index: number
-    ): string {
-        const sourceUrl = typeof (ref as { url?: string })?.url === 'string'
-            ? String((ref as { url?: string }).url || '').trim()
-            : '';
-        if (/^https?:\/\//i.test(sourceUrl)) {
-            return sourceUrl;
-        }
-
-        const { data, mimeType } = extractRefImageData(ref);
-        const raw = String(data || '').trim();
-        if (!raw) {
-            throw new Error(`AceData reference image ${index + 1} is empty.`);
-        }
-
-        if (/^https?:\/\//i.test(raw)) {
-            return raw;
-        }
-
-        if (/^blob:/i.test(raw)) {
-            throw new Error(`AceData reference image ${index + 1} is still a local blob URL. Please wait for image processing to finish and try again.`);
-        }
-
-        if (/^data:/i.test(raw)) {
-            return raw;
-        }
-
-        const cleaned = raw.replace(/^data:[^;]+;base64,/i, '').replace(/\s+/g, '');
-        if (!cleaned) {
-            throw new Error(`AceData reference image ${index + 1} is not a valid URL or Base64 payload.`);
-        }
-
-        return `data:${mimeType || 'image/png'};base64,${cleaned}`;
-    }
-
-    private resolveAceDataImageSize(options: ImageGenerationOptions): string {
-        return resolveOpenAIImageSize(options, 'gpt-image-1');
-    }
-
     // AceData image tasks appear to follow the same retrieve / retrieve_batch task pattern
     // used across other AceData services such as Luma.
     private async fetchAceDataTaskDetail(
@@ -549,8 +378,8 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         modelId?: string,
         signal?: AbortSignal
     ): Promise<{ payload: any; requestPath: string }> {
-        const cleanBase = this.normalizeAceDataBaseUrl(keySlot.baseUrl || '');
-        const candidateRoutes = this.resolveAceDataCandidateRoutes(keySlot.baseUrl || '', modelId);
+        const cleanBase = normalizeAceDataBaseUrl(keySlot.baseUrl || '');
+        const candidateRoutes = resolveAceDataCandidateRoutes(keySlot.baseUrl || '', modelId);
         let lastError: any = null;
 
         for (const route of candidateRoutes) {
@@ -583,8 +412,8 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         modelId?: string,
         signal?: AbortSignal
     ): Promise<{ payload: any; requestPath: string }> {
-        const route = this.resolveAceDataImageRoute(keySlot.baseUrl || '', modelId);
-        const cleanBase = this.normalizeAceDataBaseUrl(keySlot.baseUrl || '');
+        const route = resolveAceDataImageRoute(keySlot.baseUrl || '', modelId);
+        const cleanBase = normalizeAceDataBaseUrl(keySlot.baseUrl || '');
         return this.fetchJsonTaskResponse({
             url: `${cleanBase}${route.taskPath}`,
             keySlot,
@@ -634,7 +463,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                     provider: keySlot.provider,
                     providerName: keySlot.name,
                     model: options.modelId,
-                    imageSize: options.imageSize || this.resolveAceDataImageSize(options),
+                    imageSize: options.imageSize || resolveAceDataImageSize(options),
                     keySlotId: keySlot.id,
                     metadata: {
                         requestPath: requestMeta?.submitPath || requestPath,
@@ -1251,15 +1080,15 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         options: ImageGenerationOptions,
         keySlot: KeySlot
     ): Promise<ImageGenerationResult> {
-        const cleanBase = this.normalizeAceDataBaseUrl(keySlot.baseUrl || '');
-        const route = this.resolveAceDataImageRoute(keySlot.baseUrl || '', options.modelId);
+        const cleanBase = normalizeAceDataBaseUrl(keySlot.baseUrl || '');
+        const route = resolveAceDataImageRoute(keySlot.baseUrl || '', options.modelId);
         const url = `${cleanBase}${route.endpointPath}`;
         const requestPath = route.endpointPath;
-        const resolvedSize = this.resolveAceDataImageSize(options);
+        const resolvedSize = resolveAceDataImageSize(options);
         const count = clampImageCount(options.imageCount, 10);
         const normalizedRefs = Array.isArray(options.referenceImages)
             ? options.referenceImages.map((ref, index) =>
-                this.normalizeAceDataReferenceImage(ref as { data: string; mimeType: string; url?: string }, index)
+                normalizeAceDataReferenceImage(ref as { data: string; mimeType: string; url?: string }, index)
             )
             : [];
 
