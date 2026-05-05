@@ -78,3 +78,15 @@ test('desktop workbench header stays action-only so it does not duplicate the ac
   assert.match(headerSource, /pick\('日志', 'Logs'\)/);
   assert.match(headerSource, /pick\('关闭', 'Close'\)/);
 });
+
+test('settings workbench flattens cramped nested containers and clips rounded surfaces cleanly', () => {
+  const headerSource = readSource('src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
+  const cssSource = readSource('src/index.css');
+
+  assert.match(headerSource, /settings-desktop-quick-actions/);
+  assert.doesNotMatch(headerSource, /rounded-full border p-1/);
+  assert.match(cssSource, /\.settings-panel \.settings-reference-card,[\s\S]*\.settings-panel \.settings-section-card \{[\s\S]*overflow: clip;/);
+  assert.match(cssSource, /\.settings-panel \.settings-provider-card__metric,[\s\S]*\.settings-panel \.settings-reference-mini-metric,[\s\S]*\.settings-panel \.settings-reference-list-item,[\s\S]*\.settings-panel \.settings-log-entry,[\s\S]*\.settings-panel \.settings-reference-ring-row \{[\s\S]*box-shadow: none !important;/);
+  assert.match(cssSource, /\.settings-panel \.settings-api-quick-add__icon \{[\s\S]*box-shadow: none !important;/);
+  assert.match(cssSource, /\.settings-panel \.settings-shell-page--desktop \.settings-reference-ring-row \{[\s\S]*display: grid;[\s\S]*grid-template-columns: 64px minmax\(0, 1fr\);/);
+});
