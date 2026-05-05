@@ -36,6 +36,7 @@ import {
 import { buildSafeFormDataPreview, buildSafeRequestBodyPreview } from './openAICompatibleDiagnostics';
 import { resolveOpenAICompatibleImageDispatch } from './openAICompatibleImageDispatch';
 import { extractImageUrlsFromPayload } from './openAICompatibleImagePayload';
+import { clampImageCount, getOpenAIImageProfile, resolveOpenAIEditSize, resolveOpenAIImageSize } from './openAICompatibleImageSizing';
 import { isChatEndpointCompatibilityError, isImageEndpointCompatibilityError } from './openAICompatibleImageRoutingErrors';
 
 type WuyinImageRoute = {
@@ -893,7 +894,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
     }
 
     private resolveAceDataImageSize(options: ImageGenerationOptions): string {
-        return this.resolveOpenAIImageSize(options, 'gpt-image-1');
+        return resolveOpenAIImageSize(options, 'gpt-image-1');
     }
 
     // AceData image tasks appear to follow the same retrieve / retrieve_batch task pattern
@@ -1392,7 +1393,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const body: Record<string, any> = {
             model: options.modelId,
             prompt: options.prompt,
-            n: this.clampImageCount(options.imageCount, 10),
+            n: clampImageCount(options.imageCount, 10),
             size,
         };
         const quality = this.resolve12AIAsyncImageQuality(options);
@@ -1750,7 +1751,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const url = `${cleanBase}${route.endpointPath}`;
         const requestPath = route.endpointPath;
         const resolvedSize = this.resolveAceDataImageSize(options);
-        const count = this.clampImageCount(options.imageCount, 10);
+        const count = clampImageCount(options.imageCount, 10);
         const normalizedRefs = Array.isArray(options.referenceImages)
             ? options.referenceImages.map((ref, index) =>
                 this.normalizeAceDataReferenceImage(ref as { data: string; mimeType: string; url?: string }, index)
@@ -2072,7 +2073,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             return requestedAspectRatio;
         }
 
-        return this.resolveOpenAIImageSize(options, this.getOpenAIImageProfile(options.modelId));
+        return resolveOpenAIImageSize(options, getOpenAIImageProfile(options.modelId));
     }
 
     private resolve12AIAsyncImageQuality(options: ImageGenerationOptions): string | undefined {
@@ -2147,90 +2148,12 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         return formData;
     }
 
-    private getOpenAIImageProfile(modelId: string): 'gpt-image-1' | 'dall-e-2' | 'dall-e-3' | 'generic' {
-        const lower = String(modelId || '').toLowerCase();
-        if (lower.includes('gpt-image-1')) return 'gpt-image-1';
-        if (lower.includes('dall-e-2')) return 'dall-e-2';
-        if (lower.includes('dall-e-3')) return 'dall-e-3';
-        return 'generic';
-    }
-
-    private getAspectOrientation(aspectRatio?: string): 'square' | 'landscape' | 'portrait' {
-        const value = String(aspectRatio || '').trim();
-        if (!value || value.toLowerCase() === 'auto') {
-            return 'square';
-        }
-
-        const [widthRaw, heightRaw] = value.split(':');
-        const width = Number.parseFloat(widthRaw);
-        const height = Number.parseFloat(heightRaw);
-        if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-            return 'square';
-        }
-
-        if (Math.abs(width - height) < 0.0001) {
-            return 'square';
-        }
-
-        return width > height ? 'landscape' : 'portrait';
-    }
-
-    private clampImageCount(count: number | undefined, maxCount: number): number {
-        if (!count || !Number.isFinite(count)) return 1;
-        return Math.max(1, Math.min(Math.round(count), maxCount));
-    }
-
-    private resolveOpenAIImageSize(
-        options: ImageGenerationOptions,
-        profile: 'gpt-image-1' | 'dall-e-2' | 'dall-e-3' | 'generic'
-    ): string {
-        const override = String(options.providerConfig?.openai?.size || '').trim();
-        const orientation = this.getAspectOrientation(options.aspectRatio);
-
-        const allow = (sizes: string[]): string | undefined => {
-            if (override && sizes.includes(override)) {
-                return override;
-            }
-            return undefined;
-        };
-
-        if (profile === 'gpt-image-1') {
-            return allow(['1024x1024', '1536x1024', '1024x1536', 'auto'])
-                || (orientation === 'landscape' ? '1536x1024' : orientation === 'portrait' ? '1024x1536' : '1024x1024');
-        }
-
-        if (profile === 'dall-e-2') {
-            const requested = String(options.imageSize || '').toUpperCase();
-            return allow(['256x256', '512x512', '1024x1024'])
-                || (requested.includes('256')
-                    ? '256x256'
-                    : requested.includes('512') || requested.includes('0.5K')
-                        ? '512x512'
-                        : '1024x1024');
-        }
-
-        return allow(['1024x1024', '1792x1024', '1024x1792'])
-            || (orientation === 'landscape' ? '1792x1024' : orientation === 'portrait' ? '1024x1792' : '1024x1024');
-    }
-
-    private resolveOpenAIEditSize(options: ImageGenerationOptions): string {
-        const override = String(options.providerConfig?.openai?.size || '').trim();
-        if (['256x256', '512x512', '1024x1024'].includes(override)) {
-            return override;
-        }
-
-        const requested = String(options.imageSize || '').toUpperCase();
-        if (requested.includes('256')) return '256x256';
-        if (requested.includes('512') || requested.includes('0.5K')) return '512x512';
-        return '1024x1024';
-    }
-
     private shouldUseOpenAIEditsEndpoint(options: ImageGenerationOptions, baseUrl: string): boolean {
         const hasReferenceImages = Array.isArray(options.referenceImages) && options.referenceImages.length > 0;
         if (!hasReferenceImages) return false;
         if (options.editMode) return true;
 
-        const profile = this.getOpenAIImageProfile(options.modelId);
+        const profile = getOpenAIImageProfile(options.modelId);
         return baseUrl.includes('api.openai.com') || profile !== 'generic';
     }
 
@@ -3371,7 +3294,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
     ): Promise<ImageGenerationResult> {
         const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
         const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
-        const profile = this.getOpenAIImageProfile(options.modelId);
+        const profile = getOpenAIImageProfile(options.modelId);
 
         if (this.shouldUseOpenAIEditsEndpoint(options, baseUrl)) {
             return this.generateImageStandard_OpenAI_Edits(options, keySlot);
@@ -3381,8 +3304,8 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const body: any = {
             model: options.modelId,
             prompt: options.prompt,
-            n: this.clampImageCount(options.imageCount, profile === 'dall-e-3' ? 1 : 10),
-            size: this.resolveOpenAIImageSize(options, profile),
+            n: clampImageCount(options.imageCount, profile === 'dall-e-3' ? 1 : 10),
+            size: resolveOpenAIImageSize(options, profile),
             response_format: 'b64_json'
         };
 
@@ -3419,12 +3342,12 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
         const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
         const url = `${cleanBase}/images/edits`;
-        const sizeString = this.resolveOpenAIEditSize(options);
+        const sizeString = resolveOpenAIEditSize(options);
         const formData = new FormData();
 
         formData.append('model', options.modelId);
         formData.append('prompt', options.prompt);
-        formData.append('n', String(this.clampImageCount(options.imageCount, 10)));
+        formData.append('n', String(clampImageCount(options.imageCount, 10)));
         formData.append('size', sizeString);
         formData.append('response_format', 'b64_json');
 
