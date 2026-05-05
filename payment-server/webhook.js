@@ -36,6 +36,24 @@ function resolveWebhookRawBody(req) {
     return JSON.stringify(req.body);
 }
 
+function getMissingWeChatPayConfigKeys() {
+    return [
+        'WECHATPAY_API_V3_KEY',
+        'WECHATPAY_APPID',
+        'WECHATPAY_MCHID',
+        'WECHATPAY_PUBLIC_CERT',
+        'WECHATPAY_PRIVATE_KEY',
+    ].filter((key) => !String(process.env[key] || '').trim());
+}
+
+function formatMissingConfigMessage(keys) {
+    if (keys.length <= 1) {
+        return `${keys[0] || 'WeChat Pay config'} missing`;
+    }
+
+    return `${keys.slice(0, -1).join(', ')} and ${keys[keys.length - 1]} missing`;
+}
+
 // Keep this Alipay configuration aligned with payment-server/index.js.
 const alipaySdk = new AlipaySdk({
     appId: process.env.AP_APP_ID || process.env.ALIPAY_APP_ID,
@@ -180,9 +198,11 @@ router.post('/alipay', async (req, res) => {
 router.post('/wechat', async (req, res) => {
     console.log('[payment-webhook] Received WeChat Pay notify');
 
-    if (!process.env.WECHATPAY_API_V3_KEY) {
-        console.error('[payment-webhook] Missing WECHATPAY_API_V3_KEY, refusing to process callback.');
-        return res.status(500).json({ code: 'FAIL', message: 'WECHATPAY_API_V3_KEY missing' });
+    const missingWeChatConfigKeys = getMissingWeChatPayConfigKeys();
+    if (missingWeChatConfigKeys.length > 0) {
+        const message = formatMissingConfigMessage(missingWeChatConfigKeys);
+        console.error(`[payment-webhook] WeChat Pay configuration is incomplete: ${message}.`);
+        return res.status(500).json({ code: 'FAIL', message });
     }
 
     try {
@@ -190,8 +210,8 @@ router.post('/wechat', async (req, res) => {
         const wxpay = new WxPay({
             appid: process.env.WECHATPAY_APPID,
             mchid: process.env.WECHATPAY_MCHID,
-            publicKey: Buffer.from(process.env.WECHATPAY_PUBLIC_CERT || 'public-key', 'utf-8'),
-            privateKey: Buffer.from(process.env.WECHATPAY_PRIVATE_KEY || 'private-key', 'utf-8'),
+            publicKey: Buffer.from(process.env.WECHATPAY_PUBLIC_CERT, 'utf-8'),
+            privateKey: Buffer.from(process.env.WECHATPAY_PRIVATE_KEY, 'utf-8'),
         });
 
         const signature = req.headers['wechatpay-signature'];

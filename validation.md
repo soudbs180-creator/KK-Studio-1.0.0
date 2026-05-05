@@ -1196,6 +1196,26 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- ".env.e
 
 Because this gate touches `src/components/canvas/InfiniteCanvas.tsx`, browser QA is mandatory. Record the in-app Browser URL, title, visible `#canvas-container`, root count, and console error count in `status.md`.
 
+## Legacy Payment-Server Security Gate
+
+Use this gate when touching legacy `payment-server` callback configuration, WeChat Pay webhook validation, or legacy payment return/notify URL defaults:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/payment-server-legacy-security-contract.test.ts" "tests/unit/payment-webhook-wechat-raw-body.test.ts" "tests/unit/payment-webhook-fail-closed.test.ts" "tests/unit/payment-runtime-hardening.test.ts"
+npm.cmd run typecheck:payment-server
+node scripts/ci/check-tests-types.mjs tsconfig.tests.json
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+npm.cmd run governance:security
+npm.cmd run audit:dependencies
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "payment-server/index.js" "payment-server/webhook.js" "tests/unit/payment-server-legacy-security-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+Browser QA may be skipped for this slice because it hardens the legacy payment server and tests request/server behavior without JSX, CSS, route rendering, or browser-visible UI changes.
+
 ## keyManager Shared Pricing Helper Gate
 
 Use this gate for the M114 shared pricing catalog/snapshot helper extraction:

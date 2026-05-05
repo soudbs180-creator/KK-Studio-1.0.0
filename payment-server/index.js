@@ -126,15 +126,24 @@ function toUrlSearchParams(query = {}) {
   return params;
 }
 
-function applyLegacyPaymentDefaults(params) {
+function buildLegacyCallbackUrl(origin, pathName) {
+  const normalizedOrigin = String(origin || 'http://127.0.0.1:8080').replace(/\/+$/g, '');
+  return `${normalizedOrigin}${pathName}`;
+}
+
+function applyLegacyPaymentDefaults(params, origin) {
   params.set(
     'returnUrl',
-    process.env.PAYMENT_RETURN_URL || process.env.AP_RETURN_URL || 'https://kkai.plus/pay/success',
+    process.env.PAYMENT_RETURN_URL
+      || process.env.AP_RETURN_URL
+      || buildLegacyCallbackUrl(origin, '/pay/success'),
   );
 
   params.set(
     'notifyUrl',
-    process.env.PAYMENT_NOTIFY_URL || process.env.AP_NOTIFY_URL || 'https://kkai.plus/api/pay/notify/alipay',
+    process.env.PAYMENT_NOTIFY_URL
+      || process.env.AP_NOTIFY_URL
+      || buildLegacyCallbackUrl(origin, '/api/pay/notify/alipay'),
   );
 
   if (!params.get('currency')) {
@@ -269,7 +278,7 @@ app.get('/api/pay/qrcode', async (req, res) => {
     }
 
     const origin = buildLegacyOrigin(req);
-    const query = applyLegacyPaymentDefaults(toUrlSearchParams(req.query));
+    const query = applyLegacyPaymentDefaults(toUrlSearchParams(req.query), origin);
     const result = await handleLegacyCreateQrCodeThroughSidecar(query, req.headers, origin, {
       paymentUrlFactory: async (input) => createAlipayPageLink({
         outTradeNo: input.merchantOrderNo,
@@ -295,7 +304,7 @@ app.get('/api/pay', async (req, res) => {
     }
 
     const origin = buildLegacyOrigin(req);
-    const query = applyLegacyPaymentDefaults(toUrlSearchParams(req.query));
+    const query = applyLegacyPaymentDefaults(toUrlSearchParams(req.query), origin);
     const result = await handleLegacyRedirectThroughSidecar(query, req.headers, origin, {
       paymentUrlFactory: async (input) => createAlipayPageLink({
         outTradeNo: input.merchantOrderNo,

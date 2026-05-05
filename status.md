@@ -4,19 +4,32 @@ Last updated: 2026-05-05
 
 ## Active State
 
-- Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 and Stage One Backfill are complete; the current slice is M117 OpenAI-compatible Gemini image sizing helper extraction.
-- Current slice override: move only pure Gemini image-size and requested aspect-ratio normalization into `src/services/llm/openAICompatibleImageSizing.ts`.
+- Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 and Stage One Backfill are complete; the current slice is M118 legacy payment-server security fail-closed hardening.
+- Current slice override: hard-fail legacy WeChat Pay webhook handling when required WeChat Pay credentials are missing, remove placeholder cert/private-key fallbacks, and derive legacy payment return/notify defaults from the current request origin instead of production `kkai.plus` URLs.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source; the latest committed slice is `5aaccf50 fix: handle ecommerce analysis static html fallback`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source; the latest committed slice before the current working tree is `c0c96808 refactor: extract gemini image sizing helper`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Thread merge state: `019dd551...` is the main refactor history and `019de168...` is continuation history; both are part of the same Stage One M6 ecommerce runtime line.
 - Alternate-git worktree was clean at `296c1203` before the M113 extraction pass; M113 is now committed at `617491b3`.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: commit M117 after the completed helper extraction validation, then select the next narrow giant-file or quality-governance slice from a fresh seam map.
-- Most recent committed code/security scopes: post-hotfix ledger sync in `689a2cc2`; ecommerce analysis static HTML fallback in `5aaccf50`; M116 ecommerce card build UI stabilization in `52074495`; M115 keyManager remote model discovery helper extraction in `ed444606`; M114 keyManager shared pricing helper extraction in `245bdd4b`.
-- Current commit scope: M117 OpenAI-compatible Gemini image sizing helper extraction; no endpoint selection, auth, fetch behavior, provider routing, fallback ordering, billing, UI, release metadata, or broad type/log cleanup belongs in this commit.
+- Current focus: finish and commit M118, then return to the next ordinary Stage Two seam from the fresh audit map.
+- Most recent committed code/security scopes: M117 Gemini image sizing helper extraction in `c0c96808`; post-hotfix ledger sync in `689a2cc2`; ecommerce analysis static HTML fallback in `5aaccf50`; M116 ecommerce card build UI stabilization in `52074495`; M115 keyManager remote model discovery helper extraction in `ed444606`.
+- Current commit scope: M118 legacy payment-server security fail-closed hardening; no sidecar settlement semantics, payment amount calculation, hosted route gating, provider routing, UI, release metadata, or broad logging/type cleanup belongs in this commit.
 - Browser QA: completed for M116 in the Codex in-app Browser against the live Vite target on `127.0.0.1:3100`.
+
+## Current M118 (Legacy Payment-Server Security Fail-Closed)
+
+- Audit evidence: the finalization security scan found two release blockers in the tracked legacy `payment-server`: WeChat Pay webhook construction used literal `public-key` / `private-key` fallbacks when cert/private-key env vars were missing, and legacy payment route default return/notify URLs fell back to production `https://kkai.plus` URLs.
+- RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/payment-server-legacy-security-contract.test.ts` failed 0/2 before the fix: the WeChat webhook returned 200 instead of 500 when certificate config was incomplete, and `/api/pay/qrcode` sent `https://kkai.plus/pay/success` instead of a request-origin URL.
+- Fix scope: `payment-server/webhook.js` now checks `WECHATPAY_API_V3_KEY`, `WECHATPAY_APPID`, `WECHATPAY_MCHID`, `WECHATPAY_PUBLIC_CERT`, and `WECHATPAY_PRIVATE_KEY` before loading `wechatpay-node-v3`, returns a fail-closed JSON error when any required key is missing, and passes only configured cert/private-key values to `WxPay`.
+- Fix scope: `payment-server/index.js` now derives missing legacy `returnUrl` and `notifyUrl` from `buildLegacyOrigin(req)` for `/api/pay/qrcode` and `/api/pay`, while preserving explicit `PAYMENT_RETURN_URL` / `AP_RETURN_URL` and `PAYMENT_NOTIFY_URL` / `AP_NOTIFY_URL` overrides.
+- Fresh targeted validation passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/payment-server-legacy-security-contract.test.ts` passed 2/2; the related payment set `tests/unit/payment-server-legacy-security-contract.test.ts tests/unit/payment-webhook-wechat-raw-body.test.ts tests/unit/payment-webhook-fail-closed.test.ts tests/unit/payment-runtime-hardening.test.ts` passed 10/10.
+- Fresh type validation passed: `npm.cmd run typecheck:payment-server`; `node scripts/ci/check-tests-types.mjs tsconfig.tests.json`; and `npm.cmd run typecheck`.
+- Fresh repository validation passed: `npm.cmd run test:unit` passed 1353/1353; `npm.cmd run build`; `npm.cmd run governance:agent-docs`; `npm.cmd run check:encoding`; `npm.cmd run governance:security`; `npm.cmd run governance:check`; `npm.cmd run audit:dependencies` reported 0 vulnerabilities in root and `payment-server`; and the M118 path-limited alternate-git `diff --check` passed with LF/CRLF normalization warnings only.
+- Direct `npx.cmd tsc --noEmit -p tsconfig.tests.json --pretty false` remains a known noisy raw TypeScript invocation with pre-existing `ApiResponse.error` / nullable-size diagnostics; the project-owned semantic test checker and full `npm.cmd run typecheck` are the active gates and passed.
+- Browser QA skipped: this is a non-UI legacy payment server hardening slice with no JSX, CSS, route rendering, or browser-visible behavior change.
+- Line counts for this slice: `payment-server/index.js` is 350 physical lines; `payment-server/webhook.js` is 283 physical lines; `tests/unit/payment-server-legacy-security-contract.test.ts` is 273 physical lines; `tsconfig.tests.json` is 146 physical lines.
 
 ## Completed In `5aaccf50` (Ecommerce XLSX Static Preview Analysis)
 
@@ -200,7 +213,7 @@ Last updated: 2026-05-05
 - Browser QA skipped: this is a non-UI service/source-contract extraction with no JSX, CSS, route rendering, or browser-visible behavior change.
 - Line counts for this slice: `src/services/llm/OpenAICompatibleAdapter.ts` is 4008 physical lines; `src/services/llm/openAICompatibleTaskPayload.ts` is 219 physical lines; `tests/unit/openai-compatible-task-payload-contract.test.ts` is 105 physical lines.
 
-## Current M117 (OpenAI-Compatible Gemini Image Sizing Helper)
+## Completed In `c0c96808` M117 (OpenAI-Compatible Gemini Image Sizing Helper)
 
 - RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/openai-compatible-image-sizing-contract.test.ts` failed first because `src/services/llm/openAICompatibleImageSizing.ts` did not export `normalizeGeminiImageSize` or `normalizeRequestedAspectRatio`.
 - Moved only Gemini image-size normalization and requested aspect-ratio normalization into `src/services/llm/openAICompatibleImageSizing.ts`; `OpenAICompatibleAdapter.ts` now imports the helpers while preserving endpoint selection, auth, fetch behavior, provider routing, fallback ordering, billing, UI, and release metadata.
@@ -2554,16 +2567,16 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-Fresh remaining-work assessment after the M117 working tree:
+Fresh remaining-work assessment after the M118 security audit pass:
 
-- Current fact source: the latest committed base before M117 is `689a2cc2 docs: sync post hotfix ledger`; the alternate-git working tree contains only the M117 helper extraction and ledger updates.
-- Current M117 gate spot-checks: `tests/unit/openai-compatible-image-sizing-contract.test.ts` passed 6/6; the broader OpenAI/provider image gate passed 65/65; `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false`; `npm.cmd run architecture:check`; `npm.cmd run typecheck`; `npm.cmd run test:unit` passed 1351/1351; `npm.cmd run build`; `npm.cmd run governance:agent-docs`; `npm.cmd run check:encoding`; and the path-limited alternate-git `diff --check` passed.
+- Current fact source: the latest committed base before M118 is `c0c96808 refactor: extract gemini image sizing helper`; the alternate-git working tree contains only the M118 legacy payment-server security fix plus ledger/test registration updates.
+- Current M118 gate spot-checks: the new payment security contract passed 2/2; the related payment set passed 10/10; `npm.cmd run typecheck:payment-server`; `node scripts/ci/check-tests-types.mjs tsconfig.tests.json`; and `npm.cmd run typecheck` passed.
 - Largest tracked TS/TSX files still above 2k lines: `src/App.tsx` 4812; `src/services/auth/keyManager.ts` 4100; `src/services/llm/OpenAICompatibleAdapter.ts` 3999; `src/components/layout/PromptBar.tsx` 3965; `src/components/settings/ApiSettingsView.tsx` 3347; `src/components/layout/ChatSidebar.tsx` 2743; `src/app/useGenerationRuntime.ts` 2603; `src/context/CanvasContext.tsx` 2517; `src/components/canvas/PromptNodeComponent.tsx` 2241; `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts` 2184; `apps/api/src/server.ts` 2117; `src/hooks/useImageGeneration.ts` 2031.
 - Current tracked TS/TSX debt counts: direct `as any` matches 155; broad `any` token matches 586; TS suppressions 133; `console.log` 245. Broad workspace counts excluding generated/vendor directories are higher because they include docs/scripts/tests: `as any` 164; broad `any` token matches 672; TS suppressions 137; `console.log` 416.
-- Interpretation: the project is functionally green by the latest gates, but not refactor-complete because Stage Two giant-file splitting, Stage Three quality governance, and Stage Four `apps/web` migration remain open. Remaining completion estimate is roughly 26-42 narrow slices if Stage Four is included.
+- Interpretation: the project is functionally green by the latest gates, and M118 closes the known legacy payment security blockers found by the latest audit, but it is still not refactor-complete because Stage Two giant-file splitting, Stage Three quality governance, and Stage Four `apps/web` migration remain open. Remaining completion estimate is roughly 26-42 narrow slices if Stage Four is included.
 
-1. The current noUnused filter is clean at `5aaccf50`; the route-gate helpers are wired into live entrypoints; M107 moved OpenAI-compatible post-surface image dispatch planning into a pure helper; M108 moved image payload URL/base64 extraction into a pure helper; M109 moved OpenAI image sizing/profile logic into a pure helper; M110 moved generic task payload parsing into a pure helper; M111 moved generic task result assembly into a pure helper; M112 moved local user-route auth/header/query-key and route-surface helpers into a pure server helper; M113 moved local user-route direct endpoint URL normalization into a pure server helper; M114 moved keyManager shared pricing normalization/snapshot construction into a pure service helper; and M115 moved keyManager remote model discovery response parsing/dedupe into a pure service helper.
-2. Next cleanup candidate should be chosen from a fresh seam map, line-count pressure, or touched-file type/log debt scan. Keep the next slice separate from keyManager secrets/cloud sync, provider routing, storage persistence, release metadata, and UI behavior unless explicitly scoped.
+1. The current noUnused filter is clean at `c0c96808`; the route-gate helpers are wired into live entrypoints; M107-M117 moved the latest OpenAI-compatible and server helper seams into focused modules; M118 is the current security blocker fix.
+2. Next ordinary cleanup candidate after M118 should be chosen from the fresh seam map. The safest next architecture slice is `OpenAICompatibleAdapter.ts` Google extra-body helper extraction; the explicit remaining UI seam is `PromptBar.tsx` attachment/drag/reference-image ingestion and requires browser QA if touched.
 3. Remaining OpenAI-compatible adapter seams: request builders, response parsing, provider quirks, polling fetch helpers, and image/video/audio compatibility still need fresh maps. Do not change endpoint selection, auth, fetch behavior, or fallback ordering without a dedicated behavior test.
 4. Follow-up server seam: dedupe route auth/header/query-key logic between `apps/api/src/modules/auth/application/user-route-diagnostics-service.ts` and `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts`; verify provider auth/proxy and Gemini protocol guards plus API restart/probe on port `3001`.
 5. Follow-up UI seam: split `src/components/layout/PromptBar.tsx` paste/drop/reference-image ingestion and drag handling only with browser QA, because it touches file-input UI behavior.

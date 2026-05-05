@@ -115,6 +115,7 @@
         "tests/unit/openai-compatible-unused-cleanup-contract.test.ts",
         "tests/unit/onboarding-unused-cleanup-contract.test.ts",
         "tests/unit/payment-runtime-hardening.test.ts",
+        "tests/unit/payment-server-legacy-security-contract.test.ts",
         "tests/unit/payment-server-settlement-bridge.test.ts",
         "tests/unit/payment-settlement-auth.test.ts",
         "tests/unit/payment-settlement-hardening.test.ts",
