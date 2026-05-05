@@ -4,18 +4,18 @@ Last updated: 2026-05-06
 
 ## Active State
 
-- Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 and Stage One Backfill are complete; the post-M120 UI closure line is split and committed in `da4ffc79`, `485a6bef`, and `1ca080eb`; M121-M123 are now committed through `9e4b409e`.
-- Current slice override: post-M123 settings UI closure. It closes the already-dirty settings shell/search/card flattening plus M123 trace-contract follow-up, and must not reopen provider routing, auth/header behavior, release metadata, or broad debt cleanup.
+- Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 and Stage One Backfill are complete; the post-M120 UI closure line is split and committed in `da4ffc79`, `485a6bef`, and `1ca080eb`; M121-M123 are committed through `9e4b409e`; the post-M123 settings UI closure is committed in `5dda8972`.
+- Current slice override: no active code slice remains after the settings UI closure. The next step is a fresh seam map or quality-governance slice, not blind continuation.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source; the latest stable baseline before the current settings UI closure slice is `9e4b409e refactor: extract local user-route task token helper`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source; the latest stable baseline is `5dda8972 style: close settings workbench shell flattening`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Thread merge state: `019dd551...` is the main refactor history and `019de168...` is continuation history; both are part of the same Stage One M6 ecommerce runtime line.
 - Alternate-git worktree was clean at `296c1203` before the M113 extraction pass; M113 is now committed at `617491b3`.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: commit the post-M123 settings UI closure, then return to a fresh seam map or quality scan.
-- Most recent committed scopes: M123 local user-route task token helper extraction in `9e4b409e`; M122 local user-route task signing hardening in `dcf38e87`; M121 Wuyin route helper extraction in `74dbdbf1`; post-UI closure ledger sync in `4940dd98`; settings workbench chrome flattening in `1ca080eb`; PromptBar mobile action flattening in `485a6bef`; ecommerce canvas workbench split in `da4ffc79`; M120 OpenAI-compatible chat payload helper extraction in `cff75d23`; M119 OpenAI-compatible Google extra-body helper extraction in `8545513b`; M118 legacy payment-server security hardening in `2dbb402e`; M117 Gemini image sizing helper extraction in `c0c96808`.
-- Current commit scope: `src/components/settings/views/DashboardView.localized.tsx`, `src/components/settings/views/SystemLogsView.localized.tsx`, `src/index.css`, `tests/unit/clay-frosted-surface-contract.test.ts`, `tests/unit/local-model-proxy-trace-contract.test.ts`, `tests/unit/secure-model-proxy-trace-contract.test.ts`, `tests/unit/settings-desktop-workbench-regression.test.ts`, `tests/unit/settings-shell-scroll-regression.test.ts`, `tests/unit/settings-ui-density-regression.test.ts`, `tests/unit/settings-workbench-ui-refit.test.ts`, and ledger files.
+- Current focus: select the next fresh seam map or quality scan from the remaining work list.
+- Most recent committed scopes: post-M123 settings UI closure in `5dda8972`; M123 local user-route task token helper extraction in `9e4b409e`; M122 local user-route task signing hardening in `dcf38e87`; M121 Wuyin route helper extraction in `74dbdbf1`; post-UI closure ledger sync in `4940dd98`; settings workbench chrome flattening in `1ca080eb`; PromptBar mobile action flattening in `485a6bef`; ecommerce canvas workbench split in `da4ffc79`; M120 OpenAI-compatible chat payload helper extraction in `cff75d23`; M119 OpenAI-compatible Google extra-body helper extraction in `8545513b`; M118 legacy payment-server security hardening in `2dbb402e`; M117 Gemini image sizing helper extraction in `c0c96808`.
+- Current commit scope: docs-only ledger sync to advance the fact source from `9e4b409e` to `5dda8972`; no production/runtime files are active.
 - Browser QA: Codex in-app Browser verified `http://127.0.0.1:3100/settings/api-management` in dark theme. The visible settings API workbench rendered the flattened sidebar/search, API hero, simple-list provider card, official/direct and proxy buttons, and no console errors. The current-port Playwright smoke scripts passed in fallback mode because headless Chromium launch hit `spawn EPERM`; route fallback checks returned HTTP 200 for root/settings/API routes.
 
 ## Current Finalization Gate
@@ -2654,9 +2654,9 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-Fresh remaining-work assessment after `9e4b409e` and the 2026-05-06 settings UI closure gate:
+Fresh remaining-work assessment after `5dda8972` and the 2026-05-06 settings UI closure gate:
 
-- Current fact source: the latest stable alternate-git baseline before the settings UI closure slice is `9e4b409e refactor: extract local user-route task token helper`.
+- Current fact source: the latest stable alternate-git baseline is `5dda8972 style: close settings workbench shell flattening`.
 - Current finalization gate: `governance:check`, `architecture:check`, `governance:security`, `spec:check`, `audit:dependencies`, `typecheck`, `test:unit` 1373/1373, `build`, `check:encoding`, the strict no-unused probe, and the settings browser/manual smoke checks all passed.
 - Largest tracked TS/TSX/JS files still above 2k lines after the settings closure: `src/App.tsx` 4328; `src/components/layout/PromptBar.tsx` 3631; `src/services/auth/keyManager.ts` 3594; `src/services/llm/OpenAICompatibleAdapter.ts` 3148; `src/components/settings/ApiSettingsView.tsx` 3071; `src/components/layout/ChatSidebar.tsx` 2477; `src/app/useGenerationRuntime.ts` 2341; `src/context/CanvasContext.tsx` 2197; `src/components/canvas/PromptNodeComponent.tsx` 2121; `apps/api/src/server.ts` 1918; `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts` 1907; `src/hooks/useImageGeneration.ts` 1863.
 - Current debt counts across `src`, `apps`, `packages`, `payment-server`, and `tests`: direct `as any` matches 152; broad `any` token matches 546; TS suppressions 133; `console.log` matches 246.

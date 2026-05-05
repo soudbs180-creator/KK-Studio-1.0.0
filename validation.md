@@ -4,7 +4,7 @@ Last updated: 2026-05-06
 
 Use `npm.cmd` for npm scripts on Windows.
 
-Current baseline before the post-M123 settings UI closure at `9e4b409e`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor/UI slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
+Current baseline after the post-M123 settings UI closure at `5dda8972`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor/UI slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
 
 ## Post-M123 Settings UI Closure Gate
 

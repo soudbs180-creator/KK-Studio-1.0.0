@@ -4,7 +4,7 @@ Last updated: 2026-05-06
 
 ## Operating Mode
 
-This is a long-running execution. Plain `.git` may show stale historical state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`. The latest stable baseline before the current settings UI closure slice is `9e4b409e refactor: extract local user-route task token helper`; the latest code slices before this UI closure are `74dbdbf1 refactor: extract wuyin route helper`, `dcf38e87 fix: harden local user-route task signing`, and `9e4b409e refactor: extract local user-route task token helper`.
+This is a long-running execution. Plain `.git` may show stale historical state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`. The latest stable baseline after the settings UI closure is `5dda8972 style: close settings workbench shell flattening`; the latest code slices before that closure are `74dbdbf1 refactor: extract wuyin route helper`, `dcf38e87 fix: harden local user-route task signing`, `9e4b409e refactor: extract local user-route task token helper`, and `5dda8972 style: close settings workbench shell flattening`.
 
 The active workstream is a single merged line. Thread `019dd551...` is the main refactor history and `019de168...` is continuation history; both belong to Stage One M6 ecommerce runtime extraction. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; ecommerce source selection closed in `ccf965c3`; ecommerce partial redraw closed in `d12731ce`; connector renderer boundary hardening closed in `5f5b76e0`; connector review follow-up closed in `f06f1880`; the M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`.
 
@@ -12,7 +12,7 @@ Stage One Backfill M2 completed in `8a458cd4` by hardening `src/app/usePromptGro
 
 The active plan is `plans.md`. The current status and next exact step are tracked in `status.md`. Validation commands and expected gates are tracked in `validation.md`.
 
-Current slice override: post-M123 settings UI closure. Close only the already-dirty settings workbench shell/search/card flattening and the trace-contract follow-up from M123. Do not change provider endpoint selection, auth/header assembly, route config persistence, fetch response parsing, billing, release metadata, key storage, provider routing, or unrelated runtime/server behavior in this slice.
+Current slice override: no active code slice remains from the settings closure. The current task is to keep the ledger aligned and then choose the next fresh seam map or quality-governance slice. Do not change provider endpoint selection, auth/header assembly, route config persistence, fetch response parsing, billing, release metadata, key storage, provider routing, or unrelated runtime/server behavior unless a new slice explicitly selects them.
 
 For Clay UI work, use `C:/Users/Administrator/Downloads/DESIGN-clay.md` as the visual base with these overrides: inputs, main cards, sub cards, and framework cards use controlled frosted material; dark mode uses neutral black-gray surfaces; Clay brand colors are emphasis only. That lane is not active unless the user reports a new visual issue.
 
