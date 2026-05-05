@@ -4,7 +4,7 @@ Last updated: 2026-05-05
 
 ## Operating Mode
 
-This is a long-running execution. Plain `.git` still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`; the latest committed architecture slice is `245bdd4b`, and the current working-tree runtime slice is M115 keyManager remote model discovery helper extraction.
+This is a long-running execution. Plain `.git` may show stale historical state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`; the latest committed architecture slice is `ed444606`, and the current working-tree UI slice is M116 ecommerce visibility/localization closure.
 
 The active workstream is a single merged line. Thread `019dd551...` is the main refactor history and `019de168...` is continuation history; both belong to Stage One M6 ecommerce runtime extraction. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; ecommerce source selection closed in `ccf965c3`; ecommerce partial redraw closed in `d12731ce`; connector renderer boundary hardening closed in `5f5b76e0`; connector review follow-up closed in `f06f1880`; the M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`.
 
@@ -12,14 +12,14 @@ Stage One Backfill M2 completed in `8a458cd4` by hardening `src/app/usePromptGro
 
 The active plan is `plans.md`. The current status and next exact step are tracked in `status.md`. Validation commands and expected gates are tracked in `validation.md`.
 
-Current slice override: M115 extracts only pure remote model discovery response parsing, Google whitelist/default merge, Gemini-compatible model ID normalization, and OpenAI-compatible canonical dedupe from `src/services/auth/keyManager.ts` into `src/services/auth/keyManagerRemoteModelDiscovery.ts`. Keep provider fetches, endpoint selection, auth/header/query-key behavior, provider persistence, cloud sync, key storage, route selection, runtime model resolution, localStorage policy, release metadata, and UI behavior in their existing owners.
+Current slice override: M116 closes ecommerce/mobile UI visibility and localization debt: keep ecommerce task cards visible while hiding helper group nodes, localize ecommerce build/runtime notifications, localize ecommerce card and PromptBar companion controls, localize mobile result feed/detail chrome, and keep prompt-card insertion responsive while reference images persist in the background. Keep provider fetches, endpoint selection, auth/header/query-key behavior, provider persistence, cloud sync, key storage, route selection, runtime model resolution, localStorage policy, release metadata, and unrelated UI redesign out of this slice.
 
 For Clay UI work, use `C:/Users/Administrator/Downloads/DESIGN-clay.md` as the visual base with these overrides: inputs, main cards, sub cards, and framework cards use controlled frosted material; dark mode uses neutral black-gray surfaces; Clay brand colors are emphasis only. That lane is not active unless the user reports a new visual issue.
 
 Current convergence order:
 1. Keep the ledger files aligned with the alternate-git HEAD and the merged single execution line.
 2. Treat Stage One M6 ecommerce extraction and Stage One backfill boundaries as complete unless a new concrete regression proves otherwise.
-3. For Stage Two, split or prune one responsibility at a time from the largest files. After M115, choose the next seam from a fresh map; do not chain keyManager secrets/cloud sync, provider fetches, endpoint/auth behavior, provider persistence, route selection, storage, release metadata, UI, or broad debt cleanup into the same slice.
+3. For Stage Two, split or prune one responsibility at a time from the largest files. After M116, choose the next seam from a fresh map; do not chain keyManager secrets/cloud sync, provider fetches, endpoint/auth behavior, provider persistence, route selection, storage, release metadata, unrelated UI redesign, or broad debt cleanup into the same slice.
 4. Write/update focused source contracts before each extraction when behavior or ownership changes.
 5. Move domain helpers and side effects into focused modules while preserving compatibility exports.
 6. Verify with the targeted gate for the touched slice, typecheck, full unit suite, build or architecture check as required, docs governance, encoding checks, and path-limited `git diff --check`.
@@ -93,6 +93,11 @@ For every milestone:
 - For shared v1.4.2 ledger updates, `status.md` must name the active lane(s), included commit paths, excluded dirty path groups, and browser inspection status.
 - For a UI audit lane commit, `status.md` must record browser URL, theme, viewport/surface checked, `.theme-transitioning` result, SearchPalette/settings/API workbench checks, and stale chunk findings.
 - The final release gate includes `npm.cmd run governance:check`, `npm.cmd run audit:dependencies`, `npm.cmd run spec:check`, `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, and `npm.cmd run check:encoding`. The former `governance:version` portable metadata mismatch was cleared by `567f85aa`; rerun the gate after any future packaging/publish metadata change.
+
+## Active M116 Execution Rule
+
+- Treat M116 ecommerce visibility/localization as one UI closure slice: canvas visibility filters, ecommerce build/runtime notifications, ecommerce card actions, PromptBar companion labels, and mobile result feed/detail localization may be committed together only after the M116 gate in `validation.md` and in-app Browser QA are recorded.
+- Do not add service/provider/security/release-metadata changes to M116. Any follow-up giant-file split, type-debt cleanup, or security gate work must start from a clean alternate-git worktree after the M116 commit.
 
 ## Context Exhaustion Protocol
 

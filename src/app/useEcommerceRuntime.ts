@@ -12,6 +12,7 @@ import {
   resumeEcommerceFrameworkRuntime,
 } from '../services/ecommerce/frameworkRuntime.ts';
 import { GenerationMode, type EcommerceFrameworkQueueItem, type EcommerceGroupSheet, type PromptNode } from '../types.ts';
+import { pickByDocumentLanguage } from '../utils/localeText';
 import {
   applyEcommerceAnalysisSelectionState,
   applyEcommerceGroupSelectionState,
@@ -290,7 +291,10 @@ export function useEcommerceRuntime({
     const queuedCount = enqueueEcommerceFrameworkNodes(node.id, targetNodes);
     if (queuedCount === 0) {
       import('../services/system/notificationService').then(({ notify }) => {
-        notify.warning('No eligible cards', 'There are no ecommerce cards ready to enqueue.');
+        notify.warning(
+          pickByDocumentLanguage('暂无可加入队列的卡片', 'No eligible cards'),
+          pickByDocumentLanguage('当前没有准备好加入队列的电商卡片。', 'There are no ecommerce cards ready to enqueue.'),
+        );
       });
       return;
     }
@@ -356,10 +360,10 @@ export function useEcommerceRuntime({
     if (queuedCount === 0) {
       import('../services/system/notificationService').then(({ notify }) => {
         notify.warning(
-          'No eligible cards',
+          pickByDocumentLanguage('暂无可加入队列的卡片', 'No eligible cards'),
           phase === 'mobile'
-            ? 'There are no confirmed mobile follow-up cards ready to enqueue.'
-            : 'There are no ecommerce cards ready to enqueue for this group.',
+            ? pickByDocumentLanguage('当前没有已确认、可加入队列的手机版续作卡片。', 'There are no confirmed mobile follow-up cards ready to enqueue.')
+            : pickByDocumentLanguage('当前分组没有准备好加入队列的电商卡片。', 'There are no ecommerce cards ready to enqueue for this group.'),
         );
       });
       return;

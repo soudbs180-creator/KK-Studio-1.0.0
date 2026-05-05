@@ -108,6 +108,18 @@ test('canvas node update boundary lives outside CanvasContext', () => {
   assert.doesNotMatch(nodeUpdateWrapperSource, /imageNodes: c\.imageNodes\.map/);
 });
 
+test('addPromptNode does not await reference image persistence before returning', () => {
+  const contextSource = readSource('src/context/CanvasContext.tsx');
+  const promptUpdateWrapperSource = contextSource.slice(
+    contextSource.indexOf('const addPromptNode = useCallback'),
+    contextSource.indexOf('const urgentUpdatePromptNode = useCallback')
+  );
+
+  assert.match(promptUpdateWrapperSource, /addCanvasPromptNode\(canvas, node\)/);
+  assert.match(promptUpdateWrapperSource, /void Promise\.allSettled\(saveTasks\)/);
+  assert.doesNotMatch(promptUpdateWrapperSource, /await Promise\.allSettled\(saveTasks\)/);
+});
+
 test('addCanvasPromptNode appends a prompt above existing canvas nodes and skips duplicate ids', async () => {
   const { addCanvasPromptNode } = await loadCanvasNodeUpdatesModule();
   const source = canvas({

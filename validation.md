@@ -1503,6 +1503,66 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
 
 This slice also requires `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and a path-limited alternate-git `diff --check`.
 
+## M116 Ecommerce Visibility Localization Gate
+
+Use this gate for the active ecommerce visibility/localization UI closure slice:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/canvas-node-updates-contract.test.ts" `
+  "tests/unit/ecommerce-build-runtime-contract.test.ts" `
+  "tests/unit/ecommerce-build-visibility-localization-regression.test.ts" `
+  "tests/unit/ecommerce-button-guards.test.ts" `
+  "tests/unit/ecommerce-canvas-contract.test.ts" `
+  "tests/unit/ecommerce-canvas-flow-contract.test.ts" `
+  "tests/unit/ecommerce-framework-contract.test.ts" `
+  "tests/unit/ecommerce-framework-runtime-state-contract.test.ts" `
+  "tests/unit/ecommerce-group-shell-app-contract.test.ts" `
+  "tests/unit/ecommerce-runtime-contract.test.ts" `
+  "tests/unit/prompt-bar-ecommerce-framework-companion.test.ts" `
+  "tests/unit/prompt-bar-ecommerce-group-workbench.test.ts" `
+  "tests/unit/mobile-ecommerce-continuation-surface.test.ts" `
+  "tests/unit/mobile-result-feed-detail-contract.test.ts" `
+  "tests/unit/mobile-workspace-surface-contract.test.ts"
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "src/App.tsx" `
+  "src/app/useEcommerceBuildRuntime.ts" `
+  "src/app/useEcommerceRuntime.ts" `
+  "src/app/usePromptGroupLayout.ts" `
+  "src/components/ecommerce/EcommerceCardActions.tsx" `
+  "src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx" `
+  "src/components/mobile/MobileResultDetailScreen.tsx" `
+  "src/components/mobile/MobileResultFeed.tsx" `
+  "src/context/CanvasContext.tsx" `
+  "tests/unit/canvas-node-updates-contract.test.ts" `
+  "tests/unit/ecommerce-build-runtime-contract.test.ts" `
+  "tests/unit/ecommerce-build-visibility-localization-regression.test.ts" `
+  "tests/unit/ecommerce-button-guards.test.ts" `
+  "tests/unit/ecommerce-canvas-contract.test.ts" `
+  "tests/unit/ecommerce-canvas-flow-contract.test.ts" `
+  "tests/unit/ecommerce-framework-contract.test.ts" `
+  "tests/unit/ecommerce-framework-runtime-state-contract.test.ts" `
+  "tests/unit/ecommerce-group-shell-app-contract.test.ts" `
+  "tests/unit/ecommerce-runtime-contract.test.ts" `
+  "tests/unit/prompt-bar-ecommerce-framework-companion.test.ts" `
+  "tests/unit/prompt-bar-ecommerce-group-workbench.test.ts" `
+  "tests/unit/mobile-ecommerce-continuation-surface.test.ts" `
+  "tests/unit/mobile-result-feed-detail-contract.test.ts" `
+  "tests/unit/mobile-workspace-surface-contract.test.ts" `
+  "tsconfig.tests.json" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Because this slice touches visible UI, record Codex in-app Browser evidence in `status.md`: URL, viewport, theme, ecommerce/mobile surface checked, `.theme-transitioning`, stale chunk text count, and console error count.
+
 ## Release Gate
 
 Run these before final sign-off:

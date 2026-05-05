@@ -19,6 +19,7 @@ import EcommerceAnalysisReviewPanel from '../../ecommerce/EcommerceAnalysisRevie
 import EcommerceTaskEditorPanel, {
   type EcommerceTaskStateChangeHandler,
 } from '../../ecommerce/EcommerceTaskEditorPanel';
+import { useLocale } from '../../../context/LocaleContext';
 
 type ManualReferenceBinding = {
   assetId: string;
@@ -154,14 +155,16 @@ function resolveWorkbenchMode(
   return activeTaskState.sourceKind === 'main-image' ? 'main-card-edit' : 'module-edit';
 }
 
-function resolveVersionLabel(source: 'generated' | 'redraw' | null): string {
+type LocalePick = <T,>(zh: T, en: T) => T;
+
+function resolveVersionLabel(source: 'generated' | 'redraw' | null, pick: LocalePick): string {
   if (source === 'redraw') {
-    return 'Redraw';
+    return pick('重绘', 'Redraw');
   }
   if (source === 'generated') {
-    return 'Generated';
+    return pick('生成', 'Generated');
   }
-  return 'Pending';
+  return pick('待生成', 'Pending');
 }
 
 function buildGroupEntries(params: {
@@ -171,6 +174,7 @@ function buildGroupEntries(params: {
   taskStates: Record<string, EcommerceEditableTaskState | undefined>;
   groupSlots: Record<EcommerceGroupSheet, EcommerceGroupSlotState[]>;
   activeTaskState: EcommerceEditableTaskState | null;
+  pick: LocalePick;
 }): WorkbenchEntry[] {
   const items: Array<EcommerceAnalysisMainImageItem | EcommerceAnalysisAPlusModule> =
     params.groupSheet === '主图'
@@ -200,27 +204,28 @@ function buildGroupEntries(params: {
       isActive,
       currentImageId: slotState?.currentImageId || null,
       history: slotState?.history || [],
-      currentVersionLabel: resolveVersionLabel(slotState?.currentSource || null),
+      currentVersionLabel: resolveVersionLabel(slotState?.currentSource || null, params.pick),
       historyCount: slotState?.history.length || 0,
     };
   });
 }
 
 const FrameworkQueueCards: React.FC<{ frameworkSummary?: EcommerceFrameworkSummary }> = ({ frameworkSummary }) => {
+  const { pick } = useLocale();
   const cards = frameworkSummary
     ? [
-      { label: 'Queued', value: frameworkSummary.queued },
-      { label: 'Dispatching', value: frameworkSummary.dispatching },
-      { label: 'Running', value: frameworkSummary.running },
-      { label: 'Completed', value: frameworkSummary.completed },
-      { label: 'Failed', value: frameworkSummary.failed },
+      { label: pick('排队', 'Queued'), value: frameworkSummary.queued },
+      { label: pick('分发中', 'Dispatching'), value: frameworkSummary.dispatching },
+      { label: pick('运行中', 'Running'), value: frameworkSummary.running },
+      { label: pick('已完成', 'Completed'), value: frameworkSummary.completed },
+      { label: pick('失败', 'Failed'), value: frameworkSummary.failed },
     ]
     : [
-      { label: 'Queued', value: 0 },
-      { label: 'Dispatching', value: 0 },
-      { label: 'Running', value: 0 },
-      { label: 'Completed', value: 0 },
-      { label: 'Failed', value: 0 },
+      { label: pick('排队', 'Queued'), value: 0 },
+      { label: pick('分发中', 'Dispatching'), value: 0 },
+      { label: pick('运行中', 'Running'), value: 0 },
+      { label: pick('已完成', 'Completed'), value: 0 },
+      { label: pick('失败', 'Failed'), value: 0 },
     ];
 
   return (
@@ -271,6 +276,8 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
   onPreviewSlotHistory,
   onTaskStateChange,
 }) => {
+  const { pick } = useLocale();
+
   if (
     config.mode !== GenerationMode.ECOMMERCE
     || !onPickRequirementFile
@@ -297,6 +304,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
       taskStates,
       groupSlots: resolvedGroupSlots,
       activeTaskState,
+      pick,
     })
     : [];
   const selectedCount = activeEntries.filter((entry) => entry.selected).length;
@@ -329,7 +337,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
       >
         <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-[var(--text-primary)]">Focused task</div>
+            <div className="text-sm font-semibold text-[var(--text-primary)]">{pick('当前任务', 'Focused task')}</div>
             <div className="mt-1 text-xs text-[var(--text-secondary)]">
               {activeTaskState.displayLabel || activeTaskState.outputTypeLabel || activeTaskState.theme}
               {activeTaskState.sourceRowKey ? ` · ${activeTaskState.sourceRowKey}` : ''}
@@ -341,7 +349,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
             </span>
             {frameworkSummary ? (
               <span className="rounded-full border px-2 py-0.5 text-[10px]" style={chipStyle}>
-                {frameworkSummary.paused ? 'Paused' : 'Synced'}
+                {frameworkSummary.paused ? pick('已暂停', 'Paused') : pick('已同步', 'Synced')}
               </span>
             ) : null}
           </div>
@@ -355,7 +363,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
               style={actionButtonStyle}
               onClick={() => onActivateGroupSheet(activeTaskState.sourceSheet)}
             >
-              Sync section
+              {pick('同步分区', 'Sync section')}
             </button>
           ) : null}
           {onActivateTaskBySourceKey ? (
@@ -365,7 +373,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
               style={actionButtonStyle}
               onClick={() => onActivateTaskBySourceKey(activeTaskState.sourceRowKey)}
             >
-              Focus on canvas
+              {pick('定位到画板', 'Focus on canvas')}
             </button>
           ) : null}
           {currentTaskSlot?.currentImageId && onPreviewSlotHistory ? (
@@ -381,7 +389,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
                   currentTaskSlot.currentImageId || undefined,
                 )}
               >
-                Preview current
+                {pick('预览当前版本', 'Preview current')}
               </button>
               {currentHistoricalVersions.length > 0 ? (
                 <button
@@ -393,7 +401,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
                     previous === activeTaskState.sourceRowKey ? null : activeTaskState.sourceRowKey
                   ))}
                 >
-                  History {currentHistoricalVersions.length}
+                  {pick('历史', 'History')} {currentHistoricalVersions.length}
                 </button>
               ) : null}
             </>
@@ -415,9 +423,9 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
                 )}
               >
                 <span className="text-[var(--text-primary)]">
-                  {resolveVersionLabel(historyEntry.source)} {currentHistoricalVersions.length - index}
+                  {resolveVersionLabel(historyEntry.source, pick)} {currentHistoricalVersions.length - index}
                 </span>
-                <span className="text-[var(--text-tertiary)]">Preview</span>
+                <span className="text-[var(--text-tertiary)]">{pick('预览', 'Preview')}</span>
               </button>
             ))}
           </div>
@@ -484,21 +492,24 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
           >
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-[var(--text-primary)]">Canvas framework</div>
+                <div className="text-sm font-semibold text-[var(--text-primary)]">{pick('画板框架', 'Canvas framework')}</div>
                 <div className="mt-1 text-xs text-[var(--text-secondary)]">
-                  Batch queue control stays on the canvas framework card. PromptBar mirrors framework progress, focused task details, and slot history.
+                  {pick(
+                    '批量队列控制保留在画板框架卡上。PromptBar 只同步框架进度、当前任务和槽位历史。',
+                    'Batch queue control stays on the canvas framework card. PromptBar mirrors framework progress, focused task details, and slot history.',
+                  )}
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="rounded-full border px-2 py-0.5 text-[10px]" style={chipStyle}>
-                  {frameworkSummary?.frameworkLabel || (activeFrameworkId ? 'Framework linked' : 'No framework focus')}
+                  {frameworkSummary?.frameworkLabel || (activeFrameworkId ? pick('已连接框架', 'Framework linked') : pick('未聚焦框架', 'No framework focus'))}
                 </span>
                 <span className="rounded-full border px-2 py-0.5 text-[10px]" style={chipStyle}>
-                  Section {sectionLabelMap[resolvedGroupSheet]}
+                  {pick('分区', 'Section')} {sectionLabelMap[resolvedGroupSheet]}
                 </span>
                 {frameworkSummary ? (
                   <span className="rounded-full border px-2 py-0.5 text-[10px]" style={chipStyle}>
-                    {frameworkSummary.paused ? 'Paused' : (frameworkSummary.running > 0 ? 'Running' : 'Idle')}
+                    {frameworkSummary.paused ? pick('已暂停', 'Paused') : (frameworkSummary.running > 0 ? pick('运行中', 'Running') : pick('空闲', 'Idle'))}
                   </span>
                 ) : null}
               </div>
@@ -516,9 +527,12 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
           >
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-[var(--text-primary)]">PromptBar companion</div>
+                <div className="text-sm font-semibold text-[var(--text-primary)]">{pick('PromptBar 辅助面板', 'PromptBar companion')}</div>
                 <div className="mt-1 text-xs text-[var(--text-secondary)]">
-                  Use the canvas framework card for batch start, pause, resume, and section switching. Use PromptBar for lightweight task review and parameter follow-up.
+                  {pick(
+                    '批量开始、暂停、继续和分区切换请在画板框架卡上操作；PromptBar 负责轻量检查任务与参数跟进。',
+                    'Use the canvas framework card for batch start, pause, resume, and section switching. Use PromptBar for lightweight task review and parameter follow-up.',
+                  )}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -529,7 +543,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
                     style={actionButtonStyle}
                     onClick={() => onActivateGroupSheet(resolvedGroupSheet)}
                   >
-                    Sync section
+                    {pick('同步分区', 'Sync section')}
                   </button>
                 ) : null}
                 {activeTaskState && onActivateTaskBySourceKey ? (
@@ -539,7 +553,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
                     style={actionButtonStyle}
                     onClick={() => onActivateTaskBySourceKey(activeTaskState.sourceRowKey)}
                   >
-                    Focus active task
+                    {pick('定位当前任务', 'Focus active task')}
                   </button>
                 ) : null}
               </div>
@@ -547,21 +561,21 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
 
             <div className="mt-3 grid gap-2 md:grid-cols-4">
               <div className="rounded-lg border px-3 py-2" style={subSurfaceStyle}>
-                <div className="text-[11px] text-[var(--text-tertiary)]">Selected</div>
+                <div className="text-[11px] text-[var(--text-tertiary)]">{pick('已选', 'Selected')}</div>
                 <div className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{selectedCount}</div>
               </div>
               <div className="rounded-lg border px-3 py-2" style={subSurfaceStyle}>
-                <div className="text-[11px] text-[var(--text-tertiary)]">Skipped</div>
+                <div className="text-[11px] text-[var(--text-tertiary)]">{pick('已跳过', 'Skipped')}</div>
                 <div className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{skippedCount}</div>
               </div>
               <div className="rounded-lg border px-3 py-2" style={subSurfaceStyle}>
-                <div className="text-[11px] text-[var(--text-tertiary)]">Section items</div>
+                <div className="text-[11px] text-[var(--text-tertiary)]">{pick('分区任务', 'Section items')}</div>
                 <div className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{activeEntries.length}</div>
               </div>
               <div className="rounded-lg border px-3 py-2" style={subSurfaceStyle}>
-                <div className="text-[11px] text-[var(--text-tertiary)]">Focused task</div>
+                <div className="text-[11px] text-[var(--text-tertiary)]">{pick('当前任务', 'Focused task')}</div>
                 <div className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                  {activeTaskState?.displayLabel || activeTaskState?.outputTypeLabel || 'Canvas selection'}
+                  {activeTaskState?.displayLabel || activeTaskState?.outputTypeLabel || pick('画板选择', 'Canvas selection')}
                 </div>
               </div>
             </div>
@@ -583,12 +597,12 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
                       <div className="text-sm font-medium text-[var(--text-primary)]">{entry.title}</div>
                       <div className="mt-1 text-xs text-[var(--text-secondary)]">{entry.subtitle}</div>
                       <div className="mt-1 text-[10px] text-[var(--text-tertiary)]">
-                        {entry.currentVersionLabel} · History {entry.historyCount}
+                        {entry.currentVersionLabel} · {pick('历史', 'History')} {entry.historyCount}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="rounded-full border px-2 py-0.5 text-[10px]" style={chipStyle}>
-                        {entry.selected ? 'Selected' : 'Skipped'}
+                        {entry.selected ? pick('已选', 'Selected') : pick('已跳过', 'Skipped')}
                       </span>
                       {onActivateTaskBySourceKey ? (
                         <button
@@ -597,7 +611,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
                           style={actionButtonStyle}
                           onClick={() => onActivateTaskBySourceKey(entry.sourceKey)}
                         >
-                          Focus
+                          {pick('定位', 'Focus')}
                         </button>
                       ) : null}
                     </div>
@@ -605,13 +619,19 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
                 ))}
                 {activeEntries.length > previewEntries.length ? (
                   <div className="text-[11px] text-[var(--text-tertiary)]">
-                    {activeEntries.length - previewEntries.length} more tasks remain on the canvas framework card.
+                    {pick(
+                      `还有 ${activeEntries.length - previewEntries.length} 个任务保留在画板框架卡上。`,
+                      `${activeEntries.length - previewEntries.length} more tasks remain on the canvas framework card.`,
+                    )}
                   </div>
                 ) : null}
               </div>
             ) : (
               <div className="mt-3 min-h-0 flex-1 text-xs text-[var(--text-secondary)]">
-                Select a framework card or task card on the canvas to continue editing here.
+                {pick(
+                  '在画板上选择框架卡或任务卡后，可在这里继续编辑。',
+                  'Select a framework card or task card on the canvas to continue editing here.',
+                )}
               </div>
             )}
           </div>

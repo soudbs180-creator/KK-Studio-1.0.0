@@ -168,4 +168,17 @@ describe('mobile ecommerce continuation surface', () => {
     assert.match(detailSource, /产品图/);
     assert.match(detailSource, /参考图/);
   });
+
+  test('localizes mobile framework queue chrome instead of hard-coding English labels', () => {
+    const detailSource = readSource('src/components/mobile/MobileResultDetailScreen.tsx');
+
+    assert.match(detailSource, /import \{ useLocale \} from '\.\.\/\.\.\/context\/LocaleContext';/);
+    assert.match(detailSource, /const \{ pick \} = useLocale\(\);/);
+    assert.doesNotMatch(detailSource, />\s*Framework Queue\s*</);
+    assert.doesNotMatch(detailSource, /\? 'Paused' : 'Running'/);
+    assert.doesNotMatch(detailSource, />Queued \{frameworkStatus\.queued\}/);
+    assert.doesNotMatch(detailSource, />Running \{frameworkStatus\.running\}/);
+    assert.doesNotMatch(detailSource, />Failed \{frameworkStatus\.failed\}/);
+    assert.doesNotMatch(detailSource, />Total \{frameworkStatus\.total\}/);
+  });
 });

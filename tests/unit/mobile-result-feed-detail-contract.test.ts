@@ -52,3 +52,24 @@ test('mobile result feed stays card-focused and defers full result actions to a 
   assert.match(detailSource, /onPrevious/);
   assert.match(detailSource, /onNext/);
 });
+
+test('mobile result feed localizes chrome copy instead of hard-coding English in Chinese workspace', () => {
+  const feedSource = readSource('src/components/mobile/MobileResultFeed.tsx');
+  const detailSource = readSource('src/components/mobile/MobileResultDetailScreen.tsx');
+
+  assert.match(feedSource, /import \{ useLocale \} from '\.\.\/\.\.\/context\/LocaleContext';/);
+  assert.match(feedSource, /const \{ pick \} = useLocale\(\);/);
+  assert.match(feedSource, /const counterLabel = totalResults === 0 \? pick\([^)]*'Waiting'\)/);
+  assert.match(feedSource, /const selectedSourceLabel = pick\([^)]*'source selected'\);/);
+  assert.doesNotMatch(feedSource, />\s*Results\s*</);
+  assert.doesNotMatch(feedSource, /totalResults === 0 \? 'Waiting'/);
+  assert.doesNotMatch(feedSource, /\/ source selected/);
+
+  assert.match(detailSource, /import \{ useLocale \} from '\.\.\/\.\.\/context\/LocaleContext';/);
+  assert.match(detailSource, /const \{ pick \} = useLocale\(\);/);
+  assert.match(detailSource, /pick\('[^']+', 'Framework Queue'\)/);
+  assert.match(detailSource, /pick\('[^']+', 'Paused'\)/);
+  assert.match(detailSource, /pick\('[^']+', 'Queued'\)/);
+  assert.doesNotMatch(detailSource, />\s*Framework Queue\s*</);
+  assert.doesNotMatch(detailSource, />Queued \{frameworkStatus\.queued\}/);
+});

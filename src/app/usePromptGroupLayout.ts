@@ -1139,7 +1139,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
       .filter((promptNode) => !(
         promptNode.mode === GenerationMode.ECOMMERCE
         && promptNode.ecommerce?.frameworkId
-        && promptNode.ecommerce.kind !== 'framework'
+        && promptNode.ecommerce.kind === 'a-plus-group'
       ))
       .map((promptNode) => {
         const childImages = childImagesByPromptId.get(promptNode.id) || [];

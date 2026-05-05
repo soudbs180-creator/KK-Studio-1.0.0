@@ -902,8 +902,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         }
                     }
                 });
-                await Promise.allSettled(saveTasks); // Use allSettled so one failed reference does not abort the rest.
-                console.log('[CanvasContext.addPromptNode] Reference image persistence finished');
+                void Promise.allSettled(saveTasks).then(() => {
+                    console.log('[CanvasContext.addPromptNode] Reference image persistence finished');
+                }); // Keep card insertion responsive; one failed reference does not abort the rest.
             }
         } catch (error: any) {
             // Fatal error: adding the card failed.

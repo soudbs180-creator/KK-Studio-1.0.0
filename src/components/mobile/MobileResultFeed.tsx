@@ -1,6 +1,7 @@
 import React from 'react';
 
 import type { MobileResultEntry, ResponsiveSurface, ResultViewMode } from '../../types';
+import { useLocale } from '../../context/LocaleContext';
 import {
   getAdaptiveResultColumnCount,
   getAdaptiveResultTileGridMetrics,
@@ -90,10 +91,12 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
   onEntryOpen,
   onUseAsSource,
 }) => {
+  const { pick } = useLocale();
   const totalResults = resultEntries.length;
   const hasSelectedSource =
     Boolean(activeSourceImage) && resultEntries.some((entry) => entry.imageId === activeSourceImage);
-  const counterLabel = totalResults === 0 ? 'Waiting' : `${totalResults} results`;
+  const counterLabel = totalResults === 0 ? pick('等待中', 'Waiting') : pick(`${totalResults} 个结果`, `${totalResults} results`);
+  const selectedSourceLabel = pick('已选源图', 'source selected');
   const measuredWidth = typeof window !== 'undefined' ? window.innerWidth : getFallbackWidth(surface);
   const columnCount = getAdaptiveResultColumnCount({
     surface,
@@ -106,10 +109,10 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
       <div className="mb-3 flex items-center justify-between gap-3 px-1">
         <div className="min-w-0">
           <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
-            Results
+            {pick('结果', 'Results')}
           </div>
           <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-            Tap any result to inspect the full prompt and actions.
+            {pick('点击任意结果查看完整提示词和操作。', 'Tap any result to inspect the full prompt and actions.')}
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
@@ -123,12 +126,12 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                   viewMode === mode ? 'bg-[var(--text-primary)] text-[var(--bg-primary)]' : 'text-[var(--text-secondary)]'
                 }`}
               >
-                {mode === 'detail' ? '详细' : '标准'}
+                {mode === 'detail' ? pick('详细', 'Detail') : pick('标准', 'Standard')}
               </button>
             ))}
           </div>
           <div className="whitespace-nowrap rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)]/85 px-3 py-1.5 text-[11px] font-medium text-[var(--text-secondary)]">
-            {hasSelectedSource ? `${counterLabel} / source selected` : counterLabel}
+            {hasSelectedSource ? `${counterLabel} / ${selectedSourceLabel}` : counterLabel}
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { useLocale } from '../../context/LocaleContext';
 import type { EcommerceEditableTaskState, PromptNode } from '../../types';
 
 type EcommerceFrameworkStatus = {
@@ -96,6 +97,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
   onConfirmDesktop,
   onGenerateMobile,
 }) => {
+  const { pick } = useLocale();
   const ecommerce = node.ecommerce;
   if (!ecommerce) return null;
 
@@ -118,10 +120,10 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
       ),
   );
   const mobileActionLabel = effectiveSizeTier === '1464x600'
-    ? 'Generate mobile'
+    ? pick('生成移动版', 'Generate mobile')
     : effectiveSizeTier === '600x450'
-      ? 'Regenerate mobile'
-      : 'Generate mobile';
+      ? pick('重新生成移动版', 'Regenerate mobile')
+      : pick('生成移动版', 'Generate mobile');
 
   if (isFramework) {
     return (
@@ -129,19 +131,19 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
         {frameworkStatus ? (
           <div className="flex flex-wrap gap-1 text-[10px] text-[var(--text-secondary)]">
             <span className="rounded-full border px-2 py-1" style={frameworkChipStyle}>
-              {frameworkStatus.paused ? 'Paused' : 'Running'}
+              {frameworkStatus.paused ? pick('已暂停', 'Paused') : pick('运行中', 'Running')}
             </span>
             <span className="rounded-full border px-2 py-1" style={frameworkChipStyle}>
-              Queue {frameworkStatus.queued}
+              {pick('排队', 'Queue')} {frameworkStatus.queued}
             </span>
             <span className="rounded-full border px-2 py-1" style={frameworkChipStyle}>
-              Active {frameworkStatus.dispatching + frameworkStatus.running}
+              {pick('进行中', 'Active')} {frameworkStatus.dispatching + frameworkStatus.running}
             </span>
             <span className="rounded-full border px-2 py-1" style={frameworkChipStyle}>
-              Done {frameworkStatus.completed}
+              {pick('完成', 'Done')} {frameworkStatus.completed}
             </span>
             <span className="rounded-full border px-2 py-1" style={frameworkChipStyle}>
-              Failed {frameworkStatus.failed}
+              {pick('失败', 'Failed')} {frameworkStatus.failed}
             </span>
           </div>
         ) : null}
@@ -155,7 +157,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
               onGenerateFramework?.(node);
             }}
           >
-            Start queue
+            {pick('开始队列', 'Start queue')}
           </button>
           <button
             type="button"
@@ -170,7 +172,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
               }
             }}
           >
-            {frameworkStatus?.paused ? 'Resume' : 'Pause'}
+            {frameworkStatus?.paused ? pick('继续', 'Resume') : pick('暂停', 'Pause')}
           </button>
         </div>
       </div>
@@ -193,7 +195,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
             onToggleSelected(node, !selected);
           }}
         >
-          {selected ? 'Skip' : 'Include'}
+          {selected ? pick('跳过', 'Skip') : pick('纳入', 'Include')}
         </button>
       ) : null}
 
@@ -208,7 +210,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
             onTaskStateChange(resolvedTaskState.taskId, (previous) => ({ ...previous }));
           }}
         >
-          {taskIsActive ? 'Editing' : 'Edit task'}
+          {taskIsActive ? pick('编辑中', 'Editing') : pick('编辑任务', 'Edit task')}
         </button>
       ) : null}
 
@@ -222,7 +224,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
             onCancelNodeQueue(node);
           }}
         >
-          Cancel queued
+          {pick('取消排队', 'Cancel queued')}
         </button>
       ) : null}
 
@@ -236,7 +238,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
             onGenerateNode(node);
           }}
         >
-          Generate
+          {pick('生成', 'Generate')}
         </button>
       ) : null}
 
@@ -253,7 +255,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
                   onSetGroupSelection(node, true);
                 }}
               >
-                Select all
+                {pick('全选', 'Select all')}
               </button>
               <button
                 type="button"
@@ -264,7 +266,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
                   onSetGroupSelection(node, false);
                 }}
               >
-                Clear all
+                {pick('清空', 'Clear all')}
               </button>
             </>
           ) : null}
@@ -278,7 +280,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
                 onGenerateGroup(node, 'desktop');
               }}
             >
-              Queue main cards
+              {pick('主图入队', 'Queue main cards')}
             </button>
           ) : (
             <>
@@ -291,7 +293,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
                   onGenerateGroup(node, 'desktop');
                 }}
               >
-                Queue desktop
+                {pick('桌面版入队', 'Queue desktop')}
               </button>
               <button
                 type="button"
@@ -302,7 +304,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
                   onGenerateGroup(node, 'mobile');
                 }}
               >
-                Queue mobile
+                {pick('移动版入队', 'Queue mobile')}
               </button>
             </>
           )}
@@ -320,7 +322,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
               onGenerateNode(node);
             }}
           >
-            {isDesktopThenMobile ? 'Generate desktop' : 'Generate'}
+            {isDesktopThenMobile ? pick('生成桌面版', 'Generate desktop') : pick('生成', 'Generate')}
           </button>
           {isDesktopThenMobile ? (
             <>
@@ -334,7 +336,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
                   onConfirmDesktop(node);
                 }}
               >
-                Confirm desktop
+                {pick('确认桌面版', 'Confirm desktop')}
               </button>
               <button
                 type="button"

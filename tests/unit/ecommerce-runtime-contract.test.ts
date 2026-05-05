@@ -70,3 +70,14 @@ test('ecommerce framework scheduler actions are owned by useEcommerceRuntime', (
   assert.doesNotMatch(appSource, /const handlePreviewEcommerceSlotHistory = useCallback/);
   assert.doesNotMatch(appSource, /const handlePreviewEcommerceSlotHistoryForNode = useCallback/);
 });
+
+test('ecommerce runtime queue warnings are localized for Chinese workspace', () => {
+  const hookSource = readSource('src/app/useEcommerceRuntime.ts');
+
+  assert.match(hookSource, /import \{ pickByDocumentLanguage \} from '\.\.\/utils\/localeText';/);
+  assert.doesNotMatch(hookSource, /notify\.warning\('No eligible cards'/);
+  assert.match(hookSource, /notify\.warning\(\s*pickByDocumentLanguage\([^)]*'No eligible cards'\)/);
+  assert.match(hookSource, /pickByDocumentLanguage\([^)]*There are no ecommerce cards ready to enqueue\./);
+  assert.match(hookSource, /pickByDocumentLanguage\([^)]*There are no confirmed mobile follow-up cards ready to enqueue\./);
+  assert.match(hookSource, /pickByDocumentLanguage\([^)]*There are no ecommerce cards ready to enqueue for this group\./);
+});

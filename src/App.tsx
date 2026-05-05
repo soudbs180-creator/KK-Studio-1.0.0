@@ -3103,7 +3103,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         if (
           n.mode === GenerationMode.ECOMMERCE
           && n.ecommerce?.frameworkId
-          && n.ecommerce.kind !== 'framework'
+          && n.ecommerce.kind === 'a-plus-group'
         ) {
           return false;
         }
@@ -4413,7 +4413,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             .filter((n) => !(
               n.mode === GenerationMode.ECOMMERCE
               && n.ecommerce?.frameworkId
-              && n.ecommerce.kind !== 'framework'
+              && n.ecommerce.kind === 'a-plus-group'
             ))
             .map(n => n.position) || []),
           ...(activeCanvas?.imageNodes.map(n => n.position) || [])

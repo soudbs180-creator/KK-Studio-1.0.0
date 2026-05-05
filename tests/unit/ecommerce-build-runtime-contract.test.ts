@@ -29,8 +29,8 @@ test('ecommerce build runtime owns confirmation and node builders', () => {
   assert.match(hookSource, /const referenceAssetIds = params\.item\.referenceAssetIds \|\| \[\];/);
   assert.match(hookSource, /const referenceMentions = params\.item\.referenceMentions \|\| \[\];/);
   assert.match(hookSource, /reviewWarnings: params\.item\.reviewWarnings \|\| \[\]/);
-  assert.match(hookSource, /notify\.success\('Build complete'/);
-  assert.match(hookSource, /notify\.error\('Build failed'/);
+  assert.match(hookSource, /notify\.success\(\s*pickByDocumentLanguage\('建卡完成', 'Build complete'\)/);
+  assert.match(hookSource, /notify\.error\(\s*pickByDocumentLanguage\('建卡失败', 'Build failed'\)/);
 
   assert.match(appSource, /useEcommerceBuildRuntime\(\{/);
   assert.match(appSource, /setEcommerceBuildRuntimeState: updateEcommerceBuildRuntimeState/);

@@ -17,6 +17,7 @@ import { buildEcommerceCanvasGroupLayout } from '../services/ecommerce/groupCanv
 import { buildEcommerceAssetRoleBindings } from '../services/ecommerce/assetRoleBindings.ts';
 import { buildInitialEcommerceGroupSlotState, type EcommerceGroupSlotState } from '../services/ecommerce/groupSlotState.ts';
 import { mergeEcommerceTaskState } from '../services/ecommerce/taskMerger.ts';
+import { localizeUserFacingText, pickByDocumentLanguage } from '../utils/localeText.ts';
 import {
   createDefaultEcommerceFrameworkSchedulerConfig,
   createEcommerceFrameworkRuntimeState,
@@ -95,12 +96,20 @@ export interface UseEcommerceBuildRuntimeResult {
 
 async function notifyBuildSuccess(count: number): Promise<void> {
   const { notify } = await import('../services/system/notificationService');
-  notify.success('Build complete', `Created ${count} ecommerce cards.`);
+  notify.success(
+    pickByDocumentLanguage('建卡完成', 'Build complete'),
+    pickByDocumentLanguage(`已创建 ${count} 张电商卡片。`, `Created ${count} ecommerce cards.`),
+  );
 }
 
 async function notifyBuildFailure(error: unknown): Promise<void> {
   const { notify } = await import('../services/system/notificationService');
-  notify.error('Build failed', error instanceof Error ? error.message : 'Please try again later.');
+  notify.error(
+    pickByDocumentLanguage('建卡失败', 'Build failed'),
+    error instanceof Error
+      ? (localizeUserFacingText(error.message) || error.message)
+      : pickByDocumentLanguage('请稍后重试。', 'Please try again later.'),
+  );
 }
 
 function reportBuildSuccess(count: number): void {
@@ -153,7 +162,10 @@ export function useEcommerceBuildRuntime({
     position: { x: number; y: number },
   ): PromptNode => {
     const productName = analysis.projectMeta.productName;
-    const label = `${productName || '电商'} Framework`;
+    const label = pickByDocumentLanguage(
+      `${productName || '电商'} 框架`,
+      `${productName || 'Ecommerce'} Framework`,
+    );
     const schedulerConfig = createDefaultEcommerceFrameworkSchedulerConfig();
     const summary = [
       analysis.projectMeta.projectName || label,
@@ -375,7 +387,7 @@ export function useEcommerceBuildRuntime({
       referenceImages,
       timestamp: Date.now(),
       mode: GenerationMode.ECOMMERCE,
-      hiddenInCanvas: Boolean(params.frameworkId),
+      hiddenInCanvas: false,
       parallelCount: 1,
       thinkingMode: 'high',
       ecommerce: {
