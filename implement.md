@@ -4,7 +4,7 @@ Last updated: 2026-05-06
 
 ## Operating Mode
 
-This is a long-running execution. Plain `.git` may show stale historical state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`. The latest stable baseline before the active M122 slice is `74dbdbf1 refactor: extract wuyin route helper`; the latest code slices before M122 are `da4ffc79 refactor: move ecommerce workbench to canvas`, `485a6bef style: flatten prompt bar mobile actions`, `1ca080eb style: flatten settings workbench chrome`, and `74dbdbf1 refactor: extract wuyin route helper`.
+This is a long-running execution. Plain `.git` may show stale historical state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`. The latest stable baseline before the active M123 slice is `dcf38e87 fix: harden local user-route task signing`; the latest code slices before M123 are `1ca080eb style: flatten settings workbench chrome`, `74dbdbf1 refactor: extract wuyin route helper`, and `dcf38e87 fix: harden local user-route task signing`.
 
 The active workstream is a single merged line. Thread `019dd551...` is the main refactor history and `019de168...` is continuation history; both belong to Stage One M6 ecommerce runtime extraction. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; ecommerce source selection closed in `ccf965c3`; ecommerce partial redraw closed in `d12731ce`; connector renderer boundary hardening closed in `5f5b76e0`; connector review follow-up closed in `f06f1880`; the M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`.
 
@@ -12,14 +12,14 @@ Stage One Backfill M2 completed in `8a458cd4` by hardening `src/app/usePromptGro
 
 The active plan is `plans.md`. The current status and next exact step are tracked in `status.md`. Validation commands and expected gates are tracked in `validation.md`.
 
-Current slice override: M122 hardens local user-route task signing so the service no longer uses the public default task secret unless an explicit insecure local/test fallback flag is supplied. Do not change provider endpoint selection, auth/header assembly, route config persistence, fetch response parsing, billing, UI, release metadata, or unrelated server runtime config behavior in this slice.
+Current slice override: M123 extracts only local user-route task token signing/verification into `apps/api/src/modules/model-proxy/application/local-user-route-task-token.ts`. Do not change provider endpoint selection, auth/header assembly, route config persistence, fetch response parsing, billing, UI, release metadata, or unrelated server runtime config behavior in this slice.
 
 For Clay UI work, use `C:/Users/Administrator/Downloads/DESIGN-clay.md` as the visual base with these overrides: inputs, main cards, sub cards, and framework cards use controlled frosted material; dark mode uses neutral black-gray surfaces; Clay brand colors are emphasis only. That lane is not active unless the user reports a new visual issue.
 
 Current convergence order:
 1. Keep the ledger files aligned with the alternate-git HEAD and the merged single execution line.
 2. Treat Stage One M6 ecommerce extraction and Stage One backfill boundaries as complete unless a new concrete regression proves otherwise.
-3. For Stage Two, split or prune one responsibility at a time from the largest files. M122 handles the finalization audit blocker that local user-route task signing must not fall back to a hard-coded secret outside explicit local/test mode. After that, return to a fresh seam map or quality scan. Do not chain keyManager secrets/cloud sync, provider fetches, endpoint/auth behavior, provider persistence, route selection, storage, release metadata, unrelated UI redesign, or broad debt cleanup into the same slice.
+3. For Stage Two, split or prune one responsibility at a time from the largest files. M123 follows the M122 security hardening by moving the task-token implementation behind a focused helper. After that, resolve the unrelated settings UI WIP that currently blocks full unit verification, then return to a fresh seam map or quality scan. Do not chain keyManager secrets/cloud sync, provider fetches, endpoint/auth behavior, provider persistence, route selection, storage, release metadata, unrelated UI redesign, or broad debt cleanup into the same slice.
 4. Write/update focused source contracts before each extraction when behavior or ownership changes.
 5. Move domain helpers and side effects into focused modules while preserving compatibility exports.
 6. Verify with the targeted gate for the touched slice, typecheck, full unit suite, build or architecture check as required, docs governance, encoding checks, and path-limited `git diff --check`.

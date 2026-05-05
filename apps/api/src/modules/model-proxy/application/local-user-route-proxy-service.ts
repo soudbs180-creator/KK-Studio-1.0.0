@@ -1,5 +1,3 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
-
 import type {
   SecureModelProxyAudioRequestDto,
   SecureModelProxyAudioTransportDto,
@@ -41,12 +39,15 @@ import {
   type LocalResolvedRouteEndpointType,
   type LocalResolvedRouteFormat,
 } from "./local-user-route-auth.ts";
+import {
+  decodeLocalUserRouteTaskToken,
+  encodeLocalUserRouteTaskToken,
+  resolveLocalUserRouteTaskSigningSecret,
+  type LocalUserRouteTaskPayload,
+} from "./local-user-route-task-token.ts";
 
 export type { LocalResolvedImageSurface } from "./local-user-route-auth.ts";
-
-const LOCAL_PROXY_TASK_PREFIX = "local_proxy:";
 const CLIENT_VISIBLE_SECRET_PLACEHOLDER = "sk-readonly-0000";
-const DEFAULT_LOCAL_ROUTE_TASK_SECRET = "kkai-local-route-task-secret";
 
 type LocalUserRouteProxyMode =
   | "chat"
@@ -89,16 +90,6 @@ type LocalUserRouteProxyTransport =
   | SecureModelProxyAudioTransportDto
   | SecureModelProxyTaskTransportDto
   | SecureModelProxyDownloadTransportDto;
-
-type LocalTaskPayload = {
-  v: 1;
-  userId: string;
-  routeId: string;
-  taskId: string;
-  mode?: "image" | "video";
-  requestId?: string;
-  attemptId?: string;
-};
 
 type GeminiNativeImageResponse = {
   candidates?: Array<{
@@ -183,22 +174,6 @@ export class LocalUserRouteProxyError extends Error {
     this.code = options?.code || "LOCAL_USER_ROUTE_PROXY_ERROR";
     this.statusCode = options?.statusCode || 500;
   }
-}
-
-function toBase64Url(input: Buffer | string): string {
-  return Buffer.from(input)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-function fromBase64Url(input: string): Buffer {
-  const normalized = String(input || "")
-    .replace(/-/g, "+")
-    .replace(/_/g, "/");
-  const padLength = (4 - (normalized.length % 4)) % 4;
-  return Buffer.from(`${normalized}${"=".repeat(padLength)}`, "base64");
 }
 
 function readBearerToken(headers: Record<string, string>): string | undefined {
@@ -862,15 +837,17 @@ export class LocalUserRouteProxyService {
   private readonly logger = consoleLogger.child({ module: "local-user-route-proxy" });
   private readonly authDataService: AuthDataService;
   private readonly taskSigningSecret: string;
-  private readonly allowInsecureLocalTaskSigningFallback: boolean;
 
   constructor(
     authDataService: AuthDataService,
     config: ServerRuntimeConfig,
   ) {
     this.authDataService = authDataService;
-    this.taskSigningSecret = String(config.userApiEncryptionSecret || "").trim();
-    this.allowInsecureLocalTaskSigningFallback = config.allowInsecureLocalTaskSigningFallback === true;
+    const signingSecret = resolveLocalUserRouteTaskSigningSecret({
+      taskSigningSecret: config.userApiEncryptionSecret,
+      allowInsecureLocalTaskSigningFallback: config.allowInsecureLocalTaskSigningFallback,
+    });
+    this.taskSigningSecret = signingSecret.ok ? signingSecret.secret : "";
   }
 
   private async createVideoAdapter() {
@@ -900,7 +877,7 @@ export class LocalUserRouteProxyService {
     const effectiveMode = input.mode;
     let routeId = String(input.routeId || "").trim();
     let upstreamTaskId = String(input.taskId || "").trim();
-    let decodedTask: LocalTaskPayload | undefined;
+    let decodedTask: LocalUserRouteTaskPayload | undefined;
 
     if (effectiveMode === "image" || effectiveMode === "video") {
       this.requireTaskSigningSecret();
@@ -2119,84 +2096,25 @@ export class LocalUserRouteProxyService {
     }
   }
 
-  private encodeLocalTaskToken(payload: LocalTaskPayload): string {
-    const taskSigningSecret = this.requireTaskSigningSecret();
-    const serialized = JSON.stringify(payload);
-    const encodedPayload = toBase64Url(serialized);
-    const signature = toBase64Url(
-      createHmac("sha256", taskSigningSecret)
-        .update(encodedPayload)
-        .digest(),
-    );
-    return `${LOCAL_PROXY_TASK_PREFIX}${encodedPayload}.${signature}`;
+  private encodeLocalTaskToken(payload: LocalUserRouteTaskPayload): string {
+    return encodeLocalUserRouteTaskToken(payload, this.requireTaskSigningSecret());
   }
 
-  private decodeLocalTaskToken(token: string, expectedUserId: string): LocalTaskPayload {
-    const taskSigningSecret = this.requireTaskSigningSecret();
-    const normalizedToken = String(token || "").trim();
-    if (!normalizedToken.startsWith(LOCAL_PROXY_TASK_PREFIX)) {
-      throw new LocalUserRouteProxyError("Invalid local task id.", {
-        code: "INVALID_TASK_ID",
-        statusCode: 400,
+  private decodeLocalTaskToken(token: string, expectedUserId: string): LocalUserRouteTaskPayload {
+    const decoded = decodeLocalUserRouteTaskToken(token, expectedUserId, this.requireTaskSigningSecret());
+    if (!decoded.ok) {
+      throw new LocalUserRouteProxyError(decoded.message, {
+        code: decoded.code,
+        statusCode: decoded.statusCode,
       });
     }
 
-    const signedPayload = normalizedToken.slice(LOCAL_PROXY_TASK_PREFIX.length);
-    const separatorIndex = signedPayload.lastIndexOf(".");
-    if (separatorIndex <= 0) {
-      throw new LocalUserRouteProxyError("Invalid local task token signature.", {
-        code: "INVALID_TASK_ID",
-        statusCode: 400,
-      });
-    }
-
-    const encodedPayload = signedPayload.slice(0, separatorIndex);
-    const providedSignature = signedPayload.slice(separatorIndex + 1);
-    const expectedSignature = toBase64Url(
-      createHmac("sha256", taskSigningSecret)
-        .update(encodedPayload)
-        .digest(),
-    );
-
-    const providedBuffer = Buffer.from(providedSignature);
-    const expectedBuffer = Buffer.from(expectedSignature);
-    if (providedBuffer.length !== expectedBuffer.length || !timingSafeEqual(providedBuffer, expectedBuffer)) {
-      throw new LocalUserRouteProxyError("Local task token verification failed.", {
-        code: "INVALID_TASK_ID",
-        statusCode: 400,
-      });
-    }
-
-    let payload: LocalTaskPayload | null = null;
-    try {
-      payload = JSON.parse(fromBase64Url(encodedPayload).toString("utf8")) as LocalTaskPayload;
-    } catch {
-      payload = null;
-    }
-
-    if (
-      !payload
-      || payload.v !== 1
-      || String(payload.userId || "").trim() !== expectedUserId
-      || !String(payload.routeId || "").trim()
-      || !String(payload.taskId || "").trim()
-    ) {
-      throw new LocalUserRouteProxyError("Local task token payload is invalid.", {
-        code: "INVALID_TASK_ID",
-        statusCode: 400,
-      });
-    }
-
-    return payload;
+    return decoded.payload;
   }
 
   private requireTaskSigningSecret(): string {
     if (this.taskSigningSecret) {
       return this.taskSigningSecret;
-    }
-
-    if (this.allowInsecureLocalTaskSigningFallback) {
-      return DEFAULT_LOCAL_ROUTE_TASK_SECRET;
     }
 
     throw new LocalUserRouteProxyError("Local user-route task signing secret is not configured.", {

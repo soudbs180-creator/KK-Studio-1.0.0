@@ -4,7 +4,44 @@ Last updated: 2026-05-06
 
 Use `npm.cmd` for npm scripts on Windows.
 
-Current baseline before M122 at `74dbdbf1`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
+Current baseline before M123 at `dcf38e87`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
+
+## M123 Local User-Route Task Token Helper Gate
+
+Use this gate when touching local user-route task token helper ownership:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/local-user-route-task-token-contract.test.ts" `
+  "tests/unit/local-user-route-task-signing-secret.test.ts" `
+  "tests/unit/local-user-route-auth-contract.test.ts" `
+  "tests/unit/local-user-route-endpoint-contract.test.ts" `
+  "tests/unit/provider-auth-proxy-regression.test.ts" `
+  "tests/unit/system-gemini-auth-regression.test.ts" `
+  "tests/unit/twelve-ai-doc-alignment.test.ts" `
+  "tests/unit/async-image-proxy-regression.test.ts" `
+  "tests/unit/user-route-proxy-routing.test.ts" `
+  "apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.test.ts" `
+  "apps/api/src/modules/model-proxy/application/local-system-proxy-service.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+npm.cmd run architecture:check
+npm.cmd run governance:security
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts" `
+  "apps/api/src/modules/model-proxy/application/local-user-route-task-token.ts" `
+  "tests/unit/local-user-route-task-token-contract.test.ts" `
+  "tsconfig.tests.json" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA may be skipped for this gate because it is a non-UI API helper extraction with no JSX, CSS, route rendering, or browser-visible behavior change. Record the skip reason in `status.md`. If unrelated UI WIP is present, keep the M123 commit path-limited and record any full-unit blocker separately.
 
 ## M122 Local User-Route Task Signing Security Gate
 
