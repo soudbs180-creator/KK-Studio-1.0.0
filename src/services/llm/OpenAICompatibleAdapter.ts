@@ -37,6 +37,7 @@ import { buildSafeFormDataPreview, buildSafeRequestBodyPreview } from './openAIC
 import { resolveOpenAICompatibleImageDispatch } from './openAICompatibleImageDispatch';
 import { extractImageUrlsFromPayload } from './openAICompatibleImagePayload';
 import { clampImageCount, getOpenAIImageProfile, resolveOpenAIEditSize, resolveOpenAIImageSize } from './openAICompatibleImageSizing';
+import { extractGenericTaskId, extractTaskItemsFromPayload, mapGenericTaskStatus } from './openAICompatibleTaskPayload';
 import { isChatEndpointCompatibilityError, isImageEndpointCompatibilityError } from './openAICompatibleImageRoutingErrors';
 
 type WuyinImageRoute = {
@@ -968,7 +969,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             }
 
             const { payload, requestPath } = await this.fetchAceDataTaskDetail(taskId, keySlot, options.modelId, options.signal);
-            const status = this.mapGenericTaskStatus(payload);
+            const status = mapGenericTaskStatus(payload);
             const message = this.extractProviderMessage(payload);
 
             if (status === 'success') {
@@ -1032,126 +1033,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         const withoutV1 = normalized.replace(/\/v1$/i, '');
         return withV1 ? `${withoutV1}/v1` : withoutV1;
-    }
-
-    private extractGenericTaskId(payload: any): string {
-        return String(
-            payload?.taskId ||
-            payload?.task_id ||
-            payload?.id ||
-            (typeof payload?.data === 'string' ? payload.data : '') ||
-            payload?.data?.taskId ||
-            payload?.data?.task_id ||
-            payload?.data?.id ||
-            payload?.result?.taskId ||
-            payload?.result?.task_id ||
-            payload?.result?.id ||
-            ''
-        ).trim();
-    }
-
-    private mapGenericTaskStatus(payload: any): 'pending' | 'processing' | 'success' | 'failed' {
-        const urls = extractImageUrlsFromPayload(payload);
-        if (urls.length > 0) {
-            return 'success';
-        }
-
-        const statusCandidates = [
-            payload?.status,
-            payload?.state,
-            payload?.task_status,
-            payload?.taskStatus,
-            payload?.data?.status,
-            payload?.data?.state,
-            payload?.data?.task_status,
-            payload?.data?.taskStatus,
-            payload?.result?.status,
-            payload?.result?.state,
-            payload?.output?.status,
-            payload?.output?.state,
-        ];
-
-        for (const candidate of statusCandidates) {
-            if (typeof candidate === 'number' && Number.isFinite(candidate)) {
-                if (candidate === 2 || candidate === 1) return candidate === 2 ? 'success' : 'processing';
-                if (candidate === 3 || candidate === 7 || candidate === 8) return 'failed';
-                if (candidate === 5 || candidate === 10) return candidate === 10 ? 'processing' : 'pending';
-            }
-
-            if (typeof candidate !== 'string') continue;
-            const normalized = candidate.trim().toLowerCase();
-            if (!normalized) continue;
-            if (
-                normalized.includes('success')
-                || normalized === 'complete'
-                || normalized.includes('completed')
-                || normalized.includes('partial_complete')
-                || normalized.includes('partial-complete')
-                || (normalized.includes('partial') && normalized.includes('complete'))
-                || normalized.includes('finish')
-                || normalized === 'done'
-            ) {
-                return 'success';
-            }
-            if (
-                normalized.includes('fail')
-                || normalized.includes('error')
-                || normalized.includes('cancel')
-                || normalized.includes('reject')
-            ) {
-                return 'failed';
-            }
-            if (
-                normalized.includes('process')
-                || normalized.includes('running')
-                || normalized.includes('progress')
-                || normalized.includes('execut')
-            ) {
-                return 'processing';
-            }
-            if (
-                normalized.includes('pending')
-                || normalized.includes('queue')
-                || normalized.includes('wait')
-                || normalized.includes('submit')
-                || normalized.includes('created')
-            ) {
-                return 'pending';
-            }
-        }
-
-        if (payload?.finished === true || payload?.success === true) {
-            return urls.length > 0 ? 'success' : 'processing';
-        }
-
-        return 'processing';
-    }
-
-    private extractTaskItemsFromPayload(payload: any): any[] {
-        const items: any[] = [];
-        const pushItems = (value: any) => {
-            if (!Array.isArray(value)) return;
-            value.forEach((item) => {
-                if (item && typeof item === 'object') {
-                    items.push(item);
-                }
-            });
-        };
-
-        pushItems(payload?.data);
-        pushItems(payload?.result);
-        pushItems(payload?.output);
-        pushItems(payload?.records);
-        pushItems(payload?.list);
-        pushItems(payload?.items);
-        pushItems(payload?.data?.records);
-        pushItems(payload?.data?.list);
-        pushItems(payload?.data?.items);
-        pushItems(payload?.result?.records);
-        pushItems(payload?.result?.list);
-        pushItems(payload?.result?.items);
-
-        return items;
     }
 
     private async fetchJsonTaskResponse(params: {
@@ -1266,7 +1147,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         requestPath: string;
         keySlot: KeySlot;
     }) {
-        const status = this.mapGenericTaskStatus(params.payload);
+        const status = mapGenericTaskStatus(params.payload);
         const urls = status === 'success' ? extractImageUrlsFromPayload(params.payload) : [];
         const effectiveStatus = status === 'success' && urls.length === 0 ? 'processing' : status;
         return {
@@ -1324,7 +1205,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             const { payload, requestPath } = await this.fetch12AIAsyncImageTaskDetail(taskId, keySlot, options.signal);
             const result = this.buildPolledTaskResult({
                 payload,
-                taskId: this.extractGenericTaskId(payload) || taskId,
+                taskId: extractGenericTaskId(payload) || taskId,
                 requestPath,
                 keySlot,
             });
@@ -1453,7 +1334,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             keyManager.reportCallResult(keySlot.id, true);
             return {
                 urls: immediateUrls,
-                taskId: this.extractGenericTaskId(submitPayload) || undefined,
+                taskId: extractGenericTaskId(submitPayload) || undefined,
                 provider: keySlot.provider,
                 providerName: keySlot.name,
                 model: options.modelId,
@@ -1466,7 +1347,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             };
         }
 
-        const taskId = this.extractGenericTaskId(submitPayload);
+        const taskId = extractGenericTaskId(submitPayload);
         if (!taskId) {
             const message = this.extractProviderMessage(submitPayload) || '12AI async submit succeeded but no task ID was returned';
             throw this.buildHttpError({
@@ -1870,7 +1751,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             });
         }
 
-        const taskId = this.extractGenericTaskId(submitPayload);
+        const taskId = extractGenericTaskId(submitPayload);
         const immediateUrls = extractImageUrlsFromPayload(submitPayload);
         if (immediateUrls.length > 0) {
             keyManager.reportCallResult(keySlot.id, true);
@@ -3870,7 +3751,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             const { payload, requestPath } = await this.fetch12AIAsyncImageTaskDetail(taskId, keySlot);
             return this.buildPolledTaskResult({
                 payload,
-                taskId: this.extractGenericTaskId(payload) || taskId,
+                taskId: extractGenericTaskId(payload) || taskId,
                 requestPath,
                 keySlot,
             });
@@ -3880,7 +3761,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             const { payload, requestPath } = await this.fetchAceDataTaskDetail(taskId, keySlot, modelId);
             return this.buildPolledTaskResult({
                 payload,
-                taskId: this.extractGenericTaskId(payload) || taskId,
+                taskId: extractGenericTaskId(payload) || taskId,
                 requestPath,
                 keySlot,
             });
@@ -3890,7 +3771,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             const { payload, requestPath } = await this.fetchMidjourneyTaskDetail(taskId, keySlot);
             return this.buildPolledTaskResult({
                 payload,
-                taskId: this.extractGenericTaskId(payload) || taskId,
+                taskId: extractGenericTaskId(payload) || taskId,
                 requestPath,
                 keySlot,
             });
@@ -3900,7 +3781,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             const { payload, requestPath } = await this.fetchGenericImageTaskDetail(taskId, keySlot);
             return this.buildPolledTaskResult({
                 payload,
-                taskId: this.extractGenericTaskId(payload) || taskId,
+                taskId: extractGenericTaskId(payload) || taskId,
                 requestPath,
                 keySlot,
             });
@@ -3926,11 +3807,11 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         if (mode === GenerationMode.IMAGE && runtime.strategyId === 'acedata' && normalizedTaskIds.length > 1) {
             try {
                 const { payload, requestPath } = await this.fetchAceDataTaskDetails(normalizedTaskIds, keySlot, modelId);
-                const taskItems = this.extractTaskItemsFromPayload(payload);
+                const taskItems = extractTaskItemsFromPayload(payload);
                 const taskMap = new Map<string, any>();
 
                 taskItems.forEach((item) => {
-                    const itemTaskId = this.extractGenericTaskId(item);
+                    const itemTaskId = extractGenericTaskId(item);
                     if (!itemTaskId) return;
                     taskMap.set(itemTaskId, item);
                 });
@@ -3949,11 +3830,11 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         if (mode === GenerationMode.IMAGE && runtime.strategyId === 'gpt-best' && isMidjourneyModel && normalizedTaskIds.length > 1) {
             try {
                 const { payload, requestPath } = await this.fetchMidjourneyTasksByIds(normalizedTaskIds, keySlot);
-                const taskItems = this.extractTaskItemsFromPayload(payload);
+                const taskItems = extractTaskItemsFromPayload(payload);
                 const taskMap = new Map<string, any>();
 
                 taskItems.forEach((item) => {
-                    const itemTaskId = this.extractGenericTaskId(item);
+                    const itemTaskId = extractGenericTaskId(item);
                     if (!itemTaskId) return;
                     taskMap.set(itemTaskId, item);
                 });
