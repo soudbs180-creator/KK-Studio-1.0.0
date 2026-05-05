@@ -4,6 +4,25 @@ export type OpenAICompatibleTaskStatus = 'pending' | 'processing' | 'success' | 
 
 type PayloadRecord = Record<string, unknown>;
 
+export interface OpenAICompatibleTaskProviderRef {
+    id: string;
+    name: string;
+    provider: string;
+}
+
+export interface OpenAICompatiblePolledTaskResult {
+    urls: string[];
+    taskId: string;
+    status: OpenAICompatibleTaskStatus;
+    provider: string;
+    providerName: string;
+    keySlotId: string;
+    metadata: {
+        requestPath: string;
+        responseMessage: string;
+    };
+}
+
 function isRecord(value: unknown): value is PayloadRecord {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -148,4 +167,53 @@ export function extractTaskItemsFromPayload(payload: unknown): PayloadRecord[] {
     pushItems(getPath(payload, ['result', 'items']));
 
     return items;
+}
+
+export function extractProviderMessage(payload: unknown): string {
+    const candidates = [
+        getProperty(payload, 'msg'),
+        getProperty(payload, 'message'),
+        getProperty(payload, 'error'),
+        getPath(payload, ['error', 'message']),
+        getPath(payload, ['data', 'message']),
+        getPath(payload, ['data', 'msg']),
+        getPath(payload, ['data', 'error']),
+        getPath(payload, ['data', 'error', 'message']),
+        getPath(payload, ['result', 'message']),
+        getPath(payload, ['result', 'error']),
+        getPath(payload, ['result', 'error', 'message']),
+        getPath(payload, ['debug', 'message']),
+        getProperty(payload, 'debug'),
+    ];
+
+    for (const candidate of candidates) {
+        if (typeof candidate === 'string' && candidate.trim()) {
+            return candidate.trim();
+        }
+    }
+
+    return '';
+}
+
+export function buildOpenAICompatiblePolledTaskResult(params: {
+    payload: unknown;
+    taskId: string;
+    requestPath: string;
+    keySlot: OpenAICompatibleTaskProviderRef;
+}): OpenAICompatiblePolledTaskResult {
+    const status = mapGenericTaskStatus(params.payload);
+    const urls = status === 'success' ? extractImageUrlsFromPayload(params.payload) : [];
+    const effectiveStatus = status === 'success' && urls.length === 0 ? 'processing' : status;
+    return {
+        urls,
+        taskId: params.taskId,
+        status: effectiveStatus,
+        provider: params.keySlot.provider,
+        providerName: params.keySlot.name,
+        keySlotId: params.keySlot.id,
+        metadata: {
+            requestPath: params.requestPath,
+            responseMessage: extractProviderMessage(params.payload),
+        },
+    };
 }
