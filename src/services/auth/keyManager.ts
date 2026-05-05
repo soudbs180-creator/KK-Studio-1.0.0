@@ -73,6 +73,10 @@ import {
     resolveEffectiveProviderModels,
 } from './keyManagerEffectiveProviderModels';
 import { getDocumentedStaticModelsForProvider, PROVIDER_PRESETS } from './keyManagerProviderPresets';
+import {
+    buildPricingSnapshotFromSharedCache,
+    buildSharedPricingItemsFromRawCatalog,
+} from './keyManagerSharedPricing';
 export {
     DEFAULT_GOOGLE_MODELS,
     DEFAULT_OPENAI_MODELS,
@@ -132,7 +136,6 @@ import {
     fetchWuyinPricingCatalog,
     getCachedPricingByBaseUrl,
     selectWuyinCatalogModels,
-    type ModelPricingInfo,
 } from '../billing/newApiPricingService';
 import { applyModelPricingOverrides } from '../model/modelPricingOverrideBridge';
 import { notify } from '../system/notificationService';
@@ -165,145 +168,6 @@ export { determineKeyType } from './keyManagerKeyType';
 export { detectApiType } from './keyManagerApiType';
 
 const RATE_LIMIT_COOLDOWN_MS = 30 * 1000;
-
-function toFiniteNumber(value: unknown): number | undefined {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-        return value;
-    }
-
-    if (typeof value === 'string' && value.trim()) {
-        const parsed = Number(value);
-        if (Number.isFinite(parsed)) {
-            return parsed;
-        }
-    }
-
-    return undefined;
-}
-
-function resolveSharedPricingModelId(item: any): string {
-    const candidates = [
-        item?.model,
-        item?.modelId,
-        item?.id,
-        item?.model_name,
-        item?.modelName,
-        item?.name,
-    ];
-
-    return candidates
-        .map((value) => String(value || '').replace(/^models\//i, '').trim())
-        .find(Boolean) || '';
-}
-
-function buildSharedPricingItemsFromRawCatalog(
-    pricingData: any[],
-    groupRatioMap?: Record<string, number>,
-    fallbackEndpointUrl?: string,
-): ModelPricingInfo[] {
-    const seen = new Set<string>();
-    const rows: ModelPricingInfo[] = [];
-    const defaultGroupRatio =
-        (groupRatioMap && Object.values(groupRatioMap).find((value) => Number.isFinite(value)))
-        || 1;
-
-    for (const item of Array.isArray(pricingData) ? pricingData : []) {
-        const modelId = resolveSharedPricingModelId(item);
-        if (!modelId) {
-            continue;
-        }
-
-        const cacheKey = modelId.toLowerCase();
-        if (seen.has(cacheKey)) {
-            continue;
-        }
-        seen.add(cacheKey);
-
-        const perRequestPrice = toFiniteNumber(item?.per_request_price ?? item?.perRequestPrice ?? item?.price_per_image ?? item?.pricePerImage);
-        const explicitInputPrice = toFiniteNumber(item?.input_price ?? item?.inputPrice);
-        const modelPrice = toFiniteNumber(item?.model_price ?? item?.modelPrice);
-        const completionPrice = toFiniteNumber(item?.output_price ?? item?.outputPrice);
-        const completionRatio = toFiniteNumber(item?.completion_ratio ?? item?.completionRatio);
-        const quotaTypeRaw =
-            item?.quota_type ?? item?.quotaType ?? item?.billing_type ?? item?.billingType ?? '';
-        const quotaType = String(quotaTypeRaw).trim().toLowerCase();
-        const isPerToken = !(quotaType === 'per_request' || perRequestPrice !== undefined);
-        const inputPrice = perRequestPrice ?? explicitInputPrice ?? modelPrice ?? 0;
-        const outputPrice = completionPrice ?? (
-            isPerToken && inputPrice > 0 && completionRatio !== undefined
-                ? inputPrice * completionRatio
-                : 0
-        );
-        const groupRatio = toFiniteNumber(item?.group_ratio ?? item?.groupRatio) ?? defaultGroupRatio;
-
-        rows.push({
-            modelId,
-            modelName: (() => {
-                const rawName = item?.model_name ?? item?.modelName ?? modelId ?? '';
-                const trimmed = String(rawName).trim();
-                return trimmed || modelId;
-            })(),
-            inputPrice: Math.max(0, inputPrice),
-            outputPrice: Math.max(0, outputPrice),
-            isPerToken,
-            groupRatio,
-            currency: String(item?.currency || 'USD').trim() || 'USD',
-            billingUnit: (() => {
-                const rawUnit = item?.billing_unit ?? item?.pay_unit ?? '';
-                const trimmed = String(rawUnit).trim();
-                return trimmed || undefined;
-            })(),
-            displayPrice: (() => {
-                const trimmed = String(item?.display_price ?? '').trim();
-                return trimmed || undefined;
-            })(),
-            supportsGroups: item?.supports_groups === true || item?.supportsGroups === true,
-            endpointUrl: (() => {
-                const rawUrl = item?.endpoint_url ?? item?.endpointUrl ?? fallbackEndpointUrl ?? '';
-                const trimmed = String(rawUrl).trim();
-                return trimmed || undefined;
-            })(),
-            endpointPath: (() => {
-                const rawPath = item?.endpoint_path ?? item?.endpointPath ?? '';
-                const trimmed = String(rawPath).trim();
-                return trimmed || undefined;
-            })(),
-        });
-    }
-
-    return rows;
-}
-
-function buildPricingSnapshotFromSharedCache(pricing: ModelPricingInfo[]): ProviderPricingSnapshot | undefined {
-    if (!Array.isArray(pricing) || pricing.length === 0) {
-        return undefined;
-    }
-
-    return buildProviderPricingSnapshot(
-        pricing.map((item) => ({
-            model: item.modelId,
-            model_name: item.modelName,
-            quota_type: item.isPerToken ? 'tokens' : 'per_request',
-            per_request_price: item.isPerToken ? undefined : item.inputPrice,
-            model_price: item.isPerToken ? item.inputPrice : undefined,
-            completion_ratio:
-                item.isPerToken && item.inputPrice > 0 && item.outputPrice > 0
-                    ? item.outputPrice / item.inputPrice
-                    : undefined,
-            currency: item.currency,
-            billing_unit: item.billingUnit,
-            display_price: item.displayPrice,
-            endpoint_url: item.endpointUrl,
-            endpoint_path: item.endpointPath,
-            group_ratio: item.groupRatio,
-        })),
-        undefined,
-        {
-            fetchedAt: Date.now(),
-            note: 'Loaded from shared provider pricing cache',
-        },
-    );
-}
 
 export interface KeySlot {
     id: string;

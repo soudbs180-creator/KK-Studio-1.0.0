@@ -94,6 +94,7 @@
         "tests/unit/key-manager-provider-presets-contract.test.ts",
         "tests/unit/key-manager-provider-usage-contract.test.ts",
         "tests/unit/key-manager-route-ids-contract.test.ts",
+        "tests/unit/key-manager-shared-pricing-contract.test.ts",
         "tests/unit/llm-adapter-unused-cleanup-contract.test.ts",
         "tests/unit/llm-service-unused-cleanup-contract.test.ts",
         "tests/unit/local-user-route-endpoint-contract.test.ts",

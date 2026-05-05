@@ -1153,6 +1153,24 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- ".env.e
 
 Because this gate touches `src/components/canvas/InfiniteCanvas.tsx`, browser QA is mandatory. Record the in-app Browser URL, title, visible `#canvas-container`, root count, and console error count in `status.md`.
 
+## keyManager Shared Pricing Helper Gate
+
+Use this gate for the M114 shared pricing catalog/snapshot helper extraction:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/key-manager-shared-pricing-contract.test.ts" "tests/unit/key-manager-model-helpers-contract.test.ts" "tests/unit/key-manager-pricing-url-contract.test.ts" "tests/unit/key-manager-provider-persistence-contract.test.ts" "tests/unit/key-manager-provider-usage-contract.test.ts" "tests/unit/key-manager-runtime-fallback.test.ts" "tests/unit/user-api-cloud-storage.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+npm.cmd run architecture:check
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerSharedPricing.ts" "tests/unit/key-manager-shared-pricing-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+Do not change provider fetches, provider persistence, cloud sync, key storage, route selection, runtime model resolution, localStorage policy, release metadata, or UI behavior in this slice. Browser QA may be skipped for this non-UI service/helper extraction after recording the skip reason in `status.md`.
+
 ## UI Unused Cleanup Gate
 
 Use this gate for PromptBar/ImageCard and legacy dashboard compiler-source cleanup slices:

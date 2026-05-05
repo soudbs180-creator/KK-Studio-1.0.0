@@ -5,18 +5,18 @@ Last updated: 2026-05-05
 ## Active State
 
 - Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 and Stage One Backfill are complete; Stage Two runtime/helper extraction is committed through `617491b3`.
-- Current slice override: post-M113 review-fix/gate-repair closeout is the current scoped slice.
+- Current slice override: M114 keyManager shared pricing helper extraction is the current scoped slice.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source; the latest committed runtime slice is `617491b3 refactor: extract local user route endpoint helper`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports `4c448660` and is a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source; the latest committed slice is `5c269e78 fix: harden review gate repairs`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Thread merge state: `019dd551...` is the main refactor history and `019de168...` is continuation history; both are part of the same Stage One M6 ecommerce runtime line.
 - Alternate-git worktree was clean at `296c1203` before the M113 extraction pass; M113 is now committed at `617491b3`.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: commit the post-M113 review-fix/gate-repair scope, then select the next seam only after a fresh map.
-- Most recent code/security scopes: post-M113 review-fix/gate-repair in the current working tree; M113 local user-route endpoint helper extraction in `617491b3`; M112 local user-route auth helper extraction in `296c1203`; M111 OpenAI-compatible task result helper extraction in `3dab3056`.
-- Current commit scope: `.env.example`, PostgreSQL bootstrap SQL, KK API session token signing, Postgres session rotation, system proxy task-token signing, hosted/portable release guardrails, `scripts/test/set-log-level.mjs`, auth-gate routing, `InfiniteCanvas` id forwarding, Nutrient OCR default-language fallback, focused contract tests, and ledger updates.
-- Browser QA: passed for the UI-touched review-fix scope in the Codex in-app Browser at `http://127.0.0.1:3100/?qa=gate-repair-infinite-canvas`; page title was `KK Studio - AI Image Workspace`, `#canvas-container` existed and was visible, `#root` count was 1, and browser console error count was 0.
+- Current focus: complete and commit M114, then select the next seam only after a fresh map.
+- Most recent code/security scopes: M114 keyManager shared pricing helper extraction in the current working tree; post-M113 review-fix/gate-repair in `5c269e78`; M113 local user-route endpoint helper extraction in `617491b3`; M112 local user-route auth helper extraction in `296c1203`.
+- Current commit scope: `src/services/auth/keyManager.ts`, `src/services/auth/keyManagerSharedPricing.ts`, `tests/unit/key-manager-shared-pricing-contract.test.ts`, `tsconfig.tests.json`, and ledger updates.
+- Browser QA: skipped for M114 because this is a non-UI service/helper extraction with no JSX, CSS, route rendering, or browser-visible behavior change.
 
 ## Review Fix Slice (2026-05-05)
 
@@ -25,6 +25,17 @@ Last updated: 2026-05-05
 - Fresh targeted validation passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/workspace-auth-gate.test.ts tests/unit/ocr-service-settings-contract.test.ts tests/unit/local-env-contract.test.ts tests/unit/portable-payment-package-contract.test.ts tests/unit/portable-app-server-document-proxy-contract.test.ts tests/unit/hosted-release-guardrails.test.ts tests/unit/vps-postgres-audit-contract.test.ts tests/unit/postgres-user-session-repository.test.ts tests/unit/kk-session-token.test.ts tests/unit/request-authenticator.test.ts apps/api/src/modules/model-proxy/application/local-system-proxy-service.test.ts tests/unit/canvas-live-unused-cleanup-contract.test.ts tests/unit/ecommerce-wheel-scroll-guard.test.ts tests/unit/governance-contract.test.ts` passed 60/60.
 - Fresh repository validation passed in this turn: `npm.cmd run typecheck`; `npm.cmd run test:unit` passed 1336/1336 after the local portable bundle sync; `npm.cmd run build`; `npm.cmd run governance:agent-docs`; `npm.cmd run check:encoding`; `npm.cmd run spec:check`; `npm.cmd run governance:check`; and `npm.cmd run audit:dependencies` reported 0 production vulnerabilities in both root and `payment-server`.
 - Browser QA passed: in-app Browser smoke on `http://127.0.0.1:3100/?qa=gate-repair-infinite-canvas` showed title `KK Studio - AI Image Workspace`, visible `#canvas-container`, one visible app root, and zero console errors.
+
+## Completed Working Tree M114 (keyManager Shared Pricing Helper)
+
+- RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/key-manager-shared-pricing-contract.test.ts` failed first because `src/services/auth/keyManagerSharedPricing.ts` did not exist and `keyManager.ts` still retained the inline shared pricing helpers.
+- Extracted only shared pricing catalog model normalization and pricing snapshot construction into `src/services/auth/keyManagerSharedPricing.ts`.
+- Updated `src/services/auth/keyManager.ts` to import the helper while preserving provider fetches, provider persistence, cloud sync, key storage, route selection, runtime model resolution, localStorage policy, and UI behavior.
+- Fresh targeted validation passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/key-manager-shared-pricing-contract.test.ts` passed 3/3; the broader keyManager/pricing/cloud storage targeted gate passed 49/49.
+- Fresh structural validation passed: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false`; `npm.cmd run architecture:check` passed with the existing 5 allowlisted migration exceptions and 2 legacy bridge exceptions; `npm.cmd run typecheck` passed with the semantic test check covering 111 files via `tsconfig.tests.json`.
+- Fresh full-gate validation passed: `npm.cmd run test:unit` passed 1339/1339; `npm.cmd run build`; `npm.cmd run governance:agent-docs`; and `npm.cmd run check:encoding`.
+- Browser QA skipped: this is a non-UI service/helper extraction with no JSX, CSS, route rendering, or browser-visible behavior change.
+- Line counts for this slice: `src/services/auth/keyManager.ts` is 3655 physical lines; `src/services/auth/keyManagerSharedPricing.ts` is 136 physical lines; `tests/unit/key-manager-shared-pricing-contract.test.ts` is 108 physical lines; `tsconfig.tests.json` is 140 physical lines.
 
 ## Completed Working Tree M102 (Gemini Service Unused Cleanup)
 
@@ -2499,15 +2510,15 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-Fresh remaining-work assessment after the M113 working-tree validation:
+Fresh remaining-work assessment after the M114 working-tree validation:
 
-- Current fact source: the latest committed code slice before M113 is `296c1203`, and M113 is the current validated commit scope.
-- Current gate spot-checks: M113 targeted endpoint/auth/provider gate passed 25/25; `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` passed; `npm.cmd run architecture:check`, `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, and `npm.cmd run check:encoding` passed in the current mixed working tree.
-- Largest real source files still above 2k lines: `src/App.tsx` 4305; `src/services/auth/keyManager.ts` 3778; `src/components/layout/PromptBar.tsx` 3631; `src/services/llm/OpenAICompatibleAdapter.ts` 3529; `src/components/settings/ApiSettingsView.tsx` 3071; `src/components/layout/ChatSidebar.tsx` 2477; `src/context/CanvasContext.tsx` 2196; `src/components/canvas/PromptNodeComponent.tsx` 2091. `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts` is now 1959 lines after M113 and has dropped below the 2k tracking threshold.
-- Current broad debt counts across the scanned workspace excluding `node_modules`, `dist`, `release`, and `coverage`: `as any` 163; broad `any` token matches 678; TS suppressions 141; `console.log` 416.
+- Current fact source: the latest committed base is `5c269e78 fix: harden review gate repairs`, and M114 keyManager shared pricing helper extraction is the current validated working-tree scope awaiting commit.
+- Current gate spot-checks: M114 targeted shared-pricing contract passed 3/3; broader keyManager/pricing/cloud targeted gate passed 49/49; `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` passed; `npm.cmd run architecture:check`, `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, and `npm.cmd run check:encoding` passed in the current M114 working tree.
+- Largest real source files still above 2k lines after M114: `src/App.tsx` 4305; `src/services/auth/keyManager.ts` 3655; `src/components/layout/PromptBar.tsx` 3631; `src/services/llm/OpenAICompatibleAdapter.ts` 3529; `src/components/settings/ApiSettingsView.tsx` 3071; `src/components/layout/ChatSidebar.tsx` 2477; `src/context/CanvasContext.tsx` 2196; `src/components/canvas/PromptNodeComponent.tsx` 2091. `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts` is now 1959 lines after M113 and remains below the 2k tracking threshold.
+- Current broad debt counts across the scanned workspace excluding `node_modules`, `dist`, `release`, and `coverage`: `as any` about 164; broad `any` token matches about 678; TS suppressions about 141; `console.log` about 416.
 - Interpretation: the project is functionally green by the latest gates, but not refactor-complete because Stage Two giant-file splitting, Stage Three quality governance, and Stage Four `apps/web` migration remain open.
 
-1. The current noUnused filter is clean; the route-gate helpers are wired into live entrypoints; M107 moved OpenAI-compatible post-surface image dispatch planning into a pure helper; M108 moved image payload URL/base64 extraction into a pure helper; M109 moved OpenAI image sizing/profile logic into a pure helper; M110 moved generic task payload parsing into a pure helper; M111 moved generic task result assembly into a pure helper; M112 moved local user-route auth/header/query-key and route-surface helpers into a pure server helper; and M113 moved local user-route direct endpoint URL normalization into a pure server helper.
+1. The current noUnused filter is clean; the route-gate helpers are wired into live entrypoints; M107 moved OpenAI-compatible post-surface image dispatch planning into a pure helper; M108 moved image payload URL/base64 extraction into a pure helper; M109 moved OpenAI image sizing/profile logic into a pure helper; M110 moved generic task payload parsing into a pure helper; M111 moved generic task result assembly into a pure helper; M112 moved local user-route auth/header/query-key and route-surface helpers into a pure server helper; M113 moved local user-route direct endpoint URL normalization into a pure server helper; and M114 moved keyManager shared pricing normalization/snapshot construction into a pure service helper.
 2. Next cleanup candidate should be chosen from a fresh TS6133 cluster scan or the next largest-file split. Keep the next slice separate from keyManager secrets/cloud sync, provider routing, storage persistence, release metadata, and UI behavior unless explicitly scoped.
 3. Remaining OpenAI-compatible adapter seams: request builders, response parsing, provider quirks, polling fetch helpers, and image/video/audio compatibility still need fresh maps. Do not change endpoint selection, auth, fetch behavior, or fallback ordering without a dedicated behavior test.
 4. Follow-up server seam: dedupe route auth/header/query-key logic between `apps/api/src/modules/auth/application/user-route-diagnostics-service.ts` and `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts`; verify provider auth/proxy and Gemini protocol guards plus API restart/probe on port `3001`.
