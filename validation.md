@@ -1116,6 +1116,24 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "apps/a
 
 Do not change endpoint selection, fetch execution, task operation routing, credential retrieval/storage, keyManager/cloud sync, provider branch execution, fallback ordering, billing metadata, release metadata, or UI behavior in this slice. Browser QA may be skipped for this non-UI server/helper extraction after recording the skip reason in `status.md`.
 
+## Local User-Route Endpoint Helper Gate
+
+Use this gate for the M113 server-side local user-route direct endpoint URL normalization helper extraction:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/local-user-route-endpoint-contract.test.ts" "tests/unit/local-user-route-auth-contract.test.ts" "tests/unit/provider-auth-proxy-regression.test.ts" "tests/unit/system-gemini-auth-regression.test.ts" "tests/unit/twelve-ai-doc-alignment.test.ts" "tests/unit/async-image-proxy-regression.test.ts" "tests/unit/user-route-proxy-routing.test.ts" "apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+npm.cmd run architecture:check
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts" "apps/api/src/modules/model-proxy/application/local-user-route-auth.ts" "apps/api/src/modules/model-proxy/application/local-user-route-endpoints.ts" "tests/unit/local-user-route-endpoint-contract.test.ts" "tests/unit/local-user-route-auth-contract.test.ts" "tests/unit/provider-auth-proxy-regression.test.ts" "tests/unit/system-gemini-auth-regression.test.ts" "tests/unit/twelve-ai-doc-alignment.test.ts" "tests/unit/async-image-proxy-regression.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+Do not change auth/header/query-key behavior, endpoint call-site behavior, fetch behavior, task operation routing, credential retrieval/storage, keyManager/cloud sync, provider branch execution, fallback ordering, logging, billing metadata, release metadata, or UI behavior in this slice. Browser QA may be skipped for this non-UI server/helper extraction after recording the skip reason in `status.md`.
+
 ## UI Unused Cleanup Gate
 
 Use this gate for PromptBar/ImageCard and legacy dashboard compiler-source cleanup slices:

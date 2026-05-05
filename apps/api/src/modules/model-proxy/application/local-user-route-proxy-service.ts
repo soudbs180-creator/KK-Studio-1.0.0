@@ -19,6 +19,11 @@ import type { AudioGenerationOptions, VideoGenerationOptions } from "../../../..
 import type { ServerRuntimeConfig } from "../../../lib/server-runtime-config.ts";
 import type { AuthDataService } from "../../auth/index.ts";
 import {
+  buildDirectClaudeEndpoint,
+  buildDirectOpenAIEndpoint,
+  normalizeDirectGeminiBaseUrl,
+} from "./local-user-route-endpoints.ts";
+import {
   buildGeminiAuth,
   buildOpenAICompatAuth,
   detectLocalRouteStrategy,
@@ -227,58 +232,6 @@ function isRouteSecretPlaceholder(apiKey: string | undefined): boolean {
   return !normalized
     || normalized === CLIENT_VISIBLE_SECRET_PLACEHOLDER
     || normalized.startsWith("__kk_redacted__:");
-}
-
-function normalizeDirectOpenAIBaseUrl(url: string | undefined): string {
-  let clean = normalizeRouteString(url) || "https://api.openai.com";
-  clean = clean.replace(/\/+$/, "");
-  clean = clean.replace(/\/(?:chat\/completions|images\/generations|images\/edits|responses|models)$/i, "");
-  if (!/\/v\d[\w.-]*$/i.test(clean)) {
-    clean = `${clean}/v1`;
-  }
-  return clean.replace(/\/+$/, "");
-}
-
-function buildDirectOpenAIEndpoint(baseUrl: string | undefined, endpoint: string): string {
-  return `${normalizeDirectOpenAIBaseUrl(baseUrl)}/${endpoint.replace(/^\/+/, "")}`;
-}
-
-function normalizeDirectClaudeBaseUrl(url: string | undefined): string {
-  let clean = normalizeRouteString(url) || "https://api.anthropic.com";
-  clean = clean.replace(/\/+$/, "");
-  clean = clean.replace(/\/(?:messages|models)$/i, "");
-  if (!/\/v\d[\w.-]*$/i.test(clean)) {
-    clean = `${clean}/v1`;
-  }
-  return clean.replace(/\/+$/, "");
-}
-
-function buildDirectClaudeEndpoint(baseUrl: string | undefined, endpoint: string): string {
-  return `${normalizeDirectClaudeBaseUrl(baseUrl)}/${endpoint.replace(/^\/+/, "")}`;
-}
-
-function normalizeDirectGeminiBaseUrl(url: string | undefined): string {
-  let clean = normalizeRouteString(url) || "https://generativelanguage.googleapis.com";
-  clean = clean
-    .replace(/\/v1beta\/models\/[^/?]+:(?:generateContent|streamGenerateContent)$/i, "")
-    .replace(/\/v1\/models\/[^/?]+:(?:generateContent|streamGenerateContent)$/i, "")
-    .replace(/\/+$/, "");
-
-  const suffixes = ["/v1beta/models", "/v1/models", "/models", "/v1beta", "/v1"];
-  let stripped = true;
-  while (stripped) {
-    stripped = false;
-    const lower = clean.toLowerCase();
-    for (const suffix of suffixes) {
-      if (lower.endsWith(suffix)) {
-        clean = clean.slice(0, -suffix.length).replace(/\/+$/, "");
-        stripped = true;
-        break;
-      }
-    }
-  }
-
-  return clean || "https://generativelanguage.googleapis.com";
 }
 
 function buildDirectClaudeHeaders(routeConfig: SecureProxyUserRouteConfigDto): Record<string, string> {
