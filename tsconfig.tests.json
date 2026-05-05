@@ -96,6 +96,7 @@
         "tests/unit/key-manager-route-ids-contract.test.ts",
         "tests/unit/llm-adapter-unused-cleanup-contract.test.ts",
         "tests/unit/llm-service-unused-cleanup-contract.test.ts",
+        "tests/unit/local-user-route-auth-contract.test.ts",
         "tests/unit/model-display-name-regression.test.ts",
         "tests/unit/model-id-normalization-parity-contract.test.ts",
         "tests/unit/openai-compatible-diagnostics-contract.test.ts",

@@ -1098,6 +1098,24 @@ This slice also requires this path-limited diff check:
 git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/llm/OpenAICompatibleAdapter.ts" "src/services/llm/openAICompatibleDiagnostics.ts" "src/services/llm/openAICompatibleImageDispatch.ts" "src/services/llm/openAICompatibleImagePayload.ts" "src/services/llm/openAICompatibleImageSizing.ts" "src/services/llm/openAICompatibleImageRoutingErrors.ts" "tests/unit/openai-compatible-diagnostics-contract.test.ts" "tests/unit/openai-compatible-image-dispatch-contract.test.ts" "tests/unit/openai-compatible-image-payload-contract.test.ts" "tests/unit/openai-compatible-image-sizing-contract.test.ts" "tests/unit/openai-compatible-image-routing-errors-contract.test.ts" "tests/unit/provider-image-routing-regression.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
+## Local User-Route Auth Helper Gate
+
+Use this gate for the M112 server-side local user-route auth/header/query-key helper extraction:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/local-user-route-auth-contract.test.ts" "tests/unit/provider-auth-proxy-regression.test.ts" "tests/unit/system-gemini-auth-regression.test.ts" "tests/unit/twelve-ai-doc-alignment.test.ts" "tests/unit/async-image-proxy-regression.test.ts" "tests/unit/user-route-proxy-routing.test.ts" "apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+npm.cmd run architecture:check
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts" "apps/api/src/modules/model-proxy/application/local-user-route-auth.ts" "tests/unit/local-user-route-auth-contract.test.ts" "tests/unit/provider-auth-proxy-regression.test.ts" "tests/unit/system-gemini-auth-regression.test.ts" "tests/unit/twelve-ai-doc-alignment.test.ts" "tests/unit/async-image-proxy-regression.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+Do not change endpoint selection, fetch execution, task operation routing, credential retrieval/storage, keyManager/cloud sync, provider branch execution, fallback ordering, billing metadata, release metadata, or UI behavior in this slice. Browser QA may be skipped for this non-UI server/helper extraction after recording the skip reason in `status.md`.
+
 ## UI Unused Cleanup Gate
 
 Use this gate for PromptBar/ImageCard and legacy dashboard compiler-source cleanup slices:

@@ -61,12 +61,14 @@ test("12AI model discovery falls back to documented presets instead of a remote 
 test("12AI Gemini-native chat and proxy layers keep snake_case request fields on 12AI gateways", () => {
   const geminiAdapterSource = readSource("src/services/llm/GeminiNativeAdapter.ts");
   const localProxySource = readSource("apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts");
+  const localRouteAuthSource = readSource("apps/api/src/modules/model-proxy/application/local-user-route-auth.ts");
 
   assert.match(geminiAdapterSource, /const useSnakeCase = runtime\.strategyId === '12ai';/);
   assert.match(geminiAdapterSource, /payload\[useSnakeCase \? 'system_instruction' : 'systemInstruction'\]/);
   assert.match(geminiAdapterSource, /buildInlineImagePart\(media\.data, media\.mimeType, useSnakeCase\)/);
 
-  assert.match(localProxySource, /function is12AIBaseUrl\(baseUrl: string \| undefined\): boolean/);
+  assert.match(localRouteAuthSource, /function is12AIBaseUrl\(baseUrl: string \| undefined\): boolean/);
+  assert.match(localProxySource, /from "\.\/local-user-route-auth\.ts"/);
   assert.match(localProxySource, /payload\[useSnakeCase \? "system_instruction" : "systemInstruction"\]/);
   assert.match(localProxySource, /toInlineImagePartWithFormat\(ref, useSnakeCase\)/);
 });

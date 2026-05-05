@@ -64,10 +64,12 @@ test("async image transports expose task metadata through contracts, client prox
 
 test("local and hosted proxies keep async-image as a first-class execution path instead of collapsing it into sync image routes", () => {
   const localProxySource = readSource("apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts");
+  const authHelperSource = readSource("apps/api/src/modules/model-proxy/application/local-user-route-auth.ts");
   const localSystemProxySource = readSource("apps/api/src/modules/model-proxy/application/local-system-proxy-service.ts");
 
-  assert.match(localProxySource, /type LocalResolvedImageSurface = "chat-image" \| "provider-images" \| "gemini-native-image" \| "async-image";/);
-  assert.match(localProxySource, /return "async-image";/);
+  assert.match(authHelperSource, /type LocalResolvedImageSurface = "chat-image" \| "provider-images" \| "gemini-native-image" \| "async-image";/);
+  assert.match(authHelperSource, /return "async-image";/);
+  assert.match(localProxySource, /export type \{ LocalResolvedImageSurface \} from "\.\/local-user-route-auth\.ts";/);
   assert.match(localProxySource, /if \(effectiveMode === "image"\) \{/);
   assert.match(localProxySource, /taskId: imageResponse\.taskId/);
   assert.match(localProxySource, /mode: "image",/);

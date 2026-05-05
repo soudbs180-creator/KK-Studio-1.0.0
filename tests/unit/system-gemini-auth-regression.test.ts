@@ -11,23 +11,25 @@ function readSource(relativePath: string): string {
 
 test("VPS local proxy keeps provider-aware auth selection for system Gemini-compatible routes", () => {
   const localProxySource = readSource("apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts");
+  const authHelperSource = readSource("apps/api/src/modules/model-proxy/application/local-user-route-auth.ts");
 
   assert.match(
-    localProxySource,
+    authHelperSource,
     /function isBearerGeminiCompatRoute\(routeConfig: SecureProxyUserRouteConfigDto\): boolean \{/,
   );
   assert.match(
-    localProxySource,
+    authHelperSource,
     /function isWuyinGeminiRoute\(routeConfig: SecureProxyUserRouteConfigDto\): boolean \{/,
   );
   assert.match(
-    localProxySource,
+    authHelperSource,
     /function buildGeminiAuth\(\s*url: string,\s*routeConfig: SecureProxyUserRouteConfigDto,\s*\): \{ url: string; headers: Record<string, string> \} \{/,
   );
   assert.match(
-    localProxySource,
+    authHelperSource,
     /if \(isWuyinGeminiRoute\(routeConfig\) \|\| isBearerGeminiCompatRoute\(routeConfig\)\) \{/,
   );
+  assert.match(localProxySource, /from "\.\/local-user-route-auth\.ts"/);
   assert.match(
     localProxySource,
     /const auth = buildGeminiAuth\(`\$\{apiBase\}\/\$\{upstreamTaskId\}`,\s*routeConfig\);/,
