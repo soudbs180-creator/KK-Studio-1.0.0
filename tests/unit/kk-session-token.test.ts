@@ -8,12 +8,19 @@ import {
 
 const SESSION_SECRET_ENV = "KK_API_SESSION_SIGNING_SECRET";
 const originalSessionSecret = process.env[SESSION_SECRET_ENV];
+const originalNodeEnv = process.env.NODE_ENV;
 
 afterEach(() => {
   if (typeof originalSessionSecret === "string") {
     process.env[SESSION_SECRET_ENV] = originalSessionSecret;
   } else {
     delete process.env[SESSION_SECRET_ENV];
+  }
+
+  if (typeof originalNodeEnv === "string") {
+    process.env.NODE_ENV = originalNodeEnv;
+  } else {
+    delete process.env.NODE_ENV;
   }
 });
 
@@ -50,9 +57,9 @@ test("KK API session token verification rejects tampered signatures", () => {
   assert.equal(verifyKkSessionToken(tampered, { tokenType: "access" }), null);
 });
 
-test("KK API session tokens fail closed when production requires an explicit signing secret", () => {
+test("KK API session tokens fail closed when no explicit signing secret is configured", () => {
   delete process.env[SESSION_SECRET_ENV];
-  process.env.NODE_ENV = "production";
+  process.env.NODE_ENV = "test";
 
   assert.throws(() => {
     createKkSessionToken({
@@ -60,5 +67,9 @@ test("KK API session tokens fail closed when production requires an explicit sig
       userId: "session-user-3",
       expiresInSeconds: 3600,
     });
+  }, /KK_API_SESSION_SIGNING_SECRET/);
+
+  assert.throws(() => {
+    verifyKkSessionToken("not.a.jwt", { tokenType: "access" });
   }, /KK_API_SESSION_SIGNING_SECRET/);
 });

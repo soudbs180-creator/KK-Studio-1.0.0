@@ -17,7 +17,8 @@ test('InfiniteCanvas keeps public optional props without retaining unused destru
   assert.match(source, /onAutoArrange\?: \(\) => void;/);
   assert.match(source, /id\?: string;/);
   assert.doesNotMatch(source, /onCanvasDoubleClick,\s*onAutoArrange,\s*onResetView/);
-  assert.doesNotMatch(source, /onImageDrop,\s*id\s*\}/);
+  assert.match(source, /onContextMenu,\s*id,\s*onImageDrop/);
+  assert.match(source, /id=\{id\}/);
   assert.match(source, /onResetView,/);
   assert.match(source, /onImageDrop,/);
 });

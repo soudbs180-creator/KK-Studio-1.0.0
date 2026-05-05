@@ -281,7 +281,7 @@ CREATE TABLE IF NOT EXISTS credit_transactions (
 CREATE INDEX IF NOT EXISTS credit_transactions_user_created_idx
   ON credit_transactions(user_id, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS credit_transactions_user_idempotency_idx
+CREATE UNIQUE INDEX IF NOT EXISTS credit_transactions_user_idempotency_idx
   ON credit_transactions(user_id, type, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
 

@@ -6,6 +6,7 @@ import { AppStartupScreen } from '../components/common/AppStartupScreen';
 import NotificationToast from '../components/common/NotificationToast';
 import { useAuth } from '../context/AuthContext';
 import { useAppStartup } from '../context/AppStartupContext';
+import { shouldShowLoginForAuthGate } from './authGate';
 import { pickByDocumentLanguage } from '../utils/localeText';
 
 const CostEstimation = lazy(() => import('../pages/CostEstimation'));
@@ -215,7 +216,7 @@ export const AuthenticatedAppShell: React.FC<AuthenticatedAppShellProps> = ({
     return <AppStartupScreen stage="session_ready" warning={sessionRecoveryWarning} />;
   }
 
-  if (!user || (!session && !isTempUser)) {
+  if (shouldShowLoginForAuthGate({ user, session, isTempUser })) {
     return <LoginScreen />;
   }
 

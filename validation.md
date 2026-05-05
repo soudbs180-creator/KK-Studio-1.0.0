@@ -1134,6 +1134,25 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "apps/a
 
 Do not change auth/header/query-key behavior, endpoint call-site behavior, fetch behavior, task operation routing, credential retrieval/storage, keyManager/cloud sync, provider branch execution, fallback ordering, logging, billing metadata, release metadata, or UI behavior in this slice. Browser QA may be skipped for this non-UI server/helper extraction after recording the skip reason in `status.md`.
 
+## Post-M113 Review Fix Gate
+
+Use this gate for the review-fix/gate-repair closeout that touches auth signing, system proxy task signing, Postgres session rotation, release guardrails, OCR defaults, and canvas id forwarding:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/workspace-auth-gate.test.ts" "tests/unit/ocr-service-settings-contract.test.ts" "tests/unit/local-env-contract.test.ts" "tests/unit/portable-payment-package-contract.test.ts" "tests/unit/portable-app-server-document-proxy-contract.test.ts" "tests/unit/hosted-release-guardrails.test.ts" "tests/unit/vps-postgres-audit-contract.test.ts" "tests/unit/postgres-user-session-repository.test.ts" "tests/unit/kk-session-token.test.ts" "tests/unit/request-authenticator.test.ts" "apps/api/src/modules/model-proxy/application/local-system-proxy-service.test.ts" "tests/unit/canvas-live-unused-cleanup-contract.test.ts" "tests/unit/ecommerce-wheel-scroll-guard.test.ts" "tests/unit/governance-contract.test.ts"
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+npm.cmd run spec:check
+npm.cmd run governance:check
+npm.cmd run audit:dependencies
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- ".env.example" "apps/api/sql/bootstrap-self-hosted-postgres.sql" "apps/api/src/modules/auth/infrastructure/kk-session-token.ts" "apps/api/src/modules/auth/infrastructure/postgres-user-session-repository.ts" "apps/api/src/modules/model-proxy/application/local-system-proxy-service.ts" "apps/api/src/modules/model-proxy/application/local-system-proxy-service.test.ts" "scripts/postgres/bootstrap-kk-vps.sql" "scripts/release-hosted.mjs" "scripts/release/create-portable-release.mjs" "scripts/release/portable-app-server.cjs" "scripts/test/set-log-level.mjs" "src/app/authGate.ts" "src/app/AuthenticatedAppShell.tsx" "src/components/canvas/InfiniteCanvas.tsx" "src/services/document/nutrientDocumentService.ts" "tests/unit" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+Because this gate touches `src/components/canvas/InfiniteCanvas.tsx`, browser QA is mandatory. Record the in-app Browser URL, title, visible `#canvas-container`, root count, and console error count in `status.md`.
+
 ## UI Unused Cleanup Gate
 
 Use this gate for PromptBar/ImageCard and legacy dashboard compiler-source cleanup slices:

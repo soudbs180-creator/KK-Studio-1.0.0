@@ -39,7 +39,11 @@ export class PostgresUserSessionRepository implements BrowserSessionRepository {
   }
 
   async insert(record: BrowserSessionRecord): Promise<void> {
-    await this.queryable.query(
+    await this.insertWithQueryable(this.queryable, record);
+  }
+
+  private async insertWithQueryable(queryable: PostgresQueryable, record: BrowserSessionRecord): Promise<void> {
+    await queryable.query(
       `insert into user_sessions (
          id,
          user_id,
@@ -100,8 +104,56 @@ export class PostgresUserSessionRepository implements BrowserSessionRepository {
     nextRecord: BrowserSessionRecord,
     revokedAt: string,
   ): Promise<void> {
-    await this.revokeSession(currentId, revokedAt);
-    await this.insert(nextRecord);
+    const transaction = await this.openTransactionQueryable();
+    const queryable = transaction.queryable;
+    let transactionStarted = false;
+
+    try {
+      await queryable.query("begin");
+      transactionStarted = true;
+
+      const revokeResult = await queryable.query(
+        `update user_sessions
+            set revoked_at = $2
+          where id = $1
+            and revoked_at is null
+        returning id`,
+        [currentId, revokedAt],
+      );
+
+      if ((revokeResult.rowCount || 0) < 1) {
+        throw new Error("Session is invalid, revoked, expired, or already rotated.");
+      }
+
+      await this.insertWithQueryable(queryable, nextRecord);
+      await queryable.query("commit");
+    } catch (error) {
+      if (transactionStarted) {
+        await queryable.query("rollback");
+      }
+      throw error;
+    } finally {
+      transaction.release?.();
+    }
+  }
+
+  private async openTransactionQueryable(): Promise<{
+    queryable: PostgresQueryable;
+    release?: () => void;
+  }> {
+    const connectable = this.queryable as PostgresQueryable & {
+      connect?: () => Promise<PostgresQueryable & { release?: () => void }>;
+    };
+
+    if (typeof connectable.connect !== "function") {
+      return { queryable: this.queryable };
+    }
+
+    const client = await connectable.connect();
+    return {
+      queryable: client,
+      release: typeof client.release === "function" ? () => client.release?.() : undefined,
+    };
   }
 }
 

@@ -24,7 +24,6 @@ import type {
   LocalUserRouteProxyRequest,
 } from "./local-user-route-proxy-service.ts";
 
-const DEFAULT_SYSTEM_PROXY_TASK_SECRET = "kkai-local-system-proxy-task-secret";
 const SYSTEM_PROXY_TASK_PREFIX = "system_proxy:";
 
 type LocalSystemProxyMode =
@@ -427,7 +426,7 @@ export class LocalSystemProxyService {
     this.creditProviderRepository = options.creditProviderRepository;
     this.creditAccountService = options.creditAccountService;
     this.directRouteInvoker = options.directRouteInvoker;
-    this.taskSigningSecret = String(options.taskSigningSecret || "").trim() || DEFAULT_SYSTEM_PROXY_TASK_SECRET;
+    this.taskSigningSecret = String(options.taskSigningSecret || "").trim();
   }
 
   async invoke(
@@ -436,6 +435,10 @@ export class LocalSystemProxyService {
   ): Promise<LocalSystemProxyTransport> {
     if (input.mode === "task_status" || input.mode === "cancel_task" || input.mode === "delete_task" || input.mode === "download_task") {
       return this.invokeTaskOperation(userId, input);
+    }
+
+    if (input.mode === "image" || input.mode === "video") {
+      this.requireTaskSigningSecret();
     }
 
     const parsedRoute = parseSystemModelRoute(String(input.modelId || ""));
@@ -686,9 +689,11 @@ export class LocalSystemProxyService {
   }
 
   private encodeTaskToken(payload: SystemTaskPayload): string {
+    const taskSigningSecret = this.requireTaskSigningSecret();
+
     const encodedPayload = toBase64Url(JSON.stringify(payload));
     const signature = toBase64Url(
-      createHmac("sha256", this.taskSigningSecret)
+      createHmac("sha256", taskSigningSecret)
         .update(encodedPayload)
         .digest(),
     );
@@ -696,6 +701,8 @@ export class LocalSystemProxyService {
   }
 
   private decodeTaskToken(token: string, expectedUserId: string): SystemTaskPayload {
+    const taskSigningSecret = this.requireTaskSigningSecret();
+
     const normalizedToken = String(token || "").trim();
     if (!normalizedToken.startsWith(SYSTEM_PROXY_TASK_PREFIX)) {
       throw new LocalSystemProxyError("Invalid task id.", {
@@ -716,7 +723,7 @@ export class LocalSystemProxyService {
     const encodedPayload = signedPayload.slice(0, separatorIndex);
     const providedSignature = signedPayload.slice(separatorIndex + 1);
     const expectedSignature = toBase64Url(
-      createHmac("sha256", this.taskSigningSecret)
+      createHmac("sha256", taskSigningSecret)
         .update(encodedPayload)
         .digest(),
     );
@@ -753,5 +760,16 @@ export class LocalSystemProxyService {
     }
 
     return payload;
+  }
+
+  private requireTaskSigningSecret(): string {
+    if (this.taskSigningSecret) {
+      return this.taskSigningSecret;
+    }
+
+    throw new LocalSystemProxyError("System proxy task signing secret is not configured.", {
+      code: "TASK_SIGNING_SECRET_REQUIRED",
+      statusCode: 500,
+    });
   }
 }

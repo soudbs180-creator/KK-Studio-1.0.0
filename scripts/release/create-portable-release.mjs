@@ -49,6 +49,59 @@ function ensureExists(targetPath, message) {
   }
 }
 
+function isLocalOrPrivateKkApiBaseUrl(value) {
+  try {
+    const parsed = new URL(String(value || '').trim());
+    const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    return hostname === 'localhost'
+      || hostname === '::1'
+      || hostname === '0.0.0.0'
+      || hostname.startsWith('127.')
+      || hostname.startsWith('10.')
+      || hostname.startsWith('192.168.')
+      || /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname);
+  } catch {
+    return true;
+  }
+}
+
+async function readBuiltKkApiBaseUrl(distDir) {
+  const entries = await fs.promises.readdir(distDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = path.join(distDir, entry.name);
+    if (entry.isDirectory()) {
+      const nestedValue = await readBuiltKkApiBaseUrl(entryPath);
+      if (nestedValue) {
+        return nestedValue;
+      }
+      continue;
+    }
+
+    if (!/\.(?:html|js|mjs|json)$/i.test(entry.name)) {
+      continue;
+    }
+
+    const source = await fs.promises.readFile(entryPath, 'utf8');
+    const match = /VITE_KK_API_BASE_URL["']?\s*:\s*["']([^"']+)["']/.exec(source);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return '';
+}
+
+async function assertPortableRemoteKkApiBaseUrl(distDir) {
+  const kkApiBaseUrl = await readBuiltKkApiBaseUrl(distDir);
+  if (!kkApiBaseUrl || isLocalOrPrivateKkApiBaseUrl(kkApiBaseUrl)) {
+    throw new Error(
+      'Portable release does not package the core KK API. Set VITE_KK_API_BASE_URL to a remote VPS API before packaging.',
+    );
+  }
+
+  return kkApiBaseUrl;
+}
+
 async function copyFile(sourcePath, targetPath) {
   await mkdir(path.dirname(targetPath), { recursive: true });
   await cp(sourcePath, targetPath, { force: true });
@@ -203,6 +256,7 @@ function buildAppPackageJson() {
 
 async function main() {
   ensureExists(distSourceDir, 'dist/ was not found. Run npm run build first.');
+  await assertPortableRemoteKkApiBaseUrl(distSourceDir);
   ensureExists(process.execPath, `node executable was not found: ${process.execPath}`);
   ensureExists(portableAppServerSource, 'scripts/release/portable-app-server.cjs was not found.');
   ensureExists(portableLaunchSource, 'scripts/release/portable-launch.ps1 was not found.');

@@ -3,7 +3,11 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { createDefaultRuntimeAuthState } from '../../src/services/auth/runtimeAuthState.ts';
+import { shouldShowLoginForAuthGate } from '../../src/app/authGate.ts';
+import {
+  createDefaultRuntimeAuthState,
+  createFixedLocalRuntimeAuthState,
+} from '../../src/services/auth/runtimeAuthState.ts';
 
 const ROOT_DIR = process.cwd();
 
@@ -25,10 +29,25 @@ test('AuthenticatedAppShell routes only fully signed-out users back to LoginScre
   assert.match(source, /import LoginScreen from '\.\.\/components\/auth\/LoginScreen';/);
   assert.match(source, /import \{ AppStartupScreen \} from '\.\.\/components\/common\/AppStartupScreen';/);
   assert.match(source, /import \{ useAuth \} from '\.\.\/context\/AuthContext';/);
+  assert.match(source, /import \{ shouldShowLoginForAuthGate \} from '\.\/authGate';/);
   assert.match(source, /const \{ session, user, isTempUser, loading, sessionRecoveryWarning \} = useAuth\(\);/);
   assert.match(source, /if \(loading\) \{\s*return <AppStartupScreen stage="session_ready" warning=\{sessionRecoveryWarning\} \/>\s*;\s*\}/);
-  assert.match(source, /if \(!user \|\| \(!session && !isTempUser\)\) \{\s*return <LoginScreen \/>\s*;\s*\}/);
+  assert.match(source, /if \(shouldShowLoginForAuthGate\(\{ user, session, isTempUser \}\)\) \{\s*return <LoginScreen \/>\s*;\s*\}/);
+  assert.doesNotMatch(source, /if \(!user \|\| \(!session && !isTempUser\)\) \{\s*return <LoginScreen \/>\s*;\s*\}/);
   assert.doesNotMatch(source, /if \(!session \|\| !user \|\| isTempUser\) \{\s*return <LoginScreen \/>\s*;\s*\}/);
+});
+
+test('fixed local runtime user can open the workspace without a KK API session token', () => {
+  const localState = createFixedLocalRuntimeAuthState();
+
+  assert.equal(
+    shouldShowLoginForAuthGate({
+      user: localState.user,
+      session: null,
+      isTempUser: false,
+    }),
+    false,
+  );
 });
 
 test('AuthContext attempts to rehydrate a stored KK API session before falling back to signed-out runtime state', () => {

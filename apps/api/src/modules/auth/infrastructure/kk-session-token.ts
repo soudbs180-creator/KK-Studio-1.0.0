@@ -42,30 +42,13 @@ const defaultHeader: SessionTokenHeader = {
   kid: "kkai-v1",
 };
 
-const defaultSessionSigningSecret = "kkai-local-dev-session-secret";
-
-function shouldRequireExplicitSessionSigningSecret(): boolean {
-  const normalizedNodeEnv = String(process.env.NODE_ENV || "").trim().toLowerCase();
-  const normalizedOverride = String(process.env.KK_REQUIRE_SESSION_SIGNING_SECRET || "").trim().toLowerCase();
-  return normalizedNodeEnv === "production"
-    || normalizedOverride === "true"
-    || normalizedOverride === "1"
-    || normalizedOverride === "yes";
-}
-
 function resolveSessionSigningSecret(): string {
   const configuredSecret = String(process.env.KK_API_SESSION_SIGNING_SECRET || "").trim();
   if (configuredSecret) {
     return configuredSecret;
   }
 
-  if (shouldRequireExplicitSessionSigningSecret()) {
-    throw new Error(
-      "KK_API_SESSION_SIGNING_SECRET is required when production-grade KK API session tokens are enabled.",
-    );
-  }
-
-  return defaultSessionSigningSecret;
+  throw new Error("KK_API_SESSION_SIGNING_SECRET is required for KK API session tokens.");
 }
 
 function toBase64Url(value: string): string {
@@ -166,6 +149,8 @@ export function verifyKkSessionToken(
     nowMs?: number;
   } = {},
 ): VerifiedKkSessionToken | null {
+  resolveSessionSigningSecret();
+
   const normalizedToken = String(token || "").trim();
   const parts = normalizedToken.split(".");
   if (parts.length !== 3) {

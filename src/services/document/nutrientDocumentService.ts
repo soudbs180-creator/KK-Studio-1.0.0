@@ -201,7 +201,7 @@ class NutrientDocumentService {
         const { response, contentType, responseFileName } = await this.request('ocr-to-pdf', source, {
             ...options,
             fileName: options.fileName || inferUploadFileName(source, 'document.pdf'),
-            ocrLanguage: options.language || DEFAULT_OCR_LANGUAGE,
+            ocrLanguage: options.language,
         });
 
         return {

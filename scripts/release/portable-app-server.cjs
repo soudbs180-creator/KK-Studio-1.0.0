@@ -10,6 +10,61 @@ const NUTRIENT_BUILD_URL = 'https://api.nutrient.io/build';
 const DEFAULT_OCR_LANGUAGE = 'chi_sim';
 const MULTIPART_BODY_LIMIT_BYTES = 25 * 1024 * 1024;
 
+function isLocalOrPrivateKkApiBaseUrl(value) {
+  try {
+    const parsed = new URL(String(value || '').trim());
+    const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    return hostname === 'localhost'
+      || hostname === '::1'
+      || hostname === '0.0.0.0'
+      || hostname.startsWith('127.')
+      || hostname.startsWith('10.')
+      || hostname.startsWith('192.168.')
+      || /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname);
+  } catch {
+    return true;
+  }
+}
+
+function readBuiltKkApiBaseUrl(targetDir) {
+  const entries = fs.readdirSync(targetDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = path.join(targetDir, entry.name);
+    if (entry.isDirectory()) {
+      const nestedValue = readBuiltKkApiBaseUrl(entryPath);
+      if (nestedValue) {
+        return nestedValue;
+      }
+      continue;
+    }
+
+    if (!/\.(?:html|js|mjs|json)$/i.test(entry.name)) {
+      continue;
+    }
+
+    const source = fs.readFileSync(entryPath, 'utf8');
+    const match = /VITE_KK_API_BASE_URL["']?\s*:\s*["']([^"']+)["']/.exec(source);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
+  return '';
+}
+
+function assertPortableRemoteKkApiBaseUrl(targetDir) {
+  const kkApiBaseUrl = readBuiltKkApiBaseUrl(targetDir);
+  if (!kkApiBaseUrl || isLocalOrPrivateKkApiBaseUrl(kkApiBaseUrl)) {
+    throw new Error(
+      'Portable build does not include the core KK API. Set VITE_KK_API_BASE_URL to a remote VPS API before startup.',
+    );
+  }
+
+  return kkApiBaseUrl;
+}
+
+const portableKkApiBaseUrl = assertPortableRemoteKkApiBaseUrl(distDir);
+
 const mimeTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
   ['.html', 'text/html; charset=utf-8'],

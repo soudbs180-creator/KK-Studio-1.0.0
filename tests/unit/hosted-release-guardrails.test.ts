@@ -50,6 +50,15 @@ test("hosted release workflow deploys the VPS API before deploying the frontend"
   assert.match(movedSource, /import "\.\.\/release-hosted\.mjs";/);
 });
 
+test("hosted preview release skips the production VPS deploy command by default", () => {
+  const source = readSource("scripts/release-hosted.mjs");
+
+  assert.match(source, /const vpsPreviewDeployCommand = process\.env\.KK_VPS_PREVIEW_DEPLOY_COMMAND/);
+  assert.match(source, /if \(preview\) \{[\s\S]*runStep\("Deploy preview VPS API", vpsPreviewDeployCommand\);/);
+  assert.match(source, /Skipping VPS API deploy for preview/);
+  assert.match(source, /KK_VPS_PREVIEW_DEPLOY_COMMAND/);
+});
+
 test("cloud auto deploy waits for the VPS API before Vercel", () => {
   const source = readSource(".github/workflows/cloud-auto-deploy.yml");
 

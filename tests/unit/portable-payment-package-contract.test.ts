@@ -53,3 +53,13 @@ test('portable release exposes payment dependencies to both legacy server and co
   assert.ok(paymentLock.packages?.['']?.dependencies?.pg, 'payment-server lock root must include pg');
   assert.ok(paymentLock.packages?.['node_modules/pg']?.version, 'payment-server lock must pin pg');
 });
+
+test('portable release packaging fails unless the built frontend has a remote KK API base URL', () => {
+  const releaseSource = readSource('scripts/release/create-portable-release.mjs');
+
+  assert.match(releaseSource, /function assertPortableRemoteKkApiBaseUrl/);
+  assert.match(releaseSource, /VITE_KK_API_BASE_URL/);
+  assert.match(releaseSource, /isLocalOrPrivateKkApiBaseUrl/);
+  assert.match(releaseSource, /await assertPortableRemoteKkApiBaseUrl\(distSourceDir\)/);
+  assert.match(releaseSource, /does not package the core KK API/);
+});
