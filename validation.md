@@ -1077,10 +1077,11 @@ Generation billing follow-ups use the same generation gate and must keep stale A
 
 ## OpenAI-Compatible Adapter Gates
 
-Use this gate for the completed diagnostics preview helper extraction, image-routing error classifier extraction, and unreachable image fallback cleanup in `OpenAICompatibleAdapter`:
+Use this gate for OpenAI-compatible adapter structural slices, including diagnostics preview helper extraction, image-routing error classifier extraction, unreachable image fallback cleanup, and the M107 image-dispatch helper extraction:
 
 ```powershell
-node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/openai-compatible-image-routing-errors-contract.test.ts" "tests/unit/openai-compatible-diagnostics-contract.test.ts" "tests/unit/provider-image-routing-regression.test.ts" "tests/unit/provider-surface-router.test.ts" "tests/unit/provider-strategy.test.ts" "tests/unit/async-image-proxy-regression.test.ts" "tests/unit/frontend-key-boundary-hardening.test.ts" "tests/unit/governance-contract.test.ts"
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/openai-compatible-image-dispatch-contract.test.ts" "tests/unit/openai-compatible-image-routing-errors-contract.test.ts" "tests/unit/openai-compatible-diagnostics-contract.test.ts" "tests/unit/provider-image-routing-regression.test.ts" "tests/unit/provider-surface-router.test.ts" "tests/unit/provider-strategy.test.ts" "tests/unit/provider-channel-surface-view.test.ts" "tests/unit/twelve-ai-doc-alignment.test.ts" "tests/unit/async-image-proxy-regression.test.ts" "tests/unit/frontend-key-boundary-hardening.test.ts" "tests/unit/governance-contract.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
 npm.cmd run architecture:check
 npm.cmd run governance:security
 npm.cmd run audit:dependencies
@@ -1094,7 +1095,7 @@ npm.cmd run check:encoding
 This slice also requires this path-limited diff check:
 
 ```powershell
-git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/llm/OpenAICompatibleAdapter.ts" "src/services/llm/openAICompatibleDiagnostics.ts" "src/services/llm/openAICompatibleImageRoutingErrors.ts" "tests/unit/openai-compatible-diagnostics-contract.test.ts" "tests/unit/openai-compatible-image-routing-errors-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/llm/OpenAICompatibleAdapter.ts" "src/services/llm/openAICompatibleDiagnostics.ts" "src/services/llm/openAICompatibleImageDispatch.ts" "src/services/llm/openAICompatibleImageRoutingErrors.ts" "tests/unit/openai-compatible-diagnostics-contract.test.ts" "tests/unit/openai-compatible-image-dispatch-contract.test.ts" "tests/unit/openai-compatible-image-routing-errors-contract.test.ts" "tests/unit/provider-image-routing-regression.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
 ## UI Unused Cleanup Gate

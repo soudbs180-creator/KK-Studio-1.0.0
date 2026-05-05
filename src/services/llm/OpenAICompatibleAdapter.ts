@@ -34,6 +34,7 @@ import {
     waitForSyncImageBridgeResult
 } from './syncImageBridge';
 import { buildSafeFormDataPreview, buildSafeRequestBodyPreview } from './openAICompatibleDiagnostics';
+import { resolveOpenAICompatibleImageDispatch } from './openAICompatibleImageDispatch';
 import { isChatEndpointCompatibilityError, isImageEndpointCompatibilityError } from './openAICompatibleImageRoutingErrors';
 
 type WuyinImageRoute = {
@@ -2915,34 +2916,35 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             console.log(`[OpenAICompatibleAdapter] 忽略 compatibilityMode='chat'，优先使用供应商独立图片路由 -> ${keySlot.name}`);
         }
 
-        if (imageSurface === 'async-image') {
+        const dispatchPlan = resolveOpenAICompatibleImageDispatch({
+            runtime: channelRuntime,
+            imageSurface,
+            isGeminiImage,
+            legacyGeminiChatGateway: this.isLegacyGeminiChatGateway(baseUrl),
+            antigravityUsesChat: modelLower.includes('gemini') && modelLower.includes('image'),
+            useChatEndpoint: Boolean(options.providerConfig?.openai?.useChatEndpoint),
+        });
+
+        if (dispatchPlan.kind === 'async-image') {
             console.log(`[OpenAICompatibleAdapter] 使用 12AI async image API -> ${keySlot.name}`);
             return this.generateImage12AIAsync(options, keySlot);
         }
 
-        if (imageSurface === 'chat-image') {
+        if (dispatchPlan.kind === 'chat-strict' || dispatchPlan.kind === 'chat') {
             console.log(`[OpenAICompatibleAdapter] 使用 Chat API (显式 compatibilityMode='chat') -> ${keySlot.name}`);
-            if (isGeminiImage && !this.isLegacyGeminiChatGateway(baseUrl)) {
+            if (dispatchPlan.kind === 'chat-strict') {
                 return this.generateImageViaChatStrict(options, keySlot);
             }
             return this.generateImageViaChat(options, keySlot);
         }
 
-        const isAntigravity = channelRuntime.strategyId === 'antigravity';
-        const isOfficialOpenAI = channelRuntime.strategyId === 'openai';
-        const isSiliconFlow = channelRuntime.strategyId === 'siliconflow';
-        const isGptBest = channelRuntime.strategyId === 'gpt-best';
-        const is12AI = channelRuntime.strategyId === '12ai' && channelRuntime.geminiNative;
-        const isComfly = channelRuntime.strategyId === 'newapi';
-        const isSuxiGateway = channelRuntime.strategyId === 'suxi';
-
-        if (imageSurface === 'gemini-native-image') {
+        if (dispatchPlan.kind === 'gemini-native') {
             console.log(`[OpenAICompatibleAdapter] 使用原生 Gemini 图片协议 -> ${keySlot.name}`);
             return this.generateImageGeminiNative(options, keySlot);
         }
 
-        if (isAntigravity) {
-            if (modelLower.includes('gemini') && modelLower.includes('image')) {
+        if (dispatchPlan.kind === 'antigravity-chat' || dispatchPlan.kind === 'antigravity-extended-with-native-fallback') {
+            if (dispatchPlan.kind === 'antigravity-chat') {
                 console.log(`[OpenAICompatibleAdapter] 使用 Chat API (Antigravity + Gemini模型) -> ${keySlot.name}`);
                 return this.generateImageViaChat(options, keySlot);
             }
@@ -2958,32 +2960,32 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             }
         }
 
-        if (isOfficialOpenAI) {
+        if (dispatchPlan.kind === 'openai-strict') {
             console.log(`[OpenAICompatibleAdapter] 使用 OpenAI_Strict API -> ${keySlot.name}`);
             return this.generateImageStandard_OpenAI_Strict(options, keySlot);
         }
 
-        if (isSiliconFlow) {
+        if (dispatchPlan.kind === 'siliconflow') {
             console.log(`[OpenAICompatibleAdapter] 使用 SiliconFlow API -> ${keySlot.name}`);
             return this.generateImageStandard_SiliconFlow(options, keySlot);
         }
 
-        if (isGptBest) {
+        if (dispatchPlan.kind === 'gpt-best-native') {
             console.log(`[OpenAICompatibleAdapter] 使用 GPT Best 文档安全 Images API -> ${keySlot.name}`);
             return this.generateImageStandard_GPT_Best_Native(options, keySlot);
         }
 
-        if (is12AI) {
+        if (dispatchPlan.kind === '12ai-openai-strict') {
             console.log(`[OpenAICompatibleAdapter] 使用 OpenAI_Strict API (12AI) -> ${keySlot.name}`);
             return this.generateImageStandard_OpenAI_Strict(options, keySlot);
         }
 
-        if (isSuxiGateway) {
+        if (dispatchPlan.kind === 'suxi-openai-strict') {
             console.log(`[OpenAICompatibleAdapter] suxi 网关默认走 OpenAI Images API -> ${keySlot.name}`);
             return this.generateImageStandard_OpenAI_Strict(options, keySlot);
         }
 
-        if (isGeminiImage) {
+        if (dispatchPlan.kind === 'gemini-chat-strict-fail-closed') {
             console.log(`[OpenAICompatibleAdapter] Gemini模型优先尝试 Chat API (严格 new-api 兼容层) -> ${keySlot.name}`);
             try {
                 return await this.generateImageViaChatStrict(options, keySlot);
@@ -2996,11 +2998,11 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             }
         }
 
-        if (options.providerConfig?.openai?.useChatEndpoint) {
+        if (dispatchPlan.kind === 'provider-chat') {
             return this.generateImageViaChat(options, keySlot);
         }
 
-        if (isComfly) {
+        if (dispatchPlan.kind === 'comfly-openai-strict') {
             return this.generateImageStandard_OpenAI_Strict(options, keySlot);
         }
 

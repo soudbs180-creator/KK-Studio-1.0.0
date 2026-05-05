@@ -12,6 +12,7 @@ function readSource(relativePath: string): string {
 test("Suxi image routing stays on dedicated surfaces instead of being swallowed by chat compatibility", () => {
   const strategySource = readSource("src/services/api/providerStrategy.ts");
   const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+  const helperSource = readSource("src/services/llm/openAICompatibleImageDispatch.ts");
 
   assert.match(
     strategySource,
@@ -19,11 +20,15 @@ test("Suxi image routing stays on dedicated surfaces instead of being swallowed 
   );
   assert.match(
     adapterSource,
-    /const imageSurface = resolveImageSurface\(\{/,
+    /const dispatchPlan = resolveOpenAICompatibleImageDispatch\(\{/,
   );
   assert.match(
-    adapterSource,
-    /if \(imageSurface === 'chat-image'\)/,
+    helperSource,
+    /if \(input\.imageSurface === 'chat-image'\)/,
+  );
+  assert.match(
+    helperSource,
+    /if \(input\.runtime\.strategyId === 'suxi'\)/,
   );
 });
 
@@ -47,15 +52,30 @@ test("12AI image routing requires an explicit async preference instead of blanke
 
 test("GPT Best defaults to the doc-safe native images payload instead of the local extended payload", () => {
   const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
-  const gptBestBlockMatch = adapterSource.match(/if \(isGptBest\) \{[\s\S]*?\n        \}/);
+  const helperSource = readSource("src/services/llm/openAICompatibleImageDispatch.ts");
+  const gptBestDispatchStart = adapterSource.indexOf("dispatchPlan.kind === 'gpt-best-native'");
+  const gptBestDispatchEnd = adapterSource.indexOf("dispatchPlan.kind === '12ai-openai-strict'");
+  const gptBestDispatchBlock = adapterSource.slice(gptBestDispatchStart, gptBestDispatchEnd);
 
-  assert.ok(gptBestBlockMatch, "expected to find the GPT Best routing block");
+  assert.ok(gptBestDispatchStart > -1 && gptBestDispatchEnd > gptBestDispatchStart);
   assert.match(
-    gptBestBlockMatch[0],
+    helperSource,
+    /return \{ kind: 'gpt-best-native' \};/,
+  );
+  assert.match(
+    helperSource,
+    /if \(input\.runtime\.strategyId === 'gpt-best'\)/,
+  );
+  assert.match(
+    adapterSource,
+    /dispatchPlan\.kind === 'gpt-best-native'/,
+  );
+  assert.match(
+    gptBestDispatchBlock,
     /return this\.generateImageStandard_GPT_Best_Native\(options, keySlot\);/,
   );
   assert.doesNotMatch(
-    gptBestBlockMatch[0],
+    gptBestDispatchBlock,
     /generateImageStandard_GPT_Best_Extended/,
   );
 });
