@@ -28,6 +28,46 @@ npm.cmd run check:encoding
 git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "plans.md" "implement.md" "status.md" "validation.md"
 ```
 
+## Post-M120 UI Split Gate
+
+Use this gate for the completed ecommerce canvas workbench, PromptBar mobile action, and settings workbench chrome split:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/ecommerce-build-visibility-localization-regression.test.ts" `
+  "tests/unit/ecommerce-build-runtime-contract.test.ts" `
+  "tests/unit/ecommerce-group-shell-app-contract.test.ts" `
+  "tests/unit/prompt-bar-ecommerce-framework-companion.test.ts" `
+  "tests/unit/prompt-bar-ecommerce-group-workbench.test.ts" `
+  "tests/unit/prompt-bar-layout-regression.test.ts" `
+  "tests/unit/settings-desktop-workbench-regression.test.ts"
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "src/App.tsx" `
+  "src/app/useEcommerceBuildRuntime.ts" `
+  "src/components/canvas/PromptNodeComponent.tsx" `
+  "src/components/ecommerce/EcommerceCanvasWorkbenchCard.tsx" `
+  "src/components/layout/PromptBar.tsx" `
+  "src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx" `
+  "src/components/layout/prompt-bar/DesktopComposerModePanel.tsx" `
+  "src/components/layout/prompt-bar/PromptBarFooterMobile.tsx" `
+  "src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx" `
+  "src/index.css" `
+  "tests/unit/ecommerce-build-runtime-contract.test.ts" `
+  "tests/unit/ecommerce-build-visibility-localization-regression.test.ts" `
+  "tests/unit/ecommerce-group-shell-app-contract.test.ts" `
+  "tests/unit/prompt-bar-ecommerce-framework-companion.test.ts" `
+  "tests/unit/prompt-bar-ecommerce-group-workbench.test.ts" `
+  "tests/unit/prompt-bar-layout-regression.test.ts" `
+  "tests/unit/settings-desktop-workbench-regression.test.ts"
+```
+
+Browser QA is required for this UI split. Record the Codex in-app Browser route, theme, `.theme-transitioning` count, stale chunk count, and console error count in `status.md`. If no seeded post-build ecommerce canvas fixture is available, record that limitation and keep the post-build canvas handoff covered by targeted source contracts.
+
 ## Ecommerce Requirement Analysis Fallback Gate
 
 Use this gate when touching the ecommerce requirement-file analyzer client, especially static preview fallback, `.xlsx` local parsing, or upload endpoint response handling:
