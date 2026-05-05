@@ -160,14 +160,26 @@ test("image compatibility fallback disables unreachable post-throw fallback code
 });
 
 test("base64 image extraction preserves upstream mime types instead of forcing png", () => {
-  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+  const payloadHelperSource = readSource("src/services/llm/openAICompatibleImagePayload.ts");
 
   assert.match(
-    adapterSource,
-    /const mimeType = item\.mime_type \|\| item\.mimeType \|\| item\?\.image\?\.mime_type \|\| item\?\.image\?\.mimeType \|\| 'image\/png';/,
+    payloadHelperSource,
+    /getProperty\(item, 'mime_type'\)/,
   );
   assert.match(
-    adapterSource,
-    /urls\.push\(`data:\$\{mimeType\};base64,\$\{cleaned\}`\);/,
+    payloadHelperSource,
+    /getProperty\(item, 'mimeType'\)/,
+  );
+  assert.match(
+    payloadHelperSource,
+    /getProperty\(image, 'mime_type'\)/,
+  );
+  assert.match(
+    payloadHelperSource,
+    /getProperty\(image, 'mimeType'\)/,
+  );
+  assert.match(
+    payloadHelperSource,
+    /\|\| 'image\/png';/,
   );
 });

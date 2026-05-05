@@ -35,6 +35,7 @@ import {
 } from './syncImageBridge';
 import { buildSafeFormDataPreview, buildSafeRequestBodyPreview } from './openAICompatibleDiagnostics';
 import { resolveOpenAICompatibleImageDispatch } from './openAICompatibleImageDispatch';
+import { extractImageUrlsFromPayload } from './openAICompatibleImagePayload';
 import { isChatEndpointCompatibilityError, isImageEndpointCompatibilityError } from './openAICompatibleImageRoutingErrors';
 
 type WuyinImageRoute = {
@@ -450,99 +451,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         err.provider = originalError?.provider || keySlot.provider;
         err.compatibilityModeHint = endpointMode;
         return err as Error;
-    }
-
-    private extractImageUrlsFromPayload(data: any): string[] {
-        const candidates: any[] = [];
-        const pushAny = (value: any) => {
-            if (Array.isArray(value)) value.forEach(pushAny);
-            else if (value !== undefined && value !== null) candidates.push(value);
-        };
-
-        pushAny(data?.data);
-        pushAny(data?.data?.data);
-        pushAny(data?.data?.result);
-        pushAny(data?.data?.output);
-        pushAny(data?.data?.images);
-        pushAny(data?.data?.urls);
-        pushAny(data?.data?.outputs);
-        pushAny(data?.images);
-        pushAny(data?.result?.data);
-        pushAny(data?.result?.data?.data);
-        pushAny(data?.result?.images);
-        pushAny(data?.result?.result);
-        pushAny(data?.result?.urls);
-        pushAny(data?.result?.outputs);
-        pushAny(data?.output?.data);
-        pushAny(data?.output?.data?.data);
-        pushAny(data?.output?.images);
-        pushAny(data?.output?.result);
-        pushAny(data?.output?.urls);
-        pushAny(data?.output?.outputs);
-
-        if (typeof data?.url === 'string') candidates.push({ url: data.url });
-        if (typeof data?.data?.url === 'string') candidates.push({ url: data.data.url });
-        if (typeof data?.result?.url === 'string') candidates.push({ url: data.result.url });
-        if (typeof data?.output?.url === 'string') candidates.push({ url: data.output.url });
-        if (typeof data?.output?.image_url === 'string') candidates.push({ url: data.output.image_url });
-
-        const urls: string[] = [];
-        const addUrl = (raw: any) => {
-            if (typeof raw !== 'string') return;
-            const normalized = raw.trim();
-            if (!normalized) return;
-            urls.push(normalized);
-        };
-
-        candidates.forEach((item) => {
-            if (typeof item === 'string') {
-                addUrl(item);
-                return;
-            }
-            if (!item || typeof item !== 'object') return;
-
-            const b64 = item.b64_json || item.b64 || item.base64 || item.image_base64 || item?.image?.b64_json;
-            if (typeof b64 === 'string' && b64.trim()) {
-                const mimeType = item.mime_type || item.mimeType || item?.image?.mime_type || item?.image?.mimeType || 'image/png';
-                const cleaned = b64
-                    .replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '')
-                    .replace(/\s+/g, '');
-                urls.push(`data:${mimeType};base64,${cleaned}`);
-                return;
-            }
-
-            pushAny(item.urls);
-            pushAny(item.images);
-            pushAny(item.outputs);
-            pushAny(item.output);
-            pushAny(item.result);
-            pushAny(item.data);
-
-            addUrl(item.hd_url);
-            addUrl(item.original_url);
-            addUrl(item.full_url);
-            addUrl(item.image_url);
-            addUrl(item.url);
-            addUrl(item.uri);
-            addUrl(item.src);
-        });
-
-        const content = data?.choices?.[0]?.message?.content || data?.message || data?.output_text || '';
-        if (typeof content === 'string' && content.trim()) {
-            const base64Match = content.match(/data:(image\/[^;]+);base64,([A-Za-z0-9+/=\\s]+)/);
-            if (base64Match?.[2]) {
-                const cleaned = base64Match[2].replace(/\s+/g, '');
-                urls.push(`data:${base64Match[1]};base64,${cleaned}`);
-            }
-
-            const markdownUrl = content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
-            if (markdownUrl?.[1]) addUrl(markdownUrl[1]);
-
-            const rawUrl = content.match(/(https?:\/\/[^\s)]+)/);
-            if (rawUrl?.[1]) addUrl(rawUrl[1]);
-        }
-
-        return Array.from(new Set(urls));
     }
 
     private normalizeGeminiImageSize(raw: string | undefined): '512px' | '1K' | '2K' | '4K' {
@@ -1063,7 +971,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             const message = this.extractProviderMessage(payload);
 
             if (status === 'success') {
-                const urls = this.extractImageUrlsFromPayload(payload);
+                const urls = extractImageUrlsFromPayload(payload);
                 if (!urls.length) {
                     throw this.buildHttpError({
                         message: 'AceData task completed, but no image URL was returned',
@@ -1142,7 +1050,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
     }
 
     private mapGenericTaskStatus(payload: any): 'pending' | 'processing' | 'success' | 'failed' {
-        const urls = this.extractImageUrlsFromPayload(payload);
+        const urls = extractImageUrlsFromPayload(payload);
         if (urls.length > 0) {
             return 'success';
         }
@@ -1358,7 +1266,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         keySlot: KeySlot;
     }) {
         const status = this.mapGenericTaskStatus(params.payload);
-        const urls = status === 'success' ? this.extractImageUrlsFromPayload(params.payload) : [];
+        const urls = status === 'success' ? extractImageUrlsFromPayload(params.payload) : [];
         const effectiveStatus = status === 'success' && urls.length === 0 ? 'processing' : status;
         return {
             urls,
@@ -1539,7 +1447,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             });
         }
 
-        const immediateUrls = this.extractImageUrlsFromPayload(submitPayload);
+        const immediateUrls = extractImageUrlsFromPayload(submitPayload);
         if (immediateUrls.length > 0) {
             keyManager.reportCallResult(keySlot.id, true);
             return {
@@ -1656,7 +1564,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             const status = this.mapWuyinStatus(statusCode);
 
             if (status === 'success') {
-                const urls = this.extractImageUrlsFromPayload(payload);
+                const urls = extractImageUrlsFromPayload(payload);
                 if (!urls.length) {
                     throw this.buildHttpError({
                         message: 'Wuyin task completed, but no image URL was returned',
@@ -1785,7 +1693,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             });
         }
 
-        const immediateUrls = this.extractImageUrlsFromPayload(submitPayload);
+        const immediateUrls = extractImageUrlsFromPayload(submitPayload);
         if (immediateUrls.length > 0) {
             keyManager.reportCallResult(keySlot.id, true);
             return {
@@ -1962,7 +1870,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         const taskId = this.extractGenericTaskId(submitPayload);
-        const immediateUrls = this.extractImageUrlsFromPayload(submitPayload);
+        const immediateUrls = extractImageUrlsFromPayload(submitPayload);
         if (immediateUrls.length > 0) {
             keyManager.reportCallResult(keySlot.id, true);
             return {
@@ -3438,7 +3346,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         const content = messageObj?.content || '';
-        const extractedUrls = this.extractImageUrlsFromPayload({ choices: [{ message: { content } }] });
+        const extractedUrls = extractImageUrlsFromPayload({ choices: [{ message: { content } }] });
         if (extractedUrls.length > 0) {
             return {
                 urls: extractedUrls,
@@ -4018,7 +3926,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             const statusCode = this.extractWuyinStatusCode(payload);
             const status = this.mapWuyinStatus(statusCode);
             const message = this.extractProviderMessage(payload);
-            const urls = status === 'success' ? this.extractImageUrlsFromPayload(payload) : [];
+            const urls = status === 'success' ? extractImageUrlsFromPayload(payload) : [];
             const effectiveStatus = status === 'success' && urls.length === 0 ? 'processing' : status;
 
             return {
@@ -4191,7 +4099,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         const data = await response.json();
         keyManager.reportCallResult(keySlot.id, true);
-        const urls = this.extractImageUrlsFromPayload(data);
+        const urls = extractImageUrlsFromPayload(data);
 
         if (!urls.length) {
             const rawPreview = JSON.stringify(data || {}).slice(0, 1600);
@@ -4305,7 +4213,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         }
 
-        const urls = this.extractImageUrlsFromPayload(data);
+        const urls = extractImageUrlsFromPayload(data);
         if (!urls.length) {
             const rawPreview = JSON.stringify(data || {}).slice(0, 1600);
             throw this.buildHttpError({

@@ -100,6 +100,7 @@
         "tests/unit/model-id-normalization-parity-contract.test.ts",
         "tests/unit/openai-compatible-diagnostics-contract.test.ts",
         "tests/unit/openai-compatible-image-dispatch-contract.test.ts",
+        "tests/unit/openai-compatible-image-payload-contract.test.ts",
         "tests/unit/openai-compatible-image-routing-errors-contract.test.ts",
         "tests/unit/openai-compatible-unused-cleanup-contract.test.ts",
         "tests/unit/onboarding-unused-cleanup-contract.test.ts",
