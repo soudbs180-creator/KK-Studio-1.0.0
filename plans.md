@@ -5,7 +5,7 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed runtime slice is M114 keyManager shared pricing helper extraction in `245bdd4b`, with exact commits tracked by alternate git. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed slice is `5aaccf50 fix: handle ecommerce analysis static html fallback`, with exact commits tracked by alternate git. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -91,8 +91,8 @@ The active execution model for this thread has resumed Stage One convergence:
 - Stage Two M113 `local-user-route-proxy-service` endpoint helper extraction is completed in `617491b3`: it moves direct OpenAI/Claude/Gemini endpoint URL normalization into `apps/api/src/modules/model-proxy/application/local-user-route-endpoints.ts` while leaving auth/header/query-key behavior, endpoint call sites, fetch execution, task operations, credential retrieval/storage, provider branch execution, fallback ordering, billing metadata, release metadata, and UI behavior in the service.
 - The post-M113 review/gate repair is completed in `5c269e78`: it hardens KK API session signing, system proxy task signing, refresh-token rotation, release guardrails, OCR defaults, and canvas id forwarding.
 - Stage Two M114 `keyManager` shared pricing helper extraction is completed in `245bdd4b`: it moves raw shared pricing catalog normalization and pricing snapshot construction into `src/services/auth/keyManagerSharedPricing.ts`, while leaving provider fetches, provider persistence, cloud sync, key storage, route selection, runtime model resolution, and UI behavior unchanged.
-- Stage Two M115 `keyManager` remote model discovery helper extraction is the current working-tree slice: it moves pure Google/Gemini/OpenAI-compatible model discovery response parsing and canonical dedupe into `src/services/auth/keyManagerRemoteModelDiscovery.ts`, while leaving fetch execution, endpoint selection, auth/header behavior, provider persistence, cloud sync, key storage, route selection, runtime model resolution, and UI behavior unchanged.
-- The source-proven unused cleanup line now includes `b9baa445` (PromptBar/ImageCard), `b6767e85` (App), `fafecef9` (OpenAI-compatible adapter), `783fddeb` (LLMService), `92ee7a4f` (pure utility), `3108a29f` (ChatSidebar), `0efba271` (PromptNode), `0797bf95` (SystemLogs), `f453cd9a` (AchievementToast), `e661630e` (Onboarding residual), `05394f83` (imageCompression orphan), `eeb377d5` (dormant Pixi canvas), `9ce70e96` (dormant canvas residual), `58161f20` (legacy dashboard icons), `7d2c2584` (file-system stubs), `5dac56e8` (import-only types), `bdb082d7` (live canvas props), `e714380b` (workflow actions import), `57e8c05b` (common error-boundary parameter), `d4291729` (generation runtime import), `c29effe5` (CanvasContext type imports), `c4526e6b` (ProjectManager props), `d8845775` (ecommerce taskMerger parameter), `37540efc` (model display provider parameter), `324b42a6` (video-service cleanup), `b31edef5` (image priority/LOD cleanup), `56ffe696` (small LLM adapter cleanup), `8dfa152a` (chat-service cleanup), `a4032085` (generation-runtime contract test cleanup), `d075e6fd` (prompt optimizer duplicate-tab cleanup), `0cc6c77c` (KK API client unused DTO cleanup), `63386046` (user API payload secret-constant cleanup), `651b54c5` (cost service import cleanup), `318e6b1e` (secure model proxy unused-helper cleanup), `27f03e62` (user API profile import cleanup), and `6c624909` (UserProfileModal billing alias cleanup). The active Stage Two line is local user-route proxy service helper extraction, now through the M113 endpoint helper working tree.
+- Stage Two M115 `keyManager` remote model discovery helper extraction is completed in `ed444606`: it moves pure Google/Gemini/OpenAI-compatible model discovery response parsing and canonical dedupe into `src/services/auth/keyManagerRemoteModelDiscovery.ts`, while leaving fetch execution, endpoint selection, auth/header behavior, provider persistence, cloud sync, key storage, route selection, runtime model resolution, and UI behavior unchanged.
+- The source-proven unused cleanup line now includes the M60-M106 cleanup commits through secure proxy route-gate wiring, plus later M114-M116 and the `5aaccf50` ecommerce analysis fallback hotfix. The active Stage Two line is now ledger synchronization and next-seam selection from the current giant-file and quality-debt baseline.
 - The project is functionally green after the latest full gate, but not final-complete while `App.tsx`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`, `keyManager.ts`, and `CanvasContext.tsx` remain giant-file split targets.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
@@ -101,13 +101,13 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 
 ## Current Baseline
 
-- `src/App.tsx`: 4812 physical lines after the latest source-proven unused cleanup line.
+- `src/App.tsx`: 4305 physical lines after the latest ecommerce UI and analysis fallback line.
 - `src/app/useConnectorRenderer.ts`: 253 lines, boundary hardened in `5f5b76e0` and review-follow-up typechecked in `f06f1880`.
 - `src/app/usePromptGroupLayout.ts`: 1348 lines, extracted and boundary-hardened in `8a458cd4`.
-- `src/app/useGenerationRuntime.ts`: 2603 lines, extracted and boundary-hardened in `ab719c4a`; generation billing cleanup completed in `083db7f8`; unused import cleanup completed in `d4291729`.
+- `src/app/useGenerationRuntime.ts`: 2341 lines, extracted and boundary-hardened in `ab719c4a`; generation billing cleanup completed in `083db7f8`; unused import cleanup completed in `d4291729`.
 - `src/app/usePptRuntime.ts`: 1289 lines, extracted in `4c448660` and semantically boundary-checked in `569383aa`.
 - `src/app/pptRuntimeHelpers.ts`: 152 lines, semantically boundary-checked in `569383aa`.
-- `src/context/CanvasContext.tsx`: 2516 physical lines after Stage Two M27 prompt-node update extraction and later cleanup, down from 5218 text lines at the start of Stage Two.
+- `src/context/CanvasContext.tsx`: 2197 physical lines after Stage Two CanvasContext extractions and later cleanup, down from 5218 text lines at the start of Stage Two.
 - `src/context/canvasContextState.ts`: 114 lines, new Stage Two M1 state/default/context boundary module.
 - `src/context/canvasArrangeSelection.ts`: 601 lines, Stage Two M22/M24/M25 selected arrange helper.
 - `src/context/canvasAutoArrange.ts`: 360 lines, Stage Two M26 full-canvas auto-arrange position helper.
@@ -150,18 +150,18 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/services/auth/keyManagerSharedPricing.ts`: 136 lines, Stage Two M114 shared pricing catalog/snapshot helper boundary.
 - `src/services/auth/keyManagerRemoteModelDiscovery.ts`: 130 lines, Stage Two M115 remote model discovery response parsing helper boundary.
 - `src/utils/modelIdNormalization.ts`: 6 lines after M30 compatibility-facade consolidation, down from 84 duplicated helper lines.
-- `src/components/layout/PromptBar.tsx`: 3965 physical lines.
-- `src/components/canvas/PromptNodeComponent.tsx`: 2241 physical lines after the current unused cleanup working tree.
-- `src/components/layout/ChatSidebar.tsx`: 2743 physical lines after `3108a29f`.
-- `src/components/settings/ApiSettingsView.tsx`: 3385 physical lines.
+- `src/components/layout/PromptBar.tsx`: 3631 physical lines.
+- `src/components/canvas/PromptNodeComponent.tsx`: 2091 physical lines after the current unused cleanup line.
+- `src/components/layout/ChatSidebar.tsx`: 2477 physical lines after `3108a29f`.
+- `src/components/settings/ApiSettingsView.tsx`: 3071 physical lines.
 - `src/components/settings/views/SystemLogsView.tsx`: 421 physical lines after the current unused cleanup working tree.
 - `src/components/settings/views/SystemLogsView.localized.tsx`: 450 physical lines after the current unused cleanup working tree.
 - `src/components/Onboarding/AchievementToast.tsx`: 60 physical lines after the current unused cleanup working tree.
 - `src/components/Onboarding/OnboardingManager.tsx`: 262 physical lines after the current unused cleanup working tree.
 - `src/components/Onboarding/OnboardingOverlay.tsx`: 200 physical lines after the current unused cleanup working tree.
 - `src/components/Onboarding/useOnboardingProgress.ts`: 137 physical lines after the current unused cleanup working tree.
-- `src/services/storage/fileSystemService.ts`: 1577 physical lines.
-- `src/services/llm/OpenAICompatibleAdapter.ts`: 4008 physical lines after the M111 task result helper extraction; `src/services/llm/openAICompatibleImageDispatch.ts`: 91 physical lines; `src/services/llm/openAICompatibleImagePayload.ts`: 141 physical lines; `src/services/llm/openAICompatibleImageSizing.ts`: 81 physical lines; `src/services/llm/openAICompatibleTaskPayload.ts`: 219 physical lines.
+- `src/services/storage/fileSystemService.ts`: 1384 physical lines.
+- `src/services/llm/OpenAICompatibleAdapter.ts`: 3529 physical lines after the latest adapter helper extraction and unused cleanup line; `src/services/llm/openAICompatibleImageDispatch.ts`: 91 physical lines; `src/services/llm/openAICompatibleImagePayload.ts`: 141 physical lines; `src/services/llm/openAICompatibleImageSizing.ts`: 81 physical lines; `src/services/llm/openAICompatibleTaskPayload.ts`: 219 physical lines.
 - `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts`: 1959 physical lines after the M113 endpoint helper extraction; `apps/api/src/modules/model-proxy/application/local-user-route-auth.ts`: 370 physical lines; `apps/api/src/modules/model-proxy/application/local-user-route-endpoints.ts`: 46 physical lines.
 - `src/services/llm/openAICompatibleDiagnostics.ts`: 86 physical lines in the diagnostics preview helper boundary.
 - `src/services/llm/openAICompatibleImageRoutingErrors.ts`: 49 physical lines in the completed M57 image-routing error classifier boundary.
@@ -522,6 +522,7 @@ Scope:
 - Completed M114 in `245bdd4b`: extracted keyManager shared pricing catalog normalization and pricing snapshot construction into `src/services/auth/keyManagerSharedPricing.ts`, preserving provider fetches, persistence, cloud sync, key storage, route selection, model resolution, and UI behavior.
 - Completed M115 in `ed444606`: extracted pure remote model discovery response parsing and canonical dedupe into `src/services/auth/keyManagerRemoteModelDiscovery.ts`, preserving fetch execution, endpoint selection, auth/header behavior, provider persistence, cloud sync, key storage, route selection, model resolution, and UI behavior.
 - Completed M116 in `52074495`: closed ecommerce visibility/localization UI debt by keeping generated ecommerce task cards visible on canvas, hiding only `a-plus-group` helper nodes, localizing ecommerce/mobile post-build controls, and keeping card insertion responsive while reference images persist in the background.
+- Completed hotfix in `5aaccf50`: hardened ecommerce requirement analysis so static-preview `200 text/html` responses from `/api/ecommerce-analysis` fall back to local `.xlsx` parsing instead of surfacing a JSON parser error.
 - Next slice should be selected from a fresh seam map or quality scan; do not mix auth/header behavior, endpoint call-site behavior, fetch behavior, fallback-order changes, keyManager secrets/cloud sync, provider routing, storage persistence, release metadata, unrelated UI behavior, or broad debt cleanup.
 - Continue `src/context/CanvasContext.tsx` only for another high-confidence narrow seam; defer `migrateNodes`, IndexedDB/local-folder movement, and persistence orchestration until they can be split safely.
 - Continue `src/services/auth/keyManager.ts` only after a fresh seam map. Defer key storage, permission checks, encryption helpers, provider credential management, cloud sync, provider persistence, shared pricing cache construction, runtime routing, fetch/auth behavior, endpoint selection, and localStorage policy until smaller seams are mapped.

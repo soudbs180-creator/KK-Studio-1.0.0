@@ -4,6 +4,8 @@ Last updated: 2026-05-05
 
 Use `npm.cmd` for npm scripts on Windows.
 
+Current baseline at `5aaccf50`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
+
 ## Active Stage One M6 Closeout Gate
 
 Use this gate while scanning or extending the remaining ecommerce runtime extraction. The partial redraw slice is already committed in `d12731ce`; rerun this set when the touched area overlaps redraw, source selection, or mobile result feed boundaries:
