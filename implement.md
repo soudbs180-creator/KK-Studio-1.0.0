@@ -4,7 +4,7 @@ Last updated: 2026-05-06
 
 ## Operating Mode
 
-This is a long-running execution. Plain `.git` may show stale historical state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`. The current HEAD is `edb1e33c docs: sync post-ui closure ledgers`; the latest code slices in the current line are `da4ffc79 refactor: move ecommerce workbench to canvas`, `485a6bef style: flatten prompt bar mobile actions`, and `1ca080eb style: flatten settings workbench chrome`.
+This is a long-running execution. Plain `.git` may show stale historical state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`. The latest stable baseline before the active M121 slice is `4940dd98 docs: sync finalization audit baseline`; the latest code slices before M121 are `da4ffc79 refactor: move ecommerce workbench to canvas`, `485a6bef style: flatten prompt bar mobile actions`, and `1ca080eb style: flatten settings workbench chrome`.
 
 The active workstream is a single merged line. Thread `019dd551...` is the main refactor history and `019de168...` is continuation history; both belong to Stage One M6 ecommerce runtime extraction. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; ecommerce source selection closed in `ccf965c3`; ecommerce partial redraw closed in `d12731ce`; connector renderer boundary hardening closed in `5f5b76e0`; connector review follow-up closed in `f06f1880`; the M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`.
 
@@ -12,14 +12,14 @@ Stage One Backfill M2 completed in `8a458cd4` by hardening `src/app/usePromptGro
 
 The active plan is `plans.md`. The current status and next exact step are tracked in `status.md`. Validation commands and expected gates are tracked in `validation.md`.
 
-Current slice override: the post-M120 UI closure line is complete. `da4ffc79` moves ecommerce post-build editing onto the canvas framework card, `485a6bef` flattens PromptBar mobile actions, and `1ca080eb` flattens settings workbench chrome. Do not mix future giant-file seams, runtime/provider behavior, security, or release metadata into this UI closure line.
+Current slice override: M121 extracts only pure Wuyin route/base-url/reference-image/task-status helpers from `OpenAICompatibleAdapter.ts` into `src/services/llm/openAICompatibleWuyinRoute.ts`. Do not change endpoint selection, auth, fetch behavior, provider routing, fallback ordering, billing, UI, release metadata, or broader OpenAI-compatible provider logic in this slice.
 
 For Clay UI work, use `C:/Users/Administrator/Downloads/DESIGN-clay.md` as the visual base with these overrides: inputs, main cards, sub cards, and framework cards use controlled frosted material; dark mode uses neutral black-gray surfaces; Clay brand colors are emphasis only. That lane is not active unless the user reports a new visual issue.
 
 Current convergence order:
 1. Keep the ledger files aligned with the alternate-git HEAD and the merged single execution line.
 2. Treat Stage One M6 ecommerce extraction and Stage One backfill boundaries as complete unless a new concrete regression proves otherwise.
-3. For Stage Two, split or prune one responsibility at a time from the largest files. After the M120 helper and post-M120 UI closure commits, the next ordinary refactor seam should come from the fresh seam map; do not chain keyManager secrets/cloud sync, provider fetches, endpoint/auth behavior, provider persistence, route selection, storage, release metadata, unrelated UI redesign, or broad debt cleanup into the same slice.
+3. For Stage Two, split or prune one responsibility at a time from the largest files. After M121, the next priority is the security hardening item found by the finalization audit: local user-route task signing must not fall back to a hard-coded secret outside explicit local/test mode. Do not chain keyManager secrets/cloud sync, provider fetches, endpoint/auth behavior, provider persistence, route selection, storage, release metadata, unrelated UI redesign, or broad debt cleanup into the same slice.
 4. Write/update focused source contracts before each extraction when behavior or ownership changes.
 5. Move domain helpers and side effects into focused modules while preserving compatibility exports.
 6. Verify with the targeted gate for the touched slice, typecheck, full unit suite, build or architecture check as required, docs governance, encoding checks, and path-limited `git diff --check`.

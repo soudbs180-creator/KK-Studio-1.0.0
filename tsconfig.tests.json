@@ -114,6 +114,7 @@
         "tests/unit/openai-compatible-image-sizing-contract.test.ts",
         "tests/unit/openai-compatible-task-payload-contract.test.ts",
         "tests/unit/openai-compatible-image-routing-errors-contract.test.ts",
+        "tests/unit/openai-compatible-wuyin-route-contract.test.ts",
         "tests/unit/openai-compatible-unused-cleanup-contract.test.ts",
         "tests/unit/onboarding-unused-cleanup-contract.test.ts",
         "tests/unit/payment-runtime-hardening.test.ts",

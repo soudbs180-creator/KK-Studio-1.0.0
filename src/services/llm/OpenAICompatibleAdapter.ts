@@ -23,7 +23,7 @@ import {
     resolveProviderRuntime,
     shouldBypassChatCompatibilityForImages,
 } from '../api/providerStrategy';
-import { AspectRatio, GenerationMode } from '../../types';
+import { GenerationMode } from '../../types';
 import { logError } from '../system/systemLogService';
 import { buildInlineImagePart, buildGeminiNativeGroundingTools } from './GoogleAdapter';
 import { RegionService } from '../system/RegionService';
@@ -54,17 +54,17 @@ import {
     mapGenericTaskStatus,
 } from './openAICompatibleTaskPayload';
 import { isChatEndpointCompatibilityError, isImageEndpointCompatibilityError } from './openAICompatibleImageRoutingErrors';
-
-type WuyinImageRoute = {
-    endpointPath: string;
-    aliases: string[];
-};
-
-type WuyinResolvedRoute = {
-    endpointPath: string;
-    endpointModelId: string;
-    endpointUrl?: string;
-};
+import {
+    WUYIN_DETAIL_PATH,
+    extractWuyinStatusCode,
+    extractWuyinTaskId,
+    mapWuyinStatus,
+    normalizeWuyinAspectRatio,
+    normalizeWuyinBaseUrl,
+    normalizeWuyinImageSize,
+    normalizeWuyinReferenceImage,
+    resolveWuyinRequestRoute,
+} from './openAICompatibleWuyinRoute';
 
 type AceDataServiceId = 'flux' | 'nano-banana';
 
@@ -74,74 +74,6 @@ type AceDataImageRoute = {
     taskPath: string;
     aliases: string[];
 };
-
-const WUYIN_DEFAULT_BASE_URL = 'https://api.wuyinkeji.com';
-const WUYIN_DETAIL_PATH = '/api/async/detail';
-const WUYIN_IMAGE_ROUTES: WuyinImageRoute[] = [
-    {
-        endpointPath: '/api/async/image_nanoBanana2',
-        aliases: [
-            'image_nanobanana2',
-            'nanobanana2',
-            'nano-banana-2',
-            'nano banana 2',
-            'gemini-3.1-flash-image-preview',
-            'gemini-3.1-flash-image',
-        ],
-    },
-    {
-        endpointPath: '/api/async/image_nanoBanana_pro',
-        aliases: [
-            'image_nanobanana_pro',
-            'nanobanana_pro',
-            'nanobananapro',
-            'nano-banana-pro',
-            'nano banana pro',
-            'gemini-3-pro-image-preview',
-            'gemini-3-pro-image',
-        ],
-    },
-    {
-        endpointPath: '/api/async/image_nanoBanana',
-        aliases: [
-            'image_nanobanana',
-            'nanobanana',
-            'nano-banana',
-            'nano banana',
-            'gemini-2.5-flash-image',
-            'gemini-2.0-flash-exp-image-generation',
-        ],
-    },
-    {
-        endpointPath: '/api/async/image_grok_imagine',
-        aliases: [
-            'image_grok_imagine',
-            'grok_imagine',
-            'grok-imagine',
-            'grok imagine',
-        ],
-    },
-    {
-        endpointPath: '/api/async/image_sora',
-        aliases: [
-            'image_sora',
-            'sora',
-        ],
-    },
-];
-const WUYIN_SUPPORTED_ASPECT_RATIOS = new Set([
-    'auto',
-    '1:1',
-    '16:9',
-    '9:16',
-    '4:3',
-    '3:4',
-    '3:2',
-    '2:3',
-    '5:4',
-    '4:5',
-    '21:9',
-]);
 
 const ACEDATA_DEFAULT_BASE_URL = 'https://api.acedata.cloud';
 const ACEDATA_IMAGE_ROUTES: AceDataImageRoute[] = [
@@ -468,268 +400,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         err.provider = originalError?.provider || keySlot.provider;
         err.compatibilityModeHint = endpointMode;
         return err as Error;
-    }
-
-    private normalizeWuyinBaseUrl(baseUrl: string): string {
-        const raw = String(baseUrl || '').trim();
-        if (!raw) return WUYIN_DEFAULT_BASE_URL;
-
-        const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-
-        try {
-            const parsed = new URL(withProtocol);
-            if (/^api\.wuyinkeji\.com$/i.test(parsed.hostname)) {
-                return `${parsed.protocol}//${parsed.host}`;
-            }
-
-            const sanitizedPath = parsed.pathname
-                .replace(/\/+(doc\/\d+)?$/i, '')
-                .replace(/\/+(api\/async\/[a-z0-9_.-]+)$/i, '')
-                .replace(/\/+$/, '');
-            return `${parsed.protocol}//${parsed.host}${sanitizedPath}`;
-        } catch {
-            return WUYIN_DEFAULT_BASE_URL;
-        }
-    }
-
-    private extractWuyinDirectEndpointPath(baseUrl: string): string | null {
-        const raw = String(baseUrl || '').trim();
-        if (!raw) return null;
-
-        const candidates = /^https?:\/\//i.test(raw) ? [raw] : [`https://${raw}`];
-        for (const candidate of candidates) {
-            try {
-                const parsed = new URL(candidate);
-                const pathname = parsed.pathname.replace(/\/+$/, '');
-                if (/^\/api\/async\/[a-z0-9_.-]+$/i.test(pathname)) {
-                    return pathname;
-                }
-            } catch {
-                continue;
-            }
-        }
-
-        return null;
-    }
-
-    private normalizeWuyinAlias(value: string): string {
-        return String(value || '')
-            .trim()
-            .toLowerCase()
-            .replace(/^models\//i, '')
-            .replace(/\|.*$/, '')
-            .replace(/@.*$/, '')
-            .replace(/[^a-z0-9]+/g, '');
-    }
-
-    private findLinkedWuyinProvider(keySlot: KeySlot) {
-        return keyManager.getProviderForKeySlot(keySlot) || null;
-    }
-
-    private resolveWuyinSnapshotRoute(keySlot: KeySlot, modelId: string): WuyinResolvedRoute | null {
-        const provider = this.findLinkedWuyinProvider(keySlot);
-        if (!provider?.pricingSnapshot) return null;
-
-        const rawModelId = String(modelId || '').trim().split('@')[0].split('|')[0].trim();
-        const normalizedTarget = rawModelId.toLowerCase();
-        const normalizedAlias = this.normalizeWuyinAlias(rawModelId);
-        const pricingEntries = [
-            ...(Array.isArray(provider.pricingSnapshot._rawData) ? provider.pricingSnapshot._rawData : []),
-            ...(Array.isArray(provider.pricingSnapshot.rows) ? provider.pricingSnapshot.rows : []),
-        ];
-
-        for (const entry of pricingEntries) {
-            const endpointUrl = String((entry as any)?.endpoint_url ?? (entry as any)?.endpointUrl ?? '').trim();
-            const endpointPath =
-                String((entry as any)?.endpoint_path ?? (entry as any)?.endpointPath ?? '').trim() ||
-                this.extractWuyinDirectEndpointPath(endpointUrl) ||
-                '';
-            if (!endpointPath) continue;
-
-            const entryModel = String((entry as any)?.model ?? (entry as any)?.model_name ?? '').trim();
-            const endpointModelId = endpointPath.split('/').filter(Boolean).pop() || entryModel || rawModelId;
-            const modelCandidates = [entryModel, endpointModelId].filter(Boolean);
-            const matched = modelCandidates.some((candidate) => {
-                const normalizedCandidate = candidate.toLowerCase();
-                return normalizedCandidate === normalizedTarget || this.normalizeWuyinAlias(candidate) === normalizedAlias;
-            });
-            if (!matched) continue;
-
-            return {
-                endpointPath,
-                endpointModelId,
-                endpointUrl: endpointUrl || undefined,
-            };
-        }
-
-        return null;
-    }
-
-    private resolveWuyinImageEndpoint(modelId: string): WuyinResolvedRoute {
-        const rawModelId = String(modelId || '').trim().split('@')[0].split('|')[0].trim();
-        const endpointModelId = rawModelId.replace(/^\/+/, '');
-        const normalized = this.normalizeWuyinAlias(rawModelId);
-
-        if (/^apiasyncimage[a-z0-9]+$/i.test(normalized)) {
-            const suffix = rawModelId.replace(/^\/+/, '').replace(/^api\/async\//i, '');
-            return {
-                endpointPath: `/api/async/${suffix}`,
-                endpointModelId: suffix,
-            };
-        }
-
-        if (/^image[a-z0-9]+$/i.test(normalized) && !normalized.startsWith('images')) {
-            return {
-                endpointPath: `/api/async/${endpointModelId}`,
-                endpointModelId,
-            };
-        }
-
-        const matchedRoute = WUYIN_IMAGE_ROUTES.find((route) =>
-            route.aliases.some((alias) => this.normalizeWuyinAlias(alias) === normalized)
-        );
-        if (matchedRoute) {
-            return {
-                endpointPath: matchedRoute.endpointPath,
-                endpointModelId: matchedRoute.endpointPath.split('/').pop() || endpointModelId,
-            };
-        }
-
-        if (normalized.includes('grok') && normalized.includes('imagine')) {
-            return {
-                endpointPath: '/api/async/image_grok_imagine',
-                endpointModelId: 'image_grok_imagine',
-            };
-        }
-        if (normalized.includes('sora')) {
-            return {
-                endpointPath: '/api/async/image_sora',
-                endpointModelId: 'image_sora',
-            };
-        }
-        if (normalized.includes('31flashimage') || normalized.includes('nanobanana2')) {
-            return {
-                endpointPath: '/api/async/image_nanoBanana2',
-                endpointModelId: 'image_nanoBanana2',
-            };
-        }
-        if (normalized.includes('proimage') || normalized.includes('nanobananapro')) {
-            return {
-                endpointPath: '/api/async/image_nanoBanana_pro',
-                endpointModelId: 'image_nanoBanana_pro',
-            };
-        }
-        if (normalized.includes('25flashimage') || normalized.includes('nanobanana')) {
-            return {
-                endpointPath: '/api/async/image_nanoBanana',
-                endpointModelId: 'image_nanoBanana',
-            };
-        }
-
-        throw new Error(`Wuyin provider does not know how to route image model "${modelId}". Please use the exact Wuyin model ID from the catalog, such as image_nanoBanana2.`);
-    }
-
-    private resolveWuyinRequestRoute(baseUrl: string, modelId: string, keySlot?: KeySlot): WuyinResolvedRoute {
-        const directEndpointPath = this.extractWuyinDirectEndpointPath(baseUrl);
-        if (directEndpointPath) {
-            return {
-                endpointPath: directEndpointPath,
-                endpointModelId: directEndpointPath.split('/').filter(Boolean).pop() || modelId,
-            };
-        }
-
-        if (keySlot) {
-            const snapshotRoute = this.resolveWuyinSnapshotRoute(keySlot, modelId);
-            if (snapshotRoute) {
-                return snapshotRoute;
-            }
-        }
-
-        return this.resolveWuyinImageEndpoint(modelId);
-    }
-
-    private normalizeWuyinImageSize(raw: string | undefined): '1K' | '2K' | '4K' {
-        const normalized = String(raw || '').trim().toUpperCase();
-        if (normalized.includes('4K') || normalized.includes('HD')) return '4K';
-        if (normalized.includes('2K')) return '2K';
-        return '1K';
-    }
-
-    private normalizeWuyinAspectRatio(raw: string | undefined): string {
-        const normalized = String(raw || '').trim() || AspectRatio.AUTO;
-        return WUYIN_SUPPORTED_ASPECT_RATIOS.has(normalized) ? normalized : AspectRatio.AUTO;
-    }
-
-    private normalizeWuyinReferenceImage(
-        ref: string | { data: string; mimeType: string; url?: string },
-        index: number
-    ): { value: string; kind: 'url' | 'base64' } {
-        const sourceUrl = typeof (ref as { url?: string })?.url === 'string'
-            ? String((ref as { url?: string }).url || '').trim()
-            : '';
-        if (/^https?:\/\//i.test(sourceUrl)) {
-            return { value: sourceUrl, kind: 'url' };
-        }
-
-        const { data } = extractRefImageData(ref);
-        const raw = String(data || '').trim();
-        if (!raw) {
-            throw new Error(`五音参考图 ${index + 1} 为空，请重新上传后再试`);
-        }
-
-        if (/^https?:\/\//i.test(raw)) {
-            return { value: raw, kind: 'url' };
-        }
-
-        if (/^blob:/i.test(raw)) {
-            throw new Error(`五音参考图 ${index + 1} 仍是本地预览地址（blob），请等待图片处理完成后再试`);
-        }
-
-        if (/^data:/i.test(raw)) {
-            const commaIndex = raw.indexOf(',');
-            if (commaIndex === -1) {
-                throw new Error(`五音参考图 ${index + 1} 不是有效的 Base64 数据`);
-            }
-            const base64 = raw.slice(commaIndex + 1).replace(/\s+/g, '');
-            if (!base64) {
-                throw new Error(`五音参考图 ${index + 1} 的 Base64 数据为空`);
-            }
-            return { value: base64, kind: 'base64' };
-        }
-
-        const cleaned = raw.replace(/\s+/g, '');
-        if (!cleaned) {
-            throw new Error(`五音参考图 ${index + 1} 不是有效的 URL 或 Base64 数据`);
-        }
-
-        return { value: cleaned, kind: 'base64' };
-    }
-
-    private extractWuyinTaskId(payload: any): string {
-        return String(
-            payload?.data?.id ||
-            payload?.id ||
-            payload?.task_id ||
-            payload?.taskId ||
-            ''
-        ).trim();
-    }
-
-    private extractWuyinStatusCode(payload: any): number | undefined {
-        const value = payload?.data?.status ?? payload?.status;
-        if (typeof value === 'number' && Number.isFinite(value)) return value;
-        if (typeof value === 'string' && value.trim() !== '') {
-            const parsed = Number(value);
-            if (Number.isFinite(parsed)) return parsed;
-        }
-        return undefined;
-    }
-
-    private mapWuyinStatus(statusCode: number | undefined): 'pending' | 'processing' | 'success' | 'failed' {
-        if (statusCode === 2) return 'success';
-        if (statusCode === 3) return 'failed';
-        if (statusCode === 1) return 'processing';
-        return 'pending';
     }
 
     private normalizeAceDataBaseUrl(baseUrl: string): string {
@@ -1322,7 +992,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         keySlot: KeySlot,
         signal?: AbortSignal
     ): Promise<{ payload: any; requestPath: string }> {
-        const cleanBase = this.normalizeWuyinBaseUrl(keySlot.baseUrl || '');
+        const cleanBase = normalizeWuyinBaseUrl(keySlot.baseUrl || '');
         const detailUrl = new URL(`${cleanBase}${WUYIN_DETAIL_PATH}`);
         detailUrl.searchParams.set('id', taskId);
 
@@ -1392,8 +1062,8 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             }
 
             const { payload, requestPath } = await this.fetchWuyinTaskDetail(taskId, keySlot, options.signal);
-            const statusCode = this.extractWuyinStatusCode(payload);
-            const status = this.mapWuyinStatus(statusCode);
+            const statusCode = extractWuyinStatusCode(payload);
+            const status = mapWuyinStatus(statusCode);
 
             if (status === 'success') {
                 const urls = extractImageUrlsFromPayload(payload);
@@ -1414,7 +1084,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                     provider: keySlot.provider,
                     providerName: keySlot.name,
                     model: options.modelId,
-                    imageSize: this.normalizeWuyinImageSize(options.imageSize),
+                    imageSize: normalizeWuyinImageSize(options.imageSize),
                     metadata: {
                         requestPath: requestMeta?.submitPath || requestPath,
                         requestBodyPreview: requestMeta?.requestBodyPreview,
@@ -1451,19 +1121,23 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         options: ImageGenerationOptions,
         keySlot: KeySlot
     ): Promise<ImageGenerationResult> {
-        const cleanBase = this.normalizeWuyinBaseUrl(keySlot.baseUrl || '');
-        const route = this.resolveWuyinRequestRoute(keySlot.baseUrl || '', options.modelId, keySlot);
+        const cleanBase = normalizeWuyinBaseUrl(keySlot.baseUrl || '');
+        const route = resolveWuyinRequestRoute({
+            baseUrl: keySlot.baseUrl || '',
+            modelId: options.modelId,
+            provider: keyManager.getProviderForKeySlot(keySlot) || null,
+        });
         const url = route.endpointUrl || `${cleanBase}${route.endpointPath}`;
         const requestPath = route.endpointPath;
         const body: Record<string, any> = {
             prompt: options.prompt,
-            size: this.normalizeWuyinImageSize(options.imageSize),
-            aspectRatio: this.normalizeWuyinAspectRatio(options.aspectRatio),
+            size: normalizeWuyinImageSize(options.imageSize),
+            aspectRatio: normalizeWuyinAspectRatio(options.aspectRatio),
         };
 
         if (options.referenceImages?.length) {
             const normalizedRefs = options.referenceImages.map((ref, index) =>
-                this.normalizeWuyinReferenceImage(ref as { data: string; mimeType: string; url?: string }, index)
+                normalizeWuyinReferenceImage(ref as { data: string; mimeType: string; url?: string }, index)
             );
             body.urls = normalizedRefs.map((item) => item.value);
 
@@ -1533,7 +1207,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 provider: keySlot.provider,
                 providerName: keySlot.name,
                 model: options.modelId,
-                imageSize: this.normalizeWuyinImageSize(options.imageSize),
+                imageSize: normalizeWuyinImageSize(options.imageSize),
                 keySlotId: keySlot.id,
                 metadata: {
                     requestPath,
@@ -1542,7 +1216,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             };
         }
 
-        const taskId = this.extractWuyinTaskId(submitPayload);
+        const taskId = extractWuyinTaskId(submitPayload);
         if (!taskId) {
             throw this.buildHttpError({
                 message: 'Wuyin submit succeeded but no task ID was returned',
@@ -3572,8 +3246,8 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         if (mode === GenerationMode.IMAGE && runtime.strategyId === 'wuyinkeji') {
             const { payload, requestPath } = await this.fetchWuyinTaskDetail(taskId, keySlot);
-            const statusCode = this.extractWuyinStatusCode(payload);
-            const status = this.mapWuyinStatus(statusCode);
+            const statusCode = extractWuyinStatusCode(payload);
+            const status = mapWuyinStatus(statusCode);
             const message = extractProviderMessage(payload);
             const urls = status === 'success' ? extractImageUrlsFromPayload(payload) : [];
             const effectiveStatus = status === 'success' && urls.length === 0 ? 'processing' : status;
