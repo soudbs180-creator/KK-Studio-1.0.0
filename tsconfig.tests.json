@@ -106,6 +106,7 @@
         "tests/unit/mobile-result-feed-detail-contract.test.ts",
         "tests/unit/model-display-name-regression.test.ts",
         "tests/unit/model-id-normalization-parity-contract.test.ts",
+        "tests/unit/openai-compatible-chat-payload-contract.test.ts",
         "tests/unit/openai-compatible-diagnostics-contract.test.ts",
         "tests/unit/openai-compatible-google-extra-body-contract.test.ts",
         "tests/unit/openai-compatible-image-dispatch-contract.test.ts",

@@ -33,6 +33,7 @@ import {
     startSyncImageBridgeRequest,
     waitForSyncImageBridgeResult
 } from './syncImageBridge';
+import { buildChatCompletionsBody, buildOpenAICompatibleMessages } from './openAICompatibleChatPayload';
 import { buildSafeFormDataPreview, buildSafeRequestBodyPreview } from './openAICompatibleDiagnostics';
 import { buildNewApiGoogleExtraBody, mergeExtraBody } from './openAICompatibleGoogleExtraBody';
 import { resolveOpenAICompatibleImageDispatch } from './openAICompatibleImageDispatch';
@@ -1988,51 +1989,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         return String(baseUrl || 'https://api.openai.com').trim().replace(/\/+$/, '');
     }
 
-    private buildOpenAICompatibleMessages(options: ChatOptions): any[] {
-        const messages: any[] = options.messages.map((message) => ({
-            role: message.role,
-            content: message.content,
-        }));
-
-        if (options.inlineData && options.inlineData.length > 0) {
-            const lastUserIdx = messages.map((message) => message.role).lastIndexOf('user');
-            if (lastUserIdx >= 0) {
-                const textContent = messages[lastUserIdx].content;
-                const contentParts: any[] = [{ type: 'text', text: textContent }];
-
-                options.inlineData.forEach((media) => {
-                    contentParts.push({
-                        type: 'image_url',
-                        image_url: { url: `data:${media.mimeType};base64,${media.data}` }
-                    });
-                });
-                messages[lastUserIdx].content = contentParts;
-            }
-        }
-
-        if (options.systemPrompt) {
-            messages.unshift({ role: 'system', content: options.systemPrompt });
-        }
-
-        return messages;
-    }
-
-    private buildChatCompletionsBody(options: ChatOptions, messages: any[]): any {
-        let body: any = {
-            model: options.modelId,
-            messages,
-            temperature: options.temperature,
-            max_tokens: options.maxTokens || 20480,
-            stream: false,
-        };
-
-        if (options.extraBody) {
-            Object.assign(body, options.extraBody);
-        }
-
-        return body;
-    }
-
     private buildResponsesApiBody(options: ChatOptions, messages: any[], stream: boolean, keySlot: KeySlot): any {
         const body = buildResponsesPayload({
             model: options.modelId,
@@ -2104,8 +2060,8 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             includeJsonContentType: true,
             includeAccept: false,
         });
-        const messages = this.buildOpenAICompatibleMessages(options);
-        const chatBody = this.applyCustomBody(this.buildChatCompletionsBody(options, messages), keySlot);
+        const messages = buildOpenAICompatibleMessages(options);
+        const chatBody = this.applyCustomBody(buildChatCompletionsBody(options, messages), keySlot);
         const responsesBody = this.buildResponsesApiBody(options, messages, false, keySlot);
         const preferResponses = resolveChatSurface({
             runtime,
@@ -2179,9 +2135,9 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             includeJsonContentType: true,
             includeAccept: false,
         });
-        const messages = this.buildOpenAICompatibleMessages(options);
+        const messages = buildOpenAICompatibleMessages(options);
         const chatBody = this.applyCustomBody({
-            ...this.buildChatCompletionsBody(options, messages),
+            ...buildChatCompletionsBody(options, messages),
             stream: true
         }, keySlot);
         const responsesBody = this.buildResponsesApiBody(options, messages, true, keySlot);
