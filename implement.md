@@ -94,10 +94,10 @@ For every milestone:
 - For a UI audit lane commit, `status.md` must record browser URL, theme, viewport/surface checked, `.theme-transitioning` result, SearchPalette/settings/API workbench checks, and stale chunk findings.
 - The final release gate includes `npm.cmd run governance:check`, `npm.cmd run audit:dependencies`, `npm.cmd run spec:check`, `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, and `npm.cmd run check:encoding`. The former `governance:version` portable metadata mismatch was cleared by `567f85aa`; rerun the gate after any future packaging/publish metadata change.
 
-## Active M116 Execution Rule
+## M116 Completion Rule
 
-- Treat M116 ecommerce visibility/localization as one UI closure slice: canvas visibility filters, ecommerce build/runtime notifications, ecommerce card actions, PromptBar companion labels, and mobile result feed/detail localization may be committed together only after the M116 gate in `validation.md` and in-app Browser QA are recorded.
-- Do not add service/provider/security/release-metadata changes to M116. Any follow-up giant-file split, type-debt cleanup, or security gate work must start from a clean alternate-git worktree after the M116 commit.
+- M116 is committed in `52074495`. Do not reopen it for unrelated service/provider/security/release-metadata work.
+- Any follow-up giant-file split, type-debt cleanup, or security gate work must start from a clean alternate-git worktree and use its own validation gate.
 
 ## Context Exhaustion Protocol
 
