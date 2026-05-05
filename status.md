@@ -1,6 +1,6 @@
 # KK-Studio v1.4.2 Coordination Status
 
-Last updated: 2026-05-05
+Last updated: 2026-05-06
 
 ## Active State
 
@@ -8,16 +8,25 @@ Last updated: 2026-05-05
 - Current slice override: the UI closure line is complete; future work should return to a fresh seam-map giant-file split or finalization audit item, not reopen the UI closure commits without a new concrete regression.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source; the latest committed slice in the current line is `1ca080eb style: flatten settings workbench chrome`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source; current HEAD is `edb1e33c docs: sync post-ui closure ledgers`, and the latest code slice is `1ca080eb style: flatten settings workbench chrome`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Thread merge state: `019dd551...` is the main refactor history and `019de168...` is continuation history; both are part of the same Stage One M6 ecommerce runtime line.
 - Alternate-git worktree was clean at `296c1203` before the M113 extraction pass; M113 is now committed at `617491b3`.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: keep the ledger aligned, rerun the clean final gates, then continue the next ordinary Stage Two seam from the fresh audit map.
-- Most recent committed code/security scopes: settings workbench chrome flattening in `1ca080eb`; PromptBar mobile action flattening in `485a6bef`; ecommerce canvas workbench split in `da4ffc79`; M120 OpenAI-compatible chat payload helper extraction in `cff75d23`; M119 OpenAI-compatible Google extra-body helper extraction in `8545513b`; M118 legacy payment-server security hardening in `2dbb402e`; M117 Gemini image sizing helper extraction in `c0c96808`.
-- Current commit scope: none; the alternate-git worktree is clean after the three post-M120 UI closure commits.
+- Current focus: continue the next ordinary Stage Two seam from the fresh audit map after the 2026-05-06 finalization gate passed.
+- Most recent committed scopes: post-UI closure ledger sync in `edb1e33c`; settings workbench chrome flattening in `1ca080eb`; PromptBar mobile action flattening in `485a6bef`; ecommerce canvas workbench split in `da4ffc79`; M120 OpenAI-compatible chat payload helper extraction in `cff75d23`; M119 OpenAI-compatible Google extra-body helper extraction in `8545513b`; M118 legacy payment-server security hardening in `2dbb402e`; M117 Gemini image sizing helper extraction in `c0c96808`.
+- Current commit scope: none; the alternate-git worktree is clean at `edb1e33c`.
 - Excluded dirty UI/WIP files for this commit: none.
 - Browser QA: Codex in-app Browser used a temporary Node static server for the built `dist/` at `http://127.0.0.1:4310` after shell-launched Vite processes were cleaned up by the execution environment. A local temporary user entered the workspace, the mobile-width ecommerce input surface rendered requirement/product/reference upload controls, advanced settings expanded in-place without a two-row footer regression, the settings/API surface rendered in the same browser session, and console errors stayed at `0` apart from the existing Tailwind CDN warning. No seeded post-build canvas fixture was available in the current browser session, so the canvas-workbench handoff remains covered by the targeted source contracts.
+
+## Current Finalization Gate
+
+- Fresh full gate passed on 2026-05-06: `npm.cmd run governance:check`, `npm.cmd run architecture:check`, `npm.cmd run governance:security`, `npm.cmd run spec:check`, `npm.cmd run audit:dependencies`, `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, and `npm.cmd run check:encoding`.
+- Unit gate result: `npm.cmd run test:unit` passed 1363/1363.
+- Dependency/security result: root and `payment-server` production audits reported 0 vulnerabilities, and sensitive storage/logging boundaries passed.
+- Architecture/spec result: import boundaries passed with the existing 5 allowlisted migration exceptions and 2 legacy bridge exceptions; OpenAPI spec validation passed.
+- Strict no-unused probe passed: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false`.
+- Interpretation: the repository is build/test/security-green, but this is not final refactor completion because Stage Two giant-file splitting, Stage Three debt governance, and Stage Four `apps/web` migration remain open.
 
 ## Completed In `2dbb402e` M118 (Legacy Payment-Server Security Fail-Closed)
 
@@ -2599,16 +2608,16 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-Fresh remaining-work assessment after the M120 working tree:
+Fresh remaining-work assessment after `edb1e33c` and the 2026-05-06 finalization gate:
 
-- Current fact source: the latest committed base before M120 is `8545513b refactor: extract google extra body helper`; the alternate-git working tree contains the M120 OpenAI-compatible chat payload helper extraction plus ledger/test registration updates, with excluded PromptBar/ecommerce UI WIP files that must not be staged into this commit.
-- Current M120 gate spot-checks: the new chat payload contract passed 3/3; the adjacent OpenAI/provider image gate passed 68/68; `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false`; `npm.cmd run architecture:check`; and `npm.cmd run typecheck` passed.
-- Largest tracked TS/TSX files still above 2k lines: `src/App.tsx` 4812; `src/services/auth/keyManager.ts` 4100; `src/components/layout/PromptBar.tsx` 3965; `src/services/llm/OpenAICompatibleAdapter.ts` 3896; `src/components/settings/ApiSettingsView.tsx` 3347; `src/components/layout/ChatSidebar.tsx` 2743; `src/app/useGenerationRuntime.ts` 2603; `src/context/CanvasContext.tsx` 2517; `src/components/canvas/PromptNodeComponent.tsx` 2241; `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts` 2184; `apps/api/src/server.ts` 2117; `src/hooks/useImageGeneration.ts` 2031.
-- Current tracked TS/TSX debt counts: direct `as any` matches 155; broad `any` token matches 586; TS suppressions 133; `console.log` 245. Broad workspace counts excluding generated/vendor directories are higher because they include docs/scripts/tests: `as any` 164; broad `any` token matches 672; TS suppressions 137; `console.log` 416.
-- Interpretation: the project is functionally green by the latest gates, and M118 closed the known legacy payment security blockers found by the latest audit, but it is still not refactor-complete because Stage Two giant-file splitting, Stage Three quality governance, and Stage Four `apps/web` migration remain open. Remaining completion estimate is roughly 25-41 narrow slices if Stage Four is included.
+- Current fact source: alternate-git HEAD is `edb1e33c docs: sync post-ui closure ledgers`; the alternate-git working tree is clean before the next slice.
+- Current finalization gate: `governance:check`, `architecture:check`, `governance:security`, `spec:check`, `audit:dependencies`, `typecheck`, `test:unit` 1363/1363, `build`, `check:encoding`, and the strict no-unused probe all passed.
+- Largest tracked TS/TSX/JS files still above 2k lines: `src/App.tsx` 4837; `src/services/auth/keyManager.ts` 4100; `src/components/layout/PromptBar.tsx` 3965; `src/services/llm/OpenAICompatibleAdapter.ts` 3896; `src/components/settings/ApiSettingsView.tsx` 3347; `src/components/layout/ChatSidebar.tsx` 2743; `src/app/useGenerationRuntime.ts` 2603; `src/context/CanvasContext.tsx` 2517; `src/components/canvas/PromptNodeComponent.tsx` 2271; `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts` 2184; `apps/api/src/server.ts` 2117; `src/hooks/useImageGeneration.ts` 2031.
+- Current debt counts across `src`, `apps`, `packages`, `payment-server`, and `tests`: direct `as any` matches 166; broad `any` token matches 593; typed-any pattern matches 592; TS suppressions 133; `console.log` matches 246.
+- Interpretation: the project is functionally green by the latest gates, M118 closed the known legacy payment security blockers, and the post-M120 UI closure is committed. It is still not refactor-complete because Stage Two giant-file splitting, Stage Three quality governance, and Stage Four `apps/web` migration remain open. Remaining completion estimate is roughly 25-41 narrow slices if Stage Four is included, or about 3-4 major rounds: Stage Two seams, Stage Three debt governance, Stage Four migration, and final release/audit repair.
 
-1. The current noUnused filter is clean in the M120 working tree; the route-gate helpers are wired into live entrypoints; M107-M120 moved the latest OpenAI-compatible and server helper seams into focused modules; M118 closed the latest confirmed security blocker.
-2. Next ordinary cleanup candidate after M120 should be chosen from the fresh seam map. The safest next architecture slice remains in `OpenAICompatibleAdapter.ts` request builders or provider quirks; the explicit remaining UI seam is `PromptBar.tsx` attachment/drag/reference-image ingestion and requires browser QA if touched.
+1. The current noUnused filter is clean; the route-gate helpers are wired into live entrypoints; M107-M120 moved the latest OpenAI-compatible and server helper seams into focused modules; M118 closed the latest confirmed security blocker.
+2. Next ordinary cleanup candidate should be chosen from the fresh seam map. The safest next architecture slice remains in `OpenAICompatibleAdapter.ts` request builders or provider quirks; the explicit remaining UI seam is `PromptBar.tsx` attachment/drag/reference-image ingestion and requires browser QA if touched.
 3. Remaining OpenAI-compatible adapter seams: request builders, response parsing, provider quirks, polling fetch helpers, and image/video/audio compatibility still need fresh maps. Do not change endpoint selection, auth, fetch behavior, or fallback ordering without a dedicated behavior test.
 4. Follow-up server seam: dedupe route auth/header/query-key logic between `apps/api/src/modules/auth/application/user-route-diagnostics-service.ts` and `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts`; verify provider auth/proxy and Gemini protocol guards plus API restart/probe on port `3001`.
 5. Follow-up UI seam: split `src/components/layout/PromptBar.tsx` paste/drop/reference-image ingestion and drag handling only with browser QA, because it touches file-input UI behavior.

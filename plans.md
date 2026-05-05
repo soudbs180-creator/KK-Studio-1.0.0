@@ -1,11 +1,11 @@
 # KK-Studio v1.4.2 Single-Line Convergence Plan
 
-Last updated: 2026-05-05
+Last updated: 2026-05-06
 Branch policy: continue on the current branch and current workspace unless the user explicitly asks for a branch or worktree.
 
 ## Summary
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed slices in the current line are `da4ffc79 refactor: move ecommerce workbench to canvas`, `485a6bef style: flatten prompt bar mobile actions`, and `1ca080eb style: flatten settings workbench chrome`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the current HEAD is `edb1e33c docs: sync post-ui closure ledgers`, after the latest code slices `da4ffc79 refactor: move ecommerce workbench to canvas`, `485a6bef style: flatten prompt bar mobile actions`, and `1ca080eb style: flatten settings workbench chrome`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
@@ -93,7 +93,7 @@ The active execution model for this thread has resumed Stage One convergence:
 - Stage Two M114 `keyManager` shared pricing helper extraction is completed in `245bdd4b`: it moves raw shared pricing catalog normalization and pricing snapshot construction into `src/services/auth/keyManagerSharedPricing.ts`, while leaving provider fetches, provider persistence, cloud sync, key storage, route selection, runtime model resolution, and UI behavior unchanged.
 - Stage Two M115 `keyManager` remote model discovery helper extraction is completed in `ed444606`: it moves pure Google/Gemini/OpenAI-compatible model discovery response parsing and canonical dedupe into `src/services/auth/keyManagerRemoteModelDiscovery.ts`, while leaving fetch execution, endpoint selection, auth/header behavior, provider persistence, cloud sync, key storage, route selection, runtime model resolution, and UI behavior unchanged.
 - The source-proven unused cleanup line now includes the M60-M106 cleanup commits through secure proxy route-gate wiring, plus later M114-M119, the post-M120 UI closure commits `da4ffc79` / `485a6bef` / `1ca080eb`, and the `5aaccf50` ecommerce analysis fallback hotfix. The active line is now finalization audit plus fresh seam-map giant-file splitting.
-- The project is functionally green after the latest full gate, but not final-complete while `App.tsx`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`, `keyManager.ts`, and `CanvasContext.tsx` remain giant-file split targets.
+- The project is functionally green after the 2026-05-06 full finalization gate, but not final-complete while `App.tsx`, `PromptBar.tsx`, `OpenAICompatibleAdapter.ts`, `keyManager.ts`, and `CanvasContext.tsx` remain giant-file split targets and Stage Three/Stage Four remain open.
 
 The Clay UI source remains `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, shared CSS tokens, and existing UI surfaces. Current user override: inputs, main cards, sub cards, and framework cards use controlled frosted material. Dark mode uses neutral black-gray surfaces (`#0b0b0c`, `#141414`, `#1f1f1f`), not teal/blue/indigo canvas. Clay brand colors are emphasis only.
 
@@ -101,7 +101,7 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 
 ## Current Baseline
 
-- `src/App.tsx`: 4812 physical lines after the latest ecommerce UI and analysis fallback line.
+- `src/App.tsx`: 4837 physical lines after the latest ecommerce UI and settings closure line.
 - `src/app/useConnectorRenderer.ts`: 253 lines, boundary hardened in `5f5b76e0` and review-follow-up typechecked in `f06f1880`.
 - `src/app/usePromptGroupLayout.ts`: 1348 lines, extracted and boundary-hardened in `8a458cd4`.
 - `src/app/useGenerationRuntime.ts`: 2603 lines, extracted and boundary-hardened in `ab719c4a`; generation billing cleanup completed in `083db7f8`; unused import cleanup completed in `d4291729`.
@@ -151,7 +151,7 @@ Commit boundary going forward: UI fixes, runtime/PPT/ecommerce fixes, release me
 - `src/services/auth/keyManagerRemoteModelDiscovery.ts`: 130 lines, Stage Two M115 remote model discovery response parsing helper boundary.
 - `src/utils/modelIdNormalization.ts`: 6 lines after M30 compatibility-facade consolidation, down from 84 duplicated helper lines.
 - `src/components/layout/PromptBar.tsx`: 3965 physical lines.
-- `src/components/canvas/PromptNodeComponent.tsx`: 2241 physical lines after the current unused cleanup line.
+- `src/components/canvas/PromptNodeComponent.tsx`: 2271 physical lines after the latest ecommerce canvas-workbench wiring.
 - `src/components/layout/ChatSidebar.tsx`: 2743 physical lines after `3108a29f`.
 - `src/components/settings/ApiSettingsView.tsx`: 3347 physical lines.
 - `src/components/settings/views/SystemLogsView.tsx`: 421 physical lines after the current unused cleanup working tree.

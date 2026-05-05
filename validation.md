@@ -1,10 +1,10 @@
 # KK-Studio v1.4.2 Single-Line Validation Matrix
 
-Last updated: 2026-05-05
+Last updated: 2026-05-06
 
 Use `npm.cmd` for npm scripts on Windows.
 
-Current baseline at `5aaccf50`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
+Current baseline at `edb1e33c`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
 
 ## Active Stage One M6 Closeout Gate
 

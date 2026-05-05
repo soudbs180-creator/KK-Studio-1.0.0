@@ -1,10 +1,10 @@
 # KK-Studio v1.4.2 Implementation Rules
 
-Last updated: 2026-05-05
+Last updated: 2026-05-06
 
 ## Operating Mode
 
-This is a long-running execution. Plain `.git` may show stale historical state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`. The latest committed slices in the current line are `da4ffc79 refactor: move ecommerce workbench to canvas`, `485a6bef style: flatten prompt bar mobile actions`, and `1ca080eb style: flatten settings workbench chrome`.
+This is a long-running execution. Plain `.git` may show stale historical state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`. The current HEAD is `edb1e33c docs: sync post-ui closure ledgers`; the latest code slices in the current line are `da4ffc79 refactor: move ecommerce workbench to canvas`, `485a6bef style: flatten prompt bar mobile actions`, and `1ca080eb style: flatten settings workbench chrome`.
 
 The active workstream is a single merged line. Thread `019dd551...` is the main refactor history and `019de168...` is continuation history; both belong to Stage One M6 ecommerce runtime extraction. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; ecommerce source selection closed in `ccf965c3`; ecommerce partial redraw closed in `d12731ce`; connector renderer boundary hardening closed in `5f5b76e0`; connector review follow-up closed in `f06f1880`; the M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`.
 
