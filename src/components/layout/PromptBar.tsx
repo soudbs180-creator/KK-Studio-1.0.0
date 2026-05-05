@@ -3397,14 +3397,14 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                     {/* Footer - Modified to be a standard flex row, flowing or wrapping lightly on mobile */}
                     <PromptBarFooter isMobile={isMobile}>
-                        <div className={`flex min-w-0 items-center ${isMobile ? 'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2' : 'flex-1 gap-1.5'}`}>
+                        <div className={`flex items-center ${isMobile ? 'min-w-max shrink-0 flex-nowrap gap-2' : 'min-w-0 flex-1 gap-1.5'}`}>
                             {/* Model Button */}
                             <div
                                 ref={modelMenuAnchorRef}
-                                className={`relative inline-flex min-w-0 ${isMobile ? (isEmbeddedMobileComposer ? '' : 'col-span-2') : 'flex-shrink-0'}`}
+                                className={`relative inline-flex min-w-0 ${isMobile ? 'shrink-0' : 'flex-shrink-0'}`}
                             >
                                 <button
-                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? (isEmbeddedMobileComposer ? 'w-full max-w-full justify-start' : 'w-full max-w-full justify-center') : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
+                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-auto min-w-[9rem] max-w-none justify-start flex-shrink-0' : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
                                         ? 'bg-[var(--frost-input-bg)] text-[var(--text-tertiary)] cursor-not-allowed border-[color:var(--frost-card-sub-border)]'
                                         : 'text-[var(--text-secondary)] !opacity-100 hover:border-[var(--prompt-bar-shell-border-strong)]'
                                         }`}

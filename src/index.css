@@ -117,7 +117,7 @@
   --prompt-bar-liquid-group-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.52) 0%, rgba(248, 250, 252, 0.34) 100%);
   --prompt-bar-liquid-border: rgba(255, 255, 255, 0.62);
   --prompt-bar-liquid-border-strong: rgba(15, 23, 42, 0.14);
-  --prompt-bar-liquid-shadow: 0 12px 28px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.76), inset 0 -1px 0 rgba(255, 255, 255, 0.24);
+  --prompt-bar-liquid-shadow: none;
   --prompt-bar-liquid-send-shadow: var(--frost-card-main-shadow);
 
   /* ===== 阴影 ===== */
@@ -610,7 +610,7 @@ body.dark-mode {
   --prompt-bar-liquid-group-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(24, 27, 31, 0.42) 100%);
   --prompt-bar-liquid-border: rgba(255, 255, 255, 0.16);
   --prompt-bar-liquid-border-strong: rgba(255, 255, 255, 0.24);
-  --prompt-bar-liquid-shadow: 0 14px 30px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  --prompt-bar-liquid-shadow: none;
   --prompt-bar-liquid-send-shadow: var(--frost-card-main-shadow);
   --floating-shell-bg: linear-gradient(180deg, rgba(31, 31, 31, 0.96) 0%, rgba(20, 20, 20, 0.92) 100%);
   --floating-shell-bg-supported: rgba(31, 31, 31, 0.84);
@@ -2067,6 +2067,25 @@ body.dark-mode .input-bar {
   justify-content: space-between;
   padding-top: 12px;
   border-top: 1px solid var(--border-light);
+}
+
+.input-bar-footer[data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"] {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: none;
+}
+
+.input-bar-footer[data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"]::-webkit-scrollbar {
+  display: none;
+}
+
+.input-bar-footer[data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"] > * {
+  flex-shrink: 0;
+}
+
+.input-bar-footer[data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"] * {
+  flex-shrink: 0;
 }
 
 .prompt-bar-footer-frost {
@@ -13151,7 +13170,7 @@ body.dark-mode .input-bar {
 .input-bar [data-ecommerce-framework] {
   background: var(--frost-card-sub-bg);
   border-color: var(--frost-card-sub-border);
-  box-shadow: var(--frost-card-sub-shadow);
+  box-shadow: none;
 }
 
 .settings-panel .api-settings-view input:not([type="color"]):not([type="checkbox"]),

@@ -141,7 +141,7 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
 
   return (
     <>
-      <div className={`relative inline-flex ${isMobile ? 'row-start-2 min-w-0' : 'min-w-fit flex-shrink-0'}`}>
+      <div className={`relative inline-flex ${isMobile ? 'min-w-fit shrink-0' : 'min-w-fit flex-shrink-0'}`}>
         <button
           data-options-toggle
           className={`${isMobile ? '' : 'prompt-bar-liquid-button'} flex w-full items-center justify-center gap-1.5 h-10 rounded-lg border transition-all text-xs font-medium whitespace-nowrap ${isMobile ? (isEmbeddedMobileDrawer ? 'px-3 justify-between max-w-none' : 'px-2.5 max-w-none') : 'px-3.5 flex-shrink-0'}`}
