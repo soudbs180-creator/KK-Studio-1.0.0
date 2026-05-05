@@ -102,6 +102,7 @@
         "tests/unit/llm-service-unused-cleanup-contract.test.ts",
         "tests/unit/local-user-route-endpoint-contract.test.ts",
         "tests/unit/local-user-route-auth-contract.test.ts",
+        "tests/unit/local-user-route-task-signing-secret.test.ts",
         "tests/unit/mobile-ecommerce-continuation-surface.test.ts",
         "tests/unit/mobile-result-feed-detail-contract.test.ts",
         "tests/unit/model-display-name-regression.test.ts",

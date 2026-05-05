@@ -3,6 +3,7 @@ import { getSharedPostgresPool, hasPostgresConfig, type PostgresQueryable } from
 
 export interface ServerRuntimeConfig {
   userApiEncryptionSecret?: string;
+  allowInsecureLocalTaskSigningFallback?: boolean;
   databaseConfigReady: boolean;
   blockers: string[];
 }

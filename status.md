@@ -5,18 +5,18 @@ Last updated: 2026-05-06
 ## Active State
 
 - Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 and Stage One Backfill are complete; the post-M120 UI closure line is now split and committed in `da4ffc79`, `485a6bef`, and `1ca080eb`.
-- Current slice override: the UI closure line is complete; future work should return to a fresh seam-map giant-file split or finalization audit item, not reopen the UI closure commits without a new concrete regression.
+- Current slice override: M122 is a narrow security hardening slice for local user-route task signing. It must not reopen provider routing, UI, release metadata, or broad debt cleanup.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source; the latest stable baseline before the active M121 slice is `4940dd98 docs: sync finalization audit baseline`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source; the latest stable baseline before the active M122 slice is `74dbdbf1 refactor: extract wuyin route helper`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Thread merge state: `019dd551...` is the main refactor history and `019de168...` is continuation history; both are part of the same Stage One M6 ecommerce runtime line.
 - Alternate-git worktree was clean at `296c1203` before the M113 extraction pass; M113 is now committed at `617491b3`.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: land M121 Wuyin route helper extraction as a narrow slice, then prioritize the security audit blocker for local user-route task signing fallback.
-- Most recent committed scopes: post-UI closure ledger sync in `edb1e33c`; settings workbench chrome flattening in `1ca080eb`; PromptBar mobile action flattening in `485a6bef`; ecommerce canvas workbench split in `da4ffc79`; M120 OpenAI-compatible chat payload helper extraction in `cff75d23`; M119 OpenAI-compatible Google extra-body helper extraction in `8545513b`; M118 legacy payment-server security hardening in `2dbb402e`; M117 Gemini image sizing helper extraction in `c0c96808`.
-- M121 commit scope: Wuyin route/base-url/reference-image/task-status helper extraction in `src/services/llm/OpenAICompatibleAdapter.ts`, `src/services/llm/openAICompatibleWuyinRoute.ts`, `tests/unit/openai-compatible-wuyin-route-contract.test.ts`, `tsconfig.tests.json`, and ledger files.
-- Excluded dirty UI/WIP files for this commit: none.
+- Current focus: land M122 local user-route task signing hardening, then return to the next seam-map/quality slice.
+- Most recent committed scopes: M121 Wuyin route helper extraction in `74dbdbf1`; post-UI closure ledger sync in `4940dd98`; settings workbench chrome flattening in `1ca080eb`; PromptBar mobile action flattening in `485a6bef`; ecommerce canvas workbench split in `da4ffc79`; M120 OpenAI-compatible chat payload helper extraction in `cff75d23`; M119 OpenAI-compatible Google extra-body helper extraction in `8545513b`; M118 legacy payment-server security hardening in `2dbb402e`; M117 Gemini image sizing helper extraction in `c0c96808`.
+- M122 commit scope: local user-route task signing secret fail-closed behavior in `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts`, the optional runtime config flag in `apps/api/src/lib/server-runtime-config.ts`, the new security regression in `tests/unit/local-user-route-task-signing-secret.test.ts`, `tsconfig.tests.json`, and ledger files.
+- Excluded dirty UI/WIP files for this commit: `tests/unit/settings-desktop-workbench-regression.test.ts`, `tests/unit/settings-shell-scroll-regression.test.ts`, and `tests/unit/settings-workbench-ui-refit.test.ts` are unrelated to the M122 security slice and must not be staged here.
 - Browser QA: Codex in-app Browser used a temporary Node static server for the built `dist/` at `http://127.0.0.1:4310` after shell-launched Vite processes were cleaned up by the execution environment. A local temporary user entered the workspace, the mobile-width ecommerce input surface rendered requirement/product/reference upload controls, advanced settings expanded in-place without a two-row footer regression, the settings/API surface rendered in the same browser session, and console errors stayed at `0` apart from the existing Tailwind CDN warning. No seeded post-build canvas fixture was available in the current browser session, so the canvas-workbench handoff remains covered by the targeted source contracts.
 
 ## Current Finalization Gate
@@ -83,6 +83,17 @@ Last updated: 2026-05-06
 - Browser QA skipped: this is a non-UI service/helper extraction with no JSX, CSS, route rendering, or browser-visible behavior change.
 - Line counts for this slice before commit: `src/services/llm/OpenAICompatibleAdapter.ts` is 3570 physical lines, down from 3896 after M120; `src/services/llm/openAICompatibleWuyinRoute.ts` is 377 physical lines; `tests/unit/openai-compatible-wuyin-route-contract.test.ts` is 123 physical lines; `tsconfig.tests.json` is 149 physical lines.
 - Next priority: security hardening for local user-route task signing secret fallback, found by the finalization audit. Do not continue lower-priority giant-file cleanup until that fallback is mapped and fixed.
+
+## Completed M122 (Local User-Route Task Signing Security)
+
+- Scope: removed the unconditional `userApiEncryptionSecret || "kkai-local-route-task-secret"` fallback from `LocalUserRouteProxyService`. Task token signing and verification now require a configured secret, unless `allowInsecureLocalTaskSigningFallback: true` is passed explicitly for local/test fallback mode.
+- Safety behavior: image/video requests fail closed before route resolution or upstream invocation when task signing is unavailable, preventing orphaned provider tasks that cannot be returned safely. Follow-up task operations fail closed before token verification, so tokens signed with the public legacy default are not accepted by default.
+- RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/local-user-route-task-signing-secret.test.ts` failed first with `Missing expected rejection` because a token signed with `kkai-local-route-task-secret` was accepted.
+- Fresh targeted validation passed: the new regression passed 1/1; the local user-route/system proxy adjacency set passed 28/28; `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` passed.
+- Fresh security/architecture validation passed: `npm.cmd run governance:security`, `npm.cmd run architecture:check`, `npm.cmd run audit:dependencies`, and `npm.cmd run spec:check`.
+- Fresh repository validation passed: `npm.cmd run typecheck` with semantic coverage for 121 test files; `npm.cmd run test:unit` passed 1368/1368; `npm.cmd run build`; `npm.cmd run governance:agent-docs`; `npm.cmd run check:encoding`; and the M122 path-limited alternate-git `diff --check` passed with LF/CRLF normalization warnings only.
+- Browser QA skipped: this is a non-UI API security slice with no JSX, CSS, route rendering, or browser-visible behavior change.
+- Next priority: return to a fresh seam map or quality slice. The remaining refactor-completion blockers are still giant-file splits, type/log debt governance, the `apps/web` migration, and final release metadata alignment.
 
 ## Completed In `5aaccf50` (Ecommerce XLSX Static Preview Analysis)
 

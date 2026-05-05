@@ -861,14 +861,16 @@ async function toInlineImagePartWithFormat(
 export class LocalUserRouteProxyService {
   private readonly logger = consoleLogger.child({ module: "local-user-route-proxy" });
   private readonly authDataService: AuthDataService;
-  private readonly sharedSecret: string;
+  private readonly taskSigningSecret: string;
+  private readonly allowInsecureLocalTaskSigningFallback: boolean;
 
   constructor(
     authDataService: AuthDataService,
     config: ServerRuntimeConfig,
   ) {
     this.authDataService = authDataService;
-    this.sharedSecret = String(config.userApiEncryptionSecret || "").trim() || DEFAULT_LOCAL_ROUTE_TASK_SECRET;
+    this.taskSigningSecret = String(config.userApiEncryptionSecret || "").trim();
+    this.allowInsecureLocalTaskSigningFallback = config.allowInsecureLocalTaskSigningFallback === true;
   }
 
   private async createVideoAdapter() {
@@ -899,6 +901,10 @@ export class LocalUserRouteProxyService {
     let routeId = String(input.routeId || "").trim();
     let upstreamTaskId = String(input.taskId || "").trim();
     let decodedTask: LocalTaskPayload | undefined;
+
+    if (effectiveMode === "image" || effectiveMode === "video") {
+      this.requireTaskSigningSecret();
+    }
 
     if (effectiveMode === "task_status" || effectiveMode === "cancel_task" || effectiveMode === "delete_task" || effectiveMode === "download_task") {
       decodedTask = this.decodeLocalTaskToken(String(input.localTaskId || "").trim(), userId);
@@ -2114,10 +2120,11 @@ export class LocalUserRouteProxyService {
   }
 
   private encodeLocalTaskToken(payload: LocalTaskPayload): string {
+    const taskSigningSecret = this.requireTaskSigningSecret();
     const serialized = JSON.stringify(payload);
     const encodedPayload = toBase64Url(serialized);
     const signature = toBase64Url(
-      createHmac("sha256", this.sharedSecret)
+      createHmac("sha256", taskSigningSecret)
         .update(encodedPayload)
         .digest(),
     );
@@ -2125,6 +2132,7 @@ export class LocalUserRouteProxyService {
   }
 
   private decodeLocalTaskToken(token: string, expectedUserId: string): LocalTaskPayload {
+    const taskSigningSecret = this.requireTaskSigningSecret();
     const normalizedToken = String(token || "").trim();
     if (!normalizedToken.startsWith(LOCAL_PROXY_TASK_PREFIX)) {
       throw new LocalUserRouteProxyError("Invalid local task id.", {
@@ -2145,7 +2153,7 @@ export class LocalUserRouteProxyService {
     const encodedPayload = signedPayload.slice(0, separatorIndex);
     const providedSignature = signedPayload.slice(separatorIndex + 1);
     const expectedSignature = toBase64Url(
-      createHmac("sha256", this.sharedSecret)
+      createHmac("sha256", taskSigningSecret)
         .update(encodedPayload)
         .digest(),
     );
@@ -2180,5 +2188,20 @@ export class LocalUserRouteProxyService {
     }
 
     return payload;
+  }
+
+  private requireTaskSigningSecret(): string {
+    if (this.taskSigningSecret) {
+      return this.taskSigningSecret;
+    }
+
+    if (this.allowInsecureLocalTaskSigningFallback) {
+      return DEFAULT_LOCAL_ROUTE_TASK_SECRET;
+    }
+
+    throw new LocalUserRouteProxyError("Local user-route task signing secret is not configured.", {
+      code: "TASK_SIGNING_SECRET_REQUIRED",
+      statusCode: 500,
+    });
   }
 }
