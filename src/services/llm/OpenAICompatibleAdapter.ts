@@ -1,4 +1,4 @@
-﻿import { LLMAdapter, ChatOptions, ImageGenerationOptions, ImageGenerationResult, extractRefImageData } from './LLMAdapter';
+import { LLMAdapter, ChatOptions, ImageGenerationOptions, ImageGenerationResult, extractRefImageData } from './LLMAdapter';
 import { KeySlot, getModelMetadata, keyManager } from '../auth/keyManager';
 import {
     type AuthMethod,
@@ -36,7 +36,14 @@ import {
 import { buildSafeFormDataPreview, buildSafeRequestBodyPreview } from './openAICompatibleDiagnostics';
 import { resolveOpenAICompatibleImageDispatch } from './openAICompatibleImageDispatch';
 import { extractImageUrlsFromPayload } from './openAICompatibleImagePayload';
-import { clampImageCount, getOpenAIImageProfile, resolveOpenAIEditSize, resolveOpenAIImageSize } from './openAICompatibleImageSizing';
+import {
+    clampImageCount,
+    getOpenAIImageProfile,
+    normalizeGeminiImageSize,
+    normalizeRequestedAspectRatio,
+    resolveOpenAIEditSize,
+    resolveOpenAIImageSize,
+} from './openAICompatibleImageSizing';
 import {
     buildOpenAICompatiblePolledTaskResult,
     extractGenericTaskId,
@@ -459,22 +466,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         err.provider = originalError?.provider || keySlot.provider;
         err.compatibilityModeHint = endpointMode;
         return err as Error;
-    }
-
-    private normalizeGeminiImageSize(raw: string | undefined): '512px' | '1K' | '2K' | '4K' {
-        const v = (raw || '').trim().toUpperCase();
-        if (v.includes('512') || v.includes('0.5K')) return '512px';
-        if (v.includes('4K') || v.includes('HD')) return '4K';
-        if (v.includes('2K')) return '2K';
-        return '1K';
-    }
-
-    private normalizeRequestedAspectRatio(raw: string | undefined): string | undefined {
-        const value = String(raw || '').trim();
-        if (!value || value.toLowerCase() === AspectRatio.AUTO) {
-            return undefined;
-        }
-        return value;
     }
 
     private normalizeWuyinBaseUrl(baseUrl: string): string {
@@ -1781,7 +1772,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
     private buildNewApiGoogleExtraBody(options: ImageGenerationOptions): Record<string, any> | undefined {
         const imageConfig: Record<string, any> = {};
         const responseModalities = options.providerConfig?.google?.responseModalities || ['TEXT', 'IMAGE'];
-        const aspectRatio = this.normalizeRequestedAspectRatio(
+        const aspectRatio = normalizeRequestedAspectRatio(
             options.providerConfig?.google?.imageConfig?.aspectRatio || options.aspectRatio
         );
         const imageSize = options.providerConfig?.google?.imageConfig?.imageSize || options.imageSize;
@@ -1790,7 +1781,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             imageConfig.aspect_ratio = aspectRatio;
         }
         if (imageSize) {
-            imageConfig.image_size = this.normalizeGeminiImageSize(imageSize);
+            imageConfig.image_size = normalizeGeminiImageSize(imageSize);
         }
 
         const google: Record<string, any> = {};
@@ -1906,7 +1897,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             return explicitSize;
         }
 
-        const requestedAspectRatio = this.normalizeRequestedAspectRatio(options.aspectRatio);
+        const requestedAspectRatio = normalizeRequestedAspectRatio(options.aspectRatio);
         if (requestedAspectRatio) {
             return requestedAspectRatio;
         }
@@ -2972,10 +2963,10 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             });
         }
 
-        const aspectRatio = this.normalizeRequestedAspectRatio(
+        const aspectRatio = normalizeRequestedAspectRatio(
             options.providerConfig?.google?.imageConfig?.aspectRatio || options.aspectRatio
         );
-        const reportedImageSize = options.imageSize || this.normalizeGeminiImageSize(
+        const reportedImageSize = options.imageSize || normalizeGeminiImageSize(
             options.providerConfig?.google?.imageConfig?.imageSize || options.imageSize
         );
 
@@ -3512,7 +3503,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const authMethod = runtime.authMethod;
 
         const effectiveModelId = normalizeGeminiModelId(options.modelId);
-        const requestedImageSize = this.normalizeGeminiImageSize(
+        const requestedImageSize = normalizeGeminiImageSize(
             options.providerConfig?.google?.imageConfig?.imageSize || options.imageSize
         );
 
@@ -3543,7 +3534,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         // 🚀 [Critical] 12AI 对齐：构造干净的负载，确保字段名与官方文档严格一致
         parts.push({ text: options.prompt });
 
-        const requestedAspectRatio = this.normalizeRequestedAspectRatio(
+        const requestedAspectRatio = normalizeRequestedAspectRatio(
             options.providerConfig?.google?.imageConfig?.aspectRatio || options.aspectRatio
         );
         const imageConfig: any = {

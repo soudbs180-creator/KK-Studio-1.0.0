@@ -4,8 +4,8 @@ Last updated: 2026-05-05
 
 ## Active State
 
-- Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 and Stage One Backfill are complete; the latest committed slice is `5aaccf50 fix: handle ecommerce analysis static html fallback`.
-- Current slice override: ledger sync to `5aaccf50` plus next-slice selection from the current giant-file and quality-debt scan.
+- Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 and Stage One Backfill are complete; the current slice is M117 OpenAI-compatible Gemini image sizing helper extraction.
+- Current slice override: move only pure Gemini image-size and requested aspect-ratio normalization into `src/services/llm/openAICompatibleImageSizing.ts`.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
 - Plain `.git` still reports a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source; the latest committed slice is `5aaccf50 fix: handle ecommerce analysis static html fallback`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
@@ -13,9 +13,9 @@ Last updated: 2026-05-05
 - Alternate-git worktree was clean at `296c1203` before the M113 extraction pass; M113 is now committed at `617491b3`.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: finish this ledger-only synchronization, then start the next narrow giant-file or quality-governance slice from a fresh seam map.
-- Most recent committed code/security scopes: ecommerce analysis static HTML fallback in `5aaccf50`; M116 ecommerce card build UI stabilization in `52074495`; M115 keyManager remote model discovery helper extraction in `ed444606`; M114 keyManager shared pricing helper extraction in `245bdd4b`; post-M113 review-fix/gate-repair in `5c269e78`; M113 local user-route endpoint helper extraction in `617491b3`.
-- Current commit scope: ledger-only synchronization after `5aaccf50`; no runtime, UI, provider, security, or release metadata changes belong in this commit.
+- Current focus: commit M117 after the completed helper extraction validation, then select the next narrow giant-file or quality-governance slice from a fresh seam map.
+- Most recent committed code/security scopes: post-hotfix ledger sync in `689a2cc2`; ecommerce analysis static HTML fallback in `5aaccf50`; M116 ecommerce card build UI stabilization in `52074495`; M115 keyManager remote model discovery helper extraction in `ed444606`; M114 keyManager shared pricing helper extraction in `245bdd4b`.
+- Current commit scope: M117 OpenAI-compatible Gemini image sizing helper extraction; no endpoint selection, auth, fetch behavior, provider routing, fallback ordering, billing, UI, release metadata, or broad type/log cleanup belongs in this commit.
 - Browser QA: completed for M116 in the Codex in-app Browser against the live Vite target on `127.0.0.1:3100`.
 
 ## Completed In `5aaccf50` (Ecommerce XLSX Static Preview Analysis)
@@ -200,6 +200,16 @@ Last updated: 2026-05-05
 - Browser QA skipped: this is a non-UI service/source-contract extraction with no JSX, CSS, route rendering, or browser-visible behavior change.
 - Line counts for this slice: `src/services/llm/OpenAICompatibleAdapter.ts` is 4008 physical lines; `src/services/llm/openAICompatibleTaskPayload.ts` is 219 physical lines; `tests/unit/openai-compatible-task-payload-contract.test.ts` is 105 physical lines.
 
+## Current M117 (OpenAI-Compatible Gemini Image Sizing Helper)
+
+- RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/openai-compatible-image-sizing-contract.test.ts` failed first because `src/services/llm/openAICompatibleImageSizing.ts` did not export `normalizeGeminiImageSize` or `normalizeRequestedAspectRatio`.
+- Moved only Gemini image-size normalization and requested aspect-ratio normalization into `src/services/llm/openAICompatibleImageSizing.ts`; `OpenAICompatibleAdapter.ts` now imports the helpers while preserving endpoint selection, auth, fetch behavior, provider routing, fallback ordering, billing, UI, and release metadata.
+- Fresh targeted validation passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/openai-compatible-image-sizing-contract.test.ts` passed 6/6; the broader OpenAI/provider image gate passed 65/65.
+- Fresh structural validation passed: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false`; `npm.cmd run architecture:check`; `npm.cmd run typecheck` with semantic coverage for 116 test files.
+- Fresh full validation passed: `npm.cmd run test:unit` passed 1351/1351; `npm.cmd run build`; `npm.cmd run governance:agent-docs`; and `npm.cmd run check:encoding`.
+- Browser QA skipped: this is a non-UI service/helper extraction with no JSX, CSS, route rendering, or browser-visible behavior change.
+- Line counts for this slice: `src/services/llm/OpenAICompatibleAdapter.ts` is 3999 physical lines; `src/services/llm/openAICompatibleImageSizing.ts` is 99 physical lines; `tests/unit/openai-compatible-image-sizing-contract.test.ts` is 115 physical lines.
+
 ## Completed Working Tree M112 (Local User-Route Auth Helper)
 
 - RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/local-user-route-auth-contract.test.ts` failed first because `apps/api/src/modules/model-proxy/application/local-user-route-auth.ts` did not exist.
@@ -356,7 +366,7 @@ Last updated: 2026-05-05
 
 ## Current Quality Baseline
 
-- Current giant tracked files after `5aaccf50`: `src/index.css` 11735 physical lines, `src/App.tsx` 4305, `src/components/layout/PromptBar.tsx` 3631, `src/services/auth/keyManager.ts` 3594, `src/services/llm/OpenAICompatibleAdapter.ts` 3529, `src/components/settings/ApiSettingsView.tsx` 3071, `src/components/layout/ChatSidebar.tsx` 2477, `src/app/useGenerationRuntime.ts` 2341, `src/context/CanvasContext.tsx` 2197, `src/components/canvas/PromptNodeComponent.tsx` 2091, `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts` 1959, `apps/api/src/server.ts` 1918, and `src/hooks/useImageGeneration.ts` 1863.
+- Current giant tracked files after M117: `src/index.css` 13552 physical lines, `src/App.tsx` 4812, `src/services/auth/keyManager.ts` 4100, `src/services/llm/OpenAICompatibleAdapter.ts` 3999, `src/components/layout/PromptBar.tsx` 3965, `src/components/settings/ApiSettingsView.tsx` 3347, `src/components/layout/ChatSidebar.tsx` 2743, `src/app/useGenerationRuntime.ts` 2603, `src/context/CanvasContext.tsx` 2517, `src/components/canvas/PromptNodeComponent.tsx` 2241, `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts` 2184, `apps/api/src/server.ts` 2117, and `src/hooks/useImageGeneration.ts` 2031.
 - Current tracked TS/TSX debt scan by alternate-git over `*.ts` / `*.tsx`: direct `as any` matches 155, broad `any` token matches 586, `@ts-ignore` / `@ts-expect-error` matches 133, and `console.log` matches 245. Broad workspace scan excluding `node_modules`, `dist`, `release`, and `coverage` is noisier: `as any` 164, `any` token 672, TS suppressions 137, and `console.log` 416. The production noUnused probe now passes cleanly with `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false`. These are refactor debt indicators, not release blockers by themselves.
 - Quality rule going forward: reduce `any`, TypeScript suppressions, and bare `console.log` inside touched files when local and safe; do not perform a whole-repo cleanup inside one runtime or architecture extraction.
 - Architecture status from the latest full check: `npm.cmd run architecture:check` passed with 5 allowlisted migration exceptions and 2 allowlisted legacy bridge exceptions; `npm.cmd run spec:check` passed.
@@ -2544,13 +2554,13 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-Fresh remaining-work assessment after `5aaccf50`:
+Fresh remaining-work assessment after the M117 working tree:
 
-- Current fact source: the latest committed base is `5aaccf50 fix: handle ecommerce analysis static html fallback`, and the alternate-git worktree was clean before this ledger-only sync.
-- Current gate spot-checks after `5aaccf50`: ecommerce analysis fallback targeted set passed 19/19; `npm.cmd run typecheck` passed; `npm.cmd run test:unit` passed 1350/1350; `npm.cmd run build`; `npm.cmd run governance:agent-docs`; `npm.cmd run check:encoding`; and the hotfix path-limited alternate-git `diff --check` passed. A fresh noUnused probe passed cleanly with `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false`.
-- Largest tracked TS/TSX files still above 2k lines: `src/App.tsx` 4305; `src/components/layout/PromptBar.tsx` 3631; `src/services/auth/keyManager.ts` 3594; `src/services/llm/OpenAICompatibleAdapter.ts` 3529; `src/components/settings/ApiSettingsView.tsx` 3071; `src/components/layout/ChatSidebar.tsx` 2477; `src/app/useGenerationRuntime.ts` 2341; `src/context/CanvasContext.tsx` 2197; `src/components/canvas/PromptNodeComponent.tsx` 2091. `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts` remains 1959 lines and below the 2k TS/TSX tracking threshold.
+- Current fact source: the latest committed base before M117 is `689a2cc2 docs: sync post hotfix ledger`; the alternate-git working tree contains only the M117 helper extraction and ledger updates.
+- Current M117 gate spot-checks: `tests/unit/openai-compatible-image-sizing-contract.test.ts` passed 6/6; the broader OpenAI/provider image gate passed 65/65; `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false`; `npm.cmd run architecture:check`; `npm.cmd run typecheck`; `npm.cmd run test:unit` passed 1351/1351; `npm.cmd run build`; `npm.cmd run governance:agent-docs`; `npm.cmd run check:encoding`; and the path-limited alternate-git `diff --check` passed.
+- Largest tracked TS/TSX files still above 2k lines: `src/App.tsx` 4812; `src/services/auth/keyManager.ts` 4100; `src/services/llm/OpenAICompatibleAdapter.ts` 3999; `src/components/layout/PromptBar.tsx` 3965; `src/components/settings/ApiSettingsView.tsx` 3347; `src/components/layout/ChatSidebar.tsx` 2743; `src/app/useGenerationRuntime.ts` 2603; `src/context/CanvasContext.tsx` 2517; `src/components/canvas/PromptNodeComponent.tsx` 2241; `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts` 2184; `apps/api/src/server.ts` 2117; `src/hooks/useImageGeneration.ts` 2031.
 - Current tracked TS/TSX debt counts: direct `as any` matches 155; broad `any` token matches 586; TS suppressions 133; `console.log` 245. Broad workspace counts excluding generated/vendor directories are higher because they include docs/scripts/tests: `as any` 164; broad `any` token matches 672; TS suppressions 137; `console.log` 416.
-- Interpretation: the project is functionally green by the latest gates, but not refactor-complete because Stage Two giant-file splitting, Stage Three quality governance, and Stage Four `apps/web` migration remain open. Remaining completion estimate is roughly 25-40 narrow slices if Stage Four is included.
+- Interpretation: the project is functionally green by the latest gates, but not refactor-complete because Stage Two giant-file splitting, Stage Three quality governance, and Stage Four `apps/web` migration remain open. Remaining completion estimate is roughly 26-42 narrow slices if Stage Four is included.
 
 1. The current noUnused filter is clean at `5aaccf50`; the route-gate helpers are wired into live entrypoints; M107 moved OpenAI-compatible post-surface image dispatch planning into a pure helper; M108 moved image payload URL/base64 extraction into a pure helper; M109 moved OpenAI image sizing/profile logic into a pure helper; M110 moved generic task payload parsing into a pure helper; M111 moved generic task result assembly into a pure helper; M112 moved local user-route auth/header/query-key and route-surface helpers into a pure server helper; M113 moved local user-route direct endpoint URL normalization into a pure server helper; M114 moved keyManager shared pricing normalization/snapshot construction into a pure service helper; and M115 moved keyManager remote model discovery response parsing/dedupe into a pure service helper.
 2. Next cleanup candidate should be chosen from a fresh seam map, line-count pressure, or touched-file type/log debt scan. Keep the next slice separate from keyManager secrets/cloud sync, provider routing, storage persistence, release metadata, and UI behavior unless explicitly scoped.

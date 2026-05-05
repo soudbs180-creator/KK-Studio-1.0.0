@@ -8,6 +8,8 @@ import {
   clampImageCount,
   getAspectOrientation,
   getOpenAIImageProfile,
+  normalizeGeminiImageSize,
+  normalizeRequestedAspectRatio,
   resolveOpenAIEditSize,
   resolveOpenAIImageSize,
 } from "../../src/services/llm/openAICompatibleImageSizing.ts";
@@ -82,6 +84,20 @@ describe("OpenAI-compatible image sizing helpers", () => {
     assert.equal(resolveOpenAIEditSize(imageOptions({ imageSize: "4K" })), "1024x1024");
   });
 
+  test("normalizes Gemini image size and aspect ratio without adapter state", () => {
+    assert.equal(normalizeGeminiImageSize("512"), "512px");
+    assert.equal(normalizeGeminiImageSize("0.5K"), "512px");
+    assert.equal(normalizeGeminiImageSize("hd"), "4K");
+    assert.equal(normalizeGeminiImageSize("4k"), "4K");
+    assert.equal(normalizeGeminiImageSize("2k"), "2K");
+    assert.equal(normalizeGeminiImageSize(undefined), "1K");
+
+    assert.equal(normalizeRequestedAspectRatio("16:9"), "16:9");
+    assert.equal(normalizeRequestedAspectRatio(" 9:16 "), "9:16");
+    assert.equal(normalizeRequestedAspectRatio("auto"), undefined);
+    assert.equal(normalizeRequestedAspectRatio(undefined), undefined);
+  });
+
   test("adapter delegates sizing and count helpers to the focused module", () => {
     const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
     const testConfigSource = readSource("tsconfig.tests.json");
@@ -92,6 +108,8 @@ describe("OpenAI-compatible image sizing helpers", () => {
     assert.doesNotMatch(adapterSource, /private clampImageCount/);
     assert.doesNotMatch(adapterSource, /private resolveOpenAIImageSize/);
     assert.doesNotMatch(adapterSource, /private resolveOpenAIEditSize/);
+    assert.doesNotMatch(adapterSource, /private normalizeGeminiImageSize/);
+    assert.doesNotMatch(adapterSource, /private normalizeRequestedAspectRatio/);
     assert.match(testConfigSource, /tests\/unit\/openai-compatible-image-sizing-contract\.test\.ts/);
   });
 });

@@ -79,3 +79,21 @@ export function resolveOpenAIEditSize(options: ImageGenerationOptions): string {
     if (requested.includes('512') || requested.includes('0.5K')) return '512x512';
     return '1024x1024';
 }
+
+export type GeminiImageSize = '512px' | '1K' | '2K' | '4K';
+
+export function normalizeGeminiImageSize(raw: string | undefined): GeminiImageSize {
+    const value = String(raw || '').trim().toUpperCase();
+    if (value.includes('512') || value.includes('0.5K')) return '512px';
+    if (value.includes('4K') || value.includes('HD')) return '4K';
+    if (value.includes('2K')) return '2K';
+    return '1K';
+}
+
+export function normalizeRequestedAspectRatio(raw: string | undefined): string | undefined {
+    const value = String(raw || '').trim();
+    if (!value || value.toLowerCase() === 'auto') {
+        return undefined;
+    }
+    return value;
+}
