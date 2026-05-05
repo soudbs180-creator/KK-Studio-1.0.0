@@ -1120,6 +1120,24 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/se
 
 Browser QA may be skipped for this slice because it moves pure service normalization helpers with no JSX, CSS, route rendering, or browser-visible behavior change.
 
+## OpenAI-Compatible Google Extra Body Helper Gate
+
+Use this gate when touching New API Google `extra_body` construction or merge behavior for OpenAI-compatible routes:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/openai-compatible-google-extra-body-contract.test.ts" "tests/unit/openai-compatible-image-sizing-contract.test.ts" "tests/unit/openai-compatible-image-payload-contract.test.ts" "tests/unit/openai-compatible-image-dispatch-contract.test.ts" "tests/unit/openai-compatible-image-routing-errors-contract.test.ts" "tests/unit/provider-image-routing-regression.test.ts" "tests/unit/provider-surface-router.test.ts" "tests/unit/provider-strategy.test.ts" "tests/unit/provider-channel-surface-view.test.ts" "tests/unit/twelve-ai-doc-alignment.test.ts" "tests/unit/async-image-proxy-regression.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+npm.cmd run architecture:check
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/llm/OpenAICompatibleAdapter.ts" "src/services/llm/openAICompatibleGoogleExtraBody.ts" "tests/unit/openai-compatible-google-extra-body-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+Browser QA may be skipped for this slice because it moves pure service helper logic with no JSX, CSS, route rendering, or browser-visible behavior change.
+
 Use this gate for OpenAI-compatible adapter structural slices, including diagnostics preview helper extraction, image-routing error classifier extraction, unreachable image fallback cleanup, the M107 image-dispatch helper extraction, the M108 image-payload helper extraction, and the M109 image-sizing helper extraction:
 
 ```powershell

@@ -4,21 +4,21 @@ Last updated: 2026-05-05
 
 ## Active State
 
-- Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 and Stage One Backfill are complete; the current slice is M118 legacy payment-server security fail-closed hardening.
-- Current slice override: hard-fail legacy WeChat Pay webhook handling when required WeChat Pay credentials are missing, remove placeholder cert/private-key fallbacks, and derive legacy payment return/notify defaults from the current request origin instead of production `kkai.plus` URLs.
+- Active lane in this thread: single-line Stage Two giant-file split plus finalization audit. Stage One M6 and Stage One Backfill are complete; the current slice is M119 OpenAI-compatible Google extra-body helper extraction.
+- Current slice override: move only New API Google `extra_body` merge/build helpers from `OpenAICompatibleAdapter.ts` into `src/services/llm/openAICompatibleGoogleExtraBody.ts`.
 - Clay UI audit closure landed in `9e7ae2b5` and is no longer the active lane.
 - Current branch: `main`.
-- Plain `.git` still reports a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source; the latest committed slice before the current working tree is `c0c96808 refactor: extract gemini image sizing helper`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
+- Plain `.git` still reports a stale historical view. The writable full Git metadata copy at `node_modules/.codex-git-full` is the only development fact source; the latest committed slice before the current working tree is `2dbb402e fix: harden legacy payment server callbacks`. Use `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status/staging/commits in this session.
 - Thread merge state: `019dd551...` is the main refactor history and `019de168...` is continuation history; both are part of the same Stage One M6 ecommerce runtime line.
 - Alternate-git worktree was clean at `296c1203` before the M113 extraction pass; M113 is now committed at `617491b3`.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: finish and commit M118, then return to the next ordinary Stage Two seam from the fresh audit map.
-- Most recent committed code/security scopes: M117 Gemini image sizing helper extraction in `c0c96808`; post-hotfix ledger sync in `689a2cc2`; ecommerce analysis static HTML fallback in `5aaccf50`; M116 ecommerce card build UI stabilization in `52074495`; M115 keyManager remote model discovery helper extraction in `ed444606`.
-- Current commit scope: M118 legacy payment-server security fail-closed hardening; no sidecar settlement semantics, payment amount calculation, hosted route gating, provider routing, UI, release metadata, or broad logging/type cleanup belongs in this commit.
+- Current focus: finish and commit M119, then continue the next ordinary Stage Two seam from the fresh audit map.
+- Most recent committed code/security scopes: M118 legacy payment-server security hardening in `2dbb402e`; M117 Gemini image sizing helper extraction in `c0c96808`; post-hotfix ledger sync in `689a2cc2`; ecommerce analysis static HTML fallback in `5aaccf50`; M116 ecommerce card build UI stabilization in `52074495`.
+- Current commit scope: M119 OpenAI-compatible Google extra-body helper extraction; no endpoint selection, auth, fetch behavior, provider routing, fallback ordering, billing, UI, release metadata, or broad type/log cleanup belongs in this commit.
 - Browser QA: completed for M116 in the Codex in-app Browser against the live Vite target on `127.0.0.1:3100`.
 
-## Current M118 (Legacy Payment-Server Security Fail-Closed)
+## Completed In `2dbb402e` M118 (Legacy Payment-Server Security Fail-Closed)
 
 - Audit evidence: the finalization security scan found two release blockers in the tracked legacy `payment-server`: WeChat Pay webhook construction used literal `public-key` / `private-key` fallbacks when cert/private-key env vars were missing, and legacy payment route default return/notify URLs fell back to production `https://kkai.plus` URLs.
 - RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/payment-server-legacy-security-contract.test.ts` failed 0/2 before the fix: the WeChat webhook returned 200 instead of 500 when certificate config was incomplete, and `/api/pay/qrcode` sent `https://kkai.plus/pay/success` instead of a request-origin URL.
@@ -30,6 +30,16 @@ Last updated: 2026-05-05
 - Direct `npx.cmd tsc --noEmit -p tsconfig.tests.json --pretty false` remains a known noisy raw TypeScript invocation with pre-existing `ApiResponse.error` / nullable-size diagnostics; the project-owned semantic test checker and full `npm.cmd run typecheck` are the active gates and passed.
 - Browser QA skipped: this is a non-UI legacy payment server hardening slice with no JSX, CSS, route rendering, or browser-visible behavior change.
 - Line counts for this slice: `payment-server/index.js` is 350 physical lines; `payment-server/webhook.js` is 283 physical lines; `tests/unit/payment-server-legacy-security-contract.test.ts` is 273 physical lines; `tsconfig.tests.json` is 146 physical lines.
+
+## Current M119 (OpenAI-Compatible Google Extra Body Helper)
+
+- RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/openai-compatible-google-extra-body-contract.test.ts` failed first with `ERR_MODULE_NOT_FOUND` because `src/services/llm/openAICompatibleGoogleExtraBody.ts` did not exist.
+- Extracted only shallow `extra_body` merging and New API Google `extra_body` construction into `src/services/llm/openAICompatibleGoogleExtraBody.ts`; `OpenAICompatibleAdapter.ts` now imports `mergeExtraBody()` and `buildNewApiGoogleExtraBody()` while preserving endpoint selection, auth, fetch behavior, provider routing, fallback ordering, billing, UI, and release metadata.
+- Fresh targeted validation passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/openai-compatible-google-extra-body-contract.test.ts` passed 3/3; the adjacent OpenAI/provider image gate passed 68/68.
+- Fresh structural validation passed: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false`; `npm.cmd run architecture:check`; and `npm.cmd run typecheck` with semantic coverage for 118 test files.
+- Fresh full validation passed: `npm.cmd run test:unit` passed 1356/1356; `npm.cmd run build`; `npm.cmd run governance:agent-docs`; `npm.cmd run check:encoding`; and the M119 path-limited alternate-git `diff --check` passed with LF/CRLF normalization warnings only.
+- Browser QA skipped: this is a non-UI service/helper extraction with no JSX, CSS, route rendering, or browser-visible behavior change.
+- Line counts for this slice: `src/services/llm/OpenAICompatibleAdapter.ts` is 3940 physical lines; `src/services/llm/openAICompatibleGoogleExtraBody.ts` is 62 physical lines; `tests/unit/openai-compatible-google-extra-body-contract.test.ts` is 112 physical lines; `tsconfig.tests.json` is 147 physical lines.
 
 ## Completed In `5aaccf50` (Ecommerce XLSX Static Preview Analysis)
 
@@ -379,7 +389,7 @@ Last updated: 2026-05-05
 
 ## Current Quality Baseline
 
-- Current giant tracked files after M117: `src/index.css` 13552 physical lines, `src/App.tsx` 4812, `src/services/auth/keyManager.ts` 4100, `src/services/llm/OpenAICompatibleAdapter.ts` 3999, `src/components/layout/PromptBar.tsx` 3965, `src/components/settings/ApiSettingsView.tsx` 3347, `src/components/layout/ChatSidebar.tsx` 2743, `src/app/useGenerationRuntime.ts` 2603, `src/context/CanvasContext.tsx` 2517, `src/components/canvas/PromptNodeComponent.tsx` 2241, `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts` 2184, `apps/api/src/server.ts` 2117, and `src/hooks/useImageGeneration.ts` 2031.
+- Current giant tracked files after M119: `src/index.css` 13552 physical lines, `src/App.tsx` 4812, `src/services/auth/keyManager.ts` 4100, `src/components/layout/PromptBar.tsx` 3965, `src/services/llm/OpenAICompatibleAdapter.ts` 3940, `src/components/settings/ApiSettingsView.tsx` 3347, `src/components/layout/ChatSidebar.tsx` 2743, `src/app/useGenerationRuntime.ts` 2603, `src/context/CanvasContext.tsx` 2517, `src/components/canvas/PromptNodeComponent.tsx` 2241, `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts` 2184, `apps/api/src/server.ts` 2117, and `src/hooks/useImageGeneration.ts` 2031.
 - Current tracked TS/TSX debt scan by alternate-git over `*.ts` / `*.tsx`: direct `as any` matches 155, broad `any` token matches 586, `@ts-ignore` / `@ts-expect-error` matches 133, and `console.log` matches 245. Broad workspace scan excluding `node_modules`, `dist`, `release`, and `coverage` is noisier: `as any` 164, `any` token 672, TS suppressions 137, and `console.log` 416. The production noUnused probe now passes cleanly with `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false`. These are refactor debt indicators, not release blockers by themselves.
 - Quality rule going forward: reduce `any`, TypeScript suppressions, and bare `console.log` inside touched files when local and safe; do not perform a whole-repo cleanup inside one runtime or architecture extraction.
 - Architecture status from the latest full check: `npm.cmd run architecture:check` passed with 5 allowlisted migration exceptions and 2 allowlisted legacy bridge exceptions; `npm.cmd run spec:check` passed.
@@ -2567,16 +2577,16 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Remaining Work
 
-Fresh remaining-work assessment after the M118 security audit pass:
+Fresh remaining-work assessment after the M119 working tree:
 
-- Current fact source: the latest committed base before M118 is `c0c96808 refactor: extract gemini image sizing helper`; the alternate-git working tree contains only the M118 legacy payment-server security fix plus ledger/test registration updates.
-- Current M118 gate spot-checks: the new payment security contract passed 2/2; the related payment set passed 10/10; `npm.cmd run typecheck:payment-server`; `node scripts/ci/check-tests-types.mjs tsconfig.tests.json`; and `npm.cmd run typecheck` passed.
-- Largest tracked TS/TSX files still above 2k lines: `src/App.tsx` 4812; `src/services/auth/keyManager.ts` 4100; `src/services/llm/OpenAICompatibleAdapter.ts` 3999; `src/components/layout/PromptBar.tsx` 3965; `src/components/settings/ApiSettingsView.tsx` 3347; `src/components/layout/ChatSidebar.tsx` 2743; `src/app/useGenerationRuntime.ts` 2603; `src/context/CanvasContext.tsx` 2517; `src/components/canvas/PromptNodeComponent.tsx` 2241; `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts` 2184; `apps/api/src/server.ts` 2117; `src/hooks/useImageGeneration.ts` 2031.
+- Current fact source: the latest committed base before M119 is `2dbb402e fix: harden legacy payment server callbacks`; the alternate-git working tree contains only the M119 OpenAI-compatible Google extra-body helper extraction plus ledger/test registration updates.
+- Current M119 gate spot-checks: the new Google extra-body contract passed 3/3; the adjacent OpenAI/provider image gate passed 68/68; `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false`; `npm.cmd run architecture:check`; and `npm.cmd run typecheck` passed.
+- Largest tracked TS/TSX files still above 2k lines: `src/App.tsx` 4812; `src/services/auth/keyManager.ts` 4100; `src/components/layout/PromptBar.tsx` 3965; `src/services/llm/OpenAICompatibleAdapter.ts` 3940; `src/components/settings/ApiSettingsView.tsx` 3347; `src/components/layout/ChatSidebar.tsx` 2743; `src/app/useGenerationRuntime.ts` 2603; `src/context/CanvasContext.tsx` 2517; `src/components/canvas/PromptNodeComponent.tsx` 2241; `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts` 2184; `apps/api/src/server.ts` 2117; `src/hooks/useImageGeneration.ts` 2031.
 - Current tracked TS/TSX debt counts: direct `as any` matches 155; broad `any` token matches 586; TS suppressions 133; `console.log` 245. Broad workspace counts excluding generated/vendor directories are higher because they include docs/scripts/tests: `as any` 164; broad `any` token matches 672; TS suppressions 137; `console.log` 416.
-- Interpretation: the project is functionally green by the latest gates, and M118 closes the known legacy payment security blockers found by the latest audit, but it is still not refactor-complete because Stage Two giant-file splitting, Stage Three quality governance, and Stage Four `apps/web` migration remain open. Remaining completion estimate is roughly 26-42 narrow slices if Stage Four is included.
+- Interpretation: the project is functionally green by the latest gates, and M118 closed the known legacy payment security blockers found by the latest audit, but it is still not refactor-complete because Stage Two giant-file splitting, Stage Three quality governance, and Stage Four `apps/web` migration remain open. Remaining completion estimate is roughly 25-41 narrow slices if Stage Four is included.
 
-1. The current noUnused filter is clean at `c0c96808`; the route-gate helpers are wired into live entrypoints; M107-M117 moved the latest OpenAI-compatible and server helper seams into focused modules; M118 is the current security blocker fix.
-2. Next ordinary cleanup candidate after M118 should be chosen from the fresh seam map. The safest next architecture slice is `OpenAICompatibleAdapter.ts` Google extra-body helper extraction; the explicit remaining UI seam is `PromptBar.tsx` attachment/drag/reference-image ingestion and requires browser QA if touched.
+1. The current noUnused filter is clean in the M119 working tree; the route-gate helpers are wired into live entrypoints; M107-M119 moved the latest OpenAI-compatible and server helper seams into focused modules; M118 closed the latest confirmed security blocker.
+2. Next ordinary cleanup candidate after M119 should be chosen from the fresh seam map. The safest next architecture slice remains in `OpenAICompatibleAdapter.ts` request builders or provider quirks; the explicit remaining UI seam is `PromptBar.tsx` attachment/drag/reference-image ingestion and requires browser QA if touched.
 3. Remaining OpenAI-compatible adapter seams: request builders, response parsing, provider quirks, polling fetch helpers, and image/video/audio compatibility still need fresh maps. Do not change endpoint selection, auth, fetch behavior, or fallback ordering without a dedicated behavior test.
 4. Follow-up server seam: dedupe route auth/header/query-key logic between `apps/api/src/modules/auth/application/user-route-diagnostics-service.ts` and `apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts`; verify provider auth/proxy and Gemini protocol guards plus API restart/probe on port `3001`.
 5. Follow-up UI seam: split `src/components/layout/PromptBar.tsx` paste/drop/reference-image ingestion and drag handling only with browser QA, because it touches file-input UI behavior.

@@ -107,6 +107,7 @@
         "tests/unit/model-display-name-regression.test.ts",
         "tests/unit/model-id-normalization-parity-contract.test.ts",
         "tests/unit/openai-compatible-diagnostics-contract.test.ts",
+        "tests/unit/openai-compatible-google-extra-body-contract.test.ts",
         "tests/unit/openai-compatible-image-dispatch-contract.test.ts",
         "tests/unit/openai-compatible-image-payload-contract.test.ts",
         "tests/unit/openai-compatible-image-sizing-contract.test.ts",
