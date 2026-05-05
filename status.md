@@ -13,10 +13,21 @@ Last updated: 2026-05-05
 - Alternate-git worktree was clean at `296c1203` before the M113 extraction pass; M113 is now committed at `617491b3`.
 - UI source of truth: `C:/Users/Administrator/Downloads/DESIGN-clay.md`, `DESIGN.md`, `docs/DESIGN.md`, `.agent/rules/skills/SKILL.md`, and shared CSS tokens in `src/index.css`.
 - Runtime source of truth: Stage One hook extraction rules in `plans.md`; all custom hooks stay under `src/app/` with explicit deps/result interfaces.
-- Current focus: record the post-commit M116 browser/validation evidence, then reassess the next giant-file or quality-governance slice.
+- Current focus: finish the ecommerce requirement-analysis fallback hotfix for static-preview HTML responses, then reassess the next giant-file or quality-governance slice.
 - Most recent committed code/security scopes: M116 ecommerce card build UI stabilization in `52074495`; M115 keyManager remote model discovery helper extraction in `ed444606`; M114 keyManager shared pricing helper extraction in `245bdd4b`; post-M113 review-fix/gate-repair in `5c269e78`; M113 local user-route endpoint helper extraction in `617491b3`.
-- Current commit scope: ledger-only sync for post-M116 evidence and remaining-work planning.
+- Current commit scope: ecommerce requirement-analysis fallback hotfix for `.xlsx` uploads when the static preview returns HTML from `/api/ecommerce-analysis`.
 - Browser QA: completed for M116 in the Codex in-app Browser against the live Vite target on `127.0.0.1:3100`.
+
+## Completed Hotfix Pending Commit (Ecommerce XLSX Static Preview Analysis)
+
+- User report: uploading a spreadsheet requirement file in ecommerce mode showed `分析失败` with `Unexpected token '<', "<!DOCTYPE "... is not valid JSON`, while the in-app Browser was on `http://127.0.0.1:3104/?qa=ecommerce-card-visibility-localization-final`.
+- Root cause: the static preview server returns `dist/index.html` as `200 text/html` for `/api/ecommerce-analysis`; `analyzeEcommerceRequirementFile()` treated every successful response as JSON and surfaced the browser JSON parser error instead of using the existing local `.xlsx` fallback parser.
+- Fix scope: `src/services/ecommerce/ecommerceAnalysisClient.ts` now checks response `Content-Type` before JSON parsing, falls back to local analysis for supported files on non-JSON responses, and emits Chinese format errors for unsupported/non-parseable response shapes. `.xlsx` keeps using `parseOpenXmlWorkbook()` plus `normalizeEcommerceAnalysis()`.
+- Regression coverage: `tests/unit/ecommerce-analysis-client-fallback.test.ts` now covers `200 text/html` static-preview responses for a real in-memory `.xlsx` workbook and asserts local workbook analysis succeeds.
+- RED evidence: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-analysis-client-fallback.test.ts` failed first on the new static-preview `.xlsx` test with `SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON`.
+- Fresh targeted validation passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-analysis-client-fallback.test.ts` passed 4/4; `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ecommerce-analysis-client-fallback.test.ts tests/unit/ecommerce-requirement-analysis-runtime-contract.test.ts tests/unit/ecommerce-analysis-dev-proxy-contract.test.ts` passed 19/19.
+- Fresh repository validation passed: `npm.cmd run typecheck`; `npm.cmd run test:unit` passed 1350/1350; `npm.cmd run build`; `npm.cmd run governance:agent-docs`; `npm.cmd run check:encoding`; and path-limited alternate-git `diff --check` for the hotfix touched paths.
+- Browser QA: refreshed the Codex in-app Browser at `http://127.0.0.1:3104/?qa=ecommerce-card-visibility-localization-final`; the static server still returns `200 text/html` for `/api/ecommerce-analysis`, matching the regression; page title was `KK Studio - AI Image Workspace`, ecommerce analysis controls were present, stale chunk text count was 0, and console error count was 0. File-picker upload was not automated; the exact response condition is covered by the new unit regression.
 
 ## Completed In `52074495` M116 (Ecommerce Visibility And Localization UI Closure)
 

@@ -26,6 +26,29 @@ npm.cmd run check:encoding
 git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "plans.md" "implement.md" "status.md" "validation.md"
 ```
 
+## Ecommerce Requirement Analysis Fallback Gate
+
+Use this gate when touching the ecommerce requirement-file analyzer client, especially static preview fallback, `.xlsx` local parsing, or upload endpoint response handling:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/ecommerce-analysis-client-fallback.test.ts" `
+  "tests/unit/ecommerce-requirement-analysis-runtime-contract.test.ts" `
+  "tests/unit/ecommerce-analysis-dev-proxy-contract.test.ts"
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "src/services/ecommerce/ecommerceAnalysisClient.ts" `
+  "tests/unit/ecommerce-analysis-client-fallback.test.ts" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA for this gate should verify the active app route loads without stale chunks or console errors. If the route is served from a static preview, record whether `/api/ecommerce-analysis` resolves to `200 text/html`; the automated fallback test covers that exact response shape for spreadsheet uploads.
+
 ## Completed Clay UI Gate
 
 Use this gate if the completed Clay UI audit lane is touched again:
