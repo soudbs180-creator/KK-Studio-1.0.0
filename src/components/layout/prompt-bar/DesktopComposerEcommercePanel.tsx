@@ -319,6 +319,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
       .reverse()
     : [];
   const [expandedHistorySourceKey, setExpandedHistorySourceKey] = React.useState<string | null>(null);
+  const shouldRenderPostBuildPromptBarWorkbench = false;
 
   React.useEffect(() => {
     setExpandedHistorySourceKey(null);
@@ -333,7 +334,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
       <div
         className="mb-2 flex min-h-0 flex-col overflow-hidden rounded-xl border p-3"
         style={{ ...shellSurfaceStyle, ...workbenchViewportStyle }}
-        data-testid={workbenchMode === 'main-card-edit' ? 'ecommerce-main-card-edit-workbench' : 'ecommerce-module-edit-workbench'}
+        data-testid="ecommerce-promptbar-slot-history-surface"
       >
         <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
@@ -483,12 +484,12 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
         />
       ) : null}
 
-      {(analysisConfirmed || activeTaskState) ? (
+      {shouldRenderPostBuildPromptBarWorkbench && (analysisConfirmed || activeTaskState) ? (
         <>
           <div
             className="rounded-xl border p-3"
             style={shellSurfaceStyle}
-            data-testid="ecommerce-framework-companion-panel"
+            data-testid="ecommerce-framework-canvas-status-panel"
           >
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
@@ -523,7 +524,7 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
           <div
             className="flex min-h-0 flex-col overflow-hidden rounded-xl border p-3"
             style={{ ...shellSurfaceStyle, ...workbenchViewportStyle }}
-            data-testid="ecommerce-group-overview-workbench"
+            data-testid="ecommerce-canvas-task-overview-panel"
           >
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0 flex-1">

@@ -350,6 +350,25 @@ const AppContent: React.FC<AppContentProps> = () => {
     [activeCanvas]
   );
 
+  const ecommerceFrameworkTaskNodesById = React.useMemo(() => {
+    const taskNodesByFrameworkId = new Map<string, PromptNode[]>();
+    (activeCanvas?.promptNodes || []).forEach((node) => {
+      const frameworkId = node.ecommerce?.frameworkId;
+      if (
+        !frameworkId
+        || node.mode !== GenerationMode.ECOMMERCE
+        || (node.ecommerce?.kind !== 'main-image' && node.ecommerce?.kind !== 'a-plus-module')
+      ) {
+        return;
+      }
+
+      const existingTaskNodes = taskNodesByFrameworkId.get(frameworkId) || [];
+      existingTaskNodes.push(node);
+      taskNodesByFrameworkId.set(frameworkId, existingTaskNodes);
+    });
+    return taskNodesByFrameworkId;
+  }, [activeCanvas]);
+
   const draftPromptNode = React.useMemo(
     () => (draftNodeId ? promptNodesById.get(draftNodeId) ?? null : null),
     [draftNodeId, promptNodesById]
@@ -1107,6 +1126,10 @@ const AppContent: React.FC<AppContentProps> = () => {
   const updateEcommerceBuildRuntimeState = useCallback<SetEcommerceBuildRuntimeState>((updater) => {
     setEcommerceState((previousState) => {
       const patch = updater({
+        requirementFile: previousState.requirementFile,
+        productFiles: previousState.productFiles,
+        extraReferenceFiles: previousState.extraReferenceFiles,
+        itemReferenceFiles: previousState.itemReferenceFiles,
         analysis: previousState.analysis,
         analysisConfirmed: previousState.analysisConfirmed,
         selectedItems: previousState.selectedItems,
@@ -2525,7 +2548,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     ecommerceFrameworkStatus: resolvePromptNodeFrameworkStatus(node),
     activeEcommerceTaskState: ecommerceState.activeTaskState,
     onActivateEcommerceTask: (promptNode: PromptNode) => {
-      void handlePromptClick(promptNode, false);
+      syncPromptNodeEcommerceSelection(promptNode);
     },
     onEcommerceTaskStateChange: handleChangeEcommerceTaskState,
     ecommerceSlotState: resolveEcommerceSlotState(node),
@@ -2556,7 +2579,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     handleOpenPptDeckEditor,
     handlePauseEcommerceFramework,
     handlePreviewEcommerceSlotHistoryForNode,
-    handlePromptClick,
     handleResumeEcommerceFramework,
     handleRetryEcommerceModule,
     handleRetryNode,
@@ -2566,6 +2588,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     openSettingsSurfaceTracked,
     resolvePromptNodeFrameworkStatus,
     resolveEcommerceSlotState,
+    syncPromptNodeEcommerceSelection,
     updatePromptNode,
   ]);
 
@@ -3676,6 +3699,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           isCanvasTransforming={isCanvasTransforming}
           isMobile={isMobile}
           sourcePosition={sourceImageNode ? (resolveLiveImagePosition(sourceImageNode) ?? sourceImageNode.position) : undefined}
+          ecommerceFrameworkTaskNodes={ecommerceFrameworkTaskNodesById.get(renderedPromptNode.id) || []}
           {...getSharedPromptNodeActionProps(renderedPromptNode)}
           onLivePositionChange={handleLiveNodePositionChange}
           onHeightChange={(id, height) => {
@@ -3751,6 +3775,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     handlePromptGroupNodeSelect,
     handlePromptGroupTagRemove,
     canvasTransform,
+    ecommerceFrameworkTaskNodesById,
     handleConnectStart,
     handleCanvasNodeDragStateChange,
     handleLiveNodePositionChange,

@@ -19,6 +19,7 @@ import { resolveModelDisplayName } from '../../utils/modelDisplayName';
 import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
 import { buildPptDeckModuleState } from '../../utils/pptDeckModules';
 import EcommerceCardActions from '../ecommerce/EcommerceCardActions';
+import EcommerceCanvasWorkbenchCard from '../ecommerce/EcommerceCanvasWorkbenchCard';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -298,6 +299,7 @@ interface PromptNodeProps {
     } | null;
     ecommerceSlotState?: EcommerceGroupSlotState | null;
     activeEcommerceTaskState?: EcommerceEditableTaskState | null;
+    ecommerceFrameworkTaskNodes?: PromptNode[];
     onActivateEcommerceTask?: (node: PromptNode) => void;
     onPreviewEcommerceSlotHistory?: (node: PromptNode, preferredImageId?: string) => void;
     onEcommerceTaskStateChange?: (
@@ -549,6 +551,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     ecommerceFrameworkStatus = null,
     ecommerceSlotState = null,
     activeEcommerceTaskState = null,
+    ecommerceFrameworkTaskNodes = [],
     onActivateEcommerceTask,
     onPreviewEcommerceSlotHistory,
     onEcommerceTaskStateChange,
@@ -572,7 +575,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const [isDragging, setIsDragging] = useState(false);
     const isDraggingRef = useRef(false);
     const [cardHeight, setCardHeight] = useState(200); // 默认高度??00px,会在渲染后更??
-    const baseCardWidth = 320;
+    const isEcommerceFrameworkCard = node.mode === GenerationMode.ECOMMERCE && node.ecommerce?.kind === 'framework';
+    const baseCardWidth = isEcommerceFrameworkCard ? 680 : 320;
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : baseCardWidth;
     const cardWidth = isMobile ? Math.min(baseCardWidth, Math.max(248, viewportWidth - 24)) : baseCardWidth;
     const originX = renderOrigin?.x ?? 0;
@@ -1390,6 +1394,27 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
                 {/* Content Padding Wrapper */}
                 <div className="p-3 flex flex-col flex-1">
+                    {isEcommerceFrameworkCard ? (
+                        <div data-testid="ecommerce-canvas-framework-workbench">
+                        <EcommerceCanvasWorkbenchCard
+                            node={node}
+                            taskNodes={ecommerceFrameworkTaskNodes}
+                            activeTaskState={activeEcommerceTaskState}
+                            frameworkStatus={ecommerceFrameworkStatus}
+                            onActivateTask={onActivateEcommerceTask}
+                            onTaskStateChange={onEcommerceTaskStateChange}
+                            onToggleSelected={onToggleEcommerceSelected}
+                            onGenerateNode={onGenerateEcommerceNode}
+                            onGenerateFramework={onGenerateEcommerceFramework}
+                            onPauseFramework={onPauseEcommerceFramework}
+                            onResumeFramework={onResumeEcommerceFramework}
+                            onCancelNodeQueue={onCancelEcommerceNodeQueue}
+                            onConfirmDesktop={onConfirmEcommerceDesktop}
+                            onGenerateMobile={onRetryEcommerceModule}
+                        />
+                        </div>
+                    ) : (
+                    <>
                     {/* Reference Images Thumbnails */}
                     {node.referenceImages && node.referenceImages.length > 0 && (
                         <div className="flex gap-1 mb-2 flex-wrap">
@@ -1675,6 +1700,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                         )}
 
                     </div>
+                    </>
+                    )}
 
                     {/* 错误详情面板已被移除 */}
 
@@ -2236,6 +2263,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         prev.isCanvasTransforming === next.isCanvasTransforming &&
         prev.zoomScale === next.zoomScale &&
         prev.isMobile === next.isMobile &&
+        prev.activeEcommerceTaskState === next.activeEcommerceTaskState &&
+        prev.ecommerceFrameworkStatus === next.ecommerceFrameworkStatus &&
+        prev.ecommerceFrameworkTaskNodes === next.ecommerceFrameworkTaskNodes &&
         prev.sourcePosition?.x === next.sourcePosition?.x &&
         prev.sourcePosition?.y === next.sourcePosition?.y
     );

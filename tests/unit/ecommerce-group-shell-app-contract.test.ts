@@ -9,7 +9,7 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('ecommerce analysis confirmation hides helper groups while task cards remain visible', () => {
+test('ecommerce analysis confirmation leaves one visible framework card while child task data stays hidden', () => {
   const appSource = readSource('src/App.tsx');
   const buildRuntimeSource = readSource('src/app/useEcommerceBuildRuntime.ts');
   const runtimeSource = readSource('src/services/ecommerce/frameworkRuntime.ts');
@@ -25,11 +25,11 @@ test('ecommerce analysis confirmation hides helper groups while task cards remai
   assert.match(buildRuntimeSource, /groupIds: \{[\s\S]*'A\+': aPlusGroupNode\.id,/);
   assert.match(typesSource, /hiddenInCanvas\?: boolean/);
   assert.match(buildRuntimeSource, /hiddenInCanvas: Boolean\(frameworkId\)/);
-  assert.doesNotMatch(buildRuntimeSource, /hiddenInCanvas: Boolean\(params\.frameworkId\)/);
-  assert.match(buildRuntimeSource, /hiddenInCanvas: false/);
+  assert.match(buildRuntimeSource, /hiddenInCanvas: Boolean\(params\.frameworkId\)/);
+  assert.doesNotMatch(buildRuntimeSource, /hiddenInCanvas: false/);
   assert.match(runtimeSource, /hiddenInCanvas: true/);
   assert.match(appSource, /n\.hiddenInCanvas/);
   assert.match(appSource, /n\.ecommerce\?\.frameworkId/);
   assert.match(appSource, /n\.ecommerce\.kind === 'a-plus-group'/);
-  assert.doesNotMatch(appSource, /n\.ecommerce\.kind !== 'framework'/);
+  assert.match(appSource, /ecommerceFrameworkTaskNodesById/);
 });

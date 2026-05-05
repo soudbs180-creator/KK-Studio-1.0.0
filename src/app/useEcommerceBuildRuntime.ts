@@ -43,6 +43,10 @@ import type {
 } from './useEcommerceUploadReferenceRuntime.ts';
 
 export interface EcommerceBuildRuntimeState {
+  requirementFile: File | null;
+  productFiles: File[];
+  extraReferenceFiles: File[];
+  itemReferenceFiles: Record<string, EcommerceManualReferenceBinding[]>;
   analysis: EcommerceAnalysisResult | null;
   analysisConfirmed: boolean;
   selectedItems: Record<string, boolean>;
@@ -122,6 +126,13 @@ async function reportBuildFailure(error: unknown): Promise<void> {
   } catch {
     // Notification delivery should not change the build runtime state.
   }
+}
+
+function createBuildResetGroupSlots(): Record<EcommerceGroupSheet, EcommerceGroupSlotState[]> {
+  return {
+    '主图': [],
+    'A+': [],
+  };
 }
 
 function buildRuntimeEcommerceAssetRoles(params: {
@@ -387,7 +398,7 @@ export function useEcommerceBuildRuntime({
       referenceImages,
       timestamp: Date.now(),
       mode: GenerationMode.ECOMMERCE,
-      hiddenInCanvas: false,
+      hiddenInCanvas: Boolean(params.frameworkId),
       parallelCount: 1,
       thinkingMode: 'high',
       ecommerce: {
@@ -489,6 +500,7 @@ export function useEcommerceBuildRuntime({
           selectedItems: ecommerceState.selectedItems,
         }),
       };
+      void initialGroupSlots;
 
       const frameworkNode = buildEcommerceFrameworkNode(analysis, {
         x: basePosition.x + 260,
@@ -582,12 +594,19 @@ export function useEcommerceBuildRuntime({
 
       bringNodesToFront(createdNodeIds);
       setEcommerceBuildRuntimeState((previousState) => ({
-        analysisConfirmed: true,
-        groupSlots: initialGroupSlots,
+        requirementFile: null,
+        productFiles: [],
+        extraReferenceFiles: [],
+        itemReferenceFiles: {},
+        analysis: null,
+        analysisConfirmed: false,
+        selectedItems: {},
+        taskStates: {},
+        groupSlots: createBuildResetGroupSlots(),
         activeTaskNodeId: null,
         activeTaskState: null,
-        activeFrameworkId: frameworkNode.id,
-        activeGroupSheet: '主图',
+        activeFrameworkId: null,
+        activeGroupSheet: null,
         frameworkRuntime: {
           ...previousState.frameworkRuntime,
           [frameworkNode.id]: initialFrameworkRuntime,
@@ -598,7 +617,7 @@ export function useEcommerceBuildRuntime({
         prompt: '',
         referenceImages: [],
       }));
-      reportBuildSuccess(createdNodeIds.length);
+      reportBuildSuccess(1);
     } catch (error: unknown) {
       await reportBuildFailure(error);
     } finally {

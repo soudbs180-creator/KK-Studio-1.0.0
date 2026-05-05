@@ -55,3 +55,31 @@ test('ecommerce build runtime remains separate from upload sync and generation r
   assert.doesNotMatch(postBuildSyncSource, /runEcommerceNodeGeneration/);
   assert.match(nodeGenerationSource, /const runEcommerceNodeGeneration = useCallback/);
 });
+
+test('ecommerce build confirmation hands off to one visible canvas framework and resets the composer input state', () => {
+  const hookSource = readSource('src/app/useEcommerceBuildRuntime.ts');
+  const appSource = readSource('src/App.tsx');
+
+  assert.match(hookSource, /requirementFile: File \| null;/);
+  assert.match(hookSource, /productFiles: File\[\];/);
+  assert.match(hookSource, /extraReferenceFiles: File\[\];/);
+  assert.match(hookSource, /itemReferenceFiles: Record<string, EcommerceManualReferenceBinding\[\]>;/);
+  assert.match(hookSource, /hiddenInCanvas: Boolean\(params\.frameworkId\),/);
+  assert.match(hookSource, /reportBuildSuccess\(1\);/);
+  assert.match(hookSource, /requirementFile: null,/);
+  assert.match(hookSource, /productFiles: \[\],/);
+  assert.match(hookSource, /extraReferenceFiles: \[\],/);
+  assert.match(hookSource, /itemReferenceFiles: \{\},/);
+  assert.match(hookSource, /analysis: null,/);
+  assert.match(hookSource, /analysisConfirmed: false,/);
+  assert.match(hookSource, /selectedItems: \{\},/);
+  assert.match(hookSource, /taskStates: \{\},/);
+  assert.match(hookSource, /groupSlots: createBuildResetGroupSlots\(\),/);
+  assert.match(hookSource, /activeFrameworkId: null,/);
+  assert.match(hookSource, /activeGroupSheet: null,/);
+
+  assert.match(appSource, /requirementFile: previousState\.requirementFile,/);
+  assert.match(appSource, /productFiles: previousState\.productFiles,/);
+  assert.match(appSource, /extraReferenceFiles: previousState\.extraReferenceFiles,/);
+  assert.match(appSource, /itemReferenceFiles: previousState\.itemReferenceFiles,/);
+});
