@@ -1171,6 +1171,25 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/se
 
 Do not change provider fetches, provider persistence, cloud sync, key storage, route selection, runtime model resolution, localStorage policy, release metadata, or UI behavior in this slice. Browser QA may be skipped for this non-UI service/helper extraction after recording the skip reason in `status.md`.
 
+## keyManager Remote Model Discovery Helper Gate
+
+Use this gate for the M115 remote model discovery response parsing helper extraction:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/key-manager-remote-model-discovery-contract.test.ts"
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/key-manager-remote-model-discovery-contract.test.ts" "tests/unit/key-manager-model-helpers-contract.test.ts" "tests/unit/key-manager-model-list-contract.test.ts" "tests/unit/key-manager-shared-pricing-contract.test.ts" "tests/unit/key-manager-pricing-url-contract.test.ts" "tests/unit/key-manager-api-type-contract.test.ts" "tests/unit/google-official-gemini-protocol-guards.test.ts" "tests/unit/frontend-key-boundary-hardening.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+npm.cmd run architecture:check
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/services/auth/keyManager.ts" "src/services/auth/keyManagerRemoteModelDiscovery.ts" "tests/unit/key-manager-remote-model-discovery-contract.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+```
+
+Do not change provider fetch execution, endpoint selection, auth/header/query-key behavior, provider persistence, cloud sync, key storage, route selection, runtime model resolution, localStorage policy, release metadata, or UI behavior in this slice. Browser QA may be skipped for this non-UI service/helper extraction after recording the skip reason in `status.md`.
+
 ## UI Unused Cleanup Gate
 
 Use this gate for PromptBar/ImageCard and legacy dashboard compiler-source cleanup slices:

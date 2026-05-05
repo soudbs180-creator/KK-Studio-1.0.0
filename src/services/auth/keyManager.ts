@@ -61,9 +61,7 @@ import { buildSilentProviderPricingUrl } from './keyManagerPricingUrl';
 import { buildChannelCapabilities } from './keyManagerChannelCapabilities';
 import { detectApiType } from './keyManagerApiType';
 import {
-    DEFAULT_GOOGLE_MODELS,
     DEFAULT_OPENAI_MODELS,
-    GOOGLE_IMAGE_WHITELIST,
 } from './keyManagerDefaultModels';
 import {
     normalizeModelList,
@@ -77,6 +75,11 @@ import {
     buildPricingSnapshotFromSharedCache,
     buildSharedPricingItemsFromRawCatalog,
 } from './keyManagerSharedPricing';
+import {
+    buildGoogleModelDiscoveryResult,
+    buildOpenAICompatModelDiscoveryResult,
+    extractGeminiCompatModelIds,
+} from './keyManagerRemoteModelDiscovery';
 export {
     DEFAULT_GOOGLE_MODELS,
     DEFAULT_OPENAI_MODELS,
@@ -148,7 +151,6 @@ import {
     isGoogleOfficialModelId,
     MODEL_MIGRATION_MAP,
     parseModelString,
-    parseModelVariantMeta,
 } from './keyManagerModelHelpers';
 import type { GlobalModelType } from './keyManagerModelHelpers';
 import { determineKeyType } from './keyManagerKeyType';
@@ -3888,44 +3890,11 @@ export async function fetchGoogleModels(apiKey: string): Promise<string[]> {
         }
 
         const data = await response.json();
+        const discovery = buildGoogleModelDiscoveryResult(data);
 
-        const models = data.models
-            ?.map((m: any) => m.name.replace('models/', ''))
-            .filter((rawModel: string) => {
-                const modelId = rawModel.replace(/^models\//, '');
-                const lower = modelId.toLowerCase();
-
-                if (lower.includes('embedding') ||
-                    lower.includes('audio') ||
-                    lower.includes('robotics') ||
-                    lower.includes('code-execution') ||
-                    lower.includes('computer-use') ||
-                    lower.includes('aqa')) {
-                    return false;
-                }
-
-                if (lower.includes('tts')) return false;
-
-                const allowedPatterns = [
-                    ...GOOGLE_IMAGE_WHITELIST.map((id) => new RegExp(`^${id}$`)),
-                    /^veo-3\.1-generate-preview$/,
-                    /^veo-3\.1-fast-generate-preview$/,
-                    /^gemini-2\.5-(flash|pro|flash-lite)$/,
-                    /^gemini-3-(pro|flash)-preview$/,
-                ];
-
-                return allowedPatterns.some((pattern) => pattern.test(modelId));
-            }) || [];
-
-        console.log(`[KeyManager] Strict whitelist kept ${models.length} models:`, models);
-
-        const finalModels = Array.from(new Set([
-            ...DEFAULT_GOOGLE_MODELS,
-            ...models
-        ]));
-
-        console.log('[KeyManager] Merged Google model list:', finalModels);
-        return finalModels;
+        console.log(`[KeyManager] Strict whitelist kept ${discovery.strictModels.length} models:`, discovery.strictModels);
+        console.log('[KeyManager] Merged Google model list:', discovery.finalModels);
+        return discovery.finalModels;
     } catch (error) {
         console.error('[KeyManager] Error fetching Google models:', error);
         const failure = classifyApiFailure({
@@ -3974,14 +3943,7 @@ export async function fetchGeminiCompatModels(apiKey: string, baseUrl?: string):
             throw new Error(buildUserFacingApiErrorMessage(failure));
         }
         const data = await response.json();
-        const rawModels: any[] = data.models || data.data || [];
-        return Array.from(
-            new Set(
-                rawModels
-                    .map((model: any) => String(model?.name || model?.id || model?.model || '').replace(/^models\//i, '').trim())
-                    .filter(Boolean)
-            )
-        );
+        return extractGeminiCompatModelIds(data);
     } catch (error) {
         console.error('[KeyManager] Error fetching Gemini-compatible models:', error);
         const failure = classifyApiFailure({
@@ -4029,53 +3991,17 @@ export async function fetchOpenAICompatModels(apiKey: string, baseUrl: string): 
         }
 
         const data = await response.json();
-        const rawModels: any[] = data.data || [];
+        const discovery = buildOpenAICompatModelDiscoveryResult(data);
 
-        console.log('[KeyManager] /v1/models response:', { count: rawModels.length, firstModel: rawModels.length > 0 ? rawModels[0]?.id || rawModels[0] : null, dataType: typeof data.data, hasObjectField: !!data.object });
-
-        // Deduplicate models by canonical name:
-        // - Prefer the base name over stage suffixes when both exist
-        // - Collapse speed variants (for example fast/slow) to a single entry
-        const rawSet = new Set(rawModels.map(m => m.id));
-        const deduped = new Map<string, string>(); // canonical -> chosen model string
-
-        rawModels.forEach(m => {
-            const modelId = m.id;
-            const modelName = m.name || m.title || m.display_name || '';
-            const modelProvider = m.owned_by || m.provider || '';
-
-            const parsed = parseModelVariantMeta(modelId);
-            const canonical = parsed.canonicalId || modelId;
-
-            let formattedModel = modelId;
-            if (modelName || modelProvider) {
-                formattedModel = `${modelId}|${modelName}|${modelProvider}`;
-            }
-
-            // If canonical exists in provider response, prefer canonical (parameterized variants can be selected by UI options)
-            if (rawSet.has(canonical)) {
-                let formattedCanonical = canonical;
-                const canonicalObj = rawModels.find(obj => obj.id === canonical);
-                if (canonicalObj) {
-                    const cName = canonicalObj.name || canonicalObj.title || canonicalObj.display_name || '';
-                    const cProvider = canonicalObj.owned_by || canonicalObj.provider || '';
-                    if (cName || cProvider) {
-                        formattedCanonical = `${canonical}|${cName}|${cProvider}`;
-                    }
-                }
-                deduped.set(canonical, formattedCanonical);
-                return;
-            }
-
-            // Otherwise keep first concrete model id to avoid producing unsupported synthetic IDs
-            if (!deduped.has(canonical)) {
-                deduped.set(canonical, formattedModel);
-            }
+        console.log('[KeyManager] /v1/models response:', {
+            count: discovery.rawCount,
+            firstModel: discovery.firstModel,
+            dataType: discovery.hasDataArray ? 'object' : typeof (data as { data?: unknown }).data,
+            hasObjectField: discovery.hasObjectField,
         });
 
-        const result = Array.from(new Set(deduped.values()));
-        console.log(`[KeyManager] Deduplicated down to ${result.length} unique models:`, result);
-        return result;
+        console.log(`[KeyManager] Deduplicated down to ${discovery.models.length} unique models:`, discovery.models);
+        return discovery.models;
     } catch (error) {
         console.error('[KeyManager] Error fetching proxy models:', error);
         return [];
