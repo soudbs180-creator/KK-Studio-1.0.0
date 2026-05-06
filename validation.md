@@ -4,7 +4,45 @@ Last updated: 2026-05-06
 
 Use `npm.cmd` for npm scripts on Windows.
 
-Current code baseline before M126 after the M125 helper extraction at `42dcaa17`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. The M126 OpenAI-compatible image payload security hardening slice keeps this probe clean. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor/UI slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
+Current code baseline before M127 after the M126 image payload security hardening at `342ae802`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. The M127 OpenAI-compatible image reference helper extraction keeps this probe clean. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor/UI slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
+
+## M127 OpenAI-Compatible Image Reference Helper Gate
+
+Use this gate when touching OpenAI-compatible reference-image formatting or chat image content-part helper ownership:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/openai-compatible-image-references-contract.test.ts" `
+  "tests/unit/openai-compatible-unused-cleanup-contract.test.ts" `
+  "tests/unit/openai-compatible-image-payload-contract.test.ts" `
+  "tests/unit/openai-compatible-image-dispatch-contract.test.ts" `
+  "tests/unit/provider-image-routing-regression.test.ts" `
+  "tests/unit/openai-compatible-image-sizing-contract.test.ts" `
+  "tests/unit/openai-compatible-task-payload-contract.test.ts" `
+  "tests/unit/openai-compatible-chat-payload-contract.test.ts" `
+  "tests/unit/openai-compatible-google-extra-body-contract.test.ts" `
+  "tests/unit/openai-compatible-twelve-ai-async-route-contract.test.ts" `
+  "tests/unit/openai-compatible-acedata-route-contract.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+npm.cmd run architecture:check
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "src/services/llm/OpenAICompatibleAdapter.ts" `
+  "src/services/llm/openAICompatibleImageReferences.ts" `
+  "tests/unit/openai-compatible-image-references-contract.test.ts" `
+  "tests/unit/openai-compatible-unused-cleanup-contract.test.ts" `
+  "tsconfig.tests.json" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA may be skipped for this gate because it is a non-UI service/helper extraction and dead-comment cleanup with no JSX, CSS, route rendering, browser-visible behavior, or release metadata change. Record the skip reason in `status.md`.
 
 ## M126 OpenAI-Compatible Image Payload Security Gate
 

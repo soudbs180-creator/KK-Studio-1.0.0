@@ -37,3 +37,30 @@ test('OpenAI compatible adapter does not retain source-proven unused code', () =
   assert.doesNotMatch(chatMethodSource, /const reportedImageSize = /);
   assert.doesNotMatch(source, /nativeImageSizeStr/);
 });
+
+test('OpenAI compatible adapter does not retain unreachable commented legacy delegates', () => {
+  const source = readSource('src/services/llm/OpenAICompatibleAdapter.ts');
+  const chatStart = source.indexOf('async chat(options: ChatOptions, keySlot: KeySlot): Promise<string>');
+  const chatStreamStart = source.indexOf('async chatStream(options: ChatOptions, keySlot: KeySlot): Promise<void>');
+  const generateImageStart = source.indexOf('async generateImage(options: ImageGenerationOptions, keySlot: KeySlot)');
+  const strictStart = source.indexOf('private async generateImageStandard_OpenAI_Strict(');
+  const siliconFlowStart = source.indexOf('private async generateImageStandard_SiliconFlow(');
+
+  assert.ok(chatStart > -1);
+  assert.ok(chatStreamStart > chatStart);
+  assert.ok(generateImageStart > chatStreamStart);
+  assert.ok(strictStart > generateImageStart);
+  assert.ok(siliconFlowStart > strictStart);
+
+  const chatSource = source.slice(chatStart, chatStreamStart);
+  const chatStreamSource = source.slice(chatStreamStart, generateImageStart);
+  const strictSource = source.slice(strictStart, siliconFlowStart);
+
+  assert.match(chatSource, /return this\.chatWithCompatibleResponses\(options, keySlot\);/);
+  assert.match(chatStreamSource, /return this\.chatStreamWithCompatibleResponses\(options, keySlot\);/);
+  assert.match(strictSource, /return this\.generateImageStandard_OpenAI_Strict_DocSafe\(options, keySlot\);/);
+
+  assert.doesNotMatch(chatSource, /\/\*|\/chat\/completions|await fetch\(/);
+  assert.doesNotMatch(chatStreamSource, /\/\*|response\.body\.getReader|TextDecoder/);
+  assert.doesNotMatch(strictSource, /\/\*|const is12AIChannel =|官方 OpenAI 编辑端点待完整对接支持/);
+});

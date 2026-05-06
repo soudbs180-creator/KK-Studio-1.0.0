@@ -39,6 +39,11 @@ import { buildNewApiGoogleExtraBody, mergeExtraBody } from './openAICompatibleGo
 import { resolveOpenAICompatibleImageDispatch } from './openAICompatibleImageDispatch';
 import { extractImageUrlsFromPayload, extractOpenAICompatibleChatImageUrls } from './openAICompatibleImagePayload';
 import {
+    buildOpenAICompatibleImageContentParts,
+    formatOpenAICompatibleReferenceImage,
+    formatOpenAICompatibleReferenceImages,
+} from './openAICompatibleImageReferences';
+import {
     clampImageCount,
     getOpenAIImageProfile,
     normalizeGeminiImageSize,
@@ -1625,206 +1630,10 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
     async chat(options: ChatOptions, keySlot: KeySlot): Promise<string> {
         return this.chatWithCompatibleResponses(options, keySlot);
-        /*
-        const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
-        const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : baseUrl + '/v1';
-        const url = cleanBase + '/chat/completions';
-
-        const messages: any[] = options.messages.map(m => ({
-            role: m.role,
-            content: m.content
-        }));
-
-        // Multimodal Handling (OpenAI Vision Format)
-        if (options.inlineData && options.inlineData.length > 0) {
-            const lastUserIdx = messages.map(m => m.role).lastIndexOf('user');
-            if (lastUserIdx >= 0) {
-                const textContent = messages[lastUserIdx].content;
-                const contentParts: any[] = [{ type: 'text', text: textContent }];
-
-                options.inlineData.forEach(media => {
-                    contentParts.push({
-                        type: 'image_url',
-                        image_url: { url: `data:${media.mimeType};base64,${media.data}` }
-                    });
-                });
-                messages[lastUserIdx].content = contentParts;
-            }
-        }
-
-        if (options.systemPrompt) {
-            messages.unshift({ role: 'system', content: options.systemPrompt });
-        }
-
-        let headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-            'Authorization': this.getAuthorizationHeaderValue(keySlot.key, keySlot)
-        };
-
-        // Custom Header Support
-        if (keySlot.headerName && keySlot.headerName !== 'Authorization') {
-            delete headers.Authorization;
-            delete headers.authorization;
-            headers[keySlot.headerName] = keySlot.key;
-        }
-
-        let body: any = {
-            model: options.modelId,
-            messages,
-            temperature: options.temperature,
-            max_tokens: options.maxTokens || 20480, // [12AI Alignment] Default to 20k for better reasoning
-            stream: false
-        };
-
-        // 🚀 Provider Config (Merge into top level or extra_body?)
-        if (options.providerConfig?.openai) {
-            // Merge openai specific config if applicable
-        }
-
-        // Extended Params (Extra Body)
-        if (options.extraBody) {
-            Object.assign(body, options.extraBody);
-        }
-
-        headers = this.applyCustomHeaders(headers, keySlot);
-        body = this.applyCustomBody(body, keySlot);
-
-        // 🚀 [12AI 对齐] 负载体积检查
-        const payloadStr = JSON.stringify(body);
-        if (payloadStr.length > 48 * 1024 * 1024) {
-            console.error(`[OpenAICompatibleAdapter] Chat 请求体积 (${(payloadStr.length / 1024 / 1024).toFixed(2)}MB) 接近 50MB 上限!`);
-        }
-
-        const response = await fetch(url, {
-            method: 'POST',
-            headers,
-            body: payloadStr,
-            signal: options.signal
-        });
-
-        if (!response.ok) {
-            const text = await response.text();
-            let errMsg = `HTTP ${response.status}`;
-            try {
-                const err = JSON.parse(text);
-                errMsg = err.error?.message || errMsg;
-            } catch (e) {
-                errMsg = text.substring(0, 200);
-            }
-            keyManager.reportCallResult(keySlot.id, false, errMsg);
-            logError('OpenAIAdapter', new Error(errMsg), `URL: ${url}\nStatus: ${response.status}\nRaw Response: ${text.substring(0, 500)}`);
-            throw new Error(errMsg);
-        }
-
-        const data = await response.json();
-        keyManager.reportCallResult(keySlot.id, true);
-        return data.choices?.[0]?.message?.content || '';
-        */
     }
 
     async chatStream(options: ChatOptions, keySlot: KeySlot): Promise<void> {
         return this.chatStreamWithCompatibleResponses(options, keySlot);
-        /*
-        const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
-        const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
-        const url = `${cleanBase}/chat/completions`;
-
-        const messages: any[] = options.messages.map(m => ({
-            role: m.role,
-            content: m.content
-        }));
-
-        if (options.inlineData && options.inlineData.length > 0) {
-            const lastUserIdx = messages.map(m => m.role).lastIndexOf('user');
-            if (lastUserIdx >= 0) {
-                const textContent = messages[lastUserIdx].content;
-                const contentParts: any[] = [{ type: 'text', text: textContent }];
-                options.inlineData.forEach(media => {
-                    contentParts.push({
-                        type: 'image_url',
-                        image_url: { url: `data:${media.mimeType};base64,${media.data}` }
-                    });
-                });
-                messages[lastUserIdx].content = contentParts;
-            }
-        }
-
-        if (options.systemPrompt) {
-            messages.unshift({ role: 'system', content: options.systemPrompt });
-        }
-
-        let headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-            'Authorization': this.getAuthorizationHeaderValue(keySlot.key, keySlot)
-        };
-
-        if (keySlot.headerName && keySlot.headerName !== 'Authorization') {
-            delete headers.Authorization;
-            delete headers.authorization;
-            headers[keySlot.headerName] = keySlot.key;
-        }
-
-        let body: any = {
-            model: options.modelId,
-            messages,
-            temperature: options.temperature,
-            max_tokens: options.maxTokens || 20480,
-            stream: true
-        };
-
-        if (options.extraBody) {
-            Object.assign(body, options.extraBody);
-        }
-
-        headers = this.applyCustomHeaders(headers, keySlot);
-        body = this.applyCustomBody(body, keySlot);
-
-        const response = await fetch(url, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(body),
-            signal: options.signal
-        });
-
-        if (!response.ok || !response.body) {
-            const text = await response.text().catch(() => '');
-            const errMsg = text || `HTTP ${response.status}`;
-            keyManager.reportCallResult(keySlot.id, false, errMsg);
-            throw new Error(errMsg);
-        }
-
-        keyManager.reportCallResult(keySlot.id, true);
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-        let buffer = '';
-
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-
-            for (const rawLine of lines) {
-                const line = rawLine.trim();
-                if (!line || !line.startsWith('data:')) continue;
-
-                const payload = line.slice(5).trim();
-                if (payload === '[DONE]') return;
-
-                try {
-                    const json = JSON.parse(payload);
-                    const chunk = json.choices?.[0]?.delta?.content;
-                    if (chunk) {
-                        options.onStream?.(chunk);
-                    }
-                } catch {
-                    // ignore malformed stream chunks
-                }
-            }
-        }
-        */
     }
 
     async generateImage(options: ImageGenerationOptions, keySlot: KeySlot): Promise<ImageGenerationResult> {
@@ -1996,21 +1805,8 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         if (is4K) nativeQuality = 'hd';
         else if (is2K) nativeQuality = 'medium';
 
-        // 🚀 [Critical Fix] Multimodal Reference Image Support
-        // Convert reference images to OpenAI Vision format
-        const contentParts: any[] = [{ type: 'text', text: options.prompt }];
-
+        const contentParts = buildOpenAICompatibleImageContentParts(options.prompt, options.referenceImages);
         if (options.referenceImages?.length) {
-            options.referenceImages.forEach(refImg => {
-                const { data: imgData, mimeType } = extractRefImageData(refImg);
-                // 使用真实 MIME 类型构建 Data URI
-                const hasPrefix = imgData.startsWith('data:');
-                const dataUrl = hasPrefix ? imgData : `data:${mimeType};base64,${imgData}`;
-                contentParts.push({
-                    type: 'image_url',
-                    image_url: { url: dataUrl }
-                });
-            });
             console.log(`[OpenAICompatibleAdapter] Injected ${options.referenceImages.length} reference images into chat completion`);
         }
 
@@ -2156,17 +1952,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const url = `${cleanBase}/chat/completions`;
         const requestPath = '/v1/chat/completions';
 
-        const contentParts: any[] = [{ type: 'text', text: options.prompt }];
-        if (options.referenceImages?.length) {
-            options.referenceImages.forEach((refImg) => {
-                const { data: imgData, mimeType } = extractRefImageData(refImg);
-                const dataUrl = imgData.startsWith('data:') ? imgData : `data:${mimeType};base64,${imgData}`;
-                contentParts.push({
-                    type: 'image_url',
-                    image_url: { url: dataUrl }
-                });
-            });
-        }
+        const contentParts = buildOpenAICompatibleImageContentParts(options.prompt, options.referenceImages);
 
         const aspectRatio = normalizeRequestedAspectRatio(
             options.providerConfig?.google?.imageConfig?.aspectRatio || options.aspectRatio
@@ -2307,8 +2093,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         if (options.referenceImages?.length) {
-            const { data: refData, mimeType: refMime } = extractRefImageData(options.referenceImages[0]);
-            const dataUrl = refData.startsWith('http') ? refData : `data:${refMime};base64,${refData}`;
+            const dataUrl = formatOpenAICompatibleReferenceImage(options.referenceImages[0], { preserveHttpUrl: true });
             body.image = dataUrl;
 
             if (options.modelId.toLowerCase().includes('midjourney') || options.modelId.toLowerCase().includes('mj-')) {
@@ -2355,73 +2140,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         keySlot: KeySlot
     ): Promise<ImageGenerationResult> {
         return this.generateImageStandard_OpenAI_Strict_DocSafe(options, keySlot);
-        /*
-        const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
-        const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
-        const url = `${cleanBase}/images/generations`;
-
-        // 质量与尺寸推断
-        const is4K = options.imageSize === '4K' || options.imageSize === 'SIZE_4K';
-        const is2K = options.imageSize === '2K' || options.imageSize === 'SIZE_2K';
-        const is12AIChannel = this.resolveChannelRuntime(baseUrl, keySlot, options.modelId).strategyId === '12ai';
-
-        let sizeString = '1024x1024';
-        if (options.aspectRatio === '16:9') sizeString = '1792x1024';
-        else if (options.aspectRatio === '9:16') sizeString = '1024x1792';
-        else if (options.aspectRatio === '21:9') sizeString = '2048x870';
-        else if (options.aspectRatio === '4:1') sizeString = '2048x512';
-        else if (options.aspectRatio === '3:2') sizeString = '1536x1024';
-        else if (options.aspectRatio === '2:3') sizeString = '1024x1536';
-        else if (options.aspectRatio === '4:3') sizeString = '1024x768';
-        else if (options.aspectRatio === '3:4') sizeString = '768x1024';
-        else if (options.aspectRatio === '1:4') sizeString = '512x2048';
-        else if (options.aspectRatio === '1:8') sizeString = '512x4096';
-        else if (options.aspectRatio === '8:1') sizeString = '4096x512';
-
-        // Configuration Overrides
-        let quality = is4K || is2K ? 'hd' : 'standard';
-        let style: string | undefined;
-        if (options.providerConfig?.openai) {
-            if (options.providerConfig.openai.size) sizeString = options.providerConfig.openai.size;
-            if (options.providerConfig.openai.quality) quality = options.providerConfig.openai.quality;
-            if (options.providerConfig.openai.style) style = options.providerConfig.openai.style;
-        }
-
-        const body: any = {
-            model: options.modelId,
-            prompt: options.prompt,
-            n: options.imageCount || 1,
-            size: sizeString,
-            quality: quality,
-            response_format: 'b64_json'
-        };
-
-        if (style) body.style = style;
-
-        // 官方 DALL-E 编辑功能支持（需专用 endpoint / edits 或特殊方式，先按通用传入 mask 与 image）
-        if (options.editMode && options.referenceImages?.length) {
-            console.warn(`[OpenAICompatibleAdapter] 官方 OpenAI 编辑端点待完整对接支持。当前先尝试基础注入。`);
-            const { data: refData, mimeType: refMime } = extractRefImageData(options.referenceImages[0]);
-            body.image = refData.startsWith('http') ? refData : `data:${refMime};base64,${refData}`;
-            if (options.editMode === 'inpaint' && options.maskUrl) {
-                body.mask = options.maskUrl.startsWith('http') ? options.maskUrl : `data:image/png;base64,${options.maskUrl}`;
-            }
-        } else if (options.referenceImages?.length) {
-            // 🚀 [Fix] Support Reference Image for standard OpenAI-compatible generation (Image-to-Image)
-            const { data: refData, mimeType: refMime } = extractRefImageData(options.referenceImages[0]);
-            // Some providers (like 12AI / Midjourney-proxy) expect 'image' or 'image_url' at top level
-            const dataUrl = refData.startsWith('http') ? refData : `data:${refMime};base64,${refData}`;
-            body.image = dataUrl;
-            // Also inject into prompt if it's a known proxy pattern (optional but improves compatibility)
-            if (options.modelId.toLowerCase().includes('midjourney') || options.modelId.toLowerCase().includes('mj-')) {
-                body.prompt = `${dataUrl} ${body.prompt}`;
-            }
-        }
-
-        console.log(`[OpenAICompatibleAdapter] OpenAI_Strict -> size=${body.size}, quality=${body.quality}`);
-
-        return this.executeImageRequest(url, body, keySlot, options);
-        */
     }
 
     // ============================================================================
@@ -2457,10 +2175,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         };
 
         if (options.referenceImages && options.referenceImages.length > 0) {
-            body.image = options.referenceImages.map(ref => {
-                const { data: d, mimeType: m } = extractRefImageData(ref);
-                return d.startsWith('http') ? d : `data:${m};base64,${d}`;
-            });
+            body.image = formatOpenAICompatibleReferenceImages(options.referenceImages, { preserveHttpUrl: true });
         }
 
         console.log(`[OpenAICompatibleAdapter] SiliconFlow -> image_size=${body.image_size}`);
@@ -2538,22 +2253,17 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         if (options.referenceImages && options.referenceImages.length > 0) {
             const isFluxKontext = options.modelId.toLowerCase().includes('flux-kontext');
             const isDoubao = options.modelId.toLowerCase().includes('doubao');
-
-            // 🚀 [Fix] 使用 extractRefImageData 提取真实 MIME 类型
-            const toDataUrl = (ref: string | { data: string; mimeType: string }) => {
-                const { data: d, mimeType: m } = extractRefImageData(ref);
-                return d.startsWith('http') ? d : `data:${m};base64,${d}`;
-            };
+            const referenceImageUrls = formatOpenAICompatibleReferenceImages(options.referenceImages, { preserveHttpUrl: true });
 
             if (isFluxKontext) {
-                const imgLinks = options.referenceImages.map(toDataUrl).join(' ');
+                const imgLinks = referenceImageUrls.join(' ');
                 body.prompt = `${body.prompt} ${imgLinks}`;
-                body.image = options.referenceImages.map(toDataUrl);
+                body.image = referenceImageUrls;
             } else if (isDoubao && options.editMode === 'inpaint') {
-                body.image = toDataUrl(options.referenceImages[0]);
+                body.image = referenceImageUrls[0];
             } else {
-                body.image = options.referenceImages.map(toDataUrl);
-                body.image_url = toDataUrl(options.referenceImages[0]);
+                body.image = referenceImageUrls;
+                body.image_url = referenceImageUrls[0];
             }
         }
 
@@ -2619,10 +2329,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         if (options.referenceImages && options.referenceImages.length > 0) {
-            const refs = options.referenceImages.map((ref) => {
-                const { data: refData, mimeType: refMime } = extractRefImageData(ref);
-                return refData.startsWith('http') ? refData : `data:${refMime};base64,${refData}`;
-            });
+            const refs = formatOpenAICompatibleReferenceImages(options.referenceImages, { preserveHttpUrl: true });
             body.image = refs;
         }
 
