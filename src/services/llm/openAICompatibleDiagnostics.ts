@@ -7,8 +7,26 @@ const SENSITIVE_PREVIEW_FIELD_NAMES = new Set([
     'key',
 ]);
 
+const PROMPT_PREVIEW_FIELD_NAMES = new Set([
+    'content',
+    'input',
+    'message',
+    'messages',
+    'negative_prompt',
+    'original_prompt',
+    'prompt',
+    'prompts',
+    'raw_prompt',
+    'raw_prompt_original',
+    'text',
+]);
+
 function isSensitivePreviewField(fieldName: string): boolean {
     return SENSITIVE_PREVIEW_FIELD_NAMES.has(String(fieldName || '').toLowerCase());
+}
+
+function isPromptPreviewField(fieldName: string): boolean {
+    return PROMPT_PREVIEW_FIELD_NAMES.has(String(fieldName || '').toLowerCase());
 }
 
 function redactPreviewValue(value: unknown): unknown {
@@ -19,6 +37,10 @@ function redactPreviewValue(value: unknown): unknown {
         Object.entries(value as Record<string, unknown>).forEach(([key, entryValue]) => {
             if (isSensitivePreviewField(key)) {
                 out[key] = '<omitted:sensitive>';
+                return;
+            }
+            if (isPromptPreviewField(key)) {
+                out[key] = '<omitted:prompt>';
                 return;
             }
             out[key] = redactPreviewValue(entryValue);
@@ -48,6 +70,9 @@ export function buildSafeRequestBodyPreview(body: unknown): string {
 function buildSafeFormDataEntryPreview(key: string, value: FormDataEntryValue): unknown {
     if (isSensitivePreviewField(key)) {
         return '<omitted:sensitive>';
+    }
+    if (isPromptPreviewField(key)) {
+        return '<omitted:prompt>';
     }
 
     if (typeof Blob !== 'undefined' && value instanceof Blob) {

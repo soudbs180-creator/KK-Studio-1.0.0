@@ -1,10 +1,42 @@
 # KK-Studio v1.4.2 Single-Line Validation Matrix
 
-Last updated: 2026-05-06
+Last updated: 2026-05-07
 
 Use `npm.cmd` for npm scripts on Windows.
 
-Current code baseline before M129 after the M128 dead-cache/log-redaction cleanup at `7d65c686`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. The M129 keyManager update diagnostic redaction keeps this probe clean. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor/UI slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
+Current code baseline before M130 after the M129 keyManager update diagnostic redaction at `740042c1`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. The M130 OpenAI-compatible diagnostics prompt redaction keeps this probe clean. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor/UI slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
+
+## M130 OpenAI-Compatible Diagnostics Prompt Redaction Gate
+
+Use this gate when touching OpenAI-compatible diagnostics previews, request-body preview redaction, or diagnostic python snippets:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/openai-compatible-diagnostics-contract.test.ts" `
+  "tests/unit/openai-compatible-image-dispatch-contract.test.ts" `
+  "tests/unit/openai-compatible-image-payload-contract.test.ts" `
+  "tests/unit/provider-image-routing-regression.test.ts" `
+  "tests/unit/openai-compatible-image-sizing-contract.test.ts" `
+  "tests/unit/openai-compatible-task-payload-contract.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+npm.cmd run architecture:check
+npm.cmd run governance:security
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "src/services/llm/OpenAICompatibleAdapter.ts" `
+  "src/services/llm/openAICompatibleDiagnostics.ts" `
+  "tests/unit/openai-compatible-diagnostics-contract.test.ts" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA may be skipped for this gate because it changes only service diagnostics metadata and no JSX, CSS, route rendering, browser-visible UI, or release metadata. Record the skip reason in `status.md`.
 
 ## M129 KeyManager Update Diagnostic Redaction Gate
 

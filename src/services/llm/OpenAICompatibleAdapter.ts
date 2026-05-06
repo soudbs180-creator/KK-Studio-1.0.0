@@ -1844,7 +1844,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         const requestPath = '/v1/chat/completions';
-        const pythonSnippet = `import requests\n\nurl = "${url}"\nheaders = {"Authorization": "Bearer <API_KEY>", "Content-Type": "application/json"}\npayload = ${JSON.stringify(body, null, 2)}\nresp = requests.post(url, headers=headers, json=payload, timeout=150)\nprint(resp.status_code)\nprint(resp.text[:1000])`;
 
         console.log(`[OpenAICompatibleAdapter] Chat Image Request -> ${keySlot.name}: size=${sizeString}, quality=${nativeQuality}, imageSize=${body.imageSize}, aspectRatio=${options.aspectRatio || '1:1'}`);
 
@@ -1867,6 +1866,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         // 🚀 [12AI 对齐] 负载体积检查
         const requestBody = this.applyCustomBody(body, keySlot);
         const requestBodyPreview = buildSafeRequestBodyPreview(requestBody);
+        const pythonSnippet = `import requests\n\nurl = "${url}"\nheaders = {"Authorization": "Bearer <API_KEY>", "Content-Type": "application/json"}\npayload = ${requestBodyPreview}\nresp = requests.post(url, headers=headers, json=payload, timeout=150)\nprint(resp.status_code)\nprint(resp.text[:1000])`;
         const payloadStr = JSON.stringify(requestBody);
         if (payloadStr.length > 48 * 1024 * 1024) {
             console.error(`[OpenAICompatibleAdapter] Chat-Image 请求体积 (${(payloadStr.length / 1024 / 1024).toFixed(2)}MB) 接近 50MB 上限!`);
@@ -1975,8 +1975,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             body.tools = options.providerConfig.google.tools;
         }
 
-        const pythonSnippet = `import requests\n\nurl = "${url}"\nheaders = {"Authorization": "Bearer <API_KEY>", "Content-Type": "application/json"}\npayload = ${JSON.stringify(body, null, 2)}\nresp = requests.post(url, headers=headers, json=payload, timeout=150)\nprint(resp.status_code)\nprint(resp.text[:1000])`;
-
         let headers: Record<string, string> = {
             'Content-Type': 'application/json',
             'Authorization': this.getAuthorizationHeaderValue(keySlot.key, keySlot)
@@ -1990,6 +1988,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         const requestBody = this.applyCustomBody(body, keySlot);
         const requestBodyPreview = buildSafeRequestBodyPreview(requestBody);
+        const pythonSnippet = `import requests\n\nurl = "${url}"\nheaders = {"Authorization": "Bearer <API_KEY>", "Content-Type": "application/json"}\npayload = ${requestBodyPreview}\nresp = requests.post(url, headers=headers, json=payload, timeout=150)\nprint(resp.status_code)\nprint(resp.text[:1000])`;
         const payloadStr = JSON.stringify(requestBody);
 
         const bridgedResult = await this.executeRecoverableSyncImageRequest({
@@ -2737,7 +2736,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             metadata: {
                 requestPath,
                 requestBodyPreview,
-                pythonSnippet: `import requests\n\nurl = "${url}"\nheaders = {"Authorization": "Bearer <API_KEY>"}\nfiles = {"image": open("input.png", "rb")}\ndata = {"model": "${options.modelId}", "prompt": ${JSON.stringify(options.prompt)}, "size": "${reportedImageSize}", "response_format": "b64_json"}\nresp = requests.post(url, headers=headers, files=files, data=data, timeout=150)\nprint(resp.status_code)\nprint(resp.text[:1000])`
+                pythonSnippet: `import requests\n\nurl = "${url}"\nheaders = {"Authorization": "Bearer <API_KEY>"}\nfiles = {"image": open("input.png", "rb")}\ndata = {"model": ${JSON.stringify(options.modelId)}, "prompt": "<omitted:prompt>", "size": "${reportedImageSize}", "response_format": "b64_json"}\nresp = requests.post(url, headers=headers, files=files, data=data, timeout=150)\nprint(resp.status_code)\nprint(resp.text[:1000])`
             }
         };
     }
@@ -2780,7 +2779,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                     apiDurationMs: bridgedResult.apiDurationMs,
                     requestPath,
                     requestBodyPreview,
-                    pythonSnippet: `import requests\n\nurl = "${url}"\nheaders = {"Authorization": "Bearer <API_KEY>", "Content-Type": "application/json"}\npayload = ${JSON.stringify(body, null, 2)}\nresp = requests.post(url, headers=headers, json=payload, timeout=150)\nprint(resp.status_code)\nprint(resp.text[:1000])`
+                    pythonSnippet: `import requests\n\nurl = "${url}"\nheaders = {"Authorization": "Bearer <API_KEY>", "Content-Type": "application/json"}\npayload = ${requestBodyPreview}\nresp = requests.post(url, headers=headers, json=payload, timeout=150)\nprint(resp.status_code)\nprint(resp.text[:1000])`
                 }
             };
         }
@@ -2850,7 +2849,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             metadata: {
                 requestPath,
                 requestBodyPreview,
-                pythonSnippet: `import requests\n\nurl = "${url}"\nheaders = {"Authorization": "Bearer <API_KEY>", "Content-Type": "application/json"}\npayload = ${JSON.stringify(body, null, 2)}\nresp = requests.post(url, headers=headers, json=payload, timeout=150)\nprint(resp.status_code)\nprint(resp.text[:1000])`
+                pythonSnippet: `import requests\n\nurl = "${url}"\nheaders = {"Authorization": "Bearer <API_KEY>", "Content-Type": "application/json"}\npayload = ${requestBodyPreview}\nresp = requests.post(url, headers=headers, json=payload, timeout=150)\nprint(resp.status_code)\nprint(resp.text[:1000])`
             }
         };
     }
