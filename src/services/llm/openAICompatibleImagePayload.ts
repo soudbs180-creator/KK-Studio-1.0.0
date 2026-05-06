@@ -1,5 +1,14 @@
 type PayloadRecord = Record<string, unknown>;
 
+const ALLOWED_IMAGE_MIME_TYPES = new Set([
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+    'image/gif',
+    'image/avif',
+    'image/bmp',
+]);
+
 function isRecord(value: unknown): value is PayloadRecord {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -24,6 +33,63 @@ function firstString(...values: unknown[]): string | undefined {
         if (typeof value === 'string') return value;
     }
     return undefined;
+}
+
+function resolveAllowedImageMimeType(raw: unknown): string | undefined {
+    const normalized = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+    if (!normalized) return undefined;
+    if (normalized === 'image/jpg') return 'image/jpeg';
+    return ALLOWED_IMAGE_MIME_TYPES.has(normalized) ? normalized : undefined;
+}
+
+function normalizeBase64ImageMimeType(...values: unknown[]): string {
+    for (const value of values) {
+        const mimeType = resolveAllowedImageMimeType(value);
+        if (mimeType) return mimeType;
+    }
+    return 'image/png';
+}
+
+function formatBase64ImageDataUrl(rawBase64: string, ...mimeValues: unknown[]): string[] {
+    const normalizedBase64 = rawBase64.trim();
+    if (!normalizedBase64) return [];
+
+    const dataUrlMatch = normalizedBase64.match(/^data:([^;,]+);base64,([\s\S]+)$/i);
+    if (dataUrlMatch) {
+        const mimeType = resolveAllowedImageMimeType(dataUrlMatch[1]);
+        if (!mimeType) return [];
+        const cleaned = dataUrlMatch[2].replace(/\s+/g, '');
+        return cleaned ? [`data:${mimeType};base64,${cleaned}`] : [];
+    }
+
+    const cleaned = normalizedBase64.replace(/\s+/g, '');
+    if (!cleaned) return [];
+
+    return [`data:${normalizeBase64ImageMimeType(...mimeValues)};base64,${cleaned}`];
+}
+
+function normalizeImageUrl(raw: unknown): string | undefined {
+    if (typeof raw !== 'string') return undefined;
+    const normalized = raw.trim();
+    if (!normalized) return undefined;
+
+    if (/^https?:\/\//i.test(normalized)) {
+        try {
+            const parsed = new URL(normalized);
+            return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? normalized : undefined;
+        } catch {
+            return undefined;
+        }
+    }
+
+    const dataUrlMatch = normalized.match(/^data:([^;,]+);base64,([\s\S]+)$/i);
+    if (!dataUrlMatch) return undefined;
+
+    const mimeType = resolveAllowedImageMimeType(dataUrlMatch[1]);
+    if (!mimeType) return undefined;
+
+    const cleaned = dataUrlMatch[2].replace(/\s+/g, '');
+    return cleaned ? `data:${mimeType};base64,${cleaned}` : undefined;
 }
 
 function collectChatImageCandidates(data: unknown): PayloadRecord[] {
@@ -64,16 +130,13 @@ function formatChatImageCandidate(candidate: PayloadRecord): string[] {
         getProperty(image, 'b64_json'),
     );
     if (typeof b64 === 'string' && b64.trim()) {
-        const mimeType = firstString(
+        return formatBase64ImageDataUrl(
+            b64,
             getProperty(candidate, 'mime_type'),
             getProperty(candidate, 'mimeType'),
             getProperty(image, 'mime_type'),
             getProperty(image, 'mimeType'),
-        ) || 'image/png';
-        const cleaned = b64
-            .replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '')
-            .replace(/\s+/g, '');
-        return [`data:${mimeType};base64,${cleaned}`];
+        );
     }
 
     const url = firstString(
@@ -87,21 +150,24 @@ function formatChatImageCandidate(candidate: PayloadRecord): string[] {
         getProperty(image, 'url'),
         getProperty(image, 'image_url'),
     );
-    return typeof url === 'string' && url.trim() ? [url.trim()] : [];
+    const normalizedUrl = normalizeImageUrl(url);
+    return normalizedUrl ? [normalizedUrl] : [];
 }
 
 export function extractOpenAICompatibleChatImageUrls(data: unknown): string[] {
     const candidates = collectChatImageCandidates(data);
     if (candidates.length > 0) {
-        const bestCandidate = candidates.reduce<PayloadRecord | null>((best, candidate) => {
-            if (!best) return candidate;
-            return getChatImageCandidateWeight(candidate) > getChatImageCandidateWeight(best) ? candidate : best;
-        }, null);
-        if (bestCandidate) {
-            const extracted = formatChatImageCandidate(bestCandidate);
-            if (extracted.length > 0) {
-                return extracted;
+        let bestExtracted: { urls: string[]; weight: number } | null = null;
+        for (const candidate of candidates) {
+            const urls = formatChatImageCandidate(candidate);
+            if (urls.length === 0) continue;
+            const weight = getChatImageCandidateWeight(candidate);
+            if (!bestExtracted || weight > bestExtracted.weight) {
+                bestExtracted = { urls, weight };
             }
+        }
+        if (bestExtracted) {
+            return bestExtracted.urls;
         }
     }
 
@@ -158,10 +224,8 @@ export function extractImageUrlsFromPayload(data: unknown): string[] {
 
     const urls: string[] = [];
     const addUrl = (raw: unknown): void => {
-        if (typeof raw !== 'string') return;
-        const normalized = raw.trim();
-        if (!normalized) return;
-        urls.push(normalized);
+        const normalized = normalizeImageUrl(raw);
+        if (normalized) urls.push(normalized);
     };
 
     candidates.forEach((item) => {
@@ -180,16 +244,13 @@ export function extractImageUrlsFromPayload(data: unknown): string[] {
             getProperty(image, 'b64_json'),
         );
         if (typeof b64 === 'string' && b64.trim()) {
-            const mimeType = firstString(
+            urls.push(...formatBase64ImageDataUrl(
+                b64,
                 getProperty(item, 'mime_type'),
                 getProperty(item, 'mimeType'),
                 getProperty(image, 'mime_type'),
                 getProperty(image, 'mimeType'),
-            ) || 'image/png';
-            const cleaned = b64
-                .replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '')
-                .replace(/\s+/g, '');
-            urls.push(`data:${mimeType};base64,${cleaned}`);
+            ));
             return;
         }
 
@@ -217,8 +278,7 @@ export function extractImageUrlsFromPayload(data: unknown): string[] {
     if (typeof content === 'string' && content.trim()) {
         const base64Match = content.match(/data:(image\/[^;]+);base64,([A-Za-z0-9+/=\\s]+)/);
         if (base64Match?.[2]) {
-            const cleaned = base64Match[2].replace(/\s+/g, '');
-            urls.push(`data:${base64Match[1]};base64,${cleaned}`);
+            urls.push(...formatBase64ImageDataUrl(`data:${base64Match[1]};base64,${base64Match[2]}`));
         }
 
         const markdownUrl = content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);

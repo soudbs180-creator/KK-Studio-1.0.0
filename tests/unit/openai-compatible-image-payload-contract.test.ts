@@ -94,6 +94,63 @@ describe("OpenAI-compatible image payload parsing", () => {
     ]);
   });
 
+  test("filters unsafe structured chat-image URLs before candidate selection", () => {
+    const urls = extractOpenAICompatibleChatImageUrls({
+      choices: [
+        {
+          message: {
+            images: [
+              { url: "javascript:alert('xss')" },
+            ],
+            content: "![fallback](https://cdn.example.com/fallback.png)",
+          },
+        },
+      ],
+      data: [
+        { url: "file:///C:/secret.png" },
+        { url: "https://cdn.example.com/safe.png" },
+      ],
+    });
+
+    assert.deepEqual(urls, [
+      "https://cdn.example.com/safe.png",
+    ]);
+  });
+
+  test("normalizes unsafe structured chat-image MIME types to png", () => {
+    const urls = extractOpenAICompatibleChatImageUrls({
+      choices: [
+        {
+          message: {
+            images: [
+              { b64_json: " YWJj ", mime_type: "text/html" },
+            ],
+          },
+        },
+      ],
+    });
+
+    assert.deepEqual(urls, [
+      "data:image/png;base64,YWJj",
+    ]);
+  });
+
+  test("filters unsafe generic payload URLs and data URL MIME types", () => {
+    const urls = extractImageUrlsFromPayload({
+      data: [
+        { url: "javascript:alert('xss')" },
+        { url: "data:text/html;base64,PHNjcmlwdA==" },
+        { url: "https://cdn.example.com/safe.png" },
+        { b64_json: " ZGVm ", mimeType: "text/html" },
+      ],
+    });
+
+    assert.deepEqual(urls, [
+      "https://cdn.example.com/safe.png",
+      "data:image/png;base64,ZGVm",
+    ]);
+  });
+
   test("adapter delegates payload URL extraction to the helper module", () => {
     const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
     const testConfigSource = readSource("tsconfig.tests.json");

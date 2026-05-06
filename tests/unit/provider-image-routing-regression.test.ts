@@ -180,6 +180,10 @@ test("base64 image extraction preserves upstream mime types instead of forcing p
   );
   assert.match(
     payloadHelperSource,
-    /\|\| 'image\/png';/,
+    /function normalizeBase64ImageMimeType/,
+  );
+  assert.match(
+    payloadHelperSource,
+    /return 'image\/png';/,
   );
 });
