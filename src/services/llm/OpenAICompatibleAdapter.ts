@@ -37,7 +37,7 @@ import { buildChatCompletionsBody, buildOpenAICompatibleMessages } from './openA
 import { buildSafeFormDataPreview, buildSafeRequestBodyPreview } from './openAICompatibleDiagnostics';
 import { buildNewApiGoogleExtraBody, mergeExtraBody } from './openAICompatibleGoogleExtraBody';
 import { resolveOpenAICompatibleImageDispatch } from './openAICompatibleImageDispatch';
-import { extractImageUrlsFromPayload } from './openAICompatibleImagePayload';
+import { extractImageUrlsFromPayload, extractOpenAICompatibleChatImageUrls } from './openAICompatibleImagePayload';
 import {
     clampImageCount,
     getOpenAIImageProfile,
@@ -72,6 +72,14 @@ import {
     resolveAceDataImageRoute,
     resolveAceDataImageSize,
 } from './openAICompatibleAceDataRoute';
+import {
+    is12AIAsyncImageModel,
+    normalize12AIAsyncReferenceImage,
+    normalize12AIBaseUrl,
+    resolve12AIAsyncImageQuality,
+    resolve12AIAsyncImageSize,
+    shouldUse12AIAsyncImageRoute,
+} from './openAICompatible12AIAsyncRoute';
 
 export class OpenAICompatibleAdapter implements LLMAdapter {
     id = 'openai-compatible-adapter';
@@ -618,7 +626,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         keySlot: KeySlot,
         signal?: AbortSignal
     ): Promise<{ payload: any; requestPath: string }> {
-        const cleanBase = this.normalize12AIBaseUrl(keySlot.baseUrl || '');
+        const cleanBase = normalize12AIBaseUrl(keySlot.baseUrl || '');
         const requestPath = `/v1/images/async/generations/${encodeURIComponent(taskId)}`;
         const url = `${cleanBase}${requestPath}`;
 
@@ -678,7 +686,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                     provider: keySlot.provider,
                     providerName: keySlot.name,
                     model: options.modelId,
-                    imageSize: requestMeta?.imageSize || options.imageSize || this.resolve12AIAsyncImageSize(options),
+                    imageSize: requestMeta?.imageSize || options.imageSize || resolve12AIAsyncImageSize(options),
                     keySlotId: keySlot.id,
                     metadata: {
                         requestPath: requestMeta?.submitPath || requestPath,
@@ -716,24 +724,24 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         options: ImageGenerationOptions,
         keySlot: KeySlot
     ): Promise<ImageGenerationResult> {
-        const cleanBase = this.normalize12AIBaseUrl(keySlot.baseUrl || '');
+        const cleanBase = normalize12AIBaseUrl(keySlot.baseUrl || '');
         const requestPath = '/v1/images/async/generations';
         const url = `${cleanBase}${requestPath}`;
-        const size = this.resolve12AIAsyncImageSize(options);
+        const size = resolve12AIAsyncImageSize(options);
         const body: Record<string, any> = {
             model: options.modelId,
             prompt: options.prompt,
             n: clampImageCount(options.imageCount, 10),
             size,
         };
-        const quality = this.resolve12AIAsyncImageQuality(options);
+        const quality = resolve12AIAsyncImageQuality(options);
         if (quality) {
             body.quality = quality;
         }
 
         if (options.referenceImages?.length) {
             const refs = options.referenceImages
-                .map((ref) => this.normalize12AIAsyncReferenceImage(ref))
+                .map((ref) => normalize12AIAsyncReferenceImage(ref))
                 .filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
 
             if (refs.length === 1) {
@@ -1262,122 +1270,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             compatibilityMode: keySlot.compatibilityMode,
             modelId,
         });
-    }
-
-    private normalize12AIBaseUrl(baseUrl: string): string {
-        let clean = (baseUrl || '').trim().replace(/\/+$/, '');
-        if (!clean) return RegionService.get12AIBaseUrl();
-
-        const suffixes = [
-            '/v1/chat/completions',
-            '/chat/completions',
-            '/v1/images/async/generations',
-            '/images/async/generations',
-            '/v1/images/generations',
-            '/images/generations',
-            '/v1beta/models',
-            '/api/v1/generate',
-            '/api/pay',
-            '/v1beta',
-            '/v1',
-            '/api'
-        ];
-
-        let stripped = true;
-        while (stripped) {
-            stripped = false;
-            const lower = clean.toLowerCase();
-            for (const suffix of suffixes) {
-                if (lower.endsWith(suffix)) {
-                    clean = clean.slice(0, -suffix.length).replace(/\/+$/, '');
-                    stripped = true;
-                    break;
-                }
-            }
-        }
-
-        // 🚀 [Critical Fix] Ensure protocol is present to avoid "Failed to fetch"
-        // If the URL doesn't start with http, it's considered relative/invalid by fetch()
-        if (clean && !clean.startsWith('http')) {
-            clean = `https://${clean}`;
-        }
-
-        try {
-            const parsed = new URL(clean);
-            if (/(^|\.)12ai\.(org|xyz|io|net)$/i.test(parsed.hostname)) {
-                return `${parsed.protocol}//${parsed.host}`;
-            }
-        } catch {
-            return RegionService.get12AIBaseUrl();
-        }
-
-        return clean;
-    }
-
-    private is12AIAsyncImageModel(modelId?: string): boolean {
-        const normalized = String(modelId || '').trim().toLowerCase();
-        if (!normalized) return false;
-
-        return normalized.includes('gemini-2.5-flash-image')
-            || normalized.includes('gemini-3.1-flash-image-preview')
-            || normalized.includes('gemini-3-pro-image-preview')
-            || normalized.includes('nano-banana')
-            || normalized.includes('nanobanana');
-    }
-
-    private shouldUse12AIAsyncImageRoute(options: ImageGenerationOptions): boolean {
-        if (!this.is12AIAsyncImageModel(options.modelId)) {
-            return false;
-        }
-
-        // Default to Gemini native for the documented interactive path.
-        // Only opt into async when the request clearly benefits from task-based batching.
-        const requestedCount = Math.max(1, Number(options.imageCount || 1));
-        return requestedCount > 1;
-    }
-
-    private resolve12AIAsyncImageSize(options: ImageGenerationOptions): string {
-        const explicitSize = String(options.providerConfig?.openai?.size || '').trim();
-        if (explicitSize) {
-            return explicitSize;
-        }
-
-        const requestedAspectRatio = normalizeRequestedAspectRatio(options.aspectRatio);
-        if (requestedAspectRatio) {
-            return requestedAspectRatio;
-        }
-
-        return resolveOpenAIImageSize(options, getOpenAIImageProfile(options.modelId));
-    }
-
-    private resolve12AIAsyncImageQuality(options: ImageGenerationOptions): string | undefined {
-        const explicitQuality = String(options.providerConfig?.openai?.quality || '').trim();
-        if (explicitQuality) {
-            return explicitQuality;
-        }
-
-        const normalizedImageSize = String(options.imageSize || '').trim().toUpperCase();
-        if (!normalizedImageSize) {
-            return undefined;
-        }
-
-        if (normalizedImageSize.includes('4K')) return '4K';
-        if (normalizedImageSize.includes('2K') || normalizedImageSize.includes('HD')) return 'hd';
-        return 'standard';
-    }
-
-    private normalize12AIAsyncReferenceImage(ref: string | { data: string; mimeType: string }): string {
-        const { data, mimeType } = extractRefImageData(ref);
-        const normalizedData = String(data || '').trim();
-        if (!normalizedData) {
-            return '';
-        }
-
-        if (/^(https?:)?\/\//i.test(normalizedData) || normalizedData.startsWith('data:')) {
-            return normalizedData;
-        }
-
-        return `data:${mimeType || 'image/png'};base64,${normalizedData}`;
     }
 
     private build12AIAsyncImageHeaders(keySlot: KeySlot): Record<string, string> {
@@ -1961,7 +1853,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             console.log(`[OpenAICompatibleAdapter] 使用 AceData image API -> ${keySlot.name}`);
             return this.generateImageAceData(options, keySlot);
         }
-        const prefer12AIAsync = this.shouldUse12AIAsyncImageRoute(options);
+        const prefer12AIAsync = shouldUse12AIAsyncImageRoute(options);
         const modelMetadata = getModelMetadata(options.modelId);
         const imageSurface = resolveImageSurface({
             runtime: channelRuntime,
@@ -1969,7 +1861,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             compatibilityMode: keySlot.compatibilityMode,
             endpointTypes: modelMetadata?.endpointTypes,
             preferAsync: prefer12AIAsync,
-            isAsyncImageModel: (modelId) => this.is12AIAsyncImageModel(modelId),
+            isAsyncImageModel: is12AIAsyncImageModel,
         });
 
         if (keySlot.compatibilityMode === 'chat' && shouldBypassChatCompatibilityForImages(channelRuntime)) {
@@ -2231,98 +2123,10 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         const data = await response.json();
 
-        // 兼容更多代理返回格式（优先筛选尺寸最大的图像，避免截获预览/草图）
-        const messageObj = data?.choices?.[0]?.message || {};
-        const allImages = [
-            ...(messageObj?.images || []),
-            ...(data?.images || []),
-            ...(data?.data || [])
-        ];
-
-        let bestImage = null;
-        if (allImages.length > 0) {
-            // 根据数据长度筛选（Base64 越长，细节越丰富，尺寸越大）
-            let maxLen = 0;
-            for (const img of allImages) {
-                const len = (img?.b64_json?.length || 0) + (img?.url?.length || 0);
-                if (len > maxLen) {
-                    maxLen = len;
-                    bestImage = img;
-                }
-            }
-            console.log(`[OpenAICompatibleAdapter] Evaluated ${allImages.length} images, selected candidate with weight: ${maxLen}`);
-        }
-
-        if (bestImage?.b64_json) {
+        const extractedUrls = extractOpenAICompatibleChatImageUrls(data);
+        if (extractedUrls.length > 0) {
             return {
-                urls: [`data:image/png;base64,${String(bestImage.b64_json).replace(/\s+/g, '')}`],
-                provider: 'OpenAI-Chat',
-                model: options.modelId,
-                imageSize: sizeString,
-                metadata: {
-                    requestPath,
-                    requestBodyPreview,
-                    pythonSnippet
-                }
-            };
-        }
-        if (bestImage?.url) {
-            return {
-                urls: [bestImage.url],
-                provider: 'OpenAI-Chat',
-                model: options.modelId,
-                imageSize: sizeString,
-                metadata: {
-                    requestPath,
-                    requestBodyPreview,
-                    pythonSnippet
-                }
-            };
-        }
-
-        const content = messageObj?.content || '';
-
-        // 🚀 Improved Regex with Mime Capture (and newline cleanup)
-        const detailedMatch = content.match(/!\[.*?\]\(data:(image\/[^;]+);base64,([^)]+)\)/);
-        if (detailedMatch && detailedMatch[2]) {
-            const cleanBase64 = detailedMatch[2].replace(/\s+/g, ''); // Fix corrupted base64 with newlines
-            console.log(`[OpenAICompatibleAdapter] Extracted Base64 Image (Length: ${cleanBase64.length})`);
-            return {
-                urls: [`data:${detailedMatch[1]};base64,${cleanBase64}`],
-                provider: 'OpenAI-Chat',
-                model: options.modelId,
-                imageSize: sizeString,
-                metadata: {
-                    requestPath,
-                    requestBodyPreview,
-                    pythonSnippet
-                }
-            };
-        }
-
-        // 🚀 Support standard Markdown URLs (http/https)
-        const urlMatch = content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
-        if (urlMatch && urlMatch[1]) {
-            console.log(`[OpenAICompatibleAdapter] Extracted HTTP Markdown URL: ${urlMatch[1]}`);
-            return {
-                urls: [urlMatch[1]],
-                provider: 'OpenAI-Chat',
-                model: options.modelId,
-                imageSize: sizeString,
-                metadata: {
-                    requestPath,
-                    requestBodyPreview,
-                    pythonSnippet
-                }
-            };
-        }
-
-        // 🚀 Support Raw HTTP URLs (if markdown is missing or broken)
-        const rawUrlMatch = content.match(/(https?:\/\/[^\s]+)/);
-        if (rawUrlMatch && rawUrlMatch[1]) {
-            console.log(`[OpenAICompatibleAdapter] Extracted Raw HTTP URL: ${rawUrlMatch[1]}`);
-            return {
-                urls: [rawUrlMatch[1]],
+                urls: extractedUrls,
                 provider: 'OpenAI-Chat',
                 model: options.modelId,
                 imageSize: sizeString,
@@ -2336,6 +2140,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         // Fallback: If no markdown image found, maybe it's raw base64 or a URL?
         // But 12AI/Gemini Proxies typically return Markdown
+        const content = String(data?.choices?.[0]?.message?.content || '');
         throw new Error('Failed to extract image from chat response. Content starts with: ' + content.substring(0, 50));
     }
 
@@ -2448,57 +2253,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         const data = await response.json();
-        const messageObj = data?.choices?.[0]?.message || {};
-        const allImages = [
-            ...(messageObj?.images || []),
-            ...(data?.images || []),
-            ...(data?.data || [])
-        ];
-
-        let bestImage = null;
-        if (allImages.length > 0) {
-            let maxLen = 0;
-            for (const img of allImages) {
-                const len = (img?.b64_json?.length || 0) + (img?.url?.length || 0);
-                if (len > maxLen) {
-                    maxLen = len;
-                    bestImage = img;
-                }
-            }
-        }
-
-        if (bestImage?.b64_json) {
-            return {
-                urls: [`data:image/png;base64,${String(bestImage.b64_json).replace(/\s+/g, '')}`],
-                provider: 'OpenAI-Chat',
-                model: options.modelId,
-                imageSize: reportedImageSize,
-                metadata: {
-                    aspectRatio,
-                    requestPath,
-                    requestBodyPreview,
-                    pythonSnippet
-                }
-            };
-        }
-
-        if (bestImage?.url) {
-            return {
-                urls: [bestImage.url],
-                provider: 'OpenAI-Chat',
-                model: options.modelId,
-                imageSize: reportedImageSize,
-                metadata: {
-                    aspectRatio,
-                    requestPath,
-                    requestBodyPreview,
-                    pythonSnippet
-                }
-            };
-        }
-
-        const content = messageObj?.content || '';
-        const extractedUrls = extractImageUrlsFromPayload({ choices: [{ message: { content } }] });
+        const extractedUrls = extractOpenAICompatibleChatImageUrls(data);
         if (extractedUrls.length > 0) {
             return {
                 urls: extractedUrls,
@@ -2514,6 +2269,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             };
         }
 
+        const content = String(data?.choices?.[0]?.message?.content || '');
         throw new Error('Failed to extract image from strict chat response. Content starts with: ' + String(content).substring(0, 50));
     }
 
@@ -2897,7 +2653,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const is12AIChannel = initialRuntime.strategyId === '12ai';
         const rawBase = keySlot.baseUrl || (is12AIChannel ? RegionService.get12AIBaseUrl() : '');
         const cleanBase = is12AIChannel
-            ? this.normalize12AIBaseUrl(rawBase).replace(/\/+$/, '')
+            ? normalize12AIBaseUrl(rawBase).replace(/\/+$/, '')
             : normalizeGeminiBaseUrl(rawBase).replace(/\/+$/, '');
         const runtime = this.resolveChannelRuntime(cleanBase, keySlot, options.modelId, 'gemini');
         const authMethod = runtime.authMethod;
@@ -3095,7 +2851,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             };
         }
 
-        if (mode === GenerationMode.IMAGE && runtime.strategyId === '12ai' && this.is12AIAsyncImageModel(modelId)) {
+        if (mode === GenerationMode.IMAGE && runtime.strategyId === '12ai' && is12AIAsyncImageModel(modelId)) {
             const { payload, requestPath } = await this.fetch12AIAsyncImageTaskDetail(taskId, keySlot);
             return buildOpenAICompatiblePolledTaskResult({
                 payload,

@@ -46,7 +46,7 @@ test("12AI image routing requires an explicit async preference instead of blanke
   );
   assert.match(
     adapterSource,
-    /const prefer12AIAsync = this\.shouldUse12AIAsyncImageRoute\(options\);/,
+    /const prefer12AIAsync = shouldUse12AIAsyncImageRoute\(options\);/,
   );
 });
 

@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, test } from "node:test";
 
-import { extractImageUrlsFromPayload } from "../../src/services/llm/openAICompatibleImagePayload.ts";
+import {
+  extractImageUrlsFromPayload,
+  extractOpenAICompatibleChatImageUrls,
+} from "../../src/services/llm/openAICompatibleImagePayload.ts";
 
 const ROOT_DIR = process.cwd();
 
@@ -72,12 +75,34 @@ describe("OpenAI-compatible image payload parsing", () => {
     ]);
   });
 
+  test("selects the best chat-image candidate before falling back to message content", () => {
+    const urls = extractOpenAICompatibleChatImageUrls({
+      choices: [
+        {
+          message: {
+            images: [{ b64_json: "c21hbGw=" }],
+            content: "![fallback](https://cdn.example.com/fallback.png)",
+          },
+        },
+      ],
+      images: [{ url: "https://cdn.example.com/preview.png" }],
+      data: [{ b64_json: "bGFyZ2VyLWNoYXQtaW1hZ2UtY2FuZGlkYXRl" }],
+    });
+
+    assert.deepEqual(urls, [
+      "data:image/png;base64,bGFyZ2VyLWNoYXQtaW1hZ2UtY2FuZGlkYXRl",
+    ]);
+  });
+
   test("adapter delegates payload URL extraction to the helper module", () => {
     const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
     const testConfigSource = readSource("tsconfig.tests.json");
 
     assert.match(adapterSource, /extractImageUrlsFromPayload/);
+    assert.match(adapterSource, /extractOpenAICompatibleChatImageUrls/);
     assert.doesNotMatch(adapterSource, /private extractImageUrlsFromPayload/);
+    assert.doesNotMatch(adapterSource, /const allImages = \[/);
+    assert.doesNotMatch(adapterSource, /let bestImage = null;/);
     assert.match(testConfigSource, /tests\/unit\/openai-compatible-image-payload-contract\.test\.ts/);
   });
 });

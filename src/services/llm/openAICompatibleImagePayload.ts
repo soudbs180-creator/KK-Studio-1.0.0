@@ -26,6 +26,97 @@ function firstString(...values: unknown[]): string | undefined {
     return undefined;
 }
 
+function collectChatImageCandidates(data: unknown): PayloadRecord[] {
+    const candidates: PayloadRecord[] = [];
+    const pushCandidates = (value: unknown): void => {
+        if (!Array.isArray(value)) return;
+        value.forEach((item) => {
+            if (isRecord(item)) {
+                candidates.push(item);
+            }
+        });
+    };
+
+    pushCandidates(getPath(data, ['choices', '0', 'message', 'images']));
+    pushCandidates(getProperty(data, 'images'));
+    pushCandidates(getProperty(data, 'data'));
+
+    return candidates;
+}
+
+function getChatImageCandidateWeight(candidate: PayloadRecord): number {
+    const image = getProperty(candidate, 'image');
+    return [
+        getProperty(candidate, 'b64_json'),
+        getProperty(candidate, 'url'),
+        getProperty(image, 'b64_json'),
+        getProperty(image, 'url'),
+    ].reduce<number>((total, value) => total + (typeof value === 'string' ? value.length : 0), 0);
+}
+
+function formatChatImageCandidate(candidate: PayloadRecord): string[] {
+    const image = getProperty(candidate, 'image');
+    const b64 = firstString(
+        getProperty(candidate, 'b64_json'),
+        getProperty(candidate, 'b64'),
+        getProperty(candidate, 'base64'),
+        getProperty(candidate, 'image_base64'),
+        getProperty(image, 'b64_json'),
+    );
+    if (typeof b64 === 'string' && b64.trim()) {
+        const mimeType = firstString(
+            getProperty(candidate, 'mime_type'),
+            getProperty(candidate, 'mimeType'),
+            getProperty(image, 'mime_type'),
+            getProperty(image, 'mimeType'),
+        ) || 'image/png';
+        const cleaned = b64
+            .replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '')
+            .replace(/\s+/g, '');
+        return [`data:${mimeType};base64,${cleaned}`];
+    }
+
+    const url = firstString(
+        getProperty(candidate, 'hd_url'),
+        getProperty(candidate, 'original_url'),
+        getProperty(candidate, 'full_url'),
+        getProperty(candidate, 'image_url'),
+        getProperty(candidate, 'url'),
+        getProperty(candidate, 'uri'),
+        getProperty(candidate, 'src'),
+        getProperty(image, 'url'),
+        getProperty(image, 'image_url'),
+    );
+    return typeof url === 'string' && url.trim() ? [url.trim()] : [];
+}
+
+export function extractOpenAICompatibleChatImageUrls(data: unknown): string[] {
+    const candidates = collectChatImageCandidates(data);
+    if (candidates.length > 0) {
+        const bestCandidate = candidates.reduce<PayloadRecord | null>((best, candidate) => {
+            if (!best) return candidate;
+            return getChatImageCandidateWeight(candidate) > getChatImageCandidateWeight(best) ? candidate : best;
+        }, null);
+        if (bestCandidate) {
+            const extracted = formatChatImageCandidate(bestCandidate);
+            if (extracted.length > 0) {
+                return extracted;
+            }
+        }
+    }
+
+    const content = firstString(
+        getPath(data, ['choices', '0', 'message', 'content']),
+        getProperty(data, 'message'),
+        getProperty(data, 'output_text'),
+    ) || '';
+    if (typeof content === 'string' && content.trim()) {
+        return extractImageUrlsFromPayload({ choices: [{ message: { content } }] });
+    }
+
+    return [];
+}
+
 export function extractImageUrlsFromPayload(data: unknown): string[] {
     const candidates: unknown[] = [];
     const pushAny = (value: unknown): void => {
