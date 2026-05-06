@@ -57,6 +57,7 @@ import {
 } from './keyManagerRouteIds';
 import { sanitizeAsciiApiKey } from './keyManagerCredentialSanitizer';
 import { getRedactedChannelConfigApiKey } from './keyManagerChannelConfigSecrets';
+import { buildKeyUpdateDiagnosticPayload } from './keyManagerUpdateDiagnostics';
 import { buildSilentProviderPricingUrl } from './keyManagerPricingUrl';
 import { buildChannelCapabilities } from './keyManagerChannelCapabilities';
 import { detectApiType } from './keyManagerApiType';
@@ -2431,11 +2432,11 @@ export class KeyManager {
             throw new Error(secureModeError);
         }
 
-        console.log('[KeyManager] updateKey invoked:', {
+        console.log('[KeyManager] updateKey invoked:', buildKeyUpdateDiagnosticPayload(
             id,
             updates,
-            supportedModelsBefore: this.state.slots.find(s => s.id === id)?.supportedModels
-        });
+            this.state.slots.find(s => s.id === id)?.supportedModels
+        ));
         const slot = this.state.slots.find(s => s.id === id);
         if (slot) {
             Object.assign(slot, updates);

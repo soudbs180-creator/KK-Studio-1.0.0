@@ -4,7 +4,36 @@ Last updated: 2026-05-06
 
 Use `npm.cmd` for npm scripts on Windows.
 
-Current code baseline before M128 after the M127 image reference helper extraction at `1f0ce6bd`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. The M128 dead Gemini response cache and prompt-content logging cleanup keeps this probe clean. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor/UI slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
+Current code baseline before M129 after the M128 dead-cache/log-redaction cleanup at `7d65c686`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. The M129 keyManager update diagnostic redaction keeps this probe clean. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor/UI slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
+
+## M129 KeyManager Update Diagnostic Redaction Gate
+
+Use this gate when touching `keyManager.updateKey` diagnostics or key-manager secret redaction contracts:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/key-manager-channel-config-secrets-contract.test.ts" `
+  "tests/unit/key-manager-credential-sanitizer-contract.test.ts" `
+  "tests/unit/frontend-key-boundary-hardening.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+npm.cmd run architecture:check
+npm.cmd run governance:security
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "src/services/auth/keyManager.ts" `
+  "src/services/auth/keyManagerUpdateDiagnostics.ts" `
+  "tests/unit/key-manager-channel-config-secrets-contract.test.ts" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA may be skipped for this gate because it changes only a key-manager console diagnostic payload and a focused helper, with no JSX, CSS, route rendering, browser-visible UI, or release metadata change. Record the skip reason in `status.md`.
 
 ## M128 Dead Gemini Cache And Prompt Logging Cleanup Gate
 
