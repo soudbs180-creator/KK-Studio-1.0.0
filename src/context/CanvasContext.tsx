@@ -872,7 +872,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, []);
 
     const addPromptNode = useCallback(async (node: PromptNode) => {
-        console.log('[CanvasContext.addPromptNode] Starting prompt node insert', { nodeId: node.id, prompt: node.prompt?.substring(0, 50) });
+        console.log('[CanvasContext.addPromptNode] Starting prompt node insert', { nodeId: node.id });
 
         try {
             // [Defensive fix] Add the node to state first so the UI shows it immediately.

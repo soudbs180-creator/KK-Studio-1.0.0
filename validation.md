@@ -4,7 +4,34 @@ Last updated: 2026-05-06
 
 Use `npm.cmd` for npm scripts on Windows.
 
-Current code baseline before M127 after the M126 image payload security hardening at `342ae802`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. The M127 OpenAI-compatible image reference helper extraction keeps this probe clean. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor/UI slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
+Current code baseline before M128 after the M127 image reference helper extraction at `1f0ce6bd`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. The M128 dead Gemini response cache and prompt-content logging cleanup keeps this probe clean. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor/UI slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
+
+## M128 Dead Gemini Cache And Prompt Logging Cleanup Gate
+
+Use this gate when touching the dead Gemini response cache module, prompt-content diagnostics, or the storage unused-cleanup source contract:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/storage-service-unused-cleanup-contract.test.ts"
+rg -n "geminiCache|GeminiCache|kk_studio_gemini_cache|services/storage/cache|storage/cache" src tests apps packages
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+npm.cmd run architecture:check
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "src/services/storage/cache.ts" `
+  "src/context/CanvasContext.tsx" `
+  "tests/unit/storage-service-unused-cleanup-contract.test.ts" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA may be skipped for this gate because it removes a dead storage helper and redacts a console diagnostic without changing JSX, CSS, route rendering, browser-visible UI, or release metadata. Record the skip reason in `status.md`.
 
 ## M127 OpenAI-Compatible Image Reference Helper Gate
 

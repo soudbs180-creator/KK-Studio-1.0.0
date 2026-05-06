@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -40,4 +41,14 @@ test('image storage cleanupOriginals does not retain an unread database handle',
   assert.doesNotMatch(cleanupSource, /const db = await openDB\(\);/);
   assert.match(cleanupSource, /const \{ images \} = await getImagesPage\(offset, BATCH_SIZE\);/);
   assert.match(cleanupSource, /await saveImage\(id, compressedUrl\);/);
+});
+
+test('dead Gemini response cache module and prompt-content logging stay removed', () => {
+  const testConfigSource = readSource('tsconfig.tests.json');
+  const canvasSource = readSource('src/context/CanvasContext.tsx');
+  const cachePath = path.join(ROOT_DIR, 'src/services/storage/cache.ts');
+
+  assert.match(testConfigSource, /tests\/unit\/storage-service-unused-cleanup-contract\.test\.ts/);
+  assert.equal(existsSync(cachePath), false);
+  assert.doesNotMatch(canvasSource, /console\.(?:log|debug|info)\([^;]*(?:node\.prompt|prompt:\s*node\.prompt|promptContent)/s);
 });
