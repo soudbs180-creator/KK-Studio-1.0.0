@@ -122,6 +122,7 @@ describe("auth http routes", () => {
     const login = await handleVersionedLogin(authService, {
       email: "password-route@example.com",
       password: "password-123",
+      turnstileToken: "turnstile-ok",
     }, {
       "x-request-id": "req-password-login",
     }, "127.0.0.1");
@@ -167,6 +168,7 @@ describe("auth http routes", () => {
     const staleLogin = await handleVersionedLogin(authService, {
       email: "password-route@example.com",
       password: "password-123",
+      turnstileToken: "turnstile-ok",
     }, {
       "x-request-id": "req-password-stale-login",
     }, "127.0.0.1");
@@ -176,6 +178,7 @@ describe("auth http routes", () => {
     const freshLogin = await handleVersionedLogin(authService, {
       email: "password-route@example.com",
       password: "new-password-456",
+      turnstileToken: "turnstile-ok",
     }, {
       "x-request-id": "req-password-fresh-login",
     }, "127.0.0.1");
@@ -200,6 +203,7 @@ describe("auth http routes", () => {
     const login = await handleVersionedLogin(authService, {
       email: "password-route-invalid@example.com",
       password: "password-123",
+      turnstileToken: "turnstile-ok",
     }, {
       "x-request-id": "req-password-invalid-login",
     }, "127.0.0.1");
@@ -231,6 +235,7 @@ describe("auth http routes", () => {
     const staleLogin = await handleVersionedLogin(authService, {
       email: "password-route-invalid@example.com",
       password: "password-123",
+      turnstileToken: "turnstile-ok",
     }, {
       "x-request-id": "req-password-invalid-stale-login",
     }, "127.0.0.1");

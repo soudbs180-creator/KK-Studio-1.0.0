@@ -138,6 +138,7 @@ test("startApiServer keeps the legacy password login path bridged for stale web 
     body: JSON.stringify({
       email: "missing-user@example.com",
       password: "missing-password",
+      turnstileToken: "turnstile-ok",
     }),
   });
   const body = await response.json() as {

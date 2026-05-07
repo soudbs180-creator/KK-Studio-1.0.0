@@ -172,8 +172,10 @@ export class AuthService {
     input: LoginRequestDto,
     context: AuthRequestContext,
   ): Promise<AuthHandlerResult<LoginResponseDto>> {
-    if (!input.email || !input.password) {
-      return this.badRequest("Missing required fields: email, password.");
+    const requireTurnstileToken = !isTurnstileRequirementDisabled() && !isLocalTurnstileBypassActive();
+
+    if (!input.email || !input.password || (requireTurnstileToken && !input.turnstileToken)) {
+      return this.badRequest("Missing required fields: email, password, turnstileToken.");
     }
 
     const emailCheck = validateAuthEmail(input.email);
@@ -181,8 +183,8 @@ export class AuthService {
       return this.badRequest(emailCheck.error);
     }
 
-    if (input.turnstileToken) {
-      const turnstileResult = await this.verifyTurnstileToken(input.turnstileToken, context.ip);
+    if (input.turnstileToken || requireTurnstileToken) {
+      const turnstileResult = await this.verifyTurnstileToken(input.turnstileToken || "", context.ip);
       if (!turnstileResult.success) {
         return this.forbidden(turnstileResult.error || "Turnstile verification failed.");
       }
