@@ -94,7 +94,7 @@ test('Core UI surfaces consume the shared frosted material tokens', () => {
   assert.match(cssSource, /\.settings-panel \.settings-provider-card__metric,[\s\S]*background:\s*var\(--frost-card-sub-bg\);/);
   assert.match(cssSource, /\.settings-panel \.settings-provider-card__metric,[\s\S]*border-color:\s*var\(--frost-card-sub-border\)[\s\S]*box-shadow:\s*var\(--frost-card-sub-shadow\)[\s\S]*backdrop-filter:\s*blur\(var\(--frost-card-sub-blur\)\)/);
   assert.match(cssSource, /\.settings-panel \.settings-shell-desktop,[\s\S]*\.settings-panel \.settings-shell-mobile \{[\s\S]*background:\s*var\(--frost-card-framework-bg\);/);
-  assert.match(cssSource, /\.settings-panel \.settings-shell-desktop,[\s\S]*\.settings-panel \.settings-shell-mobile \{[\s\S]*border:\s*0 !important;[\s\S]*box-shadow:\s*var\(--frost-card-framework-shadow\) !important;[\s\S]*backdrop-filter:\s*blur\(var\(--frost-card-framework-blur\)\)/);
+  assert.match(cssSource, /\.settings-panel \.settings-shell-desktop,[\s\S]*\.settings-panel \.settings-shell-mobile \{[\s\S]*border:\s*0 !important;[\s\S]*box-shadow:\s*none !important;[\s\S]*backdrop-filter:\s*blur\(var\(--frost-card-framework-blur\)\)/);
   assert.match(cssSource, /\.settings-panel \.settings-api-action-stage\s*\{[\s\S]*background:\s*transparent !important;[\s\S]*box-shadow:\s*none !important;[\s\S]*backdrop-filter:\s*none;/);
   assert.match(cssSource, /\.settings-panel \.settings-api-quick-add\s*\{[\s\S]*border:\s*0;[\s\S]*background:\s*transparent !important;[\s\S]*box-shadow:\s*none !important;/);
   assert.match(cssSource, /\.settings-panel \.settings-api-info-stage\s*\{[\s\S]*border-top:\s*1px solid var\(--frost-card-sub-border\) !important;[\s\S]*background:\s*transparent !important;[\s\S]*box-shadow:\s*none !important;/);
@@ -121,7 +121,7 @@ test('Prompt bar surfaces avoid stale blue-glass shells and heavy shadows', () =
   assert.match(promptBarSource, /var\(--frost-card-sub-bg\)/);
   assert.match(promptBarSource, /var\(--frost-input-bg\)/);
   assert.match(promptBarSource, /var\(--accent-coral\)/);
-  assert.match(cssSource, /--prompt-bar-liquid-send-shadow:\s*var\(--frost-card-main-shadow\);/);
+  assert.match(cssSource, /--prompt-bar-liquid-send-shadow:\s*none;/);
   assert.doesNotMatch(promptBarSource, /#3B82F6|#2563EB|rgba\(96, 165, 250|rgba\(59, 130, 246/);
   assert.doesNotMatch(promptBarSource, /#60a5fa|rgba\(37, 99, 235|ring-white\/20|dark:ring-white|dark:border-white/);
   assert.doesNotMatch(promptBarSource, /focus-visible:ring-blue|focus:border-indigo|bg-sky|border-sky|text-sky/);

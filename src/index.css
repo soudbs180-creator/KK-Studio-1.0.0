@@ -118,7 +118,7 @@
   --prompt-bar-liquid-border: rgba(255, 255, 255, 0.62);
   --prompt-bar-liquid-border-strong: rgba(15, 23, 42, 0.14);
   --prompt-bar-liquid-shadow: none;
-  --prompt-bar-liquid-send-shadow: var(--frost-card-main-shadow);
+  --prompt-bar-liquid-send-shadow: none;
 
   /* ===== 阴影 ===== */
   --shadow-sm: 0 8px 20px rgba(15, 23, 42, 0.06);
@@ -611,7 +611,7 @@ body.dark-mode {
   --prompt-bar-liquid-border: rgba(255, 255, 255, 0.16);
   --prompt-bar-liquid-border-strong: rgba(255, 255, 255, 0.24);
   --prompt-bar-liquid-shadow: none;
-  --prompt-bar-liquid-send-shadow: var(--frost-card-main-shadow);
+  --prompt-bar-liquid-send-shadow: none;
   --floating-shell-bg: linear-gradient(180deg, rgba(31, 31, 31, 0.96) 0%, rgba(20, 20, 20, 0.92) 100%);
   --floating-shell-bg-supported: rgba(31, 31, 31, 0.84);
   --floating-shell-border: rgba(255, 255, 255, 0.08);
@@ -13182,9 +13182,15 @@ body.dark-mode .input-bar {
   background: var(--frost-card-framework-bg);
   background: var(--frost-card-framework-bg) !important;
   border: 0 !important;
-  box-shadow: var(--frost-card-framework-shadow) !important;
+  box-shadow: none !important;
   -webkit-backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(1.16);
   backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(1.16);
+}
+
+.settings-panel .settings-shell-main__topbar {
+  background: transparent !important;
+  border-bottom-color: transparent !important;
+  box-shadow: none !important;
 }
 
 .settings-panel .settings-shell-main,
@@ -13268,7 +13274,7 @@ body.dark-mode .input-bar {
   background: var(--frost-card-sub-bg);
   background: var(--frost-card-sub-bg) !important;
   border-color: var(--frost-card-sub-border) !important;
-  box-shadow: var(--frost-card-sub-shadow) !important;
+  box-shadow: none !important;
   -webkit-backdrop-filter: blur(var(--frost-card-sub-blur)) saturate(1.08);
   backdrop-filter: blur(var(--frost-card-sub-blur)) saturate(1.08);
 }
@@ -13286,7 +13292,7 @@ body.dark-mode .input-bar {
 
 .settings-panel .settings-reference-card,
 .settings-panel .settings-section-card {
-  overflow: clip;
+  overflow: hidden;
   background-clip: padding-box;
   border-width: 1px;
   box-shadow: none !important;
@@ -13297,7 +13303,7 @@ body.dark-mode .input-bar {
 .settings-panel .settings-reference-list-item,
 .settings-panel .settings-log-entry,
 .settings-panel .settings-reference-ring-row {
-  overflow: clip;
+  overflow: hidden;
   background-clip: padding-box;
   border: 1px solid var(--frost-card-sub-border) !important;
   box-shadow: none !important;
@@ -13312,6 +13318,7 @@ body.dark-mode .input-bar {
 
 .settings-panel .settings-reference-toolbar--flat {
   align-items: flex-end;
+  padding: 0 !important;
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;

@@ -778,6 +778,7 @@ export interface EcommercePromptState {
     activeSheet: EcommerceGroupSheet;
     groupIds?: Partial<Record<EcommerceGroupSheet, string>>;
     taskNodeIds?: string[];
+    inputSummary?: string[];
     schedulerConfig?: EcommerceFrameworkSchedulerConfig;
   };
 }

@@ -103,7 +103,26 @@ test('settings workbench flattens cramped nested containers and clips rounded su
     cssSource,
     /\.settings-panel \.settings-desktop-quick-actions > button \{[\s\S]*border-radius: var\(--radius-control-md\) !important;[\s\S]*box-shadow: none !important;/,
   );
-  assert.match(cssSource, /\.settings-panel \.settings-reference-card,[\s\S]*\.settings-panel \.settings-section-card \{[\s\S]*overflow: clip;/);
+  assert.doesNotMatch(
+    cssSource,
+    /\.settings-panel \.settings-reference-card,[\s\S]*\.settings-panel \.settings-section-card \{[\s\S]*overflow: clip;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-reference-card,[\s\S]*\.settings-panel \.settings-section-card \{[\s\S]*overflow: hidden;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell-desktop,[\s\S]*\.settings-panel \.settings-shell-mobile \{[\s\S]*border: 0 !important;[\s\S]*box-shadow: none !important;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell-main__topbar \{[\s\S]*background: transparent !important;[\s\S]*border-bottom-color: transparent !important;[\s\S]*box-shadow: none !important;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-reference-toolbar--flat \{[\s\S]*padding: 0 !important;[\s\S]*background: transparent !important;/,
+  );
   assert.match(cssSource, /\.settings-panel \.settings-provider-card__metric,[\s\S]*\.settings-panel \.settings-reference-mini-metric,[\s\S]*\.settings-panel \.settings-reference-list-item,[\s\S]*\.settings-panel \.settings-log-entry,[\s\S]*\.settings-panel \.settings-reference-ring-row \{[\s\S]*box-shadow: none !important;/);
   assert.match(cssSource, /\.settings-panel \.settings-api-quick-add__icon \{[\s\S]*box-shadow: none !important;/);
   assert.match(cssSource, /\.settings-panel \.settings-shell-page--desktop \.settings-reference-ring-row \{[\s\S]*display: grid;[\s\S]*grid-template-columns: 64px minmax\(0, 1fr\);/);

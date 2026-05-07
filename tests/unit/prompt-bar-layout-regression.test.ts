@@ -33,7 +33,7 @@ test('prompt bar keeps footer wrapping while allowing full desktop control label
   assert.match(topRowDesktopSource, /className="flex items-center justify-between mb-2 gap-2"/);
   assert.match(footerShellSource, /if \(isMobile\) \{\s*return <PromptBarFooterMobile>\{children\}<\/PromptBarFooterMobile>;\s*\}/);
   assert.match(footerShellSource, /return <PromptBarFooterDesktop>\{children\}<\/PromptBarFooterDesktop>;/);
-  assert.match(modePanelSource, /className=\{`relative inline-flex \$\{isMobile \? 'min-w-fit shrink-0' : 'min-w-fit flex-shrink-0'\}`\}/);
+  assert.match(modePanelSource, /className=\{`relative inline-flex \$\{isMobile \? 'min-w-0 shrink-0' : 'min-w-fit flex-shrink-0'\}`\}/);
   assert.match(
     modePanelSource,
     /<span className="whitespace-nowrap">[\s\S]*\{config\.aspectRatio === AspectRatio\.AUTO \? [^:]+ : config\.aspectRatio\}[\s\S]*\{config\.imageSize\}[\s\S]*<\/span>/,
@@ -142,13 +142,19 @@ test('prompt bar centers the desktop model dropdown on the trigger instead of le
   );
 });
 
-test('prompt bar normal action buttons share a flat shadow while the send button keeps its own emphasis', () => {
+test('prompt bar normal action buttons share a flat shadow while the send button keeps model-color emphasis without heavy shadows', () => {
   const cssSource = readSource('src/index.css');
+  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
 
   assert.match(cssSource, /--prompt-bar-liquid-shadow: none;/);
+  assert.match(cssSource, /--prompt-bar-liquid-send-shadow: none;/);
   assert.match(cssSource, /\.prompt-bar-liquid-button \{\s*background: var\(--prompt-bar-liquid-bg\);\s*border-color: var\(--prompt-bar-liquid-border\);\s*box-shadow: var\(--prompt-bar-liquid-shadow\);/);
   assert.match(cssSource, /\.prompt-bar-liquid-group \{\s*background: var\(--prompt-bar-liquid-group-bg\);\s*border-color: var\(--prompt-bar-liquid-border\);\s*box-shadow: var\(--prompt-bar-liquid-shadow\);/);
   assert.match(cssSource, /\.prompt-bar-liquid-send \{\s*box-shadow: var\(--prompt-bar-liquid-send-shadow\);/);
+  assert.doesNotMatch(promptBarSource, /getCreditModelSurfaceStyle/);
+  assert.doesNotMatch(promptBarSource, /boxShadow:\s*`0 2px 8px/);
+  assert.doesNotMatch(promptBarSource, /boxShadow:\s*'var\(--frost-card-main-shadow\)'/);
+  assert.doesNotMatch(promptBarSource, /shadow-\[var\(--frost-card-sub-shadow\)\]/);
   assert.doesNotMatch(
     cssSource,
     /\.input-bar-option,[\s\S]{0,240}box-shadow:\s*var\(--frost-card-sub-shadow\);/,
@@ -172,4 +178,9 @@ test('mobile prompt footer stays single-row and lets controls overflow horizonta
   assert.match(cssSource, /overflow-x: auto;/);
   assert.match(cssSource, /overflow-y: visible;/);
   assert.match(cssSource, /\.input-bar-footer\[data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"\] \* \{/);
+  assert.doesNotMatch(promptBarSource, /min-w-\[9rem\] max-w-none justify-start flex-shrink-0/);
+  assert.match(promptBarSource, /isMobile \? 'w-\[clamp\(6\.75rem,38vw,8\.5rem\)\] max-w-\[42vw\] flex-none justify-start'/);
+  assert.doesNotMatch(modePanelSource, /isEmbeddedMobileDrawer \? 'px-3 justify-between max-w-none' : 'px-2\.5 max-w-none'/);
+  assert.match(modePanelSource, /isMobile \? 'min-w-0 shrink-0'/);
+  assert.match(modePanelSource, /isMobile \? \(isEmbeddedMobileDrawer \? 'px-3 justify-between max-w-\[42vw\] min-w-0 overflow-hidden' : 'px-2\.5 max-w-\[40vw\] min-w-0 overflow-hidden'\)/);
 });

@@ -576,7 +576,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const isDraggingRef = useRef(false);
     const [cardHeight, setCardHeight] = useState(200); // 默认高度??00px,会在渲染后更??
     const isEcommerceFrameworkCard = node.mode === GenerationMode.ECOMMERCE && node.ecommerce?.kind === 'framework';
-    const baseCardWidth = isEcommerceFrameworkCard ? 680 : 320;
+    const baseCardWidth = isEcommerceFrameworkCard ? 920 : 320;
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : baseCardWidth;
     const cardWidth = isMobile ? Math.min(baseCardWidth, Math.max(248, viewportWidth - 24)) : baseCardWidth;
     const originX = renderOrigin?.x ?? 0;
@@ -588,6 +588,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const hasMoved = useRef(false);
     const [activeTab, setActiveTab] = useState<'raw' | 'opt'>('raw');
     const [copyStatus, setCopyStatus] = useState<'idle' | 'en' | 'zh'>('idle');
+    const ecommerceFrameworkCardClassName = isEcommerceFrameworkCard
+        ? 'px-4 pb-4 pt-3 flex flex-col flex-1'
+        : 'p-3 flex flex-col flex-1';
     const resolvedTimerStart = resolveGenerationTimerStart(node);
     const timerStartRef = useRef<number>(resolvedTimerStart ?? Date.now());
 
@@ -1393,7 +1396,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 ) : null}
 
                 {/* Content Padding Wrapper */}
-                <div className="p-3 flex flex-col flex-1">
+                <div className={ecommerceFrameworkCardClassName}>
                     {isEcommerceFrameworkCard ? (
                         <div data-testid="ecommerce-canvas-framework-workbench">
                         <EcommerceCanvasWorkbenchCard

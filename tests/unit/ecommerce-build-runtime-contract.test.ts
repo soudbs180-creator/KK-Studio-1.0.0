@@ -66,6 +66,11 @@ test('ecommerce build confirmation hands off to one visible canvas framework and
   assert.match(hookSource, /itemReferenceFiles: Record<string, EcommerceManualReferenceBinding\[\]>;/);
   assert.match(hookSource, /hiddenInCanvas: Boolean\(params\.frameworkId\),/);
   assert.match(hookSource, /reportBuildSuccess\(1\);/);
+  assert.match(hookSource, /const sharedInputSummary = \[/);
+  assert.match(hookSource, /analysis\.projectMeta\.projectName \|\| label/);
+  assert.match(hookSource, /analysis\.projectMeta\.productName \? `产品：\$\{analysis\.projectMeta\.productName\}` : ''/);
+  assert.match(hookSource, /String\(configPrompt \|\| ''\)\.trim\(\) \? `补充要求：\$\{String\(configPrompt \|\| ''\)\.trim\(\)\}` : ''/);
+  assert.match(hookSource, /node\.ecommerce\.frameworkMeta\.inputSummary/);
   assert.match(hookSource, /requirementFile: null,/);
   assert.match(hookSource, /productFiles: \[\],/);
   assert.match(hookSource, /extraReferenceFiles: \[\],/);

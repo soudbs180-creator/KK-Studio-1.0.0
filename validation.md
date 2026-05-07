@@ -38,6 +38,46 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
 
 Browser QA may be skipped for this gate because it changes only service diagnostics metadata and no JSX, CSS, route rendering, browser-visible UI, or release metadata. Record the skip reason in `status.md`.
 
+## User-Reported UI Regression Gate
+
+Use this gate when touching the PromptBar shadows/mobile footer, settings shell/card chrome, ecommerce confirmed-build handoff, or ecommerce canvas framework card:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/prompt-bar-layout-regression.test.ts" `
+  "tests/unit/settings-desktop-workbench-regression.test.ts" `
+  "tests/unit/prompt-bar-ecommerce-framework-companion.test.ts" `
+  "tests/unit/ecommerce-build-runtime-contract.test.ts" `
+  "tests/unit/ecommerce-canvas-contract.test.ts" `
+  "tests/unit/clay-frosted-surface-contract.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "src/app/useEcommerceBuildRuntime.ts" `
+  "src/components/canvas/PromptNodeComponent.tsx" `
+  "src/components/ecommerce/EcommerceCanvasWorkbenchCard.tsx" `
+  "src/components/layout/PromptBar.tsx" `
+  "src/components/layout/prompt-bar/DesktopComposerModePanel.tsx" `
+  "src/index.css" `
+  "src/types.ts" `
+  "tests/unit/ecommerce-build-runtime-contract.test.ts" `
+  "tests/unit/ecommerce-canvas-contract.test.ts" `
+  "tests/unit/prompt-bar-ecommerce-framework-companion.test.ts" `
+  "tests/unit/prompt-bar-layout-regression.test.ts" `
+  "tests/unit/settings-desktop-workbench-regression.test.ts" `
+  "tests/unit/clay-frosted-surface-contract.test.ts" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA is required for this gate. Use the Codex in-app Browser on the current local app and record URL, theme, desktop/mobile viewport or surface, PromptBar footer behavior, settings chrome/corner behavior, ecommerce framework card behavior when available, `.theme-transitioning`, stale chunk text count, and console error count in `status.md`.
+
 ## M129 KeyManager Update Diagnostic Redaction Gate
 
 Use this gate when touching `keyManager.updateKey` diagnostics or key-manager secret redaction contracts:

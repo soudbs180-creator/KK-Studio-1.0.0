@@ -21,6 +21,7 @@ test('prompt nodes expose ecommerce state and the generation flow handles ecomme
   assert.match(typesSource, /selectedForGeneration\?: boolean/);
   assert.match(typesSource, /desktopStage\?: 'not_applicable' \| 'pending' \| 'generating' \| 'generated' \| 'confirmed' \| 'failed'/);
   assert.match(typesSource, /mobileStage\?: 'not_applicable' \| 'locked' \| 'pending' \| 'generating' \| 'generated' \| 'failed'/);
+  assert.match(typesSource, /inputSummary\?: string\[\];/);
   assert.match(generationHookSource, /const isEcommerce = mode === GenerationMode\.ECOMMERCE/);
   assert.match(generationHookSource, /const actualCount = isPpt \? Math\.min\(20, requestedCount\) : requestedCount;/);
   assert.match(generationHookSource, /const taskPrompt = isPpt \? buildPptPagePrompt\(promptToUse, index, actualCount\) : \(isEcommerce \? promptToUse : promptToUse\);/);

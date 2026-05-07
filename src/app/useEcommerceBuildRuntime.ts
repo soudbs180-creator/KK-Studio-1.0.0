@@ -178,6 +178,14 @@ export function useEcommerceBuildRuntime({
       `${productName || 'Ecommerce'} Framework`,
     );
     const schedulerConfig = createDefaultEcommerceFrameworkSchedulerConfig();
+    const sharedInputSummary = [
+      analysis.projectMeta.projectName || label,
+      analysis.projectMeta.productName ? `产品：${analysis.projectMeta.productName}` : '',
+      ecommerceState.requirementFile?.name ? `需求文档：${ecommerceState.requirementFile.name}` : '',
+      ecommerceState.productFiles.length > 0 ? `产品图：${ecommerceState.productFiles.length}` : '',
+      ecommerceState.extraReferenceFiles.length > 0 ? `参考图：${ecommerceState.extraReferenceFiles.length}` : '',
+      String(configPrompt || '').trim() ? `补充要求：${String(configPrompt || '').trim()}` : '',
+    ].filter(Boolean);
     const summary = [
       analysis.projectMeta.projectName || label,
       analysis.projectMeta.productName ? `产品：${analysis.projectMeta.productName}` : '',
@@ -223,11 +231,12 @@ export function useEcommerceBuildRuntime({
           activeSheet: '主图',
           groupIds: {},
           taskNodeIds: [],
+          inputSummary: sharedInputSummary,
           schedulerConfig,
         },
       },
     };
-  }, [configModel, createEphemeralId, ecommerceState.selectedItems]);
+  }, [configModel, configPrompt, createEphemeralId, ecommerceState.extraReferenceFiles.length, ecommerceState.productFiles.length, ecommerceState.requirementFile?.name, ecommerceState.selectedItems]);
 
   const buildEcommerceGroupNode = useCallback((
     productName: string,
@@ -568,11 +577,12 @@ export function useEcommerceBuildRuntime({
       }
 
       const frameworkSchedulerConfig = frameworkNode.ecommerce?.frameworkMeta?.schedulerConfig;
-      if (frameworkNode.ecommerce) {
+      const node = frameworkNode;
+      if (node.ecommerce?.frameworkMeta) {
         await updatePromptNode({
-          ...frameworkNode,
+          ...node,
           ecommerce: {
-            ...frameworkNode.ecommerce,
+            ...node.ecommerce,
             frameworkMeta: {
               activeSheet: '主图',
               groupIds: {
@@ -580,6 +590,7 @@ export function useEcommerceBuildRuntime({
                 'A+': aPlusGroupNode.id,
               },
               taskNodeIds,
+              inputSummary: node.ecommerce.frameworkMeta.inputSummary,
               schedulerConfig: frameworkSchedulerConfig,
             },
           },

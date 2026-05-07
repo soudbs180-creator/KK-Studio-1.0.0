@@ -239,7 +239,7 @@ function isLightSeriesTextColor(textColor: string | undefined): boolean {
         || normalized === '#111827';
 }
 
-function getCreditModelSurfaceStyle(
+function getCreditModelFlatStyle(
     colorStart: string,
     colorEnd: string,
     textColor: string | undefined,
@@ -255,7 +255,7 @@ function getCreditModelSurfaceStyle(
             : 'var(--frost-card-sub-bg)',
         border: `1px solid ${emphasized ? 'color-mix(in srgb, var(--accent-coral) 34%, var(--frost-card-framework-border))' : 'var(--frost-card-sub-border)'}`,
         color: usesDarkText ? 'var(--clay-ink)' : undefined,
-        boxShadow: emphasized ? 'var(--frost-card-framework-shadow)' : 'var(--frost-card-sub-shadow)',
+        boxShadow: 'none',
         WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
         backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
     };
@@ -302,7 +302,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
         const end = normalizeColor(colorEnd, 'var(--accent-pink)');
         return {
             background: `linear-gradient(135deg, ${start} 0%, ${end} 100%)`,
-            boxShadow: `0 2px 8px 0 ${start}50, inset 0 1px 0 0 rgba(255,255,255,0.2)`
+            boxShadow: 'none',
         };
     };
 
@@ -324,7 +324,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                 style: {
                     background: `linear-gradient(135deg, color-mix(in srgb, ${start} 72%, rgba(255,255,255,0.18)) 0%, color-mix(in srgb, ${end} 82%, rgba(255,255,255,0.08)) 100%)`,
                     borderColor: 'var(--frost-card-main-border)',
-                    boxShadow: 'var(--frost-card-main-shadow)',
+                    boxShadow: 'none',
                     backdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
                 }
             };
@@ -334,7 +334,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
             style: {
                 background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent-coral) 86%, white 14%) 0%, var(--mobile-clay-active-bg) 45%, var(--accent-pink) 100%)',
                 borderColor: 'var(--frost-card-main-border)',
-                boxShadow: 'var(--frost-card-main-shadow)',
+                boxShadow: 'none',
                 backdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
             }
         };
@@ -449,7 +449,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                         ? 'bg-[var(--frost-card-sub-bg)] bg-[var(--frost-card-sub-bg)] text-[var(--text-tertiary)]'
                         : isInsufficient
                             ? 'bg-red-500 text-white'
-                            : `border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-primary)] shadow-[var(--frost-card-sub-shadow)] group-hover:bg-[var(--frost-card-main-bg)]`
+                            : `border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-primary)] group-hover:bg-[var(--frost-card-main-bg)]`
                     }
                 `}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
@@ -618,8 +618,8 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
     const colorEnd = normalizeColor(model.colorEnd, 'var(--accent-pink)');
     const modelTextColor = model.textColor || 'white';
     const textColorClass = modelTextColor === 'black' ? 'text-black' : 'text-white';
-    const inactiveGradientStyle = getCreditModelSurfaceStyle(colorStart, colorEnd, model.textColor, false);
-    const activeGradientStyle = getCreditModelSurfaceStyle(colorStart, colorEnd, model.textColor, true);
+    const inactiveGradientStyle = getCreditModelFlatStyle(colorStart, colorEnd, model.textColor, false);
+    const activeGradientStyle = getCreditModelFlatStyle(colorStart, colorEnd, model.textColor, true);
 
     return (
         <button
@@ -3404,7 +3404,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 className={`relative inline-flex min-w-0 ${isMobile ? 'shrink-0' : 'flex-shrink-0'}`}
                             >
                                 <button
-                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-auto min-w-[9rem] max-w-none justify-start flex-shrink-0' : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
+                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-[clamp(6.75rem,38vw,8.5rem)] max-w-[42vw] flex-none justify-start' : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
                                         ? 'bg-[var(--frost-input-bg)] text-[var(--text-tertiary)] cursor-not-allowed border-[color:var(--frost-card-sub-border)]'
                                         : 'text-[var(--text-secondary)] !opacity-100 hover:border-[var(--prompt-bar-shell-border-strong)]'
                                         }`}
@@ -3413,7 +3413,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             return {};
                                         }
                                         if (currentModel?.isSystemInternal && currentModel?.colorStart && currentModel?.colorEnd) {
-                                            return getCreditModelSurfaceStyle(
+                                            return getCreditModelFlatStyle(
                                                 currentModelPrimaryColor,
                                                 currentModelSecondaryColor,
                                                 currentModel?.textColor,

@@ -140,6 +140,12 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
   const selectedCount = editableTaskNodes.filter((taskNode) => taskNode.ecommerce?.selectedForGeneration !== false).length;
   const skippedCount = editableTaskNodes.length - selectedCount;
   const activeCount = (frameworkStatus?.dispatching || 0) + (frameworkStatus?.running || 0);
+  const frameworkInputSummary = node.ecommerce?.frameworkMeta?.inputSummary || [];
+  const referenceSummaryItems = [
+    `${editableTaskNodes.reduce((count, taskNode) => count + (taskNode.referenceImages?.length || 0), 0)} ${pick('参考图', 'refs')}`,
+    `${editableTaskNodes.reduce((count, taskNode) => count + (taskNode.ecommerce?.editableTask?.assetRoles?.filter((asset) => asset.role === 'product').length || 0), 0)} ${pick('产品图', 'product')}`,
+    `${editableTaskNodes.filter((taskNode) => taskNode.ecommerce?.editableTask?.copy?.headline || taskNode.ecommerce?.copyText).length} ${pick('文案', 'copy')}`,
+  ];
 
   React.useEffect(() => {
     if (!selectedTaskNode || activeTaskState) return;
@@ -218,6 +224,41 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
         ))}
       </div>
 
+      <div className="grid gap-2 lg:grid-cols-[minmax(0,1.1fr)_minmax(260px,0.9fr)]">
+        <div
+          className="rounded-lg border px-3 py-2"
+          style={panelStyle}
+          data-testid="ecommerce-canvas-framework-input-summary"
+        >
+          <div className="text-[10px] font-semibold uppercase text-[var(--text-tertiary)]">
+            {pick('输入内容', 'Input')}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {(frameworkInputSummary.length > 0 ? frameworkInputSummary : [node.prompt.split('\n')[0] || node.ecommerce?.displayLabel || node.id]).map((item) => (
+              <span key={item} className="max-w-full truncate rounded-full border px-2 py-1 text-[10px] text-[var(--text-secondary)]" style={panelStyle}>
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div
+          className="rounded-lg border px-3 py-2"
+          style={panelStyle}
+          data-testid="ecommerce-canvas-framework-reference-summary"
+        >
+          <div className="text-[10px] font-semibold uppercase text-[var(--text-tertiary)]">
+            {pick('素材', 'Assets')}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {referenceSummaryItems.map((item) => (
+              <span key={item} className="rounded-full border px-2 py-1 text-[10px] text-[var(--text-secondary)]" style={panelStyle}>
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -293,7 +334,7 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
         ) : null}
       </div>
 
-      <div className="grid min-h-0 gap-3 md:grid-cols-[240px_minmax(0,1fr)]">
+      <div className="grid min-h-0 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
         <div
           className="custom-scrollbar max-h-[430px] space-y-2 overflow-y-auto pr-1"
           data-testid="ecommerce-canvas-framework-task-list"

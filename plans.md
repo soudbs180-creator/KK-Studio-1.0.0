@@ -7,6 +7,17 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline before the current M130 OpenAI-compatible diagnostics prompt redaction slice is `740042c1 fix: redact key update diagnostics`. A docs-only ledger sync commit may sit above that code baseline; use alternate-git `log -1` for the exact HEAD. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
+Current user-reported UI regression milestone after M130:
+- Flatten PromptBar normal action buttons by removing heavy shadows while preserving send-button model color emphasis.
+- Keep the mobile PromptBar footer as a single horizontal row with constrained model/options controls and horizontal overflow instead of two-row wrapping.
+- Flatten settings shell/card chrome so rounded corners clip cleanly, topbar lines disappear, and nested utility containers do not feel cramped.
+- Move ecommerce confirmed-build input content into one large canvas framework card. The composer resets after card creation; further ecommerce edits happen inside the canvas card with input/reference summaries visible.
+
+Acceptance for this UI milestone:
+- Focused source contracts for PromptBar, settings, ecommerce build runtime, ecommerce types, and ecommerce canvas workbench pass.
+- `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and path-limited alternate-git `diff --check` pass or have a recorded unrelated blocker.
+- Codex in-app Browser QA checks the current app on desktop and mobile-sized surfaces and records URL, theme, viewport/surface, `.theme-transitioning`, stale chunk text count, and console errors in `status.md`.
+
 The two prior execution threads are merged into one line:
 - `019dd551...` remains the main refactor history.
 - `019de168...` is treated as continuation work.
