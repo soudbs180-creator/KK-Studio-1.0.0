@@ -68,6 +68,7 @@ install_nginx_gateway() {
   ln -sf /etc/nginx/sites-available/kk-vps-gateway.conf /etc/nginx/sites-enabled/kk-vps-gateway.conf
   rm -f /etc/nginx/sites-enabled/default
   rm -f /etc/nginx/sites-enabled/kk-api.conf
+  rm -f /etc/nginx/sites-enabled/kk-admin-4174.conf
   nginx -t
 }
 

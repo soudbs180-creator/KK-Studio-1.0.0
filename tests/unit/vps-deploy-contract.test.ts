@@ -65,8 +65,10 @@ test("VPS default web entry serves the main login app while admin stays separate
   assert.match(deploySource, /install -m 0644 "\$\{CURRENT_DIR\}\/deploy\/nginx\/kk-vps-gateway\.conf" \/etc\/nginx\/sites-available\/kk-vps-gateway\.conf/);
   assert.match(deploySource, /ln -sf \/etc\/nginx\/sites-available\/kk-vps-gateway\.conf \/etc\/nginx\/sites-enabled\/kk-vps-gateway\.conf/);
   assert.match(deploySource, /rm -f \/etc\/nginx\/sites-enabled\/kk-api\.conf/);
+  assert.match(deploySource, /rm -f \/etc\/nginx\/sites-enabled\/kk-admin-4174\.conf/);
   assert.match(deploySource, /nginx -t/);
   assert.match(bootstrapSource, /rm -f \/etc\/nginx\/sites-enabled\/kk-api\.conf/);
+  assert.match(bootstrapSource, /rm -f \/etc\/nginx\/sites-enabled\/kk-admin-4174\.conf/);
   assert.match(deploySource, /rsync -a --delete "\$\{CURRENT_DIR\}\/dist\/" "\$\{APP_SITE_ROOT\}\/"/);
   assert.match(deploySource, /rsync -a --delete "\$\{CURRENT_DIR\}\/apps\/admin\/dist\/" "\$\{ADMIN_SITE_ROOT\}\/"/);
   assert.match(bootstrapSource, /APP_SITE_ROOT="\$\{KK_APP_SITE_ROOT:-\/var\/www\/kk-app\}"/);
@@ -77,6 +79,8 @@ test("VPS default web entry serves the main login app while admin stays separate
   assert.match(nginxSource, /try_files \$uri \$uri\/ \/index\.html;/);
   assert.match(nginxSource, /server_name admin\.example\.com;/);
   assert.match(nginxSource, /root \/var\/www\/kk-admin;/);
+  assert.match(nginxSource, /listen 4174;/);
+  assert.match(nginxSource, /server_name _ 172\.245\.156\.16;/);
   assert.match(nginxSource, /server_name api\.example\.com;/);
   assert.match(nginxSource, /location \/api\/ \{\s*proxy_pass http:\/\/kk_api_upstream\/api\/;/);
   assert.match(nginxSource, /server_name api\.example\.com;[\s\S]*location \/payment\/ \{\s*proxy_pass http:\/\/kk_payment_upstream\/payment\/;/);
