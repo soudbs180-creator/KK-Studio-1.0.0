@@ -12,9 +12,11 @@ Current user-reported UI regression milestone after M130:
 - Keep the mobile PromptBar footer as a single horizontal row with constrained model/options controls and horizontal overflow instead of two-row wrapping.
 - Flatten settings shell/card chrome so rounded corners clip cleanly, topbar lines disappear, and nested utility containers do not feel cramped.
 - Move ecommerce confirmed-build input content into one large canvas framework card. The composer resets after card creation; further ecommerce edits happen inside the canvas card with input/reference summaries visible.
+- Follow-up hotfix: ecommerce main-image ratio choices (`自适应`, `1:1`, `3:4`) must render in one equal-width three-column row instead of splitting `自适应` into a tall left rail.
 
 Acceptance for this UI milestone:
 - Focused source contracts for PromptBar, settings, ecommerce build runtime, ecommerce types, and ecommerce canvas workbench pass.
+- Focused ecommerce footer/layout contracts assert the three main-image ratio choices stay inside the same equal-row grid.
 - `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and path-limited alternate-git `diff --check` pass or have a recorded unrelated blocker.
 - Codex in-app Browser QA checks the current app on desktop and mobile-sized surfaces and records URL, theme, viewport/surface, `.theme-transitioning`, stale chunk text count, and console errors in `status.md`.
 

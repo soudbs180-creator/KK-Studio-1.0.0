@@ -35,6 +35,8 @@ test('prompt bar ecommerce footer keeps ecommerce state inside the shared mode p
   assert.match(imageOptionsPanelSource, /onUpdateEcommerceSheetSetting\('A\+', \{ aPlusControlMode: mode \}\)/);
   assert.match(imageOptionsPanelSource, /const ecommerceDisplaySizes = useMemo/);
   assert.match(imageOptionsPanelSource, /ImageSize\.SIZE_4K/);
+  assert.match(imageOptionsPanelSource, /const shouldUseSingleEqualRow = totalRatioCount <= 3;/);
+  assert.match(imageOptionsPanelSource, /const autoInGrid = hasAuto && \(shouldUseSingleEqualRow \|\| isOddCount\);/);
   assert.doesNotMatch(imageOptionsPanelSource, /A\+ 生成比例/);
   assert.doesNotMatch(imageOptionsPanelSource, /fallback to 970x600/i);
   assert.match(promptBarSource, /return ecommerceAspectContext\.allowedAspectRatios;/);

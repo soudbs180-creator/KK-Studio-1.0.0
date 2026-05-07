@@ -184,3 +184,29 @@ test('mobile prompt footer stays single-row and lets controls overflow horizonta
   assert.match(modePanelSource, /isMobile \? 'min-w-0 shrink-0'/);
   assert.match(modePanelSource, /isMobile \? \(isEmbeddedMobileDrawer \? 'px-3 justify-between max-w-\[42vw\] min-w-0 overflow-hidden' : 'px-2\.5 max-w-\[40vw\] min-w-0 overflow-hidden'\)/);
 });
+
+test('ecommerce main-image ratio choices stay in one equal three-column row', () => {
+  const imageOptionsSource = readSource('src/components/image/ImageOptionsPanel.tsx');
+
+  assert.match(
+    imageOptionsSource,
+    /const totalRatioCount = gridRatios\.length \+ \(hasAuto \? 1 : 0\);/,
+  );
+  assert.match(
+    imageOptionsSource,
+    /const shouldUseSingleEqualRow = totalRatioCount <= 3;/,
+  );
+  assert.match(
+    imageOptionsSource,
+    /const autoInGrid = hasAuto && \(shouldUseSingleEqualRow \|\| isOddCount\);/,
+  );
+  assert.match(
+    imageOptionsSource,
+    /const useDoubleRow = !shouldUseSingleEqualRow && \(totalGridItems > 3 \|\| \(hasAuto && !autoInGrid\)\);/,
+  );
+  assert.match(
+    imageOptionsSource,
+    /const columns = shouldUseSingleEqualRow\s*\?\s*totalGridItems\s*:\s*\(useDoubleRow \? Math\.ceil\(totalGridItems \/ 2\) : Math\.max\(1, totalGridItems\)\);/,
+  );
+  assert.doesNotMatch(imageOptionsSource, /const autoInGrid = hasAuto && isOddCount;/);
+});

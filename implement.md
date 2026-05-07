@@ -12,7 +12,7 @@ Stage One Backfill M2 completed in `8a458cd4` by hardening `src/app/usePromptGro
 
 The active plan is `plans.md`. The current status and next exact step are tracked in `status.md`. Validation commands and expected gates are tracked in `validation.md`.
 
-Current slice override: user-reported UI regression closure after M130 is the active slice. The selected production boundary is limited to PromptBar button shadow/mobile footer layout, ecommerce confirmed-build framework card handoff, and settings shell/card chrome flattening. Do not change endpoint selection, auth/header behavior, fetch execution, polling, billing, fallback ordering, key storage, provider routing, release metadata, payment/server behavior, or unrelated runtime extraction work in this slice.
+Current slice override: user-reported UI regression closure after M130 is the active slice. The selected production boundary is limited to PromptBar button shadow/mobile footer layout, ecommerce confirmed-build framework card handoff, settings shell/card chrome flattening, and the ecommerce main-image ratio selector row layout. Do not change endpoint selection, auth/header behavior, fetch execution, polling, billing, fallback ordering, key storage, provider routing, release metadata, payment/server behavior, or unrelated runtime extraction work in this slice.
 
 For Clay UI work, use `C:/Users/Administrator/Downloads/DESIGN-clay.md` as the visual base with these overrides: inputs, main cards, sub cards, and framework cards use controlled frosted material; dark mode uses neutral black-gray surfaces; Clay brand colors are emphasis only. That lane is not active unless the user reports a new visual issue.
 

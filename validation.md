@@ -40,7 +40,7 @@ Browser QA may be skipped for this gate because it changes only service diagnost
 
 ## User-Reported UI Regression Gate
 
-Use this gate when touching the PromptBar shadows/mobile footer, settings shell/card chrome, ecommerce confirmed-build handoff, or ecommerce canvas framework card:
+Use this gate when touching the PromptBar shadows/mobile footer, settings shell/card chrome, ecommerce confirmed-build handoff, ecommerce canvas framework card, or ecommerce main-image ratio selector:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
@@ -49,7 +49,9 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/prompt-bar-ecommerce-framework-companion.test.ts" `
   "tests/unit/ecommerce-build-runtime-contract.test.ts" `
   "tests/unit/ecommerce-canvas-contract.test.ts" `
-  "tests/unit/clay-frosted-surface-contract.test.ts"
+  "tests/unit/clay-frosted-surface-contract.test.ts" `
+  "tests/unit/prompt-bar-ecommerce-footer-controls.test.ts" `
+  "tests/unit/ecommerce-sheet-settings-runtime-contract.test.ts"
 npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
 npm.cmd run typecheck
 npm.cmd run test:unit
@@ -60,6 +62,7 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
   "src/app/useEcommerceBuildRuntime.ts" `
   "src/components/canvas/PromptNodeComponent.tsx" `
   "src/components/ecommerce/EcommerceCanvasWorkbenchCard.tsx" `
+  "src/components/image/ImageOptionsPanel.tsx" `
   "src/components/layout/PromptBar.tsx" `
   "src/components/layout/prompt-bar/DesktopComposerModePanel.tsx" `
   "src/index.css" `
@@ -67,9 +70,11 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
   "tests/unit/ecommerce-build-runtime-contract.test.ts" `
   "tests/unit/ecommerce-canvas-contract.test.ts" `
   "tests/unit/prompt-bar-ecommerce-framework-companion.test.ts" `
+  "tests/unit/prompt-bar-ecommerce-footer-controls.test.ts" `
   "tests/unit/prompt-bar-layout-regression.test.ts" `
   "tests/unit/settings-desktop-workbench-regression.test.ts" `
   "tests/unit/clay-frosted-surface-contract.test.ts" `
+  "tests/unit/ecommerce-sheet-settings-runtime-contract.test.ts" `
   "plans.md" `
   "implement.md" `
   "validation.md" `

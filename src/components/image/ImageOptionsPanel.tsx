@@ -152,11 +152,15 @@ const resolveRatioLayout = (availableRatios: AspectRatio[]): RatioLayout => {
     });
 
   const hasAuto = uniqueRatios.includes(AspectRatio.AUTO);
+  const totalRatioCount = gridRatios.length + (hasAuto ? 1 : 0);
+  const shouldUseSingleEqualRow = totalRatioCount <= 3;
   const isOddCount = gridRatios.length % 2 !== 0;
-  const autoInGrid = hasAuto && isOddCount;
+  const autoInGrid = hasAuto && (shouldUseSingleEqualRow || isOddCount);
   const totalGridItems = autoInGrid ? gridRatios.length + 1 : gridRatios.length;
-  const useDoubleRow = totalGridItems > 3 || (hasAuto && !autoInGrid);
-  const columns = useDoubleRow ? Math.ceil(totalGridItems / 2) : Math.max(1, totalGridItems);
+  const useDoubleRow = !shouldUseSingleEqualRow && (totalGridItems > 3 || (hasAuto && !autoInGrid));
+  const columns = shouldUseSingleEqualRow
+    ? totalGridItems
+    : (useDoubleRow ? Math.ceil(totalGridItems / 2) : Math.max(1, totalGridItems));
   const needsScroll = useDoubleRow ? columns > 5 : columns > 4;
 
   return {
