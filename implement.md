@@ -4,6 +4,8 @@ Last updated: 2026-05-07
 
 ## Operating Mode
 
+Current hotfix override (2026-05-07): the active slice is the local-account logout/startup readability regression. Keep changes path-limited to `AuthContext`, `AppStartupScreen`, startup CSS tokens, focused unit/source contracts, and ledger updates. Do not mix this commit with ecommerce UI, provider routing, key storage, payment/server, release metadata, or unrelated runtime extraction work.
+
 This is a long-running execution. Plain `.git` may show stale historical state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`. The latest committed baseline before the current M130 slice is `740042c1 fix: redact key update diagnostics`; docs-only ledger sync commits may sit above it.
 
 The active workstream is a single merged line. Thread `019dd551...` is the main refactor history and `019de168...` is continuation history; both belong to Stage One M6 ecommerce runtime extraction. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; ecommerce source selection closed in `ccf965c3`; ecommerce partial redraw closed in `d12731ce`; connector renderer boundary hardening closed in `5f5b76e0`; connector review follow-up closed in `f06f1880`; the M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`.

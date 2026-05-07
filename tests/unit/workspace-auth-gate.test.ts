@@ -68,3 +68,33 @@ test('AuthContext does not poll hosted cookie recovery forever for signed-out lo
     /if \(!hostedRuntime && !storedToken\) \{\s*clearHostedSession\(\);\s*return;\s*\}/,
   );
 });
+
+test('explicit user logout blocks hosted session recovery until a new runtime user appears', () => {
+  const source = readSource('src/context/AuthContext.tsx');
+
+  assert.match(source, /const \[sessionRecoveryBlockedBySignOut, setSessionRecoveryBlockedBySignOut\] = useState\(false\);/);
+  assert.match(
+    source,
+    /subscribeRuntimeAuthState\(\(nextState\) => \{[\s\S]*if \(nextState\.user \|\| nextState\.isTempUser\) \{[\s\S]*setSessionRecoveryBlockedBySignOut\(false\);/,
+  );
+  assert.match(
+    source,
+    /if \(runtimeState\.user \|\| runtimeState\.isTempUser\) \{[\s\S]*setSessionRecoveryLoading\(false\);[\s\S]*return;/,
+  );
+  assert.doesNotMatch(
+    source,
+    /if \(runtimeState\.user \|\| runtimeState\.isTempUser\) \{[\s\S]{0,160}setSessionRecoveryBlockedBySignOut\(false\);/,
+  );
+  assert.match(
+    source,
+    /if \(sessionRecoveryBlockedBySignOut\) \{[\s\S]*setSessionRecoveryWarning\(null\);[\s\S]*setSessionRecoveryLoading\(false\);[\s\S]*return;/,
+  );
+  assert.match(
+    source,
+    /signOut: async \(\) => \{[\s\S]*setSessionRecoveryBlockedBySignOut\(true\);[\s\S]*await logoutHostedSessionFromServer/,
+  );
+  assert.match(
+    source,
+    /loginAsTempUser: async \(\) => \{[\s\S]*setSessionRecoveryBlockedBySignOut\(false\);[\s\S]*const tempSession = await tempUserService\.getOrCreateTempUser/,
+  );
+});

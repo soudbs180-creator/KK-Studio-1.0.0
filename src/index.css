@@ -13607,6 +13607,29 @@ body.dark-mode .storage-selection-modal {
   --storage-selection-shadow: var(--frost-card-framework-shadow);
 }
 
+.app-startup-screen {
+  --app-startup-bg: var(--clay-canvas);
+  --app-startup-panel-bg: var(--frost-card-framework-bg);
+  --app-startup-panel-border: var(--frost-card-framework-border);
+  --app-startup-panel-shadow: var(--frost-card-framework-shadow);
+  --app-startup-panel-sheen: rgb(255 255 255 / 0.24);
+  --app-startup-icon-bg: var(--frost-card-sub-bg);
+  --app-startup-icon-border: var(--frost-card-sub-border);
+  --app-startup-title: var(--text-primary);
+  --app-startup-muted: var(--text-secondary);
+  --app-startup-warning-bg: var(--state-warning-bg);
+  --app-startup-warning-border: var(--state-warning-border);
+  --app-startup-warning-text: var(--state-warning-text);
+}
+
+body.dark-mode .app-startup-screen {
+  --app-startup-bg: var(--clay-dark-canvas);
+  --app-startup-panel-sheen: rgb(255 250 240 / 0.08);
+  --app-startup-warning-bg: rgb(255 176 132 / 0.14);
+  --app-startup-warning-border: rgb(255 176 132 / 0.32);
+  --app-startup-warning-text: var(--clay-brand-peach);
+}
+
 .ios-mobile-project-pill,
 .ios-mobile-project-dropdown,
 .ios-mobile-tabbar-shell,

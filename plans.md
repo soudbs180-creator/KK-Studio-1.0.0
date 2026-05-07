@@ -5,6 +5,11 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
+Current hotfix override after the ecommerce ratio row closure:
+- Fix the user-reported local-account logout regression so explicit logout returns to the initial login page instead of staying on the startup/session-check surface.
+- Make `AppStartupScreen` own readable startup-specific CSS tokens, especially warning text, instead of borrowing settings-scope card/warning colors.
+- Acceptance: focused auth/startup contracts pass, full typecheck/unit/build gates pass, docs/encoding checks pass, path-limited alternate-git `diff --check` passes, and Codex in-app Browser confirms clean signed-out state plus local temporary-user `退出登录` both land on the login page with `app-startup-screen` count 0.
+
 The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline before the current M130 OpenAI-compatible diagnostics prompt redaction slice is `740042c1 fix: redact key update diagnostics`. A docs-only ledger sync commit may sit above that code baseline; use alternate-git `log -1` for the exact HEAD. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 Current user-reported UI regression milestone after M130:

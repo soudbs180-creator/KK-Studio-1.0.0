@@ -14,7 +14,12 @@ test('startup screen and storage selection modal avoid bright blue accents in th
   const storageModalSource = readSource('src/components/modals/StorageSelectionModal.tsx');
 
   assert.doesNotMatch(startupScreenSource, /text-blue-400/);
-  assert.match(startupScreenSource, /var\(--text-primary\)|var\(--text-secondary\)|var\(--settings-button-secondary-text\)/);
+  assert.match(startupScreenSource, /data-testid="app-startup-screen"/);
+  assert.match(startupScreenSource, /--app-startup-panel-bg/);
+  assert.match(startupScreenSource, /--app-startup-title/);
+  assert.match(startupScreenSource, /--app-startup-muted/);
+  assert.doesNotMatch(startupScreenSource, /settings-reference-card/);
+  assert.doesNotMatch(startupScreenSource, /var\(--settings-section-bg/);
 
   assert.doesNotMatch(storageModalSource, /bg-indigo-600|shadow-indigo|text-indigo-300|border-indigo-500|bg-indigo-500/);
   assert.match(
@@ -50,4 +55,16 @@ test('storage selection modal owns its light and dark theme surface contract', (
   const modalBody = storageModalSource.slice(storageModalSource.indexOf('return ('));
   assert.doesNotMatch(modalBody, /var\(--settings-section-bg/);
   assert.doesNotMatch(modalBody, /var\(--text-primary/);
+});
+
+test('startup screen owns readable light and dark theme tokens outside settings scope', () => {
+  const cssSource = readSource('src/index.css');
+
+  assert.match(cssSource, /\.app-startup-screen\s*\{/);
+  assert.match(cssSource, /--app-startup-panel-bg:\s*var\(--frost-card-framework-bg\);/);
+  assert.match(cssSource, /--app-startup-title:\s*var\(--text-primary\);/);
+  assert.match(cssSource, /--app-startup-muted:\s*var\(--text-secondary\);/);
+  assert.match(cssSource, /--app-startup-warning-text:\s*var\(--state-warning-text\);/);
+  assert.match(cssSource, /body\.dark-mode \.app-startup-screen\s*\{/);
+  assert.match(cssSource, /--app-startup-warning-text:\s*var\(--clay-brand-peach\);/);
 });

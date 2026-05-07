@@ -4,6 +4,37 @@ Last updated: 2026-05-07
 
 Use `npm.cmd` for npm scripts on Windows.
 
+## Auth Logout Startup Gate
+
+Use this gate when touching explicit logout behavior, hosted/runtime session recovery, `AppStartupScreen`, or startup warning readability:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/workspace-auth-gate.test.ts" `
+  "tests/unit/app-startup-coordinator.test.ts" `
+  "tests/unit/app-startup-screen-localization.test.ts" `
+  "tests/unit/settings-entry-surface-style-regression.test.ts" `
+  "tests/unit/theme-contrast-contract.test.ts" `
+  "tests/unit/kk-api-session-bootstrap.test.ts"
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "src/context/AuthContext.tsx" `
+  "src/components/common/AppStartupScreen.tsx" `
+  "src/index.css" `
+  "tests/unit/workspace-auth-gate.test.ts" `
+  "tests/unit/settings-entry-surface-style-regression.test.ts" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA is required because this gate touches visible startup/login state. Use the Codex in-app Browser on a live local Vite app, verify clean signed-out state returns to the login page after session check, then enter with `临时用户（仅本地）`, click `退出登录`, and record URL, startup-screen count, login button count, temp-login button count, workspace prompt count, `.theme-transitioning`, stale chunk text count, and console error count in `status.md`.
+
 Current code baseline before M130 after the M129 keyManager update diagnostic redaction at `740042c1`: `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` exits 0. The M130 OpenAI-compatible diagnostics prompt redaction keeps this probe clean. Historical per-slice notes that mention an expected noUnused failure describe older cleanup milestones; new cleanup/refactor/UI slices should keep this probe clean unless `status.md` records a fresh, unrelated blocker.
 
 ## M130 OpenAI-Compatible Diagnostics Prompt Redaction Gate
