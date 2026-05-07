@@ -2,8 +2,6 @@ import { normalizeEcommerceAnalysis } from '../src/services/ecommerce/normalize/
 import { analyzeEcommerceTextFallback } from '../src/services/ecommerce/text/fallbackTextAnalysis.ts';
 import { parseOpenXmlWorkbook } from '../src/services/ecommerce/xlsx/openXmlWorkbookParser.ts';
 
-export const config = { runtime: 'edge' };
-
 const NUTRIENT_BUILD_URL = 'https://api.nutrient.io/build';
 const DEFAULT_OCR_LANGUAGE = 'chi_sim';
 const CORS_HEADERS = {
