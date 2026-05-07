@@ -2743,6 +2743,9 @@ Historical validation for the paused ecommerce group export runtime WIP:
 - Current M128 dead-cache/log-redaction browser QA: skipped because the slice removes a dead storage helper and prompt-content console diagnostic only; it has no JSX, CSS, route rendering, browser-visible UI, or release metadata change.
 - Current M129 keyManager update diagnostic browser QA: skipped because the slice touches only a key-manager console diagnostic helper and source contracts; it has no JSX, CSS, route rendering, browser-visible UI, or release metadata change.
 - Current M130 OpenAI-compatible diagnostics browser QA: skipped because the slice touches only service diagnostics metadata and unit contracts; it has no JSX, CSS, route rendering, browser-visible UI, or release metadata change.
+- Current settings shell card fix browser QA: desktop settings smoke and mobile settings smoke both exited 0 in fallback mode because headless Chromium launch hit `spawn EPERM`; fallback route checks returned 200 for `/`, `/settings`, and `/settings/api-management`. Pixel-level browser validation is still blocked by the local Chromium launch policy.
+- Current settings shell card fix validation: targeted RED/GREEN completed for `tests/unit/settings-desktop-workbench-regression.test.ts`; `tests/unit/clay-frosted-surface-contract.test.ts` also passed after updating the frosted-surface contract. Fresh checks passed: `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run verify:desktop-settings-smoke` fallback, `npm.cmd run verify:mobile-settings-smoke` fallback, and `npm.cmd run check:encoding`.
+- Current settings shell card fix implementation: `src/index.css` now keeps the desktop `.settings-shell-desktop` as the containing card with `1px` shell border and shell shadow while preserving the mobile shell's frameless treatment.
 
 ## Remaining Work
 

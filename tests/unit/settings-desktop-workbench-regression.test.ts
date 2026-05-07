@@ -113,7 +113,11 @@ test('settings workbench flattens cramped nested containers and clips rounded su
   );
   assert.match(
     cssSource,
-    /\.settings-panel \.settings-shell-desktop,[\s\S]*\.settings-panel \.settings-shell-mobile \{[\s\S]*border: 0 !important;[\s\S]*box-shadow: none !important;/,
+    /\.settings-panel \.settings-shell-desktop \{[\s\S]*border: 1px solid var\(--settings-shell-border\) !important;[\s\S]*box-shadow: var\(--settings-shell-shadow\) !important;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell-mobile \{[\s\S]*background: var\(--frost-card-framework-bg\) !important;[\s\S]*border: 0 !important;[\s\S]*box-shadow: none !important;/,
   );
   assert.match(
     cssSource,

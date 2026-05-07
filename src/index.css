@@ -13177,7 +13177,15 @@ body.dark-mode .input-bar {
   backdrop-filter: blur(var(--frost-input-blur)) saturate(1.12);
 }
 
-.settings-panel .settings-shell-desktop,
+.settings-panel .settings-shell-desktop {
+  background: var(--frost-card-framework-bg);
+  background: var(--frost-card-framework-bg) !important;
+  border: 1px solid var(--settings-shell-border) !important;
+  box-shadow: var(--settings-shell-shadow) !important;
+  -webkit-backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(1.16);
+  backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(1.16);
+}
+
 .settings-panel .settings-shell-mobile {
   background: var(--frost-card-framework-bg);
   background: var(--frost-card-framework-bg) !important;
