@@ -1,6 +1,6 @@
 {
   "name": "payment-server",
-  "version": "1.4.2",
+  "version": "1.4.5",
   "description": "KK Studio payment sidecar service",
   "main": "index.js",
   "scripts": {

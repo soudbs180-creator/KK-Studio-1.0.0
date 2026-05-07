@@ -1,9 +1,10 @@
-# KK-Studio v1.4.2 Coordination Status
+# KK-Studio v1.4.5 Coordination Status
 
 Last updated: 2026-05-07
 
 ## Active State
 
+- Current deployment override (2026-05-07): bump the hosted release metadata from `1.4.2` to `1.4.5`, rebuild `dist/app-version.json`, verify version governance, commit the release metadata slice, and deploy production to Vercel for `https://kkai.plus/`.
 - Current hotfix override (2026-05-07): close the user-reported ecommerce framework card header and arrange regression. The left header status icon/text on framework cards is now an editable remark/name input, tags render directly after the remark/name with a five-tag cap, and full-canvas arrange keeps the framework/workbench card to the right of its related main/A+ groups.
 - Current commit scope: `src/components/canvas/PromptNodeComponent.tsx`, `src/context/canvasAutoArrange.ts`, `tests/unit/ecommerce-display-label-surface.test.ts`, `tests/unit/canvas-auto-arrange-contract.test.ts`, and ledger files only. Endpoint selection, auth/header behavior, fetch execution, polling, billing, fallback ordering, key storage, provider routing, release metadata, payment/server behavior, PromptBar controls, settings UI, and unrelated runtime extraction work are excluded.
 - Root cause: the framework prompt card reused the generic status header, including the `thumbnail-shell` early return path, so the requested remark/tag surface was not guaranteed everywhere. The arrange helper also sorted framework cohorts only pairwise, which could leave the framework card before related groups when unrelated root cards were interleaved.
@@ -26,6 +27,7 @@ Last updated: 2026-05-07
 
 ## Current Finalization Gate
 
+- Current 1.4.5 release metadata gate results: `npm.cmd run governance:version` passed with version metadata aligned to `1.4.5`; `npm.cmd run governance:agent-docs` passed; `npm.cmd run check:encoding` passed; `npm.cmd run governance:check` passed; `npm.cmd run typecheck` passed; `npm.cmd run test:unit` passed 1402/1402; `npm.cmd run build` passed and regenerated `dist/app-version.json` for `1.4.5`.
 - Current ecommerce framework card header/arrange hotfix gate results: focused RED/GREEN passed; focused ecommerce prompt/arrange suite passed 8/8; `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` passed; `npm.cmd run typecheck` passed after replacing mojibake-prone main-sheet literals in the new test with an ASCII unicode escape constant; `npm.cmd run test:unit` passed 1402/1402; `npm.cmd run build` passed; browser smoke was completed through the Codex in-app Browser as recorded in Active State; `npm.cmd run governance:agent-docs` passed; `npm.cmd run check:encoding` passed; path-limited alternate-git `diff --check` passed with LF/CRLF normalization warnings only.
 
 - Current UI ratio hotfix gate results: focused RED/GREEN passed, expanded UI/ecommerce focused gate passed 30/30, `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false` passed, `npm.cmd run typecheck` passed, `npm.cmd run test:unit` passed 1395/1395, `npm.cmd run build` passed, `npm.cmd run governance:agent-docs` passed before and after ledger sync, `npm.cmd run check:encoding` passed before and after ledger sync, and path-limited alternate-git `diff --check` passed with LF/CRLF normalization warnings only. Browser QA was completed through the Codex in-app Browser as recorded in Active State.
@@ -564,7 +566,7 @@ Last updated: 2026-05-07
 - Current tracked TS/TSX debt scan by alternate-git over `*.ts` / `*.tsx`: direct `as any` matches 155, broad `any` token matches 586, `@ts-ignore` / `@ts-expect-error` matches 133, and `console.log` matches 245. Broad workspace scan excluding `node_modules`, `dist`, `release`, and `coverage` is noisier: `as any` 164, `any` token 672, TS suppressions 137, and `console.log` 416. The production noUnused probe now passes cleanly with `npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false`. These are refactor debt indicators, not release blockers by themselves.
 - Quality rule going forward: reduce `any`, TypeScript suppressions, and bare `console.log` inside touched files when local and safe; do not perform a whole-repo cleanup inside one runtime or architecture extraction.
 - Architecture status from the latest full check: `npm.cmd run architecture:check` passed with 5 allowlisted migration exceptions and 2 allowlisted legacy bridge exceptions; `npm.cmd run spec:check` passed.
-- Version governance status from the latest full check: `npm.cmd run governance:check` passed; version metadata is aligned to `1.4.2`.
+- Version governance status from the latest full check: `npm.cmd run governance:check` passed; version metadata is aligned to `1.4.5`.
 - Dependency audit status: `npm.cmd run audit:dependencies` passed for both root and `payment-server` production dependency graphs with `found 0 vulnerabilities`.
 
 ## Working Tree M86 (Chat Service Unused Cleanup)

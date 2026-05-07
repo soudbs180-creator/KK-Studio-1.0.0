@@ -1,18 +1,18 @@
 {
   "appName": "KK Studio",
-  "version": "1.4.2",
-  "displayVersion": "v1.4.2",
-  "buildTime": "2026-05-03T01:26:15.765Z",
-  "releaseDate": "2026-04-14",
+  "version": "1.4.5",
+  "displayVersion": "v1.4.5",
+  "buildTime": "2026-05-07T09:00:00.000Z",
+  "releaseDate": "2026-05-07",
   "releaseNotes": [
-    "Main app, payment sidecar, portable metadata, and synchronized documentation are aligned to version 1.4.2.",
-    "The current working baseline consolidates the premium settings shell, API routing and credit orchestration groundwork, and mobile ecommerce continuation surfaces into one release line.",
-    "Runtime-truth docs, package governance, and portable version manifests are aligned to version 1.4.2.",
-    "Typecheck, encoding, agent-doc governance, and production build verification are green against the unified 1.4.2 baseline."
+    "Main app, payment sidecar, portable metadata, and synchronized documentation are aligned to version 1.4.5.",
+    "The current hosted baseline consolidates production Vercel deployment fixes, API routing, billing proxy behavior, and mobile ecommerce continuation surfaces into one release line.",
+    "Runtime-truth docs, package governance, and portable version manifests are aligned to version 1.4.5.",
+    "The 1.4.5 release metadata is prepared for production deployment on kkai.plus."
   ],
   "channel": "stable",
-  "packageFile": "KK-Studio-Portable-1.4.2.zip",
-  "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.4.2/KK-Studio-Portable-1.4.2.zip",
+  "packageFile": "KK-Studio-Portable-1.4.5.zip",
+  "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.4.5/KK-Studio-Portable-1.4.5.zip",
   "sha256": "3947789406e37313c67a4a6afc978f88fc1eeceadee32465d4428c64b01f49d5",
   "size": 52864654
 }

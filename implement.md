@@ -1,4 +1,4 @@
-# KK-Studio v1.4.2 Implementation Rules
+# KK-Studio v1.4.5 Implementation Rules
 
 Last updated: 2026-05-07
 
@@ -92,7 +92,7 @@ For every milestone:
 - Non-UI runtime/docs slices may skip browser inspection only after the UI lane is closed, and the skip must be recorded in `status.md`; paused runtime/PPT commits use the runtime/PPT gate in `validation.md`.
 - Do not claim a UI optimization is complete from source-contract tests, screenshots, build output, or smoke scripts alone. The browser check is mandatory for new UI work and can only be skipped for non-UI logic/docs changes with an explicit note.
 - If a command fails, classify it as either historical or introduced by the current milestone. New failures must be fixed before commit.
-- For shared v1.4.2 ledger updates, `status.md` must name the active lane(s), included commit paths, excluded dirty path groups, and browser inspection status.
+- For shared v1.4.5 ledger updates, `status.md` must name the active lane(s), included commit paths, excluded dirty path groups, and browser inspection status.
 - For a UI audit lane commit, `status.md` must record browser URL, theme, viewport/surface checked, `.theme-transitioning` result, SearchPalette/settings/API workbench checks, and stale chunk findings.
 - The final release gate includes `npm.cmd run governance:check`, `npm.cmd run audit:dependencies`, `npm.cmd run spec:check`, `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, and `npm.cmd run check:encoding`. The former `governance:version` portable metadata mismatch was cleared by `567f85aa`; rerun the gate after any future packaging/publish metadata change.
 

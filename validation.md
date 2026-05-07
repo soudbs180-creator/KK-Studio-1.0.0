@@ -1,4 +1,4 @@
-# KK-Studio v1.4.2 Single-Line Validation Matrix
+# KK-Studio v1.4.5 Single-Line Validation Matrix
 
 Last updated: 2026-05-07
 

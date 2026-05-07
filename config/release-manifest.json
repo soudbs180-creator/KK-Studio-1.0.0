@@ -1,13 +1,13 @@
 {
   "appName": "KK Studio",
-  "version": "1.4.2",
-  "displayVersion": "v1.4.2",
-  "releaseDate": "2026-04-14",
+  "version": "1.4.5",
+  "displayVersion": "v1.4.5",
+  "releaseDate": "2026-05-07",
   "releaseNotes": [
-    "Main app, payment sidecar, portable metadata, and synchronized documentation are aligned to version 1.4.2.",
-    "The current working baseline consolidates the premium settings shell, API routing and credit orchestration groundwork, and mobile ecommerce continuation surfaces into one release line.",
-    "Runtime-truth docs, package governance, and portable version manifests are aligned to version 1.4.2.",
-    "Typecheck, encoding, agent-doc governance, and production build verification are green against the unified 1.4.2 baseline."
+    "Main app, payment sidecar, portable metadata, and synchronized documentation are aligned to version 1.4.5.",
+    "The current hosted baseline consolidates production Vercel deployment fixes, API routing, billing proxy behavior, and mobile ecommerce continuation surfaces into one release line.",
+    "Runtime-truth docs, package governance, and portable version manifests are aligned to version 1.4.5.",
+    "The 1.4.5 release metadata is prepared for production deployment on kkai.plus."
   ],
   "versionTargets": {
     "releaseManifest": "config/release-manifest.json",

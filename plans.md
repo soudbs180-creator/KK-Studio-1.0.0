@@ -1,4 +1,4 @@
-# KK-Studio v1.4.2 Single-Line Convergence Plan
+# KK-Studio v1.4.5 Single-Line Convergence Plan
 
 Last updated: 2026-05-07
 Branch policy: continue on the current branch and current workspace unless the user explicitly asks for a branch or worktree.
@@ -251,7 +251,7 @@ Commit:
 
 ### 1. Refactor Ledger Alignment
 
-Goal: make `plans.md`, `implement.md`, `status.md`, and `validation.md` describe the v1.4.2 refactor line.
+Goal: make `plans.md`, `implement.md`, `status.md`, and `validation.md` describe the v1.4.5 refactor line.
 
 Acceptance:
 - The four ledger files identify `d12731ce` as the then-current alternate-git baseline, name plain `.git` as stale/historical, and describe the single merged execution line.
@@ -264,7 +264,7 @@ Validation:
 - `npm.cmd run check:encoding`
 
 Commit:
-- `docs: align v1.4.2 refactor plan`
+- `docs: align v1.4.5 refactor plan`
 
 ### 2. Stage One M6 Closeout: Remaining Ecommerce Branch Scan (Completed)
 
