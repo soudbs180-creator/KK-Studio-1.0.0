@@ -5,12 +5,14 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-Current hotfix override after the ecommerce ratio row closure:
-- Fix the user-reported local-account logout regression so explicit logout returns to the initial login page instead of staying on the startup/session-check surface.
-- Make `AppStartupScreen` own readable startup-specific CSS tokens, especially warning text, instead of borrowing settings-scope card/warning colors.
-- Acceptance: focused auth/startup contracts pass, full typecheck/unit/build gates pass, docs/encoding checks pass, path-limited alternate-git `diff --check` passes, and Codex in-app Browser confirms clean signed-out state plus local temporary-user `退出登录` both land on the login page with `app-startup-screen` count 0.
+Current hotfix override after the auth logout/startup closure:
+- Refine the ecommerce framework card header so the left status icon/text area becomes an editable remark/name input.
+- Render framework card tags immediately after the remark/name, capped at five visible tags.
+- Keep the same remark/tag behavior on the compact `thumbnail-shell` prompt card path.
+- Arrange ecommerce framework cohorts so main-sheet groups come first, A+ groups come second, and the framework/workbench card is placed to the right, even when unrelated root cards are interleaved.
+- Acceptance: focused ecommerce prompt/arrange contracts pass, strict no-unused TypeScript passes, full typecheck/unit/build gates pass, docs/encoding checks pass, path-limited alternate-git `diff --check` passes, and Codex in-app Browser records the built app smoke result plus the no-login/no-ecommerce-data limitation.
 
-The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest committed baseline before the current M130 OpenAI-compatible diagnostics prompt redaction slice is `740042c1 fix: redact key update diagnostics`. A docs-only ledger sync commit may sit above that code baseline; use alternate-git `log -1` for the exact HEAD. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
+The plain `.git` metadata currently still reports baseline commit `4c448660 Refactor Clay UI and PPT runtime boundaries` and may show stale dirty state. The development fact source is the writable full Git metadata copy at `node_modules/.codex-git-full`; the latest alternate-git baseline before the current ecommerce framework card hotfix is `cab9046c fix: return to login after logout`. Use only `git --git-dir=node_modules/.codex-git-full --work-tree=.` for status, staging, diffs, and commits in this session.
 
 Current user-reported UI regression milestone after M130:
 - Flatten PromptBar normal action buttons by removing heavy shadows while preserving send-button model color emphasis.
@@ -18,10 +20,12 @@ Current user-reported UI regression milestone after M130:
 - Flatten settings shell/card chrome so rounded corners clip cleanly, topbar lines disappear, and nested utility containers do not feel cramped.
 - Move ecommerce confirmed-build input content into one large canvas framework card. The composer resets after card creation; further ecommerce edits happen inside the canvas card with input/reference summaries visible.
 - Follow-up hotfix: ecommerce main-image ratio choices (`自适应`, `1:1`, `3:4`) must render in one equal-width three-column row instead of splitting `自适应` into a tall left rail.
+- Follow-up hotfix: ecommerce framework card left header status text becomes an editable remark/name box, header tags render directly after it with a five-tag cap, and full-canvas arrange keeps the framework/workbench card to the right of its related card groups.
 
 Acceptance for this UI milestone:
 - Focused source contracts for PromptBar, settings, ecommerce build runtime, ecommerce types, and ecommerce canvas workbench pass.
 - Focused ecommerce footer/layout contracts assert the three main-image ratio choices stay inside the same equal-row grid.
+- Focused ecommerce header/arrange contracts assert the framework remark input, adjacent five-tag cap, thumbnail-shell path, and right-side framework cohort ordering.
 - `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and path-limited alternate-git `diff --check` pass or have a recorded unrelated blocker.
 - Codex in-app Browser QA checks the current app on desktop and mobile-sized surfaces and records URL, theme, viewport/surface, `.theme-transitioning`, stale chunk text count, and console errors in `status.md`.
 

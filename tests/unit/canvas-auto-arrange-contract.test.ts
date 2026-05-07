@@ -5,6 +5,7 @@ import { test } from 'node:test';
 
 import {
   AspectRatio,
+  GenerationMode,
   ImageSize,
   KnownModel,
   type Canvas,
@@ -13,6 +14,7 @@ import {
 } from '../../src/types.ts';
 
 const ROOT_DIR = process.cwd();
+const MAIN_SHEET = '\u4e3b\u56fe';
 
 type CanvasAutoArrangeModule = {
   resolveCanvasAutoArrangePositions: (canvas: Canvas) => Record<string, { x: number; y: number }>;
@@ -110,4 +112,162 @@ test('resolveCanvasAutoArrangePositions preserves normal, follow-up, orphan, and
   assert.deepEqual(positions['image-4'], { x: -1484, y: 776 });
   assert.deepEqual(positions['prompt-3'], { x: -1840, y: 1266 });
   assert.deepEqual(positions['image-3'], { x: -1840, y: 1642 });
+});
+
+test('resolveCanvasAutoArrangePositions places ecommerce framework workbench to the right of its card groups', async () => {
+  const { resolveCanvasAutoArrangePositions } = await loadCanvasAutoArrangeModule();
+  const framework = promptNode({
+    id: 'framework-1',
+    height: 560,
+    mode: GenerationMode.ECOMMERCE,
+    ecommerce: {
+      kind: 'framework',
+      sourceSheet: MAIN_SHEET,
+      sourceRowKey: 'framework-root',
+      displayLabel: 'Framework',
+      frameworkMeta: {
+        activeSheet: MAIN_SHEET,
+        groupIds: {
+          [MAIN_SHEET]: 'main-group',
+          'A+': 'aplus-group',
+        },
+        taskNodeIds: ['main-task', 'aplus-task'],
+      },
+    },
+  });
+  const source = canvas({
+    id: 'canvas-1',
+    promptNodes: [
+      framework,
+      promptNode({
+        id: 'unrelated-root',
+        height: 200,
+        childImageIds: ['unrelated-image'],
+      }),
+      promptNode({
+        id: 'main-task',
+        mode: GenerationMode.ECOMMERCE,
+        hiddenInCanvas: true,
+        height: 200,
+        childImageIds: ['main-image'],
+        ecommerce: {
+          kind: 'main-image',
+          sourceSheet: MAIN_SHEET,
+          sourceRowKey: 'main-1',
+          frameworkId: framework.id,
+          parentNodeId: 'main-group',
+          groupId: 'main-group',
+        },
+      }),
+      promptNode({
+        id: 'aplus-task',
+        mode: GenerationMode.ECOMMERCE,
+        hiddenInCanvas: true,
+        height: 200,
+        childImageIds: ['aplus-image'],
+        ecommerce: {
+          kind: 'a-plus-module',
+          sourceSheet: 'A+',
+          sourceRowKey: 'aplus-1',
+          frameworkId: framework.id,
+          parentNodeId: 'aplus-group',
+          groupId: 'aplus-group',
+        },
+      }),
+      promptNode({
+        id: 'main-group',
+        mode: GenerationMode.ECOMMERCE,
+        hiddenInCanvas: true,
+        height: 200,
+        ecommerce: {
+          kind: 'a-plus-group',
+          sourceSheet: MAIN_SHEET,
+          sourceRowKey: 'main-group',
+          frameworkId: framework.id,
+          parentNodeId: framework.id,
+        },
+      }),
+      promptNode({
+        id: 'aplus-group',
+        mode: GenerationMode.ECOMMERCE,
+        hiddenInCanvas: true,
+        height: 200,
+        ecommerce: {
+          kind: 'a-plus-group',
+          sourceSheet: 'A+',
+          sourceRowKey: 'aplus-group',
+          frameworkId: framework.id,
+          parentNodeId: framework.id,
+        },
+      }),
+    ],
+    imageNodes: [
+      imageNode({ id: 'unrelated-image', parentPromptId: 'unrelated-root' }),
+      imageNode({ id: 'main-image', parentPromptId: 'main-task' }),
+      imageNode({ id: 'aplus-image', parentPromptId: 'aplus-task' }),
+    ],
+  });
+
+  const positions = resolveCanvasAutoArrangePositions(source);
+
+  assert.ok(positions['aplus-group'].x > positions['main-group'].x);
+  assert.ok(positions['framework-1'].x > positions['aplus-group'].x);
+  assert.ok(positions['framework-1'].x > positions['aplus-task'].x);
+});
+
+test('resolveCanvasAutoArrangePositions keeps framework cohorts ordered when unrelated roots are interleaved', async () => {
+  const { resolveCanvasAutoArrangePositions } = await loadCanvasAutoArrangeModule();
+  const framework = promptNode({
+    id: 'framework-2',
+    height: 560,
+    mode: GenerationMode.ECOMMERCE,
+    ecommerce: {
+      kind: 'framework',
+      sourceSheet: MAIN_SHEET,
+      sourceRowKey: 'framework-root',
+      displayLabel: 'Framework',
+    },
+  });
+  const source = canvas({
+    id: 'canvas-2',
+    promptNodes: [
+      framework,
+      promptNode({
+        id: 'unrelated-root-2',
+        height: 200,
+      }),
+      promptNode({
+        id: 'main-group-2',
+        mode: GenerationMode.ECOMMERCE,
+        hiddenInCanvas: true,
+        height: 200,
+        ecommerce: {
+          kind: 'a-plus-group',
+          sourceSheet: MAIN_SHEET,
+          sourceRowKey: 'main-group',
+          frameworkId: framework.id,
+          parentNodeId: framework.id,
+        },
+      }),
+      promptNode({
+        id: 'aplus-group-2',
+        mode: GenerationMode.ECOMMERCE,
+        hiddenInCanvas: true,
+        height: 200,
+        ecommerce: {
+          kind: 'a-plus-group',
+          sourceSheet: 'A+',
+          sourceRowKey: 'aplus-group',
+          frameworkId: framework.id,
+          parentNodeId: framework.id,
+        },
+      }),
+    ],
+    imageNodes: [],
+  });
+
+  const positions = resolveCanvasAutoArrangePositions(source);
+
+  assert.ok(positions['aplus-group-2'].x > positions['main-group-2'].x);
+  assert.ok(positions['framework-2'].x > positions['aplus-group-2'].x);
 });

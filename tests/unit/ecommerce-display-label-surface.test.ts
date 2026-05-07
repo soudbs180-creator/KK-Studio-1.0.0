@@ -25,3 +25,20 @@ test('ecommerce business display labels propagate to desktop and mobile result s
   assert.match(mobileTileSource, /entry\.displayLabel\s*\|\|/);
   assert.match(mobileDetailSource, /entry\.displayLabel/);
 });
+
+test('ecommerce framework header exposes an editable remark name with up to five adjacent tags', () => {
+  const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
+  const thumbnailBranch = promptNodeSource.slice(
+    promptNodeSource.indexOf("if (detailLevel === 'thumbnail-shell')"),
+    promptNodeSource.indexOf('{shellReferenceImages.length > 0 &&')
+  );
+
+  assert.match(promptNodeSource, /isEcommerceFrameworkCard/);
+  assert.match(promptNodeSource, /handleFrameworkRemarkCommit/);
+  assert.match(promptNodeSource, /data-testid="ecommerce-framework-remark-input"/);
+  assert.match(promptNodeSource, /data-testid="ecommerce-framework-header-tags"/);
+  assert.match(promptNodeSource, /node\.tags\?\.slice\(0,\s*5\)/);
+  assert.match(promptNodeSource, /onUpdateNode\?\.\(\{[\s\S]*ecommerce:[\s\S]*displayLabel:/);
+  assert.match(thumbnailBranch, /isEcommerceFrameworkCard \? \(/);
+  assert.match(thumbnailBranch, /renderEcommerceFrameworkHeaderContent\(true\)/);
+});

@@ -106,6 +106,13 @@ const getPromptBusinessDisplayLabel = (node: PromptNode): string | null => {
     return null;
 };
 
+const resolveFrameworkRemarkLabel = (node: PromptNode): string => (
+    node.ecommerce?.displayLabel
+    || node.ecommerce?.theme
+    || node.prompt
+    || node.id
+).trim();
+
 const getPptDeckStageLabel = (stage: NonNullable<PromptNode['pptDeck']>['stage']) => {
     switch (stage) {
         case 'generating':
@@ -589,6 +596,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const hasMoved = useRef(false);
     const [activeTab, setActiveTab] = useState<'raw' | 'opt'>('raw');
     const [copyStatus, setCopyStatus] = useState<'idle' | 'en' | 'zh'>('idle');
+    const [frameworkRemarkDraft, setFrameworkRemarkDraft] = useState(() => resolveFrameworkRemarkLabel(node));
+    const frameworkRemarkSkipCommitRef = useRef(false);
     const ecommerceFrameworkCardClassName = isEcommerceFrameworkCard
         ? 'px-4 pb-4 pt-3 flex flex-col flex-1'
         : 'p-3 flex flex-col flex-1';
@@ -661,6 +670,88 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             setActiveTab('raw');
         }
     }, [node.id]);
+
+    useEffect(() => {
+        if (!isEcommerceFrameworkCard) return;
+        setFrameworkRemarkDraft(resolveFrameworkRemarkLabel(node));
+    }, [isEcommerceFrameworkCard, node.ecommerce?.displayLabel, node.ecommerce?.theme, node.id, node.prompt]);
+
+    const handleFrameworkRemarkCommit = () => {
+        if (!isEcommerceFrameworkCard || !node.ecommerce) return;
+        if (frameworkRemarkSkipCommitRef.current) {
+            frameworkRemarkSkipCommitRef.current = false;
+            return;
+        }
+
+        const currentLabel = resolveFrameworkRemarkLabel(node);
+        const nextLabel = frameworkRemarkDraft.trim() || currentLabel;
+        setFrameworkRemarkDraft(nextLabel);
+
+        if (nextLabel === currentLabel) {
+            return;
+        }
+
+        void onUpdateNode?.({
+            ...node,
+            ecommerce: {
+                ...node.ecommerce,
+                displayLabel: nextLabel,
+            },
+        });
+    };
+
+    const renderEcommerceFrameworkHeaderContent = (compact = false) => (
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+            <input
+                type="text"
+                value={frameworkRemarkDraft}
+                data-testid="ecommerce-framework-remark-input"
+                aria-label="电商卡片备注名"
+                className={`${compact ? 'h-7 min-w-[120px]' : 'h-8 min-w-[140px]'} max-w-[280px] flex-[0_1_280px] rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-input-bg)] px-3 text-[12px] font-medium text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--clay-brand-pink)]`}
+                placeholder="备注名称"
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => setFrameworkRemarkDraft(e.target.value)}
+                onBlur={handleFrameworkRemarkCommit}
+                onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        e.currentTarget.blur();
+                    } else if (e.key === 'Escape') {
+                        frameworkRemarkSkipCommitRef.current = true;
+                        setFrameworkRemarkDraft(resolveFrameworkRemarkLabel(node));
+                        e.currentTarget.blur();
+                    }
+                }}
+            />
+            {node.tags && node.tags.length > 0 ? (
+                <div
+                    className="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden"
+                    data-testid="ecommerce-framework-header-tags"
+                >
+                    {node.tags?.slice(0, 5).map((tag) => {
+                        const colors = generateTagColor(tag);
+                        return (
+                            <span
+                                key={tag}
+                                className={`${compact ? 'h-5 max-w-[78px]' : 'h-6 max-w-[92px]'} inline-flex shrink-0 items-center rounded-md border px-2 text-[10px] font-medium`}
+                                style={{
+                                    backgroundColor: colors.bg,
+                                    color: colors.text,
+                                    borderColor: colors.border,
+                                }}
+                                title={tag}
+                            >
+                                #{truncateByChars(tag, compact ? 6 : 8)}
+                            </span>
+                        );
+                    })}
+                </div>
+            ) : null}
+        </div>
+    );
 
     useEffect(() => {
         if (resolvedTimerStart !== undefined) {
@@ -1075,25 +1166,31 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     )}
 
                     <div className={`flex items-center justify-between gap-2 border-b border-[var(--frost-card-main-border)] ${isThumbnailShell ? 'px-3 py-2' : 'px-4 py-2.5'}`}>
-                        <div className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium ${shellStatusTone}`}>
-                            {showError ? (
-                                <AlertTriangle size={12} />
-                            ) : node.isGenerating ? (
-                                <Loader2 size={12} className="animate-spin" />
-                            ) : node.mode === GenerationMode.VIDEO ? (
-                                <Video size={12} />
-                            ) : node.mode === GenerationMode.AUDIO ? (
-                                <Music size={12} />
-                            ) : (
-                                <Sparkles size={12} />
-                            )}
-                            <span className="truncate">
-                                {showError ? getPromptFailureLabel(node) : node.isGenerating ? '生成中' : `${renderedSuccessCount || 0} 个结果`}
-                            </span>
-                        </div>
-                        <div className="text-[11px] text-[var(--text-tertiary)] shrink-0">
-                            {node.aspectRatio}
-                        </div>
+                        {isEcommerceFrameworkCard ? (
+                            renderEcommerceFrameworkHeaderContent(true)
+                        ) : (
+                            <>
+                                <div className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium ${shellStatusTone}`}>
+                                    {showError ? (
+                                        <AlertTriangle size={12} />
+                                    ) : node.isGenerating ? (
+                                        <Loader2 size={12} className="animate-spin" />
+                                    ) : node.mode === GenerationMode.VIDEO ? (
+                                        <Video size={12} />
+                                    ) : node.mode === GenerationMode.AUDIO ? (
+                                        <Music size={12} />
+                                    ) : (
+                                        <Sparkles size={12} />
+                                    )}
+                                    <span className="truncate">
+                                        {showError ? getPromptFailureLabel(node) : node.isGenerating ? '生成中' : `${renderedSuccessCount || 0} 个结果`}
+                                    </span>
+                                </div>
+                                <div className="text-[11px] text-[var(--text-tertiary)] shrink-0">
+                                    {node.aspectRatio}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     <div
@@ -1232,7 +1329,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 <div className="flex items-center justify-between px-4 py-3 w-full" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', ...secondaryTextRenderStyle }}>
                     {/* Left: Status Icon and Text */}
                     <div className="flex flex-1 items-center gap-2 min-w-0">
-                        {showError ? (
+                        {isEcommerceFrameworkCard ? (
+                            renderEcommerceFrameworkHeaderContent()
+                        ) : showError ? (
                             <>
                                 <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-red-500/15">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500">

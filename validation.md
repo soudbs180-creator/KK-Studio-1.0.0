@@ -4,6 +4,35 @@ Last updated: 2026-05-07
 
 Use `npm.cmd` for npm scripts on Windows.
 
+## Ecommerce Framework Card Header And Arrange Gate
+
+Use this gate when touching the ecommerce framework prompt-card header remark/tag surface or full-canvas ecommerce framework cohort auto-arrange ordering:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/ecommerce-display-label-surface.test.ts" `
+  "tests/unit/canvas-auto-arrange-contract.test.ts" `
+  "tests/unit/prompt-bar-ecommerce-framework-companion.test.ts" `
+  "tests/unit/ecommerce-canvas-contract.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "src/components/canvas/PromptNodeComponent.tsx" `
+  "src/context/canvasAutoArrange.ts" `
+  "tests/unit/ecommerce-display-label-surface.test.ts" `
+  "tests/unit/canvas-auto-arrange-contract.test.ts" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA is required because this gate touches visible canvas UI. Use the Codex in-app Browser on the current built app or local dev server and record URL, title, framework remark/tag test-id counts, login/data limitation when applicable, `.theme-transitioning` or startup-screen state if available, stale chunk text count if checked, and console error count in `status.md`.
+
 ## Auth Logout Startup Gate
 
 Use this gate when touching explicit logout behavior, hosted/runtime session recovery, `AppStartupScreen`, or startup warning readability:

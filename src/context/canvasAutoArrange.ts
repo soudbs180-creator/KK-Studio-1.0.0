@@ -17,6 +17,7 @@ type LayoutGroup = {
 };
 
 const PROMPT_WIDTH = 320;
+const ECOMMERCE_FRAMEWORK_PROMPT_WIDTH = 920;
 const GROUPS_PER_ROW = 20;
 const SUB_COLUMNS = 20;
 const GROUP_GAP_X = 56;
@@ -29,6 +30,66 @@ const START_Y = 200;
 const getImageDims = (aspectRatio?: string) => {
     const { width, totalHeight } = getCardDimensions(aspectRatio as AspectRatio, true);
     return { w: width, h: totalHeight };
+};
+
+const getPromptWidth = (prompt?: PromptNode): number => (
+    prompt?.mode === 'ecommerce' && prompt.ecommerce?.kind === 'framework'
+        ? ECOMMERCE_FRAMEWORK_PROMPT_WIDTH
+        : PROMPT_WIDTH
+);
+
+const getEcommerceFrameworkSortKey = (group: LayoutGroup): {
+    frameworkId: string;
+    rank: number;
+} | null => {
+    const ecommerce = group.prompt?.ecommerce;
+    if (!group.prompt || !ecommerce) {
+        return null;
+    }
+
+    if (ecommerce.kind === 'framework') {
+        return { frameworkId: group.prompt.id, rank: 2 };
+    }
+
+    if (!ecommerce.frameworkId) {
+        return null;
+    }
+
+    const sheetRank = ecommerce.sourceSheet === 'A+' ? 1 : 0;
+    return { frameworkId: ecommerce.frameworkId, rank: sheetRank };
+};
+
+const compareRootLayoutGroups = (
+    a: LayoutGroup,
+    b: LayoutGroup,
+    rootOrder: Map<LayoutGroup, number>,
+    frameworkFirstOrder: Map<string, number>,
+): number => {
+    const leftOrder = rootOrder.get(a) ?? 0;
+    const rightOrder = rootOrder.get(b) ?? 0;
+    const leftKey = getEcommerceFrameworkSortKey(a);
+    const rightKey = getEcommerceFrameworkSortKey(b);
+    const leftBucketOrder = leftKey ? (frameworkFirstOrder.get(leftKey.frameworkId) ?? leftOrder) : leftOrder;
+    const rightBucketOrder = rightKey ? (frameworkFirstOrder.get(rightKey.frameworkId) ?? rightOrder) : rightOrder;
+    const bucketDiff = leftBucketOrder - rightBucketOrder;
+
+    if (bucketDiff !== 0) {
+        return bucketDiff;
+    }
+
+    if (leftKey && rightKey) {
+        const frameworkDiff = leftKey.frameworkId.localeCompare(rightKey.frameworkId);
+        if (frameworkDiff !== 0) {
+            return frameworkDiff;
+        }
+
+        const rankDiff = leftKey.rank - rightKey.rank;
+        if (rankDiff !== 0) {
+            return rankDiff;
+        }
+    }
+
+    return leftOrder - rightOrder;
 };
 
 export function resolveCanvasAutoArrangePositions(canvas: Canvas): CanvasAutoArrangePositions {
@@ -79,7 +140,7 @@ export function resolveCanvasAutoArrangePositions(canvas: Canvas): CanvasAutoArr
             ? rows * maxSubHeight + (rows - 1) * SUB_IMAGE_GAP
             : 0;
 
-        const groupWidth = Math.max(PROMPT_WIDTH, subBlockWidth);
+        const groupWidth = Math.max(getPromptWidth(prompt), subBlockWidth);
         const groupHeight = promptHeight + (childImages.length > 0 ? PROMPT_TO_SUB_GAP + subBlockHeight : 0);
 
         layoutGroups.push({
@@ -101,7 +162,7 @@ export function resolveCanvasAutoArrangePositions(canvas: Canvas): CanvasAutoArr
             type: 'orphan-prompt',
             prompt,
             images: [],
-            width: PROMPT_WIDTH,
+            width: getPromptWidth(prompt),
             height: prompt.height || 200,
             sourcePromptId,
         });
@@ -119,6 +180,18 @@ export function resolveCanvasAutoArrangePositions(canvas: Canvas): CanvasAutoArr
 
     const followUpGroups = layoutGroups.filter(group => !!group.sourcePromptId && group.prompt);
     const rootLayoutGroups = layoutGroups.filter(group => !group.sourcePromptId);
+    const rootOrder = new Map(rootLayoutGroups.map((group, index) => [group, index] as const));
+    const frameworkFirstOrder = new Map<string, number>();
+    rootLayoutGroups.forEach((group) => {
+        const key = getEcommerceFrameworkSortKey(group);
+        if (!key) return;
+        const order = rootOrder.get(group) ?? 0;
+        const previous = frameworkFirstOrder.get(key.frameworkId);
+        if (previous === undefined || order < previous) {
+            frameworkFirstOrder.set(key.frameworkId, order);
+        }
+    });
+    rootLayoutGroups.sort((a, b) => compareRootLayoutGroups(a, b, rootOrder, frameworkFirstOrder));
     const followUpChildrenMap = new Map<string, LayoutGroup[]>();
     followUpGroups.forEach(group => {
         const sourcePromptId = group.sourcePromptId!;
