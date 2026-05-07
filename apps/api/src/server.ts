@@ -1447,7 +1447,7 @@ function buildApiServer(
           return;
         }
 
-        if (req.method === "POST" && pathname === "/api/v1/auth/login") {
+        if (req.method === "POST" && (pathname === "/api/v1/auth/login" || pathname === "/api/auth/login")) {
           const body = await readJsonBody(req);
           const result = await handleVersionedLogin(
             authService,

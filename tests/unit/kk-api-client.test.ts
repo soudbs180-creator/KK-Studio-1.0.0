@@ -205,6 +205,61 @@ describe("kk api client", () => {
     });
   });
 
+  test("builds password login requests against the versioned auth route", async () => {
+    const requests: Array<{
+      body?: string;
+      credentials?: RequestCredentials;
+      method?: string;
+      url: string;
+    }> = [];
+
+    const client = createKkApiClient({
+      baseUrl: "http://172.245.156.16",
+      fetchImpl: async (input, init) => {
+        requests.push({
+          url: String(input),
+          method: init?.method,
+          credentials: init?.credentials,
+          body: typeof init?.body === "string" ? init.body : undefined,
+        });
+
+        return new Response(JSON.stringify({
+          success: false,
+          error: {
+            code: "AUTH_REQUIRED",
+            message: "Invalid login credentials.",
+          },
+          meta: {
+            requestId: "req-login-client",
+            timestamp: "2026-05-07T00:00:00.000Z",
+          },
+        }), {
+          status: 401,
+          headers: {
+            "content-type": "application/json",
+          },
+        });
+      },
+    });
+
+    const response = await client.login({
+      email: "missing@example.com",
+      password: "missing-password",
+    }, {
+      requestId: "req-login-client",
+    });
+
+    assert.equal(response.success, false);
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url, "http://172.245.156.16/api/v1/auth/login");
+    assert.equal(requests[0].method, "POST");
+    assert.equal(requests[0].credentials, "include");
+    assert.deepEqual(JSON.parse(requests[0].body || "{}"), {
+      email: "missing@example.com",
+      password: "missing-password",
+    });
+  });
+
   test("wraps non-envelope http failures into the standard error shape", async () => {
     const client = createKkApiClient({
       baseUrl: "http://127.0.0.1:3001",

@@ -119,6 +119,39 @@ test("startApiServer handles browser CORS preflight for local web login", async 
   assert.match(response.headers.get("access-control-allow-headers") || "", /\bx-client-version\b/);
 });
 
+test("startApiServer keeps the legacy password login path bridged for stale web clients", async () => {
+  const server = await withMutedConsoleWarnAsync(() => startApiServer(0, {
+    allowDegradedPersistence: true,
+    authDataRepository: new InMemoryAuthDataRepository(),
+    verifyTurnstileToken: async () => ({ success: true }),
+  }));
+  trackedServers.add(server);
+
+  const response = await fetch(`${getBaseUrl(server)}/api/auth/login`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-request-id": "req-legacy-login-bridge",
+    },
+    body: JSON.stringify({
+      email: "missing-user@example.com",
+      password: "missing-password",
+    }),
+  });
+  const body = await response.json() as {
+    success: boolean;
+    error?: {
+      code?: string;
+      details?: Array<{ url?: string }>;
+    };
+  };
+
+  assert.equal(response.status, 401);
+  assert.equal(body.success, false);
+  assert.equal(body.error?.code, "AUTH_REQUIRED");
+  assert.notEqual(body.error?.details?.[0]?.url, "/api/auth/login");
+});
+
 test("model proxy routes accept image payloads larger than the default JSON body limit", async () => {
   const server = await withMutedConsoleWarnAsync(() => startApiServer(0, {
     allowDegradedPersistence: true,

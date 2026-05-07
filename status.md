@@ -2,6 +2,14 @@
 
 Last updated: 2026-05-07
 
+## Current Auth And VPS Login Hotfix
+
+- Active user issue: default open entered the local workspace instead of the login page, the administrator entry reported `VITE_KK_ADMIN_URL must be configured for the admin redirect.`, and normal password login surfaced `HTTP_404: Request failed`.
+- Root cause evidence: the VPS API is reachable on `/healthz`, `/api/manifest`, and `/api/v1/auth/login`, but the bare `http://172.245.156.16/` entry was being served by the API default virtual host. The VPS deploy script also built the main web app without publishing `dist/`, so the normal login page bundle and its `VITE_KK_ADMIN_URL` injection could be stale or missing.
+- Implemented scope: default auth state now stays signed out unless a user explicitly chooses temporary local access; the login screen keeps temporary local access beside administrator sign-in; `VITE_KK_ADMIN_URL` is part of the runtime env helper; stale clients hitting `/api/auth/login` are bridged to the versioned login handler; the VPS gateway default server now serves `/var/www/kk-app` and proxies `/api/` plus `/healthz`; the deploy script now builds and publishes both `dist/` and `apps/admin/dist/` with optional `/etc/kk-studio/kk-web.env` and `/etc/kk-studio/kk-admin.env` files.
+- Fresh validation passed: targeted auth/VPS suite passed 42/42; legacy login bridge focused test passed 1/1; `npm.cmd run typecheck` passed; `npm.cmd run check:encoding` passed; `npm.cmd run build` passed; `npm.cmd run admin:build` passed.
+- Deployment note: this fix changes frontend bundles, API code, nginx, and deploy scripts. The live VPS will still show the old `HTTP_404`/default API root behavior until the updated repo is deployed, nginx config is installed/reloaded, and `kk-api` is restarted. Browser site data may also need clearing if an old `temp_user_session_v1` exists.
+
 ## Active State
 
 - Current deployment override (2026-05-07): bump the hosted release metadata from `1.4.2` to `1.4.5`, rebuild `dist/app-version.json`, verify version governance, commit the release metadata slice, and deploy production to Vercel for `https://kkai.plus/`.

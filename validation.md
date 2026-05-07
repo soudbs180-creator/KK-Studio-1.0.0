@@ -4,6 +4,48 @@ Last updated: 2026-05-07
 
 Use `npm.cmd` for npm scripts on Windows.
 
+## Auth And VPS Login Hotfix Gate
+
+Use this gate when touching the login screen default/auth state, KK API password login route, public runtime env helper, or VPS nginx/static deployment entry:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/workspace-auth-gate.test.ts" `
+  "tests/unit/login-screen-admin-entry.test.ts" `
+  "tests/unit/local-env-contract.test.ts" `
+  "tests/unit/kk-api-client.test.ts" `
+  "tests/unit/vps-deploy-contract.test.ts" `
+  "tests/unit/vps-deploy-artifacts.test.ts"
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none --test-name-pattern "legacy password login path" `
+  "tests/unit/api-server-startup.test.ts"
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run admin:build
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  ".env.example" `
+  "apps/api/src/server.ts" `
+  "deploy/nginx/kk-vps-gateway.conf" `
+  "scripts/vps/bootstrap-kk-vps.sh" `
+  "scripts/vps/deploy-kk-vps.sh" `
+  "scripts/vps/kk-web.env.example" `
+  "src/components/auth/LoginScreen.tsx" `
+  "src/context/AuthContext.tsx" `
+  "src/utils/runtimeEnv.ts" `
+  "tests/unit/api-server-startup.test.ts" `
+  "tests/unit/kk-api-client.test.ts" `
+  "tests/unit/local-env-contract.test.ts" `
+  "tests/unit/login-screen-admin-entry.test.ts" `
+  "tests/unit/vps-deploy-contract.test.ts" `
+  "tests/unit/workspace-auth-gate.test.ts" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser/VPS QA requires deploying the updated bundle and nginx config to the VPS, then checking `http://172.245.156.16/` serves the login page, `POST http://172.245.156.16/api/v1/auth/login` reaches the API, the administrator button opens the configured admin `/login`, and temporary local access only happens after its explicit button is clicked.
+
 ## Ecommerce Framework Card Header And Arrange Gate
 
 Use this gate when touching the ecommerce framework prompt-card header remark/tag surface or full-canvas ecommerce framework cohort auto-arrange ordering:

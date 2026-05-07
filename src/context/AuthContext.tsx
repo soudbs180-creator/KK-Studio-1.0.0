@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
 
-import { KKAI_FEATURE_FLAGS } from "../app/kkaiFeatureFlags.ts";
 import { clearStoredAdminSession } from "../services/api/adminSession";
 import { getStoredKkApiAccessToken, setStoredKkApiAccessToken } from "../services/api/authAccessToken";
 import { isHostedRuntime, kkWebApiClient, shouldUseLegacyWebApiFallback } from "../services/api/kkApiClient";
@@ -18,7 +17,6 @@ import {
 import {
   clearPersistedRuntimeAuthState,
   createDefaultRuntimeAuthState,
-  createFixedLocalRuntimeAuthState,
   persistRuntimeAuthState,
   readPersistedRuntimeAuthState,
   subscribeRuntimeAuthState,
@@ -62,9 +60,6 @@ function createSession(user: RuntimeAuthUser | null, accessToken?: string): Runt
 }
 
 function resolveInitialRuntimeState(): RuntimeAuthState {
-  const localOnlyRuntime = !KKAI_FEATURE_FLAGS.admin
-    && !KKAI_FEATURE_FLAGS.workspaceCloudSync
-    && !KKAI_FEATURE_FLAGS.cloudProfileFallback;
   const cachedTempUser = tempUserService.getCachedTempUser();
   if (cachedTempUser) {
     return {
@@ -76,7 +71,7 @@ function resolveInitialRuntimeState(): RuntimeAuthState {
 
   const persistedState = readPersistedRuntimeAuthState();
   if (!persistedState.isTempUser && !getStoredKkApiAccessToken()) {
-    return localOnlyRuntime ? createFixedLocalRuntimeAuthState() : createDefaultRuntimeAuthState();
+    return createDefaultRuntimeAuthState();
   }
 
   return persistedState;

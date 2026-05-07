@@ -24,6 +24,7 @@ import { startGoogleSignIn } from '../../services/auth/googleAuth.ts';
 import { signInWithPasswordWithFallback } from '../../services/auth/passwordSignIn';
 import { startWechatLogin } from '../../services/auth/wechatAuth.ts';
 import { pickByResolvedLanguage, type ResolvedLanguage } from '../../utils/localeText';
+import { readRuntimeEnv } from '../../utils/runtimeEnv';
 import { getTurnstileDisabledMessage, getTurnstileMissingSiteKeyMessage, mapAuthErrorMessage } from './authLocalization';
 import { TurnstileWidget, canUseTurnstile, ensureTurnstileScript, useTurnstile } from './TurnstileWidget';
 import WechatQrModal from './WechatQrModal';
@@ -344,7 +345,7 @@ const LoginScreen: React.FC = () => {
 
     try {
       const nextUrl = buildAdminLoginUrl({
-        configuredBaseUrl: import.meta.env.VITE_KK_ADMIN_URL,
+        configuredBaseUrl: readRuntimeEnv('VITE_KK_ADMIN_URL'),
         currentUrl: window.location.href,
       });
       window.location.assign(nextUrl);
@@ -459,7 +460,7 @@ const LoginScreen: React.FC = () => {
                 <button type="button" className="auth-btn auth-btn-ghost" onClick={handleWechatLogin} disabled={loading || wechatLoading || googleLoading}><QrCode size={18} />{t('使用微信扫码登录', 'Continue with WeChat QR')}</button>
                 <button type="button" className="auth-btn auth-btn-google" onClick={() => void handleGoogleLogin()} disabled={loading || googleLoading || wechatLoading}>{googleLoading ? <><Loader2 size={16} className="animate-spin" />{t('跳转中...', 'Redirecting...')}</> : <>{t('使用 Google 登录', 'Continue with Google')}</>}</button>
                 <div className="auth-aux-actions">
-                  {!hostedRuntime ? <button type="button" className="auth-btn auth-btn-ghost auth-btn-compact" onClick={() => void handleTempUserEntry()} disabled={loading || googleLoading || wechatLoading}>{loading ? <><Loader2 size={15} className="animate-spin" />{t('\u6b63\u5728\u51c6\u5907', 'Preparing')}</> : t('\u4e34\u65f6\u7528\u6237\uff08\u4ec5\u672c\u5730\uff09', 'Temporary local access')}</button> : null}
+                  <button type="button" className="auth-btn auth-btn-ghost auth-btn-compact" onClick={() => void handleTempUserEntry()} disabled={loading || googleLoading || wechatLoading}>{loading ? <><Loader2 size={15} className="animate-spin" />{t('\u6b63\u5728\u51c6\u5907', 'Preparing')}</> : t('\u4e34\u65f6\u7528\u6237\uff08\u4ec5\u672c\u5730\uff09', 'Temporary local access')}</button>
                   <button type="button" className="auth-btn auth-btn-ghost auth-btn-compact" onClick={handleAdminEntry} disabled={loading || googleLoading || wechatLoading}>{t('管理员登录', 'Admin sign-in')}</button>
                 </div>
               </>

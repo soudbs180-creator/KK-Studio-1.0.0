@@ -69,6 +69,19 @@ test('AuthContext does not poll hosted cookie recovery forever for signed-out lo
   );
 });
 
+test('AuthContext does not create a fixed local workspace user before the user chooses temporary local access', () => {
+  const source = readSource('src/context/AuthContext.tsx');
+
+  assert.doesNotMatch(
+    source,
+    /return localOnlyRuntime \? createFixedLocalRuntimeAuthState\(\) : createDefaultRuntimeAuthState\(\);/,
+  );
+  assert.match(
+    source,
+    /loginAsTempUser: async \(\) => \{[\s\S]*const tempSession = await tempUserService\.getOrCreateTempUser/,
+  );
+});
+
 test('explicit user logout blocks hosted session recovery until a new runtime user appears', () => {
   const source = readSource('src/context/AuthContext.tsx');
 

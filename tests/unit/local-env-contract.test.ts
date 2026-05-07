@@ -161,6 +161,7 @@ test("runtime env helper keeps Vite public vars on explicit import.meta.env keys
   );
 
   assert.match(runtimeEnvSource, /import\.meta\.env\.VITE_KK_API_BASE_URL/);
+  assert.match(runtimeEnvSource, /import\.meta\.env\.VITE_KK_ADMIN_URL/);
   assert.doesNotMatch(runtimeEnvSource, /import\.meta\.env\.VITE_SUPABASE_URL/);
   assert.doesNotMatch(runtimeEnvSource, /import\.meta\.env\.VITE_SUPABASE_ANON_KEY/);
   assert.match(runtimeEnvSource, /import\.meta\.env\.VITE_TURNSTILE_SITE_KEY/);
@@ -176,4 +177,5 @@ test(".env.example does not activate a non-local KK API base URL by default", ()
     /^VITE_KK_API_BASE_URL\s*=\s*https?:\/\/(?!localhost(?::|\/|$)|127\.|0\.0\.0\.0(?::|\/|$))/m,
   );
   assert.match(source, /^# VITE_KK_API_BASE_URL=https:\/\/your-kk-studio-api\.example\.com/m);
+  assert.match(source, /^# VITE_KK_ADMIN_URL=https:\/\/your-kk-studio-admin\.example\.com/m);
 });
