@@ -88,7 +88,11 @@ apply_bootstrap_sql_if_requested() {
 restart_services() {
   systemctl daemon-reload
   for service in "${SYSTEMD_SERVICES[@]}"; do
-    systemctl restart "${service}"
+    if systemctl list-unit-files "${service}.service" --no-legend | grep -q "^${service}\\.service"; then
+      systemctl restart "${service}"
+    else
+      echo "[deploy-kk-vps] Skipping missing optional service: ${service}"
+    fi
   done
   systemctl reload nginx
 }
