@@ -7,6 +7,7 @@ import { resetStartupModeLogDedupForTests, startApiServer } from "../../apps/api
 
 const trackedServers = new Set<Awaited<ReturnType<typeof startApiServer>>>();
 const originalConsoleWarn = console.warn;
+const originalFetch = globalThis.fetch;
 
 async function withMutedConsoleWarnAsync<T>(callback: () => Promise<T>): Promise<T> {
   const originalWarn = console.warn;
@@ -82,6 +83,7 @@ beforeEach(() => {
 
 afterEach(() => {
   console.warn = originalConsoleWarn;
+  globalThis.fetch = originalFetch;
 });
 
 test("startApiServer resolves a listening server", async () => {
@@ -150,6 +152,62 @@ test("startApiServer keeps the legacy password login path bridged for stale web 
   assert.equal(body.success, false);
   assert.equal(body.error?.code, "AUTH_REQUIRED");
   assert.notEqual(body.error?.details?.[0]?.url, "/api/auth/login");
+});
+
+test("startApiServer verifies login turnstile tokens with the configured Cloudflare secret", async () => {
+  const originalSecret = process.env.TURNSTILE_SECRET_KEY;
+  process.env.TURNSTILE_SECRET_KEY = "unit-test-turnstile-secret";
+  const verifyRequests: string[] = [];
+  globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url === "https://challenges.cloudflare.com/turnstile/v0/siteverify") {
+      verifyRequests.push(String(init?.body || ""));
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { "content-type": "application/json" },
+        status: 200,
+      });
+    }
+
+    return originalFetch(input, init);
+  };
+
+  try {
+    const server = await withMutedConsoleWarnAsync(() => startApiServer(0, {
+      allowDegradedPersistence: true,
+      authDataRepository: new InMemoryAuthDataRepository(),
+    }));
+    trackedServers.add(server);
+
+    const response = await originalFetch(`${getBaseUrl(server)}/api/v1/auth/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-request-id": "req-turnstile-login",
+      },
+      body: JSON.stringify({
+        email: "missing-user@example.com",
+        password: "missing-password",
+        turnstileToken: "browser-turnstile-token",
+      }),
+    });
+    const body = await response.json() as {
+      success: boolean;
+      error?: { code?: string; message?: string };
+    };
+
+    assert.equal(response.status, 401);
+    assert.equal(body.success, false);
+    assert.equal(body.error?.code, "AUTH_REQUIRED");
+    assert.equal(verifyRequests.length, 1);
+    assert.match(verifyRequests[0], /secret=unit-test-turnstile-secret/);
+    assert.match(verifyRequests[0], /response=browser-turnstile-token/);
+  } finally {
+    if (typeof originalSecret === "string") {
+      process.env.TURNSTILE_SECRET_KEY = originalSecret;
+    } else {
+      delete process.env.TURNSTILE_SECRET_KEY;
+    }
+  }
 });
 
 test("model proxy routes accept image payloads larger than the default JSON body limit", async () => {

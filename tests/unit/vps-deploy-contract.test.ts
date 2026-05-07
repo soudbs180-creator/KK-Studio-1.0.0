@@ -35,11 +35,14 @@ test("VPS bootstrap and deploy assets exist for the postgres-first runtime", () 
   });
 
   const bootstrapSource = readSource(bootstrapScript);
+  const apiEnvSource = readSource(apiEnv);
   assert.match(bootstrapSource, /apt-get install -y[\s\S]*nginx/);
   assert.match(bootstrapSource, /apt-get install -y[\s\S]*postgresql/);
   assert.match(bootstrapSource, /deploy\/systemd\/\*\.service/);
   assert.match(readSource(deployScript), /npm run admin:build/);
   assert.match(readSource(deployScript), /bootstrap-kk-vps\.sql/);
+  assert.match(apiEnvSource, /TURNSTILE_SECRET_KEY=/);
+  assert.match(apiEnvSource, /KK_AUTH_REQUIRE_TURNSTILE=/);
   assert.match(readSource(webEnv), /VITE_KK_API_BASE_URL=/);
   assert.match(readSource(webEnv), /VITE_KK_ADMIN_URL=/);
   assert.match(readSource(adminWebEnv), /VITE_KK_ADMIN_API_BASE_URL=/);
@@ -59,6 +62,11 @@ test("VPS default web entry serves the main login app while admin stays separate
   assert.match(deploySource, /APP_SITE_ROOT="\$\{KK_APP_SITE_ROOT:-\/var\/www\/kk-app\}"/);
   assert.match(deploySource, /WEB_ENV_FILE="\$\{KK_WEB_ENV_FILE:-\$ENV_DIR\/kk-web\.env\}"/);
   assert.match(deploySource, /ADMIN_ENV_FILE="\$\{KK_ADMIN_ENV_FILE:-\$ENV_DIR\/kk-admin\.env\}"/);
+  assert.match(deploySource, /install -m 0644 "\$\{CURRENT_DIR\}\/deploy\/nginx\/kk-vps-gateway\.conf" \/etc\/nginx\/sites-available\/kk-vps-gateway\.conf/);
+  assert.match(deploySource, /ln -sf \/etc\/nginx\/sites-available\/kk-vps-gateway\.conf \/etc\/nginx\/sites-enabled\/kk-vps-gateway\.conf/);
+  assert.match(deploySource, /rm -f \/etc\/nginx\/sites-enabled\/kk-api\.conf/);
+  assert.match(deploySource, /nginx -t/);
+  assert.match(bootstrapSource, /rm -f \/etc\/nginx\/sites-enabled\/kk-api\.conf/);
   assert.match(deploySource, /rsync -a --delete "\$\{CURRENT_DIR\}\/dist\/" "\$\{APP_SITE_ROOT\}\/"/);
   assert.match(deploySource, /rsync -a --delete "\$\{CURRENT_DIR\}\/apps\/admin\/dist\/" "\$\{ADMIN_SITE_ROOT\}\/"/);
   assert.match(bootstrapSource, /APP_SITE_ROOT="\$\{KK_APP_SITE_ROOT:-\/var\/www\/kk-app\}"/);

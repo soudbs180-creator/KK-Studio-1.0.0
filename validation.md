@@ -16,11 +16,12 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/kk-api-client.test.ts" `
   "tests/unit/vps-deploy-contract.test.ts" `
   "tests/unit/vps-deploy-artifacts.test.ts"
-node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none --test-name-pattern "legacy password login path" `
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none --test-name-pattern "configured Cloudflare secret|legacy password login path|local web login" `
   "tests/unit/api-server-startup.test.ts"
 npm.cmd run typecheck
 npm.cmd run build
 npm.cmd run admin:build
+npm.cmd run governance:agent-docs
 npm.cmd run check:encoding
 git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
   ".env.example" `
@@ -28,6 +29,8 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
   "deploy/nginx/kk-vps-gateway.conf" `
   "scripts/vps/bootstrap-kk-vps.sh" `
   "scripts/vps/deploy-kk-vps.sh" `
+  "scripts/vps/kk-api.env.example" `
+  "scripts/vps/kk-vps.env.example" `
   "scripts/vps/kk-web.env.example" `
   "src/components/auth/LoginScreen.tsx" `
   "src/context/AuthContext.tsx" `

@@ -467,10 +467,80 @@ function buildErrorMeta(requestId: string, clientVersion?: string) {
   };
 }
 
-const defaultTurnstileVerifier: TurnstileVerifier = async () => ({
-  success: false,
-  error: "Turnstile verifier is not configured for the API skeleton.",
-});
+const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+
+function isFalsyEnvValue(value: string | undefined): boolean {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "0"
+    || normalized === "false"
+    || normalized === "no"
+    || normalized === "off";
+}
+
+function getTurnstileErrorMessage(code: string): string {
+  const errorMap: Record<string, string> = {
+    "missing-input-secret": "Turnstile server secret is missing.",
+    "invalid-input-secret": "Turnstile server secret is invalid.",
+    "missing-input-response": "Complete the Turnstile challenge before submitting.",
+    "invalid-input-response": "Turnstile verification failed. Try again.",
+    "bad-request": "Turnstile verification request is malformed.",
+    "timeout-or-duplicate": "Turnstile verification expired. Try again.",
+    "internal-error": "Turnstile verification service is temporarily unavailable.",
+  };
+
+  return errorMap[code] || "Turnstile verification failed. Try again.";
+}
+
+const defaultTurnstileVerifier: TurnstileVerifier = async (token, ip) => {
+  if (isFalsyEnvValue(process.env.KK_AUTH_REQUIRE_TURNSTILE)) {
+    return { success: true };
+  }
+
+  const secret = String(process.env.TURNSTILE_SECRET_KEY || "").trim();
+  if (!secret) {
+    return {
+      success: false,
+      error: "Turnstile verifier is not configured for the API skeleton. Set TURNSTILE_SECRET_KEY or KK_AUTH_REQUIRE_TURNSTILE=false.",
+    };
+  }
+
+  if (!token) {
+    return { success: false, error: "Complete the Turnstile challenge before submitting." };
+  }
+
+  try {
+    const response = await fetch(TURNSTILE_VERIFY_URL, {
+      method: "POST",
+      body: new URLSearchParams({
+        secret,
+        response: token,
+        ...(ip ? { remoteip: ip } : {}),
+      }),
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+    });
+
+    if (!response.ok) {
+      return { success: false, error: "Turnstile verification service is temporarily unavailable." };
+    }
+
+    const data = await response.json() as {
+      success?: boolean;
+      "error-codes"?: string[];
+    };
+    if (data.success) {
+      return { success: true };
+    }
+
+    return {
+      success: false,
+      error: getTurnstileErrorMessage(data["error-codes"]?.[0] || "unknown"),
+    };
+  } catch {
+    return { success: false, error: "Turnstile verification service is temporarily unavailable." };
+  }
+};
 
 type CriticalPersistenceCapability =
   | "authData"

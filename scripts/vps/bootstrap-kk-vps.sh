@@ -108,6 +108,7 @@ install_runtime_templates() {
     install -m 0644 deploy/nginx/kk-vps-gateway.conf /etc/nginx/sites-available/kk-vps-gateway.conf
     ln -sf /etc/nginx/sites-available/kk-vps-gateway.conf /etc/nginx/sites-enabled/kk-vps-gateway.conf
     rm -f /etc/nginx/sites-enabled/default
+    rm -f /etc/nginx/sites-enabled/kk-api.conf
   fi
 
   systemctl daemon-reload

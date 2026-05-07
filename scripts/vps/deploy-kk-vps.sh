@@ -58,6 +58,19 @@ build_static_sites() {
   rsync -a --delete "${CURRENT_DIR}/apps/admin/dist/" "${ADMIN_SITE_ROOT}/"
 }
 
+install_nginx_gateway() {
+  if [[ ! -f "${CURRENT_DIR}/deploy/nginx/kk-vps-gateway.conf" ]]; then
+    echo "[deploy-kk-vps] Nginx gateway config not found at ${CURRENT_DIR}/deploy/nginx/kk-vps-gateway.conf" >&2
+    exit 1
+  fi
+
+  install -m 0644 "${CURRENT_DIR}/deploy/nginx/kk-vps-gateway.conf" /etc/nginx/sites-available/kk-vps-gateway.conf
+  ln -sf /etc/nginx/sites-available/kk-vps-gateway.conf /etc/nginx/sites-enabled/kk-vps-gateway.conf
+  rm -f /etc/nginx/sites-enabled/default
+  rm -f /etc/nginx/sites-enabled/kk-api.conf
+  nginx -t
+}
+
 apply_bootstrap_sql_if_requested() {
   if [[ "${APPLY_BOOTSTRAP_SQL}" != "true" ]]; then
     return
@@ -84,6 +97,7 @@ sync_repo_to_runtime
 install_dependencies
 apply_bootstrap_sql_if_requested
 build_static_sites
+install_nginx_gateway
 restart_services
 
 echo "[deploy-kk-vps] Deployment complete."
