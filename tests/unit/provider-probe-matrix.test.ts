@@ -64,4 +64,30 @@ describe("provider probe matrix", () => {
     assert.equal(matrix.skipReason, null);
     assert.ok(matrix.availableSurfaces.includes("openai-responses"));
   });
+
+  test("uses GPT Best model discovery before image or video probe surfaces", () => {
+    const runtime = resolveProviderRuntime({
+      provider: "GPT Best",
+      baseUrl: "https://gateway.example.com/v1",
+      format: "openai",
+    });
+
+    const imageMatrix = resolveProviderProbeMatrix({
+      runtime,
+      modelId: "nano-banana-2",
+      compatibilityMode: "standard",
+    });
+    const videoMatrix = resolveProviderProbeMatrix({
+      runtime,
+      modelId: "sora-2",
+      compatibilityMode: "chat",
+      isVideoModel: true,
+    });
+
+    assert.equal(imageMatrix.modelDiscoverySurface, "openai-models");
+    assert.equal(imageMatrix.protocolProbeSurface, "openai-models");
+    assert.equal(imageMatrix.skipReason, "standard-mode-billing-risk");
+    assert.equal(videoMatrix.protocolProbeSurface, "openai-models");
+    assert.equal(videoMatrix.skipReason, "video-billing-risk");
+  });
 });

@@ -86,6 +86,10 @@ test("GPT Best native images payload stays aligned with the documented images su
 
   assert.ok(nativeBlockMatch, "expected to find the GPT Best native images helper");
   assert.match(
+    adapterSource,
+    /assertOpenAICompatibleRuntimeBaseUrl\(keySlot, 'images'\);/,
+  );
+  assert.match(
     nativeBlockMatch[0],
     /aspect_ratio: aspectRatioStr/,
   );
@@ -117,11 +121,19 @@ test("model endpoint types flow from key metadata into image surface routing", (
   );
   assert.match(
     keyManagerSource,
+    /const REMOTE_MODEL_METADATA = new Map<string, ModelMetadata>\(\);/,
+  );
+  assert.match(
+    keyManagerSource,
+    /registerRemoteModelMetadata\(discovery\.metadataByModelId\);/,
+  );
+  assert.match(
+    keyManagerSource,
     /pricingMeta\?\.endpointTypes/,
   );
   assert.match(
     keyManagerSource,
-    /endpointTypes: exactModel\.endpointTypes/,
+    /endpointTypes: remoteMetadata\?\.endpointTypes \|\| exactModel\.endpointTypes/,
   );
   assert.match(
     adapterSource,
@@ -135,6 +147,48 @@ test("model endpoint types flow from key metadata into image surface routing", (
     adapterSource.indexOf("const modelMetadata = getModelMetadata(options.modelId);")
       < adapterSource.indexOf("const imageSurface = resolveImageSurface({"),
     "expected modelMetadata to be declared before resolveImageSurface uses it",
+  );
+});
+
+test("third-party OpenAI-compatible image paths fail fast when Base URL is missing", () => {
+  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+
+  assert.match(
+    adapterSource,
+    /private assertOpenAICompatibleRuntimeBaseUrl\(keySlot: KeySlot, surface: 'chat' \| 'images', format\?: string\): void/,
+  );
+  assert.match(
+    adapterSource,
+    /runtime\.strategyId !== 'openai'[\s\S]*?请先填写该供应商工作台提供的真实 Base URL/,
+  );
+  assert.match(
+    adapterSource,
+    /generateImageViaChat[\s\S]*?this\.assertOpenAICompatibleRuntimeBaseUrl\(keySlot, 'chat'\);/,
+  );
+  assert.match(
+    adapterSource,
+    /generateImageViaChatStrict[\s\S]*?this\.assertOpenAICompatibleRuntimeBaseUrl\(keySlot, 'chat'\);/,
+  );
+  assert.match(
+    adapterSource,
+    /generateImageStandard_OpenAI_Strict_DocSafe[\s\S]*?this\.assertOpenAICompatibleRuntimeBaseUrl\(keySlot, 'images'\);/,
+  );
+  assert.match(
+    adapterSource,
+    /generateImageGeminiNative[\s\S]*?this\.assertOpenAICompatibleRuntimeBaseUrl\(keySlot, 'images', 'gemini'\);/,
+  );
+});
+
+test("third-party OpenAI-compatible chat paths fail fast when Base URL is missing", () => {
+  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+
+  assert.match(
+    adapterSource,
+    /chatWithCompatibleResponses[\s\S]*?this\.assertOpenAICompatibleRuntimeBaseUrl\(keySlot, 'chat'\);/,
+  );
+  assert.match(
+    adapterSource,
+    /chatStreamWithCompatibleResponses[\s\S]*?this\.assertOpenAICompatibleRuntimeBaseUrl\(keySlot, 'chat'\);/,
   );
 });
 

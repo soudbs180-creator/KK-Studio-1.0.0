@@ -1,8 +1,46 @@
 # KK-Studio v1.4.5 Single-Line Validation Matrix
 
-Last updated: 2026-05-07
+Last updated: 2026-05-08
 
 Use `npm.cmd` for npm scripts on Windows.
+
+## GPT Best Priority Provider Compatibility Gate
+
+Use this gate when touching GPT Best, OpenAI-compatible provider strategy, model discovery metadata, connection-test model listing, or OpenAI-compatible image dispatch:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/openai-compatible-image-dispatch-contract.test.ts" `
+  "tests/unit/provider-image-routing-regression.test.ts" `
+  "tests/unit/provider-strategy.test.ts" `
+  "tests/unit/provider-probe-matrix.test.ts" `
+  "tests/unit/key-manager-remote-model-discovery-contract.test.ts" `
+  "tests/unit/connection-test-gpt-best-contract.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "src/services/auth/keyManager.ts" `
+  "src/services/auth/keyManagerRemoteModelDiscovery.ts" `
+  "src/services/llm/OpenAICompatibleAdapter.ts" `
+  "src/services/llm/openAICompatibleImageDispatch.ts" `
+  "tests/unit/key-manager-remote-model-discovery-contract.test.ts" `
+  "tests/unit/openai-compatible-image-dispatch-contract.test.ts" `
+  "tests/unit/provider-image-routing-regression.test.ts" `
+  "tests/unit/provider-probe-matrix.test.ts" `
+  "tests/unit/provider-strategy.test.ts" `
+  "tests/unit/connection-test-gpt-best-contract.test.ts" `
+  "tsconfig.tests.json" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA may be skipped for this gate because it is a non-UI provider-routing/model-discovery slice with no JSX, CSS, or browser-visible surface change. Record the skip reason in `status.md`.
 
 ## Auth And VPS Login Hotfix Gate
 

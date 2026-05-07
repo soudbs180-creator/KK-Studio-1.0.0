@@ -26,9 +26,17 @@ export interface OpenAICompatibleImageDispatchInput {
     runtime: ResolvedProviderRuntime;
     imageSurface: ResolvedImageSurface;
     isGeminiImage: boolean;
+    endpointTypes?: string[];
     legacyGeminiChatGateway?: boolean;
     antigravityUsesChat?: boolean;
     useChatEndpoint?: boolean;
+}
+
+function endpointHintsInclude(endpointTypes: string[] | undefined, patterns: RegExp[]): boolean {
+    return (endpointTypes || []).some((value) => {
+        const normalized = String(value || '').trim().toLowerCase();
+        return normalized && patterns.some((pattern) => pattern.test(normalized));
+    });
 }
 
 export function resolveOpenAICompatibleImageDispatch(
@@ -64,6 +72,21 @@ export function resolveOpenAICompatibleImageDispatch(
     }
 
     if (input.runtime.strategyId === 'gpt-best') {
+        const supportsImages = endpointHintsInclude(input.endpointTypes, [
+            /image-generation/,
+            /\/images\/generations/,
+            /^images$/,
+            /^generations$/,
+        ]);
+        const supportsChat = endpointHintsInclude(input.endpointTypes, [
+            /chat/,
+            /completions/,
+        ]);
+
+        if (!supportsImages && supportsChat) {
+            return { kind: 'provider-chat' };
+        }
+
         return { kind: 'gpt-best-native' };
     }
 

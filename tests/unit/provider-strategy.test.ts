@@ -141,6 +141,26 @@ describe("provider strategy", () => {
     assert.equal(runtime.authMethod, "header");
   });
 
+  test("keeps GPT Best as surface-first multi-protocol provider", () => {
+    const runtime = resolveProviderRuntime({
+      provider: "GPT Best",
+      baseUrl: "https://gateway.example.com/v1",
+      format: "openai",
+      compatibilityMode: "chat",
+    });
+
+    assert.equal(runtime.strategyId, "gpt-best");
+    assert.deepEqual(runtime.supportedProtocolFamilies, [
+      "openai-compatible",
+      "gemini-native",
+      "claude-native",
+    ]);
+    assert.equal(runtime.imageRoutingPolicy, "surface-first");
+    assert.equal(runtime.pricingSupport, "native");
+    assert.equal(runtime.managementSupport, "native");
+    assert.equal(shouldBypassChatCompatibilityForImages(runtime), true);
+  });
+
   test("falls back unknown local providers to the 12AI request profile without changing their strategy id", () => {
     const runtime = resolveProviderRuntime({
       provider: "Custom",

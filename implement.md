@@ -1,8 +1,19 @@
 # KK-Studio v1.4.5 Implementation Rules
 
-Last updated: 2026-05-07
+Last updated: 2026-05-08
 
 ## Operating Mode
+
+Current provider compatibility override (2026-05-08): the active slice is GPT Best priority compatibility from `https://gpt-best.apifox.cn/llms.txt`. Keep changes path-limited to provider strategy/connection/model-discovery/image-dispatch contracts and the minimal runtime code required to preserve GPT Best surfaces. Do not change official OpenAI request shapes, default OpenAI base fallback, unrelated auth-service work, UI, payment/server behavior, release metadata, or broad adapter refactors in this slice.
+
+GPT Best implementation rules:
+- Re-fetch or re-check the live GPT Best docs before claiming current compatibility.
+- Treat the Apifox docs host as provider evidence, not as an API base URL.
+- Preserve provider identity separately from OpenAI-compatible protocol compatibility.
+- Keep official OpenAI fallback behavior isolated: `OpenAI` with an empty Base URL may still use `https://api.openai.com/v1`.
+- For GPT Best and other non-OpenAI compatible providers, do not let image/chat-image paths silently fall back to official OpenAI when Base URL is empty.
+- Use `supported_endpoint_types` or equivalent remote model metadata for surface routing. Do not infer all images, chat, responses, or Gemini surfaces from the marketing phrase "OpenAI-compatible".
+- Use focused source/contract tests before production changes and rerun the GPT Best provider gate in `validation.md`.
 
 Current hotfix override (2026-05-07): the active slice is the ecommerce framework card header and arrange regression. Keep changes path-limited to `PromptNodeComponent`, `canvasAutoArrange`, focused ecommerce/unit contracts, and ledger updates. Do not mix this commit with auth/logout, PromptBar ratio controls, settings chrome, provider routing, key storage, payment/server, release metadata, or unrelated runtime extraction work.
 

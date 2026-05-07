@@ -1389,6 +1389,19 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         return String(baseUrl || 'https://api.openai.com').trim().replace(/\/+$/, '');
     }
 
+    private assertOpenAICompatibleRuntimeBaseUrl(keySlot: KeySlot, surface: 'chat' | 'images', format?: string): void {
+        const runtime = this.resolveChannelRuntime(keySlot.baseUrl || '', keySlot, undefined, format);
+        const rawBaseUrl = String(keySlot.baseUrl || '').trim();
+        const allowOfficialDefault = runtime.strategyId === 'openai'
+            || runtime.strategyId === '12ai'
+            || (format === 'gemini' && runtime.providerFamily === 'google-official');
+
+        if (runtime.strategyId !== 'openai' && !allowOfficialDefault && !rawBaseUrl) {
+            const surfaceLabel = surface === 'chat' ? 'Chat' : 'Images';
+            throw new Error(`${runtime.strategy.label || runtime.strategyId} ${surfaceLabel} 路由缺少 Base URL。请先填写该供应商工作台提供的真实 Base URL，不能回退到 OpenAI 官方地址。`);
+        }
+    }
+
     private buildResponsesApiBody(options: ChatOptions, messages: any[], stream: boolean, keySlot: KeySlot): any {
         const body = buildResponsesPayload({
             model: options.modelId,
@@ -1450,6 +1463,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
     }
 
     private async chatWithCompatibleResponses(options: ChatOptions, keySlot: KeySlot): Promise<string> {
+        this.assertOpenAICompatibleRuntimeBaseUrl(keySlot, 'chat');
         const baseUrl = this.buildOpenAICompatibleBaseUrl(keySlot.baseUrl);
         const runtime = this.resolveChannelRuntime(keySlot.baseUrl || '', keySlot, options.modelId);
         const chatTarget = this.buildOpenAICompatRequestTarget(buildOpenAIEndpoint(baseUrl, '/chat/completions'), keySlot, {
@@ -1525,6 +1539,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
     }
 
     private async chatStreamWithCompatibleResponses(options: ChatOptions, keySlot: KeySlot): Promise<void> {
+        this.assertOpenAICompatibleRuntimeBaseUrl(keySlot, 'chat');
         const baseUrl = this.buildOpenAICompatibleBaseUrl(keySlot.baseUrl);
         const runtime = this.resolveChannelRuntime(keySlot.baseUrl || '', keySlot, options.modelId);
         const chatTarget = this.buildOpenAICompatRequestTarget(buildOpenAIEndpoint(baseUrl, '/chat/completions'), keySlot, {
@@ -1681,6 +1696,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             runtime: channelRuntime,
             imageSurface,
             isGeminiImage,
+            endpointTypes: modelMetadata?.endpointTypes,
             legacyGeminiChatGateway: this.isLegacyGeminiChatGateway(baseUrl),
             antigravityUsesChat: modelLower.includes('gemini') && modelLower.includes('image'),
             useChatEndpoint: Boolean(options.providerConfig?.openai?.useChatEndpoint),
@@ -1782,6 +1798,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         options: ImageGenerationOptions,
         keySlot: KeySlot
     ): Promise<ImageGenerationResult> {
+        this.assertOpenAICompatibleRuntimeBaseUrl(keySlot, 'chat');
         const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
         const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
         const url = `${cleanBase}/chat/completions`;
@@ -1947,6 +1964,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         options: ImageGenerationOptions,
         keySlot: KeySlot
     ): Promise<ImageGenerationResult> {
+        this.assertOpenAICompatibleRuntimeBaseUrl(keySlot, 'chat');
         const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
         const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
         const url = `${cleanBase}/chat/completions`;
@@ -2062,6 +2080,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         options: ImageGenerationOptions,
         keySlot: KeySlot
     ): Promise<ImageGenerationResult> {
+        this.assertOpenAICompatibleRuntimeBaseUrl(keySlot, 'images');
         const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
         const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
         const profile = getOpenAIImageProfile(options.modelId);
@@ -2108,6 +2127,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         options: ImageGenerationOptions,
         keySlot: KeySlot
     ): Promise<ImageGenerationResult> {
+        this.assertOpenAICompatibleRuntimeBaseUrl(keySlot, 'images');
         const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
         const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
         const url = `${cleanBase}/images/edits`;
@@ -2280,6 +2300,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         options: ImageGenerationOptions,
         keySlot: KeySlot
     ): Promise<ImageGenerationResult> {
+        this.assertOpenAICompatibleRuntimeBaseUrl(keySlot, 'images');
         const baseUrl = (keySlot.baseUrl || '').replace(/\/+$/, '');
         const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
         const url = `${cleanBase}/images/generations`;
@@ -2355,6 +2376,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         options: ImageGenerationOptions,
         keySlot: KeySlot
     ): Promise<ImageGenerationResult> {
+        this.assertOpenAICompatibleRuntimeBaseUrl(keySlot, 'images', 'gemini');
         const initialRuntime = this.resolveChannelRuntime(keySlot.baseUrl || '', keySlot, options.modelId, 'gemini');
         const is12AIChannel = initialRuntime.strategyId === '12ai';
         const rawBase = keySlot.baseUrl || (is12AIChannel ? RegionService.get12AIBaseUrl() : '');

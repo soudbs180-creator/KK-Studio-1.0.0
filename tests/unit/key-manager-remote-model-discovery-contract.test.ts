@@ -18,6 +18,9 @@ type RemoteDiscoveryModule = {
     hasObjectField: boolean;
     hasDataArray: boolean;
     models: string[];
+    metadataByModelId: Record<string, {
+      endpointTypes?: string[];
+    }>;
   };
 };
 
@@ -42,6 +45,14 @@ test('keyManager remote model discovery parsing lives outside the monolithic key
   assert.match(helperSource, /export function buildGoogleModelDiscoveryResult/);
   assert.match(helperSource, /export function extractGeminiCompatModelIds/);
   assert.match(helperSource, /export function buildOpenAICompatModelDiscoveryResult/);
+  assert.match(keyManagerSource, /const REMOTE_MODEL_METADATA = new Map<string, ModelMetadata>\(\);/);
+  assert.match(keyManagerSource, /registerRemoteModelMetadata\(discovery\.metadataByModelId\);/);
+  assert.match(keyManagerSource, /const remoteMetadata = REMOTE_MODEL_METADATA\.get\(exactId\)\s*\|\|\s*REMOTE_MODEL_METADATA\.get\(baseId\);/);
+  assert.ok(
+    keyManagerSource.indexOf('const remoteMetadata = REMOTE_MODEL_METADATA.get(exactId)')
+      < keyManagerSource.indexOf('const exactModel = keyManager.getGlobalModelList().find'),
+    'remote endpoint metadata must be checked before route-qualified global model entries',
+  );
   assert.doesNotMatch(keyManagerSource, /const allowedPatterns = \[/);
   assert.doesNotMatch(keyManagerSource, /const deduped = new Map<string, string>/);
 });
@@ -117,5 +128,31 @@ test('OpenAI-compatible discovery preserves formatted metadata and canonical ded
     'image-model|Image Base|vendor-a',
     'chat-model|Chat Model|',
     'plain-model',
+  ]);
+});
+
+test('OpenAI-compatible discovery preserves GPT Best supported endpoint types', async () => {
+  const { buildOpenAICompatModelDiscoveryResult } = await loadRemoteDiscovery();
+
+  const result = buildOpenAICompatModelDiscoveryResult({
+    object: 'list',
+    data: [
+      {
+        id: 'nano-banana-2',
+        name: 'Nano Banana 2',
+        supported_endpoint_types: [
+          'v1beta/models/gemini-3-pro-image-preview:generateContent',
+          'image-generation',
+        ],
+      },
+    ],
+  });
+
+  assert.deepEqual(result.models, [
+    'nano-banana-2|Nano Banana 2|',
+  ]);
+  assert.deepEqual(result.metadataByModelId['nano-banana-2'].endpointTypes, [
+    'v1beta/models/gemini-3-pro-image-preview:generateContent',
+    'image-generation',
   ]);
 });

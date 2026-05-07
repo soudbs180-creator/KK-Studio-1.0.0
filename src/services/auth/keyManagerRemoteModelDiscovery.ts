@@ -6,6 +6,14 @@ import { parseModelVariantMeta } from './keyManagerModelHelpers.ts';
 
 type UnknownRecord = Record<string, unknown>;
 
+export type OpenAICompatModelDiscoveryMetadata = {
+    name?: string;
+    provider?: string;
+    description?: string;
+    endpointType?: string;
+    endpointTypes?: string[];
+};
+
 function asRecord(value: unknown): UnknownRecord | null {
     return value && typeof value === 'object' && !Array.isArray(value)
         ? value as UnknownRecord
@@ -32,6 +40,27 @@ function readTrimmedString(item: UnknownRecord, ...keys: string[]): string {
     }
 
     return '';
+}
+
+function normalizeStringList(value: unknown): string[] | undefined {
+    if (Array.isArray(value)) {
+        const normalized = value
+            .map((entry) => String(entry || '').trim())
+            .filter(Boolean);
+
+        return normalized.length > 0 ? Array.from(new Set(normalized)) : undefined;
+    }
+
+    if (typeof value === 'string' || typeof value === 'number') {
+        const normalized = String(value)
+            .split(/[\s,|]+/)
+            .map((entry) => entry.trim())
+            .filter(Boolean);
+
+        return normalized.length > 0 ? Array.from(new Set(normalized)) : undefined;
+    }
+
+    return undefined;
 }
 
 function isAllowedGoogleDiscoveryModel(modelId: string): boolean {
@@ -108,17 +137,50 @@ function formatOpenAICompatModelEntry(rawModels: UnknownRecord[], modelId: strin
         : modelId;
 }
 
+function buildOpenAICompatModelMetadata(
+    rawModels: UnknownRecord[],
+    modelId: string,
+): OpenAICompatModelDiscoveryMetadata | undefined {
+    const canonicalObj = rawModels.find((candidate) => readTrimmedString(candidate, 'id') === modelId);
+    if (!canonicalObj) {
+        return undefined;
+    }
+
+    const endpointTypes = normalizeStringList(
+        canonicalObj.endpoint_types
+        ?? canonicalObj.endpointTypes
+        ?? canonicalObj.supported_endpoint_types
+        ?? canonicalObj.supportedEndpointTypes
+        ?? canonicalObj.endpoint_type
+        ?? canonicalObj.endpointType,
+    );
+    const endpointType = readTrimmedString(canonicalObj, 'endpoint_type', 'endpointType') || endpointTypes?.[0];
+    const metadata: OpenAICompatModelDiscoveryMetadata = {
+        name: readTrimmedString(canonicalObj, 'name', 'title', 'display_name') || undefined,
+        provider: readTrimmedString(canonicalObj, 'owned_by', 'provider') || undefined,
+        description: readTrimmedString(canonicalObj, 'description') || undefined,
+        endpointType,
+        endpointTypes,
+    };
+
+    return Object.values(metadata).some((value) => Array.isArray(value) ? value.length > 0 : Boolean(value))
+        ? metadata
+        : undefined;
+}
+
 export function buildOpenAICompatModelDiscoveryResult(payload: unknown): {
     rawCount: number;
     firstModel: unknown;
     hasObjectField: boolean;
     hasDataArray: boolean;
     models: string[];
+    metadataByModelId: Record<string, OpenAICompatModelDiscoveryMetadata>;
 } {
     const record = asRecord(payload);
     const rawModels = readRecordArray(payload, 'data');
     const rawSet = new Set(rawModels.map((model) => readTrimmedString(model, 'id')).filter(Boolean));
     const deduped = new Map<string, string>();
+    const metadataByModelId: Record<string, OpenAICompatModelDiscoveryMetadata> = {};
 
     rawModels.forEach((model) => {
         const modelId = readTrimmedString(model, 'id');
@@ -132,11 +194,19 @@ export function buildOpenAICompatModelDiscoveryResult(payload: unknown): {
 
         if (rawSet.has(canonical)) {
             deduped.set(canonical, formatOpenAICompatModelEntry(rawModels, canonical));
+            const metadata = buildOpenAICompatModelMetadata(rawModels, canonical);
+            if (metadata) {
+                metadataByModelId[canonical] = metadata;
+            }
             return;
         }
 
         if (!deduped.has(canonical)) {
             deduped.set(canonical, formattedModel);
+            const metadata = buildOpenAICompatModelMetadata(rawModels, modelId);
+            if (metadata) {
+                metadataByModelId[canonical] = metadata;
+            }
         }
     });
 
@@ -148,5 +218,6 @@ export function buildOpenAICompatModelDiscoveryResult(payload: unknown): {
         hasObjectField: Boolean(record?.object),
         hasDataArray: Array.isArray(record?.data),
         models: Array.from(new Set(deduped.values())),
+        metadataByModelId,
     };
 }

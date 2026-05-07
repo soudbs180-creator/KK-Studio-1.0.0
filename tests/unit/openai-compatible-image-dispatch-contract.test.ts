@@ -45,8 +45,18 @@ describe("OpenAI-compatible image dispatch plan", () => {
         runtime: gptBestRuntime,
         imageSurface: "provider-images",
         isGeminiImage: true,
+        endpointTypes: ["image-generation"],
       }),
       { kind: "gpt-best-native" },
+    );
+    assert.deepEqual(
+      resolveOpenAICompatibleImageDispatch({
+        runtime: gptBestRuntime,
+        imageSurface: "provider-images",
+        isGeminiImage: true,
+        endpointTypes: ["openai:/v1/chat/completions"],
+      }),
+      { kind: "provider-chat" },
     );
     assert.deepEqual(
       resolveOpenAICompatibleImageDispatch({

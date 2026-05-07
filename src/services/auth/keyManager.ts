@@ -79,6 +79,7 @@ import {
 import {
     buildGoogleModelDiscoveryResult,
     buildOpenAICompatModelDiscoveryResult,
+    type OpenAICompatModelDiscoveryMetadata,
     extractGeminiCompatModelIds,
 } from './keyManagerRemoteModelDiscovery';
 export {
@@ -341,9 +342,34 @@ type ModelMetadata = {
     endpointTypes?: string[];
 };
 
+const REMOTE_MODEL_METADATA = new Map<string, ModelMetadata>();
+
 const GOOGLE_MODEL_METADATA = new Map<string, ModelMetadata>(
     GOOGLE_CHAT_MODELS.map(model => [model.id, { name: model.name, description: model.description, icon: model.icon }])
 );
+
+function toModelMetadata(metadata: OpenAICompatModelDiscoveryMetadata): ModelMetadata {
+    return {
+        name: metadata.name || '',
+        description: metadata.description,
+        endpointType: metadata.endpointType,
+        endpointTypes: metadata.endpointTypes,
+    };
+}
+
+function registerRemoteModelMetadata(metadataByModelId?: Record<string, OpenAICompatModelDiscoveryMetadata>): void {
+    Object.entries(metadataByModelId || {}).forEach(([modelId, metadata]) => {
+        const normalizedModelId = String(modelId || '').trim();
+        if (!normalizedModelId) return;
+
+        const existing = REMOTE_MODEL_METADATA.get(normalizedModelId);
+        REMOTE_MODEL_METADATA.set(normalizedModelId, {
+            ...(existing || {}),
+            ...toModelMetadata(metadata),
+            name: metadata.name || existing?.name || normalizedModelId,
+        });
+    });
+}
 
 const MODEL_TYPE_MAP = new Map<string, GlobalModelType>();
 GOOGLE_CHAT_MODELS.forEach(model => MODEL_TYPE_MAP.set(model.id, 'chat'));
@@ -383,20 +409,27 @@ GOOGLE_MODEL_METADATA.set('gemini-3-pro-image-preview', { name: 'Nano Banana Pro
 
 export const getModelMetadata = (modelId: string): ModelMetadata | undefined => {
     const exactId = String(modelId || '').trim();
+    const baseId = exactId.split('@')[0];
+    const remoteMetadata = REMOTE_MODEL_METADATA.get(exactId)
+        || REMOTE_MODEL_METADATA.get(baseId);
+
     if (exactId) {
         const exactModel = keyManager.getGlobalModelList().find(model => model.id === exactId);
         if (exactModel) {
             return {
-                name: resolveModelDisplayName(exactId, exactModel.name),
+                name: remoteMetadata?.name || resolveModelDisplayName(exactId, exactModel.name),
                 icon: exactModel.icon,
-                description: exactModel.description,
-                endpointType: exactModel.endpointType,
-                endpointTypes: exactModel.endpointTypes,
+                description: remoteMetadata?.description || exactModel.description,
+                endpointType: remoteMetadata?.endpointType || exactModel.endpointType,
+                endpointTypes: remoteMetadata?.endpointTypes || exactModel.endpointTypes,
             };
         }
     }
 
-    const baseId = exactId.split('@')[0];
+    if (remoteMetadata) {
+        return remoteMetadata;
+    }
+
     const exactAdminModel = adminModelService.getModel(exactId);
     if (exactAdminModel) {
         return {
@@ -4002,6 +4035,7 @@ export async function fetchOpenAICompatModels(apiKey: string, baseUrl: string): 
         });
 
         console.log(`[KeyManager] Deduplicated down to ${discovery.models.length} unique models:`, discovery.models);
+        registerRemoteModelMetadata(discovery.metadataByModelId);
         return discovery.models;
     } catch (error) {
         console.error('[KeyManager] Error fetching proxy models:', error);
