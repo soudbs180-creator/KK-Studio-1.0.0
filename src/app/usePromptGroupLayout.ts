@@ -13,6 +13,7 @@ import {
   buildGeneratedImageBatchPositions,
   resolveRegroupTargetSlotIndices,
 } from '../utils/generatedImageLayout';
+import { getPromptNodeBoundsWidth } from '../utils/promptNodeCardWidth';
 import { traceLocalPerformance } from '../services/system/localPerformanceTrace';
 import type {
   Point,
@@ -947,7 +948,12 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
 
       const livePromptPosition = liveNodePositionByIdRef.current[promptNode.id]
         ?? promptNode.position;
-      addRect(livePromptPosition.x, livePromptPosition.y, 380, promptNode.height || 200);
+      addRect(
+        livePromptPosition.x,
+        livePromptPosition.y,
+        getPromptNodeBoundsWidth(promptNode, isMobile),
+        promptNode.height || 200,
+      );
 
       childImages.forEach((imageNode) => {
         const { width, totalHeight } = getCardDimensions(imageNode.aspectRatio, true);

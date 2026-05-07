@@ -73,3 +73,17 @@ test('mobile result feed localizes chrome copy instead of hard-coding English in
   assert.doesNotMatch(detailSource, />\s*Framework Queue\s*</);
   assert.doesNotMatch(detailSource, />Queued \{frameworkStatus\.queued\}/);
 });
+
+test('mobile shell breakpoint and result grid width stay reactive across tablet boundaries', () => {
+  const shellSource = readSource('src/components/mobile/MobileAppShell.tsx');
+  const feedSource = readSource('src/components/mobile/MobileResultFeed.tsx');
+  const responsiveSurfaceSource = readSource('src/utils/responsiveSurface.ts');
+
+  assert.match(responsiveSurfaceSource, /export const TABLET_MAX_WIDTH = 1023;/);
+  assert.match(shellSource, /className="[^"]*\blg:hidden\b/);
+
+  assert.match(feedSource, /const \[measuredWidth, setMeasuredWidth\] = React\.useState/);
+  assert.match(feedSource, /window\.addEventListener\('resize', syncMeasuredWidth\);/);
+  assert.match(feedSource, /window\.removeEventListener\('resize', syncMeasuredWidth\);/);
+  assert.match(feedSource, /getFallbackWidth\(surface\)/);
+});

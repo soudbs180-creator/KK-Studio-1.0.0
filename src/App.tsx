@@ -22,6 +22,7 @@ import { getViewportPreferredPosition } from './utils/canvasUtils';
 import { resolveModelDisplayName } from './utils/modelDisplayName';
 import { resolveProviderIdentity } from './utils/providerDisplay';
 import { pickByDocumentLanguage } from './utils/localeText';
+import { getPromptNodeBoundsWidth } from './utils/promptNodeCardWidth';
 import { generateDownloadFilename, triggerDownload } from './utils/downloadUtils';
 import {
   getReferenceImageLookupIds,
@@ -1584,6 +1585,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   } = useCanvasSelectionBox({
     activeCanvas,
     canvasTransform,
+    isMobile,
     selectedNodeIds,
     getCardDimensions,
     selectNodes,
@@ -2818,7 +2820,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // 1. Check Prompts
       const prompt = promptNodesById.get(id);
       if (prompt) {
-        addRect(prompt.position.x, prompt.position.y, 380, prompt.height || 200);
+        addRect(prompt.position.x, prompt.position.y, getPromptNodeBoundsWidth(prompt, isMobile), prompt.height || 200);
         return;
       }
       // 2. Check Images
@@ -2837,7 +2839,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       width: (maxX - minX) + PADDING * 2,
       height: (maxY - minY) + PADDING + TOP_EXTRA + BOTTOM_EXTRA
     };
-  }, [activeCanvas, imageNodesById, promptNodesById]);
+  }, [activeCanvas, imageNodesById, isMobile, promptNodesById]);
 
   const generatingGroupStateSignatureRef = useRef('');
   useEffect(() => {
@@ -3450,6 +3452,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   } = useCanvasNodeSelection({
     activeCanvas,
     canvasTransform,
+    isMobile,
     getCardDimensions,
     resolvePromptGroupIdForNodeId,
     selectNodes,
@@ -4185,6 +4188,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     activeCanvas,
     selectedNodeIds,
     selectionMenuPosition,
+    isMobile,
     closeSelectionMenu: () => setSelectionMenuPosition(null),
     actualChildImageIdsByPromptId,
     deletePromptNode,

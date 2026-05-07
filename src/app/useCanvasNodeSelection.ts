@@ -1,6 +1,7 @@
 import React from 'react';
 
 import type { AspectRatio, Canvas } from '../types';
+import { getPromptNodeBoundsWidth } from '../utils/promptNodeCardWidth';
 import { isWorkflowUtilityNodeKind } from '../workflow/schema';
 
 interface CanvasTransformState {
@@ -22,6 +23,7 @@ interface SelectionCardDimensions {
 interface UseCanvasNodeSelectionArgs {
   activeCanvas: Canvas | null | undefined;
   canvasTransform: CanvasTransformState;
+  isMobile: boolean;
   getCardDimensions: (aspectRatio?: AspectRatio, includeFooter?: boolean) => SelectionCardDimensions;
   resolvePromptGroupIdForNodeId: (nodeId: string) => string | null;
   selectNodes: (ids: string[], mode?: 'replace' | 'toggle' | 'add' | 'remove') => void;
@@ -44,6 +46,7 @@ type CanvasNodeSelectionApi = {
 export function useCanvasNodeSelection({
   activeCanvas,
   canvasTransform,
+  isMobile,
   getCardDimensions,
   resolvePromptGroupIdForNodeId,
   selectNodes,
@@ -62,7 +65,7 @@ export function useCanvasNodeSelection({
     activeCanvas.promptNodes
       .filter((node) => nodeIds.includes(node.id))
       .forEach((node) => {
-        const width = 380;
+        const width = getPromptNodeBoundsWidth(node, isMobile);
         const height = node.height || 200;
         minX = Math.min(minX, node.position.x - width / 2);
         maxX = Math.max(maxX, node.position.x + width / 2);
@@ -103,7 +106,7 @@ export function useCanvasNodeSelection({
       x: centerX * canvasTransform.scale + canvasTransform.x,
       y: topY * canvasTransform.scale + canvasTransform.y,
     };
-  }, [activeCanvas, canvasTransform, getCardDimensions]);
+  }, [activeCanvas, canvasTransform, getCardDimensions, isMobile]);
 
   const openSelectionMenuForNodeIds = React.useCallback((nodeIds: string[]) => {
     const position = getSelectionScreenCenter(nodeIds);

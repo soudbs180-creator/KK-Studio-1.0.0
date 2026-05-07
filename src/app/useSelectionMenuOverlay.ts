@@ -2,6 +2,7 @@ import React from 'react';
 
 import { GenerationMode, type AspectRatio, type Canvas, type CanvasGroup } from '../types';
 import type { ArrangeMode } from '../context/CanvasContext';
+import { getPromptNodeBoundsWidth } from '../utils/promptNodeCardWidth';
 import { isWorkflowUtilityNodeKind } from '../workflow/schema';
 import type { SelectionMenuOverlay } from './AppCanvasOverlays';
 
@@ -19,6 +20,7 @@ interface UseSelectionMenuOverlayArgs {
   activeCanvas: Canvas | null | undefined;
   selectedNodeIds: string[];
   selectionMenuPosition: SelectionMenuPosition | null;
+  isMobile: boolean;
   closeSelectionMenu: () => void;
   actualChildImageIdsByPromptId: Map<string, string[]>;
   deletePromptNode: (nodeId: string) => void;
@@ -37,6 +39,7 @@ export function useSelectionMenuOverlay({
   activeCanvas,
   selectedNodeIds,
   selectionMenuPosition,
+  isMobile,
   closeSelectionMenu,
   actualChildImageIdsByPromptId,
   deletePromptNode,
@@ -117,7 +120,7 @@ export function useSelectionMenuOverlay({
     const allImages = activeCanvas.imageNodes.filter((node) => allMergedNodeIds.has(node.id));
 
     allPrompts.forEach((node) => {
-      const width = 380;
+      const width = getPromptNodeBoundsWidth(node, isMobile);
       const height = node.height || 200;
       minX = Math.min(minX, node.position.x - width / 2);
       maxX = Math.max(maxX, node.position.x + width / 2);
@@ -163,6 +166,7 @@ export function useSelectionMenuOverlay({
     actualChildImageIdsByPromptId,
     removeGroup,
     getCardDimensions,
+    isMobile,
     addGroup,
     clearSelection,
     closeSelectionMenu,

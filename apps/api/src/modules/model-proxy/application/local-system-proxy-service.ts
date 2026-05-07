@@ -475,8 +475,8 @@ export class LocalSystemProxyService {
     const routeConfig = buildRouteConfig(selected.route, selectedKey);
     const requestId = String(input.requestId || "").trim() || undefined;
     const attemptId = String(input.attemptId || "").trim() || undefined;
-    const businessRefId = attemptId || requestId || `${baseModelId}:${Date.now()}`;
-    const idempotencyKey = attemptId || requestId || `${baseModelId}:${Date.now()}`;
+    const businessRefId = requestId || attemptId || `${baseModelId}:${Date.now()}`;
+    const idempotencyKey = requestId || attemptId || `${baseModelId}:${Date.now()}`;
     const debit = await this.creditAccountService.debitCredits(
       userId,
       {

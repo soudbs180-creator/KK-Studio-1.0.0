@@ -18,6 +18,7 @@ import { pickByDocumentLanguage } from '../../utils/localeText';
 import { resolveModelDisplayName } from '../../utils/modelDisplayName';
 import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
 import { buildPptDeckModuleState } from '../../utils/pptDeckModules';
+import { getPromptNodeBaseCardWidth, getPromptNodeCardWidth } from '../../utils/promptNodeCardWidth';
 import EcommerceCardActions from '../ecommerce/EcommerceCardActions';
 import EcommerceCanvasWorkbenchCard from '../ecommerce/EcommerceCanvasWorkbenchCard';
 
@@ -576,9 +577,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const isDraggingRef = useRef(false);
     const [cardHeight, setCardHeight] = useState(200); // 默认高度??00px,会在渲染后更??
     const isEcommerceFrameworkCard = node.mode === GenerationMode.ECOMMERCE && node.ecommerce?.kind === 'framework';
-    const baseCardWidth = isEcommerceFrameworkCard ? 920 : 320;
+    const baseCardWidth = getPromptNodeBaseCardWidth(node);
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : baseCardWidth;
-    const cardWidth = isMobile ? Math.min(baseCardWidth, Math.max(248, viewportWidth - 24)) : baseCardWidth;
+    const cardWidth = getPromptNodeCardWidth(node, isMobile, viewportWidth);
     const originX = renderOrigin?.x ?? 0;
     const originY = renderOrigin?.y ?? 0;
     const [previewImage, setPreviewImage] = useState<{ url: string; originRect: DOMRect } | null>(null);

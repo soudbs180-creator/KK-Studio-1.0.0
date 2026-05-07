@@ -92,17 +92,36 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
   onUseAsSource,
 }) => {
   const { pick } = useLocale();
+  const [measuredWidth, setMeasuredWidth] = React.useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth : getFallbackWidth(surface)
+  ));
   const totalResults = resultEntries.length;
   const hasSelectedSource =
     Boolean(activeSourceImage) && resultEntries.some((entry) => entry.imageId === activeSourceImage);
   const counterLabel = totalResults === 0 ? pick('等待中', 'Waiting') : pick(`${totalResults} 个结果`, `${totalResults} results`);
   const selectedSourceLabel = pick('已选源图', 'source selected');
-  const measuredWidth = typeof window !== 'undefined' ? window.innerWidth : getFallbackWidth(surface);
   const columnCount = getAdaptiveResultColumnCount({
     surface,
     width: measuredWidth,
     viewMode,
   });
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') {
+      setMeasuredWidth(getFallbackWidth(surface));
+      return;
+    }
+
+    const syncMeasuredWidth = () => {
+      setMeasuredWidth(window.innerWidth);
+    };
+
+    syncMeasuredWidth();
+    window.addEventListener('resize', syncMeasuredWidth);
+    return () => {
+      window.removeEventListener('resize', syncMeasuredWidth);
+    };
+  }, [surface]);
 
   return (
     <section className="flex h-full min-h-0 flex-col">
