@@ -58,6 +58,13 @@ build_static_sites() {
   rsync -a --delete "${CURRENT_DIR}/apps/admin/dist/" "${ADMIN_SITE_ROOT}/"
 }
 
+harden_env_permissions() {
+  if [[ -f "${ENV_DIR}/kk-api.env" ]]; then
+    chgrp "${APP_GROUP}" "${ENV_DIR}/kk-api.env"
+    chmod 0640 "${ENV_DIR}/kk-api.env"
+  fi
+}
+
 install_nginx_gateway() {
   if [[ ! -f "${CURRENT_DIR}/deploy/nginx/kk-vps-gateway.conf" ]]; then
     echo "[deploy-kk-vps] Nginx gateway config not found at ${CURRENT_DIR}/deploy/nginx/kk-vps-gateway.conf" >&2
@@ -102,6 +109,7 @@ sync_repo_to_runtime
 install_dependencies
 apply_bootstrap_sql_if_requested
 build_static_sites
+harden_env_permissions
 install_nginx_gateway
 restart_services
 
