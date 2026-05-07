@@ -55,10 +55,13 @@ test("VPS bootstrap and deploy assets exist for the postgres-first runtime", () 
 });
 
 test("VPS default web entry serves the main login app while admin stays separate", () => {
+  const attributesSource = readSource(".gitattributes");
   const deploySource = readSource("scripts/vps/deploy-kk-vps.sh");
   const bootstrapSource = readSource("scripts/vps/bootstrap-kk-vps.sh");
   const nginxSource = readSource("deploy/nginx/kk-vps-gateway.conf");
 
+  assert.match(attributesSource, /scripts\/vps\/\*\.sh text eol=lf/);
+  assert.match(attributesSource, /deploy\/nginx\/\*\.conf text eol=lf/);
   assert.match(deploySource, /APP_SITE_ROOT="\$\{KK_APP_SITE_ROOT:-\/var\/www\/kk-app\}"/);
   assert.match(deploySource, /WEB_ENV_FILE="\$\{KK_WEB_ENV_FILE:-\$ENV_DIR\/kk-web\.env\}"/);
   assert.match(deploySource, /ADMIN_ENV_FILE="\$\{KK_ADMIN_ENV_FILE:-\$ENV_DIR\/kk-admin\.env\}"/);
