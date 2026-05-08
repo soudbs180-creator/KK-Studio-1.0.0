@@ -13,6 +13,14 @@ node_modules
 dist
 build
 coverage
+output
+tests
+docs
+AGENTS.md
+plans.md
+implement.md
+status.md
+validation.md
 deploy
 release
 payment-server/node_modules

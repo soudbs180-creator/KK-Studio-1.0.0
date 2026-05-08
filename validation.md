@@ -4,6 +4,26 @@ Last updated: 2026-05-09
 
 Use `npm.cmd` for npm scripts on Windows.
 
+## Current 1.4.6 Production Deploy Evidence
+
+Fresh final deploy gate before the `dpl_Ae8ckSKAuHthpkNssLnaB1dwHR5Y` production deployment:
+
+```powershell
+npm.cmd run governance:version
+npm.cmd run governance:check
+npm.cmd run audit:dependencies
+npm.cmd run spec:check
+npm.cmd run typecheck
+npm.cmd run check:encoding
+npm.cmd run build
+npm.cmd run test:unit
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check
+npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560
+npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560
+```
+
+Observed result: version metadata aligned to `1.4.6`; governance, dependency audit, spec, typecheck, encoding, build, and unit tests passed; unit tests reported 1441/1441 passing; Vercel production deploy completed and `kkai.plus` now aliases `https://kk-studio-l8gex5abk-yykks-projects-727e9560.vercel.app`.
+
 ## 1.4.6 Release Blocker Audit Gate
 
 Use this gate when touching hosted Vercel proxy routes, VPS upstream security, release hosted preflight, payment-server dependency audit, visible Chinese text, PromptBar release QA, or VPS env examples:
