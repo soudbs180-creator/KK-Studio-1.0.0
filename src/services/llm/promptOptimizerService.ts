@@ -55,7 +55,8 @@ export interface PromptOptimizationResult {
     fullResult?: PromptOptimizerResult;
 }
 
-const OPTIMIZER_CACHE_KEY = 'kk_prompt_optimizer_cache_v4';
+const OPTIMIZER_CACHE_KEY = 'kk_prompt_optimizer_cache_v5';
+const LEGACY_OPTIMIZER_CACHE_KEYS = ['kk_prompt_optimizer_cache_v4'];
 const OPTIMIZER_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const CJK_PATTERN = /[\u3400-\u9fff]/;
 
@@ -143,6 +144,21 @@ const cleanText = (value: unknown, fallback = ''): string => {
     return normalized || fallback;
 };
 
+const cleanDiagnosticToken = (value: unknown): string => {
+    const normalized = cleanText(value);
+    return /^[A-Za-z0-9_.:-]{1,80}$/.test(normalized) ? normalized : '';
+};
+
+export const summarizePromptOptimizerError = (error: unknown): string => {
+    const record = typeof error === 'object' && error ? error as Record<string, unknown> : {};
+    const name = cleanDiagnosticToken(error instanceof Error ? error.name : record.name) || 'Error';
+    const code = cleanDiagnosticToken(record.code);
+    const status = cleanDiagnosticToken(record.status || record.statusCode);
+    return [name, code ? `code=${code}` : '', status ? `status=${status}` : '']
+        .filter(Boolean)
+        .join(' ');
+};
+
 const truncateText = (value: string, maxLength: number): string => {
     if (value.length <= maxLength) return value;
     return `${value.slice(0, Math.max(0, maxLength - 1)).trim()}…`;
@@ -175,8 +191,33 @@ const normalizeTextList = (value: unknown, maxItems = 6): string[] => {
     return deduped.slice(0, maxItems);
 };
 
+const buildOptimizerCacheFingerprint = (value: string): string => {
+    const normalized = cleanText(value);
+    let hash = 2166136261;
+    for (let i = 0; i < normalized.length; i += 1) {
+        hash ^= normalized.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return `${normalized.length}:${(hash >>> 0).toString(16).padStart(8, '0')}`;
+};
+
+const redactOptimizerCacheResult = (result: PromptOptimizationResult): PromptOptimizationResult => ({
+    ...result,
+    fullResult: result.fullResult
+        ? {
+            ...result.fullResult,
+            raw_prompt_original: '<omitted:prompt>',
+            params: {
+                ...result.fullResult.params,
+                subject: '<omitted:prompt>',
+            },
+        }
+        : undefined,
+});
+
 const readOptimizerCache = (): Record<string, OptimizerCacheEntry> => {
     try {
+        LEGACY_OPTIMIZER_CACHE_KEYS.forEach((key) => localStorage.removeItem(key));
         const raw = localStorage.getItem(OPTIMIZER_CACHE_KEY);
         return raw ? JSON.parse(raw) : {};
     } catch {
@@ -545,7 +586,7 @@ const buildOptimizerCacheKey = (
         referenceImageCount: options?.referenceImages?.length || 0,
     });
     const refSign = (options?.referenceImages || [])
-        .map((ref) => `${cleanText(ref.mimeType).toLowerCase()}:${cleanText(ref.data).slice(0, 32)}`)
+        .map((ref) => `${cleanText(ref.mimeType).toLowerCase()}:${buildOptimizerCacheFingerprint(ref.data)}`)
         .join('|');
 
     return [
@@ -555,12 +596,12 @@ const buildOptimizerCacheKey = (
         cleanText(options?.mode).toLowerCase(),
         autoroute.strategyId,
         strategy,
-        input.trim(),
+        buildOptimizerCacheFingerprint(input),
         cleanText(options?.thinkingMode).toLowerCase(),
         String(!!options?.supportsThinking),
         refSign,
-        options?.ecommerceContext?.taskState?.taskId || '',
-        options?.ecommerceContext?.outputTarget?.label || '',
+        buildOptimizerCacheFingerprint(options?.ecommerceContext?.taskState?.taskId || ''),
+        buildOptimizerCacheFingerprint(options?.ecommerceContext?.outputTarget?.label || ''),
     ].join('::');
 };
 
@@ -815,11 +856,12 @@ export const optimizePromptForImage = async (
             fullResult,
         };
 
-        cache[cacheKey] = { result, createdAt: Date.now() };
+        const cacheSafeResult = redactOptimizerCacheResult(result);
+        cache[cacheKey] = { result: cacheSafeResult, createdAt: Date.now() };
         writeOptimizerCache(cache);
         return result;
     } catch (error) {
-        console.warn('[Optimizer] Falling back to heuristic optimization.', error);
+        console.warn('[Optimizer] Falling back to heuristic optimization.', summarizePromptOptimizerError(error));
         const fallback = buildFallbackResult(input, strategy, resolvedOptions);
         return {
             optimizedEn: fallback.optimized_prompt_en,

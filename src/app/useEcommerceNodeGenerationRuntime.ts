@@ -10,7 +10,7 @@ import {
   type EcommerceEditableTaskState,
   type PromptNode,
 } from '../types.ts';
-import { optimizeGenerationPrompt } from './optimizeGenerationPrompt.ts';
+import { optimizeGenerationPrompt, summarizePromptOptimizationError } from './optimizeGenerationPrompt.ts';
 import type { ApplyEffectiveSizingToEcommerceTaskState } from './useEcommerceBuildRuntime.ts';
 import type { EcommerceNodeGenerationSettings } from './useEcommerceSheetSettingsRuntime.ts';
 
@@ -181,7 +181,7 @@ export function useEcommerceNodeGenerationRuntime({
         } : undefined,
       },
       onError: (error) => {
-        console.warn('[runEcommerceNodeGeneration] Prompt optimization failed, fallback to render task prompt.', error);
+        console.warn('[runEcommerceNodeGeneration] Prompt optimization failed, fallback to render task prompt.', summarizePromptOptimizationError(error));
       },
     });
     nextPrompt = optimizedNextPrompt;

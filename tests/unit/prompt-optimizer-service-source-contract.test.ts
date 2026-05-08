@@ -78,6 +78,35 @@ test('prompt optimizer service keeps human-readable Chinese fallback copy', () =
   assert.match(serviceSource, /已按支持思考的模型优化为/);
 });
 
+test('prompt optimizer cache does not persist raw prompt or reference image content', () => {
+  const serviceSource = readSource('src/services/llm/promptOptimizerService.ts');
+
+  assert.match(serviceSource, /const buildOptimizerCacheFingerprint = /);
+  assert.match(serviceSource, /const redactOptimizerCacheResult = /);
+  assert.match(serviceSource, /const cacheSafeResult = redactOptimizerCacheResult\(result\);/);
+  assert.match(serviceSource, /cache\[cacheKey\] = \{ result: cacheSafeResult, createdAt: Date\.now\(\) \};/);
+  assert.doesNotMatch(serviceSource, /input\.trim\(\),/);
+  assert.doesNotMatch(serviceSource, /cleanText\(ref\.data\)\.slice\(0,\s*32\)/);
+  assert.match(serviceSource, /raw_prompt_original: '<omitted:prompt>'/);
+  assert.match(serviceSource, /subject: '<omitted:prompt>'/);
+});
+
+test('prompt optimizer failure logging uses redacted error summaries', () => {
+  const serviceSource = readSource('src/services/llm/promptOptimizerService.ts');
+  const generationRuntimeSource = readSource('src/app/useGenerationRuntime.ts');
+  const ecommerceRuntimeSource = readSource('src/app/useEcommerceNodeGenerationRuntime.ts');
+
+  assert.match(serviceSource, /const summarizePromptOptimizerError = /);
+  assert.match(serviceSource, /console\.warn\('\[Optimizer\] Falling back to heuristic optimization\.', summarizePromptOptimizerError\(error\)\);/);
+  assert.match(generationRuntimeSource, /import \{ optimizeGenerationPrompt, summarizePromptOptimizationError \} from '\.\/optimizeGenerationPrompt';/);
+  assert.match(generationRuntimeSource, /console\.warn\('\[handleGenerate\] Prompt optimization failed, fallback to raw prompt:', summarizePromptOptimizationError\(error\)\);/);
+  assert.match(ecommerceRuntimeSource, /import \{ optimizeGenerationPrompt, summarizePromptOptimizationError \} from '\.\/optimizeGenerationPrompt\.ts';/);
+  assert.match(ecommerceRuntimeSource, /console\.warn\('\[runEcommerceNodeGeneration\] Prompt optimization failed, fallback to render task prompt\.', summarizePromptOptimizationError\(error\)\);/);
+  assert.doesNotMatch(serviceSource, /console\.warn\('\[Optimizer\] Falling back to heuristic optimization\.', error\);/);
+  assert.doesNotMatch(generationRuntimeSource, /console\.warn\('\[handleGenerate\] Prompt optimization failed, fallback to raw prompt:', error\);/);
+  assert.doesNotMatch(ecommerceRuntimeSource, /console\.warn\('\[runEcommerceNodeGeneration\] Prompt optimization failed, fallback to render task prompt\.', error\);/);
+});
+
 test('prompt node optimizer display reads neutral route metadata while keeping Chinese labels', () => {
   const componentSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
 

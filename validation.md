@@ -181,6 +181,39 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
 
 Browser QA may be skipped for this gate because it changes only service diagnostics metadata and no JSX, CSS, route rendering, browser-visible UI, or release metadata. Record the skip reason in `status.md`.
 
+## Prompt Optimizer Cache And Logging Redaction Gate
+
+Use this gate when touching prompt optimizer cache keys, persisted optimizer cache results, optimizer fallback diagnostics, or generation-runtime prompt optimizer failure logging:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/prompt-optimizer-service-source-contract.test.ts" `
+  "tests/unit/prompt-optimizer-autoroute-contract.test.ts" `
+  "tests/unit/prompt-optimizer-capability-route-contract.test.ts" `
+  "tests/unit/ecommerce-structured-task-source-contract.test.ts" `
+  "tests/unit/generation-runtime-contract.test.ts" `
+  "tests/unit/ecommerce-node-generation-runtime-contract.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+npm.cmd run governance:security
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "src/services/llm/promptOptimizerService.ts" `
+  "src/app/optimizeGenerationPrompt.ts" `
+  "src/app/useGenerationRuntime.ts" `
+  "src/app/useEcommerceNodeGenerationRuntime.ts" `
+  "tests/unit/prompt-optimizer-service-source-contract.test.ts" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA may be skipped for this gate because it changes only service cache/logging behavior and no JSX, CSS, route rendering, browser-visible UI, or release metadata. Record the skip reason in `status.md`.
+
 ## User-Reported UI Regression Gate
 
 Use this gate when touching the PromptBar shadows/mobile footer, settings shell/card chrome, ecommerce confirmed-build handoff, ecommerce canvas framework card, or ecommerce main-image ratio selector:
