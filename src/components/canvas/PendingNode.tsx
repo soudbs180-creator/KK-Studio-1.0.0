@@ -190,7 +190,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                 <img
                                     key={img.id || idx}
                                     src={toReferenceImageDataUrl(img.data, img.mimeType)}
-                                    alt="Reference"
+                                    alt="参考图"
                                     className="w-8 h-8 object-cover rounded border border-[color:var(--frost-card-sub-border)]"
                                 />
                             ))}
@@ -236,7 +236,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
             >
                 <div className="flex items-center gap-2 text-[var(--text-tertiary)] mb-2">
                     <div className="w-2 h-2 rounded-full bg-[var(--text-tertiary)] animate-pulse" />
-                    <span className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider">Generating x{parallelCount}</span>
+                    <span className="text-[10px] text-[var(--text-secondary)] font-bold tracking-wider">生成中 x{parallelCount}</span>
                 </div>
                 {referenceImages && referenceImages.length > 0 && (
                     <div className="flex gap-1 mb-1 flex-wrap">
@@ -244,7 +244,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                             <img
                                 key={img.id || idx}
                                 src={toReferenceImageDataUrl(img.data, img.mimeType)}
-                                alt="Reference"
+                                alt="参考图"
                                 className="w-8 h-8 object-cover rounded border border-[color:var(--frost-card-sub-border)]"
                             />
                         ))}
@@ -412,7 +412,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                         textTransform: 'uppercase',
                                         letterSpacing: '1px'
                                     }}>
-                                        Generating #{i + 1}
+                                        生成队列 #{i + 1}
                                     </span>
                                 </div>
                             </div>
