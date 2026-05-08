@@ -2,6 +2,17 @@
 
 Last updated: 2026-05-08
 
+## Current Hosted Production Startup Hotfix
+
+- Active user issue: `https://kkai.plus/` loads the frontend but remains on the startup screen with "Confirming your session" / `正在确认会话`.
+- Root cause: Vercel production was missing hosted API/admin/runtime env and same-origin rewrites, so `/api/v1/auth/session` did not reach the VPS API. The frontend then treated non-auth hosted session failures with no cached token as retryable forever, keeping `sessionRecoveryLoading=true` and preventing the signed-out login page from rendering.
+- Implemented scope: `vercel.json` now rewrites `/api/v1/*`, `/api/auth/*`, `/healthz`, and `/api/manifest` to the VPS gateway. `AuthContext` now treats hosted cookie recovery failure with no cached token as a terminal signed-out startup state by clearing hosted runtime state instead of scheduling another startup retry.
+- Vercel production env configured for this hotfix: `VITE_KK_API_BASE_URL=https://kkai.plus`, `VITE_KK_ADMIN_URL=http://172.245.156.16:4174`, and `VITE_AUTH_REDIRECT_ORIGIN=https://kkai.plus`. Existing Turnstile production env remains in place.
+- RED/GREEN evidence: the new `workspace-auth-gate` regression failed before the code change because hosted no-token failure still scheduled retry, then passed after the no-token fallback cleared hosted state. The hosted/auth focused suite passed 53/53 after the fix.
+- Fresh validation passed for this slice: hosted/auth focused suite 53/53, `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, path-limited alternate-git `diff --check`, and `npm.cmd run release:hosted:check` with no immediate blockers in the local snapshot. The preflight still lists local snapshot reminders for Google/WeChat/payment-sidecar server secrets because it does not read the remote VPS environment.
+- Production deployment result: `vercel.cmd deploy . --prod -y --scope yykks-projects-727e9560` produced `dpl_2R1WWxiMQujUJX3iXFpQ9sbDxjmi`, URL `https://kk-studio-fctb3qx3f-yykks-projects-727e9560.vercel.app`, and aliases `https://kkai.plus` plus `https://www.kkai.plus`. `vercel.cmd inspect https://kkai.plus --scope yykks-projects-727e9560` confirmed target `production` and status `Ready`.
+- Direct unauthenticated HTTP fetches to `https://kkai.plus` from this environment can be blocked by Vercel Security Check `429`, so production alias readiness is verified with Vercel CLI inspect. If a browser still shows the old startup loop, hard refresh or clear site data to discard the old bundle/session cache.
+
 ## Completed In `fe99e829` (GPT Best Provider Compatibility)
 
 - Active user issue: verify whether the GPT Best API project documented at `https://gpt-best.apifox.cn/llms.txt` is compatible enough to become a priority provider, while preserving official OpenAI API behavior.

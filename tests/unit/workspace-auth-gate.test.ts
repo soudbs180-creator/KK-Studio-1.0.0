@@ -69,6 +69,19 @@ test('AuthContext does not poll hosted cookie recovery forever for signed-out lo
   );
 });
 
+test('AuthContext does not leave hosted signed-out visitors on the startup screen after cookie recovery fails', () => {
+  const source = readSource('src/context/AuthContext.tsx');
+
+  assert.match(
+    source,
+    /if \(!storedToken\) \{\s*clearHostedSession\(\);\s*return;\s*\}/,
+  );
+  assert.doesNotMatch(
+    source,
+    /if \(!storedToken\) \{\s*setSessionRecoveryWarning\(retryableWarning\);\s*scheduleRetry\(\);\s*return;\s*\}/,
+  );
+});
+
 test('AuthContext does not create a fixed local workspace user before the user chooses temporary local access', () => {
   const source = readSource('src/context/AuthContext.tsx');
 

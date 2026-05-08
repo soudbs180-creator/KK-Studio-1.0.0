@@ -4,6 +4,37 @@ Last updated: 2026-05-08
 
 Use `npm.cmd` for npm scripts on Windows.
 
+## Hosted Production Startup Hotfix Gate
+
+Use this gate when touching Vercel hosted routing, hosted session bootstrap, hosted auth startup recovery, or `kkai.plus` production login entry:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/hosted-release-guardrails.test.ts" `
+  "tests/unit/workspace-auth-gate.test.ts" `
+  "tests/unit/app-startup-coordinator.test.ts" `
+  "tests/unit/kk-api-session-bootstrap.test.ts" `
+  "tests/unit/kk-api-client.test.ts" `
+  "tests/unit/kk-api-client-session-cookie.test.ts" `
+  "tests/unit/kk-api-server-health-vps-contract.test.ts" `
+  "tests/unit/auth-redirect.test.ts" `
+  "tests/unit/login-screen-admin-entry.test.ts"
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "src/context/AuthContext.tsx" `
+  "tests/unit/workspace-auth-gate.test.ts" `
+  "tests/unit/hosted-release-guardrails.test.ts" `
+  "vercel.json" `
+  "status.md" `
+  "validation.md"
+vercel.cmd inspect https://kkai.plus --scope yykks-projects-727e9560
+```
+
+Production verification note: direct unauthenticated HTTP requests to `https://kkai.plus` from this environment can return Vercel Security Check `429`; use Vercel CLI inspect/alias checks as the authoritative deployment readiness signal here, and ask the user to hard-refresh or clear site data if their browser has cached the old bundle or a stale local temporary session.
+
 ## GPT Best Priority Provider Compatibility Gate
 
 Use this gate when touching GPT Best, OpenAI-compatible provider strategy, model discovery metadata, connection-test model listing, or OpenAI-compatible image dispatch:

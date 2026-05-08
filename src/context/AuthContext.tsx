@@ -260,8 +260,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (!storedToken) {
-        setSessionRecoveryWarning(retryableWarning);
-        scheduleRetry();
+        clearHostedSession();
         return;
       }
 

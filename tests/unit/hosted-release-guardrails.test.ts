@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 
@@ -8,6 +8,23 @@ const ROOT_DIR = process.cwd();
 function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), "utf-8");
 }
+
+test("vercel production rewrites hosted BFF routes to the VPS gateway", () => {
+  const configPath = path.join(ROOT_DIR, "vercel.json");
+
+  assert.equal(existsSync(configPath), true, "vercel.json should exist");
+  const config = JSON.parse(readFileSync(configPath, "utf-8")) as {
+    rewrites?: Array<{ source?: string; destination?: string }>;
+  };
+
+  assert.ok(Array.isArray(config.rewrites), "vercel.json should define rewrites");
+  assert.deepEqual(config.rewrites.slice(0, 4), [
+    { source: "/api/v1/:path*", destination: "http://172.245.156.16/api/v1/:path*" },
+    { source: "/api/auth/:path*", destination: "http://172.245.156.16/api/auth/:path*" },
+    { source: "/healthz", destination: "http://172.245.156.16/healthz" },
+    { source: "/api/manifest", destination: "http://172.245.156.16/api/manifest" },
+  ]);
+});
 
 test("hosted preflight checks verify VPS API and PostgreSQL prerequisites without Supabase release dependencies", () => {
   const source = readSource("scripts/diagnose-hosted-release.mjs");
