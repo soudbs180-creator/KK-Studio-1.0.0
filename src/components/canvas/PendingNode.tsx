@@ -174,13 +174,13 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                 >
                     <div className="flex items-center gap-2 text-[var(--text-tertiary)] mb-2">
                         <Loader2 size={12} className="animate-spin" />
-                        <span className="text-[10px] font-medium">鍥惧儚姝ｅ湪鍑嗗...</span>
+                        <span className="text-[10px] font-medium">图像正在准备...</span>
                         {onDisconnect && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); onDisconnect(); }}
                                 className="ml-auto w-4 h-4 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-colors"
                             >
-                                <span className="text-red-400 text-[10px]">脳</span>
+                                <span className="text-red-400 text-[10px]">×</span>
                             </button>
                         )}
                     </div>

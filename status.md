@@ -2,6 +2,14 @@
 
 Last updated: 2026-05-08
 
+## Current Encoding Mojibake Guard Hotfix
+
+- Active user issue: resolve the validation error left after the PromptBar UI slice.
+- Root cause: `tests/unit/encoding-check-contract.test.ts` added a release-UI mojibake guard, but `scripts/ci/check-encoding.js` did not yet have the broader `suspiciousMojibakePatterns` scan path, and two release-facing UI files still contained visible mojibake text.
+- Implemented scope: `scripts/ci/check-encoding.js` now applies broad mojibake regexes to release/runtime source roots while preserving the existing explicit fragment and suspicious-character checks. `src/app/useGenerationRuntime.ts` and `src/components/canvas/PendingNode.tsx` have the affected user-facing strings repaired. `tests/unit/encoding-check-contract.test.ts` locks the scanner contract and the two fixed UI surfaces.
+- Dirty-worktree guard: unrelated hosted/API/payment files remain dirty in the alternate git worktree and are excluded from this encoding hotfix. Stage only `scripts/ci/check-encoding.js`, `src/app/useGenerationRuntime.ts`, `src/components/canvas/PendingNode.tsx`, `tests/unit/encoding-check-contract.test.ts`, and this `status.md` update.
+- Fresh validation for this slice: focused encoding contract passed 2/2; `npm.cmd run typecheck` passed; `npm.cmd run test:unit` passed 1431/1431; `npm.cmd run build` passed; `npm.cmd run governance:agent-docs` passed; `npm.cmd run check:encoding` passed; and path-limited alternate-git `diff --check` passed with Windows LF/CRLF normalization warnings only.
+
 ## Current PromptBar Frosted Controls Hotfix
 
 - Active user issue: the model library should read as a frosted surface, the divider under the input/buttons should move upward, action buttons should stay flat by default and show gradients only on hover, and enabled toggles should use a brighter active style.
@@ -9,7 +17,7 @@ Last updated: 2026-05-08
 - Browser QA: the Codex in-app Browser was attempted against `http://localhost:3000` and was blocked by the local browser with `net::ERR_BLOCKED_BY_CLIENT`, so the UI check used a local Playwright fallback that starts Vite in-process at `http://127.0.0.1:4312`.
 - Playwright evidence: desktop viewport `1600x1000` and mobile viewport `390x844` screenshots were captured under `.tmp-playwright/promptbar-ui-qa/`. `result.json` records model/button defaults with `backgroundImage: "none"`, hover gradient on the model control, frosted dropdown `backdropFilter: "blur(24px) saturate(1.18)"`, mobile footer `flexWrap: "nowrap"` and `overflowX: "auto"`, `.theme-transitioning` count `0`, and stale chunk text `false`. One console error remains from the local admin model API fetch failing in this isolated run, so the model list stayed in "正在同步最新模型库..." state; the active-toggle style is covered by source contract and token assertions for this local no-model condition.
 - Current dirty-worktree guard: unrelated hosted/API files remain dirty in the alternate git worktree and are excluded from this UI milestone. Stage only `src/index.css`, `src/components/layout/PromptBar.tsx`, `src/components/image/ImageOptionsPanel.tsx`, `tests/unit/prompt-bar-layout-regression.test.ts`, and this `status.md` update.
-- Fresh validation for this UI slice: focused PromptBar/Clay/theme/token suite passed 25/25; path-limited alternate-git `diff --check` passed with Windows LF/CRLF normalization warnings only; `npm.cmd run typecheck` passed; `npm.cmd run build` passed; `npm.cmd run governance:agent-docs` passed; `npm.cmd run check:encoding` passed. `npm.cmd run test:unit` currently has one unrelated dirty-worktree failure in `tests/unit/encoding-check-contract.test.ts`, which expects `scripts/ci/check-encoding.js` to contain a new `suspiciousMojibakePatterns` contract; that test/script pair is outside this PromptBar UI milestone and is excluded from this commit.
+- Fresh validation for this UI slice: focused PromptBar/Clay/theme/token suite passed 25/25; path-limited alternate-git `diff --check` passed with Windows LF/CRLF normalization warnings only; `npm.cmd run typecheck` passed; `npm.cmd run build` passed; `npm.cmd run governance:agent-docs` passed; `npm.cmd run check:encoding` passed. The unrelated dirty-worktree encoding failure observed during the UI slice is handled in the current encoding hotfix.
 
 ## Current Hosted Production Startup Hotfix
 
