@@ -3,7 +3,22 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
+import type {
+  PromptGroupBounds,
+  UsePromptGroupLayoutDeps,
+  UsePromptGroupLayoutResult,
+  UsePromptGroupStackingDeps,
+  UsePromptGroupStackingResult,
+} from '../../src/app/usePromptGroupLayout.ts';
 import { buildDockedPromptChildRegroupLayout } from '../../src/utils/generatedImageLayout.ts';
+
+type PromptGroupLayoutPublicBoundary = {
+  bounds: PromptGroupBounds;
+  layoutDeps: UsePromptGroupLayoutDeps;
+  layoutResult: UsePromptGroupLayoutResult;
+  stackingDeps: UsePromptGroupStackingDeps;
+  stackingResult: UsePromptGroupStackingResult;
+}
 
 const ROOT_DIR = process.cwd();
 
@@ -30,6 +45,22 @@ test('prompt-group regroup keeps the right-most child on the right-most dock slo
 
   assert.equal(layout.length, 3);
   assert.ok(layout[1]!.dockedPosition.x > layout[2]!.dockedPosition.x);
+});
+
+test('usePromptGroupLayout exposes explicit hook boundary types', () => {
+  const appSource = readSource('src/App.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const boundaryIsTypechecked: PromptGroupLayoutPublicBoundary | null = null;
+
+  assert.equal(boundaryIsTypechecked, null);
+  assert.match(promptGroupLayoutSource, /export type PromptGroupBounds = \{ x: number; y: number; width: number; height: number \};/);
+  assert.match(promptGroupLayoutSource, /export interface UsePromptGroupLayoutDeps \{/);
+  assert.match(promptGroupLayoutSource, /export interface UsePromptGroupLayoutResult \{/);
+  assert.match(promptGroupLayoutSource, /export interface UsePromptGroupStackingDeps \{/);
+  assert.match(promptGroupLayoutSource, /export interface UsePromptGroupStackingResult \{/);
+  assert.doesNotMatch(appSource, /const buildPromptGroupRegroupLayouts = useCallback/);
+  assert.doesNotMatch(appSource, /const promptGroupBoundsById = useMemo/);
+  assert.doesNotMatch(appSource, /const visiblePromptGroupViews = useMemo/);
 });
 
 test('prompt-group regroup keeps a wider dock gap below the main card during recycle', () => {

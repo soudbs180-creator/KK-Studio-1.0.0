@@ -10,9 +10,9 @@ function readSource(relativePath: string): string {
 }
 
 test('ecommerce group export warns when no generated deliverables are available instead of exporting an empty zip', () => {
-  const appSource = readSource('src/App.tsx');
+  const groupExportRuntimeSource = readSource('src/app/useEcommerceGroupExportRuntime.ts');
 
-  assert.match(appSource, /if \(exportables\.length === 0\) \{/);
-  assert.match(appSource, /notify\.warning\('无可导出图片',/);
-  assert.doesNotMatch(appSource, /导出完成'.*\$\{packageLabel\}已导出，共 0 张图片/);
+  assert.match(groupExportRuntimeSource, /if \(exportables\.length === 0\) \{/);
+  assert.match(groupExportRuntimeSource, /notify\.warning\('无可导出图片',/);
+  assert.doesNotMatch(groupExportRuntimeSource, /导出完成'.*\$\{packageLabel\}已导出，共 0 张图片/);
 });

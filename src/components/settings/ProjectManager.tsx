@@ -50,10 +50,6 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     onToggleGrid,
     onAutoArrange,
     showGrid = true,
-    mobilePromptOptimizationEnabled = false,
-    mobilePromptOptimizationSupported = true,
-    onToggleMobilePromptOptimization,
-    onOpenMobilePromptLibrary,
 }) => {
     const {
         state,
@@ -376,7 +372,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
             >
                 <div
                     className="flex items-center justify-between border-b px-4 py-3"
-                    style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-tertiary)' }}
+                    style={frostedProjectManagerSubSurfaceStyle}
                 >
                     <h3 className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-tertiary)' }}>
                         我的项目
@@ -474,7 +470,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
 
                 <div
                     className="space-y-1 border-t p-2"
-                    style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-secondary)' }}
+                    style={frostedProjectManagerSubSurfaceStyle}
                 >
                     <button
                         onClick={(event) => {
@@ -577,14 +573,14 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         </div>
                     </div>
 
-                    <p className="mb-6 rounded-lg border border-white/5 bg-white/5 p-3 text-sm leading-relaxed text-gray-700 dark:text-zinc-300">
+                    <p className="mb-6 rounded-lg border p-3 text-sm leading-relaxed text-[var(--text-secondary)]" style={frostedProjectManagerSubSurfaceStyle}>
                         删除后，该项目会从当前工作区消失。如果你之后重新同步本地素材，还可以重新导入回来。
                     </p>
 
                     <div className="flex justify-end gap-3">
                         <button
                             onClick={() => setShowDeleteConfirm(null)}
-                            className="rounded-lg px-4 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-white/5 hover:text-gray-800 dark:text-zinc-400 dark:hover:text-white"
+                            className="rounded-lg px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--frost-card-sub-bg)] hover:text-[var(--text-primary)]"
                         >
                             取消
                         </button>
@@ -629,7 +625,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         <button
                             onClick={() => setShowMergeModal(false)}
                             disabled={!!mergingCanvasId}
-                            className="rounded-lg px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-white/5 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-400 dark:hover:text-white"
+                            className="rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--frost-card-sub-bg)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             关闭
                         </button>
@@ -637,7 +633,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
 
                     <div className="mt-4 space-y-2">
                         {mergeCandidates.length === 0 ? (
-                            <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-5 text-sm text-gray-500 dark:text-zinc-400">
+                            <div className="rounded-xl border px-4 py-5 text-sm text-[var(--text-secondary)]" style={frostedProjectManagerSubSurfaceStyle}>
                                 当前没有其他项目可合并。
                             </div>
                         ) : (
@@ -646,7 +642,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                     key={canvas.id}
                                     onClick={() => handleMergeIntoCurrent(canvas.id)}
                                     disabled={!!mergingCanvasId}
-                                    className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="flex w-full items-center justify-between rounded-xl border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-4 py-3 text-left transition-colors hover:bg-[var(--frost-card-main-bg)] disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     <div>
                                         <div className="text-sm font-medium text-gray-900 dark:text-white">{canvas.name}</div>

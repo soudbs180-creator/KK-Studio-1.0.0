@@ -99,10 +99,10 @@ const getRechargeSubmissionStatusLabel = (status?: string | null) => {
 
 const getStatusClass = (status?: string | null) => {
   const lower = (status || '').toLowerCase();
-  if (lower === 'failed') return 'bg-red-500/10 text-red-400 border-red-500/20';
-  if (lower === 'pending') return 'bg-amber-500/10 text-amber-300 border-amber-500/20';
-  if (lower === 'refunded') return 'bg-blue-500/10 text-blue-300 border-blue-500/20';
-  return 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20';
+  if (lower === 'failed') return 'kk-user-profile-modal__status--failed';
+  if (lower === 'pending') return 'kk-user-profile-modal__status--pending';
+  if (lower === 'refunded') return 'kk-user-profile-modal__status--refunded';
+  return 'kk-user-profile-modal__status--completed';
 };
 
 const UserProfileModal: React.FC<UserProfileModalProps> = ({
@@ -116,7 +116,6 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const { isTempUser, tempUserExpiry } = useAuth();
   const { accountRole, checkingAdmin } = useAdminRole();
   const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
-  const billingFeatureEnabled = KKAI_FEATURE_FLAGS.billing;
   const {
     balance,
     billingLogs,
@@ -621,20 +620,23 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         onClick={resetAndClose}
       >
         <div
-          className={`w-full overflow-hidden border shadow-2xl ${
+          className={`kk-user-profile-modal w-full overflow-hidden border ${
             isMobile
               ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none'
               : 'max-w-[860px] rounded-2xl'
           }`}
           style={{
-            backgroundColor: 'var(--bg-surface)',
-            borderColor: 'var(--border-light)',
+            background: 'var(--frost-card-framework-bg)',
+            borderColor: 'var(--frost-card-framework-border)',
+            boxShadow: 'var(--frost-card-framework-shadow)',
+            backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+            WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
           }}
           onClick={(event) => event.stopPropagation()}
         >
         <div
-          className={`flex items-center justify-between border-b ${isMobile ? 'mobile-sheet-header-safe px-3 py-3' : 'px-4 py-3'}`}
-          style={{ borderColor: 'var(--border-light)' }}
+          className={`kk-user-profile-modal__header flex items-center justify-between border-b ${isMobile ? 'mobile-sheet-header-safe px-3 py-3' : 'px-4 py-3'}`}
+          style={{ borderColor: 'var(--frost-card-framework-border)' }}
         >
           <div className="flex items-center gap-2">
             {view !== 'main' && (
@@ -664,13 +666,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
           </button>
         </div>
 
-        <div className={`${isMobile ? 'mobile-sheet-scroll flex-1 px-3 py-3' : 'max-h-[78vh] overflow-y-auto px-4 py-4'}`}>
+        <div className={`kk-user-profile-modal__body ${isMobile ? 'mobile-sheet-scroll flex-1 px-3 py-3' : 'max-h-[78vh] overflow-y-auto px-4 py-4'}`}>
           {message && (
             <div
-              className={`mb-4 rounded-lg border px-3 py-2 text-sm ${
+              className={`kk-user-profile-modal__notice mb-4 rounded-lg px-3 py-2 text-sm ${
                 message.type === 'success'
-                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-                  : 'border-red-500/30 bg-red-500/10 text-red-300'
+                  ? 'kk-user-profile-modal__notice--success'
+                  : 'kk-user-profile-modal__notice--danger'
               }`}
             >
               {message.text}
@@ -680,12 +682,12 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
           {view === 'main' && (
             <div className={`${isMobile ? 'space-y-3' : 'space-y-4'}`}>
               {isTempUser && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+                <div className="kk-user-profile-modal__notice kk-user-profile-modal__notice--warning rounded-xl p-3 text-sm">
                   <div className="flex items-start gap-2">
-                    <AlertCircle size={18} className="mt-0.5 text-amber-300" />
+                    <AlertCircle size={18} className="mt-0.5 shrink-0" />
                     <div>
                       <div className="font-medium">临时账号</div>
-                      <p className="mt-1 text-xs text-amber-200/90">
+                      <p className="mt-1 text-xs">
                         当前账号剩余有效期：{timeRemaining || '计算中'}。建议绑定正式账号，避免数据丢失。
                       </p>
                     </div>
@@ -693,9 +695,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </div>
               )}
 
-              <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border-light)' }}>
+              <div className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
                 <div className="flex items-center gap-3">
-                  <div className="h-14 w-14 overflow-hidden rounded-full bg-indigo-500/20 text-white">
+                  <div className="h-14 w-14 overflow-hidden rounded-full bg-gradient-to-br from-[var(--clay-brand-coral)] via-[var(--clay-brand-pink)] to-[var(--clay-brand-peach)] text-white">
                     {avatarSrc ? (
                       <img src={avatarSrc} alt="头像" className="h-full w-full object-cover" />
                     ) : (
@@ -718,7 +720,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                       </div>
                     )}
                     {isGoogleBound && (
-                      <div className="mt-1 text-[11px] text-blue-300">
+                      <div className="mt-1 text-[11px] text-[var(--clay-brand-lavender)]">
                         已绑定 Google，可使用 Google 一键登录
                       </div>
                     )}
@@ -734,20 +736,20 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </div>
 
               {billingUiEnabled && (
-                <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border-light)' }}>
+                <div className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                         积分
                       </div>
-                      <div className="mt-1 text-2xl font-bold text-amber-300">{remainingBalanceDisplay}</div>
+                      <div className="mt-1 text-2xl font-bold text-[var(--clay-brand-ochre)]">{remainingBalanceDisplay}</div>
                       <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
                         {remainingBalanceHint}
                       </div>
                     </div>
                     <button
                       onClick={() => setShowRechargeModal(true)}
-                      className="inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-medium text-white"
+                      className="inline-flex h-10 items-center justify-center rounded-lg bg-[var(--accent-coral)] px-4 text-sm font-medium text-white"
                     >
                       立即充值
                     </button>
@@ -755,10 +757,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </div>
               )}
 
-              <div className="space-y-2">
+              <div className="kk-user-profile-modal__action-list">
                 <button
                   onClick={() => setView('edit-profile')}
-                  className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm"
+                  className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm"
                   style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
                 >
                   <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
@@ -771,7 +773,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <button
                   onClick={() => void handleWechatBind()}
                   disabled={!canBindWechat}
-                  className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm disabled:cursor-not-allowed disabled:opacity-60"
                   style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
                 >
                   <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
@@ -784,7 +786,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <button
                   onClick={() => void handleGoogleBind()}
                   disabled={!canBindGoogle || loading}
-                  className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm disabled:cursor-not-allowed disabled:opacity-60"
                   style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
                 >
                   <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
@@ -797,7 +799,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 {canChangePassword && (
                   <button
                     onClick={() => setView('change-password')}
-                    className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm"
+                    className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm"
                     style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
                   >
                     <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
@@ -809,14 +811,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 )}
 
                 {!canChangePassword && !isTempUser && (
-                  <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+                  <div className="kk-user-profile-modal__action-note kk-user-profile-modal__notice--success text-xs">
                     微信纯登录账号不需要单独密码，后续可直接扫码进入。
                   </div>
                 )}
 
                 <button
                   onClick={openSecurity}
-                  className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm"
+                  className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm"
                   style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
                 >
                   <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
@@ -829,7 +831,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 {billingUiEnabled && (
                   <button
                     onClick={openBilling}
-                    className="flex h-11 w-full items-center justify-between rounded-lg border px-3 text-sm"
+                    className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm"
                     style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
                   >
                     <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
@@ -845,7 +847,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     resetAndClose();
                     onSignOut();
                   }}
-                  className="flex h-11 w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg border border-red-500/30 bg-red-500/10 px-3 text-sm text-red-300"
+                  className="kk-user-profile-modal__action-row kk-user-profile-modal__action-row--danger flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap text-sm"
                 >
                   <LogOut size={15} className="shrink-0" />
                   <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">退出登录</span>
@@ -864,8 +866,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   value={displayName}
                   onChange={(event) => setDisplayName(event.target.value)}
                   placeholder="请输入昵称"
-                  className="h-10 w-full rounded-lg border bg-[var(--bg-tertiary)] px-3 text-sm"
-                  style={{ borderColor: 'var(--border-light)' }}
+                  className="h-10 w-full rounded-lg border bg-[var(--frost-input-bg)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                  style={{ borderColor: 'var(--frost-input-border)' }}
                 />
               </label>
 
@@ -905,8 +907,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                         onClick={() => setAvatarUrl(option.id)}
                         className={`rounded-xl border p-2 text-left transition-all ${selected ? 'scale-[1.02]' : 'hover:-translate-y-0.5'}`}
                         style={{
-                          borderColor: selected ? 'rgb(99 102 241 / 0.9)' : 'var(--border-light)',
-                          backgroundColor: selected ? 'rgb(99 102 241 / 0.12)' : 'var(--bg-tertiary)',
+                          borderColor: selected ? 'rgb(255 107 90 / 0.56)' : 'var(--frost-card-sub-border)',
+                          background: selected ? 'rgb(255 107 90 / 0.12)' : 'var(--frost-card-sub-bg)',
                         }}
                       >
                         <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'rgb(255 255 255 / 0.08)' }}>
@@ -931,8 +933,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   value={avatarInputValue}
                   onChange={(event) => setAvatarUrl(event.target.value)}
                   placeholder="请输入外部图片地址，或直接点选上方预设头像"
-                  className="h-10 w-full rounded-lg border bg-[var(--bg-tertiary)] px-3 text-sm"
-                  style={{ borderColor: 'var(--border-light)' }}
+                  className="h-10 w-full rounded-lg border bg-[var(--frost-input-bg)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                  style={{ borderColor: 'var(--frost-input-border)' }}
                 />
                 <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
                   {selectedPresetAvatar ? `当前已选择预设头像：${selectedPresetAvatar.label}` : '也可以粘贴任意外部图片地址。'}
@@ -942,7 +944,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
               <button
                 onClick={() => void handleUpdateProfile()}
                 disabled={loading}
-                className="inline-flex h-10 max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg bg-indigo-600 px-4 text-sm font-medium text-white disabled:opacity-70"
+                className="inline-flex h-10 max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg bg-[var(--accent-coral)] px-4 text-sm font-medium text-white disabled:opacity-70"
               >
                 {loading && <Loader2 size={16} className="animate-spin" />}
                 <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">保存资料</span>
@@ -952,7 +954,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
           {view === 'change-password' && canChangePassword && (
             <div className="space-y-3">
-              <div className="rounded-lg border p-3" style={{ borderColor: 'var(--border-light)' }}>
+              <div className="kk-user-profile-modal__sub-card rounded-lg border p-3" style={{ borderColor: 'var(--frost-card-sub-border)' }}>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
@@ -989,8 +991,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   onChange={(event) => setPasswordVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
                   placeholder="请输入 6 位验证码"
                   inputMode="numeric"
-                  className="h-10 w-full rounded-lg border bg-[var(--bg-tertiary)] px-3 text-sm"
-                  style={{ borderColor: 'var(--border-light)' }}
+                  className="h-10 w-full rounded-lg border bg-[var(--frost-input-bg)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                  style={{ borderColor: 'var(--frost-input-border)' }}
                 />
               </label>
 
@@ -1003,8 +1005,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   value={newPassword}
                   onChange={(event) => setNewPassword(event.target.value)}
                   placeholder="至少 6 位"
-                  className="h-10 w-full rounded-lg border bg-[var(--bg-tertiary)] px-3 text-sm"
-                  style={{ borderColor: 'var(--border-light)' }}
+                  className="h-10 w-full rounded-lg border bg-[var(--frost-input-bg)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                  style={{ borderColor: 'var(--frost-input-border)' }}
                 />
               </label>
 
@@ -1017,15 +1019,15 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   placeholder="请再次输入新密码"
-                  className="h-10 w-full rounded-lg border bg-[var(--bg-tertiary)] px-3 text-sm"
-                  style={{ borderColor: 'var(--border-light)' }}
+                  className="h-10 w-full rounded-lg border bg-[var(--frost-input-bg)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                  style={{ borderColor: 'var(--frost-input-border)' }}
                 />
               </label>
 
               <button
                 onClick={() => void handleChangePassword()}
                 disabled={loading || passwordCodeSending}
-                className="inline-flex h-10 max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg bg-indigo-600 px-4 text-sm font-medium text-white disabled:opacity-70"
+                className="inline-flex h-10 max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg bg-[var(--accent-coral)] px-4 text-sm font-medium text-white disabled:opacity-70"
               >
                 {loading && <Loader2 size={16} className="animate-spin" />}
                 <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">保存新密码</span>
@@ -1035,7 +1037,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
           {view === 'billing' && billingUiEnabled && (
             <div className="space-y-4">
-              <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border-light)' }}>
+              <div className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
@@ -1049,11 +1051,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="rounded-lg border px-3 py-2" style={{ borderColor: 'var(--border-light)' }}>
+                  <div className="kk-user-profile-modal__sub-card rounded-lg border px-3 py-2" style={{ borderColor: 'var(--frost-card-sub-border)' }}>
                     <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
                       积分
                     </div>
-                    <div className="text-xl font-bold text-amber-300">{remainingBalanceDisplay}</div>
+                    <div className="text-xl font-bold text-[var(--clay-brand-ochre)]">{remainingBalanceDisplay}</div>
                     {latestRecharge ? (
                       <div className="mt-1 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
                         最近充值：{formatDateTime(latestRecharge.created_at)}
@@ -1064,14 +1066,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
                 <button
                   onClick={() => setShowRechargeModal(true)}
-                  className="mt-3 inline-flex h-9 max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg bg-amber-500 px-4 text-sm text-white"
+                  className="mt-3 inline-flex h-9 max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg bg-[var(--accent-coral)] px-4 text-sm text-white"
                 >
                   <CreditCard size={14} className="shrink-0" />
                   <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">充值积分</span>
                 </button>
               </div>
 
-              <section className="rounded-xl border p-4" style={{ borderColor: 'var(--border-light)' }}>
+              <section className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
                 <div className="mb-2 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                   生成记录（含失败与退款）
                 </div>
@@ -1084,7 +1086,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     </span>
                   </div>
                 ) : usageLogs.length === 0 ? (
-                  <div className="rounded-lg border border-dashed px-3 py-4 text-xs" style={{ borderColor: 'var(--border-light)', color: 'var(--text-tertiary)' }}>
+                  <div className="kk-user-profile-modal__sub-card rounded-lg border border-dashed px-3 py-4 text-xs" style={{ borderColor: 'var(--frost-card-sub-border)', color: 'var(--text-tertiary)' }}>
                     暂无生成记录。
                   </div>
                 ) : (
@@ -1094,7 +1096,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                       const amountText = record.amount >= 0 ? `+${record.amount}` : `${record.amount}`;
 
                       return (
-                        <div key={record.id} className="rounded-lg border p-3" style={{ borderColor: 'var(--border-light)' }}>
+                        <div key={record.id} className="kk-user-profile-modal__sub-card rounded-lg border p-3" style={{ borderColor: 'var(--frost-card-sub-border)' }}>
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="min-w-0 flex-1">
                               <div className="truncate text-sm" style={{ color: 'var(--text-primary)' }}>
@@ -1111,7 +1113,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                             </div>
 
                             <div className="text-right">
-                              <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] ${getStatusClass(record.status)}`}>
+                              <span className={`kk-user-profile-modal__status inline-flex rounded-full border px-2 py-0.5 text-[11px] ${getStatusClass(record.status)}`}>
                                 {getRechargeSubmissionStatusLabel(record.status || 'completed')}
                               </span>
                               <div className={`mt-1 text-sm font-semibold ${record.amount >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
@@ -1126,7 +1128,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 )}
               </section>
 
-              <section className="rounded-xl border p-4" style={{ borderColor: 'var(--border-light)' }}>
+              <section className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
                 <div className="mb-2 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                   充值记录
                 </div>
@@ -1139,13 +1141,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     </span>
                   </div>
                 ) : billingLogs.length === 0 ? (
-                  <div className="rounded-lg border border-dashed px-3 py-4 text-xs" style={{ borderColor: 'var(--border-light)', color: 'var(--text-tertiary)' }}>
+                  <div className="kk-user-profile-modal__sub-card rounded-lg border border-dashed px-3 py-4 text-xs" style={{ borderColor: 'var(--frost-card-sub-border)', color: 'var(--text-tertiary)' }}>
                     暂无充值记录。
                   </div>
                 ) : (
                   <div className="space-y-2">
                     {billingLogs.slice(0, 50).map((record) => (
-                      <div key={record.id} className="rounded-lg border p-3" style={{ borderColor: 'var(--border-light)' }}>
+                      <div key={record.id} className="kk-user-profile-modal__sub-card rounded-lg border p-3" style={{ borderColor: 'var(--frost-card-sub-border)' }}>
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div>
                             <div className="text-sm" style={{ color: 'var(--text-primary)' }}>
@@ -1161,7 +1163,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                             )}
                           </div>
 
-                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] ${getStatusClass(record.status)}`}>
+                          <span className={`kk-user-profile-modal__status inline-flex rounded-full border px-2 py-0.5 text-[11px] ${getStatusClass(record.status)}`}>
                             {getRechargeSubmissionStatusLabel(record.status || 'completed')}
                           </span>
                         </div>
@@ -1175,7 +1177,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
           {view === 'security' && (
             <div className="space-y-4">
-              <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border-light)' }}>
+              <div className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
@@ -1197,21 +1199,21 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </div>
 
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
-                  <div className="rounded-lg border px-3 py-3" style={{ borderColor: 'var(--border-light)' }}>
+                  <div className="kk-user-profile-modal__sub-card rounded-lg border px-3 py-3" style={{ borderColor: 'var(--frost-card-sub-border)' }}>
                     <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>当前 AAL</div>
                     <div className="mt-1 text-lg font-semibold text-emerald-300">
                       {mfaStatus?.currentLevel?.toUpperCase() || '未启用'}
                     </div>
                   </div>
 
-                  <div className="rounded-lg border px-3 py-3" style={{ borderColor: 'var(--border-light)' }}>
+                  <div className="kk-user-profile-modal__sub-card rounded-lg border px-3 py-3" style={{ borderColor: 'var(--frost-card-sub-border)' }}>
                     <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>下一等级</div>
                     <div className="mt-1 text-lg font-semibold text-amber-300">
                       {mfaStatus?.nextLevel?.toUpperCase() || '-'}
                     </div>
                   </div>
 
-                  <div className="rounded-lg border px-3 py-3" style={{ borderColor: 'var(--border-light)' }}>
+                  <div className="kk-user-profile-modal__sub-card rounded-lg border px-3 py-3" style={{ borderColor: 'var(--frost-card-sub-border)' }}>
                     <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>已验证因子</div>
                     <div className="mt-1 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
                       {mfaStatus?.verifiedFactors.length || 0}
@@ -1220,7 +1222,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </div>
               </div>
 
-              <section className="rounded-xl border p-4" style={{ borderColor: 'var(--border-light)' }}>
+              <section className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
                 <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                   启用 TOTP 动态口令
                 </div>
@@ -1236,15 +1238,15 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     value={mfaFriendlyName}
                     onChange={(event) => setMfaFriendlyName(event.target.value)}
                     placeholder="例如：我的手机"
-                    className="h-10 w-full rounded-lg border bg-[var(--bg-tertiary)] px-3 text-sm"
-                    style={{ borderColor: 'var(--border-light)' }}
+                    className="h-10 w-full rounded-lg border bg-[var(--frost-input-bg)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                    style={{ borderColor: 'var(--frost-input-border)' }}
                   />
                 </label>
 
                 <button
                   onClick={() => void handleStartMfaEnrollment()}
                   disabled={mfaActionLoading}
-                  className="mt-3 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-medium text-white disabled:opacity-70"
+                  className="mt-3 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[var(--accent-coral)] px-4 text-sm font-medium text-white disabled:opacity-70"
                 >
                   {mfaActionLoading && <Loader2 size={16} className="animate-spin" />}
                   生成绑定二维码
@@ -1255,23 +1257,23 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </p>
 
                 {mfaEnrollment && (
-                  <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                  <div className="kk-user-profile-modal__mfa-enrollment mt-4 rounded-xl border p-4">
                     <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-                      <div className="rounded-xl bg-white p-3">
+                      <div className="kk-user-profile-modal__qr-panel rounded-xl p-3">
                         <img src={mfaEnrollment.qrCode} alt="TOTP 绑定二维码" className="mx-auto h-auto w-full max-w-[180px]" />
                       </div>
 
                       <div className="space-y-3">
                         <div>
                           <div className="text-xs text-emerald-200/80">备用密钥</div>
-                          <div className="mt-1 break-all rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white">
+                          <div className="mt-1 break-all rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-3 py-2 text-sm text-[var(--text-primary)]">
                             {mfaEnrollment.secret}
                           </div>
                         </div>
 
                         <div>
                           <div className="text-xs text-emerald-200/80">OTP Auth URI</div>
-                          <div className="mt-1 break-all rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-slate-200">
+                          <div className="mt-1 break-all rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-3 py-2 text-xs text-[var(--text-secondary)]">
                             {mfaEnrollment.uri}
                           </div>
                         </div>
@@ -1283,14 +1285,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                             onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
                             placeholder="请输入验证码"
                             inputMode="numeric"
-                            className="h-10 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-white"
+                            className="h-10 w-full rounded-lg border border-[var(--frost-input-border)] bg-[var(--frost-input-bg)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                           />
                         </label>
 
                         <button
                           onClick={() => void handleVerifyMfaCode(mfaEnrollment.factorId)}
                           disabled={mfaActionLoading}
-                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-medium text-white disabled:opacity-70"
+                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[var(--accent-coral)] px-4 text-sm font-medium text-white disabled:opacity-70"
                         >
                           {mfaActionLoading && <Loader2 size={16} className="animate-spin" />}
                           完成绑定并验证
@@ -1301,7 +1303,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 )}
               </section>
 
-              <section className="rounded-xl border p-4" style={{ borderColor: 'var(--border-light)' }}>
+              <section className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
                 <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                   已绑定因子
                 </div>
@@ -1314,13 +1316,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     </span>
                   </div>
                 ) : !mfaStatus || mfaStatus.verifiedFactors.length === 0 ? (
-                  <div className="mt-3 rounded-lg border border-dashed px-3 py-4 text-xs" style={{ borderColor: 'var(--border-light)', color: 'var(--text-tertiary)' }}>
+                  <div className="kk-user-profile-modal__sub-card mt-3 rounded-lg border border-dashed px-3 py-4 text-xs" style={{ borderColor: 'var(--frost-card-sub-border)', color: 'var(--text-tertiary)' }}>
                     还没有已验证的 MFA 因子。
                   </div>
                 ) : (
                   <div className="mt-3 space-y-2">
                     {mfaStatus.verifiedFactors.map((factor) => (
-                      <div key={factor.id} className="rounded-lg border p-3" style={{ borderColor: 'var(--border-light)' }}>
+                      <div key={factor.id} className="kk-user-profile-modal__sub-card rounded-lg border p-3" style={{ borderColor: 'var(--frost-card-sub-border)' }}>
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
                             <div className="text-sm" style={{ color: 'var(--text-primary)' }}>
@@ -1337,7 +1339,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                         </div>
 
                         {mfaStatus.currentLevel !== 'aal2' && factor.factorType === 'totp' && (
-                          <div className="mt-3 rounded-lg border border-white/10 bg-black/10 p-3">
+                          <div className="kk-user-profile-modal__sub-card mt-3 rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] p-3">
                             <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                               当前会话还没有提升到 AAL2，输入一次动态口令即可完成二次验证。
                             </div>
@@ -1348,14 +1350,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                                 onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
                                 placeholder="6 位动态口令"
                                 inputMode="numeric"
-                                className="h-10 min-w-[180px] flex-1 rounded-lg border bg-[var(--bg-tertiary)] px-3 text-sm"
-                                style={{ borderColor: 'var(--border-light)' }}
+                                className="h-10 min-w-[180px] flex-1 rounded-lg border bg-[var(--frost-input-bg)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                                style={{ borderColor: 'var(--frost-input-border)' }}
                               />
 
                               <button
                                 onClick={() => void handleVerifyMfaCode(factor.id)}
                                 disabled={mfaActionLoading}
-                                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-medium text-white disabled:opacity-70"
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[var(--accent-coral)] px-4 text-sm font-medium text-white disabled:opacity-70"
                               >
                                 {mfaActionLoading && <Loader2 size={16} className="animate-spin" />}
                                 验证当前会话
@@ -1369,7 +1371,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 )}
 
                 {Boolean(mfaStatus?.pendingFactors.length) && (
-                  <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-3 text-xs text-amber-100">
+                  <div className="kk-user-profile-modal__notice kk-user-profile-modal__notice--warning mt-4 rounded-lg px-3 py-3 text-xs">
                     还有 {mfaStatus?.pendingFactors.length} 个未完成验证的因子，只有完成一次动态口令校验后才会真正生效。
                   </div>
                 )}

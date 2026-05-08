@@ -1,23 +1,19 @@
-﻿import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
-import { Canvas, PromptNode, GeneratedImage, AspectRatio, CanvasGroup, CanvasDrawing, GenerationMode, KnownModel, PromptPendingSyncRequest, type WorkflowNode } from '../types';
+import React, { useContext, useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
+import { Canvas, PromptNode, GeneratedImage, AspectRatio, CanvasGroup, CanvasDrawing, GenerationMode, KnownModel, type WorkflowNode } from '../types';
 import { startTransition } from 'react';
 import { shouldEnableWorkspaceCloudSync } from '../app/kkaiFeatureFlags';
-import { saveImage, saveOriginalImage, getImage, getImageByQuality, getStrictOriginalImage, deleteImage, getAllImages, clearAllImages, getImagesPage, normalizePersistableMediaSource } from '../services/storage/imageStorage';
+import { saveImage, saveOriginalImage, getImage, getImageByQuality, deleteImage, clearAllImages, normalizePersistableMediaSource } from '../services/storage/imageStorage';
 import { syncService } from '../services/system/syncService';
 import { fileSystemService } from '../services/storage/fileSystemService';
 import { dataURLToBlob as base64ToBlob, safeRevokeBlobUrl } from '../utils/blobUtils';
 import { calculateImageHash } from '../utils/imageUtils';
-import { getCardDimensions } from '../utils/styleUtils';
 import { notificationService, notify } from '../services/system/notificationService';
 import { traceLocalPerformance } from '../services/system/localPerformanceTrace';
 import { logError, logInfo } from '../services/system/systemLogService';
 import { ImageQuality, QUALITY_CONFIGS, compressImageToQuality, getQualityStorageId } from '../services/image/imageQuality';
 import { getLocalFolderHandle, getStorageMode, restoreLocalFolderConnection, setLocalFolderHandle } from '../services/storage/storagePreference';
-import { featureFlags } from '../config/featureFlags';
-import { createEmptyWorkflowGraph } from '../workflow/types';
-import { canvasToWorkflow, syncCanvasWorkflow } from '../workflow/adapters/canvasToWorkflow';
-import { workflowToLegacyCanvas } from '../workflow/adapters/workflowToLegacy';
-import { dedupeWorkflowEdges, isWorkflowUtilityNodeKind } from '../workflow/schema';
+import { canvasToWorkflow } from '../workflow/adapters/canvasToWorkflow';
+import { isWorkflowUtilityNodeKind } from '../workflow/schema';
 import { clampGenerationDurationMs } from '../utils/timeUtils';
 import { buildGeneratedImageBatchPositions } from '../utils/generatedImageLayout';
 import {
@@ -27,784 +23,87 @@ import {
 } from '../utils/referenceImageStorage';
 import {
     clearPersistedCanvasStorageSnapshot,
-    getCachedStrippedCanvases,
     persistCanvasStateToLocalStorage,
     restoreCanvasStateFromLocalStorage,
 } from './canvasPersistence';
 import { useCanvasCloudSync } from './useCanvasCloudSync';
 import { useCanvasFileSystemPersistence } from './useCanvasFileSystemPersistence';
 import { useCanvasLocalPersistence } from './useCanvasLocalPersistence';
+import {
+    DEFAULT_CANVAS,
+    DEFAULT_STATE,
+    MAX_CANVASES,
+    CanvasContext,
+    createCanvasWorkflow,
+    generateId,
+    type ArrangeMode,
+    type CanvasState,
+} from './canvasContextState';
+import { syncCanvasCompatibility } from './canvasCompatibility';
+import { resolvePromptChildImageIds } from './canvasPromptChildImages';
+import { resolveCanvasSelectionIds, type CanvasSelectionMode } from './canvasSelection';
+import { hydrateRecoveredMediaCacheEntry, resolveOriginalPersistSourceForDisk } from './canvasMediaRecovery';
+import { mergeCanvases, resolvePreferredActiveCanvasId } from './canvasMerge';
+import { mergeCanvasIntoState } from './canvasMergeInto';
+import { arrangeSelectedGroupedNodes, arrangeSelectedRootNodes, arrangeSingleSelectedPromptChildren } from './canvasArrangeSelection';
+import { resolveCanvasAutoArrangePositions } from './canvasAutoArrange';
+import { cleanupInvalidCanvasCardsForCanvas, type CleanupInvalidCardsSummary } from './canvasCleanup';
+import { resolveNextCardPosition, resolveNextGroupPosition, resolveSmartCanvasPosition } from './canvasPlacement';
+import { bringCanvasNodesToFront } from './canvasLayering';
+import { addCanvasGroupToCanvas, removeCanvasGroupFromCanvas, updateCanvasGroupInCanvas } from './canvasGroups';
+import { moveSelectedCanvasNodes } from './canvasMovement';
+import { setCanvasNodeTags } from './canvasTags';
+import {
+    addCanvasPromptNode,
+    applyCanvasNodeBatchUpdates,
+    updateCanvasPromptNode,
+    updateCanvasImageNode,
+    updateCanvasImageNodeDimensions
+} from './canvasNodeUpdates';
+import {
+    updateCanvasImageNodePosition,
+    updateCanvasPromptNodePosition
+} from './canvasPositionUpdates';
+import {
+    deleteCanvasImageNode,
+    deleteCanvasPromptNode,
+    linkCanvasPromptToImage,
+    unlinkCanvasPromptFromImage
+} from './canvasPromptImageLinks';
+import {
+    addCanvasWorkflowNode,
+    deleteCanvasWorkflowNode,
+    updateCanvasWorkflowNode,
+    updateCanvasWorkflowNodePosition
+} from './canvasWorkflowUpdates';
+import {
+    buildPersistedImageRecoverySignature,
+    buildPromptRecoveryEntries,
+    resolveImageRecoveryUrlFromMetadata,
+    resolvePromptRecoveryEntrySource,
+    type PromptRecoveryEntry,
+} from './canvasPersistedImageRecovery';
+import {
+    hasUnrecoverableSyncGenerationInFlight,
+    markInterruptedSyncPromptGenerations,
+    normalizeCanvasPromptRecovery,
+} from './canvasPromptRecovery';
 import { resolveModelDisplayName } from '../utils/modelDisplayName';
 import { isPhoneResponsiveWidth } from '../utils/responsiveSurface';
 import { getAllTasks, type PersistedTask } from '../services/persistence/taskPersistence';
-import { migrateLegacyEcommerceFrameworkCanvas } from '../services/ecommerce/frameworkRuntime.ts';
 import {
     buildImageResultIdentity,
     buildTaskResultIdentity,
-    getCompletedTaskResultUrls,
-    getImageRecoveryCandidates,
-    getPromptCompletedTasks,
     normalizePersistentResultUrl,
 } from '../utils/imageResultPersistence';
 import { useAuth } from './AuthContext';
 import { useAppStartup } from './AppStartupContext';
 
-const MAX_CANVASES = 10;
-
-
-// 副卡排列模式: 横向 | 宫格 | 纵向
-export type SubCardLayout = 'row' | 'grid' | 'column';
-
-// 整理模式: 宫格(6列) | 横向 | 纵向
-export type ArrangeMode = 'grid' | 'row' | 'column';
-
-
-interface CanvasState {
-    canvases: Canvas[];
-    activeCanvasId: string;
-    // History is keyed by canvasId. Each entry has past/future stacks of the *specific canvas content* (Canvas object)
-    history: {
-        [key: string]: {
-            past: Canvas[];
-            future: Canvas[];
-        }
-    };
-    // Local File System Support
-    fileSystemHandle: FileSystemDirectoryHandle | null;
-    folderName: string | null;
-    selectedNodeIds: string[];
-    // 副卡排列模式 (轮换: row -> grid -> column -> row)
-    subCardLayoutMode: SubCardLayout;
-    // 🎯 视口中心位置（动态优先级加载）
-    viewportCenter: { x: number; y: number };
-}
-
-interface CanvasContextType {
-    state: CanvasState;
-    activeCanvas: Canvas | undefined;
-    createCanvas: () => string | null; // Returns new canvas ID or null if max reached
-    switchCanvas: (id: string) => void;
-    deleteCanvas: (id: string) => void;
-    renameCanvas: (id: string, newName: string) => void;
-    addPromptNode: (node: PromptNode) => Promise<void>;
-    updatePromptNode: (node: PromptNode) => Promise<void>;
-    addImageNodes: (nodes: GeneratedImage[], parentUpdates?: Record<string, Partial<PromptNode>>) => Promise<void>;
-    updatePromptNodePosition: (id: string, pos: { x: number; y: number }, options?: { moveChildren?: boolean; ignoreSelection?: boolean }) => void;
-    updateImageNodePosition: (id: string, pos: { x: number; y: number }, options?: { ignoreSelection?: boolean }) => void;
-    updateImageNodeDimensions: (id: string, dimensions: string) => void;
-    updateImageNode: (id: string, updates: Partial<GeneratedImage>) => void; // 🎯 [New] Generic Update
-    deleteImageNode: (id: string) => void;
-    deletePromptNode: (id: string) => void;
-    linkNodes: (promptId: string, imageId: string) => void;
-    unlinkNodes: (promptId: string, imageId: string) => void;
-    clearAllData: () => void;
-    canCreateCanvas: boolean;
-    undo: () => void;
-    redo: () => void;
-    pushToHistory: () => void;
-    canUndo: boolean;
-    canRedo: boolean;
-    arrangeAllNodes: (mode?: ArrangeMode) => void; // Auto-layout cards: grid(6列) | row | column
-    getNextCardPosition: () => { x: number; y: number }; // Get next available position for new card
-    // File System
-    connectLocalFolder: () => Promise<void>;
-    disconnectLocalFolder: () => Promise<void>;
-    changeLocalFolder: () => Promise<void>;
-    refreshLocalFolder: () => Promise<void>;
-    isConnectedToLocal: boolean;
-    currentFolderName: string | null;
-    selectedNodeIds: string[];
-    selectNodes: (ids: string[], mode?: 'replace' | 'add' | 'remove' | 'toggle') => void;
-    clearSelection: () => void;
-    bringNodesToFront: (nodeIds: string[]) => void;
-    moveSelectedNodes: (delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => void;
-    moveSelectedNodesImmediate: (delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => void;
-    findSmartPosition: (x: number, y: number, width: number, height: number, buffer?: number) => { x: number; y: number };
-    findNextGroupPosition: () => { x: number; y: number }; // Grid-based Card Group placement
-    addGroup: (group: CanvasGroup) => void;
-    removeGroup: (id: string) => void;
-    updateGroup: (group: CanvasGroup) => void;
-    setNodeTags: (ids: string[], tags: string[]) => void;
-    isReady: boolean;
-    // 🎯 设置视口中心（动态优先级加载）
-    setViewportCenter: (center: { x: number; y: number }) => void;
-    // 🎯 迁移选中节点到其他项目
-    migrateNodes: (nodeIds: string[], targetCanvasId: string) => void;
-    mergeCanvasInto: (sourceCanvasId: string, targetCanvasId: string, options?: { deleteSource?: boolean }) => {
-        movedPrompts: number;
-        movedImages: number;
-        deletedSource: boolean;
-    };
-    cleanupInvalidCards: (canvasId?: string) => {
-        removedPrompts: number;
-        removedImages: number;
-        removedGroups: number;
-    };
-    // 🎯 [Persistence] Urgent state saving for generation tasks
-    urgentUpdatePromptNode: (node: PromptNode) => void;
-    // 🎯 [Batch Update] Atomic update for multiple nodes (e.g. stacking)
-    updateNodes: (updates: {
-        promptNodes?: { id: string, updates: Partial<PromptNode> }[],
-        imageNodes?: { id: string, updates: Partial<GeneratedImage> }[]
-    }) => void;
-    addWorkflowNode: (node: WorkflowNode) => void;
-    updateWorkflowNode: (id: string, updates: Partial<WorkflowNode>) => void;
-    updateWorkflowNodePosition: (id: string, pos: { x: number; y: number }) => void;
-    deleteWorkflowNode: (id: string) => void;
-}
-
-const CanvasContext = createContext<CanvasContextType | undefined>(undefined);
+export type { ArrangeMode, CanvasContextType, CanvasState, SubCardLayout } from './canvasContextState';
 
 const STORAGE_KEY = 'kk_studio_canvas_state';
 const LOCAL_FOLDER_REFRESH_INTERVAL_MS = 60000;
 const LOCAL_FOLDER_IDLE_GRACE_MS = 45000;
-const SYNC_GENERATION_INTERRUPTED_ERROR = '页面刷新或离开时中断了同步生成请求，供应商可能已完成出图，但当前项目没有收到最终响应。';
-
-const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
-
-const createCanvasWorkflow = (): Canvas['workflow'] | undefined =>
-    featureFlags.experimentalWorkflowGraph ? createEmptyWorkflowGraph<WorkflowNode>() : undefined;
-
-const DEFAULT_CANVAS: Canvas = {
-    id: 'default',
-    name: '项目1',
-    promptNodes: [],
-    imageNodes: [],
-    groups: [] as CanvasGroup[],
-    drawings: [] as CanvasDrawing[],
-    workflow: createCanvasWorkflow(),
-    lastModified: Date.now()
-};
-const DEFAULT_STATE: CanvasState = {
-    canvases: [DEFAULT_CANVAS],
-    activeCanvasId: 'default',
-    history: { 'default': { past: [], future: [] } },
-    fileSystemHandle: null,
-    folderName: null,
-    selectedNodeIds: [],
-    subCardLayoutMode: 'row', // 默认横向排列
-    viewportCenter: { x: 0, y: 0 } // 默认画布中心
-};
-
-const syncCanvasCompatibility = (canvas: Canvas): Canvas =>
-    migrateLegacyEcommerceFrameworkCanvas(
-        syncCanvasWorkflow(canvas, featureFlags.experimentalWorkflowGraph)
-    );
-
-type LocalMediaCacheEntry = {
-    url?: string;
-    originalUrl?: string;
-    filename?: string;
-};
-
-const normalizeMediaCacheSource = (value?: string | null): string => (
-    typeof value === 'string' ? value.trim() : ''
-);
-
-const isVideoFileName = (filename?: string | null): boolean => (
-    typeof filename === 'string' && /\.(mp4|webm|mov)$/i.test(filename)
-);
-
-const hydrateRecoveredMediaCacheEntry = async (
-    id: string,
-    entry?: LocalMediaCacheEntry | null
-): Promise<void> => {
-    const displayUrl = normalizeMediaCacheSource(entry?.url);
-    const originalUrl = normalizeMediaCacheSource(entry?.originalUrl);
-    const primaryOriginalSource = originalUrl;
-
-    if (!displayUrl && !primaryOriginalSource) {
-        return;
-    }
-
-    if (isVideoFileName(entry?.filename)) {
-        const videoSource = primaryOriginalSource || displayUrl;
-        if (!videoSource) return;
-        await saveImage(id, videoSource);
-        return;
-    }
-
-    // Never promote a thumbnail/display asset into the protected original slot.
-    // If disk recovery only found a thumbnail, keep it in the preview tiers and
-    // preserve any existing original already stored in IndexedDB/OPFS.
-    if (primaryOriginalSource) {
-        await saveOriginalImage(id, primaryOriginalSource);
-    }
-
-    if (displayUrl) {
-        await Promise.allSettled([
-            saveImage(getQualityStorageId(id, ImageQuality.MICRO), displayUrl),
-            saveImage(getQualityStorageId(id, ImageQuality.THUMBNAIL), displayUrl),
-        ]);
-    }
-};
-
-const isGeneratedMediaVideoLike = (image?: Partial<GeneratedImage> | null): boolean => (
-    image?.mode === GenerationMode.VIDEO || image?.mode === GenerationMode.AUDIO
-);
-
-const resolveOriginalPersistSourceForDisk = async (
-    image: Pick<GeneratedImage, 'id' | 'storageId' | 'originalUrl' | 'apiResultUrl' | 'url' | 'mode'>
-): Promise<string | null> => {
-    const explicitOriginal = normalizeMediaCacheSource(image.originalUrl)
-        || normalizeMediaCacheSource(image.apiResultUrl);
-    if (explicitOriginal && !explicitOriginal.startsWith('blob:')) {
-        return explicitOriginal;
-    }
-
-    const storageId = image.storageId || image.id;
-    if (storageId) {
-        const cachedOriginal = await getStrictOriginalImage(storageId);
-        if (cachedOriginal && !cachedOriginal.startsWith('blob:')) {
-            return cachedOriginal;
-        }
-    }
-
-    if (isGeneratedMediaVideoLike(image)) {
-        const stableVideoSource = normalizeMediaCacheSource(image.url);
-        return stableVideoSource && !stableVideoSource.startsWith('blob:')
-            ? stableVideoSource
-            : null;
-    }
-
-    return null;
-};
-
-
-const getExpectedPromptImageCount = (node?: Partial<PromptNode> | null): number => (
-    Math.max(1, Number(node?.lastGenerationTotalCount || node?.parallelCount || 1) || 1)
-);
-
-const getPendingTaskIdsFromPrompt = (node?: Partial<PromptNode> | null): string[] => {
-    const rawPendingTaskIds = (node?.generationMetadata as { pendingTaskIds?: unknown } | undefined)?.pendingTaskIds;
-    if (!Array.isArray(rawPendingTaskIds)) return [];
-
-    return Array.from(new Set(
-        rawPendingTaskIds.filter((taskId): taskId is string => typeof taskId === 'string' && taskId.trim().length > 0)
-    ));
-};
-
-const getPendingSyncRequestsFromPrompt = (node?: Partial<PromptNode> | null): PromptPendingSyncRequest[] => {
-    const rawPendingSyncRequests = (node?.generationMetadata as { pendingSyncRequests?: unknown } | undefined)?.pendingSyncRequests;
-    if (!Array.isArray(rawPendingSyncRequests)) return [];
-
-    return rawPendingSyncRequests
-        .map((item): PromptPendingSyncRequest | null => {
-            if (!item || typeof item !== 'object') return null;
-
-            const requestId = typeof (item as { requestId?: unknown }).requestId === 'string'
-                ? String((item as { requestId: string }).requestId).trim()
-                : '';
-            if (!requestId) return null;
-
-            const index = typeof (item as { index?: unknown }).index === 'number'
-                && Number.isFinite((item as { index: number }).index)
-                ? (item as { index: number }).index
-                : 0;
-            const prompt = typeof (item as { prompt?: unknown }).prompt === 'string'
-                ? (item as { prompt: string }).prompt
-                : String(node?.prompt || '');
-            const startedAt = typeof (item as { startedAt?: unknown }).startedAt === 'number'
-                && Number.isFinite((item as { startedAt: number }).startedAt)
-                ? (item as { startedAt: number }).startedAt
-                : Date.now();
-            const keySlotId = typeof (item as { keySlotId?: unknown }).keySlotId === 'string'
-                ? (item as { keySlotId: string }).keySlotId
-                : undefined;
-
-            return {
-                requestId,
-                index,
-                prompt,
-                startedAt,
-                keySlotId,
-            };
-        })
-        .filter((item): item is PromptPendingSyncRequest => !!item);
-};
-
-type PromptRecoveryEntry = {
-    taskId: string;
-    resultIndex: number;
-    url?: string;
-    storageId?: string;
-    completedAt?: number;
-    keySlotId?: string;
-    provider?: string;
-    providerLabel?: string;
-    model?: string;
-    modelLabel?: string;
-    cost?: number;
-    costSource?: 'snapshot' | 'explicit' | 'stored' | 'estimated' | 'none';
-    tokens?: number;
-};
-
-const getTaskResultUrlAtIndex = (urls: string[], index?: number): string | undefined => {
-    if (!urls.length) return undefined;
-    if (typeof index === 'number' && Number.isFinite(index) && index >= 0 && index < urls.length) {
-        return urls[index];
-    }
-    return urls[0];
-};
-
-const normalizeTaskResultStorageIds = (value?: Record<string, string> | null): Record<string, string> => {
-    if (!value || typeof value !== 'object') return {};
-
-    return Object.fromEntries(
-        Object.entries(value)
-            .filter(([key, storageId]) => (
-                String(key).trim().length > 0
-                && typeof storageId === 'string'
-                && storageId.trim().length > 0
-            ))
-            .map(([key, storageId]) => [String(key).trim(), storageId.trim()])
-    );
-};
-
-const getTaskResultStorageIdAtIndex = (
-    storageIds?: Record<string, string> | null,
-    index?: number
-): string | undefined => {
-    const normalizedStorageIds = normalizeTaskResultStorageIds(storageIds);
-    if (typeof index === 'number' && Number.isFinite(index)) {
-        const directMatch = normalizedStorageIds[String(index)];
-        if (directMatch) return directMatch;
-    }
-
-    const firstKey = Object.keys(normalizedStorageIds)[0];
-    return firstKey ? normalizedStorageIds[firstKey] : undefined;
-};
-
-const resolveStoredResultSource = async (storageId?: string | null): Promise<string | undefined> => {
-    const normalizedStorageId = typeof storageId === 'string' ? storageId.trim() : '';
-    if (!normalizedStorageId) return undefined;
-
-    try {
-        const original = await getStrictOriginalImage(normalizedStorageId);
-        if (original) return original;
-    } catch {
-        // noop
-    }
-
-    try {
-        const cached = await getImage(normalizedStorageId);
-        if (cached) return cached;
-    } catch {
-        // noop
-    }
-
-    return undefined;
-};
-
-const resolvePromptRecoveryEntrySource = async (
-    entry?: PromptRecoveryEntry | null
-): Promise<string | undefined> => {
-    if (!entry) return undefined;
-
-    const storedSource = await resolveStoredResultSource(entry.storageId);
-    if (storedSource) return storedSource;
-
-    const normalizedUrl = normalizePersistentResultUrl(entry.url) || entry.url;
-    if (normalizedUrl && !normalizedUrl.startsWith('blob:')) {
-        return normalizedUrl;
-    }
-
-    return undefined;
-};
-
-const buildPromptRecoveryEntries = (
-    node: PromptNode,
-    persistedTasks: PersistedTask[] = []
-): PromptRecoveryEntry[] => {
-    const entries: PromptRecoveryEntry[] = [];
-    const seenKeys = new Set<string>();
-
-    getPromptCompletedTasks(node).forEach((task) => {
-        const urls = getCompletedTaskResultUrls(task);
-        const storageIds = normalizeTaskResultStorageIds(task.resultStorageIds);
-        const resultIndexes = Array.from(new Set([
-            ...urls.map((_, index) => index),
-            ...Object.keys(storageIds)
-                .map((key) => Number.parseInt(key, 10))
-                .filter((value) => Number.isFinite(value) && value >= 0),
-        ])).sort((left, right) => left - right);
-
-        resultIndexes.forEach((index) => {
-            const url = getTaskResultUrlAtIndex(urls, index);
-            const storageId = storageIds[String(index)];
-            const identity = buildTaskResultIdentity({
-                taskId: task.taskId,
-                resultIndex: index,
-                url,
-            });
-            if (!identity || seenKeys.has(identity)) return;
-            seenKeys.add(identity);
-            entries.push({
-                taskId: task.taskId,
-                resultIndex: index,
-                url,
-                storageId,
-                completedAt: task.completedAt,
-                keySlotId: task.keySlotId,
-                provider: task.provider,
-                providerLabel: task.providerLabel,
-                model: task.model,
-                modelLabel: resolveModelDisplayName(task.model, task.modelLabel),
-                cost: task.cost,
-                costSource: task.costSource,
-                tokens: task.tokens,
-            });
-        });
-    });
-
-    persistedTasks.forEach((task) => {
-        const urls = (task.resultUrls || [])
-            .map((url) => normalizePersistentResultUrl(url))
-            .filter((url): url is string => !!url);
-        const storageIds = normalizeTaskResultStorageIds(task.resultStorageIds);
-        const resultIndexes = Array.from(new Set([
-            ...urls.map((_, index) => index),
-            ...Object.keys(storageIds)
-                .map((key) => Number.parseInt(key, 10))
-                .filter((value) => Number.isFinite(value) && value >= 0),
-        ])).sort((left, right) => left - right);
-
-        resultIndexes.forEach((index) => {
-            const url = getTaskResultUrlAtIndex(urls, index);
-            const storageId = storageIds[String(index)];
-            const identity = buildTaskResultIdentity({
-                taskId: task.taskId,
-                resultIndex: index,
-                url,
-            });
-            if (!identity || seenKeys.has(identity)) return;
-            seenKeys.add(identity);
-            entries.push({
-                taskId: task.taskId,
-                resultIndex: index,
-                url,
-                storageId,
-                completedAt: task.completedAt ? Date.parse(task.completedAt) : undefined,
-                keySlotId: task.keySlotId,
-                provider: task.provider,
-                providerLabel: task.providerLabel,
-                model: task.model,
-                cost: task.cost,
-                costSource: task.costSource,
-                tokens: task.tokens,
-            });
-        });
-    });
-
-    return entries;
-};
-
-const resolveImageRecoveryUrlFromMetadata = async (
-    image: GeneratedImage,
-    prompt: PromptNode | undefined,
-    promptTasks: PersistedTask[] = []
-): Promise<string | undefined> => {
-    const directStorageCandidates = Array.from(new Set([
-        image.storageId,
-        image.id,
-    ].filter((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0)));
-
-    for (const storageId of directStorageCandidates) {
-        const storedSource = await resolveStoredResultSource(storageId);
-        if (storedSource) return storedSource;
-    }
-
-    const directCandidates = getImageRecoveryCandidates(image)
-        .map((candidate) => normalizePersistentResultUrl(candidate) || candidate)
-        .filter((candidate): candidate is string => !!candidate && !candidate.startsWith('blob:'));
-    if (directCandidates.length > 0) {
-        return directCandidates[0];
-    }
-
-    if (!prompt) return undefined;
-
-    const completedTask = getPromptCompletedTasks(prompt).find((task) => task.taskId === image.sourceTaskId);
-    const completedStoredSource = await resolveStoredResultSource(
-        getTaskResultStorageIdAtIndex(completedTask?.resultStorageIds, image.sourceResultIndex)
-    );
-    if (completedStoredSource) return completedStoredSource;
-
-    const completedUrl = completedTask
-        ? getTaskResultUrlAtIndex(getCompletedTaskResultUrls(completedTask), image.sourceResultIndex)
-        : undefined;
-    if (completedUrl) return completedUrl;
-
-    const persistedTask = promptTasks.find((task) => task.taskId === image.sourceTaskId);
-    const persistedStoredSource = await resolveStoredResultSource(
-        getTaskResultStorageIdAtIndex(persistedTask?.resultStorageIds, image.sourceResultIndex)
-    );
-    if (persistedStoredSource) return persistedStoredSource;
-
-    const persistedUrl = persistedTask
-        ? getTaskResultUrlAtIndex(
-            (persistedTask.resultUrls || [])
-                .map((url) => normalizePersistentResultUrl(url))
-                .filter((url): url is string => !!url),
-            image.sourceResultIndex
-        )
-        : undefined;
-    if (persistedUrl) return persistedUrl;
-
-    const promptCompletedEntries = buildPromptRecoveryEntries(prompt, promptTasks);
-    if (promptCompletedEntries.length === 1) {
-        return resolvePromptRecoveryEntrySource(promptCompletedEntries[0]);
-    }
-
-    return undefined;
-};
-
-const hasRecoverablePendingTask = (node?: Partial<PromptNode> | null): boolean => {
-    if (!node) return false;
-    if (getPendingTaskIdsFromPrompt(node).length > 0) return true;
-    if (getPendingSyncRequestsFromPrompt(node).length > 0) return true;
-    return typeof node.jobId === 'string' && node.jobId.trim().length > 0;
-};
-
-const buildPersistedImageRecoverySignature = (canvases: Canvas[] = []): string => {
-    const tokens: string[] = [];
-
-    canvases.forEach((canvas) => {
-        const imageNodes = canvas.imageNodes || [];
-        const promptNodes = canvas.promptNodes || [];
-
-        imageNodes.forEach((imageNode) => {
-            if (!imageNode.url || !imageNode.originalUrl) {
-                tokens.push(`img:${canvas.id}:${imageNode.id}`);
-            }
-        });
-
-        promptNodes.forEach((promptNode) => {
-            const recoveryEntries = buildPromptRecoveryEntries(promptNode);
-            if (!recoveryEntries.length) return;
-
-            const existingChildren = imageNodes.filter((imageNode) => imageNode.parentPromptId === promptNode.id);
-            const seenResultKeys = new Set<string>();
-
-            existingChildren.forEach((imageNode) => {
-                const identity = buildImageResultIdentity(imageNode);
-                if (identity) {
-                    seenResultKeys.add(identity);
-                }
-                const fallbackIdentity = buildTaskResultIdentity({
-                    taskId: imageNode.sourceTaskId,
-                    resultIndex: imageNode.sourceResultIndex,
-                    url: normalizePersistentResultUrl(imageNode.apiResultUrl || imageNode.originalUrl || imageNode.url),
-                });
-                if (fallbackIdentity) {
-                    seenResultKeys.add(fallbackIdentity);
-                }
-            });
-
-            const hasMissingRecoveryEntry = recoveryEntries.some((entry) => {
-                const identity = buildTaskResultIdentity({
-                    taskId: entry.taskId,
-                    resultIndex: entry.resultIndex,
-                    url: entry.url,
-                });
-                if (!identity) return false;
-                return !seenResultKeys.has(identity);
-            });
-
-            if (hasMissingRecoveryEntry) {
-                tokens.push(`prompt:${canvas.id}:${promptNode.id}`);
-            }
-        });
-    });
-
-    return tokens.join('|');
-};
-
-const resolvePromptChildImageIds = (
-    node?: Pick<PromptNode, 'id' | 'childImageIds' | 'sourceImageId'> | null,
-    imageNodes: GeneratedImage[] = []
-): string[] => {
-    if (!node?.id) return [];
-
-    const promptId = node.id;
-    const sourceImageId = node.sourceImageId;
-    const orderedIds = (node.childImageIds || []).filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
-    const imageNodeById = new Map(imageNodes.map((imageNode) => [imageNode.id, imageNode] as const));
-    const strongOwnedImages = imageNodes.filter((imageNode) => (
-        imageNode.parentPromptId === promptId && imageNode.id !== sourceImageId
-    ));
-
-    if (strongOwnedImages.length > 0) {
-        const resolvedIds: string[] = [];
-        const seenIds = new Set<string>();
-
-        orderedIds.forEach((imageId) => {
-            const imageNode = imageNodeById.get(imageId);
-            if (!imageNode || imageNode.id === sourceImageId || imageNode.parentPromptId !== promptId || seenIds.has(imageNode.id)) {
-                return;
-            }
-            seenIds.add(imageNode.id);
-            resolvedIds.push(imageNode.id);
-        });
-
-        strongOwnedImages.forEach((imageNode) => {
-            if (seenIds.has(imageNode.id)) return;
-            seenIds.add(imageNode.id);
-            resolvedIds.push(imageNode.id);
-        });
-
-        return resolvedIds;
-    }
-
-    if (sourceImageId) {
-        return [];
-    }
-
-    const legacyIds: string[] = [];
-    const seenIds = new Set<string>();
-    orderedIds.forEach((imageId) => {
-        const imageNode = imageNodeById.get(imageId);
-        if (!imageNode || imageNode.id === sourceImageId || imageNode.parentPromptId || seenIds.has(imageNode.id)) {
-            return;
-        }
-        seenIds.add(imageNode.id);
-        legacyIds.push(imageNode.id);
-    });
-
-    return legacyIds;
-};
-
-const getWorkflowSourceNodeIds = (node: WorkflowNode): string[] => {
-    if (!isWorkflowUtilityNodeKind(node.kind)) {
-        return [];
-    }
-
-    const rawSourceIds = (node.data as { sourceNodeIds?: unknown } | undefined)?.sourceNodeIds;
-    if (!Array.isArray(rawSourceIds)) {
-        return [];
-    }
-
-    return Array.from(new Set(
-        rawSourceIds.filter((sourceId): sourceId is string => (
-            typeof sourceId === 'string' && sourceId.trim().length > 0
-        ))
-    ));
-};
-
-const normalizeRecoveredPromptNode = (
-    node: PromptNode,
-    imageNodes: GeneratedImage[] = []
-): PromptNode => {
-    const resolvedChildImageIds = resolvePromptChildImageIds(node, imageNodes);
-    const pendingTaskIds = getPendingTaskIdsFromPrompt(node);
-    const pendingSyncRequests = getPendingSyncRequestsFromPrompt(node);
-    const completedTasks = getPromptCompletedTasks(node);
-    const expectedImageCount = getExpectedPromptImageCount(node);
-    const hasRecoverablePendingState = pendingTaskIds.length > 0
-        || pendingSyncRequests.length > 0
-        || (typeof node.jobId === 'string' && node.jobId.trim().length > 0);
-    const isEffectivelyComplete = resolvedChildImageIds.length > 0 && (
-        resolvedChildImageIds.length >= expectedImageCount || (pendingTaskIds.length === 0 && pendingSyncRequests.length === 0)
-    );
-    const shouldMarkInterrupted = Boolean(node.isGenerating)
-        && resolvedChildImageIds.length === 0
-        && !hasRecoverablePendingState;
-    const nextPendingTaskIds = isEffectivelyComplete ? [] : pendingTaskIds;
-    const nextPendingSyncRequests = isEffectivelyComplete ? [] : pendingSyncRequests;
-    const shouldPersistGenerationMetadata = !!node.generationMetadata || pendingTaskIds.length > 0 || pendingSyncRequests.length > 0 || completedTasks.length > 0 || isEffectivelyComplete || shouldMarkInterrupted;
-    const nextErrorDetails = isEffectivelyComplete
-        ? undefined
-        : shouldMarkInterrupted
-            ? {
-                ...(node.errorDetails || {}),
-                code: node.errorDetails?.code || 'SYNC_REQUEST_INTERRUPTED',
-                responseBody: node.errorDetails?.responseBody || SYNC_GENERATION_INTERRUPTED_ERROR,
-                model: node.errorDetails?.model || node.model,
-                timestamp: node.errorDetails?.timestamp || Date.now()
-            }
-            : node.errorDetails;
-
-    return {
-        ...node,
-        childImageIds: resolvedChildImageIds,
-        referenceImages: normalizeReferenceImagesStorage(node.referenceImages) || [],
-        parallelCount: node.parallelCount || 1,
-        tags: node.tags || [],
-        isGenerating: Boolean(node.isGenerating) && !isEffectivelyComplete && !shouldMarkInterrupted,
-        jobId: isEffectivelyComplete || shouldMarkInterrupted ? undefined : (nextPendingTaskIds[0] || node.jobId),
-        generationMetadata: shouldPersistGenerationMetadata
-            ? {
-                ...(node.generationMetadata || {}),
-                pendingTaskIds: nextPendingTaskIds,
-                pendingSyncRequests: nextPendingSyncRequests,
-                completedTasks,
-            }
-            : node.generationMetadata,
-        error: isEffectivelyComplete ? undefined : (shouldMarkInterrupted ? (node.error || SYNC_GENERATION_INTERRUPTED_ERROR) : node.error),
-        errorDetails: nextErrorDetails,
-    };
-};
-
-const normalizeCanvasPromptRecovery = (canvas: Canvas): Canvas => {
-    const legacyReadyCanvas = workflowToLegacyCanvas(canvas);
-
-    return syncCanvasCompatibility({
-        ...legacyReadyCanvas,
-        promptNodes: (legacyReadyCanvas.promptNodes || []).map((node) => normalizeRecoveredPromptNode(node, legacyReadyCanvas.imageNodes || [])),
-        groups: legacyReadyCanvas.groups || [],
-        drawings: legacyReadyCanvas.drawings || []
-    });
-};
-
-const markInterruptedSyncPromptGenerations = (state: CanvasState): CanvasState => ({
-    ...state,
-    canvases: (state.canvases || []).map((canvas) => {
-        let hasChanges = false;
-
-        const promptNodes = (canvas.promptNodes || []).map((node) => {
-            const hasResolvedImages = resolvePromptChildImageIds(node, canvas.imageNodes || []).length > 0;
-            const shouldMarkInterrupted = Boolean(node?.isGenerating)
-                && !hasResolvedImages
-                && !hasRecoverablePendingTask(node);
-
-            if (!shouldMarkInterrupted) return node;
-            hasChanges = true;
-
-            return {
-                ...node,
-                isGenerating: false,
-                jobId: undefined,
-                error: node.error || SYNC_GENERATION_INTERRUPTED_ERROR,
-                errorDetails: {
-                    ...(node.errorDetails || {}),
-                    code: node.errorDetails?.code || 'SYNC_REQUEST_INTERRUPTED',
-                    responseBody: node.errorDetails?.responseBody || SYNC_GENERATION_INTERRUPTED_ERROR,
-                    model: node.errorDetails?.model || node.model,
-                    timestamp: Date.now()
-                },
-                generationMetadata: {
-                    ...(node.generationMetadata || {}),
-                    pendingTaskIds: [],
-                    pendingSyncRequests: []
-                }
-            };
-        });
-
-        if (!hasChanges) return canvas;
-        return normalizeCanvasPromptRecovery({ ...canvas, promptNodes });
-    })
-});
-
-const hasUnrecoverableSyncGenerationInFlight = (state?: CanvasState | null): boolean => {
-    if (!state?.canvases?.length) return false;
-
-    return state.canvases.some((canvas) =>
-        (canvas.promptNodes || []).some((node) =>
-            Boolean(node?.isGenerating)
-            && resolvePromptChildImageIds(node, canvas.imageNodes || []).length === 0
-            && !hasRecoverablePendingTask(node)
-        )
-    );
-};
 
 const normalizeRestoredCanvasState = (restoredState: CanvasState): CanvasState => {
     const nextState: CanvasState = {
@@ -1173,7 +472,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                         // [Key fix] Merge disk project.json with the latest localStorage state.
                                         // A hard refresh usually leaves fresher state in localStorage via beforeunload.
                                         // project.json may lag behind due to async writes, so both sources must be merged carefully.
-                                        const mergedCanvases = mergeCanvases(prev.canvases, canvases);
+                                        const mergedCanvases = mergeCanvases(prev.canvases, canvases, normalizeCanvasPromptRecovery);
                                         const finalActiveId = resolvePreferredActiveCanvasId(
                                             prev.activeCanvasId,
                                             savedActiveCanvasId,
@@ -1255,11 +554,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Helper: Strip image URLs for storage
 
 
-    const getCanvasCardCount = (canvas?: Canvas | null): number => {
-        if (!canvas) return 0;
-        return (canvas.promptNodes?.length || 0) + (canvas.imageNodes?.length || 0);
-    };
-
     const canLoadCloudLayout = Boolean(
         shouldEnableWorkspaceCloudSync()
         && user
@@ -1275,112 +569,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         && isStageReady('workspace_ready')
     );
 
-    const isCanvasEffectivelyEmpty = (canvas?: Canvas | null): boolean => getCanvasCardCount(canvas) === 0;
-
-    const mergeItemsById = <T extends { id: string }>(localItems: T[] = [], diskItems: T[] = []): T[] => {
-        const map = new Map<string, T>();
-        diskItems.forEach(item => map.set(item.id, item));
-        localItems.forEach(item => {
-            const existing = map.get(item.id);
-            map.set(item.id, existing ? { ...existing, ...item } : item);
-        });
-        return Array.from(map.values());
-    };
-
-    const mergeSingleCanvas = (localCanvas: Canvas, diskCanvas: Canvas): Canvas => {
-        const localCount = getCanvasCardCount(localCanvas);
-        const diskCount = getCanvasCardCount(diskCanvas);
-
-        if (localCount === 0 && diskCount > 0) {
-            return normalizeCanvasPromptRecovery({
-                ...localCanvas,
-                ...diskCanvas,
-                name: diskCanvas.name || localCanvas.name,
-                folderName: diskCanvas.folderName || localCanvas.folderName,
-                promptNodes: diskCanvas.promptNodes || [],
-                imageNodes: diskCanvas.imageNodes || [],
-                groups: diskCanvas.groups || [],
-                drawings: diskCanvas.drawings || [],
-                lastModified: Math.max(localCanvas.lastModified || 0, diskCanvas.lastModified || 0)
-            });
-        }
-
-        if (diskCount === 0 && localCount > 0) {
-            return normalizeCanvasPromptRecovery({
-                ...diskCanvas,
-                ...localCanvas,
-                promptNodes: localCanvas.promptNodes || [],
-                imageNodes: localCanvas.imageNodes || [],
-                groups: localCanvas.groups || [],
-                drawings: localCanvas.drawings || [],
-                lastModified: Math.max(localCanvas.lastModified || 0, diskCanvas.lastModified || 0)
-            });
-        }
-
-        const preferLocal = (localCanvas.lastModified || 0) >= (diskCanvas.lastModified || 0);
-        const baseCanvas = preferLocal ? diskCanvas : localCanvas;
-        const overrideCanvas = preferLocal ? localCanvas : diskCanvas;
-
-        return normalizeCanvasPromptRecovery({
-            ...baseCanvas,
-            ...overrideCanvas,
-            name: overrideCanvas.name || baseCanvas.name,
-            folderName: overrideCanvas.folderName || baseCanvas.folderName,
-            promptNodes: mergeItemsById(localCanvas.promptNodes || [], diskCanvas.promptNodes || []),
-            imageNodes: mergeItemsById(localCanvas.imageNodes || [], diskCanvas.imageNodes || []),
-            groups: mergeItemsById(localCanvas.groups || [], diskCanvas.groups || []),
-            drawings: mergeItemsById(localCanvas.drawings || [], diskCanvas.drawings || []),
-            lastModified: Math.max(localCanvas.lastModified || 0, diskCanvas.lastModified || 0)
-        });
-    };
-
-    const mergeCanvases = (local: Canvas[], disk: Canvas[]): Canvas[] => {
-        const map = new Map<string, Canvas>();
-        disk.forEach(canvas => map.set(canvas.id, canvas));
-
-        local.forEach(localCanvas => {
-            const diskCanvas = map.get(localCanvas.id);
-            if (!diskCanvas) {
-                map.set(localCanvas.id, localCanvas);
-                return;
-            }
-
-            map.set(localCanvas.id, mergeSingleCanvas(localCanvas, diskCanvas));
-        });
-
-        return Array.from(map.values());
-    };
-
-    const resolvePreferredActiveCanvasId = (
-        localActiveId: string | undefined,
-        diskActiveId: string | null | undefined,
-        canvases: Canvas[]
-    ): string => {
-        const localActiveCanvas = localActiveId ? canvases.find(c => c.id === localActiveId) : undefined;
-        const diskActiveCanvas = diskActiveId ? canvases.find(c => c.id === diskActiveId) : undefined;
-
-        if (localActiveCanvas && !isCanvasEffectivelyEmpty(localActiveCanvas)) {
-            return localActiveCanvas.id;
-        }
-
-        if (diskActiveCanvas && !isCanvasEffectivelyEmpty(diskActiveCanvas)) {
-            return diskActiveCanvas.id;
-        }
-
-        if (localActiveCanvas && diskActiveCanvas && localActiveCanvas.id !== diskActiveCanvas.id) {
-            return diskActiveCanvas.id;
-        }
-
-        const firstNonEmptyCanvas = canvases.find(canvas => !isCanvasEffectivelyEmpty(canvas));
-        if (firstNonEmptyCanvas) {
-            return firstNonEmptyCanvas.id;
-        }
-
-        if (diskActiveCanvas) return diskActiveCanvas.id;
-        if (localActiveCanvas) return localActiveCanvas.id;
-        return canvases[0]?.id || 'default';
-    };
-
     // Cloud sync: load and merge on init.
     useEffect(() => {
         const loadCloud = async () => {
@@ -1390,7 +578,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const cloudCanvases = await syncService.loadLayout();
                 if (cloudCanvases && cloudCanvases.length > 0) {
                     setState(prev => {
-                        const merged = mergeCanvases(prev.canvases, cloudCanvases);
+                        const merged = mergeCanvases(prev.canvases, cloudCanvases, normalizeCanvasPromptRecovery);
                         // Check if anything changed
                         if (JSON.stringify(merged) !== JSON.stringify(prev.canvases)) {
                             console.log('[CanvasContext] Merged cloud layout.', { local: prev.canvases.length, cloud: cloudCanvases.length, merged: merged.length });
@@ -1684,27 +872,16 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, []);
 
     const addPromptNode = useCallback(async (node: PromptNode) => {
-        console.log('[CanvasContext.addPromptNode] Starting prompt node insert', { nodeId: node.id, prompt: node.prompt?.substring(0, 50) });
+        console.log('[CanvasContext.addPromptNode] Starting prompt node insert', { nodeId: node.id });
 
         try {
             // [Defensive fix] Add the node to state first so the UI shows it immediately.
-            updateCanvas(c => {
-                const allZIndices = [
-                    ...c.promptNodes.map(n => n.zIndex ?? 0),
-                    ...c.imageNodes.map(n => n.zIndex ?? 0),
-                    ...(c.groups || []).map(g => g.zIndex ?? 0)
-                ];
-                let maxZ = allZIndices.length > 0 ? Math.max(...allZIndices) : 0;
-
-                // Give the new PromptNode the highest z-index so older cards do not cover it.
-                const nodeWithZIndex = { ...node, zIndex: maxZ + 1 };
-
-                return {
-                    ...c,
-                    promptNodes: c.promptNodes.some(n => n.id === node.id) ?
-                        (console.warn(`[CanvasContext] Skip duplicate promptNodeID: ${node.id}`), c.promptNodes) :
-                        [...c.promptNodes, nodeWithZIndex]
-                };
+            updateCanvas(canvas => {
+                const nextCanvas = addCanvasPromptNode(canvas, node);
+                if (nextCanvas === canvas) {
+                    console.warn(`[CanvasContext] Skip duplicate promptNodeID: ${node.id}`);
+                }
+                return nextCanvas;
             });
             console.log('[CanvasContext.addPromptNode] Prompt card added to canvas');
 
@@ -1725,8 +902,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         }
                     }
                 });
-                await Promise.allSettled(saveTasks); // Use allSettled so one failed reference does not abort the rest.
-                console.log('[CanvasContext.addPromptNode] Reference image persistence finished');
+                void Promise.allSettled(saveTasks).then(() => {
+                    console.log('[CanvasContext.addPromptNode] Reference image persistence finished');
+                }); // Keep card insertion responsive; one failed reference does not abort the rest.
             }
         } catch (error: any) {
             // Fatal error: adding the card failed.
@@ -1778,43 +956,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             await Promise.all(saveTasks);
         }
 
-        updateCanvas(c => ({
-            ...c,
-            promptNodes: c.promptNodes.map(n => {
-                if (n.id === node.id) {
-                    // [Defensive merge]
-                    // We must ensure we don't accidentally overwrite existing valid data with empty data
-                    // especially during rapid status updates (generating -> success)
-                    const merged: PromptNode = {
-                        ...n,
-                        ...node,
-                        // If the incoming node has empty prompt/refs but the existing one has them, keep the existing values.
-                        // Unless we are explicitly clearing them (which usually happens via setConfig/delete)
-                        // But updatePromptNode is mostly used for status updates.
-                        prompt: (node.prompt && node.prompt.length > 0) ? node.prompt : n.prompt,
-                        referenceImages: (node.referenceImages && node.referenceImages.length > 0) ? node.referenceImages : n.referenceImages
-                    };
-
-                    // [Bugfix] Prevent stale callbacks from flipping completed/failed cards back to "generating".
-                    // Typical case: ResizeObserver/onHeightChange races carry older node snapshots over newer state.
-                    const hasFinished = resolvePromptChildImageIds(n, c.imageNodes).length > 0;
-                    const hasFailed = !!n.error;
-
-                    if ((hasFinished || hasFailed) && node.isGenerating === true && n.isGenerating === false) {
-                        merged.isGenerating = false;
-                        // Also preserve error so stale undefined values do not overwrite it.
-                        // [Fix] Still allow callers to clear error explicitly with error: undefined.
-                        if (hasFailed && !merged.error && !('error' in node)) {
-                            merged.error = n.error;
-                            merged.errorDetails = n.errorDetails;
-                        }
-                    }
-
-                    return merged;
-                }
-                return n;
-            })
-        }));
+        updateCanvas(canvas => updateCanvasPromptNode(canvas, node));
     }, [updateCanvas]);
 
     const urgentUpdatePromptNode = useCallback((node: PromptNode) => {
@@ -2112,57 +1254,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         pos: { x: number; y: number },
         options?: { moveChildren?: boolean; ignoreSelection?: boolean }
     ) => {
-        updateCanvas(c => {
-            const node = c.promptNodes.find(n => n.id === id);
-            if (!node) return c;
-
-            const dx = pos.x - node.position.x;
-            const dy = pos.y - node.position.y;
-            const moveChildren = options?.moveChildren !== false;
-            const ignoreSelection = options?.ignoreSelection === true;
-
-            // GROUP MOVE LOGIC
-            if (!ignoreSelection) {
-                const selectedIds = new Set(state.selectedNodeIds || []);
-                if (selectedIds.has(id)) {
-                    const newPromptNodes = c.promptNodes.map(n => {
-                        if (selectedIds.has(n.id)) {
-                            return { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } };
-                        }
-                        return n;
-                    });
-
-                    const movedPromptIds = new Set(c.promptNodes.filter(n => selectedIds.has(n.id)).map(n => n.id));
-                    const newImageNodes = c.imageNodes.map(img => {
-                        if (selectedIds.has(img.id) || (img.parentPromptId && movedPromptIds.has(img.parentPromptId))) {
-                            return { ...img, position: { x: img.position.x + dx, y: img.position.y + dy } };
-                        }
-                        return img;
-                    });
-
-                    return { ...c, promptNodes: newPromptNodes, imageNodes: newImageNodes };
-                }
-            }
-
-            if (!moveChildren) {
-                return {
-                    ...c,
-                    promptNodes: c.promptNodes.map(n => n.id === id ? { ...n, position: pos } : n)
-                };
-            }
-
-            // [MODIFIED] Removed repulsion logic as per user request
-            // Freely update position without checking for overlap/pushing
-            return {
-                ...c,
-                promptNodes: c.promptNodes.map(n => n.id === id ? { ...n, position: pos } : n),
-                imageNodes: c.imageNodes.map((img) => (
-                    img.parentPromptId === id
-                        ? { ...img, position: { x: img.position.x + dx, y: img.position.y + dy } }
-                        : img
-                ))
-            };
-        });
+        updateCanvas(canvas => updateCanvasPromptNodePosition(canvas, state.selectedNodeIds || [], id, pos, options));
     }, [updateCanvas, state.selectedNodeIds]);
 
     const updateImageNodePosition = useCallback((
@@ -2170,66 +1262,15 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         pos: { x: number; y: number },
         options?: { ignoreSelection?: boolean }
     ) => {
-        updateCanvas(c => {
-            const node = c.imageNodes.find(n => n.id === id);
-            if (!node) return c;
-
-            const dx = pos.x - node.position.x;
-            const dy = pos.y - node.position.y;
-            const ignoreSelection = options?.ignoreSelection === true;
-
-            // GROUP MOVE LOGIC
-            if (!ignoreSelection) {
-                const selectedIds = new Set(state.selectedNodeIds || []);
-                if (selectedIds.has(id)) {
-                    // [MODIFIED] Removed repulsion hook
-
-                    const newPromptNodes = c.promptNodes.map(n => {
-                        if (selectedIds.has(n.id)) {
-                            return { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } };
-                        }
-                        return n;
-                    });
-
-                    const movedPromptIds = new Set(c.promptNodes.filter(n => selectedIds.has(n.id)).map(n => n.id));
-                    const newImageNodes = c.imageNodes.map(img => {
-                        if (selectedIds.has(img.id) || (img.parentPromptId && movedPromptIds.has(img.parentPromptId))) {
-                            return { ...img, position: { x: img.position.x + dx, y: img.position.y + dy } };
-                        }
-                        return img;
-                    });
-
-                    return { ...c, promptNodes: newPromptNodes, imageNodes: newImageNodes };
-                }
-            }
-
-            // SINGLE MOVE - Removed repulsion logic
-            return {
-                ...c,
-                promptNodes: c.promptNodes, // No changes to prompt nodes
-                imageNodes: c.imageNodes.map(img =>
-                    img.id === id ? { ...img, position: pos } : img
-                )
-            };
-        });
+        updateCanvas(canvas => updateCanvasImageNodePosition(canvas, state.selectedNodeIds || [], id, pos, options));
     }, [updateCanvas, state.selectedNodeIds]);
 
     const updateImageNodeDimensions = useCallback((id: string, dimensions: string) => {
-        updateCanvas(c => ({
-            ...c,
-            imageNodes: c.imageNodes.map(img =>
-                img.id === id ? { ...img, dimensions } : img
-            )
-        }));
+        updateCanvas(canvas => updateCanvasImageNodeDimensions(canvas, id, dimensions));
     }, [updateCanvas]);
 
     const updateImageNode = useCallback((id: string, updates: Partial<GeneratedImage>) => {
-        updateCanvas(c => ({
-            ...c,
-            imageNodes: c.imageNodes.map(img =>
-                img.id === id ? { ...img, ...updates } : img
-            )
-        }));
+        updateCanvas(canvas => updateCanvasImageNode(canvas, id, updates));
     }, [updateCanvas]);
 
     // [Batch update] Support stacking and other large-move operations.
@@ -2237,37 +1278,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         promptNodes?: { id: string, updates: Partial<PromptNode> }[],
         imageNodes?: { id: string, updates: Partial<GeneratedImage> }[]
     }) => {
-        updateCanvas(c => {
-            let nextPromptNodes = [...c.promptNodes];
-            let nextImageNodes = [...c.imageNodes];
-            let changed = false;
-
-            if (batch.promptNodes && batch.promptNodes.length > 0) {
-                const updateMap = new Map(batch.promptNodes.map(u => [u.id, u.updates]));
-                nextPromptNodes = nextPromptNodes.map(n => {
-                    const u = updateMap.get(n.id);
-                    if (u) {
-                        changed = true;
-                        return { ...n, ...u };
-                    }
-                    return n;
-                });
-            }
-
-            if (batch.imageNodes && batch.imageNodes.length > 0) {
-                const updateMap = new Map(batch.imageNodes.map(u => [u.id, u.updates]));
-                nextImageNodes = nextImageNodes.map(img => {
-                    const u = updateMap.get(img.id);
-                    if (u) {
-                        changed = true;
-                        return { ...img, ...u };
-                    }
-                    return img;
-                });
-            }
-
-            return changed ? { ...c, promptNodes: nextPromptNodes, imageNodes: nextImageNodes } : c;
-        });
+        updateCanvas(canvas => applyCanvasNodeBatchUpdates(canvas, batch));
     }, [updateCanvas]);
 
     const persistedImageRecoverySignature = useMemo(
@@ -2476,144 +1487,20 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
 
         pushToHistory();
-        updateCanvas(c => {
-            const workflow = canvasToWorkflow(c);
-            const existingNode = workflow.nodes.find(existing => existing.id === node.id);
-            if (existingNode) {
-                return c;
-            }
-
-            return {
-                ...c,
-                workflow: {
-                    ...workflow,
-                    nodes: [...workflow.nodes, node],
-                    edges: dedupeWorkflowEdges([
-                        ...workflow.edges,
-                        ...getWorkflowSourceNodeIds(node)
-                            .filter(sourceId => workflow.nodes.some(existingNode => existingNode.id === sourceId))
-                            .map(sourceId => ({
-                                id: `edge:${sourceId}:control:${node.id}`,
-                                from: sourceId,
-                                to: node.id,
-                                role: 'control' as const,
-                            })),
-                    ]),
-                },
-            };
-        });
+        updateCanvas(canvas => addCanvasWorkflowNode(canvas, node));
     }, [pushToHistory, updateCanvas]);
 
     const updateWorkflowNode = useCallback((id: string, updates: Partial<WorkflowNode>) => {
-        updateCanvas(c => {
-            const workflow = canvasToWorkflow(c);
-            if (!workflow.nodes.length && !workflow.edges.length) return c;
-            let changed = false;
-
-            const nextNodes = workflow.nodes.map((node) => {
-                if (node.id !== id) return node;
-                changed = true;
-                return {
-                    ...node,
-                    ...updates,
-                    id: node.id,
-                    kind: node.kind,
-                } as WorkflowNode;
-            });
-
-            if (!changed) return c;
-
-            const updatedNode = nextNodes.find(node => node.id === id);
-            const validNodeIds = new Set(nextNodes.map(node => node.id));
-            const nextEdges = dedupeWorkflowEdges([
-                ...workflow.edges.filter((edge) => {
-                    if (!validNodeIds.has(edge.from) || !validNodeIds.has(edge.to)) {
-                        return false;
-                    }
-
-                    if (edge.to !== id) {
-                        return true;
-                    }
-
-                    return edge.from === id;
-                }),
-                ...(updatedNode
-                    ? getWorkflowSourceNodeIds(updatedNode)
-                        .filter(sourceId => validNodeIds.has(sourceId))
-                        .map(sourceId => ({
-                            id: `edge:${sourceId}:control:${id}`,
-                            from: sourceId,
-                            to: id,
-                            role: 'control' as const,
-                        }))
-                    : []),
-            ]);
-
-            return {
-                ...c,
-                workflow: {
-                    ...workflow,
-                    nodes: nextNodes,
-                    edges: nextEdges,
-                },
-            };
-        });
+        updateCanvas(canvas => updateCanvasWorkflowNode(canvas, id, updates));
     }, [updateCanvas]);
 
     const updateWorkflowNodePosition = useCallback((id: string, pos: { x: number; y: number }) => {
-        updateCanvas(c => {
-            if (!c.workflow) return c;
-            let changed = false;
-
-            const nextNodes = c.workflow.nodes.map((node) => {
-                if (node.id !== id) return node;
-                changed = true;
-                return {
-                    ...node,
-                    position: pos,
-                };
-            });
-
-            if (!changed) return c;
-
-            return {
-                ...c,
-                workflow: {
-                    ...c.workflow,
-                    nodes: nextNodes,
-                },
-            };
-        });
+        updateCanvas(canvas => updateCanvasWorkflowNodePosition(canvas, id, pos));
     }, [updateCanvas]);
 
     const deleteWorkflowNode = useCallback((id: string) => {
         pushToHistory();
-        updateCanvas(c => {
-            const workflow = canvasToWorkflow(c);
-            if (!workflow.nodes.length && !workflow.edges.length) return c;
-
-            const nextNodes = workflow.nodes.filter((node) => node.id !== id);
-            if (nextNodes.length === workflow.nodes.length) {
-                return c;
-            }
-
-            const validNodeIds = new Set(nextNodes.map((node) => node.id));
-            const nextEdges = workflow.edges.filter((edge) => (
-                edge.from !== id
-                && edge.to !== id
-                && validNodeIds.has(edge.from)
-                && validNodeIds.has(edge.to)
-            ));
-
-            return {
-                ...c,
-                workflow: {
-                    ...workflow,
-                    nodes: nextNodes,
-                    edges: nextEdges,
-                },
-            };
-        });
+        updateCanvas(canvas => deleteCanvasWorkflowNode(canvas, id));
     }, [pushToHistory, updateCanvas]);
 
 
@@ -2642,17 +1529,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             if (node) {
                 safeRevokeBlobUrl(node.url);
             }
-            return {
-                ...c,
-                imageNodes: c.imageNodes.filter(n => n.id !== id),
-                // Also update parent prompt node to remove from child list
-                promptNodes: c.promptNodes.map(p => ({
-                    ...p,
-                    childImageIds: p.childImageIds.filter(cid => cid !== id),
-                    // [Ref Fix] Also clear sourceImageId if this image was a source for a follow-up
-                    sourceImageId: p.sourceImageId === id ? undefined : p.sourceImageId
-                }))
-            };
+            return deleteCanvasImageNode(c, id);
         });
     }, [updateCanvas]);
 
@@ -2660,58 +1537,15 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         pushToHistory();
 
         urgentSaveRef.current = true; // 父节点删除后同步存盘
-        updateCanvas(c => {
-            // [Strict Logic] Delete Main Card -> Sub-cards become Lonely Sub Cards (Orphaned)
-            // DO NOT delete the images. Just clear their parentPromptId.
-
-            const newImageNodes = c.imageNodes.map(img => {
-                if (img.parentPromptId === id) {
-                    return { ...img, parentPromptId: '' }; // Orphan it (empty string)
-                }
-                return img;
-            });
-
-            // Filter out the deleted prompt node
-            const newPromptNodes = c.promptNodes.filter(n => n.id !== id);
-
-            return {
-                ...c,
-                promptNodes: newPromptNodes,
-                imageNodes: newImageNodes
-            };
-        });
+        updateCanvas(canvas => deleteCanvasPromptNode(canvas, id));
     }, [updateCanvas, pushToHistory]);
 
     const linkNodes = useCallback((promptId: string, imageId: string) => {
-        updateCanvas(c => {
-            // Avoid duplicates
-            const promptNode = c.promptNodes.find(p => p.id === promptId);
-            if (!promptNode || promptNode.childImageIds.includes(imageId)) return c;
-
-            return {
-                ...c,
-                promptNodes: c.promptNodes.map(p =>
-                    p.id === promptId ? { ...p, childImageIds: [...p.childImageIds, imageId] } : p
-                ),
-                imageNodes: c.imageNodes.map(img =>
-                    img.id === imageId ? { ...img, parentPromptId: promptId } : img
-                )
-            };
-        });
+        updateCanvas(canvas => linkCanvasPromptToImage(canvas, promptId, imageId));
     }, [updateCanvas]);
 
     const unlinkNodes = useCallback((promptId: string, imageId: string) => {
-        updateCanvas(c => {
-            return {
-                ...c,
-                promptNodes: c.promptNodes.map(p =>
-                    p.id === promptId ? { ...p, childImageIds: p.childImageIds.filter(id => id !== imageId) } : p
-                ),
-                imageNodes: c.imageNodes.map(img =>
-                    img.id === imageId ? { ...img, parentPromptId: '' } : img
-                )
-            };
-        });
+        updateCanvas(canvas => unlinkCanvasPromptFromImage(canvas, promptId, imageId));
     }, [updateCanvas]);
 
 
@@ -2785,14 +1619,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         clearAllImages();
         // Reset to default state
         setState({
+            ...DEFAULT_STATE,
             canvases: [DEFAULT_CANVAS],
             activeCanvasId: DEFAULT_CANVAS.id,
-            history: {},
-            fileSystemHandle: null,
-            folderName: null,
-            selectedNodeIds: [],
-            subCardLayoutMode: 'row',
-            viewportCenter: { x: 0, y: 0 }
+            history: {}
         });
     }, [state.canvases]);
 
@@ -2804,26 +1634,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
      */
     const arrangeAllNodes = useCallback((mode: ArrangeMode = 'grid') => {
         pushToHistory(); // Allow undo
-
-        // --- Configuration ---
-        const PROMPT_WIDTH = 320;
-        const PROMPT_HEIGHT = 160; // Base height, dynamic in reality but fixed for grid slot
-        const GAP_X = 100;  // Larger horizontal gap to prevent overlap.
-        const GAP_Y = 120;  // Larger vertical gap to prevent overlap.
-        const IMAGE_GAP = 40; // Larger gap between images.
-        const AUTO_ARRANGE_GROUPS_PER_ROW = 20; // Wrap after a fixed 20 groups per row.
-        const AUTO_ARRANGE_SUB_COLUMNS = 20; // Keep sub-cards laid out horizontally when possible.
-        const AUTO_ARRANGE_GROUP_GAP_X = 56; // Extra horizontal spacing between auto-arranged groups.
-        const AUTO_ARRANGE_GROUP_GAP_Y = 120; // Extra vertical spacing between auto-arranged group rows.
-        const AUTO_ARRANGE_SUB_IMAGE_GAP = 32; // Additional spacing between sub-cards.
-        const AUTO_ARRANGE_PROMPT_TO_SUB_GAP = 56; // Larger gap between the prompt card and its sub-cards.
-
-        // --- Helper: Get dimensions ---
-        const getImageDims = (aspectRatio?: string, dimensions?: string) => {
-            // Using EXACT components dimensions to ensure perfect top alignment CSS logic
-            const { width, totalHeight } = getCardDimensions(aspectRatio as AspectRatio, true);
-            return { w: width, h: totalHeight };
-        };
 
         const currentCanvas = state.canvases.find(c => c.id === state.activeCanvasId);
         if (!currentCanvas) return;
@@ -2849,1102 +1659,44 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         if (selectedIds.length > 0) {
             {
-                // 1. Analyze Selection Composition
-                const selectedPrompts = currentCanvas.promptNodes.filter(p => selectedIds.includes(p.id));
-                const selectedImages = currentCanvas.imageNodes.filter(img => selectedIds.includes(img.id));
-
-                const isPromptOnly = selectedPrompts.length > 0 && selectedImages.length === 0;
-                const isImageOnly = selectedPrompts.length === 0 && selectedImages.length > 0;
-
-                // [New] When only a prompt is selected, rotate its child-card layout mode.
-                if (isPromptOnly && selectedPrompts.length === 1) {
-                    const prompt = selectedPrompts[0];
-                    const childImages = currentCanvas.imageNodes.filter(img => img.parentPromptId === prompt.id);
-
-                    if (childImages.length > 0) {
-                        const targetMode: SubCardLayout = prompt.mode === GenerationMode.PPT ? 'column' : mode;
-                        const SUB_GAP = AUTO_ARRANGE_SUB_IMAGE_GAP;
-                        const PROMPT_TO_SUB_GAP = AUTO_ARRANGE_PROMPT_TO_SUB_GAP;
-
-                        // Compute child-card bounds.
-                        const imageDims = childImages.map(img => getImageDims(img.aspectRatio, img.dimensions));
-                        const avgWidth = imageDims.reduce((sum, d) => sum + d.w, 0) / imageDims.length;
-                        const avgHeight = imageDims.reduce((sum, d) => sum + d.h, 0) / imageDims.length;
-
-                        const newImagePositions: Record<string, { x: number, y: number }> = {};
-                        const promptCenterX = prompt.position.x;
-                        const promptBottom = prompt.position.y;
-
-                        if (targetMode === 'row') {
-                            // Horizontal layout: arrange child cards in a single centered row.
-                            const totalWidth = childImages.length * avgWidth + (childImages.length - 1) * SUB_GAP;
-                            let currentX = promptCenterX - totalWidth / 2 + avgWidth / 2;
-                            const y = promptBottom + PROMPT_TO_SUB_GAP + avgHeight;
-
-                            childImages.forEach((img, i) => {
-                                const dims = imageDims[i];
-                                newImagePositions[img.id] = { x: currentX, y };
-                                currentX += dims.w + SUB_GAP;
-                            });
-                        } else if (targetMode === 'grid') {
-                            // Grid layout: use a 4-column grid with centered alignment.
-                            const columns = Math.min(AUTO_ARRANGE_SUB_COLUMNS, childImages.length);
-                            const rows = Math.ceil(childImages.length / columns);
-                            const totalWidth = columns * avgWidth + (columns - 1) * SUB_GAP;
-                            const startX = promptCenterX - totalWidth / 2 + avgWidth / 2;
-                            const startY = promptBottom + PROMPT_TO_SUB_GAP + avgHeight;
-
-                            childImages.forEach((img, i) => {
-                                const col = i % columns;
-                                const row = Math.floor(i / columns);
-                                newImagePositions[img.id] = {
-                                    x: startX + col * (avgWidth + SUB_GAP),
-                                    y: startY + row * (avgHeight + SUB_GAP)
-                                };
-                            });
-                        } else {
-                            // Vertical layout: stack child cards in one centered column.
-                            let currentY = promptBottom + PROMPT_TO_SUB_GAP + avgHeight;
-
-                            childImages.forEach((img, i) => {
-                                const dims = imageDims[i];
-                                newImagePositions[img.id] = { x: promptCenterX, y: currentY };
-                                currentY += dims.h + SUB_GAP;
-                            });
-                        }
-
-                        // Rotate to the next layout mode.
-
-                        // Apply the position changes.
-                        const newCanvases = state.canvases.map(c => {
-                            if (c.id !== state.activeCanvasId) return c;
-                            return {
-                                ...c,
-                                imageNodes: c.imageNodes.map(img =>
-                                    newImagePositions[img.id] ? { ...img, position: newImagePositions[img.id] } : img
-                                ),
-                                lastModified: Date.now()
-                            };
-                        });
-
-                        setState(prev => ({ ...prev, canvases: newCanvases, subCardLayoutMode: targetMode }));
-                        return;
-                    }
-                }
-
-                // 2. Identify Roots & Sync Mode
-                let roots: any[] = [];
-                let syncChildren = false;
-
-                if (isPromptOnly) {
-                    // [Mode A] Prompt only: also sync child cards so the whole group arranges together.
-                    roots = selectedPrompts.map(p => ({
-                        id: p.id, type: 'prompt', obj: p,
-                        x: p.position.x, y: p.position.y,
-                        width: PROMPT_WIDTH, height: p.height || 200,
-                        visualCx: p.position.x, visualCy: p.position.y - (p.height || 200) / 2
+                const singlePromptArrange = arrangeSingleSelectedPromptChildren(currentCanvas, selectedIds, mode);
+                if (singlePromptArrange) {
+                    const newCanvases = state.canvases.map(c =>
+                        c.id === state.activeCanvasId ? singlePromptArrange.canvas : c
+                    );
+                    setState(prev => ({
+                        ...prev,
+                        canvases: newCanvases,
+                        subCardLayoutMode: singlePromptArrange.subCardLayoutMode
                     }));
-                    syncChildren = true; // Enable child-card sync so sub-cards follow the prompt during moves.
-                }
-                else if (isImageOnly) {
-                    // [MODE B] Image Only: Sort Images independent of parents
-                    roots = selectedImages.map(img => {
-                        const dims = getImageDims(img.aspectRatio, img.dimensions);
-                        return {
-                            id: img.id, type: 'image', obj: img,
-                            x: img.position.x, y: img.position.y,
-                            width: dims.w, height: dims.h,
-                            visualCx: img.position.x, visualCy: img.position.y - dims.h / 2
-                        };
-                    });
-                    syncChildren = false;
-                }
-                else {
-                    // [MODE C] Mixed/Group: Use Group Logic
-                    syncChildren = true;
-                    const uniqueRootsMap = new Map<string, { id: string, type: 'prompt' | 'image', obj: any }>();
-                    const getPrompt = (id: string) => currentCanvas.promptNodes.find(p => p.id === id);
-                    const getImage = (id: string) => currentCanvas.imageNodes.find(img => img.id === id);
-
-                    selectedIds.forEach(id => {
-                        const p = getPrompt(id);
-                        if (p) {
-                            uniqueRootsMap.set(p.id, { id: p.id, type: 'prompt', obj: p });
-                            return;
-                        }
-                        const img = getImage(id);
-                        if (img) {
-                            if (img.parentPromptId) {
-                                const parent = getPrompt(img.parentPromptId);
-                                if (parent) uniqueRootsMap.set(parent.id, { id: parent.id, type: 'prompt', obj: parent });
-                                else uniqueRootsMap.set(img.id, { id: img.id, type: 'image', obj: img });
-                            } else {
-                                uniqueRootsMap.set(img.id, { id: img.id, type: 'image', obj: img });
-                            }
-                        }
-                    });
-
-                    roots = Array.from(uniqueRootsMap.values()).map(r => {
-                        const node = r.obj;
-                        let width, height;
-
-                        if (r.type === 'prompt') {
-                            // [Fix] Calculate the bounding box of the prompt and all children.
-                            const children = currentCanvas.imageNodes.filter(img => img.parentPromptId === node.id);
-
-                            // 1. Initial Bounds (Prompt itself) - Anchor: Bottom Center
-                            const pH = node.height || 200;
-                            let minTop = node.position.y - pH;
-                            let maxBottom = node.position.y;
-                            let minLeft = node.position.x - PROMPT_WIDTH / 2;
-                            let maxRight = node.position.x + PROMPT_WIDTH / 2;
-
-                            // 2. Expand with Children
-                            children.forEach(child => {
-                                const dims = getImageDims(child.aspectRatio, child.dimensions);
-                                // Anchor: Bottom Center (Assuming consistent system)
-                                const cTop = child.position.y - dims.h;
-                                const cBottom = child.position.y;
-                                const cLeft = child.position.x - dims.w / 2;
-                                const cRight = child.position.x + dims.w / 2;
-
-                                if (cTop < minTop) minTop = cTop;
-                                if (cBottom > maxBottom) maxBottom = cBottom;
-                                if (cLeft < minLeft) minLeft = cLeft;
-                                if (cRight > maxRight) maxRight = cRight;
-                            });
-
-                            width = maxRight - minLeft;
-                            height = maxBottom - minTop;
-                        } else {
-                            const dims = getImageDims(node.aspectRatio, node.dimensions);
-                            width = dims.w;
-                            height = dims.h;
-                        }
-
-                        return {
-                            ...r,
-                            x: node.position.x, y: node.position.y,
-                            width, height,
-                            visualCx: node.position.x, visualCy: node.position.y - height / 2,
-                        };
-                    });
+                    return;
                 }
 
-                if (roots.length >= 2) {
-                    // 2. Use the requested mode to choose the layout strategy.
-                    const strategy: 'matrix' | 'row' | 'column' = mode === 'grid' ? 'matrix' : mode;
-                    const GAP = 120; // Larger gap between groups (was 80).
-                    const GRID_COLUMNS = 6; // Grid mode uses 6 fixed columns.
-
-                    // 3. Arrange
-                    const newPositions: Record<string, { x: number, y: number }> = {};
-
-                    if (strategy === 'matrix') {
-                        // Grid Sort: Rough Row-Major
-                        roots.sort((a, b) => {
-                            if (Math.abs(a.visualCy - b.visualCy) > 200) return a.visualCy - b.visualCy;
-                            return a.visualCx - b.visualCx;
-                        });
-
-                        // Use a fixed 6-column grid.
-                        const columns = GRID_COLUMNS;
-                        // Center around average center
-                        const avgX = roots.reduce((s, r) => s + r.x, 0) / roots.length;
-                        const avgY = roots.reduce((s, r) => s + r.y, 0) / roots.length;
-
-                        // Calculate grid total size
-                        const maxW = Math.max(...roots.map(r => r.width));
-                        const maxH = Math.max(...roots.map(r => r.height));
-                        const CELL_W = maxW + GAP;
-                        const CELL_H = maxH + GAP;
-
-                        const gridW = columns * CELL_W;
-                        const rows = Math.ceil(roots.length / columns);
-                        const gridH = rows * CELL_H;
-
-                        const startX = avgX - gridW / 2 + CELL_W / 2; // + Half cell because anchor is center
-                        const startY = avgY - gridH / 2 + CELL_H; // + Full cell H because anchor is bottom
-
-                        roots.forEach((r, i) => {
-                            const col = i % columns;
-                            const row = Math.floor(i / columns);
-                            newPositions[r.id] = {
-                                x: startX + col * CELL_W,
-                                y: startY + row * CELL_H
-                            };
-                        });
-
-                    } else if (strategy === 'column') {
-                        // Sort Top->Bottom
-                        roots.sort((a, b) => a.visualCy - b.visualCy);
-                        const avgX = roots.reduce((s, r) => s + r.x, 0) / roots.length;
-
-                        // Start Y = Top-most Top + First Height
-                        const topY = Math.min(...roots.map(r => r.visualCy - r.height / 2));
-                        let currentY = topY;
-
-                        roots.forEach((r) => {
-                            currentY += r.height; // Bottom Anchor
-                            newPositions[r.id] = { x: avgX, y: currentY };
-                            currentY += GAP;
-                        });
-
-                    } else {
-                        // Row (Default) - Sort Left->Right
-                        roots.sort((a, b) => a.visualCx - b.visualCx);
-                        // Align Centers Vertically
-                        const avgCy = roots.reduce((s, r) => s + r.visualCy, 0) / roots.length;
-
-                        let currentLeft = Math.min(...roots.map(r => r.visualCx - r.width / 2));
-
-                        roots.forEach((r) => {
-                            const newX = currentLeft + r.width / 2;
-                            newPositions[r.id] = { x: newX, y: avgCy + r.height / 2 };
-                            currentLeft += r.width + GAP;
-                        });
-                    }
-
-                    // 4. Apply & Sync Children
-                    const newCanvases = state.canvases.map(c => {
-                        if (c.id !== state.activeCanvasId) return c;
-
-                        const getRootDelta = (rid: string) => {
-                            const target = newPositions[rid];
-                            const original = roots.find(r => r.id === rid);
-                            if (!target || !original) return { x: 0, y: 0 };
-                            return { x: target.x - original.x, y: target.y - original.y };
-                        };
-
-                        return {
-                            ...c,
-                            promptNodes: c.promptNodes.map(pn => newPositions[pn.id] ? { ...pn, position: newPositions[pn.id] } : pn),
-                            imageNodes: c.imageNodes.map(img => {
-                                // If it's a Root
-                                if (newPositions[img.id]) return { ...img, position: newPositions[img.id] };
-                                // If it's a Child of a Root (Only if Sync Enabled)
-                                if (syncChildren && img.parentPromptId && newPositions[img.parentPromptId]) {
-                                    const delta = getRootDelta(img.parentPromptId);
-                                    return { ...img, position: { x: img.position.x + delta.x, y: img.position.y + delta.y } };
-                                }
-                                return img;
-                            }),
-                            lastModified: Date.now()
-                        };
-                    });
-
+                const selectedRootArrange = arrangeSelectedRootNodes(currentCanvas, selectedIds, mode);
+                if (selectedRootArrange) {
+                    const newCanvases = state.canvases.map(c =>
+                        c.id === state.activeCanvasId ? selectedRootArrange.canvas : c
+                    );
                     setState(prev => ({ ...prev, canvases: newCanvases }));
                     return;
                 }
-            }
 
-            // Filter selected nodes
-            const selectedPrompts = currentCanvas.promptNodes.filter(p => selectedIds.includes(p.id));
-            const selectedImages = currentCanvas.imageNodes.filter(img => selectedIds.includes(img.id));
-            const selectedCount = selectedPrompts.length + selectedImages.length;
-
-            if (selectedCount > 1) {
-                {
-                    const selectionSubColumns = AUTO_ARRANGE_SUB_COLUMNS;
-                    const selectionSubImageGap = AUTO_ARRANGE_SUB_IMAGE_GAP;
-                    const selectionPromptToSubGap = AUTO_ARRANGE_PROMPT_TO_SUB_GAP;
-                    const selectionGroupGapX = AUTO_ARRANGE_GROUP_GAP_X;
-                    const selectionGroupGapY = AUTO_ARRANGE_GROUP_GAP_Y;
-
-                    type SelectedGroup = {
-                        prompt?: typeof selectedPrompts[0];
-                        images: typeof selectedImages;
-                        originalX: number;
-                        originalY: number;
-                    };
-                    type SelectedImagePlacement = {
-                        id: string;
-                        xOffset: number;
-                        bottomOffset: number;
-                    };
-                    type SelectedGroupLayout = {
-                        promptHeight: number;
-                        width: number;
-                        height: number;
-                        imageLayoutHeight: number;
-                        imagePlacements: SelectedImagePlacement[];
-                    };
-                    type PositionedSelectedGroup = SelectedGroup & { layout: SelectedGroupLayout };
-
-                    const buildSelectionImageLayout = (
-                        images: typeof selectedImages,
-                        layoutMode: SubCardLayout
-                    ): { width: number; height: number; placements: SelectedImagePlacement[] } => {
-                        if (images.length === 0) {
-                            return { width: 0, height: 0, placements: [] };
-                        }
-
-                        const imageDims = images.map(img => getImageDims(img.aspectRatio, img.dimensions));
-
-                        if (layoutMode === 'column') {
-                            const maxWidth = Math.max(...imageDims.map(d => d.w));
-                            const totalHeight = imageDims.reduce((sum, d) => sum + d.h, 0) + (imageDims.length - 1) * selectionSubImageGap;
-                            let currentTop = 0;
-                            const placements = images.map((img, index) => {
-                                const dims = imageDims[index];
-                                const placement = {
-                                    id: img.id,
-                                    xOffset: 0,
-                                    bottomOffset: currentTop + dims.h
-                                };
-                                currentTop += dims.h + selectionSubImageGap;
-                                return placement;
-                            });
-                            return { width: maxWidth, height: totalHeight, placements };
-                        }
-
-                        if (layoutMode === 'row') {
-                            const totalWidth = imageDims.reduce((sum, d) => sum + d.w, 0) + (imageDims.length - 1) * selectionSubImageGap;
-                            const maxHeight = Math.max(...imageDims.map(d => d.h));
-                            let currentLeft = -totalWidth / 2;
-                            const placements = images.map((img, index) => {
-                                const dims = imageDims[index];
-                                const placement = {
-                                    id: img.id,
-                                    xOffset: currentLeft + dims.w / 2,
-                                    bottomOffset: dims.h
-                                };
-                                currentLeft += dims.w + selectionSubImageGap;
-                                return placement;
-                            });
-                            return { width: totalWidth, height: maxHeight, placements };
-                        }
-
-                        const maxWidth = Math.max(...imageDims.map(d => d.w));
-                        const maxHeight = Math.max(...imageDims.map(d => d.h));
-                        const columns = Math.min(selectionSubColumns, imageDims.length);
-                        const totalWidth = columns * maxWidth + (columns - 1) * selectionSubImageGap;
-                        const totalHeight = Math.ceil(imageDims.length / columns) * maxHeight + (Math.ceil(imageDims.length / columns) - 1) * selectionSubImageGap;
-                        const startOffsetX = -totalWidth / 2;
-                        const placements = images.map((img, index) => {
-                            const dims = imageDims[index];
-                            const col = index % columns;
-                            const row = Math.floor(index / columns);
-                            return {
-                                id: img.id,
-                                xOffset: startOffsetX + col * (maxWidth + selectionSubImageGap) + maxWidth / 2,
-                                bottomOffset: row * (maxHeight + selectionSubImageGap) + dims.h
-                            };
-                        });
-
-                        return { width: totalWidth, height: totalHeight, placements };
-                    };
-
-                    const selectedGroupsForArrange: SelectedGroup[] = [];
-                    const groupedImageIds = new Set<string>();
-
-                    selectedPrompts.forEach(prompt => {
-                        const childImages = currentCanvas.imageNodes.filter(img => img.parentPromptId === prompt.id);
-                        childImages.forEach(img => groupedImageIds.add(img.id));
-                        selectedGroupsForArrange.push({
-                            prompt,
-                            images: childImages,
-                            originalX: prompt.position.x,
-                            originalY: prompt.position.y
-                        });
-                    });
-
-                    selectedImages
-                        .filter(img => !groupedImageIds.has(img.id))
-                        .forEach(img => {
-                            selectedGroupsForArrange.push({
-                                images: [img],
-                                originalX: img.position.x,
-                                originalY: img.position.y
-                            });
-                        });
-
-                    if (selectedGroupsForArrange.length > 0) {
-                        selectedGroupsForArrange.sort((a, b) => {
-                            const rowDiff = Math.floor(a.originalY / 200) - Math.floor(b.originalY / 200);
-                            if (rowDiff !== 0) return rowDiff;
-                            return a.originalX - b.originalX;
-                        });
-
-                        const selectionCenterX = selectedGroupsForArrange.reduce((sum, group) => sum + group.originalX, 0) / selectedGroupsForArrange.length;
-                        const selectionCenterY = selectedGroupsForArrange.reduce((sum, group) => sum + group.originalY, 0) / selectedGroupsForArrange.length;
-
-                        const positionedSelectionGroups: PositionedSelectedGroup[] = selectedGroupsForArrange.map(group => {
-                            const layoutMode: SubCardLayout = group.prompt?.mode === GenerationMode.PPT ? 'column' : mode;
-                            const imageLayout = buildSelectionImageLayout(group.images, layoutMode);
-                            const promptHeight = group.prompt?.height || 0;
-                            const width = group.prompt ? Math.max(PROMPT_WIDTH, imageLayout.width) : imageLayout.width;
-                            const height = group.prompt
-                                ? promptHeight + (imageLayout.height > 0 ? selectionPromptToSubGap + imageLayout.height : 0)
-                                : imageLayout.height;
-
-                            return {
-                                ...group,
-                                layout: {
-                                    promptHeight,
-                                    width,
-                                    height,
-                                    imageLayoutHeight: imageLayout.height,
-                                    imagePlacements: imageLayout.placements
-                                }
-                            };
-                        });
-
-                        const selectionStrategy: 'matrix' | 'row' | 'column' = mode === 'grid' ? 'matrix' : mode;
-                        const selectionRows: Array<{ groups: PositionedSelectedGroup[]; maxPromptHeight: number; maxTotalHeight: number; rowWidth: number }> = [];
-                        const createSelectionRow = () => ({ groups: [] as PositionedSelectedGroup[], maxPromptHeight: 0, maxTotalHeight: 0, rowWidth: 0 });
-                        const pushGroupIntoRow = (
-                            row: { groups: PositionedSelectedGroup[]; maxPromptHeight: number; maxTotalHeight: number; rowWidth: number },
-                            group: PositionedSelectedGroup
-                        ) => {
-                            row.rowWidth += (row.groups.length > 0 ? selectionGroupGapX : 0) + group.layout.width;
-                            row.groups.push(group);
-                            row.maxPromptHeight = Math.max(row.maxPromptHeight, group.layout.promptHeight);
-                            row.maxTotalHeight = Math.max(
-                                row.maxTotalHeight,
-                                group.prompt
-                                    ? row.maxPromptHeight + (group.layout.imageLayoutHeight > 0 ? selectionPromptToSubGap + group.layout.imageLayoutHeight : 0)
-                                    : group.layout.height
-                            );
-                        };
-
-                        if (selectionStrategy === 'row') {
-                            const row = createSelectionRow();
-                            positionedSelectionGroups.forEach(group => pushGroupIntoRow(row, group));
-                            if (row.groups.length > 0) selectionRows.push(row);
-                        } else if (selectionStrategy === 'column') {
-                            positionedSelectionGroups.forEach(group => {
-                                const row = createSelectionRow();
-                                pushGroupIntoRow(row, group);
-                                selectionRows.push(row);
-                            });
-                        } else {
-                            const gridColumns = Math.min(AUTO_ARRANGE_GROUPS_PER_ROW, Math.max(1, positionedSelectionGroups.length));
-                            let currentSelectionRow = createSelectionRow();
-                            positionedSelectionGroups.forEach(group => {
-                                if (currentSelectionRow.groups.length >= gridColumns) {
-                                    selectionRows.push(currentSelectionRow);
-                                    currentSelectionRow = createSelectionRow();
-                                }
-                                pushGroupIntoRow(currentSelectionRow, group);
-                            });
-                            if (currentSelectionRow.groups.length > 0) selectionRows.push(currentSelectionRow);
-                        }
-
-                        const totalSelectionHeight = selectionRows.reduce((sum, row) => sum + row.maxTotalHeight, 0) + (selectionRows.length - 1) * selectionGroupGapY;
-                        let currentTopY = selectionCenterY - totalSelectionHeight / 2;
-                        const arrangedPositions: Record<string, { x: number; y: number }> = {};
-
-                        selectionRows.forEach(row => {
-                            let currentLeftX = selectionCenterX - row.rowWidth / 2;
-                            const rowTopY = currentTopY;
-                            const rowSubCardsTopY = rowTopY + row.maxPromptHeight + selectionPromptToSubGap;
-
-                            row.groups.forEach(group => {
-                                const groupCenterX = currentLeftX + group.layout.width / 2;
-
-                                if (group.prompt) {
-                                    arrangedPositions[group.prompt.id] = {
-                                        x: groupCenterX,
-                                        y: rowTopY + group.layout.promptHeight
-                                    };
-                                }
-
-                                const imageTopY = group.prompt ? rowSubCardsTopY : rowTopY;
-                                group.layout.imagePlacements.forEach(placement => {
-                                    arrangedPositions[placement.id] = {
-                                        x: groupCenterX + placement.xOffset,
-                                        y: imageTopY + placement.bottomOffset
-                                    };
-                                });
-
-                                currentLeftX += group.layout.width + selectionGroupGapX;
-                            });
-
-                            currentTopY += row.maxTotalHeight + selectionGroupGapY;
-                        });
-
-                        const arrangedCanvases = state.canvases.map(canvas => {
-                            if (canvas.id !== state.activeCanvasId) return canvas;
-                            return {
-                                ...canvas,
-                                promptNodes: canvas.promptNodes.map(prompt =>
-                                    arrangedPositions[prompt.id] ? { ...prompt, position: arrangedPositions[prompt.id] } : prompt
-                                ),
-                                imageNodes: canvas.imageNodes.map(image =>
-                                    arrangedPositions[image.id] ? { ...image, position: arrangedPositions[image.id] } : image
-                                ),
-                                lastModified: Date.now()
-                            };
-                        });
-
-                        setState(prev => ({ ...prev, canvases: arrangedCanvases, subCardLayoutMode: mode }));
-                        return;
-                    }
+                const selectedGroupedArrange = arrangeSelectedGroupedNodes(currentCanvas, selectedIds, mode);
+                if (selectedGroupedArrange) {
+                    const newCanvases = state.canvases.map(c =>
+                        c.id === state.activeCanvasId ? selectedGroupedArrange.canvas : c
+                    );
+                    setState(prev => ({
+                        ...prev,
+                        canvases: newCanvases,
+                        subCardLayoutMode: selectedGroupedArrange.subCardLayoutMode
+                    }));
+                    return;
                 }
-                // Selection arrange: process the selection as card groups and keep nearby/top-aligned layouts stable.
-
-                // 1. Build the selected group list, similar to the global arrange flow.
-                const SUB_COLUMNS = AUTO_ARRANGE_SUB_COLUMNS; // Default horizontal sub-card columns.
-                const SUB_IMAGE_GAP = AUTO_ARRANGE_SUB_IMAGE_GAP;
-                const PROMPT_TO_SUB_GAP = AUTO_ARRANGE_PROMPT_TO_SUB_GAP;
-                const GROUP_GAP_X = AUTO_ARRANGE_GROUP_GAP_X;
-                const GROUP_GAP_Y = AUTO_ARRANGE_GROUP_GAP_Y;
-
-                type SelectionGroup = {
-                    prompt?: typeof selectedPrompts[0];
-                    images: typeof selectedImages;
-                    width: number;
-                    height: number;
-                    originalX: number;
-                    originalY: number;
-                };
-
-                const groups: SelectionGroup[] = [];
-                const processedImageIds = new Set<string>();
-
-                // 2a. Process selected prompt cards together with their child image cards.
-                selectedPrompts.forEach(prompt => {
-                    const childImages = currentCanvas.imageNodes.filter(img => img.parentPromptId === prompt.id);
-                    const promptHeight = prompt.height || 200;
-
-                    let maxSubWidth = 0;
-                    let maxSubHeight = 0;
-                    childImages.forEach(img => {
-                        const dims = getImageDims(img.aspectRatio, img.dimensions);
-                        maxSubWidth = Math.max(maxSubWidth, dims.w);
-                        maxSubHeight = Math.max(maxSubHeight, dims.h);
-                        processedImageIds.add(img.id);
-                    });
-
-                    const actualColumns = Math.min(SUB_COLUMNS, childImages.length);
-                    const rows = Math.ceil(childImages.length / SUB_COLUMNS);
-                    const subBlockWidth = actualColumns > 0 ? actualColumns * maxSubWidth + (actualColumns - 1) * SUB_IMAGE_GAP : 0;
-                    const subBlockHeight = rows > 0 ? rows * maxSubHeight + (rows - 1) * SUB_IMAGE_GAP : 0;
-
-                    const groupWidth = Math.max(PROMPT_WIDTH, subBlockWidth);
-                    const groupHeight = promptHeight + (childImages.length > 0 ? PROMPT_TO_SUB_GAP + subBlockHeight : 0);
-
-                    groups.push({
-                        prompt,
-                        images: childImages,
-                        width: groupWidth,
-                        height: groupHeight,
-                        originalX: prompt.position.x,
-                        originalY: prompt.position.y
-                    });
-                });
-
-                // 2b. Process selected standalone image cards without a parent prompt.
-                selectedImages.filter(img => !processedImageIds.has(img.id)).forEach(img => {
-                    const dims = getImageDims(img.aspectRatio, img.dimensions);
-                    groups.push({
-                        images: [img],
-                        width: dims.w,
-                        height: dims.h + 200 + PROMPT_TO_SUB_GAP, // Reserve prompt height for standalone images.
-                        originalX: img.position.x,
-                        originalY: img.position.y
-                    });
-                });
-
-                if (groups.length === 0) return;
-
-                // 3. Sort by original position to preserve spatial proximity.
-                groups.sort((a, b) => {
-                    const rowDiff = Math.floor(a.originalY / 200) - Math.floor(b.originalY / 200);
-                    if (rowDiff !== 0) return rowDiff;
-                    return a.originalX - b.originalX;
-                });
-
-                // 4. Compute the center of the selected area.
-                const centerX = groups.reduce((sum, g) => sum + g.originalX, 0) / groups.length;
-                const centerY = groups.reduce((sum, g) => sum + g.originalY, 0) / groups.length;
-
-                // 5. Two-pass layout: assign rows first, then set final positions.
-                const gridColumns = Math.min(AUTO_ARRANGE_GROUPS_PER_ROW, Math.max(1, groups.length));
-                const layoutRows: Array<{ groups: SelectionGroup[]; maxPromptHeight: number; maxTotalHeight: number }> = [];
-                let currentRow: typeof layoutRows[0] = { groups: [], maxPromptHeight: 0, maxTotalHeight: 0 };
-                groups.forEach((group) => {
-                    if (currentRow.groups.length >= gridColumns) {
-                        layoutRows.push(currentRow);
-                        currentRow = { groups: [], maxPromptHeight: 0, maxTotalHeight: 0 };
-                    }
-                    currentRow.groups.push(group);
-                    const promptHeight = group.prompt?.height || 200;
-                    currentRow.maxPromptHeight = Math.max(currentRow.maxPromptHeight, promptHeight);
-                    currentRow.maxTotalHeight = Math.max(currentRow.maxTotalHeight, group.height);
-                });
-                if (currentRow.groups.length > 0) layoutRows.push(currentRow);
-
-                // 6. Compute overall bounds and start layout from the center.
-                const maxGroupWidth = Math.max(...groups.map(g => g.width));
-                const totalLayoutWidth = gridColumns * maxGroupWidth + (gridColumns - 1) * GROUP_GAP_X;
-                const totalLayoutHeight = layoutRows.reduce((sum, r) => sum + r.maxTotalHeight, 0) + (layoutRows.length - 1) * GROUP_GAP_Y;
-                const startX = centerX - totalLayoutWidth / 2;
-                let startY = centerY - totalLayoutHeight / 2;
-
-                const newPositions: Record<string, { x: number; y: number }> = {};
-                const movedPrompts = new Set<string>();
-
-                // 7. Apply positions with top-aligned sub-cards.
-                layoutRows.forEach(layoutRow => {
-                    let rowX = startX;
-                    const rowMaxPromptHeight = layoutRow.maxPromptHeight;
-                    const subCardsStartY = startY + rowMaxPromptHeight + PROMPT_TO_SUB_GAP;
-
-                    layoutRow.groups.forEach(group => {
-                        // [Fix] Use the current group's actual width when calculating its center.
-                        const groupCenterX = rowX + group.width / 2;
-
-                        if (group.prompt) {
-                            const promptHeight = group.prompt.height || 200;
-                            newPositions[group.prompt.id] = {
-                                x: groupCenterX,
-                                y: startY + promptHeight // Keep prompt tops aligned at startY.
-                            };
-                            movedPrompts.add(group.prompt.id);
-
-                            // Sub-card positions.
-                            if (group.images.length > 0) {
-                                const imageDims = group.images.map(img => getImageDims(img.aspectRatio, img.dimensions));
-                                const maxWidth = Math.max(...imageDims.map(d => d.w));
-                                const maxHeight = Math.max(...imageDims.map(d => d.h));
-                                const actualColumns = Math.min(SUB_COLUMNS, group.images.length);
-                                const blockWidth = actualColumns * maxWidth + (actualColumns - 1) * SUB_IMAGE_GAP;
-                                const blockStartX = groupCenterX - blockWidth / 2;
-
-                                group.images.forEach((img, i) => {
-                                    const col = i % SUB_COLUMNS;
-                                    const imgRow = Math.floor(i / SUB_COLUMNS);
-                                    const cardCenterX = blockStartX + col * (maxWidth + SUB_IMAGE_GAP) + maxWidth / 2;
-                                    const cardTopY = subCardsStartY + imgRow * (maxHeight + SUB_IMAGE_GAP);
-                                    const dims = imageDims[i];
-                                    newPositions[img.id] = { x: cardCenterX, y: cardTopY + dims.h };
-                                });
-                            }
-                        } else if (group.images[0]) {
-                            // Standalone image card.
-                            const img = group.images[0];
-                            const dims = getImageDims(img.aspectRatio, img.dimensions);
-                            newPositions[img.id] = { x: groupCenterX, y: subCardsStartY + dims.h };
-                        }
-
-                        // [Fix] Advance by the real group width, not maxGroupWidth, to avoid overlap.
-                        rowX += group.width + GROUP_GAP_X;
-                    });
-
-                    startY += layoutRow.maxTotalHeight + GROUP_GAP_Y;
-                });
-
-                // 8. Apply positions.
-                const newCanvases = state.canvases.map(c => {
-                    if (c.id !== state.activeCanvasId) return c;
-                    return {
-                        ...c,
-                        promptNodes: c.promptNodes.map(pn => newPositions[pn.id] ? { ...pn, position: newPositions[pn.id] } : pn),
-                        imageNodes: c.imageNodes.map(img => newPositions[img.id] ? { ...img, position: newPositions[img.id] } : img),
-                        lastModified: Date.now()
-                    };
-                });
-
-                setState(prev => ({ ...prev, canvases: newCanvases }));
-                return;
             }
         }
 
-        // --- New layout logic: start from the upper-left and place up to 20 groups per row. ---
-        // Configuration
-        const GROUPS_PER_ROW = AUTO_ARRANGE_GROUPS_PER_ROW;  // Fixed 20 groups per row.
-        const GROUP_GAP_X = AUTO_ARRANGE_GROUP_GAP_X;     // Horizontal gap between groups.
-        const GROUP_GAP_Y = AUTO_ARRANGE_GROUP_GAP_Y;     // Vertical gap between rows.
-        const START_X = -2000;      // Upper-left layout origin X.
-        const START_Y = 200;        // Upper-left layout origin Y.
-
-        // 1. Classify cards.
-        const errorPrompts = currentCanvas.promptNodes.filter(p => p.error);
-        const errorPromptIds = new Set(errorPrompts.map(p => p.id));
-
-        // Normal prompt cards with child images.
-        const normalPrompts = currentCanvas.promptNodes.filter(p =>
-            !errorPromptIds.has(p.id) &&
-            currentCanvas.imageNodes.some(img => img.parentPromptId === p.id)
-        );
-
-        // Orphan prompt cards without child images.
-        const orphanPrompts = currentCanvas.promptNodes.filter(p =>
-            !errorPromptIds.has(p.id) &&
-            !currentCanvas.imageNodes.some(img => img.parentPromptId === p.id)
-        );
-
-        // Orphan image cards without a parent prompt.
-        const orphanImages = currentCanvas.imageNodes.filter(img =>
-            !img.parentPromptId ||
-            !currentCanvas.promptNodes.some(p => p.id === img.parentPromptId)
-        );
-
-        // 2. Build layout groups.
-        type LayoutGroupType = 'normal' | 'orphan-prompt' | 'orphan-image' | 'error';
-        type LayoutGroup = {
-            type: LayoutGroupType;
-            prompt?: typeof normalPrompts[0];
-            images: typeof currentCanvas.imageNodes;
-            width: number;
-            height: number;
-            sourcePromptId?: string;
-            layoutHeight?: number;
-        };
-        const layoutGroups: LayoutGroup[] = [];
-        const promptById = new Map(currentCanvas.promptNodes.map(prompt => [prompt.id, prompt]));
-        const imageById = new Map(currentCanvas.imageNodes.map(img => [img.id, img]));
-
-        // 2a. Normal card groups (prompt + child images).
-        const SUB_COLUMNS = AUTO_ARRANGE_SUB_COLUMNS; // Default horizontal sub-card columns.
-        const SUB_IMAGE_GAP = AUTO_ARRANGE_SUB_IMAGE_GAP; // Child-card gap.
-        const PROMPT_TO_SUB_GAP = AUTO_ARRANGE_PROMPT_TO_SUB_GAP; // Gap between prompt and child cards.
-
-        normalPrompts.forEach(prompt => {
-            const childImages = currentCanvas.imageNodes.filter(img => img.parentPromptId === prompt.id);
-            const promptWidth = 320;
-            const promptHeight = prompt.height || 200;
-            const sourceImage = prompt.sourceImageId ? imageById.get(prompt.sourceImageId) : undefined;
-            const sourcePromptId = sourceImage?.parentPromptId && promptById.has(sourceImage.parentPromptId)
-                ? sourceImage.parentPromptId
-                : undefined;
-
-            // Compute child-card bounds.
-            let maxSubWidth = 0;
-            let maxSubHeight = 0;
-            childImages.forEach(img => {
-                const dims = getImageDims(img.aspectRatio, img.dimensions);
-                maxSubWidth = Math.max(maxSubWidth, dims.w);
-                maxSubHeight = Math.max(maxSubHeight, dims.h);
-            });
-
-            // Actual column count, capped by image count.
-            const actualColumns = Math.min(SUB_COLUMNS, childImages.length);
-            const rows = Math.ceil(childImages.length / SUB_COLUMNS);
-
-            // Child-card block size.
-            const subBlockWidth = actualColumns > 0
-                ? actualColumns * maxSubWidth + (actualColumns - 1) * SUB_IMAGE_GAP
-                : 0;
-            const subBlockHeight = rows > 0
-                ? rows * maxSubHeight + (rows - 1) * SUB_IMAGE_GAP
-                : 0;
-
-            // Total group width and height.
-            const groupWidth = Math.max(promptWidth, subBlockWidth);
-            const groupHeight = promptHeight + (childImages.length > 0 ? PROMPT_TO_SUB_GAP + subBlockHeight : 0);
-
-            layoutGroups.push({
-                type: 'normal',
-                prompt,
-                images: childImages,
-                width: groupWidth,
-                height: groupHeight,
-                sourcePromptId
-            });
-        });
-
-        // 2b. Orphan prompt cards.
-        orphanPrompts.forEach(prompt => {
-            const sourceImage = prompt.sourceImageId ? imageById.get(prompt.sourceImageId) : undefined;
-            const sourcePromptId = sourceImage?.parentPromptId && promptById.has(sourceImage.parentPromptId)
-                ? sourceImage.parentPromptId
-                : undefined;
-            layoutGroups.push({
-                type: 'orphan-prompt',
-                prompt,
-                images: [],
-                width: 320,
-                height: prompt.height || 200,
-                sourcePromptId
-            });
-        });
-
-        // 2c. Orphan image cards.
-        orphanImages.forEach(img => {
-            const dims = getImageDims(img.aspectRatio, img.dimensions);
-            layoutGroups.push({
-                type: 'orphan-image',
-                images: [img],
-                width: dims.w,
-                height: dims.h
-            });
-        });
-
-        // 3. Layout normal + orphan groups with 20 groups per row.
-        // Two-pass layout:
-        //   Pass 1: assign groups to rows and compute each row's max prompt height.
-        //   Pass 2: place groups using those row metrics so sub-card tops align.
-
-        const followUpGroups = layoutGroups.filter(group => !!group.sourcePromptId && group.prompt);
-        const rootLayoutGroups = layoutGroups.filter(group => !group.sourcePromptId);
-        const followUpChildrenMap = new Map<string, LayoutGroup[]>();
-        followUpGroups.forEach(group => {
-            const sourcePromptId = group.sourcePromptId!;
-            const existing = followUpChildrenMap.get(sourcePromptId) || [];
-            existing.push(group);
-            followUpChildrenMap.set(sourcePromptId, existing);
-        });
-        followUpChildrenMap.forEach((groups) => {
-            groups.sort((a, b) => (a.prompt?.timestamp || 0) - (b.prompt?.timestamp || 0));
-        });
-
-        const computeLayoutHeight = (group: LayoutGroup, stack = new Set<string>()): number => {
-            const promptId = group.prompt?.id;
-            if (!promptId || stack.has(promptId)) return group.height;
-            const nextStack = new Set(stack);
-            nextStack.add(promptId);
-            const children = followUpChildrenMap.get(promptId) || [];
-            return children.length === 0
-                ? group.height
-                : Math.max(group.height, ...children.map(child => computeLayoutHeight(child, nextStack)));
-        };
-
-        rootLayoutGroups.forEach(group => {
-            group.layoutHeight = computeLayoutHeight(group);
-        });
-
-        // Pass 1: assign groups to rows.
-        const rows: Array<{
-            groups: LayoutGroup[];
-            maxPromptHeight: number;  // Tallest prompt in the row.
-            maxTotalHeight: number;   // Tallest full group in the row.
-            startX: number;
-        }> = [];
-
-        let currentX = START_X;
-        let currentRow: typeof rows[0] = { groups: [], maxPromptHeight: 0, maxTotalHeight: 0, startX: START_X };
-
-        rootLayoutGroups.forEach((group) => {
-            const groupsInCurrentRow = currentRow.groups.length;
-
-            // Wrap only by group count, not by width.
-            if (groupsInCurrentRow >= GROUPS_PER_ROW) {
-                rows.push(currentRow);
-                currentX = START_X;
-                currentRow = { groups: [], maxPromptHeight: 0, maxTotalHeight: 0, startX: START_X };
-            }
-
-            // Add to the current row.
-            currentRow.groups.push(group);
-
-            // Update row height metrics.
-            const promptHeight = group.prompt?.height || 200;
-            currentRow.maxPromptHeight = Math.max(currentRow.maxPromptHeight, promptHeight);
-            currentRow.maxTotalHeight = Math.max(currentRow.maxTotalHeight, group.layoutHeight || group.height);
-
-            currentX += group.width + GROUP_GAP_X;
-        });
-
-        // Push the last row.
-        if (currentRow.groups.length > 0) {
-            rows.push(currentRow);
-        }
-
-        // Pass 2: place groups using the computed row metrics.
-        const positions: { [id: string]: { x: number; y: number } } = {};
-        const placedBounds = new Map<string, { left: number; top: number; right: number; bottom: number; width: number; height: number }>();
-        const followUpRightEdge = new Map<string, number>();
-        let currentY = START_Y;
-
-        const placeGroup = (group: LayoutGroup, left: number, top: number) => {
-            const groupCenterX = left + group.width / 2;
-            const promptHeight = group.prompt?.height || 200;
-            const subCardsStartY = top + promptHeight + PROMPT_TO_SUB_GAP;
-
-            if (group.type === 'normal' && group.prompt) {
-                positions[group.prompt.id] = {
-                    x: groupCenterX,
-                    y: top + promptHeight
-                };
-
-                if (group.images.length > 0) {
-                    const imageDims = group.images.map(img => getImageDims(img.aspectRatio, img.dimensions));
-                    const maxWidth = Math.max(...imageDims.map(d => d.w));
-                    const maxHeight = Math.max(...imageDims.map(d => d.h));
-                    const actualColumns = Math.min(SUB_COLUMNS, group.images.length);
-                    const blockWidth = actualColumns * maxWidth + (actualColumns - 1) * SUB_IMAGE_GAP;
-                    const blockStartX = groupCenterX - blockWidth / 2;
-
-                    group.images.forEach((img, index) => {
-                        const col = index % SUB_COLUMNS;
-                        const imgRow = Math.floor(index / SUB_COLUMNS);
-                        const cardCenterX = blockStartX + col * (maxWidth + SUB_IMAGE_GAP) + maxWidth / 2;
-                        const cardTopY = subCardsStartY + imgRow * (maxHeight + SUB_IMAGE_GAP);
-                        const dims = imageDims[index];
-                        positions[img.id] = {
-                            x: cardCenterX,
-                            y: cardTopY + dims.h
-                        };
-                    });
-                }
-            } else if (group.type === 'orphan-prompt' && group.prompt) {
-                positions[group.prompt.id] = {
-                    x: groupCenterX,
-                    y: top + promptHeight
-                };
-            } else if (group.type === 'orphan-image' && group.images[0]) {
-                const img = group.images[0];
-                const dims = getImageDims(img.aspectRatio, img.dimensions);
-                positions[img.id] = {
-                    x: groupCenterX,
-                    y: subCardsStartY + dims.h
-                };
-            }
-
-            if (group.prompt?.id) {
-                placedBounds.set(group.prompt.id, {
-                    left,
-                    top,
-                    right: left + group.width,
-                    bottom: top + group.height,
-                    width: group.width,
-                    height: group.height
-                });
-            }
-        };
-
-        rows.forEach((row) => {
-            let rowX = START_X;
-
-            row.groups.forEach((group) => {
-                placeGroup(group, rowX, currentY);
-                rowX += group.width + GROUP_GAP_X;
-            });
-
-            currentY += row.maxTotalHeight + GROUP_GAP_Y;
-        });
-
-        const pendingFollowUps = [...followUpGroups];
-        let guard = 0;
-
-        while (pendingFollowUps.length > 0 && guard < 1000) {
-            guard += 1;
-            let placedInLoop = 0;
-
-            for (let index = 0; index < pendingFollowUps.length; index += 1) {
-                const group = pendingFollowUps[index];
-                const sourcePromptId = group.sourcePromptId;
-
-                if (!sourcePromptId) {
-                    continue;
-                }
-
-                const anchorBounds = placedBounds.get(sourcePromptId);
-                if (!anchorBounds) {
-                    continue;
-                }
-
-                const left = followUpRightEdge.get(sourcePromptId) ?? (anchorBounds.right + GROUP_GAP_X);
-                placeGroup(group, left, anchorBounds.top);
-
-                if (group.prompt?.id) {
-                    const placed = placedBounds.get(group.prompt.id);
-                    if (placed) {
-                        followUpRightEdge.set(sourcePromptId, placed.right + GROUP_GAP_X);
-                    }
-                }
-
-                pendingFollowUps.splice(index, 1);
-                index -= 1;
-                placedInLoop += 1;
-            }
-
-            if (placedInLoop === 0) {
-                pendingFollowUps.forEach((group) => {
-                    placeGroup(group, START_X, currentY);
-                    currentY += (group.layoutHeight || group.height) + GROUP_GAP_Y;
-                });
-                pendingFollowUps.length = 0;
-            }
-        }
-
-        // 4. Arrange error card groups on their own rows.
-        if (errorPrompts.length > 0) {
-            // Start a fresh error row.
-            let errorX = START_X;
-            let errorRowMaxHeight = 0;
-            let errorGroupsInRow = 0;
-            currentY += GROUP_GAP_Y + 50; // Extra 50px separation.
-
-            const ERROR_GAP_X = 40; // Tighter spacing between error groups.
-
-            errorPrompts.forEach(prompt => {
-                const promptWidth = 320;
-                const promptHeight = prompt.height || 200;
-                const childImages = currentCanvas.imageNodes.filter(img => img.parentPromptId === prompt.id);
-
-                // Compute error-group bounds using the same child-card layout.
-                let groupWidth = promptWidth;
-                let groupHeight = promptHeight;
-
-                if (childImages.length > 0) {
-                    let maxSubWidth = 0;
-                    let maxSubHeight = 0;
-                    childImages.forEach(img => {
-                        const dims = getImageDims(img.aspectRatio, img.dimensions);
-                        maxSubWidth = Math.max(maxSubWidth, dims.w);
-                        maxSubHeight = Math.max(maxSubHeight, dims.h);
-                    });
-                    const actualColumns = Math.min(SUB_COLUMNS, childImages.length);
-                    const rows = Math.ceil(childImages.length / SUB_COLUMNS);
-                    const subBlockWidth = actualColumns * maxSubWidth + (actualColumns - 1) * SUB_IMAGE_GAP;
-                    const subBlockHeight = rows * maxSubHeight + (rows - 1) * SUB_IMAGE_GAP;
-                    groupWidth = Math.max(promptWidth, subBlockWidth);
-                    groupHeight = promptHeight + PROMPT_TO_SUB_GAP + subBlockHeight;
-                }
-
-                // Wrap error groups only by group count.
-                if (errorGroupsInRow >= GROUPS_PER_ROW) {
-                    errorX = START_X;
-                    currentY += errorRowMaxHeight + GROUP_GAP_Y;
-                    errorRowMaxHeight = 0;
-                    errorGroupsInRow = 0;
-                }
-
-                const groupCenterX = errorX + groupWidth / 2;
-
-                // Prompt position.
-                positions[prompt.id] = {
-                    x: groupCenterX,
-                    y: currentY + promptHeight
-                };
-
-                // Child image positions: centered columns with top alignment.
-                if (childImages.length > 0) {
-                    const promptBottom = currentY + promptHeight + PROMPT_TO_SUB_GAP;
-
-                    // Compute child-card bounds.
-                    const imageDims = childImages.map(img => getImageDims(img.aspectRatio, img.dimensions));
-                    const maxWidth = Math.max(...imageDims.map(d => d.w));
-                    const maxHeight = Math.max(...imageDims.map(d => d.h));
-
-                    // Compute the actual column count.
-                    const actualColumns = Math.min(SUB_COLUMNS, childImages.length);
-                    const blockWidth = actualColumns * maxWidth + (actualColumns - 1) * SUB_IMAGE_GAP;
-                    const blockStartX = groupCenterX - blockWidth / 2;
-
-                    childImages.forEach((img, i) => {
-                        const col = i % SUB_COLUMNS;
-                        const row = Math.floor(i / SUB_COLUMNS);
-                        const cardCenterX = blockStartX + col * (maxWidth + SUB_IMAGE_GAP) + maxWidth / 2;
-                        // Top-aligned: y = top position + card height (bottom anchor).
-                        const cardTopY = promptBottom + row * (maxHeight + SUB_IMAGE_GAP);
-                        const dims = imageDims[i];
-                        positions[img.id] = {
-                            x: cardCenterX,
-                            y: cardTopY + dims.h
-                        };
-                    });
-                }
-
-                errorX += groupWidth + ERROR_GAP_X;
-                errorRowMaxHeight = Math.max(errorRowMaxHeight, groupHeight);
-                errorGroupsInRow++;
-            });
-        }
+        const positions = resolveCanvasAutoArrangePositions(currentCanvas);
 
         setState(prev => {
             // Recompute from prev so we always use the latest state.
@@ -4011,7 +1763,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     // [NEW] Migration: Save currently loaded images (Temp) to the new Local Folder
                     // This ensures work done in Temp mode is not lost/abandoned when switching
                     if (handle) {
-                        // Do not call getAllImages; migrate only the assets required by the current state.
+                        // Migrate only the assets required by the current state.
 
                         // Helper to save base64/blob to disk
                         const saveToDisk = async (id: string, urlOrData: string, isVideo: boolean = false) => {
@@ -4101,7 +1853,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     // If found existing project in the folder, MERGE instead of overwrite
                     if (canvases.length > 0) {
                         setState(prev => {
-                            const mergedCanvases = mergeCanvases(prev.canvases, canvases);
+                            const mergedCanvases = mergeCanvases(prev.canvases, canvases, normalizeCanvasPromptRecovery);
                             const finalCanvases = mergedCanvases.map(canvas => ({
                                 ...canvas,
                                 imageNodes: (canvas.imageNodes || []).map(img => {
@@ -4369,7 +2121,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         }))
                     }));
 
-                    const mergedCanvases = mergeCanvases(prev.canvases, hydratedDiskCanvases);
+                    const mergedCanvases = mergeCanvases(prev.canvases, hydratedDiskCanvases, normalizeCanvasPromptRecovery);
                     const finalActiveId = resolvePreferredActiveCanvasId(
                         prev.activeCanvasId,
                         null,
@@ -4417,46 +2169,12 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     /**
      * Get the next available position for a new card (to the right of existing cards)
      */
-    const selectNodes = useCallback((ids: string[], mode: 'replace' | 'add' | 'remove' | 'toggle' = 'replace') => {
+    const selectNodes = useCallback((ids: string[], mode: CanvasSelectionMode = 'replace') => {
         setState(prev => {
-            const current = new Set(prev.selectedNodeIds || []);
-            let newSelectedIds: string[] = [];
-
-            switch (mode) {
-                case 'replace':
-                    // Replace the current selection.
-                    newSelectedIds = ids;
-                    break;
-
-                case 'add':
-                    // Add to selection (Shift + marquee).
-                    ids.forEach(id => current.add(id));
-                    newSelectedIds = Array.from(current);
-                    break;
-
-                case 'remove':
-                    // Remove from selection (Alt + marquee).
-                    ids.forEach(id => current.delete(id));
-                    newSelectedIds = Array.from(current);
-                    break;
-
-                case 'toggle':
-                    // Toggle selection (Ctrl + click).
-                    ids.forEach(id => {
-                        if (current.has(id)) {
-                            current.delete(id);
-                        } else {
-                            current.add(id);
-                        }
-                    });
-                    newSelectedIds = Array.from(current);
-                    break;
-
-                default:
-                    newSelectedIds = ids;
-            }
-
-            return { ...prev, selectedNodeIds: newSelectedIds };
+            return {
+                ...prev,
+                selectedNodeIds: resolveCanvasSelectionIds(prev.selectedNodeIds, ids, mode)
+            };
         });
     }, []);
 
@@ -4472,195 +2190,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const currentCanvas = prev.canvases.find(c => c.id === prev.activeCanvasId);
             if (!currentCanvas) return prev;
 
-            const promptById = new Map(currentCanvas.promptNodes.map(node => [node.id, node]));
-            const imageById = new Map(currentCanvas.imageNodes.map(node => [node.id, node]));
-            const workflowById = new Map(
-                (currentCanvas.workflow?.nodes || [])
-                    .filter(node => isWorkflowUtilityNodeKind(node.kind))
-                    .map(node => [node.id, node])
-            );
-            const canvasGroupsByNodeId = new Map<string, CanvasGroup[]>();
-            currentCanvas.groups.forEach(group => {
-                group.nodeIds.forEach(id => {
-                    const linkedGroups = canvasGroupsByNodeId.get(id) || [];
-                    linkedGroups.push(group);
-                    canvasGroupsByNodeId.set(id, linkedGroups);
-                });
-            });
-            const orderedNodeIds: string[] = [];
-            const orderedNodeIdSet = new Set<string>();
-            const expandedPromptIds = new Set<string>();
-            const expandedCanvasGroupIds = new Set<string>();
-
-            const pushCanvasGroup = (group: CanvasGroup) => {
-                if (expandedCanvasGroupIds.has(group.id)) return;
-                expandedCanvasGroupIds.add(group.id);
-
-                group.nodeIds.forEach(memberId => {
-                    const prompt = promptById.get(memberId);
-                    if (prompt) {
-                        pushPromptGroup(prompt.id);
-                        return;
-                    }
-
-                    const image = imageById.get(memberId);
-                    if (image?.parentPromptId) {
-                        pushPromptGroup(image.parentPromptId);
-                        return;
-                    }
-
-                    pushNodeId(memberId);
-                });
-            };
-
-            const pushNodeId = (id?: string) => {
-                if (!id || orderedNodeIdSet.has(id)) return;
-                orderedNodeIdSet.add(id);
-                orderedNodeIds.push(id);
-
-                const linkedGroups = canvasGroupsByNodeId.get(id) || [];
-                linkedGroups.forEach(pushCanvasGroup);
-            };
-
-            const getPromptGroupImageIds = (promptId: string) => {
-                const prompt = promptById.get(promptId);
-                if (!prompt) return [] as string[];
-
-                const childImageIds = new Set<string>(
-                    (prompt.childImageIds || []).filter((id): id is string => Boolean(id))
-                );
-
-                currentCanvas.imageNodes.forEach(image => {
-                    if (image.parentPromptId === promptId) {
-                        childImageIds.add(image.id);
-                    }
-                });
-
-                return Array.from(childImageIds);
-            };
-
-            const pushPromptGroup = (promptId: string) => {
-                if (expandedPromptIds.has(promptId)) return;
-                expandedPromptIds.add(promptId);
-
-                const prompt = promptById.get(promptId);
-                if (!prompt) return;
-
-                pushNodeId(prompt.id);
-                getPromptGroupImageIds(promptId).forEach(pushNodeId);
-            };
-
-            nodeIds.forEach(id => {
-                const prompt = promptById.get(id);
-                if (prompt) {
-                    pushPromptGroup(prompt.id);
-                    return;
-                }
-
-                const image = imageById.get(id);
-                if (image) {
-                    if (image.parentPromptId) {
-                        pushPromptGroup(image.parentPromptId);
-                    } else {
-                        pushNodeId(image.id);
-                    }
-                    return;
-                }
-
-                if (workflowById.has(id)) {
-                    pushNodeId(id);
-                    return;
-                }
-
-                pushNodeId(id);
-            });
-
-            const nodeIdSet = new Set(orderedNodeIds);
-
-            // Find current max zIndex
-            const allZIndices = [
-                ...currentCanvas.promptNodes.map(n => n.zIndex ?? 0),
-                ...currentCanvas.imageNodes.map(n => n.zIndex ?? 0),
-                ...(currentCanvas.workflow?.nodes || []).map(n => n.zIndex ?? 0),
-                ...currentCanvas.groups.map(g => g.zIndex ?? 0)
-            ];
-            let maxZ = allZIndices.length > 0 ? Math.max(...allZIndices) : 0;
-            const nextZIndexById = new Map<string, number>();
-            const promotedPromptGroupIds = new Set<string>();
-
-            orderedNodeIds.forEach(id => {
-                const prompt = promptById.get(id);
-                if (prompt) {
-                    if (promotedPromptGroupIds.has(prompt.id)) return;
-                    promotedPromptGroupIds.add(prompt.id);
-                    const groupZIndex = ++maxZ;
-                    nextZIndexById.set(prompt.id, groupZIndex);
-                    getPromptGroupImageIds(prompt.id).forEach(childImageId => {
-                        nextZIndexById.set(childImageId, groupZIndex);
-                    });
-                    return;
-                }
-
-                const image = imageById.get(id);
-                if (image?.parentPromptId && promptById.has(image.parentPromptId)) {
-                    if (promotedPromptGroupIds.has(image.parentPromptId)) return;
-                    promotedPromptGroupIds.add(image.parentPromptId);
-                    const groupZIndex = ++maxZ;
-                    nextZIndexById.set(image.parentPromptId, groupZIndex);
-                    getPromptGroupImageIds(image.parentPromptId).forEach(childImageId => {
-                        nextZIndexById.set(childImageId, groupZIndex);
-                    });
-                    return;
-                }
-
-                if (!nextZIndexById.has(id)) {
-                    nextZIndexById.set(id, ++maxZ);
-                }
-            });
-
-            // Update prompt nodes
-            const newPromptNodes = currentCanvas.promptNodes.map(n => {
-                const nextZIndex = nextZIndexById.get(n.id);
-                if (nextZIndex !== undefined) {
-                    return { ...n, zIndex: nextZIndex };
-                }
-                return n;
-            });
-
-            // Update image nodes
-            const newImageNodes = currentCanvas.imageNodes.map(n => {
-                const nextZIndex = nextZIndexById.get(n.id);
-                if (nextZIndex !== undefined) {
-                    return { ...n, zIndex: nextZIndex };
-                }
-                return n;
-            });
-
-            const newWorkflow = currentCanvas.workflow
-                ? {
-                    ...currentCanvas.workflow,
-                    nodes: currentCanvas.workflow.nodes.map(node => {
-                        const nextZIndex = nextZIndexById.get(node.id);
-                        if (nextZIndex !== undefined) {
-                            return { ...node, zIndex: nextZIndex };
-                        }
-                        return node;
-                    })
-                }
-                : currentCanvas.workflow;
-
-            // Also bring groups to front if they contain any of the selected nodes
-            const newGroups = currentCanvas.groups.map(g => {
-                const hasSelectedNode = g.nodeIds.some(id => nodeIdSet.has(id));
-                if (hasSelectedNode) {
-                    return { ...g, zIndex: ++maxZ };
-                }
-                return g;
-            });
+            const layeredCanvas = bringCanvasNodesToFront(currentCanvas, nodeIds);
 
             const newCanvases = prev.canvases.map(c =>
                 c.id === prev.activeCanvasId
-                    ? { ...c, promptNodes: newPromptNodes, imageNodes: newImageNodes, workflow: newWorkflow, groups: newGroups }
+                    ? layeredCanvas
                     : c
             );
 
@@ -4673,64 +2207,19 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const applyMoveSelectedNodes = useCallback((delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => {
         setState(prev => {
-            let selectedIds = prev.selectedNodeIds || [];
-
-            if (Array.isArray(sourceNodeIdOrIds) && sourceNodeIdOrIds.length > 0) {
-                selectedIds = sourceNodeIdOrIds;
-            } else if (typeof sourceNodeIdOrIds === 'string' && sourceNodeIdOrIds) {
-                selectedIds = selectedIds.includes(sourceNodeIdOrIds) ? selectedIds : [sourceNodeIdOrIds];
-            }
-            if (selectedIds.length === 0) return prev;
-
             const currentCanvas = prev.canvases.find(c => c.id === prev.activeCanvasId);
             if (!currentCanvas) return prev;
 
-            // Simple set-based selection
-            const selectedSet = new Set(selectedIds);
-            const movedPromptIds = new Set(
-                currentCanvas.promptNodes
-                    .filter((node) => selectedSet.has(node.id))
-                    .map((node) => node.id)
-            );
-
-            // Move only selected nodes
-            const newPromptNodes = currentCanvas.promptNodes.map(n => {
-                if (selectedSet.has(n.id)) {
-                    return { ...n, position: { x: n.position.x + delta.x, y: n.position.y + delta.y }, userMoved: true };
-                }
-                return n;
+            const movedCanvas = moveSelectedCanvasNodes({
+                canvas: currentCanvas,
+                selectedNodeIds: prev.selectedNodeIds || [],
+                delta,
+                sourceNodeIdOrIds,
             });
-
-            const newImageNodes = currentCanvas.imageNodes.map(n => {
-                const isDirectlyMovedImage = selectedSet.has(n.id);
-                const isMovingWithPromptGroup = Boolean(n.parentPromptId && movedPromptIds.has(n.parentPromptId));
-                if (isDirectlyMovedImage || isMovingWithPromptGroup) {
-                    return {
-                        ...n,
-                        position: { x: n.position.x + delta.x, y: n.position.y + delta.y },
-                        userMoved: selectedSet.has(n.id) ? true : n.userMoved,
-                    };
-                }
-                return n;
-            });
-
-            const newWorkflow = currentCanvas.workflow
-                ? {
-                    ...currentCanvas.workflow,
-                    nodes: currentCanvas.workflow.nodes.map(node => {
-                        if (selectedSet.has(node.id) && isWorkflowUtilityNodeKind(node.kind)) {
-                            return {
-                                ...node,
-                                position: { x: node.position.x + delta.x, y: node.position.y + delta.y }
-                            };
-                        }
-                        return node;
-                    })
-                }
-                : currentCanvas.workflow;
+            if (movedCanvas === currentCanvas) return prev;
 
             const newCanvases = prev.canvases.map(c =>
-                c.id === prev.activeCanvasId ? { ...c, promptNodes: newPromptNodes, imageNodes: newImageNodes, workflow: newWorkflow } : c
+                c.id === prev.activeCanvasId ? movedCanvas : c
             );
 
             return { ...prev, canvases: newCanvases };
@@ -4794,263 +2283,37 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, []);
 
     const getNextCardPosition = useCallback((): { x: number; y: number } => {
-        const CARD_WIDTH = 280;
-        const CARD_HEIGHT = 320;
-        const GAP_X = 20;
-        const GAP_Y = 20;
-        const MAX_WIDTH = 1600;
-        const SLOT_WIDTH = CARD_WIDTH + GAP_X;
-        const SLOT_HEIGHT = CARD_HEIGHT + GAP_Y;
-        const columnsPerRow = Math.floor(MAX_WIDTH / SLOT_WIDTH);
-
         const currentCanvas = state.canvases.find(c => c.id === state.activeCanvasId);
-        if (!currentCanvas) return { x: 0, y: 0 };
-
-        const totalCards = currentCanvas.promptNodes.length + currentCanvas.imageNodes.length;
-        const col = totalCards % columnsPerRow;
-        const row = Math.floor(totalCards / columnsPerRow);
-
-        return { x: col * SLOT_WIDTH, y: row * SLOT_HEIGHT };
+        return resolveNextCardPosition(currentCanvas);
     }, [state]);
 
-    /**
-     * Find a smart position that doesn't overlap with existing nodes.
-     * Starts at target (x,y) and spirals/shifts out until free space found.
-     */
     const findSmartPosition = useCallback((targetX: number, targetY: number, width: number, height: number, buffer = 20): { x: number; y: number } => {
         const currentCanvas = state.canvases.find(c => c.id === state.activeCanvasId);
-        if (!currentCanvas) return { x: targetX, y: targetY };
-
-        // Helper: Check collision
-        const checkCollision = (cx: number, cy: number) => {
-            // Check groups first (Large blocks)
-            for (const g of currentCanvas.groups) {
-                const gX = g.bounds.x;
-                const gY = g.bounds.y;
-                const gW = g.bounds.width;
-                const gH = g.bounds.height;
-
-                const myX = cx - width / 2; // Anchor Center Helper
-                const myY = cy - height;    // Anchor Bottom Helper
-
-                // Check Overlap
-                // My: [myX, myY, width, height]
-                // Group: [gX, gY, gW, gH]
-                if (myX < gX + gW + buffer && myX + width + buffer > gX &&
-                    myY < gY + gH + buffer && myY + height + buffer > gY) {
-                    return true;
-                }
-            }
-
-            // Check prompts
-            for (const p of currentCanvas.promptNodes) {
-                // Approximate prompt dimensions (default width 320, height ~160+)
-                // Origin is Bottom Center, but stored pos is card bottom center?
-                // Wait, in `layoutTree`: "nodeX = x + width/2", "positions[node.id] = {x, y}"
-                // And App.tsx `getCardDimensions` logic implies stored pos is bottom center?
-                // Let's assume standard card calc:
-                const pW = 320;
-                const pH = 200; // Roughly
-                // Rect: [p.x - pW/2, p.y - pH, pW, pH]
-                const px = p.position.x - pW / 2;
-                const py = p.position.y - pH;
-
-                // My Candidate Rect: [cx - width/2, cy - height, width, height]
-                const myX = cx - width / 2;
-                const myY = cy - height;
-
-                if (myX < px + pW + buffer && myX + width + buffer > px &&
-                    myY < py + pH + buffer && myY + height + buffer > py) {
-                    return true;
-                }
-            }
-
-            // Check images
-            for (const img of currentCanvas.imageNodes) {
-                // Check dims
-                let iW = 280;
-                let iH = 320;
-                if (img.dimensions) {
-                    const [w, h] = img.dimensions.split('x').map(Number);
-                    if (w && h) {
-                        const ratio = w / h;
-                        iW = ratio > 1 ? 320 : (ratio < 1 ? 200 : 280);
-                        iH = (iW / ratio) + 40;
-                    }
-                }
-                const ix = img.position.x - iW / 2;
-                const iy = img.position.y - iH;
-
-                const myX = cx - width / 2;
-                const myY = cy - height;
-
-                if (myX < ix + iW + buffer && myX + width + buffer > ix &&
-                    myY < iy + iH + buffer && myY + height + buffer > iy) {
-                    return true;
-                }
-            }
-
-            for (const workflowNode of currentCanvas.workflow?.nodes || []) {
-                if (!isWorkflowUtilityNodeKind(workflowNode.kind)) continue;
-
-                const nodeWidth = workflowNode.width || 280;
-                const nodeHeight = workflowNode.height || 180;
-                const nodeX = workflowNode.position.x - nodeWidth / 2;
-                const nodeY = workflowNode.position.y - nodeHeight;
-                const myX = cx - width / 2;
-                const myY = cy - height;
-
-                if (myX < nodeX + nodeWidth + buffer && myX + width + buffer > nodeX &&
-                    myY < nodeY + nodeHeight + buffer && myY + height + buffer > nodeY) {
-                    return true;
-                }
-            }
-
-            return false;
-        };
-
-        // If no collision at target, return immediately
-        if (!checkCollision(targetX, targetY)) return { x: targetX, y: targetY };
-
-        // Simple Shift Strategy: Try moving Down, then Right, then Diagonal
-        // Iterating shifts
-        const shifts = [
-            { dx: 0, dy: height + buffer }, // Down 1 slot
-            { dx: width + buffer, dy: 0 },  // Right 1 slot
-            { dx: -(width + buffer), dy: 0 }, // Left 1 slot
-            { dx: 0, dy: -(height + buffer) }, // Up 1 slot
-
-            { dx: width + buffer, dy: height + buffer }, // Diagonal Right Down
-            { dx: -(width + buffer), dy: height + buffer }, // Diagonal Left Down
-
-            { dx: (width + buffer) * 2, dy: 0 }, // Right 2
-            { dx: 0, dy: (height + buffer) * 2 }, // Down 2
-        ];
-
-        for (const shift of shifts) {
-            const sx = targetX + shift.dx;
-            const sy = targetY + shift.dy;
-            if (!checkCollision(sx, sy)) return { x: sx, y: sy };
-        }
-
-        // Fallback: Just put it far below
-        return { x: targetX, y: targetY + height + buffer + 100 };
+        return resolveSmartCanvasPosition(currentCanvas, targetX, targetY, width, height, buffer);
     }, [state]);
 
-    /**
-     * Find the grid position for the next card group.
-     * Strategy: place groups left-to-right and wrap after 30 groups per row.
-     * Return the bottom-center anchor position of the main prompt card.
-     *
-     * Card Group Layout Strategy:
-     * - Each group consists of a Main Card (Prompt) and Sub Cards (Images)
-     * - Groups are arranged in a grid: 30 per row, then wrap to next row
-     * - Dynamic width calculation based on existing sub-cards
-     */
     const findNextGroupPosition = useCallback((): { x: number; y: number } => {
-        // Card-group layout constants.
-        const SUB_CARD_WIDTH = 280;      // Sub-card width.
-        const SUB_CARD_GAP = 16;         // Gap between sub-cards.
-        const GROUP_BASE_WIDTH = 380;   // Base width when a group has a single sub-card column.
-        const GROUP_HEIGHT = 600;        // Prompt height + gaps + sub-card height.
-        const GAP_X = 40;                // Horizontal gap between groups.
-        const GAP_Y = 80;                // Vertical gap between rows.
-        const GROUPS_PER_ROW = 30;       // Maximum groups per row.
-
         const currentCanvas = state.canvases.find(c => c.id === state.activeCanvasId);
-        if (!currentCanvas) return { x: 0, y: 200 };
-
-        const groupCount = currentCanvas.promptNodes.length;
-
-        // Return the initial position when there are no existing groups.
-        if (groupCount === 0) {
-            return { x: 0, y: 200 };
-        }
-
-        // Compute each existing group's actual width from its child-card count.
-        const getGroupWidth = (promptId: string): number => {
-            const childCount = currentCanvas.imageNodes.filter(
-                img => img.parentPromptId === promptId
-            ).length;
-
-            // Child cards use at most two columns.
-            const cols = Math.min(Math.max(childCount, 1), 2);
-            const width = cols * SUB_CARD_WIDTH + (cols - 1) * SUB_CARD_GAP + 40;
-            return Math.max(GROUP_BASE_WIDTH, width);
-        };
-
-        // Compute the current row and column index.
-        const row = Math.floor(groupCount / GROUPS_PER_ROW);
-        const col = groupCount % GROUPS_PER_ROW;
-
-        // Compute the accumulated X offset within the current row.
-        const startRowIdx = row * GROUPS_PER_ROW;
-        let xOffset = 0;
-
-        // Sum the width of every existing group in this row.
-        for (let i = startRowIdx; i < groupCount; i++) {
-            const prompt = currentCanvas.promptNodes[i];
-            if (prompt) {
-                xOffset += getGroupWidth(prompt.id) + GAP_X;
-            }
-        }
-
-        // Keep the layout left-aligned.
-        const startX = 0;
-
-        // New group position = startX + accumulated offset + half the new group width.
-        const newGroupWidth = GROUP_BASE_WIDTH;
-        const x = startX + xOffset + newGroupWidth / 2;
-
-        // Compute Y from the row index.
-        const y = 200 + row * (GROUP_HEIGHT + GAP_Y);
-
-        return { x, y };
+        return resolveNextGroupPosition(currentCanvas);
     }, [state]);
 
     /** Group Management */
     const addGroup = useCallback((group: CanvasGroup) => {
-        updateCanvas((canvas) => ({
-            ...canvas,
-            groups: [
-                ...(canvas.groups || []),
-                group.zIndex !== undefined
-                    ? group
-                    : {
-                        ...group,
-                        zIndex: Math.max(
-                            0,
-                            ...canvas.promptNodes.map(node => node.zIndex ?? 0),
-                            ...canvas.imageNodes.map(node => node.zIndex ?? 0),
-                            ...(canvas.groups || []).map(existingGroup => existingGroup.zIndex ?? 0)
-                        ) + 1
-                    }
-            ]
-        }));
+        updateCanvas((canvas) => addCanvasGroupToCanvas(canvas, group));
     }, [updateCanvas]);
 
     const removeGroup = useCallback((id: string) => {
-        updateCanvas((canvas) => ({
-            ...canvas,
-            groups: (canvas.groups || []).filter(g => g.id !== id)
-        }));
+        updateCanvas((canvas) => removeCanvasGroupFromCanvas(canvas, id));
     }, [updateCanvas]);
 
     const updateGroup = useCallback((group: CanvasGroup) => {
-        updateCanvas((canvas) => ({
-            ...canvas,
-            groups: (canvas.groups || []).map(g => g.id === group.id ? group : g)
-        }));
+        updateCanvas((canvas) => updateCanvasGroupInCanvas(canvas, group));
     }, [updateCanvas]);
 
 
 
     const setNodeTags = useCallback((ids: string[], tags: string[]) => {
-        updateCanvas((canvas) => ({
-            ...canvas,
-            promptNodes: canvas.promptNodes.map(n => ids.includes(n.id) ? { ...n, tags } : n),
-            imageNodes: canvas.imageNodes.map(n => ids.includes(n.id) ? { ...n, tags } : n)
-        }));
+        updateCanvas((canvas) => setCanvasNodeTags(canvas, ids, tags));
     }, [updateCanvas]);
 
     // Track viewport-center updates with useCallback to avoid needless loops.
@@ -5143,7 +2406,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, []);
 
     const mergeCanvasInto = useCallback((sourceCanvasId: string, targetCanvasId: string, options?: { deleteSource?: boolean }) => {
-        const deleteSource = options?.deleteSource !== false;
         let summary = {
             movedPrompts: 0,
             movedImages: 0,
@@ -5151,99 +2413,16 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         };
 
         setState(prev => {
-            if (sourceCanvasId === targetCanvasId) {
-                return prev;
-            }
-
-            const sourceCanvas = prev.canvases.find(c => c.id === sourceCanvasId);
-            const targetCanvas = prev.canvases.find(c => c.id === targetCanvasId);
-            if (!sourceCanvas || !targetCanvas) {
-                return prev;
-            }
-
-            const targetPromptIds = new Set(targetCanvas.promptNodes.map(node => node.id));
-            const targetImageIds = new Set(targetCanvas.imageNodes.map(node => node.id));
-            const targetGroupIds = new Set((targetCanvas.groups || []).map(group => group.id));
-            const targetMaxX = Math.max(
-                0,
-                ...targetCanvas.promptNodes.map(node => node.position.x || 0),
-                ...targetCanvas.imageNodes.map(node => node.position.x || 0)
-            );
-            const offsetX = targetCanvas.promptNodes.length > 0 || targetCanvas.imageNodes.length > 0 ? targetMaxX + 500 : 0;
-
-            const movedPrompts = sourceCanvas.promptNodes
-                .filter(node => !targetPromptIds.has(node.id))
-                .map(node => ({
-                    ...node,
-                    position: { x: node.position.x + offsetX, y: node.position.y }
-                }));
-
-            const movedImages = sourceCanvas.imageNodes
-                .filter(node => !targetImageIds.has(node.id))
-                .map(node => ({
-                    ...node,
-                    canvasId: targetCanvasId,
-                    position: { x: node.position.x + offsetX, y: node.position.y }
-                }));
-
-            const movedNodeIds = new Set<string>([
-                ...movedPrompts.map(node => node.id),
-                ...movedImages.map(node => node.id)
-            ]);
-
-            const movedGroups = (sourceCanvas.groups || [])
-                .filter(group => !targetGroupIds.has(group.id))
-                .map(group => ({
-                    ...group,
-                    nodeIds: (group.nodeIds || []).filter(nodeId => movedNodeIds.has(nodeId))
-                }))
-                .filter(group => group.nodeIds.length > 0);
-
-            summary = {
-                movedPrompts: movedPrompts.length,
-                movedImages: movedImages.length,
-                deletedSource: deleteSource
-            };
-
-            const updatedCanvases = prev.canvases
-                .map(canvas => {
-                    if (canvas.id === targetCanvasId) {
-                        return {
-                            ...canvas,
-                            promptNodes: [...canvas.promptNodes, ...movedPrompts],
-                            imageNodes: [...canvas.imageNodes, ...movedImages],
-                            groups: [...(canvas.groups || []), ...movedGroups],
-                            lastModified: Date.now()
-                        };
-                    }
-
-                    if (canvas.id === sourceCanvasId && !deleteSource) {
-                        return {
-                            ...canvas,
-                            promptNodes: [],
-                            imageNodes: [],
-                            groups: [],
-                            lastModified: Date.now()
-                        };
-                    }
-
-                    return canvas;
-                })
-                .filter(canvas => !(deleteSource && canvas.id === sourceCanvasId));
-
-            return {
-                ...prev,
-                canvases: updatedCanvases,
-                activeCanvasId: prev.activeCanvasId === sourceCanvasId && deleteSource ? targetCanvasId : prev.activeCanvasId,
-                selectedNodeIds: []
-            };
+            const result = mergeCanvasIntoState(prev, sourceCanvasId, targetCanvasId, options);
+            summary = result.summary;
+            return result.state;
         });
 
         return summary;
     }, []);
 
     const cleanupInvalidCards = useCallback((canvasId?: string) => {
-        let summary = {
+        let summary: CleanupInvalidCardsSummary = {
             removedPrompts: 0,
             removedImages: 0,
             removedGroups: 0
@@ -5256,112 +2435,17 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 return prev;
             }
 
-            const promptIds = new Set(targetCanvas.promptNodes.map(node => node.id));
-            const promptIdsToRemove = new Set(
-                targetCanvas.promptNodes
-                    .filter(node => !node.isGenerating && !!node.error && (node.childImageIds?.length || 0) === 0)
-                    .map(node => node.id)
-            );
-
-            const imageIdsToRemove = new Set(
-                targetCanvas.imageNodes
-                    .filter(node => {
-                        const hasBrokenParent = !!node.parentPromptId && !node.orphaned && !promptIds.has(node.parentPromptId);
-                        const hasBrokenContent = !node.isGenerating && !node.url && !node.originalUrl && !node.apiResultUrl;
-                        const hasErrorState = !node.isGenerating && !!node.error;
-                        return hasBrokenParent || hasBrokenContent || hasErrorState;
-                    })
-                    .map(node => node.id)
-            );
-
-            const nextPromptNodes = targetCanvas.promptNodes
-                .filter(node => !promptIdsToRemove.has(node.id))
-                .map(node => ({
-                    ...node,
-                    childImageIds: (node.childImageIds || []).filter(childId => !imageIdsToRemove.has(childId))
-                }));
-
-            const nextPromptIds = new Set(nextPromptNodes.map(node => node.id));
-            const nextImageNodes = targetCanvas.imageNodes.filter(node => {
-                if (imageIdsToRemove.has(node.id)) {
-                    return false;
-                }
-                if (!node.orphaned && node.parentPromptId && !nextPromptIds.has(node.parentPromptId)) {
-                    imageIdsToRemove.add(node.id);
-                    return false;
-                }
-                return true;
+            const result = cleanupInvalidCanvasCardsForCanvas({
+                canvas: targetCanvas,
+                selectedNodeIds: prev.selectedNodeIds,
+                toWorkflow: canvasToWorkflow,
+                syncCompatibility: syncCanvasCompatibility,
+                now: Date.now,
             });
 
-            const workflow = canvasToWorkflow(targetCanvas);
-            const validLegacyNodeIds = new Set<string>([
-                ...nextPromptNodes.map(node => node.id),
-                ...nextImageNodes.map(node => node.id),
-            ]);
-            const nextWorkflowNodes = workflow.nodes.map((node): WorkflowNode => {
-                if (!isWorkflowUtilityNodeKind(node.kind)) {
-                    return node;
-                }
+            summary = result.summary;
 
-                const sourceNodeIds = getWorkflowSourceNodeIds(node).filter(sourceId => validLegacyNodeIds.has(sourceId));
-                const outputNodeIds = Array.isArray((node.data as { outputNodeIds?: unknown } | undefined)?.outputNodeIds)
-                    ? ((node.data as { outputNodeIds?: unknown[] }).outputNodeIds || []).filter((outputId): outputId is string => (
-                        typeof outputId === 'string' && validLegacyNodeIds.has(outputId)
-                    ))
-                    : undefined;
-
-                return {
-                    ...node,
-                    data: {
-                        ...node.data,
-                        sourceNodeIds,
-                        ...(outputNodeIds ? { outputNodeIds } : {}),
-                    },
-                } as WorkflowNode;
-            });
-            const validWorkflowNodeIds = new Set(nextWorkflowNodes.map(node => node.id));
-            const nextWorkflowEdges = dedupeWorkflowEdges(
-                workflow.edges.filter(edge => (
-                    validWorkflowNodeIds.has(edge.from)
-                    && validWorkflowNodeIds.has(edge.to)
-                    && !promptIdsToRemove.has(edge.from)
-                    && !promptIdsToRemove.has(edge.to)
-                    && !imageIdsToRemove.has(edge.from)
-                    && !imageIdsToRemove.has(edge.to)
-                ))
-            );
-
-            const syncedCanvas = syncCanvasCompatibility({
-                ...targetCanvas,
-                promptNodes: nextPromptNodes,
-                imageNodes: nextImageNodes,
-                groups: (targetCanvas.groups || []).filter(group =>
-                    (group.nodeIds || []).some(nodeId => (
-                        validLegacyNodeIds.has(nodeId) || validWorkflowNodeIds.has(nodeId)
-                    ))
-                ),
-                workflow: {
-                    ...workflow,
-                    nodes: nextWorkflowNodes,
-                    edges: nextWorkflowEdges,
-                },
-                lastModified: Date.now(),
-            });
-
-            const remainingNodeIds = new Set<string>([
-                ...nextPromptNodes.map(node => node.id),
-                ...nextImageNodes.map(node => node.id),
-                ...((syncedCanvas.workflow?.nodes || []).map(node => node.id)),
-            ]);
-            const nextGroups = syncedCanvas.groups || [];
-
-            summary = {
-                removedPrompts: targetCanvas.promptNodes.length - nextPromptNodes.length,
-                removedImages: targetCanvas.imageNodes.length - nextImageNodes.length,
-                removedGroups: (targetCanvas.groups || []).length - nextGroups.length
-            };
-
-            if (summary.removedPrompts === 0 && summary.removedImages === 0 && summary.removedGroups === 0) {
+            if (!result.changed) {
                 return prev;
             }
 
@@ -5369,10 +2453,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 ...prev,
                 canvases: prev.canvases.map(canvas =>
                     canvas.id === targetCanvasId
-                        ? syncedCanvas
+                        ? result.canvas
                         : canvas
                 ),
-                selectedNodeIds: prev.selectedNodeIds.filter(nodeId => remainingNodeIds.has(nodeId))
+                selectedNodeIds: result.selectedNodeIds
             };
         });
 

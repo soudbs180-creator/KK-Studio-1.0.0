@@ -11,10 +11,12 @@ function readSource(relativePath: string): string {
 
 test('ecommerce group slot runtime state is wired into actionable current-version and history preview entrypoints', () => {
   const appSource = readSource('src/App.tsx');
+  const hookSource = readSource('src/app/useEcommerceSlotHistoryRuntime.ts');
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
   const desktopPanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
 
-  assert.match(appSource, /handlePreviewEcommerceSlotHistory/);
+  assert.match(hookSource, /handlePreviewEcommerceSlotHistory/);
+  assert.match(appSource, /onPreviewEcommerceSlotHistory/);
   assert.match(promptBarSource, /onPreviewEcommerceSlotHistory/);
   assert.match(desktopPanelSource, /onPreviewSlotHistory/);
   assert.match(desktopPanelSource, /currentImageId/);

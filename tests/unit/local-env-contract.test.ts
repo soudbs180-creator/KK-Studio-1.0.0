@@ -9,6 +9,10 @@ const ROOT_DIR = process.cwd();
 const helperModuleUrl = pathToFileURL(path.join(ROOT_DIR, "scripts", "lib", "env-contract.mjs")).href;
 const envHelper = await import(helperModuleUrl);
 
+function readSource(relativePath: string): string {
+  return fs.readFileSync(path.join(ROOT_DIR, relativePath), "utf8");
+}
+
 const trackedEnvKeys = [
   "VITE_KK_API_BASE_URL",
   "VITE_SUPABASE_URL",
@@ -157,9 +161,21 @@ test("runtime env helper keeps Vite public vars on explicit import.meta.env keys
   );
 
   assert.match(runtimeEnvSource, /import\.meta\.env\.VITE_KK_API_BASE_URL/);
+  assert.match(runtimeEnvSource, /import\.meta\.env\.VITE_KK_ADMIN_URL/);
   assert.doesNotMatch(runtimeEnvSource, /import\.meta\.env\.VITE_SUPABASE_URL/);
   assert.doesNotMatch(runtimeEnvSource, /import\.meta\.env\.VITE_SUPABASE_ANON_KEY/);
   assert.match(runtimeEnvSource, /import\.meta\.env\.VITE_TURNSTILE_SITE_KEY/);
   assert.doesNotMatch(runtimeEnvSource, /const meta = import\.meta/);
   assert.doesNotMatch(runtimeEnvSource, /meta\.env;\s*$/m);
+});
+
+test(".env.example does not activate a non-local KK API base URL by default", () => {
+  const source = readSource(".env.example");
+
+  assert.doesNotMatch(
+    source,
+    /^VITE_KK_API_BASE_URL\s*=\s*https?:\/\/(?!localhost(?::|\/|$)|127\.|0\.0\.0\.0(?::|\/|$))/m,
+  );
+  assert.match(source, /^# VITE_KK_API_BASE_URL=https:\/\/your-kk-studio-api\.example\.com/m);
+  assert.match(source, /^# VITE_KK_ADMIN_URL=https:\/\/your-kk-studio-admin\.example\.com/m);
 });

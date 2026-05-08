@@ -1,0 +1,4 @@
+*.sh text eol=lf
+deploy/nginx/*.conf text eol=lf
+scripts/vps/*.env.example text eol=lf
+scripts/vps/*.sh text eol=lf

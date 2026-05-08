@@ -13,6 +13,7 @@ import {
   buildGeneratedImageBatchPositions,
   resolveRegroupTargetSlotIndices,
 } from '../utils/generatedImageLayout';
+import { getPromptNodeBoundsWidth } from '../utils/promptNodeCardWidth';
 import { traceLocalPerformance } from '../services/system/localPerformanceTrace';
 import type {
   Point,
@@ -23,7 +24,7 @@ import type {
   WorkflowUtilityCanvasNode,
 } from './appCanvasTypes';
 
-type PromptGroupBounds = { x: number; y: number; width: number; height: number };
+export type PromptGroupBounds = { x: number; y: number; width: number; height: number };
 type SelectNodes = (ids: string[], mode?: 'replace' | 'add' | 'remove' | 'toggle') => void;
 type UpdatePromptNode = (promptNode: PromptNode) => void | Promise<unknown>;
 
@@ -60,7 +61,7 @@ const boundsIntersect = (
   || right.y + right.height <= left.y
 );
 
-interface UsePromptGroupLayoutDeps {
+export interface UsePromptGroupLayoutDeps {
   activeCanvas: { id: string; promptNodes: PromptNode[]; imageNodes: GeneratedImage[] } | null | undefined;
   canvasInteractionPhase: CanvasInteractionPhase;
   focusedGroupId: string | null | undefined;
@@ -102,7 +103,7 @@ interface UsePromptGroupLayoutDeps {
   workflowUtilityNodesById: Map<string, WorkflowUtilityCanvasNode> | null | undefined;
 }
 
-interface UsePromptGroupLayoutResult {
+export interface UsePromptGroupLayoutResult {
   liveSceneInteractionPhase: CanvasInteractionPhase;
   liveSceneState: LiveSceneSnapshot;
   liveSceneRef: RefObject<LiveSceneSnapshot>;
@@ -149,7 +150,7 @@ interface UsePromptGroupLayoutResult {
   clearPromptGroupRegroup: (groupId: string) => void;
 }
 
-interface UsePromptGroupStackingDeps {
+export interface UsePromptGroupStackingDeps {
   activeCanvas: { id: string; promptNodes: PromptNode[]; imageNodes: GeneratedImage[] } | null | undefined;
   focusedGroupId: string | null | undefined;
   floatingStackBandSize: number;
@@ -157,7 +158,7 @@ interface UsePromptGroupStackingDeps {
   groupOverlapMap: Record<string, string[]> | null | undefined;
 }
 
-interface UsePromptGroupStackingResult {
+export interface UsePromptGroupStackingResult {
   promptGroupLayerById: Map<string, number>;
   promptGroupStackZIndexById: Map<string, number>;
 }
@@ -947,7 +948,12 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
 
       const livePromptPosition = liveNodePositionByIdRef.current[promptNode.id]
         ?? promptNode.position;
-      addRect(livePromptPosition.x, livePromptPosition.y, 380, promptNode.height || 200);
+      addRect(
+        livePromptPosition.x,
+        livePromptPosition.y,
+        getPromptNodeBoundsWidth(promptNode, isMobile),
+        promptNode.height || 200,
+      );
 
       childImages.forEach((imageNode) => {
         const { width, totalHeight } = getCardDimensions(imageNode.aspectRatio, true);
@@ -1139,7 +1145,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
       .filter((promptNode) => !(
         promptNode.mode === GenerationMode.ECOMMERCE
         && promptNode.ecommerce?.frameworkId
-        && promptNode.ecommerce.kind !== 'framework'
+        && promptNode.ecommerce.kind === 'a-plus-group'
       ))
       .map((promptNode) => {
         const childImages = childImagesByPromptId.get(promptNode.id) || [];

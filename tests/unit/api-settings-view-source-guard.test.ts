@@ -37,10 +37,6 @@ test('ApiSettingsView stays parseable and keeps core Chinese labels free of moji
     "const UI_TOKEN_LIMIT_LABEL = '词元上限';",
     "const UI_LEGACY_TOKEN_LIMIT_LABEL = '令牌上限';",
     "const UI_BUDGET_OPTIONS = ['不限额', '金额预算', UI_TOKEN_LIMIT_LABEL] as const;",
-    "const TOKEN_UNIT_LABEL = '词元';",
-    "const TOKEN_LIMIT_LABEL = '词元上限';",
-    "const LEGACY_TOKEN_LIMIT_LABEL = '令牌上限';",
-    "const BUDGET_OPTIONS = ['不限额', '金额预算', TOKEN_LIMIT_LABEL] as const;",
     "if (!value.trim()) return '尚未填写';",
     "if (value.length <= 10) return '已填写';",
     "return `${value.slice(0, 6)}••••${value.slice(-4)}`;",
@@ -53,6 +49,7 @@ test('ApiSettingsView stays parseable and keeps core Chinese labels free of moji
   }
 
   assert.ok(!source.includes("const UI_BUDGET_OPTIONS = ['Unlimited', 'Budget', UI_TOKEN_LIMIT_LABEL] as const;"));
+  assert.ok(!source.includes("const BUDGET_OPTIONS = ['不限额', '金额预算', TOKEN_LIMIT_LABEL] as const;"));
   assert.ok(!source.includes("pick('\u8930\u64b3\u58a0\u93bf\u5d84\u7d94\u93c6\u509b\u6902\u93c3\u72b3\u7876\u7039\u5c7e\u579a\u9286?'"));
   assert.ok(!source.includes("pick('\u93bf\u5d84\u7d94\u6fb6\u8fab\u89e6'"));
 });

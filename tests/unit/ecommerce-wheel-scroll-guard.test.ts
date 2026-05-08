@@ -18,3 +18,11 @@ test('ecommerce composer scroll surfaces are marked so canvas wheel zoom does no
   assert.match(reviewPanelSource, /custom-scrollbar/);
   assert.match(desktopWorkbenchSource, /custom-scrollbar/);
 });
+
+test('InfiniteCanvas forwards its optional id prop to the canvas container', () => {
+  const infiniteCanvasSource = readSource('src/components/canvas/InfiniteCanvas.tsx');
+
+  assert.match(infiniteCanvasSource, /id\?: string;/);
+  assert.match(infiniteCanvasSource, /forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>\(\(\{[\s\S]*\bid,/);
+  assert.match(infiniteCanvasSource, /<div[\s\S]*ref=\{containerRef\}[\s\S]*id=\{id\}/);
+});

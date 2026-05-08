@@ -2,6 +2,17 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
+import type {
+  ConnectorRenderSnapshot,
+  UseConnectorRendererDeps,
+  UseConnectorRendererResult,
+} from '../../src/app/useConnectorRenderer.ts'
+
+type ConnectorRendererPublicBoundary = {
+  snapshot: ConnectorRenderSnapshot
+  deps: UseConnectorRendererDeps
+  result: UseConnectorRendererResult
+}
 
 const ROOT_DIR = process.cwd()
 
@@ -10,6 +21,20 @@ function readSource(relativePath: string) {
 }
 
 describe('canvas connector throttling contract', () => {
+  test('connector renderer exposes explicit hook boundary types', () => {
+    const hookSource = readSource('src/app/useConnectorRenderer.ts')
+    const appSource = readSource('src/App.tsx')
+    const boundaryIsTypechecked: ConnectorRendererPublicBoundary | null = null
+
+    assert.equal(boundaryIsTypechecked, null)
+    assert.match(hookSource, /export type ConnectorRenderSnapshot = \{/)
+    assert.match(hookSource, /export interface UseConnectorRendererDeps \{/)
+    assert.match(hookSource, /export interface UseConnectorRendererResult \{/)
+    assert.doesNotMatch(appSource, /buildConnectorRenderSnapshot/)
+    assert.doesNotMatch(appSource, /commitConnectorRenderSnapshot/)
+    assert.doesNotMatch(appSource, /scheduleConnectorRenderSnapshot/)
+  })
+
   test('App throttles connector snapshots from the performance profile', () => {
     const hookSource = readSource('src/app/useConnectorRenderer.ts')
 

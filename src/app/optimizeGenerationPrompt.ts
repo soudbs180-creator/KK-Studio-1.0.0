@@ -1,5 +1,5 @@
 import type { PromptNode, ReferenceImage } from '../types';
-import { optimizePromptForImage } from '../services/llm/promptOptimizerService';
+import { optimizePromptForImage, summarizePromptOptimizerError } from '../services/llm/promptOptimizerService';
 
 type PromptOptimizationOptions = NonNullable<Parameters<typeof optimizePromptForImage>[1]>;
 
@@ -17,6 +17,8 @@ interface OptimizeGenerationPromptResult {
   optimizedPromptZh?: string;
   promptOptimizerResult?: PromptNode['promptOptimizerResult'];
 }
+
+export const summarizePromptOptimizationError = summarizePromptOptimizerError;
 
 function buildPromptOptimizerReferenceImages(referenceImages?: ReferenceImage[]): NonNullable<PromptOptimizationOptions['referenceImages']> {
   return (referenceImages || [])

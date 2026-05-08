@@ -17,7 +17,9 @@ test('ecommerce structured task flow is wired through analysis, generation, disp
   const cardActionsSource = readSource('src/components/ecommerce/EcommerceCardActions.tsx');
   const promptBarSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
   const imageCardSource = readSource('src/components/image/ImageCard2.tsx');
+  const nodeGenerationHookSource = readSource('src/app/useEcommerceNodeGenerationRuntime.ts');
   const optimizePromptSource = readSource('src/app/optimizeGenerationPrompt.ts');
+  const postBuildSyncSource = readSource('src/app/useEcommercePostBuildSyncRuntime.ts');
   const optimizerSource = readSource('src/services/llm/promptOptimizerService.ts');
   const generationHookSource = readSource('src/hooks/useImageGeneration.ts');
 
@@ -53,12 +55,12 @@ test('ecommerce structured task flow is wired through analysis, generation, disp
   assert.match(promptBarSource, /taskStates/);
   assert.match(promptBarSource, /onTaskStateChange/);
 
-  assert.match(appSource, /optimizeGenerationPrompt\(\{/);
-  assert.match(appSource, /mode:\s*GenerationMode\.ECOMMERCE/);
-  assert.match(appSource, /ecommerceContext:/);
-  assert.match(appSource, /displayLabel:\s*renderTask\.displayLabel/);
+  assert.match(nodeGenerationHookSource, /optimizeGenerationPrompt\(\{/);
+  assert.match(nodeGenerationHookSource, /mode:\s*GenerationMode\.ECOMMERCE/);
+  assert.match(nodeGenerationHookSource, /ecommerceContext:/);
+  assert.match(postBuildSyncSource, /displayLabel:\s*renderTask\.displayLabel/);
   assert.match(appSource, /inheritedDisplayLabel/);
-  assert.match(appSource, /editableTask:\s*renderTask\.taskState/);
+  assert.match(postBuildSyncSource, /editableTask:\s*renderTask\.taskState/);
 
   assert.match(imageCardSource, /image\.displayLabel \|\| /);
   assert.match(optimizePromptSource, /const optimized = await optimizePromptForImage\(rawPrompt,\s*\{/);

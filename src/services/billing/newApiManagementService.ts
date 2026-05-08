@@ -7,8 +7,6 @@
  * 文档参考: https://docs.newapi.pro/zh/docs/api/management/
  */
 
-import { notify } from '../system/notificationService';
-
 // ============== 类型定义 ==============
 
 export interface NewApiManagementConfig {
@@ -251,7 +249,7 @@ export class NewApiManagementService {
   async updateAllChannelsBalance(): Promise<Channel[]> {
     try {
       // 获取所有渠道
-      const channels = await this.getAllChannels();
+      await this.getAllChannels();
 
       // 批量更新余额 (NewAPI 通常提供批量更新接口)
       const updatedChannels = await this.request<Channel[]>(

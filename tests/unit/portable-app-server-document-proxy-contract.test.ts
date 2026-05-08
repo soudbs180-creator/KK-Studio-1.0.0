@@ -20,3 +20,13 @@ test('portable app server preserves the nutrient document route instead of treat
     /if \(pathname === '\/api\/nutrient-document'\) \{\s*await handleNutrientDocumentProxy\(req, res\);\s*return;\s*\}/,
   );
 });
+
+test('portable app server fails startup before serving a broken local core API', () => {
+  const source = readSource('scripts/release/portable-app-server.cjs');
+
+  assert.match(source, /function assertPortableRemoteKkApiBaseUrl/);
+  assert.match(source, /VITE_KK_API_BASE_URL/);
+  assert.match(source, /const portableKkApiBaseUrl = assertPortableRemoteKkApiBaseUrl\(distDir\)/);
+  assert.match(source, /does not include the core KK API/);
+  assert.match(source, /pathname\.startsWith\('\/api\/'\)/);
+});

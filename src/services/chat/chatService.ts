@@ -8,7 +8,7 @@
 
 import { keyManager } from '../auth/keyManager';
 import { ChatModelType } from '../../types';
-import { buildApiUrl, buildHeaders, GOOGLE_API_BASE } from '../api/apiConfig';
+import { buildApiUrl, buildHeaders } from '../api/apiConfig';
 
 export interface ChatMessage {
     id: string;
@@ -129,7 +129,7 @@ class ChatService {
             );
 
             if (!response.ok) {
-                const errorText = await response.text();
+                await response.text();
                 keyManager.reportFailure(keyData.id, `HTTP ${response.status}`);
                 throw new Error(`API 请求失败: ${response.status}`);
             }

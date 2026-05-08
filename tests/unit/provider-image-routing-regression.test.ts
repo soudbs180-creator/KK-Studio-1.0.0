@@ -12,6 +12,7 @@ function readSource(relativePath: string): string {
 test("Suxi image routing stays on dedicated surfaces instead of being swallowed by chat compatibility", () => {
   const strategySource = readSource("src/services/api/providerStrategy.ts");
   const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+  const helperSource = readSource("src/services/llm/openAICompatibleImageDispatch.ts");
 
   assert.match(
     strategySource,
@@ -19,11 +20,15 @@ test("Suxi image routing stays on dedicated surfaces instead of being swallowed 
   );
   assert.match(
     adapterSource,
-    /const imageSurface = resolveImageSurface\(\{/,
+    /const dispatchPlan = resolveOpenAICompatibleImageDispatch\(\{/,
   );
   assert.match(
-    adapterSource,
-    /if \(imageSurface === 'chat-image'\)/,
+    helperSource,
+    /if \(input\.imageSurface === 'chat-image'\)/,
+  );
+  assert.match(
+    helperSource,
+    /if \(input\.runtime\.strategyId === 'suxi'\)/,
   );
 });
 
@@ -41,21 +46,36 @@ test("12AI image routing requires an explicit async preference instead of blanke
   );
   assert.match(
     adapterSource,
-    /const prefer12AIAsync = this\.shouldUse12AIAsyncImageRoute\(options\);/,
+    /const prefer12AIAsync = shouldUse12AIAsyncImageRoute\(options\);/,
   );
 });
 
 test("GPT Best defaults to the doc-safe native images payload instead of the local extended payload", () => {
   const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
-  const gptBestBlockMatch = adapterSource.match(/if \(isGptBest\) \{[\s\S]*?\n        \}/);
+  const helperSource = readSource("src/services/llm/openAICompatibleImageDispatch.ts");
+  const gptBestDispatchStart = adapterSource.indexOf("dispatchPlan.kind === 'gpt-best-native'");
+  const gptBestDispatchEnd = adapterSource.indexOf("dispatchPlan.kind === '12ai-openai-strict'");
+  const gptBestDispatchBlock = adapterSource.slice(gptBestDispatchStart, gptBestDispatchEnd);
 
-  assert.ok(gptBestBlockMatch, "expected to find the GPT Best routing block");
+  assert.ok(gptBestDispatchStart > -1 && gptBestDispatchEnd > gptBestDispatchStart);
   assert.match(
-    gptBestBlockMatch[0],
+    helperSource,
+    /return \{ kind: 'gpt-best-native' \};/,
+  );
+  assert.match(
+    helperSource,
+    /if \(input\.runtime\.strategyId === 'gpt-best'\)/,
+  );
+  assert.match(
+    adapterSource,
+    /dispatchPlan\.kind === 'gpt-best-native'/,
+  );
+  assert.match(
+    gptBestDispatchBlock,
     /return this\.generateImageStandard_GPT_Best_Native\(options, keySlot\);/,
   );
   assert.doesNotMatch(
-    gptBestBlockMatch[0],
+    gptBestDispatchBlock,
     /generateImageStandard_GPT_Best_Extended/,
   );
 });
@@ -65,6 +85,10 @@ test("GPT Best native images payload stays aligned with the documented images su
   const nativeBlockMatch = adapterSource.match(/private async generateImageStandard_GPT_Best_Native[\s\S]*?return this\.executeImageRequest\(url, body, keySlot, options\);/);
 
   assert.ok(nativeBlockMatch, "expected to find the GPT Best native images helper");
+  assert.match(
+    adapterSource,
+    /assertOpenAICompatibleRuntimeBaseUrl\(keySlot, 'images'\);/,
+  );
   assert.match(
     nativeBlockMatch[0],
     /aspect_ratio: aspectRatioStr/,
@@ -97,11 +121,19 @@ test("model endpoint types flow from key metadata into image surface routing", (
   );
   assert.match(
     keyManagerSource,
+    /const REMOTE_MODEL_METADATA = new Map<string, ModelMetadata>\(\);/,
+  );
+  assert.match(
+    keyManagerSource,
+    /registerRemoteModelMetadata\(discovery\.metadataByModelId\);/,
+  );
+  assert.match(
+    keyManagerSource,
     /pricingMeta\?\.endpointTypes/,
   );
   assert.match(
     keyManagerSource,
-    /endpointTypes: exactModel\.endpointTypes/,
+    /endpointTypes: remoteMetadata\?\.endpointTypes \|\| exactModel\.endpointTypes/,
   );
   assert.match(
     adapterSource,
@@ -118,15 +150,94 @@ test("model endpoint types flow from key metadata into image surface routing", (
   );
 });
 
-test("base64 image extraction preserves upstream mime types instead of forcing png", () => {
+test("third-party OpenAI-compatible image paths fail fast when Base URL is missing", () => {
   const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
 
   assert.match(
     adapterSource,
-    /const mimeType = item\.mime_type \|\| item\.mimeType \|\| item\?\.image\?\.mime_type \|\| item\?\.image\?\.mimeType \|\| 'image\/png';/,
+    /private assertOpenAICompatibleRuntimeBaseUrl\(keySlot: KeySlot, surface: 'chat' \| 'images', format\?: string\): void/,
   );
   assert.match(
     adapterSource,
-    /urls\.push\(`data:\$\{mimeType\};base64,\$\{cleaned\}`\);/,
+    /runtime\.strategyId !== 'openai'[\s\S]*?请先填写该供应商工作台提供的真实 Base URL/,
+  );
+  assert.match(
+    adapterSource,
+    /generateImageViaChat[\s\S]*?this\.assertOpenAICompatibleRuntimeBaseUrl\(keySlot, 'chat'\);/,
+  );
+  assert.match(
+    adapterSource,
+    /generateImageViaChatStrict[\s\S]*?this\.assertOpenAICompatibleRuntimeBaseUrl\(keySlot, 'chat'\);/,
+  );
+  assert.match(
+    adapterSource,
+    /generateImageStandard_OpenAI_Strict_DocSafe[\s\S]*?this\.assertOpenAICompatibleRuntimeBaseUrl\(keySlot, 'images'\);/,
+  );
+  assert.match(
+    adapterSource,
+    /generateImageGeminiNative[\s\S]*?this\.assertOpenAICompatibleRuntimeBaseUrl\(keySlot, 'images', 'gemini'\);/,
+  );
+});
+
+test("third-party OpenAI-compatible chat paths fail fast when Base URL is missing", () => {
+  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+
+  assert.match(
+    adapterSource,
+    /chatWithCompatibleResponses[\s\S]*?this\.assertOpenAICompatibleRuntimeBaseUrl\(keySlot, 'chat'\);/,
+  );
+  assert.match(
+    adapterSource,
+    /chatStreamWithCompatibleResponses[\s\S]*?this\.assertOpenAICompatibleRuntimeBaseUrl\(keySlot, 'chat'\);/,
+  );
+});
+
+test("image compatibility fallback disables unreachable post-throw fallback code", () => {
+  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+
+  assert.match(
+    adapterSource,
+    /throw this\.buildImageCompatibilityModeError\('chat', chatErr, keySlot\);/,
+  );
+  assert.match(
+    adapterSource,
+    /throw this\.buildImageCompatibilityModeError\('standard', imagesErr, keySlot\);/,
+  );
+  assert.doesNotMatch(
+    adapterSource,
+    /Chat API 不兼容，回退 Images API/,
+  );
+  assert.doesNotMatch(
+    adapterSource,
+    /Images API 疑似不兼容，自动回退 Chat API/,
+  );
+});
+
+test("base64 image extraction preserves upstream mime types instead of forcing png", () => {
+  const payloadHelperSource = readSource("src/services/llm/openAICompatibleImagePayload.ts");
+
+  assert.match(
+    payloadHelperSource,
+    /getProperty\(item, 'mime_type'\)/,
+  );
+  assert.match(
+    payloadHelperSource,
+    /getProperty\(item, 'mimeType'\)/,
+  );
+  assert.match(
+    payloadHelperSource,
+    /getProperty\(image, 'mime_type'\)/,
+  );
+  assert.match(
+    payloadHelperSource,
+    /getProperty\(image, 'mimeType'\)/,
+  );
+  assert.match(
+    payloadHelperSource,
+    /function normalizeBase64ImageMimeType/,
+  );
+  assert.match(
+    payloadHelperSource,
+    /return 'image\/png';/,
   );
 });

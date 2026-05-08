@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
-import { GeneratedImage, GenerationMode, type NormalizedRect, type PartialRedrawRequest } from '../../types';
+import { GeneratedImage, GenerationMode, type PartialRedrawRequest } from '../../types';
 import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy } from 'lucide-react';
 import { PartialRedrawModal } from './PartialRedrawModal';
 import { notify } from '../../services/system/notificationService';

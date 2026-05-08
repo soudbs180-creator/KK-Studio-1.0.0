@@ -78,3 +78,60 @@ test('desktop workbench header stays action-only so it does not duplicate the ac
   assert.match(headerSource, /pick\('日志', 'Logs'\)/);
   assert.match(headerSource, /pick\('关闭', 'Close'\)/);
 });
+
+test('settings workbench flattens cramped nested containers and clips rounded surfaces cleanly', () => {
+  const headerSource = readSource('src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
+  const cssSource = readSource('src/index.css');
+
+  assert.match(headerSource, /settings-desktop-quick-actions/);
+  assert.doesNotMatch(headerSource, /rounded-full border p-1/);
+  const quickActionsClass = headerSource.match(/className="([^"]*settings-desktop-quick-actions[^"]*)"/);
+  assert.ok(quickActionsClass);
+  assert.doesNotMatch(
+    quickActionsClass[1],
+    /(?:^|\s)(?:rounded(?:-[^\s"]+)?|border(?:-[^\s"]+)?|bg-[^\s"]+|shadow(?:-[^\s"]+)?|ring(?:-[^\s"]+)?|backdrop(?:-[^\s"]+)?|p-\d|px-\d|py-\d)(?:\s|$)/,
+  );
+  assert.match(
+    headerSource,
+    /<div className="settings-desktop-quick-actions[^"]*">\s*<SettingsActionButton[\s\S]*<SettingsActionButton[\s\S]*<SettingsActionButton/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-desktop-quick-actions \{[\s\S]*background: transparent !important;[\s\S]*border: 0 !important;[\s\S]*box-shadow: none !important;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-desktop-quick-actions > button \{[\s\S]*border-radius: var\(--radius-control-md\) !important;[\s\S]*box-shadow: none !important;/,
+  );
+  assert.doesNotMatch(
+    cssSource,
+    /\.settings-panel \.settings-reference-card,[\s\S]*\.settings-panel \.settings-section-card \{[\s\S]*overflow: clip;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-reference-card,[\s\S]*\.settings-panel \.settings-section-card \{[\s\S]*overflow: hidden;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell-desktop \{[\s\S]*border: 1px solid var\(--settings-shell-border\) !important;[\s\S]*box-shadow: var\(--settings-shell-shadow\) !important;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell-mobile \{[\s\S]*background: var\(--frost-card-framework-bg\) !important;[\s\S]*border: 0 !important;[\s\S]*box-shadow: none !important;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell-main__topbar \{[\s\S]*background: transparent !important;[\s\S]*border-bottom-color: transparent !important;[\s\S]*box-shadow: none !important;/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-reference-toolbar--flat \{[\s\S]*padding: 0 !important;[\s\S]*background: transparent !important;/,
+  );
+  assert.match(cssSource, /\.settings-panel \.settings-provider-card__metric,[\s\S]*\.settings-panel \.settings-reference-mini-metric,[\s\S]*\.settings-panel \.settings-reference-list-item,[\s\S]*\.settings-panel \.settings-log-entry,[\s\S]*\.settings-panel \.settings-reference-ring-row \{[\s\S]*box-shadow: none !important;/);
+  assert.match(cssSource, /\.settings-panel \.settings-api-quick-add__icon \{[\s\S]*box-shadow: none !important;/);
+  assert.match(cssSource, /\.settings-panel \.settings-shell-page--desktop \.settings-reference-ring-row \{[\s\S]*display: grid;[\s\S]*grid-template-columns: 64px minmax\(0, 1fr\);/);
+  assert.match(
+    cssSource,
+    /\.settings-panel \.settings-shell-page--desktop \.settings-dashboard-overview-grid \.settings-reference-ring-row \{[\s\S]*background: transparent !important;[\s\S]*border-color: transparent !important;[\s\S]*box-shadow: none !important;/,
+  );
+});

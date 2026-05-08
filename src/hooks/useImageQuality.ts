@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ImageQuality, getAppropriateQuality } from '../services/image/imageQuality';
+import { getAppropriateQuality } from '../services/image/imageQuality';
 import { getImageByQuality } from '../services/storage/imageStorage';
 
 /**

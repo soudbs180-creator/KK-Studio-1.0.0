@@ -14,17 +14,19 @@ test('prompt nodes expose ecommerce state and the generation flow handles ecomme
   const generationHookSource = readSource('src/hooks/useImageGeneration.ts');
   const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
   const appSource = readSource('src/App.tsx');
+  const groupExportRuntimeSource = readSource('src/app/useEcommerceGroupExportRuntime.ts');
 
   assert.match(typesSource, /ecommerce\?:\s*EcommercePromptState/);
   assert.match(typesSource, /export interface EcommercePromptState/);
   assert.match(typesSource, /selectedForGeneration\?: boolean/);
   assert.match(typesSource, /desktopStage\?: 'not_applicable' \| 'pending' \| 'generating' \| 'generated' \| 'confirmed' \| 'failed'/);
   assert.match(typesSource, /mobileStage\?: 'not_applicable' \| 'locked' \| 'pending' \| 'generating' \| 'generated' \| 'failed'/);
+  assert.match(typesSource, /inputSummary\?: string\[\];/);
   assert.match(generationHookSource, /const isEcommerce = mode === GenerationMode\.ECOMMERCE/);
   assert.match(generationHookSource, /const actualCount = isPpt \? Math\.min\(20, requestedCount\) : requestedCount;/);
   assert.match(generationHookSource, /const taskPrompt = isPpt \? buildPptPagePrompt\(promptToUse, index, actualCount\) : \(isEcommerce \? promptToUse : promptToUse\);/);
   assert.match(promptNodeSource, /node\.ecommerce/);
   assert.match(promptNodeSource, /onRetryEcommerceModule/);
   assert.match(appSource, /handleRetryEcommerceModule/);
-  assert.match(appSource, /selectedForGeneration !== false/);
+  assert.match(groupExportRuntimeSource, /selectedForGeneration !== false/);
 });

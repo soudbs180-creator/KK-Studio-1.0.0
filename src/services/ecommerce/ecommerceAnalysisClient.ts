@@ -20,6 +20,15 @@ function canUseLocalFallback(extension: string): extension is SupportedLocalFall
     || extension === 'docx';
 }
 
+function hasJsonContentType(response: Response): boolean {
+  const contentType = response.headers.get('content-type')?.toLowerCase();
+  if (!contentType) {
+    return true;
+  }
+
+  return contentType.includes('application/json') || contentType.includes('+json');
+}
+
 async function analyzeRequirementFileTextLocally(
   file: File,
   sourceText: string,
@@ -59,6 +68,7 @@ function shouldUseLocalFallback(
   options: {
     status?: number;
     error?: unknown;
+    nonJsonResponse?: boolean;
   } = {},
 ): boolean {
   const extension = getFileExtension(file);
@@ -67,6 +77,10 @@ function shouldUseLocalFallback(
   }
 
   if (options.status === 404 || options.status === 501) {
+    return true;
+  }
+
+  if (options.nonJsonResponse) {
     return true;
   }
 
@@ -103,6 +117,10 @@ export async function analyzeEcommerceRequirementFile(file: File): Promise<Ecomm
     });
 
     if (!response.ok) {
+      if (!hasJsonContentType(response) && shouldUseLocalFallback(file, { nonJsonResponse: true })) {
+        return analyzeRequirementFileLocally(file);
+      }
+
       if (shouldUseLocalFallback(file, { status: response.status })) {
         return analyzeRequirementFileLocally(file);
       }
@@ -117,7 +135,25 @@ export async function analyzeEcommerceRequirementFile(file: File): Promise<Ecomm
       throw new Error(message);
     }
 
-    const payload = await response.json() as { analysis?: EcommerceAnalysisResult };
+    if (!hasJsonContentType(response)) {
+      if (shouldUseLocalFallback(file, { nonJsonResponse: true })) {
+        return analyzeRequirementFileLocally(file);
+      }
+
+      throw new Error('电商需求单解析接口返回了非 JSON 数据，当前文件类型暂不支持本地解析。');
+    }
+
+    let payload: { analysis?: EcommerceAnalysisResult };
+    try {
+      payload = await response.json() as { analysis?: EcommerceAnalysisResult };
+    } catch {
+      if (shouldUseLocalFallback(file, { nonJsonResponse: true })) {
+        return analyzeRequirementFileLocally(file);
+      }
+
+      throw new Error('电商需求单返回数据格式无效。');
+    }
+
     if (!payload.analysis) {
       throw new Error('电商需求单返回数据格式无效。');
     }

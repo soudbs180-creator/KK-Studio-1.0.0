@@ -130,7 +130,7 @@ interface OnboardingTask {
   completed: boolean;
 }
 
-function getTasksByPhase(phase: OnboardingPhase): OnboardingTask[] {
+function getTasksByPhase(_phase: OnboardingPhase): OnboardingTask[] {
   // 这里应该导入实际的任务列表
   // 简化处理
   return [];

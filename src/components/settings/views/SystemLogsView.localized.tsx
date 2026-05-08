@@ -163,17 +163,6 @@ export const SystemLogsView: React.FC = () => {
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [levelFilter, logs, sourceFilter]);
 
-  const importantLogs = useMemo(
-    () =>
-      logs.filter(
-        (item) =>
-          item.level === LogLevel.WARNING ||
-          item.level === LogLevel.ERROR ||
-          item.level === LogLevel.CRITICAL
-      ),
-    [logs]
-  );
-
   const errorLogs = useMemo(
     () => logs.filter((item) => item.level === LogLevel.ERROR || item.level === LogLevel.CRITICAL),
     [logs]
@@ -289,8 +278,9 @@ export const SystemLogsView: React.FC = () => {
             '统一控制级别、来源和流状态。',
             'Control severity, source, and stream state in one place.'
           )}
+          surface="plain"
         >
-          <div className="settings-reference-toolbar">
+          <div className="settings-reference-toolbar settings-reference-toolbar--flat">
             <div className="settings-reference-toolbar__filters">
               <div className="min-w-[280px] max-w-full">
                 <SegmentedControlMulti

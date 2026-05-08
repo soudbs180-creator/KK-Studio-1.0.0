@@ -62,6 +62,13 @@ test("dead 12AI alias shim is removed once the canonical service name is AI12API
   );
 });
 
+test("dead AI12 API service is removed once provider routing owns 12AI execution", () => {
+  assert.equal(
+    existsSync(resolveWorkspacePath("src/services/api/AI12APIService.ts")),
+    false,
+  );
+});
+
 test("dead NewAPI admin storage helper is removed once the admin view is read-only", () => {
   assert.equal(
     existsSync(resolveWorkspacePath("src/services/api/newApiAdmin.ts")),

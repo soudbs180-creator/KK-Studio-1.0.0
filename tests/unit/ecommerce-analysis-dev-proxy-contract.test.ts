@@ -26,4 +26,5 @@ test('local dev server wires the ecommerce analysis upload endpoint', () => {
   assert.match(apiHandlerSource, /from '\.\.\/src\/services\/ecommerce\/normalize\/ecommerceAnalysisNormalizer\.ts'/);
   assert.match(apiHandlerSource, /from '\.\.\/src\/services\/ecommerce\/text\/fallbackTextAnalysis\.ts'/);
   assert.match(apiHandlerSource, /from '\.\.\/src\/services\/ecommerce\/xlsx\/openXmlWorkbookParser\.ts'/);
+  assert.doesNotMatch(apiHandlerSource, /runtime:\s*'edge'/);
 });

@@ -5,7 +5,11 @@ APP_USER="${KK_APP_USER:-kkstudio}"
 APP_GROUP="${KK_APP_GROUP:-$APP_USER}"
 APP_ROOT="${KK_APP_ROOT:-/opt/kk-studio}"
 CURRENT_DIR="${KK_CURRENT_DIR:-$APP_ROOT/current}"
+ENV_DIR="${KK_ENV_DIR:-/etc/kk-studio}"
+APP_SITE_ROOT="${KK_APP_SITE_ROOT:-/var/www/kk-app}"
 ADMIN_SITE_ROOT="${KK_ADMIN_SITE_ROOT:-/var/www/kk-admin}"
+WEB_ENV_FILE="${KK_WEB_ENV_FILE:-$ENV_DIR/kk-web.env}"
+ADMIN_ENV_FILE="${KK_ADMIN_ENV_FILE:-$ENV_DIR/kk-admin.env}"
 APPLY_BOOTSTRAP_SQL="${KK_APPLY_BOOTSTRAP_SQL:-false}"
 POSTGRES_DB="${KK_PG_DB:-kkstudio}"
 POSTGRES_SUPERUSER="${KK_PG_SUPERUSER:-postgres}"
@@ -34,11 +38,45 @@ install_dependencies() {
   sudo -u "${APP_USER}" bash -lc "cd '${CURRENT_DIR}' && npm ci"
 }
 
-build_admin_site() {
-  sudo -u "${APP_USER}" bash -lc "cd '${CURRENT_DIR}' && npm run admin:build"
-  sudo -u "${APP_USER}" bash -lc "cd '${CURRENT_DIR}' && npm run build"
-  install -d -m 0755 "${ADMIN_SITE_ROOT}"
+run_npm_script_with_optional_env() {
+  local npm_command="$1"
+  local env_file="$2"
+
+  if [[ -f "${env_file}" ]]; then
+    sudo -u "${APP_USER}" bash -lc "set -a; source '${env_file}'; set +a; cd '${CURRENT_DIR}' && ${npm_command}"
+    return
+  fi
+
+  sudo -u "${APP_USER}" bash -lc "cd '${CURRENT_DIR}' && ${npm_command}"
+}
+
+build_static_sites() {
+  run_npm_script_with_optional_env "npm run build" "${WEB_ENV_FILE}"
+  run_npm_script_with_optional_env "npm run admin:build" "${ADMIN_ENV_FILE}"
+  install -d -m 0755 "${APP_SITE_ROOT}" "${ADMIN_SITE_ROOT}"
+  rsync -a --delete "${CURRENT_DIR}/dist/" "${APP_SITE_ROOT}/"
   rsync -a --delete "${CURRENT_DIR}/apps/admin/dist/" "${ADMIN_SITE_ROOT}/"
+}
+
+harden_env_permissions() {
+  if [[ -f "${ENV_DIR}/kk-api.env" ]]; then
+    chgrp "${APP_GROUP}" "${ENV_DIR}/kk-api.env"
+    chmod 0640 "${ENV_DIR}/kk-api.env"
+  fi
+}
+
+install_nginx_gateway() {
+  if [[ ! -f "${CURRENT_DIR}/deploy/nginx/kk-vps-gateway.conf" ]]; then
+    echo "[deploy-kk-vps] Nginx gateway config not found at ${CURRENT_DIR}/deploy/nginx/kk-vps-gateway.conf" >&2
+    exit 1
+  fi
+
+  install -m 0644 "${CURRENT_DIR}/deploy/nginx/kk-vps-gateway.conf" /etc/nginx/sites-available/kk-vps-gateway.conf
+  ln -sf /etc/nginx/sites-available/kk-vps-gateway.conf /etc/nginx/sites-enabled/kk-vps-gateway.conf
+  rm -f /etc/nginx/sites-enabled/default
+  rm -f /etc/nginx/sites-enabled/kk-api.conf
+  rm -f /etc/nginx/sites-enabled/kk-admin-4174.conf
+  nginx -t
 }
 
 apply_bootstrap_sql_if_requested() {
@@ -57,7 +95,11 @@ apply_bootstrap_sql_if_requested() {
 restart_services() {
   systemctl daemon-reload
   for service in "${SYSTEMD_SERVICES[@]}"; do
-    systemctl restart "${service}"
+    if systemctl list-unit-files "${service}.service" --no-legend | grep -q "^${service}\\.service"; then
+      systemctl restart "${service}"
+    else
+      echo "[deploy-kk-vps] Skipping missing optional service: ${service}"
+    fi
   done
   systemctl reload nginx
 }
@@ -66,7 +108,9 @@ require_repo_root
 sync_repo_to_runtime
 install_dependencies
 apply_bootstrap_sql_if_requested
-build_admin_site
+build_static_sites
+harden_env_permissions
+install_nginx_gateway
 restart_services
 
 echo "[deploy-kk-vps] Deployment complete."

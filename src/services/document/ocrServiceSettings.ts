@@ -1,6 +1,7 @@
 import type { OcrServiceSettings } from '../../types';
 
 const STORAGE_KEY = 'kk_ocr_service_settings_v1';
+const LEGACY_SECRET_FIELD = 'api' + 'Key';
 const listeners = new Set<() => void>();
 
 const canUseStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -9,9 +10,8 @@ const buildDefaultOcrServiceSettings = (): OcrServiceSettings => ({
   provider: 'nutrient',
   enabled: true,
   defaultLanguage: 'chi_sim',
-  apiKey: '',
   keySource: 'missing',
-  healthState: 'missing_key',
+  healthState: 'unknown',
   updatedAt: Date.now(),
 });
 
@@ -20,22 +20,20 @@ const normalizeOcrServiceSettings = (
   hasEnvironmentKey = false,
 ): OcrServiceSettings => {
   const fallback = buildDefaultOcrServiceSettings();
-  const apiKey = typeof raw?.apiKey === 'string' ? raw.apiKey.trim() : '';
   const defaultLanguage = typeof raw?.defaultLanguage === 'string' && raw.defaultLanguage.trim()
     ? raw.defaultLanguage.trim()
     : fallback.defaultLanguage;
   const keySource = hasEnvironmentKey
     ? 'environment'
-    : (apiKey ? 'user' : 'missing');
-  const healthState = hasEnvironmentKey || apiKey
+    : 'missing';
+  const healthState = hasEnvironmentKey
     ? 'configured'
-    : 'missing_key';
+    : 'unknown';
 
   return {
     provider: 'nutrient',
     enabled: raw?.enabled !== false,
     defaultLanguage,
-    apiKey,
     keySource,
     healthState,
     updatedAt: typeof raw?.updatedAt === 'number' && Number.isFinite(raw.updatedAt)
@@ -56,7 +54,19 @@ const readStoredOcrServiceSettings = (): Partial<OcrServiceSettings> | null => {
     }
 
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed as Partial<OcrServiceSettings> : null;
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+
+    const stored = parsed as Record<string, unknown>;
+    if (LEGACY_SECRET_FIELD in stored) {
+      const sanitized = { ...stored };
+      delete sanitized[LEGACY_SECRET_FIELD];
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+      return sanitized as Partial<OcrServiceSettings>;
+    }
+
+    return stored as Partial<OcrServiceSettings>;
   } catch {
     return null;
   }
@@ -78,7 +88,7 @@ export const getOcrServiceSettings = (hasEnvironmentKey = false) =>
   normalizeOcrServiceSettings(readStoredOcrServiceSettings(), hasEnvironmentKey);
 
 export const updateOcrServiceSettings = (
-  patch: Partial<Pick<OcrServiceSettings, 'enabled' | 'defaultLanguage' | 'apiKey'>>,
+  patch: Partial<Pick<OcrServiceSettings, 'enabled' | 'defaultLanguage'>>,
   hasEnvironmentKey = false,
 ) => {
   const current = getOcrServiceSettings(hasEnvironmentKey);

@@ -68,6 +68,18 @@ describe("VPS PostgreSQL audit contract", () => {
     assert.deepEqual(missingColumns, []);
   });
 
+  test("self-hosted bootstrap enforces credit recharge idempotency in PostgreSQL", () => {
+    const bootstrapSql = readFileSync(
+      path.join(ROOT_DIR, "apps", "api", "sql", "bootstrap-self-hosted-postgres.sql"),
+      "utf8",
+    );
+
+    assert.match(
+      bootstrapSql,
+      /create\s+unique\s+index\s+if\s+not\s+exists\s+credit_transactions_user_idempotency_idx\s+on\s+credit_transactions\s*\(\s*user_id\s*,\s*type\s*,\s*idempotency_key\s*\)\s+where\s+idempotency_key\s+is\s+not\s+null/i,
+    );
+  });
+
   test("SQL evaluation reports missing runtime tables without contacting Supabase", () => {
     const evaluation = evaluatePostgresBootstrapSql("create table if not exists profiles (id uuid);");
     const profiles = evaluation.find((result) => result.name === "profiles");

@@ -17,7 +17,7 @@ import { buildCancelledPromptNodePatch } from './buildCancelledPromptNodePatch';
 import { buildCompletedPromptNodePatch } from './buildCompletedPromptNodePatch';
 import { buildGeneratingPromptNode } from './buildGeneratingPromptNode';
 import { buildRetryExecutionNode } from './buildRetryExecutionNode';
-import { optimizeGenerationPrompt } from './optimizeGenerationPrompt';
+import { optimizeGenerationPrompt, summarizePromptOptimizationError } from './optimizeGenerationPrompt';
 import { prepareRetriedExecutionNode } from './prepareRetriedExecutionNode';
 import { persistGeneratingPromptNode } from './persistGeneratingPromptNode';
 import { resolveGenerationBillingState } from './resolveGenerationBillingState';
@@ -27,7 +27,6 @@ import { buildPptDeckModuleState } from '../utils/pptDeckModules';
 import { normalizePptSlidesForCount } from '../utils/pptUtils';
 import { calculateImageHash } from '../utils/imageUtils';
 import { normalizePersistableMediaSource, saveOriginalImage } from '../services/storage/imageStorage';
-import { resolveModelDisplayName } from '../utils/modelDisplayName';
 import { clampGenerationDurationMs } from '../utils/timeUtils';
 
 type CreditBillingAttempt = {
@@ -2146,8 +2145,8 @@ export function useGenerationRuntime({
         thinkingMode: params.config.thinkingMode || 'minimal',
       },
       onError: (error) => {
-        const message = error instanceof Error ? error.message : String(error || '');
-        console.warn('[handleGenerate] Prompt optimization failed, fallback to raw prompt:', error);
+        const message = summarizePromptOptimizationError(error);
+        console.warn('[handleGenerate] Prompt optimization failed, fallback to raw prompt:', summarizePromptOptimizationError(error));
         import('../services/system/notificationService').then(({ notify }) => {
           notify.error('Prompt optimization failed', 'Fell back to the original prompt: ' + message);
         });

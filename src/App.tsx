@@ -2,70 +2,33 @@
 import InfiniteCanvas, { InfiniteCanvasHandle } from './components/canvas/InfiniteCanvas';
 import ImageNode from './components/image/ImageCard';
 import PromptNodeComponent from './components/canvas/PromptNodeComponent';
-import PendingNode from './components/canvas/PendingNode';
 // KeyManagerModal removed - integrated into UserProfileModal
-import ChatSidebar from './components/layout/ChatSidebar';
-import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, ReferenceImage, type PartialRedrawRequest, type AgentWorkflowNode, type PreviewWorkflowNode, type SaveWorkflowNode, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceAPlusControlMode, type EcommerceEditableTaskState, type EcommerceTaskAssetRoleBinding, type EcommerceGroupSheet, type EcommerceImageRef, type EcommerceSheetSetting, type EcommerceSheetSettingPatch, type EcommerceFrameworkRuntimeState, type EcommerceFrameworkQueueItem } from './types';
-import { Image as ImageIcon, MessageSquare, Plus, Trash2, Shield, FileText, CheckCircle2, History, CreditCard, ChevronDown, Wand2, RefreshCw, Star, Coins, Settings } from 'lucide-react';
-import { SelectionMenu } from './components/canvas/SelectionMenu';
+import { AspectRatio, ImageSize, GenerationConfig, PromptNode, GeneratedImage, GenerationMode, KnownModel, CanvasGroup, type PartialRedrawRequest, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceFrameworkRuntimeState } from './types';
 import { CanvasGroupComponent } from './components/canvas/CanvasGroupComponent';
 import { generateImage, cancelGeneration } from './services/llm/geminiService';
-import { modelCaller } from './services/model/modelCaller';
-import { getModelPricing, getModelCredits } from './services/model/modelPricing';
+import { getModelCredits } from './services/model/modelPricing';
 import { keyManager, getModelMetadata, normalizeModelId } from './services/auth/keyManager';
 import { adminModelService } from './services/model/adminModelService';
 import { unifiedModelService } from './services/model/unifiedModelService';
-import { getModelCapabilities } from './services/model/modelCapabilities';
 import { buildPartialRedrawReferenceImage } from './services/image/partialRedraw';
 import { analyzeEcommerceRequirementFile } from './services/ecommerce/ecommerceAnalysisClient.ts';
-import { resolveEcommercePromptNodeMetadata } from './services/ecommerce/ecommercePromptNodeMetadata.ts';
-import { isEcommerceAllowedModel, normalizeEcommerceModelId, resolveEcommerceAspectPolicy, resolveEffectiveEcommerceAPlusPolicy, resolvePreferredEcommerceImageSize } from './services/ecommerce/ecommerceModelPolicy.ts';
-import type { EcommerceAnalysisAsset, EcommerceAnalysisAPlusModule, EcommerceAnalysisMainImageItem, EcommerceAnalysisResult } from './services/ecommerce/types.ts';
-import { buildEcommerceRenderTask } from './services/ecommerce/renderTaskBuilder.ts';
-import { buildEcommerceCanvasGroupLayout } from './services/ecommerce/groupCanvasLayout.ts';
-import { buildEcommerceGroupExportManifest } from './services/ecommerce/groupExportManifest.ts';
-import { buildEcommerceAssetRoleBindings } from './services/ecommerce/assetRoleBindings.ts';
-import {
-  applyEcommerceSlotResult,
-  buildEcommerceSlotPreviewBundle,
-  buildInitialEcommerceGroupSlotState,
-  type EcommerceGroupSlotState,
-} from './services/ecommerce/groupSlotState.ts';
-import { mergeEcommerceTaskState } from './services/ecommerce/taskMerger.ts';
-import {
-  cancelEcommerceFrameworkNodeQueue,
-  createDefaultEcommerceFrameworkSchedulerConfig,
-  createEcommerceFrameworkRuntimeState,
-  enqueueEcommerceFrameworkItems,
-  markEcommerceFrameworkQueueItemStatus,
-  migrateLegacyEcommerceFrameworkCanvas,
-  pauseEcommerceFrameworkRuntime,
-  resolveEcommerceFrameworkDispatchPlan,
-  resolveEcommerceFrameworkSummary,
-  resolveFrameworkLane,
-  resumeEcommerceFrameworkRuntime,
-} from './services/ecommerce/frameworkRuntime.ts';
+import type { EcommerceAnalysisResult } from './services/ecommerce/types.ts';
+import type { EcommerceGroupSlotState } from './services/ecommerce/groupSlotState.ts';
 import { llmService } from './services/llm/LLMService';
 import { cancelSecureSystemProxyTask } from './services/model/secureModelProxy';
-import { appendUploadFilesWithinLimit } from './components/ecommerce/ecommerceImportPreview.ts';
 import { getCardDimensions } from './utils/styleUtils';
 import { buildGeneratedImageBatchPositions } from './utils/generatedImageLayout';
 import { getViewportPreferredPosition } from './utils/canvasUtils';
-import { getViewportOffsets } from './utils/canvasCenter';
-import { clampGenerationDurationMs } from './utils/timeUtils';
 import { resolveModelDisplayName } from './utils/modelDisplayName';
 import { resolveProviderIdentity } from './utils/providerDisplay';
 import { pickByDocumentLanguage } from './utils/localeText';
+import { getPromptNodeBoundsWidth } from './utils/promptNodeCardWidth';
 import { generateDownloadFilename, triggerDownload } from './utils/downloadUtils';
 import {
   getReferenceImageLookupIds,
   normalizeReferenceImagesStorage,
-  toReferenceImageDataUrl,
 } from './utils/referenceImageStorage';
-import {
-  resolveLiveSceneNodePosition,
-  type CanvasInteractionPhase,
-} from './canvas/liveScene';
+import type { CanvasInteractionPhase } from './canvas/liveScene';
 import AppPromptComposer from './app/AppPromptComposer';
 import AppGlobalModals, { type AppGlobalModalsProps } from './app/AppGlobalModals';
 import {
@@ -83,8 +46,6 @@ import { buildSoftConnectorPath, getSoftConnectorPointAt } from './canvas/connec
 import AppDesktopChrome from './app/AppDesktopChrome';
 import AppCanvasOverlays from './app/AppCanvasOverlays';
 import AppMobileWorkspace from './app/AppMobileWorkspace';
-import { buildCompletedPromptNodePatch } from './app/buildCompletedPromptNodePatch';
-import { optimizeGenerationPrompt } from './app/optimizeGenerationPrompt';
 import { resolveFollowUpDraftPosition } from './app/followUpDraftPosition';
 import { buildPromptGroupRenderLayout } from './app/promptGroupRenderLayout';
 import { useAppPromptBarProps } from './app/useAppPromptBarProps';
@@ -104,7 +65,56 @@ import { useConnectorRenderer } from './app/useConnectorRenderer';
 import { usePromptGroupLayout, usePromptGroupStacking } from './app/usePromptGroupLayout';
 import { useGenerationRuntime } from './app/useGenerationRuntime';
 import { usePptRuntime } from './app/usePptRuntime';
-import { resolveProviderKeyType } from './services/api/providerStrategy.ts';
+import { useEcommerceRuntime, type UpdateEcommerceSelectionState } from './app/useEcommerceRuntime';
+import { useEcommerceFrameworkRuntimeState, type SetEcommerceFrameworkRuntimeState } from './app/useEcommerceFrameworkRuntimeState';
+import { useEcommerceSlotHistoryRuntime } from './app/useEcommerceSlotHistoryRuntime';
+import {
+  useEcommerceUploadReferenceRuntime,
+  type EcommerceManualReferenceBinding,
+  type SetEcommerceUploadReferenceState,
+} from './app/useEcommerceUploadReferenceRuntime';
+import { useEcommerceGroupExportRuntime, type SetEcommerceGroupExportState } from './app/useEcommerceGroupExportRuntime';
+import {
+  createDefaultEcommerceSheetSettings,
+  useEcommerceSheetSettingsRuntime,
+  type SetEcommerceSheetSettingsState,
+} from './app/useEcommerceSheetSettingsRuntime';
+import {
+  useEcommerceTaskStateRuntime,
+  type SetEcommerceTaskStateRuntimeState,
+} from './app/useEcommerceTaskStateRuntime';
+import {
+  createEmptyEcommerceGroupSlots,
+  useEcommerceRequirementAnalysisRuntime,
+  type SetEcommerceRequirementAnalysisState,
+} from './app/useEcommerceRequirementAnalysisRuntime';
+import {
+  useEcommerceBuildRuntime,
+  type SetEcommerceBuildRuntimeState,
+} from './app/useEcommerceBuildRuntime';
+import {
+  useEcommercePostBuildSyncRuntime,
+  type SetEcommercePostBuildSyncState,
+} from './app/useEcommercePostBuildSyncRuntime';
+import {
+  useEcommerceNodeGenerationRuntime,
+  type SetEcommerceNodeGenerationRuntimeState,
+} from './app/useEcommerceNodeGenerationRuntime';
+import { useEcommerceMobileContinuationRuntime } from './app/useEcommerceMobileContinuationRuntime';
+import {
+  useEcommerceTaskActivationRuntime,
+  type SetEcommerceTaskActivationRuntimeState,
+} from './app/useEcommerceTaskActivationRuntime';
+import {
+  useEcommercePromptActivationRuntime,
+  type SetEcommercePromptActivationRuntimeState,
+} from './app/useEcommercePromptActivationRuntime';
+import {
+  useEcommerceSourceSelectionRuntime,
+} from './app/useEcommerceSourceSelectionRuntime';
+import { useEcommercePartialRedrawRuntime } from './app/useEcommercePartialRedrawRuntime';
+import { useEcommerceModeRuntime, type SetEcommerceModeRuntimeState } from './app/useEcommerceModeRuntime';
+import { useEcommerceSubmitRuntime } from './app/useEcommerceSubmitRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
 const GENERATE_TIMEOUT_MS = 600000;
@@ -127,20 +137,6 @@ type EcommerceRuntimeState = {
   frameworkRuntime: Record<string, EcommerceFrameworkRuntimeState>;
   isAnalyzing: boolean;
   isConfirmingAnalysis: boolean;
-};
-
-type EcommerceManualReferenceBinding = {
-  assetId: string;
-  label: string;
-  fileName: string;
-  referenceImage: ReferenceImage;
-  assetRole: EcommerceTaskAssetRoleBinding;
-};
-
-type EcommerceUploadReferenceBundle = {
-  productReferences: ReferenceImage[];
-  extraReferences: ReferenceImage[];
-  productImageRef?: EcommerceImageRef;
 };
 
 type SharedPromptNodeActionProps = Pick<
@@ -203,10 +199,6 @@ type ConnectorDisconnectButtonProps = {
 };
 
 
-const MAX_ECOMMERCE_PRODUCT_FILES = 4;
-const MAX_ECOMMERCE_EXTRA_REFERENCE_FILES = 4;
-const MAX_ECOMMERCE_ITEM_REFERENCE_FILES = 6;
-
 const ConnectorDisconnectButton: React.FC<ConnectorDisconnectButtonProps> = ({ x, y, onClick }) => (
   <foreignObject
     x={x - 12}
@@ -230,57 +222,6 @@ const ConnectorDisconnectButton: React.FC<ConnectorDisconnectButtonProps> = ({ x
   </foreignObject>
 );
 
-const createEmptyEcommerceGroupSlots = (): Record<EcommerceGroupSheet, EcommerceGroupSlotState[]> => ({
-  '主图': [],
-  'A+': [],
-});
-
-const createEcommerceAnalysisResetPatch = (
-  options: {
-    isAnalyzing?: boolean;
-    requirementFile?: File | null;
-  } = {},
-): Partial<EcommerceRuntimeState> => {
-  const patch: Partial<EcommerceRuntimeState> = {
-    itemReferenceFiles: {},
-    analysis: null,
-    analysisConfirmed: false,
-    selectedItems: {},
-    taskStates: {},
-    groupSlots: createEmptyEcommerceGroupSlots(),
-    activeTaskNodeId: null,
-    activeTaskState: null,
-    activeGroupSheet: null,
-    isConfirmingAnalysis: false,
-  };
-
-  if ('requirementFile' in options) {
-    patch.requirementFile = options.requirementFile ?? null;
-  }
-
-  if ('isAnalyzing' in options) {
-    patch.isAnalyzing = options.isAnalyzing ?? false;
-  }
-
-  return patch;
-};
-
-const createDefaultEcommerceSheetSettings = (modelId: string): Record<EcommerceGroupSheet, EcommerceSheetSetting> => {
-  const preferredImageSize = resolvePreferredEcommerceImageSize(normalizeEcommerceModelId(modelId) || modelId) as ImageSize;
-
-  return {
-    '主图': {
-      aspectRatio: AspectRatio.AUTO,
-      imageSize: preferredImageSize,
-    },
-    'A+': {
-      aspectRatio: AspectRatio.LANDSCAPE_16_9,
-      imageSize: ImageSize.SIZE_4K,
-      aPlusControlMode: 'auto',
-    },
-  };
-};
-
 // Lucide icons replaced with SVGs
 import { CanvasProvider, useCanvas } from './context/CanvasContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -288,23 +229,19 @@ import { AppStartupProvider, useAppStartup } from './context/AppStartupContext';
 import { AuthenticatedAppShell } from './app/AuthenticatedAppShell';
 import { KKAI_FEATURE_FLAGS } from './app/kkaiFeatureFlags';
 import { createAppRootMode } from './context/kkaiRuntimeContext';
-import ConnectionDot from './components/canvas/ConnectionDot';
 import type { UserProfileView } from './components/modals/UserProfileModal';
 import { useAuth } from './context/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { BillingProvider, useBilling } from './context/BillingContext';
 import { formatRemainingCredits } from './services/billing/remainingBalance';
-import { buildGenerationAttemptRequestId } from './services/billing/generationBillingCoordinator';
 import {
   isCapabilityRouteAssignmentRouteDisabled,
   resolveEnabledCapabilityRouteAssignment,
 } from './services/api/capabilityRouteAssignments';
 
 
-import { saveAs } from 'file-saver';
-import JSZip from 'jszip';
 // import { syncService } from './services/system/syncService'; // [FIX] Dynamic Import
-import { saveImage, saveOriginalImage, normalizePersistableMediaSource } from './services/storage/imageStorage';
+import { saveOriginalImage, normalizePersistableMediaSource } from './services/storage/imageStorage';
 import { cancelImageLoad, loadImage } from './services/image/imageLoader';
 import { ImageQuality } from './services/image/imageQuality';
 import { calculateImageHash } from './utils/imageUtils';
@@ -315,7 +252,6 @@ import { WorkspaceSurfacePanels } from './components/workspace/WorkspaceSurfaceP
 
 // ProjectManager imported from components
 import ProjectManager from './components/settings/ProjectManager';
-import { Search } from 'lucide-react'; // Import Search icon
 import GpuBackground from './components/layout/GpuBackground';
 import type { Supplier } from './services/billing/supplierService';
 import { resolveAvatarUrl } from './utils/presetAvatars';
@@ -339,7 +275,6 @@ import {
 import { isWorkflowUtilityNodeKind } from './workflow/schema';
 import {
   getCanvasPerformanceProfile,
-  type CanvasCardDetailLevel,
 } from './canvas/performanceProfile';
 
 interface AppContentProps {
@@ -353,7 +288,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     isTempUser,
     signOut
   } = useAuth();
-  const { advanceTo, stage } = useAppStartup();
+  const { advanceTo } = useAppStartup();
   const [showTutorial, setShowTutorial] = useState(false);
   // [Draft Feature] Persistent Input Card State (Moved to top to avoid ReferenceError)
   const [draftNodeId, setDraftNodeId] = useState<string | null>(null);
@@ -378,9 +313,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     updatePromptNodePosition, updateImageNodePosition, updateImageNodeDimensions, updateImageNode, // canvas mutation helpers
     deletePromptNode,
     deleteImageNode,
-    urgentUpdatePromptNode, // hot-path prompt updates for transient generation state
     linkNodes,
-    unlinkNodes,
     undo,
     redo,
     canUndo,
@@ -396,10 +329,8 @@ const AppContent: React.FC<AppContentProps> = () => {
     updateGroup,
     setNodeTags,
     arrangeAllNodes,
-    moveSelectedNodes,
     moveSelectedNodesImmediate,
     addWorkflowNode,
-    updateWorkflowNode,
     updateWorkflowNodePosition,
     deleteWorkflowNode,
     isReady,
@@ -419,6 +350,25 @@ const AppContent: React.FC<AppContentProps> = () => {
     () => new Map((activeCanvas?.promptNodes || []).map(node => [node.id, node])),
     [activeCanvas]
   );
+
+  const ecommerceFrameworkTaskNodesById = React.useMemo(() => {
+    const taskNodesByFrameworkId = new Map<string, PromptNode[]>();
+    (activeCanvas?.promptNodes || []).forEach((node) => {
+      const frameworkId = node.ecommerce?.frameworkId;
+      if (
+        !frameworkId
+        || node.mode !== GenerationMode.ECOMMERCE
+        || (node.ecommerce?.kind !== 'main-image' && node.ecommerce?.kind !== 'a-plus-module')
+      ) {
+        return;
+      }
+
+      const existingTaskNodes = taskNodesByFrameworkId.get(frameworkId) || [];
+      existingTaskNodes.push(node);
+      taskNodesByFrameworkId.set(frameworkId, existingTaskNodes);
+    });
+    return taskNodesByFrameworkId;
+  }, [activeCanvas]);
 
   const draftPromptNode = React.useMemo(
     () => (draftNodeId ? promptNodesById.get(draftNodeId) ?? null : null),
@@ -462,7 +412,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   useLayoutEffect(() => {
     activeCanvasRef.current = activeCanvas;
   }, [activeCanvas]);
-  const ecommerceFrameworkRuntimeRef = useRef<Record<string, EcommerceFrameworkRuntimeState>>({});
 
   const selectedNodeIdsRef = useRef<string[]>(selectedNodeIds);
   useEffect(() => {
@@ -1104,292 +1053,220 @@ const AppContent: React.FC<AppContentProps> = () => {
   });
   const [ecommerceRatioOverride, setEcommerceRatioOverride] = useState<AspectRatio[] | undefined>(undefined);
 
-  useEffect(() => {
-    ecommerceFrameworkRuntimeRef.current = ecommerceState.frameworkRuntime;
-  }, [ecommerceState.frameworkRuntime]);
-
-  useEffect(() => {
-    const frameworkNodes = (activeCanvas?.promptNodes || []).filter((node) => (
-      node.mode === GenerationMode.ECOMMERCE && node.ecommerce?.kind === 'framework'
-    ));
-
+  const updateEcommerceUploadReferenceState = useCallback<SetEcommerceUploadReferenceState>((updater) => {
     setEcommerceState((previousState) => {
-      const nextFrameworkRuntime: Record<string, EcommerceFrameworkRuntimeState> = {};
-      let didChange = false;
-
-      frameworkNodes.forEach((frameworkNode) => {
-        const existingRuntime = previousState.frameworkRuntime[frameworkNode.id];
-        if (existingRuntime) {
-          nextFrameworkRuntime[frameworkNode.id] = existingRuntime;
-          return;
-        }
-
-        nextFrameworkRuntime[frameworkNode.id] = createEcommerceFrameworkRuntimeState({
-          frameworkId: frameworkNode.id,
-          activeSheet: frameworkNode.ecommerce?.frameworkMeta?.activeSheet || frameworkNode.ecommerce?.sourceSheet || '主图',
-          config: frameworkNode.ecommerce?.frameworkMeta?.schedulerConfig,
-        });
-        didChange = true;
+      const patch = updater({
+        productFiles: previousState.productFiles,
+        extraReferenceFiles: previousState.extraReferenceFiles,
+        itemReferenceFiles: previousState.itemReferenceFiles,
       });
-
-      if (!didChange) {
-        const previousIds = Object.keys(previousState.frameworkRuntime);
-        if (previousIds.length !== Object.keys(nextFrameworkRuntime).length) {
-          didChange = true;
-        } else if (previousIds.some((frameworkId) => !nextFrameworkRuntime[frameworkId])) {
-          didChange = true;
-        }
-      }
-
-      const nextActiveFrameworkId = previousState.activeFrameworkId && nextFrameworkRuntime[previousState.activeFrameworkId]
-        ? previousState.activeFrameworkId
-        : (frameworkNodes[0]?.id || null);
-      const nextActiveGroupSheet = previousState.activeTaskState?.sourceSheet
-        || (nextActiveFrameworkId
-          ? (previousState.activeGroupSheet || nextFrameworkRuntime[nextActiveFrameworkId]?.activeSheet || null)
-          : null);
-
-      if (
-        !didChange
-        && nextActiveFrameworkId === previousState.activeFrameworkId
-        && nextActiveGroupSheet === previousState.activeGroupSheet
-      ) {
-        return previousState;
-      }
-
-      return {
-        ...previousState,
-        frameworkRuntime: nextFrameworkRuntime,
-        activeFrameworkId: nextActiveFrameworkId,
-        activeGroupSheet: nextActiveGroupSheet,
-      };
+      return patch ? { ...previousState, ...patch } : previousState;
     });
-  }, [activeCanvas]);
-
-  const resolveEcommerceFrameworkId = useCallback((node?: PromptNode | null): string | null => {
-    if (!node?.ecommerce) {
-      return null;
-    }
-
-    if (node.ecommerce.kind === 'framework') {
-      return node.id;
-    }
-
-    return node.ecommerce.frameworkId || null;
   }, []);
 
-  const resolveEcommerceFrameworkNode = useCallback((frameworkId?: string | null): PromptNode | null => {
-    if (!frameworkId) {
-      return null;
-    }
-
-    return activeCanvasRef.current?.promptNodes.find((node) => (
-      node.id === frameworkId && node.ecommerce?.kind === 'framework'
-    )) || null;
+  const updateEcommerceFrameworkRuntimeState = useCallback<SetEcommerceFrameworkRuntimeState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater(previousState);
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
   }, []);
 
-  const updateEcommerceFrameworkMeta = useCallback((
-    frameworkId: string,
-    patch: Partial<NonNullable<NonNullable<PromptNode['ecommerce']>['frameworkMeta']>>,
-  ) => {
-    const frameworkNode = activeCanvasRef.current?.promptNodes.find((node) => (
-      node.id === frameworkId && node.ecommerce?.kind === 'framework'
-    ));
-    if (!frameworkNode?.ecommerce) {
-      return;
-    }
-
-    updatePromptNode({
-      ...frameworkNode,
-      ecommerce: {
-        ...frameworkNode.ecommerce,
-        frameworkMeta: {
-          activeSheet: frameworkNode.ecommerce.frameworkMeta?.activeSheet || frameworkNode.ecommerce.sourceSheet || '主图',
-          groupIds: frameworkNode.ecommerce.frameworkMeta?.groupIds,
-          taskNodeIds: frameworkNode.ecommerce.frameworkMeta?.taskNodeIds,
-          schedulerConfig: frameworkNode.ecommerce.frameworkMeta?.schedulerConfig,
-          ...patch,
-        },
-      },
-    });
-  }, [updatePromptNode]);
-
-  const updateEcommerceFrameworkRuntime = useCallback((
-    frameworkId: string,
-    updater: (current: EcommerceFrameworkRuntimeState) => EcommerceFrameworkRuntimeState,
-  ): EcommerceFrameworkRuntimeState => {
-    const frameworkNode = resolveEcommerceFrameworkNode(frameworkId);
-    const currentRuntime = ecommerceFrameworkRuntimeRef.current[frameworkId]
-      || createEcommerceFrameworkRuntimeState({
-        frameworkId,
-        activeSheet: frameworkNode?.ecommerce?.frameworkMeta?.activeSheet || frameworkNode?.ecommerce?.sourceSheet || '主图',
-        config: frameworkNode?.ecommerce?.frameworkMeta?.schedulerConfig,
+  const updateEcommerceGroupExportState = useCallback<SetEcommerceGroupExportState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        analysisConfirmed: previousState.analysisConfirmed,
+        selectedItems: previousState.selectedItems,
+        groupSlots: previousState.groupSlots,
       });
-    const nextRuntime = updater(currentRuntime);
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
 
-    ecommerceFrameworkRuntimeRef.current = {
-      ...ecommerceFrameworkRuntimeRef.current,
-      [frameworkId]: nextRuntime,
-    };
+  const updateEcommerceSheetSettingsState = useCallback<SetEcommerceSheetSettingsState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        sheetSettings: previousState.sheetSettings,
+        taskStates: previousState.taskStates,
+        activeTaskState: previousState.activeTaskState,
+      });
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
 
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      frameworkRuntime: {
-        ...previousState.frameworkRuntime,
-        [frameworkId]: nextRuntime,
-      },
-    }));
+  const updateEcommerceTaskStateRuntimeState = useCallback<SetEcommerceTaskStateRuntimeState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        taskStates: previousState.taskStates,
+        activeTaskState: previousState.activeTaskState,
+      });
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
 
-    return nextRuntime;
-  }, [resolveEcommerceFrameworkNode]);
+  const updateEcommerceRequirementAnalysisState = useCallback<SetEcommerceRequirementAnalysisState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        requirementFile: previousState.requirementFile,
+        productFiles: previousState.productFiles,
+        itemReferenceFiles: previousState.itemReferenceFiles,
+        analysis: previousState.analysis,
+        analysisConfirmed: previousState.analysisConfirmed,
+        selectedItems: previousState.selectedItems,
+        taskStates: previousState.taskStates,
+        groupSlots: previousState.groupSlots,
+        activeTaskNodeId: previousState.activeTaskNodeId,
+        activeTaskState: previousState.activeTaskState,
+        activeGroupSheet: previousState.activeGroupSheet,
+        isAnalyzing: previousState.isAnalyzing,
+        isConfirmingAnalysis: previousState.isConfirmingAnalysis,
+      });
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
 
-  const syncEcommerceFrameworkView = useCallback((frameworkId: string, activeSheet: EcommerceGroupSheet) => {
-    updateEcommerceFrameworkRuntime(frameworkId, (currentRuntime) => ({
-      ...currentRuntime,
-      activeSheet,
-      lastUpdatedAt: Date.now(),
-    }));
-    updateEcommerceFrameworkMeta(frameworkId, { activeSheet });
-  }, [updateEcommerceFrameworkMeta, updateEcommerceFrameworkRuntime]);
+  const updateEcommerceBuildRuntimeState = useCallback<SetEcommerceBuildRuntimeState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        requirementFile: previousState.requirementFile,
+        productFiles: previousState.productFiles,
+        extraReferenceFiles: previousState.extraReferenceFiles,
+        itemReferenceFiles: previousState.itemReferenceFiles,
+        analysis: previousState.analysis,
+        analysisConfirmed: previousState.analysisConfirmed,
+        selectedItems: previousState.selectedItems,
+        taskStates: previousState.taskStates,
+        sheetSettings: previousState.sheetSettings,
+        groupSlots: previousState.groupSlots,
+        activeTaskNodeId: previousState.activeTaskNodeId,
+        activeTaskState: previousState.activeTaskState,
+        activeFrameworkId: previousState.activeFrameworkId,
+        activeGroupSheet: previousState.activeGroupSheet,
+        frameworkRuntime: previousState.frameworkRuntime,
+        isConfirmingAnalysis: previousState.isConfirmingAnalysis,
+      });
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
+
+  const updateEcommercePostBuildSyncState = useCallback<SetEcommercePostBuildSyncState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        analysis: previousState.analysis,
+        analysisConfirmed: previousState.analysisConfirmed,
+        taskStates: previousState.taskStates,
+        activeTaskNodeId: previousState.activeTaskNodeId,
+        activeTaskState: previousState.activeTaskState,
+      });
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
+
+  const updateEcommerceNodeGenerationRuntimeState = useCallback<SetEcommerceNodeGenerationRuntimeState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        activeTaskNodeId: previousState.activeTaskNodeId,
+        activeTaskState: previousState.activeTaskState,
+      });
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
+  const updateEcommerceTaskActivationRuntimeState = useCallback<SetEcommerceTaskActivationRuntimeState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        activeTaskNodeId: previousState.activeTaskNodeId,
+        activeTaskState: previousState.activeTaskState,
+        activeGroupSheet: previousState.activeGroupSheet,
+      });
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
+  const updateEcommerceModeRuntimeState = useCallback<SetEcommerceModeRuntimeState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        activeTaskNodeId: previousState.activeTaskNodeId,
+        activeTaskState: previousState.activeTaskState,
+      });
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
+  const updateEcommercePromptActivationRuntimeState = useCallback<SetEcommercePromptActivationRuntimeState>((updater) => {
+    setEcommerceState((previousState) => {
+      const patch = updater({
+        activeTaskNodeId: previousState.activeTaskNodeId,
+        activeTaskState: previousState.activeTaskState,
+        activeFrameworkId: previousState.activeFrameworkId,
+        activeGroupSheet: previousState.activeGroupSheet,
+      });
+      return patch ? { ...previousState, ...patch } : previousState;
+    });
+  }, []);
+
+  const frameworkStateView = useEcommerceFrameworkRuntimeState({
+    activeCanvas,
+    activeCanvasRef,
+    ecommerceState,
+    setEcommerceState: updateEcommerceFrameworkRuntimeState,
+    updatePromptNode,
+  });
+
+  const {
+    ecommerceFrameworkRuntimeRef,
+    resolveEcommerceFrameworkId,
+    syncEcommerceFrameworkView,
+    handleActivateEcommerceGroupSheet,
+  } = frameworkStateView;
+  const {
+    syncPromptNodeEcommerceSelection,
+    resolvePromptNodeFrameworkStatus,
+  } = useEcommercePromptActivationRuntime({
+    activeCanvasRef,
+    ecommerceFrameworkRuntimeRef,
+    setEcommercePromptActivationRuntimeState: updateEcommercePromptActivationRuntimeState,
+    setEcommerceRatioOverride,
+    resolveEcommerceFrameworkId,
+    syncEcommerceFrameworkView,
+  });
+  const {
+    resetEcommerceSourceSelectionState,
+  } = useEcommerceSourceSelectionRuntime({
+    setEcommerceRatioOverride,
+    setEcommerceSourceSelectionRuntimeState: updateEcommercePromptActivationRuntimeState,
+  });
 
   const resolveEffectiveEcommerceThinkingMode = useCallback((): 'minimal' | 'high' => (
     config.mode === GenerationMode.ECOMMERCE ? 'high' : (config.thinkingMode || 'minimal')
   ), [config.mode, config.thinkingMode]);
 
-  const resolveEcommerceAPlusControlMode = useCallback((sheetSetting?: EcommerceSheetSetting): EcommerceAPlusControlMode => (
-    sheetSetting?.aPlusControlMode || 'auto'
-  ), []);
+  const {
+    resolveEcommerceAPlusControlMode,
+    applyEffectiveSizingToTaskState,
+    resolveEcommerceNodeGenerationSettings,
+    handleUpdateEcommerceSheetSetting,
+  } = useEcommerceSheetSettingsRuntime({
+    activeCanvasRef,
+    configMode: config.mode,
+    configModel: config.model,
+    ecommerceState,
+    setConfig,
+    setEcommerceSheetSettingsState: updateEcommerceSheetSettingsState,
+    updatePromptNode,
+  });
 
-  const applyEffectiveSizingToTaskState = useCallback((
-    taskState: EcommerceEditableTaskState,
-    options?: { controlMode?: EcommerceAPlusControlMode },
-  ): EcommerceEditableTaskState => {
-    if (taskState.sourceSheet !== 'A+' || taskState.sourceKind !== 'a-plus-module') {
-      return {
-        ...taskState,
-        effectiveSizePolicy: taskState.effectiveSizePolicy,
-        effectiveSizeTier: taskState.effectiveSizeTier || taskState.sizeTier,
-      };
-    }
+  const {
+    buildInitialEcommerceTaskStates,
+    handleChangeEcommerceTaskState,
+  } = useEcommerceTaskStateRuntime({
+    applyEffectiveSizingToTaskState,
+    setEcommerceTaskStateRuntimeState: updateEcommerceTaskStateRuntimeState,
+  });
 
-    const activeSheetSetting = ecommerceState.sheetSettings['A+'] || createDefaultEcommerceSheetSettings(config.model)['A+'];
-    const effectivePolicy = resolveEffectiveEcommerceAPlusPolicy({
-      detectedSizeTier: taskState.sizeTier,
-      controlMode: taskState.sizeControlOverride ?? options?.controlMode ?? resolveEcommerceAPlusControlMode(activeSheetSetting),
-    });
-
-    return {
-      ...taskState,
-      effectiveSizePolicy: effectivePolicy.effectiveSizePolicy,
-      effectiveSizeTier: effectivePolicy.effectiveSizeTier,
-    };
-  }, [config.model, ecommerceState.sheetSettings, resolveEcommerceAPlusControlMode]);
-
-  const resolveEcommerceNodeGenerationSettings = useCallback((
-    node: PromptNode,
-    generationTarget?: 'sheet' | 'desktop' | 'mobile',
-  ) => {
-    const fallbackSheetSettings = createDefaultEcommerceSheetSettings(node.model);
-    const sheetSettings = node.ecommerce
-      ? (ecommerceState.sheetSettings[node.ecommerce.sourceSheet] || fallbackSheetSettings[node.ecommerce.sourceSheet])
-      : fallbackSheetSettings['主图'];
-
-    if (!node.ecommerce) {
-      return {
-        aspectRatio: node.aspectRatio || sheetSettings.aspectRatio,
-        imageSize: node.imageSize || sheetSettings.imageSize,
-      };
-    }
-
-    if (generationTarget === 'mobile') {
-      return {
-        aspectRatio: (node.ecommerce.mobileAspectRatio || AspectRatio.LANDSCAPE_4_3) as AspectRatio,
-        imageSize: sheetSettings.imageSize,
-      };
-    }
-
-    const effectiveSizePolicy = node.ecommerce.effectiveSizePolicy || node.ecommerce.sizePolicy;
-
-    if (node.ecommerce.kind === 'a-plus-module' && effectiveSizePolicy === 'desktop-then-mobile') {
-      return {
-        aspectRatio: (node.ecommerce.desktopAspectRatio || node.ecommerce.currentAspectRatio || node.aspectRatio || AspectRatio.LANDSCAPE_21_9) as AspectRatio,
-        imageSize: sheetSettings.imageSize,
-      };
-    }
-
-    return {
-      aspectRatio: (
-        node.ecommerce.kind === 'a-plus-module'
-          ? (node.ecommerce.currentAspectRatio || node.aspectRatio || AspectRatio.LANDSCAPE_16_9)
-          : (sheetSettings.aspectRatio || node.ecommerce.currentAspectRatio || node.aspectRatio || AspectRatio.SQUARE)
-      ) as AspectRatio,
-      imageSize: sheetSettings.imageSize || node.imageSize || (resolvePreferredEcommerceImageSize(node.model) as ImageSize),
-    };
-  }, [ecommerceState.sheetSettings]);
-
-  const resolveEcommerceSlotState = useCallback((node: PromptNode) => {
-    if (!node.ecommerce || node.ecommerce.kind === 'a-plus-group') {
-      return null;
-    }
-
-    return ecommerceState.groupSlots[node.ecommerce.sourceSheet].find(
-      (slot) => slot.sourceKey === node.ecommerce?.sourceRowKey,
-    ) ?? null;
-  }, [ecommerceState.groupSlots]);
-
-  const handlePreviewEcommerceSlotHistory = useCallback((
-    sourceSheet: EcommerceGroupSheet,
-    sourceKey: string,
-    preferredImageId?: string,
-  ) => {
-    const canvas = activeCanvasRef.current;
-    if (!canvas) {
-      return;
-    }
-
-    const slotState = ecommerceState.groupSlots[sourceSheet].find((slot) => slot.sourceKey === sourceKey);
-    if (!slotState) {
-      return;
-    }
-
-    const imagesById = new Map(canvas.imageNodes.map((imageNode) => [imageNode.id, imageNode] as const));
-    const previewBundle = buildEcommerceSlotPreviewBundle(slotState, imagesById, preferredImageId);
-    if (!previewBundle) {
-      return;
-    }
-
-    setWorkspaceSurface('workspace');
-    setPreviewImages(previewBundle.images);
-    setPreviewInitialIndex(previewBundle.initialIndex);
-  }, [ecommerceState.groupSlots]);
-
-  const handlePreviewEcommerceSlotHistoryForNode = useCallback((node: PromptNode, preferredImageId?: string) => {
-    if (!node.ecommerce || node.ecommerce.kind === 'a-plus-group') {
-      return;
-    }
-
-    handlePreviewEcommerceSlotHistory(node.ecommerce.sourceSheet, node.ecommerce.sourceRowKey, preferredImageId);
-  }, [handlePreviewEcommerceSlotHistory]);
-
-  useEffect(() => {
-    if (config.mode !== GenerationMode.ECOMMERCE) {
-      setEcommerceRatioOverride(undefined);
-      setEcommerceState((previousState) => ({
-        ...previousState,
-        activeTaskNodeId: null,
-        activeTaskState: null,
-      }));
-      return;
-    }
-
-    if (config.thinkingMode !== 'high') {
-      setConfig((previousConfig) => (
-        previousConfig.mode === GenerationMode.ECOMMERCE && previousConfig.thinkingMode !== 'high'
-          ? { ...previousConfig, thinkingMode: 'high' }
-          : previousConfig
-      ));
-    }
-  }, [config.mode, config.thinkingMode, setConfig]);
+  useEcommerceModeRuntime({
+    configMode: config.mode,
+    configThinkingMode: config.thinkingMode,
+    setConfig,
+    setEcommerceRatioOverride,
+    setEcommerceModeRuntimeState: updateEcommerceModeRuntimeState,
+  });
 
   const [modePreferredKeyMap, setModePreferredKeyMap] = useState<Partial<Record<GenerationMode, string>>>(() => {
     try {
@@ -1561,7 +1438,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   // Pending generation state
   // Active source image for continuing conversation
   const [activeSourceImage, setActiveSourceImage] = useState<string | null>(null);
-  const [pendingPrompt, setPendingPrompt] = useState<string>('');
 
   // Persist Active Source Image
   useEffect(() => {
@@ -1709,6 +1585,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   } = useCanvasSelectionBox({
     activeCanvas,
     canvasTransform,
+    isMobile,
     selectedNodeIds,
     getCardDimensions,
     selectNodes,
@@ -1807,8 +1684,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   const {
     isGenerating,
     executeGeneration,
-    pollTaskStatus,
-    cancelGeneration: cancelGen,
     recoverFailedSyncBridgeGeneration
   } = useImageGeneration({
     isMobile,
@@ -1856,1164 +1731,75 @@ const AppContent: React.FC<AppContentProps> = () => {
     reader.readAsDataURL(blob);
   }), []);
 
-  const sanitizeReferenceToken = useCallback((value: string) => (
-    String(value || '')
-      .trim()
-      .toLowerCase()
-      .replace(/[^\w.-]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 80) || 'ref'
-  ), []);
-
-  const buildUploadReferenceIdentity = useCallback((file: File, labelPrefix: string) => (
-    `${labelPrefix}-${sanitizeReferenceToken(file.name || labelPrefix)}-${file.size}-${file.lastModified}`
-  ), [sanitizeReferenceToken]);
-
-  const buildProductImageRef = useCallback((referenceImage?: ReferenceImage | null): EcommerceImageRef | undefined => (
-    referenceImage
-      ? {
-          id: referenceImage.id,
-          storageId: referenceImage.storageId,
-          label: '产品图1',
-          mimeType: referenceImage.mimeType,
-          url: referenceImage.url,
-        }
-      : undefined
-  ), []);
-
-  const buildReferenceImageSignature = useCallback((referenceImages: ReferenceImage[]) => (
-    referenceImages.map((referenceImage) => [
-      referenceImage.id,
-      referenceImage.storageId || '',
-      referenceImage.mimeType || '',
-      referenceImage.url || '',
-      referenceImage.data || '',
-    ].join('|')).join('||')
-  ), []);
-
-  const buildEcommerceImageRefSignature = useCallback((reference?: EcommerceImageRef) => (
-    reference
-      ? [reference.id, reference.storageId || '', reference.label || '', reference.mimeType || '', reference.url || ''].join('|')
-      : ''
-  ), []);
-
-  const buildTaskStateSyncSignature = useCallback((taskState?: EcommerceEditableTaskState | null) => JSON.stringify({
-    imageRoleSummary: taskState?.imageRoleSummary || [],
-    assetRoles: taskState?.assetRoles || [],
-    missingFields: taskState?.missingFields || [],
-    effectiveSizePolicy: taskState?.effectiveSizePolicy || '',
-    effectiveSizeTier: taskState?.effectiveSizeTier || '',
-    promptOverride: taskState?.promptOverride || '',
-    resolvedPromptPreview: taskState?.resolvedPromptPreview || '',
-    displayLabel: taskState?.displayLabel || '',
-  }), []);
-
-  const createReferenceImageFromFile = useCallback(async (file: File, labelPrefix: string): Promise<ReferenceImage> => {
-    const dataUrl = await readBlobAsDataUrl(file);
-    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-    const referenceIdentity = buildUploadReferenceIdentity(file, labelPrefix);
-    return {
-      id: referenceIdentity,
-      storageId: referenceIdentity,
-      data: match?.[2] || '',
-      mimeType: match?.[1] || file.type || 'image/png',
-      url: dataUrl,
-    };
-  }, [buildUploadReferenceIdentity, readBlobAsDataUrl]);
-
-  const createReferenceImageFromAsset = useCallback((asset: EcommerceAnalysisAsset): ReferenceImage | null => {
-    if (!asset.previewUrl) return null;
-    const match = asset.previewUrl.match(/^data:([^;]+);base64,(.+)$/);
-    return {
-      id: `analysis-${asset.assetId}`,
-      storageId: asset.assetId,
-      data: match?.[2] || '',
-      mimeType: match?.[1] || asset.mimeType || 'image/png',
-      url: asset.previewUrl,
-    };
-  }, []);
-
-  const buildCurrentEcommerceUploadReferences = useCallback(async (): Promise<EcommerceUploadReferenceBundle> => {
-    const productReferences = await Promise.all(
-      ecommerceState.productFiles
-        .slice(0, MAX_ECOMMERCE_PRODUCT_FILES)
-        .map((file, index) => createReferenceImageFromFile(file, `product-${index + 1}`)),
-    );
-    const extraReferences = await Promise.all(
-      ecommerceState.extraReferenceFiles
-        .slice(0, MAX_ECOMMERCE_EXTRA_REFERENCE_FILES)
-        .map((file, index) => createReferenceImageFromFile(file, `extra-${index + 1}`)),
-    );
-
-    return {
-      productReferences,
-      extraReferences,
-      productImageRef: buildProductImageRef(productReferences[0]),
-    };
-  }, [buildProductImageRef, createReferenceImageFromFile, ecommerceState.extraReferenceFiles, ecommerceState.productFiles]);
-
-  const extractEcommerceManualReferenceBindings = useCallback((taskStateSeed?: EcommerceEditableTaskState | null) => {
-    if (!taskStateSeed?.sourceRowKey) {
-      return [] as EcommerceManualReferenceBinding[];
-    }
-
-    return ecommerceState.itemReferenceFiles[taskStateSeed.sourceRowKey] || [];
-  }, [ecommerceState.itemReferenceFiles]);
-
-  const buildInitialEcommerceTaskStates = useCallback((analysis: EcommerceAnalysisResult): Record<string, EcommerceEditableTaskState> => {
-    const nextStateMap: Record<string, EcommerceEditableTaskState> = {};
-
-    analysis.mainImageItems.forEach((item) => {
-      if (item.editableTask) {
-        nextStateMap[item.itemId] = applyEffectiveSizingToTaskState(item.editableTask);
-      }
-    });
-    analysis.aPlusGroup.modules.forEach((item) => {
-      if (item.editableTask) {
-        nextStateMap[item.moduleId] = applyEffectiveSizingToTaskState(item.editableTask);
-      }
-    });
-
-    return nextStateMap;
-  }, [applyEffectiveSizingToTaskState]);
-
-  const findEcommerceAnalysisItemBySourceKey = useCallback((analysis: EcommerceAnalysisResult, sourceKey: string) => {
-    return analysis.mainImageItems.find((item) => item.itemId === sourceKey)
-      || analysis.aPlusGroup.modules.find((item) => item.moduleId === sourceKey)
-      || null;
-  }, []);
-
-  const handleChangeEcommerceTaskState = useCallback((
-    taskId: string,
-    updater:
-      | EcommerceEditableTaskState
-      | ((previous: EcommerceEditableTaskState) => EcommerceEditableTaskState),
-  ) => {
-    setEcommerceState((previousState) => {
-      const nextTaskStates = { ...previousState.taskStates };
-      let didUpdate = false;
-
-      Object.entries(nextTaskStates).forEach(([rowKey, taskState]) => {
-        if (!taskState) return;
-        if (taskState.taskId !== taskId && rowKey !== taskId) return;
-        const updatedTaskState = typeof updater === 'function' ? updater(taskState) : updater;
-        nextTaskStates[rowKey] = applyEffectiveSizingToTaskState(updatedTaskState);
-        didUpdate = true;
-      });
-
-      let nextActiveTaskState = previousState.activeTaskState;
-      if (previousState.activeTaskState && previousState.activeTaskState.taskId === taskId) {
-        const updatedActiveTaskState = typeof updater === 'function'
-          ? updater(previousState.activeTaskState)
-          : updater;
-        nextActiveTaskState = applyEffectiveSizingToTaskState(updatedActiveTaskState);
-        didUpdate = true;
-      }
-
-      if (!didUpdate) {
-        return previousState;
-      }
-
-      return {
-        ...previousState,
-        taskStates: nextTaskStates,
-        activeTaskState: nextActiveTaskState,
-      };
-    });
-  }, [applyEffectiveSizingToTaskState]);
-
-  const buildRuntimeEcommerceAssetRoles = useCallback((params: {
-    rowAssets: EcommerceAnalysisAsset[];
-    rowMentions: Array<{ assetId: string; label: string; mentionTokens: string[]; notes?: string }>;
-    manualReferences: EcommerceManualReferenceBinding[];
-    productReferences: ReferenceImage[];
-    extraReferences: ReferenceImage[];
-  }): EcommerceTaskAssetRoleBinding[] => {
-    return buildEcommerceAssetRoleBindings({
-      rowAssets: params.rowAssets,
-      rowMentions: params.rowMentions,
-      manualReferences: params.manualReferences,
-      productReferences: params.productReferences,
-      extraReferences: params.extraReferences,
-    });
-  }, []);
-
-  const handlePickEcommerceRequirementFile = useCallback((files: FileList | File[]) => {
-    const [file] = Array.from(files);
-    if (!file) return;
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      ...createEcommerceAnalysisResetPatch({ requirementFile: file }),
-    }));
-  }, []);
-
-  const handleClearEcommerceRequirementFile = useCallback(() => {
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      ...createEcommerceAnalysisResetPatch({ requirementFile: null, isAnalyzing: false }),
-    }));
-  }, []);
-
-  const handlePickEcommerceProductFiles = useCallback((files: FileList | File[]) => {
-    const nextFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
-    if (nextFiles.length === 0) return;
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      productFiles: appendUploadFilesWithinLimit(
-        previousState.productFiles,
-        nextFiles,
-        MAX_ECOMMERCE_PRODUCT_FILES,
-      ),
-      analysis: previousState.analysis,
-    }));
-  }, []);
-
-  const handlePickEcommerceExtraReferenceFiles = useCallback((files: FileList | File[]) => {
-    const nextFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
-    if (nextFiles.length === 0) return;
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      extraReferenceFiles: appendUploadFilesWithinLimit(
-        previousState.extraReferenceFiles,
-        nextFiles,
-        MAX_ECOMMERCE_EXTRA_REFERENCE_FILES,
-      ),
-    }));
-  }, []);
-
-  const handleRemoveEcommerceProductFile = useCallback((index: number) => {
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      productFiles: previousState.productFiles.filter((_, fileIndex) => fileIndex !== index),
-    }));
-  }, []);
-
-  const handleRemoveEcommerceExtraReferenceFile = useCallback((index: number) => {
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      extraReferenceFiles: previousState.extraReferenceFiles.filter((_, fileIndex) => fileIndex !== index),
-    }));
-  }, []);
-
-  const handlePickEcommerceItemReferenceFiles = useCallback(async (sourceKey: string, files: FileList | File[]) => {
-    const nextFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
-    if (!sourceKey || nextFiles.length === 0) {
-      return;
-    }
-
-    const manualReferenceBindings = await Promise.all(
-      nextFiles.map(async (file, index) => {
-        const referenceImage = await createReferenceImageFromFile(file, `item-${sourceKey}-${index + 1}`);
-        const assetId = referenceImage.storageId || referenceImage.id;
-        const label = `手动参考图${index + 1}`;
-
-        return {
-          assetId,
-          label,
-          fileName: file.name,
-          referenceImage,
-          assetRole: {
-            assetId,
-            role: 'reference' as const,
-            label,
-            normalizedLabel: label,
-            source: 'upload' as const,
-            note: '用户手动补传到当前需求的参考图',
-          },
-        } satisfies EcommerceManualReferenceBinding;
-      }),
-    );
-
-    setEcommerceState((previousState) => {
-      const previousBindings = previousState.itemReferenceFiles[sourceKey] || [];
-      return {
-        ...previousState,
-        itemReferenceFiles: {
-          ...previousState.itemReferenceFiles,
-          [sourceKey]: [
-            ...previousBindings,
-            ...manualReferenceBindings,
-          ].slice(0, MAX_ECOMMERCE_ITEM_REFERENCE_FILES),
-        },
-      };
-    });
-  }, [createReferenceImageFromFile]);
-
-  const handleRemoveEcommerceItemReferenceFile = useCallback((sourceKey: string, index: number) => {
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      itemReferenceFiles: {
-        ...previousState.itemReferenceFiles,
-        [sourceKey]: (previousState.itemReferenceFiles[sourceKey] || []).filter((_, bindingIndex) => bindingIndex !== index),
-      },
-    }));
-  }, []);
-
-  const handleResetEcommerceAnalysis = useCallback(() => {
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      ...createEcommerceAnalysisResetPatch({ isAnalyzing: false }),
-    }));
-  }, []);
-
-  const handleToggleEcommerceAnalysisSelection = useCallback((id: string, selected: boolean) => {
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      selectedItems: {
-        ...previousState.selectedItems,
-        [id]: selected,
-      },
-    }));
-  }, []);
-
-  const handleUpdateEcommerceSheetSetting = useCallback((
-    sheet: EcommerceGroupSheet,
-    patch: EcommerceSheetSettingPatch,
-  ) => {
-    const previousSetting = ecommerceState.sheetSettings[sheet] || createDefaultEcommerceSheetSettings(config.model)[sheet];
-    const mergedSetting: EcommerceSheetSetting = {
-      ...previousSetting,
-      ...patch,
-    };
-    const nextSetting: EcommerceSheetSetting = sheet === 'A+'
-      ? { ...mergedSetting, imageSize: ImageSize.SIZE_4K }
-      : mergedSetting;
-
-    if (
-      previousSetting.aspectRatio === nextSetting.aspectRatio
-      && previousSetting.imageSize === nextSetting.imageSize
-      && previousSetting.aPlusControlMode === nextSetting.aPlusControlMode
-    ) {
-      return;
-    }
-
-    setEcommerceState((previousState) => {
-      const nextTaskStates = Object.fromEntries(
-        Object.entries(previousState.taskStates).map(([rowKey, taskState]) => [
-          rowKey,
-          taskState && taskState.sourceSheet === sheet
-            ? applyEffectiveSizingToTaskState(taskState, { controlMode: nextSetting.aPlusControlMode })
-            : taskState,
-        ]),
-      ) as Record<string, EcommerceEditableTaskState>;
-
-      const nextActiveTaskState = previousState.activeTaskState && previousState.activeTaskState.sourceSheet === sheet
-        ? applyEffectiveSizingToTaskState(previousState.activeTaskState, { controlMode: nextSetting.aPlusControlMode })
-        : previousState.activeTaskState;
-
-      return {
-        ...previousState,
-        taskStates: nextTaskStates,
-        activeTaskState: nextActiveTaskState,
-        sheetSettings: {
-          ...previousState.sheetSettings,
-          [sheet]: nextSetting,
-        },
-      };
-    });
-
-    if (config.mode === GenerationMode.ECOMMERCE) {
-      setConfig((previousConfig) => ({
-        ...previousConfig,
-        aspectRatio: sheet !== 'A+' ? nextSetting.aspectRatio : previousConfig.aspectRatio,
-        imageSize: nextSetting.imageSize,
-        thinkingMode: 'high',
-      }));
-    }
-
-    startTransition(() => {
-      const promptNodes = activeCanvasRef.current?.promptNodes || [];
-      promptNodes
-        .filter((node) => (
-          node.mode === GenerationMode.ECOMMERCE
-          && node.ecommerce?.sourceSheet === sheet
-          && node.ecommerce.kind !== 'a-plus-group'
-        ))
-        .forEach((node) => {
-          if (!node.ecommerce) {
-            return;
-          }
-
-          const effectivePolicy = node.ecommerce.kind === 'a-plus-module'
-            ? resolveEffectiveEcommerceAPlusPolicy({
-                detectedSizeTier: node.ecommerce.sizeTier,
-                controlMode: node.ecommerce.sizeControlOverride ?? nextSetting.aPlusControlMode,
-              })
-            : null;
-          const nextNodeAspectRatio = node.ecommerce.sourceSheet === 'A+'
-            ? (effectivePolicy?.runtimeAspectRatio || node.ecommerce.currentAspectRatio || node.aspectRatio)
-            : nextSetting.aspectRatio;
-          const nextNodeImageSize = nextSetting.imageSize;
-          const nextEffectiveSizePolicy = effectivePolicy?.effectiveSizePolicy || node.ecommerce.sizePolicy;
-          const nextTaskState = node.ecommerce.editableTask
-            ? applyEffectiveSizingToTaskState(node.ecommerce.editableTask, { controlMode: nextSetting.aPlusControlMode })
-            : node.ecommerce.editableTask;
-          const nextRenderTask = nextTaskState && node.ecommerce.seriesTemplate
-            ? buildEcommerceRenderTask({
-                taskState: nextTaskState,
-                seriesTemplate: node.ecommerce.seriesTemplate,
-                aspectRatio: String(nextNodeAspectRatio),
-                imageSize: String(nextNodeImageSize),
-                productName: node.ecommerce.productImageRef?.label || node.ecommerce.theme || '',
-              })
-            : null;
-
-          updatePromptNode({
-            ...node,
-            prompt: nextRenderTask?.prompt || node.prompt,
-            originalPrompt: nextRenderTask?.prompt || node.originalPrompt,
-            aspectRatio: nextNodeAspectRatio as AspectRatio,
-            imageSize: nextNodeImageSize,
-            ecommerce: {
-              ...node.ecommerce,
-              aPlusControlMode: node.ecommerce.sourceSheet === 'A+' ? resolveEcommerceAPlusControlMode(nextSetting) : node.ecommerce.aPlusControlMode,
-              currentAspectRatio: nextNodeAspectRatio as AspectRatio,
-              sizePolicy: nextEffectiveSizePolicy,
-              effectiveSizePolicy: effectivePolicy?.effectiveSizePolicy || node.ecommerce.effectiveSizePolicy,
-              effectiveSizeTier: effectivePolicy?.effectiveSizeTier || node.ecommerce.effectiveSizeTier,
-              allowedAspectRatios: (effectivePolicy?.allowedAspectRatios || node.ecommerce.allowedAspectRatios) as AspectRatio[] | undefined,
-              activeDeliveryKind: nextEffectiveSizePolicy === 'desktop-then-mobile'
-                ? (node.ecommerce.activeDeliveryKind === 'mobile' ? 'mobile' : 'desktop')
-                : 'default',
-              desktopStage: nextEffectiveSizePolicy === 'desktop-then-mobile'
-                ? node.ecommerce.desktopStage
-                : 'not_applicable',
-              mobileStage: nextEffectiveSizePolicy === 'desktop-then-mobile'
-                ? node.ecommerce.mobileStage
-                : 'not_applicable',
-              desktopAspectRatio: node.ecommerce.kind === 'a-plus-module' && nextEffectiveSizePolicy === 'desktop-then-mobile'
-                ? nextNodeAspectRatio as AspectRatio
-                : undefined,
-              mobileAspectRatio: nextEffectiveSizePolicy === 'desktop-then-mobile'
-                ? ((effectivePolicy?.mobileAspectRatio || node.ecommerce.mobileAspectRatio) as AspectRatio | undefined)
-                : undefined,
-              editableTask: nextRenderTask?.taskState || nextTaskState,
-              displayLabel: nextRenderTask?.displayLabel || node.ecommerce.displayLabel,
-            },
-          });
-        });
-    });
-  }, [activeCanvasRef, applyEffectiveSizingToTaskState, config.mode, config.model, ecommerceState.sheetSettings, resolveEcommerceAPlusControlMode, setConfig, updatePromptNode]);
-
-  const handleAnalyzeEcommerceRequirement = useCallback(async () => {
-    if (!ecommerceState.requirementFile) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning('缺少需求单', '请先上传运营需求文件。');
-      });
-      return;
-    }
-
-    setEcommerceState((previousState) => ({ ...previousState, isAnalyzing: true }));
-    try {
-      let analysis = await analyzeEcommerceRequirementFile(ecommerceState.requirementFile);
-
-      if (config.enablePromptOptimization && ecommerceState.productFiles.length > 0) {
-        try {
-          const { enhanceAnalysisWithAI } = await import('./services/ecommerce/ecommerceAnalysisEnhancer');
-          const productImageData = await Promise.all(
-            ecommerceState.productFiles.map(async (file) => {
-              const dataUrl = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(String(reader.result || ''));
-                reader.onerror = () => reject(new Error('读取产品图失败'));
-                reader.readAsDataURL(file);
-              });
-              const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-              return { mimeType: match?.[1] || file.type || 'image/png', data: match?.[2] || dataUrl };
-            }),
-          );
-          analysis = await enhanceAnalysisWithAI(analysis, productImageData);
-        } catch (enhanceError) {
-          console.warn('[ecommerce] AI enhancement failed, using template analysis', enhanceError);
-        }
-      }
-
-      const selectedItems: Record<string, boolean> = {};
-      analysis.mainImageItems.forEach((item) => {
-        selectedItems[item.itemId] = true;
-      });
-      analysis.aPlusGroup.modules.forEach((module) => {
-        selectedItems[module.moduleId] = true;
-      });
-      setEcommerceState((previousState) => ({
-        ...previousState,
-        analysis,
-        itemReferenceFiles: previousState.itemReferenceFiles,
-        analysisConfirmed: false,
-        selectedItems,
-        taskStates: buildInitialEcommerceTaskStates(analysis),
-        groupSlots: createEmptyEcommerceGroupSlots(),
-        activeTaskNodeId: null,
-        activeTaskState: null,
-        activeGroupSheet: null,
-        isAnalyzing: false,
-        isConfirmingAnalysis: false,
-      }));
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.success('分析完成', `已解析主图 ${analysis.mainImageItems.length} 条，A+ ${analysis.aPlusGroup.modules.length} 条。`);
-      });
-    } catch (error: any) {
-      setEcommerceState((previousState) => ({ ...previousState, isAnalyzing: false, isConfirmingAnalysis: false }));
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.error('分析失败', error?.message || '请稍后重试。');
-      });
-    }
-  }, [buildInitialEcommerceTaskStates, ecommerceState.requirementFile]);
-
-  useEffect(() => {
-    if (!ecommerceState.activeTaskNodeId || !ecommerceState.activeTaskState) {
-      return;
-    }
-
-    const latestNode = activeCanvas?.promptNodes.find((node) => node.id === ecommerceState.activeTaskNodeId);
-    if (!latestNode?.ecommerce?.seriesTemplate) {
-      return;
-    }
-
-    const mergedTaskState = applyEffectiveSizingToTaskState(mergeEcommerceTaskState({
-      baseTask: ecommerceState.activeTaskState,
-      seriesTemplate: latestNode.ecommerce.seriesTemplate,
-      sparseIntent: ecommerceState.activeTaskState.sparseUserIntent,
-      productName: latestNode.ecommerce.productImageRef?.label || latestNode.ecommerce.theme || '',
-    }));
-    const nextAspectRatio = latestNode.ecommerce.currentAspectRatio || latestNode.aspectRatio || AspectRatio.SQUARE;
-    const nextImageSize = latestNode.imageSize || (resolvePreferredEcommerceImageSize(latestNode.model) as ImageSize);
-    const renderTask = buildEcommerceRenderTask({
-      taskState: mergedTaskState,
-      seriesTemplate: latestNode.ecommerce.seriesTemplate,
-      aspectRatio: String(nextAspectRatio),
-      imageSize: String(nextImageSize),
-    });
-
-    if (
-      latestNode.originalPrompt === renderTask.prompt
-      && latestNode.ecommerce.displayLabel === renderTask.displayLabel
-      && latestNode.ecommerce.editableTask?.taskId === renderTask.taskState.taskId
-      && latestNode.ecommerce.editableTask?.resolvedPromptPreview === renderTask.taskState.resolvedPromptPreview
-    ) {
-      return;
-    }
-
-    updatePromptNode({
-      ...latestNode,
-      prompt: renderTask.prompt,
-      originalPrompt: renderTask.prompt,
-      imageSize: nextImageSize,
-      ecommerce: {
-        ...latestNode.ecommerce,
-        editableTask: renderTask.taskState,
-        displayLabel: renderTask.displayLabel,
-      },
-    });
-  }, [activeCanvas, applyEffectiveSizingToTaskState, ecommerceState.activeTaskNodeId, ecommerceState.activeTaskState, updatePromptNode]);
-
-  useEffect(() => {
-    const analysis = ecommerceState.analysis;
-    if (!ecommerceState.analysisConfirmed || !analysis || !activeCanvas?.promptNodes.length) {
-      return;
-    }
-
-    const ecommercePromptNodes = activeCanvas.promptNodes.filter(
-      (node) => node.mode === GenerationMode.ECOMMERCE && node.ecommerce?.kind !== 'a-plus-group',
-    );
-    if (ecommercePromptNodes.length === 0) {
-      return;
-    }
-
-    let cancelled = false;
-
-    void (async () => {
-      const {
-        productReferences: nextProductReferences,
-        extraReferences: nextExtraReferences,
-        productImageRef: nextProductImageRef,
-      } = await buildCurrentEcommerceUploadReferences();
-      if (cancelled) {
-        return;
-      }
-
-      const nextTaskStatesBySourceKey: Record<string, EcommerceEditableTaskState> = {};
-      const nextActiveTaskCandidates = new Map<string, EcommerceEditableTaskState>();
-
-      ecommercePromptNodes.forEach((node) => {
-        if (!node.ecommerce?.seriesTemplate) {
-          return;
-        }
-
-        const sourceItem = findEcommerceAnalysisItemBySourceKey(analysis, node.ecommerce.sourceRowKey);
-        if (!sourceItem) {
-          return;
-        }
-
-        const rowAssets = analysis.assets.referenceAssets.filter((asset) => (
-          sourceItem.referenceAssetIds.includes(asset.assetId)
-        ));
-        const rowReferences = rowAssets
-          .map(createReferenceImageFromAsset)
-          .filter((referenceImage): referenceImage is ReferenceImage => Boolean(referenceImage));
-        const taskStateSeed = ecommerceState.taskStates[node.ecommerce.sourceRowKey] || node.ecommerce.editableTask;
-        const manualReferences = extractEcommerceManualReferenceBindings(taskStateSeed);
-        const nextImageSize = node.imageSize || (resolvePreferredEcommerceImageSize(node.model) as ImageSize);
-        const nextAspectRatio = node.ecommerce.currentAspectRatio || node.aspectRatio || AspectRatio.SQUARE;
-        const nextReferenceImages = [...rowReferences, ...manualReferences.map((reference) => reference.referenceImage), ...nextProductReferences, ...nextExtraReferences];
-        const nextAssetRoles = buildRuntimeEcommerceAssetRoles({
-          rowAssets,
-          rowMentions: sourceItem.referenceMentions,
-          manualReferences: manualReferences,
-          productReferences: nextProductReferences,
-          extraReferences: nextExtraReferences,
-        });
-        const nextTaskState = taskStateSeed
-          ? applyEffectiveSizingToTaskState({
-              ...taskStateSeed,
-              assetRoles: nextAssetRoles,
-            })
-          : null;
-        const nextRenderTask = nextTaskState
-          ? buildEcommerceRenderTask({
-              taskState: mergeEcommerceTaskState({
-                baseTask: nextTaskState,
-                seriesTemplate: node.ecommerce.seriesTemplate,
-                sparseIntent: nextTaskState.sparseUserIntent,
-                productName: analysis.projectMeta.productName,
-              }),
-              seriesTemplate: node.ecommerce.seriesTemplate,
-              aspectRatio: String(nextAspectRatio),
-              imageSize: String(nextImageSize),
-            })
-          : null;
-
-        if (nextRenderTask) {
-          nextTaskStatesBySourceKey[node.ecommerce.sourceRowKey] = nextRenderTask.taskState;
-          nextActiveTaskCandidates.set(nextRenderTask.taskState.taskId, nextRenderTask.taskState);
-          nextActiveTaskCandidates.set(node.ecommerce.sourceRowKey, nextRenderTask.taskState);
-        }
-
-        const nextEditableTask = nextRenderTask?.taskState || node.ecommerce.editableTask;
-        const nextDisplayLabel = nextRenderTask?.displayLabel || node.ecommerce.displayLabel;
-        const referenceImagesChanged = buildReferenceImageSignature(node.referenceImages || [])
-          !== buildReferenceImageSignature(nextReferenceImages);
-        const productImageRefChanged = buildEcommerceImageRefSignature(node.ecommerce.productImageRef)
-          !== buildEcommerceImageRefSignature(nextProductImageRef);
-        const taskStateChanged = buildTaskStateSyncSignature(node.ecommerce.editableTask)
-          !== buildTaskStateSyncSignature(nextEditableTask);
-        const displayLabelChanged = (node.ecommerce.displayLabel || '') !== (nextDisplayLabel || '');
-
-        if (!referenceImagesChanged && !productImageRefChanged && !taskStateChanged && !displayLabelChanged) {
-          return;
-        }
-
-        updatePromptNode({
-          ...node,
-          prompt: nextRenderTask?.prompt || node.prompt,
-          originalPrompt: nextRenderTask?.prompt || node.originalPrompt || node.prompt,
-          referenceImages: nextReferenceImages,
-          ecommerce: {
-            ...node.ecommerce,
-            productImageRef: nextProductImageRef,
-            editableTask: nextEditableTask,
-            displayLabel: nextDisplayLabel,
-          },
-        });
-      });
-
-      if (Object.keys(nextTaskStatesBySourceKey).length === 0) {
-        return;
-      }
-
-      setEcommerceState((previousState) => ({
-        ...previousState,
-        taskStates: {
-          ...previousState.taskStates,
-          ...nextTaskStatesBySourceKey,
-        },
-        activeTaskState: previousState.activeTaskState
-          ? nextActiveTaskCandidates.get(previousState.activeTaskState.taskId)
-            || nextActiveTaskCandidates.get(previousState.activeTaskState.sourceRowKey)
-            || previousState.activeTaskState
-          : previousState.activeTaskState,
-      }));
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activeCanvas?.id,
-    activeCanvas?.promptNodes.length,
-    buildCurrentEcommerceUploadReferences,
-    buildEcommerceImageRefSignature,
+  const {
     buildReferenceImageSignature,
-    buildRuntimeEcommerceAssetRoles,
+    buildEcommerceImageRefSignature,
     buildTaskStateSyncSignature,
-    applyEffectiveSizingToTaskState,
+    createReferenceImageFromAsset,
+    buildCurrentEcommerceUploadReferences,
+    extractEcommerceManualReferenceBindings,
+    handlePickEcommerceProductFiles,
+    handlePickEcommerceExtraReferenceFiles,
+    handleRemoveEcommerceProductFile,
+    handleRemoveEcommerceExtraReferenceFile,
+    handlePickEcommerceItemReferenceFiles,
+    handleRemoveEcommerceItemReferenceFile,
+  } = useEcommerceUploadReferenceRuntime({
+    ecommerceState,
+    setEcommerceUploadReferenceState: updateEcommerceUploadReferenceState,
+    readBlobAsDataUrl,
+  });
+
+  const {
+    handlePickEcommerceRequirementFile,
+    handleClearEcommerceRequirementFile,
+    handleResetEcommerceAnalysis,
+    handleAnalyzeEcommerceRequirement,
+  } = useEcommerceRequirementAnalysisRuntime({
+    ecommerceState,
+    enablePromptOptimization: Boolean(config.enablePromptOptimization),
+    readBlobAsDataUrl,
+    analyzeRequirementFile: analyzeEcommerceRequirementFile,
+    buildInitialEcommerceTaskStates,
+    setEcommerceRequirementAnalysisState: updateEcommerceRequirementAnalysisState,
+  });
+
+  const { handleConfirmEcommerceAnalysis } = useEcommerceBuildRuntime({
+    ecommerceState,
+    configModel: config.model,
+    configPrompt: config.prompt,
+    setConfig,
+    setEcommerceBuildRuntimeState: updateEcommerceBuildRuntimeState,
+    addPromptNode,
+    updatePromptNode,
+    bringNodesToFront,
+    findNextGroupPosition,
+    createEphemeralId,
+    buildCurrentEcommerceUploadReferences,
     createReferenceImageFromAsset,
     extractEcommerceManualReferenceBindings,
-    ecommerceState.analysis,
-    ecommerceState.analysisConfirmed,
-    ecommerceState.taskStates,
-    findEcommerceAnalysisItemBySourceKey,
+    applyEffectiveSizingToTaskState,
+    resolveEcommerceAPlusControlMode,
+  });
+  const { handleEcommerceSubmitGuard } = useEcommerceSubmitRuntime({
+    hasEcommerceAnalysis: Boolean(ecommerceState.analysis),
+    handleAnalyzeEcommerceRequirement,
+    handleConfirmEcommerceAnalysis,
+  });
+
+  useEcommercePostBuildSyncRuntime({
+    activeCanvas,
+    ecommerceState,
+    setEcommercePostBuildSyncState: updateEcommercePostBuildSyncState,
     updatePromptNode,
-  ]);
-
-  const buildEcommerceFrameworkNode = useCallback((
-    analysis: EcommerceAnalysisResult,
-    position: { x: number; y: number },
-  ): PromptNode => {
-    const productName = analysis.projectMeta.productName;
-    const label = `${productName || '电商'} Framework`;
-    const schedulerConfig = createDefaultEcommerceFrameworkSchedulerConfig();
-    const summary = [
-      analysis.projectMeta.projectName || label,
-      analysis.projectMeta.productName ? `产品：${analysis.projectMeta.productName}` : '',
-      '主图',
-      ...analysis.mainImageItems.map((item, index) => {
-        const selected = ecommerceState.selectedItems[item.itemId] !== false ? '保留' : '跳过';
-        return `${index + 1}. [${selected}] ${item.theme || item.type}${item.designRequirements ? ` - ${item.designRequirements}` : ''}`;
-      }),
-      'A+',
-      ...analysis.aPlusGroup.modules.map((item, index) => {
-        const selected = ecommerceState.selectedItems[item.moduleId] !== false ? '保留' : '跳过';
-        return `${index + 1}. [${selected}] ${item.moduleName}${item.designRequirements ? ` - ${item.designRequirements}` : ''}`;
-      }),
-    ].filter(Boolean).join('\n');
-
-    return {
-      id: createEphemeralId('ecom-framework'),
-      prompt: summary,
-      originalPrompt: summary,
-      position,
-      aspectRatio: AspectRatio.LANDSCAPE_16_9,
-      imageSize: ImageSize.SIZE_1K,
-      model: normalizeEcommerceModelId(config.model) || 'gemini-3.1-flash-image-preview',
-      childImageIds: [],
-      timestamp: Date.now(),
-      mode: GenerationMode.ECOMMERCE,
-      parallelCount: 1,
-      thinkingMode: 'high',
-      referenceImages: [],
-      ecommerce: {
-        kind: 'framework',
-        sourceSheet: '主图',
-        sourceRowKey: 'framework-root',
-        selectedForGeneration: false,
-        stage: 'ready',
-        theme: label,
-        displayLabel: label,
-        desktopStage: 'not_applicable',
-        mobileStage: 'not_applicable',
-        allowedAspectRatios: [AspectRatio.LANDSCAPE_16_9],
-        currentAspectRatio: AspectRatio.LANDSCAPE_16_9,
-        frameworkMeta: {
-          activeSheet: '主图',
-          groupIds: {},
-          taskNodeIds: [],
-          schedulerConfig,
-        },
-      },
-    };
-  }, [config.model, createEphemeralId, ecommerceState.selectedItems]);
-
-  const buildEcommerceGroupNode = useCallback((
-    productName: string,
-    sourceSheet: '主图' | 'A+',
-    position: { x: number; y: number },
-  frameworkId?: string,
-  ): PromptNode => {
-    const sheetSetting = ecommerceState.sheetSettings[sourceSheet] || createDefaultEcommerceSheetSettings(config.model)[sourceSheet];
-
-    return {
-      id: createEphemeralId(sourceSheet === '主图' ? 'ecom-main-group' : 'ecom-group'),
-      prompt: `${productName || '电商'} ${sourceSheet}组卡`,
-      originalPrompt: `${productName || '电商'} ${sourceSheet}组卡`,
-      position,
-      aspectRatio: sheetSetting.aspectRatio,
-      imageSize: sheetSetting.imageSize,
-      model: normalizeEcommerceModelId(config.model) || 'gemini-3.1-flash-image-preview',
-      childImageIds: [],
-      timestamp: Date.now(),
-      mode: GenerationMode.ECOMMERCE,
-      hiddenInCanvas: Boolean(frameworkId),
-      parallelCount: 1,
-      thinkingMode: 'high',
-      ecommerce: {
-        kind: 'a-plus-group',
-        sourceSheet,
-        sourceRowKey: sourceSheet === '主图' ? 'main-group' : 'aplus-group',
-        frameworkId,
-        parentNodeId: frameworkId,
-        selectedForGeneration: false,
-        stage: 'analysis_ready',
-        theme: `${productName || '电商'} ${sourceSheet}组卡`,
-        sizePolicy: 'sheet-native',
-        allowedAspectRatios: [sheetSetting.aspectRatio],
-        currentAspectRatio: sheetSetting.aspectRatio,
-        desktopStage: 'pending',
-        mobileStage: 'locked',
-      },
-    };
-  }, [config.model, createEphemeralId, ecommerceState.sheetSettings]);
-
-  const buildEcommercePromptNode = useCallback(async (params: ({
-    item: EcommerceAnalysisMainImageItem;
-    kind: 'main-image';
-    position: { x: number; y: number };
-    groupId?: string;
-    frameworkId?: string;
-    selected: boolean;
-    analysis: EcommerceAnalysisResult;
-    uploadReferences?: EcommerceUploadReferenceBundle;
-  } | {
-    item: EcommerceAnalysisAPlusModule;
-    kind: 'a-plus-module';
-    position: { x: number; y: number };
-    groupId?: string;
-    frameworkId?: string;
-    selected: boolean;
-    analysis: EcommerceAnalysisResult;
-    uploadReferences?: EcommerceUploadReferenceBundle;
-  })): Promise<PromptNode> => {
-    const modelId = normalizeEcommerceModelId(config.model) || 'gemini-3.1-flash-image-preview';
-    const policy = resolveEcommerceAspectPolicy({
-      kind: params.kind,
-      modelId,
-      declaredDimensions: 'declaredSizeText' in params.item ? params.item.declaredSizeText : undefined,
-      designRequirements: params.item.designRequirements,
-      copyText: params.item.copyText,
-    });
-    const preferredImageSize = resolvePreferredEcommerceImageSize(modelId) as ImageSize;
-    const rowAssets = params.analysis.assets.referenceAssets.filter((asset) => params.item.referenceAssetIds.includes(asset.assetId));
-    const {
-      productReferences,
-      extraReferences,
-      productImageRef,
-    } = params.uploadReferences || await buildCurrentEcommerceUploadReferences();
-    const rowReferences = rowAssets.map(createReferenceImageFromAsset).filter((item): item is ReferenceImage => Boolean(item));
-    const sourceMetadata = params.kind === 'main-image'
-      ? resolveEcommercePromptNodeMetadata({
-          kind: 'main-image',
-          item: params.item,
-        })
-      : resolveEcommercePromptNodeMetadata({
-          kind: 'a-plus-module',
-          item: params.item,
-        });
-    const sourceKey = params.kind === 'main-image' ? params.item.itemId : params.item.moduleId;
-    const sheetSetting = ecommerceState.sheetSettings[sourceMetadata.sourceSheet]
-      || createDefaultEcommerceSheetSettings(modelId)[sourceMetadata.sourceSheet];
-    const aPlusEffectivePolicy = params.kind === 'a-plus-module'
-      ? resolveEffectiveEcommerceAPlusPolicy({
-          detectedSizeTier: policy.sizeTier,
-          controlMode: resolveEcommerceAPlusControlMode(sheetSetting),
-        })
-      : null;
-    const resolvedNodeAspectRatio = (sourceMetadata.sourceSheet === 'A+'
-      ? (aPlusEffectivePolicy?.runtimeAspectRatio || policy.defaultAspectRatio)
-      : sheetSetting.aspectRatio) as AspectRatio;
-    const taskStateSeed = ecommerceState.taskStates[sourceKey]
-      || params.item.editableTask;
-    const taskManualReferences = extractEcommerceManualReferenceBindings(taskStateSeed);
-    const referenceImages = [...rowReferences, ...taskManualReferences.map((reference) => reference.referenceImage), ...productReferences, ...extraReferences];
-    const runtimeAssetRoles = buildRuntimeEcommerceAssetRoles({
-      rowAssets,
-      rowMentions: params.item.referenceMentions,
-      manualReferences: taskManualReferences,
-      productReferences,
-      extraReferences,
-    });
-    const mergedTaskState = applyEffectiveSizingToTaskState(mergeEcommerceTaskState({
-      baseTask: {
-        ...(taskStateSeed || {
-          taskId: `task-${sourceMetadata.sourceRowKey}`,
-          templateId: params.analysis.seriesTemplate.templateId,
-          sourceKind: params.kind,
-          sourceSheet: sourceMetadata.sourceSheet,
-          sourceRowKey: sourceMetadata.sourceRowKey,
-          declaredSizeText: 'declaredSizeText' in params.item ? params.item.declaredSizeText : undefined,
-          sizeTier: policy.sizeTier,
-          effectiveSizePolicy: aPlusEffectivePolicy?.effectiveSizePolicy,
-          effectiveSizeTier: aPlusEffectivePolicy?.effectiveSizeTier,
-          sizeControlOverride: null,
-          theme: sourceMetadata.theme,
-          outputTypeLabel: params.kind === 'main-image' ? '主图' : 'A+',
-          imageRoleSummary: runtimeAssetRoles.map((item) => item.normalizedLabel),
-          sparseUserIntent: '',
-          copy: { headline: '', subheadline: '', highlight: '', featureTags: [], cta: '' },
-          style: { tone: '', atmosphere: '', effect: '', backgroundType: '' },
-          layout: { productSize: 'balanced', textPosition: 'top-left', accessoryPolicy: 'auto' },
-          inherit: {
-            keepSeriesStyle: true,
-            keepFontStyle: true,
-            keepLayoutStyle: true,
-            keepCopyStyle: true,
-            keepPalette: true,
-          },
-          assetRoles: runtimeAssetRoles,
-          consistencyChecks: [],
-          missingFields: [],
-          resolvedPromptPreview: '',
-          displayLabel: '',
-          promptOverride: '',
-        }),
-        assetRoles: runtimeAssetRoles,
-      },
-      seriesTemplate: params.analysis.seriesTemplate,
-      sparseIntent: String(config.prompt || '').trim() || taskStateSeed?.sparseUserIntent || '',
-      productName: params.analysis.projectMeta.productName,
-    }), {
-      controlMode: resolveEcommerceAPlusControlMode(sheetSetting),
-    });
-    const renderTask = buildEcommerceRenderTask({
-      taskState: mergedTaskState,
-      seriesTemplate: params.analysis.seriesTemplate,
-      aspectRatio: resolvedNodeAspectRatio,
-      imageSize: sheetSetting.imageSize,
-    });
-
-    return {
-      id: createEphemeralId(params.kind === 'main-image' ? 'ecom-main' : 'ecom-module'),
-      prompt: renderTask.prompt,
-      originalPrompt: renderTask.prompt,
-      position: params.position,
-      aspectRatio: resolvedNodeAspectRatio,
-      imageSize: sheetSetting.imageSize,
-      model: modelId,
-      childImageIds: [],
-      referenceImages,
-      timestamp: Date.now(),
-      mode: GenerationMode.ECOMMERCE,
-      hiddenInCanvas: Boolean(params.frameworkId),
-      parallelCount: 1,
-      thinkingMode: 'high',
-      ecommerce: {
-        kind: params.kind,
-        sourceSheet: sourceMetadata.sourceSheet,
-        sourceRowKey: sourceMetadata.sourceRowKey,
-        groupId: params.groupId,
-        frameworkId: params.frameworkId,
-        parentNodeId: params.groupId || params.frameworkId,
-        selectedForGeneration: params.selected,
-        productImageRef,
-        referenceBindings: params.item.referenceMentions,
-        copyText: params.item.copyText,
-        designRequirements: params.item.designRequirements,
-        theme: sourceMetadata.theme,
-        sizePolicy: aPlusEffectivePolicy?.effectiveSizePolicy || policy.sizePolicy,
-        sizeTier: policy.sizeTier,
-        effectiveSizePolicy: aPlusEffectivePolicy?.effectiveSizePolicy,
-        effectiveSizeTier: aPlusEffectivePolicy?.effectiveSizeTier,
-        allowedAspectRatios: (aPlusEffectivePolicy?.allowedAspectRatios || policy.allowedAspectRatios) as AspectRatio[],
-        currentAspectRatio: resolvedNodeAspectRatio,
-        activeDeliveryKind: (aPlusEffectivePolicy?.effectiveSizePolicy || policy.sizePolicy) === 'desktop-then-mobile' ? 'desktop' : 'default',
-        aPlusControlMode: resolveEcommerceAPlusControlMode(sheetSetting),
-        sizeControlOverride: mergedTaskState.sizeControlOverride ?? null,
-        stage: 'analysis_ready',
-        desktopStage: (aPlusEffectivePolicy?.effectiveSizePolicy || policy.sizePolicy) === 'desktop-then-mobile' ? 'pending' : 'not_applicable',
-        mobileStage: (aPlusEffectivePolicy?.effectiveSizePolicy || policy.sizePolicy) === 'desktop-then-mobile' ? 'locked' : 'not_applicable',
-        declaredSizeText: 'declaredSizeText' in params.item ? params.item.declaredSizeText : undefined,
-        desktopAspectRatio: (aPlusEffectivePolicy?.effectiveSizePolicy || policy.sizePolicy) === 'desktop-then-mobile' ? resolvedNodeAspectRatio : undefined,
-        mobileAspectRatio: (aPlusEffectivePolicy?.mobileAspectRatio || policy.mobileAspectRatio) as AspectRatio | undefined,
-        needsReview: params.item.needsReview,
-        reviewWarnings: params.item.reviewWarnings,
-        seriesTemplate: params.analysis.seriesTemplate,
-        editableTask: renderTask.taskState,
-        displayLabel: renderTask.displayLabel,
-      },
-    };
-  }, [buildCurrentEcommerceUploadReferences, buildRuntimeEcommerceAssetRoles, config.model, config.prompt, createEphemeralId, createReferenceImageFromAsset, ecommerceState.sheetSettings, ecommerceState.taskStates, extractEcommerceManualReferenceBindings]);
-
-  const handleConfirmEcommerceAnalysis = useCallback(async () => {
-    if (!ecommerceState.analysis || ecommerceState.isConfirmingAnalysis) return;
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      isConfirmingAnalysis: true,
-    }));
-
-    try {
-      const analysis = ecommerceState.analysis;
-      if (!analysis) {
-        return;
-      }
-
-      const currentUploadReferences = await buildCurrentEcommerceUploadReferences();
-      const basePosition = findNextGroupPosition();
-      const createdNodeIds: string[] = [];
-      const taskNodeIds: string[] = [];
-      const layoutPlan = buildEcommerceCanvasGroupLayout({
-        basePosition,
-        mainSlotKeys: analysis.mainImageItems.map((item) => item.itemId),
-        aPlusSlotKeys: analysis.aPlusGroup.modules.map((item) => item.moduleId),
-      });
-      const mainSlotPositionByKey = new Map(
-        layoutPlan.mainGroup.slots.map((slot) => [slot.sourceKey, slot.position] as const),
-      );
-      const aPlusSlotPositionByKey = new Map(
-        layoutPlan.aPlusGroup.slots.map((slot) => [slot.sourceKey, slot.position] as const),
-      );
-      const initialGroupSlots = {
-        '主图': buildInitialEcommerceGroupSlotState({
-          groupKey: 'main',
-          slots: layoutPlan.mainGroup.slots.map((slot) => ({
-            slotId: slot.slotId,
-            sourceKey: slot.sourceKey,
-          })),
-          selectedItems: ecommerceState.selectedItems,
-        }),
-        'A+': buildInitialEcommerceGroupSlotState({
-          groupKey: 'aplus',
-          slots: layoutPlan.aPlusGroup.slots.map((slot) => ({
-            slotId: slot.slotId,
-            sourceKey: slot.sourceKey,
-            deliveryKinds: (ecommerceState.taskStates[slot.sourceKey]?.effectiveSizePolicy
-              || analysis.aPlusGroup.modules.find((item) => item.moduleId === slot.sourceKey)?.sizePolicy) === 'desktop-then-mobile'
-              ? ['desktop', 'mobile']
-              : ['default'],
-          })),
-          selectedItems: ecommerceState.selectedItems,
-        }),
-      };
-
-      const frameworkNode = buildEcommerceFrameworkNode(analysis, {
-        x: basePosition.x + 260,
-        y: basePosition.y - 260,
-      });
-      await addPromptNode(frameworkNode);
-      createdNodeIds.push(frameworkNode.id);
-
-      const mainGroupNode = buildEcommerceGroupNode(
-        analysis.projectMeta.productName,
-        '主图',
-        layoutPlan.mainGroup.position,
-        frameworkNode.id,
-      );
-      await addPromptNode(mainGroupNode);
-      createdNodeIds.push(mainGroupNode.id);
-
-      const aPlusGroupNode = buildEcommerceGroupNode(
-        analysis.projectMeta.productName,
-        'A+',
-        layoutPlan.aPlusGroup.position,
-        frameworkNode.id,
-      );
-      await addPromptNode(aPlusGroupNode);
-      createdNodeIds.push(aPlusGroupNode.id);
-
-      for (let index = 0; index < analysis.mainImageItems.length; index += 1) {
-        const item = analysis.mainImageItems[index];
-        const node = await buildEcommercePromptNode({
-          item,
-          kind: 'main-image',
-          position: mainSlotPositionByKey.get(item.itemId) || {
-            x: layoutPlan.mainGroup.position.x,
-            y: layoutPlan.mainGroup.position.y + 180 + index * 220,
-          },
-          groupId: mainGroupNode.id,
-          frameworkId: frameworkNode.id,
-          selected: ecommerceState.selectedItems[item.itemId] !== false,
-          analysis,
-          uploadReferences: currentUploadReferences,
-        });
-        await addPromptNode(node);
-        createdNodeIds.push(node.id);
-        taskNodeIds.push(node.id);
-      }
-
-      for (let index = 0; index < analysis.aPlusGroup.modules.length; index += 1) {
-        const item = analysis.aPlusGroup.modules[index];
-        const node = await buildEcommercePromptNode({
-          item,
-          kind: 'a-plus-module',
-          groupId: aPlusGroupNode.id,
-          frameworkId: frameworkNode.id,
-          position: aPlusSlotPositionByKey.get(item.moduleId) || {
-            x: layoutPlan.aPlusGroup.position.x,
-            y: layoutPlan.aPlusGroup.position.y + 180 + index * 220,
-          },
-          selected: ecommerceState.selectedItems[item.moduleId] !== false,
-          analysis,
-          uploadReferences: currentUploadReferences,
-        });
-        await addPromptNode(node);
-        createdNodeIds.push(node.id);
-        taskNodeIds.push(node.id);
-      }
-
-      const frameworkSchedulerConfig = frameworkNode.ecommerce?.frameworkMeta?.schedulerConfig;
-      if (frameworkNode.ecommerce) {
-        await updatePromptNode({
-          ...frameworkNode,
-          ecommerce: {
-            ...frameworkNode.ecommerce,
-            frameworkMeta: {
-              activeSheet: '主图',
-              groupIds: {
-                '主图': mainGroupNode.id,
-                'A+': aPlusGroupNode.id,
-              },
-              taskNodeIds,
-              schedulerConfig: frameworkSchedulerConfig,
-            },
-          },
-        });
-      }
-
-      const initialFrameworkRuntime = createEcommerceFrameworkRuntimeState({
-        frameworkId: frameworkNode.id,
-        activeSheet: '主图',
-        config: frameworkSchedulerConfig,
-      });
-
-      bringNodesToFront(createdNodeIds);
-      setEcommerceState((previousState) => ({
-        ...previousState,
-        analysisConfirmed: true,
-        groupSlots: initialGroupSlots,
-        activeTaskNodeId: null,
-        activeTaskState: null,
-        activeFrameworkId: frameworkNode.id,
-        activeGroupSheet: '主图',
-        frameworkRuntime: {
-          ...previousState.frameworkRuntime,
-          [frameworkNode.id]: initialFrameworkRuntime,
-        },
-      }));
-      setConfig((previousConfig) => ({
-        ...previousConfig,
-        prompt: '',
-        referenceImages: [],
-      }));
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.success('Build complete', 'Created ' + createdNodeIds.length + ' ecommerce cards.');
-      });
-    } catch (error: any) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.error('Build failed', error?.message || 'Please try again later.');
-      });
-    } finally {
-      setEcommerceState((previousState) => ({
-        ...previousState,
-        isConfirmingAnalysis: false,
-      }));
-    }
-  }, [addPromptNode, bringNodesToFront, buildCurrentEcommerceUploadReferences, buildEcommerceFrameworkNode, buildEcommerceGroupNode, buildEcommercePromptNode, ecommerceState.analysis, ecommerceState.isConfirmingAnalysis, ecommerceState.selectedItems, ecommerceState.taskStates, findNextGroupPosition, updatePromptNode]);
-
-  const handleActivateEcommerceGroupSheet = useCallback((sheet: '主图' | 'A+') => {
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      activeTaskNodeId: null,
-      activeTaskState: null,
-      activeGroupSheet: sheet,
-    }));
-
-    if (ecommerceState.activeFrameworkId) {
-      syncEcommerceFrameworkView(ecommerceState.activeFrameworkId, sheet);
-    }
-  }, [ecommerceState.activeFrameworkId, syncEcommerceFrameworkView]);
-
-  useEffect(() => {
-    return () => {
-    };
-  }, []);
+    buildCurrentEcommerceUploadReferences,
+    buildReferenceImageSignature,
+    buildEcommerceImageRefSignature,
+    buildTaskStateSyncSignature,
+    createReferenceImageFromAsset,
+    extractEcommerceManualReferenceBindings,
+    applyEffectiveSizingToTaskState,
+  });
 
   useEffect(() => {
     return () => {
@@ -3296,13 +2082,10 @@ const AppContent: React.FC<AppContentProps> = () => {
   const {
     handleCancelGeneration,
     handleRetryPptSinglePage,
-    ensureCreditAttemptCharged,
     prepareInitialGenerationSubmissionContext,
     runInitialGenerationSubmissionTransaction,
     prepareRetryGeneratedMediaExecutionContext,
     completeRetryGeneratedMediaBatch,
-    resolveFailedCreditAttempt,
-    applyOptimisticServerCreditDebit,
   } = useGenerationRuntime({
     activeCanvas,
     updatePromptNode,
@@ -3440,261 +2223,13 @@ const AppContent: React.FC<AppContentProps> = () => {
     return details;
   }, []);
 
-  const sanitizeEcommerceExportName = useCallback((value: string, fallback: string) => {
-    const normalized = String(value || '')
-      .replace(/[\\/:*?"<>|]+/g, '-')
-      .replace(/\s+/g, '-')
-      .trim();
-    return normalized || fallback;
-  }, []);
-
-  const resolveLatestEcommerceSlotImage = useCallback((node: PromptNode, deliveryKind?: 'default' | 'desktop' | 'mobile') => {
-    const canvas = activeCanvasRef.current;
-    const taskId = node.ecommerce?.editableTask?.taskId;
-    if (!canvas || !node.ecommerce) {
-      return null;
-    }
-
-    const candidatePromptIds = new Set<string>([node.id]);
-    if (taskId) {
-      canvas.promptNodes.forEach((promptNode) => {
-        if (promptNode.partialRedraw?.inheritedTaskState?.taskId === taskId) {
-          candidatePromptIds.add(promptNode.id);
-        }
-      });
-    }
-
-    const latestImage = canvas.imageNodes
-      .filter((imageNode) => {
-        if (!imageNode.parentPromptId || !candidatePromptIds.has(imageNode.parentPromptId)) {
-          return false;
-        }
-
-        if (!deliveryKind) {
-          return true;
-        }
-
-        if (deliveryKind === 'default') {
-          return !imageNode.ecommerceDeliveryKind || imageNode.ecommerceDeliveryKind === 'default';
-        }
-
-        return imageNode.ecommerceDeliveryKind === deliveryKind;
-      })
-      .sort((left, right) => (right.timestamp || 0) - (left.timestamp || 0))[0];
-
-    if (!latestImage) {
-      return null;
-    }
-
-    return {
-      image: latestImage,
-      latestSource: latestImage.parentPromptId === node.id ? 'generated' as const : 'redraw' as const,
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!ecommerceState.analysisConfirmed) {
-      return;
-    }
-
-    setEcommerceState((previousState) => {
-      const nextGroupSlots: Record<EcommerceGroupSheet, EcommerceGroupSlotState[]> = {
-        '主图': previousState.groupSlots['主图'].map((slot) => ({
-          ...slot,
-          selected: previousState.selectedItems[slot.sourceKey] !== false,
-        })),
-        'A+': previousState.groupSlots['A+'].map((slot) => ({
-          ...slot,
-          selected: previousState.selectedItems[slot.sourceKey] !== false,
-        })),
-      };
-
-      (activeCanvas?.promptNodes || []).forEach((promptNode) => {
-        if (!promptNode.ecommerce || promptNode.ecommerce.kind === 'a-plus-group') {
-          return;
-        }
-
-        const sheet = promptNode.ecommerce.sourceSheet;
-        const slot = nextGroupSlots[sheet].find((entry) => entry.sourceKey === promptNode.ecommerce?.sourceRowKey);
-        if (!slot) {
-          return;
-        }
-
-        const latest = resolveLatestEcommerceSlotImage(promptNode);
-        if (!latest) {
-          return;
-        }
-
-        nextGroupSlots[sheet] = applyEcommerceSlotResult(nextGroupSlots[sheet], {
-          slotId: slot.slotId,
-          imageId: latest.image.id,
-          source: latest.latestSource,
-        });
-
-        slot.deliveries.forEach((delivery) => {
-          const latestForDelivery = resolveLatestEcommerceSlotImage(promptNode, delivery.deliveryKind);
-          if (!latestForDelivery) {
-            return;
-          }
-
-          nextGroupSlots[sheet] = applyEcommerceSlotResult(nextGroupSlots[sheet], {
-            slotId: slot.slotId,
-            deliveryKind: delivery.deliveryKind,
-            imageId: latestForDelivery.image.id,
-            source: latestForDelivery.latestSource,
-          });
-        });
-      });
-
-      const previousSignature = JSON.stringify(previousState.groupSlots);
-      const nextSignature = JSON.stringify(nextGroupSlots);
-      if (previousSignature === nextSignature) {
-        return previousState;
-      }
-
-      return {
-        ...previousState,
-        groupSlots: nextGroupSlots,
-      };
-    });
-  }, [activeCanvas, ecommerceState.analysisConfirmed, ecommerceState.selectedItems, resolveLatestEcommerceSlotImage]);
-
-  const handleExportEcommerceGroup = useCallback(async (groupNode: PromptNode) => {
-    if (!groupNode.ecommerce || groupNode.ecommerce.kind !== 'a-plus-group') {
-      return;
-    }
-
-    const canvas = activeCanvasRef.current;
-    if (!canvas) {
-      return;
-    }
-
-    const moduleNodes = canvas.promptNodes.filter((promptNode) => (
-      !!promptNode.ecommerce
-      && promptNode.ecommerce.kind !== 'a-plus-group'
-      && promptNode.ecommerce.groupId === groupNode.id
-    ));
-    const slotStateBySourceKey = new Map(
-      ecommerceState.groupSlots[groupNode.ecommerce.sourceSheet].map((slot) => [slot.sourceKey, slot] as const),
-    );
-
-    const packageType = groupNode.ecommerce.sourceSheet === '主图' ? 'main-image-group' : 'a-plus-group';
-    const packageLabel = groupNode.ecommerce.sourceSheet === '主图' ? '主图包' : 'A+包';
-    const zip = new JSZip();
-    const exportables: Array<{ fileName: string; image: GeneratedImage }> = [];
-
-    const manifest = buildEcommerceGroupExportManifest({
-      packageType,
-      groupId: groupNode.id,
-      groupLabel: groupNode.ecommerce.sourceSheet,
-      sourcePromptId: groupNode.id,
-      slots: moduleNodes.map((promptNode, index) => {
-        const latest = resolveLatestEcommerceSlotImage(promptNode);
-        const slotLabel = promptNode.ecommerce?.displayLabel || promptNode.ecommerce?.sourceRowKey || `${groupNode.ecommerce?.sourceSheet} 模块`;
-        const slotState = promptNode.ecommerce
-          ? slotStateBySourceKey.get(promptNode.ecommerce.sourceRowKey)
-          : undefined;
-        const slotId = slotState?.slotId || `${groupNode.id}-slot-${index + 1}`;
-        const isSelected = slotState?.selected ?? (promptNode.ecommerce?.selectedForGeneration !== false);
-        if (!promptNode.ecommerce || !isSelected) {
-          return {
-            slotId,
-            slotLabel,
-            selectedForGeneration: false,
-          };
-        }
-
-        if ((promptNode.ecommerce.effectiveSizePolicy || promptNode.ecommerce.sizePolicy) === 'desktop-then-mobile') {
-          const deliverables = (['desktop', 'mobile'] as const).map((deliveryKind) => {
-            const latestForDelivery = resolveLatestEcommerceSlotImage(promptNode, deliveryKind);
-            if (!latestForDelivery) {
-              return { deliveryKind };
-            }
-
-            const extension = latestForDelivery.image.mimeType?.includes('jpeg') || latestForDelivery.image.mimeType?.includes('jpg')
-              ? 'jpg'
-              : latestForDelivery.image.mimeType?.includes('webp')
-                ? 'webp'
-                : 'png';
-            const fileName = `${String(index + 1).padStart(2, '0')}-${sanitizeEcommerceExportName(slotLabel, `slot-${index + 1}`)}-${deliveryKind}.${extension}`;
-            exportables.push({ fileName, image: latestForDelivery.image });
-
-            return {
-              deliveryKind,
-              latestImageId: latestForDelivery.image.id,
-              latestSource: latestForDelivery.latestSource,
-              fileName,
-            };
-          });
-
-          if (!deliverables.some((deliverable) => 'latestImageId' in deliverable)) {
-            return {
-              slotId,
-              slotLabel,
-              selectedForGeneration: true,
-            };
-          }
-
-          return {
-            slotId,
-            slotLabel,
-            selectedForGeneration: true,
-            deliverables,
-          };
-        }
-
-        if (!latest) {
-          return {
-            slotId,
-            slotLabel,
-            selectedForGeneration: true,
-          };
-        }
-
-        const extension = latest.image.mimeType?.includes('jpeg') || latest.image.mimeType?.includes('jpg')
-          ? 'jpg'
-          : latest.image.mimeType?.includes('webp')
-            ? 'webp'
-            : 'png';
-        const fileName = `${String(index + 1).padStart(2, '0')}-${sanitizeEcommerceExportName(slotLabel, `slot-${index + 1}`)}.${extension}`;
-        exportables.push({ fileName, image: latest.image });
-
-        return {
-          slotId,
-          slotLabel,
-          selectedForGeneration: true,
-          latestImageId: latest.image.id,
-          latestSource: latest.latestSource,
-          fileName,
-        };
-      }),
-    });
-
-    if (exportables.length === 0) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning('无可导出图片', `${packageLabel}当前没有已生成的图片可打包。`);
-      });
-      return;
-    }
-
-    zip.file('manifest.json', JSON.stringify(manifest, null, 2));
-
-    const fallbackQualityFiles: string[] = [];
-    for (const exportItem of exportables) {
-      const { blob, isOriginal } = await resolvePptImageBlob(exportItem.image);
-      if (!isOriginal) fallbackQualityFiles.push(exportItem.fileName);
-      zip.file(exportItem.fileName, blob);
-    }
-
-    const content = await zip.generateAsync({ type: 'blob' });
-    saveAs(content, `${sanitizeEcommerceExportName(packageLabel, packageLabel)}-${Date.now()}.zip`);
-    import('./services/system/notificationService').then(({ notify }) => {
-      if (fallbackQualityFiles.length > 0) {
-        notify.warning('部分图片非原始质量', `${fallbackQualityFiles.length} 张图片使用了回退源：${fallbackQualityFiles.slice(0, 3).join('、')}${fallbackQualityFiles.length > 3 ? '…' : ''}`);
-      }
-      notify.success('导出完成', `${packageLabel}已导出，共 ${exportables.length} 张图片。`);
-    });
-  }, [ecommerceState.groupSlots, resolveLatestEcommerceSlotImage, resolvePptImageBlob, sanitizeEcommerceExportName]);
+  const { handleExportEcommerceGroup } = useEcommerceGroupExportRuntime({
+    activeCanvas,
+    activeCanvasRef,
+    ecommerceState,
+    setEcommerceGroupExportState: updateEcommerceGroupExportState,
+    resolvePptImageBlob,
+  });
 
   const getNodeIoTrace = useCallback((nodeId: string) => {
     const node = activeCanvas?.promptNodes.find(n => n.id === nodeId);
@@ -3716,12 +2251,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
     if (!submitGuard.allowed) return;
 
-    if (submitGuard.isEcommerce) {
-      if (!ecommerceState.analysis) {
-        await handleAnalyzeEcommerceRequirement();
-        return;
-      }
-      await handleConfirmEcommerceAnalysis();
+    if (await handleEcommerceSubmitGuard(submitGuard)) {
       return;
     }
 
@@ -3760,7 +2290,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       setDraftNodeId,
       updateImageNodePosition,
     });
-  }, [config, draftNodeId, addPromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialGenerationSubmissionContext, runInitialGenerationSubmissionTransaction, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission]);
+  }, [config, draftNodeId, addPromptNode, updateImageNodePosition, activeSourceImage, executeGeneration, getPreferredKeyForMode, prepareInitialGenerationSubmissionContext, runInitialGenerationSubmissionTransaction, resolveCreditCostForModel, hasExplicitModelRoute, resolveGenerationPlacement, prepareGenerationReferenceImages, deletePromptNode, tryStartGenerationSubmission, handleEcommerceSubmitGuard]);
 
   // Handle reference images
   const handleFilesDrop = useCallback((files: File[]) => {
@@ -3797,10 +2327,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   }, [arrangeAllNodes]);
 
   // --- 连接管理 ---
-  const handleCutConnection = useCallback((promptId: string, imageId: string) => {
-    unlinkNodes(promptId, imageId);
-  }, [unlinkNodes]);
-
   // 🎯 [Strict Logic] Disconnect Parent -> Child Group becomes Normal Group
   const handleDisconnectPrompt = useCallback((id: string) => {
     const node = activeCanvas?.promptNodes.find(n => n.id === id);
@@ -3819,7 +2345,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   }, [activeCanvas, updatePromptNode, draftNodeId, setActiveSourceImage]);
 
   // 🎯 [Strict Logic] Pin Draft -> Create Lonely Main Card
-  const handlePinDraft = useCallback((id: string, mode: 'button' | 'drag') => {
+  const handlePinDraft = useCallback((id: string, _mode: 'button' | 'drag') => {
     const node = activeCanvas?.promptNodes.find(n => n.id === id);
     if (!node) return;
 
@@ -3843,47 +2369,6 @@ const AppContent: React.FC<AppContentProps> = () => {
       notify.success('已固定', '草稿已转换为独立卡片');
     });
   }, [activeCanvas, updatePromptNode, setDraftNodeId, setConfig]);
-
-  // 🎯 [New Feature] Pin Image -> Convert to Lonely Main Card (Idea Freeze)
-  const handlePinImage = useCallback(async (imageId: string) => {
-    const imageNode = activeCanvas?.imageNodes.find(n => n.id === imageId);
-    if (!imageNode) return;
-
-    // 1. Create New Prompt Node based on Image
-    const newPromptId = Date.now().toString();
-    const newPromptNode: PromptNode = {
-      id: newPromptId,
-      prompt: imageNode.prompt || '',
-      position: imageNode.position, // Take image's place
-      width: undefined as number | undefined, // Default width
-      height: undefined as number | undefined,
-      isDraft: false, // Lonely Main Card (Permanent)
-      model: imageNode.model,
-      imageSize: imageNode.imageSize || ImageSize.SIZE_1K,
-      aspectRatio: imageNode.aspectRatio,
-      childImageIds: [], // Initialize empty array for new prompt node
-      // 🎯 Use the image itself as a reference to preserve the "Idea"
-      referenceImages: [{
-        id: `ref-${newPromptId}`,
-        storageId: imageNode.storageId || imageNode.id,
-        url: imageNode.url, // Thumbnail
-        data: imageNode.url, // Base64/Blob
-        mimeType: imageNode.mimeType || 'image/png'
-      }],
-      timestamp: Date.now()
-    };
-
-    // 2. Add New Prompt Node
-    addPromptNode(newPromptNode);
-
-    // 3. Delete Original Image Node (Transformation complete)
-    deleteImageNode(imageId);
-
-    import('./services/system/notificationService').then(({ notify }) => {
-      notify.success('想法已定格', '图片已转换为独立主卡');
-    });
-
-  }, [activeCanvas, addPromptNode, deleteImageNode]);
 
   // Retry Logic (In-Place Regeneration)
   const handleRetryNode = useCallback(async (node: PromptNode) => {
@@ -3929,523 +2414,63 @@ const AppContent: React.FC<AppContentProps> = () => {
   }, [config.parallelCount, isMobile, addImageNodes, extractErrorDetails, resolveNodeRouteState, recoverFailedSyncBridgeGeneration, applyAuthoritativeBalance, resolveCreditCostForModel, prepareRetryGeneratedMediaExecutionContext, completeRetryGeneratedMediaBatch, buildPptPageAlias, resolveModelDisplayName, buildGeneratedImageBatchPositions, calculateImageHash, generateImage, getCardDimensions, normalizePersistableMediaSource, saveOriginalImage]);
 
 
-  const updateEcommerceNodeState = useCallback((nodeId: string, patch: Partial<NonNullable<PromptNode['ecommerce']>>, nodePatch: Partial<PromptNode> = {}) => {
-    const latestNode = activeCanvasRef.current?.promptNodes.find((node) => node.id === nodeId);
-    if (!latestNode?.ecommerce) return;
-    updatePromptNode({
-      ...latestNode,
-      ...nodePatch,
-      ecommerce: {
-        ...latestNode.ecommerce,
-        ...patch,
-      },
-    });
-  }, [updatePromptNode]);
+  const {
+    updateEcommerceNodeState,
+    handleGenerateEcommerceNode,
+    handleConfirmEcommerceDesktop,
+    handleRetryEcommerceModule,
+  } = useEcommerceNodeGenerationRuntime({
+    activeCanvasRef,
+    ecommerceState,
+    setEcommerceNodeGenerationRuntimeState: updateEcommerceNodeGenerationRuntimeState,
+    enablePromptOptimization: Boolean(config.enablePromptOptimization),
+    configPrompt: config.prompt,
+    updatePromptNode,
+    handleRetryNode,
+    applyEffectiveSizingToTaskState,
+    resolveEcommerceNodeGenerationSettings,
+    resolveEffectiveEcommerceThinkingMode,
+  });
 
-  const syncActiveEcommerceTask = useCallback((nodeId: string, taskState: EcommerceEditableTaskState) => {
-    setEcommerceState((previousState) => {
-      if (previousState.activeTaskNodeId !== nodeId) {
-        return previousState;
-      }
-
-      return {
-        ...previousState,
-        activeTaskState: taskState,
-      };
-    });
-  }, []);
-
-  const runEcommerceNodeGeneration = useCallback(async (
-    node: PromptNode,
-    options?: {
-      aspectRatio?: AspectRatio;
-      imageSize?: ImageSize;
-      generationTarget?: 'sheet' | 'desktop' | 'mobile';
-      promptSuffix?: string;
-      stagePatch?: Partial<NonNullable<PromptNode['ecommerce']>>;
-      successPatch?: Partial<NonNullable<PromptNode['ecommerce']>>;
-      failurePatch?: Partial<NonNullable<PromptNode['ecommerce']>>;
-    },
-  ) => {
-    const latestNode = activeCanvasRef.current?.promptNodes.find((item) => item.id === node.id) || node;
-    if (!latestNode.ecommerce) return;
-
-    const nextGenerationSettings = resolveEcommerceNodeGenerationSettings(latestNode, options?.generationTarget);
-    const nextAspectRatio = options?.aspectRatio || nextGenerationSettings.aspectRatio;
-    const nextImageSize = options?.imageSize || nextGenerationSettings.imageSize;
-    const activeDraft = ecommerceState.activeTaskNodeId === node.id
-      ? ecommerceState.activeTaskState
-      : null;
-    const baseTaskState = activeDraft || latestNode.ecommerce.editableTask;
-    const seriesTemplate = latestNode.ecommerce.seriesTemplate;
-    const mergedTaskState = (baseTaskState && seriesTemplate)
-      ? applyEffectiveSizingToTaskState(mergeEcommerceTaskState({
-          baseTask: {
-            ...baseTaskState,
-            assetRoles: baseTaskState.assetRoles,
-          },
-          seriesTemplate,
-          sparseIntent: ecommerceState.activeTaskNodeId === node.id
-            ? (String(config.prompt || '').trim() || baseTaskState.sparseUserIntent || '')
-            : (baseTaskState.sparseUserIntent || ''),
-          productName: latestNode.ecommerce.productImageRef?.label || latestNode.ecommerce.theme || '',
-        }))
-      : null;
-    const renderTask = mergedTaskState && seriesTemplate
-      ? buildEcommerceRenderTask({
-          taskState: mergedTaskState,
-          seriesTemplate,
-          aspectRatio: String(nextAspectRatio),
-          imageSize: String(nextImageSize),
-        })
-      : null;
-    const activeDeliveryKind = options?.generationTarget === 'mobile'
-      ? 'mobile'
-      : (latestNode.ecommerce.effectiveSizePolicy || latestNode.ecommerce.sizePolicy) === 'desktop-then-mobile'
-        ? 'desktop'
-        : 'default';
-    let nextPrompt = [renderTask?.prompt || latestNode.originalPrompt || latestNode.prompt, options?.promptSuffix || ''].filter(Boolean).join('\n');
-    const {
-      optimizedPrompt: optimizedNextPrompt,
-      optimizedPromptEn,
-      optimizedPromptZh,
-      promptOptimizerResult,
-    } = await optimizeGenerationPrompt({
-      enabled: config.enablePromptOptimization && !!nextPrompt,
-      rawPrompt: nextPrompt,
-      referenceImages: latestNode.referenceImages || [],
-      options: {
-        preferredModelId: latestNode.model,
-        aspectRatio: String(nextAspectRatio),
-        imageSize: String(nextImageSize),
-        mode: GenerationMode.ECOMMERCE,
-        supportsThinking: !!getModelCapabilities(latestNode.model)?.supportsThinking,
-        thinkingMode: resolveEffectiveEcommerceThinkingMode(),
-        ecommerceContext: renderTask && seriesTemplate ? {
-          taskState: renderTask.taskState,
-          seriesTemplate,
-          assetRoles: renderTask.taskState.assetRoles,
-          outputTarget: {
-            label: renderTask.displayLabel,
-            aspectRatio: String(nextAspectRatio),
-            imageSize: String(nextImageSize),
-          },
-        } : undefined,
-      },
-      onError: (error) => {
-        console.warn('[runEcommerceNodeGeneration] Prompt optimization failed, fallback to render task prompt.', error);
-      },
-    });
-    nextPrompt = optimizedNextPrompt;
-
-    const executionNode: PromptNode = {
-      ...latestNode,
-      prompt: nextPrompt,
-      originalPrompt: renderTask?.prompt || latestNode.originalPrompt || latestNode.prompt,
-      optimizedPromptEn,
-      optimizedPromptZh,
-      promptOptimizerResult,
-      imageSize: nextImageSize,
-      thinkingMode: resolveEffectiveEcommerceThinkingMode(),
-      mode: GenerationMode.ECOMMERCE,
-      aspectRatio: nextAspectRatio,
-      ecommerce: {
-        ...latestNode.ecommerce,
-        editableTask: renderTask?.taskState || latestNode.ecommerce.editableTask,
-        displayLabel: renderTask?.displayLabel || latestNode.ecommerce.displayLabel,
-        currentAspectRatio: nextAspectRatio,
-        activeDeliveryKind,
-        stage: 'generating',
-        ...options?.stagePatch,
-      },
-    };
-
-    if (renderTask?.taskState) {
-      syncActiveEcommerceTask(node.id, renderTask.taskState);
-    }
-
-    await handleRetryNode(executionNode);
-
-    const finalizedNode = activeCanvasRef.current?.promptNodes.find((item) => item.id === node.id) || executionNode;
-    const succeeded = !finalizedNode.error && (finalizedNode.childImageIds?.length || 0) > 0;
-    updateEcommerceNodeState(node.id, succeeded ? {
-      stage: 'generated',
-      ...options?.successPatch,
-    } : {
-      stage: 'failed',
-      ...options?.failurePatch,
-    });
-  }, [applyEffectiveSizingToTaskState, config.enablePromptOptimization, config.prompt, ecommerceState.activeTaskNodeId, ecommerceState.activeTaskState, handleRetryNode, resolveEcommerceNodeGenerationSettings, resolveEffectiveEcommerceThinkingMode, syncActiveEcommerceTask, updateEcommerceNodeState]);
-
-  const handleToggleEcommerceSelected = useCallback((node: PromptNode, selected: boolean) => {
-    if (!node.ecommerce) return;
-    updateEcommerceNodeState(node.id, { selectedForGeneration: selected });
+  const updateEcommerceSelectionState = useCallback<UpdateEcommerceSelectionState>((updater) => {
     setEcommerceState((previousState) => ({
       ...previousState,
-      selectedItems: {
-        ...previousState.selectedItems,
-        [node.ecommerce?.sourceRowKey || node.id]: selected,
-      },
-      groupSlots: node.ecommerce?.sourceSheet
-        ? {
-            ...previousState.groupSlots,
-            [node.ecommerce.sourceSheet]: previousState.groupSlots[node.ecommerce.sourceSheet].map((slot) => (
-              slot.sourceKey === node.ecommerce?.sourceRowKey
-                ? { ...slot, selected }
-                : slot
-            )),
-          }
-        : previousState.groupSlots,
+      ...updater(previousState),
     }));
-  }, [updateEcommerceNodeState]);
-
-  const handleSetEcommerceGroupSelection = useCallback((groupNode: PromptNode, selected: boolean) => {
-    if (!groupNode.ecommerce || groupNode.ecommerce.kind !== 'a-plus-group') {
-      return;
-    }
-
-    const childNodes = (activeCanvasRef.current?.promptNodes || []).filter((node) => (
-      node.mode === GenerationMode.ECOMMERCE
-      && node.ecommerce?.groupId === groupNode.id
-      && node.ecommerce.kind !== 'a-plus-group'
-    ));
-
-    childNodes.forEach((node) => {
-      updateEcommerceNodeState(node.id, { selectedForGeneration: selected });
-    });
-
-    const affectedSourceKeys = new Set(
-      childNodes
-        .map((node) => node.ecommerce?.sourceRowKey)
-        .filter((sourceKey): sourceKey is string => Boolean(sourceKey)),
-    );
-
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      selectedItems: {
-        ...previousState.selectedItems,
-        ...Object.fromEntries(Array.from(affectedSourceKeys).map((sourceKey) => [sourceKey, selected])),
-      },
-      groupSlots: {
-        ...previousState.groupSlots,
-        [groupNode.ecommerce!.sourceSheet]: previousState.groupSlots[groupNode.ecommerce!.sourceSheet].map((slot) => (
-          affectedSourceKeys.has(slot.sourceKey)
-            ? { ...slot, selected }
-            : slot
-        )),
-      },
-    }));
-  }, [updateEcommerceNodeState]);
-
-  const handleGenerateEcommerceNode = useCallback(async (node: PromptNode) => {
-    if (!node.ecommerce) return;
-    if (node.ecommerce.kind === 'main-image') {
-      await runEcommerceNodeGeneration(node, {
-        generationTarget: 'sheet',
-      });
-      return;
-    }
-
-    if (node.ecommerce.kind === 'a-plus-module') {
-      const effectiveSizePolicy = node.ecommerce.effectiveSizePolicy || node.ecommerce.sizePolicy;
-      const effectiveSizeTier = node.ecommerce.effectiveSizeTier || node.ecommerce.sizeTier;
-      const isDesktopThenMobile = effectiveSizePolicy === 'desktop-then-mobile';
-      const desktopPromptSuffix = effectiveSizeTier === '1464x600'
-        ? '先生成 1464*600 桌面端母版，保留后续转 600*450 手机端的安全排版空间。'
-        : effectiveSizeTier === '600x450'
-          ? '先生成可收敛到 600*450 手机端成品的紧凑母版，保持主体与文案一致。'
-          : '先生成桌面端 A+ 模块版本。';
-      await runEcommerceNodeGeneration(node, {
-        generationTarget: isDesktopThenMobile ? 'desktop' : 'sheet',
-        ...(isDesktopThenMobile ? {} : {}),
-        promptSuffix: isDesktopThenMobile ? '先生成桌面端 21:9 电商横幅版本。' : undefined,
-        stagePatch: isDesktopThenMobile ? { desktopStage: 'generating' } : undefined,
-        successPatch: isDesktopThenMobile ? { desktopStage: 'generated', mobileStage: 'locked' } : undefined,
-        failurePatch: isDesktopThenMobile ? { desktopStage: 'failed' } : undefined,
-        ...(isDesktopThenMobile ? { promptSuffix: desktopPromptSuffix } : {}),
-      });
-    }
-  }, [runEcommerceNodeGeneration]);
-
-  const handleConfirmEcommerceDesktop = useCallback((node: PromptNode) => {
-    if (!node.ecommerce || node.ecommerce.kind !== 'a-plus-module' || node.ecommerce.desktopStage !== 'generated') return;
-    updateEcommerceNodeState(node.id, {
-      desktopStage: 'confirmed',
-      mobileStage: 'pending',
-      stage: 'ready',
-    });
-  }, [updateEcommerceNodeState]);
-
-  const handleRetryEcommerceModule = useCallback(async (node: PromptNode) => {
-    if (!node.ecommerce || node.ecommerce.kind !== 'a-plus-module' || node.ecommerce.desktopStage !== 'confirmed') return;
-    await runEcommerceNodeGeneration(node, {
-      generationTarget: 'mobile',
-
-
-      stagePatch: { mobileStage: 'generating' },
-      successPatch: { mobileStage: 'generated' },
-      failurePatch: { mobileStage: 'failed' },
-      ...({ promptSuffix: '将这个 A+ 画面转换成 600*450 手机端版本，排版更紧凑，保持主体、文案、风格与画面逻辑一致。' }),
-    });
-  }, [runEcommerceNodeGeneration]);
-
-  const resolveEcommerceFrameworkQueuePhases = useCallback((
-    node: PromptNode,
-    phasePreference?: 'desktop' | 'mobile',
-  ): EcommerceFrameworkQueueItem['phase'][] => {
-    const ecommerce = node.ecommerce;
-    if (!ecommerce || ecommerce.selectedForGeneration === false) {
-      return [];
-    }
-
-    if (ecommerce.kind === 'main-image') {
-      if (phasePreference === 'mobile') {
-        return [];
-      }
-
-      return (ecommerce.stage === 'analysis_ready' || ecommerce.stage === 'ready' || ecommerce.stage === 'failed')
-        ? ['sheet']
-        : [];
-    }
-
-    if (ecommerce.kind !== 'a-plus-module') {
-      return [];
-    }
-
-    const effectiveSizePolicy = ecommerce.effectiveSizePolicy || ecommerce.sizePolicy;
-    const requiresMobileFollowUp = effectiveSizePolicy === 'desktop-then-mobile';
-
-    if (phasePreference === 'mobile') {
-      return ecommerce.desktopStage === 'confirmed'
-        && (ecommerce.mobileStage === 'pending' || ecommerce.mobileStage === 'failed' || ecommerce.mobileStage === 'locked')
-        ? ['mobile']
-        : [];
-    }
-
-    if (phasePreference === 'desktop') {
-      if (requiresMobileFollowUp) {
-        return ecommerce.desktopStage === 'pending' || ecommerce.desktopStage === 'failed'
-          ? ['desktop']
-          : [];
-      }
-
-      return ecommerce.stage === 'analysis_ready' || ecommerce.stage === 'ready' || ecommerce.stage === 'failed'
-        ? ['sheet']
-        : [];
-    }
-
-    if (requiresMobileFollowUp) {
-      if (ecommerce.desktopStage === 'confirmed' && (ecommerce.mobileStage === 'pending' || ecommerce.mobileStage === 'failed')) {
-        return ['mobile'];
-      }
-
-      return ecommerce.desktopStage === 'pending' || ecommerce.desktopStage === 'failed'
-        ? ['desktop']
-        : [];
-    }
-
-    return (ecommerce.stage === 'analysis_ready' || ecommerce.stage === 'ready' || ecommerce.stage === 'failed')
-      ? ['sheet']
-      : [];
   }, []);
 
-  const enqueueEcommerceFrameworkNodes = useCallback((
-    frameworkId: string,
-    nodes: PromptNode[],
-    phasePreference?: 'desktop' | 'mobile',
-  ): number => {
-    const queueItems: Array<Pick<EcommerceFrameworkQueueItem, 'queueId' | 'nodeId' | 'phase' | 'laneKey' | 'laneType' | 'sourceSheet'>> = [];
+  const {
+    resolveEcommerceSlotState,
+    handlePreviewEcommerceSlotHistory,
+    handlePreviewEcommerceSlotHistoryForNode,
+  } = useEcommerceSlotHistoryRuntime({
+    activeCanvasRef,
+    ecommerceState,
+    setWorkspaceSurface,
+    setPreviewImages,
+    setPreviewInitialIndex,
+  });
 
-    nodes.forEach((node) => {
-      const ecommerce = node.ecommerce;
-      if (!ecommerce) {
-        return;
-      }
-
-      const phases = resolveEcommerceFrameworkQueuePhases(node, phasePreference);
-      if (phases.length === 0) {
-        return;
-      }
-
-      const resolvedKey = keyManager.getNextKey(node.model, node.keySlotId);
-      const provider = resolvedKey?.provider || node.provider;
-      const baseUrl = resolvedKey?.baseUrl || resolvedKey?.providerConfig?.baseUrl;
-      const providerKeyType = resolveProviderKeyType(provider, baseUrl);
-      const lane = resolveFrameworkLane({
-        keySlotId: resolvedKey?.id || node.keySlotId || providerKeyType,
-        provider,
-        baseUrl,
-      });
-
-      phases.forEach((phase) => {
-        queueItems.push({
-          queueId: frameworkId + ':' + node.id + ':' + phase + ':' + Date.now() + ':' + queueItems.length,
-          nodeId: node.id,
-          phase,
-          laneKey: lane.laneKey,
-          laneType: lane.laneType,
-          sourceSheet: ecommerce.sourceSheet,
-        });
-      });
-    });
-
-    if (queueItems.length === 0) {
-      return 0;
-    }
-
-    updateEcommerceFrameworkRuntime(frameworkId, (currentRuntime) => enqueueEcommerceFrameworkItems(currentRuntime, queueItems));
-    return queueItems.length;
-  }, [resolveEcommerceFrameworkQueuePhases, updateEcommerceFrameworkRuntime]);
-
-  const pumpEcommerceFrameworkQueue = useCallback((frameworkId: string) => {
-    const currentRuntime = ecommerceFrameworkRuntimeRef.current[frameworkId];
-    if (!currentRuntime || currentRuntime.paused) {
-      return;
-    }
-
-    const starters = resolveEcommerceFrameworkDispatchPlan(currentRuntime);
-    if (starters.length === 0) {
-      return;
-    }
-
-    updateEcommerceFrameworkRuntime(frameworkId, (runtime) => {
-      let nextRuntime = runtime;
-      starters.forEach((item) => {
-        nextRuntime = markEcommerceFrameworkQueueItemStatus(nextRuntime, item.queueId, 'dispatching');
-      });
-      return nextRuntime;
-    });
-
-    starters.forEach((item) => {
-      void (async () => {
-        updateEcommerceFrameworkRuntime(frameworkId, (runtime) => markEcommerceFrameworkQueueItemStatus(runtime, item.queueId, 'running', {
-          startedAt: Date.now(),
-          error: undefined,
-        }));
-
-        try {
-          const latestNode = activeCanvasRef.current?.promptNodes.find((promptNode) => promptNode.id === item.nodeId);
-          if (!latestNode?.ecommerce) {
-            throw new Error('Missing ecommerce node');
-          }
-
-          if (item.phase === 'mobile') {
-            await handleRetryEcommerceModule(latestNode);
-          } else {
-            await handleGenerateEcommerceNode(latestNode);
-          }
-
-          updateEcommerceFrameworkRuntime(frameworkId, (runtime) => markEcommerceFrameworkQueueItemStatus(runtime, item.queueId, 'completed', {
-            finishedAt: Date.now(),
-            error: undefined,
-          }));
-        } catch (error: any) {
-          updateEcommerceFrameworkRuntime(frameworkId, (runtime) => markEcommerceFrameworkQueueItemStatus(runtime, item.queueId, 'failed', {
-            finishedAt: Date.now(),
-            error: error?.message || 'Queue item failed',
-          }));
-        } finally {
-          setTimeout(() => {
-            pumpEcommerceFrameworkQueue(frameworkId);
-          }, 0);
-        }
-      })();
-    });
-  }, [handleGenerateEcommerceNode, handleRetryEcommerceModule, updateEcommerceFrameworkRuntime]);
-
-  const handleGenerateEcommerceFramework = useCallback(async (node: PromptNode) => {
-    if (!node.ecommerce || node.ecommerce.kind !== 'framework') return;
-
-    const targetNodes = (activeCanvasRef.current?.promptNodes || []).filter((item) => (
-      item.mode === GenerationMode.ECOMMERCE
-      && !!item.ecommerce
-      && item.ecommerce.kind !== 'framework'
-      && item.ecommerce.kind !== 'a-plus-group'
-      && item.ecommerce.frameworkId === node.id
-      && item.ecommerce.selectedForGeneration !== false
-    ));
-
-    const queuedCount = enqueueEcommerceFrameworkNodes(node.id, targetNodes);
-    if (queuedCount === 0) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning('No eligible cards', 'There are no ecommerce cards ready to enqueue.');
-      });
-      return;
-    }
-
-    const nextSheet = node.ecommerce.frameworkMeta?.activeSheet || ecommerceState.activeGroupSheet || '主图';
-    syncEcommerceFrameworkView(node.id, nextSheet);
-    pumpEcommerceFrameworkQueue(node.id);
-  }, [ecommerceState.activeGroupSheet, enqueueEcommerceFrameworkNodes, pumpEcommerceFrameworkQueue, syncEcommerceFrameworkView]);
-
-  const handlePauseEcommerceFramework = useCallback((node: PromptNode) => {
-    const frameworkId = resolveEcommerceFrameworkId(node);
-    if (!frameworkId) {
-      return;
-    }
-
-    updateEcommerceFrameworkRuntime(frameworkId, (runtime) => pauseEcommerceFrameworkRuntime(runtime));
-  }, [resolveEcommerceFrameworkId, updateEcommerceFrameworkRuntime]);
-
-  const handleResumeEcommerceFramework = useCallback((node: PromptNode) => {
-    const frameworkId = resolveEcommerceFrameworkId(node);
-    if (!frameworkId) {
-      return;
-    }
-
-    updateEcommerceFrameworkRuntime(frameworkId, (runtime) => resumeEcommerceFrameworkRuntime(runtime));
-    pumpEcommerceFrameworkQueue(frameworkId);
-  }, [pumpEcommerceFrameworkQueue, resolveEcommerceFrameworkId, updateEcommerceFrameworkRuntime]);
-
-  const handleCancelEcommerceFrameworkNodeQueue = useCallback((node: PromptNode) => {
-    const frameworkId = resolveEcommerceFrameworkId(node);
-    if (!frameworkId) {
-      return;
-    }
-
-    updateEcommerceFrameworkRuntime(frameworkId, (runtime) => cancelEcommerceFrameworkNodeQueue(runtime, node.id));
-  }, [resolveEcommerceFrameworkId, updateEcommerceFrameworkRuntime]);
-
-  const handleGenerateEcommerceGroup = useCallback(async (node: PromptNode, phase: 'desktop' | 'mobile') => {
-    if (!node.ecommerce || node.ecommerce.kind !== 'a-plus-group') return;
-
-    const frameworkId = node.ecommerce.frameworkId;
-    const targetNodes = (activeCanvasRef.current?.promptNodes || []).filter((item) => (
-      item.mode === GenerationMode.ECOMMERCE
-      && !!item.ecommerce
-      && item.ecommerce.kind !== 'framework'
-      && item.ecommerce.kind !== 'a-plus-group'
-      && item.ecommerce.groupId === node.id
-      && item.ecommerce.selectedForGeneration !== false
-    ));
-
-    if (!frameworkId) {
-      for (const targetNode of targetNodes) {
-        if (phase === 'mobile') {
-          await handleRetryEcommerceModule(targetNode);
-        } else {
-          await handleGenerateEcommerceNode(targetNode);
-        }
-      }
-      return;
-    }
-
-    const queuedCount = enqueueEcommerceFrameworkNodes(frameworkId, targetNodes, phase);
-    if (queuedCount === 0) {
-      import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning(
-          'No eligible cards',
-          phase === 'mobile'
-            ? 'There are no confirmed mobile follow-up cards ready to enqueue.'
-            : 'There are no ecommerce cards ready to enqueue for this group.',
-        );
-      });
-      return;
-    }
-
-    syncEcommerceFrameworkView(frameworkId, node.ecommerce.sourceSheet);
-    pumpEcommerceFrameworkQueue(frameworkId);
-  }, [enqueueEcommerceFrameworkNodes, handleGenerateEcommerceNode, handleRetryEcommerceModule, pumpEcommerceFrameworkQueue, syncEcommerceFrameworkView]);
+  const {
+    enqueueEcommerceFrameworkNodes,
+    pumpEcommerceFrameworkQueue,
+    handleGenerateEcommerceFramework,
+    handlePauseEcommerceFramework,
+    handleResumeEcommerceFramework,
+    handleCancelEcommerceFrameworkNodeQueue,
+    handleGenerateEcommerceGroup,
+    handleToggleEcommerceAnalysisSelection,
+    handleToggleEcommerceSelected,
+    handleSetEcommerceGroupSelection,
+  } = useEcommerceRuntime({
+    activeCanvasRef,
+    frameworkStateView,
+    ecommerceState,
+    updateEcommerceSelectionState,
+    updateEcommerceNodeState,
+    handleGenerateEcommerceNode,
+    handleRetryEcommerceModule,
+  });
 
   // Auto-Recover Interrupted Tasks
   useEffect(() => {
@@ -4470,9 +2495,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     traceLocalPerformance('canvas-interaction.prompt-click', () => {
       setActiveSourceImage(null);
 
-      const ecommerceTaskState = clickedNode.ecommerce?.editableTask
-        || clickedNode.partialRedraw?.inheritedTaskState
-        || null;
       const textToCopy = clickedNode.mode === GenerationMode.ECOMMERCE
         ? ''
         : ((isOptimizedView && clickedNode.optimizedPromptEn?.trim())
@@ -4490,31 +2512,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         mode: clickedNode.mode || GenerationMode.IMAGE, // 🎯 Sync Mode (Image/Video)
       }));
 
-      const nextFrameworkId = clickedNode.mode === GenerationMode.ECOMMERCE
-        ? resolveEcommerceFrameworkId(clickedNode)
-        : null;
-      const nextActiveSheet = clickedNode.mode === GenerationMode.ECOMMERCE
-        ? (clickedNode.ecommerce?.kind === 'framework'
-          ? (clickedNode.ecommerce.frameworkMeta?.activeSheet || clickedNode.ecommerce.sourceSheet || null)
-          : (clickedNode.ecommerce?.sourceSheet || null))
-        : null;
-
-      setEcommerceRatioOverride(clickedNode.ecommerce?.allowedAspectRatios);
-      setEcommerceState((previousState) => ({
-        ...previousState,
-        activeTaskNodeId: clickedNode.mode === GenerationMode.ECOMMERCE && clickedNode.ecommerce?.kind !== 'framework'
-          ? clickedNode.id
-          : null,
-        activeTaskState: clickedNode.mode === GenerationMode.ECOMMERCE && clickedNode.ecommerce?.kind !== 'framework'
-          ? ecommerceTaskState
-          : null,
-        activeFrameworkId: nextFrameworkId,
-        activeGroupSheet: nextActiveSheet,
-      }));
-
-      if (nextFrameworkId && nextActiveSheet) {
-        syncEcommerceFrameworkView(nextFrameworkId, nextActiveSheet);
-      }
+      syncPromptNodeEcommerceSelection(clickedNode);
 
       // [Draft Logic] Resume Draft if clicked on a draft node
       if (clickedNode.isDraft) {
@@ -4528,20 +2526,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       nodeId: clickedNode.id,
       referenceImageCount: clickedNode.referenceImages?.length || 0,
     });
-  }, [resolveEcommerceFrameworkId, setConfig, syncEcommerceFrameworkView]);
-
-  const resolvePromptNodeFrameworkStatus = useCallback((node: PromptNode) => {
-    const frameworkId = resolveEcommerceFrameworkId(node);
-    if (!frameworkId) {
-      return null;
-    }
-
-    return resolveEcommerceFrameworkSummary(
-      activeCanvasRef.current?.promptNodes || [],
-      frameworkId,
-      ecommerceFrameworkRuntimeRef.current[frameworkId],
-    );
-  }, [resolveEcommerceFrameworkId]);
+  }, [setConfig, syncPromptNodeEcommerceSelection]);
 
   const getSharedPromptNodeActionProps = useCallback((node: PromptNode): SharedPromptNodeActionProps => ({
     onCancel: handleCancelGeneration,
@@ -4565,7 +2550,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     ecommerceFrameworkStatus: resolvePromptNodeFrameworkStatus(node),
     activeEcommerceTaskState: ecommerceState.activeTaskState,
     onActivateEcommerceTask: (promptNode: PromptNode) => {
-      void handlePromptClick(promptNode, false);
+      syncPromptNodeEcommerceSelection(promptNode);
     },
     onEcommerceTaskStateChange: handleChangeEcommerceTaskState,
     ecommerceSlotState: resolveEcommerceSlotState(node),
@@ -4596,7 +2581,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     handleOpenPptDeckEditor,
     handlePauseEcommerceFramework,
     handlePreviewEcommerceSlotHistoryForNode,
-    handlePromptClick,
     handleResumeEcommerceFramework,
     handleRetryEcommerceModule,
     handleRetryNode,
@@ -4606,32 +2590,9 @@ const AppContent: React.FC<AppContentProps> = () => {
     openSettingsSurfaceTracked,
     resolvePromptNodeFrameworkStatus,
     resolveEcommerceSlotState,
+    syncPromptNodeEcommerceSelection,
     updatePromptNode,
   ]);
-
-  const handleActivateEcommerceTaskBySourceKey = useCallback((sourceKey: string) => {
-    const targetNode = activeCanvas?.promptNodes.find((node) => (
-      node.mode === GenerationMode.ECOMMERCE
-      && node.ecommerce?.sourceRowKey === sourceKey
-    ));
-
-    if (targetNode) {
-      void handlePromptClick(targetNode, false);
-      return;
-    }
-
-    const fallbackTask = ecommerceState.taskStates[sourceKey];
-    if (!fallbackTask) {
-      return;
-    }
-
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      activeTaskNodeId: null,
-      activeTaskState: fallbackTask,
-      activeGroupSheet: fallbackTask.sourceSheet,
-    }));
-  }, [activeCanvas, ecommerceState.taskStates, handlePromptClick]);
 
   const handleImageClick = useCallback((imageId: string) => {
     // 🎯 Shift=切换（向后兼容），无修饰键=替换
@@ -4642,14 +2603,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     // Set this image as source for continuing conversation
     setActiveSourceImage(imageId);
-    setEcommerceRatioOverride(undefined);
-    setEcommerceState((previousState) => ({
-      ...previousState,
-      activeTaskNodeId: null,
-      activeTaskState: null,
-      activeFrameworkId: null,
-      activeGroupSheet: null,
-    }));
+    resetEcommerceSourceSelectionState();
     // Clear prompt and existing references to start fresh continue-conversation
     setConfig(prev => ({ ...prev, prompt: '', referenceImages: [] }));
 
@@ -4689,11 +2643,20 @@ const AppContent: React.FC<AppContentProps> = () => {
       });
       setDraftNodeId(newId);
     }
-  }, [selectNodes, setConfig, draftNodeId, deletePromptNode, activeCanvas, addPromptNode, config, imageNodesById, promptNodesById]);
+  }, [selectNodes, setConfig, draftNodeId, deletePromptNode, activeCanvas, addPromptNode, config, imageNodesById, promptNodesById, resetEcommerceSourceSelectionState]);
 
   const handleMobileUseImageAsSource = useCallback((imageId: string) => {
     handleImageClick(imageId);
   }, [handleImageClick]);
+  const {
+    resolveEcommercePartialRedrawContext,
+    finalizeEcommercePartialRedrawResult,
+  } = useEcommercePartialRedrawRuntime({
+    activeCanvasRef,
+    updateImageNode,
+    updatePromptNode,
+    deletePromptNode,
+  });
 
   const handlePartialRedrawRequest = useCallback((image: GeneratedImage, request: PartialRedrawRequest) => {
     void (async () => {
@@ -4704,14 +2667,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         const parentPromptId = sourceImage.parentPromptId;
         const parentPrompt = canvas?.promptNodes.find((promptNode) => promptNode.id === parentPromptId);
         const sourceImageUrl = sourceImage.originalUrl || sourceImage.apiResultUrl || sourceImage.url;
-        const inheritedTaskState = parentPrompt?.ecommerce?.editableTask
-          || sourceImage.partialRedraw?.inheritedTaskState
-          || undefined;
-        const inheritedDisplayLabel = parentPrompt?.ecommerce?.displayLabel
-          || sourceImage.partialRedraw?.inheritedDisplayLabel;
-        const inheritedDeliveryKind = sourceImage.ecommerceDeliveryKind
-          || sourceImage.partialRedraw?.inheritedDeliveryKind
-          || parentPrompt?.ecommerce?.activeDeliveryKind;
+        const ecommercePartialRedrawContext = resolveEcommercePartialRedrawContext(sourceImage, parentPrompt);
 
         const croppedSourceReference = await buildPartialRedrawReferenceImage(
           sourceImageUrl,
@@ -4757,9 +2713,9 @@ const AppContent: React.FC<AppContentProps> = () => {
             generationRect: request.generationRect,
             targetAspectRatio: request.aspectRatio,
             extraReferenceImageIds: request.referenceImages.map((ref) => ref.storageId || ref.id),
-            inheritedDisplayLabel,
-            inheritedTaskState,
-            inheritedDeliveryKind,
+            inheritedDisplayLabel: ecommercePartialRedrawContext.inheritedDisplayLabel,
+            inheritedTaskState: ecommercePartialRedrawContext.inheritedTaskState,
+            inheritedDeliveryKind: ecommercePartialRedrawContext.inheritedDeliveryKind,
             compositeVersion: 1,
           },
           tags: [],
@@ -4773,29 +2729,13 @@ const AppContent: React.FC<AppContentProps> = () => {
           ?.childImageIds?.[0];
 
         if (latestRedrawResultId) {
-          const redrawResultImage = activeCanvasRef.current?.imageNodes.find((img) => img.id === latestRedrawResultId);
-          if (parentPrompt?.mode === GenerationMode.ECOMMERCE && redrawResultImage) {
-            await updateImageNode(redrawResultImage.id, {
-              parentPromptId: parentPrompt.id,
-              position: { ...sourceImage.position },
-              ecommerceDeliveryKind: inheritedDeliveryKind || redrawResultImage.ecommerceDeliveryKind,
-            });
-
-            const latestParentPrompt = activeCanvasRef.current?.promptNodes.find((promptNode) => promptNode.id === parentPrompt.id) || parentPrompt;
-            if (!latestParentPrompt.childImageIds.includes(latestRedrawResultId)) {
-              await updatePromptNode({
-                ...latestParentPrompt,
-                childImageIds: [...latestParentPrompt.childImageIds, latestRedrawResultId],
-              });
-            }
-
-            const latestRedrawPrompt = activeCanvasRef.current?.promptNodes.find((promptNode) => promptNode.id === redrawNode.id) || redrawNode;
-            await updatePromptNode({
-              ...latestRedrawPrompt,
-              childImageIds: [],
-            });
-            deletePromptNode(redrawNode.id);
-          }
+          await finalizeEcommercePartialRedrawResult({
+            parentPrompt,
+            sourceImage,
+            redrawNode,
+            latestRedrawResultId,
+            inheritedDeliveryKind: ecommercePartialRedrawContext.inheritedDeliveryKind,
+          });
 
           handleOpenPreview(latestRedrawResultId);
         } else {
@@ -4808,7 +2748,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         });
       }
     })();
-  }, [addPromptNode, config.aspectRatio, config.imageSize, config.model, executeGeneration, handleOpenPreview]);
+  }, [addPromptNode, config.aspectRatio, config.imageSize, config.model, executeGeneration, finalizeEcommercePartialRedrawResult, handleOpenPreview, resolveEcommercePartialRedrawContext]);
 
   const handleMobileResultPartialRedraw = useCallback((entry: MobileResultEntry, request: PartialRedrawRequest) => {
     const imageNode = activeCanvas?.imageNodes.find((image) => image.id === entry.imageId);
@@ -4819,83 +2759,36 @@ const AppContent: React.FC<AppContentProps> = () => {
     handlePartialRedrawRequest(imageNode, request);
   }, [activeCanvas, handlePartialRedrawRequest]);
 
-  const resolveMobileResultPromptNode = useCallback((entry: MobileResultEntry) => {
-    const promptNodeId = entry.ecommerceContinuation?.promptNodeId
-      || entry.detailEntry?.promptId
-      || entry.parentPromptId;
-    if (!promptNodeId) {
-      return null;
-    }
-
-    return activeCanvasRef.current?.promptNodes.find((node) => node.id === promptNodeId) || null;
-  }, []);
-
-  const handleMobileEditEcommerceTask = useCallback((entry: MobileResultEntry) => {
-    if (!entry.ecommerceContinuation?.canEditTask) {
-      return;
-    }
-
-    const promptNode = resolveMobileResultPromptNode(entry);
-    if (!promptNode || promptNode.mode !== GenerationMode.ECOMMERCE) {
-      return;
-    }
-
-    void handlePromptClick(promptNode, false);
-    focusWorkspace();
-    setMobileScreen('home');
-  }, [focusWorkspace, handlePromptClick, resolveMobileResultPromptNode]);
-
-  const handleMobileToggleEcommerceSelected = useCallback((entry: MobileResultEntry, selected: boolean) => {
-    if (!entry.ecommerceContinuation?.canToggleSelection) {
-      return;
-    }
-
-    const promptNode = resolveMobileResultPromptNode(entry);
-    if (!promptNode || promptNode.mode !== GenerationMode.ECOMMERCE) {
-      return;
-    }
-
-    handleToggleEcommerceSelected(promptNode, selected);
-  }, [handleToggleEcommerceSelected, resolveMobileResultPromptNode]);
-
-  const handleMobileConfirmEcommerceDesktop = useCallback((entry: MobileResultEntry) => {
-    if (!entry.ecommerceContinuation?.canConfirmDesktop) {
-      return;
-    }
-
-    const promptNode = resolveMobileResultPromptNode(entry);
-    if (!promptNode || promptNode.mode !== GenerationMode.ECOMMERCE) {
-      return;
-    }
-
-    handleConfirmEcommerceDesktop(promptNode);
-  }, [handleConfirmEcommerceDesktop, resolveMobileResultPromptNode]);
-
-  const handleMobileGenerateEcommerceMobile = useCallback((entry: MobileResultEntry) => {
-    if (!entry.ecommerceContinuation?.canGenerateMobile) {
-      return;
-    }
-
-    const promptNode = resolveMobileResultPromptNode(entry);
-    if (!promptNode || promptNode.mode !== GenerationMode.ECOMMERCE) {
-      return;
-    }
-
-    const frameworkId = promptNode.ecommerce?.frameworkId;
-    if (frameworkId) {
-      const queuedCount = enqueueEcommerceFrameworkNodes(frameworkId, [promptNode], 'mobile');
-      if (queuedCount > 0) {
-        syncEcommerceFrameworkView(
-          frameworkId,
-          (promptNode.ecommerce?.sourceSheet || ecommerceState.activeGroupSheet || 'A+') as EcommerceGroupSheet,
-        );
-        pumpEcommerceFrameworkQueue(frameworkId);
-        return;
-      }
-    }
-
-    void handleRetryEcommerceModule(promptNode);
-  }, [ecommerceState.activeGroupSheet, enqueueEcommerceFrameworkNodes, handleRetryEcommerceModule, pumpEcommerceFrameworkQueue, resolveMobileResultPromptNode, syncEcommerceFrameworkView]);
+  const {
+    handleMobileEditEcommerceTask,
+    handleMobileToggleEcommerceSelected,
+    handleMobileConfirmEcommerceDesktop,
+    handleMobileGenerateEcommerceMobile,
+  } = useEcommerceMobileContinuationRuntime({
+    activeCanvasRef,
+    activeGroupSheet: ecommerceState.activeGroupSheet,
+    focusWorkspace,
+    setMobileScreen,
+    activatePromptNode: (promptNode) => {
+      void handlePromptClick(promptNode, false);
+    },
+    handleToggleEcommerceSelected,
+    handleConfirmEcommerceDesktop,
+    handleRetryEcommerceModule,
+    enqueueEcommerceFrameworkNodes,
+    pumpEcommerceFrameworkQueue,
+    syncEcommerceFrameworkView,
+  });
+  const {
+    handleActivateEcommerceTaskBySourceKey,
+  } = useEcommerceTaskActivationRuntime({
+    activeCanvasRef,
+    ecommerceTaskStates: ecommerceState.taskStates,
+    setEcommerceTaskActivationRuntimeState: updateEcommerceTaskActivationRuntimeState,
+    activatePromptNode: (promptNode) => {
+      void handlePromptClick(promptNode, false);
+    },
+  });
 
   // Dynamic Group Bounds Calculation
   const getComputedGroupBounds = useCallback((group: CanvasGroup) => {
@@ -4927,7 +2820,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       // 1. Check Prompts
       const prompt = promptNodesById.get(id);
       if (prompt) {
-        addRect(prompt.position.x, prompt.position.y, 380, prompt.height || 200);
+        addRect(prompt.position.x, prompt.position.y, getPromptNodeBoundsWidth(prompt, isMobile), prompt.height || 200);
         return;
       }
       // 2. Check Images
@@ -4946,7 +2839,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       width: (maxX - minX) + PADDING * 2,
       height: (maxY - minY) + PADDING + TOP_EXTRA + BOTTOM_EXTRA
     };
-  }, [activeCanvas, imageNodesById, promptNodesById]);
+  }, [activeCanvas, imageNodesById, isMobile, promptNodesById]);
 
   const generatingGroupStateSignatureRef = useRef('');
   useEffect(() => {
@@ -5235,7 +3128,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         if (
           n.mode === GenerationMode.ECOMMERCE
           && n.ecommerce?.frameworkId
-          && n.ecommerce.kind !== 'framework'
+          && n.ecommerce.kind === 'a-plus-group'
         ) {
           return false;
         }
@@ -5357,7 +3250,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     handlePromptGroupNodeHeightChange,
     handlePromptGroupTagRemove,
     beginPromptGroupRegroup,
-    settlePromptGroupRegroup,
     clearPromptGroupRegroup,
   } = usePromptGroupLayout({
     activeCanvas,
@@ -5394,15 +3286,8 @@ const AppContent: React.FC<AppContentProps> = () => {
     workflowUtilityNodesById,
   });
 
-  const visibleWorkflowUtilityNodesById = React.useMemo(
-    () => new Map(visibleWorkflowUtilityNodes.map((node) => [node.id, node])),
-    [visibleWorkflowUtilityNodes]
-  );
-
   const {
-    connectorRenderSnapshot,
     connectorRenderPromptNodes,
-    connectorRenderVisibleImageNodes,
     connectorRenderWorkflowUtilityNodesById,
     resolveLivePromptPosition,
     resolveLiveImagePosition,
@@ -5563,12 +3448,11 @@ const AppContent: React.FC<AppContentProps> = () => {
   ]);
 
   const {
-    getSelectionScreenCenter,
-    selectNodeFromCurrentEvent,
     handleCanvasNodeSelect,
   } = useCanvasNodeSelection({
     activeCanvas,
     canvasTransform,
+    isMobile,
     getCardDimensions,
     resolvePromptGroupIdForNodeId,
     selectNodes,
@@ -5610,7 +3494,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   }, [handleSelectionMouseUp, handleDragConnectionMouseUp]);
 
   const {
-    getPromptChildrenForWorkflow,
     resolveWorkflowSourceIdsFromSelection,
     resolveCanvasNodePosition,
     resolvePrimaryWorkflowSourcePrompt,
@@ -5627,10 +3510,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   });
 
   const {
-    notifyWorkflowCard,
-    getWorkflowInsertPosition,
-    exportWorkflowImagesAsZip,
-    createTemplatePromptNode,
     handleWorkflowPreviewAction,
     handleWorkflowSaveAction,
     handleWorkflowAgentAction,
@@ -5761,13 +3640,11 @@ const AppContent: React.FC<AppContentProps> = () => {
       focusedGroupId,
       generatingGroupIds,
       canvasScale: canvasTransform.scale,
-      isMobile,
       promptGroupLayoutState,
       regroupLayoutsById: promptGroupRegroupLayoutsById.get(node.id) ?? new Map(),
       imageCardHeightById,
       resolveLivePromptPosition,
       resolveLiveImagePosition,
-      getPromptHeight,
     });
 
     return (
@@ -5825,6 +3702,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           isCanvasTransforming={isCanvasTransforming}
           isMobile={isMobile}
           sourcePosition={sourceImageNode ? (resolveLiveImagePosition(sourceImageNode) ?? sourceImageNode.position) : undefined}
+          ecommerceFrameworkTaskNodes={ecommerceFrameworkTaskNodesById.get(renderedPromptNode.id) || []}
           {...getSharedPromptNodeActionProps(renderedPromptNode)}
           onLivePositionChange={handleLiveNodePositionChange}
           onHeightChange={(id, height) => {
@@ -5900,6 +3778,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     handlePromptGroupNodeSelect,
     handlePromptGroupTagRemove,
     canvasTransform,
+    ecommerceFrameworkTaskNodesById,
     handleConnectStart,
     handleCanvasNodeDragStateChange,
     handleLiveNodePositionChange,
@@ -5921,7 +3800,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     promptGroupStackZIndexById,
     resolveLiveImagePosition,
     resolveLivePromptPosition,
-    getPromptHeight,
     selectedNodeIds,
     updatePromptNodePosition,
   ]);
@@ -6084,7 +3962,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         stackZIndexOverride={canvasGroupStackZIndexById.get(group.id)}
         highlighted={highlightedId === group.id}
         onUngroup={removeGroup}
-        onDragStart={(id, event) => {
+        onDragStart={(_id, event) => {
           const nodeIds = group.nodeIds;
           const isMultiSelect = event.shiftKey || event.ctrlKey || event.metaKey;
           const alreadySelected = selectedNodeIds || [];
@@ -6310,6 +4188,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     activeCanvas,
     selectedNodeIds,
     selectionMenuPosition,
+    isMobile,
     closeSelectionMenu: () => setSelectionMenuPosition(null),
     actualChildImageIdsByPromptId,
     deletePromptNode,
@@ -6563,7 +4442,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             .filter((n) => !(
               n.mode === GenerationMode.ECOMMERCE
               && n.ecommerce?.frameworkId
-              && n.ecommerce.kind !== 'framework'
+              && n.ecommerce.kind === 'a-plus-group'
             ))
             .map(n => n.position) || []),
           ...(activeCanvas?.imageNodes.map(n => n.position) || [])

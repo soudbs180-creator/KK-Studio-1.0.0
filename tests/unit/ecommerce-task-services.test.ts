@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { test } from 'node:test';
 
 import type { EcommerceEditableTaskState, EcommerceSeriesTemplate } from '../../src/types.ts';
@@ -7,6 +9,12 @@ import { buildEcommerceDisplayLabel, buildEcommerceRenderTask } from '../../src/
 import { extractSeriesTemplateFromAnalysis } from '../../src/services/ecommerce/seriesTemplateExtractor.ts';
 import { parseSparseEcommerceIntent } from '../../src/services/ecommerce/sparseIntentParser.ts';
 import { mergeEcommerceTaskState } from '../../src/services/ecommerce/taskMerger.ts';
+
+const ROOT_DIR = process.cwd();
+
+function readSource(relativePath: string): string {
+  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
+}
 
 function createSeriesTemplate(): EcommerceSeriesTemplate {
   return {
@@ -203,6 +211,20 @@ test('mergeEcommerceTaskState prefers explicit user patch over task defaults and
   assert.equal(merged.style.tone, '更清凉一点');
   assert.match(merged.copy.headline, /Fast Cooling|Portable Air Cooler/);
   assert.equal(merged.inherit.keepSeriesStyle, true);
+});
+
+test('mergeEcommerceTaskState keeps copy seed compatibility without reading the template parameter', () => {
+  const taskMergerSource = readSource('src/services/ecommerce/taskMerger.ts');
+
+  assert.match(
+    taskMergerSource,
+    /function buildTemplateCopySeed\(\s*baseCopy: EcommerceCopyTaskState,\s*_seriesTemplate\?: EcommerceSeriesTemplate,\s*\): EcommerceCopyTaskState/,
+  );
+  assert.doesNotMatch(
+    taskMergerSource,
+    /function buildTemplateCopySeed\(\s*baseCopy: EcommerceCopyTaskState,\s*seriesTemplate\?: EcommerceSeriesTemplate,/,
+  );
+  assert.match(taskMergerSource, /buildTemplateCopySeed\(input\.baseTask\.copy, input\.seriesTemplate\)/);
 });
 
 test('resolveEcommerceCopy fills missing commercial copy while preserving explicit user text', () => {

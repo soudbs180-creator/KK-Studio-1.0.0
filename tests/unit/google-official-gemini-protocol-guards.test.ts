@@ -30,11 +30,12 @@ test("Google Gemini audio generation uses speechConfig and inline audio parts", 
   assert.doesNotMatch(localProxySource, /audioConfig:\s*\{\s*voiceConfig/);
 });
 
-test("Google TTS presets and routing heuristics include current official model ids", () => {
+test("Google TTS presets and audio classification include current official model ids", () => {
   const presetsSource = readSource("src/services/model/modelPresets.ts");
   const registrySource = readSource("src/services/model/modelRegistry.ts");
   const capabilitiesSource = readSource("src/services/model/modelCapabilities.ts");
   const keyManagerSource = readSource("src/services/auth/keyManager.ts");
+  const modelHelpersSource = readSource("src/services/auth/keyManagerModelHelpers.ts");
 
   assert.match(presetsSource, /gemini-2\.5-flash-preview-tts/);
   assert.match(presetsSource, /gemini-2\.5-pro-preview-tts/);
@@ -51,6 +52,9 @@ test("Google TTS presets and routing heuristics include current official model i
   assert.match(capabilitiesSource, /lyria-3-pro-preview/);
   assert.match(capabilitiesSource, /lyria-3-clip-preview/);
   assert.match(capabilitiesSource, /lowerModelId\.includes\('tts'\)/);
-  assert.match(keyManagerSource, /id\.includes\('tts'\)/);
-  assert.match(keyManagerSource, /normalizedModelId\.includes\('tts'\)/);
+  assert.match(modelHelpersSource, /id\.includes\('tts'\)/);
+  assert.match(keyManagerSource, /inferModelType\(id\)/);
+  assert.match(keyManagerSource, /const inferred = inferModelType\(baseId\);/);
+  assert.match(keyManagerSource, /return \(inferred === 'video' \|\| inferred === 'audio'\) \? inferred : 'image';/);
+  assert.doesNotMatch(keyManagerSource, /const isCreditModel = normalizedModelId\.includes\('nano-banana'\)/);
 });

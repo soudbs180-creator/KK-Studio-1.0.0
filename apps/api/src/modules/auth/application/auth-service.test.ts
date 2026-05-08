@@ -63,6 +63,7 @@ test("default auth service persists local password registrations across service 
     const loginResult = await loginService.login({
       email: "user@example.com",
       password: "password-123",
+      turnstileToken: "turnstile-ok",
     }, {
       ip: "127.0.0.1",
     });
@@ -120,6 +121,7 @@ test("auth service updates password through the local identity store", async () 
     const loginResult = await authService.login({
       email: "password-change@example.com",
       password: "password-123",
+      turnstileToken: "turnstile-ok",
     }, {
       ip: "127.0.0.1",
     });
@@ -160,6 +162,7 @@ test("auth service updates password through the local identity store", async () 
     const stalePasswordLogin = await authService.login({
       email: "password-change@example.com",
       password: "password-123",
+      turnstileToken: "turnstile-ok",
     }, {
       ip: "127.0.0.1",
     });
@@ -168,6 +171,7 @@ test("auth service updates password through the local identity store", async () 
     const freshPasswordLogin = await authService.login({
       email: "password-change@example.com",
       password: "new-password-456",
+      turnstileToken: "turnstile-ok",
     }, {
       ip: "127.0.0.1",
     });
@@ -199,6 +203,7 @@ test("auth service updates password with a verification code", async () => {
     const loginResult = await authService.login({
       email: "current-password@example.com",
       password: "password-123",
+      turnstileToken: "turnstile-ok",
     }, {
       ip: "127.0.0.1",
     });
@@ -237,6 +242,7 @@ test("auth service updates password with a verification code", async () => {
     const freshPasswordLogin = await authService.login({
       email: "current-password@example.com",
       password: "replacement-789",
+      turnstileToken: "turnstile-ok",
     }, {
       ip: "127.0.0.1",
     });
@@ -262,6 +268,23 @@ test("auth service requires a turnstile token on registration", async () => {
   assert.equal(registerResult.body.success, false);
 });
 
+test("auth service requires a turnstile token on password login", async () => {
+  const authService = new AuthService({
+    verifyTurnstileToken: async () => ({ success: true }),
+  });
+
+  const loginResult = await authService.login({
+    email: "missing-login-turnstile@example.com",
+    password: "password-123",
+  }, {
+    ip: "127.0.0.1",
+  });
+
+  assert.equal(loginResult.statusCode, 400);
+  assert.equal(loginResult.body.success, false);
+  assert.match(loginResult.body.error || "", /turnstileToken/);
+});
+
 test("auth service clears issued password change codes after a current-password reset", async () => {
   const tempDirectory = mkdtempSync(path.join(tmpdir(), "kk-local-auth-password-clear-"));
   process.env[LOCAL_AUTH_IDENTITY_FILE_ENV] = path.join(tempDirectory, "auth-identities.json");
@@ -284,6 +307,7 @@ test("auth service clears issued password change codes after a current-password 
     const loginResult = await authService.login({
       email: "clear-code@example.com",
       password: "password-123",
+      turnstileToken: "turnstile-ok",
     }, {
       ip: "127.0.0.1",
     });
@@ -346,6 +370,7 @@ test("auth service rate-limits repeated password verification code attempts", as
     const loginResult = await authService.login({
       email: "rate-limit-code@example.com",
       password: "password-123",
+      turnstileToken: "turnstile-ok",
     }, {
       ip: "127.0.0.1",
     });

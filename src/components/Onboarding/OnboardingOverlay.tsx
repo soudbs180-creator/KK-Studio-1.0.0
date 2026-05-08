@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { X, ChevronRight, ChevronLeft, Sparkles, MousePointer, Keyboard, Zap, Award } from 'lucide-react';
+import { X, ChevronRight, Sparkles, MousePointer, Zap, Award } from 'lucide-react';
 import { OnboardingPhase, OnboardingProgress } from './types';
 
 interface OnboardingOverlayProps {

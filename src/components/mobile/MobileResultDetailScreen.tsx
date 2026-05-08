@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 
 import type { MobileResultEntry, PartialRedrawRequest } from '../../types';
+import { useLocale } from '../../context/LocaleContext';
 
 interface MobileResultDetailScreenProps {
   entry: MobileResultEntry;
@@ -161,6 +162,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
   onPrevious,
   onNext,
 }) => {
+  const { pick } = useLocale();
   const promptSummary = normalizeText(entry.promptSummary, '未命名结果');
   const fullPrompt = normalizeText(entry.fullPrompt, promptSummary);
   const ecommerceContinuation = entry.ecommerceContinuation;
@@ -288,10 +290,10 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-                      Framework Queue
+                      {pick('框架队列', 'Framework Queue')}
                     </div>
                     <div className="mt-1 truncate text-sm font-medium text-[var(--text-primary)]">
-                      {ecommerceContinuation.frameworkLabel || 'Framework'}
+                      {ecommerceContinuation.frameworkLabel || pick('框架', 'Framework')}
                     </div>
                   </div>
                   <span
@@ -301,16 +303,16 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
                         : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
                     }`}
                   >
-                    {frameworkStatus.paused ? 'Paused' : 'Running'}
+                    {frameworkStatus.paused ? pick('已暂停', 'Paused') : pick('运行中', 'Running')}
                   </span>
                 </div>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-[var(--text-secondary)]">
-                  <span>Queued {frameworkStatus.queued}</span>
-                  <span>Running {frameworkStatus.running}</span>
-                  <span>Done {frameworkStatus.completed}</span>
-                  <span>Dispatch {frameworkStatus.dispatching}</span>
-                  <span>Failed {frameworkStatus.failed}</span>
-                  <span>Total {frameworkStatus.total}</span>
+                  <span>{pick('排队', 'Queued')} {frameworkStatus.queued}</span>
+                  <span>{pick('运行', 'Running')} {frameworkStatus.running}</span>
+                  <span>{pick('完成', 'Done')} {frameworkStatus.completed}</span>
+                  <span>{pick('分发', 'Dispatch')} {frameworkStatus.dispatching}</span>
+                  <span>{pick('失败', 'Failed')} {frameworkStatus.failed}</span>
+                  <span>{pick('总数', 'Total')} {frameworkStatus.total}</span>
                 </div>
               </div>
             ) : null}

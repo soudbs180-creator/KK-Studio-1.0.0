@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
 
-import { KKAI_FEATURE_FLAGS } from "../app/kkaiFeatureFlags.ts";
 import { clearStoredAdminSession } from "../services/api/adminSession";
 import { getStoredKkApiAccessToken, setStoredKkApiAccessToken } from "../services/api/authAccessToken";
 import { isHostedRuntime, kkWebApiClient, shouldUseLegacyWebApiFallback } from "../services/api/kkApiClient";
@@ -18,7 +17,6 @@ import {
 import {
   clearPersistedRuntimeAuthState,
   createDefaultRuntimeAuthState,
-  createFixedLocalRuntimeAuthState,
   persistRuntimeAuthState,
   readPersistedRuntimeAuthState,
   subscribeRuntimeAuthState,
@@ -62,9 +60,6 @@ function createSession(user: RuntimeAuthUser | null, accessToken?: string): Runt
 }
 
 function resolveInitialRuntimeState(): RuntimeAuthState {
-  const localOnlyRuntime = !KKAI_FEATURE_FLAGS.admin
-    && !KKAI_FEATURE_FLAGS.workspaceCloudSync
-    && !KKAI_FEATURE_FLAGS.cloudProfileFallback;
   const cachedTempUser = tempUserService.getCachedTempUser();
   if (cachedTempUser) {
     return {
@@ -76,7 +71,7 @@ function resolveInitialRuntimeState(): RuntimeAuthState {
 
   const persistedState = readPersistedRuntimeAuthState();
   if (!persistedState.isTempUser && !getStoredKkApiAccessToken()) {
-    return localOnlyRuntime ? createFixedLocalRuntimeAuthState() : createDefaultRuntimeAuthState();
+    return createDefaultRuntimeAuthState();
   }
 
   return persistedState;
@@ -96,6 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [runtimeState, setRuntimeState] = useState<RuntimeAuthState>(() => resolveInitialRuntimeState());
   const [authActionLoading, setAuthActionLoading] = useState(false);
   const [sessionRecoveryLoading, setSessionRecoveryLoading] = useState(false);
+  const [sessionRecoveryBlockedBySignOut, setSessionRecoveryBlockedBySignOut] = useState(false);
   const [sessionRecoveryWarning, setSessionRecoveryWarning] = useState<string | null>(null);
   const hostedRuntime = useMemo(() => isHostedRuntime(), []);
   const runtimeUserId = runtimeState.user?.id || null;
@@ -132,6 +128,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     return subscribeRuntimeAuthState((nextState) => {
+      if (nextState.user || nextState.isTempUser) {
+        setSessionRecoveryBlockedBySignOut(false);
+      }
       setRuntimeState(nextState);
     });
   }, []);
@@ -141,6 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       tempUserService.clearCachedTempUser();
       const nextState = clearHostedSessionRuntime();
       clearStoredAdminSession();
+      setSessionRecoveryBlockedBySignOut(true);
       setSessionRecoveryWarning(null);
       setSessionRecoveryLoading(false);
       setRuntimeState(nextState);
@@ -151,6 +151,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (runtimeState.user || runtimeState.isTempUser) {
       setSessionRecoveryLoading(false);
       setSessionRecoveryWarning(null);
+      return;
+    }
+
+    if (sessionRecoveryBlockedBySignOut) {
+      setSessionRecoveryWarning(null);
+      setSessionRecoveryLoading(false);
       return;
     }
 
@@ -190,6 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (response.success) {
         const nextState = applyHostedSessionToRuntime(response.data);
+        setSessionRecoveryBlockedBySignOut(false);
         setSessionRecoveryWarning(null);
         setSessionRecoveryLoading(false);
         setRuntimeState(nextState);
@@ -213,6 +220,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (response.success) {
           const nextState = updateRuntimeAuthStateFromProfile(response.data);
+          setSessionRecoveryBlockedBySignOut(false);
           setSessionRecoveryWarning(null);
           setSessionRecoveryLoading(false);
           setRuntimeState(nextState);
@@ -252,8 +260,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (!storedToken) {
-        setSessionRecoveryWarning(retryableWarning);
-        scheduleRetry();
+        clearHostedSession();
         return;
       }
 
@@ -266,7 +273,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       disposed = true;
       clearRetryTimer();
     };
-  }, [hostedRuntime, runtimeState.user, runtimeState.isTempUser, sessionAccessToken]);
+  }, [hostedRuntime, runtimeState.user, runtimeState.isTempUser, sessionAccessToken, sessionRecoveryBlockedBySignOut]);
 
   const value = useMemo<AuthContextType>(() => {
     return {
@@ -275,6 +282,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       loading,
       signOut: async () => {
         tempUserService.clearCachedTempUser();
+        setSessionRecoveryBlockedBySignOut(true);
         await logoutHostedSessionFromServer().catch(() => {
           clearHostedSessionRuntime();
         });
@@ -289,6 +297,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           setStoredKkApiAccessToken(undefined);
           clearStoredAdminSession();
+          setSessionRecoveryBlockedBySignOut(false);
           setSessionRecoveryWarning(null);
           const tempSession = await tempUserService.getOrCreateTempUser();
           const nextState = persistRuntimeAuthState({

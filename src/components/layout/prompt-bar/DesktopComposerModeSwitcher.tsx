@@ -17,8 +17,8 @@ const DesktopComposerModeSwitcher: React.FC<DesktopComposerModeSwitcherProps> = 
 }) => {
   const activeModeIndex = modeOptions.findIndex((item) => item.mode === activeMode);
   const normalizedActiveIndex = activeModeIndex >= 0 ? activeModeIndex : 0;
-  const modeSlotWidth = isMobile ? 72 : 82;
-  const sliderWidth = isMobile ? 64 : 74;
+  const modeSlotWidth = isMobile ? 78 : 82;
+  const sliderWidth = isMobile ? 70 : 74;
   const sliderOffset =
     4 + normalizedActiveIndex * modeSlotWidth + (modeSlotWidth - sliderWidth) / 2;
 
@@ -37,8 +37,8 @@ const DesktopComposerModeSwitcher: React.FC<DesktopComposerModeSwitcherProps> = 
           style={{
             width: `${sliderWidth}px`,
             transform: `translate3d(${sliderOffset}px, 0, 0)`,
-            backgroundColor: modeOptions[normalizedActiveIndex]?.activeBg || 'rgba(99,102,241,0.16)',
-            border: `1px solid ${modeOptions[normalizedActiveIndex]?.activeBorder || 'var(--prompt-bar-shell-border-strong)'}`,
+            backgroundColor: 'var(--prompt-bar-shell-hover)',
+            border: '1px solid var(--prompt-bar-shell-border-strong)',
             boxShadow: 'none',
             willChange: 'transform, background-color, border-color, box-shadow',
           }}
@@ -68,7 +68,7 @@ const DesktopComposerModeSwitcher: React.FC<DesktopComposerModeSwitcherProps> = 
             <div key={item.mode} className="relative z-10">
               <button
                 type="button"
-                className={`rounded-lg px-2 py-1.5 font-medium transition-colors duration-200 ease-out ${isMobile ? 'w-[72px] text-[12px]' : 'w-[82px] text-sm'} ${isActive ? 'font-semibold' : 'hover:text-[var(--text-primary)]'}`}
+                className={`rounded-lg px-2.5 py-1.5 font-medium transition-colors duration-200 ease-out ${isMobile ? 'w-[78px] text-[12px]' : 'w-[82px] text-sm'} ${isActive ? 'font-semibold' : 'hover:text-[var(--text-primary)]'}`}
                 style={{ color: isActive ? item.color : 'var(--text-secondary)' }}
                 onMouseDown={(event) => {
                   event.stopPropagation();

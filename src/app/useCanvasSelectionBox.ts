@@ -1,6 +1,7 @@
 import React from 'react';
 
 import type { AspectRatio, Canvas } from '../types';
+import { getPromptNodeBoundsWidth } from '../utils/promptNodeCardWidth';
 import type { Point, SelectionBoxState } from './appCanvasTypes';
 
 interface CanvasTransformState {
@@ -22,6 +23,7 @@ interface SelectionMenuPosition {
 interface UseCanvasSelectionBoxArgs {
   activeCanvas: Canvas | null | undefined;
   canvasTransform: CanvasTransformState;
+  isMobile: boolean;
   selectedNodeIds: string[];
   getCardDimensions: (aspectRatio?: AspectRatio, includeFooter?: boolean) => SelectionCardDimensions;
   selectNodes: (ids: string[], mode?: 'replace' | 'add' | 'remove' | 'toggle') => void;
@@ -54,6 +56,7 @@ function intersectsRect(
 export function useCanvasSelectionBox({
   activeCanvas,
   canvasTransform,
+  isMobile,
   selectedNodeIds,
   getCardDimensions,
   selectNodes,
@@ -109,7 +112,7 @@ export function useCanvasSelectionBox({
     activeCanvas.promptNodes
       .filter((node) => nodeIds.includes(node.id))
       .forEach((node) => {
-        const width = 380;
+        const width = getPromptNodeBoundsWidth(node, isMobile);
         const height = node.height || 200;
         minX = Math.min(minX, node.position.x - width / 2);
         maxX = Math.max(maxX, node.position.x + width / 2);
@@ -137,7 +140,7 @@ export function useCanvasSelectionBox({
       x: ((minX + maxX) / 2) * canvasTransform.scale + canvasTransform.x,
       y: minY * canvasTransform.scale + canvasTransform.y,
     };
-  }, [activeCanvas, canvasTransform, getCardDimensions]);
+  }, [activeCanvas, canvasTransform, getCardDimensions, isMobile]);
 
   const handleSelectionMouseDown = React.useCallback((event: React.MouseEvent) => {
     const target = event.target as HTMLElement;
@@ -205,7 +208,7 @@ export function useCanvasSelectionBox({
       const ids: string[] = [];
 
       activeCanvas?.promptNodes.forEach((node) => {
-        const { width: nodeWidth } = getCardDimensions(node.aspectRatio);
+        const nodeWidth = getPromptNodeBoundsWidth(node, isMobile);
         const nodeRect = {
           x: node.position.x - nodeWidth / 2,
           y: node.position.y - 140,
@@ -262,6 +265,7 @@ export function useCanvasSelectionBox({
     canvasTransform,
     activeCanvas,
     getCardDimensions,
+    isMobile,
     selectNodes,
     clearSelection,
     closeSelectionMenu,

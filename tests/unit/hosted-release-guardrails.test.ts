@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 
@@ -8,6 +8,43 @@ const ROOT_DIR = process.cwd();
 function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), "utf-8");
 }
+
+test("vercel production proxies hosted BFF routes without forwarding the public Host header", () => {
+  const configPath = path.join(ROOT_DIR, "vercel.json");
+
+  assert.equal(existsSync(configPath), true, "vercel.json should exist");
+  const config = JSON.parse(readFileSync(configPath, "utf-8")) as {
+    rewrites?: Array<{ source?: string; destination?: string }>;
+  };
+
+  const rewrites = Array.isArray(config.rewrites) ? config.rewrites : [];
+  assert.equal(
+    rewrites.some((rewrite) => String(rewrite.destination || "").startsWith("http://172.245.156.16")),
+    false,
+    "Vercel must not externally rewrite to the VPS because the original Host header makes the VPS redirect to kkai.plus",
+  );
+  assert.deepEqual(rewrites, [
+    { source: "/healthz", destination: "/api/healthz" },
+  ]);
+
+  [
+    "api/_vpsProxy.ts",
+    "api/v1.ts",
+    "api/v1/[...path].ts",
+    "api/auth.ts",
+    "api/auth/[...path].ts",
+    "api/manifest.ts",
+    "api/healthz.ts",
+  ].forEach((relativePath) => {
+    assert.equal(existsSync(path.join(ROOT_DIR, relativePath)), true, `${relativePath} should exist`);
+  });
+
+  const proxySource = readSource("api/_vpsProxy.ts");
+  assert.match(proxySource, /const HOP_BY_HOP_REQUEST_HEADERS = new Set/);
+  assert.match(proxySource, /['"]host['"]/);
+  assert.match(proxySource, /export async function proxyToVps/);
+  assert.match(proxySource, /new URL\(upstreamPath, resolveVpsApiBaseUrl\(\)\)/);
+});
 
 test("hosted preflight checks verify VPS API and PostgreSQL prerequisites without Supabase release dependencies", () => {
   const source = readSource("scripts/diagnose-hosted-release.mjs");
@@ -48,6 +85,15 @@ test("hosted release workflow deploys the VPS API before deploying the frontend"
   assert.match(source, /runStep\("Deploy VPS API", vpsDeployCommand\);/);
   assert.match(source, /npx vercel deploy --prod -y/);
   assert.match(movedSource, /import "\.\.\/release-hosted\.mjs";/);
+});
+
+test("hosted preview release skips the production VPS deploy command by default", () => {
+  const source = readSource("scripts/release-hosted.mjs");
+
+  assert.match(source, /const vpsPreviewDeployCommand = process\.env\.KK_VPS_PREVIEW_DEPLOY_COMMAND/);
+  assert.match(source, /if \(preview\) \{[\s\S]*runStep\("Deploy preview VPS API", vpsPreviewDeployCommand\);/);
+  assert.match(source, /Skipping VPS API deploy for preview/);
+  assert.match(source, /KK_VPS_PREVIEW_DEPLOY_COMMAND/);
 });
 
 test("cloud auto deploy waits for the VPS API before Vercel", () => {

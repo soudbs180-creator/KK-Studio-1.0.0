@@ -30,11 +30,26 @@ test('ecommerce framework types and runtime helpers are wired as first-class sur
 
   assert.match(appSource, /handleGenerateEcommerceFramework/);
   assert.match(appSource, /pumpEcommerceFrameworkQueue/);
-  assert.match(appSource, /migrateLegacyEcommerceFrameworkCanvas/);
+  assert.doesNotMatch(appSource, /migrateLegacyEcommerceFrameworkCanvas/);
   assert.doesNotMatch(
     appSource,
     /await Promise\.allSettled\(targetModules\.map\(\(item\) => \(\s*phase === 'desktop' \? handleGenerateEcommerceNode\(item\) : handleRetryEcommerceModule\(item\)\s*\)\)\);/,
   );
 
   assert.match(mobileWorkspaceSource, /selectMobileFeedResults\(activeCanvas\?\.promptNodes \|\| \[\], activeCanvas\?\.imageNodes \|\| \[\], frameworkRuntime\)/);
+});
+
+test('ecommerce framework prompt width is shared with canvas layout bounds', () => {
+  const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
+  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const promptNodeCardWidthSource = readSource('src/utils/promptNodeCardWidth.ts');
+  const appSource = readSource('src/App.tsx');
+
+  assert.match(promptNodeCardWidthSource, /export const ECOMMERCE_FRAMEWORK_PROMPT_CARD_WIDTH = 920;/);
+  assert.match(promptNodeCardWidthSource, /export function getPromptNodeBoundsWidth/);
+  assert.match(promptNodeSource, /getPromptNodeCardWidth\(node, isMobile/);
+  assert.match(promptGroupLayoutSource, /getPromptNodeBoundsWidth\(promptNode, isMobile/);
+  assert.match(appSource, /getPromptNodeBoundsWidth\(prompt, isMobile\)/);
+  assert.doesNotMatch(promptGroupLayoutSource, /addRect\(livePromptPosition\.x, livePromptPosition\.y, 380,/);
+  assert.doesNotMatch(appSource, /addRect\(prompt\.position\.x, prompt\.position\.y, 380,/);
 });

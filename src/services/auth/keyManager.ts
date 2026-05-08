@@ -20,7 +20,6 @@ import {
     BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE,
     createBrowserDirectProviderChecksDisabledError,
     getKeyManagerStorageKey,
-    getProviderStorageKey,
     isBrowserRuntime,
     purgeAnonymousSensitiveLocalCaches,
     shouldAllowSessionlessLocalUserApiStorage,
@@ -29,10 +28,12 @@ import {
 } from './keyManagerStorage';
 import {
     loadProvidersFromLocal,
+    mergeCloudProvidersWithLocalRuntimeState,
     persistProvidersLocal,
 } from './keyManagerProviders';
 import {
     findLinkedProviderForSlot,
+    findProviderLinkedSlots,
     normalizeProviderLinkValue,
     normalizeStoredProviders,
 } from './keyManagerProviderLinks';
@@ -41,6 +42,60 @@ import {
     resolveProviderBudgetLimit,
     resolveProviderTokenLimit,
 } from './keyManagerEffectiveSlot';
+import {
+    applyProviderUsageDeltaToProvider,
+    isUsageLimitExceeded,
+} from './keyManagerProviderUsage';
+import {
+    buildProviderRouteId,
+    buildStableSystemRouteId,
+    buildUserSlotRouteId,
+    decodeRouteSuffix,
+    extractSlotRouteTarget,
+    matchesProviderRouteSuffix,
+    matchesSlotRouteSuffix,
+} from './keyManagerRouteIds';
+import { sanitizeAsciiApiKey } from './keyManagerCredentialSanitizer';
+import { getRedactedChannelConfigApiKey } from './keyManagerChannelConfigSecrets';
+import { buildKeyUpdateDiagnosticPayload } from './keyManagerUpdateDiagnostics';
+import { buildSilentProviderPricingUrl } from './keyManagerPricingUrl';
+import { buildChannelCapabilities } from './keyManagerChannelCapabilities';
+import { detectApiType } from './keyManagerApiType';
+import {
+    DEFAULT_OPENAI_MODELS,
+} from './keyManagerDefaultModels';
+import {
+    normalizeModelList,
+} from './keyManagerModelList';
+import {
+    getDefaultOfficialModelsForRuntime,
+    resolveEffectiveProviderModels,
+} from './keyManagerEffectiveProviderModels';
+import { getDocumentedStaticModelsForProvider, PROVIDER_PRESETS } from './keyManagerProviderPresets';
+import {
+    buildPricingSnapshotFromSharedCache,
+    buildSharedPricingItemsFromRawCatalog,
+} from './keyManagerSharedPricing';
+import {
+    buildGoogleModelDiscoveryResult,
+    buildOpenAICompatModelDiscoveryResult,
+    type OpenAICompatModelDiscoveryMetadata,
+    extractGeminiCompatModelIds,
+} from './keyManagerRemoteModelDiscovery';
+export {
+    DEFAULT_GOOGLE_MODELS,
+    DEFAULT_OPENAI_MODELS,
+    GOOGLE_IMAGE_WHITELIST,
+    VIDEO_MODEL_WHITELIST,
+    ADVANCED_IMAGE_MODEL_WHITELIST,
+    AUDIO_MODEL_WHITELIST,
+} from './keyManagerDefaultModels';
+export {
+    BLACKLIST_MODELS,
+    normalizeModelList,
+} from './keyManagerModelList';
+export { resolveEffectiveProviderModels } from './keyManagerEffectiveProviderModels';
+export { getDocumentedStaticModelsForProvider, PROVIDER_PRESETS } from './keyManagerProviderPresets';
 import {
     applyOpenAICompatAuthToUrl,
     type ApiProtocolFormat,
@@ -56,7 +111,7 @@ import {
     resolveApiProtocolFormat,
 } from '../api/apiConfig';
 import { buildUserFacingApiErrorMessage, classifyApiFailure, hasAuthErrorMarkers } from '../api/errorClassification';
-import { resolveProviderKeyType, resolveProviderModelCompatibilityIssue, resolveProviderRuntime } from '../api/providerStrategy';
+import { resolveProviderModelCompatibilityIssue, resolveProviderRuntime } from '../api/providerStrategy';
 import type { ChannelConfig } from '../api/channelConfig';
 import { buildChannelSurfaceView } from '../api/providerChannelSurfaceView.ts';
 import {
@@ -74,8 +129,7 @@ import {
 import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from '../api/kkApiClient';
 import { getPreferredKkApiAccessToken } from '../api/authAccessToken';
 import { MODEL_PRESETS, CHAT_MODEL_PRESETS } from '../model/modelPresets';
-import { RegionService } from '../system/RegionService';
-import { Provider } from '../../types';
+import type { Provider } from '../../types';
 import { getLatestRuntimeAuthState } from './runtimeAuthState';
 import { MODEL_REGISTRY } from '../model/modelRegistry';
 import { adminModelService } from '../model/adminModelService'; // 完成 [API Key 轮换历史记录清理]
@@ -87,285 +141,37 @@ import {
     fetchWuyinPricingCatalog,
     getCachedPricingByBaseUrl,
     selectWuyinCatalogModels,
-    type ModelPricingInfo,
 } from '../billing/newApiPricingService';
 import { applyModelPricingOverrides } from '../model/modelPricingOverrideBridge';
 import { notify } from '../system/notificationService';
 import { isStartupStageReady, type AppStartupStage } from '../system/appStartup';
 import { resolveModelDisplayName } from '../../utils/modelDisplayName';
-
-const PROVIDER_MARKETING_SUFFIX_RE = /(\/(pricing|models))(\/.*)?$/i;
-
-/**
- * Helper: Parse "id(name, description)" format
- */
-export function parseModelString(input: string): { id: string; name?: string; description?: string; provider?: string } {
-    // Detect custom delimiter format: "id|name|provider"
-    if (input.includes('|')) {
-        const parts = input.split('|');
-        let id = parts[0]?.trim() || '';
-        let name = parts[1]?.trim() || undefined;
-        const provider = parts[2]?.trim() || undefined;
-
-        // 如果第二个参数是ID，第一个是名称(显示用)"name|id|provider"
-        const idLikeRegex = /^[a-z0-9-.:/]+$/;
-        const firstLooksLikeName = /\s/.test(id) || !idLikeRegex.test(id);
-        const secondLooksLikeId = !!name && idLikeRegex.test(name);
-        if (secondLooksLikeId && firstLooksLikeName) {
-            const tmp = id;
-            id = name!;
-            name = tmp;
-        }
-
-        return {
-            id,
-            name,
-            provider
-        };
-    }
-
-    // Normalize full-width parentheses to standard ones
-    const normalized = input.replace(/（/g, '(').replace(/）/g, ')');
-    const match = normalized.match(/^([^()]+)(?:\(([^/]+)(?:\/\s*(.+))?\))?$/);
-
-    if (!match) return { id: input.trim() };
-
-    let id = match[1].trim();
-    let name = match[2]?.trim();
-    const description = match[3]?.trim();
-
-    // 智能交换: 如果第二个参数看起来像ID (无空格, kebab-case/小写)
-    // 就交换
-    const idLikeRegex = /^[a-z0-9-.:]+$/;
-    const hasSpace = /\s/.test(id);
-
-    if (name && idLikeRegex.test(name) && (hasSpace || !idLikeRegex.test(id))) {
-        // Swap
-        const temp = id;
-        id = name;
-        name = temp;
-    }
-
-    return {
-        id,
-        name,
-        description
-    };
-}
-
-
-/**
- * Helper: Determine Key Type based on Provider and Base URL
- * Strictly enforces "official" status only for Google provider with official endpoints.
- */
-export function determineKeyType(provider: string | Provider, baseUrl?: string): 'official' | 'proxy' | 'third-party' {
-    return resolveProviderKeyType(provider, baseUrl);
-}
-
-function extractSlotRouteTarget(suffix: string | null | undefined): string | null {
-    const decodedSuffix = (() => {
-        try {
-            return decodeURIComponent(String(suffix || '').trim().toLowerCase());
-        } catch {
-            return String(suffix || '').trim().toLowerCase();
-        }
-    })();
-
-    if (!decodedSuffix) return null;
-    if (decodedSuffix.startsWith('slot_key_')) return decodedSuffix.slice(5);
-    if (decodedSuffix.startsWith('slot_')) return decodedSuffix.slice(5);
-    if (decodedSuffix.startsWith('provider_')) return decodedSuffix;
-    return null;
-}
-
-function decodeRouteSuffix(suffix: string | null | undefined): string {
-    try {
-        return decodeURIComponent(String(suffix || '').trim().toLowerCase());
-    } catch {
-        return String(suffix || '').trim().toLowerCase();
-    }
-}
-
-function matchesSlotRouteSuffix(slot: Pick<KeySlot, 'id' | 'name' | 'provider' | 'proxyConfig'>, suffix: string | null | undefined): boolean {
-    const decodedSuffix = decodeRouteSuffix(suffix);
-    if (!decodedSuffix) return false;
-
-    const routeTarget = extractSlotRouteTarget(decodedSuffix);
-    const slotIdLower = String(slot.id || '').trim().toLowerCase();
-    const slotNameLower = String(slot.name || '').trim().toLowerCase();
-    const slotSuffixLower = String(slot.proxyConfig?.serverName || slot.provider || 'Custom').trim().toLowerCase();
-    const providerLower = String(slot.provider || '').trim().toLowerCase();
-
-    if (routeTarget) {
-        return slotIdLower === routeTarget;
-    }
-
-    return (
-        slotIdLower === decodedSuffix ||
-        slotNameLower === decodedSuffix ||
-        slotSuffixLower === decodedSuffix ||
-        providerLower === decodedSuffix
-    );
-}
-
-function matchesProviderRouteSuffix(
-    provider: Pick<ThirdPartyProvider, 'id' | 'name'>,
-    suffix: string | null | undefined
-): boolean {
-    const decodedSuffix = decodeRouteSuffix(suffix);
-    if (!decodedSuffix) return false;
-
-    const routeTarget = extractSlotRouteTarget(decodedSuffix);
-    const providerIdLower = String(provider.id || '').trim().toLowerCase();
-    const providerNameLower = String(provider.name || '').trim().toLowerCase();
-
-    if (routeTarget) {
-        return providerIdLower === routeTarget;
-    }
-
-    return providerIdLower === decodedSuffix || providerNameLower === decodedSuffix;
-}
+import {
+    categorizeModels,
+    extractModelIdsFromPricingData,
+    inferModelType,
+    isGoogleOfficialModelId,
+    MODEL_MIGRATION_MAP,
+    parseModelString,
+} from './keyManagerModelHelpers';
+import type { GlobalModelType } from './keyManagerModelHelpers';
+import { determineKeyType } from './keyManagerKeyType';
+export {
+    parseModelString,
+    MODEL_MIGRATION_MAP,
+    DEPRECATED_MODELS,
+    normalizeModelId,
+    parseModelVariantMeta,
+    appendModelVariantLabel,
+    categorizeModels,
+    isDeprecatedModel,
+    isGoogleOfficialModelId,
+} from './keyManagerModelHelpers';
+export type { ModelVariantMeta, GlobalModelType } from './keyManagerModelHelpers';
+export { determineKeyType } from './keyManagerKeyType';
+export { detectApiType } from './keyManagerApiType';
 
 const RATE_LIMIT_COOLDOWN_MS = 30 * 1000;
-
-function toFiniteNumber(value: unknown): number | undefined {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-        return value;
-    }
-
-    if (typeof value === 'string' && value.trim()) {
-        const parsed = Number(value);
-        if (Number.isFinite(parsed)) {
-            return parsed;
-        }
-    }
-
-    return undefined;
-}
-
-function resolveSharedPricingModelId(item: any): string {
-    const candidates = [
-        item?.model,
-        item?.modelId,
-        item?.id,
-        item?.model_name,
-        item?.modelName,
-        item?.name,
-    ];
-
-    return candidates
-        .map((value) => String(value || '').replace(/^models\//i, '').trim())
-        .find(Boolean) || '';
-}
-
-function buildSharedPricingItemsFromRawCatalog(
-    pricingData: any[],
-    groupRatioMap?: Record<string, number>,
-    fallbackEndpointUrl?: string,
-): ModelPricingInfo[] {
-    const seen = new Set<string>();
-    const rows: ModelPricingInfo[] = [];
-    const defaultGroupRatio =
-        (groupRatioMap && Object.values(groupRatioMap).find((value) => Number.isFinite(value)))
-        || 1;
-
-    for (const item of Array.isArray(pricingData) ? pricingData : []) {
-        const modelId = resolveSharedPricingModelId(item);
-        if (!modelId) {
-            continue;
-        }
-
-        const cacheKey = modelId.toLowerCase();
-        if (seen.has(cacheKey)) {
-            continue;
-        }
-        seen.add(cacheKey);
-
-        const perRequestPrice = toFiniteNumber(item?.per_request_price ?? item?.perRequestPrice ?? item?.price_per_image ?? item?.pricePerImage);
-        const explicitInputPrice = toFiniteNumber(item?.input_price ?? item?.inputPrice);
-        const modelPrice = toFiniteNumber(item?.model_price ?? item?.modelPrice);
-        const completionPrice = toFiniteNumber(item?.output_price ?? item?.outputPrice);
-        const completionRatio = toFiniteNumber(item?.completion_ratio ?? item?.completionRatio);
-        const quotaTypeRaw =
-            item?.quota_type ?? item?.quotaType ?? item?.billing_type ?? item?.billingType ?? '';
-        const quotaType = String(quotaTypeRaw).trim().toLowerCase();
-        const isPerToken = !(quotaType === 'per_request' || perRequestPrice !== undefined);
-        const inputPrice = perRequestPrice ?? explicitInputPrice ?? modelPrice ?? 0;
-        const outputPrice = completionPrice ?? (
-            isPerToken && inputPrice > 0 && completionRatio !== undefined
-                ? inputPrice * completionRatio
-                : 0
-        );
-        const groupRatio = toFiniteNumber(item?.group_ratio ?? item?.groupRatio) ?? defaultGroupRatio;
-
-        rows.push({
-            modelId,
-            modelName: (() => {
-                const rawName = item?.model_name ?? item?.modelName ?? modelId ?? '';
-                const trimmed = String(rawName).trim();
-                return trimmed || modelId;
-            })(),
-            inputPrice: Math.max(0, inputPrice),
-            outputPrice: Math.max(0, outputPrice),
-            isPerToken,
-            groupRatio,
-            currency: String(item?.currency || 'USD').trim() || 'USD',
-            billingUnit: (() => {
-                const rawUnit = item?.billing_unit ?? item?.pay_unit ?? '';
-                const trimmed = String(rawUnit).trim();
-                return trimmed || undefined;
-            })(),
-            displayPrice: (() => {
-                const trimmed = String(item?.display_price ?? '').trim();
-                return trimmed || undefined;
-            })(),
-            supportsGroups: item?.supports_groups === true || item?.supportsGroups === true,
-            endpointUrl: (() => {
-                const rawUrl = item?.endpoint_url ?? item?.endpointUrl ?? fallbackEndpointUrl ?? '';
-                const trimmed = String(rawUrl).trim();
-                return trimmed || undefined;
-            })(),
-            endpointPath: (() => {
-                const rawPath = item?.endpoint_path ?? item?.endpointPath ?? '';
-                const trimmed = String(rawPath).trim();
-                return trimmed || undefined;
-            })(),
-        });
-    }
-
-    return rows;
-}
-
-function buildPricingSnapshotFromSharedCache(pricing: ModelPricingInfo[]): ProviderPricingSnapshot | undefined {
-    if (!Array.isArray(pricing) || pricing.length === 0) {
-        return undefined;
-    }
-
-    return buildProviderPricingSnapshot(
-        pricing.map((item) => ({
-            model: item.modelId,
-            model_name: item.modelName,
-            quota_type: item.isPerToken ? 'tokens' : 'per_request',
-            per_request_price: item.isPerToken ? undefined : item.inputPrice,
-            model_price: item.isPerToken ? item.inputPrice : undefined,
-            completion_ratio:
-                item.isPerToken && item.inputPrice > 0 && item.outputPrice > 0
-                    ? item.outputPrice / item.inputPrice
-                    : undefined,
-            currency: item.currency,
-            billing_unit: item.billingUnit,
-            display_price: item.displayPrice,
-            endpoint_url: item.endpointUrl,
-            endpoint_path: item.endpointPath,
-            group_ratio: item.groupRatio,
-        })),
-        undefined,
-        {
-            fetchedAt: Date.now(),
-            note: 'Loaded from shared provider pricing cache',
-        },
-    );
-}
 
 export interface KeySlot {
     id: string;
@@ -506,538 +312,10 @@ export interface ThirdPartyProvider {
     updatedAt: number;
 }
 
-/**
- * Preset third-party API providers
- */
-export const PROVIDER_PRESETS: Record<string, Omit<ThirdPartyProvider, 'id' | 'apiKey' | 'usage' | 'status' | 'createdAt' | 'updatedAt' | 'isActive'> & { defaultApiKey?: string }> = {
-    'zhipu': {
-        name: '\u667A\u8C31 AI',
-        baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
-        models: ['glm-4', 'glm-4-flash', 'glm-4-plus', 'cogview-4'],
-        format: 'openai',
-        icon: '\u{1F9E0}'
-    },
-    'wanqing': {
-        name: '\u4E07\u9752 (\u5FEB\u624B)',
-        baseUrl: 'https://wanqing.streamlakeapi.com/api/gateway/v1/endpoints',
-        models: ['deepseek-reasoner', 'deepseek-v3', 'qwen-max'],
-        format: 'openai',
-        icon: '\u{1F3AC}'
-    },
-    'sambanova': {
-        name: 'SambaNova',
-        baseUrl: 'https://api.sambanova.ai/v1',
-        models: ['Meta-Llama-3.1-405B-Instruct', 'Meta-Llama-3.1-70B-Instruct', 'Meta-Llama-3.1-8B-Instruct', 'Meta-Llama-3.2-90B-Vision-Instruct', 'Meta-Llama-3.2-11B-Vision-Instruct', 'Meta-Llama-3.2-3B-Instruct', 'Meta-Llama-3.2-1B-Instruct', 'Qwen2.5-72B-Instruct', 'Qwen2.5-Coder-32B-Instruct'],
-        format: 'openai',
-        icon: '\u{1F680}'
-    },
-    'openclaw': {
-        name: 'OpenClaw (Zero Token)',
-        baseUrl: 'http://127.0.0.1:3001/v1',
-        models: ['claude-3-5-sonnet-20241022', 'doubao-pro-32k', 'doubao-pro-128k', 'deepseek-chat', 'deepseek-reasoner'],
-        format: 'openai',
-        icon: '\u{1F43E}',
-        defaultApiKey: 'sk-openclaw-zero-token'
-    },
-    't8star': {
-        name: 'T8Star',
-        baseUrl: 'https://ai.t8star.cn',
-        // Conservative defaults; users can auto-detect or customize in UI
-        models: ['gemini-3.1-pro-preview', 'gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image', 'gemini-3-pro-image-preview', 'gemini-2.5-flash', 'gemini-3-flash-preview', 'runway-gen3', 'luma-video', 'kling-v1', 'sv3d', 'flux-kontext-max', 'recraft-v3-svg', 'ideogram-v2', 'suno-v3.5', 'minimax-t2a-01'],
-        format: 'openai',
-        icon: '\u2B50'
-    },
-    'volcengine': {
-        name: '\u706B\u5C71\u5F15\u64CE',
-        baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-        models: ['doubao-pro', 'doubao-lite'],
-        format: 'openai',
-        icon: '\u{1F30B}'
-    },
-    'deepseek': {
-        name: 'DeepSeek',
-        baseUrl: 'https://api.deepseek.com',
-        models: ['deepseek-chat', 'deepseek-reasoner'],
-        format: 'openai',
-        icon: '\u{1F52E}'
-    },
-    'moonshot': {
-        name: 'Moonshot (Kimi)',
-        baseUrl: 'https://api.moonshot.cn/v1',
-        models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'],
-        format: 'openai',
-        icon: '\u{1F319}'
-    },
-    'siliconflow': {
-        name: 'SiliconFlow',
-        baseUrl: 'https://api.siliconflow.cn/v1',
-        models: ['Qwen/Qwen2.5-72B-Instruct', 'deepseek-ai/DeepSeek-V3'],
-        format: 'openai',
-        icon: '\u{1F48E}'
-    },
-    '12ai': {
-        name: '12AI',
-        baseUrl: 'https://cdn.12ai.org',
-        models: [
-            'gpt-5.1',
-            'gemini-2.5-pro', 'gemini-2.5-pro-c',
-            'gemini-2.5-flash', 'gemini-2.5-flash-c',
-            'gemini-3.1-pro-preview', 'gemini-3.1-pro-preview-c',
-            'gemini-3.1-flash-image-preview',
-            'gemini-2.5-flash-image', 'gemini-2.5-flash-image-c',
-            'gemini-3-pro-image-preview', 'gemini-3-pro-image-preview-c',
-            'claude-4-sonnet', 'runway-gen3', 'luma-video', 'kling-v1', 'sv3d',
-            'flux-kontext-max', 'recraft-v3-svg', 'ideogram-v2', 'suno-v3.5', 'minimax-t2a-01'
-        ],
-        format: 'gemini', // Best for Gemini-compatible routes and reference images
-        icon: '\u{1F680}'
-    },
-    'antigravity': {
-        name: 'Antigravity (\u672C\u5730)',
-        baseUrl: 'http://127.0.0.1:8045',
-        models: ['gemini-3.1-pro-preview', 'gemini-3.1-flash-image-preview', 'gemini-3-pro-image-preview', 'gemini-3-flash', 'gemini-2.5-flash-image', 'gemini-2.5-flash', 'runway-gen3', 'luma-video', 'kling-v1', 'sv3d', 'vidu', 'minimax-video', 'flux-kontext-max', 'recraft-v3-svg', 'ideogram-v2', 'suno-v3.5', 'minimax-t2a-01'],
-        format: 'openai',
-        icon: '\u{1F300}'
-    },
-    '12ai-nanobanana': {
-        name: '12AI NanoBanana',
-        baseUrl: 'https://cdn.12ai.org',
-        models: [
-            'gemini-3.1-flash-image-preview',
-            'gemini-2.5-flash-image', 'gemini-2.5-flash-image-c',
-            'gemini-3-pro-image-preview', 'gemini-3-pro-image-preview-c'
-        ],
-        format: 'gemini',
-        icon: '\u{1F34C}'
-    },
-    'flow2api': {
-        name: 'Flow2API',
-        baseUrl: 'http://127.0.0.1:8000',
-        models: [
-            'gemini-3.1-flash-image-landscape',
-            'gemini-3.1-flash-image-portrait',
-            'gemini-3.0-pro-image-landscape',
-            'imagen-4.0-generate-preview-landscape'
-        ],
-        format: 'openai',
-        icon: '\u{1F30A}'
-    },
-    'wuyinkeji-nanobanana2': {
-        name: 'Wuyin Keji NanoBanana2',
-        baseUrl: 'https://api.wuyinkeji.com/api/async/image_nanoBanana2',
-        models: ['image_nanoBanana2'],
-        format: 'openai',
-        icon: '\u{1F96D}'
-    },
-    'gpt-best': {
-        name: 'GPT-Best',
-        baseUrl: '',
-        models: ['gpt-4o', 'gpt-4o-mini', 'o3-pro', 'codex-mini-latest', 'o3-deep-research-2025-06-26'],
-        format: 'openai',
-        icon: '\u{1F3AF}'
-    },
-    'custom': {
-        name: '\u81EA\u5B9A\u4E49\u4F9B\u5E94\u5546',
-        baseUrl: '',
-        models: [],
-        format: 'auto',
-        icon: '\u2699\uFE0F'
-    }
-};
-
-export function getDocumentedStaticModelsForProvider(strategyId: string): string[] {
-    if (strategyId !== '12ai') {
-        return [];
-    }
-
-    return Array.from(new Set([
-        ...(PROVIDER_PRESETS['12ai']?.models || []),
-        ...(PROVIDER_PRESETS['12ai-nanobanana']?.models || []),
-    ]));
-}
-
-function getDefaultOfficialModelsForRuntime(runtime: ReturnType<typeof resolveProviderRuntime>): string[] {
-    if (runtime.strategyId === 'google' && runtime.providerFamily === 'google-official') {
-        return DEFAULT_GOOGLE_MODELS;
-    }
-
-    if (runtime.strategyId === 'openai' && (!runtime.baseUrl || runtime.host === 'api.openai.com')) {
-        return DEFAULT_OPENAI_MODELS;
-    }
-
-    return [];
-}
-
-export function resolveEffectiveProviderModels(input: {
-    provider?: string;
-    baseUrl?: string;
-    format?: ApiProtocolFormat;
-    models?: string[];
-}): string[] {
-    const runtime = resolveProviderRuntime({
-        provider: input.provider,
-        baseUrl: input.baseUrl,
-        format: input.format,
-    });
-    const normalizedModels = normalizeModelList(
-        Array.isArray(input.models) ? input.models : [],
-        runtime.uiProvider || input.provider,
-        input.baseUrl,
-    );
-
-    if (normalizedModels.length > 0) {
-        return normalizedModels;
-    }
-
-    const builtInOfficialModels = getDefaultOfficialModelsForRuntime(runtime);
-    if (builtInOfficialModels.length > 0) {
-        return normalizeModelList(builtInOfficialModels, runtime.uiProvider || input.provider, input.baseUrl);
-    }
-
-    const documentedModels = getDocumentedStaticModelsForProvider(runtime.strategyId);
-    if (documentedModels.length === 0) {
-        return normalizedModels;
-    }
-
-    return normalizeModelList(documentedModels, runtime.uiProvider || input.provider, input.baseUrl);
-}
-
-/**
- * Resolve the 12AI base URL from the region service so callers share one source of truth.
- */
-function get12AIBaseUrl(): string {
-    return RegionService.get12AIBaseUrl();
-}
-
 const DEFAULT_MAX_FAILURES = 3;
 const CLOUD_SYNC_POLL_INTERVAL_MS = 60 * 1000;
-// Legacy Gemini model IDs kept for backward-compatible migrations
-const LEGACY_GOOGLE_MODELS = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash-exp'];
-
-/**
- * Canonical model migration map used to upgrade old saved model IDs to the current equivalents.
- */
-export const MODEL_MIGRATION_MAP: Record<string, string> = {
-    // Gemini 1.5 series -> Gemini 2.5 series
-    'gemini-1.5-pro': 'gemini-2.5-pro',
-    'gemini-1.5-pro-latest': 'gemini-2.5-pro',
-    'gemini-1.5-flash': 'gemini-2.5-flash',
-    'gemini-1.5-flash-latest': 'gemini-2.5-flash',
-
-    // Gemini 2.0 series -> Gemini 2.5 series
-    'gemini-2.0-flash-exp': 'gemini-2.5-flash',
-    'gemini-2.0-pro-exp': 'gemini-2.5-pro',
-
-    // Gemini 2.0 image generation alias -> Gemini 2.5 Flash Image
-    'gemini-2.0-flash-exp-image-generation': 'gemini-2.5-flash-image',
-
-    // Nano Banana aliases -> official Gemini image models
-    'nano-banana': 'gemini-2.5-flash-image',
-    'nano banana': 'gemini-2.5-flash-image',
-    'nano-banana-pro': 'gemini-3-pro-image-preview',
-    'nano banana pro': 'gemini-3-pro-image-preview',
-    'nano-banana-2': 'gemini-3.1-flash-image-preview',
-    'nano banana 2': 'gemini-3.1-flash-image-preview',
-    'gemini-2.5-flash-image-preview': 'gemini-2.5-flash-image',
-
-    // Normalize legacy "-latest" aliases
-    'gemini-flash-lite-latest': 'gemini-2.5-flash-lite',
-    'gemini-flash-latest': 'gemini-2.5-flash',
-    'gemini-pro-latest': 'gemini-2.5-pro',
-    // Retroactive fixes for old canvas nodes
-    'gemini-3-pro-image': 'gemini-3-pro-image-preview',
-};
-
-/**
- * Blacklisted model patterns that should never surface in the UI.
- */
-export const BLACKLIST_MODELS = [
-    // Imagen dated preview builds
-    /^imagen-[34]\.0-(ultra-)?generate-preview-\d{2}-\d{2}$/,
-    /^imagen-[34]\.0-(fast-)?generate-preview-\d{2}-\d{2}$/,
-    // Older Imagen generate-001 aliases
-    /^imagen-[34]\.0-.*generate-001$/,
-];
-
-/**
- * Deprecated model IDs kept for backward-compatibility checks.
- */
-export const DEPRECATED_MODELS = Object.keys(MODEL_MIGRATION_MAP);
-
-/**
- * Normalize a legacy model ID to the current canonical ID.
- * @param modelId - Raw model ID from persisted state or user input
- * @returns Canonical model ID when a migration mapping exists; otherwise the original ID
- */
-export function normalizeModelId(modelId: string): string {
-    const raw = (modelId || '').trim();
-    const parsedVariant = parseModelVariantMeta(raw);
-    const variantCanonical = String(parsedVariant.canonicalId || '').trim();
-    if (variantCanonical && variantCanonical !== raw) {
-        const canonicalTarget = MODEL_MIGRATION_MAP[variantCanonical]
-            || MODEL_MIGRATION_MAP[variantCanonical.toLowerCase()]
-            || variantCanonical;
-        console.log(`[ModelMigration] Canonicalizing "${modelId}" -> "${canonicalTarget}"`);
-        return canonicalTarget;
-    }
-
-    const normalized = MODEL_MIGRATION_MAP[raw];
-    if (normalized) {
-        console.log(`[ModelMigration] Auto-correcting "${modelId}" -> "${normalized}"`);
-        return normalized;
-    }
-
-    const lowerRaw = raw.toLowerCase();
-    const lowerMapped = MODEL_MIGRATION_MAP[lowerRaw];
-    if (lowerMapped) {
-        console.log(`[ModelMigration] Auto-correcting "${modelId}" -> "${lowerMapped}"`);
-        return lowerMapped;
-    }
-
-    const dashed = lowerRaw.replace(/\s+/g, '-');
-    const dashedMapped = MODEL_MIGRATION_MAP[dashed];
-    if (dashedMapped) {
-        console.log(`[ModelMigration] Auto-correcting "${modelId}" -> "${dashedMapped}"`);
-        return dashedMapped;
-    }
-
-    return raw;
-}
-
-export interface ModelVariantMeta {
-    baseId: string;
-    canonicalId: string; // for dedup (keeps speed tier, strips ratio/quality/date)
-    speed?: 'fast' | 'slow';
-    quality?: '512px' | '4k' | '2k' | '1k' | 'high' | 'hd' | 'ultra' | 'medium' | 'low' | 'standard';
-    ratio?: string;
-}
-
-/**
- * Parse vendor-specific suffix patterns and extract variant metadata.
- * - Keeps speed tier (fast/slow) as model-differentiating signal
- * - Treats resolution/quality/ratio suffix as parameter-like signal
- */
-export function parseModelVariantMeta(modelId: string): ModelVariantMeta {
-    const raw = (modelId || '').trim();
-    let working = raw
-        .replace(/-\*$/i, '')
-        .replace(/-\d{8}$/i, '');
-
-    const ratioRegex = /(16[x-]9|9[x-]16|1[x-]1|4[x-]3|3[x-]4|21[x-]9|9[x-]21|3[x-]2|2[x-]3|4[x-]5|5[x-]4)$/i;
-    const qualityRegex = /(512px|4k|2k|1k|hd|high|ultra|medium|low|standard)$/i;
-    const speedRegex = /(fast|slow)$/i;
-
-    let ratio: string | undefined;
-    let quality: ModelVariantMeta['quality'];
-    let speed: ModelVariantMeta['speed'];
-
-    const ratioMatch = working.match(new RegExp(`-${ratioRegex.source}`, 'i'));
-    if (ratioMatch) {
-        ratio = ratioMatch[1].toLowerCase();
-        working = working.replace(new RegExp(`-${ratioRegex.source}$`, 'i'), '');
-    }
-
-    const qualityMatch = working.match(new RegExp(`-${qualityRegex.source}`, 'i'));
-    if (qualityMatch) {
-        quality = qualityMatch[1].toLowerCase() as ModelVariantMeta['quality'];
-        working = working.replace(new RegExp(`-${qualityRegex.source}$`, 'i'), '');
-    }
-
-    const speedMatch = working.match(new RegExp(`-${speedRegex.source}`, 'i'));
-    if (speedMatch) {
-        speed = speedMatch[1].toLowerCase() as ModelVariantMeta['speed'];
-        // Keep speed in canonicalId to distinguish fast/slow model families
-    }
-
-    return {
-        baseId: raw,
-        canonicalId: working,
-        speed,
-        quality,
-        ratio
-    };
-}
-
-export function appendModelVariantLabel(baseName: string, modelId: string): string {
-    const parsed = parseModelVariantMeta(modelId);
-    const tags: string[] = [];
-
-    if (parsed.speed) {
-        tags.push(parsed.speed === 'fast' ? 'Fast' : 'Slow');
-    }
-
-    if (parsed.quality) {
-        const qualityMap: Record<string, string> = {
-            '512px': '512px',
-            '4k': '4K',
-            '2k': '2K',
-            '1k': '1K',
-            high: 'High',
-            hd: 'HD',
-            ultra: 'Ultra',
-            medium: 'Medium',
-            low: 'Low',
-            standard: 'Standard'
-        };
-        tags.push(qualityMap[parsed.quality] || parsed.quality);
-    }
-
-    if (tags.length === 0) return baseName;
-    return `${baseName} (${tags.join(' · ')})`;
-}
-
-/**
- * Return whether a model is explicitly marked as deprecated.
- */
-export function isDeprecatedModel(modelId: string): boolean {
-    return DEPRECATED_MODELS.includes(modelId);
-}
-
-/**
- * Determine whether a model should be filtered from the available model list.
- */
-function shouldFilterModel(modelId: string): boolean {
-    // Strict mode: explicit whitelist entries always win over block rules.
-    // If model is explicitly in our whitelist, DO NOT FILTER IT, even if it matches a ban pattern below.
-    if (GOOGLE_IMAGE_WHITELIST.includes(modelId)) return false;
-
-    // Filter dated Imagen preview builds
-    if (/imagen-[34]\.0-.*-preview-\d{2}-\d{2}/.test(modelId)) {
-        console.log(`[ModelFilter] Filtering Imagen preview: ${modelId}`);
-        return true;
-    }
-
-    // Filter old Imagen generate-001 aliases, except the strict whitelist
-    if (/imagen-[34]\.0-.*generate-001$/.test(modelId)) {
-        console.log(`[ModelFilter] Filtering old Imagen: ${modelId}`);
-        return true;
-    }
-
-    // Filter deprecated Gemini 2.0 image-generation model IDs
-    if (modelId === 'gemini-2.0-flash-exp-image-generation') {
-        console.log(`[ModelFilter] Filtering deprecated model: ${modelId}`);
-        return true;
-    }
-
-    return false;
-}
-
-/**
- * Normalize a model list, applying migrations, deduplication, and the official Google whitelist.
- * @param provider Optional provider label used to decide whether official Google rules apply
- */
-export function normalizeModelList(models: string[], provider?: string, baseUrl?: string): string[] {
-    const isOfficialGoogle = provider === 'Google';
-
-    // 1. Migrate & Normalize
-    const normalized = models.map(id => {
-        const raw = (id || '').trim();
-
-        // Non-official Google-style provider routes should keep their raw model IDs.
-        // For example, channel-specific aliases such as "nano-banana-2" may be valid upstream names.
-        if (!isOfficialGoogle) {
-            return raw;
-        }
-
-        // Official Google providers should migrate aliases into canonical model IDs
-        const target = MODEL_MIGRATION_MAP[raw];
-        if (target) return target;
-        return normalizeModelId(raw);
-    });
-
-    // 2. Filter, Remove Duplicates & Apply Strict Whitelist
-    const unique = Array.from(new Set(normalized)).filter(id => {
-        // Always filter explicit blacklist (malformed previews)
-        if (shouldFilterModel(id)) return false;
-
-        // Strict check: ONLY for official Google provider
-        // If it looks like a Google image model, it MUST be in the whitelist
-        if (isOfficialGoogle) {
-            const isGoogleImageLike = id.includes('image') || id.includes('nano') || id.includes('banana') || id.includes('imagen');
-            if (isGoogleImageLike && !GOOGLE_IMAGE_WHITELIST.includes(id)) {
-                return false;
-            }
-        }
-
-        if (resolveProviderModelCompatibilityIssue({ provider, baseUrl, modelId: id })) {
-            return false;
-        }
-
-        // Fix: If it is 'nano-banana' (which shouldn't exist after step 1), kill it.
-        if (id === 'nano-banana' || id === 'nano-banana-pro') return false;
-
-        return true;
-    });
-
-    return unique;
-}
-
-// Strict whitelist for official Google image models
-export const GOOGLE_IMAGE_WHITELIST = [
-    'gemini-2.5-flash-image',
-    'gemini-3-pro-image-preview',
-    'gemini-3.1-flash-image-preview',
-    'imagen-4.0-generate-001',
-    'imagen-4.0-ultra-generate-001',
-    'imagen-4.0-fast-generate-001'
-];
-
-// Video model whitelist
-export const VIDEO_MODEL_WHITELIST = [
-    'runway-gen3',
-    'luma-video',
-    'kling-v1',
-    'sv3d',
-    'vidu',
-    'minimax-video',
-    'wan-v1'
-];
-
-// Advanced image editing whitelist
-export const ADVANCED_IMAGE_MODEL_WHITELIST = [
-    'flux-kontext-max',
-    'recraft-v3-svg',
-    'ideogram-v2'
-];
-
-// Audio model whitelist
-export const AUDIO_MODEL_WHITELIST = [
-    'suno-v3.5',
-    'minimax-t2a-01'
-];
-
-const isGoogleOfficialModelId = (modelId: string): boolean => {
-    const id = String(modelId || '').replace(/^models\//, '').toLowerCase();
-    return id.startsWith('gemini-') || id.startsWith('imagen-') || id.startsWith('veo-');
-};
-
-// Default official Google model list
-export const DEFAULT_GOOGLE_MODELS = [
-    // Gemini 3.1 series
-    'gemini-3.1-pro-preview',
-    // Gemini 3 series
-    'gemini-3-pro-preview',
-    'gemini-3-flash-preview',
-    // Gemini 2.5 series
-    'gemini-2.5-flash',
-
-    // Strict Image Models
-    ...GOOGLE_IMAGE_WHITELIST,
-
-    // Veo 视频生成
-    'veo-3.1-generate-preview',
-    'veo-3.1-fast-generate-preview'
-];
-const DEFAULT_OPENAI_MODELS = ['dall-e-3', 'dall-e-2', 'gpt-4o', 'gpt-4o-mini'];
 
 const GOOGLE_HEADER_NAME = 'x-goog-api-key';
-
-const isLegacyGoogleModelList = (models: string[]) => {
-    if (models.length !== LEGACY_GOOGLE_MODELS.length) return false;
-    return models.every(m => LEGACY_GOOGLE_MODELS.includes(m));
-};
-
-type GlobalModelType = 'chat' | 'image' | 'video' | 'image+chat' | 'audio'; // multimodal support
 
 const GOOGLE_CHAT_MODELS = [
     // Gemini 2.5 series - best value
@@ -1064,9 +342,34 @@ type ModelMetadata = {
     endpointTypes?: string[];
 };
 
+const REMOTE_MODEL_METADATA = new Map<string, ModelMetadata>();
+
 const GOOGLE_MODEL_METADATA = new Map<string, ModelMetadata>(
     GOOGLE_CHAT_MODELS.map(model => [model.id, { name: model.name, description: model.description, icon: model.icon }])
 );
+
+function toModelMetadata(metadata: OpenAICompatModelDiscoveryMetadata): ModelMetadata {
+    return {
+        name: metadata.name || '',
+        description: metadata.description,
+        endpointType: metadata.endpointType,
+        endpointTypes: metadata.endpointTypes,
+    };
+}
+
+function registerRemoteModelMetadata(metadataByModelId?: Record<string, OpenAICompatModelDiscoveryMetadata>): void {
+    Object.entries(metadataByModelId || {}).forEach(([modelId, metadata]) => {
+        const normalizedModelId = String(modelId || '').trim();
+        if (!normalizedModelId) return;
+
+        const existing = REMOTE_MODEL_METADATA.get(normalizedModelId);
+        REMOTE_MODEL_METADATA.set(normalizedModelId, {
+            ...(existing || {}),
+            ...toModelMetadata(metadata),
+            name: metadata.name || existing?.name || normalizedModelId,
+        });
+    });
+}
 
 const MODEL_TYPE_MAP = new Map<string, GlobalModelType>();
 GOOGLE_CHAT_MODELS.forEach(model => MODEL_TYPE_MAP.set(model.id, 'chat'));
@@ -1106,20 +409,27 @@ GOOGLE_MODEL_METADATA.set('gemini-3-pro-image-preview', { name: 'Nano Banana Pro
 
 export const getModelMetadata = (modelId: string): ModelMetadata | undefined => {
     const exactId = String(modelId || '').trim();
+    const baseId = exactId.split('@')[0];
+    const remoteMetadata = REMOTE_MODEL_METADATA.get(exactId)
+        || REMOTE_MODEL_METADATA.get(baseId);
+
     if (exactId) {
         const exactModel = keyManager.getGlobalModelList().find(model => model.id === exactId);
         if (exactModel) {
             return {
-                name: resolveModelDisplayName(exactId, exactModel.name),
+                name: remoteMetadata?.name || resolveModelDisplayName(exactId, exactModel.name),
                 icon: exactModel.icon,
-                description: exactModel.description,
-                endpointType: exactModel.endpointType,
-                endpointTypes: exactModel.endpointTypes,
+                description: remoteMetadata?.description || exactModel.description,
+                endpointType: remoteMetadata?.endpointType || exactModel.endpointType,
+                endpointTypes: remoteMetadata?.endpointTypes || exactModel.endpointTypes,
             };
         }
     }
 
-    const baseId = exactId.split('@')[0];
+    if (remoteMetadata) {
+        return remoteMetadata;
+    }
+
     const exactAdminModel = adminModelService.getModel(exactId);
     if (exactAdminModel) {
         return {
@@ -1130,72 +440,6 @@ export const getModelMetadata = (modelId: string): ModelMetadata | undefined => 
 
     return GOOGLE_MODEL_METADATA.get(baseId);
 };
-
-function buildStableSystemRouteId(baseModelId: string, providerId?: string, fallbackIndex?: number): string {
-    const normalizedBaseId = String(baseModelId || '').trim();
-    const normalizedProviderId = String(providerId || '').trim();
-    if (!normalizedProviderId) {
-        return fallbackIndex && fallbackIndex > 1
-            ? `${normalizedBaseId}@system_${fallbackIndex}`
-            : `${normalizedBaseId}@system`;
-    }
-    return `${normalizedBaseId}@system_${encodeURIComponent(normalizedProviderId)}`;
-}
-
-function buildUserSlotRouteId(baseModelId: string, slotId: string): string {
-    return `${String(baseModelId || '').trim()}@slot_${encodeURIComponent(String(slotId || '').trim())}`;
-}
-
-function buildProviderRouteId(baseModelId: string, providerId: string): string {
-    const normalizedProviderId = String(providerId || '').trim();
-    const routeProviderId = normalizedProviderId.startsWith('provider_')
-        ? normalizedProviderId
-        : `provider_${normalizedProviderId}`;
-    return `${String(baseModelId || '').trim()}@${encodeURIComponent(routeProviderId)}`;
-}
-
-const inferModelType = (modelId: string): GlobalModelType => {
-    const id = modelId.toLowerCase();
-
-    // OpenRouter Specific: "provider/model" format usually implies chat unless "flux", "sd", "ideogram" etc.
-    const isOpenRouter = id.includes('/') && !id.startsWith('models/');
-
-    const isVideo = id.includes('video') || id.includes('veo') || id.includes('kling') ||
-        id.includes('runway') || id.includes('gen-3') || id.includes('gen-2') ||
-        id.includes('luma') || id.includes('sora') || id.includes('pika') ||
-        id.includes('minimax-video') || id.includes('wan') || id.includes('pixverse') ||
-        id.includes('hailuo') || id.includes('seedance') || id.includes('viggle') ||
-        id.includes('higgsfield') || id.includes('vidu') || id.includes('ray-') ||
-        id.includes('jimeng') || id.includes('cogvideo') || id.includes('hunyuanvideo');
-    if (isVideo) return 'video';
-
-    // Treat image-specific model families as image models, not chat models
-    const isImage = id.includes('imagen') || id.includes('image') || id.includes('img') ||
-        id.includes('dall-e') || id.includes('dalle') || id.includes('midjourney') ||
-        id.includes('mj') || id.includes('nano') || id.includes('banana') ||
-        id.includes('flux') || id.includes('stable') || id.includes('sd-') ||
-        id.includes('stable-diffusion') || id.includes('diffusion') ||
-        id.includes('painting') || id.includes('draw') || id.includes('ideogram') ||
-        id.includes('recraft') || id.includes('seedream');
-    if (isImage) return 'image';
-
-    const isAudio = id.includes('lyria') || id.includes('audio') || id.includes('music') || id.includes('tts') ||
-        id.includes('suno') || id.includes('voicemod') || id.includes('elevenlabs') ||
-        id.includes('fish-audio');
-    if (isAudio) return 'audio';
-
-    const isChat = id.includes('gemini') || id.includes('gpt') || id.includes('claude') ||
-        id.includes('deepseek') || id.includes('qwen') || id.includes('llama') ||
-        id.includes('mistral') || id.includes('yi-') || id.includes(':free') ||
-        id.includes('moonshot') || id.includes('doubao');
-    if (isChat) return 'chat';
-
-    // Default OpenRouter to chat if ambivalent
-    if (isOpenRouter) return 'chat';
-
-    return 'chat';
-};
-
 
 // Register Chat Model Presets
 CHAT_MODEL_PRESETS.forEach(preset => {
@@ -1208,7 +452,6 @@ export class KeyManager {
     private state: KeyManagerState;
     private listeners: Set<() => void> = new Set();
     private userId: string | null = null;
-    private authHasSession = false;
     private authIsTempUser = false;
     private sessionlessLocalUserApiStorageEnabled = false;
     private isSyncing = false;
@@ -1254,7 +497,6 @@ export class KeyManager {
         });
 
         subscribeAuthSessionChange((detail) => {
-            this.authHasSession = detail.hasSession;
             this.authIsTempUser = detail.isTempUser;
 
             if (detail.isTempUser || !detail.hasSession) {
@@ -1309,10 +551,6 @@ export class KeyManager {
         return getKeyManagerStorageKey(this.userId);
     }
 
-    private getProviderStorageKey(targetUserId: string | null = this.userId): string {
-        return getProviderStorageKey(targetUserId);
-    }
-
     private canUseSessionlessLocalUserApiStorage(): boolean {
         return this.sessionlessLocalUserApiStorageEnabled && Boolean(this.userId);
     }
@@ -1331,10 +569,6 @@ export class KeyManager {
         }
 
         return USER_API_LOGIN_REQUIRED_MESSAGE;
-    }
-
-    private getBrowserDirectProviderChecksDisabledMessage(): string {
-        return BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE;
     }
 
     /**
@@ -1473,16 +707,6 @@ export class KeyManager {
         }
 
         // Return empty state if nothing found (Fresh user / Fresh storage)
-        return {
-            slots: [],
-            currentIndex: 0,
-            maxFailures: DEFAULT_MAX_FAILURES,
-            rotationStrategy: 'round-robin'
-        };
-    }
-
-    private migrateFromOldFormat(): KeyManagerState {
-        this.purgeAnonymousSensitiveLocalCaches();
         return {
             slots: [],
             currentIndex: 0,
@@ -1686,8 +910,9 @@ export class KeyManager {
         }
     ) {
         const previousProviders = [...this.providers];
-        const cloudProviders = this.mergeCloudProvidersWithLocalRuntimeState(
-            this.normalizeStoredProviders(extractUserApiProvidersFromPayload(rawPayload))
+        const cloudProviders = mergeCloudProvidersWithLocalRuntimeState(
+            this.normalizeStoredProviders(extractUserApiProvidersFromPayload(rawPayload)),
+            this.providers,
         );
         const hasProviderEnvelope = isUserApisEnvelope(rawPayload) && 'providers' in rawPayload;
         const shouldPreserveLocalProviders =
@@ -2181,13 +1406,13 @@ export class KeyManager {
         if (isBrowserRuntime()) {
             return {
                 success: false,
-                message: this.getBrowserDirectProviderChecksDisabledMessage(),
+                message: BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE,
             };
         }
 
         try {
             // Sanitize input key before connectivity test
-            const cleanKey = key.replace(/[^\x00-\x7F]/g, "").trim();
+            const cleanKey = sanitizeAsciiApiKey(key);
             if (!cleanKey) return { success: false, message: 'API Key \u65E0\u6548\uFF08\u4EC5\u652F\u6301 ASCII / \u82F1\u6587\u5B57\u7B26\uFF09' };
 
             let targetUrl = url;
@@ -2420,12 +1645,7 @@ export class KeyManager {
 
                             // Try to fetch /pricing in the background and refresh the cached pricing snapshot
                             try {
-                                const sanitizedPricingBase = cleanUrl.replace(PROVIDER_MARKETING_SUFFIX_RE, '') || cleanUrl;
-                                const normalizedPricingBase = sanitizedPricingBase.replace(/\/+$/, '') || cleanUrl;
-                                const pricingBase = normalizedPricingBase.endsWith('/v1')
-                                    ? normalizedPricingBase.replace(/\/v1$/, '')
-                                    : normalizedPricingBase;
-                                const pricingUrl = `${pricingBase}/pricing`;
+                                const pricingUrl = buildSilentProviderPricingUrl(cleanUrl);
                                 // We don't want to block the models return, so do this asynchronously but catch errors locally.
                                 // It runs in the background.
                                 fetch(pricingUrl, {
@@ -2474,68 +1694,13 @@ export class KeyManager {
         return this.state.rotationStrategy || 'round-robin'; // Default to round-robin
     }
 
-    private resolveProviderBudgetLimit(provider: ThirdPartyProvider): number {
-        return resolveProviderBudgetLimit(provider);
-    }
-
-    private resolveProviderTokenLimit(provider: ThirdPartyProvider): number {
-        return resolveProviderTokenLimit(provider);
-    }
-
-    private isUsageLimitExceeded(target: {
-        budgetLimit?: number;
-        totalCost?: number;
-        tokenLimit?: number;
-        usedTokens?: number;
-    }): boolean {
-        const budgetLimit = target.budgetLimit ?? -1;
-        const totalCost = target.totalCost ?? 0;
-        const tokenLimit = target.tokenLimit ?? -1;
-        const usedTokens = target.usedTokens ?? 0;
-
-        if (budgetLimit > 0 && totalCost >= budgetLimit) {
-            return true;
-        }
-
-        if (tokenLimit > 0 && usedTokens >= tokenLimit) {
-            return true;
-        }
-
-        return false;
-    }
-
     private applyProviderUsageDelta(providerId: string, tokenDelta: number, costDelta: number): ThirdPartyProvider | undefined {
         this.loadProviders();
 
         const provider = this.providers.find((entry) => entry.id === providerId);
         if (!provider) return undefined;
 
-        const now = Date.now();
-        if (!provider.usage) {
-            provider.usage = {
-                totalTokens: 0,
-                totalCost: 0,
-                dailyTokens: 0,
-                dailyCost: 0,
-                lastReset: now,
-            };
-        }
-
-        const lastResetDate = new Date(provider.usage.lastReset || 0);
-        const today = new Date(now);
-        if (lastResetDate.toDateString() !== today.toDateString()) {
-            provider.usage.dailyTokens = 0;
-            provider.usage.dailyCost = 0;
-            provider.usage.lastReset = now;
-        }
-
-        provider.usage.totalTokens = Math.max(0, (provider.usage.totalTokens || 0) + tokenDelta);
-        provider.usage.totalCost = Math.max(0, (provider.usage.totalCost || 0) + costDelta);
-        provider.usage.dailyTokens = Math.max(0, (provider.usage.dailyTokens || 0) + tokenDelta);
-        provider.usage.dailyCost = Math.max(0, (provider.usage.dailyCost || 0) + costDelta);
-        provider.updatedAt = now;
-
-        return provider;
+        return applyProviderUsageDeltaToProvider(provider, tokenDelta, costDelta);
     }
 
     /**
@@ -2571,18 +1736,9 @@ export class KeyManager {
             normalizedModelId = MODEL_MIGRATION_MAP[normalizedModelId];
         }
 
-        // Model-driven routing: credit-billed internal models default to the built-in proxy
-        // unless the caller explicitly requested a different route suffix.
-        const isCreditModel = normalizedModelId.includes('nano-banana') ||
-            normalizedModelId.includes('gemini-3.1-flash-image') ||
-            normalizedModelId.includes('gemini-3-pro-image') ||
-            normalizedModelId === 'gemini-2.5-flash-image' ||
-            normalizedModelId.includes('lyria') ||
-            normalizedModelId.includes('tts');
-
         // Routing strategy:
         // 1. If a suffix is present, try to match that explicit route.
-        // 2. Without a suffix, credit models prefer the built-in proxy and normal models prefer user Google keys.
+        // 2. Without a suffix, prefer direct Google/Gemini keys.
 
         // Convert third-party providers into temporary KeySlot objects so routing stays unified.
         this.loadProviders();
@@ -2613,8 +1769,8 @@ export class KeyManager {
                 headerName: runtime.headerName,
                 group: p.group,
                 status: 'valid',
-                budgetLimit: this.resolveProviderBudgetLimit(p),
-                tokenLimit: this.resolveProviderTokenLimit(p),
+                budgetLimit: resolveProviderBudgetLimit(p),
+                tokenLimit: resolveProviderTokenLimit(p),
                 usedTokens: p.usage?.totalTokens || 0,
                 totalCost: p.usage?.totalCost || 0,
                 successCount: 0,
@@ -2682,7 +1838,7 @@ export class KeyManager {
 
         const isSlotHealthy = (slot: KeySlot) => {
             if (slot.disabled) return false;
-            if (this.isUsageLimitExceeded(slot)) return false;
+            if (isUsageLimitExceeded(slot)) return false;
             return true;
         };
 
@@ -2826,7 +1982,7 @@ export class KeyManager {
                 disabled.push(s);
                 continue;
             }
-            if (this.isUsageLimitExceeded(s)) {
+            if (isUsageLimitExceeded(s)) {
                 budgetExhausted.push(s);
                 continue;
             }
@@ -2841,7 +1997,7 @@ export class KeyManager {
                 const healingCandidates = this.state.slots.filter(s =>
                     (s.provider === 'Google' || (s.provider as string) === 'Gemini') &&
                     !s.disabled &&
-                    !this.isUsageLimitExceeded(s)
+                    !isUsageLimitExceeded(s)
                 );
 
                 if (healingCandidates.length > 0) {
@@ -3206,7 +2362,7 @@ export class KeyManager {
         }
 
         // Sanitize the input key before validation: trim whitespace and remove non-ASCII noise
-        const trimmedKey = key.replace(/[^\x00-\x7F]/g, "").trim();
+        const trimmedKey = sanitizeAsciiApiKey(key);
 
         if (!trimmedKey) {
             return { success: false, error: '请输入有效的 API Key（仅保留 ASCII 字符）。' };
@@ -3309,11 +2465,11 @@ export class KeyManager {
             throw new Error(secureModeError);
         }
 
-        console.log('[KeyManager] updateKey invoked:', {
+        console.log('[KeyManager] updateKey invoked:', buildKeyUpdateDiagnosticPayload(
             id,
             updates,
-            supportedModelsBefore: this.state.slots.find(s => s.id === id)?.supportedModels
-        });
+            this.state.slots.find(s => s.id === id)?.supportedModels
+        ));
         const slot = this.state.slots.find(s => s.id === id);
         if (slot) {
             Object.assign(slot, updates);
@@ -3365,7 +2521,7 @@ export class KeyManager {
         if (isBrowserRuntime()) {
             return {
                 valid: false,
-                error: this.getBrowserDirectProviderChecksDisabledMessage(),
+                error: BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE,
             };
         }
 
@@ -3589,9 +2745,6 @@ export class KeyManager {
 
     /**
      * Get validated global model list from all channels (Standard + Custom)
-     */
-    /**
-     * Get validated global model list from all channels (Standard + Custom)
      * SORTING ORDER: User Custom Models (Top) -> Standard Google Models (Bottom)
      */
     getGlobalModelList(): {
@@ -3706,7 +2859,6 @@ export class KeyManager {
             textColor?: 'white' | 'black';
             creditCost?: number; // Credit cost badge shown in the model picker UI
         }>();
-        const chatModelIds = new Set(GOOGLE_CHAT_MODELS.map(model => model.id));
         const normalizeUserSourceSignaturePart = (value?: string) =>
             String(value || '').trim().replace(/\/+$/, '').toLowerCase();
         const userSlotSourceSignatures = new Set(
@@ -3975,23 +3127,6 @@ export class KeyManager {
         return this.getProjectedSlots();
     }
 
-    private buildChannelCapabilities(models: string[], pricingSupport: ChannelConfig['pricingSupport'], managementSupport: ChannelConfig['managementSupport']) {
-        const normalizedModels = Array.isArray(models) ? models : [];
-        const hasWildcard = normalizedModels.includes('*');
-        const categorized = categorizeModels(normalizedModels.map((item) => parseModelString(item).id));
-        const lowerModels = normalizedModels.map((item) => parseModelString(item).id.toLowerCase());
-
-        return {
-            chat: hasWildcard || categorized.chatModels.length > 0 || normalizedModels.length === 0,
-            image: hasWildcard || categorized.imageModels.length > 0,
-            video: hasWildcard || categorized.videoModels.length > 0,
-            audio: hasWildcard || lowerModels.some((model) => /audio|tts|suno|lyria|minimax-t2a/i.test(model)),
-            modelDiscovery: true,
-            pricingDiscovery: pricingSupport === 'native',
-            managementApi: managementSupport === 'native',
-        };
-    }
-
     private buildSlotChannelConfig(slot: KeySlot): ChannelConfig {
         const slotBaseUrl = slot.baseUrl
             || (slot.provider === 'OpenAI' ? 'https://api.openai.com' : GOOGLE_API_BASE);
@@ -4020,7 +3155,7 @@ export class KeyManager {
             id: slot.id,
             name: slot.name || slot.provider || 'Unnamed Channel',
             baseUrl: slotBaseUrl,
-            apiKey: '',
+            apiKey: getRedactedChannelConfigApiKey(),
             provider: slot.provider,
             providerFamily: runtime.providerFamily,
             protocolHint: normalizeApiProtocolFormat(slot.format, runtime.resolvedFormat),
@@ -4029,7 +3164,7 @@ export class KeyManager {
                 headerName: slot.headerName || runtime.headerName,
                 authorizationValueFormat: runtime.authorizationValueFormat,
             },
-            capabilities: this.buildChannelCapabilities(effectiveSlotModels, pricingSupport, managementSupport),
+            capabilities: buildChannelCapabilities(effectiveSlotModels, pricingSupport, managementSupport),
             pricingSupport,
             managementSupport,
             supportedModels: effectiveSlotModels,
@@ -4063,7 +3198,7 @@ export class KeyManager {
             id: provider.id,
             name: provider.name,
             baseUrl: provider.baseUrl,
-            apiKey: '',
+            apiKey: getRedactedChannelConfigApiKey(),
             provider: runtime.uiProvider,
             providerFamily: runtime.providerFamily,
             protocolHint: normalizeApiProtocolFormat(provider.format, runtime.resolvedFormat),
@@ -4072,7 +3207,7 @@ export class KeyManager {
                 headerName: runtime.headerName,
                 authorizationValueFormat: runtime.authorizationValueFormat,
             },
-            capabilities: this.buildChannelCapabilities(effectiveProviderModels, pricingSupport, managementSupport),
+            capabilities: buildChannelCapabilities(effectiveProviderModels, pricingSupport, managementSupport),
             pricingSupport,
             managementSupport,
             supportedModels: effectiveProviderModels,
@@ -4158,7 +3293,7 @@ export class KeyManager {
         const hasValidSlot = this.getProjectedSlots().some(s => {
             if (s.disabled || s.status === 'invalid') return false;
             // Budget check: if budget is set and exhausted, it's effectively invalid
-            if (this.isUsageLimitExceeded(s)) return false;
+            if (isUsageLimitExceeded(s)) return false;
 
             // Scenario 1: Exact model support in supportedModels array (or wildcard)
             const supported = s.supportedModels || [];
@@ -4180,10 +3315,10 @@ export class KeyManager {
         this.loadProviders();
         return this.providers.some(p => {
             if (!p.isActive) return false;
-            if (this.isUsageLimitExceeded({
-                budgetLimit: this.resolveProviderBudgetLimit(p),
+            if (isUsageLimitExceeded({
+                budgetLimit: resolveProviderBudgetLimit(p),
                 totalCost: p.usage?.totalCost,
-                tokenLimit: this.resolveProviderTokenLimit(p),
+                tokenLimit: resolveProviderTokenLimit(p),
                 usedTokens: p.usage?.totalTokens,
             })) return false;
 
@@ -4375,42 +3510,11 @@ export class KeyManager {
         previousProvider?: Partial<ThirdPartyProvider>,
         options?: { persistState?: boolean }
     ): boolean {
-        const candidateProviders = [provider, previousProvider]
-            .filter((item): item is Partial<ThirdPartyProvider> => !!item && !!item.baseUrl)
-            .map((item) => ({
-                baseUrl: normalizeProviderLinkValue(item.baseUrl),
-                apiKey: String(item.apiKey || '').trim(),
-                name: normalizeProviderLinkValue(item.name),
-            }))
-            .filter((item) => !!item.baseUrl);
-
-        if (candidateProviders.length === 0) return false;
-
-        const matchedSlots = this.state.slots.filter((slot) => {
-            const slotBaseUrl = normalizeProviderLinkValue(slot.baseUrl);
-            if (!slotBaseUrl) return false;
-
-            return candidateProviders.some((candidate) => {
-                if (slotBaseUrl !== candidate.baseUrl) return false;
-
-                const slotKey = String(slot.key || '').trim();
-                const slotName = normalizeProviderLinkValue(slot.name);
-
-                if (candidate.apiKey && slotKey && slotKey === candidate.apiKey) return true;
-                if (candidate.name && slotName && slotName === candidate.name) return true;
-                return false;
-            });
-        });
-
-        if (matchedSlots.length === 0) {
-            const currentBaseUrl = normalizeProviderLinkValue(provider.baseUrl);
-            if (currentBaseUrl) {
-                const sameBaseUrlSlots = this.state.slots.filter((slot) => normalizeProviderLinkValue(slot.baseUrl) === currentBaseUrl);
-                if (sameBaseUrlSlots.length === 1) {
-                    matchedSlots.push(sameBaseUrlSlots[0]);
-                }
-            }
-        }
+        const matchedSlots = findProviderLinkedSlots(
+            this.state.slots,
+            [provider, previousProvider],
+            { allowSingleBaseUrlFallback: true },
+        );
 
         if (matchedSlots.length === 0) return false;
 
@@ -4489,29 +3593,7 @@ export class KeyManager {
         provider: ThirdPartyProvider,
         options?: { persistState?: boolean }
     ): boolean {
-        const candidateProviders = [{
-            baseUrl: normalizeProviderLinkValue(provider.baseUrl),
-            apiKey: String(provider.apiKey || '').trim(),
-            name: normalizeProviderLinkValue(provider.name),
-        }].filter((item) => !!item.baseUrl);
-
-        if (candidateProviders.length === 0) return false;
-
-        const matchedSlots = this.state.slots.filter((slot) => {
-            const slotBaseUrl = normalizeProviderLinkValue(slot.baseUrl);
-            if (!slotBaseUrl) return false;
-
-            return candidateProviders.some((candidate) => {
-                if (slotBaseUrl !== candidate.baseUrl) return false;
-
-                const slotKey = String(slot.key || '').trim();
-                const slotName = normalizeProviderLinkValue(slot.name);
-
-                if (candidate.apiKey && slotKey && slotKey === candidate.apiKey) return true;
-                if (candidate.name && slotName && slotName === candidate.name) return true;
-                return false;
-            });
-        });
+        const matchedSlots = findProviderLinkedSlots(this.state.slots, [provider]);
 
         if (matchedSlots.length === 0) return false;
 
@@ -4638,7 +3720,7 @@ export class KeyManager {
         if (isBrowserRuntime()) {
             return {
                 ok: false,
-                message: this.getBrowserDirectProviderChecksDisabledMessage(),
+                message: BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE,
             };
         }
 
@@ -4768,35 +3850,6 @@ export class KeyManager {
         }
     }
 
-    private mergeCloudProvidersWithLocalRuntimeState(
-        cloudProviders: ThirdPartyProvider[],
-    ): ThirdPartyProvider[] {
-        if (cloudProviders.length === 0 || this.providers.length === 0) {
-            return cloudProviders;
-        }
-
-        const localProvidersById = new Map<string, ThirdPartyProvider>();
-        this.providers.forEach((provider) => {
-            const normalizedId = String(provider.id || "").trim();
-            if (normalizedId) {
-                localProvidersById.set(normalizedId, provider);
-            }
-        });
-
-        return cloudProviders.map((provider) => {
-            const localProvider = localProvidersById.get(String(provider.id || "").trim());
-            if (!localProvider) {
-                return provider;
-            }
-
-            return {
-                ...provider,
-                pricingSnapshot: provider.pricingSnapshot || localProvider.pricingSnapshot,
-                activitySummary: provider.activitySummary || localProvider.activitySummary,
-            };
-        });
-    }
-
     private loadProviders(force = false): void {
         try {
             const loaded = loadProvidersFromLocal(
@@ -4830,16 +3883,6 @@ export class KeyManager {
         }
     }
 
-    private flushPendingProviderCloudSync(): void {
-        if (!this.userId || !this.cloudSyncState.pendingProviderCloudSync) {
-            return;
-        }
-
-        void this.flushPendingCloudSync().catch((error) => {
-            console.error('[KeyManager] Failed to sync providers to cloud:', error);
-        });
-    }
-
 }
 
 // Singleton instance
@@ -4855,28 +3898,6 @@ export default keyManager;
 // ============================================================================
 // API type detection helpers
 // ============================================================================
-
-/**
- * Detect the general API type from the key prefix and base URL.
- */
-export function detectApiType(apiKey: string, baseUrl?: string): 'google-official' | 'openai' | 'proxy' | 'unknown' {
-    // Google official API
-    if (apiKey.startsWith('AIza') || baseUrl?.includes('googleapis.com') || baseUrl?.includes('generativelanguage.googleapis.com')) {
-        return 'google-official';
-    }
-
-    // OpenAI official API
-    if (apiKey.startsWith('sk-') && (!baseUrl || baseUrl.includes('api.openai.com'))) {
-        return 'openai';
-    }
-
-    // Other non-Google endpoints are treated as proxy-compatible APIs
-    if (baseUrl && !baseUrl.includes('googleapis.com') && baseUrl.length > 0) {
-        return 'proxy';
-    }
-
-    return 'unknown';
-}
 
 /**
  * Fetch available Google models using the official models endpoint.
@@ -4903,44 +3924,11 @@ export async function fetchGoogleModels(apiKey: string): Promise<string[]> {
         }
 
         const data = await response.json();
+        const discovery = buildGoogleModelDiscoveryResult(data);
 
-        const models = data.models
-            ?.map((m: any) => m.name.replace('models/', ''))
-            .filter((rawModel: string) => {
-                const modelId = rawModel.replace(/^models\//, '');
-                const lower = modelId.toLowerCase();
-
-                if (lower.includes('embedding') ||
-                    lower.includes('audio') ||
-                    lower.includes('robotics') ||
-                    lower.includes('code-execution') ||
-                    lower.includes('computer-use') ||
-                    lower.includes('aqa')) {
-                    return false;
-                }
-
-                if (lower.includes('tts')) return false;
-
-                const allowedPatterns = [
-                    ...GOOGLE_IMAGE_WHITELIST.map((id) => new RegExp(`^${id}$`)),
-                    /^veo-3\.1-generate-preview$/,
-                    /^veo-3\.1-fast-generate-preview$/,
-                    /^gemini-2\.5-(flash|pro|flash-lite)$/,
-                    /^gemini-3-(pro|flash)-preview$/,
-                ];
-
-                return allowedPatterns.some((pattern) => pattern.test(modelId));
-            }) || [];
-
-        console.log(`[KeyManager] Strict whitelist kept ${models.length} models:`, models);
-
-        const finalModels = Array.from(new Set([
-            ...DEFAULT_GOOGLE_MODELS,
-            ...models
-        ]));
-
-        console.log('[KeyManager] Merged Google model list:', finalModels);
-        return finalModels;
+        console.log(`[KeyManager] Strict whitelist kept ${discovery.strictModels.length} models:`, discovery.strictModels);
+        console.log('[KeyManager] Merged Google model list:', discovery.finalModels);
+        return discovery.finalModels;
     } catch (error) {
         console.error('[KeyManager] Error fetching Google models:', error);
         const failure = classifyApiFailure({
@@ -4949,11 +3937,6 @@ export async function fetchGoogleModels(apiKey: string): Promise<string[]> {
         });
         throw new Error(buildUserFacingApiErrorMessage(failure));
     }
-}
-
-// Shared Google defaults used when no custom model list is available.
-function getDefaultGoogleModels(): string[] {
-    return DEFAULT_GOOGLE_MODELS;
 }
 
 export async function fetchGeminiCompatModels(apiKey: string, baseUrl?: string): Promise<string[]> {
@@ -4994,14 +3977,7 @@ export async function fetchGeminiCompatModels(apiKey: string, baseUrl?: string):
             throw new Error(buildUserFacingApiErrorMessage(failure));
         }
         const data = await response.json();
-        const rawModels: any[] = data.models || data.data || [];
-        return Array.from(
-            new Set(
-                rawModels
-                    .map((model: any) => String(model?.name || model?.id || model?.model || '').replace(/^models\//i, '').trim())
-                    .filter(Boolean)
-            )
-        );
+        return extractGeminiCompatModelIds(data);
     } catch (error) {
         console.error('[KeyManager] Error fetching Gemini-compatible models:', error);
         const failure = classifyApiFailure({
@@ -5049,142 +4025,22 @@ export async function fetchOpenAICompatModels(apiKey: string, baseUrl: string): 
         }
 
         const data = await response.json();
-        const rawModels: any[] = data.data || [];
+        const discovery = buildOpenAICompatModelDiscoveryResult(data);
 
-        console.log('[KeyManager] /v1/models response:', { count: rawModels.length, firstModel: rawModels.length > 0 ? rawModels[0]?.id || rawModels[0] : null, dataType: typeof data.data, hasObjectField: !!data.object });
-
-        // Deduplicate models by canonical name:
-        // - Prefer the base name over stage suffixes when both exist
-        // - Collapse speed variants (for example fast/slow) to a single entry
-        const rawSet = new Set(rawModels.map(m => m.id));
-        const deduped = new Map<string, string>(); // canonical -> chosen model string
-
-        rawModels.forEach(m => {
-            const modelId = m.id;
-            const modelName = m.name || m.title || m.display_name || '';
-            const modelProvider = m.owned_by || m.provider || '';
-
-            const parsed = parseModelVariantMeta(modelId);
-            const canonical = parsed.canonicalId || modelId;
-
-            let formattedModel = modelId;
-            if (modelName || modelProvider) {
-                formattedModel = `${modelId}|${modelName}|${modelProvider}`;
-            }
-
-            // If canonical exists in provider response, prefer canonical (parameterized variants can be selected by UI options)
-            if (rawSet.has(canonical)) {
-                let formattedCanonical = canonical;
-                const canonicalObj = rawModels.find(obj => obj.id === canonical);
-                if (canonicalObj) {
-                    const cName = canonicalObj.name || canonicalObj.title || canonicalObj.display_name || '';
-                    const cProvider = canonicalObj.owned_by || canonicalObj.provider || '';
-                    if (cName || cProvider) {
-                        formattedCanonical = `${canonical}|${cName}|${cProvider}`;
-                    }
-                }
-                deduped.set(canonical, formattedCanonical);
-                return;
-            }
-
-            // Otherwise keep first concrete model id to avoid producing unsupported synthetic IDs
-            if (!deduped.has(canonical)) {
-                deduped.set(canonical, formattedModel);
-            }
+        console.log('[KeyManager] /v1/models response:', {
+            count: discovery.rawCount,
+            firstModel: discovery.firstModel,
+            dataType: discovery.hasDataArray ? 'object' : typeof (data as { data?: unknown }).data,
+            hasObjectField: discovery.hasObjectField,
         });
 
-        const result = Array.from(new Set(deduped.values()));
-        console.log(`[KeyManager] Deduplicated down to ${result.length} unique models:`, result);
-        return result;
+        console.log(`[KeyManager] Deduplicated down to ${discovery.models.length} unique models:`, discovery.models);
+        registerRemoteModelMetadata(discovery.metadataByModelId);
+        return discovery.models;
     } catch (error) {
         console.error('[KeyManager] Error fetching proxy models:', error);
         return [];
     }
-}
-
-function extractModelIdsFromPricingData(pricingData: any[]): string[] {
-    if (!Array.isArray(pricingData)) return [];
-
-    return Array.from(new Set(
-        pricingData
-            .map((item) => {
-                const candidates = [
-                    item?.model,
-                    item?.modelId,
-                    item?.id,
-                    item?.model_name,
-                    item?.modelName,
-                    item?.name,
-                ];
-
-                return candidates
-                    .map((value) => String(value || '').replace(/^models\//i, '').trim())
-                    .find(Boolean);
-            })
-            .filter((value): value is string => Boolean(value))
-    ));
-}
-
-/**
- * Categorize model IDs into image, video, chat, or other buckets.
- * This drives grouped rendering in the channel and provider editors.
- */
-export function categorizeModels(models: string[]): {
-    imageModels: string[];
-    videoModels: string[];
-    chatModels: string[];
-    otherModels: string[];
-} {
-    const categories = {
-        imageModels: [] as string[],
-        videoModels: [] as string[],
-        chatModels: [] as string[],
-        otherModels: [] as string[]
-    };
-
-    models.forEach(model => {
-        const lowerModel = model.toLowerCase();
-
-        // Heuristic: video-oriented model families
-        if (lowerModel.includes('veo') ||
-            lowerModel.includes('runway') ||
-            lowerModel.includes('luma') ||
-            lowerModel.includes('dream-machine') ||
-            lowerModel.includes('kling') ||
-            lowerModel.includes('cogvideo') ||
-            lowerModel.includes('svd') ||
-            lowerModel.includes('video')) {
-            categories.videoModels.push(model);
-        }
-        // Heuristic: image-oriented model families
-        else if (lowerModel.includes('imagen') ||
-            lowerModel.includes('dall-e') ||
-            lowerModel.includes('midjourney') ||
-            lowerModel.includes('image') ||
-            lowerModel.includes('nano') ||
-            lowerModel.includes('banana') ||
-            lowerModel.includes('flux') ||
-            lowerModel.includes('stable') ||
-            lowerModel.includes('diffusion') ||
-            lowerModel.includes('painting') ||
-            lowerModel.includes('draw') ||
-            lowerModel.includes('img')) {
-            categories.imageModels.push(model);
-        }
-        // Heuristic: treat mainstream chat families as chat models
-        else if (lowerModel.includes('gemini') ||
-            lowerModel.includes('gpt') ||
-            lowerModel.includes('claude') ||
-            lowerModel.includes('chat')) {
-            categories.chatModels.push(model);
-        }
-        // Everything else falls into the catch-all category
-        else {
-            categories.otherModels.push(model);
-        }
-    });
-
-    return categories;
 }
 
 /**

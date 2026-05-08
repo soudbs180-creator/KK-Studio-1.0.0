@@ -749,7 +749,6 @@ export async function cleanupOriginals(): Promise<{ count: number; savedBytes: n
         // 🚀 改为分批加载避免内存溢出
         const BATCH_SIZE = 10;
         const totalImages = await getImageCount();
-        const db = await openDB();
 
         console.log(`[compressLargeImages] Processing ${totalImages} images in batches of ${BATCH_SIZE}`);
 

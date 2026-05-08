@@ -11,7 +11,7 @@ description: KK Studio 完整规则总纲 - Clay UI、工程验证、供应商�
 
 ## 🚨 当前项目基线（强制）
 
-- **当前项目版本**：`1.4.2`
+- **当前项目版本**：`1.4.5`
 - **版本源文件**：`package.json` + `src/config/appInfo.ts`
 - **文档基线文件**：`README.md`、`docs/development/session-handoff.md`、`docs/development/progress.md`
 - **规则基线文件**：`.agent/README.md` + 本文件
@@ -24,6 +24,7 @@ description: KK Studio 完整规则总纲 - Clay UI、工程验证、供应商�
 - 不允许为追求“好看”而大幅改动既有 UI 动线；优先稳定、兼容、专业、可维护。
 - Windows PowerShell 默认 `cp936` 会把 UTF-8 中文规则文件误显示成乱码；读取 `.agent`、`docs` 与治理脚本时，优先使用 UTF-8 显式读取或直接运行校验脚本。
 - 修改完成后，默认执行：`npm run typecheck`、`npm run check:encoding`、`npm run build`。
+- UI changes also require Codex in-app Browser evidence before a UI commit: record URL, viewport, theme, checked surfaces, `.theme-transitioning`, and stale chunk status in `status.md`.
 
 ---
 
@@ -1879,7 +1880,7 @@ Last updated: 2026-04-29
 - 标记本仓库当前与 live docs 的已知 drift，避免把本地适配经验误写成供应商事实
 
 ### v2.3 (2026-03-24)
-- 同步当前项目版本为 `1.4.2`
+- 同步当前项目版本为 `1.4.5`
 - 更新文档基线时间，并保持 README / progress / handoff 口径一致
 - 延续版本同步源文件与 `<project-root>` 路径规范
 - 补充当前阶段以设置中心、后台链路与鉴权稳态为主要关注方向

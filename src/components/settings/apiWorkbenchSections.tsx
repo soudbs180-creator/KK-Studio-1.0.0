@@ -143,7 +143,7 @@ export const ApiWorkbenchOverviewSection: React.FC<ApiWorkbenchOverviewSectionPr
             </div>
           ) : null}
           {isHydratingRuntimeUserApis ? (
-            <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 text-[var(--text-secondary)]" style={SETTINGS_ELEVATED_STYLE}>
+            <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 text-[var(--text-secondary)]" style={SETTINGS_OVERLAY_STYLE}>
               {snapshotHydrationHelper}
             </div>
           ) : null}
@@ -241,7 +241,7 @@ export const ApiWorkbenchCurrentViewSection: React.FC<ApiWorkbenchCurrentViewSec
             ))}
           </div>
         ) : (
-          <div className="rounded-[18px] border p-4" style={SETTINGS_ELEVATED_STYLE}>
+          <div className="rounded-[18px] border p-4" style={SETTINGS_OVERLAY_STYLE}>
             <div className="text-[15px] font-semibold text-[var(--text-primary)]">
               {pick('全局延迟概览', 'Global latency summary')}
             </div>
@@ -522,7 +522,7 @@ export const ApiWorkbenchRoutePoolSection: React.FC<ApiWorkbenchRoutePoolSection
   >
     <div className="grid gap-3 lg:grid-cols-2">
       {items.map((item) => (
-        <div key={item.id} className="rounded-[18px] border p-3" style={SETTINGS_ELEVATED_STYLE}>
+        <div key={item.id} className="rounded-[18px] border p-3" style={SETTINGS_OVERLAY_STYLE}>
           <div className="flex flex-wrap items-center gap-2">
             <div className="text-[14px] font-semibold text-[var(--text-primary)]">{item.name}</div>
             <SettingsBadge tone="neutral">{item.routeKind}</SettingsBadge>
@@ -584,7 +584,7 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
     >
       <div className="settings-capability-grid">
         {items.map((item) => (
-          <div key={item.role} className="settings-capability-card settings-reference-card--soft" style={SETTINGS_ELEVATED_STYLE}>
+          <div key={item.role} className="settings-capability-card settings-reference-card--soft" style={SETTINGS_OVERLAY_STYLE}>
             <div className="settings-capability-card__header">
               <div className="settings-capability-card__identity">
                 <div className="settings-capability-card__avatar" style={SETTINGS_OVERLAY_STYLE}>
@@ -655,37 +655,33 @@ type ApiWorkbenchOcrSectionProps = {
   pick: LocalePick;
   enabled: boolean;
   defaultLanguage: string;
-  apiKey: string;
   keySourceLabel: string;
   healthLabel: string;
   onEnabledChange: (enabled: boolean) => void;
   onDefaultLanguageChange: (value: string) => void;
-  onApiKeyChange: (value: string) => void;
 };
 
 export const ApiWorkbenchOcrSection: React.FC<ApiWorkbenchOcrSectionProps> = ({
   pick,
   enabled,
   defaultLanguage,
-  apiKey,
   keySourceLabel,
   healthLabel,
   onEnabledChange,
   onDefaultLanguageChange,
-  onApiKeyChange,
 }) => (
   <SettingsSection
     testId="settings-workbench-ocr"
     title={pick('OCR 服务', 'OCR service')}
     eyebrow={pick('文档解析', 'Document parsing')}
     description={pick(
-      'OCR 单独配置，不混进普通 LLM 链路。优先使用服务端环境变量，缺失时再走本地 BYOK。',
-      'OCR stays isolated from generic LLM routes. Server env keys come first, then local BYOK.',
+      'OCR 单独配置，不混进普通 LLM 链路。密钥只从服务端环境变量读取。',
+      'OCR stays isolated from generic LLM routes. Keys are read only from server env.',
     )}
     action={<SettingsBadge tone="neutral">{pick('OCR service', 'OCR service')}</SettingsBadge>}
   >
     <div className="grid gap-3 lg:grid-cols-[1.2fr,1fr]">
-      <div className="space-y-3 rounded-[18px] border p-3" style={SETTINGS_ELEVATED_STYLE}>
+      <div className="space-y-3 rounded-[18px] border p-3" style={SETTINGS_OVERLAY_STYLE}>
         <SettingToggle
           label={pick('启用 OCR 服务', 'Enable OCR service')}
           checked={enabled}
@@ -699,18 +695,9 @@ export const ApiWorkbenchOcrSection: React.FC<ApiWorkbenchOcrSectionProps> = ({
           placeholder="chi_sim"
           disabled={!enabled}
         />
-        <SettingInput
-          label={pick('Nutrient API Key（可选）', 'Nutrient API Key (optional)')}
-          value={apiKey}
-          onChange={onApiKeyChange}
-          placeholder={pick('优先读取 NUTRIENT_API_KEY / NUTRIENT_DWS_API_KEY', 'Prefer NUTRIENT_API_KEY / NUTRIENT_DWS_API_KEY')}
-          type="password"
-          disabled={!enabled}
-          helper={pick('如果服务端环境变量已配置，这里可以留空。', 'Leave this empty when the server env already provides the key.')}
-        />
       </div>
       <div className="grid gap-3">
-        <InfoCell label={pick('密钥来源', 'Key source')} value={keySourceLabel} helper={pick('先看服务端环境变量，再看本地 OCR 配置。', 'Server env is preferred before local OCR config.')} />
+        <InfoCell label={pick('密钥来源', 'Key source')} value={keySourceLabel} helper={pick('只读取服务端 NUTRIENT_API_KEY / NUTRIENT_DWS_API_KEY。', 'Only server NUTRIENT_API_KEY / NUTRIENT_DWS_API_KEY is used.')} />
         <InfoCell label={pick('健康状态', 'Health state')} value={healthLabel} helper={pick('当前 OCR 请求仍然走 /api/nutrient-document。', 'OCR requests still use /api/nutrient-document.')} />
       </div>
     </div>

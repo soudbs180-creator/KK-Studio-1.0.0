@@ -33,7 +33,7 @@ test('prompt bar keeps footer wrapping while allowing full desktop control label
   assert.match(topRowDesktopSource, /className="flex items-center justify-between mb-2 gap-2"/);
   assert.match(footerShellSource, /if \(isMobile\) \{\s*return <PromptBarFooterMobile>\{children\}<\/PromptBarFooterMobile>;\s*\}/);
   assert.match(footerShellSource, /return <PromptBarFooterDesktop>\{children\}<\/PromptBarFooterDesktop>;/);
-  assert.match(modePanelSource, /className=\{`relative inline-flex \$\{isMobile \? 'row-start-2 min-w-0' : 'min-w-fit flex-shrink-0'\}`\}/);
+  assert.match(modePanelSource, /className=\{`relative inline-flex \$\{isMobile \? 'min-w-0 shrink-0' : 'min-w-fit flex-shrink-0'\}`\}/);
   assert.match(
     modePanelSource,
     /<span className="whitespace-nowrap">[\s\S]*\{config\.aspectRatio === AspectRatio\.AUTO \? [^:]+ : config\.aspectRatio\}[\s\S]*\{config\.imageSize\}[\s\S]*<\/span>/,
@@ -99,7 +99,7 @@ test('prompt bar keeps the textarea transparent while reserving the frosted foot
 
   assert.doesNotMatch(desktopFooterSource, /prompt-bar-footer-frost/);
   assert.match(mobileFooterSource, /data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"/);
-  assert.match(mobileFooterSource, /className="input-bar-footer prompt-bar-footer-frost flex w-full flex-nowrap items-center gap-2 overflow-hidden px-1 pb-1 pt-0\.5 min-h-\[44px\]"/);
+  assert.match(mobileFooterSource, /className="input-bar-footer prompt-bar-footer-frost flex w-full flex-nowrap items-center gap-2 overflow-x-auto overflow-y-visible px-1 pb-1 pt-0\.5 min-h-\[44px\]"/);
   assert.match(cssSource, /\.prompt-bar-footer-frost\s*\{/);
   assert.match(cssSource, /\.prompt-bar-footer-frost::before\s*\{/);
   assert.match(cssSource, /border-top: 1px solid var\(--prompt-bar-footer-frost-border\);/);
@@ -140,4 +140,103 @@ test('prompt bar centers the desktop model dropdown on the trigger instead of le
     promptBarSource,
     /className="absolute left-1\/2 bottom-full mb-3 z-50 -translate-x-1\/2 animate-fadeIn origin-bottom"/,
   );
+});
+
+test('prompt bar normal action buttons share a flat shadow while the send button keeps model-color emphasis without heavy shadows', () => {
+  const cssSource = readSource('src/index.css');
+  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+
+  assert.match(cssSource, /--prompt-bar-liquid-shadow: none;/);
+  assert.match(cssSource, /--prompt-bar-liquid-send-shadow: none;/);
+  assert.match(cssSource, /\.prompt-bar-liquid-button \{\s*background: var\(--prompt-bar-liquid-bg\);\s*border-color: var\(--prompt-bar-liquid-border\);\s*box-shadow: var\(--prompt-bar-liquid-shadow\);/);
+  assert.match(cssSource, /\.prompt-bar-liquid-group \{\s*background: var\(--prompt-bar-liquid-group-bg\);\s*border-color: var\(--prompt-bar-liquid-border\);\s*box-shadow: var\(--prompt-bar-liquid-shadow\);/);
+  assert.match(cssSource, /\.prompt-bar-liquid-send \{\s*box-shadow: var\(--prompt-bar-liquid-send-shadow\);/);
+  assert.doesNotMatch(promptBarSource, /getCreditModelSurfaceStyle/);
+  assert.doesNotMatch(promptBarSource, /boxShadow:\s*`0 2px 8px/);
+  assert.doesNotMatch(promptBarSource, /boxShadow:\s*'var\(--frost-card-main-shadow\)'/);
+  assert.doesNotMatch(promptBarSource, /shadow-\[var\(--frost-card-sub-shadow\)\]/);
+  assert.doesNotMatch(
+    cssSource,
+    /\.input-bar-option,[\s\S]{0,240}box-shadow:\s*var\(--frost-card-sub-shadow\);/,
+    'final material bindings must not re-add heavy shadows to normal prompt footer buttons',
+  );
+});
+
+test('prompt bar model library and footer controls use frosted flat defaults with hover-only gradients and bright enabled toggles', () => {
+  const cssSource = readSource('src/index.css');
+  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const imageOptionsSource = readSource('src/components/image/ImageOptionsPanel.tsx');
+
+  assert.match(cssSource, /--prompt-bar-liquid-bg:\s*rgba\(/);
+  assert.match(cssSource, /--prompt-bar-liquid-bg-hover:\s*linear-gradient\(/);
+  assert.match(cssSource, /--prompt-bar-liquid-group-bg:\s*rgba\(/);
+  assert.match(cssSource, /--prompt-bar-liquid-group-bg-hover:\s*linear-gradient\(/);
+  assert.match(cssSource, /\.prompt-bar-liquid-button:hover\s*\{[\s\S]*background:\s*var\(--prompt-bar-liquid-bg-hover\);/);
+  assert.match(cssSource, /\.prompt-bar-liquid-group:hover\s*\{[\s\S]*background:\s*var\(--prompt-bar-liquid-group-bg-hover\);/);
+  assert.match(cssSource, /\.prompt-bar-footer-frost::before\s*\{[\s\S]*inset:\s*-6px 0 0;/);
+  assert.match(cssSource, /\.prompt-bar-footer-frost::before\s*\{[\s\S]*transform:\s*translateY\(-6px\);/);
+  assert.doesNotMatch(cssSource, /--prompt-bar-liquid-bg:\s*linear-gradient\(/);
+  assert.doesNotMatch(cssSource, /--prompt-bar-liquid-group-bg:\s*linear-gradient\(/);
+
+  assert.match(promptBarSource, /const modelLibrarySurfaceStyle: React\.CSSProperties = \{/);
+  assert.match(promptBarSource, /const modelLibrarySearchSurfaceStyle: React\.CSSProperties = \{/);
+  assert.match(promptBarSource, /background:\s*'var\(--frost-card-framework-bg\)'/);
+  assert.match(promptBarSource, /WebkitBackdropFilter:\s*'blur\(var\(--frost-card-framework-blur\)\) saturate\(1\.18\)'/);
+  assert.match(promptBarSource, /style=\{\{ \.\.\.modelLibrarySearchSurfaceStyle, width: 'min\(22rem, calc\(100vw - 24px\)\)' \}\}/);
+  assert.match(promptBarSource, /style=\{\{ \.\.\.modelLibrarySurfaceStyle, borderRadius: '1rem' \}\}/);
+  assert.doesNotMatch(promptBarSource, /background:\s*'color-mix\(in srgb, var\(--bg-overlay\) 96%, transparent\)'/);
+
+  assert.match(imageOptionsSource, /const ACTIVE_TOGGLE_STYLE: React\.CSSProperties = \{/);
+  assert.match(imageOptionsSource, /background:\s*'var\(--prompt-bar-toggle-active-bg\)'/);
+  assert.match(imageOptionsSource, /color:\s*'var\(--prompt-bar-toggle-active-text\)'/);
+  assert.match(imageOptionsSource, /boxShadow:\s*'var\(--prompt-bar-toggle-active-shadow\)'/);
+});
+
+test('mobile prompt footer stays single-row and lets controls overflow horizontally instead of wrapping', () => {
+  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const modePanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerModePanel.tsx');
+  const footerSource = readSource('src/components/layout/prompt-bar/PromptBarFooterMobile.tsx');
+  const cssSource = readSource('src/index.css');
+
+  assert.match(footerSource, /data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"/);
+  assert.match(footerSource, /flex-nowrap items-center gap-2 overflow-x-auto overflow-y-visible/);
+  assert.doesNotMatch(promptBarSource, /isMobile \? 'grid w-full grid-cols-\[minmax\(0,1fr\)_auto\]/);
+  assert.doesNotMatch(promptBarSource, /isMobile \? \(isEmbeddedMobileComposer \? '' : 'col-span-2'\)/);
+  assert.doesNotMatch(modePanelSource, /isMobile \? 'row-start-2 min-w-0'/);
+  assert.match(cssSource, /\.input-bar-footer\[data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"\]/);
+  assert.match(cssSource, /flex-wrap: nowrap;/);
+  assert.match(cssSource, /overflow-x: auto;/);
+  assert.match(cssSource, /overflow-y: visible;/);
+  assert.match(cssSource, /\.input-bar-footer\[data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"\] \* \{/);
+  assert.doesNotMatch(promptBarSource, /min-w-\[9rem\] max-w-none justify-start flex-shrink-0/);
+  assert.match(promptBarSource, /isMobile \? 'w-\[clamp\(6\.75rem,38vw,8\.5rem\)\] max-w-\[42vw\] flex-none justify-start'/);
+  assert.doesNotMatch(modePanelSource, /isEmbeddedMobileDrawer \? 'px-3 justify-between max-w-none' : 'px-2\.5 max-w-none'/);
+  assert.match(modePanelSource, /isMobile \? 'min-w-0 shrink-0'/);
+  assert.match(modePanelSource, /isMobile \? \(isEmbeddedMobileDrawer \? 'px-3 justify-between max-w-\[42vw\] min-w-0 overflow-hidden' : 'px-2\.5 max-w-\[40vw\] min-w-0 overflow-hidden'\)/);
+});
+
+test('ecommerce main-image ratio choices stay in one equal three-column row', () => {
+  const imageOptionsSource = readSource('src/components/image/ImageOptionsPanel.tsx');
+
+  assert.match(
+    imageOptionsSource,
+    /const totalRatioCount = gridRatios\.length \+ \(hasAuto \? 1 : 0\);/,
+  );
+  assert.match(
+    imageOptionsSource,
+    /const shouldUseSingleEqualRow = totalRatioCount <= 3;/,
+  );
+  assert.match(
+    imageOptionsSource,
+    /const autoInGrid = hasAuto && \(shouldUseSingleEqualRow \|\| isOddCount\);/,
+  );
+  assert.match(
+    imageOptionsSource,
+    /const useDoubleRow = !shouldUseSingleEqualRow && \(totalGridItems > 3 \|\| \(hasAuto && !autoInGrid\)\);/,
+  );
+  assert.match(
+    imageOptionsSource,
+    /const columns = shouldUseSingleEqualRow\s*\?\s*totalGridItems\s*:\s*\(useDoubleRow \? Math\.ceil\(totalGridItems \/ 2\) : Math\.max\(1, totalGridItems\)\);/,
+  );
+  assert.doesNotMatch(imageOptionsSource, /const autoInGrid = hasAuto && isOddCount;/);
 });

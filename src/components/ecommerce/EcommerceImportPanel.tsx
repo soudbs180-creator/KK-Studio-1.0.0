@@ -239,7 +239,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                 {hasRequirementFile ? (
                   <button
                     type="button"
-                    className="inline-flex h-9 items-center justify-center rounded-[12px] border px-3 text-[11px] font-medium transition-all duration-200 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-9 items-center justify-center rounded-[12px] border px-3 text-[11px] font-medium transition-all duration-200 hover:bg-[var(--toolbar-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                     style={{
                       borderColor: 'var(--frost-card-sub-border)',
                       color: 'var(--text-secondary)',
@@ -253,7 +253,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
 
                 <button
                   type="button"
-                  className="ml-auto inline-flex h-9 items-center justify-center gap-2 rounded-[12px] border px-3 text-sm font-semibold transition-all duration-200 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="ml-auto inline-flex h-9 items-center justify-center gap-2 rounded-[12px] border px-3 text-sm font-semibold transition-all duration-200 hover:bg-[var(--toolbar-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                   style={{
                     borderColor: 'var(--frost-card-sub-border)',
                     background: 'var(--frost-card-sub-bg)',

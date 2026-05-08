@@ -121,6 +121,7 @@ describe("http auth routes", () => {
       const loginResult = await handleVersionedLogin(authService, {
         email: "password-route-success@example.com",
         password: "password-123",
+        turnstileToken: "turnstile-ok",
       }, {
         "x-request-id": "req-auth-password-login",
         "x-client-version": "auth-module-test",
@@ -169,6 +170,7 @@ describe("http auth routes", () => {
       const staleLoginResult = await handleVersionedLogin(authService, {
         email: "password-route-success@example.com",
         password: "password-123",
+        turnstileToken: "turnstile-ok",
       }, {
         "x-request-id": "req-auth-password-stale-login",
         "x-client-version": "auth-module-test",
@@ -179,6 +181,7 @@ describe("http auth routes", () => {
       const freshLoginResult = await handleVersionedLogin(authService, {
         email: "password-route-success@example.com",
         password: "new-password-456",
+        turnstileToken: "turnstile-ok",
       }, {
         "x-request-id": "req-auth-password-fresh-login",
         "x-client-version": "auth-module-test",

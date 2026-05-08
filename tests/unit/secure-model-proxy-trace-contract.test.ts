@@ -15,6 +15,7 @@ test('secure proxy requests preserve optional request tracing metadata', () => {
   const llmServiceSource = readSource('src/services/llm/LLMService.ts');
   const localSystemProxySource = readSource('apps/api/src/modules/model-proxy/application/local-system-proxy-service.ts');
   const localUserRouteSource = readSource('apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts');
+  const localUserRouteTaskTokenSource = readSource('apps/api/src/modules/model-proxy/application/local-user-route-task-token.ts');
 
   assert.match(
     contractsSource,
@@ -41,7 +42,7 @@ test('secure proxy requests preserve optional request tracing metadata', () => {
   assert.match(localSystemProxySource, /requestId,[\s\S]*attemptId,[\s\S]*\}\),/);
   assert.match(localSystemProxySource, /requestId: taskPayload\.requestId \|\| input\.requestId,/);
   assert.match(localSystemProxySource, /attemptId: taskPayload\.attemptId \|\| input\.attemptId,/);
-  assert.match(localUserRouteSource, /type LocalTaskPayload = \{[\s\S]*requestId\?: string;[\s\S]*attemptId\?: string;[\s\S]*\};/);
+  assert.match(localUserRouteTaskTokenSource, /export type LocalUserRouteTaskPayload = \{[\s\S]*requestId\?: string;[\s\S]*attemptId\?: string;[\s\S]*\};/);
   assert.match(localUserRouteSource, /requestId: taskResponse\.requestId \|\| requestId,/);
   assert.match(localUserRouteSource, /attemptId: taskResponse\.attemptId \|\| attemptId,/);
 });

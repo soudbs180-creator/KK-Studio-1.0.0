@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { PromptNode, AspectRatio, GenerationMode, PromptGenerationMetadata, type EcommerceEditableTaskState } from '../../types';
 import type { EcommerceGroupSlotState } from '../../services/ecommerce/groupSlotState.ts';
-import { Sparkles, Loader2, Video, Image, Pin, Music, Copy, Check, Languages, Info, ChevronRight, Shield, CheckCircle2, AlertTriangle, Download } from 'lucide-react';
+import { Sparkles, Loader2, Video, Image, Music, Copy, Check, Languages, Info, Shield, CheckCircle2, AlertTriangle, Download } from 'lucide-react';
 import { getCardDimensions } from '../../utils/styleUtils';
 import { generateTagColor } from '../../utils/colorUtils';
 import { notify } from '../../services/system/notificationService';
@@ -18,7 +18,9 @@ import { pickByDocumentLanguage } from '../../utils/localeText';
 import { resolveModelDisplayName } from '../../utils/modelDisplayName';
 import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
 import { buildPptDeckModuleState } from '../../utils/pptDeckModules';
+import { getPromptNodeBaseCardWidth, getPromptNodeCardWidth } from '../../utils/promptNodeCardWidth';
 import EcommerceCardActions from '../ecommerce/EcommerceCardActions';
+import EcommerceCanvasWorkbenchCard from '../ecommerce/EcommerceCanvasWorkbenchCard';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -103,6 +105,13 @@ const getPromptBusinessDisplayLabel = (node: PromptNode): string | null => {
     if (node.partialRedraw?.inheritedDisplayLabel) return node.partialRedraw.inheritedDisplayLabel;
     return null;
 };
+
+const resolveFrameworkRemarkLabel = (node: PromptNode): string => (
+    node.ecommerce?.displayLabel
+    || node.ecommerce?.theme
+    || node.prompt
+    || node.id
+).trim();
 
 const getPptDeckStageLabel = (stage: NonNullable<PromptNode['pptDeck']>['stage']) => {
     switch (stage) {
@@ -298,6 +307,7 @@ interface PromptNodeProps {
     } | null;
     ecommerceSlotState?: EcommerceGroupSlotState | null;
     activeEcommerceTaskState?: EcommerceEditableTaskState | null;
+    ecommerceFrameworkTaskNodes?: PromptNode[];
     onActivateEcommerceTask?: (node: PromptNode) => void;
     onPreviewEcommerceSlotHistory?: (node: PromptNode, preferredImageId?: string) => void;
     onEcommerceTaskStateChange?: (
@@ -520,7 +530,6 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     renderOrigin,
     actualChildImageCount = 0,
 
-    onPositionChange,
     isSelected,
     onSelect,
     onBringToFront,
@@ -529,10 +538,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     canvasTransform, // Optional now
     zoomScale = 1,
     isMobile = false,
-    sourcePosition,
     onCancel,
     onDelete,
-    onRetry,
     onEditPptDeck,
     onExportPpt,
     onExportPptx,
@@ -552,17 +559,14 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     ecommerceFrameworkStatus = null,
     ecommerceSlotState = null,
     activeEcommerceTaskState = null,
+    ecommerceFrameworkTaskNodes = [],
     onActivateEcommerceTask,
     onPreviewEcommerceSlotHistory,
     onEcommerceTaskStateChange,
-    ioTrace,
-    onOpenStorageSettings,
-    onDisconnect,
     onHeightChange,
     highlighted,
     shadowBoost = false,
     onLivePositionChange,
-    onPin,
     onRemoveTag,
     onDragDelta,
     onDragCommit,
@@ -579,9 +583,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const [isDragging, setIsDragging] = useState(false);
     const isDraggingRef = useRef(false);
     const [cardHeight, setCardHeight] = useState(200); // 默认高度??00px,会在渲染后更??
-    const baseCardWidth = 320;
+    const isEcommerceFrameworkCard = node.mode === GenerationMode.ECOMMERCE && node.ecommerce?.kind === 'framework';
+    const baseCardWidth = getPromptNodeBaseCardWidth(node);
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : baseCardWidth;
-    const cardWidth = isMobile ? Math.min(baseCardWidth, Math.max(248, viewportWidth - 24)) : baseCardWidth;
+    const cardWidth = getPromptNodeCardWidth(node, isMobile, viewportWidth);
     const originX = renderOrigin?.x ?? 0;
     const originY = renderOrigin?.y ?? 0;
     const [previewImage, setPreviewImage] = useState<{ url: string; originRect: DOMRect } | null>(null);
@@ -591,8 +596,11 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const hasMoved = useRef(false);
     const [activeTab, setActiveTab] = useState<'raw' | 'opt'>('raw');
     const [copyStatus, setCopyStatus] = useState<'idle' | 'en' | 'zh'>('idle');
-    const [showErrorDetails, setShowErrorDetails] = useState(false);
-    const [showTraceDetails, setShowTraceDetails] = useState(false);
+    const [frameworkRemarkDraft, setFrameworkRemarkDraft] = useState(() => resolveFrameworkRemarkLabel(node));
+    const frameworkRemarkSkipCommitRef = useRef(false);
+    const ecommerceFrameworkCardClassName = isEcommerceFrameworkCard
+        ? 'px-4 pb-4 pt-3 flex flex-col flex-1'
+        : 'p-3 flex flex-col flex-1';
     const resolvedTimerStart = resolveGenerationTimerStart(node);
     const timerStartRef = useRef<number>(resolvedTimerStart ?? Date.now());
 
@@ -661,9 +669,89 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         } else {
             setActiveTab('raw');
         }
-        setShowErrorDetails(false);
-        setShowTraceDetails(false);
     }, [node.id]);
+
+    useEffect(() => {
+        if (!isEcommerceFrameworkCard) return;
+        setFrameworkRemarkDraft(resolveFrameworkRemarkLabel(node));
+    }, [isEcommerceFrameworkCard, node.ecommerce?.displayLabel, node.ecommerce?.theme, node.id, node.prompt]);
+
+    const handleFrameworkRemarkCommit = () => {
+        if (!isEcommerceFrameworkCard || !node.ecommerce) return;
+        if (frameworkRemarkSkipCommitRef.current) {
+            frameworkRemarkSkipCommitRef.current = false;
+            return;
+        }
+
+        const currentLabel = resolveFrameworkRemarkLabel(node);
+        const nextLabel = frameworkRemarkDraft.trim() || currentLabel;
+        setFrameworkRemarkDraft(nextLabel);
+
+        if (nextLabel === currentLabel) {
+            return;
+        }
+
+        void onUpdateNode?.({
+            ...node,
+            ecommerce: {
+                ...node.ecommerce,
+                displayLabel: nextLabel,
+            },
+        });
+    };
+
+    const renderEcommerceFrameworkHeaderContent = (compact = false) => (
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+            <input
+                type="text"
+                value={frameworkRemarkDraft}
+                data-testid="ecommerce-framework-remark-input"
+                aria-label="电商卡片备注名"
+                className={`${compact ? 'h-7 min-w-[120px]' : 'h-8 min-w-[140px]'} max-w-[280px] flex-[0_1_280px] rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-input-bg)] px-3 text-[12px] font-medium text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--clay-brand-pink)]`}
+                placeholder="备注名称"
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => setFrameworkRemarkDraft(e.target.value)}
+                onBlur={handleFrameworkRemarkCommit}
+                onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        e.currentTarget.blur();
+                    } else if (e.key === 'Escape') {
+                        frameworkRemarkSkipCommitRef.current = true;
+                        setFrameworkRemarkDraft(resolveFrameworkRemarkLabel(node));
+                        e.currentTarget.blur();
+                    }
+                }}
+            />
+            {node.tags && node.tags.length > 0 ? (
+                <div
+                    className="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden"
+                    data-testid="ecommerce-framework-header-tags"
+                >
+                    {node.tags?.slice(0, 5).map((tag) => {
+                        const colors = generateTagColor(tag);
+                        return (
+                            <span
+                                key={tag}
+                                className={`${compact ? 'h-5 max-w-[78px]' : 'h-6 max-w-[92px]'} inline-flex shrink-0 items-center rounded-md border px-2 text-[10px] font-medium`}
+                                style={{
+                                    backgroundColor: colors.bg,
+                                    color: colors.text,
+                                    borderColor: colors.border,
+                                }}
+                                title={tag}
+                            >
+                                #{truncateByChars(tag, compact ? 6 : 8)}
+                            </span>
+                        );
+                    })}
+                </div>
+            ) : null}
+        </div>
+    );
 
     useEffect(() => {
         if (resolvedTimerStart !== undefined) {
@@ -1078,25 +1166,31 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     )}
 
                     <div className={`flex items-center justify-between gap-2 border-b border-[var(--frost-card-main-border)] ${isThumbnailShell ? 'px-3 py-2' : 'px-4 py-2.5'}`}>
-                        <div className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium ${shellStatusTone}`}>
-                            {showError ? (
-                                <AlertTriangle size={12} />
-                            ) : node.isGenerating ? (
-                                <Loader2 size={12} className="animate-spin" />
-                            ) : node.mode === GenerationMode.VIDEO ? (
-                                <Video size={12} />
-                            ) : node.mode === GenerationMode.AUDIO ? (
-                                <Music size={12} />
-                            ) : (
-                                <Sparkles size={12} />
-                            )}
-                            <span className="truncate">
-                                {showError ? getPromptFailureLabel(node) : node.isGenerating ? '生成中' : `${renderedSuccessCount || 0} 个结果`}
-                            </span>
-                        </div>
-                        <div className="text-[11px] text-[var(--text-tertiary)] shrink-0">
-                            {node.aspectRatio}
-                        </div>
+                        {isEcommerceFrameworkCard ? (
+                            renderEcommerceFrameworkHeaderContent(true)
+                        ) : (
+                            <>
+                                <div className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium ${shellStatusTone}`}>
+                                    {showError ? (
+                                        <AlertTriangle size={12} />
+                                    ) : node.isGenerating ? (
+                                        <Loader2 size={12} className="animate-spin" />
+                                    ) : node.mode === GenerationMode.VIDEO ? (
+                                        <Video size={12} />
+                                    ) : node.mode === GenerationMode.AUDIO ? (
+                                        <Music size={12} />
+                                    ) : (
+                                        <Sparkles size={12} />
+                                    )}
+                                    <span className="truncate">
+                                        {showError ? getPromptFailureLabel(node) : node.isGenerating ? '生成中' : `${renderedSuccessCount || 0} 个结果`}
+                                    </span>
+                                </div>
+                                <div className="text-[11px] text-[var(--text-tertiary)] shrink-0">
+                                    {node.aspectRatio}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     <div
@@ -1235,7 +1329,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 <div className="flex items-center justify-between px-4 py-3 w-full" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', ...secondaryTextRenderStyle }}>
                     {/* Left: Status Icon and Text */}
                     <div className="flex flex-1 items-center gap-2 min-w-0">
-                        {showError ? (
+                        {isEcommerceFrameworkCard ? (
+                            renderEcommerceFrameworkHeaderContent()
+                        ) : showError ? (
                             <>
                                 <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-red-500/15">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500">
@@ -1400,7 +1496,28 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 ) : null}
 
                 {/* Content Padding Wrapper */}
-                <div className="p-3 flex flex-col flex-1">
+                <div className={ecommerceFrameworkCardClassName}>
+                    {isEcommerceFrameworkCard ? (
+                        <div data-testid="ecommerce-canvas-framework-workbench">
+                        <EcommerceCanvasWorkbenchCard
+                            node={node}
+                            taskNodes={ecommerceFrameworkTaskNodes}
+                            activeTaskState={activeEcommerceTaskState}
+                            frameworkStatus={ecommerceFrameworkStatus}
+                            onActivateTask={onActivateEcommerceTask}
+                            onTaskStateChange={onEcommerceTaskStateChange}
+                            onToggleSelected={onToggleEcommerceSelected}
+                            onGenerateNode={onGenerateEcommerceNode}
+                            onGenerateFramework={onGenerateEcommerceFramework}
+                            onPauseFramework={onPauseEcommerceFramework}
+                            onResumeFramework={onResumeEcommerceFramework}
+                            onCancelNodeQueue={onCancelEcommerceNodeQueue}
+                            onConfirmDesktop={onConfirmEcommerceDesktop}
+                            onGenerateMobile={onRetryEcommerceModule}
+                        />
+                        </div>
+                    ) : (
+                    <>
                     {/* Reference Images Thumbnails */}
                     {node.referenceImages && node.referenceImages.length > 0 && (
                         <div className="flex gap-1 mb-2 flex-wrap">
@@ -1543,7 +1660,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                             <Sparkles size={12} />
                                             <span>自动策略说明</span>
                                         </div>
-                                        <div className="text-[10px] text-violet-100/80 leading-normal">
+                                        <div className="text-[10px] text-[var(--clay-brand-lavender)] leading-normal">
                                             {getOptimizerStrategySummaryZh(node)}
                                         </div>
                                     </div>
@@ -1641,9 +1758,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                             }
                                             : badge.tone === 'blue'
                                                 ? {
-                                                    background: 'rgba(59, 130, 246, 0.12)',
-                                                    borderColor: 'rgba(59, 130, 246, 0.28)',
-                                                    color: 'rgb(147, 197, 253)',
+                                                    background: 'var(--state-info-bg)',
+                                                    borderColor: 'var(--state-info-border)',
+                                                    color: 'var(--state-info-text)',
                                                 }
                                                 : {
                                                     background: 'rgba(245, 158, 11, 0.12)',
@@ -1686,6 +1803,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                         )}
 
                     </div>
+                    </>
+                    )}
 
                     {/* 错误详情面板已被移除 */}
 
@@ -2247,6 +2366,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         prev.isCanvasTransforming === next.isCanvasTransforming &&
         prev.zoomScale === next.zoomScale &&
         prev.isMobile === next.isMobile &&
+        prev.activeEcommerceTaskState === next.activeEcommerceTaskState &&
+        prev.ecommerceFrameworkStatus === next.ecommerceFrameworkStatus &&
+        prev.ecommerceFrameworkTaskNodes === next.ecommerceFrameworkTaskNodes &&
         prev.sourcePosition?.x === next.sourcePosition?.x &&
         prev.sourcePosition?.y === next.sourcePosition?.y
     );

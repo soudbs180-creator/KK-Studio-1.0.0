@@ -16,8 +16,8 @@ describe('responsive surface utilities', () => {
     assert.equal(resolveResponsiveSurface(320), 'phone');
     assert.equal(resolveResponsiveSurface(768), 'phone');
     assert.equal(resolveResponsiveSurface(769), 'tablet');
-    assert.equal(resolveResponsiveSurface(1024), 'tablet');
-    assert.equal(resolveResponsiveSurface(1025), 'desktop');
+    assert.equal(resolveResponsiveSurface(1023), 'tablet');
+    assert.equal(resolveResponsiveSurface(1024), 'desktop');
     assert.equal(resolveResponsiveSurface(1440), 'desktop');
   });
 
@@ -30,8 +30,8 @@ describe('responsive surface utilities', () => {
   test('exposes width helpers backed by the shared breakpoint classifier', () => {
     assert.equal(isPhoneResponsiveWidth(768), true);
     assert.equal(isPhoneResponsiveWidth(769), false);
-    assert.equal(isCompactResponsiveWidth(1024), true);
-    assert.equal(isCompactResponsiveWidth(1025), false);
+    assert.equal(isCompactResponsiveWidth(1023), true);
+    assert.equal(isCompactResponsiveWidth(1024), false);
   });
 
   test('layout overlays reuse shared width helpers instead of hard-coded viewport checks', () => {

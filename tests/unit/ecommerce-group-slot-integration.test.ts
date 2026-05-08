@@ -11,13 +11,17 @@ function readSource(relativePath: string): string {
 
 test('App wires ecommerce group slot runtime state into preview and canvas surfaces', () => {
   const appSource = readSource('src/App.tsx');
+  const buildRuntimeSource = readSource('src/app/useEcommerceBuildRuntime.ts');
+  const hookSource = readSource('src/app/useEcommerceSlotHistoryRuntime.ts');
+  const exportRuntimeSource = readSource('src/app/useEcommerceGroupExportRuntime.ts');
   const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
 
   assert.match(appSource, /groupSlots/);
-  assert.match(appSource, /buildInitialEcommerceGroupSlotState/);
-  assert.match(appSource, /applyEcommerceSlotResult/);
-  assert.match(appSource, /buildEcommerceSlotPreviewBundle/);
-  assert.match(appSource, /handlePreviewEcommerceSlotHistory/);
+  assert.match(buildRuntimeSource, /buildInitialEcommerceGroupSlotState/);
+  assert.match(exportRuntimeSource, /applyEcommerceSlotResult/);
+  assert.doesNotMatch(appSource, /applyEcommerceSlotResult/);
+  assert.match(hookSource, /buildEcommerceSlotPreviewBundle/);
+  assert.match(hookSource, /handlePreviewEcommerceSlotHistory/);
   assert.match(appSource, /onPreviewEcommerceSlotHistory/);
   assert.match(appSource, /ecommerceSlotState/);
   assert.match(promptNodeSource, /ecommerceSlotState/);

@@ -9,9 +9,10 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('PromptBar ecommerce panel exposes group overview, edit workbench, and slot history entrypoints', () => {
+test('PromptBar ecommerce panel keeps review controls before confirmation and leaves post-build editing on canvas', () => {
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
   const desktopPanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
+  const canvasWorkbenchSource = readSource('src/components/ecommerce/EcommerceCanvasWorkbenchCard.tsx');
 
   assert.match(promptBarSource, /ecommerceActiveGroupSheet/);
   assert.match(promptBarSource, /ecommerceAnalysisConfirmed/);
@@ -24,10 +25,12 @@ test('PromptBar ecommerce panel exposes group overview, edit workbench, and slot
   assert.match(desktopPanelSource, /onActivateTaskBySourceKey/);
   assert.match(desktopPanelSource, /onActivateGroupSheet/);
   assert.match(desktopPanelSource, /onPreviewSlotHistory/);
-  assert.match(desktopPanelSource, /ecommerce-group-overview-workbench/);
-  assert.match(desktopPanelSource, /ecommerce-main-card-edit-workbench/);
-  assert.match(desktopPanelSource, /ecommerce-module-edit-workbench/);
+  assert.doesNotMatch(desktopPanelSource, /ecommerce-group-overview-workbench/);
+  assert.doesNotMatch(desktopPanelSource, /ecommerce-main-card-edit-workbench/);
+  assert.doesNotMatch(desktopPanelSource, /ecommerce-module-edit-workbench/);
   assert.match(desktopPanelSource, /ecommerce-slot-history-panel/);
   assert.match(desktopPanelSource, /ecommerce-slot-history-open-current/);
   assert.match(desktopPanelSource, /ecommerce-slot-history-open-all/);
+  assert.match(canvasWorkbenchSource, /data-testid="ecommerce-canvas-framework-task-list"/);
+  assert.match(canvasWorkbenchSource, /data-testid="ecommerce-canvas-framework-task-editor"/);
 });

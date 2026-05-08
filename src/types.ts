@@ -463,8 +463,7 @@ export interface OcrServiceSettings {
   provider: 'nutrient';
   enabled: boolean;
   defaultLanguage: string;
-  apiKey?: string;
-  keySource: 'environment' | 'user' | 'missing';
+  keySource: 'environment' | 'missing';
   healthState: 'configured' | 'missing_key' | 'unknown';
   updatedAt: number;
 }
@@ -779,6 +778,7 @@ export interface EcommercePromptState {
     activeSheet: EcommerceGroupSheet;
     groupIds?: Partial<Record<EcommerceGroupSheet, string>>;
     taskNodeIds?: string[];
+    inputSummary?: string[];
     schedulerConfig?: EcommerceFrameworkSchedulerConfig;
   };
 }

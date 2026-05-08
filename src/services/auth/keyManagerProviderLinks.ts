@@ -1,4 +1,4 @@
-import { normalizeApiProtocolFormat } from "../api/apiConfig";
+import { normalizeApiProtocolFormat } from "../api/apiConfig.ts";
 import type { Provider } from "../../types";
 
 export interface ProviderLinkKeySlot {
@@ -42,6 +42,60 @@ export interface ProviderLinkProvider {
 
 export function normalizeProviderLinkValue(value: string | undefined | null): string {
     return String(value || "").trim().replace(/\/+$/, "").toLowerCase();
+}
+
+export interface ProviderLinkedSlotMatchOptions {
+    allowSingleBaseUrlFallback?: boolean;
+}
+
+type ProviderLinkCandidateProvider = Partial<Pick<ProviderLinkProvider, "baseUrl" | "name" | "apiKey">>;
+
+function buildProviderLinkCandidates(
+    providers: Array<ProviderLinkCandidateProvider | null | undefined>,
+): Array<{ baseUrl: string; apiKey: string; name: string }> {
+    return providers
+        .filter((item): item is ProviderLinkCandidateProvider => !!item && !!item.baseUrl)
+        .map((item) => ({
+            baseUrl: normalizeProviderLinkValue(item.baseUrl),
+            apiKey: String(item.apiKey || "").trim(),
+            name: normalizeProviderLinkValue(item.name),
+        }))
+        .filter((item) => !!item.baseUrl);
+}
+
+export function findProviderLinkedSlots<TSlot extends Pick<ProviderLinkKeySlot, "baseUrl" | "name" | "key">>(
+    slots: TSlot[],
+    providers: Array<ProviderLinkCandidateProvider | null | undefined>,
+    options: ProviderLinkedSlotMatchOptions = {},
+): TSlot[] {
+    const candidateProviders = buildProviderLinkCandidates(providers);
+    if (candidateProviders.length === 0) return [];
+
+    const matchedSlots = slots.filter((slot) => {
+        const slotBaseUrl = normalizeProviderLinkValue(slot.baseUrl);
+        if (!slotBaseUrl) return false;
+
+        return candidateProviders.some((candidate) => {
+            if (slotBaseUrl !== candidate.baseUrl) return false;
+
+            const slotKey = String(slot.key || "").trim();
+            const slotName = normalizeProviderLinkValue(slot.name);
+
+            if (candidate.apiKey && slotKey && slotKey === candidate.apiKey) return true;
+            if (candidate.name && slotName && slotName === candidate.name) return true;
+            return false;
+        });
+    });
+
+    if (matchedSlots.length > 0 || !options.allowSingleBaseUrlFallback) {
+        return matchedSlots;
+    }
+
+    const currentBaseUrl = normalizeProviderLinkValue(providers[0]?.baseUrl);
+    if (!currentBaseUrl) return [];
+
+    const sameBaseUrlSlots = slots.filter((slot) => normalizeProviderLinkValue(slot.baseUrl) === currentBaseUrl);
+    return sameBaseUrlSlots.length === 1 ? [sameBaseUrlSlots[0]] : [];
 }
 
 export function normalizeStoredProviders<TProvider extends ProviderLinkProvider>(

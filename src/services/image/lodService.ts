@@ -5,7 +5,7 @@
  * 优化内存使用和渲染性能
  */
 
-import { ImageQuality, getQualityStorageId, QUALITY_CONFIGS } from './imageQuality';
+import { ImageQuality, getQualityStorageId } from './imageQuality';
 import { getImage, getImageByQuality } from '../storage/imageStorage';
 import { registerBlobUrl, touchBlobUrl, releaseBlobUrl } from '../storage/memoryManager';
 
@@ -43,18 +43,6 @@ export function getLODLevel(zoomScale: number): LODLevel {
     if (zoomScale < ZOOM_THRESHOLDS.THUMBNAIL) return LODLevel.THUMBNAIL;
     if (zoomScale < ZOOM_THRESHOLDS.PREVIEW) return LODLevel.PREVIEW;
     return LODLevel.ORIGINAL;
-}
-
-/**
- * 将LOD级别映射到ImageQuality
- */
-function lodToQuality(level: LODLevel): ImageQuality {
-    switch (level) {
-        case LODLevel.MICRO: return ImageQuality.MICRO;
-        case LODLevel.THUMBNAIL: return ImageQuality.PREVIEW; // 复用PREVIEW质量
-        case LODLevel.PREVIEW: return ImageQuality.PREVIEW;
-        case LODLevel.ORIGINAL: return ImageQuality.ORIGINAL;
-    }
 }
 
 /**
@@ -100,7 +88,6 @@ export async function getLODUrl(
 
     try {
         // 尝试从存储加载
-        const quality = lodToQuality(targetLevel);
         const storageId = imageId; // 或使用getQualityStorageId
 
         let imageData: string | null = null;

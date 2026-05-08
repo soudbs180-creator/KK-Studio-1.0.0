@@ -36,9 +36,9 @@ test("prompt-group layout repair skips active drags and manually moved cards", (
 });
 
 test("dragged image cards mark manual layout overrides in canvas state", () => {
-  const canvasContextSource = readSource("src/context/CanvasContext.tsx");
+  const canvasMovementSource = readSource("src/context/canvasMovement.ts");
 
-  assert.match(canvasContextSource, /userMoved: selectedSet\.has\(n\.id\) \? true : n\.userMoved/);
+  assert.match(canvasMovementSource, /userMoved: selectedSet\.has\(node\.id\) \? true : node\.userMoved/);
 });
 
 test("main-card regroup is not blocked by previously moved child cards", () => {

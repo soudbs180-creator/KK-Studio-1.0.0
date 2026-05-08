@@ -23,24 +23,25 @@ test("12AI Gemini native image payload keeps doc-specific snake_case request par
 });
 
 test("12AI built-in presets include the current Nano Banana 2 model", () => {
-  const keyManagerSource = readSource("src/services/auth/keyManager.ts");
+  const providerPresetsSource = readSource("src/services/auth/keyManagerProviderPresets.ts");
 
   assert.match(
-    keyManagerSource,
+    providerPresetsSource,
     /'12ai':\s*\{[\s\S]*?models:\s*\[[\s\S]*?'gemini-3\.1-flash-image-preview'/,
   );
   assert.match(
-    keyManagerSource,
+    providerPresetsSource,
     /'12ai-nanobanana':\s*\{[\s\S]*?models:\s*\[[\s\S]*?'gemini-3\.1-flash-image-preview'/,
   );
 });
 
 test("12AI model discovery falls back to documented presets instead of a remote models endpoint", () => {
   const keyManagerSource = readSource("src/services/auth/keyManager.ts");
+  const providerPresetsSource = readSource("src/services/auth/keyManagerProviderPresets.ts");
   const connectionTestSource = readSource("src/services/api/connectionTest.ts");
 
   assert.match(
-    keyManagerSource,
+    providerPresetsSource,
     /export function getDocumentedStaticModelsForProvider\(strategyId: string\)/,
   );
   assert.match(
@@ -60,23 +61,29 @@ test("12AI model discovery falls back to documented presets instead of a remote 
 test("12AI Gemini-native chat and proxy layers keep snake_case request fields on 12AI gateways", () => {
   const geminiAdapterSource = readSource("src/services/llm/GeminiNativeAdapter.ts");
   const localProxySource = readSource("apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts");
+  const localRouteAuthWrapperSource = readSource("apps/api/src/modules/model-proxy/application/local-user-route-auth.ts");
+  const localRouteAuthSource = readSource("apps/api/src/lib/local-user-route-auth.ts");
 
   assert.match(geminiAdapterSource, /const useSnakeCase = runtime\.strategyId === '12ai';/);
   assert.match(geminiAdapterSource, /payload\[useSnakeCase \? 'system_instruction' : 'systemInstruction'\]/);
   assert.match(geminiAdapterSource, /buildInlineImagePart\(media\.data, media\.mimeType, useSnakeCase\)/);
 
-  assert.match(localProxySource, /function is12AIBaseUrl\(baseUrl: string \| undefined\): boolean/);
+  assert.match(localRouteAuthSource, /function is12AIBaseUrl\(baseUrl: string \| undefined\): boolean/);
+  assert.match(localRouteAuthWrapperSource, /export \* from "\.\.\/\.\.\/\.\.\/lib\/local-user-route-auth\.ts";/);
+  assert.match(localProxySource, /from "\.\/local-user-route-auth\.ts"/);
   assert.match(localProxySource, /payload\[useSnakeCase \? "system_instruction" : "systemInstruction"\]/);
   assert.match(localProxySource, /toInlineImagePartWithFormat\(ref, useSnakeCase\)/);
 });
 
 test("12AI diagnostics probe uses action endpoints and 12AI auth rules instead of a models listing endpoint", () => {
   const diagnosticsSource = readSource("apps/api/src/modules/auth/application/user-route-diagnostics-service.ts");
+  const localRouteAuthSource = readSource("apps/api/src/lib/local-user-route-auth.ts");
 
   assert.match(diagnosticsSource, /const TWELVE_AI_DOCUMENTED_MODELS = \[/);
-  assert.match(diagnosticsSource, /function is12AIBaseUrl\(baseUrl: string \| undefined\): boolean/);
-  assert.match(diagnosticsSource, /return is12AIBaseUrl\(routeConfig\.baseUrl\) \? "Authorization" : "x-api-key";/);
-  assert.match(diagnosticsSource, /if \(format === "claude" && is12AI\) \{\s*return "bearer";\s*\}/);
+  assert.match(diagnosticsSource, /from "\.\.\/\.\.\/\.\.\/lib\/local-user-route-auth\.ts";/);
+  assert.match(localRouteAuthSource, /function is12AIBaseUrl\(baseUrl: string \| undefined\): boolean/);
+  assert.match(localRouteAuthSource, /return is12AIBaseUrl\(routeConfig\.baseUrl\) \? "Authorization" : "x-api-key";/);
+  assert.match(localRouteAuthSource, /return is12AIBaseUrl\(routeConfig\.baseUrl\) \? "bearer" : "raw";/);
   assert.match(diagnosticsSource, /buildGeminiGenerateContentEndpoint\(routeConfig\.baseUrl, "gemini-2\.5-flash", routeConfig\.apiKey, authMethod\)/);
   assert.match(diagnosticsSource, /models: is12AI \? TWELVE_AI_DOCUMENTED_MODELS : normalizeModels\(payload\)/);
 });

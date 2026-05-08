@@ -315,6 +315,24 @@ test("shared logging helpers redact sensitive payload fields before persistence 
   assert.doesNotMatch(billingObservabilitySource, /console\.log\(`\[Billing\]\[\$\{ts\}\]\[\$\{eventType\}\] \$\{JSON\.stringify\(payload\)\}`\)/);
 });
 
+test("Netlify legacy functions do not expose public raw-key BYOK endpoints", () => {
+  const securityScriptSource = readSource("scripts/governance/check-sensitive-boundaries.mjs");
+  const netlifyFunctionFiles = existsSync(path.join(ROOT_DIR, "netlify", "functions"))
+    ? collectSourceFiles("netlify/functions")
+    : [];
+
+  assert.match(securityScriptSource, /"netlify"/);
+  assert.equal(existsSync(path.join(ROOT_DIR, "netlify", "functions", "keys.ts")), false);
+  assert.equal(existsSync(path.join(ROOT_DIR, "netlify", "functions", "generate.ts")), false);
+
+  for (const file of netlifyFunctionFiles) {
+    const source = readSource(file);
+    assert.doesNotMatch(source, /path:\s*["']\/api\/(?:keys|generate)["']/);
+    assert.doesNotMatch(source, /\bapiKey\b[\s\S]*GoogleGenAI/);
+    assert.doesNotMatch(source, /localStorage/i);
+  }
+});
+
 test("cross-package imports use public package index entrypoints instead of deep src paths", () => {
   const files = [
     ...collectSourceFiles("apps"),

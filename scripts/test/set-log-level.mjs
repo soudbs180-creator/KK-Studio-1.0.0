@@ -1,4 +1,5 @@
 process.env.KK_LOG_LEVEL ??= "WARN";
+process.env.KK_API_SESSION_SIGNING_SECRET ??= "unit-test-kk-session-signing-secret";
 
 const originalConsoleWarn = console.warn.bind(console);
 const originalConsoleError = console.error.bind(console);

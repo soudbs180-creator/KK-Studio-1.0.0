@@ -60,7 +60,7 @@ test('secure system proxy transports expose verifiable billing metadata and the 
   assert.doesNotMatch(secureProxyClientSource, /if \(localSessionState !== 'valid' \|\| !shouldUseLocalUserRouteApi\(\)\) \{/);
   assert.match(
     localSystemProxySource,
-    /const idempotencyKey = attemptId \|\| requestId \|\| `\$\{baseModelId\}:\$\{Date\.now\(\)\}`;/,
+    /const idempotencyKey = requestId \|\| attemptId \|\| `\$\{baseModelId\}:\$\{Date\.now\(\)\}`;/,
   );
   assert.match(
     localSystemProxySource,

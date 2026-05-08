@@ -1,11 +1,6 @@
-﻿import { LLMAdapter, ChatOptions, ImageGenerationOptions, ImageGenerationResult, VideoGenerationOptions, VideoGenerationResult, AudioGenerationOptions, AudioGenerationResult, ProviderConfig } from './LLMAdapter';
+﻿import { ChatOptions, ImageGenerationOptions, ImageGenerationResult, VideoGenerationOptions, VideoGenerationResult, AudioGenerationOptions, AudioGenerationResult } from './LLMAdapter';
 import { GenerationMode } from '../../types';
-import { GeminiNativeAdapter } from './GeminiNativeAdapter';
-import { OpenAICompatibleAdapter } from './OpenAICompatibleAdapter';
-import { ClaudeNativeAdapter } from './ClaudeNativeAdapter';
-import { VideoCompatibleAdapter } from './VideoCompatibleAdapter';
-import { AudioCompatibleAdapter } from './AudioCompatibleAdapter';
-import { KeyManager, KeySlot, getModelMetadata } from '../auth/keyManager';
+import { KeySlot, getModelMetadata } from '../auth/keyManager';
 import { keyManager } from '../auth/keyManager';
 import * as costService from '../billing/costService';
 import { logWarning } from '../system/systemLogService';
@@ -30,57 +25,19 @@ import {
     isSecureProxySessionReauthError,
 } from '../model/secureModelProxy';
 import { resolveKkApiBaseUrl } from '../api/kkApiClient';
-import { resolveProviderModelCompatibilityIssue, resolveProviderRuntime } from '../api/providerStrategy';
+import { resolveProviderModelCompatibilityIssue } from '../api/providerStrategy';
 import { resolveProviderIdentity } from '../../utils/providerDisplay';
 import { getModelPricing } from '../model/modelPricing';
 import { isSystemModelRoute } from '../model/modelRoute';
-import { resolveAdapterKind } from './providerAdapterRouter';
 
 export class LLMService {
     private static instance: LLMService;
-    private openAICompatibleAdapter: OpenAICompatibleAdapter;
-    private geminiNativeAdapter: GeminiNativeAdapter;
-    private claudeNativeAdapter: ClaudeNativeAdapter;
-    private videoAdapter: VideoCompatibleAdapter;
-    private audioAdapter: AudioCompatibleAdapter;
-
-    private constructor() {
-        this.geminiNativeAdapter = new GeminiNativeAdapter();
-        this.openAICompatibleAdapter = new OpenAICompatibleAdapter();
-        this.claudeNativeAdapter = new ClaudeNativeAdapter();
-
-        this.videoAdapter = new VideoCompatibleAdapter();
-        this.audioAdapter = new AudioCompatibleAdapter();
-    }
 
     public static getInstance(): LLMService {
         if (!LLMService.instance) {
             LLMService.instance = new LLMService();
         }
         return LLMService.instance;
-    }
-
-    private getAdapterForSlot(keySlot: KeySlot, modelId?: string): LLMAdapter {
-        const runtime = resolveProviderRuntime({
-            provider: keySlot.provider,
-            baseUrl: keySlot.baseUrl,
-            format: keySlot.format,
-            authMethod: keySlot.authMethod,
-            headerName: keySlot.headerName,
-            compatibilityMode: keySlot.compatibilityMode,
-            modelId,
-        });
-        const adapterKind = resolveAdapterKind(runtime);
-
-        if (adapterKind === 'claude-native') {
-            return this.claudeNativeAdapter;
-        }
-
-        if (adapterKind === 'gemini-native') {
-            return this.geminiNativeAdapter;
-        }
-
-        return this.openAICompatibleAdapter;
     }
 
     private applyProviderIdentity<T extends { provider?: string; providerName?: string; keySlotId?: string }>(
@@ -102,11 +59,6 @@ export class LLMService {
         }
 
         return result;
-    }
-
-    private resolveSystemBaseModelId(modelId: string): string {
-        const [baseModelId] = (modelId || '').split('@');
-        return baseModelId.trim();
     }
 
     private shouldUseSecureProxyUserRoute(keySlot: KeySlot): boolean {
@@ -261,76 +213,6 @@ export class LLMService {
         }
 
         return result as Record<string, unknown>;
-    }
-
-    private async runDirectChat(options: ChatOptions, keySlot: KeySlot): Promise<string> {
-        const adapter = this.getAdapterForSlot(keySlot, options.modelId);
-        if (options.stream && adapter.chatStream) {
-            await adapter.chatStream(options, keySlot);
-            return '';
-        }
-
-        const content = await adapter.chat(options, keySlot);
-        if (options.stream && typeof options.onStream === 'function' && content) {
-            options.onStream(content);
-        }
-
-        return content;
-    }
-
-    private async runDirectImage(options: ImageGenerationOptions, keySlot: KeySlot): Promise<ImageGenerationResult> {
-        const adapter = this.getAdapterForSlot(keySlot, options.modelId);
-        return adapter.generateImage(options, keySlot);
-    }
-
-    private async runDirectVideo(options: VideoGenerationOptions, keySlot: KeySlot): Promise<VideoGenerationResult> {
-        const adapter = this.getAdapterForSlot(keySlot, options.modelId);
-        if (!adapter.generateVideo) {
-            throw new Error(`Provider ${keySlot.name || keySlot.provider} does not support direct video generation.`);
-        }
-
-        return adapter.generateVideo(options, keySlot);
-    }
-
-    private async runDirectAudio(options: AudioGenerationOptions, keySlot: KeySlot): Promise<AudioGenerationResult> {
-        const adapter = this.getAdapterForSlot(keySlot, options.modelId);
-        if (!adapter.generateAudio) {
-            throw new Error(`Provider ${keySlot.name || keySlot.provider} does not support direct audio generation.`);
-        }
-
-        return adapter.generateAudio(options, keySlot);
-    }
-
-    private async runDirectTaskStatus(
-        taskId: string,
-        mode: GenerationMode,
-        keySlot: KeySlot,
-        modelId?: string,
-    ): Promise<any> {
-        const adapter = this.getAdapterForSlot(keySlot, modelId);
-        if (!adapter.checkTaskStatus) {
-            throw new Error(`Provider ${keySlot.name || keySlot.provider} does not support direct task status checks.`);
-        }
-
-        return adapter.checkTaskStatus(taskId, mode, keySlot, modelId);
-    }
-
-    private async runDirectTaskStatuses(
-        taskIds: string[],
-        mode: GenerationMode,
-        keySlot: KeySlot,
-        modelId?: string,
-    ): Promise<any[]> {
-        const adapter = this.getAdapterForSlot(keySlot, modelId);
-        if (adapter.checkTaskStatuses) {
-            return adapter.checkTaskStatuses(taskIds, mode, keySlot, modelId);
-        }
-
-        if (!adapter.checkTaskStatus) {
-            throw new Error(`Provider ${keySlot.name || keySlot.provider} does not support direct task status checks.`);
-        }
-
-        return Promise.all(taskIds.map((taskId) => adapter.checkTaskStatus!(taskId, mode, keySlot, modelId)));
     }
 
     private createBrowserDirectProviderCallBlockedError(action: string, keySlot?: Pick<KeySlot, 'name' | 'provider'>): Error {
@@ -821,7 +703,7 @@ export class LLMService {
         throw lastError || new Error("Video generation failed after retries");
     }
 
-    public async generateAudio(options: AudioGenerationOptions, onTaskId?: (id: string) => void): Promise<AudioGenerationResult> {
+    public async generateAudio(options: AudioGenerationOptions, _onTaskId?: (id: string) => void): Promise<AudioGenerationResult> {
         let lastError: any;
         const maxAttempts = 3;
 
@@ -920,9 +802,9 @@ export class LLMService {
      */
     public async checkTaskStatus(
         taskId: string,
-        mode: GenerationMode,
+        _mode: GenerationMode,
         preferredKeyId?: string | { id?: string },
-        modelId?: string
+        _modelId?: string
     ): Promise<any> {
         const normalizedPreferredKeyId = typeof preferredKeyId === 'string'
             ? preferredKeyId

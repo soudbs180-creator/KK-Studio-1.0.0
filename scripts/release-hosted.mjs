@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
 const vpsDeployCommand = process.env.KK_VPS_DEPLOY_COMMAND;
+const vpsPreviewDeployCommand = process.env.KK_VPS_PREVIEW_DEPLOY_COMMAND;
 
 const args = new Set(process.argv.slice(2));
 const skipCheck = args.has("--skip-check");
@@ -48,7 +49,26 @@ Options:
   --help, -h     Show this help message.
 
 Environment:
-  KK_VPS_DEPLOY_COMMAND  Command that deploys PostgreSQL migrations, apps/api, and apps/payment-sidecar on the VPS.`);
+  KK_VPS_DEPLOY_COMMAND          Command that deploys PostgreSQL migrations, apps/api, and apps/payment-sidecar on the production VPS.
+  KK_VPS_PREVIEW_DEPLOY_COMMAND  Optional command that deploys the preview/staging VPS API. Production VPS deploy is skipped for --preview unless this is set.`);
+}
+
+function deployVps() {
+  if (preview) {
+    if (vpsPreviewDeployCommand) {
+      runStep("Deploy preview VPS API", vpsPreviewDeployCommand);
+      return;
+    }
+
+    console.log("[release:hosted] Skipping VPS API deploy for preview because KK_VPS_PREVIEW_DEPLOY_COMMAND is not set.");
+    return;
+  }
+
+  if (!vpsDeployCommand) {
+    throw new Error("Missing KK_VPS_DEPLOY_COMMAND. Set it to the production VPS deployment command or pass --skip-vps.");
+  }
+
+  runStep("Deploy VPS API", vpsDeployCommand);
 }
 
 function main() {
@@ -65,10 +85,7 @@ function main() {
   }
 
   if (!skipVps) {
-    if (!vpsDeployCommand) {
-      throw new Error("Missing KK_VPS_DEPLOY_COMMAND. Set it to the VPS deployment command or pass --skip-vps.");
-    }
-    runStep("Deploy VPS API", vpsDeployCommand);
+    deployVps();
   }
 
   if (!skipVercel) {

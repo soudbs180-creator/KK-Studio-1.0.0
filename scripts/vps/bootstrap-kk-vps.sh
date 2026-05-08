@@ -5,6 +5,7 @@ APP_USER="${KK_APP_USER:-kkstudio}"
 APP_GROUP="${KK_APP_GROUP:-$APP_USER}"
 APP_ROOT="${KK_APP_ROOT:-/opt/kk-studio}"
 ENV_DIR="${KK_ENV_DIR:-/etc/kk-studio}"
+APP_SITE_ROOT="${KK_APP_SITE_ROOT:-/var/www/kk-app}"
 ADMIN_SITE_ROOT="${KK_ADMIN_SITE_ROOT:-/var/www/kk-admin}"
 POSTGRES_DB="${KK_PG_DB:-kkstudio}"
 POSTGRES_USER="${KK_PG_USER:-kkstudio}"
@@ -68,6 +69,7 @@ prepare_directories() {
     "${APP_ROOT}/shared/uploads" \
     "${APP_ROOT}/shared/tmp" \
     "${ENV_DIR}" \
+    "${APP_SITE_ROOT}" \
     "${ADMIN_SITE_ROOT}"
 }
 
@@ -106,6 +108,8 @@ install_runtime_templates() {
     install -m 0644 deploy/nginx/kk-vps-gateway.conf /etc/nginx/sites-available/kk-vps-gateway.conf
     ln -sf /etc/nginx/sites-available/kk-vps-gateway.conf /etc/nginx/sites-enabled/kk-vps-gateway.conf
     rm -f /etc/nginx/sites-enabled/default
+    rm -f /etc/nginx/sites-enabled/kk-api.conf
+    rm -f /etc/nginx/sites-enabled/kk-admin-4174.conf
   fi
 
   systemctl daemon-reload

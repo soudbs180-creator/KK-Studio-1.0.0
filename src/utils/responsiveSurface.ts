@@ -1,7 +1,7 @@
 import type { MobileResultLayout, ResponsiveSurface, ResultViewMode } from '../types';
 
 export const PHONE_MAX_WIDTH = 768;
-export const TABLET_MAX_WIDTH = 1024;
+export const TABLET_MAX_WIDTH = 1023;
 const RESULT_GRID_GAP_PX = 12;
 const RESULT_GRID_ROW_HEIGHT_PX = 8;
 const RESULT_GRID_VERTICAL_CHROME_PX = 12;

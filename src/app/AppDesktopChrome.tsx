@@ -84,28 +84,32 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
       {billingUiEnabled && (
         <div className="absolute top-4 left-4 z-[100] flex items-center gap-2">
           <div
-            className="flex items-center gap-3 rounded-full border px-4 py-2 shadow-2xl backdrop-blur-md transition-all hover:border-[var(--border-medium)] group"
+            className="group flex items-center gap-3 rounded-full border px-4 py-2 transition-all hover:border-[var(--frost-card-framework-border)]"
             style={{
-              background: 'var(--floating-shell-bg)',
-              borderColor: 'var(--floating-shell-border)',
-              boxShadow: 'var(--floating-shell-shadow)',
-              backdropFilter: 'blur(18px) saturate(160%)',
-              WebkitBackdropFilter: 'blur(18px) saturate(160%)',
+              background: 'var(--frost-card-framework-bg)',
+              borderColor: 'var(--frost-card-framework-border)',
+              boxShadow: 'var(--frost-card-framework-shadow)',
+              backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+              WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
             }}
           >
             <div className="flex items-center gap-1.5">
-              <Sparkles size={18} fill="currentColor" className="text-blue-500" />
+              <Sparkles size={18} fill="currentColor" className="text-[var(--accent-coral)]" />
               <div className="flex items-center select-none gap-1">
                 <span className="min-w-[20px] text-[18px] font-mono font-bold leading-none drop-shadow-sm" style={{ color: 'var(--text-primary)' }}>
                   {remainingBalanceDisplay}
                 </span>
-                <span className="text-[14px] font-bold leading-none text-blue-400">积分</span>
+                <span className="text-[14px] font-bold leading-none text-[var(--accent-coral)]">积分</span>
               </div>
             </div>
             <div className="h-6 w-px" style={{ backgroundColor: 'var(--floating-shell-border)' }} />
             <button
               onClick={onRecharge}
-              className="inline-flex items-center justify-center rounded-lg bg-indigo-500 px-3 py-1 text-[11px] font-bold leading-none text-white shadow-lg shadow-indigo-500/20 transition-all active:scale-95 hover:bg-indigo-400"
+              className="inline-flex items-center justify-center rounded-lg px-3 py-1 text-[11px] font-bold leading-none text-white transition-all active:scale-95"
+              style={{
+                background: 'var(--accent-coral)',
+                boxShadow: '0 8px 18px rgb(255 107 90 / 0.18)',
+              }}
             >
               充值
             </button>
@@ -122,13 +126,17 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
           <button
             data-testid="desktop-user-menu-trigger"
             onClick={() => setShowUserMenu((prev) => !prev)}
-            className="relative flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 shadow-2xl transition-all active:scale-95"
-            style={{ borderColor: 'var(--border-light)', backgroundColor: 'var(--bg-secondary)' }}
+            className="relative flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 transition-all active:scale-95"
+            style={{
+              background: 'var(--frost-card-sub-bg)',
+              borderColor: 'var(--frost-card-sub-border)',
+              boxShadow: 'var(--frost-card-sub-shadow)',
+            }}
           >
             {avatarUrl ? (
               <img src={avatarUrl} className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full w-full items-center justify-center bg-gradient-to-tr from-indigo-500 via-purple-500 to-amber-500 text-sm font-bold text-white">
+              <div className="flex h-full w-full items-center justify-center bg-gradient-to-tr from-[var(--clay-brand-pink)] via-[var(--clay-brand-coral)] to-[var(--clay-brand-peach)] text-sm font-bold text-white">
                 {user?.email?.[0].toUpperCase() || 'K'}
               </div>
             )}
@@ -143,8 +151,14 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
               <div
-                className="absolute right-0 top-12 z-50 w-64 origin-top-right animate-in rounded-xl border p-2 shadow-2xl duration-100 fade-in zoom-in-95"
-                style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-light)' }}
+                className="absolute right-0 top-12 z-50 w-64 origin-top-right animate-in rounded-xl border p-2 duration-100 fade-in zoom-in-95"
+                style={{
+                  background: 'var(--frost-card-framework-bg)',
+                  borderColor: 'var(--frost-card-framework-border)',
+                  boxShadow: 'var(--frost-card-framework-shadow)',
+                  backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                  WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                }}
               >
                 <div
                   className="group mb-2 cursor-pointer rounded-lg border-b px-3 py-3 transition-colors"
@@ -157,7 +171,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
                   }}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-indigo-500 font-bold text-white">
+                    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[var(--accent-coral)] font-bold text-white">
                       {avatarUrl ? (
                         <img src={avatarUrl} className="h-full w-full object-cover" />
                       ) : user?.email?.[0].toUpperCase()}
@@ -177,7 +191,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
                   <DesktopMenuActionButton
                     icon={<User size={14} />}
                     label="个人中心"
-                    accentColor="var(--accent-blue)"
+                    accentColor="var(--clay-brand-coral)"
                     onClick={() => {
                       onOpenProfile('main');
                       setShowUserMenu(false);
@@ -195,7 +209,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
                   <DesktopMenuActionButton
                     icon={<LayoutDashboard size={14} />}
                     label="设置"
-                    accentColor="var(--accent-purple)"
+                    accentColor="var(--clay-brand-lavender)"
                     testId="desktop-user-menu-settings"
                     onClick={() => {
                       onOpenSettings();
@@ -230,10 +244,11 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
       >
         <button
           id="chat-trigger-button"
-          className="ai-chat-btn relative flex aspect-square h-10 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-transparent p-2 text-xs transition-all duration-300 hover:scale-110 hover:shadow-[0_0_35px] hover:shadow-blue-400/80 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="ai-chat-btn relative flex aspect-square h-10 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-transparent p-2 text-xs transition-all duration-300 hover:scale-110 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           type="button"
           onClick={onToggleChat}
           aria-pressed={isChatOpen}
+          style={{ boxShadow: isChatOpen ? '0 0 0 2px rgb(255 107 90 / 0.28)' : undefined }}
         >
           <div className="uiverse visible absolute left-0 top-0 z-[-1] h-full w-full">
             <div className="circle circle-12"></div>
@@ -249,7 +264,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
             <div className="circle circle-2"></div>
             <div className="circle circle-1"></div>
           </div>
-          <div className="absolute inset-0 z-[1] rounded-full bg-blue-500/15"></div>
+          <div className="absolute inset-0 z-[1] rounded-full bg-[var(--accent-coral)]/15"></div>
           <svg
             className="ai-chat-icon relative z-10"
             width="24"

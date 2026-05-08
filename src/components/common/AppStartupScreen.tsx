@@ -27,36 +27,43 @@ export const AppStartupScreen: React.FC<{
   const localizedWarning = localizeUserFacingText(warning) || warning;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center px-6" style={{ backgroundColor: 'var(--bg-base)' }}>
+    <div
+      data-testid="app-startup-screen"
+      className="app-startup-screen fixed inset-0 flex items-center justify-center px-6"
+      style={{ backgroundColor: 'var(--app-startup-bg, var(--bg-base))' }}
+    >
       <div
-        className="settings-reference-card settings-reference-card--elevated w-full max-w-xl p-8 text-center backdrop-blur-xl"
+        className="app-startup-card w-full max-w-xl p-8 text-center backdrop-blur-xl"
         style={{
-          borderColor: 'var(--settings-border-subtle, var(--border-light))',
+          borderColor: 'var(--app-startup-panel-border)',
           background:
-            'linear-gradient(180deg, rgb(255 255 255 / 0.03) 0%, transparent 100%), var(--settings-section-bg, var(--bg-surface))',
-          boxShadow: '0 28px 64px rgb(2 6 23 / 0.18)',
+            'linear-gradient(180deg, var(--app-startup-panel-sheen) 0%, transparent 100%), var(--app-startup-panel-bg)',
+          boxShadow: 'var(--app-startup-panel-shadow)',
+          borderWidth: 1,
+          borderStyle: 'solid',
+          borderRadius: 'var(--radius-panel-xl, 20px)',
         }}
       >
         <div
           className="mx-auto mb-4 flex h-12 w-12 items-center justify-center border"
           style={{
-            borderColor: 'var(--settings-border-subtle, var(--border-light))',
-            background: 'var(--settings-surface-overlay, var(--bg-elevated))',
-            color: 'var(--text-secondary)',
+            borderColor: 'var(--app-startup-icon-border)',
+            background: 'var(--app-startup-icon-bg)',
+            color: 'var(--app-startup-muted)',
             borderRadius: 'var(--radius-surface-md, 18px)',
           }}
         >
           <Loader2 className="animate-spin" size={20} />
         </div>
-        <h2 className="mb-2 text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h2>
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{getStageLabel(stage)}</p>
+        <h2 className="mb-2 text-xl font-semibold" style={{ color: 'var(--app-startup-title)' }}>{title}</h2>
+        <p className="text-sm" style={{ color: 'var(--app-startup-muted)' }}>{getStageLabel(stage)}</p>
         {localizedWarning ? (
           <div
-            className="mt-5 flex items-start gap-3 border px-4 py-3 text-left text-sm"
+            className="app-startup-warning mt-5 flex items-start gap-3 border px-4 py-3 text-left text-sm"
             style={{
-              borderColor: 'var(--settings-state-warning-border, rgba(245, 158, 11, 0.24))',
-              background: 'var(--settings-state-warning-bg, rgba(245, 158, 11, 0.12))',
-              color: 'var(--settings-state-warning-text, #fde68a)',
+              borderColor: 'var(--app-startup-warning-border)',
+              background: 'var(--app-startup-warning-bg)',
+              color: 'var(--app-startup-warning-text)',
               borderRadius: 'var(--radius-surface-sm, 16px)',
             }}
           >

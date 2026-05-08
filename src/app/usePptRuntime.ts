@@ -777,10 +777,11 @@ ${paragraphs}
   }, [requirePptEditableExportBundle, resolvePptExportImageAsset]);
 
   const handleExportPptx = useCallback(async (node: PromptNode): Promise<void> => {
-    if (!activeCanvasRef.current) return;
     if (node.mode !== GenerationMode.PPT) return;
 
-    const ordered = getPromptPptImageNodes(activeCanvasRef.current.imageNodes, node.id).slice(0, 20);
+    const bundle = getOrderedPptNodeBundle(node);
+    const ordered = bundle?.images.slice(0, 20) || [];
+    const promptNode = bundle?.promptNode || node;
 
     if (ordered.length === 0) {
       showNoPptPagesWarning();
@@ -798,12 +799,12 @@ ${paragraphs}
     writePptxPackageSkeleton({
       zip,
       slideCount: ordered.length,
-      title: node.prompt || 'KK Studio PPT export',
+      title: promptNode.prompt || 'KK Studio PPT export',
     });
 
     for (let i = 0; i < ordered.length; i++) {
       const img = ordered[i];
-      const outlineRaw = node.pptSlides?.[i] || img.alias || `Slide ${i + 1}`;
+      const outlineRaw = promptNode.pptSlides?.[i] || img.alias || `Slide ${i + 1}`;
       const { title: outlineTitle, subtitle: outlineSubtitle } = parsePptOutlineLine(outlineRaw);
       const titleText = outlineTitle || `Slide ${i + 1}`;
       const subtitleText = outlineSubtitle || '';
@@ -893,13 +894,12 @@ ${paragraphs}
     import('../services/system/notificationService').then(({ notify }) => {
       notify.success('PPTX export complete', `Exported ${ordered.length} slides as a .pptx file`);
     });
-  }, [activeCanvasRef, parsePptOutlineLine, showNoPptPagesWarning]);
+  }, [getOrderedPptNodeBundle, parsePptOutlineLine, showNoPptPagesWarning]);
 
   const handleExportPptPackage = useCallback(async (node: PromptNode): Promise<void> => {
-    const canvas = activeCanvasRef.current;
-    if (!canvas) return;
-
-    const childImages = getPromptPptImageNodes(canvas.imageNodes, node.id);
+    const bundle = getOrderedPptNodeBundle(node);
+    const childImages = bundle?.images || [];
+    const promptNode = bundle?.promptNode || node;
 
     if (childImages.length === 0) {
       showNoPptPagesWarning();
@@ -913,7 +913,7 @@ ${paragraphs}
       const img = childImages[i];
       const pageNo = i + 1;
       const pageName = img.alias || `图${pageNo}`;
-      const outlineRaw = node.pptSlides?.[i] || img.alias || '';
+      const outlineRaw = promptNode.pptSlides?.[i] || img.alias || '';
       const { title: outlineTitle, subtitle: outlineSubtitle } = parsePptOutlineLine(outlineRaw);
       const fileName = `pages/${String(pageNo).padStart(2, '0')}-${pageName.replace(/[\\/:*?"<>|]/g, '_')}.png`;
       const src = img.originalUrl || img.url;
@@ -942,42 +942,42 @@ ${paragraphs}
       });
     }
 
-    const outlinePages = (node.pptSlides || []).map((text, idx) => ({
+    const outlinePages = (promptNode.pptSlides || []).map((text, idx) => ({
       page: idx + 1,
       text,
     }));
 
     zip.file('meta/manifest.json', JSON.stringify({
       exportedAt: new Date().toISOString(),
-      nodeId: node.id,
-      nodePrompt: node.prompt,
+      nodeId: promptNode.id,
+      nodePrompt: promptNode.prompt,
       pageCount: childImages.length,
       pages: pagesMeta,
     }, null, 2));
 
     zip.file('outline/ppt-outline.json', JSON.stringify({
-      topic: node.prompt,
+      topic: promptNode.prompt,
       pageCount: Math.max(childImages.length, outlinePages.length),
-      styleLocked: node.pptStyleLocked !== false,
+      styleLocked: promptNode.pptStyleLocked !== false,
       pages: outlinePages,
     }, null, 2));
 
     zip.file('meta/node-meta.json', JSON.stringify({
-      nodeId: node.id,
-      model: node.model,
-      modelLabel: node.modelLabel,
-      provider: node.provider,
-      providerLabel: node.providerLabel,
-      keySlotId: node.keySlotId,
-      aspectRatio: node.aspectRatio,
-      imageSize: node.imageSize,
-      parallelCount: node.parallelCount,
-      styleLocked: node.pptStyleLocked !== false,
-      referenceStorageIds: (node.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
+      nodeId: promptNode.id,
+      model: promptNode.model,
+      modelLabel: promptNode.modelLabel,
+      provider: promptNode.provider,
+      providerLabel: promptNode.providerLabel,
+      keySlotId: promptNode.keySlotId,
+      aspectRatio: promptNode.aspectRatio,
+      imageSize: promptNode.imageSize,
+      parallelCount: promptNode.parallelCount,
+      styleLocked: promptNode.pptStyleLocked !== false,
+      referenceStorageIds: (promptNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
     }, null, 2));
 
     const slidesHtml = buildPptSlidesPreviewHtml({
-      title: node.prompt || 'PPT 导出',
+      title: promptNode.prompt || 'PPT 导出',
       items: pagesMeta.map((pageMeta) => ({
         page: pageMeta.page,
         title: String(pageMeta.title || ''),
@@ -993,7 +993,7 @@ ${paragraphs}
     import('../services/system/notificationService').then(({ notify }) => {
       notify.success('导出完成', `已导出 ${childImages.length} 页与 pages/outline/meta 目录`);
     });
-  }, [activeCanvasRef, parsePptOutlineLine, showNoPptPagesWarning]);
+  }, [getOrderedPptNodeBundle, parsePptOutlineLine, showNoPptPagesWarning]);
 
   const stitchPptImagesToBlob = useCallback(async (images: GeneratedImage[]) => {
     const loaded = await Promise.all(images.map(async (image) => {
@@ -1073,11 +1073,9 @@ ${paragraphs}
   }, [getOrderedPptPreviewBundle, stitchPptImagesToBlob]);
 
   const handleExportPptSinglePage = useCallback(async (node: PromptNode, pageIndex: number): Promise<void> => {
-    const canvas = activeCanvasRef.current;
-    if (!canvas) return;
     if (node.mode !== GenerationMode.PPT) return;
 
-    const ordered = getPromptPptImageNodes(canvas.imageNodes || [], node.id);
+    const ordered = getOrderedPptNodeBundle(node)?.images || [];
     const target = ordered[pageIndex];
     if (!target) return;
 
@@ -1094,7 +1092,7 @@ ${paragraphs}
         notify.error('导出失败', error instanceof Error ? error.message : '无法导出该页面');
       });
     }
-  }, [activeCanvasRef]);
+  }, [getOrderedPptNodeBundle]);
 
   const handleEditPptTextFromLightbox = useCallback((image: GeneratedImage): void => {
     const bundle = getOrderedPptPreviewBundle(image.id);

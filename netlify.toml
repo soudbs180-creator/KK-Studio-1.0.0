@@ -11,6 +11,3 @@
   targetPort = 3000
   port = 8888
   autoLaunch = false
-
-# Functions use config.path for routing (Netlify Functions v2)
-# No redirects needed

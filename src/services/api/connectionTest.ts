@@ -93,6 +93,32 @@ function resolveConnectionRuntime(config: ConnectionConfig, cleanBase: string) {
   });
 }
 
+function resolveOfficialCompatibleBaseUrl(runtime: ReturnType<typeof resolveConnectionRuntime>, cleanBase: string, surface: 'chat' | 'models'): string {
+  const normalizedBase = String(cleanBase || '').trim();
+  if (normalizedBase) {
+    return normalizedBase;
+  }
+
+  const surfaceLabel = surface === 'chat' ? 'Chat' : 'Models';
+  if (runtime.strategyId !== 'openai') {
+    throw new Error(`${runtime.strategy.label || runtime.strategyId} ${surfaceLabel} test requires a Base URL from the provider workbench; documentation hosts must not fall back to official OpenAI.`);
+  }
+
+  return 'https://api.openai.com';
+}
+
+function assertNativeProtocolBaseUrl(runtime: ReturnType<typeof resolveConnectionRuntime>, cleanBase: string, surface: 'models'): void {
+  const normalizedBase = String(cleanBase || '').trim();
+  const allowOfficialDefault = runtime.providerFamily === 'google-official'
+    || runtime.strategyId === 'anthropic'
+    || runtime.strategyId === '12ai';
+
+  if (!allowOfficialDefault && !normalizedBase) {
+    const surfaceLabel = surface === 'models' ? 'Models' : surface;
+    throw new Error(`${runtime.strategy.label || runtime.strategyId} ${surfaceLabel} test requires a Base URL from the provider workbench; documentation hosts must not fall back to official provider APIs.`);
+  }
+}
+
 function get12AIProbeModel(
   runtime: ReturnType<typeof resolveConnectionRuntime>,
   config: ConnectionConfig,
@@ -177,8 +203,8 @@ async function runGeminiGenerateContentTest(
 
 async function runOpenAIChatTest(cleanBase: string, config: ConnectionConfig): Promise<OpenAITestResponse> {
   const resolved = resolveConfig(config);
-  const base = cleanBase || 'https://api.openai.com';
   const runtime = resolveConnectionRuntime(resolved, cleanBase);
+  const base = resolveOfficialCompatibleBaseUrl(runtime, cleanBase, 'chat');
   const headers = buildProxyHeaders(
     runtime.authMethod as AuthMethod,
     resolved.apiKey,
@@ -575,9 +601,15 @@ export async function testModelsList(config: ConnectionConfig): Promise<TestResu
       };
     }
     const usesOpenAIStyleModelList = runtime.providerFamily === 'newapi-family';
+    const listBase = !nativeGemini && !nativeClaude
+      ? resolveOfficialCompatibleBaseUrl(runtime, cleanBase, 'models')
+      : cleanBase;
+    if (nativeGemini || nativeClaude) {
+      assertNativeProtocolBaseUrl(runtime, cleanBase, 'models');
+    }
     const listUrl = usesOpenAIStyleModelList
       ? applyOpenAICompatAuthToUrl(
-          buildOpenAIEndpoint(cleanBase || 'https://api.openai.com', '/models'),
+          buildOpenAIEndpoint(listBase, '/models'),
           runtime.authMethod as AuthMethod,
           resolved.apiKey,
         )
@@ -586,7 +618,7 @@ export async function testModelsList(config: ConnectionConfig): Promise<TestResu
         : nativeClaude
           ? buildClaudeEndpoint(cleanBase || 'https://api.anthropic.com', '/models')
           : applyOpenAICompatAuthToUrl(
-              buildOpenAIEndpoint(cleanBase || 'https://api.openai.com', '/models'),
+              buildOpenAIEndpoint(listBase, '/models'),
               runtime.authMethod as AuthMethod,
               resolved.apiKey,
             );

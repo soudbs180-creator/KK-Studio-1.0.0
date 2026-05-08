@@ -11,11 +11,12 @@ function readSource(relativePath: string): string {
 
 test('ecommerce analysis confirmation keeps unchecked modules as skipped slots instead of dropping them', () => {
   const appSource = readSource('src/App.tsx');
+  const buildRuntimeSource = readSource('src/app/useEcommerceBuildRuntime.ts');
 
   assert.doesNotMatch(appSource, /if \(ecommerceState\.selectedItems\[item\.itemId\] === false\) \{\s*continue;\s*\}/);
   assert.doesNotMatch(appSource, /if \(ecommerceState\.selectedItems\[item\.moduleId\] === false\) \{\s*continue;\s*\}/);
-  assert.match(appSource, /selected:\s*ecommerceState\.selectedItems\[item\.itemId\] !== false/);
-  assert.match(appSource, /selected:\s*ecommerceState\.selectedItems\[item\.moduleId\] !== false/);
-  assert.match(appSource, /groupId:\s*mainGroupNode\.id/);
-  assert.match(appSource, /groupId:\s*aPlusGroupNode\.id/);
+  assert.match(buildRuntimeSource, /selected:\s*ecommerceState\.selectedItems\[item\.itemId\] !== false/);
+  assert.match(buildRuntimeSource, /selected:\s*ecommerceState\.selectedItems\[item\.moduleId\] !== false/);
+  assert.match(buildRuntimeSource, /groupId:\s*mainGroupNode\.id/);
+  assert.match(buildRuntimeSource, /groupId:\s*aPlusGroupNode\.id/);
 });

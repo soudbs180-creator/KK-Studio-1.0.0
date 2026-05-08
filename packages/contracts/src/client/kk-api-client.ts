@@ -38,7 +38,6 @@ import type {
 } from "../dto/auth.ts";
 import type {
   AdminCreditAccountLookupDto,
-    AdminRechargeSubmissionDto,
     AdminRechargeCreditsRequestDto,
     AdminRechargeCreditsResponseDto,
     CreateRechargeSubmissionRequestDto,

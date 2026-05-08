@@ -35,6 +35,8 @@ test('prompt bar ecommerce footer keeps ecommerce state inside the shared mode p
   assert.match(imageOptionsPanelSource, /onUpdateEcommerceSheetSetting\('A\+', \{ aPlusControlMode: mode \}\)/);
   assert.match(imageOptionsPanelSource, /const ecommerceDisplaySizes = useMemo/);
   assert.match(imageOptionsPanelSource, /ImageSize\.SIZE_4K/);
+  assert.match(imageOptionsPanelSource, /const shouldUseSingleEqualRow = totalRatioCount <= 3;/);
+  assert.match(imageOptionsPanelSource, /const autoInGrid = hasAuto && \(shouldUseSingleEqualRow \|\| isOddCount\);/);
   assert.doesNotMatch(imageOptionsPanelSource, /A\+ 生成比例/);
   assert.doesNotMatch(imageOptionsPanelSource, /fallback to 970x600/i);
   assert.match(promptBarSource, /return ecommerceAspectContext\.allowedAspectRatios;/);
@@ -48,6 +50,7 @@ test('app forwards ecommerce sheet settings and the ecommerce confirm label into
   const appSource = readSource('src/App.tsx');
   const appPromptComposerSource = readSource('src/app/AppPromptComposer.tsx');
   const promptBarHookSource = readSource('src/app/useAppPromptBarProps.ts');
+  const sheetSettingsRuntimeSource = readSource('src/app/useEcommerceSheetSettingsRuntime.ts');
 
   assert.match(
     appPromptComposerSource,
@@ -55,9 +58,10 @@ test('app forwards ecommerce sheet settings and the ecommerce confirm label into
   );
   assert.match(appPromptComposerSource, /const PromptBarCompat = PromptBar as React\.ComponentType<AppPromptBarProps>;/);
   assert.match(appSource, /const \{\s*mobilePromptBarProps,\s*desktopPromptBarProps,\s*\} = useAppPromptBarProps\(\{/s);
-  assert.match(appSource, /aspectRatio: AspectRatio\.AUTO,\s*imageSize: preferredImageSize,/s);
-  assert.match(appSource, /'A\+': \{\s*aspectRatio: AspectRatio\.LANDSCAPE_16_9,\s*imageSize: ImageSize\.SIZE_4K,/s);
-  assert.match(appSource, /sheet === 'A\+'\s*\?\s*\{ \.\.\.mergedSetting, imageSize: ImageSize\.SIZE_4K \}/);
+  assert.match(appSource, /useEcommerceSheetSettingsRuntime\(\{/);
+  assert.match(sheetSettingsRuntimeSource, /aspectRatio: AspectRatio\.AUTO,\s*imageSize: preferredImageSize,/s);
+  assert.match(sheetSettingsRuntimeSource, /'A\+': \{\s*aspectRatio: AspectRatio\.LANDSCAPE_16_9,\s*imageSize: ImageSize\.SIZE_4K,/s);
+  assert.match(sheetSettingsRuntimeSource, /sheet === 'A\+'\s*\?\s*\{ \.\.\.mergedSetting, imageSize: ImageSize\.SIZE_4K \}/);
   assert.match(promptBarHookSource, /ecommerceSheetSettings: ecommerceState\.sheetSettings,/);
   assert.match(promptBarHookSource, /onUpdateEcommerceSheetSetting,/);
   assert.match(promptBarHookSource, /sendLabel: config\.mode === GenerationMode\.ECOMMERCE \?/);

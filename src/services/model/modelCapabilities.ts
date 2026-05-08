@@ -860,7 +860,7 @@ export function getMaxRefImages(modelId: string): number {
  * @param customLabel - 可选的自定义显示名称
  * @returns 用户友好的模型名称
  */
-export function getModelDisplayName(modelId: string, customLabel?: string, provider?: string): string {
+export function getModelDisplayName(modelId: string, customLabel?: string, _provider?: string): string {
     const lowerModelId = modelId.toLowerCase();
     // 🚀 [Fix] 支持多种系统积分模型后缀
     const isSystem = lowerModelId.includes('@system') || 

@@ -155,6 +155,25 @@ test('falls back to local xlsx analysis when ecommerce analysis endpoint is unav
   assert.equal(analysis.aPlusGroup.modules[0].declaredSizeText, '970*600');
 });
 
+test('falls back to local xlsx analysis when static preview returns html instead of json', async () => {
+  const file = await buildSimpleWorkbookFile();
+
+  const analysis = await withFetchStub(
+    async () => new Response('<!DOCTYPE html><html><body>KK Studio</body></html>', {
+      status: 200,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    }),
+    () => analyzeEcommerceRequirementFile(file),
+  );
+
+  assert.equal(analysis.projectMeta.projectName, '便携需求');
+  assert.equal(analysis.projectMeta.productName, '除湿机');
+  assert.equal(analysis.projectMeta.sourceFileType, 'xlsx');
+  assert.equal(analysis.mainImageItems.length, 1);
+  assert.equal(analysis.aPlusGroup.modules.length, 1);
+  assert.equal(analysis.aPlusGroup.modules[0].declaredSizeText, '970*600');
+});
+
 test('falls back to local pdf analysis through the nutrient document route when ecommerce analysis endpoint is unavailable', async () => {
   const file = new File(
     [new Uint8Array([0x25, 0x50, 0x44, 0x46])],

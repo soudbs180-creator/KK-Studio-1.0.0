@@ -18,5 +18,15 @@ test('LoginScreen source contains a dedicated administrator redirect button', ()
   const source = readFileSync('src/components/auth/LoginScreen.tsx', 'utf8');
 
   assert.match(source, /buildAdminLoginUrl/);
+  assert.match(source, /readRuntimeEnv\('VITE_KK_ADMIN_URL'\)/);
   assert.match(source, /window\.location\.assign/);
+});
+
+test('LoginScreen keeps manual local access beside the administrator entry', () => {
+  const source = readFileSync('src/components/auth/LoginScreen.tsx', 'utf8');
+
+  assert.match(source, /className="auth-aux-actions"/);
+  assert.match(source, /handleTempUserEntry/);
+  assert.match(source, /handleAdminEntry/);
+  assert.doesNotMatch(source, /!\s*hostedRuntime\s*\?\s*<button[\s\S]*handleTempUserEntry/);
 });

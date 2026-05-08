@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, test } from 'node:test';
 
 import {
@@ -7,6 +9,12 @@ import {
   resolveModelDisplayName,
 } from '../../src/utils/modelDisplayName.ts';
 import { normalizeModelId } from '../../src/utils/modelIdNormalization.ts';
+
+const ROOT_DIR = process.cwd();
+
+function readSource(relativePath: string): string {
+  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
+}
 
 describe('model display name normalization', () => {
   test('maps raw route-qualified Nano Banana 2 ids back to the picker label', () => {
@@ -48,5 +56,21 @@ describe('model display name normalization', () => {
     assert.equal(normalizeModelId('gemini-3.1-flash-image-preview-4k'), 'gemini-3.1-flash-image-preview');
     assert.equal(normalizeModelId('gemini-3.1-flash-image-preview-512px'), 'gemini-3.1-flash-image-preview');
     assert.equal(normalizeModelId('gemini-2.5-flash-image-preview'), 'gemini-2.5-flash-image');
+  });
+
+  test('getModelDisplayName keeps provider argument compatibility without reading it', () => {
+    const capabilitiesSource = readSource('src/services/model/modelCapabilities.ts');
+    const testConfigSource = readSource('tsconfig.tests.json');
+
+    assert.match(testConfigSource, /tests\/unit\/model-display-name-regression\.test\.ts/);
+    assert.match(
+      capabilitiesSource,
+      /export function getModelDisplayName\(modelId: string, customLabel\?: string, _provider\?: string\): string/,
+    );
+    assert.doesNotMatch(
+      capabilitiesSource,
+      /export function getModelDisplayName\(modelId: string, customLabel\?: string, provider\?: string\): string/,
+    );
+    assert.match(capabilitiesSource, /if \(customLabel\) return customLabel;/);
   });
 });

@@ -1,6 +1,6 @@
 
 import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Bot, Check, ChevronDown, ChevronRight, Copy, Eraser, FileText, Film, GitBranch, Image as ImageIcon, Layout, Loader2, MessageSquare, Mic, Paperclip, Pencil, Plus, RotateCcw, Square, User, X, Zap, Sparkles, Search, Download, Upload, Archive, Edit2, Trash2 } from 'lucide-react';
+import { ArrowUp, Bot, Check, ChevronDown, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2 } from 'lucide-react';
 import { generateImage } from '../../services/llm/geminiService';
 import { llmService } from '../../services/llm/LLMService';
 import { notify } from '../../services/system/notificationService';
@@ -58,7 +58,11 @@ const ChatSidebarModelMenuButton = React.memo(function ChatSidebarModelMenuButto
         <button
             onClick={() => onSelect(model)}
             onContextMenu={(event) => onOpenContextMenu(event, model.id)}
-            className={`w-full flex items-start gap-2.5 px-2.5 py-2 rounded-lg text-sm text-left transition-all ${selected ? 'bg-white/5 dark:bg-white/10 shadow-sm' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+            className={`w-full flex items-start gap-2.5 px-2.5 py-2 rounded-lg border text-sm text-left transition-all ${selected ? 'border-[var(--frost-card-sub-border)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+            style={selected ? {
+                background: 'var(--frost-card-sub-bg)',
+                boxShadow: 'var(--frost-card-sub-shadow)',
+            } : undefined}
         >
             <span className="mt-0.5 relative shrink-0 inline-flex h-5 w-5 items-center justify-center">
                 <ModelLogo
@@ -657,7 +661,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
     // 3. Layout State
     const [keyboardHeight, setKeyboardHeight] = useState(0);
-    const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
     const [sidebarWidth, setSidebarWidth] = useState(() => {
         // [NEW] Added width sync
         setTimeout(() => onWidthChange && onWidthChange(
@@ -693,7 +696,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             if (vv) {
                 const heightDiff = window.innerHeight - vv.height;
                 setKeyboardHeight(heightDiff > 100 ? heightDiff : 0);
-                setViewportHeight(vv.height);
             }
         };
 
@@ -887,18 +889,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         return -1;
     }, [messages]);
 
-    const filteredSessions = useMemo(() => {
-        const sorted = sessions
-            .filter(session => showArchived || !session.archived)
-            .sort((a, b) => b.updatedAt - a.updatedAt);
-        if (!sessionSearch.trim()) return sorted;
-        const q = sessionSearch.trim().toLowerCase();
-        return sorted.filter(session => {
-            if ((session.title || '').toLowerCase().includes(q)) return true;
-            return session.messages.some(m => (m.content || '').toLowerCase().includes(q));
-        });
-    }, [sessionSearch, sessions, showArchived]);
-
     const pinnedModels = useMemo(() => getPinnedModels(), [pinnedUpdate]);
 
     const filteredModelMenuItems = useMemo<ChatSidebarModelMenuItem[]>(() => {
@@ -950,12 +940,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         }
         return trail;
     }, [activeSession, sessionMap]);
-
-    const activeChildren = useMemo(() => {
-        return sessions
-            .filter(s => s.parentSessionId === activeSessionId)
-            .sort((a, b) => b.updatedAt - a.updatedAt);
-    }, [sessions, activeSessionId]);
 
     const sessionTreeRows = useMemo(() => {
         const visibleSessions = sessions.filter(session => showArchived || !session.archived);
@@ -1080,14 +1064,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             window.removeEventListener('mouseup', handleMouseUp);
         };
     }, [isDragging]);
-
-    const startDrag = (e: React.MouseEvent) => {
-        if (isOpen) return;
-        e.preventDefault();
-        setIsDragging(true);
-        dragStartRef.current = { x: e.clientX, y: e.clientY };
-        startPosRef.current = { ...position };
-    };
 
     const appendFilesAsAttachments = useCallback(async (files: File[]) => {
         if (!files || files.length === 0) return;
@@ -1617,15 +1593,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         }));
     }, []);
 
-    const getBranchSourcePreview = useCallback((session: ChatSessionItem): string | null => {
-        if (!session.parentSessionId || !session.branchFromMessageId) return null;
-        const parent = sessionMap.get(session.parentSessionId);
-        if (!parent) return null;
-        const source = parent.messages.find(m => m.id === session.branchFromMessageId);
-        if (!source || !source.content) return null;
-        return source.content.replace(/\s+/g, ' ').slice(0, 40);
-    }, [sessionMap]);
-
     const handleToggleArchiveSession = useCallback((id: string) => {
         setSessions(prev => prev.map(session => {
             if (session.id !== id) return session;
@@ -1784,18 +1751,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         reader.readAsText(file, 'utf-8');
     }, [sessions]);
 
-    const handleClear = () => {
-        if (confirm('确定要清空对话历史吗?')) {
-            setMessages([{ id: Date.now().toString(), role: 'assistant', content: '对话已重置。', timestamp: Date.now() }]);
-        }
-    };
-
-    const getTransformOrigin = () => {
-        const x = position.x < window.innerWidth / 2 ? 'left' : 'right';
-        const y = position.y < window.innerHeight / 2 ? 'bottom' : 'bottom';
-        return `${x} ${y} `;
-    };
-
     return (
         <>
             {/* 2. Chat Card Popover (Morph Transformation) */}
@@ -1813,7 +1768,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                     }}
                     onMouseDown={registerActivity}
                     onWheel={registerActivity}
-                    className={`fixed z-[100] flex flex-col bg-[var(--toolbar-bg)] backdrop-blur-[40px] border-[var(--border-subtle)] shadow-[var(--shadow-lg)] overflow-hidden ${isMobile
+                    className={`fixed z-[100] flex flex-col border overflow-hidden ${isMobile
                         ? 'left-2 right-2 rounded-[32px] border pb-0'
                         : 'top-0 right-0 bottom-0 border-l'
                         }`}
@@ -1822,10 +1777,20 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                         bottom: keyboardHeight > 0
                             ? 'max(env(safe-area-inset-bottom, 0px), 6px)'
                             : 'calc(env(safe-area-inset-bottom, 0px) + var(--mobile-tabbar-height, 72px) + var(--mobile-tabbar-floating-offset, 12px) + 8px)',
+                        background: 'var(--frost-card-framework-bg)',
+                        borderColor: 'var(--frost-card-framework-border)',
+                        boxShadow: 'var(--frost-card-framework-shadow)',
+                        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
                         transition: 'top 0.25s ease, bottom 0.25s ease'
                     } : {
                         // Full height sidebar on the right
                         width: `${sidebarWidth}px`,
+                        background: 'var(--frost-card-framework-bg)',
+                        borderColor: 'var(--frost-card-framework-border)',
+                        boxShadow: 'var(--frost-card-framework-shadow)',
+                        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
                         transform: 'translateX(0)',
                         transition: 'transform 0.3s ease-out'
                     }}
@@ -1860,7 +1825,13 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                     )}
 
                     {/* Session Header */}
-                    <div className={`relative z-10 flex flex-col bg-[var(--bg-secondary)] border-b border-[var(--border-light)] shrink-0 ${isMobile ? 'pt-3' : 'pt-4'}`}>
+                    <div
+                        className={`relative z-10 flex flex-col border-b shrink-0 ${isMobile ? 'pt-3' : 'pt-4'}`}
+                        style={{
+                            background: 'var(--frost-card-main-bg)',
+                            borderColor: 'var(--frost-card-main-border)',
+                        }}
+                    >
                         <div className="flex items-center justify-between px-4 pb-3">
                             {/* Left: Active Session Title */}
                             <div className="flex-1 min-w-0 flex items-center gap-2">
@@ -1905,9 +1876,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
                         {/* Expandable History Panel */}
                         {showHistoryPanel && (
-                            <div className="flex flex-col border-t border-[var(--border-light)] bg-[var(--bg-tertiary)]/30 max-h-[40vh] overflow-hidden">
+                            <div className="flex flex-col border-t border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] max-h-[40vh] overflow-hidden">
                                 {/* Panel Controls */}
-                                <div className="flex items-center px-4 py-2 gap-2 border-b border-white/5">
+                                <div className="flex items-center px-4 py-2 gap-2 border-b border-[var(--frost-card-sub-border)]">
                                     <input
                                         ref={sessionImportRef}
                                         type="file"
@@ -1924,7 +1895,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                             value={sessionSearch}
                                             onChange={(e) => setSessionSearch(e.target.value)}
                                             placeholder="搜索历史记录..."
-                                            className="w-full h-7 pl-8 pr-2 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-light)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--primary)] transition-colors"
+                                            className="w-full h-7 pl-8 pr-2 rounded-md bg-[var(--frost-input-bg)] border border-[var(--frost-input-border)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent-coral)] transition-colors"
                                         />
                                         <div className="absolute left-2.5 top-1.5 text-[var(--text-tertiary)] pointer-events-none">
                                             <Search size={14} />
@@ -2043,17 +2014,17 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                     <div className={`flex-1 overflow-y-auto space-y-4 scrollbar-thin ${isMobile ? 'px-3 py-3' : 'px-6 py-4'}`}>
                         {messages.map((msg, idx) => (
                             <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''} group`}>
-                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-md ${msg.role === 'user'
-                                    ? 'bg-[var(--bg-tertiary)] border border-[var(--border-light)]'
-                                    : 'bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 text-white'
+                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${msg.role === 'user'
+                                    ? 'bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)]'
+                                    : 'bg-gradient-to-br from-[var(--clay-brand-coral)] via-[var(--clay-brand-pink)] to-[var(--clay-brand-peach)] text-white'
                                     }`}>
                                     {msg.role === 'user' ? <User size={14} className="text-[var(--text-tertiary)]" /> : <Bot size={16} className="animate-icon-breathe" />}
                                 </div>
                                 <div className={`${isMobile ? 'max-w-[90%]' : 'max-w-[82%]'} flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                     {/* 消息文本 */}
-                                    <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${msg.role === 'user'
-                                        ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-tr-md border border-[var(--border-light)]'
-                                        : 'bg-blue-500/12 text-[var(--text-primary)] border border-blue-500/25 rounded-tl-md backdrop-blur-sm'
+                                    <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
+                                        ? 'bg-[var(--frost-card-sub-bg)] text-[var(--text-primary)] rounded-tr-md border border-[var(--frost-card-sub-border)]'
+                                        : 'bg-[var(--frost-card-sub-bg)] text-[var(--text-primary)] border border-[var(--frost-card-sub-border)] rounded-tl-md'
                                         }`}>
                                         <div className="whitespace-pre-wrap">{msg.content}</div>
                                     </div>
@@ -2068,14 +2039,14 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                                             <img
                                                                 src={att.data}
                                                                 alt={att.name}
-                                                                className="max-w-[240px] max-h-[240px] object-cover bg-[var(--bg-secondary)]"
+                                                                className="max-w-[240px] max-h-[240px] object-cover bg-[var(--frost-card-sub-bg)]"
                                                             />
                                                         </a>
                                                     ) : (
-                                                        <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-tertiary)] cursor-default">
-                                                            {att.type === 'video' && <Film size={16} className="text-purple-400" />}
-                                                            {att.type === 'audio' && <Mic size={16} className="text-green-400" />}
-                                                            {att.type === 'document' && <FileText size={16} className="text-blue-400" />}
+                                                        <div className="flex items-center gap-2 px-3 py-2 bg-[var(--frost-card-sub-bg)] cursor-default">
+                                                            {att.type === 'video' && <Film size={16} className="text-[var(--clay-brand-lavender)]" />}
+                                                            {att.type === 'audio' && <Mic size={16} className="text-[var(--clay-brand-mint)]" />}
+                                                                {att.type === 'document' && <FileText size={16} className="text-[var(--clay-brand-lavender)]" />}
                                                             <span className="text-xs text-[var(--text-secondary)] truncate max-w-[150px]">{att.name}</span>
                                                         </div>
                                                     )}
@@ -2092,7 +2063,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                             {msg.role === 'user' && (
                                                 <button
                                                     onClick={() => handleEditResend(msg)}
-                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-white/10 hover:bg-white/10"
+                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                                     title="编辑后重发"
                                                 >
                                                     <Pencil size={12} />
@@ -2102,7 +2073,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                             {msg.role === 'assistant' && idx === lastAssistantIndex && (
                                                 <button
                                                     onClick={() => handleRegenerateAssistant(msg.id)}
-                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-white/10 hover:bg-white/10 disabled:opacity-50"
+                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)] disabled:opacity-50"
                                                     disabled={isThinking}
                                                     title="重试这一轮回答"
                                                 >
@@ -2113,7 +2084,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                             {msg.role === 'assistant' && (
                                                 <button
                                                     onClick={() => handleEditFromAssistant(msg.id)}
-                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-white/10 hover:bg-white/10"
+                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                                     title="编辑上一条提问"
                                                 >
                                                     <Pencil size={12} />
@@ -2122,7 +2093,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                             )}
                                             <button
                                                 onClick={() => handleBranchFrom(idx)}
-                                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-white/10 hover:bg-white/10"
+                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                                 title="从当前消息创建分支"
                                             >
                                                 <GitBranch size={12} />
@@ -2130,7 +2101,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                             </button>
                                             <button
                                                 onClick={() => handleCopyMessage(msg)}
-                                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-white/10 hover:bg-white/10"
+                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                                 title="复制消息文本"
                                             >
                                                 {copiedMessageId === msg.id ? <Check size={12} /> : <Copy size={12} />}
@@ -2144,13 +2115,13 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
                         {isThinking && (
                             <div className="flex gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-cyan-500 flex items-center justify-center shrink-0 shadow-md">
+                                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--clay-brand-coral)] via-[var(--clay-brand-pink)] to-[var(--clay-brand-peach)] flex items-center justify-center shrink-0">
                                     <Bot size={16} className="animate-pulse text-white" />
                                 </div>
-                                <div className="flex items-center gap-1.5 px-4 py-3 bg-blue-500/12 border border-blue-500/25 rounded-2xl rounded-tl-md h-11">
-                                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" />
+                                <div className="flex items-center gap-1.5 px-4 py-3 bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] rounded-2xl rounded-tl-md h-11">
+                                    <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                    <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                    <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce" />
                                 </div>
                             </div>
                         )}
@@ -2165,7 +2136,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                         {/* Input Area - Always visible */}
                         <div
                             className={`mb-3 px-2 rounded-xl border transition-colors ${isDropActive
-                                ? 'border-blue-400/60 bg-blue-500/10'
+                                ? 'border-[var(--accent-coral)] bg-[var(--accent-coral)]/10'
                                 : 'border-transparent'
                                 }`}
                             onDragEnter={(e) => {
@@ -2212,7 +2183,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                 autoFocus
                             />
                             {isDropActive && (
-                                <div className="mt-2 text-[11px] text-blue-300">
+                                        <div className="mt-2 text-[11px] text-[var(--clay-brand-lavender)]">
                                     松开鼠标即可添加图片/视频/文档作为参考
                                 </div>
                             )}
@@ -2227,13 +2198,13 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                             <img
                                                 src={att.data}
                                                 alt={att.name}
-                                                className="w-16 h-16 object-cover rounded-lg border border-[var(--border-light)]"
+                                                className="w-16 h-16 object-cover rounded-lg border border-[var(--frost-card-sub-border)]"
                                             />
                                         ) : (
-                                            <div className="w-16 h-16 rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] flex flex-col items-center justify-center gap-1">
-                                                {att.type === 'video' && <Film size={20} className="text-purple-400" />}
-                                                {att.type === 'audio' && <Film size={20} className="text-green-400" />}
-                                                {att.type === 'document' && <FileText size={20} className="text-blue-400" />}
+                                            <div className="w-16 h-16 rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] flex flex-col items-center justify-center gap-1">
+                                                {att.type === 'video' && <Film size={20} className="text-[var(--clay-brand-lavender)]" />}
+                                                {att.type === 'audio' && <Film size={20} className="text-[var(--clay-brand-mint)]" />}
+                                                {att.type === 'document' && <FileText size={20} className="text-[var(--clay-brand-lavender)]" />}
                                                 <span className="text-[8px] text-[var(--text-tertiary)] truncate max-w-14 px-1">{att.name}</span>
                                             </div>
                                         )}
@@ -2280,7 +2251,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                     }
                                 }}
                                 className={`px-2.5 min-h-[44px] flex items-center gap-1.5 justify-center rounded-lg border transition-all active:scale-95 ${isMobile ? 'col-start-2 row-start-2 justify-self-end' : ''} ${agentMode
-                                    ? 'bg-violet-500/15 border-violet-400/30 text-violet-300 hover:bg-violet-500/25'
+                                    ? 'border-[var(--mobile-clay-active-border)] bg-[var(--frost-card-sub-bg)] text-[var(--clay-brand-lavender)] hover:bg-[var(--toolbar-hover)]'
                                     : 'border-transparent hover:bg-[var(--toolbar-hover)] text-[var(--text-secondary)]'
                                     }`}
                                 title={agentMode ? 'Agent 已开启：可自动路由问答/生成图/改图/文档任务' : '开启 Agent 增强模式'}
@@ -2355,7 +2326,16 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                                     >
                                                         <div className="flex flex-col gap-2">
                                                             {!isModelMenuBootstrapping && (
-                                                                <div className="bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-2xl shadow-xl p-2 relative z-30">
+                                                                <div
+                                                                    className="relative z-30 rounded-2xl border p-2"
+                                                                    style={{
+                                                                        background: 'var(--frost-card-framework-bg)',
+                                                                        borderColor: 'var(--frost-card-framework-border)',
+                                                                        boxShadow: 'var(--frost-card-framework-shadow)',
+                                                                        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                                                                        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                                                                    }}
+                                                                >
                                                                     <div className="relative flex items-center">
                                                                         <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -2366,7 +2346,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                                                             onChange={(e) => setModelSearch(e.target.value)}
                                                                             onClick={(e) => e.stopPropagation()}
                                                                             placeholder="搜索模型..."
-                                                                            className="w-full bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-transparent focus:border-indigo-500/50 placeholder-[var(--text-tertiary)]"
+                                                                            className="w-full bg-[var(--frost-input-bg)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-[var(--frost-input-border)] focus:border-[var(--accent-coral)] placeholder-[var(--text-tertiary)]"
                                                                             autoFocus
                                                                         />
                                                                         {modelSearch && (
@@ -2393,7 +2373,16 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                                             )}
 
                                                             {/* Model List Module */}
-                                                            <div className="bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-2xl shadow-2xl p-1.5 max-h-[50vh] overflow-y-auto overflow-x-hidden scrollbar-thin relative z-30">
+                                                            <div
+                                                                className="relative z-30 max-h-[50vh] overflow-y-auto overflow-x-hidden rounded-2xl border p-1.5 scrollbar-thin"
+                                                                style={{
+                                                                    background: 'var(--frost-card-framework-bg)',
+                                                                    borderColor: 'var(--frost-card-framework-border)',
+                                                                    boxShadow: 'var(--frost-card-framework-shadow)',
+                                                                    backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                                                                    WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                                                                }}
+                                                            >
                                                                 <div className="px-2 py-1.5 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] font-bold border-b border-[var(--border-light)] mb-1 select-none flex justify-between items-center">
                                                                     <span>选择模型 (右键可顶置)</span>
                                                                 </div>
@@ -2408,7 +2397,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                                                             {Array.from({ length: MODEL_MENU_SKELETON_COUNT }).map((_, index) => (
                                                                                 <div
                                                                                     key={`chat-sidebar-model-loading-${index}`}
-                                                                                    className="h-12 rounded-xl bg-white/5 border border-white/5 animate-pulse"
+                                                                                    className="h-12 rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] animate-pulse"
                                                                                 />
                                                                             ))}
                                                                         </div>
@@ -2445,8 +2434,16 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                         {/* Context Menu for Pinning */}
                                         {contextMenu && ReactDOM.createPortal(
                                             <div
-                                                className="fixed z-[10010] bg-[#2a2a2e] border border-white/10 rounded-lg shadow-xl py-1 w-32 backdrop-blur-md"
-                                                style={{ top: contextMenu.y, left: contextMenu.x }}
+                                                className="fixed z-[10010] w-32 rounded-lg border py-1"
+                                                style={{
+                                                    top: contextMenu.y,
+                                                    left: contextMenu.x,
+                                                    background: 'var(--frost-card-framework-bg)',
+                                                    borderColor: 'var(--frost-card-framework-border)',
+                                                    boxShadow: 'var(--frost-card-framework-shadow)',
+                                                    backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                                                    WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                                                }}
                                             >
                                                 <button
                                                     onClick={(e) => {
@@ -2457,7 +2454,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                                         // We might need a state trigger here too like in PromptBar
                                                         setPinnedUpdate(prev => prev + 1);
                                                     }}
-                                                    className="w-full text-left px-3 py-2 text-sm text-white hover:bg-white/10 flex items-center gap-2"
+                                                    className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)] flex items-center gap-2"
                                                 >
                                                     {getPinnedModels().includes(contextMenu.modelId) ? '取消顶置' : '📌 顶置模型'}
                                                 </button>
@@ -2496,8 +2493,16 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             )}
             {sessionContextMenu && ReactDOM.createPortal(
                 <div
-                    className="fixed z-[10020] bg-[#2a2a2e] border border-white/10 rounded-lg shadow-xl py-1 w-40 backdrop-blur-md"
-                    style={{ top: sessionContextMenu.y, left: sessionContextMenu.x }}
+                    className="fixed z-[10020] w-40 rounded-lg border py-1"
+                    style={{
+                        top: sessionContextMenu.y,
+                        left: sessionContextMenu.x,
+                        background: 'var(--frost-card-framework-bg)',
+                        borderColor: 'var(--frost-card-framework-border)',
+                        boxShadow: 'var(--frost-card-framework-shadow)',
+                        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                    }}
                 >
                     <button
                         onClick={(e) => {
@@ -2505,7 +2510,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                             handleRenameSession(sessionContextMenu.sessionId);
                             setSessionContextMenu(null);
                         }}
-                        className="w-full text-left px-3 py-2 text-sm text-white hover:bg-white/10"
+                        className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)]"
                     >
                         重命名
                     </button>
@@ -2514,7 +2519,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                             e.stopPropagation();
                             handleDuplicateSession(sessionContextMenu.sessionId);
                         }}
-                        className="w-full text-left px-3 py-2 text-sm text-white hover:bg-white/10"
+                        className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)]"
                     >
                         复制分支
                     </button>
@@ -2524,7 +2529,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                             handleToggleArchiveSession(sessionContextMenu.sessionId);
                             setSessionContextMenu(null);
                         }}
-                        className="w-full text-left px-3 py-2 text-sm text-white hover:bg-white/10"
+                        className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)]"
                     >
                         归档/取消归档
                     </button>
@@ -2543,7 +2548,16 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             )}
             {importPreview && ReactDOM.createPortal(
                 <div className="fixed inset-0 z-[10030] bg-black/50 flex items-center justify-center p-4">
-                    <div className="w-full max-w-md rounded-xl border border-white/10 bg-[var(--bg-secondary)] shadow-2xl p-4">
+                    <div
+                        className="w-full max-w-md rounded-xl border p-4"
+                        style={{
+                            background: 'var(--frost-card-framework-bg)',
+                            borderColor: 'var(--frost-card-framework-border)',
+                            boxShadow: 'var(--frost-card-framework-shadow)',
+                            backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                            WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                        }}
+                    >
                         <div className="text-sm font-medium text-[var(--text-primary)] mb-2">导入预览</div>
                         <div className="text-xs text-[var(--text-secondary)] space-y-1 mb-4">
                             <div>导入会话: {importPreview.stats.imported}</div>
@@ -2556,12 +2570,12 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                 value={importPreviewSearch}
                                 onChange={(e) => setImportPreviewSearch(e.target.value)}
                                 placeholder="搜索导入明细..."
-                                className="h-8 w-full sm:w-auto sm:flex-1 px-2 rounded-lg border border-white/10 bg-[var(--bg-tertiary)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none"
+                                className="h-8 w-full sm:w-auto sm:flex-1 px-2 rounded-lg border border-[var(--frost-input-border)] bg-[var(--frost-input-bg)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none"
                             />
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => setImportPreviewShowAll(prev => !prev)}
-                                    className="flex-1 sm:flex-none h-8 px-2 rounded-lg border border-white/10 text-[11px] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)] whitespace-nowrap"
+                                    className="flex-1 sm:flex-none h-8 px-2 rounded-lg border border-[var(--frost-card-sub-border)] text-[11px] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)] whitespace-nowrap"
                                 >
                                     {importPreviewShowAll ? '收起' : '查看全部'}
                                 </button>
@@ -2569,7 +2583,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                     onClick={() => setImportPreviewOnlyExcluded(prev => !prev)}
                                     className={`flex-1 sm:flex-none h-8 px-2 rounded-lg border text-[11px] whitespace-nowrap transition-colors ${importPreviewOnlyExcluded
                                         ? 'border-red-400/40 bg-red-500/15 text-red-200'
-                                        : 'border-white/10 text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'
+                                        : 'border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'
                                         }`}
                                 >
                                     {importPreviewOnlyExcluded ? '显示全部' : '只看已勾选'}
@@ -2588,16 +2602,16 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                             const visible = importPreviewShowAll ? filtered : filtered.slice(0, 10);
 
                             return (
-                                <div className="mb-3 border border-white/10 rounded-lg p-2 max-h-44 overflow-y-auto scrollbar-thin">
+                                <div className="mb-3 border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] rounded-lg p-2 max-h-44 overflow-y-auto scrollbar-thin">
                                     <div className="text-[10px] text-[var(--text-tertiary)] mb-2">排除项（勾选后不导入）</div>
                                     <div className="flex items-center gap-2 mb-2">
                                         <button
                                             onClick={() => setImportExcludedIds(visible.map(s => s.id))}
-                                            className="text-[10px] px-2 py-1 rounded border border-white/10 hover:bg-[var(--toolbar-hover)]"
+                                            className="text-[10px] px-2 py-1 rounded border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                         >全选可见</button>
                                         <button
                                             onClick={() => setImportExcludedIds([])}
-                                            className="text-[10px] px-2 py-1 rounded border border-white/10 hover:bg-[var(--toolbar-hover)]"
+                                            className="text-[10px] px-2 py-1 rounded border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
                                         >清空排除</button>
                                         <span className="text-[10px] text-[var(--text-tertiary)]">已排除 {importExcludedIds.length} 条</span>
                                     </div>
@@ -2618,7 +2632,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                                     <span className="flex-1 truncate text-[var(--text-secondary)]">{getSessionLabel(session)}</span>
                                                     {newSet.has(session.id) && <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-200">添加</span>}
                                                     {conflictSet.has(session.id) && <span className="px-1 py-0.5 rounded bg-amber-500/20 text-amber-200">冲突</span>}
-                                                    {duplicateSet.has(session.id) && <span className="px-1 py-0.5 rounded bg-blue-500/20 text-blue-200">重复</span>}
+                                                    {duplicateSet.has(session.id) && <span className="px-1 py-0.5 rounded bg-[var(--clay-brand-lavender)]/20 text-[var(--clay-brand-lavender)]">重复</span>}
                                                 </label>
                                             );
                                         })}
@@ -2666,7 +2680,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                 const visible = importPreviewShowAll ? list : list.slice(0, 8);
                                 return visible.length > 0 && (
                                     <div>
-                                        <div className="text-[10px] text-blue-300 mb-1">内容疑似重复</div>
+                                        <div className="text-[10px] text-[var(--clay-brand-lavender)] mb-1">内容疑似重复</div>
                                         <div className="text-[10px] text-[var(--text-secondary)] space-y-0.5">
                                             {visible.map((name, idx) => <div key={`dup-${idx}`}>{name}</div>)}
                                         </div>
@@ -2687,7 +2701,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                         <div className="grid grid-cols-1 gap-2 mb-3">
                             <button
                                 onClick={() => applyImportMode('smart')}
-                                className="w-full py-2 rounded-lg bg-blue-500/20 border border-blue-400/40 text-blue-200 text-sm hover:bg-blue-500/30"
+                                className="w-full py-2 rounded-lg bg-[var(--accent-coral)]/15 border border-[var(--accent-coral)]/40 text-[var(--accent-coral)] text-sm hover:bg-[var(--accent-coral)]/25"
                             >
                                 智能合并（推荐）
                             </button>
@@ -2712,7 +2726,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                 setImportExcludedIds([]);
                                 setImportPreviewOnlyExcluded(false);
                             }}
-                            className="w-full py-2 rounded-lg border border-white/10 text-[var(--text-secondary)] text-sm hover:bg-[var(--toolbar-hover)]"
+                            className="w-full py-2 rounded-lg border border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] text-sm hover:bg-[var(--toolbar-hover)]"
                         >
                             取消
                         </button>

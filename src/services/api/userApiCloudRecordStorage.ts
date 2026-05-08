@@ -44,17 +44,6 @@ export function resetUserApisPayloadCacheForTests(): void {
   userApisPayloadInFlight.clear();
 }
 
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (typeof error === 'object' && error && 'message' in error) {
-    const message = String((error as { message?: unknown }).message || '').trim();
-    if (message) {
-      return message;
-    }
-  }
-
-  return fallback;
-}
-
 function unwrapOrUndefined<T>(
   response: {
     success: boolean;

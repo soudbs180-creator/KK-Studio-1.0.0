@@ -1,4 +1,4 @@
-import { ModelType, ImageSize, Provider } from '../../types';
+import type { Provider } from '../../types';
 
 export interface ModelCapability {
     id: string;

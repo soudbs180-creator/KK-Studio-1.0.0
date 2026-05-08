@@ -692,51 +692,6 @@ async function invalidateCloudSession(reason: string): Promise<void> {
   return invalidateCloudSessionPromise;
 }
 
-async function buildInvocationError(
-  feature: string,
-  error: any,
-  response?: Response
-): Promise<Error> {
-  if (isSecureProxySessionReauthError(error) || isSecureProxyGuestModeError(error)) {
-    return error;
-  }
-
-  const status = response?.status;
-  let responseBody = '';
-
-  if (response) {
-    try {
-      responseBody = await response.clone().text();
-    } catch {
-      responseBody = '';
-    }
-  }
-
-  let message = error?.message || 'System proxy invocation failed';
-  if (status === 401) {
-    // A proxy-side 401 does not always mean the local KK session is gone.
-    // It can also happen when the VPS API session or provider route config drifts
-    // from the current browser session. Keep the local session intact here so users see a
-    // recoverable auth error instead of being force-signed-out mid-generation.
-    return buildSessionReauthError(feature, responseBody, 'system');
-  } else if (status === 403) {
-    message = `System credit ${feature} is not available for the current account.`;
-  } else if (responseBody) {
-    try {
-      const parsed = JSON.parse(responseBody);
-      message = parsed?.error || parsed?.message || message;
-    } catch {
-      message = responseBody || message;
-    }
-  }
-
-  return buildSecureProxyBoundaryError(message, {
-    status,
-    responseBody,
-    feature,
-  });
-}
-
 type LocalUserRouteProxyHttpResult = {
   response?: Response;
   payload: any;
@@ -874,6 +829,14 @@ async function invokeLocalUserRouteProxy(
   feature: string,
   body: Record<string, unknown>,
 ): Promise<any> {
+  if (!shouldUseLocalUserRouteApi()) {
+    throw buildSecureProxyBoundaryError('Local user-route proxy is disabled.', {
+      code: LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE,
+      status: 503,
+      feature,
+    });
+  }
+
   const session = await resolveCloudSession(feature, { routeKind: 'user-route' });
   let activeAccessToken = session.accessToken;
   const failureLabel = 'local KK API user-route proxy';
@@ -973,6 +936,13 @@ async function invokeLocalSystemProxy(
   feature: string,
   body: Record<string, unknown>,
 ): Promise<any> {
+  if (!shouldUseLocalSystemProxy()) {
+    throw buildSecureProxyBoundaryError('Local system proxy is disabled.', {
+      status: 503,
+      feature,
+    });
+  }
+
   const invokeWithToken = async (accessToken: string): Promise<LocalSystemProxyHttpResult> => {
     try {
       return await invokeLocalSystemProxyHttp(accessToken, body);

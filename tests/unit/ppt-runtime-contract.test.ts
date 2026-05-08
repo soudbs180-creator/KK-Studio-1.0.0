@@ -3,7 +3,31 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
+import type {
+  OrderedPptNodeBundle,
+  OrderedPptPreviewBundle,
+  PptDeckEditorState,
+  PptEditableExportBundle,
+  PptOutlineLineParts,
+  PptStackPreviewState,
+  UsePptRuntimeDeps,
+  UsePptRuntimeResult,
+} from '../../src/app/usePptRuntime.ts';
+import type { PptRuntimeCanvasSnapshot } from '../../src/app/pptRuntimeHelpers.ts';
+
 const ROOT_DIR = process.cwd();
+
+type PptRuntimePublicBoundary = {
+  deps: UsePptRuntimeDeps;
+  result: UsePptRuntimeResult;
+  outline: PptOutlineLineParts;
+  previewBundle: OrderedPptPreviewBundle;
+  nodeBundle: OrderedPptNodeBundle;
+  exportBundle: PptEditableExportBundle;
+  deckEditor: PptDeckEditorState;
+  stackPreview: PptStackPreviewState;
+  canvasSnapshot: PptRuntimeCanvasSnapshot;
+}
 
 function readSource(relativePath: string): string {
   const fullPath = path.join(ROOT_DIR, relativePath);
@@ -21,9 +45,15 @@ test('PPT runtime helpers and exports are owned by usePptRuntime', () => {
   const appSource = readSource('src/App.tsx');
   const hookSource = readSource('src/app/usePptRuntime.ts');
   const helperSource = readSource('src/app/pptRuntimeHelpers.ts');
+  const testConfigSource = readSource('tsconfig.tests.json');
+  const boundaryIsTypechecked: PptRuntimePublicBoundary | null = null;
 
+  assert.equal(boundaryIsTypechecked, null);
   assert.match(hookSource, /export interface UsePptRuntimeDeps/);
   assert.match(hookSource, /export interface UsePptRuntimeResult/);
+  assert.match(testConfigSource, /tests\/unit\/ppt-runtime-contract\.test\.ts/);
+  assert.match(testConfigSource, /tests\/unit\/ppt-runtime-helper-contract\.test\.ts/);
+  assert.match(testConfigSource, /tests\/unit\/ppt-deck-single-container-contract\.test\.ts/);
   assert.match(hookSource, /setPptDeckEditor: Dispatch<SetStateAction<PptDeckEditorState \| null>>;/);
   assert.match(hookSource, /type UpdatePromptNode = \(promptNode: PromptNode\) => void \| Promise<unknown>;/);
   assert.match(hookSource, /type UpdateImageNode = \(id: string, updates: Partial<GeneratedImage>\) => void \| Promise<unknown>;/);
@@ -76,6 +106,7 @@ test('PPT runtime helpers and exports are owned by usePptRuntime', () => {
   assert.match(helperSource, /export function resolveOrderedPptNodeBundleForCanvas/);
   assert.match(helperSource, /getPromptPptImageNodes\(safeImageNodes, promptNode\.id\)\.forEach\(pushImage\);/);
   assert.match(helperSource, /if \(candidate\.parentPromptId !== promptNode\.id\) return;/);
+  assert.doesNotMatch(hookSource, /getPromptPptImageNodes/);
   assert.match(hookSource, /const getPptEditableExportBundle = useCallback\(\(node: PromptNode\): PptEditableExportBundle \| null => \{/);
   assert.match(hookSource, /const pages = buildPptEditablePages\(bundle\.promptNode, images\);/);
   assert.match(hookSource, /const requirePptEditableExportBundle = useCallback\(\(node: PromptNode\): PptEditableExportBundle \| null => \{/);
@@ -112,13 +143,20 @@ test('PPT runtime helpers and exports are owned by usePptRuntime', () => {
   assert.match(hookSource, /buildPptxSlideRelationshipsXml\(/);
   assert.match(hookSource, /saveAs\(pptxBlob, `ppt-layered-\$\{Date\.now\(\)\}\.pptx`\);/);
   assert.match(hookSource, /const handleExportPptx = useCallback\(async \(node: PromptNode\): Promise<void> => \{/);
-  assert.match(hookSource, /const ordered = getPromptPptImageNodes\([^)]*\.imageNodes, node\.id\)\.slice\(0, 20\);/);
-  assert.match(hookSource, /const outlineRaw = node\.pptSlides\?\.\[i\] \|\| img\.alias \|\|/);
+  assert.match(hookSource, /const bundle = getOrderedPptNodeBundle\(node\);/);
+  assert.match(hookSource, /const ordered = bundle\?\.images\.slice\(0, 20\) \|\| \[\];/);
+  assert.match(hookSource, /const promptNode = bundle\?\.promptNode \|\| node;/);
+  assert.match(hookSource, /title: promptNode\.prompt \|\| 'KK Studio PPT export',/);
+  assert.match(hookSource, /const outlineRaw = promptNode\.pptSlides\?\.\[i\] \|\| img\.alias \|\|/);
   assert.match(hookSource, /zip\.file\(`ppt\/slides\/slide\$\{i \+ 1\}\.xml`, buildPptxSlideXml\(\{/);
   assert.match(hookSource, /zip\.file\(`ppt\/slides\/_rels\/slide\$\{i \+ 1\}\.xml\.rels`, buildPptxSlideRelationshipsXml\(\[/);
   assert.match(hookSource, /saveAs\(pptxBlob, `ppt-slides-\$\{Date\.now\(\)\}\.pptx`\);/);
   assert.match(hookSource, /import\('\.\.\/services\/system\/notificationService'\)\.then\(\(\{ notify \}\) => \{/);
   assert.match(hookSource, /const handleExportPptPackage = useCallback\(async \(node: PromptNode\): Promise<void> => \{/);
+  assert.match(hookSource, /const childImages = bundle\?\.images \|\| \[\];/);
+  assert.match(hookSource, /const outlineRaw = promptNode\.pptSlides\?\.\[i\] \|\| img\.alias \|\| '';/);
+  assert.match(hookSource, /nodeId: promptNode\.id,/);
+  assert.match(hookSource, /referenceStorageIds: \(promptNode\.referenceImages \|\| \[\]\)\.map/);
   assert.match(hookSource, /const slidesHtml = buildPptSlidesPreviewHtml\(\{/);
   assert.match(hookSource, /zip\.file\('outline\/slides-preview\.html', slidesHtml\);/);
   assert.match(hookSource, /saveAs\(blob, `ppt-pages-\$\{Date\.now\(\)\}\.zip`\);/);
@@ -127,7 +165,7 @@ test('PPT runtime helpers and exports are owned by usePptRuntime', () => {
   assert.match(hookSource, /saveAs\(blob, `ppt-full-screen-\$\{Date\.now\(\)\}\.png`\);/);
   assert.match(hookSource, /const handleExportPptSinglePage = useCallback\(async \(node: PromptNode, pageIndex: number\): Promise<void> => \{/);
   assert.match(hookSource, /if \(node\.mode !== GenerationMode\.PPT\) return;/);
-  assert.match(hookSource, /const ordered = getPromptPptImageNodes\(canvas\.imageNodes \|\| \[\], node\.id\);/);
+  assert.match(hookSource, /const ordered = getOrderedPptNodeBundle\(node\)\?\.images \|\| \[\];/);
   assert.match(hookSource, /const name = `ppt-page-\$\{String\(pageIndex \+ 1\)\.padStart\(2, '0'\)\}\.png`;/);
   assert.match(hookSource, /notify\.success\('导出完成', `已导出图 \$\{pageIndex \+ 1\}`\);/);
   assert.match(hookSource, /const handleEditPptTextFromLightbox = useCallback\(\(image: GeneratedImage\): void => \{/);

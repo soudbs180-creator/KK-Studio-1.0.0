@@ -1439,42 +1439,42 @@ export const fileSystemService = {
      * 🚀 创建标签快捷链接
      * 在 picture/tags/{tagName}/ 或 video/tags/{tagName}/ 下创建指向原文档的.url快捷方式
      */
-    async createTagShortcut(handle: FileSystemDirectoryHandle, tag: string, filename: string, isVideo: boolean = false): Promise<void> {
+    async createTagShortcut(_handle: FileSystemDirectoryHandle, tag: string, filename: string, _isVideo: boolean = false): Promise<void> {
         logInfo('FileSystem', '跳过标签快捷方式', `${tag}/${filename}`);
     },
 
     /**
      * 🚀 删除标签快捷链接
      */
-    async removeTagShortcut(handle: FileSystemDirectoryHandle, tag: string, filename: string, isVideo: boolean = false): Promise<void> {
+    async removeTagShortcut(_handle: FileSystemDirectoryHandle, tag: string, filename: string, _isVideo: boolean = false): Promise<void> {
         logInfo('FileSystem', '跳过删除标签快捷方式', `${tag}/${filename}`);
     },
 
     /**
      * 🚀 清理空的标签文档夹
      */
-    async cleanupEmptyTagFolder(handle: FileSystemDirectoryHandle, tag: string, isVideo: boolean = false): Promise<void> {
+    async cleanupEmptyTagFolder(_handle: FileSystemDirectoryHandle, tag: string, _isVideo: boolean = false): Promise<void> {
         logInfo('FileSystem', '跳过标签目录清理', tag);
     },
 
     /**
      * 🚀 为文档的所有标签创建快捷链接
      */
-    async syncFileTagShortcuts(handle: FileSystemDirectoryHandle, filename: string, tags: string[], isVideo: boolean = false): Promise<void> {
+    async syncFileTagShortcuts(_handle: FileSystemDirectoryHandle, filename: string, tags: string[], _isVideo: boolean = false): Promise<void> {
         logInfo('FileSystem', '跳过批量标签快捷方式', `${filename} (${tags.length})`);
     },
 
     /**
      * 🚀 保存布局和设置到 settings/ 目录
      */
-    async saveSettings(handle: FileSystemDirectoryHandle, settings: Record<string, any>): Promise<void> {
+    async saveSettings(_handle: FileSystemDirectoryHandle, settings: Record<string, any>): Promise<void> {
         logInfo('FileSystem', '跳过文件系统设置保存', Object.keys(settings || {}).join(','));
     },
 
     /**
      * 🚀 加载布局和设置
      */
-    async loadSettings(handle: FileSystemDirectoryHandle): Promise<Record<string, any> | null> {
+    async loadSettings(_handle: FileSystemDirectoryHandle): Promise<Record<string, any> | null> {
         return null;
     },
 

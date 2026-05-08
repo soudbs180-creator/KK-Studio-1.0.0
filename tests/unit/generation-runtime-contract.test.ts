@@ -3,14 +3,55 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 
+import type {
+  CompleteRetryGeneratedMediaBatchParams,
+  PrepareInitialGenerationSubmissionContextResult,
+  RetryGeneratedMediaResultContext,
+  UseGenerationRuntimeDeps,
+  UseGenerationRuntimeResult,
+} from '../../src/app/useGenerationRuntime.ts';
+
 const ROOT_DIR = process.cwd();
-const APP_RETRY_NODE_END_MARKER = 'const updateEcommerceNodeState = useCallback';
+const APP_RETRY_NODE_END_MARKER = 'const {\n    updateEcommerceNodeState,';
+
+type GenerationRuntimePublicBoundary = {
+  deps: UseGenerationRuntimeDeps;
+  result: UseGenerationRuntimeResult;
+  initialSubmission: PrepareInitialGenerationSubmissionContextResult;
+  retryContext: RetryGeneratedMediaResultContext;
+  completeRetryBatch: CompleteRetryGeneratedMediaBatchParams;
+}
 
 function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
 describe('generation runtime extraction contract', () => {
+  test('generation runtime public boundary types are semantically checked', () => {
+    const generationRuntimeSource = readSource('src/app/useGenerationRuntime.ts');
+    const testConfigSource = readSource('tsconfig.tests.json');
+    const boundaryIsTypechecked: GenerationRuntimePublicBoundary | null = null;
+
+    assert.equal(boundaryIsTypechecked, null);
+    assert.match(generationRuntimeSource, /export interface UseGenerationRuntimeDeps \{/);
+    assert.match(generationRuntimeSource, /export interface UseGenerationRuntimeResult \{/);
+    assert.match(generationRuntimeSource, /export type PrepareInitialGenerationSubmissionContextResult =/);
+    assert.match(generationRuntimeSource, /export interface RetryGeneratedMediaResultContext \{/);
+    assert.match(generationRuntimeSource, /export interface CompleteRetryGeneratedMediaBatchParams extends Omit</);
+    assert.match(testConfigSource, /tests\/unit\/generation-runtime-contract\.test\.ts/);
+  });
+
+  test('generation runtime receives model display names through deps only', () => {
+    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+
+    assert.doesNotMatch(
+      hookSource,
+      /import\s+\{\s*resolveModelDisplayName\s*\}\s+from ['"]\.\.\/utils\/modelDisplayName['"];/,
+    );
+    assert.match(hookSource, /resolveModelDisplayName: \(modelId: string, fallbackLabel\?: string\) => string;/);
+    assert.match(hookSource, /modelLabel: params\.resolveModelDisplayName\(/);
+  });
+
   test('cancel generation ownership lives in useGenerationRuntime', () => {
     const hookPath = path.join(ROOT_DIR, 'src/app/useGenerationRuntime.ts');
     assert.equal(existsSync(hookPath), true, 'src/app/useGenerationRuntime.ts should exist');
@@ -81,11 +122,13 @@ describe('generation runtime extraction contract', () => {
     assert.match(hookSource, /refreshBilling,/);
     assert.match(hookSource, /adjustBalanceOptimistically\(-requiredCredits\)/);
 
-    assert.match(appSource, /ensureCreditAttemptCharged,[\s\S]*?resolveFailedCreditAttempt,[\s\S]*?applyOptimisticServerCreditDebit,/);
     assert.match(appSource, /consumeCreditsDetailed,/);
     assert.match(appSource, /refundCreditsByTransaction,/);
     assert.match(appSource, /refreshBilling,/);
     assert.match(appSource, /adjustBalanceOptimistically,/);
+    assert.doesNotMatch(appSource, /\bensureCreditAttemptCharged\b/);
+    assert.doesNotMatch(appSource, /\bresolveFailedCreditAttempt\b/);
+    assert.doesNotMatch(appSource, /\bapplyOptimisticServerCreditDebit\b/);
     assert.doesNotMatch(appSource, /const ensureCreditAttemptCharged = useCallback\(async/);
     assert.doesNotMatch(appSource, /const resolveFailedCreditAttempt = useCallback\(async/);
     assert.doesNotMatch(appSource, /const applyOptimisticServerCreditDebit = useCallback\(/);
@@ -938,10 +981,6 @@ describe('generation runtime extraction contract', () => {
       hookSource.indexOf('const executeRetryGeneratedMediaRequest = useCallback'),
       hookSource.indexOf('const applyRetryGeneratedMediaAuthoritativeBalance = useCallback'),
     );
-    const retryAttemptsSource = hookSource.slice(
-      hookSource.indexOf('const runRetryGeneratedMediaAttempts = useCallback'),
-      hookSource.indexOf('const prepareGenerationDraftContext = useCallback'),
-    );
     assert.match(hookSource, /prepareRetryVideoGenerationRequest: \(params: PrepareRetryVideoGenerationRequestParams\) => PrepareRetryVideoGenerationRequestResult;/);
     assert.match(hookSource, /const prepareRetryVideoGenerationRequest = useCallback\(\(params: PrepareRetryVideoGenerationRequestParams\)/);
     assert.match(hookSource, /if \(params\.executionNode\.videoResolution\) return params\.executionNode\.videoResolution;/);
@@ -973,11 +1012,6 @@ describe('generation runtime extraction contract', () => {
       hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
       hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
     );
-    const attemptRequestSource = hookSource.slice(
-      hookSource.indexOf('const executeRetryGeneratedMediaAttemptRequest = useCallback'),
-      hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
-    );
-
     assert.match(hookSource, /buildRetryVideoGenerationResultContext: \(params: BuildRetryVideoGenerationResultContextParams\) => BuildRetryVideoGenerationResultContextResult;/);
     assert.match(hookSource, /const buildRetryVideoGenerationResultContext = useCallback\(\(\s*params: BuildRetryVideoGenerationResultContextParams,\s*\): BuildRetryVideoGenerationResultContextResult => \{/);
     assert.match(hookSource, /const usage = params\.videoResult\.usage as/);
@@ -1287,10 +1321,6 @@ describe('generation runtime extraction contract', () => {
     );
     const assembleAttemptResultSource = hookSource.slice(
       hookSource.indexOf('const assembleRetryGeneratedMediaAttemptResult = useCallback'),
-      hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
-    );
-    const retryAttemptsSource = hookSource.slice(
-      hookSource.indexOf('const runRetryGeneratedMediaAttempts = useCallback'),
       hookSource.indexOf('const resolveRetryGeneratedMediaLayoutPrompt = useCallback'),
     );
     const completeBatchSource = hookSource.slice(

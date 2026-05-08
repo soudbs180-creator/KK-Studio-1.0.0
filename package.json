@@ -1,7 +1,7 @@
 {
   "name": "kk-studio",
   "private": true,
-  "version": "1.4.2",
+  "version": "1.4.5",
   "workspaces": [
     "packages/*"
   ],
@@ -38,6 +38,7 @@
     "governance:compat": "node scripts/governance/check-compatibility-registry.mjs",
     "governance:security": "node scripts/governance/check-sensitive-boundaries.mjs",
     "governance:check": "npm run governance:version && npm run governance:agent-docs && npm run governance:compat && npm run governance:security",
+    "audit:dependencies": "npm audit --omit=dev --audit-level=moderate && npm audit --omit=dev --audit-level=moderate --prefix payment-server",
     "typecheck:tests": "node scripts/ci/check-tests-types.mjs tsconfig.tests.json",
     "typecheck:payment-server": "node scripts/ci/check-payment-server.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.architecture.json && node scripts/ci/check-tests-types.mjs tsconfig.tests.json && npm run typecheck:payment-server",
@@ -50,7 +51,7 @@
     "test:contract": "node --test --test-isolation=none \"tests/contract/*.test.ts\"",
     "test:e2e": "node --test --test-isolation=none \"tests/e2e/*.test.ts\"",
     "test": "npm run test:unit && npm run test:integration && npm run test:contract && npm run test:e2e",
-    "verify:changes": "npm run architecture:check && npm run governance:check && npm run typecheck && npm run spec:check && npm run build && npm run test && npm run verify:prompt-group-drag && npm run verify:mobile-settings-smoke && npm run verify:desktop-settings-smoke && npm run verify:startup-runtime-banner-centering && npm run check:encoding",
+    "verify:changes": "npm run architecture:check && npm run governance:check && npm run audit:dependencies && npm run typecheck && npm run spec:check && npm run build && npm run test && npm run verify:prompt-group-drag && npm run verify:mobile-settings-smoke && npm run verify:desktop-settings-smoke && npm run verify:startup-runtime-banner-centering && npm run check:encoding",
     "preview": "vite preview --configLoader native",
     "clean": "node -e \"try{require('fs').rmSync('node_modules/.vite',{recursive:true})}catch(e){}\"",
     "check:encoding": "node scripts/ci/check-encoding.js"
@@ -90,7 +91,7 @@
     "@types/three": "^0.183.1",
     "@vitejs/plugin-react": "^6.0.1",
     "autoprefixer": "^10.4.27",
-    "postcss": "^8.5.8",
+    "postcss": "^8.5.13",
     "tailwindcss": "^4.2.2",
     "typescript": "~6.0.2",
     "vite": "^8.0.8"
@@ -108,6 +109,7 @@
     "tar": "7.5.13",
     "minimatch": "9.0.7",
     "picomatch": "4.0.4",
+    "protobufjs": "7.5.5",
     "qs": "6.15.0",
     "rollup": "4.60.1"
   }
