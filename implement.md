@@ -4,6 +4,18 @@ Last updated: 2026-05-09
 
 ## Operating Mode
 
+Current 1.4.5 release blocker audit (2026-05-09): close the hosted/VPS proxy, dependency audit, visible Chinese text, PromptBar QA, and clean-hosted-env guardrails needed before a formal 1.4.5 release. Use alternate git only. Keep this release audit split from unrelated canvas snap-to-grid and collapsed manual group dirty work.
+
+Release audit execution rules:
+- Stage and commit release audit files in narrow groups: security/proxy/dependency/VPS, UI/localization, and ledger updates.
+- Do not stage `.env.local`, `apps/api/.env.local`, `output/`, `.tmp*`, Playwright screenshots, or unrelated canvas snap/collapsed-group files.
+- Vercel proxy defaults must be HTTPS. Production proxy code must fail closed before sending Authorization, cookie, csrf, session, or token-like headers to an HTTP upstream.
+- Hosted builds must use same-origin HTTPS or an HTTPS VPS API domain. A local HTTP VPS base URL is allowed only as a local dirty snapshot and must block hosted preflight.
+- `VITE_TURNSTILE_LOCAL_BYPASS=true` is forbidden in hosted release snapshots. Real hosted Turnstile/OAuth/payment sidecar secrets must be supplied in the deployment environment, not committed.
+- Chinese visible UI fixes must be verified through `npm.cmd run check:encoding` and a focused visible-text contract. Technical terms such as `Turnstile`, `API Key`, `PPT`, `PPTX`, `Chrome`, and `Edge` may remain English.
+- UI release audit work requires real browser evidence. Record URL, viewport, theme, console/page errors, stale chunk count, `.theme-transitioning`, clipped button count, PromptBar active gradient evidence, and local sensitive-storage keys in `status.md`.
+- If `npm.cmd run release:hosted:check` fails only because local dirty env contains dev bypass or remote HTTP API base URL, record it as a release-environment blocker and do not weaken the guard.
+
 Current desktop snap-to-grid hotfix (2026-05-09): add the desktop left-toolbar snap toggle and route the enabled state into prompt, image, workflow utility, selected-node, and canvas-group drag commit paths. Keep the change scoped to canvas snap behavior, the toolbar control, focused contract coverage, and ledger updates. Do not stage or commit existing unrelated hosted/API/payment/PromptBar/settings/collapsed-group work.
 
 Snap-to-grid implementation rules:

@@ -5,6 +5,15 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
+Current 1.4.5 release blocker audit:
+- Treat the current alternate-git worktree as the 1.4.5 release candidate baseline, but keep unrelated canvas snap/collapsed-group work out of this release audit commit line.
+- Security/proxy milestone: move hosted `/api/v1/*`, `/api/auth/*`, `/api/manifest`, and `/healthz` onto tracked Vercel API functions backed by `api/_vpsProxy.ts`; default the upstream to HTTPS; dynamically derive upstream host/proto; and fail closed before forwarding Authorization, cookies, session, csrf, or token headers to a production HTTP upstream.
+- Hosted environment milestone: make `resolveKkApiBaseUrl()` prefer the HTTPS runtime origin when a hosted build still carries an HTTP remote VPS base URL, and make `release:hosted:check` block `VITE_TURNSTILE_LOCAL_BYPASS` plus remote HTTP `VITE_KK_API_BASE_URL` snapshots.
+- Dependency/VPS milestone: clear the `payment-server` moderate dependency audit by overriding `express-rate-limit` to `8.5.1`/`ip-address` `10.2.0`, and document secure cookie plus payment sidecar settlement/internal tokens in VPS env examples.
+- UI/localization milestone: keep PromptBar active toggles on `bg-[image:var(--prompt-bar-toggle-active-bg)]`, widen the 390px mobile model control, and replace remaining visible PendingNode English fallback text/alt strings with Simplified Chinese.
+- Browser QA milestone: run real Chromium QA across login, temporary local workspace, PromptBar/model menu, settings, recharge/balance entry, and 390px mobile surfaces. Record screenshots and JSON under `output/playwright/1.4.5-release-qa/`, but do not commit artifacts.
+- Release remains blocked until `npm.cmd run release:hosted:check` is rerun in a clean hosted environment without local `.env.local` dev bypass or remote HTTP API base URL, with real hosted OAuth/Turnstile/payment-sidecar secrets confirmed.
+
 Current desktop snap-to-grid hotfix:
 - Add a desktop-only snap-to-grid toggle to the left canvas toolbar.
 - The toolbar control uses a magnet icon, exposes a stable `canvas-snap-to-grid-toggle` test id, and reflects state through `aria-pressed`.

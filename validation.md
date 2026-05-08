@@ -4,6 +4,34 @@ Last updated: 2026-05-09
 
 Use `npm.cmd` for npm scripts on Windows.
 
+## 1.4.5 Release Blocker Audit Gate
+
+Use this gate when touching hosted Vercel proxy routes, VPS upstream security, release hosted preflight, payment-server dependency audit, visible Chinese text, PromptBar release QA, or VPS env examples:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/vercel-vps-proxy.test.ts" `
+  "tests/unit/kk-api-base-url-hosted-contract.test.ts" `
+  "tests/unit/hosted-release-guardrails.test.ts" `
+  "tests/unit/vps-deploy-artifacts.test.ts" `
+  "tests/unit/vps-deploy-contract.test.ts" `
+  "tests/unit/prompt-bar-layout-regression.test.ts" `
+  "tests/unit/encoding-check-contract.test.ts"
+npm.cmd run governance:check
+npm.cmd run audit:dependencies
+npm.cmd run spec:check
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run check:encoding
+npm.cmd run release:hosted:check
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check
+```
+
+Expected local result for `release:hosted:check`: it must fail while local `.env.local` contains `VITE_TURNSTILE_LOCAL_BYPASS=true` or a remote HTTP `VITE_KK_API_BASE_URL`. Treat that failure as the required clean-hosted-environment release blocker, not as a code failure. Before production release, rerun the same command in a clean hosted environment and require it to pass with HTTPS/same-origin API configuration plus real OAuth, Turnstile, and payment sidecar secrets.
+
+Browser QA for this gate must cover desktop dark/light and 390px mobile surfaces: login, temporary local workspace, storage selection/browser-cache path, PromptBar/model menu, active toggle gradient, settings, recharge/balance entry, mobile footer, and mobile settings/more sheet. Record screenshots and `release-qa-summary-refreshed.json` under `output/playwright/1.4.5-release-qa/`; do not commit `output/`.
+
 ## Desktop Canvas Snap-To-Grid Hotfix Gate
 
 Use this gate when touching the desktop left toolbar snap toggle, canvas snap helper, prompt/image/workflow card drag snapping, or selected-node movement snap behavior:
