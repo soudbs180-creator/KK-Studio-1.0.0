@@ -162,6 +162,42 @@ test('prompt bar normal action buttons share a flat shadow while the send button
   );
 });
 
+test('prompt bar model library and footer controls use frosted flat defaults with hover-only gradients and bright enabled toggles', () => {
+  const cssSource = readSource('src/index.css');
+  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const imageOptionsSource = readSource('src/components/image/ImageOptionsPanel.tsx');
+  const footerFrostRule = cssSource.match(/\.prompt-bar-footer-frost::before\s*\{[\s\S]*?\}/)?.[0] || '';
+
+  assert.match(cssSource, /--prompt-bar-liquid-bg:\s*rgba\(/);
+  assert.match(cssSource, /--prompt-bar-liquid-bg-hover:\s*linear-gradient\(/);
+  assert.match(cssSource, /--prompt-bar-liquid-group-bg:\s*rgba\(/);
+  assert.match(cssSource, /--prompt-bar-liquid-group-bg-hover:\s*linear-gradient\(/);
+  assert.match(cssSource, /\.prompt-bar-liquid-button:hover\s*\{[\s\S]*background:\s*var\(--prompt-bar-liquid-bg-hover\);/);
+  assert.match(cssSource, /\.prompt-bar-liquid-group:hover\s*\{[\s\S]*background:\s*var\(--prompt-bar-liquid-group-bg-hover\);/);
+  assert.match(cssSource, /\.prompt-bar-footer-frost::before\s*\{[\s\S]*inset:\s*-6px 0 0;/);
+  assert.doesNotMatch(footerFrostRule, /transform:/);
+  assert.doesNotMatch(cssSource, /--prompt-bar-liquid-bg:\s*linear-gradient\(/);
+  assert.doesNotMatch(cssSource, /--prompt-bar-liquid-group-bg:\s*linear-gradient\(/);
+
+  assert.match(promptBarSource, /const modelLibrarySurfaceStyle: React\.CSSProperties = \{/);
+  assert.match(promptBarSource, /const modelLibrarySearchSurfaceStyle: React\.CSSProperties = \{/);
+  assert.match(promptBarSource, /background:\s*'var\(--frost-card-framework-bg\)'/);
+  assert.match(promptBarSource, /WebkitBackdropFilter:\s*'blur\(var\(--frost-card-framework-blur\)\) saturate\(1\.18\)'/);
+  assert.match(promptBarSource, /style=\{\{ \.\.\.modelLibrarySearchSurfaceStyle, width: 'min\(22rem, calc\(100vw - 24px\)\)' \}\}/);
+  assert.match(promptBarSource, /style=\{\{ \.\.\.modelLibrarySurfaceStyle, borderRadius: '1rem' \}\}/);
+  assert.doesNotMatch(promptBarSource, /background:\s*'color-mix\(in srgb, var\(--bg-overlay\) 96%, transparent\)'/);
+  assert.match(promptBarSource, /rounded-md border transition-all text-\[11px\] font-medium \$\{config\.enableGrounding/);
+  assert.match(promptBarSource, /rounded-md border transition-all text-\[11px\] font-medium \$\{config\.enableImageSearch/);
+  assert.match(promptBarSource, /bg-\[image:var\(--prompt-bar-toggle-active-bg\)\]/);
+  assert.doesNotMatch(promptBarSource, /bg-\[var\(--prompt-bar-toggle-active-bg\)\]/);
+  assert.match(promptBarSource, /border-transparent text-\[var\(--text-secondary\)\]/);
+
+  assert.match(imageOptionsSource, /const ACTIVE_TOGGLE_STYLE: React\.CSSProperties = \{/);
+  assert.match(imageOptionsSource, /background:\s*'var\(--prompt-bar-toggle-active-bg\)'/);
+  assert.match(imageOptionsSource, /color:\s*'var\(--prompt-bar-toggle-active-text\)'/);
+  assert.match(imageOptionsSource, /boxShadow:\s*'var\(--prompt-bar-toggle-active-shadow\)'/);
+});
+
 test('mobile prompt footer stays single-row and lets controls overflow horizontally instead of wrapping', () => {
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
   const modePanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerModePanel.tsx');

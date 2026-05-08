@@ -112,13 +112,18 @@
   --prompt-bar-footer-frost-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(248, 250, 252, 0.26) 36%, rgba(248, 250, 252, 0.4) 100%);
   --prompt-bar-footer-frost-border: rgba(15, 23, 42, 0.08);
   --prompt-bar-footer-frost-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
-  --prompt-bar-liquid-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.62) 100%);
+  --prompt-bar-liquid-bg: rgba(255, 255, 255, 0.58);
   --prompt-bar-liquid-bg-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 250, 252, 0.7) 100%);
-  --prompt-bar-liquid-group-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.52) 0%, rgba(248, 250, 252, 0.34) 100%);
+  --prompt-bar-liquid-group-bg: rgba(255, 255, 255, 0.36);
+  --prompt-bar-liquid-group-bg-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.66) 0%, rgba(248, 250, 252, 0.42) 100%);
   --prompt-bar-liquid-border: rgba(255, 255, 255, 0.62);
   --prompt-bar-liquid-border-strong: rgba(15, 23, 42, 0.14);
   --prompt-bar-liquid-shadow: none;
   --prompt-bar-liquid-send-shadow: none;
+  --prompt-bar-toggle-active-bg: linear-gradient(135deg, rgb(255 77 139 / 0.22) 0%, rgb(255 176 132 / 0.20) 100%);
+  --prompt-bar-toggle-active-border: rgb(255 77 139 / 0.46);
+  --prompt-bar-toggle-active-text: var(--clay-brand-pink-ink, #8a123f);
+  --prompt-bar-toggle-active-shadow: 0 0 0 1px rgb(255 77 139 / 0.18);
 
   /* ===== 阴影 ===== */
   --shadow-sm: 0 8px 20px rgba(15, 23, 42, 0.06);
@@ -605,13 +610,18 @@ body.dark-mode {
   --prompt-bar-footer-frost-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(39, 42, 48, 0.2) 34%, rgba(24, 27, 31, 0.46) 100%);
   --prompt-bar-footer-frost-border: rgba(255, 255, 255, 0.1);
   --prompt-bar-footer-frost-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  --prompt-bar-liquid-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(39, 42, 48, 0.56) 100%);
+  --prompt-bar-liquid-bg: rgba(255, 255, 255, 0.08);
   --prompt-bar-liquid-bg-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(45, 48, 54, 0.62) 100%);
-  --prompt-bar-liquid-group-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(24, 27, 31, 0.42) 100%);
+  --prompt-bar-liquid-group-bg: rgba(255, 255, 255, 0.06);
+  --prompt-bar-liquid-group-bg-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(24, 27, 31, 0.42) 100%);
   --prompt-bar-liquid-border: rgba(255, 255, 255, 0.16);
   --prompt-bar-liquid-border-strong: rgba(255, 255, 255, 0.24);
   --prompt-bar-liquid-shadow: none;
   --prompt-bar-liquid-send-shadow: none;
+  --prompt-bar-toggle-active-bg: linear-gradient(135deg, rgb(255 176 132 / 0.24) 0%, rgb(255 77 139 / 0.20) 100%);
+  --prompt-bar-toggle-active-border: rgb(255 176 132 / 0.48);
+  --prompt-bar-toggle-active-text: var(--clay-brand-peach, #ffb084);
+  --prompt-bar-toggle-active-shadow: 0 0 0 1px rgb(255 176 132 / 0.20);
   --floating-shell-bg: linear-gradient(180deg, rgba(31, 31, 31, 0.96) 0%, rgba(20, 20, 20, 0.92) 100%);
   --floating-shell-bg-supported: rgba(31, 31, 31, 0.84);
   --floating-shell-border: rgba(255, 255, 255, 0.08);
@@ -2098,7 +2108,7 @@ body.dark-mode .input-bar {
 .prompt-bar-footer-frost::before {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: -6px 0 0;
   border-radius: inherit;
   background: var(--prompt-bar-footer-frost-bg);
   box-shadow: var(--prompt-bar-footer-frost-shadow);
@@ -2142,6 +2152,11 @@ body.dark-mode .input-bar {
   background: var(--prompt-bar-liquid-group-bg);
   border-color: var(--prompt-bar-liquid-border);
   box-shadow: var(--prompt-bar-liquid-shadow);
+}
+
+.prompt-bar-liquid-group:hover {
+  background: var(--prompt-bar-liquid-group-bg-hover);
+  border-color: var(--prompt-bar-liquid-border-strong);
 }
 
 .prompt-bar-liquid-send {
