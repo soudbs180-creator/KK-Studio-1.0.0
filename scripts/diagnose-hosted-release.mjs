@@ -31,6 +31,7 @@ const hostedFrontendForbidden = [
   "VITE_ENABLE_LEGACY_WEB_API_FALLBACK",
   "VITE_SUPABASE_URL",
   "VITE_SUPABASE_ANON_KEY",
+  "VITE_TURNSTILE_LOCAL_BYPASS",
 ];
 
 const hostedApiRequired = [
@@ -200,6 +201,16 @@ function pushMissingEnvChecks(remoteChecks, label, snapshots, keys) {
   });
 }
 
+function isRemoteHttpUrl(value) {
+  try {
+    const url = new URL(String(value || "").trim());
+    return url.protocol === "http:"
+      && !["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function run() {
   const snapshots = collectEnvSnapshots(rootPath, { includeFunctionEnv: false });
   const frontendSnapshots = snapshots.frontendSnapshots;
@@ -292,9 +303,13 @@ function run() {
   hostedFrontendForbidden.forEach((key) => {
     const value = getEffectiveValue(frontendSnapshots, key);
     if (value && String(value.value || "").trim()) {
-      warnings.push(`Hosted frontend forbidden env ${key} is present in the local snapshot via ${value.source}. Keep hosted builds on the VPS API path and do not copy this into Vercel.`);
+      blockers.push(`Hosted frontend forbidden env ${key} is present in the local snapshot via ${value.source}. Use a clean hosted build environment and do not copy local/dev bypass flags into Vercel.`);
     }
   });
+  const hostedApiBaseUrl = getEffectiveValue(frontendSnapshots, "VITE_KK_API_BASE_URL");
+  if (hostedApiBaseUrl && isRemoteHttpUrl(hostedApiBaseUrl.value)) {
+    blockers.push(`Hosted frontend VITE_KK_API_BASE_URL must be HTTPS or same-origin. Current local snapshot via ${hostedApiBaseUrl.source} points at remote HTTP.`);
+  }
   const misplacedRootServerEnv = findSnapshotEntries(frontendSnapshots, [
     "DATABASE_URL",
     "USER_API_ENCRYPTION_SECRET",

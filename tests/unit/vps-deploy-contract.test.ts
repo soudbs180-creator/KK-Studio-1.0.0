@@ -43,6 +43,10 @@ test("VPS bootstrap and deploy assets exist for the postgres-first runtime", () 
   assert.match(readSource(deployScript), /bootstrap-kk-vps\.sql/);
   assert.match(apiEnvSource, /TURNSTILE_SECRET_KEY=/);
   assert.match(apiEnvSource, /KK_AUTH_REQUIRE_TURNSTILE=/);
+  assert.match(apiEnvSource, /KK_SESSION_COOKIE_SECURE=true/);
+  assert.match(apiEnvSource, /KK_SESSION_COOKIE_SAME_SITE=lax/);
+  assert.match(apiEnvSource, /PAYMENT_SIDECAR_INTERNAL_TOKEN=/);
+  assert.match(apiEnvSource, /PAYMENT_SIDECAR_SETTLEMENT_TOKEN=/);
   assert.match(readSource(webEnv), /VITE_KK_API_BASE_URL=/);
   assert.match(readSource(webEnv), /VITE_KK_ADMIN_URL=/);
   assert.match(readSource(adminWebEnv), /VITE_KK_ADMIN_API_BASE_URL=/);

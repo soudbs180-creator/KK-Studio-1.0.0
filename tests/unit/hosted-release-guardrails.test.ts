@@ -9,7 +9,7 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), "utf-8");
 }
 
-test("vercel production rewrites hosted BFF routes to the VPS gateway", () => {
+test("vercel production proxies hosted BFF routes without forwarding the public Host header", () => {
   const configPath = path.join(ROOT_DIR, "vercel.json");
 
   assert.equal(existsSync(configPath), true, "vercel.json should exist");
@@ -17,13 +17,38 @@ test("vercel production rewrites hosted BFF routes to the VPS gateway", () => {
     rewrites?: Array<{ source?: string; destination?: string }>;
   };
 
-  assert.ok(Array.isArray(config.rewrites), "vercel.json should define rewrites");
-  assert.deepEqual(config.rewrites.slice(0, 4), [
-    { source: "/api/v1/:path*", destination: "http://172.245.156.16/api/v1/:path*" },
-    { source: "/api/auth/:path*", destination: "http://172.245.156.16/api/auth/:path*" },
-    { source: "/healthz", destination: "http://172.245.156.16/healthz" },
-    { source: "/api/manifest", destination: "http://172.245.156.16/api/manifest" },
+  const rewrites = Array.isArray(config.rewrites) ? config.rewrites : [];
+  assert.equal(
+    rewrites.some((rewrite) => String(rewrite.destination || "").startsWith("http://172.245.156.16")),
+    false,
+    "Vercel must not externally rewrite to the VPS because the original Host header makes the VPS redirect to kkai.plus",
+  );
+  assert.deepEqual(rewrites, [
+    { source: "/healthz", destination: "/api/healthz" },
   ]);
+
+  [
+    "api/_vpsProxy.ts",
+    "api/v1.ts",
+    "api/v1/[...path].ts",
+    "api/auth.ts",
+    "api/auth/[...path].ts",
+    "api/manifest.ts",
+    "api/healthz.ts",
+  ].forEach((relativePath) => {
+    assert.equal(existsSync(path.join(ROOT_DIR, relativePath)), true, `${relativePath} should exist`);
+  });
+
+  const proxySource = readSource("api/_vpsProxy.ts");
+  assert.match(proxySource, /const HOP_BY_HOP_REQUEST_HEADERS = new Set/);
+  assert.match(proxySource, /['"]host['"]/);
+  assert.match(proxySource, /const DEFAULT_VPS_API_BASE_URL = 'https:\/\//);
+  assert.doesNotMatch(proxySource, /DEFAULT_VPS_API_BASE_URL = 'http:\/\//);
+  assert.match(proxySource, /export async function proxyToVps/);
+  assert.match(proxySource, /new URL\(upstreamPath, resolveVpsApiBaseUrl\(\)\)/);
+  assert.match(proxySource, /upstreamUrl\.host/);
+  assert.match(proxySource, /upstreamUrl\.protocol/);
+  assert.match(proxySource, /UPSTREAM_REQUIRES_HTTPS/);
 });
 
 test("hosted preflight checks verify VPS API and PostgreSQL prerequisites without Supabase release dependencies", () => {
@@ -31,7 +56,7 @@ test("hosted preflight checks verify VPS API and PostgreSQL prerequisites withou
 
   assert.match(source, /from "\.\/lib\/env-contract\.mjs";/);
   assert.match(source, /const hostedFrontendRequired = \[\s*"VITE_KK_API_BASE_URL",\s*\];/);
-  assert.match(source, /const hostedFrontendForbidden = \[\s*"VITE_ENABLE_LEGACY_WEB_API_FALLBACK",\s*"VITE_SUPABASE_URL",\s*"VITE_SUPABASE_ANON_KEY",\s*\];/);
+  assert.match(source, /const hostedFrontendForbidden = \[\s*"VITE_ENABLE_LEGACY_WEB_API_FALLBACK",\s*"VITE_SUPABASE_URL",\s*"VITE_SUPABASE_ANON_KEY",\s*"VITE_TURNSTILE_LOCAL_BYPASS",\s*\];/);
   assert.match(source, /const frontendSnapshots = snapshots\.frontendSnapshots;/);
   assert.match(source, /const localApiSnapshots = snapshots\.apiSnapshots;/);
   assert.match(source, /label: "vercel whoami"/);
@@ -51,6 +76,9 @@ test("hosted preflight checks verify VPS API and PostgreSQL prerequisites withou
   assert.match(source, /Vercel authentication is unavailable\./);
   assert.doesNotMatch(source, /Supabase authentication is unavailable\./);
   assert.match(source, /It does not read remote VPS or Vercel dashboard state\./);
+  assert.match(source, /Hosted frontend forbidden env \$\{key\} is present/);
+  assert.match(source, /Hosted frontend VITE_KK_API_BASE_URL must be HTTPS or same-origin/);
+  assert.match(source, /isRemoteHttpUrl/);
 });
 
 test("hosted release workflow deploys the VPS API before deploying the frontend", () => {

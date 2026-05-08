@@ -62,11 +62,37 @@ function shouldPreferRuntimeOriginForLocalApi(
   }
 }
 
+function shouldPreferRuntimeOriginForHostedHttpApi(
+  configuredBaseUrl: string,
+  runtimeOrigin?: string,
+): boolean {
+  if (!runtimeOrigin) {
+    return false;
+  }
+
+  try {
+    const configuredUrl = new URL(configuredBaseUrl);
+    const runtimeUrl = new URL(runtimeOrigin);
+
+    return runtimeUrl.protocol === "https:"
+      && configuredUrl.protocol === "http:"
+      && !isLoopbackHostname(configuredUrl.hostname)
+      && !isPrivateNetworkHostname(configuredUrl.hostname)
+      && !isLoopbackHostname(runtimeUrl.hostname)
+      && !isPrivateNetworkHostname(runtimeUrl.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function resolveKkApiBaseUrl(): string {
   const configuredBaseUrl = readRuntimeEnv("VITE_KK_API_BASE_URL") || "";
   const runtimeOrigin = readRuntimeOrigin();
   if (configuredBaseUrl) {
     if (shouldPreferRuntimeOriginForLocalApi(configuredBaseUrl, runtimeOrigin)) {
+      return runtimeOrigin!;
+    }
+    if (shouldPreferRuntimeOriginForHostedHttpApi(configuredBaseUrl, runtimeOrigin)) {
       return runtimeOrigin!;
     }
     return configuredBaseUrl;
