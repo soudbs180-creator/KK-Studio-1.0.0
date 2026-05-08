@@ -7,6 +7,7 @@ import {
     Grid3x3,
     Layers,
     LayoutDashboard,
+    Magnet,
     Maximize2,
     Moon,
     Search,
@@ -28,10 +29,12 @@ interface ProjectManagerProps {
     onFitToAll: () => void;
     onResetView: () => void;
     onToggleGrid: () => void;
+    onToggleSnapToGrid: () => void;
     onAutoArrange: () => void;
     onToggleChat?: () => void;
     isChatOpen?: boolean;
     showGrid?: boolean;
+    showSnapToGrid?: boolean;
     onOpenProfile?: () => void;
     mobilePromptOptimizationEnabled?: boolean;
     mobilePromptOptimizationSupported?: boolean;
@@ -48,8 +51,10 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     onFitToAll,
     onResetView,
     onToggleGrid,
+    onToggleSnapToGrid,
     onAutoArrange,
     showGrid = true,
+    showSnapToGrid = false,
 }) => {
     const {
         state,
@@ -804,6 +809,20 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         tabIndex={-1}
                     >
                         {showGrid ? <Grid3x3 size={20} /> : <Square size={20} />}
+                    </button>
+
+                    <button
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            onToggleSnapToGrid();
+                        }}
+                        className={`${desktopIconButtonClass} ${showSnapToGrid ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
+                        title={showSnapToGrid ? '关闭吸附' : '开启吸附'}
+                        aria-pressed={showSnapToGrid}
+                        data-testid="canvas-snap-to-grid-toggle"
+                        tabIndex={-1}
+                    >
+                        <Magnet size={20} />
                     </button>
 
                     <button

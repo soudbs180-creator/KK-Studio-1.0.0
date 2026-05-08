@@ -20,6 +20,7 @@ import { getResolvedCreditCost, isCreditBillingTarget } from '../../utils/credit
 import { resolveModelDisplayName } from '../../utils/modelDisplayName';
 import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
 import { base64ToBlob, generateDownloadFilename, triggerDownload } from '../../utils/downloadUtils';
+import { snapCanvasPointToGrid } from '../../utils/canvasSnapToGrid';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -94,6 +95,7 @@ interface ImageNodeProps {
     onDragStateChange?: (dragging: boolean) => void;
     isNew?: boolean; // 🚀 [New] 是否为刚生成的图片
     isCanvasTransforming?: boolean;
+    snapToGrid?: boolean;
     isChatMode?: boolean; // 🚀 [New Prop] 渲染为垂直聊天流中的标准块
 }
 
@@ -131,6 +133,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     onDragStateChange,
     isNew = false, // 🚀 [New] 是否为新生成的图片
     isCanvasTransforming = false,
+    snapToGrid = false,
     canvasTransform, // 🚀 [New] 用于计算动画起始位置
     isChatMode = false // 🚀 [New] 垂直聊天流标识
 }) => {
@@ -1058,10 +1061,10 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             }
 
             // Keep the card on the exact pointer trajectory instead of accumulating per-frame deltas.
-            const newPos = {
+            const newPos = snapCanvasPointToGrid({
                 x: dragStartCanvasPos.current.x + (dx / scale),
                 y: dragStartCanvasPos.current.y + (dy / scale)
-            };
+            }, { enabled: snapToGrid });
             const stepX = newPos.x - localPosRef.current.x;
             const stepY = newPos.y - localPosRef.current.y;
 
@@ -1142,6 +1145,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         originX,
         originY,
         onLivePositionChange,
+        snapToGrid,
     ]);
 
     // 🚀 [New] Alias Editing Logic
@@ -1965,6 +1969,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         prev.shadowBoost === next.shadowBoost &&
         prev.isVisible === next.isVisible &&
         prev.isCanvasTransforming === next.isCanvasTransforming &&
+        prev.snapToGrid === next.snapToGrid &&
         prev.isNew === next.isNew
     );
 });

@@ -1,8 +1,45 @@
 # KK-Studio v1.4.5 Single-Line Validation Matrix
 
-Last updated: 2026-05-08
+Last updated: 2026-05-09
 
 Use `npm.cmd` for npm scripts on Windows.
+
+## Desktop Canvas Snap-To-Grid Hotfix Gate
+
+Use this gate when touching the desktop left toolbar snap toggle, canvas snap helper, prompt/image/workflow card drag snapping, or selected-node movement snap behavior:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/canvas-snap-to-grid-contract.test.ts" `
+  "tests/unit/canvas-movement-contract.test.ts"
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git diff --check -- `
+  "src/utils/canvasSnapToGrid.ts" `
+  "tests/unit/canvas-snap-to-grid-contract.test.ts" `
+  "tsconfig.tests.json" `
+  "src/components/settings/ProjectManager.tsx" `
+  "src/App.tsx" `
+  "src/context/canvasMovement.ts" `
+  "src/context/canvasContextState.ts" `
+  "src/context/CanvasContext.tsx" `
+  "src/app/usePromptGroupDragHandlers.ts" `
+  "src/components/canvas/PromptNodeComponent.tsx" `
+  "src/components/image/ImageCard2.tsx" `
+  "src/workflow/nodes/WorkflowUtilityCard.tsx" `
+  "src/workflow/nodes/PreviewNodeCard.tsx" `
+  "src/workflow/nodes/SaveNodeCard.tsx" `
+  "src/workflow/nodes/AgentNodeCard.tsx" `
+  "tests/unit/canvas-movement-contract.test.ts" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA is required because this changes visible desktop UI. Record the URL, viewport, theme, left-toolbar snap control, `aria-pressed` toggle, `.theme-transitioning`, stale chunk status, and console errors in `status.md`. If the in-app Browser is blocked, record that and use the repository Playwright/headless-browser fallback.
 
 ## Hosted Production Startup Hotfix Gate
 

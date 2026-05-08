@@ -51,7 +51,7 @@ import { cleanupInvalidCanvasCardsForCanvas, type CleanupInvalidCardsSummary } f
 import { resolveNextCardPosition, resolveNextGroupPosition, resolveSmartCanvasPosition } from './canvasPlacement';
 import { bringCanvasNodesToFront } from './canvasLayering';
 import { addCanvasGroupToCanvas, removeCanvasGroupFromCanvas, updateCanvasGroupInCanvas } from './canvasGroups';
-import { moveSelectedCanvasNodes } from './canvasMovement';
+import { moveSelectedCanvasNodes, type CanvasMoveOptions } from './canvasMovement';
 import { setCanvasNodeTags } from './canvasTags';
 import {
     addCanvasPromptNode,
@@ -2205,7 +2205,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Layering is now driven by view-only group tiers in App.tsx.
     // Keep persisted zIndex stable so selection and generation do not continuously inflate stored order.
 
-    const applyMoveSelectedNodes = useCallback((delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => {
+    const applyMoveSelectedNodes = useCallback((delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[], options?: CanvasMoveOptions) => {
         setState(prev => {
             const currentCanvas = prev.canvases.find(c => c.id === prev.activeCanvasId);
             if (!currentCanvas) return prev;
@@ -2215,6 +2215,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 selectedNodeIds: prev.selectedNodeIds || [],
                 delta,
                 sourceNodeIdOrIds,
+                options,
             });
             if (movedCanvas === currentCanvas) return prev;
 
@@ -2228,9 +2229,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const pendingMoveDeltaRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
     const pendingMoveSourceRef = useRef<string | string[] | undefined>(undefined);
+    const pendingMoveOptionsRef = useRef<CanvasMoveOptions | undefined>(undefined);
     const moveRafRef = useRef<number | null>(null);
 
-    const flushPendingMoveSelectedNodes = useCallback((delta?: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => {
+    const flushPendingMoveSelectedNodes = useCallback((delta?: { x: number; y: number }, sourceNodeIdOrIds?: string | string[], options?: CanvasMoveOptions) => {
         if (moveRafRef.current !== null) {
             cancelAnimationFrame(moveRafRef.current);
             moveRafRef.current = null;
@@ -2241,16 +2243,18 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             y: pendingMoveDeltaRef.current.y + (delta?.y ?? 0),
         };
         const batchedSource = sourceNodeIdOrIds ?? pendingMoveSourceRef.current;
+        const batchedOptions = options ?? pendingMoveOptionsRef.current;
 
         pendingMoveDeltaRef.current = { x: 0, y: 0 };
         pendingMoveSourceRef.current = undefined;
+        pendingMoveOptionsRef.current = undefined;
 
         if (batchedDelta.x !== 0 || batchedDelta.y !== 0) {
-            applyMoveSelectedNodes(batchedDelta, batchedSource);
+            applyMoveSelectedNodes(batchedDelta, batchedSource, batchedOptions);
         }
     }, [applyMoveSelectedNodes]);
 
-    const moveSelectedNodes = useCallback((delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => {
+    const moveSelectedNodes = useCallback((delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[], options?: CanvasMoveOptions) => {
         pendingMoveDeltaRef.current = {
             x: pendingMoveDeltaRef.current.x + delta.x,
             y: pendingMoveDeltaRef.current.y + delta.y,
@@ -2258,6 +2262,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         if (sourceNodeIdOrIds !== undefined) {
             pendingMoveSourceRef.current = sourceNodeIdOrIds;
+        }
+        if (options !== undefined) {
+            pendingMoveOptionsRef.current = options;
         }
 
         if (moveRafRef.current !== null) {
@@ -2270,8 +2277,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
     }, [flushPendingMoveSelectedNodes]);
 
-    const moveSelectedNodesImmediate = useCallback((delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => {
-        flushPendingMoveSelectedNodes(delta, sourceNodeIdOrIds);
+    const moveSelectedNodesImmediate = useCallback((delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[], options?: CanvasMoveOptions) => {
+        flushPendingMoveSelectedNodes(delta, sourceNodeIdOrIds, options);
     }, [flushPendingMoveSelectedNodes]);
 
     useEffect(() => {

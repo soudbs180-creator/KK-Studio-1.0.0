@@ -190,6 +190,7 @@ type SharedImageNodeProps = Pick<
   | 'isCanvasTransforming'
   | 'isNew'
   | 'canvasTransform'
+  | 'snapToGrid'
 >;
 
 type ConnectorDisconnectButtonProps = {
@@ -404,6 +405,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   const handleFitToAll = () => canvasRef.current?.fitToAll();
 
   const handleToggleGrid = () => setShowGrid(prev => !prev);
+  const handleToggleSnapToGrid = () => setSnapToGrid(prev => !prev);
 
 
 
@@ -650,6 +652,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   const [settingsInitialSupplier, setSettingsInitialSupplier] = useState<Supplier | null>(null);
   const [settingsPanelSessionKey, setSettingsPanelSessionKey] = useState(0);
   const [showGrid, setShowGrid] = useState(true);
+  const [snapToGrid, setSnapToGrid] = useState(false);
   const [promptBarUiBusy, setPromptBarUiBusy] = useState(false);
   const openSettingsPanel = useCallback((
     view: SettingsSurfaceView = 'api-management',
@@ -3214,6 +3217,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     isCanvasTransforming,
     isNew: (nowTimestamp || Date.now()) - (image.timestamp || 0) < 10000,
     canvasTransform,
+    snapToGrid,
   }), [
     activeSourceImage,
     canvasTransform,
@@ -3226,6 +3230,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     isCanvasTransforming,
     isMobile,
     nowTimestamp,
+    snapToGrid,
     updateImageNode,
     updateImageNodeDisplayMeta,
     updateImageNodePosition,
@@ -3473,6 +3478,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     clearPromptGroupRegroup,
     applyLiveNodeDeltaToDraggedSet,
     moveSelectedNodesImmediate,
+    snapToGrid,
     commitPromptGroupDrag,
   });
 
@@ -3588,11 +3594,11 @@ const AppContent: React.FC<AppContentProps> = () => {
           if (!sourceNodeId) return;
 
           if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0) {
-            moveSelectedNodesImmediate(delta, expandedSelectedNodeIds);
+            moveSelectedNodesImmediate(delta, expandedSelectedNodeIds, { snapToGrid });
             return;
           }
 
-          moveSelectedNodesImmediate(delta, sourceNodeId);
+          moveSelectedNodesImmediate(delta, sourceNodeId, { snapToGrid });
         }}
       />
     );
@@ -3609,6 +3615,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     moveSelectedNodesImmediate,
     resolveLiveImagePosition,
     selectedNodeIds,
+    snapToGrid,
   ]);
 
   const renderPromptGroupWorkflowItem = useCallback((item: PromptGroupRenderItem) => {
@@ -3699,6 +3706,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           onClickPrompt={handlePromptClick}
           onConnectStart={handleConnectStart}
           zoomScale={canvasTransform.scale}
+          snapToGrid={snapToGrid}
           isCanvasTransforming={isCanvasTransforming}
           isMobile={isMobile}
           sourcePosition={sourceImageNode ? (resolveLiveImagePosition(sourceImageNode) ?? sourceImageNode.position) : undefined}
@@ -3801,6 +3809,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     resolveLiveImagePosition,
     resolveLivePromptPosition,
     selectedNodeIds,
+    snapToGrid,
     updatePromptNodePosition,
   ]);
 
@@ -3810,6 +3819,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       isSelected={selectedNodeIds.includes(item.node.id)}
       highlighted={highlightedId === item.node.id}
       zoomScale={canvasTransform.scale}
+      snapToGrid={snapToGrid}
       onSelect={() => handleCanvasNodeSelect(item.node.id)}
       onBringToFront={() => bringNodesToFront([item.node.id])}
       onDelete={deleteWorkflowNode}
@@ -3824,6 +3834,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     handleWorkflowPreviewAction,
     highlightedId,
     selectedNodeIds,
+    snapToGrid,
     updateWorkflowNodePosition,
   ]);
 
@@ -3833,6 +3844,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       isSelected={selectedNodeIds.includes(item.node.id)}
       highlighted={highlightedId === item.node.id}
       zoomScale={canvasTransform.scale}
+      snapToGrid={snapToGrid}
       onSelect={() => handleCanvasNodeSelect(item.node.id)}
       onBringToFront={() => bringNodesToFront([item.node.id])}
       onDelete={deleteWorkflowNode}
@@ -3849,6 +3861,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     handleWorkflowSaveAction,
     highlightedId,
     selectedNodeIds,
+    snapToGrid,
     updateWorkflowNodePosition,
   ]);
 
@@ -3858,6 +3871,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       isSelected={selectedNodeIds.includes(item.node.id)}
       highlighted={highlightedId === item.node.id}
       zoomScale={canvasTransform.scale}
+      snapToGrid={snapToGrid}
       onSelect={() => handleCanvasNodeSelect(item.node.id)}
       onBringToFront={() => bringNodesToFront([item.node.id])}
       onDelete={deleteWorkflowNode}
@@ -3872,6 +3886,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     handleWorkflowAgentAction,
     highlightedId,
     selectedNodeIds,
+    snapToGrid,
     updateWorkflowNodePosition,
   ]);
 
@@ -3979,7 +3994,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
           selectNodes(nodeIds, 'toggle');
         }}
-        onGroupDrag={(delta, sourceNodeIds) => moveSelectedNodesImmediate(delta, sourceNodeIds)}
+        onGroupDrag={(delta, sourceNodeIds) => moveSelectedNodesImmediate(delta, sourceNodeIds, { snapToGrid })}
         onDragStateChange={handleCanvasNodeDragStateChange}
         onUpdateGroup={updateGroup}
         computedBounds={getComputedGroupBounds(group)}
@@ -3995,6 +4010,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     removeGroup,
     selectNodes,
     selectedNodeIds,
+    snapToGrid,
     updateGroup,
     visibleGroups,
   ]);
@@ -4266,7 +4282,9 @@ const AppContent: React.FC<AppContentProps> = () => {
       onFitToAll={handleFitToAll}
       onResetView={handleResetView}
       onToggleGrid={handleToggleGrid}
+      onToggleSnapToGrid={handleToggleSnapToGrid}
       showGrid={showGrid}
+      showSnapToGrid={snapToGrid}
       onAutoArrange={handleAutoArrange}
       onToggleChat={toggleChatPanel}
       isChatOpen={isChatOpen}

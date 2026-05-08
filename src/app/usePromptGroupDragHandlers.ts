@@ -10,7 +10,8 @@ interface UsePromptGroupDragHandlersArgs {
   beginPromptGroupRegroup: (groupId: string, childImages: GeneratedImage[]) => void;
   clearPromptGroupRegroup: (groupId: string) => void;
   applyLiveNodeDeltaToDraggedSet: (sourceNodeId: string, nodeIds: string[], delta: Point) => void;
-  moveSelectedNodesImmediate: (delta: Point, sourceNodeIdOrIds?: string | string[]) => void;
+  moveSelectedNodesImmediate: (delta: Point, sourceNodeIdOrIds?: string | string[], options?: { snapToGrid?: boolean }) => void;
+  snapToGrid?: boolean;
   commitPromptGroupDrag: (
     node: PromptNode,
     childImages: GeneratedImage[],
@@ -49,6 +50,7 @@ export function usePromptGroupDragHandlers({
   clearPromptGroupRegroup,
   applyLiveNodeDeltaToDraggedSet,
   moveSelectedNodesImmediate,
+  snapToGrid = false,
   commitPromptGroupDrag,
 }: UsePromptGroupDragHandlersArgs) {
   const handlePromptGroupDragDelta = React.useCallback(({
@@ -102,7 +104,7 @@ export function usePromptGroupDragHandlers({
 
     if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0 && selectedNodeIds.length > 1) {
       clearPromptGroupRegroup(node.id);
-      moveSelectedNodesImmediate(delta, expandedSelectedNodeIds);
+      moveSelectedNodesImmediate(delta, expandedSelectedNodeIds, { snapToGrid });
       return;
     }
 
@@ -119,6 +121,7 @@ export function usePromptGroupDragHandlers({
     moveSelectedNodesImmediate,
     selectedNodeIds,
     shouldAutoRegroupPromptGroup,
+    snapToGrid,
   ]);
 
   const handlePromptGroupChildDragDelta = React.useCallback(({
@@ -154,16 +157,17 @@ export function usePromptGroupDragHandlers({
     clearPromptGroupRegroup(groupId);
 
     if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 1) {
-      moveSelectedNodesImmediate(delta, expandedSelectedNodeIds);
+      moveSelectedNodesImmediate(delta, expandedSelectedNodeIds, { snapToGrid });
       return;
     }
 
-    moveSelectedNodesImmediate(delta, [sourceNodeId]);
+    moveSelectedNodesImmediate(delta, [sourceNodeId], { snapToGrid });
   }, [
     clearPromptGroupRegroup,
     expandedSelectedNodeIds,
     moveSelectedNodesImmediate,
     selectedNodeIds,
+    snapToGrid,
   ]);
 
   return {

@@ -8,6 +8,7 @@ interface SaveNodeCardProps {
   isSelected?: boolean;
   highlighted?: boolean;
   zoomScale?: number;
+  snapToGrid?: boolean;
   onSelect?: () => void;
   onBringToFront?: () => void;
   onDelete?: (id: string) => void;

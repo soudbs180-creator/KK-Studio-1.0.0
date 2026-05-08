@@ -1,8 +1,21 @@
 # KK-Studio v1.4.5 Implementation Rules
 
-Last updated: 2026-05-08
+Last updated: 2026-05-09
 
 ## Operating Mode
+
+Current desktop snap-to-grid hotfix (2026-05-09): add the desktop left-toolbar snap toggle and route the enabled state into prompt, image, workflow utility, selected-node, and canvas-group drag commit paths. Keep the change scoped to canvas snap behavior, the toolbar control, focused contract coverage, and ledger updates. Do not stage or commit existing unrelated hosted/API/payment/PromptBar/settings/collapsed-group work.
+
+Snap-to-grid implementation rules:
+- The snap grid size is the visible canvas grid size, currently 16 canvas units.
+- Disabled snap must preserve existing free-drag behavior exactly.
+- Invalid coordinates or invalid grid sizes must be returned unchanged.
+- Apply snapping after pointer-to-canvas coordinate conversion and before persisted position updates.
+- Do not apply render/pixel rounding to already snapped persisted workflow positions; render-only pixel alignment must stay separate from canvas position storage.
+- Multi-selected drag commits must snap each moved node's final position independently when snap is enabled, not only snap the source card delta.
+- Desktop toolbar state must be accessible through `aria-pressed` and a stable `data-testid`.
+- UI evidence is required before commit. Prefer the Codex in-app Browser; if it is blocked, record the blocker and use the repository Playwright/headless-browser fallback with URL, viewport, theme, checked surfaces, `.theme-transitioning`, stale chunk text, and console-error status.
+- Stage only snap-to-grid files plus ledger files, with patch staging if a file also contains unrelated dirty work.
 
 Completed provider compatibility override (2026-05-08): GPT Best priority compatibility from `https://gpt-best.apifox.cn/llms.txt` is committed in `fe99e829`. M131 prompt optimizer cache/logging redaction is committed in `dade1de4`. The active slice is M132 shared local user-route auth inference. Keep changes path-limited to the local user-route auth helper, diagnostics auth inference, focused local user-route contracts, and ledgers. Do not change endpoint call-site behavior, fetch execution, fallback ordering, key storage, provider persistence, billing/payment behavior, storage persistence, UI, release metadata, or broad adapter refactors in this slice.
 

@@ -1,9 +1,16 @@
 # KK-Studio v1.4.5 Single-Line Convergence Plan
 
-Last updated: 2026-05-08
+Last updated: 2026-05-09
 Branch policy: continue on the current branch and current workspace unless the user explicitly asks for a branch or worktree.
 
 ## Summary
+
+Current desktop snap-to-grid hotfix:
+- Add a desktop-only snap-to-grid toggle to the left canvas toolbar.
+- The toolbar control uses a magnet icon, exposes a stable `canvas-snap-to-grid-toggle` test id, and reflects state through `aria-pressed`.
+- When enabled, dragging prompt cards, image cards, workflow utility cards, selected companion cards, and selected canvas groups snaps the stored canvas position to the visible 16 px canvas grid.
+- Acceptance: focused snap-to-grid and canvas-movement contracts pass, `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and path-limited `diff --check` pass; browser QA records URL, viewport, theme, checked surface, `.theme-transitioning`, stale chunk status, and console errors.
+- Commit scope must stay limited to the snap helper, toolbar state/wiring, affected card drag props, shared movement helper snap options, the focused contracts, `tsconfig.tests.json` test registration, and ledger files. Existing unrelated dirty files and collapsed canvas group work are excluded.
 
 Completed provider compatibility override after the ecommerce framework card closure:
 - Verify GPT Best against the live Apifox `llms.txt` source before changing local routing.

@@ -13,6 +13,7 @@ type CanvasMovementModule = {
     selectedNodeIds: string[];
     delta: { x: number; y: number };
     sourceNodeIdOrIds?: string | string[];
+    snapToGrid?: boolean;
   }) => Canvas;
   resolveMoveSelectedCanvasNodeIds: (selectedNodeIds: string[], sourceNodeIdOrIds?: string | string[]) => string[];
 };
@@ -220,6 +221,38 @@ test('movement only moves selected workflow utility nodes', async () => {
   assert.deepEqual(result.workflow?.nodes.find((node) => node.id === 'preview-1')?.position, { x: 22, y: 23 });
   assert.deepEqual(result.workflow?.nodes.find((node) => node.id === 'video-1')?.position, { x: 30, y: 30 });
   assert.deepEqual(result.workflow?.nodes.find((node) => node.id === 'prompt-workflow')?.position, { x: 40, y: 40 });
+});
+
+test('snap-enabled movement snaps every moved selected node to the canvas grid', async () => {
+  const { moveSelectedCanvasNodes } = await loadCanvasMovementModule();
+  const source = canvas({
+    id: 'canvas-1',
+    promptNodes: [
+      promptNode({ id: 'prompt-1', position: { x: 3, y: 7 } }),
+    ],
+    imageNodes: [
+      imageNode({ id: 'image-1', position: { x: 23, y: 41 }, userMoved: false }),
+    ],
+    workflow: {
+      version: 1,
+      nodes: [
+        workflowNode({ id: 'save-1', kind: 'save', position: { x: 9, y: 25 } }),
+      ],
+      edges: [],
+    },
+  });
+
+  const result = moveSelectedCanvasNodes({
+    canvas: source,
+    selectedNodeIds: ['prompt-1', 'image-1', 'save-1'],
+    delta: { x: 10, y: 10 },
+    snapToGrid: true,
+  });
+
+  assert.deepEqual(result.promptNodes.find((node) => node.id === 'prompt-1')?.position, { x: 16, y: 16 });
+  assert.deepEqual(result.imageNodes.find((node) => node.id === 'image-1')?.position, { x: 32, y: 48 });
+  assert.equal(result.imageNodes.find((node) => node.id === 'image-1')?.userMoved, true);
+  assert.deepEqual(result.workflow?.nodes.find((node) => node.id === 'save-1')?.position, { x: 16, y: 32 });
 });
 
 test('movement with no effective selected ids is a no-op', async () => {

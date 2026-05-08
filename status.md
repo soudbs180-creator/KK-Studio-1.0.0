@@ -1,6 +1,18 @@
 # KK-Studio v1.4.5 Coordination Status
 
-Last updated: 2026-05-08
+Last updated: 2026-05-09
+
+## Current Desktop Snap-To-Grid Hotfix
+
+- Active user issue: add a desktop left-toolbar snap feature so dragging canvas cards can snap to the grid when enabled.
+- Implemented scope: `src/utils/canvasSnapToGrid.ts` defines the 16-unit snap helper; `src/components/settings/ProjectManager.tsx` adds the magnet toolbar toggle with `data-testid="canvas-snap-to-grid-toggle"` and `aria-pressed`; `src/App.tsx` owns the `snapToGrid` state and passes it to prompt/image/workflow utility cards plus selected-node/group drag commit paths; prompt cards, image cards, and workflow utility cards apply the helper during drag position updates; preview/save/agent workflow wrapper props accept the forwarded snap flag; `src/context/canvasMovement.ts` snaps each moved selected node's final persisted position when requested.
+- Review follow-up: a read-only subagent review found workflow utility cards could persist off-grid positions at non-100% zoom because snapped coordinates were passed through render pixel rounding, and multi-selected drags could leave companion cards off-grid. Fixed by persisting `nextPosition` directly in `WorkflowUtilityCard.tsx` and by adding optional snap behavior to `moveSelectedCanvasNodes`, `CanvasContext`, `usePromptGroupDragHandlers`, and App drag commit calls.
+- Focused contract: `tests/unit/canvas-snap-to-grid-contract.test.ts` covers enabled/disabled snapping, invalid coordinate preservation, toolbar contract, workflow utility non-resnap behavior, and drag wiring. `tests/unit/canvas-movement-contract.test.ts` covers snap-enabled multi-node movement across prompt, image, and workflow utility nodes. `tsconfig.tests.json` includes the new snap contract.
+- Browser QA: Codex in-app Browser was attempted against `http://localhost:3000/` and was blocked by the local browser with `net::ERR_BLOCKED_BY_CLIENT`. Fallback browser QA used the repository same-process Vite helper and local headless Chromium at `http://127.0.0.1:4324`, viewport `1600x980`, dark theme.
+- Browser evidence: `output/playwright/snap-grid/result.json` and `output/playwright/snap-grid/desktop-snap-toggle.png` record the desktop left toolbar snap toggle. The toggle was visible once, `aria-pressed` changed from `false` to `true`, the button bounding box stayed `40x40` at `x=23,y=358`, `.theme-transitioning` count was `0`, stale chunk text was `false`, and console error count was `0`.
+- Dev-server note: detached `npm.cmd run dev:start`, manual Vite, and Vite preview processes reported ready but did not expose a listening port in this local process environment. The same-process Vite helper returned `200 text/html`, so browser QA used that path.
+- Dirty-worktree guard: many unrelated files are already dirty, including hosted/VPS/payment/PromptBar/settings/encoding/collapsed-group work. Exclude all unrelated dirty files and stage only snap-to-grid files plus the four ledger files for this commit.
+- Fresh validation already run for this slice: focused snap contract passed 3/3 after the review fix; focused canvas movement contract passed 8/8 after the review fix; `npm.cmd run build` passed; browser QA passed through the fallback path above. Remaining before commit: rerun the full hotfix gate after ledger updates, including `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and path-limited `git diff --check`.
 
 ## Current Encoding Mojibake Guard Hotfix
 

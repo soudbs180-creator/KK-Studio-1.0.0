@@ -62,8 +62,8 @@ export interface CanvasContextType {
     selectNodes: (ids: string[], mode?: 'replace' | 'add' | 'remove' | 'toggle') => void;
     clearSelection: () => void;
     bringNodesToFront: (nodeIds: string[]) => void;
-    moveSelectedNodes: (delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => void;
-    moveSelectedNodesImmediate: (delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[]) => void;
+    moveSelectedNodes: (delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[], options?: { snapToGrid?: boolean }) => void;
+    moveSelectedNodesImmediate: (delta: { x: number; y: number }, sourceNodeIdOrIds?: string | string[], options?: { snapToGrid?: boolean }) => void;
     findSmartPosition: (x: number, y: number, width: number, height: number, buffer?: number) => { x: number; y: number };
     findNextGroupPosition: () => { x: number; y: number };
     addGroup: (group: CanvasGroup) => void;

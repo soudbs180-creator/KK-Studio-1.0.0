@@ -1,8 +1,19 @@
 import type { Canvas } from '../types.ts';
+import { snapCanvasPointToGrid } from '../utils/canvasSnapToGrid.ts';
 import { isWorkflowUtilityNodeKind } from '../workflow/schema.ts';
 
 export type CanvasMoveDelta = { x: number; y: number };
 export type CanvasMoveSource = string | string[] | undefined;
+export type CanvasMoveOptions = { snapToGrid?: boolean };
+
+const moveCanvasPoint = (
+    position: { x: number; y: number },
+    delta: CanvasMoveDelta,
+    options?: CanvasMoveOptions,
+) => snapCanvasPointToGrid({
+    x: position.x + delta.x,
+    y: position.y + delta.y,
+}, { enabled: options?.snapToGrid });
 
 export function resolveMoveSelectedCanvasNodeIds(
     selectedNodeIds: string[],
@@ -24,8 +35,11 @@ export function moveSelectedCanvasNodes(input: {
     selectedNodeIds: string[];
     delta: CanvasMoveDelta;
     sourceNodeIdOrIds?: CanvasMoveSource;
+    options?: CanvasMoveOptions;
+    snapToGrid?: boolean;
 }): Canvas {
     const { canvas, delta, sourceNodeIdOrIds } = input;
+    const options = input.options ?? { snapToGrid: input.snapToGrid };
     const selectedIds = resolveMoveSelectedCanvasNodeIds(input.selectedNodeIds, sourceNodeIdOrIds);
     if (selectedIds.length === 0) return canvas;
 
@@ -40,7 +54,7 @@ export function moveSelectedCanvasNodes(input: {
         if (selectedSet.has(node.id)) {
             return {
                 ...node,
-                position: { x: node.position.x + delta.x, y: node.position.y + delta.y },
+                position: moveCanvasPoint(node.position, delta, options),
                 userMoved: true,
             };
         }
@@ -53,7 +67,7 @@ export function moveSelectedCanvasNodes(input: {
         if (isDirectlyMovedImage || isMovingWithPromptGroup) {
             return {
                 ...node,
-                position: { x: node.position.x + delta.x, y: node.position.y + delta.y },
+                position: moveCanvasPoint(node.position, delta, options),
                 userMoved: selectedSet.has(node.id) ? true : node.userMoved,
             };
         }
@@ -67,7 +81,7 @@ export function moveSelectedCanvasNodes(input: {
                 if (selectedSet.has(node.id) && isWorkflowUtilityNodeKind(node.kind)) {
                     return {
                         ...node,
-                        position: { x: node.position.x + delta.x, y: node.position.y + delta.y },
+                        position: moveCanvasPoint(node.position, delta, options),
                     };
                 }
                 return node;
