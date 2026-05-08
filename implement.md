@@ -4,7 +4,7 @@ Last updated: 2026-05-08
 
 ## Operating Mode
 
-Current provider compatibility override (2026-05-08): the active slice is GPT Best priority compatibility from `https://gpt-best.apifox.cn/llms.txt`. Keep changes path-limited to provider strategy/connection/model-discovery/image-dispatch contracts and the minimal runtime code required to preserve GPT Best surfaces. Do not change official OpenAI request shapes, default OpenAI base fallback, unrelated auth-service work, UI, payment/server behavior, release metadata, or broad adapter refactors in this slice.
+Completed provider compatibility override (2026-05-08): GPT Best priority compatibility from `https://gpt-best.apifox.cn/llms.txt` is committed in `fe99e829`. The active next slice is prompt optimizer cache/logging redaction. Keep changes path-limited to prompt optimizer service/cache contracts and the minimal runtime code required to prevent prompt-content leakage. Do not change automatic route selection, provider routing, endpoint/auth behavior, billing/payment behavior, storage persistence, UI, release metadata, or broad adapter refactors in this slice.
 
 GPT Best implementation rules:
 - Re-fetch or re-check the live GPT Best docs before claiming current compatibility.
@@ -14,6 +14,12 @@ GPT Best implementation rules:
 - For GPT Best and other non-OpenAI compatible providers, do not let image/chat-image paths silently fall back to official OpenAI when Base URL is empty.
 - Use `supported_endpoint_types` or equivalent remote model metadata for surface routing. Do not infer all images, chat, responses, or Gemini surfaces from the marketing phrase "OpenAI-compatible".
 - Use focused source/contract tests before production changes and rerun the GPT Best provider gate in `validation.md`.
+
+Prompt optimizer redaction rules:
+- Write or update a focused contract before production changes and verify it fails for prompt-content leakage.
+- Redact user prompt/content fields in cache keys, cache metadata, and diagnostics/log previews; preserve functional prompt optimization request behavior.
+- Do not change provider selection, endpoint selection, auth/header behavior, billing, UI, storage ownership, or automatic route fallback semantics.
+- Browser QA may be skipped after recording the reason because this is a non-UI service/logging slice.
 
 Current hotfix override (2026-05-07): the active slice is the ecommerce framework card header and arrange regression. Keep changes path-limited to `PromptNodeComponent`, `canvasAutoArrange`, focused ecommerce/unit contracts, and ledger updates. Do not mix this commit with auth/logout, PromptBar ratio controls, settings chrome, provider routing, key storage, payment/server, release metadata, or unrelated runtime extraction work.
 

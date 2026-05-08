@@ -5,19 +5,23 @@ Branch policy: continue on the current branch and current workspace unless the u
 
 ## Summary
 
-Current provider compatibility override after the ecommerce framework card closure:
+Completed provider compatibility override after the ecommerce framework card closure:
 - Verify GPT Best against the live Apifox `llms.txt` source before changing local routing.
 - Treat GPT Best as a priority multi-protocol provider, but keep official OpenAI behavior isolated and unchanged.
 - Use the workbench/runtime-supplied API Base URL for GPT Best. The Apifox documentation host is evidence only and must not be used as an API base.
 - Preserve Bearer-header auth, `/v1/models` discovery, `/v1/chat/completions`, `/v1/images/generations`, and `supported_endpoint_types`-driven surface selection.
-- Acceptance: focused GPT Best/provider routing contracts pass, strict no-unused TypeScript passes, `npm.cmd run typecheck`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, build/unit validation as applicable, and path-limited alternate-git `diff --check` pass. Browser QA may be skipped because this is a non-UI provider-routing slice, but the skip reason must be recorded in `status.md`.
+- Result: focused GPT Best/provider routing contracts passed, strict no-unused TypeScript passed, `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and path-limited alternate-git `diff --check` passed. Browser QA was skipped because this was a non-UI provider-routing slice, and the skip reason is recorded in `status.md`. The slice is committed in `fe99e829`.
 
-Current GPT Best compatibility milestone:
+Completed GPT Best compatibility milestone:
 - M-GB1 Source calibration and provider identity: `https://gpt-best.apifox.cn/llms.txt` is treated as documentation evidence; GPT Best provider aliases resolve to the local `gpt-best` runtime strategy with Bearer-header auth and surface-first routing.
 - M-GB2 Model discovery metadata: OpenAI-compatible `/models` parsing preserves remote endpoint metadata, including `supported_endpoint_types`, and registers it in model metadata without replacing Google/admin model metadata ownership.
 - M-GB3 Image dispatch priority: GPT Best models with image-generation endpoint hints route to the documented native images surface; chat-only endpoint hints stay on chat image routing; official OpenAI still reaches the official default base when its Base URL is empty.
 - M-GB4 Base URL guardrail: non-OpenAI OpenAI-compatible image/chat-image paths fail fast when the key slot has no real Base URL, preventing GPT Best or other third-party providers from silently falling back to `api.openai.com`.
-- M-GB5 Validation and commit: run the GPT Best focused gate plus repository-required typecheck/governance/encoding checks, update ledgers, stage only this slice, and commit through `node_modules/.codex-git-full`.
+- M-GB5 Validation and commit: the GPT Best focused gate plus repository-required typecheck/governance/encoding checks passed; the slice was staged path-limited and committed through `node_modules/.codex-git-full` in `fe99e829`.
+
+Next service-hardening candidate:
+- Inspect prompt optimizer cache/logging paths for prompt-content leakage.
+- Acceptance: add or update a focused contract first, confirm RED, implement a minimal redaction fix, run the targeted prompt optimizer gate plus typecheck/governance/encoding checks, update ledgers, and commit only this service slice.
 
 Current hotfix override after the auth logout/startup closure:
 - Refine the ecommerce framework card header so the left status icon/text area becomes an editable remark/name input.
