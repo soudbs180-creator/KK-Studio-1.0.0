@@ -214,6 +214,45 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
 
 Browser QA may be skipped for this gate because it changes only service cache/logging behavior and no JSX, CSS, route rendering, browser-visible UI, or release metadata. Record the skip reason in `status.md`.
 
+## M132 Shared Local User-Route Auth Inference Gate
+
+Use this gate when touching local user-route auth/header/query-key inference, the shared local user-route auth helper, diagnostics route auth selection, or the model-proxy compatibility re-export:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/local-user-route-auth-contract.test.ts" `
+  "tests/unit/user-route-diagnostics-routes.test.ts" `
+  "tests/unit/user-route-pricing-endpoint-override.test.ts" `
+  "tests/unit/user-route-proxy-routing.test.ts" `
+  "tests/unit/twelve-ai-doc-alignment.test.ts" `
+  "tests/unit/system-gemini-auth-regression.test.ts" `
+  "tests/unit/provider-auth-proxy-regression.test.ts"
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+npm.cmd run governance:security
+npm.cmd run architecture:check
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "apps/api/src/lib/local-user-route-auth.ts" `
+  "apps/api/src/modules/auth/application/user-route-diagnostics-service.ts" `
+  "apps/api/src/modules/model-proxy/application/local-user-route-auth.ts" `
+  "tests/unit/local-user-route-auth-contract.test.ts" `
+  "tests/unit/provider-auth-proxy-regression.test.ts" `
+  "tests/unit/async-image-proxy-regression.test.ts" `
+  "tests/unit/system-gemini-auth-regression.test.ts" `
+  "tests/unit/twelve-ai-doc-alignment.test.ts" `
+  "tests/unit/user-route-diagnostics-routes.test.ts" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA may be skipped for this gate because it changes only server-side auth-helper/diagnostics behavior and source contracts, with no JSX, CSS, route rendering, browser-visible UI, or release metadata. Record the skip reason in `status.md`.
+
 ## User-Reported UI Regression Gate
 
 Use this gate when touching the PromptBar shadows/mobile footer, settings shell/card chrome, ecommerce confirmed-build handoff, ecommerce canvas framework card, or ecommerce main-image ratio selector:
@@ -516,6 +555,7 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
   "tests/unit/local-user-route-auth-contract.test.ts" `
   "tests/unit/local-user-route-endpoint-contract.test.ts" `
   "tests/unit/provider-auth-proxy-regression.test.ts" `
+  "tests/unit/async-image-proxy-regression.test.ts" `
   "tests/unit/system-gemini-auth-regression.test.ts" `
   "tests/unit/twelve-ai-doc-alignment.test.ts" `
   "tests/unit/async-image-proxy-regression.test.ts" `
@@ -1828,7 +1868,7 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "src/se
 
 ## Local User-Route Auth Helper Gate
 
-Use this gate for the M112 server-side local user-route auth/header/query-key helper extraction:
+Use this gate for the historical M112 server-side local user-route auth/header/query-key helper extraction and the current compatibility wrapper over the shared helper:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none "tests/unit/local-user-route-auth-contract.test.ts" "tests/unit/provider-auth-proxy-regression.test.ts" "tests/unit/system-gemini-auth-regression.test.ts" "tests/unit/twelve-ai-doc-alignment.test.ts" "tests/unit/async-image-proxy-regression.test.ts" "tests/unit/user-route-proxy-routing.test.ts" "apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.test.ts"
@@ -1839,7 +1879,7 @@ npm.cmd run test:unit
 npm.cmd run build
 npm.cmd run governance:agent-docs
 npm.cmd run check:encoding
-git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts" "apps/api/src/modules/model-proxy/application/local-user-route-auth.ts" "tests/unit/local-user-route-auth-contract.test.ts" "tests/unit/provider-auth-proxy-regression.test.ts" "tests/unit/system-gemini-auth-regression.test.ts" "tests/unit/twelve-ai-doc-alignment.test.ts" "tests/unit/async-image-proxy-regression.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "apps/api/src/lib/local-user-route-auth.ts" "apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts" "apps/api/src/modules/model-proxy/application/local-user-route-auth.ts" "tests/unit/local-user-route-auth-contract.test.ts" "tests/unit/provider-auth-proxy-regression.test.ts" "tests/unit/system-gemini-auth-regression.test.ts" "tests/unit/twelve-ai-doc-alignment.test.ts" "tests/unit/async-image-proxy-regression.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
 Do not change endpoint selection, fetch execution, task operation routing, credential retrieval/storage, keyManager/cloud sync, provider branch execution, fallback ordering, billing metadata, release metadata, or UI behavior in this slice. Browser QA may be skipped for this non-UI server/helper extraction after recording the skip reason in `status.md`.
@@ -1857,7 +1897,7 @@ npm.cmd run test:unit
 npm.cmd run build
 npm.cmd run governance:agent-docs
 npm.cmd run check:encoding
-git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts" "apps/api/src/modules/model-proxy/application/local-user-route-auth.ts" "apps/api/src/modules/model-proxy/application/local-user-route-endpoints.ts" "tests/unit/local-user-route-endpoint-contract.test.ts" "tests/unit/local-user-route-auth-contract.test.ts" "tests/unit/provider-auth-proxy-regression.test.ts" "tests/unit/system-gemini-auth-regression.test.ts" "tests/unit/twelve-ai-doc-alignment.test.ts" "tests/unit/async-image-proxy-regression.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- "apps/api/src/lib/local-user-route-auth.ts" "apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts" "apps/api/src/modules/model-proxy/application/local-user-route-auth.ts" "apps/api/src/modules/model-proxy/application/local-user-route-endpoints.ts" "tests/unit/local-user-route-endpoint-contract.test.ts" "tests/unit/local-user-route-auth-contract.test.ts" "tests/unit/provider-auth-proxy-regression.test.ts" "tests/unit/system-gemini-auth-regression.test.ts" "tests/unit/twelve-ai-doc-alignment.test.ts" "tests/unit/async-image-proxy-regression.test.ts" "tsconfig.tests.json" "plans.md" "implement.md" "validation.md" "status.md"
 ```
 
 Do not change auth/header/query-key behavior, endpoint call-site behavior, fetch behavior, task operation routing, credential retrieval/storage, keyManager/cloud sync, provider branch execution, fallback ordering, logging, billing metadata, release metadata, or UI behavior in this slice. Browser QA may be skipped for this non-UI server/helper extraction after recording the skip reason in `status.md`.

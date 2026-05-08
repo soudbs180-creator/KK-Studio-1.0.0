@@ -4,7 +4,7 @@ Last updated: 2026-05-08
 
 ## Operating Mode
 
-Completed provider compatibility override (2026-05-08): GPT Best priority compatibility from `https://gpt-best.apifox.cn/llms.txt` is committed in `fe99e829`. The active slice is prompt optimizer cache/logging redaction. Keep changes path-limited to prompt optimizer service/cache contracts and the minimal runtime code required to prevent prompt-content leakage. Do not change automatic route selection, provider routing, endpoint/auth behavior, billing/payment behavior, storage persistence, UI, release metadata, or broad adapter refactors in this slice.
+Completed provider compatibility override (2026-05-08): GPT Best priority compatibility from `https://gpt-best.apifox.cn/llms.txt` is committed in `fe99e829`. M131 prompt optimizer cache/logging redaction is committed in `dade1de4`. The active slice is M132 shared local user-route auth inference. Keep changes path-limited to the local user-route auth helper, diagnostics auth inference, focused local user-route contracts, and ledgers. Do not change endpoint call-site behavior, fetch execution, fallback ordering, key storage, provider persistence, billing/payment behavior, storage persistence, UI, release metadata, or broad adapter refactors in this slice.
 
 GPT Best implementation rules:
 - Re-fetch or re-check the live GPT Best docs before claiming current compatibility.
@@ -21,9 +21,18 @@ Prompt optimizer redaction rules:
 - Do not change provider selection, endpoint selection, auth/header behavior, billing, UI, storage ownership, or automatic route fallback semantics.
 - Browser QA may be skipped after recording the reason because this is a non-UI service/logging slice.
 
-Previous hotfix override (2026-05-07): the ecommerce framework card header and arrange regression is closed. Do not mix future prompt optimizer commits with auth/logout, PromptBar ratio controls, settings chrome, provider routing, key storage, payment/server, release metadata, or unrelated runtime extraction work.
+Shared local user-route auth inference rules:
+- Add or update focused contracts before production changes and verify the RED failure for divergent diagnostics/proxy auth behavior.
+- Diagnostics and proxy execution must share the same auth/header/query-key inference helper.
+- GPT Best Gemini routes must use Bearer header auth even when persisted route data says `authMethod: "query"`.
+- Official Google Gemini and 12AI Gemini query-key behavior must remain unchanged.
+- Normalize copied API keys by removing zero-width characters, line breaks, tabs, surrounding whitespace, embedded whitespace, and a leading `Bearer` prefix before query/header assembly.
+- Preserve endpoint URL construction, fetch execution, pricing discovery payloads, provider routing, key storage, billing, UI, release metadata, and old import-path compatibility.
+- Browser QA may be skipped after recording the reason because this is a non-UI server/auth helper slice.
 
-This is a long-running execution. Plain `.git` may show stale historical state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`. The latest committed baseline before the current prompt optimizer redaction slice is `fdee527d docs: sync gpt best milestone status`; docs-only ledger sync commits may sit above it.
+Previous hotfix override (2026-05-07): the ecommerce framework card header and arrange regression is closed. Do not mix future server/auth commits with auth/logout, PromptBar ratio controls, settings chrome, provider routing changes outside the shared helper, key storage, payment/server, release metadata, or unrelated runtime extraction work.
+
+This is a long-running execution. Plain `.git` may show stale historical state. Do not use plain `.git` for commit readiness. The development fact source is `git --git-dir=node_modules/.codex-git-full --work-tree=.`. The latest committed baseline before the current M132 server/auth slice is `dade1de4 fix: redact prompt optimizer cache diagnostics`; docs-only ledger sync commits may sit above it.
 
 The active workstream is a single merged line. Thread `019dd551...` is the main refactor history and `019de168...` is continuation history; both belong to Stage One M6 ecommerce runtime extraction. The Clay UI audit and frosted-surface cleanup closed in `9e7ae2b5`; ecommerce source selection closed in `ccf965c3`; ecommerce partial redraw closed in `d12731ce`; connector renderer boundary hardening closed in `5f5b76e0`; connector review follow-up closed in `f06f1880`; the M6 closeout scan found no remaining ecommerce-owned business branch in `src/App.tsx`. The latest alternate-git baseline before this slice is `cab9046c fix: return to login after logout`.
 
@@ -31,14 +40,14 @@ Stage One Backfill M2 completed in `8a458cd4` by hardening `src/app/usePromptGro
 
 The active plan is `plans.md`. The current status and next exact step are tracked in `status.md`. Validation commands and expected gates are tracked in `validation.md`.
 
-Current slice override: prompt optimizer cache/logging redaction is the active slice. The selected production boundary is limited to `promptOptimizerService`, the generation runtime optimizer error summarizer export, the two optimizer failure logging call sites, and focused source contracts. Do not change endpoint selection, auth/header behavior, fetch execution, polling, billing, fallback ordering, key storage, provider routing, release metadata, payment/server behavior, PromptBar controls, settings UI, storage ownership, or unrelated runtime extraction work in this slice.
+Current slice override: M132 shared local user-route auth inference is the active slice. The selected production boundary is limited to `apps/api/src/lib/local-user-route-auth.ts`, the model-proxy compatibility re-export, user-route diagnostics helper imports/calls, and focused local user-route source/route tests. Do not change endpoint call-site behavior, fetch execution, polling, billing, fallback ordering, key storage, provider persistence, release metadata, payment/server behavior, PromptBar controls, settings UI, storage ownership, or unrelated runtime extraction work in this slice.
 
 For Clay UI work, use `C:/Users/Administrator/Downloads/DESIGN-clay.md` as the visual base with these overrides: inputs, main cards, sub cards, and framework cards use controlled frosted material; dark mode uses neutral black-gray surfaces; Clay brand colors are emphasis only. That lane is not active unless the user reports a new visual issue.
 
 Current convergence order:
 1. Keep the ledger files aligned with the alternate-git HEAD and the merged single execution line.
 2. Treat Stage One M6 ecommerce extraction and Stage One backfill boundaries as complete unless a new concrete regression proves otherwise.
-3. For Stage Two, split or prune one responsibility at a time from the largest files. M123 followed the M122 security hardening by moving the task-token implementation behind a focused helper. M124 continued the OpenAI-compatible adapter seam by extracting pure AceData route/reference/size helpers. M125 extracted 12AI async route helpers and chat-image response selection. M126 closed the security follow-up by allowlisting image URL schemes and raster MIME types in the payload helper. M127 extracted repeated reference-image formatting and removed unreachable commented delegates. M128 removed the dead Gemini response cache module and its prompt-content logs. M129 redacted the raw `updateKey` diagnostic payload. M130 redacted prompt-bearing OpenAI-compatible diagnostics and snippets. M131 redacts prompt optimizer cache/logging surfaces. The current service milestone must stay path-limited to prompt optimizer cache/logging code and focused tests.
+3. For Stage Two, split or prune one responsibility at a time from the largest files. M123 followed the M122 security hardening by moving the task-token implementation behind a focused helper. M124 continued the OpenAI-compatible adapter seam by extracting pure AceData route/reference/size helpers. M125 extracted 12AI async route helpers and chat-image response selection. M126 closed the security follow-up by allowlisting image URL schemes and raster MIME types in the payload helper. M127 extracted repeated reference-image formatting and removed unreachable commented delegates. M128 removed the dead Gemini response cache module and its prompt-content logs. M129 redacted the raw `updateKey` diagnostic payload. M130 redacted prompt-bearing OpenAI-compatible diagnostics and snippets. M131 redacted prompt optimizer cache/logging surfaces. M132 shares local user-route auth inference between diagnostics and proxy. The current service milestone must stay path-limited to local user-route auth inference code and focused tests.
 4. Write/update focused source contracts before each extraction when behavior or ownership changes.
 5. Move domain helpers and side effects into focused modules while preserving compatibility exports.
 6. Verify with the targeted gate for the touched slice, typecheck, full unit suite, build or architecture check as required, docs governance, encoding checks, and path-limited `git diff --check`.

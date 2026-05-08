@@ -5,12 +5,19 @@ import type {
   UserRoutePricingSyncRequestDto,
   UserRoutePricingSyncDto,
 } from "../../../../../../packages/contracts/src/index.ts";
+import {
+  formatAuthorizationHeaderValue,
+  getApiKeyToken,
+  inferLocalAuthorizationValueFormat,
+  inferLocalAuthMethod,
+  inferLocalHeaderName,
+  is12AIBaseUrl,
+  normalizeRouteString,
+} from "../../../lib/local-user-route-auth.ts";
 import type { AuthDataService } from "./auth-data-service.ts";
 
 type JsonRecord = Record<string, unknown>;
 type ResolvedRouteFormat = Exclude<UserApiProtocolFormat, "auto">;
-type ResolvedAuthMethod = "query" | "header";
-type AuthorizationValueFormat = "bearer" | "raw";
 
 const OPENAI_DEFAULT_BASE_URL = "https://api.openai.com";
 const GOOGLE_DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com";
@@ -53,29 +60,7 @@ export class UserRouteDiagnosticsError extends Error {
 }
 
 function normalizeString(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function getApiKeyToken(apiKey: string): string {
-  return String(apiKey || "")
-    .replace(/[\u200B-\u200D\uFEFF]/g, "")
-    .replace(/\r?\n|\r|\t/g, "")
-    .trim()
-    .replace(/^Bearer\s+/i, "")
-    .replace(/\s+/g, "")
-    .trim();
-}
-
-function formatAuthorizationHeaderValue(
-  apiKey: string,
-  valueFormat: AuthorizationValueFormat,
-): string {
-  const token = getApiKeyToken(apiKey);
-  if (valueFormat === "raw") {
-    return token;
-  }
-
-  return /^Bearer\s+/i.test(apiKey) ? apiKey : `Bearer ${token}`;
+  return normalizeRouteString(value);
 }
 
 function inferRouteFormat(routeConfig: SecureProxyUserRouteConfigDto): ResolvedRouteFormat {
@@ -94,97 +79,6 @@ function inferRouteFormat(routeConfig: SecureProxyUserRouteConfigDto): ResolvedR
   }
 
   return "openai";
-}
-
-function is12AIBaseUrl(baseUrl: string | undefined): boolean {
-  const normalized = normalizeString(baseUrl);
-  if (!normalized) return false;
-
-  try {
-    const candidate = /^https?:\/\//i.test(normalized) ? normalized : `https://${normalized}`;
-    const host = new URL(candidate).hostname.toLowerCase();
-    return /(^|\.)12ai\.(org|xyz|io|net)$/i.test(host);
-  } catch {
-    return false;
-  }
-}
-
-function isGoogleOfficialGeminiBaseUrl(baseUrl: string | undefined): boolean {
-  const normalized = normalizeString(baseUrl).toLowerCase();
-  return normalized.includes("googleapis.com") || normalized.includes("generativelanguage.googleapis.com");
-}
-
-function shouldForceHeaderAuthForProvider(provider: string, baseUrl: string): boolean {
-  const normalizedProvider = normalizeString(provider).toLowerCase();
-  const normalizedBaseUrl = normalizeString(baseUrl).toLowerCase();
-  return normalizedProvider === "gpt-best"
-    || normalizedProvider === "gptbest"
-    || normalizedBaseUrl.includes("gpt-best")
-    || normalizedBaseUrl.includes("gptbest");
-}
-
-function inferAuthMethod(
-  routeConfig: SecureProxyUserRouteConfigDto,
-  format: ResolvedRouteFormat,
-): ResolvedAuthMethod {
-  if (shouldForceHeaderAuthForProvider(routeConfig.provider, routeConfig.baseUrl)) {
-    return "header";
-  }
-
-  if (routeConfig.authMethod === "query" || routeConfig.authMethod === "header") {
-    return routeConfig.authMethod;
-  }
-
-  return format === "gemini" && (isGoogleOfficialGeminiBaseUrl(routeConfig.baseUrl) || is12AIBaseUrl(routeConfig.baseUrl))
-    ? "query"
-    : "header";
-}
-
-function inferHeaderName(
-  routeConfig: SecureProxyUserRouteConfigDto,
-  format: ResolvedRouteFormat,
-): string {
-  const configured = normalizeString(routeConfig.headerName);
-  if (configured) {
-    return configured;
-  }
-
-  if (format === "gemini") {
-    return "x-goog-api-key";
-  }
-  if (format === "claude") {
-    return is12AIBaseUrl(routeConfig.baseUrl) ? "Authorization" : "x-api-key";
-  }
-
-  return "Authorization";
-}
-
-function inferAuthorizationValueFormat(
-  routeConfig: SecureProxyUserRouteConfigDto,
-  format: ResolvedRouteFormat,
-  headerName: string,
-): AuthorizationValueFormat {
-  const baseUrl = normalizeString(routeConfig.baseUrl).toLowerCase();
-  const provider = normalizeString(routeConfig.provider).toLowerCase();
-  const normalizedHeader = headerName.toLowerCase();
-  const is12AI = is12AIBaseUrl(routeConfig.baseUrl);
-
-  if (format === "gemini" || format === "claude") {
-    if (format === "claude" && is12AI) {
-      return "bearer";
-    }
-    return "raw";
-  }
-
-  if (normalizedHeader !== "authorization") {
-    return "raw";
-  }
-
-  if (baseUrl.includes("wuyinkeji") || provider.includes("wuyin")) {
-    return "raw";
-  }
-
-  return "bearer";
 }
 
 function normalizeOpenAIBaseUrl(url: string | undefined): string {
@@ -242,7 +136,7 @@ function normalizeGeminiBaseUrl(url: string | undefined): string {
 function buildGeminiModelsEndpoint(
   baseUrl: string | undefined,
   apiKey: string,
-  authMethod: ResolvedAuthMethod,
+  authMethod: "query" | "header",
 ): string {
   const endpoint = `${normalizeGeminiBaseUrl(baseUrl)}/v1beta/models`;
   if (authMethod === "query") {
@@ -255,7 +149,7 @@ function buildGeminiGenerateContentEndpoint(
   baseUrl: string | undefined,
   modelId: string,
   apiKey: string,
-  authMethod: ResolvedAuthMethod,
+  authMethod: "query" | "header",
 ): string {
   const endpoint = `${normalizeGeminiBaseUrl(baseUrl)}/v1beta/models/${encodeURIComponent(modelId)}:generateContent`;
   if (authMethod === "query") {
@@ -267,9 +161,9 @@ function buildGeminiGenerateContentEndpoint(
 function buildHeaders(
   routeConfig: SecureProxyUserRouteConfigDto,
   format: ResolvedRouteFormat,
-  authMethod: ResolvedAuthMethod,
+  authMethod: "query" | "header",
   headerName: string,
-  authorizationValueFormat: AuthorizationValueFormat,
+  authorizationValueFormat: "bearer" | "raw",
 ): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: "application/json",
@@ -473,9 +367,9 @@ export class UserRouteDiagnosticsService {
   ): Promise<UserRouteConnectivityCheckDto> {
     const routeConfig = await this.resolveRouteConfig(userId, email, routeId, accessToken);
     const format = inferRouteFormat(routeConfig);
-    const authMethod = inferAuthMethod(routeConfig, format);
-    const headerName = inferHeaderName(routeConfig, format);
-    const authorizationValueFormat = inferAuthorizationValueFormat(routeConfig, format, headerName);
+    const authMethod = inferLocalAuthMethod(routeConfig, format);
+    const headerName = inferLocalHeaderName(routeConfig, format);
+    const authorizationValueFormat = inferLocalAuthorizationValueFormat(routeConfig, format, headerName);
     const is12AI = is12AIBaseUrl(routeConfig.baseUrl);
     const endpointUrl =
       is12AI
@@ -589,9 +483,9 @@ export class UserRouteDiagnosticsService {
   ): Promise<UserRoutePricingSyncDto> {
     const routeConfig = await this.resolveRouteConfig(userId, email, routeId, accessToken);
     const format = inferRouteFormat(routeConfig);
-    const authMethod = inferAuthMethod(routeConfig, format);
-    const headerName = inferHeaderName(routeConfig, format);
-    const authorizationValueFormat = inferAuthorizationValueFormat(routeConfig, format, headerName);
+    const authMethod = inferLocalAuthMethod(routeConfig, format);
+    const headerName = inferLocalHeaderName(routeConfig, format);
+    const authorizationValueFormat = inferLocalAuthorizationValueFormat(routeConfig, format, headerName);
 
     if (!supportsPricingSync(routeConfig, format)) {
       return {

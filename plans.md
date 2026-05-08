@@ -26,9 +26,18 @@ Completed prompt optimizer cache/logging redaction milestone:
 - Runtime fallback diagnostics and user notifications use a small error summary instead of logging arbitrary error objects that can contain prompt content.
 - Acceptance: focused source contracts covered cache-key redaction, cache-result redaction, and logging redaction; focused prompt optimizer/runtime suites, strict no-unused TypeScript, governance/security, typecheck, unit, build, docs, encoding, and path-limited `diff --check` are the required gate.
 
-Next service-hardening candidate:
-- Inspect shared local user-route auth/header/query-key inference for duplication between diagnostics and proxy execution.
-- Acceptance: map the seam first, add a focused contract before production changes, preserve endpoint selection/auth/header/fetch behavior, run a local-user-route targeted gate plus typecheck/governance/encoding checks, update ledgers, and commit only this server/auth slice.
+Current shared local user-route auth inference milestone:
+- Move the local user-route auth/header/query-key and route-format helper from the model-proxy module into `apps/api/src/lib/local-user-route-auth.ts`.
+- Keep the old model-proxy helper path as a compatibility re-export so the proxy import surface remains stable.
+- Make user-route diagnostics consume the same shared helper as the local proxy, removing its divergent auth inference.
+- Regression target: GPT Best Gemini diagnostics must force Bearer header auth, not `?key=` query auth or `x-goog-api-key`, matching local proxy behavior.
+- Guardrail: diagnostics keeps its historical 12AI auto-format OpenAI action probe selection while sharing auth/header inference, so the helper extraction does not silently change 12AI probe endpoint/body behavior.
+- Token hygiene target: copied API keys with zero-width characters, line breaks, tabs, whitespace, or a leading `Bearer` prefix are normalized consistently for query and header auth.
+- Acceptance: RED/GREEN local user-route diagnostics and helper contracts pass, strict no-unused TypeScript passes, architecture/security/typecheck/unit/build/docs/encoding pass, path-limited alternate-git `diff --check` passes, browser QA is skipped with a non-UI server/auth reason, and the commit contains only this server/auth slice plus ledgers.
+
+Next service-hardening candidate after the shared auth slice:
+- Inspect OpenAI-compatible error helper duplication or another small service diagnostics boundary.
+- Acceptance: map the seam first, add a focused contract before production changes, preserve endpoint selection/auth/header/fetch behavior, run the targeted gate plus typecheck/governance/encoding checks, update ledgers, and commit only that slice.
 
 Current hotfix override after the auth logout/startup closure:
 - Refine the ecommerce framework card header so the left status icon/text area becomes an editable remark/name input.
@@ -597,7 +606,7 @@ Scope:
 - Completed M129 in `740042c1`: added a focused redacted `updateKey` diagnostic payload helper and extended the key-manager secrets contract so raw `key` / `apiKey` update values cannot be logged, preserving key persistence, provider persistence, cloud sync, model discovery, route selection, auth/header behavior, UI, and release metadata.
 - Completed M130 in the prompt diagnostics redaction slice: redacted prompt-like fields from OpenAI-compatible JSON/multipart diagnostics previews and changed diagnostic python snippets to use redacted previews or fixed prompt placeholders, preserving endpoint selection, auth/header behavior, fetch execution, polling, billing, fallback ordering, UI, and release metadata.
 - Completed M131 in the prompt optimizer cache/logging redaction slice: fingerprinted prompt/reference cache-key inputs, advanced the optimizer cache namespace to v5 while removing legacy v4 entries, redacted persisted raw prompt fields, and summarized optimizer failure diagnostics before console/user notification, preserving prompt optimization request behavior, provider selection, endpoint/auth behavior, billing, storage ownership, UI, and route fallback semantics.
-- Next step after M131: choose one fresh Stage Two seam from the read-only candidates, with high-confidence options including shared user-route auth inference, OpenAI-compatible error helpers, or another small service diagnostics boundary. Do not mix auth/header behavior, endpoint call-site behavior, fetch behavior, fallback-order changes, keyManager secrets/cloud sync, provider routing, storage persistence, release metadata, unrelated runtime behavior, or broad debt cleanup.
+- Current M132 shared local user-route auth inference slice: centralize the local user-route auth/header/query-key helper under `apps/api/src/lib/local-user-route-auth.ts`, keep the old model-proxy helper path as a compatibility export, and wire diagnostics to the same auth helper so GPT Best Gemini diagnostics and pricing sync use Bearer header auth like the proxy while preserving 12AI diagnostics endpoint/body selection. Do not mix endpoint call-site behavior, fetch behavior, fallback-order changes, keyManager secrets/cloud sync, provider routing, storage persistence, release metadata, unrelated runtime behavior, or broad debt cleanup.
 - Continue `src/context/CanvasContext.tsx` only for another high-confidence narrow seam; defer `migrateNodes`, IndexedDB/local-folder movement, and persistence orchestration until they can be split safely.
 - Continue `src/services/auth/keyManager.ts` only after a fresh seam map. Defer key storage, permission checks, encryption helpers, provider credential management, cloud sync, provider persistence, shared pricing cache construction, runtime routing, fetch/auth behavior, endpoint selection, and localStorage policy until smaller seams are mapped.
 - Split `src/components/layout/PromptBar.tsx` by composer state, attachments, ecommerce controls, and mobile/desktop presentation.
