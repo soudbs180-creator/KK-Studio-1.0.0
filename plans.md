@@ -12,7 +12,8 @@ Current 1.4.5 release blocker audit:
 - Dependency/VPS milestone: clear the `payment-server` moderate dependency audit by overriding `express-rate-limit` to `8.5.1`/`ip-address` `10.2.0`, and document secure cookie plus payment sidecar settlement/internal tokens in VPS env examples.
 - UI/localization milestone: keep PromptBar active toggles on `bg-[image:var(--prompt-bar-toggle-active-bg)]`, widen the 390px mobile model control, and replace remaining visible PendingNode English fallback text/alt strings with Simplified Chinese.
 - Browser QA milestone: run real Chromium QA across login, temporary local workspace, PromptBar/model menu, settings, recharge/balance entry, and 390px mobile surfaces. Record screenshots and JSON under `output/playwright/1.4.5-release-qa/`, but do not commit artifacts.
-- Release remains blocked until `npm.cmd run release:hosted:check` is rerun in a clean hosted environment without local `.env.local` dev bypass or remote HTTP API base URL, with real hosted OAuth/Turnstile/payment-sidecar secrets confirmed.
+- VPS exposure milestone: public nginx configs must return `404` for `/internal/` instead of proxying it to the payment sidecar; internal settlement/callback traffic must stay service-to-service with scoped tokens.
+- Release remains blocked until the production `api.kkai.plus` DNS and HTTPS endpoint are fixed and smoked successfully. Clean-env `release:hosted:check` now passes when local dev env files are isolated and hosted process env is supplied, but the public HTTPS VPS API is not yet reachable.
 
 Current desktop snap-to-grid hotfix:
 - Add a desktop-only snap-to-grid toggle to the left canvas toolbar.

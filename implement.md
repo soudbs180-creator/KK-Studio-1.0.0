@@ -15,6 +15,8 @@ Release audit execution rules:
 - Chinese visible UI fixes must be verified through `npm.cmd run check:encoding` and a focused visible-text contract. Technical terms such as `Turnstile`, `API Key`, `PPT`, `PPTX`, `Chrome`, and `Edge` may remain English.
 - UI release audit work requires real browser evidence. Record URL, viewport, theme, console/page errors, stale chunk count, `.theme-transitioning`, clipped button count, PromptBar active gradient evidence, and local sensitive-storage keys in `status.md`.
 - If `npm.cmd run release:hosted:check` fails only because local dirty env contains dev bypass or remote HTTP API base URL, record it as a release-environment blocker and do not weaken the guard.
+- VPS nginx public virtual hosts must fail closed for `/internal/` with `404`; do not expose internal payment callback or settlement paths through public DNS.
+- Production release remains blocked if `api.kkai.plus` cannot serve HTTPS with a valid certificate and healthy `/healthz`, `/api/manifest`, and `/api/v1/auth/session` responses.
 
 Current desktop snap-to-grid hotfix (2026-05-09): add the desktop left-toolbar snap toggle and route the enabled state into prompt, image, workflow utility, selected-node, and canvas-group drag commit paths. Keep the change scoped to canvas snap behavior, the toolbar control, focused contract coverage, and ledger updates. Do not stage or commit existing unrelated hosted/API/payment/PromptBar/settings/collapsed-group work.
 

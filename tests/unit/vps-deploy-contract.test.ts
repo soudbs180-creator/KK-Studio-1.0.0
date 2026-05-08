@@ -95,9 +95,30 @@ test("VPS default web entry serves the main login app while admin stays separate
   assert.match(nginxSource, /server_name api\.example\.com;/);
   assert.match(nginxSource, /location \/api\/ \{\s*proxy_pass http:\/\/kk_api_upstream\/api\/;/);
   assert.match(nginxSource, /server_name api\.example\.com;[\s\S]*location \/payment\/ \{\s*proxy_pass http:\/\/kk_payment_upstream\/payment\/;/);
-  assert.match(nginxSource, /server_name api\.example\.com;[\s\S]*location \/internal\/ \{\s*proxy_pass http:\/\/kk_payment_upstream\/internal\/;/);
+  assert.match(nginxSource, /server_name api\.example\.com;[\s\S]*location \/internal\/ \{\s*return 404;/);
   assert.ok(
     nginxSource.indexOf("server_name _ app.example.com;") < nginxSource.indexOf("server_name api.example.com;"),
     "the default app server must appear before the API virtual host",
   );
+});
+
+test("VPS nginx gateway does not expose internal payment routes on public virtual hosts", () => {
+  const gatewaySource = readSource("deploy/nginx/kk-vps-gateway.conf");
+  const legacySource = readSource("deploy/nginx/kk-vps.conf");
+
+  for (const [label, source] of [
+    ["gateway", gatewaySource],
+    ["legacy", legacySource],
+  ] as const) {
+    assert.doesNotMatch(
+      source,
+      /location\s+\/internal\/\s*\{[\s\S]*?proxy_pass\s+http:\/\/[^;]+\/internal\//,
+      `${label} nginx config must not proxy public /internal/ traffic`,
+    );
+    assert.match(
+      source,
+      /location\s+\/internal\/\s*\{[\s\S]*?return\s+404;/,
+      `${label} nginx config should fail closed for public /internal/ traffic`,
+    );
+  }
 });

@@ -32,6 +32,18 @@ Expected local result for `release:hosted:check`: it must fail while local `.env
 
 Browser QA for this gate must cover desktop dark/light and 390px mobile surfaces: login, temporary local workspace, storage selection/browser-cache path, PromptBar/model menu, active toggle gradient, settings, recharge/balance entry, mobile footer, and mobile settings/more sheet. Record screenshots and `release-qa-summary-refreshed.json` under `output/playwright/1.4.5-release-qa/`; do not commit `output/`.
 
+Hosted/VPS production smoke must also verify:
+
+```powershell
+npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560
+npx.cmd vercel env ls --scope yykks-projects-727e9560
+curl.exe -vI https://api.kkai.plus/healthz
+curl.exe -vI https://api.kkai.plus/api/manifest
+curl.exe -vI https://api.kkai.plus/api/v1/auth/session
+```
+
+The HTTPS `api.kkai.plus` checks must complete TLS and return application/API responses before production release. Public `/internal/` paths must return `404` at nginx and must not proxy to the payment sidecar.
+
 ## Desktop Canvas Snap-To-Grid Hotfix Gate
 
 Use this gate when touching the desktop left toolbar snap toggle, canvas snap helper, prompt/image/workflow card drag snapping, or selected-node movement snap behavior:
