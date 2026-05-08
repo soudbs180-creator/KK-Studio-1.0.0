@@ -1,10 +1,10 @@
-# KK-Studio v1.4.5 Single-Line Validation Matrix
+# KK-Studio v1.4.6 Single-Line Validation Matrix
 
 Last updated: 2026-05-09
 
 Use `npm.cmd` for npm scripts on Windows.
 
-## 1.4.5 Release Blocker Audit Gate
+## 1.4.6 Release Blocker Audit Gate
 
 Use this gate when touching hosted Vercel proxy routes, VPS upstream security, release hosted preflight, payment-server dependency audit, visible Chinese text, PromptBar release QA, or VPS env examples:
 
@@ -30,7 +30,7 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check
 
 Expected local result for `release:hosted:check`: it must fail while local `.env.local` contains `VITE_TURNSTILE_LOCAL_BYPASS=true` or a remote HTTP `VITE_KK_API_BASE_URL`. Treat that failure as the required clean-hosted-environment release blocker, not as a code failure. Before production release, rerun the same command in a clean hosted environment and require it to pass with HTTPS/same-origin API configuration plus real OAuth, Turnstile, and payment sidecar secrets.
 
-Browser QA for this gate must cover desktop dark/light and 390px mobile surfaces: login, temporary local workspace, storage selection/browser-cache path, PromptBar/model menu, active toggle gradient, settings, recharge/balance entry, mobile footer, and mobile settings/more sheet. Record screenshots and `release-qa-summary-refreshed.json` under `output/playwright/1.4.5-release-qa/`; do not commit `output/`.
+Browser QA for this gate must cover desktop dark/light and 390px mobile surfaces: login, temporary local workspace, storage selection/browser-cache path, PromptBar/model menu, active toggle gradient, settings, recharge/balance entry, mobile footer, and mobile settings/more sheet. Record screenshots and `release-qa-summary-refreshed.json` under `output/playwright/1.4.6-release-qa/`; do not commit `output/`.
 
 Hosted/VPS production smoke must also verify:
 
@@ -43,6 +43,27 @@ curl.exe -vI https://api.kkai.plus/api/v1/auth/session
 ```
 
 The HTTPS `api.kkai.plus` checks must complete TLS and return application/API responses before production release. Public `/internal/` paths must return `404` at nginx and must not proxy to the payment sidecar.
+
+## 1.4.6 Version And Portable Alignment Gate
+
+Use this gate when bumping release metadata, package versions, portable manifests, or portable release scanner logic:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/portable-payment-package-contract.test.ts" `
+  "tests/unit/portable-app-server-document-proxy-contract.test.ts"
+$env:VITE_KK_API_BASE_URL='https://api.kkai.plus'; npm.cmd run package:portable
+npm.cmd run publish:portable
+npm.cmd run governance:version
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check
+```
+
+Before committing, confirm no current release metadata points at `1.4.5`, `v1.4.5`, or `KK-Studio-Portable-1.4.5` outside explicitly historical status notes. Do not stage `release/KK-Studio-Portable/`, `output/`, local `.env*` files, or line-ending-only noise.
 
 ## Desktop Canvas Snap-To-Grid Hotfix Gate
 

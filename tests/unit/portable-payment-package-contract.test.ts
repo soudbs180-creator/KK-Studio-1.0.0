@@ -60,6 +60,8 @@ test('portable release packaging fails unless the built frontend has a remote KK
   assert.match(releaseSource, /function assertPortableRemoteKkApiBaseUrl/);
   assert.match(releaseSource, /VITE_KK_API_BASE_URL/);
   assert.match(releaseSource, /isLocalOrPrivateKkApiBaseUrl/);
+  assert.match(releaseSource, /\(\[`"'\]\)\(\.\*\?\)\\1/);
+  assert.match(releaseSource, /match\?\.\[2\]/);
   assert.match(releaseSource, /await assertPortableRemoteKkApiBaseUrl\(distSourceDir\)/);
   assert.match(releaseSource, /does not package the core KK API/);
 });

@@ -92,15 +92,34 @@ async function resolvePlaywrightModuleUrl() {
     const modulePath = path.join(npxCacheRoot, entry.name, 'node_modules', 'playwright', 'index.mjs');
     if (!existsSync(modulePath)) continue;
     const stats = await stat(modulePath);
-    candidates.push({ modulePath, mtimeMs: stats.mtimeMs });
+    const version = readPlaywrightCacheVersion(modulePath);
+    candidates.push({
+      modulePath,
+      mtimeMs: stats.mtimeMs,
+      stable: isStablePlaywrightVersion(version),
+      version,
+    });
   }
 
-  candidates.sort((left, right) => right.mtimeMs - left.mtimeMs);
+  candidates.sort((left, right) => Number(right.stable) - Number(left.stable) || right.mtimeMs - left.mtimeMs);
   if (candidates.length === 0) {
     throw new Error('Playwright module was not found in the npx cache. Run `cmd /c npx playwright --version` once first.');
   }
 
   return `file:///${candidates[0].modulePath.replace(/\\/g, '/')}`;
+}
+
+function readPlaywrightCacheVersion(modulePath) {
+  try {
+    const packagePath = path.join(path.dirname(modulePath), '..', 'playwright-core', 'package.json');
+    return JSON.parse(readFileSync(packagePath, 'utf8')).version || '';
+  } catch {
+    return '';
+  }
+}
+
+function isStablePlaywrightVersion(version) {
+  return /^\d+\.\d+\.\d+$/.test(String(version || ''));
 }
 
 async function gotoWithRetry(page, url) {

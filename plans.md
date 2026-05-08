@@ -1,17 +1,17 @@
-# KK-Studio v1.4.5 Single-Line Convergence Plan
+# KK-Studio v1.4.6 Single-Line Convergence Plan
 
 Last updated: 2026-05-09
 Branch policy: continue on the current branch and current workspace unless the user explicitly asks for a branch or worktree.
 
 ## Summary
 
-Current 1.4.5 release blocker audit:
-- Treat the current alternate-git worktree as the 1.4.5 release candidate baseline, but keep unrelated canvas snap/collapsed-group work out of this release audit commit line.
+Current 1.4.6 release blocker audit:
+- Treat the current alternate-git worktree as the 1.4.6 release candidate baseline, including the snap-to-grid and collapsed manual group feature line.
 - Security/proxy milestone: move hosted `/api/v1/*`, `/api/auth/*`, `/api/manifest`, and `/healthz` onto tracked Vercel API functions backed by `api/_vpsProxy.ts`; default the upstream to HTTPS; dynamically derive upstream host/proto; and fail closed before forwarding Authorization, cookies, session, csrf, or token headers to a production HTTP upstream.
 - Hosted environment milestone: make `resolveKkApiBaseUrl()` prefer the HTTPS runtime origin when a hosted build still carries an HTTP remote VPS base URL, and make `release:hosted:check` block `VITE_TURNSTILE_LOCAL_BYPASS` plus remote HTTP `VITE_KK_API_BASE_URL` snapshots.
 - Dependency/VPS milestone: clear the `payment-server` moderate dependency audit by overriding `express-rate-limit` to `8.5.1`/`ip-address` `10.2.0`, and document secure cookie plus payment sidecar settlement/internal tokens in VPS env examples.
 - UI/localization milestone: keep PromptBar active toggles on `bg-[image:var(--prompt-bar-toggle-active-bg)]`, widen the 390px mobile model control, and replace remaining visible PendingNode English fallback text/alt strings with Simplified Chinese.
-- Browser QA milestone: run real Chromium QA across login, temporary local workspace, PromptBar/model menu, settings, recharge/balance entry, and 390px mobile surfaces. Record screenshots and JSON under `output/playwright/1.4.5-release-qa/`, but do not commit artifacts.
+- Browser QA milestone: run real Chromium QA across login, temporary local workspace, PromptBar/model menu, settings, recharge/balance entry, and 390px mobile surfaces. Record screenshots and JSON under `output/playwright/1.4.6-release-qa/`, but do not commit artifacts.
 - VPS exposure milestone: public nginx configs must return `404` for `/internal/` instead of proxying it to the payment sidecar; internal settlement/callback traffic must stay service-to-service with scoped tokens.
 - Release remains blocked until the production `api.kkai.plus` DNS and HTTPS endpoint are fixed and smoked successfully. Clean-env `release:hosted:check` now passes when local dev env files are isolated and hosted process env is supplied, but the public HTTPS VPS API is not yet reachable.
 
@@ -311,7 +311,7 @@ Commit:
 
 ### 1. Refactor Ledger Alignment
 
-Goal: make `plans.md`, `implement.md`, `status.md`, and `validation.md` describe the v1.4.5 refactor line.
+Goal: make `plans.md`, `implement.md`, `status.md`, and `validation.md` describe the v1.4.6 refactor line.
 
 Acceptance:
 - The four ledger files identify `d12731ce` as the then-current alternate-git baseline, name plain `.git` as stale/historical, and describe the single merged execution line.
@@ -324,7 +324,7 @@ Validation:
 - `npm.cmd run check:encoding`
 
 Commit:
-- `docs: align v1.4.5 refactor plan`
+- `docs: align v1.4.6 refactor plan`
 
 ### 2. Stage One M6 Closeout: Remaining Ecommerce Branch Scan (Completed)
 

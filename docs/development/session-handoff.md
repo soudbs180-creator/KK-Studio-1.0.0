@@ -10,7 +10,7 @@
 - 当前对外口径继续保守：除非再补完手工烟测，否则 `设置 / 管理后台 / 鉴权` 继续写成 `已落地待回归`。
 
 ## 2. 当前事实基线
-- 当前版本：`1.4.5`
+- 当前版本：`1.4.6`
 - `config/release-manifest.json` 是主版本源。
 - `src/config/appInfo.ts` 是运行时只读导出。
 - `release/publish/stable/manifest.json` 是 portable stable 发布清单。

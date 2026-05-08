@@ -82,9 +82,9 @@ async function readBuiltKkApiBaseUrl(distDir) {
     }
 
     const source = await fs.promises.readFile(entryPath, 'utf8');
-    const match = /VITE_KK_API_BASE_URL["']?\s*:\s*["']([^"']+)["']/.exec(source);
-    if (match?.[1]) {
-      return match[1];
+    const match = /VITE_KK_API_BASE_URL["']?\s*:\s*([`"'])(.*?)\1/.exec(source);
+    if (match?.[2]) {
+      return match[2];
     }
   }
 

@@ -1,13 +1,13 @@
 {
   "appName": "KK Studio",
-  "version": "1.4.5",
-  "displayVersion": "v1.4.5",
-  "releaseDate": "2026-05-07",
+  "version": "1.4.6",
+  "displayVersion": "v1.4.6",
+  "releaseDate": "2026-05-09",
   "releaseNotes": [
-    "Main app, payment sidecar, portable metadata, and synchronized documentation are aligned to version 1.4.5.",
-    "The current hosted baseline consolidates production Vercel deployment fixes, API routing, billing proxy behavior, and mobile ecommerce continuation surfaces into one release line.",
-    "Runtime-truth docs, package governance, and portable version manifests are aligned to version 1.4.5.",
-    "The 1.4.5 release metadata is prepared for production deployment on kkai.plus."
+    "Desktop canvas now includes a snap-to-grid toggle for more precise prompt, image, workflow, and grouped-card positioning.",
+    "Manual canvas groups can now collapse into compact cards and expand back without rendering hidden members or connectors.",
+    "Hosted/VPS release guardrails, package metadata, workspace packages, and portable version manifests are aligned to version 1.4.6.",
+    "The 1.4.6 release metadata is prepared for production deployment on kkai.plus once the remaining DNS/TLS smoke gate passes."
   ],
   "versionTargets": {
     "releaseManifest": "config/release-manifest.json",

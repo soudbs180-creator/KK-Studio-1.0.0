@@ -16,7 +16,7 @@
   - `多供应商 Phase 1`：`进行中`
 
 ## 2. 统一事实基线
-- 当前版本：`1.4.5`
+- 当前版本：`1.4.6`
 - `config/release-manifest.json` 是版本真相源。
 - `src/config/appInfo.ts` 是运行时只读导出。
 - `release/publish/stable/manifest.json` 是 stable 发布清单。
