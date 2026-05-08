@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import { CanvasGroup } from '../../types';
-import { Type, GripHorizontal, Trash2 } from 'lucide-react';
+import { Type, GripHorizontal, Trash2, Eye, EyeOff } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
 
@@ -34,6 +34,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     const rafRef = useRef<number | null>(null);
     const pendingDelta = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
+    const isCollapsed = Boolean(group.collapsed);
     const fallbackStackZIndex = ((group.zIndex ?? 0) * 100) + (isDragging ? 30 : highlighted ? 20 : 10);
     const stackZIndex = stackZIndexOverride ?? fallbackStackZIndex;
     const effectiveStackZIndex = elevateCanvasStackZIndex(stackZIndex, isDragging);
@@ -76,29 +77,44 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
         WebkitBackdropFilter: 'blur(var(--frost-input-blur)) saturate(1.12)',
         backdropFilter: 'blur(var(--frost-input-blur)) saturate(1.12)',
     };
+    const groupCollapsedCardStyle: React.CSSProperties = {
+        ...groupHeaderSurfaceStyle,
+        minWidth: 180,
+        maxWidth: 320,
+    };
 
     // Rename state
     const [isEditing, setIsEditing] = useState(false);
-    const [label, setLabel] = useState(group.label || 'Group');
+    const defaultGroupLabel = '分组';
+    const collapsedToggleLabel = isCollapsed ? '展开分组' : '折叠分组';
+    const [label, setLabel] = useState(group.label || defaultGroupLabel);
     const inputRef = useRef<HTMLInputElement>(null);
+    // Use computed bounds if available, otherwise fall back to stored group bounds
+    const bounds = computedBounds || group.bounds;
+    const compactBounds = {
+        x: bounds.x,
+        y: bounds.y,
+        width: Math.max(180, Math.min(320, bounds.width)),
+        height: 44,
+    };
+    const renderedBounds = isCollapsed ? compactBounds : bounds;
 
     // Sync label
     useEffect(() => {
-        setLabel(group.label || 'Group');
-    }, [group.label]);
+        setLabel(group.label || defaultGroupLabel);
+    }, [defaultGroupLabel, group.label]);
 
     // Sync bounds (if not dragging)
     useEffect(() => {
         if (!isDragging) {
-            const newBounds = computedBounds || group.bounds;
-            localBoundsRef.current = newBounds;
+            localBoundsRef.current = renderedBounds;
             if (containerRef.current) {
-                containerRef.current.style.transform = `translate(${newBounds.x}px, ${newBounds.y}px)`;
-                containerRef.current.style.width = `${newBounds.width}px`;
-                containerRef.current.style.height = `${newBounds.height}px`;
+                containerRef.current.style.transform = `translate(${renderedBounds.x}px, ${renderedBounds.y}px)`;
+                containerRef.current.style.width = `${renderedBounds.width}px`;
+                containerRef.current.style.height = `${renderedBounds.height}px`;
             }
         }
-    }, [computedBounds, group.bounds, isDragging]);
+    }, [isDragging, renderedBounds]);
 
     // Focus input on edit start
     useEffect(() => {
@@ -154,8 +170,10 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
         setIsEditing(false);
     };
 
-    // Use computed bounds if available, otherwise fall back to stored group bounds
-    const bounds = computedBounds || group.bounds;
+    const handleToggleCollapsed = useCallback((e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        onUpdateGroup?.({ ...group, collapsed: !group.collapsed });
+    }, [group, onUpdateGroup]);
 
     const flushPendingDrag = useCallback(() => {
         if (!onGroupDrag) return;
@@ -226,16 +244,18 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
         <>
             <div
                 ref={containerRef}
-                className={`absolute border rounded-[32px] group-container transition-colors ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                className={isCollapsed
+                    ? `absolute canvas-group-collapsed-card border rounded-2xl transition-colors ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`
+                    : `absolute border rounded-[32px] group-container transition-colors ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                 style={{
                     left: 0,
                     top: 0,
-                    width: bounds.width,
-                    height: bounds.height,
-                    transform: `translate(${bounds.x}px, ${bounds.y}px)`,
+                    width: renderedBounds.width,
+                    height: renderedBounds.height,
+                    transform: `translate(${renderedBounds.x}px, ${renderedBounds.y}px)`,
                     zIndex: effectiveStackZIndex,
                     pointerEvents: 'auto',
-                    ...groupSurfaceStyle,
+                    ...(isCollapsed ? groupCollapsedCardStyle : groupSurfaceStyle),
                     willChange: isDragging ? 'width, height' : 'auto',
                     // Disable transition during drag to prevent rubber-banding
                     transition: isDragging ? 'none' : 'box-shadow 0.3s ease, transform 0.1s linear, width 0.1s linear, height 0.1s linear',
@@ -244,50 +264,87 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                 onMouseDown={handleMouseDown} // Allow dragging from anywhere in the group box
                 onContextMenu={handleContextMenu}
             >
-                {/* Header / Drag Handle */}
-                <div
-                    className="absolute -top-10 left-0 flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-opacity opacity-100"
-                    style={groupHeaderSurfaceStyle}
-                >
-                    <GripHorizontal size={14} style={{ color: highlighted ? 'var(--state-info-text)' : 'var(--text-tertiary)' }} />
-                    {isEditing ? (
-                        <input
-                            ref={inputRef}
-                            value={label}
-                            onChange={(e) => setLabel(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleRename();
-                                if (e.key === 'Escape') {
-                                    setLabel(group.label || 'Group');
-                                    setIsEditing(false);
-                                }
-                                e.stopPropagation();
-                            }}
-                            onMouseDown={(e) => e.stopPropagation()} // Allow text alignment/cursor
-                            className="w-32 text-xs font-medium border-none outline-none rounded px-1 transition-all"
+                {isCollapsed ? (
+                    <div className="flex h-full min-w-0 items-center gap-2 px-3">
+                        <button
+                            type="button"
+                            onClick={handleToggleCollapsed}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className="flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-xs font-medium transition-colors hover:bg-[var(--frost-card-sub-bg)]"
                             style={{
-                                ...groupInputSurfaceStyle,
-                                color: 'var(--text-primary)',
-                                fontSize: '16px',
-                                transitionDuration: 'var(--duration-fast)'
+                                borderColor: 'var(--frost-card-sub-border)',
+                                color: highlighted ? 'var(--state-info-text)' : 'var(--text-secondary)',
                             }}
-                            onFocus={(e) => {
-                                e.currentTarget.style.boxShadow = '0 0 0 1px var(--state-info-border)';
-                            }}
-                            onBlur={(e) => {
-                                e.currentTarget.style.boxShadow = 'none';
-                                handleRename();
-                            }}
-                        />
-                    ) : (
-                        <span
-                            className="text-xs font-medium whitespace-nowrap"
-                            style={{ color: highlighted ? 'var(--state-info-text)' : 'var(--text-secondary)' }}
+                            title={collapsedToggleLabel}
+                            aria-label={collapsedToggleLabel}
                         >
-                            {group.label || 'Group'}
+                            <Eye size={14} />
+                            <span>展开分组</span>
+                        </button>
+                        <span
+                            className="min-w-0 truncate text-xs font-medium"
+                            style={{ color: highlighted ? 'var(--state-info-text)' : 'var(--text-secondary)' }}
+                            title={group.label || defaultGroupLabel}
+                        >
+                            {group.label || defaultGroupLabel}
                         </span>
-                    )}
-                </div>
+                    </div>
+                ) : (
+                    <div
+                        className="absolute -top-10 left-0 flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-opacity opacity-100"
+                        style={groupHeaderSurfaceStyle}
+                    >
+                        <GripHorizontal size={14} style={{ color: highlighted ? 'var(--state-info-text)' : 'var(--text-tertiary)' }} />
+                        {isEditing ? (
+                            <input
+                                ref={inputRef}
+                                value={label}
+                                onChange={(e) => setLabel(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleRename();
+                                    if (e.key === 'Escape') {
+                                        setLabel(group.label || defaultGroupLabel);
+                                        setIsEditing(false);
+                                    }
+                                    e.stopPropagation();
+                                }}
+                                onMouseDown={(e) => e.stopPropagation()} // Allow text alignment/cursor
+                                className="w-32 text-xs font-medium border-none outline-none rounded px-1 transition-all"
+                                style={{
+                                    ...groupInputSurfaceStyle,
+                                    color: 'var(--text-primary)',
+                                    fontSize: '16px',
+                                    transitionDuration: 'var(--duration-fast)'
+                                }}
+                                onFocus={(e) => {
+                                    e.currentTarget.style.boxShadow = '0 0 0 1px var(--state-info-border)';
+                                }}
+                                onBlur={(e) => {
+                                    e.currentTarget.style.boxShadow = 'none';
+                                    handleRename();
+                                }}
+                            />
+                        ) : (
+                            <span
+                                className="text-xs font-medium whitespace-nowrap"
+                                style={{ color: highlighted ? 'var(--state-info-text)' : 'var(--text-secondary)' }}
+                            >
+                                {group.label || defaultGroupLabel}
+                            </span>
+                        )}
+                        <button
+                            type="button"
+                            onClick={handleToggleCollapsed}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className="flex h-6 w-6 items-center justify-center rounded-lg transition-colors hover:bg-[var(--frost-card-sub-bg)]"
+                            style={{ color: highlighted ? 'var(--state-info-text)' : 'var(--text-tertiary)' }}
+                            title={collapsedToggleLabel}
+                            aria-label={collapsedToggleLabel}
+                        >
+                            <EyeOff size={14} />
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Context Menu Portal (Fixed Position) */}
@@ -325,7 +382,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                         className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-500 hover:bg-[rgba(255,107,90,0.10)] hover:text-red-400 rounded transition-colors text-left"
                     >
                         <Trash2 size={14} />
-                        取消打组
+                        取消分组
                     </button>
                 </div>,
                 document.body

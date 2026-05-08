@@ -22,6 +22,14 @@ Current desktop snap-to-grid hotfix:
 - Acceptance: focused snap-to-grid and canvas-movement contracts pass, `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and path-limited `diff --check` pass; browser QA records URL, viewport, theme, checked surface, `.theme-transitioning`, stale chunk status, and console errors.
 - Commit scope must stay limited to the snap helper, toolbar state/wiring, affected card drag props, shared movement helper snap options, the focused contracts, `tsconfig.tests.json` test registration, and ledger files. Existing unrelated dirty files and collapsed canvas group work are excluded.
 
+Current desktop collapsed manual group hotfix:
+- Add a desktop-only eye control to manual canvas groups so users can hide a group after grouping.
+- Expanded groups show an eye-off hide button in the group header. Collapsed groups render as a compact card with an eye icon, `展开分组`, and the group name.
+- Collapsed group members are removed from prompt/image/workflow render queues, prompt-group child render data, connector rendering, image-load scheduling, and `InfiniteCanvas.cardPositions`.
+- Collapsed group viewport culling uses the same computed bounds as the rendered compact card, so stale persisted `group.bounds` cannot hide the card incorrectly after members move.
+- Acceptance: focused collapsed-group, canvas group, prompt regroup, and visual-regression contracts pass; `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, strict no-unused TypeScript, and path-limited alternate-git `diff --check` pass; browser QA records URL, viewport, theme, checked surfaces, `.theme-transitioning`, stale chunk status, connector count, and console errors.
+- Commit scope must stay limited to collapsed manual group runtime/UI/test/ledger files. Existing unrelated hosted/VPS/payment/PromptBar/settings/snap-to-grid dirty files are excluded, and mixed files such as `src/App.tsx` and `tsconfig.tests.json` require hunk-scoped staging.
+
 Completed provider compatibility override after the ecommerce framework card closure:
 - Verify GPT Best against the live Apifox `llms.txt` source before changing local routing.
 - Treat GPT Best as a priority multi-protocol provider, but keep official OpenAI behavior isolated and unchanged.

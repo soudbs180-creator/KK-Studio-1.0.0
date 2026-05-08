@@ -31,6 +31,17 @@ Snap-to-grid implementation rules:
 - UI evidence is required before commit. Prefer the Codex in-app Browser; if it is blocked, record the blocker and use the repository Playwright/headless-browser fallback with URL, viewport, theme, checked surfaces, `.theme-transitioning`, stale chunk text, and console-error status.
 - Stage only snap-to-grid files plus ledger files, with patch staging if a file also contains unrelated dirty work.
 
+Current desktop collapsed manual group hotfix (2026-05-09): add the desktop manual-group hide/expand path requested by the user. Keep the change scoped to manual canvas group collapse state, compact card UI, hidden-member render/load suppression, focused contract coverage, browser evidence, and ledger updates. Do not stage or commit existing unrelated hosted/API/payment/PromptBar/settings/snap-to-grid work.
+
+Collapsed manual group implementation rules:
+- Persist only a small optional `CanvasGroup.collapsed` flag; do not duplicate member state or delete hidden nodes.
+- The expanded manual group header owns the hide control and uses lucide `EyeOff`; the collapsed card owns the expand control and uses lucide `Eye`.
+- Collapsed cards must render as compact canvas objects with expand text plus group label only.
+- Hidden group members must be excluded from prompt/image/workflow render queues, prompt-group child data, image-load scheduling/prefetch, connector rendering, and canvas fit/card-position inputs.
+- Collapsed group culling must use computed member bounds when available, matching `CanvasGroupComponent` placement, instead of relying on stale persisted `group.bounds`.
+- UI evidence is required before commit. Prefer the Codex in-app Browser; if it is blocked, record the blocker and use the repository Playwright/headless-browser fallback with URL, viewport, theme, checked surfaces, connector count, `.theme-transitioning`, stale chunk text, and console-error status.
+- Stage only collapsed-group files plus ledger files. Use patch staging for mixed files such as `src/App.tsx` and `tsconfig.tests.json`, excluding snap-to-grid and hosted/VPS hunks.
+
 Completed provider compatibility override (2026-05-08): GPT Best priority compatibility from `https://gpt-best.apifox.cn/llms.txt` is committed in `fe99e829`. M131 prompt optimizer cache/logging redaction is committed in `dade1de4`. The active slice is M132 shared local user-route auth inference. Keep changes path-limited to the local user-route auth helper, diagnostics auth inference, focused local user-route contracts, and ledgers. Do not change endpoint call-site behavior, fetch execution, fallback ordering, key storage, provider persistence, billing/payment behavior, storage persistence, UI, release metadata, or broad adapter refactors in this slice.
 
 GPT Best implementation rules:

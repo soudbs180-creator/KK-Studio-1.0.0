@@ -81,6 +81,38 @@ git diff --check -- `
 
 Browser QA is required because this changes visible desktop UI. Record the URL, viewport, theme, left-toolbar snap control, `aria-pressed` toggle, `.theme-transitioning`, stale chunk status, and console errors in `status.md`. If the in-app Browser is blocked, record that and use the repository Playwright/headless-browser fallback.
 
+## Desktop Collapsed Manual Group Hotfix Gate
+
+Use this gate when touching desktop manual canvas group collapse state, compact group cards, hidden group member render suppression, connector suppression, or collapsed group image-load scheduling:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/canvas-collapsed-groups-contract.test.ts" `
+  "tests/unit/canvas-groups-contract.test.ts" `
+  "tests/unit/prompt-group-regroup-behavior.test.ts" `
+  "tests/unit/canvas-visual-regression.test.ts"
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "src/App.tsx" `
+  "src/app/collapsedCanvasGroups.ts" `
+  "src/components/canvas/CanvasGroupComponent.tsx" `
+  "src/types.ts" `
+  "tests/unit/canvas-collapsed-groups-contract.test.ts" `
+  "tests/unit/canvas-visual-regression.test.ts" `
+  "tsconfig.tests.json" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA is required because this changes visible desktop UI and resource loading. Record the URL, viewport, theme, collapsed card, expand/hide controls, hidden member prompt/image surfaces, connector count, `.theme-transitioning`, stale chunk status, and console errors in `status.md`. If the in-app Browser is blocked, record that and use the repository Playwright/headless-browser fallback.
+
 ## Hosted Production Startup Hotfix Gate
 
 Use this gate when touching Vercel hosted routing, hosted session bootstrap, hosted auth startup recovery, or `kkai.plus` production login entry:
