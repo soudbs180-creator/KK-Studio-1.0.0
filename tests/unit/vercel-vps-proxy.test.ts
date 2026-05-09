@@ -47,6 +47,27 @@ test("Vercel VPS proxy default upstream is HTTPS", async () => {
   assert.equal(new URL(observedUrl).protocol, "https:");
 });
 
+test("Vercel VPS proxy default upstream avoids the unresolved canonical API hostname", async () => {
+  let observedUrl = "";
+
+  delete process.env.KK_VPS_API_BASE_URL;
+  globalThis.fetch = async (input) => {
+    observedUrl = String(input);
+    return new Response(null, { status: 204 });
+  };
+
+  const response = await proxyToVps(
+    new Request("https://kkai.plus/api/v1/auth/session"),
+    "/api/v1/auth/session",
+  );
+
+  const upstreamUrl = new URL(observedUrl);
+  assert.equal(response.status, 204);
+  assert.equal(upstreamUrl.protocol, "https:");
+  assert.equal(upstreamUrl.hostname, "172-245-156-16.sslip.io");
+  assert.notEqual(upstreamUrl.hostname, "api.kkai.plus");
+});
+
 test("Vercel VPS proxy preserves HTTPS API requests while stripping caller-controlled host headers", async () => {
   let observedUrl = "";
   let observedInit: RequestInit | undefined;

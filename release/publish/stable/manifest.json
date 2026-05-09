@@ -2,17 +2,17 @@
   "appName": "KK Studio",
   "version": "1.4.6",
   "displayVersion": "v1.4.6",
-  "buildTime": "2026-05-08T17:49:03.250Z",
+  "buildTime": "2026-05-09T04:06:48.654Z",
   "releaseDate": "2026-05-09",
   "releaseNotes": [
     "Desktop canvas now includes a snap-to-grid toggle for more precise prompt, image, workflow, and grouped-card positioning.",
     "Manual canvas groups can now collapse into compact cards and expand back without rendering hidden members or connectors.",
     "Hosted/VPS release guardrails, package metadata, workspace packages, and portable version manifests are aligned to version 1.4.6.",
-    "The 1.4.6 release metadata is prepared for production deployment on kkai.plus once the remaining DNS/TLS smoke gate passes."
+    "The 1.4.6 hosted release now uses the verified kkai.plus same-origin API with an HTTPS VPS upstream while the permanent api.kkai.plus DNS record awaits Cloudflare access."
   ],
   "channel": "stable",
   "packageFile": "KK-Studio-Portable-1.4.6.zip",
   "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.4.6/KK-Studio-Portable-1.4.6.zip",
-  "sha256": "f7dd639e1e8ce2f17a029ea02aeb2ed28af72884a8588fae49a8c0151689e22f",
-  "size": 52899158
+  "sha256": "2ba18a49403584b9d934ae18b6059d77c655c772eca6701739c8a8e9153b07c3",
+  "size": 52901506
 }

@@ -1,6 +1,6 @@
 export const config = { runtime: 'edge' };
 
-const DEFAULT_VPS_API_BASE_URL = 'https://api.kkai.plus';
+const DEFAULT_VPS_API_BASE_URL = 'https://172-245-156-16.sslip.io';
 
 const HOP_BY_HOP_REQUEST_HEADERS = new Set([
   'connection',

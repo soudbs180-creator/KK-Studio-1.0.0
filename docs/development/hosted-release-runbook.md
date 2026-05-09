@@ -168,7 +168,7 @@ What must be true before release:
 - Local `/healthz` reports `status: ok`
 - `config.canonicalPersistenceReady` is `true`
 - No hosted-required env shows as missing or placeholder in the local snapshot
-- `VITE_KK_API_BASE_URL` points at the VPS API origin
+- `VITE_KK_API_BASE_URL` points at an HTTPS API origin or the hosted same-origin URL
 - `VITE_ENABLE_LEGACY_WEB_API_FALLBACK` is not present in the hosted env plan
 - Hosted payment runtimes cannot boot in memory-only settlement mode
 - Hosted payment runtimes fail closed instead of booting with in-memory payment storage or missing settlement auth.
@@ -195,9 +195,11 @@ The command must deploy:
 - `apps/payment-sidecar`
 - PostgreSQL migrations required by auth, billing, workspace sync, model routing, and payment settlement
 
-### 3. Configure API DNS and TLS
+### 3. Confirm API DNS and TLS
 
-Production hosted builds expect the browser-facing API origin to be HTTPS. For the current `kkai.plus` release, the public API host is:
+Production hosted builds expect the browser-facing API origin to be HTTPS. Current 1.4.6 hosted baseline uses `https://kkai.plus` as the browser-facing same-origin API. Vercel API functions proxy to the verified HTTPS VPS upstream `https://172-245-156-16.sslip.io` until the permanent `api.kkai.plus` DNS record can be changed in Cloudflare.
+
+Permanent canonical API domain setup remains recommended, but it is a follow-up infrastructure hardening step rather than the active 1.4.6 hosted availability path. For that permanent path, the target public API host is:
 
 ```text
 api.kkai.plus -> 172.245.156.16

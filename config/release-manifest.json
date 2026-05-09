@@ -7,7 +7,7 @@
     "Desktop canvas now includes a snap-to-grid toggle for more precise prompt, image, workflow, and grouped-card positioning.",
     "Manual canvas groups can now collapse into compact cards and expand back without rendering hidden members or connectors.",
     "Hosted/VPS release guardrails, package metadata, workspace packages, and portable version manifests are aligned to version 1.4.6.",
-    "The 1.4.6 release metadata is prepared for production deployment on kkai.plus once the remaining DNS/TLS smoke gate passes."
+    "The 1.4.6 hosted release now uses the verified kkai.plus same-origin API with an HTTPS VPS upstream while the permanent api.kkai.plus DNS record awaits Cloudflare access."
   ],
   "versionTargets": {
     "releaseManifest": "config/release-manifest.json",
