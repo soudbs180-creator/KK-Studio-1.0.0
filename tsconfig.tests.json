@@ -145,6 +145,7 @@
         "tests/unit/storage-service-unused-cleanup-contract.test.ts",
         "tests/unit/app-unused-cleanup-contract.test.ts",
         "tests/unit/api-settings-unused-cleanup-contract.test.ts",
+        "tests/unit/admin-login-page-surface.test.ts",
         "tests/unit/ui-unused-cleanup-contract.test.ts",
         "tests/unit/video-service-unused-cleanup-contract.test.ts",
         "tests/unit/vercel-vps-proxy.test.ts",

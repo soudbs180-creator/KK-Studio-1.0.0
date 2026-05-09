@@ -50,7 +50,28 @@ npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560
 
 Observed result: package metadata reports `1.4.6`; Vercel Production contains `KK_VPS_API_BASE_URL` and `VITE_KK_API_BASE_URL`; `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_632NEDeDWYXHJtyjnxfgDgQfuHXo`, target `production`, status `Ready`, URL `https://kk-studio-gq1riacd7-yykks-projects-727e9560.vercel.app`, and aliases `https://kkai.plus`, `https://www.kkai.plus`, `https://kk-studio.vercel.app`, `https://kk-studio-yykks-projects-727e9560.vercel.app`, and `https://kk-studio-yinchenkang0-1635-yykks-projects-727e9560.vercel.app`. The remote deployment build ran as `kk-studio@1.4.6` and transformed 2140 modules.
 
-Fresh DNS/VPS blocker evidence: `Resolve-DnsName api.kkai.plus -Server 1.1.1.1 -Type A`, `Resolve-DnsName api.kkai.plus -Server 8.8.8.8 -Type A`, and direct checks using the Cloudflare nameserver hostnames return `198.18.0.73`, not `172.245.156.16`. Node DoH checks against `https://cloudflare-dns.com/dns-query` and `https://dns.google/resolve` return no A answer and only the Cloudflare SOA. `CF_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ZONE_ID` are unset locally, and `node scripts/deploy/cloudflare-upsert-api-dns.mjs` fails closed with the expected missing-token message. VPS HTTP smoke currently returns `200` for `http://172.245.156.16/healthz`, `200` for `/api/manifest`, `401 AUTH_REQUIRED` for `/api/v1/auth/session`, and `404` for both `/internal` and `/internal/`. Do not call the full hosted/VPS line releasable until `api.kkai.plus` points to the VPS, the TLS helper succeeds, and HTTPS smoke passes.
+Fresh DNS workaround fix after Cloudflare credentials were unavailable:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/vercel-vps-proxy.test.ts tests/unit/portable-payment-package-contract.test.ts tests/unit/hosted-release-guardrails.test.ts
+$env:VITE_KK_API_BASE_URL='https://172-245-156-16.sslip.io'; $env:VITE_TURNSTILE_LOCAL_BYPASS='false'; npm.cmd run package:portable
+npm.cmd run publish:portable
+```
+
+Observed result: RED first reproduced the proxy defaulting to unresolved `api.kkai.plus`; after the fix, the focused suite passed 19/19. Portable packaging rebuilt against `https://172-245-156-16.sslip.io`, `npm.cmd run publish:portable` updated `release/publish/stable/manifest.json`, and the current stable portable archive digest is `2ba18a49403584b9d934ae18b6059d77c655c772eca6701739c8a8e9153b07c3` with size `52901506`. Node HTTPS smoke shows `https://172-245-156-16.sslip.io/healthz` returns `200`, `https://172-245-156-16.sslip.io/api/v1/auth/session` returns expected unauthenticated `401` JSON, and CORS allows `Origin: http://127.0.0.1:3000`. Direct same-machine `https://kkai.plus/api/*` checks can still return Vercel Security Check `429`, so use Vercel inspect plus the HTTPS VPS upstream smoke as the automated evidence from this environment.
+
+Latest production deployment after the DNS workaround fix:
+
+```powershell
+npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560
+npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560
+npx.cmd vercel env ls production --scope yykks-projects-727e9560
+node <https-vps-upstream-smoke>
+```
+
+Observed result: Vercel deploy completed, remote build ran `npm run build` as `kk-studio@1.4.6`, transformed 2140 modules, and aliased `https://kkai.plus`. Inspect reports deployment `dpl_DjvHLa9pM5jZmPDYjJBBNVVF4NK4`, target `production`, status `Ready`, URL `https://kk-studio-bp55q7fxi-yykks-projects-727e9560.vercel.app`, and the expected public aliases. Production env still lists `KK_VPS_API_BASE_URL` and `VITE_KK_API_BASE_URL`. HTTPS VPS upstream smoke returns `200` for `/healthz`, `200` for `/api/manifest`, expected `401` JSON for unauthenticated `/api/v1/auth/session`, `204` for CORS preflight from `http://127.0.0.1:3000`, and `404` for `/internal` plus `/internal/`.
+
+Fresh permanent-domain blocker evidence: `Resolve-DnsName api.kkai.plus -Server 1.1.1.1 -Type A`, `Resolve-DnsName api.kkai.plus -Server 8.8.8.8 -Type A`, and direct checks using the Cloudflare nameserver hostnames return `198.18.0.73`, not `172.245.156.16`. `CF_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ZONE_ID` are unset locally, `npx.cmd wrangler whoami` is unauthenticated, and `node scripts/deploy/cloudflare-upsert-api-dns.mjs` fails closed with the expected missing-token message. Treat `api.kkai.plus` as a follow-up canonical-domain hardening task until Cloudflare DNS edit access is available.
 
 Fresh deployment-boundary guardrail after review:
 
@@ -2629,6 +2650,18 @@ npm.cmd run governance:check
 ```
 
 Current release status: the former `governance:version` portable metadata mismatch was cleared by `567f85aa`, and `npm.cmd run governance:check` passed in the latest full gate. Rerun this gate after any future packaging or publish metadata change.
+
+## Current Admin Login UI Fix Gate
+
+```powershell
+node --test --test-isolation=none tests/unit/admin-login-page-surface.test.ts
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/admin-login-page-surface.test.ts
+npm.cmd run admin:build
+npm.cmd run typecheck
+npm.cmd run check:encoding
+```
+
+Browser validation: Codex in-app Browser checked built `apps/admin/dist` at `http://127.0.0.1:4174/login` on desktop 1280x720 and mobile 390x844; console error count was `0`.
 
 ## Finalization Audit Gate
 
