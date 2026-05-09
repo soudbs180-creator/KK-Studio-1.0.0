@@ -40,6 +40,10 @@ Expected result: version metadata reports `1.4.6`; the login page distinguishes 
 
 Fresh result on 2026-05-09: RED first reproduced the missing parent `error` status branch in `tests/unit/login-screen-auth-actions.test.ts`, then the focused login page test passed 4/4 after the fix. The broader login/Turnstile/hosted guardrail suite freshly passed 17/17; `npm.cmd run governance:agent-docs`, `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run check:encoding`, `npm.cmd pkg get version`, and path-limited alternate-git `diff --check` also passed for this hotfix.
 
+Production deploy result for commit `78aa280f`: `npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560` completed successfully, the remote build ran `npm run build` as `kk-studio@1.4.6`, and `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_4SXnYSMc3yeFCuLsgLEbJSR8ZnFV`, target `production`, status `Ready`, URL `https://kk-studio-o6m9dv4bi-yykks-projects-727e9560.vercel.app`, aliased to `https://kkai.plus`.
+
+Production browser QA result: the in-app browser rendered the real hosted login page in Chinese with `v1.4.6`, no console warnings/errors, no Tailwind CDN warning, and no old `Language zh-CN` Turnstile warning. Turnstile status moved from `待验证 / 请完成 Cloudflare 安全验证后再登录。` to `已就绪 / 安全验证已完成。`. Independent headless Playwright from this machine was stopped by Vercel Security Check `429`, matching the known local automation limitation.
+
 ## Current 1.4.6 Production Deploy Evidence
 
 Fresh final deploy gate before the `dpl_Ae8ckSKAuHthpkNssLnaB1dwHR5Y` production deployment:
