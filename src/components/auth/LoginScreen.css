@@ -224,6 +224,10 @@ body.auth-screen-active.auth-screen-active--light #root {
 }
 
 .auth-input-wrap {
+  --input-autofill-bg: rgb(27 40 66);
+  --input-autofill-text: #ffffff;
+  --input-selection-bg: rgba(113, 187, 255, 0.32);
+  --input-selection-text: #ffffff;
   height: 48px;
   display: flex;
   align-items: center;
@@ -259,6 +263,16 @@ body.auth-screen-active.auth-screen-active--light #root {
 
 .auth-input-wrap input::placeholder {
   color: #95a9cc;
+}
+
+.auth-input-wrap input:-webkit-autofill,
+.auth-input-wrap input:-webkit-autofill:hover,
+.auth-input-wrap input:-webkit-autofill:focus,
+.auth-input-wrap input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--input-autofill-text) !important;
+  caret-color: var(--input-autofill-text);
+  box-shadow: 0 0 0 1000px var(--input-autofill-bg) inset !important;
+  transition: background-color 9999s ease-out, color 9999s ease-out;
 }
 
 .auth-field-help {
@@ -727,6 +741,10 @@ body.auth-screen-active.auth-screen-active--light #root {
 }
 
 .auth-page--light .auth-input-wrap {
+  --input-autofill-bg: #ffffff;
+  --input-autofill-text: #102447;
+  --input-selection-bg: rgba(84, 124, 208, 0.24);
+  --input-selection-text: #102447;
   border-color: rgba(110, 139, 192, 0.24);
   background: rgba(255, 255, 255, 0.78);
   color: #173052;

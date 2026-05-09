@@ -2,6 +2,17 @@
 
 Last updated: 2026-05-09
 
+## Current Login/Input Hotfix Closure
+
+- Active user issue: hosted login could fail with a raw transport-style message such as `HTTP_404: Request failed.` instead of a useful Chinese password/login error, and browser-managed autofill/selection overlays could render as an off-theme colored block inside inputs.
+- Implemented fix scope: `src/components/auth/authLocalization.ts` now maps common invalid-password responses to `邮箱或密码错误。` and maps hosted auth route/proxy failures to a Chinese service-unavailable message without leaking raw `HTTP_404`, `Request failed`, `INVALID_RESPONSE_PAYLOAD`, or HTML-payload text. `src/services/api/kkApiBaseUrl.ts` now strips accidental `/api` and `/api/v1` path prefixes from configured API origins and keeps hosted browser runtime traffic on the same-origin Vercel proxy when the build env points at IP-like or `sslip.io`/`nip.io` HTTPS infrastructure hosts.
+- Implemented UI fix scope: global inputs, auth login inputs, and admin login inputs now define autofill text/background tokens plus selection colors, and WebKit autofill is neutralized with an inset background matching the input surface. This targets the colored rectangle/strip users saw inside input fields without changing the normal input layout.
+- Candidate commit boundary: stage only `apps/admin/src/styles/admin.css`, `src/components/auth/LoginScreen.css`, `src/components/auth/authLocalization.ts`, `src/index.css`, `src/services/api/kkApiBaseUrl.ts`, `tests/unit/auth-localization.test.ts`, `tests/unit/kk-api-base-url-hosted-contract.test.ts`, `tests/unit/input-autofill-style-contract.test.ts`, `status.md`, and `validation.md`. Exclude generated `output/` and the line-ending-only `tests/unit/kk-api-client.test.ts` status noise.
+- Version check: `npm.cmd pkg get version` reports `1.4.6`.
+- Fresh validation for this hotfix closure: `npm.cmd pkg get version` returned `1.4.6`; targeted auth/input/base-url gate passed 45/45; `npm.cmd run governance:check`, `npm.cmd run audit:dependencies`, `npm.cmd run spec:check`, `npm.cmd run typecheck`, `npm.cmd run test:unit` passed 1451/1451, `npm.cmd run build`, `npm.cmd run admin:build`, and `npm.cmd run check:encoding` all passed. Path-limited alternate-git `diff --check` passed with Windows LF/CRLF normalization warnings only.
+- Browser QA evidence: built static preview served at `http://127.0.0.1:4173/`; clean `http://localhost:4173/` displayed the login page with Chinese text and `v1.4.6`, and the auth email/password inputs had no obvious colored strip. The preview console reported two known local static-preview admin model fetch errors while loading model catalog assets, matching the existing isolated local-model fetch noise rather than a login rendering error. Mobile viewport switching was inconclusive in the in-app Browser, so do not treat this as full mobile pixel acceptance.
+- Known local release preflight caveat: `npm.cmd run release:hosted:check` is still expected to fail in the dirty local environment because `.env.local` contains `VITE_TURNSTILE_LOCAL_BYPASS=true` and an HTTP VPS API address. Clean hosted-env release preflight evidence remains the required production gate.
+
 ## Current 1.4.6 Release Blocker Audit
 
 - Active user issue: align the release candidate to v1.4.6 after adding desktop snap-to-grid and collapsed manual canvas groups, while preserving hosted/VPS security, dependency audit, visible Chinese text, PromptBar UI details, local storage safety, and real browser QA gates.

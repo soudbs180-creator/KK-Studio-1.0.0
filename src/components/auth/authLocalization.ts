@@ -22,6 +22,28 @@ function isCaptchaErrorMessage(message: string): boolean {
   );
 }
 
+function isInvalidPasswordMessage(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+  return (
+    normalizedMessage.includes("invalid login credentials")
+    || normalizedMessage.includes("invalid email or password")
+    || normalizedMessage.includes("incorrect email or password")
+  );
+}
+
+function isHostedAuthRouteUnavailableMessage(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+  return (
+    normalizedMessage.includes(HOSTED_PASSWORD_LOGIN_ROUTE_DISABLED_CODE.toLowerCase())
+    || normalizedMessage.includes("auth_route_disabled")
+    || normalizedMessage.includes("http_404")
+    || normalizedMessage.includes("http_405")
+    || normalizedMessage.includes("route_not_found")
+    || normalizedMessage.includes("invalid_response_payload")
+    || normalizedMessage.includes("html page instead of the expected json payload")
+  );
+}
+
 function extractErrorCode(error: unknown): string | null {
   if (typeof error === "string" && error.trim()) {
     return error.trim();
@@ -192,7 +214,7 @@ export function mapAuthErrorMessage(
     );
   }
 
-  if (message.includes("Invalid login credentials")) {
+  if (isInvalidPasswordMessage(message)) {
     return pick(language, "邮箱或密码错误。", "Incorrect email or password.");
   }
 
@@ -208,11 +230,11 @@ export function mapAuthErrorMessage(
     return pick(language, "操作过于频繁，请稍后再试。", "Too many attempts. Please try again later.");
   }
 
-  if (message.includes(HOSTED_PASSWORD_LOGIN_ROUTE_DISABLED_CODE)) {
+  if (isHostedAuthRouteUnavailableMessage(message)) {
     return pick(
       language,
-      "托管密码登录接口不可用，请检查 KK API 登录路由是否可用。",
-      "The hosted password login route is unavailable. Check whether the KK API sign-in route is available.",
+      "登录服务暂时不可用，请刷新页面后重试；如果仍失败，请联系管理员检查 KK API 登录路由。",
+      "The sign-in service is temporarily unavailable. Refresh and try again; if it still fails, ask an administrator to check the KK API sign-in route.",
     );
   }
 
