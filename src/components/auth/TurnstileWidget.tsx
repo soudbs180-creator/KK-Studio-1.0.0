@@ -88,7 +88,7 @@ function resolveTurnstileLanguage(language?: string): ResolvedLanguage {
 }
 
 function getWidgetLanguageCode(language: ResolvedLanguage): string {
-  return language === 'en-US' ? 'en' : 'zh-CN';
+  return language === 'en-US' ? 'en' : 'zh-cn';
 }
 
 function getSiteKeySourceLabel(language: ResolvedLanguage, debugSiteKey?: string): string {
