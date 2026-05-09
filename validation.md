@@ -65,11 +65,12 @@ curl.exe -vI https://api.kkai.plus/api/v1/auth/session
 VPS API TLS helper syntax and fail-fast checks must also run on the VPS before enabling the API domain:
 
 ```bash
+CF_API_TOKEN=<cloudflare-zone-dns-edit-token> node scripts/deploy/cloudflare-upsert-api-dns.mjs
 bash -n /tmp/configure-kk-vps-api-tls.sh
 API_DOMAIN=api.kkai.plus EXPECTED_API_IPV4=172.245.156.16 bash /tmp/configure-kk-vps-api-tls.sh
 ```
 
-Before DNS is fixed, the second command must stop at the DNS check and must not write nginx TLS state. After DNS points to the VPS, run the helper from `scripts/vps/configure-kk-vps-api-tls.sh`; it must serve only ACME challenge paths over temporary HTTP, then install the HTTPS virtual host. The HTTPS `api.kkai.plus` checks must complete TLS and return application/API responses before production release. Public `/internal` and `/internal/` paths must return `404` at nginx and must not proxy to the payment sidecar.
+Without a Cloudflare token, the DNS helper must fail closed without mutating DNS. Before DNS is fixed, the VPS TLS command must stop at the DNS check and must not write nginx TLS state. After DNS points to the VPS, run the helper from `scripts/vps/configure-kk-vps-api-tls.sh`; it must serve only ACME challenge paths over temporary HTTP, then install the HTTPS virtual host. The HTTPS `api.kkai.plus` checks must complete TLS and return application/API responses before production release. Public `/internal` and `/internal/` paths must return `404` at nginx and must not proxy to the payment sidecar.
 
 ## 1.4.6 Version And Portable Alignment Gate
 

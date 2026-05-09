@@ -212,6 +212,14 @@ Content: 172.245.156.16
 Proxy: DNS only until the certificate and smoke checks pass
 ```
 
+For the Cloudflare-managed `kkai.plus` zone, the repository helper can upsert the record when a DNS-edit token is available:
+
+```bash
+CF_API_TOKEN=<cloudflare-zone-dns-edit-token> node scripts/deploy/cloudflare-upsert-api-dns.mjs
+```
+
+The helper writes the record as DNS-only, not proxied, so Let's Encrypt can validate the VPS origin directly during the TLS issuance step.
+
 Then run this on the VPS as root:
 
 ```bash

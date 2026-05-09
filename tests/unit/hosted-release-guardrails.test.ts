@@ -144,6 +144,27 @@ test("hosted release runbook keeps routing and billing smoke tests explicit", ()
   assert.match(source, /WECHAT_AUTH_UNAVAILABLE/);
 });
 
+test("Cloudflare DNS helper upserts the API host as DNS-only before VPS TLS", () => {
+  const dnsScriptPath = "scripts/deploy/cloudflare-upsert-api-dns.mjs";
+  assert.equal(existsSync(path.join(ROOT_DIR, dnsScriptPath)), true, `${dnsScriptPath} should exist`);
+
+  const source = readSource(dnsScriptPath);
+
+  assert.match(source, /CF_API_TOKEN/);
+  assert.match(source, /CLOUDFLARE_API_TOKEN/);
+  assert.match(source, /CLOUDFLARE_ZONE_ID/);
+  assert.match(source, /6e8b3a4638980f182b0c4b89bf99e6da/);
+  assert.match(source, /api\.kkai\.plus/);
+  assert.match(source, /172\.245\.156\.16/);
+  assert.match(source, /proxied:\s*false/);
+  assert.match(source, /DNS-only/);
+  assert.match(source, /PATCH/);
+  assert.match(source, /POST/);
+  assert.match(source, /\/client\/v4\/zones\/\$\{zoneId\}\/dns_records/);
+  assert.match(source, /verifyDns/);
+  assert.doesNotMatch(source, /console\.log\(token/);
+});
+
 test("local API env example documents hosted Google and WeChat auth server secrets", () => {
   const source = readSource("apps/api/.env.local.example");
 
