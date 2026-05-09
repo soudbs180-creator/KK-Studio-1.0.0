@@ -26,28 +26,6 @@ export function isPrivateNetworkHostname(hostname: string): boolean {
   );
 }
 
-function isIpHostname(hostname: string): boolean {
-  const normalized = normalizeHostname(hostname);
-  return Boolean(
-    normalized
-    && (
-      /^\d{1,3}(?:\.\d{1,3}){3}$/.test(normalized)
-      || normalized.includes(":")
-    ),
-  );
-}
-
-function isEphemeralDnsIpHostname(hostname: string): boolean {
-  const normalized = normalizeHostname(hostname);
-  return Boolean(
-    normalized
-    && (
-      normalized.endsWith(".sslip.io")
-      || normalized.endsWith(".nip.io")
-    ),
-  );
-}
-
 export function resolveOriginHostname(origin?: string): string | undefined {
   const normalizedOrigin = String(origin || "").trim();
   if (!normalizedOrigin) {
@@ -113,26 +91,6 @@ function shouldPreferRuntimeOriginForLocalApi(
   }
 }
 
-function shouldPreferRuntimeOriginForHostedInfrastructureApi(
-  configuredBaseUrl: string,
-  runtimeOrigin?: string,
-): boolean {
-  if (!isHostedRuntimeOrigin(runtimeOrigin)) {
-    return false;
-  }
-
-  try {
-    const configuredUrl = new URL(configuredBaseUrl);
-    return configuredUrl.protocol === "https:"
-      && (
-        isIpHostname(configuredUrl.hostname)
-        || isEphemeralDnsIpHostname(configuredUrl.hostname)
-      );
-  } catch {
-    return false;
-  }
-}
-
 function shouldPreferRuntimeOriginForHostedHttpApi(
   configuredBaseUrl: string,
   runtimeOrigin?: string,
@@ -156,6 +114,34 @@ function shouldPreferRuntimeOriginForHostedHttpApi(
   }
 }
 
+function isTemporaryVpsApiHostname(hostname: string): boolean {
+  const normalized = normalizeHostname(hostname) || "";
+  return /^(\d{1,3}\.){3}\d{1,3}$/.test(normalized)
+    || normalized.endsWith(".sslip.io")
+    || normalized.endsWith(".nip.io");
+}
+
+function shouldPreferRuntimeOriginForHostedTemporaryVpsApi(
+  configuredBaseUrl: string,
+  runtimeOrigin?: string,
+): boolean {
+  if (!runtimeOrigin) {
+    return false;
+  }
+
+  try {
+    const configuredUrl = new URL(configuredBaseUrl);
+    const runtimeUrl = new URL(runtimeOrigin);
+
+    return runtimeUrl.protocol === "https:"
+      && configuredUrl.protocol === "https:"
+      && isHostedRuntimeOrigin(runtimeOrigin)
+      && isTemporaryVpsApiHostname(configuredUrl.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function resolveKkApiBaseUrl(): string {
   const configuredBaseUrl = normalizeConfiguredApiBaseUrl(readRuntimeEnv("VITE_KK_API_BASE_URL") || "");
   const runtimeOrigin = readRuntimeOrigin();
@@ -166,7 +152,7 @@ export function resolveKkApiBaseUrl(): string {
     if (shouldPreferRuntimeOriginForHostedHttpApi(configuredBaseUrl, runtimeOrigin)) {
       return runtimeOrigin!;
     }
-    if (shouldPreferRuntimeOriginForHostedInfrastructureApi(configuredBaseUrl, runtimeOrigin)) {
+    if (shouldPreferRuntimeOriginForHostedTemporaryVpsApi(configuredBaseUrl, runtimeOrigin)) {
       return runtimeOrigin!;
     }
     return configuredBaseUrl;

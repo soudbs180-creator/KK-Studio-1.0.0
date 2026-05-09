@@ -25,21 +25,48 @@ test("vercel production proxies hosted BFF routes without forwarding the public 
   );
   assert.deepEqual(rewrites, [
     { source: "/healthz", destination: "/api/healthz" },
+    { source: "/api/v1/:path*", destination: "/api/v1?__kk_path=:path*" },
+    { source: "/api/auth/:path*", destination: "/api/auth?__kk_path=:path*" },
   ]);
 
-  [
-    "api/_vpsProxy.ts",
+  const vercelProxyEntries = [
+    "api/[...path].ts",
     "api/v1.ts",
     "api/v1/[...path].ts",
     "api/auth.ts",
     "api/auth/[...path].ts",
     "api/manifest.ts",
     "api/healthz.ts",
+  ];
+
+  [
+    "api/_vpsProxy.js",
+    "api/_vpsProxy.d.ts",
+    ...vercelProxyEntries,
   ].forEach((relativePath) => {
     assert.equal(existsSync(path.join(ROOT_DIR, relativePath)), true, `${relativePath} should exist`);
   });
 
-  const proxySource = readSource("api/_vpsProxy.ts");
+  vercelProxyEntries.forEach((relativePath) => {
+    const source = readSource(relativePath);
+    assert.match(
+      source,
+      /export const config = \{ runtime: ['"]edge['"] \};/,
+      `${relativePath} should declare the Edge runtime locally so Vercel does not deploy it as a Node lambda`,
+    );
+    assert.doesNotMatch(
+      source,
+      /_vpsProxy\.ts/,
+      `${relativePath} must not import the helper with a .ts extension because Vercel compiles entries to .js`,
+    );
+    assert.match(
+      source,
+      /_vpsProxy\.js/,
+      `${relativePath} should import the deployed helper module with a .js runtime specifier`,
+    );
+  });
+
+  const proxySource = readSource("api/_vpsProxy.js");
   assert.match(proxySource, /const HOP_BY_HOP_REQUEST_HEADERS = new Set/);
   assert.match(proxySource, /['"]host['"]/);
   assert.match(proxySource, /const DEFAULT_VPS_API_BASE_URL = 'https:\/\//);
@@ -202,6 +229,14 @@ test("Vercel upload boundaries exclude local ledgers, generated artifacts, and n
   ].forEach((flag) => {
     assert.match(previewDeploy, new RegExp(flag.replace(".", "\\.")), `${flag} should be excluded from preview tar uploads`);
   });
+});
+
+test("production html does not load Tailwind from the browser CDN", () => {
+  const source = readSource("index.html");
+
+  assert.doesNotMatch(source, /https:\/\/cdn\.tailwindcss\.com/);
+  assert.doesNotMatch(source, /tailwind\.config\s*=/);
+  assert.match(readSource("src/index.css"), /@import "tailwindcss";/);
 });
 
 test("local API env example documents hosted Google and WeChat auth server secrets", () => {

@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 
-import { proxyToVps } from "../../api/_vpsProxy.ts";
+import { proxyToVps } from "../../api/_vpsProxy.js";
+import apiCatchAllHandler from "../../api/[...path].ts";
+import authStableHandler from "../../api/auth.ts";
 import authCatchAllHandler from "../../api/auth/[...path].ts";
+import v1StableHandler from "../../api/v1.ts";
 import v1CatchAllHandler from "../../api/v1/[...path].ts";
 
 const originalFetch = globalThis.fetch;
@@ -171,5 +174,39 @@ test("Vercel catch-all API routes preserve /api/v1 and /api/auth subpaths", asyn
   assert.deepEqual(observedUrls, [
     "https://api.example.com/api/v1/model-proxy/user?trace=1",
     "https://api.example.com/api/auth/session?mode=refresh",
+  ]);
+});
+
+test("Vercel top-level API catch-all proxies nested /api/v1 routes when segment catch-all is not matched", async () => {
+  const observedUrls: string[] = [];
+
+  process.env.KK_VPS_API_BASE_URL = "https://api.example.com";
+  globalThis.fetch = async (input) => {
+    observedUrls.push(String(input));
+    return new Response(null, { status: 204 });
+  };
+
+  await apiCatchAllHandler(new Request("https://kkai.plus/api/v1/auth/login?trace=1"));
+
+  assert.deepEqual(observedUrls, [
+    "https://api.example.com/api/v1/auth/login?trace=1",
+  ]);
+});
+
+test("Vercel rewrite targets proxy nested /api/v1 routes through the stable segment entry", async () => {
+  const observedUrls: string[] = [];
+
+  process.env.KK_VPS_API_BASE_URL = "https://api.example.com";
+  globalThis.fetch = async (input) => {
+    observedUrls.push(String(input));
+    return new Response(null, { status: 204 });
+  };
+
+  await v1StableHandler(new Request("https://kkai.plus/api/v1?__kk_path=auth/login&trace=1"));
+  await authStableHandler(new Request("https://kkai.plus/api/auth?__kk_path=login&trace=2"));
+
+  assert.deepEqual(observedUrls, [
+    "https://api.example.com/api/v1/auth/login?trace=1",
+    "https://api.example.com/api/auth/login?trace=2",
   ]);
 });

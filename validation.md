@@ -1,8 +1,32 @@
 # KK-Studio v1.4.6 Single-Line Validation Matrix
 
-Last updated: 2026-05-09
+Last updated: 2026-05-10
 
 Use `npm.cmd` for npm scripts on Windows.
+
+## Hosted Vercel API Proxy Login Fix Gate
+
+Use this gate when touching Vercel API proxy helper files, hosted `/api/v1/*` or `/api/auth/*` routing, Vercel rewrites, or hosted KK API base URL selection:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/hosted-release-guardrails.test.ts tests/unit/vercel-vps-proxy.test.ts tests/unit/kk-api-base-url-hosted-contract.test.ts tests/unit/input-autofill-style-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run check:encoding
+npm.cmd run test:unit
+node "C:\Users\Administrator\AppData\Roaming\npm\node_modules\vercel\dist\vc.js" inspect https://kkai.plus --scope yykks-projects-727e9560
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- api/_vpsProxy.ts api/_vpsProxy.js api/_vpsProxy.d.ts api/[...path].ts api/v1.ts api/v1/[...path].ts api/auth.ts api/auth/[...path].ts api/healthz.ts api/manifest.ts src/services/api/kkApiBaseUrl.ts tests/unit/hosted-release-guardrails.test.ts tests/unit/kk-api-base-url-hosted-contract.test.ts tests/unit/vercel-vps-proxy.test.ts vercel.json status.md validation.md
+```
+
+Fresh result on 2026-05-10: the focused hosted/proxy/input suite passed 22/22; `npm.cmd run typecheck` passed with semantic coverage for 131 test files; `npm.cmd run build` passed as `kk-studio@1.4.6` and transformed 2140 modules; `npm.cmd run check:encoding` passed; and `npm.cmd run test:unit` passed 1456/1456.
+
+Fresh production evidence on 2026-05-10: `vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_9TzojFb3YM2UonhKwwFRu151v6fL`, target `production`, status `Ready`, URL `https://kk-studio-7d78nulgj-yykks-projects-727e9560.vercel.app`, aliased to `https://kkai.plus`. Production smoke returned `200` JSON for `/api/healthz`, `200` JSON for `/api/manifest`, expected `401 AUTH_REQUIRED` JSON for `/api/v1/auth/session`, expected `401 AUTH_REQUIRED` JSON for `/api/v1/profile/user-apis`, and expected `403 TURNSTILE_FAILED` JSON for `/api/v1/auth/login` with a fake Turnstile token. The login route now returns KK API JSON rather than Vercel HTML, Vercel 404, or a Vercel function import error.
+
+Follow-up deploy evidence after commit `5b922928`: `vercel deploy . --prod -y --scope yykks-projects-727e9560` completed successfully; the remote build ran `npm run build` as `kk-studio@1.4.6`, transformed 2140 modules, and aliased `https://kkai.plus`. `vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_Ej3wrGiASL4FtBMZcARY81XszG34`, target `production`, status `Ready`, URL `https://kk-studio-e165sudnw-yykks-projects-727e9560.vercel.app`. Fresh production smoke returned `200` JSON for `/api/healthz`, `200` JSON for `/api/manifest`, expected `401 AUTH_REQUIRED` JSON for `/api/v1/auth/session`, and expected `403 TURNSTILE_FAILED` JSON for `/api/v1/auth/login` with a fake Turnstile token.
+
+Fresh production page QA: Node fetch confirmed `https://kkai.plus/` returns `200 text/html` with `lang="zh-CN"` and `https://kkai.plus/app-version.json` returns version `1.4.6`. Headless Chromium opened the production login page at desktop `1440x900` and mobile `390x844`; both rendered Chinese login text, visible `v1.4.6`, email/password inputs, no stale chunk text, no `.theme-transitioning`, no page errors, and no request failures. The only `kkai.plus` console error was expected signed-out `/api/v1/auth/session` `401`; other console messages came from Cloudflare Turnstile/headless browser policy behavior. Artifacts: `output/playwright/hosted-login-smoke/summary.json`, `desktop-1440x900.png`, and `mobile-390x844.png`.
+
+Remote reconciliation evidence: after inspecting remote-only commits, `git merge -s ours origin/main -m "chore: reconcile origin main release history"` created `6fcdb366` and kept the current release tree unchanged. Fresh focused hosted/proxy/input suite passed 22/22; `npm.cmd run typecheck` passed; `npm.cmd run build` passed; `npm.cmd run check:encoding` passed; production smoke returned `200` JSON for `/api/healthz`, expected `401 AUTH_REQUIRED` JSON for `/api/v1/auth/session`, and `app-version.json` returned `1.4.6`. `git merge-base --is-ancestor origin/main HEAD` returned exit code `0`. `git push origin main` was attempted but blocked by local GitHub credential state: `schannel: AcquireCredentialsHandle failed: SEC_E_NO_CREDENTIALS`.
 
 ## Login/Input Hotfix Gate
 
@@ -22,6 +46,27 @@ Expected result: version metadata reports `1.4.6`; invalid credentials render as
 Fresh hotfix result on 2026-05-09: version check returned `1.4.6`; the targeted gate passed 45/45; `npm.cmd run governance:check`, `npm.cmd run audit:dependencies`, `npm.cmd run spec:check`, `npm.cmd run typecheck`, `npm.cmd run test:unit` passed 1451/1451, `npm.cmd run build`, `npm.cmd run admin:build`, and `npm.cmd run check:encoding` passed. Local static preview at `http://localhost:4173/` rendered the Chinese login page with `v1.4.6` and no visible input color strip; console output retained the known local admin-model fetch noise in static preview.
 
 Production deploy result for commit `17973288`: `npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560` completed successfully, the remote build ran `npm run build` as `kk-studio@1.4.6`, and `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_4U49MUEyEPtdjTBziC2rejxGeMMP`, target `production`, status `Ready`, URL `https://kk-studio-rja71b3e3-yykks-projects-727e9560.vercel.app`, aliased to `https://kkai.plus`.
+
+## Login Turnstile Status Hotfix Gate
+
+Use this gate when touching hosted login Turnstile status, submit blocking copy, or Cloudflare widget runtime configuration:
+
+```powershell
+npm.cmd pkg get version
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/login-screen-auth-actions.test.ts tests/unit/turnstile-runtime-config.test.ts tests/unit/hosted-release-guardrails.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/components/auth/LoginScreen.tsx src/components/auth/TurnstileWidget.tsx tests/unit/login-screen-auth-actions.test.ts status.md validation.md
+```
+
+Expected result: version metadata reports `1.4.6`; the login page distinguishes Turnstile `rendered`, `verified`, and `error` parent states; rendered-but-unverified Turnstile shows `Verify` plus `请完成 Cloudflare 安全验证后再登录。`; widget errors use the error badge instead of the loading badge; and the Cloudflare locale guard still requires `zh-cn`.
+
+Fresh result on 2026-05-09: RED first reproduced the missing parent `error` status branch in `tests/unit/login-screen-auth-actions.test.ts`, then the focused login page test passed 4/4 after the fix. The broader login/Turnstile/hosted guardrail suite freshly passed 17/17; `npm.cmd run governance:agent-docs`, `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run check:encoding`, `npm.cmd pkg get version`, and path-limited alternate-git `diff --check` also passed for this hotfix.
+
+Production deploy result for commit `78aa280f`: `npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560` completed successfully, the remote build ran `npm run build` as `kk-studio@1.4.6`, and `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_4SXnYSMc3yeFCuLsgLEbJSR8ZnFV`, target `production`, status `Ready`, URL `https://kk-studio-o6m9dv4bi-yykks-projects-727e9560.vercel.app`, aliased to `https://kkai.plus`.
+
+Production browser QA result: the in-app browser rendered the real hosted login page in Chinese with `v1.4.6`, no console warnings/errors, no Tailwind CDN warning, and no old `Language zh-CN` Turnstile warning. Turnstile status moved from `待验证 / 请完成 Cloudflare 安全验证后再登录。` to `已就绪 / 安全验证已完成。`. Independent headless Playwright from this machine was stopped by Vercel Security Check `429`, matching the known local automation limitation.
 
 ## Current 1.4.6 Production Deploy Evidence
 
@@ -2650,6 +2695,39 @@ npm.cmd run test:unit
 npm.cmd run build
 npm.cmd run check:encoding
 ```
+
+## Current Hosted Login Route Fix Gate
+
+Use this gate for the `kkai.plus` hosted login route fix:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/kk-api-base-url-hosted-contract.test.ts tests/unit/vps-deploy-contract.test.ts tests/unit/vps-deploy-artifacts.test.ts
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none --test-name-pattern "kkai.plus browser CORS preflight" tests/unit/api-server-startup.test.ts
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- apps/api/src/server.ts scripts/vps/kk-api.env.example scripts/vps/kk-vps.env.example src/services/api/kkApiBaseUrl.ts tests/unit/api-server-startup.test.ts tests/unit/kk-api-base-url-hosted-contract.test.ts tests/unit/vps-deploy-artifacts.test.ts tests/unit/vps-deploy-contract.test.ts status.md validation.md
+```
+
+Fresh evidence for this slice:
+
+- RED first: `tests/unit/kk-api-base-url-hosted-contract.test.ts` failed because hosted `kkai.plus` still resolved `https://172-245-156-16.sslip.io` to `https://kkai.plus`.
+- RED first: `tests/unit/api-server-startup.test.ts --test-name-pattern "kkai.plus browser CORS preflight"` failed because `access-control-allow-origin` was missing for `https://kkai.plus`.
+- GREEN: the targeted base URL/VPS deployment/CORS tests passed 8/8 plus the focused CORS test 1/1.
+- Passed: `npm.cmd run typecheck`.
+- Passed: `npm.cmd run test:unit` (1454/1454).
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed: path-limited alternate-git `diff --check` with Windows LF/CRLF normalization warnings only.
+
+Production smoke requirement after deploy:
+
+```powershell
+node -e "fetch('https://172-245-156-16.sslip.io/api/v1/auth/login',{method:'OPTIONS',headers:{origin:'https://kkai.plus','access-control-request-method':'POST','access-control-request-headers':'content-type,x-client-version'}}).then(r=>console.log(r.status,r.headers.get('access-control-allow-origin'),r.headers.get('access-control-allow-credentials')))"
+```
+
+Expected: `204 https://kkai.plus true`. If this still returns missing CORS headers, deploy or restart the VPS API with either the committed code or `KK_API_ALLOWED_ORIGINS=https://kkai.plus,https://www.kkai.plus`.
 
 ## Security Cleanup Gate
 

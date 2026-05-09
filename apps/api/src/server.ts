@@ -221,6 +221,10 @@ const corsAllowedHeaders = [
   "x-kk-temp-user-id",
   "x-request-id",
 ].join(", ");
+const defaultPublicCorsOrigins = [
+  "https://kkai.plus",
+  "https://www.kkai.plus",
+];
 
 function resolveJsonBodyMaxBytes(pathname?: string): number {
   const defaultMaxBytes = Number(process.env.KK_API_MAX_JSON_BODY_BYTES || defaultMaxJsonBodyBytes);
@@ -300,6 +304,7 @@ function isLoopbackCorsOrigin(origin: string): boolean {
 
 function getConfiguredCorsOrigins(): Set<string> {
   const configuredOrigins = [
+    ...defaultPublicCorsOrigins,
     process.env.KK_API_PUBLIC_ORIGIN,
     process.env.KK_API_ALLOWED_ORIGINS,
     process.env.KK_API_CORS_ALLOWED_ORIGINS,

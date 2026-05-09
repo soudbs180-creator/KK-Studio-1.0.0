@@ -1,6 +1,6 @@
-import { proxyToVps } from './_vpsProxy.ts';
+import { proxyToVps } from './_vpsProxy.js';
 
-export { config } from './_vpsProxy.ts';
+export const config = { runtime: 'edge' };
 
 export default async function handler(request: Request) {
   return proxyToVps(request, '/healthz');

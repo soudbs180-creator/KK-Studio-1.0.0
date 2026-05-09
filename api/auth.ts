@@ -1,7 +1,19 @@
-import { proxyToVps } from './_vpsProxy.ts';
+import { proxyToVps } from './_vpsProxy.js';
 
-export { config } from './_vpsProxy.ts';
+export const config = { runtime: 'edge' };
 
 export default async function handler(request: Request) {
+  const url = new URL(request.url);
+  const rewritePath = url.searchParams.get('__kk_path');
+  if (rewritePath) {
+    url.searchParams.delete('__kk_path');
+    const suffix = rewritePath.replace(/^\/+/, '');
+    const query = url.searchParams.toString();
+    return proxyToVps(
+      new Request(url.toString(), request),
+      `/api/auth/${suffix}${query ? `?${query}` : ''}`,
+    );
+  }
+
   return proxyToVps(request, '/api/auth');
 }

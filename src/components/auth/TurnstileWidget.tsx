@@ -14,7 +14,7 @@ const TURNSTILE_SCRIPT_SELECTOR = 'script[data-turnstile-script="true"]';
 type TurnstileTheme = 'light' | 'dark' | 'auto';
 type TurnstileAppearance = 'always' | 'execute' | 'interaction-only';
 type TurnstileSize = 'normal' | 'compact' | 'flexible';
-type TurnstileStatus = 'idle' | 'loading' | 'rendering' | 'rendered' | 'verified' | 'error';
+export type TurnstileStatus = 'idle' | 'loading' | 'rendering' | 'rendered' | 'verified' | 'error';
 
 interface TurnstileRenderOptions {
   sitekey: string;
@@ -32,6 +32,7 @@ interface TurnstileWidgetProps {
   onVerify: (token: string) => void;
   onError?: (error: string) => void;
   onExpire?: () => void;
+  onStatusChange?: (status: TurnstileStatus) => void;
   theme?: TurnstileTheme;
   language?: string;
   className?: string;
@@ -88,7 +89,7 @@ function resolveTurnstileLanguage(language?: string): ResolvedLanguage {
 }
 
 function getWidgetLanguageCode(language: ResolvedLanguage): string {
-  return language === 'en-US' ? 'en' : 'zh-CN';
+  return language === 'en-US' ? 'en' : 'zh-cn';
 }
 
 function getSiteKeySourceLabel(language: ResolvedLanguage, debugSiteKey?: string): string {
@@ -243,6 +244,7 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   onVerify,
   onError,
   onExpire,
+  onStatusChange,
   theme = 'auto',
   language,
   className = '',
@@ -261,6 +263,10 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   const siteKey = useMemo(() => getResolvedSiteKey(), []);
   const resolvedAppearance = debugState.appearance || appearance;
   const shouldRender = canUseTurnstile();
+
+  useEffect(() => {
+    onStatusChange?.(status);
+  }, [onStatusChange, status]);
 
   const destroyWidget = useCallback(() => {
     if (widgetIdRef.current && window.turnstile) {

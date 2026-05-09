@@ -1,0 +1,278 @@
+{
+  "generatedAt": "2026-05-09T19:24:44.295Z",
+  "messages": [
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 401 ()",
+      "location": {
+        "url": "https://kkai.plus/api/v1/auth/session",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "This document requires 'TrustedHTML' assignment. The action has been blocked.",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "This document requires 'TrustedHTML' assignment. The action has been blocked.",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "This document requires 'TrustedScript' assignment. The action has been blocked.",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "This document requires 'TrustedScript' assignment. The action has been blocked.",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "This document requires 'TrustedScriptURL' assignment. The action has been blocked.",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "This document requires 'TrustedScriptURL' assignment. The action has been blocked.",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "Executing inline script violates the following Content Security Policy directive 'script-src 'nonce-TlMPHi8UKGkQvGkRHSquTS' 'unsafe-eval''. Either the 'unsafe-inline' keyword, a hash ('sha256-eJGI0Ik4oYe/PKLDOt4wcN76wYs8h+Ew05pMzdY6xG8='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked.",
+      "location": {
+        "url": "about:srcdoc",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "Executing inline script violates the following Content Security Policy directive 'script-src 'nonce-TlMPHi8UKGkQvGkRHSquTS' 'unsafe-eval''. Either the 'unsafe-inline' keyword, a hash ('sha256-eJGI0Ik4oYe/PKLDOt4wcN76wYs8h+Ew05pMzdY6xG8='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked.",
+      "location": {
+        "url": "about:srcdoc",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "This document requires 'TrustedScript' assignment. The action has been blocked.",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "This document requires 'TrustedScript' assignment. The action has been blocked.",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x411402500c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "location": {
+        "url": "https://kkai.plus/?qa=hosted-login-smoke-console-source",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "warning",
+      "text": "Form submission canceled because the form is not connected",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x411402500c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "location": {
+        "url": "https://kkai.plus/?qa=hosted-login-smoke-console-source",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x411402500c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "location": {
+        "url": "https://kkai.plus/?qa=hosted-login-smoke-console-source",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "%c%d font-size:0;color:transparent NaN",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 159096
+      }
+    },
+    {
+      "type": "error",
+      "text": "%c%d font-size:0;color:transparent NaN",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 159096
+      }
+    },
+    {
+      "type": "warning",
+      "text": "%c%d font-size:0;color:transparent NaN",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 159096
+      }
+    },
+    {
+      "type": "warning",
+      "text": "%c%d font-size:0;color:transparent NaN",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 159096
+      }
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x411402500c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)",
+      "location": {
+        "url": "https://kkai.plus/?qa=hosted-login-smoke-console-source",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "Permissions policy violation: xr-spatial-tracking is not allowed in this document.",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "Permissions policy violation: xr-spatial-tracking is not allowed in this document.",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "warning",
+      "text": "No available adapters.",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "warning",
+      "text": "Failed to parse audio contentType: audio/mp4; codecs=ac-3",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "warning",
+      "text": "Failed to parse audio contentType: audio/mp4; codecs=ec-3",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "warning",
+      "text": "Invalid (ambiguous) video codec string: video/webm; codecs=vp9",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "warning",
+      "text": "Failed to parse video contentType: video/ogg; codecs=theora",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 401 ()",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/pat/9f931598b9f78afb/1778354666596/6ad7ef50b95c0aa564526b3b0205c9bf54b3e9be5ecc87aa6ce1c30f0705afef/S8sB7ZThrTuuE1U",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "type": "warning",
+      "text": "The resource https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/cmg/1 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+      "location": {
+        "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/turnstile/f/ov2/av0/rch/8c1cp/0x4AAAAAACsemsOXCYwfwDll/auto/fbE/new/flexible?lang=zh-cn",
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    }
+  ],
+  "responses": [
+    {
+      "status": 401,
+      "url": "https://kkai.plus/api/v1/auth/session",
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "status": 401,
+      "url": "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/g/pat/9f931598b9f78afb/1778354666596/6ad7ef50b95c0aa564526b3b0205c9bf54b3e9be5ecc87aa6ce1c30f0705afef/S8sB7ZThrTuuE1U",
+      "contentType": "text/plain; charset=utf-8"
+    }
+  ]
+}

@@ -23,7 +23,7 @@ test("hosted HTTPS runtimes use same-origin API rewrites when build env points a
   }
 });
 
-test("hosted kkai.plus runtime keeps sslip VPS upstream behind the same-origin proxy", () => {
+test("hosted kkai.plus runtime routes temporary HTTPS VPS API origins through same-origin proxy", () => {
   const originalBaseUrl = process.env.VITE_KK_API_BASE_URL;
   const locationLike = globalThis as { location?: { origin?: string } };
   const originalLocation = locationLike.location;

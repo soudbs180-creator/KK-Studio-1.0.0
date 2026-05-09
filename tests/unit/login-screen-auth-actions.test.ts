@@ -33,7 +33,7 @@ test('LoginScreen stays parseable and keeps the server-backed sign-in actions co
   assert.match(source, /Temporary local access/);
   assert.match(source, /Admin sign-in/);
   assert.match(source, /注册请求已提交，后端认证接口就绪后可继续完成验证。/);
-  assert.match(source, /当前请求需要先完成人机验证，验证通过后再提交。/);
+  assert.match(source, /\u8bf7\u5b8c\u6210 Cloudflare \u5b89\u5168\u9a8c\u8bc1\u540e\u518d\u767b\u5f55\u3002/);
   assert.match(source, /密码长度至少 8 位。/);
   assert.match(source, /Password must be at least 8 characters\./);
   assert.match(source, /minLength=\{8\}/);
@@ -63,6 +63,13 @@ test('LoginScreen keeps Turnstile status visible when the widget cannot render',
 
   assert.match(source, /const turnstileDisabledByRuntime = !TURNSTILE_ENABLED;/);
   assert.match(source, /const showTurnstileBlock = turnstileAvailable \|\| turnstileMissingSiteKey \|\| turnstileDisabledByRuntime;/);
+  assert.match(source, /const \[turnstileWidgetStatus, setTurnstileWidgetStatus\] = useState<TurnstileStatus>\('idle'\);/);
+  assert.match(source, /const turnstileWidgetFailed = turnstileAvailable && !turnstileToken && turnstileWidgetStatus === 'error';/);
+  assert.match(source, /const turnstileAwaitingVerification = turnstileAvailable && !turnstileToken && turnstileWidgetStatus === 'rendered';/);
+  assert.match(source, /turnstileWidgetFailed \|\| !turnstileAvailable \? 'is-error' : 'is-pending'/);
+  assert.match(source, /turnstileWidgetFailed\s*\?\s*t\('\u9a8c\u8bc1\u5f02\u5e38', 'Error'\)/);
+  assert.match(source, /onStatusChange=\{handleTurnstileStatusChange\}/);
+  assert.match(source, /请完成 Cloudflare 安全验证后再登录。/);
   assert.match(source, /turnstileMissingSiteKey\s*\?\s*getTurnstileMissingSiteKeyMessage\(language\)\s*:\s*getTurnstileDisabledMessage\(language\)/);
 });
 
