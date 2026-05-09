@@ -2,6 +2,18 @@
 
 Last updated: 2026-05-09
 
+## Current Hosted Login Route Fix
+
+- Active user issue: production login showed `登录服务暂时不可用，请刷新页面后重试；如果仍失败，请联系管理员检查 KK API 登录路由。`
+- Root cause evidence: direct Node fetch to `https://kkai.plus/api/v1/auth/login` returned `429` with `text/html` body titled `Vercel Security Checkpoint`, so the browser login client received HTML instead of the KK API JSON envelope and correctly mapped it to the hosted-login-route unavailable message.
+- Implemented frontend routing fix: `src/services/api/kkApiBaseUrl.ts` no longer rewrites configured HTTPS VPS/API origins such as `https://172-245-156-16.sslip.io` back to the Vercel same-origin proxy. HTTP remote VPS origins are still forced to same-origin so production never sends browser auth traffic over plaintext HTTP.
+- Implemented VPS API CORS fix: `apps/api/src/server.ts` now defaults credentialed browser CORS to allow `https://kkai.plus` and `https://www.kkai.plus`, with an explicit regression covering `OPTIONS /api/v1/auth/login`.
+- Implemented VPS deployment contract fix: `scripts/vps/kk-api.env.example` and `scripts/vps/kk-vps.env.example` now use `KK_SESSION_COOKIE_SAME_SITE=none` with `KK_SESSION_COOKIE_SECURE=true` so direct HTTPS VPS auth can persist the browser refresh cookie across origins.
+- Production environment action already applied: Vercel Production `VITE_KK_API_BASE_URL` and `KK_VPS_API_BASE_URL` were updated to `https://172-245-156-16.sslip.io`.
+- Current production VPS state before redeploy: direct smoke against `https://172-245-156-16.sslip.io/api/v1/auth/login` returns JSON `TURNSTILE_FAILED` for a fake token, but both `OPTIONS` and `POST` responses still have no `access-control-allow-origin`. This confirms the VPS API process has not yet picked up the CORS fix or equivalent `KK_API_ALLOWED_ORIGINS` runtime env.
+- Candidate commit boundary: include only `apps/api/src/server.ts`, `scripts/vps/kk-api.env.example`, `scripts/vps/kk-vps.env.example`, `src/services/api/kkApiBaseUrl.ts`, `tests/unit/api-server-startup.test.ts`, `tests/unit/kk-api-base-url-hosted-contract.test.ts`, `tests/unit/vps-deploy-artifacts.test.ts`, `tests/unit/vps-deploy-contract.test.ts`, `status.md`, and `validation.md`. Exclude generated `output/` and unrelated line-ending-only `tests/unit/kk-api-client.test.ts`.
+- Browser QA status: skipped for this slice because it changes runtime API routing/CORS and deployment env examples only; there are no JSX/CSS UI changes. Production smoke is still blocked until the VPS API deploy/restart returns CORS headers for `https://kkai.plus`.
+
 ## Current Login/Input Hotfix Closure
 
 - Active user issue: hosted login could fail with a raw transport-style message such as `HTTP_404: Request failed.` instead of a useful Chinese password/login error, and browser-managed autofill/selection overlays could render as an off-theme colored block inside inputs.

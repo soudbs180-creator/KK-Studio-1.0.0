@@ -23,7 +23,7 @@ test("hosted HTTPS runtimes use same-origin API rewrites when build env points a
   }
 });
 
-test("hosted kkai.plus runtime keeps sslip VPS upstream behind the same-origin proxy", () => {
+test("hosted kkai.plus runtime uses the configured HTTPS VPS API origin", () => {
   const originalBaseUrl = process.env.VITE_KK_API_BASE_URL;
   const locationLike = globalThis as { location?: { origin?: string } };
   const originalLocation = locationLike.location;
@@ -32,7 +32,7 @@ test("hosted kkai.plus runtime keeps sslip VPS upstream behind the same-origin p
   locationLike.location = { origin: "https://kkai.plus" };
 
   try {
-    assert.equal(resolveKkApiBaseUrl(), "https://kkai.plus");
+    assert.equal(resolveKkApiBaseUrl(), "https://172-245-156-16.sslip.io");
   } finally {
     if (typeof originalBaseUrl === "string") {
       process.env.VITE_KK_API_BASE_URL = originalBaseUrl;

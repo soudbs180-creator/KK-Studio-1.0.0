@@ -34,7 +34,7 @@ test("VPS bootstrap and deploy scripts reference the expected runtime artifacts"
   assert.match(envSource, /DATABASE_URL=/);
   assert.match(envSource, /KK_API_SESSION_SIGNING_SECRET=/);
   assert.match(envSource, /KK_SESSION_COOKIE_SECURE=true/);
-  assert.match(envSource, /KK_SESSION_COOKIE_SAME_SITE=lax/);
+  assert.match(envSource, /KK_SESSION_COOKIE_SAME_SITE=none/);
   assert.match(envSource, /GOOGLE_OAUTH_CLIENT_ID=/);
   assert.match(envSource, /WECHAT_OPEN_APP_ID=/);
   assert.match(envSource, /PAYMENT_SIDECAR_INTERNAL_TOKEN=/);

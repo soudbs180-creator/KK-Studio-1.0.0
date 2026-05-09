@@ -2672,6 +2672,39 @@ npm.cmd run build
 npm.cmd run check:encoding
 ```
 
+## Current Hosted Login Route Fix Gate
+
+Use this gate for the `kkai.plus` hosted login route fix:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/kk-api-base-url-hosted-contract.test.ts tests/unit/vps-deploy-contract.test.ts tests/unit/vps-deploy-artifacts.test.ts
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none --test-name-pattern "kkai.plus browser CORS preflight" tests/unit/api-server-startup.test.ts
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- apps/api/src/server.ts scripts/vps/kk-api.env.example scripts/vps/kk-vps.env.example src/services/api/kkApiBaseUrl.ts tests/unit/api-server-startup.test.ts tests/unit/kk-api-base-url-hosted-contract.test.ts tests/unit/vps-deploy-artifacts.test.ts tests/unit/vps-deploy-contract.test.ts status.md validation.md
+```
+
+Fresh evidence for this slice:
+
+- RED first: `tests/unit/kk-api-base-url-hosted-contract.test.ts` failed because hosted `kkai.plus` still resolved `https://172-245-156-16.sslip.io` to `https://kkai.plus`.
+- RED first: `tests/unit/api-server-startup.test.ts --test-name-pattern "kkai.plus browser CORS preflight"` failed because `access-control-allow-origin` was missing for `https://kkai.plus`.
+- GREEN: the targeted base URL/VPS deployment/CORS tests passed 8/8 plus the focused CORS test 1/1.
+- Passed: `npm.cmd run typecheck`.
+- Passed: `npm.cmd run test:unit` (1454/1454).
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run check:encoding`.
+- Passed: path-limited alternate-git `diff --check` with Windows LF/CRLF normalization warnings only.
+
+Production smoke requirement after deploy:
+
+```powershell
+node -e "fetch('https://172-245-156-16.sslip.io/api/v1/auth/login',{method:'OPTIONS',headers:{origin:'https://kkai.plus','access-control-request-method':'POST','access-control-request-headers':'content-type,x-client-version'}}).then(r=>console.log(r.status,r.headers.get('access-control-allow-origin'),r.headers.get('access-control-allow-credentials')))"
+```
+
+Expected: `204 https://kkai.plus true`. If this still returns missing CORS headers, deploy or restart the VPS API with either the committed code or `KK_API_ALLOWED_ORIGINS=https://kkai.plus,https://www.kkai.plus`.
+
 ## Security Cleanup Gate
 
 Use this gate for narrow endpoint or secret-boundary cleanup slices:
