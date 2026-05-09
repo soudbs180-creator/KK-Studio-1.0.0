@@ -1,8 +1,46 @@
-# KK-Studio v1.4.5 Implementation Rules
+# KK-Studio v1.4.6 Implementation Rules
 
-Last updated: 2026-05-08
+Last updated: 2026-05-09
 
 ## Operating Mode
+
+Current 1.4.6 release blocker audit (2026-05-09): align the two-feature release line, including desktop snap-to-grid and collapsed manual groups, while preserving hosted/VPS proxy, dependency audit, visible Chinese text, PromptBar QA, and clean-hosted-env guardrails. Use alternate git only.
+
+Release audit execution rules:
+- Stage and commit release audit files in narrow groups: security/proxy/dependency/VPS, UI/localization, and ledger updates.
+- Do not stage `.env.local`, `apps/api/.env.local`, `output/`, `.tmp*`, Playwright screenshots, or unrelated canvas snap/collapsed-group files.
+- Vercel proxy defaults must be HTTPS. Production proxy code must fail closed before sending Authorization, cookie, csrf, session, or token-like headers to an HTTP upstream.
+- Hosted builds must use same-origin HTTPS or an HTTPS VPS API domain. A local HTTP VPS base URL is allowed only as a local dirty snapshot and must block hosted preflight.
+- `VITE_TURNSTILE_LOCAL_BYPASS=true` is forbidden in hosted release snapshots. Real hosted Turnstile/OAuth/payment sidecar secrets must be supplied in the deployment environment, not committed.
+- Chinese visible UI fixes must be verified through `npm.cmd run check:encoding` and a focused visible-text contract. Technical terms such as `Turnstile`, `API Key`, `PPT`, `PPTX`, `Chrome`, and `Edge` may remain English.
+- UI release audit work requires real browser evidence. Record URL, viewport, theme, console/page errors, stale chunk count, `.theme-transitioning`, clipped button count, PromptBar active gradient evidence, and local sensitive-storage keys in `status.md`.
+- If `npm.cmd run release:hosted:check` fails only because local dirty env contains dev bypass or remote HTTP API base URL, record it as a release-environment blocker and do not weaken the guard.
+- VPS nginx public virtual hosts must fail closed for `/internal/` with `404`; do not expose internal payment callback or settlement paths through public DNS.
+- Production release remains blocked if `api.kkai.plus` cannot serve HTTPS with a valid certificate and healthy `/healthz`, `/api/manifest`, and `/api/v1/auth/session` responses.
+
+Current desktop snap-to-grid hotfix (2026-05-09): add the desktop left-toolbar snap toggle and route the enabled state into prompt, image, workflow utility, selected-node, and canvas-group drag commit paths. Keep the change scoped to canvas snap behavior, the toolbar control, focused contract coverage, and ledger updates. Do not stage or commit existing unrelated hosted/API/payment/PromptBar/settings/collapsed-group work.
+
+Snap-to-grid implementation rules:
+- The snap grid size is the visible canvas grid size, currently 16 canvas units.
+- Disabled snap must preserve existing free-drag behavior exactly.
+- Invalid coordinates or invalid grid sizes must be returned unchanged.
+- Apply snapping after pointer-to-canvas coordinate conversion and before persisted position updates.
+- Do not apply render/pixel rounding to already snapped persisted workflow positions; render-only pixel alignment must stay separate from canvas position storage.
+- Multi-selected drag commits must snap each moved node's final position independently when snap is enabled, not only snap the source card delta.
+- Desktop toolbar state must be accessible through `aria-pressed` and a stable `data-testid`.
+- UI evidence is required before commit. Prefer the Codex in-app Browser; if it is blocked, record the blocker and use the repository Playwright/headless-browser fallback with URL, viewport, theme, checked surfaces, `.theme-transitioning`, stale chunk text, and console-error status.
+- Stage only snap-to-grid files plus ledger files, with patch staging if a file also contains unrelated dirty work.
+
+Current desktop collapsed manual group hotfix (2026-05-09): add the desktop manual-group hide/expand path requested by the user. Keep the change scoped to manual canvas group collapse state, compact card UI, hidden-member render/load suppression, focused contract coverage, browser evidence, and ledger updates. Do not stage or commit existing unrelated hosted/API/payment/PromptBar/settings/snap-to-grid work.
+
+Collapsed manual group implementation rules:
+- Persist only a small optional `CanvasGroup.collapsed` flag; do not duplicate member state or delete hidden nodes.
+- The expanded manual group header owns the hide control and uses lucide `EyeOff`; the collapsed card owns the expand control and uses lucide `Eye`.
+- Collapsed cards must render as compact canvas objects with expand text plus group label only.
+- Hidden group members must be excluded from prompt/image/workflow render queues, prompt-group child data, image-load scheduling/prefetch, connector rendering, and canvas fit/card-position inputs.
+- Collapsed group culling must use computed member bounds when available, matching `CanvasGroupComponent` placement, instead of relying on stale persisted `group.bounds`.
+- UI evidence is required before commit. Prefer the Codex in-app Browser; if it is blocked, record the blocker and use the repository Playwright/headless-browser fallback with URL, viewport, theme, checked surfaces, connector count, `.theme-transitioning`, stale chunk text, and console-error status.
+- Stage only collapsed-group files plus ledger files. Use patch staging for mixed files such as `src/App.tsx` and `tsconfig.tests.json`, excluding snap-to-grid and hosted/VPS hunks.
 
 Completed provider compatibility override (2026-05-08): GPT Best priority compatibility from `https://gpt-best.apifox.cn/llms.txt` is committed in `fe99e829`. M131 prompt optimizer cache/logging redaction is committed in `dade1de4`. The active slice is M132 shared local user-route auth inference. Keep changes path-limited to the local user-route auth helper, diagnostics auth inference, focused local user-route contracts, and ledgers. Do not change endpoint call-site behavior, fetch execution, fallback ordering, key storage, provider persistence, billing/payment behavior, storage persistence, UI, release metadata, or broad adapter refactors in this slice.
 
@@ -118,7 +156,7 @@ For every milestone:
 - Non-UI runtime/docs slices may skip browser inspection only after the UI lane is closed, and the skip must be recorded in `status.md`; paused runtime/PPT commits use the runtime/PPT gate in `validation.md`.
 - Do not claim a UI optimization is complete from source-contract tests, screenshots, build output, or smoke scripts alone. The browser check is mandatory for new UI work and can only be skipped for non-UI logic/docs changes with an explicit note.
 - If a command fails, classify it as either historical or introduced by the current milestone. New failures must be fixed before commit.
-- For shared v1.4.5 ledger updates, `status.md` must name the active lane(s), included commit paths, excluded dirty path groups, and browser inspection status.
+- For shared v1.4.6 ledger updates, `status.md` must name the active lane(s), included commit paths, excluded dirty path groups, and browser inspection status.
 - For a UI audit lane commit, `status.md` must record browser URL, theme, viewport/surface checked, `.theme-transitioning` result, SearchPalette/settings/API workbench checks, and stale chunk findings.
 - The final release gate includes `npm.cmd run governance:check`, `npm.cmd run audit:dependencies`, `npm.cmd run spec:check`, `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, and `npm.cmd run check:encoding`. The former `governance:version` portable metadata mismatch was cleared by `567f85aa`; rerun the gate after any future packaging/publish metadata change.
 

@@ -888,6 +888,7 @@ export interface CanvasGroup {
   zIndex?: number;
   label?: string;
   color?: string; // Border color
+  collapsed?: boolean;
   type: 'custom';
 }
 

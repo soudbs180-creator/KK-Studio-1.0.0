@@ -42,8 +42,13 @@ test("vercel production proxies hosted BFF routes without forwarding the public 
   const proxySource = readSource("api/_vpsProxy.ts");
   assert.match(proxySource, /const HOP_BY_HOP_REQUEST_HEADERS = new Set/);
   assert.match(proxySource, /['"]host['"]/);
+  assert.match(proxySource, /const DEFAULT_VPS_API_BASE_URL = 'https:\/\//);
+  assert.doesNotMatch(proxySource, /DEFAULT_VPS_API_BASE_URL = 'http:\/\//);
   assert.match(proxySource, /export async function proxyToVps/);
   assert.match(proxySource, /new URL\(upstreamPath, resolveVpsApiBaseUrl\(\)\)/);
+  assert.match(proxySource, /upstreamUrl\.host/);
+  assert.match(proxySource, /upstreamUrl\.protocol/);
+  assert.match(proxySource, /UPSTREAM_REQUIRES_HTTPS/);
 });
 
 test("hosted preflight checks verify VPS API and PostgreSQL prerequisites without Supabase release dependencies", () => {
@@ -51,7 +56,7 @@ test("hosted preflight checks verify VPS API and PostgreSQL prerequisites withou
 
   assert.match(source, /from "\.\/lib\/env-contract\.mjs";/);
   assert.match(source, /const hostedFrontendRequired = \[\s*"VITE_KK_API_BASE_URL",\s*\];/);
-  assert.match(source, /const hostedFrontendForbidden = \[\s*"VITE_ENABLE_LEGACY_WEB_API_FALLBACK",\s*"VITE_SUPABASE_URL",\s*"VITE_SUPABASE_ANON_KEY",\s*\];/);
+  assert.match(source, /const hostedFrontendForbidden = \[\s*"VITE_ENABLE_LEGACY_WEB_API_FALLBACK",\s*"VITE_SUPABASE_URL",\s*"VITE_SUPABASE_ANON_KEY",\s*"VITE_TURNSTILE_LOCAL_BYPASS",\s*\];/);
   assert.match(source, /const frontendSnapshots = snapshots\.frontendSnapshots;/);
   assert.match(source, /const localApiSnapshots = snapshots\.apiSnapshots;/);
   assert.match(source, /label: "vercel whoami"/);
@@ -71,6 +76,9 @@ test("hosted preflight checks verify VPS API and PostgreSQL prerequisites withou
   assert.match(source, /Vercel authentication is unavailable\./);
   assert.doesNotMatch(source, /Supabase authentication is unavailable\./);
   assert.match(source, /It does not read remote VPS or Vercel dashboard state\./);
+  assert.match(source, /Hosted frontend forbidden env \$\{key\} is present/);
+  assert.match(source, /Hosted frontend VITE_KK_API_BASE_URL must be HTTPS or same-origin/);
+  assert.match(source, /isRemoteHttpUrl/);
 });
 
 test("hosted release workflow deploys the VPS API before deploying the frontend", () => {
@@ -122,6 +130,11 @@ test("hosted release runbook keeps routing and billing smoke tests explicit", ()
   assert.match(source, /Hosted API on the VPS is still on an older version without `userRoute`/);
   assert.match(source, /Hosted payment runtimes must fail closed when durable storage or settlement auth is unavailable\./);
   assert.match(source, /Legacy `\/api\/pay\*` payment routes stay local-only by default/);
+  assert.match(source, /Current 1\.4\.6 hosted baseline uses `https:\/\/kkai\.plus` as the browser-facing same-origin API/);
+  assert.match(source, /`https:\/\/172-245-156-16\.sslip\.io`/);
+  assert.match(source, /API_DOMAIN=api\.kkai\.plus/);
+  assert.match(source, /scripts\/vps\/configure-kk-vps-api-tls\.sh/);
+  assert.match(source, /curl -fsS https:\/\/api\.kkai\.plus\/healthz/);
   assert.match(source, /`PAYMENT_SIDECAR_SETTLEMENT_TOKEN`/);
   assert.match(source, /`PAYMENT_WEBHOOK_SETTLEMENT_TOKEN`/);
   assert.match(source, /`GOOGLE_OAUTH_CLIENT_ID`/);
@@ -131,6 +144,64 @@ test("hosted release runbook keeps routing and billing smoke tests explicit", ()
   assert.match(source, /`GOOGLE_ALLOWED_REDIRECT_ORIGINS`/);
   assert.match(source, /GOOGLE_AUTH_UNAVAILABLE/);
   assert.match(source, /WECHAT_AUTH_UNAVAILABLE/);
+});
+
+test("Cloudflare DNS helper upserts the API host as DNS-only before VPS TLS", () => {
+  const dnsScriptPath = "scripts/deploy/cloudflare-upsert-api-dns.mjs";
+  assert.equal(existsSync(path.join(ROOT_DIR, dnsScriptPath)), true, `${dnsScriptPath} should exist`);
+
+  const source = readSource(dnsScriptPath);
+
+  assert.match(source, /CF_API_TOKEN/);
+  assert.match(source, /CLOUDFLARE_API_TOKEN/);
+  assert.match(source, /CLOUDFLARE_ZONE_ID/);
+  assert.match(source, /6e8b3a4638980f182b0c4b89bf99e6da/);
+  assert.match(source, /api\.kkai\.plus/);
+  assert.match(source, /172\.245\.156\.16/);
+  assert.match(source, /proxied:\s*false/);
+  assert.match(source, /DNS-only/);
+  assert.match(source, /PATCH/);
+  assert.match(source, /POST/);
+  assert.match(source, /const apiBaseUrl = "https:\/\/api\.cloudflare\.com";/);
+  assert.doesNotMatch(source, /const apiBaseUrl = "https:\/\/api\.cloudflare\.com\/client\/v4";/);
+  assert.match(source, /\/client\/v4\/zones\/\$\{zoneId\}\/dns_records/);
+  assert.match(source, /verifyDns/);
+  assert.doesNotMatch(source, /console\.log\(token/);
+});
+
+test("Vercel upload boundaries exclude local ledgers, generated artifacts, and nested repo copies", () => {
+  const vercelIgnore = readSource(".vercelignore");
+  const previewDeploy = readSource("scripts/deploy/vercel-preview-deploy.ps1");
+
+  [
+    "m",
+    "output",
+    "tests",
+    "docs",
+    "release",
+    "deploy",
+    "plans.md",
+    "implement.md",
+    "status.md",
+    "validation.md",
+  ].forEach((entry) => {
+    assert.match(vercelIgnore, new RegExp(`(^|\\n)${entry.replace(".", "\\.")}($|\\n)`), `${entry} should be excluded from Vercel uploads`);
+  });
+
+  [
+    "--exclude=m",
+    "--exclude=output",
+    "--exclude=tests",
+    "--exclude=docs",
+    "--exclude=release",
+    "--exclude=deploy",
+    "--exclude=plans.md",
+    "--exclude=implement.md",
+    "--exclude=status.md",
+    "--exclude=validation.md",
+  ].forEach((flag) => {
+    assert.match(previewDeploy, new RegExp(flag.replace(".", "\\.")), `${flag} should be excluded from preview tar uploads`);
+  });
 });
 
 test("local API env example documents hosted Google and WeChat auth server secrets", () => {

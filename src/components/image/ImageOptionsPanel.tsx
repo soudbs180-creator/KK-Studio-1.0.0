@@ -54,11 +54,14 @@ const SEGMENT_STYLE: React.CSSProperties = {
   backgroundColor: 'color-mix(in srgb, var(--bg-input) 76%, transparent)',
 };
 
-const ACTIVE_BUTTON_STYLE: React.CSSProperties = {
-  borderColor: 'var(--border-strong)',
-  backgroundColor: 'color-mix(in srgb, var(--bg-hover) 88%, transparent)',
-  color: 'var(--text-primary)',
+const ACTIVE_TOGGLE_STYLE: React.CSSProperties = {
+  borderColor: 'var(--prompt-bar-toggle-active-border)',
+  background: 'var(--prompt-bar-toggle-active-bg)',
+  color: 'var(--prompt-bar-toggle-active-text)',
+  boxShadow: 'var(--prompt-bar-toggle-active-shadow)',
 };
+
+const ACTIVE_BUTTON_STYLE = ACTIVE_TOGGLE_STYLE;
 
 const INACTIVE_BUTTON_STYLE: React.CSSProperties = {
   borderColor: 'var(--border-subtle)',

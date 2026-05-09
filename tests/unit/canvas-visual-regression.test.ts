@@ -188,6 +188,7 @@ test('canvas groups use shared frosted shell and label material tokens', () => {
     source,
     /const groupHeaderSurfaceStyle: React\.CSSProperties = \{[\s\S]*var\(--frost-card-sub-bg\)[\s\S]*var\(--frost-card-sub-border\)[\s\S]*var\(--frost-card-sub-shadow\)[\s\S]*blur\(var\(--frost-card-sub-blur\)\)/,
   );
-  assert.match(source, /\.\.\.groupSurfaceStyle,/);
+  assert.match(source, /\.\.\.\(isCollapsed \? groupCollapsedCardStyle : groupSurfaceStyle\),/);
+  assert.match(source, /const groupCollapsedCardStyle: React\.CSSProperties = \{[\s\S]*\.\.\.groupHeaderSurfaceStyle[\s\S]*minWidth:\s*180[\s\S]*maxWidth:\s*320/);
   assert.match(source, /style=\{groupHeaderSurfaceStyle\}/);
 });

@@ -120,3 +120,18 @@ test('desktop settings smoke verification covers direct settings routes and the 
   assert.match(workbenchSectionsSource, /data-testid="api-workbench-diagnostics-toggle"/);
   assert.ok((apiSettingsViewSource.match(/data-testid="api-official-editor-back"/g) || []).length >= 2);
 });
+
+test('browser smoke scripts prefer stable Playwright npx cache entries over alpha cache entries', () => {
+  const scriptSources = [
+    readSource('scripts/test/verify-mobile-settings-smoke.mjs'),
+    readSource('scripts/test/verify-desktop-settings-smoke.mjs'),
+    readSource('scripts/test/verify-prompt-group-drag.mjs'),
+    readSource('scripts/test/verify-startup-runtime-banner-centering.mjs'),
+  ];
+
+  for (const scriptSource of scriptSources) {
+    assert.match(scriptSource, /readPlaywrightCacheVersion/);
+    assert.match(scriptSource, /isStablePlaywrightVersion/);
+    assert.match(scriptSource, /Number\(right\.stable\) - Number\(left\.stable\)/);
+  }
+});

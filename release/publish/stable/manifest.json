@@ -1,18 +1,18 @@
 {
   "appName": "KK Studio",
-  "version": "1.4.5",
-  "displayVersion": "v1.4.5",
-  "buildTime": "2026-05-07T09:00:00.000Z",
-  "releaseDate": "2026-05-07",
+  "version": "1.4.6",
+  "displayVersion": "v1.4.6",
+  "buildTime": "2026-05-08T17:49:03.250Z",
+  "releaseDate": "2026-05-09",
   "releaseNotes": [
-    "Main app, payment sidecar, portable metadata, and synchronized documentation are aligned to version 1.4.5.",
-    "The current hosted baseline consolidates production Vercel deployment fixes, API routing, billing proxy behavior, and mobile ecommerce continuation surfaces into one release line.",
-    "Runtime-truth docs, package governance, and portable version manifests are aligned to version 1.4.5.",
-    "The 1.4.5 release metadata is prepared for production deployment on kkai.plus."
+    "Desktop canvas now includes a snap-to-grid toggle for more precise prompt, image, workflow, and grouped-card positioning.",
+    "Manual canvas groups can now collapse into compact cards and expand back without rendering hidden members or connectors.",
+    "Hosted/VPS release guardrails, package metadata, workspace packages, and portable version manifests are aligned to version 1.4.6.",
+    "The 1.4.6 release metadata is prepared for production deployment on kkai.plus once the remaining DNS/TLS smoke gate passes."
   ],
   "channel": "stable",
-  "packageFile": "KK-Studio-Portable-1.4.5.zip",
-  "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.4.5/KK-Studio-Portable-1.4.5.zip",
-  "sha256": "3947789406e37313c67a4a6afc978f88fc1eeceadee32465d4428c64b01f49d5",
-  "size": 52864654
+  "packageFile": "KK-Studio-Portable-1.4.6.zip",
+  "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.4.6/KK-Studio-Portable-1.4.6.zip",
+  "sha256": "f7dd639e1e8ce2f17a029ea02aeb2ed28af72884a8588fae49a8c0151689e22f",
+  "size": 52899158
 }

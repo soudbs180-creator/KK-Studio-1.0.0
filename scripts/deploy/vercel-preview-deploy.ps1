@@ -19,13 +19,43 @@ try {
     New-Item -ItemType Directory -Path $tempDir | Out-Null
 
     tar.exe `
+        --exclude=m `
         --exclude=node_modules `
         --exclude=.git `
+        --exclude=.github `
+        --exclude=.agent `
+        --exclude=.agents `
+        --exclude=.claude `
+        --exclude=.codex-* `
+        --exclude=.kk-local `
+        --exclude=.npm-cache `
+        --exclude=.tmp `
+        --exclude=.tmp-* `
+        --exclude=.worktrees `
         --exclude=.env `
         --exclude=.env.* `
         --exclude=dist `
         --exclude=build `
         --exclude=coverage `
+        --exclude=output `
+        --exclude=tests `
+        --exclude=docs `
+        --exclude=deploy `
+        --exclude=release `
+        --exclude=AGENTS.md `
+        --exclude=plans.md `
+        --exclude=implement.md `
+        --exclude=status.md `
+        --exclude=validation.md `
+        --exclude=*.log `
+        --exclude=*.out `
+        --exclude=*.err `
+        --exclude=*.out.log `
+        --exclude=*.err.log `
+        --exclude=tmp-*.out `
+        --exclude=tmp-*.err `
+        --exclude=*.bak `
+        --exclude=*.backup `
         -czf $tarball `
         -C $resolvedProjectPath .
 

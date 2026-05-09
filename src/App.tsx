@@ -45,6 +45,7 @@ import {
 import { buildSoftConnectorPath, getSoftConnectorPointAt } from './canvas/connectorGeometry';
 import AppDesktopChrome from './app/AppDesktopChrome';
 import AppCanvasOverlays from './app/AppCanvasOverlays';
+import { getCollapsedCanvasGroupNodeIds } from './app/collapsedCanvasGroups';
 import AppMobileWorkspace from './app/AppMobileWorkspace';
 import { resolveFollowUpDraftPosition } from './app/followUpDraftPosition';
 import { buildPromptGroupRenderLayout } from './app/promptGroupRenderLayout';
@@ -190,6 +191,7 @@ type SharedImageNodeProps = Pick<
   | 'isCanvasTransforming'
   | 'isNew'
   | 'canvasTransform'
+  | 'snapToGrid'
 >;
 
 type ConnectorDisconnectButtonProps = {
@@ -404,6 +406,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   const handleFitToAll = () => canvasRef.current?.fitToAll();
 
   const handleToggleGrid = () => setShowGrid(prev => !prev);
+  const handleToggleSnapToGrid = () => setSnapToGrid(prev => !prev);
 
 
 
@@ -650,6 +653,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   const [settingsInitialSupplier, setSettingsInitialSupplier] = useState<Supplier | null>(null);
   const [settingsPanelSessionKey, setSettingsPanelSessionKey] = useState(0);
   const [showGrid, setShowGrid] = useState(true);
+  const [snapToGrid, setSnapToGrid] = useState(false);
   const [promptBarUiBusy, setPromptBarUiBusy] = useState(false);
   const openSettingsPanel = useCallback((
     view: SettingsSurfaceView = 'api-management',
@@ -3042,6 +3046,10 @@ const AppContent: React.FC<AppContentProps> = () => {
   ]);
   const liveNodePositionByIdRef = useRef<Record<string, { x: number; y: number }>>({});
   const liveDerivedNodeIdsByOwnerRef = useRef<Record<string, string[]>>({});
+  const collapsedCanvasGroupNodeIds = React.useMemo(
+    () => getCollapsedCanvasGroupNodeIds(activeCanvas?.groups),
+    [activeCanvas?.groups],
+  );
 
   // Viewport Culling (Virtualization) Logic
   // Optimization: Only render nodes overlapping with the current viewport (+buffer)
@@ -3107,7 +3115,16 @@ const AppContent: React.FC<AppContentProps> = () => {
         if (!g.nodeIds || g.nodeIds.length === 0) {
           return false;
         }
-        const { x, y, width, height } = g.bounds;
+        const resolvedGroupBounds = getComputedGroupBounds(g) || g.bounds;
+        const groupViewportBounds = g.collapsed
+          ? {
+            x: resolvedGroupBounds.x,
+            y: resolvedGroupBounds.y,
+            width: Math.max(180, Math.min(320, resolvedGroupBounds.width)),
+            height: 44,
+          }
+          : resolvedGroupBounds;
+        const { x, y, width, height } = groupViewportBounds;
         return !(x > vRight || x + width < vLeft || y > vBottom || y + height < vTop);
       })
       .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
@@ -3115,6 +3132,10 @@ const AppContent: React.FC<AppContentProps> = () => {
     // 2. Filter prompt nodes (hide idle drafts, but keep nodes that are generating)
     const visiblePromptNodes = activeCanvas.promptNodes
       .filter(n => {
+        if (collapsedCanvasGroupNodeIds.has(n.id)) {
+          return false;
+        }
+
         // Hide a node only when it is a static draft; the active center control is responsible for rendering it
         // Once it enters generating state, it must appear on the canvas
         if (n.isDraft && !n.isGenerating) {
@@ -3151,6 +3172,10 @@ const AppContent: React.FC<AppContentProps> = () => {
     // 3. Filter Image Nodes
     const visibleImageNodes = activeCanvas.imageNodes
       .filter(n => {
+        if (collapsedCanvasGroupNodeIds.has(n.id)) {
+          return false;
+        }
+
         if (isPptDeckChildImageNode(n)) {
           return false;
         }
@@ -3172,6 +3197,10 @@ const AppContent: React.FC<AppContentProps> = () => {
     const visibleWorkflowUtilityNodes = (activeCanvas.workflow?.nodes || [])
       .filter((node): node is WorkflowUtilityCanvasNode => isWorkflowUtilityNodeKind(node.kind))
       .filter((node) => {
+        if (collapsedCanvasGroupNodeIds.has(node.id)) {
+          return false;
+        }
+
         const width = node.width || 284;
         const height = node.height || 176;
         const x = node.position.x - width / 2;
@@ -3195,7 +3224,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     };
 
     return { visiblePromptNodes, visibleImageNodes, visibleWorkflowUtilityNodes, visibleGroups, nowTimestamp };
-  }, [activeCanvas, canvasPerformanceProfile.overscanBuffer, canvasTransform, isNodeDragActive, isPptDeckChildImageNode, liveNodePositionVersion, promptGroupLayerById, promptGroupStackZIndexById, standaloneImageStackZIndexById]);
+  }, [activeCanvas, canvasPerformanceProfile.overscanBuffer, canvasTransform, collapsedCanvasGroupNodeIds, getComputedGroupBounds, isNodeDragActive, isPptDeckChildImageNode, liveNodePositionVersion, promptGroupLayerById, promptGroupStackZIndexById, standaloneImageStackZIndexById]);
 
   const getSharedImageNodeProps = useCallback((image: GeneratedImage): SharedImageNodeProps => ({
     image,
@@ -3214,6 +3243,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     isCanvasTransforming,
     isNew: (nowTimestamp || Date.now()) - (image.timestamp || 0) < 10000,
     canvasTransform,
+    snapToGrid,
   }), [
     activeSourceImage,
     canvasTransform,
@@ -3226,6 +3256,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     isCanvasTransforming,
     isMobile,
     nowTimestamp,
+    snapToGrid,
     updateImageNode,
     updateImageNodeDisplayMeta,
     updateImageNodePosition,
@@ -3322,6 +3353,10 @@ const AppContent: React.FC<AppContentProps> = () => {
     const lateralImages: Array<{ node: GeneratedImage; distance: number }> = [];
 
     activeCanvas.imageNodes.forEach((node) => {
+      if (collapsedCanvasGroupNodeIds.has(node.id)) {
+        return;
+      }
+
       const width = 800;
       const height = 1200;
       const left = node.position.x - width / 2;
@@ -3406,7 +3441,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     });
 
     return scheduling;
-  }, [activeCanvas, canvasTransform.scale, canvasTransform.x, canvasTransform.y]);
+  }, [activeCanvas, canvasTransform.scale, canvasTransform.x, canvasTransform.y, collapsedCanvasGroupNodeIds]);
 
   useEffect(() => {
     if (!activeCanvas) return;
@@ -3473,6 +3508,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     clearPromptGroupRegroup,
     applyLiveNodeDeltaToDraggedSet,
     moveSelectedNodesImmediate,
+    snapToGrid,
     commitPromptGroupDrag,
   });
 
@@ -3588,11 +3624,11 @@ const AppContent: React.FC<AppContentProps> = () => {
           if (!sourceNodeId) return;
 
           if (selectedNodeIds.includes(sourceNodeId) && expandedSelectedNodeIds.length > 0) {
-            moveSelectedNodesImmediate(delta, expandedSelectedNodeIds);
+            moveSelectedNodesImmediate(delta, expandedSelectedNodeIds, { snapToGrid });
             return;
           }
 
-          moveSelectedNodesImmediate(delta, sourceNodeId);
+          moveSelectedNodesImmediate(delta, sourceNodeId, { snapToGrid });
         }}
       />
     );
@@ -3609,6 +3645,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     moveSelectedNodesImmediate,
     resolveLiveImagePosition,
     selectedNodeIds,
+    snapToGrid,
   ]);
 
   const renderPromptGroupWorkflowItem = useCallback((item: PromptGroupRenderItem) => {
@@ -3699,6 +3736,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           onClickPrompt={handlePromptClick}
           onConnectStart={handleConnectStart}
           zoomScale={canvasTransform.scale}
+          snapToGrid={snapToGrid}
           isCanvasTransforming={isCanvasTransforming}
           isMobile={isMobile}
           sourcePosition={sourceImageNode ? (resolveLiveImagePosition(sourceImageNode) ?? sourceImageNode.position) : undefined}
@@ -3801,6 +3839,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     resolveLiveImagePosition,
     resolveLivePromptPosition,
     selectedNodeIds,
+    snapToGrid,
     updatePromptNodePosition,
   ]);
 
@@ -3810,6 +3849,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       isSelected={selectedNodeIds.includes(item.node.id)}
       highlighted={highlightedId === item.node.id}
       zoomScale={canvasTransform.scale}
+      snapToGrid={snapToGrid}
       onSelect={() => handleCanvasNodeSelect(item.node.id)}
       onBringToFront={() => bringNodesToFront([item.node.id])}
       onDelete={deleteWorkflowNode}
@@ -3824,6 +3864,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     handleWorkflowPreviewAction,
     highlightedId,
     selectedNodeIds,
+    snapToGrid,
     updateWorkflowNodePosition,
   ]);
 
@@ -3833,6 +3874,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       isSelected={selectedNodeIds.includes(item.node.id)}
       highlighted={highlightedId === item.node.id}
       zoomScale={canvasTransform.scale}
+      snapToGrid={snapToGrid}
       onSelect={() => handleCanvasNodeSelect(item.node.id)}
       onBringToFront={() => bringNodesToFront([item.node.id])}
       onDelete={deleteWorkflowNode}
@@ -3849,6 +3891,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     handleWorkflowSaveAction,
     highlightedId,
     selectedNodeIds,
+    snapToGrid,
     updateWorkflowNodePosition,
   ]);
 
@@ -3858,6 +3901,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       isSelected={selectedNodeIds.includes(item.node.id)}
       highlighted={highlightedId === item.node.id}
       zoomScale={canvasTransform.scale}
+      snapToGrid={snapToGrid}
       onSelect={() => handleCanvasNodeSelect(item.node.id)}
       onBringToFront={() => bringNodesToFront([item.node.id])}
       onDelete={deleteWorkflowNode}
@@ -3872,6 +3916,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     handleWorkflowAgentAction,
     highlightedId,
     selectedNodeIds,
+    snapToGrid,
     updateWorkflowNodePosition,
   ]);
 
@@ -3893,14 +3938,23 @@ const AppContent: React.FC<AppContentProps> = () => {
   );
 
   const canvasRenderItems = React.useMemo<CanvasRenderItem[]>(() => ([
-    ...visiblePromptGroupViews.map((groupView) => ({
-      id: groupView.id,
-      kind: 'prompt-group' as const,
-      groupView,
-      node: groupView.rootPrompt,
-      childNodes: groupView.childImages,
-      detailLevel: canvasPerformanceProfile.cardDetailLevel,
-    })),
+    ...visiblePromptGroupViews
+      .filter((groupView) => !collapsedCanvasGroupNodeIds.has(groupView.rootPrompt.id))
+      .map((groupView) => {
+        const visibleChildImages = groupView.childImages.filter((imageNode) => !collapsedCanvasGroupNodeIds.has(imageNode.id));
+        return {
+          id: groupView.id,
+          kind: 'prompt-group' as const,
+          groupView: {
+            ...groupView,
+            childImages: visibleChildImages,
+            intraGroupEdges: groupView.intraGroupEdges.filter((edge) => !collapsedCanvasGroupNodeIds.has(edge.toId)),
+          },
+          node: groupView.rootPrompt,
+          childNodes: visibleChildImages,
+          detailLevel: canvasPerformanceProfile.cardDetailLevel,
+        };
+      }),
     ...standaloneVisibleImageNodes.map((node) => ({
       id: node.id,
       kind: 'image' as const,
@@ -3915,7 +3969,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         ? promptGroupStackZIndexById.get(node.parentPromptId)
         : standaloneImageStackZIndexById.get(node.id),
     })),
-    ...visibleWorkflowUtilityNodes.flatMap((node): Array<PreviewRenderItem | SaveRenderItem | AgentRenderItem> => {
+    ...visibleWorkflowUtilityNodes.filter((node) => !collapsedCanvasGroupNodeIds.has(node.id)).flatMap((node): Array<PreviewRenderItem | SaveRenderItem | AgentRenderItem> => {
       if (node.kind === 'preview') {
         return [{
           id: node.id,
@@ -3943,6 +3997,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       return [];
     }),
   ]), [
+    collapsedCanvasGroupNodeIds,
     promptGroupLayerById,
     promptGroupStackZIndexById,
     standaloneImageStackZIndexById,
@@ -3979,7 +4034,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
           selectNodes(nodeIds, 'toggle');
         }}
-        onGroupDrag={(delta, sourceNodeIds) => moveSelectedNodesImmediate(delta, sourceNodeIds)}
+        onGroupDrag={(delta, sourceNodeIds) => moveSelectedNodesImmediate(delta, sourceNodeIds, { snapToGrid })}
         onDragStateChange={handleCanvasNodeDragStateChange}
         onUpdateGroup={updateGroup}
         computedBounds={getComputedGroupBounds(group)}
@@ -3995,6 +4050,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     removeGroup,
     selectNodes,
     selectedNodeIds,
+    snapToGrid,
     updateGroup,
     visibleGroups,
   ]);
@@ -4266,7 +4322,9 @@ const AppContent: React.FC<AppContentProps> = () => {
       onFitToAll={handleFitToAll}
       onResetView={handleResetView}
       onToggleGrid={handleToggleGrid}
+      onToggleSnapToGrid={handleToggleSnapToGrid}
       showGrid={showGrid}
+      showSnapToGrid={snapToGrid}
       onAutoArrange={handleAutoArrange}
       onToggleChat={toggleChatPanel}
       isChatOpen={isChatOpen}
@@ -4438,6 +4496,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         onInteractionChange={handleCanvasInteractionChange}
         cardPositions={[
           ...(activeCanvas?.promptNodes
+            .filter((n) => !collapsedCanvasGroupNodeIds.has(n.id))
             .filter((n) => !n.hiddenInCanvas)
             .filter((n) => !(
               n.mode === GenerationMode.ECOMMERCE
@@ -4445,7 +4504,9 @@ const AppContent: React.FC<AppContentProps> = () => {
               && n.ecommerce.kind === 'a-plus-group'
             ))
             .map(n => n.position) || []),
-          ...(activeCanvas?.imageNodes.map(n => n.position) || [])
+          ...(activeCanvas?.imageNodes
+            .filter((n) => !collapsedCanvasGroupNodeIds.has(n.id))
+            .map(n => n.position) || [])
         ]}
         onCanvasClick={() => {
           // [Draft Logic] Detach from draft when clicking background
@@ -4543,6 +4604,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           {connectorRenderPromptNodes.map(pn => {
             if (pn.isDraft) return null; // Draft/pending connection is rendered by pending-connection block below
             if (!pn.sourceImageId) return null;
+            if (collapsedCanvasGroupNodeIds.has(pn.sourceImageId)) return null;
             const sourceNode = imageNodesById.get(pn.sourceImageId);
             if (!sourceNode) return null;
             const sourcePosition = resolveConnectorRenderPosition(sourceNode.id, sourceNode.position);
@@ -4616,6 +4678,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
           {/* B. Pending Node Connection */}
           {activeSourceImage && (() => {
+            if (collapsedCanvasGroupNodeIds.has(activeSourceImage)) return null;
             const hasDraftFollowup = !!activeCanvas?.promptNodes.some(p => p.isDraft && p.sourceImageId === activeSourceImage);
             if (hasDraftFollowup) return null;
             const sourceNode = imageNodesById.get(activeSourceImage);
@@ -4677,6 +4740,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
           {/* C. Workflow Utility Connections */}
           {(activeCanvas?.workflow?.edges || []).map((edge) => {
+            if (collapsedCanvasGroupNodeIds.has(edge.from) || collapsedCanvasGroupNodeIds.has(edge.to)) return null;
             const targetNode = connectorRenderWorkflowUtilityNodesById.get(edge.to);
             if (!targetNode) return null;
 

@@ -2313,7 +2313,7 @@ export function useGenerationRuntime({
     const target = ordered[pageIndex];
     if (!target) {
       import('../services/system/notificationService').then(({ notify }) => {
-        notify.warning('é¡µé¢ä¸å­˜åœ¨', `æœªæ‰¾åˆ°å›¾ ${pageIndex + 1}`);
+        notify.warning('页面不存在', `未找到图 ${pageIndex + 1}`);
       });
       return;
     }
@@ -2343,25 +2343,25 @@ export function useGenerationRuntime({
       Math.max(pageIndex + 1, executionNode.parallelCount || 1, ordered.length),
     );
     const slideText = slides[pageIndex]
-      || `ä¸»é¢˜ï¼š${node.prompt}ã€‚ä¿æŒåŒä¸€å¥—è§†è§‰é£Žæ ¼ï¼Œé¡µé¢å†…å®¹ç‹¬ç«‹ä¸é‡å¤ã€‚`;
+      || `主题：${node.prompt}。保持同一套视觉风格，页面内容独立不重复。`;
     const layoutDirective = (() => {
       const t = slideText.toLowerCase();
-      if (/å°é¢|cover|title/.test(t)) return 'é‡‡ç”¨å°é¢ç‰ˆå¼ï¼šå¤§æ ‡é¢˜ + å‰¯æ ‡é¢˜ + è§†è§‰ä¸»å›¾ï¼Œä¿¡æ¯ç²¾ç®€ã€‚';
-      if (/ç›®å½•|agenda|contents?/.test(t)) return 'é‡‡ç”¨ç›®å½•ç‰ˆå¼ï¼šæ¸…æ™°åˆ—å‡º 4-6 ä¸ªç« èŠ‚æ¡ç›®ï¼Œå±‚çº§åˆ†æ˜Žã€‚';
-      if (/æ€»ç»“|ç»“è®º|è¡ŒåŠ¨|summary|conclusion/.test(t)) return 'é‡‡ç”¨æ€»ç»“ç‰ˆå¼ï¼šçªå‡ºç»“è®ºè¦ç‚¹å’Œè¡ŒåŠ¨å»ºè®®ï¼Œé‡ç‚¹é«˜äº®ã€‚';
-      if (/ç« èŠ‚|section|transition/.test(t)) return 'é‡‡ç”¨ç« èŠ‚è¿‡æ¸¡é¡µç‰ˆå¼ï¼šçªå‡ºç« èŠ‚æ ‡é¢˜ï¼Œå¹¶é…åˆå…³é”®è¯ã€‚';
-      return 'é‡‡ç”¨å†…å®¹é¡µç‰ˆå¼ï¼šæ ‡é¢˜ + 3-5 ä¸ªä¿¡æ¯å—ï¼Œå±‚æ¬¡æ¸…æ™°ã€‚';
+      if (/封面|cover|title/.test(t)) return '采用封面版式：大标题 + 副标题 + 视觉主图，信息精简。';
+      if (/目录|agenda|contents?/.test(t)) return '采用目录版式：清晰列出 4-6 个章节条目，层级分明。';
+      if (/总结|结论|行动|summary|conclusion/.test(t)) return '采用总结版式：突出结论要点和行动建议，重点高亮。';
+      if (/章节|section|transition/.test(t)) return '采用章节过渡页版式：突出章节标题，并配合关键词。';
+      return '采用内容页版式：标题 + 3-5 个信息块，层次清晰。';
     })();
     const styleDirective = executionNode.pptStyleLocked !== false
-      ? 'ä¸Žæ•´å¥— PPT ä¿æŒå®Œå…¨ç»Ÿä¸€çš„è§†è§‰è¯­è¨€'
-      : 'ä¿æŒæ•´ä½“é£Žæ ¼ç»Ÿä¸€ï¼Œä½†å…è®¸å½“å‰é¡µé¢æœ‰é€‚åº¦å˜åŒ–';
+      ? '与整套 PPT 保持完全统一的视觉语言'
+      : '保持整体风格统一，但允许当前页面有适度变化';
     const previousVisualHint = (() => {
-      const raw = (target.prompt || '').replace(/PPTç¬¬\d+\/?\d*é¡µã€‚?/g, '').trim();
+      const raw = (target.prompt || '').replace(/PPT第\d+\/?\d*页。?/g, '').trim();
       if (!raw) return '';
       const compact = raw.length > 120 ? `${raw.slice(0, 120)}...` : raw;
-      return `å‚è€ƒä¸Šä¸€ç‰ˆè§†è§‰å…³é”®è¯ï¼š${compact}ã€‚`;
+      return `参考上一版视觉关键词：${compact}。`;
     })();
-    const taskPrompt = `PPT ç¬¬ ${pageIndex + 1}/${Math.max(1, node.childImageIds.length)} é¡µã€‚${slideText}ã€‚16:9ã€‚${styleDirective}ã€‚${layoutDirective}${previousVisualHint}`;
+    const taskPrompt = `PPT 第 ${pageIndex + 1}/${Math.max(1, node.childImageIds.length)} 页。${slideText}。16:9。${styleDirective}。${layoutDirective}${previousVisualHint}`;
 
     updateImageNode(target.id, {
       isGenerating: true,
@@ -2465,7 +2465,7 @@ export function useGenerationRuntime({
       });
 
       import('../services/system/notificationService').then(({ notify }) => {
-        notify.success('å•é¡µé‡ç»˜å®Œæˆ', `å·²æ›´æ–°å›¾${pageIndex + 1}`);
+        notify.success('单页重绘完成', `已更新图${pageIndex + 1}`);
       });
     } catch (error: any) {
       const failedBillingState = await resolveFailedCreditAttempt(executionNode);
@@ -2475,10 +2475,10 @@ export function useGenerationRuntime({
       });
       updateImageNode(target.id, {
         isGenerating: false,
-        error: error?.message || 'å•é¡µé‡ç»˜å¤±è´¥',
+        error: error?.message || '单页重绘失败',
       });
       import('../services/system/notificationService').then(({ notify }) => {
-        notify.error('å•é¡µé‡ç»˜å¤±è´¥', error?.message || 'è¯·ç¨åŽé‡è¯•');
+        notify.error('单页重绘失败', error?.message || '请稍后重试');
       });
     }
   }, [

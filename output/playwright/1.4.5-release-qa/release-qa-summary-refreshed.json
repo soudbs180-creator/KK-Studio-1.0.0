@@ -1,0 +1,925 @@
+{
+  "generatedAt": "2026-05-08T16:12:36.036Z",
+  "targetUrl": "http://127.0.0.1:4327",
+  "artifactDir": "C:\\Users\\Administrator\\Downloads\\KK-Studio-1.0.0\\output\\playwright\\1.4.5-release-qa",
+  "browserExecutablePath": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+  "viewports": [
+    {
+      "label": "desktop-dark",
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "theme": "dark"
+    },
+    {
+      "label": "desktop-light",
+      "viewport": {
+        "width": 1440,
+        "height": 920
+      },
+      "theme": "light"
+    },
+    {
+      "label": "mobile-dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark"
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "remoteHttpRequests": [
+    {
+      "page": "login-light-desktop",
+      "method": "POST",
+      "url": "http://172.245.156.16/api/v1/auth/temp-users"
+    },
+    {
+      "page": "login-light-desktop",
+      "method": "GET",
+      "url": "http://172.245.156.16/api/v1/model-catalog/active"
+    },
+    {
+      "page": "login-light-desktop",
+      "method": "GET",
+      "url": "http://172.245.156.16/healthz"
+    },
+    {
+      "page": "login-light-desktop",
+      "method": "GET",
+      "url": "http://172.245.156.16/api/v1/profile/key-manager-state"
+    },
+    {
+      "page": "login-light-desktop",
+      "method": "GET",
+      "url": "http://172.245.156.16/api/v1/profile/user-apis"
+    },
+    {
+      "page": "recharge-dark",
+      "method": "GET",
+      "url": "http://172.245.156.16/api/v1/model-catalog/active"
+    },
+    {
+      "page": "mobile-workspace-dark-390",
+      "method": "GET",
+      "url": "http://172.245.156.16/api/v1/model-catalog/active"
+    },
+    {
+      "page": "mobile-workspace-dark-390",
+      "method": "GET",
+      "url": "http://172.245.156.16/healthz"
+    },
+    {
+      "page": "mobile-workspace-dark-390",
+      "method": "GET",
+      "url": "http://172.245.156.16/api/v1/profile/key-manager-state"
+    },
+    {
+      "page": "mobile-workspace-dark-390",
+      "method": "GET",
+      "url": "http://172.245.156.16/api/v1/profile/user-apis"
+    }
+  ],
+  "metrics": [
+    {
+      "label": "login-light-desktop",
+      "url": "http://127.0.0.1:4327/login",
+      "title": "KK Studio - AI Image Workspace",
+      "textLength": 219,
+      "textSample": "KK 创作平台\n\n下一代智能创作工作台\n\n本地运行时优先保留工作区状态，后端认证接口就绪后再同步账号。\n\n欢迎回来\n\n使用 KK API 或本地运行时继续进入工作区。\n\n邮箱地址\n　\n登录密码\n　\n安全验证\n已关闭\n当前部署关闭了 Turnstile，但后端仍然要求验证码，请检查风控配置。\n登录\n或使用以下方式进入\n使用微信扫码登录\n使用 Google 登录\n临时用户（仅本地）\n管理员登录\n没有账号？立即注册\n忘记密码？\nv1.4.5",
+      "mojibakeMatches": [],
+      "staleChunkTextCount": 0,
+      "englishFallbackHits": [],
+      "themeTransitioningCount": 0,
+      "promptBarVisible": false,
+      "promptFooter": null,
+      "modelButton": null,
+      "modelSearchVisible": false,
+      "activeToggleCandidates": [
+        {
+          "text": "登录",
+          "backgroundImage": "linear-gradient(135deg, rgb(68, 185, 255) 0%, rgb(127, 108, 255) 48%, rgb(255, 143, 68) 100%)",
+          "color": "rgb(255, 255, 255)",
+          "borderColor": "rgb(255, 255, 255)"
+        }
+      ],
+      "toggleButtons": [],
+      "clippedButtons": [],
+      "visibleButtonCount": 8,
+      "sessionAccessTokenPresent": false,
+      "localSensitiveKeys": [],
+      "storageMode": null
+    },
+    {
+      "label": "login-buttons",
+      "tempEnabled": true,
+      "adminButtonCount": 0
+    },
+    {
+      "label": "temp-workspace-after-login-click",
+      "url": "http://127.0.0.1:4327/login",
+      "title": "KK Studio - AI Image Workspace",
+      "textLength": 458,
+      "textSample": "存储设置成功\n原图将保存在浏览器中\n0\n积分\n充值\n100%\nv1.4.5\n图片\n视频\n电商\n音乐\nPPT\n优化提示词\n无可用模型\n自适应 · 1K\n1 张\n发送\nKK STUDIO\n设置\n主工作区\n总览\n状态、入口、活动。\nAPI 工作台\n本地 API、供应商、预算。\n计费账本\n充值、消耗、账本。\n系统维护\n日志\n错误、告警、排障。\n存储\n模式、容量、清理。\n中文\nEN\n131955ba-718e-47ed-97ed-faf01722ff24@temp.local\n标准账户\n快捷操作\n保持当前工作流\n刷新\n日志\n关闭\n简约配置\nAPI 配置\n尚未接入链路\n\n默认只显示添加入口和已配置供应商。\n\n高级模式\n刷新数据\n简约列表\nAPI 供应商\n\n管理本地 API，并从一个入口添加官方直连或中转站。\n\n添加 API\n官方直连使用内置地址；中转站需要供应商名称、请求地址和 API Key。\n官方直连\n中转站\n配置状态\n等待接入 API\n默认页只保留添加和管理动作；诊断、路由池和 OCR 等信息在高级模式查看。",
+      "mojibakeMatches": [],
+      "staleChunkTextCount": 0,
+      "englishFallbackHits": [],
+      "themeTransitioningCount": 0,
+      "promptBarVisible": true,
+      "promptFooter": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "overflowX": "visible"
+      },
+      "modelButton": {
+        "text": "无可用模型",
+        "width": 91,
+        "height": 40,
+        "scrollWidth": 89,
+        "scrollHeight": 38,
+        "backgroundImage": "none",
+        "backgroundColor": "rgba(255, 255, 255, 0.58)",
+        "color": "rgb(58, 58, 58)"
+      },
+      "modelSearchVisible": false,
+      "activeToggleCandidates": [],
+      "toggleButtons": [
+        {
+          "text": "充值",
+          "width": 46,
+          "height": 19,
+          "scrollWidth": 46,
+          "scrollHeight": 19,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(255, 255, 255)",
+          "borderColor": "rgb(229, 231, 235)"
+        },
+        {
+          "text": "无可用模型",
+          "width": 91,
+          "height": 40,
+          "scrollWidth": 89,
+          "scrollHeight": 38,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(255, 255, 255, 0.58)",
+          "color": "rgb(58, 58, 58)",
+          "borderColor": "rgba(10, 10, 10, 0.08)"
+        },
+        {
+          "text": "计费账本\n充值、消耗、账本。",
+          "width": 265,
+          "height": 57,
+          "scrollWidth": 265,
+          "scrollHeight": 57,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(58, 58, 58)",
+          "borderColor": "rgba(0, 0, 0, 0)"
+        }
+      ],
+      "clippedButtons": [],
+      "visibleButtonCount": 37,
+      "sessionAccessTokenPresent": false,
+      "localSensitiveKeys": [],
+      "storageMode": "browser"
+    },
+    {
+      "label": "workspace-dark-1600",
+      "url": "http://127.0.0.1:4327/login",
+      "title": "KK Studio - AI Image Workspace",
+      "textLength": 479,
+      "textSample": "存储设置成功\n原图将保存在浏览器中\n0\n积分\n充值\n100%\nv1.4.5\n图片\n视频\n电商\n音乐\nPPT\n优化提示词\n无可用模型\n自适应 · 1K\n1 张\n发送\nKK STUDIO\n设置\n\n统一管理 API、计费、日志和存储。\n\n主工作区\n总览\n状态、入口、活动。\nAPI 工作台\n本地 API、供应商、预算。\n计费账本\n充值、消耗、账本。\n系统维护\n日志\n错误、告警、排障。\n存储\n模式、容量、清理。\n中文\nEN\n131955ba-718e-47ed-97ed-faf01722ff24@temp.local\n标准账户\n快捷操作\n保持当前工作流\n刷新\n日志\n关闭\n简约配置\nAPI 配置\n尚未接入链路\n\n默认只显示添加入口和已配置供应商。\n\n高级模式\n刷新数据\n简约列表\nAPI 供应商\n\n管理本地 API，并从一个入口添加官方直连或中转站。\n\n添加 API\n官方直连使用内置地址；中转站需要供应商名称、请求地址和 API Key。\n官方直连\n中转站\n配置状态\n等待接入 API\n默认页只保留添加和管理动作；诊断、路由池和 OCR 等信息在高级模式查看。",
+      "mojibakeMatches": [],
+      "staleChunkTextCount": 0,
+      "englishFallbackHits": [],
+      "themeTransitioningCount": 0,
+      "promptBarVisible": true,
+      "promptFooter": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "overflowX": "visible"
+      },
+      "modelButton": {
+        "text": "无可用模型",
+        "width": 91,
+        "height": 40,
+        "scrollWidth": 89,
+        "scrollHeight": 38,
+        "backgroundImage": "none",
+        "backgroundColor": "rgba(20, 20, 20, 0.62)",
+        "color": "rgba(255, 250, 240, 0.82)"
+      },
+      "modelSearchVisible": false,
+      "activeToggleCandidates": [],
+      "toggleButtons": [
+        {
+          "text": "充值",
+          "width": 46,
+          "height": 19,
+          "scrollWidth": 46,
+          "scrollHeight": 19,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(255, 255, 255)",
+          "borderColor": "rgb(229, 231, 235)"
+        },
+        {
+          "text": "无可用模型",
+          "width": 91,
+          "height": 40,
+          "scrollWidth": 89,
+          "scrollHeight": 38,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(20, 20, 20, 0.62)",
+          "color": "rgba(255, 250, 240, 0.82)",
+          "borderColor": "rgba(255, 250, 240, 0.1)"
+        },
+        {
+          "text": "计费账本\n充值、消耗、账本。",
+          "width": 263,
+          "height": 67,
+          "scrollWidth": 263,
+          "scrollHeight": 67,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgba(255, 250, 240, 0.8)",
+          "borderColor": "rgba(0, 0, 0, 0)"
+        }
+      ],
+      "clippedButtons": [],
+      "visibleButtonCount": 37,
+      "sessionAccessTokenPresent": false,
+      "localSensitiveKeys": [],
+      "storageMode": "browser"
+    },
+    {
+      "label": "model-menu-dark-1600",
+      "url": "http://127.0.0.1:4327/login",
+      "title": "KK Studio - AI Image Workspace",
+      "textLength": 479,
+      "textSample": "存储设置成功\n原图将保存在浏览器中\n0\n积分\n充值\n100%\nv1.4.5\n图片\n视频\n电商\n音乐\nPPT\n优化提示词\n无可用模型\n自适应 · 1K\n1 张\n发送\nKK STUDIO\n设置\n\n统一管理 API、计费、日志和存储。\n\n主工作区\n总览\n状态、入口、活动。\nAPI 工作台\n本地 API、供应商、预算。\n计费账本\n充值、消耗、账本。\n系统维护\n日志\n错误、告警、排障。\n存储\n模式、容量、清理。\n中文\nEN\n131955ba-718e-47ed-97ed-faf01722ff24@temp.local\n标准账户\n快捷操作\n保持当前工作流\n刷新\n日志\n关闭\n简约配置\nAPI 配置\n尚未接入链路\n\n默认只显示添加入口和已配置供应商。\n\n高级模式\n刷新数据\n简约列表\nAPI 供应商\n\n管理本地 API，并从一个入口添加官方直连或中转站。\n\n添加 API\n官方直连使用内置地址；中转站需要供应商名称、请求地址和 API Key。\n官方直连\n中转站\n配置状态\n等待接入 API\n默认页只保留添加和管理动作；诊断、路由池和 OCR 等信息在高级模式查看。",
+      "mojibakeMatches": [],
+      "staleChunkTextCount": 0,
+      "englishFallbackHits": [],
+      "themeTransitioningCount": 0,
+      "promptBarVisible": true,
+      "promptFooter": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "overflowX": "visible"
+      },
+      "modelButton": {
+        "text": "无可用模型",
+        "width": 91,
+        "height": 40,
+        "scrollWidth": 89,
+        "scrollHeight": 38,
+        "backgroundImage": "none",
+        "backgroundColor": "rgba(20, 20, 20, 0.62)",
+        "color": "rgba(255, 250, 240, 0.82)"
+      },
+      "modelSearchVisible": false,
+      "activeToggleCandidates": [],
+      "toggleButtons": [
+        {
+          "text": "充值",
+          "width": 46,
+          "height": 19,
+          "scrollWidth": 46,
+          "scrollHeight": 19,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(255, 255, 255)",
+          "borderColor": "rgb(229, 231, 235)"
+        },
+        {
+          "text": "无可用模型",
+          "width": 91,
+          "height": 40,
+          "scrollWidth": 89,
+          "scrollHeight": 38,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(20, 20, 20, 0.62)",
+          "color": "rgba(255, 250, 240, 0.82)",
+          "borderColor": "rgba(255, 250, 240, 0.1)"
+        },
+        {
+          "text": "计费账本\n充值、消耗、账本。",
+          "width": 263,
+          "height": 67,
+          "scrollWidth": 263,
+          "scrollHeight": 67,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgba(255, 250, 240, 0.8)",
+          "borderColor": "rgba(0, 0, 0, 0)"
+        }
+      ],
+      "clippedButtons": [],
+      "visibleButtonCount": 37,
+      "sessionAccessTokenPresent": false,
+      "localSensitiveKeys": [],
+      "storageMode": "browser"
+    },
+    {
+      "label": "promptbar-active-toggle-dark",
+      "url": "http://127.0.0.1:4327/login",
+      "title": "KK Studio - AI Image Workspace",
+      "textLength": 479,
+      "textSample": "存储设置成功\n原图将保存在浏览器中\n0\n积分\n充值\n100%\nv1.4.5\n图片\n视频\n电商\n音乐\nPPT\n优化提示词\n无可用模型\n自适应 · 1K\n1 张\n发送\nKK STUDIO\n设置\n\n统一管理 API、计费、日志和存储。\n\n主工作区\n总览\n状态、入口、活动。\nAPI 工作台\n本地 API、供应商、预算。\n计费账本\n充值、消耗、账本。\n系统维护\n日志\n错误、告警、排障。\n存储\n模式、容量、清理。\n中文\nEN\n131955ba-718e-47ed-97ed-faf01722ff24@temp.local\n标准账户\n快捷操作\n保持当前工作流\n刷新\n日志\n关闭\n简约配置\nAPI 配置\n尚未接入链路\n\n默认只显示添加入口和已配置供应商。\n\n高级模式\n刷新数据\n简约列表\nAPI 供应商\n\n管理本地 API，并从一个入口添加官方直连或中转站。\n\n添加 API\n官方直连使用内置地址；中转站需要供应商名称、请求地址和 API Key。\n官方直连\n中转站\n配置状态\n等待接入 API\n默认页只保留添加和管理动作；诊断、路由池和 OCR 等信息在高级模式查看。",
+      "mojibakeMatches": [],
+      "staleChunkTextCount": 0,
+      "englishFallbackHits": [],
+      "themeTransitioningCount": 0,
+      "promptBarVisible": true,
+      "promptFooter": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "overflowX": "visible"
+      },
+      "modelButton": {
+        "text": "无可用模型",
+        "width": 91,
+        "height": 40,
+        "scrollWidth": 89,
+        "scrollHeight": 38,
+        "backgroundImage": "none",
+        "backgroundColor": "rgba(20, 20, 20, 0.62)",
+        "color": "rgba(255, 250, 240, 0.82)"
+      },
+      "modelSearchVisible": false,
+      "activeToggleCandidates": [],
+      "toggleButtons": [
+        {
+          "text": "充值",
+          "width": 46,
+          "height": 19,
+          "scrollWidth": 46,
+          "scrollHeight": 19,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(255, 255, 255)",
+          "borderColor": "rgb(229, 231, 235)"
+        },
+        {
+          "text": "无可用模型",
+          "width": 91,
+          "height": 40,
+          "scrollWidth": 89,
+          "scrollHeight": 38,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(20, 20, 20, 0.62)",
+          "color": "rgba(255, 250, 240, 0.82)",
+          "borderColor": "rgba(255, 250, 240, 0.1)"
+        },
+        {
+          "text": "计费账本\n充值、消耗、账本。",
+          "width": 263,
+          "height": 67,
+          "scrollWidth": 263,
+          "scrollHeight": 67,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgba(255, 250, 240, 0.8)",
+          "borderColor": "rgba(0, 0, 0, 0)"
+        }
+      ],
+      "clippedButtons": [],
+      "visibleButtonCount": 37,
+      "sessionAccessTokenPresent": false,
+      "localSensitiveKeys": [],
+      "storageMode": "browser"
+    },
+    {
+      "label": "workspace-light-1440",
+      "url": "http://127.0.0.1:4327/login",
+      "title": "KK Studio - AI Image Workspace",
+      "textLength": 458,
+      "textSample": "存储设置成功\n原图将保存在浏览器中\n0\n积分\n充值\n100%\nv1.4.5\n图片\n视频\n电商\n音乐\nPPT\n优化提示词\n无可用模型\n自适应 · 1K\n1 张\n发送\nKK STUDIO\n设置\n主工作区\n总览\n状态、入口、活动。\nAPI 工作台\n本地 API、供应商、预算。\n计费账本\n充值、消耗、账本。\n系统维护\n日志\n错误、告警、排障。\n存储\n模式、容量、清理。\n中文\nEN\n131955ba-718e-47ed-97ed-faf01722ff24@temp.local\n标准账户\n快捷操作\n保持当前工作流\n刷新\n日志\n关闭\n简约配置\nAPI 配置\n尚未接入链路\n\n默认只显示添加入口和已配置供应商。\n\n高级模式\n刷新数据\n简约列表\nAPI 供应商\n\n管理本地 API，并从一个入口添加官方直连或中转站。\n\n添加 API\n官方直连使用内置地址；中转站需要供应商名称、请求地址和 API Key。\n官方直连\n中转站\n配置状态\n等待接入 API\n默认页只保留添加和管理动作；诊断、路由池和 OCR 等信息在高级模式查看。",
+      "mojibakeMatches": [],
+      "staleChunkTextCount": 0,
+      "englishFallbackHits": [],
+      "themeTransitioningCount": 0,
+      "promptBarVisible": true,
+      "promptFooter": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "overflowX": "visible"
+      },
+      "modelButton": {
+        "text": "无可用模型",
+        "width": 91,
+        "height": 40,
+        "scrollWidth": 89,
+        "scrollHeight": 38,
+        "backgroundImage": "none",
+        "backgroundColor": "rgba(255, 255, 255, 0.58)",
+        "color": "rgb(58, 58, 58)"
+      },
+      "modelSearchVisible": false,
+      "activeToggleCandidates": [],
+      "toggleButtons": [
+        {
+          "text": "充值",
+          "width": 46,
+          "height": 19,
+          "scrollWidth": 46,
+          "scrollHeight": 19,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(255, 255, 255)",
+          "borderColor": "rgb(229, 231, 235)"
+        },
+        {
+          "text": "无可用模型",
+          "width": 91,
+          "height": 40,
+          "scrollWidth": 89,
+          "scrollHeight": 38,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(255, 255, 255, 0.58)",
+          "color": "rgb(58, 58, 58)",
+          "borderColor": "rgba(10, 10, 10, 0.08)"
+        },
+        {
+          "text": "计费账本\n充值、消耗、账本。",
+          "width": 265,
+          "height": 57,
+          "scrollWidth": 265,
+          "scrollHeight": 57,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(58, 58, 58)",
+          "borderColor": "rgba(0, 0, 0, 0)"
+        }
+      ],
+      "clippedButtons": [],
+      "visibleButtonCount": 37,
+      "sessionAccessTokenPresent": false,
+      "localSensitiveKeys": [],
+      "storageMode": "browser"
+    },
+    {
+      "label": "model-menu-light-1440",
+      "url": "http://127.0.0.1:4327/login",
+      "title": "KK Studio - AI Image Workspace",
+      "textLength": 440,
+      "textSample": "0\n积分\n充值\n100%\nv1.4.5\n图片\n视频\n电商\n音乐\nPPT\n优化提示词\n无可用模型\n自适应 · 1K\n1 张\n发送\nKK STUDIO\n设置\n主工作区\n总览\n状态、入口、活动。\nAPI 工作台\n本地 API、供应商、预算。\n计费账本\n充值、消耗、账本。\n系统维护\n日志\n错误、告警、排障。\n存储\n模式、容量、清理。\n中文\nEN\n131955ba-718e-47ed-97ed-faf01722ff24@temp.local\n标准账户\n快捷操作\n保持当前工作流\n刷新\n日志\n关闭\n简约配置\nAPI 配置\n尚未接入链路\n\n默认只显示添加入口和已配置供应商。\n\n高级模式\n刷新数据\n简约列表\nAPI 供应商\n\n管理本地 API，并从一个入口添加官方直连或中转站。\n\n添加 API\n官方直连使用内置地址；中转站需要供应商名称、请求地址和 API Key。\n官方直连\n中转站\n配置状态\n等待接入 API\n默认页只保留添加和管理动作；诊断、路由池和 OCR 等信息在高级模式查看。",
+      "mojibakeMatches": [],
+      "staleChunkTextCount": 0,
+      "englishFallbackHits": [],
+      "themeTransitioningCount": 0,
+      "promptBarVisible": true,
+      "promptFooter": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "overflowX": "visible"
+      },
+      "modelButton": {
+        "text": "无可用模型",
+        "width": 91,
+        "height": 40,
+        "scrollWidth": 89,
+        "scrollHeight": 38,
+        "backgroundImage": "none",
+        "backgroundColor": "rgba(255, 255, 255, 0.58)",
+        "color": "rgb(58, 58, 58)"
+      },
+      "modelSearchVisible": false,
+      "activeToggleCandidates": [],
+      "toggleButtons": [
+        {
+          "text": "充值",
+          "width": 46,
+          "height": 19,
+          "scrollWidth": 46,
+          "scrollHeight": 19,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(255, 255, 255)",
+          "borderColor": "rgb(229, 231, 235)"
+        },
+        {
+          "text": "无可用模型",
+          "width": 91,
+          "height": 40,
+          "scrollWidth": 89,
+          "scrollHeight": 38,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(255, 255, 255, 0.58)",
+          "color": "rgb(58, 58, 58)",
+          "borderColor": "rgba(10, 10, 10, 0.08)"
+        },
+        {
+          "text": "计费账本\n充值、消耗、账本。",
+          "width": 265,
+          "height": 57,
+          "scrollWidth": 265,
+          "scrollHeight": 57,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(58, 58, 58)",
+          "borderColor": "rgba(0, 0, 0, 0)"
+        }
+      ],
+      "clippedButtons": [],
+      "visibleButtonCount": 36,
+      "sessionAccessTokenPresent": false,
+      "localSensitiveKeys": [],
+      "storageMode": "browser"
+    },
+    {
+      "label": "settings-light",
+      "url": "http://127.0.0.1:4327/login",
+      "title": "KK Studio - AI Image Workspace",
+      "textLength": 440,
+      "textSample": "0\n积分\n充值\n100%\nv1.4.5\n图片\n视频\n电商\n音乐\nPPT\n优化提示词\n无可用模型\n自适应 · 1K\n1 张\n发送\nKK STUDIO\n设置\n主工作区\n总览\n状态、入口、活动。\nAPI 工作台\n本地 API、供应商、预算。\n计费账本\n充值、消耗、账本。\n系统维护\n日志\n错误、告警、排障。\n存储\n模式、容量、清理。\n中文\nEN\n131955ba-718e-47ed-97ed-faf01722ff24@temp.local\n标准账户\n快捷操作\n保持当前工作流\n刷新\n日志\n关闭\n简约配置\nAPI 配置\n尚未接入链路\n\n默认只显示添加入口和已配置供应商。\n\n高级模式\n刷新数据\n简约列表\nAPI 供应商\n\n管理本地 API，并从一个入口添加官方直连或中转站。\n\n添加 API\n官方直连使用内置地址；中转站需要供应商名称、请求地址和 API Key。\n官方直连\n中转站\n配置状态\n等待接入 API\n默认页只保留添加和管理动作；诊断、路由池和 OCR 等信息在高级模式查看。",
+      "mojibakeMatches": [],
+      "staleChunkTextCount": 0,
+      "englishFallbackHits": [],
+      "themeTransitioningCount": 0,
+      "promptBarVisible": true,
+      "promptFooter": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "overflowX": "visible"
+      },
+      "modelButton": {
+        "text": "无可用模型",
+        "width": 91,
+        "height": 40,
+        "scrollWidth": 89,
+        "scrollHeight": 38,
+        "backgroundImage": "none",
+        "backgroundColor": "rgba(255, 255, 255, 0.58)",
+        "color": "rgb(58, 58, 58)"
+      },
+      "modelSearchVisible": false,
+      "activeToggleCandidates": [],
+      "toggleButtons": [
+        {
+          "text": "充值",
+          "width": 46,
+          "height": 19,
+          "scrollWidth": 46,
+          "scrollHeight": 19,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(255, 255, 255)",
+          "borderColor": "rgb(229, 231, 235)"
+        },
+        {
+          "text": "无可用模型",
+          "width": 91,
+          "height": 40,
+          "scrollWidth": 89,
+          "scrollHeight": 38,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(255, 255, 255, 0.58)",
+          "color": "rgb(58, 58, 58)",
+          "borderColor": "rgba(10, 10, 10, 0.08)"
+        },
+        {
+          "text": "计费账本\n充值、消耗、账本。",
+          "width": 265,
+          "height": 57,
+          "scrollWidth": 265,
+          "scrollHeight": 57,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(58, 58, 58)",
+          "borderColor": "rgba(0, 0, 0, 0)"
+        }
+      ],
+      "clippedButtons": [],
+      "visibleButtonCount": 36,
+      "sessionAccessTokenPresent": false,
+      "localSensitiveKeys": [],
+      "storageMode": "browser"
+    },
+    {
+      "label": "recharge-dark",
+      "url": "http://127.0.0.1:4327/login",
+      "title": "KK Studio - AI Image Workspace",
+      "textLength": 440,
+      "textSample": "0\n积分\n充值\n100%\nv1.4.5\n图片\n视频\n电商\n音乐\nPPT\n优化提示词\n无可用模型\n自适应 · 1K\n1 张\n发送\nKK STUDIO\n设置\n主工作区\n总览\n状态、入口、活动。\nAPI 工作台\n本地 API、供应商、预算。\n计费账本\n充值、消耗、账本。\n系统维护\n日志\n错误、告警、排障。\n存储\n模式、容量、清理。\n中文\nEN\n131955ba-718e-47ed-97ed-faf01722ff24@temp.local\n标准账户\n快捷操作\n保持当前工作流\n刷新\n日志\n关闭\n简约配置\nAPI 配置\n尚未接入链路\n\n默认只显示添加入口和已配置供应商。\n\n高级模式\n刷新数据\n简约列表\nAPI 供应商\n\n管理本地 API，并从一个入口添加官方直连或中转站。\n\n添加 API\n官方直连使用内置地址；中转站需要供应商名称、请求地址和 API Key。\n官方直连\n中转站\n配置状态\n等待接入 API\n默认页只保留添加和管理动作；诊断、路由池和 OCR 等信息在高级模式查看。",
+      "mojibakeMatches": [],
+      "staleChunkTextCount": 0,
+      "englishFallbackHits": [],
+      "themeTransitioningCount": 0,
+      "promptBarVisible": true,
+      "promptFooter": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "overflowX": "visible"
+      },
+      "modelButton": {
+        "text": "无可用模型",
+        "width": 91,
+        "height": 40,
+        "scrollWidth": 89,
+        "scrollHeight": 38,
+        "backgroundImage": "none",
+        "backgroundColor": "rgba(20, 20, 20, 0.62)",
+        "color": "rgba(255, 250, 240, 0.82)"
+      },
+      "modelSearchVisible": false,
+      "activeToggleCandidates": [],
+      "toggleButtons": [
+        {
+          "text": "充值",
+          "width": 46,
+          "height": 19,
+          "scrollWidth": 46,
+          "scrollHeight": 19,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(255, 255, 255)",
+          "borderColor": "rgb(229, 231, 235)"
+        },
+        {
+          "text": "无可用模型",
+          "width": 91,
+          "height": 40,
+          "scrollWidth": 89,
+          "scrollHeight": 38,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(20, 20, 20, 0.62)",
+          "color": "rgba(255, 250, 240, 0.82)",
+          "borderColor": "rgba(255, 250, 240, 0.1)"
+        },
+        {
+          "text": "计费账本\n充值、消耗、账本。",
+          "width": 265,
+          "height": 57,
+          "scrollWidth": 265,
+          "scrollHeight": 57,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgba(255, 250, 240, 0.8)",
+          "borderColor": "rgba(0, 0, 0, 0)"
+        }
+      ],
+      "clippedButtons": [],
+      "visibleButtonCount": 36,
+      "sessionAccessTokenPresent": false,
+      "localSensitiveKeys": [],
+      "storageMode": "browser"
+    },
+    {
+      "label": "mobile-workspace-dark-390",
+      "url": "http://127.0.0.1:4327/login",
+      "title": "KK Studio - AI Image Workspace",
+      "textLength": 338,
+      "textSample": "KK STUDIO\nGuest_131955ba\n积分\n0\n结果\n\n点击任意结果查看完整提示词和操作。\n\n标准\n详细\n等待中\n图片\n视频\n电商\n音乐\nPPT\n无可用模型\n高级设置\n无可用模型 · 自动比例 · 1K\n展开\n发送\n当前入口\nAPI 工作台\n本地 API、供应商、预算。\n中文\nEN\nAPI 配置\n尚未接入链路\n\n默认只显示添加入口和已配置供应商。\n\n高级模式\n刷新数据\n简约列表\nAPI 供应商\n\n管理本地 API，并从一个入口添加官方直连或中转站。\n\n添加 API\n官方直连使用内置地址；中转站需要供应商名称、请求地址和 API Key。\n官方直连\n中转站\n配置状态\n等待接入 API\n默认页只保留添加和管理动作；诊断、路由池和 OCR 等信息在高级模式查看。",
+      "mojibakeMatches": [],
+      "staleChunkTextCount": 0,
+      "englishFallbackHits": [],
+      "themeTransitioningCount": 0,
+      "promptBarVisible": true,
+      "promptFooter": {
+        "display": "flex",
+        "flexWrap": "nowrap",
+        "overflowX": "auto"
+      },
+      "modelButton": {
+        "text": "无可用模型",
+        "width": 144,
+        "height": 44,
+        "scrollWidth": 142,
+        "scrollHeight": 42,
+        "backgroundImage": "none",
+        "backgroundColor": "rgba(20, 20, 20, 0.62)",
+        "color": "rgba(255, 250, 240, 0.82)"
+      },
+      "modelSearchVisible": false,
+      "activeToggleCandidates": [],
+      "toggleButtons": [
+        {
+          "text": "积分\n0",
+          "width": 92,
+          "height": 44,
+          "scrollWidth": 90,
+          "scrollHeight": 42,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(31, 31, 31, 0.72)",
+          "color": "rgb(255, 250, 240)",
+          "borderColor": "rgba(255, 250, 240, 0.12)"
+        },
+        {
+          "text": "无可用模型",
+          "width": 144,
+          "height": 44,
+          "scrollWidth": 142,
+          "scrollHeight": 42,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(20, 20, 20, 0.62)",
+          "color": "rgba(255, 250, 240, 0.82)",
+          "borderColor": "rgba(255, 250, 240, 0.1)"
+        },
+        {
+          "text": "返回设置总览",
+          "width": 36,
+          "height": 44,
+          "scrollWidth": 34,
+          "scrollHeight": 42,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(20, 20, 20, 0.62)",
+          "color": "rgba(255, 250, 240, 0.68)",
+          "borderColor": "rgba(255, 250, 240, 0.12)"
+        },
+        {
+          "text": "关闭设置",
+          "width": 36,
+          "height": 44,
+          "scrollWidth": 34,
+          "scrollHeight": 42,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(20, 20, 20, 0.62)",
+          "color": "rgba(255, 250, 240, 0.68)",
+          "borderColor": "rgba(255, 250, 240, 0.12)"
+        }
+      ],
+      "clippedButtons": [],
+      "visibleButtonCount": 23,
+      "sessionAccessTokenPresent": false,
+      "localSensitiveKeys": [],
+      "storageMode": "browser"
+    },
+    {
+      "label": "mobile-more-sheet",
+      "url": "http://127.0.0.1:4327/login",
+      "title": "KK Studio - AI Image Workspace",
+      "textLength": 338,
+      "textSample": "KK STUDIO\nGuest_131955ba\n积分\n0\n结果\n\n点击任意结果查看完整提示词和操作。\n\n标准\n详细\n等待中\n图片\n视频\n电商\n音乐\nPPT\n无可用模型\n高级设置\n无可用模型 · 自动比例 · 1K\n展开\n发送\n当前入口\nAPI 工作台\n本地 API、供应商、预算。\n中文\nEN\nAPI 配置\n尚未接入链路\n\n默认只显示添加入口和已配置供应商。\n\n高级模式\n刷新数据\n简约列表\nAPI 供应商\n\n管理本地 API，并从一个入口添加官方直连或中转站。\n\n添加 API\n官方直连使用内置地址；中转站需要供应商名称、请求地址和 API Key。\n官方直连\n中转站\n配置状态\n等待接入 API\n默认页只保留添加和管理动作；诊断、路由池和 OCR 等信息在高级模式查看。",
+      "mojibakeMatches": [],
+      "staleChunkTextCount": 0,
+      "englishFallbackHits": [],
+      "themeTransitioningCount": 0,
+      "promptBarVisible": true,
+      "promptFooter": {
+        "display": "flex",
+        "flexWrap": "nowrap",
+        "overflowX": "auto"
+      },
+      "modelButton": {
+        "text": "无可用模型",
+        "width": 144,
+        "height": 44,
+        "scrollWidth": 142,
+        "scrollHeight": 42,
+        "backgroundImage": "none",
+        "backgroundColor": "rgba(20, 20, 20, 0.62)",
+        "color": "rgba(255, 250, 240, 0.82)"
+      },
+      "modelSearchVisible": false,
+      "activeToggleCandidates": [],
+      "toggleButtons": [
+        {
+          "text": "积分\n0",
+          "width": 92,
+          "height": 44,
+          "scrollWidth": 90,
+          "scrollHeight": 42,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(31, 31, 31, 0.72)",
+          "color": "rgb(255, 250, 240)",
+          "borderColor": "rgba(255, 250, 240, 0.12)"
+        },
+        {
+          "text": "无可用模型",
+          "width": 144,
+          "height": 44,
+          "scrollWidth": 142,
+          "scrollHeight": 42,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(20, 20, 20, 0.62)",
+          "color": "rgba(255, 250, 240, 0.82)",
+          "borderColor": "rgba(255, 250, 240, 0.1)"
+        },
+        {
+          "text": "返回设置总览",
+          "width": 36,
+          "height": 44,
+          "scrollWidth": 34,
+          "scrollHeight": 42,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(20, 20, 20, 0.62)",
+          "color": "rgba(255, 250, 240, 0.68)",
+          "borderColor": "rgba(255, 250, 240, 0.12)"
+        },
+        {
+          "text": "关闭设置",
+          "width": 36,
+          "height": 44,
+          "scrollWidth": 34,
+          "scrollHeight": 42,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(20, 20, 20, 0.62)",
+          "color": "rgba(255, 250, 240, 0.68)",
+          "borderColor": "rgba(255, 250, 240, 0.12)"
+        }
+      ],
+      "clippedButtons": [],
+      "visibleButtonCount": 23,
+      "sessionAccessTokenPresent": false,
+      "localSensitiveKeys": [],
+      "storageMode": "browser"
+    },
+    {
+      "label": "mobile-settings",
+      "url": "http://127.0.0.1:4327/login",
+      "title": "KK Studio - AI Image Workspace",
+      "textLength": 338,
+      "textSample": "KK STUDIO\nGuest_131955ba\n积分\n0\n结果\n\n点击任意结果查看完整提示词和操作。\n\n标准\n详细\n等待中\n图片\n视频\n电商\n音乐\nPPT\n无可用模型\n高级设置\n无可用模型 · 自动比例 · 1K\n展开\n发送\n当前入口\nAPI 工作台\n本地 API、供应商、预算。\n中文\nEN\nAPI 配置\n尚未接入链路\n\n默认只显示添加入口和已配置供应商。\n\n高级模式\n刷新数据\n简约列表\nAPI 供应商\n\n管理本地 API，并从一个入口添加官方直连或中转站。\n\n添加 API\n官方直连使用内置地址；中转站需要供应商名称、请求地址和 API Key。\n官方直连\n中转站\n配置状态\n等待接入 API\n默认页只保留添加和管理动作；诊断、路由池和 OCR 等信息在高级模式查看。",
+      "mojibakeMatches": [],
+      "staleChunkTextCount": 0,
+      "englishFallbackHits": [],
+      "themeTransitioningCount": 0,
+      "promptBarVisible": true,
+      "promptFooter": {
+        "display": "flex",
+        "flexWrap": "nowrap",
+        "overflowX": "auto"
+      },
+      "modelButton": {
+        "text": "无可用模型",
+        "width": 144,
+        "height": 44,
+        "scrollWidth": 142,
+        "scrollHeight": 42,
+        "backgroundImage": "none",
+        "backgroundColor": "rgba(20, 20, 20, 0.62)",
+        "color": "rgba(255, 250, 240, 0.82)"
+      },
+      "modelSearchVisible": false,
+      "activeToggleCandidates": [],
+      "toggleButtons": [
+        {
+          "text": "积分\n0",
+          "width": 92,
+          "height": 44,
+          "scrollWidth": 90,
+          "scrollHeight": 42,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(31, 31, 31, 0.72)",
+          "color": "rgb(255, 250, 240)",
+          "borderColor": "rgba(255, 250, 240, 0.12)"
+        },
+        {
+          "text": "无可用模型",
+          "width": 144,
+          "height": 44,
+          "scrollWidth": 142,
+          "scrollHeight": 42,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(20, 20, 20, 0.62)",
+          "color": "rgba(255, 250, 240, 0.82)",
+          "borderColor": "rgba(255, 250, 240, 0.1)"
+        },
+        {
+          "text": "返回设置总览",
+          "width": 36,
+          "height": 44,
+          "scrollWidth": 34,
+          "scrollHeight": 42,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(20, 20, 20, 0.62)",
+          "color": "rgba(255, 250, 240, 0.68)",
+          "borderColor": "rgba(255, 250, 240, 0.12)"
+        },
+        {
+          "text": "关闭设置",
+          "width": 36,
+          "height": 44,
+          "scrollWidth": 34,
+          "scrollHeight": 42,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(20, 20, 20, 0.62)",
+          "color": "rgba(255, 250, 240, 0.68)",
+          "borderColor": "rgba(255, 250, 240, 0.12)"
+        }
+      ],
+      "clippedButtons": [],
+      "visibleButtonCount": 23,
+      "sessionAccessTokenPresent": false,
+      "localSensitiveKeys": [],
+      "storageMode": "browser"
+    }
+  ],
+  "counts": {
+    "consoleErrorCount": 0,
+    "pageErrorCount": 0,
+    "remoteHttpRequestCount": 10,
+    "mojibakeMetricCount": 0,
+    "staleChunkMetricCount": 0,
+    "englishFallbackMetricCount": 0,
+    "clippedMetricCount": 0,
+    "activeGradientMetricCount": 1,
+    "themeTransitioningMetricCount": 0
+  }
+}

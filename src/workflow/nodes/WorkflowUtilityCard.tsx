@@ -4,6 +4,7 @@ import { Trash2 } from 'lucide-react';
 import type { WorkflowNode } from '../../types';
 import { getCanvasCardShadow } from '../../utils/canvasCardShadow';
 import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
+import { snapCanvasPointToGrid } from '../../utils/canvasSnapToGrid';
 
 type UtilityCardNode = Extract<WorkflowNode, { kind: 'preview' | 'save' | 'agent' }>;
 
@@ -18,6 +19,7 @@ interface WorkflowUtilityCardProps<TNode extends UtilityCardNode = UtilityCardNo
   isSelected?: boolean;
   highlighted?: boolean;
   zoomScale?: number;
+  snapToGrid?: boolean;
   onSelect?: () => void;
   onBringToFront?: () => void;
   onDelete?: (id: string) => void;
@@ -31,11 +33,6 @@ const getWorkflowCardStackZIndex = (node: UtilityCardNode, isSelected: boolean) 
   return persistedOrder + 10;
 };
 
-const snapCanvasCoordinate = (value: number, scale: number = 1) => {
-  if (!Number.isFinite(value) || !Number.isFinite(scale) || scale <= 0) return value;
-  return Math.round(value * scale) / scale;
-};
-
 const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
   node,
   title,
@@ -47,6 +44,7 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
   isSelected = false,
   highlighted = false,
   zoomScale = 1,
+  snapToGrid = false,
   onSelect,
   onBringToFront,
   onDelete,
@@ -89,16 +87,11 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
       const pointer = latestPointerRef.current;
       if (!dragState || !pointer) return;
 
-      const nextX = snapCanvasCoordinate(
-        dragState.originX + (pointer.x - dragState.startX) / Math.max(zoomScale, 0.0001),
-        zoomScale,
-      );
-      const nextY = snapCanvasCoordinate(
-        dragState.originY + (pointer.y - dragState.startY) / Math.max(zoomScale, 0.0001),
-        zoomScale,
-      );
-
-      onPositionChange(node.id, { x: nextX, y: nextY });
+      const nextPosition = snapCanvasPointToGrid({
+        x: dragState.originX + (pointer.x - dragState.startX) / Math.max(zoomScale, 0.0001),
+        y: dragState.originY + (pointer.y - dragState.startY) / Math.max(zoomScale, 0.0001),
+      }, { enabled: snapToGrid });
+      onPositionChange(node.id, nextPosition);
     });
   };
 

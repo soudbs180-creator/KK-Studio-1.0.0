@@ -168,7 +168,7 @@ What must be true before release:
 - Local `/healthz` reports `status: ok`
 - `config.canonicalPersistenceReady` is `true`
 - No hosted-required env shows as missing or placeholder in the local snapshot
-- `VITE_KK_API_BASE_URL` points at the VPS API origin
+- `VITE_KK_API_BASE_URL` points at an HTTPS API origin or the hosted same-origin URL
 - `VITE_ENABLE_LEGACY_WEB_API_FALLBACK` is not present in the hosted env plan
 - Hosted payment runtimes cannot boot in memory-only settlement mode
 - Hosted payment runtimes fail closed instead of booting with in-memory payment storage or missing settlement auth.
@@ -195,7 +195,55 @@ The command must deploy:
 - `apps/payment-sidecar`
 - PostgreSQL migrations required by auth, billing, workspace sync, model routing, and payment settlement
 
-### 3. Verify VPS health
+### 3. Confirm API DNS and TLS
+
+Production hosted builds expect the browser-facing API origin to be HTTPS. Current 1.4.6 hosted baseline uses `https://kkai.plus` as the browser-facing same-origin API. Vercel API functions proxy to the verified HTTPS VPS upstream `https://172-245-156-16.sslip.io` until the permanent `api.kkai.plus` DNS record can be changed in Cloudflare.
+
+Permanent canonical API domain setup remains recommended, but it is a follow-up infrastructure hardening step rather than the active 1.4.6 hosted availability path. For that permanent path, the target public API host is:
+
+```text
+api.kkai.plus -> 172.245.156.16
+```
+
+Before running the TLS helper, add the DNS record in the authoritative DNS provider:
+
+```text
+Type: A
+Name: api
+Content: 172.245.156.16
+Proxy: DNS only until the certificate and smoke checks pass
+```
+
+For the Cloudflare-managed `kkai.plus` zone, the repository helper can upsert the record when a DNS-edit token is available:
+
+```bash
+CF_API_TOKEN=<cloudflare-zone-dns-edit-token> node scripts/deploy/cloudflare-upsert-api-dns.mjs
+```
+
+The helper writes the record as DNS-only, not proxied, so Let's Encrypt can validate the VPS origin directly during the TLS issuance step.
+
+Then run this on the VPS as root:
+
+```bash
+API_DOMAIN=api.kkai.plus \
+EXPECTED_API_IPV4=172.245.156.16 \
+LETSENCRYPT_EMAIL=<operator-email> \
+bash scripts/vps/configure-kk-vps-api-tls.sh
+```
+
+The helper fails before changing TLS state if DNS does not resolve to the VPS. After it completes, verify:
+
+During the temporary ACME challenge phase, the helper serves only `/.well-known/acme-challenge/` over HTTP. It must return `404` for all other HTTP paths until the HTTPS virtual host is installed, so authenticated API traffic is never intentionally exposed before TLS is ready.
+
+```bash
+curl -fsS https://api.kkai.plus/healthz
+curl -fsS https://api.kkai.plus/api/manifest
+curl -i https://api.kkai.plus/api/v1/auth/session
+```
+
+`/api/v1/auth/session` may return `401` for an unauthenticated smoke, but it must complete TLS and return the API JSON error envelope. Public `/internal` and `/internal/` paths must return `404`.
+
+### 4. Verify VPS health
 
 Confirm:
 

@@ -1,8 +1,223 @@
-# KK-Studio v1.4.5 Single-Line Validation Matrix
+# KK-Studio v1.4.6 Single-Line Validation Matrix
 
-Last updated: 2026-05-08
+Last updated: 2026-05-09
 
 Use `npm.cmd` for npm scripts on Windows.
+
+## Current 1.4.6 Production Deploy Evidence
+
+Fresh final deploy gate before the `dpl_Ae8ckSKAuHthpkNssLnaB1dwHR5Y` production deployment:
+
+```powershell
+npm.cmd run governance:version
+npm.cmd run governance:check
+npm.cmd run audit:dependencies
+npm.cmd run spec:check
+npm.cmd run typecheck
+npm.cmd run check:encoding
+npm.cmd run build
+npm.cmd run test:unit
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check
+npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560
+npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560
+```
+
+Observed result: version metadata aligned to `1.4.6`; governance, dependency audit, spec, typecheck, encoding, build, and unit tests passed; unit tests reported 1441/1441 passing; Vercel production deploy completed and `kkai.plus` aliased `https://kk-studio-l8gex5abk-yykks-projects-727e9560.vercel.app`.
+
+Fresh production inspect after `b6f1fd6f`: `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_ACm7915SrSFiVQGNVJUDoDXMMQFA`, target `production`, status `Ready`, URL `https://kk-studio-u1atrmy8j-yykks-projects-727e9560.vercel.app`, and aliases `https://kkai.plus`, `https://www.kkai.plus`, `https://kk-studio.vercel.app`, `https://kk-studio-yykks-projects-727e9560.vercel.app`, and `https://kk-studio-yinchenkang0-1635-yykks-projects-727e9560.vercel.app`. The inspected Vercel build contains `api/auth/[...path]`, `api/v1/[...path]`, `api/healthz`, `api/ecommerce-analysis`, and `api/v1`.
+
+Fresh production deployment after `0ec11cb9`: `npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560` completed successfully, uploaded only `363B` of changed data, restored the previous build cache, ran `npm run build` as `kk-studio@1.4.6`, transformed 2140 modules, completed the build, and aliased `https://kkai.plus`. `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_BvSuUPCu4EWeBkoFcktZvDS5uJpV`, target `production`, status `Ready`, URL `https://kk-studio-a16e63rja-yykks-projects-727e9560.vercel.app`, and the expected public aliases.
+
+Fresh HTTPS upstream workaround while `api.kkai.plus` DNS remains unavailable:
+
+```powershell
+scp -i .codex-tmp-vps-key2 scripts/vps/configure-kk-vps-api-tls.sh root@172.245.156.16:/tmp/configure-kk-vps-api-tls.sh
+ssh -i .codex-tmp-vps-key2 root@172.245.156.16 "API_DOMAIN=172-245-156-16.sslip.io EXPECTED_API_IPV4=172.245.156.16 bash /tmp/configure-kk-vps-api-tls.sh"
+npx.cmd vercel env add KK_VPS_API_BASE_URL production --value "https://172-245-156-16.sslip.io" --yes --scope yykks-projects-727e9560
+npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560
+npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560
+```
+
+Observed result: the VPS resolves `172-245-156-16.sslip.io` to `172.245.156.16`, Certbot issued a Let's Encrypt certificate for the wildcard DNS hostname, nginx HTTPS config passed syntax checks and reloaded, and VPS-side HTTPS smoke returns `200` for `/healthz`, `200` for `/api/manifest`, expected unauthenticated `401` for `/api/v1/auth/session`, and `404` for `/internal` plus `/internal/`. Vercel Production now contains `KK_VPS_API_BASE_URL`, and the post-env deploy is `dpl_JBqdQMBorigt5kTExqRrv3JosAHc`, Ready, URL `https://kk-studio-icg1ticp2-yykks-projects-727e9560.vercel.app`, aliased to `https://kkai.plus`. Direct local `https://kkai.plus/api/*` smoke returns Vercel Security Check `429`, and the deployment URL returns Vercel Deployment Protection `401`; treat this as an automated-smoke limitation from this machine, not VPS HTTPS failure.
+
+Latest 1.4.6 production deployment after `aa14ee33`:
+
+```powershell
+npm.cmd pkg get version
+npx.cmd vercel env ls production --scope yykks-projects-727e9560
+npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560
+```
+
+Observed result: package metadata reports `1.4.6`; Vercel Production contains `KK_VPS_API_BASE_URL` and `VITE_KK_API_BASE_URL`; `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_632NEDeDWYXHJtyjnxfgDgQfuHXo`, target `production`, status `Ready`, URL `https://kk-studio-gq1riacd7-yykks-projects-727e9560.vercel.app`, and aliases `https://kkai.plus`, `https://www.kkai.plus`, `https://kk-studio.vercel.app`, `https://kk-studio-yykks-projects-727e9560.vercel.app`, and `https://kk-studio-yinchenkang0-1635-yykks-projects-727e9560.vercel.app`. The remote deployment build ran as `kk-studio@1.4.6` and transformed 2140 modules.
+
+Fresh DNS/VPS blocker evidence: `Resolve-DnsName api.kkai.plus -Server 1.1.1.1 -Type A`, `Resolve-DnsName api.kkai.plus -Server 8.8.8.8 -Type A`, and direct checks using the Cloudflare nameserver hostnames return `198.18.0.73`, not `172.245.156.16`. Node DoH checks against `https://cloudflare-dns.com/dns-query` and `https://dns.google/resolve` return no A answer and only the Cloudflare SOA. `CF_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ZONE_ID` are unset locally, and `node scripts/deploy/cloudflare-upsert-api-dns.mjs` fails closed with the expected missing-token message. VPS HTTP smoke currently returns `200` for `http://172.245.156.16/healthz`, `200` for `/api/manifest`, `401 AUTH_REQUIRED` for `/api/v1/auth/session`, and `404` for both `/internal` and `/internal/`. Do not call the full hosted/VPS line releasable until `api.kkai.plus` points to the VPS, the TLS helper succeeds, and HTTPS smoke passes.
+
+Fresh deployment-boundary guardrail after review:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/hosted-release-guardrails.test.ts
+node scripts/deploy/cloudflare-upsert-api-dns.mjs
+npm.cmd run governance:version
+npm.cmd run check:encoding
+```
+
+Observed result: guardrail tests first failed on the duplicated Cloudflare `/client/v4` API path and missing `m/` upload exclusions, then passed 9/9 after the helper and upload-boundary fixes. The Cloudflare DNS helper still fails closed without `CF_API_TOKEN` or `CLOUDFLARE_API_TOKEN`, which is the expected local state until DNS credentials are supplied. Version governance remains aligned to `1.4.6`, and encoding check passed.
+
+Fresh post-fix full gate:
+
+```powershell
+npm.cmd run governance:check
+npm.cmd run audit:dependencies
+npm.cmd run spec:check
+npm.cmd run typecheck
+npm.cmd run check:encoding
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/hosted-release-guardrails.test.ts tests/unit/vps-deploy-contract.test.ts tests/unit/vercel-vps-proxy.test.ts
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- .vercelignore scripts/deploy/cloudflare-upsert-api-dns.mjs scripts/deploy/vercel-preview-deploy.ps1 tests/unit/hosted-release-guardrails.test.ts status.md validation.md
+npm.cmd run test:unit
+npm.cmd run build
+```
+
+Observed result: governance, dependency audit, spec, typecheck, encoding, focused Hosted/VPS guardrails, and path-limited diff checks passed. `npm.cmd run test:unit` passed 1444/1444, and `npm.cmd run build` completed with Vite transforming 2140 modules.
+
+## 1.4.6 Release Blocker Audit Gate
+
+Use this gate when touching hosted Vercel proxy routes, VPS upstream security, release hosted preflight, payment-server dependency audit, visible Chinese text, PromptBar release QA, or VPS env examples:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/vercel-vps-proxy.test.ts" `
+  "tests/unit/kk-api-base-url-hosted-contract.test.ts" `
+  "tests/unit/hosted-release-guardrails.test.ts" `
+  "tests/unit/vps-deploy-artifacts.test.ts" `
+  "tests/unit/vps-deploy-contract.test.ts" `
+  "tests/unit/prompt-bar-layout-regression.test.ts" `
+  "tests/unit/encoding-check-contract.test.ts"
+npm.cmd run governance:check
+npm.cmd run audit:dependencies
+npm.cmd run spec:check
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run check:encoding
+npm.cmd run release:hosted:check
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check
+```
+
+Expected local result for `release:hosted:check`: it must fail while local `.env.local` contains `VITE_TURNSTILE_LOCAL_BYPASS=true` or a remote HTTP `VITE_KK_API_BASE_URL`. Treat that failure as the required clean-hosted-environment release blocker, not as a code failure. Before production release, rerun the same command in a clean hosted environment and require it to pass with HTTPS/same-origin API configuration plus real OAuth, Turnstile, and payment sidecar secrets.
+
+Browser QA for this gate must cover desktop dark/light and 390px mobile surfaces: login, temporary local workspace, storage selection/browser-cache path, PromptBar/model menu, active toggle gradient, settings, recharge/balance entry, mobile footer, and mobile settings/more sheet. Record screenshots and `release-qa-summary-refreshed.json` under `output/playwright/1.4.6-release-qa/`; do not commit `output/`.
+
+Deployment upload boundary must exclude local-only files and generated artifacts. Production `.vercelignore` and fallback `scripts/deploy/vercel-preview-deploy.ps1` tar packaging must keep `m/`, `output/`, `tests/`, `docs/`, `deploy/`, `release/`, AI ledgers, local env files, build outputs, caches, logs, and backup files out of uploaded artifacts while preserving runtime source, `api/` functions, package manifests, lockfiles, and Vercel config.
+
+Hosted/VPS production smoke must also verify:
+
+```powershell
+npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560
+npx.cmd vercel env ls --scope yykks-projects-727e9560
+curl.exe -vI https://api.kkai.plus/healthz
+curl.exe -vI https://api.kkai.plus/api/manifest
+curl.exe -vI https://api.kkai.plus/api/v1/auth/session
+```
+
+VPS API TLS helper syntax and fail-fast checks must also run on the VPS before enabling the API domain:
+
+```bash
+CF_API_TOKEN=<cloudflare-zone-dns-edit-token> node scripts/deploy/cloudflare-upsert-api-dns.mjs
+bash -n /tmp/configure-kk-vps-api-tls.sh
+API_DOMAIN=api.kkai.plus EXPECTED_API_IPV4=172.245.156.16 bash /tmp/configure-kk-vps-api-tls.sh
+```
+
+Without a Cloudflare token, the DNS helper must fail closed without mutating DNS. Before DNS is fixed, the VPS TLS command must stop at the DNS check and must not write nginx TLS state. After DNS points to the VPS, run the helper from `scripts/vps/configure-kk-vps-api-tls.sh`; it must serve only ACME challenge paths over temporary HTTP, then install the HTTPS virtual host. The HTTPS `api.kkai.plus` checks must complete TLS and return application/API responses before production release. Public `/internal` and `/internal/` paths must return `404` at nginx and must not proxy to the payment sidecar.
+
+## 1.4.6 Version And Portable Alignment Gate
+
+Use this gate when bumping release metadata, package versions, portable manifests, or portable release scanner logic:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/portable-payment-package-contract.test.ts" `
+  "tests/unit/portable-app-server-document-proxy-contract.test.ts"
+$env:VITE_KK_API_BASE_URL='https://api.kkai.plus'; npm.cmd run package:portable
+npm.cmd run publish:portable
+npm.cmd run governance:version
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check
+```
+
+Before committing, confirm no current release metadata points at `1.4.5`, `v1.4.5`, or `KK-Studio-Portable-1.4.5` outside explicitly historical status notes. Do not stage `release/KK-Studio-Portable/`, `output/`, local `.env*` files, or line-ending-only noise.
+
+## Desktop Canvas Snap-To-Grid Hotfix Gate
+
+Use this gate when touching the desktop left toolbar snap toggle, canvas snap helper, prompt/image/workflow card drag snapping, or selected-node movement snap behavior:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/canvas-snap-to-grid-contract.test.ts" `
+  "tests/unit/canvas-movement-contract.test.ts"
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git diff --check -- `
+  "src/utils/canvasSnapToGrid.ts" `
+  "tests/unit/canvas-snap-to-grid-contract.test.ts" `
+  "tsconfig.tests.json" `
+  "src/components/settings/ProjectManager.tsx" `
+  "src/App.tsx" `
+  "src/context/canvasMovement.ts" `
+  "src/context/canvasContextState.ts" `
+  "src/context/CanvasContext.tsx" `
+  "src/app/usePromptGroupDragHandlers.ts" `
+  "src/components/canvas/PromptNodeComponent.tsx" `
+  "src/components/image/ImageCard2.tsx" `
+  "src/workflow/nodes/WorkflowUtilityCard.tsx" `
+  "src/workflow/nodes/PreviewNodeCard.tsx" `
+  "src/workflow/nodes/SaveNodeCard.tsx" `
+  "src/workflow/nodes/AgentNodeCard.tsx" `
+  "tests/unit/canvas-movement-contract.test.ts" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA is required because this changes visible desktop UI. Record the URL, viewport, theme, left-toolbar snap control, `aria-pressed` toggle, `.theme-transitioning`, stale chunk status, and console errors in `status.md`. If the in-app Browser is blocked, record that and use the repository Playwright/headless-browser fallback.
+
+## Desktop Collapsed Manual Group Hotfix Gate
+
+Use this gate when touching desktop manual canvas group collapse state, compact group cards, hidden group member render suppression, connector suppression, or collapsed group image-load scheduling:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none `
+  "tests/unit/canvas-collapsed-groups-contract.test.ts" `
+  "tests/unit/canvas-groups-contract.test.ts" `
+  "tests/unit/prompt-group-regroup-behavior.test.ts" `
+  "tests/unit/canvas-visual-regression.test.ts"
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+npx.cmd tsc --noEmit --noUnusedLocals true --noUnusedParameters true --pretty false
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
+  "src/App.tsx" `
+  "src/app/collapsedCanvasGroups.ts" `
+  "src/components/canvas/CanvasGroupComponent.tsx" `
+  "src/types.ts" `
+  "tests/unit/canvas-collapsed-groups-contract.test.ts" `
+  "tests/unit/canvas-visual-regression.test.ts" `
+  "tsconfig.tests.json" `
+  "plans.md" `
+  "implement.md" `
+  "validation.md" `
+  "status.md"
+```
+
+Browser QA is required because this changes visible desktop UI and resource loading. Record the URL, viewport, theme, collapsed card, expand/hide controls, hidden member prompt/image surfaces, connector count, `.theme-transitioning`, stale chunk status, and console errors in `status.md`. If the in-app Browser is blocked, record that and use the repository Playwright/headless-browser fallback.
 
 ## Hosted Production Startup Hotfix Gate
 

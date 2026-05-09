@@ -174,13 +174,13 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                 >
                     <div className="flex items-center gap-2 text-[var(--text-tertiary)] mb-2">
                         <Loader2 size={12} className="animate-spin" />
-                        <span className="text-[10px] font-medium">鍥惧儚姝ｅ湪鍑嗗...</span>
+                        <span className="text-[10px] font-medium">图像正在准备...</span>
                         {onDisconnect && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); onDisconnect(); }}
                                 className="ml-auto w-4 h-4 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-colors"
                             >
-                                <span className="text-red-400 text-[10px]">脳</span>
+                                <span className="text-red-400 text-[10px]">×</span>
                             </button>
                         )}
                     </div>
@@ -190,7 +190,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                 <img
                                     key={img.id || idx}
                                     src={toReferenceImageDataUrl(img.data, img.mimeType)}
-                                    alt="Reference"
+                                    alt="参考图"
                                     className="w-8 h-8 object-cover rounded border border-[color:var(--frost-card-sub-border)]"
                                 />
                             ))}
@@ -236,7 +236,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
             >
                 <div className="flex items-center gap-2 text-[var(--text-tertiary)] mb-2">
                     <div className="w-2 h-2 rounded-full bg-[var(--text-tertiary)] animate-pulse" />
-                    <span className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider">Generating x{parallelCount}</span>
+                    <span className="text-[10px] text-[var(--text-secondary)] font-bold tracking-wider">生成中 x{parallelCount}</span>
                 </div>
                 {referenceImages && referenceImages.length > 0 && (
                     <div className="flex gap-1 mb-1 flex-wrap">
@@ -244,7 +244,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                             <img
                                 key={img.id || idx}
                                 src={toReferenceImageDataUrl(img.data, img.mimeType)}
-                                alt="Reference"
+                                alt="参考图"
                                 className="w-8 h-8 object-cover rounded border border-[color:var(--frost-card-sub-border)]"
                             />
                         ))}
@@ -412,7 +412,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                         textTransform: 'uppercase',
                                         letterSpacing: '1px'
                                     }}>
-                                        Generating #{i + 1}
+                                        生成队列 #{i + 1}
                                     </span>
                                 </div>
                             </div>

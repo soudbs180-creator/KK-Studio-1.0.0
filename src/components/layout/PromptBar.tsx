@@ -239,6 +239,19 @@ function isLightSeriesTextColor(textColor: string | undefined): boolean {
         || normalized === '#111827';
 }
 
+const modelLibrarySurfaceStyle: React.CSSProperties = {
+    background: 'var(--frost-card-framework-bg)',
+    borderColor: 'var(--frost-card-framework-border)',
+    boxShadow: 'var(--frost-card-framework-shadow)',
+    WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.18)',
+    backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.18)',
+};
+
+const modelLibrarySearchSurfaceStyle: React.CSSProperties = {
+    ...modelLibrarySurfaceStyle,
+    boxShadow: 'var(--frost-card-sub-shadow)',
+};
+
 function getCreditModelFlatStyle(
     colorStart: string,
     colorEnd: string,
@@ -2739,13 +2752,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
             {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
                 <div
                     className="mb-2 rounded-2xl border p-2.5  max-w-[calc(100vw-24px)]"
-                    style={{
-                        width: 'min(22rem, calc(100vw - 24px))',
-                        background: 'color-mix(in srgb, var(--bg-overlay) 96%, transparent)',
-                        borderColor: 'var(--frost-card-framework-border)',
-                        backdropFilter: 'blur(20px) saturate(160%)',
-                        WebkitBackdropFilter: 'blur(20px) saturate(160%)',
-                    }}
+                    style={{ ...modelLibrarySearchSurfaceStyle, width: 'min(22rem, calc(100vw - 24px))' }}
                 >
                     <div className="relative flex items-center">
                         <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2784,14 +2791,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
             <div
                 ref={modelListScrollRef}
                 className="dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] max-h-[50vh] overflow-y-auto scrollbar-thin origin-bottom p-4"
-                style={{
-                    background: 'var(--frost-card-framework-bg)',
-                    borderColor: 'var(--frost-card-framework-border)',
-                    boxShadow: 'var(--frost-card-framework-shadow)',
-                    borderRadius: '1rem',
-                    backdropFilter: 'blur(22px) saturate(165%)',
-                    WebkitBackdropFilter: 'blur(22px) saturate(165%)',
-                }}
+                style={{ ...modelLibrarySurfaceStyle, borderRadius: '1rem' }}
                 onScroll={(e) => {
                     const nextTop = e.currentTarget.scrollTop;
                     modelListScrollPos.current = nextTop;
@@ -3404,7 +3404,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 className={`relative inline-flex min-w-0 ${isMobile ? 'shrink-0' : 'flex-shrink-0'}`}
                             >
                                 <button
-                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-[clamp(6.75rem,38vw,8.5rem)] max-w-[42vw] flex-none justify-start' : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
+                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-[clamp(7rem,40vw,9rem)] max-w-[44vw] flex-none justify-start' : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
                                         ? 'bg-[var(--frost-input-bg)] text-[var(--text-tertiary)] cursor-not-allowed border-[color:var(--frost-card-sub-border)]'
                                         : 'text-[var(--text-secondary)] !opacity-100 hover:border-[var(--prompt-bar-shell-border-strong)]'
                                         }`}
@@ -3417,11 +3417,37 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 currentModelPrimaryColor,
                                                 currentModelSecondaryColor,
                                                 currentModel?.textColor,
-                                                true,
+                                                false,
                                             );
                                         }
                                         return {};
                                     })()}
+                                    onMouseEnter={(event) => {
+                                        if (currentModel?.isSystemInternal && currentModel?.colorStart && currentModel?.colorEnd) {
+                                            const hoverStyle = getCreditModelFlatStyle(
+                                                currentModelPrimaryColor,
+                                                currentModelSecondaryColor,
+                                                currentModel?.textColor,
+                                                true,
+                                            );
+                                            event.currentTarget.style.background = String(hoverStyle.background || '');
+                                            event.currentTarget.style.border = String(hoverStyle.border || '');
+                                            event.currentTarget.style.boxShadow = String(hoverStyle.boxShadow || '');
+                                        }
+                                    }}
+                                    onMouseLeave={(event) => {
+                                        if (currentModel?.isSystemInternal && currentModel?.colorStart && currentModel?.colorEnd) {
+                                            const defaultStyle = getCreditModelFlatStyle(
+                                                currentModelPrimaryColor,
+                                                currentModelSecondaryColor,
+                                                currentModel?.textColor,
+                                                false,
+                                            );
+                                            event.currentTarget.style.background = String(defaultStyle.background || '');
+                                            event.currentTarget.style.border = String(defaultStyle.border || '');
+                                            event.currentTarget.style.boxShadow = String(defaultStyle.boxShadow || '');
+                                        }
+                                    }}
                                     onMouseDown={(e) => e.stopPropagation()} // 🚀 阻止 mousedown 冒泡，防止被 handleClickOutside 误杀
                                     onClick={(e) => {
                                         e.stopPropagation(); // 🚀 阻止冒泡，防止被 handleClickOutside 误杀
@@ -3492,7 +3518,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     >
                                         {/* 🔍 Search Input Module - Above the list - 只在多个模型时显示 */}
                                         {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
-                                            <div className="mb-2 p-2.5 bg-[var(--frost-card-framework-bg)] border border-[var(--border-medium)] rounded-2xl  animate-scaleIn origin-bottom max-w-[calc(100vw-24px)]" style={{ width: 'min(22rem, calc(100vw - 24px))' }}>
+                                            <div className="mb-2 p-2.5 border rounded-2xl  animate-scaleIn origin-bottom max-w-[calc(100vw-24px)]" style={{ ...modelLibrarySearchSurfaceStyle, width: 'min(22rem, calc(100vw - 24px))' }}>
                                                 <div className="relative flex items-center">
                                                     <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -3530,7 +3556,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         <div
                                             ref={modelListScrollRef}
                                             className="dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] max-h-[50vh] overflow-y-auto scrollbar-thin animate-scaleIn origin-bottom p-4"
-                                            style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)', boxShadow: 'var(--frost-card-framework-shadow)', borderRadius: '1rem' }}
+                                            style={{ ...modelLibrarySurfaceStyle, borderRadius: '1rem' }}
                                             onScroll={(e) => {
                                                 const nextTop = e.currentTarget.scrollTop;
                                                 modelListScrollPos.current = nextTop;
@@ -3689,9 +3715,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     >
                                         {groundingSupported && (
                                             <button
-                                                className={`flex min-w-0 max-w-full items-center justify-center gap-1 overflow-hidden px-2 h-full rounded-md transition-all text-[11px] font-medium ${config.enableGrounding
-                                                    ? 'bg-[var(--prompt-bar-shell-hover)] text-[var(--text-primary)]'
-                                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--prompt-bar-shell-hover)]'
+                                                className={`flex min-w-0 max-w-full items-center justify-center gap-1 overflow-hidden px-2 h-full rounded-md border transition-all text-[11px] font-medium ${config.enableGrounding
+                                                    ? 'border-[var(--prompt-bar-toggle-active-border)] bg-[image:var(--prompt-bar-toggle-active-bg)] text-[var(--prompt-bar-toggle-active-text)] shadow-[var(--prompt-bar-toggle-active-shadow)]'
+                                                    : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--prompt-bar-shell-hover)]'
                                                     }`}
                                                 onClick={() => updateConfigFields({ enableGrounding: !config.enableGrounding })}
                                                 title="Google 搜索 (实时信息)"
@@ -3712,9 +3738,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                                         {imageSearchSupported && (
                                             <button
-                                                className={`flex min-w-0 max-w-full items-center justify-center gap-1 overflow-hidden px-2 h-full rounded-md transition-all text-[11px] font-medium ${config.enableImageSearch
-                                                    ? 'bg-[var(--prompt-bar-shell-hover)] text-[var(--text-primary)]'
-                                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--prompt-bar-shell-hover)]'
+                                                className={`flex min-w-0 max-w-full items-center justify-center gap-1 overflow-hidden px-2 h-full rounded-md border transition-all text-[11px] font-medium ${config.enableImageSearch
+                                                    ? 'border-[var(--prompt-bar-toggle-active-border)] bg-[image:var(--prompt-bar-toggle-active-bg)] text-[var(--prompt-bar-toggle-active-text)] shadow-[var(--prompt-bar-toggle-active-shadow)]'
+                                                    : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--prompt-bar-shell-hover)]'
                                                     }`}
                                                 onClick={() => updateConfigFields({ enableImageSearch: !config.enableImageSearch })}
                                                 title="图片搜索 (参考网络图片)"

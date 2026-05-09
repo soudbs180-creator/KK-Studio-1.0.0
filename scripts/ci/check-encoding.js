@@ -39,6 +39,16 @@ const scanExtensions = new Set([
   ".yml",
 ]);
 
+const broadMojibakePatternRoots = new Set([
+  "src",
+  "apps",
+  "api",
+  "billing",
+  "packages",
+  "payment-server",
+  "server",
+  "supabase",
+]);
 const suspiciousFragments = [
   "\u93C4\uE219\u7AF4\u5A06",
   "\u9359\u6220\u5E47",
@@ -57,6 +67,15 @@ const suspiciousFragments = [
   "SUPABASE_SERVICE_ROLE_KEY=\u6D63\u72B5\u6B91",
 ];
 const suspiciousCharSet = new Set("\u9359\u95C2\u59AB\u7487\u6DC7\u93C2\u8930\u7F02\u95B9\u93C6\u95B2\u68F0\u6E1A\u6D98\u7C32\u9350\u5A34\u7039\u95AB\u7ED7\u9422\u6D63");
+const suspiciousMojibakePatterns = [
+  /[\u00c3\u00c2]\S{0,3}[\u00a0-\u00bf]/u,
+  /\u00e9[\u00a0-\u00bf]/u,
+  /[\u00e5\u00e6\u00e7\u00e8\u00e4][\u0080-\u00bf\u2018-\u2026]/u,
+  /[\u00e3\u00ef][\u0080-\u00bf\u201a-\u2026]/u,
+  /\u00e2[\u0080-\u00bf\u0153\u20ac\u2122]/u,
+  /\u00f0\u0178/u,
+  /[\u9365\u60e7\u511a\u59dd\u6e6a\u9351\u55d7\ue62c\u9435\u74a7]/u,
+];
 const traditionalOnlyChars = new Set(["這", "個", "們", "為", "與", "會", "體", "點", "對", "於", "裡", "發", "說", "請", "將", "後", "臺", "門", "風", "務", "應", "變", "數", "圖", "層", "審", "寫", "則", "誤", "檢", "碼", "邏", "輯", "網"]);
 const skipDirectories = new Set([
   "node_modules",
@@ -102,10 +121,18 @@ function countSuspiciousChars(text) {
   return count;
 }
 
-function hasSuspiciousText(text) {
+function shouldApplyBroadMojibakePatterns(filePath) {
+  const relativePath = path.relative(process.cwd(), filePath);
+  const [root] = relativePath.split(path.sep);
+  return broadMojibakePatternRoots.has(root);
+}
+
+function hasSuspiciousText(text, filePath) {
   if (
     text.startsWith("//")
     || text.startsWith("/*")
+    || text.startsWith("{/*")
+    || text.startsWith("<!--")
     || text.startsWith("*")
     || text.startsWith("*/")
   ) {
@@ -117,6 +144,10 @@ function hasSuspiciousText(text) {
   }
 
   if (suspiciousFragments.some((fragment) => text.includes(fragment))) {
+    return true;
+  }
+
+  if (shouldApplyBroadMojibakePatterns(filePath) && suspiciousMojibakePatterns.some((pattern) => pattern.test(text))) {
     return true;
   }
 
@@ -192,7 +223,7 @@ function walk(targetPath) {
       return;
     }
 
-    if (hasSuspiciousText(trimmed)) {
+    if (hasSuspiciousText(trimmed, resolvedPath)) {
       mojibakeIssues.push(`${resolvedPath}:${index + 1}: ${trimmed}`);
     }
 

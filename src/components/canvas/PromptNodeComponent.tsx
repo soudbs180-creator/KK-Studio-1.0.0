@@ -19,6 +19,7 @@ import { resolveModelDisplayName } from '../../utils/modelDisplayName';
 import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
 import { buildPptDeckModuleState } from '../../utils/pptDeckModules';
 import { getPromptNodeBaseCardWidth, getPromptNodeCardWidth } from '../../utils/promptNodeCardWidth';
+import { snapCanvasPointToGrid } from '../../utils/canvasSnapToGrid';
 import EcommerceCardActions from '../ecommerce/EcommerceCardActions';
 import EcommerceCanvasWorkbenchCard from '../ecommerce/EcommerceCanvasWorkbenchCard';
 
@@ -333,6 +334,7 @@ interface PromptNodeProps {
     onDragStateChange?: (dragging: boolean) => void;
     onUpdateNode?: (node: PromptNode) => void; // 🚀 [New Prop] Update node externally
     isCanvasTransforming?: boolean;
+    snapToGrid?: boolean;
     isChatMode?: boolean; // 🚀 [New Prop] Render as standard block in chat feed
 }
 
@@ -573,6 +575,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     onDragStateChange,
     onUpdateNode,
     isCanvasTransforming = false,
+    snapToGrid = false,
     isChatMode = false
 }) => {
     // 🚀 [DEBUG] Trace PromptNode Rendering
@@ -985,10 +988,10 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         }
 
         const scale = zoomScale || 1;
-        const nextPos = {
+        const nextPos = snapCanvasPointToGrid({
             x: dragStartCanvasPos.current.x + ((clientX - dragStartPos.current.x) / scale),
             y: dragStartCanvasPos.current.y + ((clientY - dragStartPos.current.y) / scale),
-        };
+        }, { enabled: snapToGrid });
         const dx = nextPos.x - localPosRef.current.x;
         const dy = nextPos.y - localPosRef.current.y;
         localPosRef.current = nextPos;
@@ -1049,7 +1052,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             window.removeEventListener('touchmove', handleMouseMove);
             window.removeEventListener('touchend', handleMouseUp);
         };
-    }, [isDragging]);
+    }, [isDragging, snapToGrid]);
 
     const effectiveChildImageCount = Math.max(0, actualChildImageCount);
     const pptDeck = node.mode === GenerationMode.PPT ? buildPptDeckModuleState(node) : null;
@@ -2364,6 +2367,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         prev.shadowBoost === next.shadowBoost &&
         prev.detailLevel === next.detailLevel &&
         prev.isCanvasTransforming === next.isCanvasTransforming &&
+        prev.snapToGrid === next.snapToGrid &&
         prev.zoomScale === next.zoomScale &&
         prev.isMobile === next.isMobile &&
         prev.activeEcommerceTaskState === next.activeEcommerceTaskState &&

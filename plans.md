@@ -1,9 +1,34 @@
-# KK-Studio v1.4.5 Single-Line Convergence Plan
+# KK-Studio v1.4.6 Single-Line Convergence Plan
 
-Last updated: 2026-05-08
+Last updated: 2026-05-09
 Branch policy: continue on the current branch and current workspace unless the user explicitly asks for a branch or worktree.
 
 ## Summary
+
+Current 1.4.6 release blocker audit:
+- Treat the current alternate-git worktree as the 1.4.6 release candidate baseline, including the snap-to-grid and collapsed manual group feature line.
+- Security/proxy milestone: move hosted `/api/v1/*`, `/api/auth/*`, `/api/manifest`, and `/healthz` onto tracked Vercel API functions backed by `api/_vpsProxy.ts`; default the upstream to HTTPS; dynamically derive upstream host/proto; and fail closed before forwarding Authorization, cookies, session, csrf, or token headers to a production HTTP upstream.
+- Hosted environment milestone: make `resolveKkApiBaseUrl()` prefer the HTTPS runtime origin when a hosted build still carries an HTTP remote VPS base URL, and make `release:hosted:check` block `VITE_TURNSTILE_LOCAL_BYPASS` plus remote HTTP `VITE_KK_API_BASE_URL` snapshots.
+- Dependency/VPS milestone: clear the `payment-server` moderate dependency audit by overriding `express-rate-limit` to `8.5.1`/`ip-address` `10.2.0`, and document secure cookie plus payment sidecar settlement/internal tokens in VPS env examples.
+- UI/localization milestone: keep PromptBar active toggles on `bg-[image:var(--prompt-bar-toggle-active-bg)]`, widen the 390px mobile model control, and replace remaining visible PendingNode English fallback text/alt strings with Simplified Chinese.
+- Browser QA milestone: run real Chromium QA across login, temporary local workspace, PromptBar/model menu, settings, recharge/balance entry, and 390px mobile surfaces. Record screenshots and JSON under `output/playwright/1.4.6-release-qa/`, but do not commit artifacts.
+- VPS exposure milestone: public nginx configs must return `404` for `/internal/` instead of proxying it to the payment sidecar; internal settlement/callback traffic must stay service-to-service with scoped tokens.
+- Release remains blocked until the production `api.kkai.plus` DNS and HTTPS endpoint are fixed and smoked successfully. Clean-env `release:hosted:check` now passes when local dev env files are isolated and hosted process env is supplied, but the public HTTPS VPS API is not yet reachable.
+
+Current desktop snap-to-grid hotfix:
+- Add a desktop-only snap-to-grid toggle to the left canvas toolbar.
+- The toolbar control uses a magnet icon, exposes a stable `canvas-snap-to-grid-toggle` test id, and reflects state through `aria-pressed`.
+- When enabled, dragging prompt cards, image cards, workflow utility cards, selected companion cards, and selected canvas groups snaps the stored canvas position to the visible 16 px canvas grid.
+- Acceptance: focused snap-to-grid and canvas-movement contracts pass, `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and path-limited `diff --check` pass; browser QA records URL, viewport, theme, checked surface, `.theme-transitioning`, stale chunk status, and console errors.
+- Commit scope must stay limited to the snap helper, toolbar state/wiring, affected card drag props, shared movement helper snap options, the focused contracts, `tsconfig.tests.json` test registration, and ledger files. Existing unrelated dirty files and collapsed canvas group work are excluded.
+
+Current desktop collapsed manual group hotfix:
+- Add a desktop-only eye control to manual canvas groups so users can hide a group after grouping.
+- Expanded groups show an eye-off hide button in the group header. Collapsed groups render as a compact card with an eye icon, `展开分组`, and the group name.
+- Collapsed group members are removed from prompt/image/workflow render queues, prompt-group child render data, connector rendering, image-load scheduling, and `InfiniteCanvas.cardPositions`.
+- Collapsed group viewport culling uses the same computed bounds as the rendered compact card, so stale persisted `group.bounds` cannot hide the card incorrectly after members move.
+- Acceptance: focused collapsed-group, canvas group, prompt regroup, and visual-regression contracts pass; `npm.cmd run typecheck`, `npm.cmd run test:unit`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, strict no-unused TypeScript, and path-limited alternate-git `diff --check` pass; browser QA records URL, viewport, theme, checked surfaces, `.theme-transitioning`, stale chunk status, connector count, and console errors.
+- Commit scope must stay limited to collapsed manual group runtime/UI/test/ledger files. Existing unrelated hosted/VPS/payment/PromptBar/settings/snap-to-grid dirty files are excluded, and mixed files such as `src/App.tsx` and `tsconfig.tests.json` require hunk-scoped staging.
 
 Completed provider compatibility override after the ecommerce framework card closure:
 - Verify GPT Best against the live Apifox `llms.txt` source before changing local routing.
@@ -286,7 +311,7 @@ Commit:
 
 ### 1. Refactor Ledger Alignment
 
-Goal: make `plans.md`, `implement.md`, `status.md`, and `validation.md` describe the v1.4.5 refactor line.
+Goal: make `plans.md`, `implement.md`, `status.md`, and `validation.md` describe the v1.4.6 refactor line.
 
 Acceptance:
 - The four ledger files identify `d12731ce` as the then-current alternate-git baseline, name plain `.git` as stale/historical, and describe the single merged execution line.
@@ -299,7 +324,7 @@ Validation:
 - `npm.cmd run check:encoding`
 
 Commit:
-- `docs: align v1.4.5 refactor plan`
+- `docs: align v1.4.6 refactor plan`
 
 ### 2. Stage One M6 Closeout: Remaining Ecommerce Branch Scan (Completed)
 

@@ -166,6 +166,7 @@ test('prompt bar model library and footer controls use frosted flat defaults wit
   const cssSource = readSource('src/index.css');
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
   const imageOptionsSource = readSource('src/components/image/ImageOptionsPanel.tsx');
+  const footerFrostRule = cssSource.match(/\.prompt-bar-footer-frost::before\s*\{[\s\S]*?\}/)?.[0] || '';
 
   assert.match(cssSource, /--prompt-bar-liquid-bg:\s*rgba\(/);
   assert.match(cssSource, /--prompt-bar-liquid-bg-hover:\s*linear-gradient\(/);
@@ -174,7 +175,7 @@ test('prompt bar model library and footer controls use frosted flat defaults wit
   assert.match(cssSource, /\.prompt-bar-liquid-button:hover\s*\{[\s\S]*background:\s*var\(--prompt-bar-liquid-bg-hover\);/);
   assert.match(cssSource, /\.prompt-bar-liquid-group:hover\s*\{[\s\S]*background:\s*var\(--prompt-bar-liquid-group-bg-hover\);/);
   assert.match(cssSource, /\.prompt-bar-footer-frost::before\s*\{[\s\S]*inset:\s*-6px 0 0;/);
-  assert.match(cssSource, /\.prompt-bar-footer-frost::before\s*\{[\s\S]*transform:\s*translateY\(-6px\);/);
+  assert.doesNotMatch(footerFrostRule, /transform:/);
   assert.doesNotMatch(cssSource, /--prompt-bar-liquid-bg:\s*linear-gradient\(/);
   assert.doesNotMatch(cssSource, /--prompt-bar-liquid-group-bg:\s*linear-gradient\(/);
 
@@ -185,6 +186,11 @@ test('prompt bar model library and footer controls use frosted flat defaults wit
   assert.match(promptBarSource, /style=\{\{ \.\.\.modelLibrarySearchSurfaceStyle, width: 'min\(22rem, calc\(100vw - 24px\)\)' \}\}/);
   assert.match(promptBarSource, /style=\{\{ \.\.\.modelLibrarySurfaceStyle, borderRadius: '1rem' \}\}/);
   assert.doesNotMatch(promptBarSource, /background:\s*'color-mix\(in srgb, var\(--bg-overlay\) 96%, transparent\)'/);
+  assert.match(promptBarSource, /rounded-md border transition-all text-\[11px\] font-medium \$\{config\.enableGrounding/);
+  assert.match(promptBarSource, /rounded-md border transition-all text-\[11px\] font-medium \$\{config\.enableImageSearch/);
+  assert.match(promptBarSource, /bg-\[image:var\(--prompt-bar-toggle-active-bg\)\]/);
+  assert.doesNotMatch(promptBarSource, /bg-\[var\(--prompt-bar-toggle-active-bg\)\]/);
+  assert.match(promptBarSource, /border-transparent text-\[var\(--text-secondary\)\]/);
 
   assert.match(imageOptionsSource, /const ACTIVE_TOGGLE_STYLE: React\.CSSProperties = \{/);
   assert.match(imageOptionsSource, /background:\s*'var\(--prompt-bar-toggle-active-bg\)'/);
@@ -209,7 +215,8 @@ test('mobile prompt footer stays single-row and lets controls overflow horizonta
   assert.match(cssSource, /overflow-y: visible;/);
   assert.match(cssSource, /\.input-bar-footer\[data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"\] \* \{/);
   assert.doesNotMatch(promptBarSource, /min-w-\[9rem\] max-w-none justify-start flex-shrink-0/);
-  assert.match(promptBarSource, /isMobile \? 'w-\[clamp\(6\.75rem,38vw,8\.5rem\)\] max-w-\[42vw\] flex-none justify-start'/);
+  assert.doesNotMatch(promptBarSource, /isMobile \? 'w-\[clamp\(6\.75rem,38vw,8\.5rem\)\] max-w-\[42vw\] flex-none justify-start'/);
+  assert.match(promptBarSource, /isMobile \? 'w-\[clamp\(7rem,40vw,9rem\)\] max-w-\[44vw\] flex-none justify-start'/);
   assert.doesNotMatch(modePanelSource, /isEmbeddedMobileDrawer \? 'px-3 justify-between max-w-none' : 'px-2\.5 max-w-none'/);
   assert.match(modePanelSource, /isMobile \? 'min-w-0 shrink-0'/);
   assert.match(modePanelSource, /isMobile \? \(isEmbeddedMobileDrawer \? 'px-3 justify-between max-w-\[42vw\] min-w-0 overflow-hidden' : 'px-2\.5 max-w-\[40vw\] min-w-0 overflow-hidden'\)/);

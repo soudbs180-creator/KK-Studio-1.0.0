@@ -43,6 +43,10 @@ test("VPS bootstrap and deploy assets exist for the postgres-first runtime", () 
   assert.match(readSource(deployScript), /bootstrap-kk-vps\.sql/);
   assert.match(apiEnvSource, /TURNSTILE_SECRET_KEY=/);
   assert.match(apiEnvSource, /KK_AUTH_REQUIRE_TURNSTILE=/);
+  assert.match(apiEnvSource, /KK_SESSION_COOKIE_SECURE=true/);
+  assert.match(apiEnvSource, /KK_SESSION_COOKIE_SAME_SITE=lax/);
+  assert.match(apiEnvSource, /PAYMENT_SIDECAR_INTERNAL_TOKEN=/);
+  assert.match(apiEnvSource, /PAYMENT_SIDECAR_SETTLEMENT_TOKEN=/);
   assert.match(readSource(webEnv), /VITE_KK_API_BASE_URL=/);
   assert.match(readSource(webEnv), /VITE_KK_ADMIN_URL=/);
   assert.match(readSource(adminWebEnv), /VITE_KK_ADMIN_API_BASE_URL=/);
@@ -91,9 +95,74 @@ test("VPS default web entry serves the main login app while admin stays separate
   assert.match(nginxSource, /server_name api\.example\.com;/);
   assert.match(nginxSource, /location \/api\/ \{\s*proxy_pass http:\/\/kk_api_upstream\/api\/;/);
   assert.match(nginxSource, /server_name api\.example\.com;[\s\S]*location \/payment\/ \{\s*proxy_pass http:\/\/kk_payment_upstream\/payment\/;/);
-  assert.match(nginxSource, /server_name api\.example\.com;[\s\S]*location \/internal\/ \{\s*proxy_pass http:\/\/kk_payment_upstream\/internal\/;/);
+  assert.match(nginxSource, /server_name api\.example\.com;[\s\S]*location \/internal\/ \{\s*return 404;/);
   assert.ok(
     nginxSource.indexOf("server_name _ app.example.com;") < nginxSource.indexOf("server_name api.example.com;"),
     "the default app server must appear before the API virtual host",
   );
+});
+
+test("VPS nginx gateway does not expose internal payment routes on public virtual hosts", () => {
+  const gatewaySource = readSource("deploy/nginx/kk-vps-gateway.conf");
+  const legacySource = readSource("deploy/nginx/kk-vps.conf");
+
+  for (const [label, source] of [
+    ["gateway", gatewaySource],
+    ["legacy", legacySource],
+  ] as const) {
+    assert.doesNotMatch(
+      source,
+      /location\s+\/internal\/\s*\{[\s\S]*?proxy_pass\s+http:\/\/[^;]+\/internal\//,
+      `${label} nginx config must not proxy public /internal/ traffic`,
+    );
+    assert.match(
+      source,
+      /location\s+\/internal\/\s*\{[\s\S]*?return\s+404;/,
+      `${label} nginx config should fail closed for public /internal/ traffic`,
+    );
+    assert.match(
+      source,
+      /location\s+=\s+\/internal\s*\{[\s\S]*?return\s+404;/,
+      `${label} nginx config should fail closed for the exact public /internal path`,
+    );
+  }
+});
+
+test("VPS API TLS helper fails fast on DNS and keeps internal routes closed", () => {
+  const tlsScriptPath = "scripts/vps/configure-kk-vps-api-tls.sh";
+  assert.equal(existsSync(path.join(ROOT_DIR, tlsScriptPath)), true, `${tlsScriptPath} should exist`);
+
+  const tlsSource = readSource(tlsScriptPath);
+
+  assert.match(tlsSource, /API_DOMAIN="\$\{API_DOMAIN:-api\.kkai\.plus\}"/);
+  assert.match(tlsSource, /EXPECTED_API_IPV4="\$\{EXPECTED_API_IPV4:-172\.245\.156\.16\}"/);
+  assert.match(tlsSource, /getent ahostsv4 "\$\{API_DOMAIN\}" \|\| true/);
+  assert.match(tlsSource, /DNS for \$\{API_DOMAIN\} does not include \$\{EXPECTED_API_IPV4\}/);
+  assert.ok(
+    tlsSource.indexOf("verify_dns_points_to_vps") < tlsSource.indexOf("write_http_challenge_site"),
+    "DNS verification must run before nginx ACME site changes",
+  );
+  assert.ok(
+    tlsSource.indexOf("verify_dns_points_to_vps") < tlsSource.indexOf("request_certificate"),
+    "DNS verification must run before certbot requests",
+  );
+  const httpChallengeSite = tlsSource.slice(
+    tlsSource.indexOf("write_http_challenge_site()"),
+    tlsSource.indexOf("request_certificate()"),
+  );
+  assert.doesNotMatch(
+    httpChallengeSite,
+    /proxy_pass/,
+    "temporary ACME HTTP site must not expose the API before HTTPS is issued",
+  );
+  assert.match(httpChallengeSite, /location \/ \{[\s\S]*return 404;/);
+  assert.match(tlsSource, /apt-get install -y[\s\S]*certbot/);
+  assert.match(tlsSource, /certbot certonly[\s\S]*--webroot/);
+  assert.match(tlsSource, /kk-vps-api-tls\.conf/);
+  assert.match(tlsSource, /listen 443 ssl/);
+  assert.match(tlsSource, /ssl_certificate \/etc\/letsencrypt\/live\/\$\{API_DOMAIN\}\/fullchain\.pem;/);
+  assert.match(tlsSource, /proxy_pass http:\/\/127\.0\.0\.1:3001/);
+  assert.match(tlsSource, /location = \/internal \{[\s\S]*return 404;/);
+  assert.match(tlsSource, /location \/internal\/ \{[\s\S]*return 404;/);
+  assert.match(tlsSource, /curl -fsS "https:\/\/\$\{API_DOMAIN\}\/healthz"/);
 });

@@ -60,6 +60,24 @@ test('portable release packaging fails unless the built frontend has a remote KK
   assert.match(releaseSource, /function assertPortableRemoteKkApiBaseUrl/);
   assert.match(releaseSource, /VITE_KK_API_BASE_URL/);
   assert.match(releaseSource, /isLocalOrPrivateKkApiBaseUrl/);
+  assert.match(releaseSource, /\(\[`"'\]\)\(\.\*\?\)\\1/);
+  assert.match(releaseSource, /match\?\.\[2\]/);
   assert.match(releaseSource, /await assertPortableRemoteKkApiBaseUrl\(distSourceDir\)/);
   assert.match(releaseSource, /does not package the core KK API/);
+});
+
+test('portable stable release notes describe the hosted same-origin API workaround instead of blocking on api DNS', () => {
+  const releaseManifest = readJson<{
+    releaseNotes?: string[];
+  }>('config/release-manifest.json');
+
+  assert.ok(
+    releaseManifest.releaseNotes?.some((note) => note.includes('verified kkai.plus same-origin API')),
+    'release notes should identify the active hosted API route',
+  );
+  assert.equal(
+    releaseManifest.releaseNotes?.some((note) => note.includes('remaining DNS/TLS smoke gate')),
+    false,
+    'release notes should not keep the already-mitigated DNS blocker as the active release state',
+  );
 });
