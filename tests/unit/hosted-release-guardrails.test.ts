@@ -204,6 +204,14 @@ test("Vercel upload boundaries exclude local ledgers, generated artifacts, and n
   });
 });
 
+test("production html does not load Tailwind from the browser CDN", () => {
+  const source = readSource("index.html");
+
+  assert.doesNotMatch(source, /https:\/\/cdn\.tailwindcss\.com/);
+  assert.doesNotMatch(source, /tailwind\.config\s*=/);
+  assert.match(readSource("src/index.css"), /@import "tailwindcss";/);
+});
+
 test("local API env example documents hosted Google and WeChat auth server secrets", () => {
   const source = readSource("apps/api/.env.local.example");
 
