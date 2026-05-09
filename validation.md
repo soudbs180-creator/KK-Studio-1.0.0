@@ -22,6 +22,8 @@ Fresh result on 2026-05-10: the focused hosted/proxy/input suite passed 22/22; `
 
 Fresh production evidence on 2026-05-10: `vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_9TzojFb3YM2UonhKwwFRu151v6fL`, target `production`, status `Ready`, URL `https://kk-studio-7d78nulgj-yykks-projects-727e9560.vercel.app`, aliased to `https://kkai.plus`. Production smoke returned `200` JSON for `/api/healthz`, `200` JSON for `/api/manifest`, expected `401 AUTH_REQUIRED` JSON for `/api/v1/auth/session`, expected `401 AUTH_REQUIRED` JSON for `/api/v1/profile/user-apis`, and expected `403 TURNSTILE_FAILED` JSON for `/api/v1/auth/login` with a fake Turnstile token. The login route now returns KK API JSON rather than Vercel HTML, Vercel 404, or a Vercel function import error.
 
+Follow-up deploy evidence after commit `5b922928`: `vercel deploy . --prod -y --scope yykks-projects-727e9560` completed successfully; the remote build ran `npm run build` as `kk-studio@1.4.6`, transformed 2140 modules, and aliased `https://kkai.plus`. `vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_Ej3wrGiASL4FtBMZcARY81XszG34`, target `production`, status `Ready`, URL `https://kk-studio-e165sudnw-yykks-projects-727e9560.vercel.app`. Fresh production smoke returned `200` JSON for `/api/healthz`, `200` JSON for `/api/manifest`, expected `401 AUTH_REQUIRED` JSON for `/api/v1/auth/session`, and expected `403 TURNSTILE_FAILED` JSON for `/api/v1/auth/login` with a fake Turnstile token.
+
 ## Login/Input Hotfix Gate
 
 Use this gate when touching hosted password login error presentation, KK API base URL selection in hosted runtime, or input autofill/selection styling:
