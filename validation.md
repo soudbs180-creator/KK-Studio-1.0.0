@@ -28,6 +28,18 @@ Fresh production inspect after `b6f1fd6f`: `npx.cmd vercel inspect https://kkai.
 
 Fresh production deployment after `0ec11cb9`: `npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560` completed successfully, uploaded only `363B` of changed data, restored the previous build cache, ran `npm run build` as `kk-studio@1.4.6`, transformed 2140 modules, completed the build, and aliased `https://kkai.plus`. `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_BvSuUPCu4EWeBkoFcktZvDS5uJpV`, target `production`, status `Ready`, URL `https://kk-studio-a16e63rja-yykks-projects-727e9560.vercel.app`, and the expected public aliases.
 
+Fresh HTTPS upstream workaround while `api.kkai.plus` DNS remains unavailable:
+
+```powershell
+scp -i .codex-tmp-vps-key2 scripts/vps/configure-kk-vps-api-tls.sh root@172.245.156.16:/tmp/configure-kk-vps-api-tls.sh
+ssh -i .codex-tmp-vps-key2 root@172.245.156.16 "API_DOMAIN=172-245-156-16.sslip.io EXPECTED_API_IPV4=172.245.156.16 bash /tmp/configure-kk-vps-api-tls.sh"
+npx.cmd vercel env add KK_VPS_API_BASE_URL production --value "https://172-245-156-16.sslip.io" --yes --scope yykks-projects-727e9560
+npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560
+npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560
+```
+
+Observed result: the VPS resolves `172-245-156-16.sslip.io` to `172.245.156.16`, Certbot issued a Let's Encrypt certificate for the wildcard DNS hostname, nginx HTTPS config passed syntax checks and reloaded, and VPS-side HTTPS smoke returns `200` for `/healthz`, `200` for `/api/manifest`, expected unauthenticated `401` for `/api/v1/auth/session`, and `404` for `/internal` plus `/internal/`. Vercel Production now contains `KK_VPS_API_BASE_URL`, and the post-env deploy is `dpl_JBqdQMBorigt5kTExqRrv3JosAHc`, Ready, URL `https://kk-studio-icg1ticp2-yykks-projects-727e9560.vercel.app`, aliased to `https://kkai.plus`. Direct local `https://kkai.plus/api/*` smoke returns Vercel Security Check `429`, and the deployment URL returns Vercel Deployment Protection `401`; treat this as an automated-smoke limitation from this machine, not VPS HTTPS failure.
+
 Fresh DNS/VPS blocker evidence: `Resolve-DnsName api.kkai.plus -Server 1.1.1.1 -Type A`, `Resolve-DnsName api.kkai.plus -Server 8.8.8.8 -Type A`, and direct checks using the Cloudflare nameserver hostnames return `198.18.0.73`, not `172.245.156.16`. Node DoH checks against `https://cloudflare-dns.com/dns-query` and `https://dns.google/resolve` return no A answer and only the Cloudflare SOA. `CF_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ZONE_ID` are unset locally, and `node scripts/deploy/cloudflare-upsert-api-dns.mjs` fails closed with the expected missing-token message. VPS HTTP smoke currently returns `200` for `http://172.245.156.16/healthz`, `200` for `/api/manifest`, `401 AUTH_REQUIRED` for `/api/v1/auth/session`, and `404` for both `/internal` and `/internal/`. Do not call the full hosted/VPS line releasable until `api.kkai.plus` points to the VPS, the TLS helper succeeds, and HTTPS smoke passes.
 
 Fresh deployment-boundary guardrail after review:
