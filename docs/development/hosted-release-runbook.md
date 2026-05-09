@@ -195,7 +195,45 @@ The command must deploy:
 - `apps/payment-sidecar`
 - PostgreSQL migrations required by auth, billing, workspace sync, model routing, and payment settlement
 
-### 3. Verify VPS health
+### 3. Configure API DNS and TLS
+
+Production hosted builds expect the browser-facing API origin to be HTTPS. For the current `kkai.plus` release, the public API host is:
+
+```text
+api.kkai.plus -> 172.245.156.16
+```
+
+Before running the TLS helper, add the DNS record in the authoritative DNS provider:
+
+```text
+Type: A
+Name: api
+Content: 172.245.156.16
+Proxy: DNS only until the certificate and smoke checks pass
+```
+
+Then run this on the VPS as root:
+
+```bash
+API_DOMAIN=api.kkai.plus \
+EXPECTED_API_IPV4=172.245.156.16 \
+LETSENCRYPT_EMAIL=<operator-email> \
+bash scripts/vps/configure-kk-vps-api-tls.sh
+```
+
+The helper fails before changing TLS state if DNS does not resolve to the VPS. After it completes, verify:
+
+During the temporary ACME challenge phase, the helper serves only `/.well-known/acme-challenge/` over HTTP. It must return `404` for all other HTTP paths until the HTTPS virtual host is installed, so authenticated API traffic is never intentionally exposed before TLS is ready.
+
+```bash
+curl -fsS https://api.kkai.plus/healthz
+curl -fsS https://api.kkai.plus/api/manifest
+curl -i https://api.kkai.plus/api/v1/auth/session
+```
+
+`/api/v1/auth/session` may return `401` for an unauthenticated smoke, but it must complete TLS and return the API JSON error envelope. Public `/internal` and `/internal/` paths must return `404`.
+
+### 4. Verify VPS health
 
 Confirm:
 

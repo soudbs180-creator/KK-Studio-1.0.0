@@ -130,6 +130,9 @@ test("hosted release runbook keeps routing and billing smoke tests explicit", ()
   assert.match(source, /Hosted API on the VPS is still on an older version without `userRoute`/);
   assert.match(source, /Hosted payment runtimes must fail closed when durable storage or settlement auth is unavailable\./);
   assert.match(source, /Legacy `\/api\/pay\*` payment routes stay local-only by default/);
+  assert.match(source, /API_DOMAIN=api\.kkai\.plus/);
+  assert.match(source, /scripts\/vps\/configure-kk-vps-api-tls\.sh/);
+  assert.match(source, /curl -fsS https:\/\/api\.kkai\.plus\/healthz/);
   assert.match(source, /`PAYMENT_SIDECAR_SETTLEMENT_TOKEN`/);
   assert.match(source, /`PAYMENT_WEBHOOK_SETTLEMENT_TOKEN`/);
   assert.match(source, /`GOOGLE_OAUTH_CLIENT_ID`/);

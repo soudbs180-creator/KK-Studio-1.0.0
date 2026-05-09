@@ -122,3 +122,42 @@ test("VPS nginx gateway does not expose internal payment routes on public virtua
     );
   }
 });
+
+test("VPS API TLS helper fails fast on DNS and keeps internal routes closed", () => {
+  const tlsScriptPath = "scripts/vps/configure-kk-vps-api-tls.sh";
+  assert.equal(existsSync(path.join(ROOT_DIR, tlsScriptPath)), true, `${tlsScriptPath} should exist`);
+
+  const tlsSource = readSource(tlsScriptPath);
+
+  assert.match(tlsSource, /API_DOMAIN="\$\{API_DOMAIN:-api\.kkai\.plus\}"/);
+  assert.match(tlsSource, /EXPECTED_API_IPV4="\$\{EXPECTED_API_IPV4:-172\.245\.156\.16\}"/);
+  assert.match(tlsSource, /getent ahostsv4 "\$\{API_DOMAIN\}" \|\| true/);
+  assert.match(tlsSource, /DNS for \$\{API_DOMAIN\} does not include \$\{EXPECTED_API_IPV4\}/);
+  assert.ok(
+    tlsSource.indexOf("verify_dns_points_to_vps") < tlsSource.indexOf("write_http_challenge_site"),
+    "DNS verification must run before nginx ACME site changes",
+  );
+  assert.ok(
+    tlsSource.indexOf("verify_dns_points_to_vps") < tlsSource.indexOf("request_certificate"),
+    "DNS verification must run before certbot requests",
+  );
+  const httpChallengeSite = tlsSource.slice(
+    tlsSource.indexOf("write_http_challenge_site()"),
+    tlsSource.indexOf("request_certificate()"),
+  );
+  assert.doesNotMatch(
+    httpChallengeSite,
+    /proxy_pass/,
+    "temporary ACME HTTP site must not expose the API before HTTPS is issued",
+  );
+  assert.match(httpChallengeSite, /location \/ \{[\s\S]*return 404;/);
+  assert.match(tlsSource, /apt-get install -y[\s\S]*certbot/);
+  assert.match(tlsSource, /certbot certonly[\s\S]*--webroot/);
+  assert.match(tlsSource, /kk-vps-api-tls\.conf/);
+  assert.match(tlsSource, /listen 443 ssl/);
+  assert.match(tlsSource, /ssl_certificate \/etc\/letsencrypt\/live\/\$\{API_DOMAIN\}\/fullchain\.pem;/);
+  assert.match(tlsSource, /proxy_pass http:\/\/127\.0\.0\.1:3001/);
+  assert.match(tlsSource, /location = \/internal \{[\s\S]*return 404;/);
+  assert.match(tlsSource, /location \/internal\/ \{[\s\S]*return 404;/);
+  assert.match(tlsSource, /curl -fsS "https:\/\/\$\{API_DOMAIN\}\/healthz"/);
+});
