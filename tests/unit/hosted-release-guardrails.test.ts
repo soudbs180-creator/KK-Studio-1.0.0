@@ -160,9 +160,46 @@ test("Cloudflare DNS helper upserts the API host as DNS-only before VPS TLS", ()
   assert.match(source, /DNS-only/);
   assert.match(source, /PATCH/);
   assert.match(source, /POST/);
+  assert.match(source, /const apiBaseUrl = "https:\/\/api\.cloudflare\.com";/);
+  assert.doesNotMatch(source, /const apiBaseUrl = "https:\/\/api\.cloudflare\.com\/client\/v4";/);
   assert.match(source, /\/client\/v4\/zones\/\$\{zoneId\}\/dns_records/);
   assert.match(source, /verifyDns/);
   assert.doesNotMatch(source, /console\.log\(token/);
+});
+
+test("Vercel upload boundaries exclude local ledgers, generated artifacts, and nested repo copies", () => {
+  const vercelIgnore = readSource(".vercelignore");
+  const previewDeploy = readSource("scripts/deploy/vercel-preview-deploy.ps1");
+
+  [
+    "m",
+    "output",
+    "tests",
+    "docs",
+    "release",
+    "deploy",
+    "plans.md",
+    "implement.md",
+    "status.md",
+    "validation.md",
+  ].forEach((entry) => {
+    assert.match(vercelIgnore, new RegExp(`(^|\\n)${entry.replace(".", "\\.")}($|\\n)`), `${entry} should be excluded from Vercel uploads`);
+  });
+
+  [
+    "--exclude=m",
+    "--exclude=output",
+    "--exclude=tests",
+    "--exclude=docs",
+    "--exclude=release",
+    "--exclude=deploy",
+    "--exclude=plans.md",
+    "--exclude=implement.md",
+    "--exclude=status.md",
+    "--exclude=validation.md",
+  ].forEach((flag) => {
+    assert.match(previewDeploy, new RegExp(flag.replace(".", "\\.")), `${flag} should be excluded from preview tar uploads`);
+  });
 });
 
 test("local API env example documents hosted Google and WeChat auth server secrets", () => {

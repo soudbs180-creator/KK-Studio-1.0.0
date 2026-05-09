@@ -4,7 +4,7 @@ const token = process.env.CF_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN || ""
 const zoneId = process.env.CLOUDFLARE_ZONE_ID || "6e8b3a4638980f182b0c4b89bf99e6da";
 const recordName = process.env.API_DNS_RECORD_NAME || "api.kkai.plus";
 const recordContent = process.env.API_DNS_RECORD_IPV4 || "172.245.156.16";
-const apiBaseUrl = "https://api.cloudflare.com/client/v4";
+const apiBaseUrl = "https://api.cloudflare.com";
 
 function requireConfig() {
   if (!token) {

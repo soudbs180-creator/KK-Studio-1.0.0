@@ -22,7 +22,38 @@ npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560
 npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560
 ```
 
-Observed result: version metadata aligned to `1.4.6`; governance, dependency audit, spec, typecheck, encoding, build, and unit tests passed; unit tests reported 1441/1441 passing; Vercel production deploy completed and `kkai.plus` now aliases `https://kk-studio-l8gex5abk-yykks-projects-727e9560.vercel.app`.
+Observed result: version metadata aligned to `1.4.6`; governance, dependency audit, spec, typecheck, encoding, build, and unit tests passed; unit tests reported 1441/1441 passing; Vercel production deploy completed and `kkai.plus` aliased `https://kk-studio-l8gex5abk-yykks-projects-727e9560.vercel.app`.
+
+Fresh production inspect after `b6f1fd6f`: `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_ACm7915SrSFiVQGNVJUDoDXMMQFA`, target `production`, status `Ready`, URL `https://kk-studio-u1atrmy8j-yykks-projects-727e9560.vercel.app`, and aliases `https://kkai.plus`, `https://www.kkai.plus`, `https://kk-studio.vercel.app`, `https://kk-studio-yykks-projects-727e9560.vercel.app`, and `https://kk-studio-yinchenkang0-1635-yykks-projects-727e9560.vercel.app`. The inspected Vercel build contains `api/auth/[...path]`, `api/v1/[...path]`, `api/healthz`, `api/ecommerce-analysis`, and `api/v1`.
+
+Fresh DNS/VPS blocker evidence: `Resolve-DnsName api.kkai.plus -Server autumn.ns.cloudflare.com -Type A`, `Resolve-DnsName api.kkai.plus -Server langston.ns.cloudflare.com -Type A`, and `Resolve-DnsName api.kkai.plus -Server 1.1.1.1 -Type A` return `198.18.0.73`, not `172.245.156.16`. `CF_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ZONE_ID` are unset locally, and `node scripts/deploy/cloudflare-upsert-api-dns.mjs` fails closed with the expected missing-token message. VPS HTTP smoke currently returns `200` for `http://172.245.156.16/healthz`, `200` for `/api/manifest`, `401 AUTH_REQUIRED` for `/api/v1/auth/session`, and `404` for both `/internal` and `/internal/`. Do not call the full hosted/VPS line releasable until `api.kkai.plus` points to the VPS, the TLS helper succeeds, and HTTPS smoke passes.
+
+Fresh deployment-boundary guardrail after review:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/hosted-release-guardrails.test.ts
+node scripts/deploy/cloudflare-upsert-api-dns.mjs
+npm.cmd run governance:version
+npm.cmd run check:encoding
+```
+
+Observed result: guardrail tests first failed on the duplicated Cloudflare `/client/v4` API path and missing `m/` upload exclusions, then passed 9/9 after the helper and upload-boundary fixes. The Cloudflare DNS helper still fails closed without `CF_API_TOKEN` or `CLOUDFLARE_API_TOKEN`, which is the expected local state until DNS credentials are supplied. Version governance remains aligned to `1.4.6`, and encoding check passed.
+
+Fresh post-fix full gate:
+
+```powershell
+npm.cmd run governance:check
+npm.cmd run audit:dependencies
+npm.cmd run spec:check
+npm.cmd run typecheck
+npm.cmd run check:encoding
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/hosted-release-guardrails.test.ts tests/unit/vps-deploy-contract.test.ts tests/unit/vercel-vps-proxy.test.ts
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- .vercelignore scripts/deploy/cloudflare-upsert-api-dns.mjs scripts/deploy/vercel-preview-deploy.ps1 tests/unit/hosted-release-guardrails.test.ts status.md validation.md
+npm.cmd run test:unit
+npm.cmd run build
+```
+
+Observed result: governance, dependency audit, spec, typecheck, encoding, focused Hosted/VPS guardrails, and path-limited diff checks passed. `npm.cmd run test:unit` passed 1444/1444, and `npm.cmd run build` completed with Vite transforming 2140 modules.
 
 ## 1.4.6 Release Blocker Audit Gate
 
@@ -51,6 +82,8 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check
 Expected local result for `release:hosted:check`: it must fail while local `.env.local` contains `VITE_TURNSTILE_LOCAL_BYPASS=true` or a remote HTTP `VITE_KK_API_BASE_URL`. Treat that failure as the required clean-hosted-environment release blocker, not as a code failure. Before production release, rerun the same command in a clean hosted environment and require it to pass with HTTPS/same-origin API configuration plus real OAuth, Turnstile, and payment sidecar secrets.
 
 Browser QA for this gate must cover desktop dark/light and 390px mobile surfaces: login, temporary local workspace, storage selection/browser-cache path, PromptBar/model menu, active toggle gradient, settings, recharge/balance entry, mobile footer, and mobile settings/more sheet. Record screenshots and `release-qa-summary-refreshed.json` under `output/playwright/1.4.6-release-qa/`; do not commit `output/`.
+
+Deployment upload boundary must exclude local-only files and generated artifacts. Production `.vercelignore` and fallback `scripts/deploy/vercel-preview-deploy.ps1` tar packaging must keep `m/`, `output/`, `tests/`, `docs/`, `deploy/`, `release/`, AI ledgers, local env files, build outputs, caches, logs, and backup files out of uploaded artifacts while preserving runtime source, `api/` functions, package manifests, lockfiles, and Vercel config.
 
 Hosted/VPS production smoke must also verify:
 
