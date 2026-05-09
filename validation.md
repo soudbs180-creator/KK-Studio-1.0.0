@@ -24,6 +24,8 @@ Fresh production evidence on 2026-05-10: `vercel inspect https://kkai.plus --sco
 
 Follow-up deploy evidence after commit `5b922928`: `vercel deploy . --prod -y --scope yykks-projects-727e9560` completed successfully; the remote build ran `npm run build` as `kk-studio@1.4.6`, transformed 2140 modules, and aliased `https://kkai.plus`. `vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_Ej3wrGiASL4FtBMZcARY81XszG34`, target `production`, status `Ready`, URL `https://kk-studio-e165sudnw-yykks-projects-727e9560.vercel.app`. Fresh production smoke returned `200` JSON for `/api/healthz`, `200` JSON for `/api/manifest`, expected `401 AUTH_REQUIRED` JSON for `/api/v1/auth/session`, and expected `403 TURNSTILE_FAILED` JSON for `/api/v1/auth/login` with a fake Turnstile token.
 
+Fresh production page QA: Node fetch confirmed `https://kkai.plus/` returns `200 text/html` with `lang="zh-CN"` and `https://kkai.plus/app-version.json` returns version `1.4.6`. Headless Chromium opened the production login page at desktop `1440x900` and mobile `390x844`; both rendered Chinese login text, visible `v1.4.6`, email/password inputs, no stale chunk text, no `.theme-transitioning`, no page errors, and no request failures. The only `kkai.plus` console error was expected signed-out `/api/v1/auth/session` `401`; other console messages came from Cloudflare Turnstile/headless browser policy behavior. Artifacts: `output/playwright/hosted-login-smoke/summary.json`, `desktop-1440x900.png`, and `mobile-390x844.png`.
+
 ## Login/Input Hotfix Gate
 
 Use this gate when touching hosted password login error presentation, KK API base URL selection in hosted runtime, or input autofill/selection styling:
