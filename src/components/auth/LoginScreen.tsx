@@ -26,7 +26,7 @@ import { startWechatLogin } from '../../services/auth/wechatAuth.ts';
 import { pickByResolvedLanguage, type ResolvedLanguage } from '../../utils/localeText';
 import { readRuntimeEnv } from '../../utils/runtimeEnv';
 import { getTurnstileDisabledMessage, getTurnstileMissingSiteKeyMessage, mapAuthErrorMessage } from './authLocalization';
-import { TurnstileWidget, canUseTurnstile, ensureTurnstileScript, useTurnstile } from './TurnstileWidget';
+import { TurnstileWidget, canUseTurnstile, ensureTurnstileScript, useTurnstile, type TurnstileStatus } from './TurnstileWidget';
 import WechatQrModal from './WechatQrModal';
 import './LoginScreen.css';
 
@@ -127,6 +127,7 @@ const LoginScreen: React.FC = () => {
   const [wechatAuthorizationUrl, setWechatAuthorizationUrl] = useState<string | null>(null);
   const [wechatExpiresAt, setWechatExpiresAt] = useState<string | null>(null);
   const [showShaderBackground, setShowShaderBackground] = useState(false);
+  const [turnstileWidgetStatus, setTurnstileWidgetStatus] = useState<TurnstileStatus>('idle');
   const t = useCallback(<T,>(zh: T, en: T): T => pickByResolvedLanguage(language, zh, en), [language]);
 
   const localErrors = useMemo(() => validateFields(view, email, password, confirmPassword, language), [view, email, password, confirmPassword, language]);
@@ -211,6 +212,7 @@ const LoginScreen: React.FC = () => {
   const handleTurnstileVerify = useCallback((token: string) => { setCaptchaRequiredByBackend(false); handleVerify(token); }, [handleVerify]);
   const handleTurnstileError = useCallback((nextError: string) => { handleError(nextError); if (captchaRequiredByBackend) setError(nextError); }, [captchaRequiredByBackend, handleError]);
   const handleTurnstileExpire = useCallback(() => { handleExpire(); setCaptchaRequiredByBackend(true); }, [handleExpire]);
+  const handleTurnstileStatusChange = useCallback((status: TurnstileStatus) => { setTurnstileWidgetStatus(status); }, []);
 
   const handleEmailChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const nextEmail = event.target.value;
@@ -262,7 +264,7 @@ const LoginScreen: React.FC = () => {
     }
     if (turnstileAvailable && !turnstileToken) {
       setCaptchaRequiredByBackend(true);
-      setError(turnstileError || t('安全验证尚未完成，请等待 Turnstile 加载完毕后再试。', 'Security verification is not finished yet. Wait for Turnstile to finish loading and try again.'));
+      setError(turnstileError || t('请完成 Cloudflare 安全验证后再登录。', 'Complete the Cloudflare security check before signing in.'));
       return;
     }
 
@@ -378,9 +380,15 @@ const LoginScreen: React.FC = () => {
   };
 
   const showFieldError = (field: FieldName) => Boolean(fieldErrors[field] && (submitted || fieldTouched[field]));
-  const turnstileStatusClass = turnstileToken ? 'is-ready' : turnstileAvailable ? 'is-pending' : 'is-error';
+  const turnstileWidgetFailed = turnstileAvailable && !turnstileToken && turnstileWidgetStatus === 'error';
+  const turnstileAwaitingVerification = turnstileAvailable && !turnstileToken && turnstileWidgetStatus === 'rendered';
+  const turnstileStatusClass = turnstileToken ? 'is-ready' : turnstileWidgetFailed || !turnstileAvailable ? 'is-error' : 'is-pending';
   const turnstileStatusLabel = turnstileToken
     ? t('已就绪', 'Ready')
+    : turnstileWidgetFailed
+      ? t('验证异常', 'Error')
+    : turnstileAwaitingVerification
+      ? t('待验证', 'Verify')
     : turnstileAvailable
       ? t('加载中', 'Loading')
       : turnstileMissingSiteKey
@@ -390,7 +398,7 @@ const LoginScreen: React.FC = () => {
     ? getTurnstileMissingSiteKeyMessage(language)
     : turnstileDisabledByRuntime
       ? getTurnstileDisabledMessage(language)
-      : turnstileError || (captchaRequiredByBackend && !turnstileToken ? t('当前请求需要先完成人机验证，验证通过后再提交。', 'Complete the CAPTCHA verification before submitting this request.') : turnstileToken ? t('安全验证已完成。', 'Security verification is complete.') : t('页面打开后会自动加载 Turnstile，用于阻挡机器请求。', 'Turnstile loads automatically when the page opens to help block bots.'));
+      : turnstileError || (captchaRequiredByBackend && !turnstileToken ? t('请完成 Cloudflare 安全验证后再登录。', 'Complete the Cloudflare security check before signing in.') : turnstileToken ? t('安全验证已完成。', 'Security verification is complete.') : turnstileAwaitingVerification ? t('请完成 Cloudflare 安全验证后再登录。', 'Complete the Cloudflare security check before signing in.') : t('页面打开后会自动加载 Turnstile，用于阻挡机器请求。', 'Turnstile loads automatically when the page opens to help block bots.'));
 
   return (
     <div className={`auth-page auth-page--${resolvedTheme}`}>
@@ -448,7 +456,7 @@ const LoginScreen: React.FC = () => {
             {showTurnstileBlock && (
               <div className="auth-turnstile-block">
                 <div className="auth-turnstile-head"><span>{t('安全验证', 'Security check')}</span><span className={`auth-turnstile-badge ${turnstileStatusClass}`}>{turnstileStatusLabel}</span></div>
-                {turnstileAvailable ? <><TurnstileWidget onVerify={handleTurnstileVerify} onError={handleTurnstileError} onExpire={handleTurnstileExpire} appearance="always" action={view === 'forgot-password' ? 'reset-password' : view} language={language} className="auth-turnstile-shell" /><div className="auth-turnstile-help">{turnstileHint}</div></> : <div className="auth-turnstile-inline-error" role="alert">{turnstileMissingSiteKey ? getTurnstileMissingSiteKeyMessage(language) : getTurnstileDisabledMessage(language)}</div>}
+                {turnstileAvailable ? <><TurnstileWidget onVerify={handleTurnstileVerify} onError={handleTurnstileError} onExpire={handleTurnstileExpire} onStatusChange={handleTurnstileStatusChange} appearance="always" action={view === 'forgot-password' ? 'reset-password' : view} language={language} className="auth-turnstile-shell" /><div className="auth-turnstile-help">{turnstileHint}</div></> : <div className="auth-turnstile-inline-error" role="alert">{turnstileMissingSiteKey ? getTurnstileMissingSiteKeyMessage(language) : getTurnstileDisabledMessage(language)}</div>}
               </div>
             )}
 

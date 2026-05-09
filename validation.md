@@ -23,6 +23,23 @@ Fresh hotfix result on 2026-05-09: version check returned `1.4.6`; the targeted 
 
 Production deploy result for commit `17973288`: `npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560` completed successfully, the remote build ran `npm run build` as `kk-studio@1.4.6`, and `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_4U49MUEyEPtdjTBziC2rejxGeMMP`, target `production`, status `Ready`, URL `https://kk-studio-rja71b3e3-yykks-projects-727e9560.vercel.app`, aliased to `https://kkai.plus`.
 
+## Login Turnstile Status Hotfix Gate
+
+Use this gate when touching hosted login Turnstile status, submit blocking copy, or Cloudflare widget runtime configuration:
+
+```powershell
+npm.cmd pkg get version
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/login-screen-auth-actions.test.ts tests/unit/turnstile-runtime-config.test.ts tests/unit/hosted-release-guardrails.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/components/auth/LoginScreen.tsx src/components/auth/TurnstileWidget.tsx tests/unit/login-screen-auth-actions.test.ts status.md validation.md
+```
+
+Expected result: version metadata reports `1.4.6`; the login page distinguishes Turnstile `rendered`, `verified`, and `error` parent states; rendered-but-unverified Turnstile shows `Verify` plus `请完成 Cloudflare 安全验证后再登录。`; widget errors use the error badge instead of the loading badge; and the Cloudflare locale guard still requires `zh-cn`.
+
+Fresh result on 2026-05-09: RED first reproduced the missing parent `error` status branch in `tests/unit/login-screen-auth-actions.test.ts`, then the focused login page test passed 4/4 after the fix. The broader login/Turnstile/hosted guardrail suite freshly passed 17/17; `npm.cmd run governance:agent-docs`, `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run check:encoding`, `npm.cmd pkg get version`, and path-limited alternate-git `diff --check` also passed for this hotfix.
+
 ## Current 1.4.6 Production Deploy Evidence
 
 Fresh final deploy gate before the `dpl_Ae8ckSKAuHthpkNssLnaB1dwHR5Y` production deployment:
