@@ -37,7 +37,7 @@ const SENSITIVE_REQUEST_HEADERS = new Set([
   'proxy-authorization',
 ]);
 
-function resolveVpsApiBaseUrl(): string {
+function resolveVpsApiBaseUrl() {
   const configured = String(
     process.env.KK_VPS_API_BASE_URL
       || DEFAULT_VPS_API_BASE_URL,
@@ -51,11 +51,11 @@ function resolveVpsApiBaseUrl(): string {
   }
 }
 
-function isProductionHostedProxy(): boolean {
+function isProductionHostedProxy() {
   return process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production';
 }
 
-function hasSensitiveRequestHeaders(source: Headers): boolean {
+function hasSensitiveRequestHeaders(source) {
   let hasSensitiveHeader = false;
 
   source.forEach((_, key) => {
@@ -71,7 +71,7 @@ function hasSensitiveRequestHeaders(source: Headers): boolean {
   return hasSensitiveHeader;
 }
 
-function copyRequestHeaders(source: Headers, upstreamUrl: URL): Headers {
+function copyRequestHeaders(source, upstreamUrl) {
   const headers = new Headers();
   source.forEach((value, key) => {
     if (!HOP_BY_HOP_REQUEST_HEADERS.has(key.toLowerCase())) {
@@ -83,7 +83,7 @@ function copyRequestHeaders(source: Headers, upstreamUrl: URL): Headers {
   return headers;
 }
 
-function copyResponseHeaders(source: Headers): Headers {
+function copyResponseHeaders(source) {
   const headers = new Headers();
   source.forEach((value, key) => {
     if (!HOP_BY_HOP_RESPONSE_HEADERS.has(key.toLowerCase())) {
@@ -93,7 +93,7 @@ function copyResponseHeaders(source: Headers): Headers {
   return headers;
 }
 
-export async function proxyToVps(request: Request, upstreamPath: string): Promise<Response> {
+export async function proxyToVps(request, upstreamPath) {
   const requestUrl = new URL(request.url);
   const upstreamUrl = new URL(upstreamPath, resolveVpsApiBaseUrl());
   upstreamUrl.search = requestUrl.search;

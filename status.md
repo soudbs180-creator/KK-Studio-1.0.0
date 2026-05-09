@@ -1,6 +1,20 @@
 # KK-Studio v1.4.6 Coordination Status
 
-Last updated: 2026-05-09
+Last updated: 2026-05-10
+
+## Current Hosted Vercel API Proxy Login Fix
+
+- Active user issue: production login showed `Login service is temporarily unavailable` because `https://kkai.plus/api/v1/auth/login` did not reliably reach the KK API JSON route.
+- Root cause evidence: production API requests were previously blocked or broken at multiple hosted boundaries: Vercel Bot Protection returned an HTML Security Checkpoint for `/api/*`, the Vercel runtime could not import the compiled proxy helper when entry files referenced `api/_vpsProxy.ts`, and deep `/api/v1/*` plus `/api/auth/*` routes were not reliably matched without explicit rewrites.
+- Production platform action: Vercel Firewall Bot Protection for this project was changed from `challenge` to `log`, so hosted API requests are no longer replaced by a Vercel HTML checkpoint before the KK API proxy runs.
+- Implemented proxy runtime fix: `api/_vpsProxy.ts` was replaced by runtime-safe `api/_vpsProxy.js` plus `api/_vpsProxy.d.ts`; all Vercel API entries import `_vpsProxy.js` and declare `export const config = { runtime: 'edge' }` locally.
+- Implemented routing fix: `api/[...path].ts` was added as a top-level fallback, and `vercel.json` now rewrites `/api/v1/:path*` to `/api/v1?__kk_path=:path*` and `/api/auth/:path*` to `/api/auth?__kk_path=:path*`. The stable `api/v1.ts` and `api/auth.ts` entries expand `__kk_path` and strip the internal query parameter before proxying.
+- Implemented hosted base URL fix: `src/services/api/kkApiBaseUrl.ts` keeps hosted browser traffic on same-origin `https://kkai.plus` when the configured API origin is a temporary VPS infrastructure host such as an IP, `sslip.io`, or `nip.io`, while the Vercel proxy uses the HTTPS VPS upstream.
+- Version check: root `package.json` and `config/release-manifest.json` are aligned to `1.4.6`; `src/config/appInfo.ts` correctly reads the runtime version from `config/release-manifest.json` rather than hard-coding it.
+- Fresh production deploy evidence: `vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_9TzojFb3YM2UonhKwwFRu151v6fL`, target `production`, status `Ready`, URL `https://kk-studio-7d78nulgj-yykks-projects-727e9560.vercel.app`, created `2026-05-10 02:25:16 GMT+0800`, and aliases `https://kkai.plus` plus `https://www.kkai.plus`.
+- Fresh production smoke evidence from this machine: `GET https://kkai.plus/api/healthz` returned `200 application/json`; `GET https://kkai.plus/api/manifest` returned `200 application/json`; `GET https://kkai.plus/api/v1/auth/session` returned expected `401 AUTH_REQUIRED` JSON; `GET https://kkai.plus/api/v1/profile/user-apis` returned expected `401 AUTH_REQUIRED` JSON; and `POST https://kkai.plus/api/v1/auth/login` with a fake Turnstile token returned expected `403 TURNSTILE_FAILED` JSON. This confirms the hosted login route now reaches the KK API instead of returning Vercel HTML, Vercel 404, or a function 500.
+- VPS direct CORS note: direct browser calls to the temporary VPS HTTPS origin remain a separate hardening concern; hosted production now uses the same-origin Vercel proxy path for browser API calls, so the login route is no longer blocked by direct VPS CORS from `kkai.plus`.
+- Commit boundary for this fix: stage only `api/_vpsProxy.ts` deletion, `api/_vpsProxy.js`, `api/_vpsProxy.d.ts`, `api/[...path].ts`, `api/v1.ts`, `api/v1/[...path].ts`, `api/auth.ts`, `api/auth/[...path].ts`, `api/healthz.ts`, `api/manifest.ts`, `src/services/api/kkApiBaseUrl.ts`, `tests/unit/hosted-release-guardrails.test.ts`, `tests/unit/kk-api-base-url-hosted-contract.test.ts`, `tests/unit/vercel-vps-proxy.test.ts`, `vercel.json`, `status.md`, and `validation.md`. Exclude generated `output/` and the line-ending-only `tests/unit/kk-api-client.test.ts` noise.
 
 ## Current Hosted Login Route Fix
 

@@ -1,8 +1,26 @@
 # KK-Studio v1.4.6 Single-Line Validation Matrix
 
-Last updated: 2026-05-09
+Last updated: 2026-05-10
 
 Use `npm.cmd` for npm scripts on Windows.
+
+## Hosted Vercel API Proxy Login Fix Gate
+
+Use this gate when touching Vercel API proxy helper files, hosted `/api/v1/*` or `/api/auth/*` routing, Vercel rewrites, or hosted KK API base URL selection:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/hosted-release-guardrails.test.ts tests/unit/vercel-vps-proxy.test.ts tests/unit/kk-api-base-url-hosted-contract.test.ts tests/unit/input-autofill-style-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run check:encoding
+npm.cmd run test:unit
+node "C:\Users\Administrator\AppData\Roaming\npm\node_modules\vercel\dist\vc.js" inspect https://kkai.plus --scope yykks-projects-727e9560
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- api/_vpsProxy.ts api/_vpsProxy.js api/_vpsProxy.d.ts api/[...path].ts api/v1.ts api/v1/[...path].ts api/auth.ts api/auth/[...path].ts api/healthz.ts api/manifest.ts src/services/api/kkApiBaseUrl.ts tests/unit/hosted-release-guardrails.test.ts tests/unit/kk-api-base-url-hosted-contract.test.ts tests/unit/vercel-vps-proxy.test.ts vercel.json status.md validation.md
+```
+
+Fresh result on 2026-05-10: the focused hosted/proxy/input suite passed 22/22; `npm.cmd run typecheck` passed with semantic coverage for 131 test files; `npm.cmd run build` passed as `kk-studio@1.4.6` and transformed 2140 modules; `npm.cmd run check:encoding` passed; and `npm.cmd run test:unit` passed 1456/1456.
+
+Fresh production evidence on 2026-05-10: `vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_9TzojFb3YM2UonhKwwFRu151v6fL`, target `production`, status `Ready`, URL `https://kk-studio-7d78nulgj-yykks-projects-727e9560.vercel.app`, aliased to `https://kkai.plus`. Production smoke returned `200` JSON for `/api/healthz`, `200` JSON for `/api/manifest`, expected `401 AUTH_REQUIRED` JSON for `/api/v1/auth/session`, expected `401 AUTH_REQUIRED` JSON for `/api/v1/profile/user-apis`, and expected `403 TURNSTILE_FAILED` JSON for `/api/v1/auth/login` with a fake Turnstile token. The login route now returns KK API JSON rather than Vercel HTML, Vercel 404, or a Vercel function import error.
 
 ## Login/Input Hotfix Gate
 
