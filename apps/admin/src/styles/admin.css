@@ -181,6 +181,10 @@ button {
 }
 
 .admin-login-input {
+  --input-autofill-bg: #ffffff;
+  --input-autofill-text: var(--clay-ink);
+  --input-selection-bg: rgb(255 107 90 / 0.22);
+  --input-selection-text: var(--clay-ink);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -214,6 +218,21 @@ button {
 
 .admin-login-input input::placeholder {
   color: #9a8f82;
+}
+
+.admin-login-input input::selection {
+  background: var(--input-selection-bg);
+  color: var(--input-selection-text);
+}
+
+.admin-login-input input:-webkit-autofill,
+.admin-login-input input:-webkit-autofill:hover,
+.admin-login-input input:-webkit-autofill:focus,
+.admin-login-input input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--input-autofill-text) !important;
+  caret-color: var(--input-autofill-text);
+  box-shadow: 0 0 0 1000px var(--input-autofill-bg) inset !important;
+  transition: background-color 9999s ease-out, color 9999s ease-out;
 }
 
 .admin-login-error {

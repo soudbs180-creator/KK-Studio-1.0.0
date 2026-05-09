@@ -12,6 +12,10 @@
   --bg-surface: #ffffff;
   --bg-overlay: #ffffff;
   --bg-input: #ffffff;
+  --input-autofill-bg: var(--bg-input);
+  --input-autofill-text: var(--text-primary);
+  --input-selection-bg: rgb(0 113 227 / 0.18);
+  --input-selection-text: var(--text-primary);
   --bg-hover: #eef2f7;
   --bg-canvas: #f5f5f7;
 
@@ -552,6 +556,10 @@ body.dark-mode {
   --bg-surface: #141414;
   --bg-overlay: #1f1f1f;
   --bg-input: #1f1f1f;
+  --input-autofill-bg: var(--bg-input);
+  --input-autofill-text: var(--text-primary);
+  --input-selection-bg: rgb(96 165 250 / 0.32);
+  --input-selection-text: var(--text-primary);
   --bg-hover: #292929;
   --bg-canvas: #0b0b0c;
 
@@ -1144,6 +1152,30 @@ input::-webkit-inner-spin-button {
 /* Firefox */
 input[type=number] {
   -moz-appearance: textfield;
+}
+
+::selection {
+  background: var(--input-selection-bg, rgb(0 113 227 / 0.18));
+  color: var(--input-selection-text, var(--text-primary));
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+textarea:-webkit-autofill:active,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus,
+select:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--input-autofill-text, var(--text-primary));
+  caret-color: var(--input-autofill-text, var(--text-primary));
+  box-shadow: 0 0 0 1000px var(--input-autofill-bg, var(--bg-input)) inset !important;
+  background-clip: content-box !important;
+  transition: background-color 9999s ease-out, color 9999s ease-out;
 }
 
 /* 2. Global Dark Scrollbar (Webkit) */

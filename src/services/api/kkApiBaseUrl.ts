@@ -26,6 +26,28 @@ export function isPrivateNetworkHostname(hostname: string): boolean {
   );
 }
 
+function isIpHostname(hostname: string): boolean {
+  const normalized = normalizeHostname(hostname);
+  return Boolean(
+    normalized
+    && (
+      /^\d{1,3}(?:\.\d{1,3}){3}$/.test(normalized)
+      || normalized.includes(":")
+    ),
+  );
+}
+
+function isEphemeralDnsIpHostname(hostname: string): boolean {
+  const normalized = normalizeHostname(hostname);
+  return Boolean(
+    normalized
+    && (
+      normalized.endsWith(".sslip.io")
+      || normalized.endsWith(".nip.io")
+    ),
+  );
+}
+
 export function resolveOriginHostname(origin?: string): string | undefined {
   const normalizedOrigin = String(origin || "").trim();
   if (!normalizedOrigin) {
@@ -37,6 +59,35 @@ export function resolveOriginHostname(origin?: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+function isHostedRuntimeOrigin(runtimeOrigin?: string): boolean {
+  const runtimeHostname = resolveOriginHostname(runtimeOrigin);
+  return Boolean(
+    runtimeHostname
+    && !isLoopbackHostname(runtimeHostname)
+    && !isPrivateNetworkHostname(runtimeHostname)
+  );
+}
+
+function normalizeConfiguredApiBaseUrl(configuredBaseUrl: string): string {
+  try {
+    const url = new URL(configuredBaseUrl);
+    const normalizedPathname = url.pathname.replace(/\/+$/, "");
+    if (
+      normalizedPathname === "/api"
+      || normalizedPathname === "/api/v1"
+    ) {
+      url.pathname = "/";
+      url.search = "";
+      url.hash = "";
+      return url.origin;
+    }
+  } catch {
+    return configuredBaseUrl;
+  }
+
+  return configuredBaseUrl;
 }
 
 function shouldPreferRuntimeOriginForLocalApi(
@@ -57,6 +108,26 @@ function shouldPreferRuntimeOriginForLocalApi(
       && configuredPort === "3001"
       && (isLoopbackHostname(runtimeUrl.hostname) || isPrivateNetworkHostname(runtimeUrl.hostname))
       && runtimePort === "3000";
+  } catch {
+    return false;
+  }
+}
+
+function shouldPreferRuntimeOriginForHostedInfrastructureApi(
+  configuredBaseUrl: string,
+  runtimeOrigin?: string,
+): boolean {
+  if (!isHostedRuntimeOrigin(runtimeOrigin)) {
+    return false;
+  }
+
+  try {
+    const configuredUrl = new URL(configuredBaseUrl);
+    return configuredUrl.protocol === "https:"
+      && (
+        isIpHostname(configuredUrl.hostname)
+        || isEphemeralDnsIpHostname(configuredUrl.hostname)
+      );
   } catch {
     return false;
   }
@@ -86,13 +157,16 @@ function shouldPreferRuntimeOriginForHostedHttpApi(
 }
 
 export function resolveKkApiBaseUrl(): string {
-  const configuredBaseUrl = readRuntimeEnv("VITE_KK_API_BASE_URL") || "";
+  const configuredBaseUrl = normalizeConfiguredApiBaseUrl(readRuntimeEnv("VITE_KK_API_BASE_URL") || "");
   const runtimeOrigin = readRuntimeOrigin();
   if (configuredBaseUrl) {
     if (shouldPreferRuntimeOriginForLocalApi(configuredBaseUrl, runtimeOrigin)) {
       return runtimeOrigin!;
     }
     if (shouldPreferRuntimeOriginForHostedHttpApi(configuredBaseUrl, runtimeOrigin)) {
+      return runtimeOrigin!;
+    }
+    if (shouldPreferRuntimeOriginForHostedInfrastructureApi(configuredBaseUrl, runtimeOrigin)) {
       return runtimeOrigin!;
     }
     return configuredBaseUrl;

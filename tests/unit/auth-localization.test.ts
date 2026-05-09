@@ -126,8 +126,37 @@ describe("auth-facing localization helpers", () => {
     );
     assert.equal(
       authLocalization.mapAuthErrorMessage("zh-CN", new Error("Incorrect email or password."), "login"),
-      "请检查账号和密码。",
+      "邮箱或密码错误。",
     );
+  });
+
+  test("maps hosted password login failures to actionable Chinese copy", async () => {
+    const authLocalization = await import("../../src/components/auth/authLocalization.ts");
+
+    assert.equal(
+      authLocalization.mapAuthErrorMessage("zh-CN", new Error("AUTH_REQUIRED: Invalid email or password."), "login"),
+      "邮箱或密码错误。",
+    );
+    assert.equal(
+      authLocalization.mapAuthErrorMessage("zh-CN", new Error("Invalid email or password."), "login"),
+      "邮箱或密码错误。",
+    );
+
+    const unavailable = authLocalization.mapAuthErrorMessage(
+      "zh-CN",
+      new Error("HTTP_404: Request failed."),
+      "login",
+    );
+    assert.match(unavailable, /登录/);
+    assert.doesNotMatch(unavailable, /HTTP_404|Request failed/);
+
+    const htmlPayload = authLocalization.mapAuthErrorMessage(
+      "zh-CN",
+      new Error("INVALID_RESPONSE_PAYLOAD: KK API returned an HTML page instead of the expected JSON payload."),
+      "login",
+    );
+    assert.match(htmlPayload, /登录/);
+    assert.doesNotMatch(htmlPayload, /INVALID_RESPONSE_PAYLOAD|HTML page/);
   });
 
   test("localizeUserFacingText translates common notification strings to English when English mode is active", () => {

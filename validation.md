@@ -4,6 +4,25 @@ Last updated: 2026-05-09
 
 Use `npm.cmd` for npm scripts on Windows.
 
+## Login/Input Hotfix Gate
+
+Use this gate when touching hosted password login error presentation, KK API base URL selection in hosted runtime, or input autofill/selection styling:
+
+```powershell
+npm.cmd pkg get version
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/auth-localization.test.ts tests/unit/input-autofill-style-contract.test.ts tests/unit/kk-api-base-url-hosted-contract.test.ts tests/unit/kk-api-client.test.ts tests/unit/password-sign-in-fallback.test.ts tests/unit/theme-contrast-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- apps/admin/src/styles/admin.css src/components/auth/LoginScreen.css src/components/auth/authLocalization.ts src/index.css src/services/api/kkApiBaseUrl.ts tests/unit/auth-localization.test.ts tests/unit/kk-api-base-url-hosted-contract.test.ts tests/unit/input-autofill-style-contract.test.ts status.md validation.md
+```
+
+Expected result: version metadata reports `1.4.6`; invalid credentials render as `邮箱或密码错误。`; hosted route/proxy failures render as a Chinese service-unavailable login message without raw transport codes; hosted browser runtime stays on same-origin API proxy for IP-like infrastructure hosts; and input autofill/selection overlays use theme tokens instead of browser default color blocks.
+
+Fresh hotfix result on 2026-05-09: version check returned `1.4.6`; the targeted gate passed 45/45; `npm.cmd run governance:check`, `npm.cmd run audit:dependencies`, `npm.cmd run spec:check`, `npm.cmd run typecheck`, `npm.cmd run test:unit` passed 1451/1451, `npm.cmd run build`, `npm.cmd run admin:build`, and `npm.cmd run check:encoding` passed. Local static preview at `http://localhost:4173/` rendered the Chinese login page with `v1.4.6` and no visible input color strip; console output retained the known local admin-model fetch noise in static preview.
+
+Production deploy result for commit `17973288`: `npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560` completed successfully, the remote build ran `npm run build` as `kk-studio@1.4.6`, and `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_4U49MUEyEPtdjTBziC2rejxGeMMP`, target `production`, status `Ready`, URL `https://kk-studio-rja71b3e3-yykks-projects-727e9560.vercel.app`, aliased to `https://kkai.plus`.
+
 ## Current 1.4.6 Production Deploy Evidence
 
 Fresh final deploy gate before the `dpl_Ae8ckSKAuHthpkNssLnaB1dwHR5Y` production deployment:
