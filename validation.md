@@ -21,6 +21,8 @@ Expected result: version metadata reports `1.4.6`; invalid credentials render as
 
 Fresh hotfix result on 2026-05-09: version check returned `1.4.6`; the targeted gate passed 45/45; `npm.cmd run governance:check`, `npm.cmd run audit:dependencies`, `npm.cmd run spec:check`, `npm.cmd run typecheck`, `npm.cmd run test:unit` passed 1451/1451, `npm.cmd run build`, `npm.cmd run admin:build`, and `npm.cmd run check:encoding` passed. Local static preview at `http://localhost:4173/` rendered the Chinese login page with `v1.4.6` and no visible input color strip; console output retained the known local admin-model fetch noise in static preview.
 
+Production deploy result for commit `17973288`: `npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560` completed successfully, the remote build ran `npm run build` as `kk-studio@1.4.6`, and `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports deployment `dpl_4U49MUEyEPtdjTBziC2rejxGeMMP`, target `production`, status `Ready`, URL `https://kk-studio-rja71b3e3-yykks-projects-727e9560.vercel.app`, aliased to `https://kkai.plus`.
+
 ## Current 1.4.6 Production Deploy Evidence
 
 Fresh final deploy gate before the `dpl_Ae8ckSKAuHthpkNssLnaB1dwHR5Y` production deployment:
