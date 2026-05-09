@@ -120,6 +120,11 @@ test("VPS nginx gateway does not expose internal payment routes on public virtua
       /location\s+\/internal\/\s*\{[\s\S]*?return\s+404;/,
       `${label} nginx config should fail closed for public /internal/ traffic`,
     );
+    assert.match(
+      source,
+      /location\s+=\s+\/internal\s*\{[\s\S]*?return\s+404;/,
+      `${label} nginx config should fail closed for the exact public /internal path`,
+    );
   }
 });
 
