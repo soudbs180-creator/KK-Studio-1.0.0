@@ -1,17 +1,296 @@
 :root {
   color-scheme: light;
-  font-family: "Segoe UI", sans-serif;
-  background: #f3f6fb;
-  color: #102038;
+  font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #fffaf0;
+  color: #0a0a0a;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --clay-canvas: #fffaf0;
+  --clay-ink: #0a0a0a;
+  --clay-body: #3a3a3a;
+  --clay-muted: #6a6a6a;
+  --clay-surface-soft: #faf5e8;
+  --clay-surface-card: #fffdf7;
+  --clay-hairline: #e7ddca;
+  --clay-accent: #ff6b5a;
+  --clay-accent-soft: #ffe3dc;
+  --clay-teal: #1a3a3a;
+  --motion-fast: 120ms;
+  --motion-standard: 160ms;
+  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  background: linear-gradient(135deg, #fffaf0 0%, #faf5e8 48%, #fffdf7 100%);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
 }
 
 .admin-app-shell {
   min-height: 100vh;
   display: grid;
   place-items: center;
+}
+
+.admin-login-page {
+  min-height: 100vh;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
+  align-items: center;
+  gap: 48px;
+  padding: clamp(32px, 5vw, 72px);
+}
+
+.admin-login-brand {
+  max-width: 620px;
+}
+
+.admin-login-mark {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 28px;
+  border: 1px solid var(--clay-hairline);
+  border-radius: 20px;
+  background: rgb(255 255 255 / 0.72);
+  color: var(--clay-teal);
+  box-shadow: 0 20px 48px rgb(59 39 18 / 0.09);
+}
+
+.admin-login-kicker,
+.admin-login-eyebrow {
+  margin: 0;
+  color: var(--clay-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.admin-login-brand h1 {
+  margin: 12px 0 18px;
+  color: var(--clay-ink);
+  font-size: clamp(44px, 6vw, 76px);
+  line-height: 0.95;
+  letter-spacing: 0;
+}
+
+.admin-login-copy {
+  max-width: 540px;
+  margin: 0;
+  color: var(--clay-body);
+  font-size: 17px;
+  line-height: 1.75;
+}
+
+.admin-login-checkpoints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 32px;
+}
+
+.admin-login-checkpoints span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--clay-hairline);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.62);
+  color: var(--clay-body);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-login-checkpoints svg {
+  color: var(--clay-accent);
+}
+
+.admin-login-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 32px;
+  border: 1px solid var(--clay-hairline);
+  border-radius: 24px;
+  background: rgb(255 253 247 / 0.82);
+  box-shadow: 0 28px 70px rgb(59 39 18 / 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.admin-login-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.admin-login-card h2 {
+  margin: 8px 0 0;
+  color: var(--clay-ink);
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.admin-login-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #f7c9bf;
+  border-radius: 999px;
+  background: var(--clay-accent-soft);
+  color: #9c3428;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-login-form {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-login-field {
+  display: grid;
+  gap: 8px;
+  color: var(--clay-body);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-login-input {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--clay-hairline);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.78);
+  color: var(--clay-muted);
+  transition:
+    border-color var(--motion-standard) var(--motion-ease),
+    box-shadow var(--motion-standard) var(--motion-ease),
+    background var(--motion-standard) var(--motion-ease);
+}
+
+.admin-login-input:focus-within {
+  border-color: var(--clay-accent);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgb(255 107 90 / 0.16);
+}
+
+.admin-login-input input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--clay-ink);
+  font-size: 15px;
+}
+
+.admin-login-input input::placeholder {
+  color: #9a8f82;
+}
+
+.admin-login-error {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #ffb4a7;
+  border-radius: 14px;
+  background: #fff0ed;
+  color: #a33628;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.admin-login-submit {
+  width: 100%;
+  min-height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--clay-ink);
+  color: #fffaf0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0;
+  transition:
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-fast) var(--motion-ease),
+    background var(--motion-fast) var(--motion-ease);
+}
+
+.admin-login-submit:hover {
+  transform: translateY(-1px);
+  background: #1a3a3a;
+  box-shadow: 0 14px 30px rgb(10 10 10 / 0.16);
+}
+
+.admin-login-submit:focus-visible {
+  outline: 3px solid rgb(255 107 90 / 0.42);
+  outline-offset: 3px;
+}
+
+@media (max-width: 760px) {
+  .admin-login-page {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding: 28px 18px;
+  }
+
+  .admin-login-brand h1 {
+    font-size: clamp(38px, 15vw, 56px);
+  }
+
+  .admin-login-copy {
+    font-size: 15px;
+  }
+
+  .admin-login-card {
+    padding: 22px;
+    border-radius: 20px;
+  }
+
+  .admin-login-card__header {
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

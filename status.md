@@ -2866,6 +2866,7 @@ Historical validation for the paused ecommerce group export runtime WIP:
 
 ## Browser QA
 
+- Current admin login UI fix browser QA: Codex in-app Browser verified `http://127.0.0.1:4174/login` from the built `apps/admin/dist` preview. Desktop 1280x720 light surface rendered the new two-column Clay login page with styled brand copy, checkpoints, labeled inputs, icon affordances, and primary submit button. Mobile 390x844 light surface stacked correctly, exposed all three fields and the submit button in the full-page capture, and reported console error count `0`. `.theme-transitioning` is not present in this standalone admin app; stale chunk text was not present in DOM snapshots.
 - Browser QA was completed for the historical Clay UI lane before `9e7ae2b5`.
 - Current AchievementToast cleanup browser smoke was completed after the `f453cd9a` build at `http://127.0.0.1:3102/?qa=onboarding-unused-cleanup-1777890000000`: production login screen rendered with title `KK Studio - AI Image Workspace`, no connection-refused or render-error text, and `0` current-port console errors. The `AchievementToast` route state was not directly visible without completing onboarding tasks.
 - Current Onboarding residual cleanup browser smoke: blocked by Codex in-app Browser automation timeouts before navigation; fallback HTTP smoke against the built `dist` returned 200/title `KK Studio - AI Image Workspace`, but no pixel-level browser verdict was obtained for this slice.

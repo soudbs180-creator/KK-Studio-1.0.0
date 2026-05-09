@@ -2651,6 +2651,18 @@ npm.cmd run governance:check
 
 Current release status: the former `governance:version` portable metadata mismatch was cleared by `567f85aa`, and `npm.cmd run governance:check` passed in the latest full gate. Rerun this gate after any future packaging or publish metadata change.
 
+## Current Admin Login UI Fix Gate
+
+```powershell
+node --test --test-isolation=none tests/unit/admin-login-page-surface.test.ts
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/admin-login-page-surface.test.ts
+npm.cmd run admin:build
+npm.cmd run typecheck
+npm.cmd run check:encoding
+```
+
+Browser validation: Codex in-app Browser checked built `apps/admin/dist` at `http://127.0.0.1:4174/login` on desktop 1280x720 and mobile 390x844; console error count was `0`.
+
 ## Finalization Audit Gate
 
 Use this after the active Stage Two slice is closed and before claiming full project completion:
