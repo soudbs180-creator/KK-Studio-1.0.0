@@ -32,6 +32,14 @@ node -e "fetch('https://kkai.plus/app-version.json?probe='+Date.now()).then(r=>r
 
 Browser verification: open `https://kkai.plus/` after deployment, inject bad `kk_studio_canvas_state` plus `kk_canvas_view` in a test session, reload, and confirm the workspace does not render tiny cards with overflowing text or a disordered canvas. The restored transform should either be at least `0.35` scale or reset to the centered fallback.
 
+Fresh production result on 2026-05-10:
+
+- `npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560` completed and created deployment `dpl_B7d8WLM3DpRJwvVKyWpq9GjiNs9Q`, URL `https://kk-studio-4kgevbd1t-yykks-projects-727e9560.vercel.app`.
+- `npx.cmd vercel alias set kk-studio-4kgevbd1t-yykks-projects-727e9560.vercel.app kkai.plus --scope yykks-projects-727e9560` and the same command for `www.kkai.plus` completed because the custom domain was still pointing at the old rollback deployment after the deploy.
+- `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` now resolves `kkai.plus` to `dpl_B7d8WLM3DpRJwvVKyWpq9GjiNs9Q`.
+- `https://kkai.plus/` serves the new production assets including `assets/canvas-core-BRGhbfQB.js`; the old rollback asset `assets/canvas-core-CUNRGw_l.js` is no longer referenced.
+- Isolated production browser QA injected corrupted canvas persistence and restored to `{"x":720,"y":450,"scale":1}` with a normal `320x147` prompt card, no stale chunk text, no `.theme-transitioning`, no console warnings/errors, and no request failures.
+
 ## Hosted Vercel API Proxy Login Fix Gate
 
 Use this gate when touching Vercel API proxy helper files, hosted `/api/v1/*` or `/api/auth/*` routing, Vercel rewrites, or hosted KK API base URL selection:
