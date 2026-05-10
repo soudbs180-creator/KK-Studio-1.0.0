@@ -4,6 +4,24 @@ Last updated: 2026-05-10
 
 Use `npm.cmd` for npm scripts on Windows.
 
+## Tutorial Overlay Readability Gate
+
+Use this gate when touching the first-run tutorial overlay, tutorial card sizing, or tutorial description rendering:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/tutorial-overlay-layout-regression.test.ts tests/unit/responsive-surface.test.ts tests/unit/clay-global-ui-refit-contract.test.ts tests/unit/onboarding-unused-cleanup-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+npm.cmd run test:unit
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/components/common/TutorialOverlay.tsx tests/unit/tutorial-overlay-layout-regression.test.ts status.md validation.md
+```
+
+Expected result: tutorial copy renders as readable paragraph/list content instead of one collapsed dense paragraph; desktop first-run overlay uses a wider card than mobile; mobile remains viewport-bound and unclipped.
+
+Fresh result on 2026-05-10: RED/GREEN completed for `tests/unit/tutorial-overlay-layout-regression.test.ts`; focused tutorial/responsive/Clay/onboarding suite passed 22/22; `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and `npm.cmd run test:unit` 1462/1462 passed; path-limited alternate-git `diff --check` passed. Browser QA against local `http://127.0.0.1:3197/?qa=tutorial-geometry` in dark theme, with only `/api/v1/model-catalog/active` stubbed to remove unrelated local-preview CORS noise, confirmed desktop `1440x900` card `560x294` and mobile `390x844` card `366x284`, both unclipped, with 1 paragraph plus 4 list items, `.theme-transitioning=0`, stale chunk count `0`, console errors/warnings `0`, and horizontal document scroll `false`.
+
 ## ProjectManager Desktop Rail UI Gate
 
 Use this gate when touching the desktop ProjectManager tool rail, idle collapse behavior, or its viewport positioning:

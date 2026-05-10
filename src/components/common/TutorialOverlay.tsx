@@ -16,6 +16,35 @@ interface TutorialOverlayProps {
 
 type TutorialSurface = 'mobile' | 'desktop';
 
+const TUTORIAL_MOBILE_CARD_MAX_WIDTH = 460;
+const TUTORIAL_DESKTOP_CARD_MAX_WIDTH = 560;
+const TUTORIAL_CARD_INITIAL_HEIGHT = 320;
+const TUTORIAL_BULLET_PREFIXES = [
+    String.fromCodePoint(0x2022),
+    String.fromCharCode(0x00e2, 0x20ac, 0x00a2),
+];
+
+const getInitialTutorialCardWidth = () =>
+    typeof window !== 'undefined' && isPhoneResponsiveWidth(window.innerWidth)
+        ? TUTORIAL_MOBILE_CARD_MAX_WIDTH
+        : TUTORIAL_DESKTOP_CARD_MAX_WIDTH;
+
+const splitTutorialDescription = (description: string) => {
+    const paragraphs: string[] = [];
+    const bullets: string[] = [];
+
+    for (const line of description.split(/\n+/).map((entry) => entry.trim()).filter(Boolean)) {
+        const bulletPrefix = TUTORIAL_BULLET_PREFIXES.find((prefix) => line.startsWith(prefix));
+        if (bulletPrefix) {
+            bullets.push(line.slice(bulletPrefix.length).trim());
+        } else {
+            paragraphs.push(line);
+        }
+    }
+
+    return { paragraphs, bullets };
+};
+
 const DESKTOP_TUTORIAL_STEPS: TutorialStep[] = [
     {
         title: "欢迎使用无限画布",
@@ -83,9 +112,13 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
     const [isMobile, setIsMobile] = useState(() =>
         typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false
     );
-    const [tooltipSize, setTooltipSize] = useState({ width: 360, height: 320 });
+    const [tooltipSize, setTooltipSize] = useState(() => ({
+        width: getInitialTutorialCardWidth(),
+        height: TUTORIAL_CARD_INITIAL_HEIGHT
+    }));
     const overlayColor = 'var(--tutorial-overlay-bg)';
     const tutorialSurface: TutorialSurface = isMobile ? 'mobile' : 'desktop';
+    const tutorialCardMaxWidth = isMobile ? TUTORIAL_MOBILE_CARD_MAX_WIDTH : TUTORIAL_DESKTOP_CARD_MAX_WIDTH;
     const STEPS = React.useMemo(() => getTutorialSteps(tutorialSurface), [tutorialSurface]);
 
     useEffect(() => {
@@ -94,6 +127,10 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
 
     const displayStepIndex = Math.min(currentStepIndex, STEPS.length - 1);
     const step = STEPS[displayStepIndex];
+    const descriptionParts = React.useMemo(
+        () => splitTutorialDescription(step.description),
+        [step.description]
+    );
 
     useEffect(() => {
         const handleResize = () => setIsMobile(isPhoneResponsiveWidth(window.innerWidth));
@@ -183,8 +220,8 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
             const element = tooltipRef.current;
             if (!element) return;
 
-            const nextWidth = element.offsetWidth || 360;
-            const nextHeight = element.offsetHeight || 320;
+            const nextWidth = element.offsetWidth || tutorialCardMaxWidth;
+            const nextHeight = element.offsetHeight || TUTORIAL_CARD_INITIAL_HEIGHT;
 
             setTooltipSize((prev) => {
                 if (prev.width === nextWidth && prev.height === nextHeight) {
@@ -207,16 +244,17 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
             window.removeEventListener('resize', updateTooltipSize);
             resizeObserver?.disconnect();
         };
-    }, [displayStepIndex, step.title, step.description, isMobile]);
+    }, [displayStepIndex, step.title, step.description, isMobile, tutorialCardMaxWidth]);
 
     // Calculate position for the tooltip - use transform for GPU acceleration
     const getTooltipTransform = (): React.CSSProperties => {
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
-        const viewportMargin = 16;
+        const viewportMargin = isMobile ? 12 : 24;
         const targetGap = 20;
         const tooltipWidth = Math.min(tooltipSize.width, viewportWidth - viewportMargin * 2);
         const tooltipHeight = Math.min(tooltipSize.height, viewportHeight - viewportMargin * 2);
+        const tooltipWidthRule = `min(${tutorialCardMaxWidth}px, calc(100vw - ${viewportMargin * 2}px))`;
 
         const clampX = (value: number) =>
             Math.max(viewportMargin, Math.min(value, viewportWidth - tooltipWidth - viewportMargin));
@@ -228,7 +266,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
                 position: 'fixed',
                 left: clampX((viewportWidth - tooltipWidth) / 2),
                 top: clampY((viewportHeight - tooltipHeight) / 2),
-                width: `min(360px, calc(100vw - ${viewportMargin * 2}px))`,
+                width: tooltipWidthRule,
                 maxHeight: `calc(100vh - ${viewportMargin * 2}px)`
             };
         }
@@ -291,7 +329,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
             position: 'fixed',
             left: clampX(resolved.left),
             top: clampY(resolved.top),
-            width: `min(360px, calc(100vw - ${viewportMargin * 2}px))`,
+            width: tooltipWidthRule,
             maxHeight: `calc(100vh - ${viewportMargin * 2}px)`
         };
     };
@@ -383,27 +421,30 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
             {/* Content Box - GPU accelerated */}
             <div
                 ref={tooltipRef}
-                className="p-4 w-full max-w-[min(360px,calc(100vw-20px))] will-change-transform"
+                className="w-full will-change-transform"
+                data-tutorial-surface={tutorialSurface}
                 style={{
                     ...getTooltipTransform(),
                     transition: 'left 0.3s ease, top 0.3s ease'
                 }}
             >
                 <div
-                    className="overflow-y-auto border rounded-[28px] p-6 animate-in fade-in zoom-in-95 duration-300"
+                    className="overflow-y-auto border rounded-[24px] animate-in fade-in zoom-in-95 duration-300"
+                    data-testid="tutorial-overlay-card"
                     style={{
                         background: 'var(--tutorial-card-bg)',
                         borderColor: 'var(--tutorial-card-border)',
                         boxShadow: 'var(--tutorial-card-shadow)',
                         maxHeight: isMobile
                             ? 'calc(100dvh - max(16px, env(safe-area-inset-top, 0px)) - max(16px, env(safe-area-inset-bottom, 0px)))'
-                            : 'calc(100vh - 32px)',
+                            : 'min(720px, calc(100vh - 48px))',
+                        padding: isMobile ? '20px' : '28px',
                         paddingBottom: isMobile
-                            ? 'max(24px, calc(16px + env(safe-area-inset-bottom, 0px)))'
-                            : undefined,
+                            ? 'max(24px, calc(20px + env(safe-area-inset-bottom, 0px)))'
+                            : '28px',
                     }}
                 >
-                    <div className="flex justify-between items-start mb-5">
+                    <div className="flex justify-between items-start mb-5 gap-4">
                         <div className="flex items-center gap-2">
                             <div className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: 'var(--tutorial-dot-bg)' }} />
                             <span className="text-[10px] font-bold tracking-widest text-[var(--text-tertiary)] uppercase">
@@ -418,10 +459,27 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
                         </button>
                     </div>
 
-                    <h3 className="mb-2 text-xl font-bold tracking-tight text-[var(--text-primary)]">{step.title}</h3>
-                    <p className="mb-8 text-[14px] leading-relaxed text-[var(--text-secondary)]">
-                        {step.description}
-                    </p>
+                    <h3 className={`${isMobile ? 'mb-3 text-[20px]' : 'mb-4 text-[24px]'} font-bold tracking-tight text-[var(--text-primary)]`}>
+                        {step.title}
+                    </h3>
+                    <div
+                        className={`${isMobile ? 'mb-7 text-[14px] leading-6' : 'mb-8 text-[15px] leading-7'} space-y-4 text-[var(--text-secondary)]`}
+                        data-testid="tutorial-overlay-description"
+                    >
+                        {descriptionParts.paragraphs.map((paragraph) => (
+                            <p key={paragraph}>{paragraph}</p>
+                        ))}
+                        {descriptionParts.bullets.length > 0 && (
+                            <ul className={isMobile ? 'space-y-2.5' : 'space-y-3'}>
+                                {descriptionParts.bullets.map((bullet) => (
+                                    <li key={bullet} className="flex gap-3">
+                                        <span className="mt-[0.65em] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: 'var(--tutorial-dot-bg)' }} />
+                                        <span>{bullet}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
 
                     <div className="flex justify-between items-center gap-3">
                         <button

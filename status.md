@@ -2,6 +2,18 @@
 
 Last updated: 2026-05-10
 
+## Current Tutorial Overlay Readability Fix
+
+- Active lane: onboarding/tutorial overlay UI readability, scoped to `src/components/common/TutorialOverlay.tsx` and its focused regression test only.
+- Included files for this slice: `src/components/common/TutorialOverlay.tsx`, `tests/unit/tutorial-overlay-layout-regression.test.ts`, `status.md`, and `validation.md`.
+- Excluded files/artifacts: `output/`, `.tmp-playwright/`, PromptBar, ProjectManager rail, canvas persistence/sanitizer, settings/API workbench, login/auth, provider routing, deployment/proxy files, and unrelated runtime refactors.
+- Root cause evidence: the user-selected production overlays are owned by `TutorialOverlay.tsx`, not the older `src/components/Onboarding/*` flow. The tutorial descriptions contained newline-separated bullet copy, but the component rendered `step.description` inside one plain `<p>`, so the browser collapsed the copy into a dense paragraph. Desktop and mobile also shared the old `360px` card width cap.
+- Implemented fix: tutorial descriptions are split into intro paragraphs plus semantic list items, the card exposes stable `data-testid` hooks for QA, desktop width now caps at `560px`, mobile width caps at `460px` while staying viewport-bound, and card padding/height remain viewport-safe.
+- RED/GREEN evidence: `tests/unit/tutorial-overlay-layout-regression.test.ts` first failed on the missing responsive card constants and structured description rendering; after the fix it passed.
+- Browser QA evidence: local Vite preview at `http://127.0.0.1:3197/?qa=tutorial-geometry`, dark theme, first-run tutorial with `kk_tutorial_seen` absent. The QA run stubbed only `/api/v1/model-catalog/active` to remove unrelated local-preview CORS noise from the admin model background poll. Desktop `1440x900`: `surface=desktop`, card `560x294` at `left=440, top=303`, not clipped, description rendered as 1 paragraph and 4 list items, `.theme-transitioning=0`, stale chunk text count `0`, console errors/warnings `0`, horizontal document scroll `false`. Mobile `390x844`: `surface=mobile`, card `366x284` at `left=12, top=280`, not clipped, description rendered as 1 paragraph and 4 list items, `.theme-transitioning=0`, stale chunk text count `0`, console errors/warnings `0`, horizontal document scroll `false`.
+- Fresh validation evidence: focused tutorial/responsive/Clay/onboarding suite passed 22/22; `npm.cmd run typecheck` passed; `npm.cmd run build` passed and produced `dist/assets/TutorialOverlay-BP_Vz5QS.js`; `npm.cmd run governance:agent-docs` passed; `npm.cmd run check:encoding` passed; `npm.cmd run test:unit` passed 1462/1462; path-limited alternate-git `diff --check` passed with Windows LF/CRLF normalization warnings only.
+- Next step: stage only included files through alternate git and commit this narrow tutorial overlay fix. Do not stage QA temp files or screenshots.
+
 ## Current ProjectManager Desktop Rail UI Fix
 
 - Active lane: desktop workspace UI regression, scoped to the left ProjectManager tool rail idle-collapse behavior.
