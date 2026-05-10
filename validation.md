@@ -2778,31 +2778,23 @@ npm.cmd run check:encoding
 
 If UI files were touched since the last browser evidence, rerun the Clay UI contract suite and Codex in-app Browser QA before final sign-off. If only runtime/docs files were touched, record the browser skip reason in `status.md`.
 
-## Canvas Card Overflow Fix Gate
+## Canvas Card Overflow Rollback Gate
 
-Use this gate for the canvas card text overflow fix:
+Use this gate for the canvas card text overflow rollback:
 
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-visual-regression.test.ts
 npm.cmd run typecheck
 npm.cmd run build
+npm.cmd run governance:agent-docs
 npm.cmd run check:encoding
 ```
 
-Fresh evidence for this slice:
+Fresh production rollback evidence:
 
-- RED first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-visual-regression.test.ts` failed on `canvas card text cannot escape narrow card surfaces` because prompt/workflow cards did not yet expose wrapping and minimum-size safeguards.
-- GREEN: the same targeted test passed 8/8 after the fix.
-- Passed: `npm.cmd run typecheck`.
-- Passed: `npm.cmd run build`.
-- Passed: `npm.cmd run check:encoding`.
-- Browser QA: Codex in-app Browser loaded `http://127.0.0.1:4173/` after build; workspace DOM/title rendered, stale chunk text absent, `.theme-transitioning` absent. Screenshot capture timed out; console errors were existing admin model fetch failures unrelated to the canvas overflow path.
-
-Production parity evidence:
-
-- `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports production deployment `dpl_J9bcG4DvMeuE2ZrfivQMLD8NF637`, URL `https://kk-studio-2dege9hxw-yykks-projects-727e9560.vercel.app`, created `Sun May 10 2026 04:14:55 GMT+0800`, status Ready.
-- `https://kkai.plus/app-version.json` reports `buildTime: 2026-05-09T20:15:06.564Z` and `commitSha: 9aa070f87ec4cb1e494404b2eb4f2e04d197772b`.
-- Local `dist/app-version.json` reports `buildTime: 2026-05-10T04:00:09.690Z` and `commitSha: null`.
-- Local preview asset scan: `http://127.0.0.1:4173/assets/index-u_AvA3Y2.js` contains `Math.max(260`; `http://127.0.0.1:4173/assets/canvas-core-CY0Nrr1E.js` contains `min-w-0 max-w-full break-words`, `[overflow-wrap:anywhere]`, and `overflow-x-hidden overflow-y-auto`.
-- Production asset scan: `https://kkai.plus/assets/index-C92hbb3n.js` and `https://kkai.plus/assets/canvas-core-CUNRGw_l.js` do not contain those canvas card overflow fix fingerprints.
-- Deployment risk: current production does not include the local canvas-card UI fix. Do not treat normal `.git` HEAD or remote `main` as deploy-ready evidence until the ACL/git metadata mismatch is resolved or a deploy explicitly uploads the current working tree/build.
+- Bad hosted deployment inspected before rollback: `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reported production deployment `dpl_3WRjJS4YvCfLCCcwpcpTa5ArWnnH`, URL `https://kk-studio-7bki6mquo-yykks-projects-727e9560.vercel.app`, `commitSha: 3267afb381377580170e96b9952467952bea63d0`.
+- Rollback command passed: `npx.cmd vercel rollback https://kk-studio-2dege9hxw-yykks-projects-727e9560.vercel.app -y --scope yykks-projects-727e9560 --timeout 5m`.
+- Rollback status passed: `npx.cmd vercel rollback status kk-studio --scope yykks-projects-727e9560` reported success for `kk-studio-2dege9hxw-yykks-projects-727e9560.vercel.app` (`dpl_J9bcG4DvMeuE2ZrfivQMLD8NF637`).
+- Post-rollback inspect passed: `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports production deployment `dpl_J9bcG4DvMeuE2ZrfivQMLD8NF637`.
+- Post-rollback asset/version fetch passed: `https://kkai.plus/` serves `assets/index-C92hbb3n.js`, `assets/canvas-core-CUNRGw_l.js`, and `assets/index-BSLZ6Um1.css`; `https://kkai.plus/app-version.json` reports `buildTime: 2026-05-09T20:15:06.564Z` and `commitSha: 9aa070f87ec4cb1e494404b2eb4f2e04d197772b`.
+- Local code rollback: the `PromptNodeComponent` text-wrap helper, the `WorkflowUtilityCard` width/height clamp, and the source-level regression test for that withdrawn fix were removed from the working tree so a future local deploy does not reintroduce the hosted UI regression.
