@@ -4,6 +4,34 @@ Last updated: 2026-05-10
 
 Use `npm.cmd` for npm scripts on Windows.
 
+## Canvas Production UI Recovery Gate
+
+Use this gate when touching persisted canvas geometry recovery, canvas localStorage restoration, or restored canvas view scale:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-persistence-geometry-sanitizer.test.ts
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-visual-regression.test.ts tests/unit/canvas-merge-contract.test.ts tests/unit/canvas-workflow-updates-contract.test.ts tests/unit/workspace-layout-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/context/canvasGeometrySanitizer.ts src/context/canvasPersistence.ts src/components/canvas/InfiniteCanvas.tsx tests/unit/canvas-persistence-geometry-sanitizer.test.ts tsconfig.tests.json status.md validation.md
+```
+
+Expected result: corrupted persisted prompt/workflow geometry is sanitized before render; malformed persisted canvas collections restore as an empty list instead of throwing; restored `kk_canvas_view` values below scale `0.35` are rejected so the canvas falls back to a centered scale `1` view.
+
+Fresh local result on 2026-05-10: the real restore-path sanitizer test passed 4/4; the focused canvas suite passed 17/17; `npm.cmd run typecheck` passed with 132 semantic test files; `npm.cmd run build` passed and produced `dist/assets/canvas-core-Dium_GUZ.js`; `npm.cmd run governance:agent-docs` passed; `npm.cmd run check:encoding` passed; and path-limited alternate-git `diff --check` passed with Windows LF/CRLF normalization warnings only. Local browser smoke against the built `dist` at `http://127.0.0.1:4186/` injected bad persisted canvas state and confirmed the restored view reset to `{"x":720,"y":450,"scale":1}` with the prompt card rendered at `320x147` instead of a tiny overflowing box.
+
+Production deploy verification after this gate:
+
+```powershell
+npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560
+npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560
+node -e "fetch('https://kkai.plus/app-version.json?probe='+Date.now()).then(r=>r.text()).then(console.log)"
+```
+
+Browser verification: open `https://kkai.plus/` after deployment, inject bad `kk_studio_canvas_state` plus `kk_canvas_view` in a test session, reload, and confirm the workspace does not render tiny cards with overflowing text or a disordered canvas. The restored transform should either be at least `0.35` scale or reset to the centered fallback.
+
 ## Hosted Vercel API Proxy Login Fix Gate
 
 Use this gate when touching Vercel API proxy helper files, hosted `/api/v1/*` or `/api/auth/*` routing, Vercel rewrites, or hosted KK API base URL selection:

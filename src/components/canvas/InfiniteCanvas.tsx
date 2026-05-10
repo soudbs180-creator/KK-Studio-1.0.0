@@ -56,6 +56,8 @@ interface CanvasInteractionState {
     idleRelaxationMs: number;
 }
 
+const MIN_RESTORED_CANVAS_VIEW_SCALE = 0.35;
+
 const isValidTransform = (value: any): value is Transform => {
     if (!value || typeof value !== 'object') return false;
     const { x, y, scale } = value;
@@ -64,7 +66,7 @@ const isValidTransform = (value: any): value is Transform => {
         && Number.isFinite(scale)
         && Math.abs(x) <= 200000
         && Math.abs(y) <= 200000
-        && scale >= 0.1
+        && scale >= MIN_RESTORED_CANVAS_VIEW_SCALE
         && scale <= 3;
 };
 
