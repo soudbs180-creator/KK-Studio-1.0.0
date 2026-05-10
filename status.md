@@ -2,6 +2,16 @@
 
 Last updated: 2026-05-10
 
+## Current PromptBar Footer Frost Production UI Recovery Fix
+
+- Active user issue: `kkai.plus` post-login workspace UI still looked cramped/disordered after the prior canvas rollback; the user explicitly confirmed this is the entered workspace page, not the login page.
+- Known-good reference: v1.4.5 / commit `71c79e15` used `.prompt-bar-footer-frost::before { inset: 0; }`.
+- Root cause evidence: commit `f7e53832 fix(promptbar): refine frosted controls` changed `.prompt-bar-footer-frost::before` from `inset: 0` to `inset: -6px 0 0`. That made the footer frost pseudo-element extend upward into the PromptBar input/control area, visually squeezing and covering controls. Production still served CSS asset `assets/index-Ci0q10SP.css` with `inset:-6px 0 0` before this fix.
+- Implemented fix scope: `src/index.css` restores the 1.4.5 footer frost bounds with `inset: 0`; `tests/unit/prompt-bar-layout-regression.test.ts` now requires `inset: 0` and rejects negative footer frost insets.
+- Fresh local validation evidence before commit: the targeted PromptBar layout regression test passed 11/11 after RED/GREEN verification; `npm.cmd run build` passed and produced `dist/assets/index-a8hsw9tV.css`; the built CSS contains `.prompt-bar-footer-frost:before` with `inset:0` and no negative inset; `npm.cmd run typecheck`, `npm.cmd run check:encoding`, `npm.cmd run test:unit` 1460/1460, and `npm.cmd run governance:agent-docs` passed; path-limited alternate-git `diff --check` passed with Windows LF/CRLF normalization warnings only.
+- Local browser evidence: the built workspace was opened from a local static preview in an isolated browser session and the desktop workspace/PromptBar screenshot was captured at `output/playwright/promptbar-footer-frost-fix/local-desktop-workspace-1440x900.png`. The in-app browser had stale localhost asset pollution during this investigation, so final production verification must use the deployed `kkai.plus` asset URL plus a fresh browser reload.
+- Dirty-worktree guard: stage only `src/index.css`, `tests/unit/prompt-bar-layout-regression.test.ts`, `status.md`, and `validation.md`; do not stage generated `output/`.
+
 ## Current Canvas Production UI Recovery Fix
 
 - Active user issue: after rolling production back from the bad canvas card text-wrap deployment, `kkai.plus` could still render the workspace UI in a visually disordered state for browsers that had persisted bad canvas geometry or a thumbnail-scale canvas view.

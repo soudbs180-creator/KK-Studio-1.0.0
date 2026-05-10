@@ -4,6 +4,32 @@ Last updated: 2026-05-10
 
 Use `npm.cmd` for npm scripts on Windows.
 
+## PromptBar Footer Frost UI Recovery Gate
+
+Use this gate when touching PromptBar footer frost bounds, mobile footer chrome, or the global PromptBar CSS variables:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-bar-layout-regression.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run test:unit
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/index.css tests/unit/prompt-bar-layout-regression.test.ts status.md validation.md
+```
+
+Expected result: `.prompt-bar-footer-frost::before` uses `inset: 0` and no negative inset, matching the v1.4.5 footer bounds so the frosted layer does not intrude into the PromptBar input/control area.
+
+Production verification after deploy:
+
+```powershell
+npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560
+npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560
+node -e "fetch('https://kkai.plus/?probe='+Date.now()).then(r=>r.text()).then(async html=>{const css=[...html.matchAll(/assets\\/index-[^\"']+\\.css/g)].at(-1)?.[0]; if(!css) throw new Error('missing css asset'); const text=await fetch('https://kkai.plus/'+css+'?probe='+Date.now()).then(r=>r.text()); console.log(css, /prompt-bar-footer-frost:before\\{[^}]*inset:0/.test(text), /prompt-bar-footer-frost:before\\{[^}]*inset:-6px 0 0/.test(text));})"
+```
+
+Fresh local result on 2026-05-10: RED/GREEN was completed for `tests/unit/prompt-bar-layout-regression.test.ts`; the focused test passed 11/11 after restoring `inset: 0`; `npm.cmd run build` passed and produced `dist/assets/index-a8hsw9tV.css`; local built CSS contains `inset:0` for `.prompt-bar-footer-frost:before`; `npm.cmd run typecheck`, `npm.cmd run check:encoding`, `npm.cmd run test:unit` 1460/1460, `npm.cmd run governance:agent-docs`, and path-limited alternate-git `diff --check` passed.
+
 ## Canvas Production UI Recovery Gate
 
 Use this gate when touching persisted canvas geometry recovery, canvas localStorage restoration, or restored canvas view scale:
