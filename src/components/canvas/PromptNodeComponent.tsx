@@ -58,6 +58,8 @@ const snapCanvasCoordinate = (value: number, scale: number = 1) => {
     return Math.round(value * scale) / scale;
 };
 
+const canvasCardTextWrapClassName = 'min-w-0 max-w-full break-words [overflow-wrap:anywhere]';
+
 const getFiniteTimerStart = (value: unknown): number | undefined => (
     typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined
 );
@@ -1549,7 +1551,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
                     {/* Prompt Text Area - 画布主卡禁用文本选择，避免拖拽时误选中文案 */}
                     <div
-                        className={`relative text-[var(--text-primary)] text-[15px] leading-7 font-normal flex-1 tracking-wide overflow-y-auto max-h-[160px] custom-scrollbar pr-1 min-h-[40px] group/content ${isChatMode ? 'select-text cursor-text' : 'select-none'}`}
+                        className={`${canvasCardTextWrapClassName} relative text-[var(--text-primary)] text-[15px] leading-7 font-normal flex-1 tracking-wide overflow-x-hidden overflow-y-auto max-h-[160px] custom-scrollbar pr-1 min-h-[40px] group/content ${isChatMode ? 'select-text cursor-text' : 'select-none'}`}
                         style={primaryTextRenderStyle}
                         onWheel={(e) => e.stopPropagation()}
                         onClick={(e) => {
@@ -1599,7 +1601,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
                                 {/* English - Professional Structure */}
                                 <div className="relative group/en">
-                                    <div className="text-[14px] leading-relaxed text-[var(--text-primary)] font-medium tracking-tight font-serif-ui whitespace-pre-wrap selection:bg-[rgba(255,77,139,0.24)] pr-8">
+                                    <div className={`text-[14px] leading-relaxed text-[var(--text-primary)] font-medium tracking-tight font-serif-ui whitespace-pre-wrap selection:bg-[rgba(255,77,139,0.24)] pr-8 ${canvasCardTextWrapClassName}`}>
                                         {node.optimizedPromptEn || node.promptOptimizerResult?.optimized_prompt_en}
                                     </div>
                                     <button
@@ -1632,7 +1634,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
                                 {/* Chinese - User Friendly Explanation */}
                                 <div className="relative group/zh">
-                                    <div className="text-[12px] leading-6 text-[var(--text-secondary)] font-normal italic opacity-90 whitespace-pre-wrap selection:bg-amber-500/20 pr-8">
+                                    <div className={`text-[12px] leading-6 text-[var(--text-secondary)] font-normal italic opacity-90 whitespace-pre-wrap selection:bg-amber-500/20 pr-8 ${canvasCardTextWrapClassName}`}>
                                         {node.optimizedPromptZh || node.promptOptimizerResult?.optimized_prompt_zh_display || 'AI 正在解析您的创意...'}
                                     </div>
                                     <button
@@ -1733,7 +1735,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 )}
                             </div>
                         ) : (
-                            <div className="text-[15px] leading-7 text-[var(--text-primary)] font-normal selection:bg-[rgba(255,77,139,0.18)] pr-2">
+                            <div className={`text-[15px] leading-7 text-[var(--text-primary)] font-normal selection:bg-[rgba(255,77,139,0.18)] pr-2 ${canvasCardTextWrapClassName}`}>
                                 {node.originalPrompt || node.prompt || (node.isDraft ? <span className="text-[var(--text-tertiary)] italic">输入提示词...</span> : '')}
                             </div>
                         )}

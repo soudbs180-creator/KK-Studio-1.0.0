@@ -2777,3 +2777,23 @@ npm.cmd run check:encoding
 ```
 
 If UI files were touched since the last browser evidence, rerun the Clay UI contract suite and Codex in-app Browser QA before final sign-off. If only runtime/docs files were touched, record the browser skip reason in `status.md`.
+
+## Canvas Card Overflow Fix Gate
+
+Use this gate for the canvas card text overflow fix:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-visual-regression.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run check:encoding
+```
+
+Fresh evidence for this slice:
+
+- RED first: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-visual-regression.test.ts` failed on `canvas card text cannot escape narrow card surfaces` because prompt/workflow cards did not yet expose wrapping and minimum-size safeguards.
+- GREEN: the same targeted test passed 8/8 after the fix.
+- Passed: `npm.cmd run typecheck`.
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run check:encoding`.
+- Browser QA: Codex in-app Browser loaded `http://127.0.0.1:4173/` after build; workspace DOM/title rendered, stale chunk text absent, `.theme-transitioning` absent. Screenshot capture timed out; console errors were existing admin model fetch failures unrelated to the canvas overflow path.

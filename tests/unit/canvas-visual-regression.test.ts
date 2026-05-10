@@ -164,6 +164,23 @@ test('prompt cards avoid transform-focused will-change hints during drag so back
   );
 });
 
+test('canvas card text cannot escape narrow card surfaces', () => {
+  const promptSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
+  const workflowSource = readSource('src/workflow/nodes/WorkflowUtilityCard.tsx');
+
+  assert.match(promptSource, /const canvasCardTextWrapClassName = '[^']*break-words[^']*\[overflow-wrap:anywhere\]/);
+  assert.match(promptSource, /className=\{`\$\{canvasCardTextWrapClassName\}[\s\S]*overflow-x-hidden/);
+  assert.match(promptSource, /className=\{`text-\[14px\][^`]*\$\{canvasCardTextWrapClassName\}/);
+  assert.match(promptSource, /className=\{`text-\[12px\][^`]*\$\{canvasCardTextWrapClassName\}/);
+  assert.match(promptSource, /className=\{`text-\[15px\][^`]*\$\{canvasCardTextWrapClassName\}/);
+
+  assert.match(workflowSource, /export const WORKFLOW_UTILITY_CARD_MIN_WIDTH = 260;/);
+  assert.match(workflowSource, /Math\.max\(WORKFLOW_UTILITY_CARD_MIN_WIDTH, node\.width \|\| WORKFLOW_UTILITY_CARD_DEFAULT_WIDTH\)/);
+  assert.match(workflowSource, /const workflowCardTextWrapClassName = '[^']*break-words[^']*\[overflow-wrap:anywhere\]/);
+  assert.match(workflowSource, /className=\{`mt-1 text-xs leading-5 text-\[var\(--text-secondary\)\] \$\{workflowCardTextWrapClassName\}`\}/);
+  assert.match(workflowSource, /className=\{`rounded-2xl border px-3 py-2 text-xs leading-5 text-\[var\(--text-secondary\)\] \$\{workflowCardTextWrapClassName\}`\}/);
+});
+
 test('canvas groups avoid transform-only will-change hints while dragging their frosted shells', () => {
   const source = readSource('src/components/canvas/CanvasGroupComponent.tsx');
 

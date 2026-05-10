@@ -33,6 +33,13 @@ const getWorkflowCardStackZIndex = (node: UtilityCardNode, isSelected: boolean) 
   return persistedOrder + 10;
 };
 
+export const WORKFLOW_UTILITY_CARD_DEFAULT_WIDTH = 284;
+export const WORKFLOW_UTILITY_CARD_MIN_WIDTH = 260;
+export const WORKFLOW_UTILITY_CARD_DEFAULT_HEIGHT = 176;
+export const WORKFLOW_UTILITY_CARD_MIN_HEIGHT = 132;
+
+const workflowCardTextWrapClassName = 'min-w-0 max-w-full break-words [overflow-wrap:anywhere]';
+
 const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
   node,
   title,
@@ -51,8 +58,8 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
   onPositionChange,
   onAction,
 }: WorkflowUtilityCardProps<TNode>) => {
-  const width = node.width || 284;
-  const height = node.height || 176;
+  const width = Math.max(WORKFLOW_UTILITY_CARD_MIN_WIDTH, node.width || WORKFLOW_UTILITY_CARD_DEFAULT_WIDTH);
+  const height = Math.max(WORKFLOW_UTILITY_CARD_MIN_HEIGHT, node.height || WORKFLOW_UTILITY_CARD_DEFAULT_HEIGHT);
   const dragStateRef = useRef<{
     originX: number;
     originY: number;
@@ -185,7 +192,7 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
           </div>
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-[var(--text-primary)]">{title}</div>
-            <div className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{subtitle}</div>
+            <div className={`mt-1 text-xs leading-5 text-[var(--text-secondary)] ${workflowCardTextWrapClassName}`}>{subtitle}</div>
           </div>
         </div>
 
@@ -208,7 +215,7 @@ const WorkflowUtilityCard = <TNode extends UtilityCardNode>({
             {contentRows.map((row) => (
               <div
                 key={row}
-                className="rounded-2xl border px-3 py-2 text-xs leading-5 text-[var(--text-secondary)]"
+                className={`rounded-2xl border px-3 py-2 text-xs leading-5 text-[var(--text-secondary)] ${workflowCardTextWrapClassName}`}
                 style={{
                   borderColor: 'var(--frost-card-sub-border)',
                   background: 'var(--frost-card-sub-bg)',
