@@ -724,7 +724,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         <>
             <div
                 id="project-manager-container"
-                className={`fixed left-4 z-50 flex flex-col items-center gap-2 select-none transition-all duration-300 ease-out ${isCollapsed ? '-translate-x-full opacity-35 hover:opacity-100' : 'translate-x-0 opacity-100'}`}
+                className={`fixed left-4 z-50 flex flex-col items-center gap-2 select-none transition-all duration-300 ease-out ${isCollapsed ? 'translate-x-0 opacity-45 hover:opacity-100' : 'translate-x-0 opacity-100'}`}
                 style={{ top: topPosition }}
                 onMouseEnter={() => setIsCollapsed(false)}
             >

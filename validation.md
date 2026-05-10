@@ -4,6 +4,24 @@ Last updated: 2026-05-10
 
 Use `npm.cmd` for npm scripts on Windows.
 
+## ProjectManager Desktop Rail UI Gate
+
+Use this gate when touching the desktop ProjectManager tool rail, idle collapse behavior, or its viewport positioning:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/project-manager-unused-cleanup-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+npm.cmd run test:unit
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/components/settings/ProjectManager.tsx tests/unit/project-manager-unused-cleanup-contract.test.ts status.md validation.md
+```
+
+Expected result: the desktop `#project-manager-container` stays fixed at the left viewport inset during idle collapse, lowers opacity only, and never uses `-translate-x-full` to move the rail offscreen.
+
+Fresh result on 2026-05-10: RED/GREEN was completed for `tests/unit/project-manager-unused-cleanup-contract.test.ts`; the focused test first failed on the existing `-translate-x-full` desktop collapse class, then passed 2/2 after the fix. `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, `npm.cmd run test:unit` 1461/1461, and path-limited alternate-git `diff --check` passed. Browser QA against the built local `dist` at desktop `1440x900` dark theme confirmed `#project-manager-trigger` remained at `x=17,width=40` after the idle collapse timer; `.theme-transitioning=0` and stale chunk text count was `0`.
+
 ## PromptBar Footer Frost UI Recovery Gate
 
 Use this gate when touching PromptBar footer frost bounds, mobile footer chrome, or the global PromptBar CSS variables:

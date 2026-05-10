@@ -2,6 +2,19 @@
 
 Last updated: 2026-05-10
 
+## Current ProjectManager Desktop Rail UI Fix
+
+- Active lane: desktop workspace UI regression, scoped to the left ProjectManager tool rail idle-collapse behavior.
+- Included files for this slice: `src/components/settings/ProjectManager.tsx`, `tests/unit/project-manager-unused-cleanup-contract.test.ts`, `status.md`, and `validation.md`.
+- Excluded files/artifacts: `output/`, `.tmp-playwright/`, production PromptBar CSS, canvas persistence/sanitizer code, settings/API workbench code, auth/provider routing, deployment/API proxy files, and unrelated ledgers.
+- Root cause evidence: Codex in-app Browser opened `https://kkai.plus/` and confirmed the user was in the workspace, not blocked at login. After closing the settings panel, the visible DOM contained the workspace PromptBar and no console warnings/errors. Supplemental production geometry captured from a temporary browser context showed `#project-manager-trigger` at `x=-25`, `width=40`, `right=15` after idle, while PromptBar geometry was normal and loaded live `assets/index-C4Idgjym.css`. The offscreen rail matched `ProjectManager` desktop collapsed class `-translate-x-full`.
+- Implemented fix: `src/components/settings/ProjectManager.tsx` keeps the desktop rail at `translate-x-0` in idle collapse and only lowers opacity, so the tool buttons remain inside the viewport instead of sliding mostly offscreen.
+- Regression coverage: `tests/unit/project-manager-unused-cleanup-contract.test.ts` now rejects `-translate-x-full` on the desktop `project-manager-container` class while preserving the existing unused-prop cleanup contract.
+- RED/GREEN evidence: the focused test first failed on the existing `-translate-x-full` class with `desktop collapsed rail must not move its controls offscreen`; after the fix it passed 2/2.
+- Browser QA evidence: local built `dist` was served from a temporary HTTP server at `http://127.0.0.1:59164/?qa=project-manager-rail-1778410286578` in dark theme, desktop `1440x900`. After waiting past the 4s idle collapse timer, `#project-manager-container` had class `translate-x-0 opacity-45 hover:opacity-100`, container box `x=16,width=42`, and `#project-manager-trigger` box `x=17,width=40,right=57`. `.theme-transitioning=0`, stale chunk text count `0`. Local preview console contained the known static-preview admin model CORS noise for `http://172.245.156.16/api/v1/model-catalog/active`, unrelated to this layout fix. Temporary screenshots/JSON under `.tmp-playwright/live-ui-inspect` and `.tmp-playwright/project-manager-rail` were deleted before staging.
+- Fresh validation evidence: focused ProjectManager test passed 2/2; `npm.cmd run typecheck` passed; `npm.cmd run build` passed and produced `dist/assets/index-BD7FgBib.js`; `npm.cmd run governance:agent-docs` passed; `npm.cmd run check:encoding` passed; `npm.cmd run test:unit` passed 1461/1461; path-limited alternate-git `diff --check` passed with Windows LF/CRLF normalization warnings only.
+- Next step: stage only the included files through alternate git and commit this narrow UI rail fix; do not stage generated screenshots or `.tmp-playwright`.
+
 ## Current PromptBar Footer Frost Production UI Recovery Fix
 
 - Active user issue: `kkai.plus` post-login workspace UI still looked cramped/disordered after the prior canvas rollback; the user explicitly confirmed this is the entered workspace page, not the login page.
