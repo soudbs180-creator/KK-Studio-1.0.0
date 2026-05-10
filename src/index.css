@@ -2140,7 +2140,7 @@ body.dark-mode .input-bar {
 .prompt-bar-footer-frost::before {
   content: '';
   position: absolute;
-  inset: -6px 0 0;
+  inset: 0;
   border-radius: inherit;
   background: var(--prompt-bar-footer-frost-bg);
   box-shadow: var(--prompt-bar-footer-frost-shadow);

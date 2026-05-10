@@ -4,6 +4,70 @@ Last updated: 2026-05-10
 
 Use `npm.cmd` for npm scripts on Windows.
 
+## PromptBar Footer Frost UI Recovery Gate
+
+Use this gate when touching PromptBar footer frost bounds, mobile footer chrome, or the global PromptBar CSS variables:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/prompt-bar-layout-regression.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run test:unit
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/index.css tests/unit/prompt-bar-layout-regression.test.ts status.md validation.md
+```
+
+Expected result: `.prompt-bar-footer-frost::before` uses `inset: 0` and no negative inset, matching the v1.4.5 footer bounds so the frosted layer does not intrude into the PromptBar input/control area.
+
+Production verification after deploy:
+
+```powershell
+npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560
+npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560
+node -e "fetch('https://kkai.plus/?probe='+Date.now()).then(r=>r.text()).then(async html=>{const css=[...html.matchAll(/assets\\/index-[^\"']+\\.css/g)].at(-1)?.[0]; if(!css) throw new Error('missing css asset'); const text=await fetch('https://kkai.plus/'+css+'?probe='+Date.now()).then(r=>r.text()); console.log(css, /prompt-bar-footer-frost:before\\{[^}]*inset:0/.test(text), /prompt-bar-footer-frost:before\\{[^}]*inset:-6px 0 0/.test(text));})"
+```
+
+Fresh local result on 2026-05-10: RED/GREEN was completed for `tests/unit/prompt-bar-layout-regression.test.ts`; the focused test passed 11/11 after restoring `inset: 0`; `npm.cmd run build` passed and produced `dist/assets/index-a8hsw9tV.css`; local built CSS contains `inset:0` for `.prompt-bar-footer-frost:before`; `npm.cmd run typecheck`, `npm.cmd run check:encoding`, `npm.cmd run test:unit` 1460/1460, `npm.cmd run governance:agent-docs`, and path-limited alternate-git `diff --check` passed.
+
+Fresh production result on 2026-05-10: production deployment `dpl_8GrbT468nTemUAaqML1yn4pMLaEQ` is Ready and `kkai.plus` was explicitly aliased to it. The live HTML now loads `assets/index-C4Idgjym.css`; the live `.prompt-bar-footer-frost:before` rule has `inset:0`, and the old `inset:-6px 0 0` rule is absent. Browser QA entered the deployed workspace on desktop `1440x900` and mobile `390x844`; the mobile computed pseudo-element inset is `0px`, with workspace textarea visible, no stale chunk text, and screenshots saved under `output/playwright/promptbar-footer-frost-fix/`.
+
+## Canvas Production UI Recovery Gate
+
+Use this gate when touching persisted canvas geometry recovery, canvas localStorage restoration, or restored canvas view scale:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-persistence-geometry-sanitizer.test.ts
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/canvas-visual-regression.test.ts tests/unit/canvas-merge-contract.test.ts tests/unit/canvas-workflow-updates-contract.test.ts tests/unit/workspace-layout-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/context/canvasGeometrySanitizer.ts src/context/canvasPersistence.ts src/components/canvas/InfiniteCanvas.tsx tests/unit/canvas-persistence-geometry-sanitizer.test.ts tsconfig.tests.json status.md validation.md
+```
+
+Expected result: corrupted persisted prompt/workflow geometry is sanitized before render; malformed persisted canvas collections restore as an empty list instead of throwing; restored `kk_canvas_view` values below scale `0.35` are rejected so the canvas falls back to a centered scale `1` view.
+
+Fresh local result on 2026-05-10: the real restore-path sanitizer test passed 4/4; the focused canvas suite passed 17/17; `npm.cmd run typecheck` passed with 132 semantic test files; `npm.cmd run build` passed and produced `dist/assets/canvas-core-Dium_GUZ.js`; `npm.cmd run governance:agent-docs` passed; `npm.cmd run check:encoding` passed; and path-limited alternate-git `diff --check` passed with Windows LF/CRLF normalization warnings only. Local browser smoke against the built `dist` at `http://127.0.0.1:4186/` injected bad persisted canvas state and confirmed the restored view reset to `{"x":720,"y":450,"scale":1}` with the prompt card rendered at `320x147` instead of a tiny overflowing box.
+
+Production deploy verification after this gate:
+
+```powershell
+npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560
+npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560
+node -e "fetch('https://kkai.plus/app-version.json?probe='+Date.now()).then(r=>r.text()).then(console.log)"
+```
+
+Browser verification: open `https://kkai.plus/` after deployment, inject bad `kk_studio_canvas_state` plus `kk_canvas_view` in a test session, reload, and confirm the workspace does not render tiny cards with overflowing text or a disordered canvas. The restored transform should either be at least `0.35` scale or reset to the centered fallback.
+
+Fresh production result on 2026-05-10:
+
+- `npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560` completed and created deployment `dpl_B7d8WLM3DpRJwvVKyWpq9GjiNs9Q`, URL `https://kk-studio-4kgevbd1t-yykks-projects-727e9560.vercel.app`.
+- `npx.cmd vercel alias set kk-studio-4kgevbd1t-yykks-projects-727e9560.vercel.app kkai.plus --scope yykks-projects-727e9560` and the same command for `www.kkai.plus` completed because the custom domain was still pointing at the old rollback deployment after the deploy.
+- `npx.cmd vercel inspect https://kkai.plus --scope yykks-projects-727e9560` now resolves `kkai.plus` to `dpl_B7d8WLM3DpRJwvVKyWpq9GjiNs9Q`.
+- `https://kkai.plus/` serves the new production assets including `assets/canvas-core-BRGhbfQB.js`; the old rollback asset `assets/canvas-core-CUNRGw_l.js` is no longer referenced.
+- Isolated production browser QA injected corrupted canvas persistence and restored to `{"x":720,"y":450,"scale":1}` with a normal `320x147` prompt card, no stale chunk text, no `.theme-transitioning`, no console warnings/errors, and no request failures.
+
 ## Hosted Vercel API Proxy Login Fix Gate
 
 Use this gate when touching Vercel API proxy helper files, hosted `/api/v1/*` or `/api/auth/*` routing, Vercel rewrites, or hosted KK API base URL selection:

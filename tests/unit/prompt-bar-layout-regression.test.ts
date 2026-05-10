@@ -174,7 +174,8 @@ test('prompt bar model library and footer controls use frosted flat defaults wit
   assert.match(cssSource, /--prompt-bar-liquid-group-bg-hover:\s*linear-gradient\(/);
   assert.match(cssSource, /\.prompt-bar-liquid-button:hover\s*\{[\s\S]*background:\s*var\(--prompt-bar-liquid-bg-hover\);/);
   assert.match(cssSource, /\.prompt-bar-liquid-group:hover\s*\{[\s\S]*background:\s*var\(--prompt-bar-liquid-group-bg-hover\);/);
-  assert.match(cssSource, /\.prompt-bar-footer-frost::before\s*\{[\s\S]*inset:\s*-6px 0 0;/);
+  assert.match(cssSource, /\.prompt-bar-footer-frost::before\s*\{[\s\S]*inset:\s*0;/);
+  assert.doesNotMatch(footerFrostRule, /inset:\s*-\d/);
   assert.doesNotMatch(footerFrostRule, /transform:/);
   assert.doesNotMatch(cssSource, /--prompt-bar-liquid-bg:\s*linear-gradient\(/);
   assert.doesNotMatch(cssSource, /--prompt-bar-liquid-group-bg:\s*linear-gradient\(/);

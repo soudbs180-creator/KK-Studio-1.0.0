@@ -44,6 +44,7 @@
         "tests/unit/canvas-media-recovery-contract.test.ts",
         "tests/unit/canvas-placement-contract.test.ts",
         "tests/unit/canvas-persisted-image-recovery-contract.test.ts",
+        "tests/unit/canvas-persistence-geometry-sanitizer.test.ts",
         "tests/unit/canvas-prompt-recovery-contract.test.ts",
         "tests/unit/canvas-prompt-child-images-runtime-contract.test.ts",
         "tests/unit/canvas-selection-runtime-contract.test.ts",
