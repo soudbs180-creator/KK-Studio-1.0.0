@@ -30,6 +30,8 @@ node -e "fetch('https://kkai.plus/?probe='+Date.now()).then(r=>r.text()).then(as
 
 Fresh local result on 2026-05-10: RED/GREEN was completed for `tests/unit/prompt-bar-layout-regression.test.ts`; the focused test passed 11/11 after restoring `inset: 0`; `npm.cmd run build` passed and produced `dist/assets/index-a8hsw9tV.css`; local built CSS contains `inset:0` for `.prompt-bar-footer-frost:before`; `npm.cmd run typecheck`, `npm.cmd run check:encoding`, `npm.cmd run test:unit` 1460/1460, `npm.cmd run governance:agent-docs`, and path-limited alternate-git `diff --check` passed.
 
+Fresh production result on 2026-05-10: production deployment `dpl_8GrbT468nTemUAaqML1yn4pMLaEQ` is Ready and `kkai.plus` was explicitly aliased to it. The live HTML now loads `assets/index-C4Idgjym.css`; the live `.prompt-bar-footer-frost:before` rule has `inset:0`, and the old `inset:-6px 0 0` rule is absent. Browser QA entered the deployed workspace on desktop `1440x900` and mobile `390x844`; the mobile computed pseudo-element inset is `0px`, with workspace textarea visible, no stale chunk text, and screenshots saved under `output/playwright/promptbar-footer-frost-fix/`.
+
 ## Canvas Production UI Recovery Gate
 
 Use this gate when touching persisted canvas geometry recovery, canvas localStorage restoration, or restored canvas view scale:
