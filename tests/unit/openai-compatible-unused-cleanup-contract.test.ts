@@ -20,7 +20,8 @@ test('OpenAI compatible adapter does not retain source-proven unused code', () =
   assert.ok(chatMethodStart > -1 && chatMethodEnd > chatMethodStart);
   assert.match(source, /generateImageViaChat/);
   assert.match(source, /generateImageStandard_OpenAI_Strict/);
-  assert.match(source, /buildImageCompatibilityModeError/);
+  assert.match(source, /buildOpenAICompatibleImageCompatibilityModeError/);
+  assert.doesNotMatch(source, /private buildImageCompatibilityModeError\(/);
 
   assert.doesNotMatch(source, /AudioGenerationOptions/);
   assert.doesNotMatch(source, /AudioGenerationResult/);

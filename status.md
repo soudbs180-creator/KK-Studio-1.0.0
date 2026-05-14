@@ -1,6 +1,18 @@
 # KK-Studio v1.4.6 Coordination Status
 
-Last updated: 2026-05-10
+Last updated: 2026-05-14
+
+## Current OpenAI-Compatible Error Helper Extraction
+
+- Active lane: non-UI Stage Two OpenAI-compatible service helper extraction, scoped to adapter error construction only.
+- Included files for this slice: `src/services/llm/OpenAICompatibleAdapter.ts`, `src/services/llm/openAICompatibleErrors.ts`, `tests/unit/openai-compatible-error-helper-contract.test.ts`, `tests/unit/openai-compatible-unused-cleanup-contract.test.ts`, `tests/unit/provider-image-routing-regression.test.ts`, `tsconfig.tests.json`, `status.md`, and `validation.md`.
+- Excluded files/artifacts: `output/`, `.tmp-playwright/`, screenshots, `dist/`, PromptBar, tutorial overlay, ProjectManager rail, canvas persistence/sanitizer, provider routing, endpoint selection, auth/header behavior, fetch execution, billing, deployment/proxy files, login/settings UI, and unrelated runtime refactors.
+- Root cause / seam map: `OpenAICompatibleAdapter.ts` still owned private `buildHttpError` and `buildImageCompatibilityModeError` helpers while adjacent diagnostics, routing-error, payload, sizing, task, and provider-route helpers had already been extracted. The remaining helper bodies only construct `Error` objects and copy diagnostic metadata; they do not own endpoint selection, auth, fetch execution, polling, billing, or fallback ordering.
+- Implemented fix: added `src/services/llm/openAICompatibleErrors.ts` with `buildOpenAICompatibleHttpError` and `buildOpenAICompatibleImageCompatibilityModeError`; updated the adapter to import those helpers and delegate all existing error construction calls. Compatibility-mode fallback metadata still uses the original error provider first, then falls back to `keySlot.provider`.
+- RED/GREEN evidence: `tests/unit/openai-compatible-error-helper-contract.test.ts` first failed because the helper module did not exist and the adapter still retained private constructors. After extraction it passed, preserving `status`, `code`, `requestPath`, `requestBody`, `responseBody`, `provider`, and `compatibilityModeHint` metadata. Existing source contracts were updated to protect the new helper delegation while preserving the disabled automatic fallback behavior.
+- Browser QA: skipped because this slice changes only service helper code and source contracts, with no JSX, CSS, route rendering, browser-visible UI, or release metadata change.
+- Fresh validation evidence: focused OpenAI-compatible error/diagnostics/routing suite passed 22/22; `npm.cmd run typecheck` passed with 133 semantic test files; `npm.cmd run test:unit` passed 1465/1465 after updating stale structure assertions; `npm.cmd run build` passed and produced `dist/assets/provider-adapters-CHVaQuIR.js`; `npm.cmd run governance:agent-docs` passed; `npm.cmd run check:encoding` passed; path-limited alternate-git `diff --check` passed with Windows LF/CRLF normalization warnings only.
+- Next step: rerun post-ledger `governance:agent-docs`, `check:encoding`, and path-limited `diff --check`; then stage only included files through alternate git and commit this narrow service helper slice.
 
 ## Current Tutorial Overlay Readability Fix
 

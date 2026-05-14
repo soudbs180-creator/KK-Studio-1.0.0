@@ -197,11 +197,11 @@ test("image compatibility fallback disables unreachable post-throw fallback code
 
   assert.match(
     adapterSource,
-    /throw this\.buildImageCompatibilityModeError\('chat', chatErr, keySlot\);/,
+    /throw buildOpenAICompatibleImageCompatibilityModeError\('chat', chatErr, keySlot\.provider\);/,
   );
   assert.match(
     adapterSource,
-    /throw this\.buildImageCompatibilityModeError\('standard', imagesErr, keySlot\);/,
+    /throw buildOpenAICompatibleImageCompatibilityModeError\('standard', imagesErr, keySlot\.provider\);/,
   );
   assert.doesNotMatch(
     adapterSource,

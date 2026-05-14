@@ -116,6 +116,7 @@
         "tests/unit/openai-compatible-acedata-route-contract.test.ts",
         "tests/unit/openai-compatible-chat-payload-contract.test.ts",
         "tests/unit/openai-compatible-diagnostics-contract.test.ts",
+        "tests/unit/openai-compatible-error-helper-contract.test.ts",
         "tests/unit/openai-compatible-google-extra-body-contract.test.ts",
         "tests/unit/openai-compatible-image-dispatch-contract.test.ts",
         "tests/unit/openai-compatible-image-payload-contract.test.ts",

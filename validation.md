@@ -1,8 +1,26 @@
 # KK-Studio v1.4.6 Single-Line Validation Matrix
 
-Last updated: 2026-05-10
+Last updated: 2026-05-14
 
 Use `npm.cmd` for npm scripts on Windows.
+
+## OpenAI-Compatible Error Helper Gate
+
+Use this gate when touching OpenAI-compatible adapter error construction, HTTP error metadata, or compatibility-mode fallback error metadata:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/openai-compatible-error-helper-contract.test.ts tests/unit/openai-compatible-unused-cleanup-contract.test.ts tests/unit/provider-image-routing-regression.test.ts tests/unit/openai-compatible-diagnostics-contract.test.ts tests/unit/openai-compatible-image-routing-errors-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/services/llm/OpenAICompatibleAdapter.ts src/services/llm/openAICompatibleErrors.ts tests/unit/openai-compatible-error-helper-contract.test.ts tests/unit/openai-compatible-unused-cleanup-contract.test.ts tests/unit/provider-image-routing-regression.test.ts tsconfig.tests.json status.md validation.md
+```
+
+Expected result: OpenAI-compatible HTTP and compatibility-mode errors are constructed by `src/services/llm/openAICompatibleErrors.ts`, preserve diagnostic metadata, and keep automatic chat/images fallback disabled for billing safety.
+
+Fresh result on 2026-05-14: RED confirmed the missing helper module and adapter-local private constructors; GREEN focused OpenAI-compatible error/diagnostics/routing suite passed 22/22. `npm.cmd run typecheck` passed with 133 semantic test files, `npm.cmd run test:unit` passed 1465/1465, `npm.cmd run build` passed, `npm.cmd run governance:agent-docs` passed, `npm.cmd run check:encoding` passed, and path-limited alternate-git `diff --check` passed. Browser QA was skipped because this was a non-UI service helper extraction.
 
 ## Tutorial Overlay Readability Gate
 
