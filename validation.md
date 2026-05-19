@@ -1,8 +1,62 @@
 # KK-Studio v1.4.6 Single-Line Validation Matrix
 
-Last updated: 2026-05-10
+Last updated: 2026-05-14
 
 Use `npm.cmd` for npm scripts on Windows.
+
+## OpenAI-Compatible Error Helper Gate
+
+Use this gate when touching OpenAI-compatible adapter error construction, HTTP error metadata, or compatibility-mode fallback error metadata:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/openai-compatible-error-helper-contract.test.ts tests/unit/openai-compatible-unused-cleanup-contract.test.ts tests/unit/provider-image-routing-regression.test.ts tests/unit/openai-compatible-diagnostics-contract.test.ts tests/unit/openai-compatible-image-routing-errors-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/services/llm/OpenAICompatibleAdapter.ts src/services/llm/openAICompatibleErrors.ts tests/unit/openai-compatible-error-helper-contract.test.ts tests/unit/openai-compatible-unused-cleanup-contract.test.ts tests/unit/provider-image-routing-regression.test.ts tsconfig.tests.json status.md validation.md
+```
+
+Expected result: OpenAI-compatible HTTP and compatibility-mode errors are constructed by `src/services/llm/openAICompatibleErrors.ts`, preserve diagnostic metadata, and keep automatic chat/images fallback disabled for billing safety.
+
+Fresh result on 2026-05-14: RED confirmed the missing helper module and adapter-local private constructors; GREEN focused OpenAI-compatible error/diagnostics/routing suite passed 22/22. `npm.cmd run typecheck` passed with 133 semantic test files, `npm.cmd run test:unit` passed 1465/1465, `npm.cmd run build` passed, `npm.cmd run governance:agent-docs` passed, `npm.cmd run check:encoding` passed, and path-limited alternate-git `diff --check` passed. Browser QA was skipped because this was a non-UI service helper extraction.
+
+## Tutorial Overlay Readability Gate
+
+Use this gate when touching the first-run tutorial overlay, tutorial card sizing, or tutorial description rendering:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/tutorial-overlay-layout-regression.test.ts tests/unit/responsive-surface.test.ts tests/unit/clay-global-ui-refit-contract.test.ts tests/unit/onboarding-unused-cleanup-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+npm.cmd run test:unit
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/components/common/TutorialOverlay.tsx tests/unit/tutorial-overlay-layout-regression.test.ts status.md validation.md
+```
+
+Expected result: tutorial copy renders as readable paragraph/list content instead of one collapsed dense paragraph; desktop first-run overlay uses a wider card than mobile; mobile remains viewport-bound and unclipped.
+
+Fresh result on 2026-05-10: RED/GREEN completed for `tests/unit/tutorial-overlay-layout-regression.test.ts`; focused tutorial/responsive/Clay/onboarding suite passed 22/22; `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and `npm.cmd run test:unit` 1462/1462 passed; path-limited alternate-git `diff --check` passed. Browser QA against local `http://127.0.0.1:3197/?qa=tutorial-geometry` in dark theme, with only `/api/v1/model-catalog/active` stubbed to remove unrelated local-preview CORS noise, confirmed desktop `1440x900` card `560x294` and mobile `390x844` card `366x284`, both unclipped, with 1 paragraph plus 4 list items, `.theme-transitioning=0`, stale chunk count `0`, console errors/warnings `0`, and horizontal document scroll `false`.
+
+## ProjectManager Desktop Rail UI Gate
+
+Use this gate when touching the desktop ProjectManager tool rail, idle collapse behavior, or its viewport positioning:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/project-manager-unused-cleanup-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+npm.cmd run test:unit
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/components/settings/ProjectManager.tsx tests/unit/project-manager-unused-cleanup-contract.test.ts status.md validation.md
+```
+
+Expected result: the desktop `#project-manager-container` stays fixed at the left viewport inset during idle collapse, lowers opacity only, and never uses `-translate-x-full` to move the rail offscreen.
+
+Fresh result on 2026-05-10: RED/GREEN was completed for `tests/unit/project-manager-unused-cleanup-contract.test.ts`; the focused test first failed on the existing `-translate-x-full` desktop collapse class, then passed 2/2 after the fix. `npm.cmd run typecheck`, `npm.cmd run build`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, `npm.cmd run test:unit` 1461/1461, and path-limited alternate-git `diff --check` passed. Browser QA against the built local `dist` at desktop `1440x900` dark theme confirmed `#project-manager-trigger` remained at `x=17,width=40` after the idle collapse timer; `.theme-transitioning=0` and stale chunk text count was `0`.
 
 ## PromptBar Footer Frost UI Recovery Gate
 

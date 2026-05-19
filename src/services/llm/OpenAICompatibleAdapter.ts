@@ -35,6 +35,10 @@ import {
 } from './syncImageBridge';
 import { buildChatCompletionsBody, buildOpenAICompatibleMessages } from './openAICompatibleChatPayload';
 import { buildSafeFormDataPreview, buildSafeRequestBodyPreview } from './openAICompatibleDiagnostics';
+import {
+    buildOpenAICompatibleHttpError,
+    buildOpenAICompatibleImageCompatibilityModeError,
+} from './openAICompatibleErrors';
 import { buildNewApiGoogleExtraBody, mergeExtraBody } from './openAICompatibleGoogleExtraBody';
 import { resolveOpenAICompatibleImageDispatch } from './openAICompatibleImageDispatch';
 import { extractImageUrlsFromPayload, extractOpenAICompatibleChatImageUrls } from './openAICompatibleImagePayload';
@@ -266,26 +270,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         };
     }
 
-    private buildHttpError(params: {
-        message: string;
-        status?: number;
-        requestPath?: string;
-        requestBody?: string;
-        responseBody?: string;
-        provider?: string;
-    }): Error {
-        const err: any = new Error(params.message);
-        if (typeof params.status === 'number') {
-            err.status = params.status;
-            err.code = `HTTP_${params.status}`;
-        }
-        if (params.requestPath) err.requestPath = params.requestPath;
-        if (params.requestBody) err.requestBody = params.requestBody;
-        if (params.responseBody) err.responseBody = params.responseBody;
-        if (params.provider) err.provider = params.provider;
-        return err as Error;
-    }
-
     private async executeRecoverableSyncImageRequest(params: {
         options: ImageGenerationOptions;
         parserType: SyncImageBridgeParserType;
@@ -352,7 +336,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         if (result.status === 'error') {
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: result.responseStatus
                     ? `[${result.responseStatus}] ${result.error}`
                     : result.error,
@@ -365,22 +349,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         return null;
-    }
-
-    private buildImageCompatibilityModeError(endpointMode: 'chat' | 'standard', originalError: any, keySlot: KeySlot): Error {
-        const originalMessage = String(originalError?.message || originalError || 'Unknown image endpoint error');
-        const guidance = endpointMode === 'chat'
-            ? 'Chat image endpoint failed. Automatic fallback to Images API is disabled to avoid duplicate billed requests. If this provider requires the Images endpoint, switch this channel to Standard mode in Settings > API Management and retry.'
-            : 'Standard Images endpoint failed. Automatic fallback to Chat API is disabled to avoid duplicate billed requests. If this provider requires the Chat endpoint, switch this channel to Chat mode in Settings > API Management and retry.';
-        const err: any = new Error(`${guidance} Original error: ${originalMessage}`);
-        if (originalError?.status !== undefined) err.status = originalError.status;
-        if (originalError?.code !== undefined) err.code = originalError.code;
-        if (originalError?.requestPath !== undefined) err.requestPath = originalError.requestPath;
-        if (originalError?.requestBody !== undefined) err.requestBody = originalError.requestBody;
-        if (originalError?.responseBody !== undefined) err.responseBody = originalError.responseBody;
-        err.provider = originalError?.provider || keySlot.provider;
-        err.compatibilityModeHint = endpointMode;
-        return err as Error;
     }
 
     // AceData image tasks appear to follow the same retrieve / retrieve_batch task pattern
@@ -460,7 +428,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             if (status === 'success') {
                 const urls = extractImageUrlsFromPayload(payload);
                 if (!urls.length) {
-                    throw this.buildHttpError({
+                    throw buildOpenAICompatibleHttpError({
                         message: 'AceData task completed, but no image URL was returned',
                         requestPath,
                         requestBody: requestMeta?.requestBodyPreview,
@@ -489,7 +457,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             if (status === 'failed') {
                 const errorMessage = message || 'AceData image generation failed';
                 keyManager.reportCallResult(keySlot.id, false, errorMessage);
-                throw this.buildHttpError({
+                throw buildOpenAICompatibleHttpError({
                     message: errorMessage,
                     requestPath,
                     requestBody: requestMeta?.requestBodyPreview,
@@ -502,7 +470,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             pollIntervalMs = Math.min(Math.round(pollIntervalMs * 1.4), maxIntervalMs);
         }
 
-        throw this.buildHttpError({
+        throw buildOpenAICompatibleHttpError({
             message: 'AceData image generation timed out after 10 minutes',
             requestPath: requestMeta?.submitPath || '/tasks',
             requestBody: requestMeta?.requestBodyPreview,
@@ -555,7 +523,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const raw = await response.text().catch(() => '');
 
         if (!response.ok) {
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: `[${response.status}] ${raw.slice(0, 500) || 'Task request failed'}`,
                 status: response.status,
                 requestPath,
@@ -570,7 +538,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 requestPath,
             };
         } catch {
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: 'Task endpoint returned non-JSON payload',
                 requestPath,
                 responseBody: raw.slice(0, 1600),
@@ -675,7 +643,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             if (result.status === 'success') {
                 const urls = Array.isArray(result.urls) ? result.urls : [];
                 if (!urls.length) {
-                    throw this.buildHttpError({
+                    throw buildOpenAICompatibleHttpError({
                         message: '12AI async task completed, but no image URL was returned',
                         requestPath,
                         requestBody: requestMeta?.requestBodyPreview,
@@ -704,7 +672,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             if (result.status === 'failed') {
                 const message = String(result.metadata?.responseMessage || extractProviderMessage(payload) || '12AI async image generation failed').trim();
                 keyManager.reportCallResult(keySlot.id, false, message);
-                throw this.buildHttpError({
+                throw buildOpenAICompatibleHttpError({
                     message,
                     requestPath,
                     requestBody: requestMeta?.requestBodyPreview,
@@ -717,7 +685,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             pollIntervalMs = Math.min(Math.round(pollIntervalMs * 1.4), maxIntervalMs);
         }
 
-        throw this.buildHttpError({
+        throw buildOpenAICompatibleHttpError({
             message: '12AI async image generation timed out after 10 minutes',
             requestPath: requestMeta?.submitPath || '/v1/images/async/generations',
             requestBody: requestMeta?.requestBodyPreview,
@@ -768,7 +736,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const raw = await response.text().catch(() => '');
         if (!response.ok) {
             keyManager.reportCallResult(keySlot.id, false, raw.slice(0, 300) || `HTTP ${response.status}`);
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: `[${response.status}] ${raw.slice(0, 500) || '12AI async image request failed'}`,
                 status: response.status,
                 requestPath,
@@ -782,7 +750,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         try {
             submitPayload = raw ? JSON.parse(raw) : {};
         } catch {
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: '12AI async image submit endpoint returned non-JSON payload',
                 requestPath,
                 requestBody: requestBodyPreview,
@@ -812,7 +780,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const taskId = extractGenericTaskId(submitPayload);
         if (!taskId) {
             const message = extractProviderMessage(submitPayload) || '12AI async submit succeeded but no task ID was returned';
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message,
                 requestPath,
                 requestBody: requestBodyPreview,
@@ -852,7 +820,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const raw = await response.text().catch(() => '');
 
         if (!response.ok) {
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: `[${response.status}] ${raw.slice(0, 500) || 'Wuyin detail request failed'}`,
                 status: response.status,
                 requestPath,
@@ -865,7 +833,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         try {
             payload = raw ? JSON.parse(raw) : {};
         } catch {
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: 'Wuyin detail endpoint returned non-JSON payload',
                 requestPath,
                 responseBody: raw.slice(0, 1600),
@@ -876,7 +844,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const logicalCode = Number(payload?.code);
         if (Number.isFinite(logicalCode) && logicalCode !== 200) {
             const message = extractProviderMessage(payload) || `Wuyin detail error code ${logicalCode}`;
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message,
                 requestPath,
                 responseBody: raw.slice(0, 1600),
@@ -910,7 +878,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             if (status === 'success') {
                 const urls = extractImageUrlsFromPayload(payload);
                 if (!urls.length) {
-                    throw this.buildHttpError({
+                    throw buildOpenAICompatibleHttpError({
                         message: 'Wuyin task completed, but no image URL was returned',
                         requestPath,
                         requestBody: requestMeta?.requestBodyPreview,
@@ -938,7 +906,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             if (status === 'failed') {
                 const message = extractProviderMessage(payload) || 'Wuyin image generation failed';
                 keyManager.reportCallResult(keySlot.id, false, message);
-                throw this.buildHttpError({
+                throw buildOpenAICompatibleHttpError({
                     message,
                     requestPath,
                     requestBody: requestMeta?.requestBodyPreview,
@@ -951,7 +919,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             pollIntervalMs = Math.min(Math.round(pollIntervalMs * 1.4), maxIntervalMs);
         }
 
-        throw this.buildHttpError({
+        throw buildOpenAICompatibleHttpError({
             message: 'Wuyin image generation timed out after 10 minutes',
             requestPath: requestMeta?.submitPath || WUYIN_DETAIL_PATH,
             requestBody: requestMeta?.requestBodyPreview,
@@ -1005,7 +973,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const raw = await response.text().catch(() => '');
         if (!response.ok) {
             keyManager.reportCallResult(keySlot.id, false, raw.slice(0, 300) || `HTTP ${response.status}`);
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: `[${response.status}] ${raw.slice(0, 500) || 'Wuyin image request failed'}`,
                 status: response.status,
                 requestPath,
@@ -1019,7 +987,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         try {
             submitPayload = raw ? JSON.parse(raw) : {};
         } catch {
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: 'Wuyin image submit endpoint returned non-JSON payload',
                 requestPath,
                 requestBody: requestBodyPreview,
@@ -1032,7 +1000,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         if (Number.isFinite(logicalCode) && logicalCode !== 200) {
             const message = extractProviderMessage(submitPayload) || `Wuyin submit error code ${logicalCode}`;
             keyManager.reportCallResult(keySlot.id, false, message);
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message,
                 requestPath,
                 requestBody: requestBodyPreview,
@@ -1060,7 +1028,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         const taskId = extractWuyinTaskId(submitPayload);
         if (!taskId) {
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: 'Wuyin submit succeeded but no task ID was returned',
                 requestPath,
                 requestBody: requestBodyPreview,
@@ -1182,7 +1150,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const raw = await response.text().catch(() => '');
         if (!response.ok) {
             keyManager.reportCallResult(keySlot.id, false, raw.slice(0, 300) || `HTTP ${response.status}`);
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: `[${response.status}] ${raw.slice(0, 500) || 'AceData image request failed'}`,
                 status: response.status,
                 requestPath,
@@ -1196,7 +1164,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         try {
             submitPayload = raw ? JSON.parse(raw) : {};
         } catch {
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: 'AceData image endpoint returned non-JSON payload',
                 requestPath,
                 requestBody: requestBodyPreview,
@@ -1208,7 +1176,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         if (submitPayload?.success === false) {
             const errorMessage = extractProviderMessage(submitPayload) || 'AceData image generation failed';
             keyManager.reportCallResult(keySlot.id, false, errorMessage);
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: errorMessage,
                 requestPath,
                 requestBody: requestBodyPreview,
@@ -1245,7 +1213,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         if (!taskId) {
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: 'AceData submit succeeded but no image URL or task ID was returned',
                 requestPath,
                 requestBody: requestBodyPreview,
@@ -1434,7 +1402,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 errMsg = rawText.substring(0, 500) || errMsg;
             }
 
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: errMsg,
                 status: response.status,
                 requestPath,
@@ -1451,7 +1419,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         try {
             return JSON.parse(rawText);
         } catch {
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: 'Invalid JSON response from provider',
                 status: response.status,
                 requestPath,
@@ -1575,7 +1543,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
             if (!response.ok || !response.body) {
                 const text = await response.text().catch(() => '');
-                throw this.buildHttpError({
+                throw buildOpenAICompatibleHttpError({
                     message: text || `HTTP ${response.status}`,
                     status: response.status,
                     requestPath: target.requestPath,
@@ -1771,7 +1739,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                     throw chatErr;
                 }
                 console.warn(`[OpenAICompatibleAdapter] Chat API compatibility fallback disabled for billing safety -> ${keySlot.name}`);
-                throw this.buildImageCompatibilityModeError('chat', chatErr, keySlot);
+                throw buildOpenAICompatibleImageCompatibilityModeError('chat', chatErr, keySlot.provider);
             }
         }
 
@@ -1790,7 +1758,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 throw imagesErr;
             }
             console.warn(`[OpenAICompatibleAdapter] Images compatibility fallback disabled for billing safety -> ${keySlot.name}`);
-            throw this.buildImageCompatibilityModeError('standard', imagesErr, keySlot);
+            throw buildOpenAICompatibleImageCompatibilityModeError('standard', imagesErr, keySlot.provider);
         }
     }
 
@@ -1924,7 +1892,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         if (!response.ok) {
             const text = await response.text().catch(() => '');
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: `Chat-to-Image Error (${response.status}): ${text.substring(0, 200)}`,
                 status: response.status,
                 requestPath,
@@ -2045,7 +2013,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         if (!response.ok) {
             const text = await response.text().catch(() => '');
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: `Chat-to-Image Error (${response.status}): ${text.substring(0, 200)}`,
                 status: response.status,
                 requestPath,
@@ -2723,7 +2691,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
             keyManager.reportCallResult(keySlot.id, false, detail);
             logError('OpenAIAdapter', new Error(detail), `Path: ${requestPath}\nStatus: ${response.status}\nRaw Response: ${raw.slice(0, 500)}`);
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: `[${response.status}] ${detail}`,
                 status: response.status,
                 requestPath,
@@ -2739,7 +2707,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         if (!urls.length) {
             const rawPreview = JSON.stringify(data || {}).slice(0, 1600);
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: '接口已返回成功状态，但未找到可用图片数据',
                 status: response.status,
                 requestPath,
@@ -2825,7 +2793,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             }
             keyManager.reportCallResult(keySlot.id, false, detail);
             logError('OpenAIAdapter', new Error(detail), `Path: ${requestPath}\nStatus: ${response.status}\nRaw Response: ${raw.slice(0, 500)}`);
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: `[${response.status}] ${detail}`,
                 status: response.status,
                 requestPath,
@@ -2852,7 +2820,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const urls = extractImageUrlsFromPayload(data);
         if (!urls.length) {
             const rawPreview = JSON.stringify(data || {}).slice(0, 1600);
-            throw this.buildHttpError({
+            throw buildOpenAICompatibleHttpError({
                 message: '接口已返回成功状态，但未找到可用图片数据',
                 status: response.status,
                 requestPath,

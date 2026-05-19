@@ -68,3 +68,22 @@ test('startup screen owns readable light and dark theme tokens outside settings 
   assert.match(cssSource, /body\.dark-mode \.app-startup-screen\s*\{/);
   assert.match(cssSource, /--app-startup-warning-text:\s*var\(--clay-brand-peach\);/);
 });
+
+test('startup screen renders a full-screen branded launch hall instead of a tiny toast', () => {
+  const startupScreenSource = readSource('src/components/common/AppStartupScreen.tsx');
+  const cssSource = readSource('src/index.css');
+
+  assert.match(startupScreenSource, /data-testid="app-startup-shell"/);
+  assert.match(startupScreenSource, /data-testid="app-startup-brand-mark"/);
+  assert.match(startupScreenSource, /data-testid="app-startup-progress-track"/);
+  assert.match(startupScreenSource, /data-testid="app-startup-status-list"/);
+  assert.match(startupScreenSource, /APP_STARTUP_STATUS_ITEMS\.map/);
+  assert.doesNotMatch(startupScreenSource, /<Loader2 className="animate-spin" size=\{20\} \/>/);
+
+  assert.match(cssSource, /\.app-startup-shell\s*\{/);
+  assert.match(cssSource, /\.app-startup-card\s*\{/);
+  assert.match(cssSource, /\.app-startup-status-list\s*\{/);
+  assert.match(cssSource, /\.app-startup-progress-track\s*\{/);
+  assert.match(cssSource, /\.app-startup-orbit\s*\{/);
+  assert.doesNotMatch(cssSource, /\.app-startup-card\s*\{[\s\S]*max-width:\s*36rem/);
+});
