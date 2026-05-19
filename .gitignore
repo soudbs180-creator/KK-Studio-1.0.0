@@ -61,6 +61,7 @@ scripts/alipay-mcp.env
 .tmp/
 .tmp-playwright/
 .playwright-cli/
+output/
 .tmp-*.html
 .tmp-*.js
 .tmp-*.mjs

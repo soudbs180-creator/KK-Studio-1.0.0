@@ -129,6 +129,7 @@ Use this gate when touching Vercel API proxy helper files, hosted `/api/v1/*` or
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/hosted-release-guardrails.test.ts tests/unit/vercel-vps-proxy.test.ts tests/unit/kk-api-base-url-hosted-contract.test.ts tests/unit/input-autofill-style-contract.test.ts
 npm.cmd run typecheck
+npm.cmd run test:unit
 npm.cmd run build
 npm.cmd run check:encoding
 npm.cmd run test:unit
@@ -2799,6 +2800,30 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
 ```
 
 Because this slice touches visible UI, record Codex in-app Browser evidence in `status.md`: URL, viewport, theme, ecommerce/mobile surface checked, `.theme-transitioning`, stale chunk text count, and console error count.
+
+## Current Startup Launch Hall UI Gate
+
+Use this gate for the startup loading screen redesign:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/settings-entry-surface-style-regression.test.ts tests/unit/app-startup-screen-localization.test.ts
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/app-startup-coordinator.test.ts tests/unit/workspace-auth-gate.test.ts tests/unit/workspace-startup-skeleton-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run check:encoding
+```
+
+Fresh evidence for this slice:
+
+- RED first: the startup launch hall regression failed on the missing `app-startup-shell` contract before implementation.
+- GREEN: the startup surface/localization tests passed 5/5.
+- GREEN: startup coordinator/auth gate/skeleton contract tests passed 12/12.
+- Passed: `npm.cmd run typecheck`.
+- Passed: `npm.cmd run test:unit` (1466/1466).
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run check:encoding`.
+- Browser QA: local built-fixture desktop 1280x720 and mobile 390x844 checks passed with no overflow and text-fit true; screenshots are in `output/playwright/`.
+- Vercel preview deploy passed: `https://kk-studio-ot9vx3us7-yykks-projects-727e9560.vercel.app`.
 
 ## Release Gate
 
