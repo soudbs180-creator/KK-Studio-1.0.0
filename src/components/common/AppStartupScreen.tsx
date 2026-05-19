@@ -89,7 +89,7 @@ export const AppStartupScreen: React.FC<{
         data-testid="app-startup-shell"
         className="app-startup-shell"
       >
-        <div className="app-startup-rails" aria-hidden>
+        <div className="app-startup-orbit" aria-hidden>
           <span />
           <span />
           <span />
@@ -112,16 +112,11 @@ export const AppStartupScreen: React.FC<{
             </div>
             <div>
               <p className="app-startup-eyebrow">{eyebrow}</p>
-              <h2 style={{ color: 'var(--app-startup-title)' }}>{title}</h2>
+              <h2>{title}</h2>
             </div>
           </div>
 
-          <p
-            className="app-startup-subtitle"
-            style={{ color: 'var(--app-startup-muted)' }}
-          >
-            {subtitle}
-          </p>
+          <p className="app-startup-subtitle">{subtitle}</p>
 
           <div className="app-startup-stage-line">
             <span>{getStageLabel(stage)}</span>

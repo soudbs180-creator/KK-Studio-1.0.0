@@ -16,5 +16,7 @@ test('AppStartupScreen follows the shared document language helpers', () => {
   assert.match(source, /Preparing the sign-in environment/);
   assert.match(source, /Syncing your workspace setup/);
   assert.doesNotMatch(source, /API connectivity/);
+  assert.match(source, /Confirming your session/);
   assert.match(source, /KK Studio is restoring your workspace/);
+  assert.match(source, /Loading the workspace shell/);
 });

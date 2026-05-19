@@ -2801,7 +2801,7 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
 
 Because this slice touches visible UI, record Codex in-app Browser evidence in `status.md`: URL, viewport, theme, ecommerce/mobile surface checked, `.theme-transitioning`, stale chunk text count, and console error count.
 
-## Current Startup Launch Hall UI Gate
+## Current Startup Simple Progress UI Gate
 
 Use this gate for the startup loading screen redesign:
 
@@ -2815,15 +2815,15 @@ npm.cmd run check:encoding
 
 Fresh evidence for this slice:
 
-- RED first: the startup launch hall regression failed on the missing `app-startup-shell` contract before implementation.
+- RED first: the simple progress regression failed because the current component had no `getStageProgress` stage-driven width contract.
 - GREEN: the startup surface/localization tests passed 5/5.
 - GREEN: startup coordinator/auth gate/skeleton contract tests passed 12/12.
 - Passed: `npm.cmd run typecheck`.
 - Passed: `npm.cmd run test:unit` (1466/1466).
 - Passed: `npm.cmd run build`.
 - Passed: `npm.cmd run check:encoding`.
-- Browser QA: local built-fixture desktop 1280x720 and mobile 390x844 checks passed with no overflow and text-fit true; screenshots are in `output/playwright/`.
-- Vercel preview deploy passed: `https://kk-studio-ot9vx3us7-yykks-projects-727e9560.vercel.app`.
+- Browser QA: local built-fixture desktop 1280x720 and mobile 390x844 checks passed with a single prompt, a 0-100 progress fill, no overflow, and text-fit true; screenshots are in `output/playwright/`.
+- Vercel preview deploy passed: `https://kk-studio-6n5q1hmzi-yykks-projects-727e9560.vercel.app`.
 
 ## Release Gate
 
