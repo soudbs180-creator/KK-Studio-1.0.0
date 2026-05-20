@@ -1,6 +1,18 @@
 # KK-Studio v1.4.6 Coordination Status
 
-Last updated: 2026-05-14
+Last updated: 2026-05-21
+
+## Current Startup And File UI Density Recovery
+
+- Active lane: UI density recovery for the startup restore surface and ecommerce import file card surface.
+- Included files for this slice: `src/components/common/AppStartupScreen.tsx`, `src/components/ecommerce/EcommerceImportPanel.tsx`, `src/index.css`, `tests/unit/settings-entry-surface-style-regression.test.ts`, `tests/unit/app-startup-screen-localization.test.ts`, `tests/unit/ecommerce-import-panel-density-contract.test.ts`, `tests/unit/tailwind-utility-cascade-contract.test.ts`, `status.md`, and `validation.md`.
+- Excluded files/artifacts: `.gitignore`, generated `dist/`, generated `output/`, provider/service routing, auth/proxy code, payment code, canvas persistence, deployment metadata, and unrelated dirty worktree files.
+- Root cause evidence: `AppStartupScreen` had been reduced from the full restore launch hall to a `420px` prompt card, removing the title, subtitle, brand mark, status list, and 640px shell contract. Browser/screenshot follow-up showed the ecommerce issue had two layout causes. First, the import grid used the page-level `md:` breakpoint inside a fixed-width PromptBar, so at the in-app Browser viewport (`735px`) the 718px PromptBar rendered the upload cards as one stacked column (`grid h=244`, cards full-width), making the frame feel tall and sparse. Second, `src/index.css` imported Tailwind and then applied an unlayered global reset `* { margin: 0; padding: 0; }`; with Tailwind v4 cascade layers, that reset overrode `px-*` and `py-*` utilities, so cards with `px-3 py-3` computed to `padding: 0px` and text pressed into the borders.
+- Implemented fix: the startup tests again require the branded full launch hall and restore copy. The startup component keeps token-colored title/subtitle/eyebrow rendering. Ecommerce import file cards now use a component-width-aware `auto-fit` grid (`minmax(min(100%, 210px), 1fr)`) instead of a viewport breakpoint, reduce vertical rhythm (`py-2.5`, `gap-2`, `leading-4`, 36px icons, 56px thumbnails), and keep chips plus clear/analyze actions non-wrapping. The global reset now lives inside `@layer base`, letting Tailwind utility spacing keep precedence over reset defaults.
+- RED/GREEN evidence: startup RED failed on the missing restore title/brand hooks; ecommerce density RED failed on the old `py-3`/`md:grid-cols` layout; Tailwind cascade RED failed because the reset section was not inside a base layer. GREEN focused startup/ecommerce/Clay/CSS cascade density suite passed 19/19.
+- Fresh validation evidence: focused density suite passed 19/19; `npm.cmd run typecheck` passed with 133 semantic test files; `npm.cmd run build` passed and produced `dist/assets/index-B8W1Zxhr.css` plus `dist/assets/index-C3yX1XQs.js`. The built CSS shows the reset in `@layer base` before the utilities layer, so `px-*` and `py-*` utilities regain precedence.
+- Browser QA evidence: Codex in-app Browser opened `http://127.0.0.1:3000/?ui-density-check=1779267073759` and exposed the ecommerce import surface. Before the CSS-layer fix, live geometry confirmed the grid had recovered to 3 columns after the component change (`columnCount=3`, three `224px` cards, PromptBar height `370px` instead of the earlier `506px`), while also proving the deeper reset bug because the panel/cards still computed `padding: 0px`. After the CSS-layer fix, a full in-app Browser reload remained at the canvas hydration spinner (`useCanvas().isReady` guard) with no console errors, so no final Browser screenshot artifact is claimed for this slice; build/typecheck/source contracts are the fresh verification for the cascade fix.
+- Next step: keep this slice separate from the pre-existing dirty `.gitignore` and older ledger edits; commit only the included files if/when this UI recovery slice is staged.
 
 ## Current OpenAI-Compatible Error Helper Extraction
 

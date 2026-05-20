@@ -1,8 +1,24 @@
 # KK-Studio v1.4.6 Single-Line Validation Matrix
 
-Last updated: 2026-05-14
+Last updated: 2026-05-21
 
 Use `npm.cmd` for npm scripts on Windows.
+
+## Current Startup And File UI Density Gate
+
+Use this gate when touching the startup restore screen, ecommerce import file cards, PromptBar-embedded import layout, or text-density guardrails:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/settings-entry-surface-style-regression.test.ts tests/unit/app-startup-screen-localization.test.ts tests/unit/ecommerce-import-panel-density-contract.test.ts tests/unit/tailwind-utility-cascade-contract.test.ts tests/unit/ecommerce-import-panel-preview-loop.test.ts tests/unit/ecommerce-frosted-surface-contract.test.ts tests/unit/clay-frosted-surface-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+```
+
+Expected result: startup restore keeps the full 640px launch hall with branded header, title, progress, and status list; ecommerce import file cards use a component-width-aware compact grid inside PromptBar, avoid oversized empty card height, keep chips/buttons from wrapping into cramped text, and global CSS reset stays in the base layer so Tailwind `px-*` / `py-*` spacing utilities win over reset defaults.
+
+Fresh result on 2026-05-21: RED confirmed the startup screen had collapsed to a tiny prompt by missing `KK Studio is restoring your workspace` and the brand/status hooks; ecommerce density RED failed on the old `py-3`/viewport-breakpoint grid; Tailwind cascade RED failed because the reset was not in `@layer base`. GREEN targeted UI density suite passed 19/19; `npm.cmd run typecheck` passed with 133 semantic test files; `npm.cmd run build` passed and produced `dist/assets/index-B8W1Zxhr.css` plus `dist/assets/index-C3yX1XQs.js`. Browser geometry before the CSS-layer fix confirmed the component-grid fix (`columnCount=3`, cards `224px`, PromptBar `370px` instead of earlier `506px`) and exposed the deeper cascade bug (`px/py` utilities computed as `padding: 0px`). After the CSS-layer fix, the in-app Browser full reload remained at the canvas hydration spinner with no console errors, so no final Browser screenshot artifact is claimed.
 
 ## OpenAI-Compatible Error Helper Gate
 

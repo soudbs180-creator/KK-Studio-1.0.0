@@ -51,10 +51,13 @@ function useFilePreviewUrls(files: File[]): string[] {
   return urls;
 }
 
-const chipClass = 'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium';
-const cardClass = 'rounded-[16px] border px-3 py-3';
+const chipClass = 'inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-medium';
+const cardClass = 'rounded-[16px] border px-3 py-2.5';
 const cardButtonClass = 'w-full text-left transition-all duration-200 hover:opacity-90';
-const thumbClass = 'relative h-[60px] w-[60px] overflow-hidden rounded-[14px] border';
+const thumbClass = 'relative h-14 w-14 overflow-hidden rounded-[12px] border';
+const importGridStyle: React.CSSProperties = {
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))',
+};
 
 const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
   requirementFileName,
@@ -152,13 +155,13 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
   return (
     <>
       <div
-        className="mb-2 rounded-[18px] border px-3 py-3"
+        className="mb-2 rounded-[18px] border px-3 py-2.5"
         style={{
           background: 'var(--frost-card-framework-bg)',
           borderColor: 'var(--frost-card-sub-border)',
         }}
       >
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <div className="text-[15px] font-semibold text-[var(--text-primary)]">电商需求单导入</div>
             <span
@@ -183,12 +186,16 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
             </span>
           </div>
 
-          <div className="text-[11px] leading-5 text-[var(--text-secondary)]">
+          <div className="text-[11px] leading-4 text-[var(--text-secondary)]">
             需求单参考图逐条绑定；产品图和补充参考图是全局素材。
             {analyzedProductName ? ` 已识别产品：${analyzedProductName}` : ''}
           </div>
 
-          <div className="grid gap-2 md:grid-cols-[1.08fr_1fr_1fr]">
+          <div
+            className="grid gap-2"
+            data-ecommerce-import-grid
+            style={importGridStyle}
+          >
             <div
               className={cardClass}
               style={{
@@ -201,9 +208,9 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                 className={cardButtonClass}
                 onClick={() => requirementInputRef.current?.click()}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-2.5">
                   <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border"
                     style={{
                       borderColor: hasRequirementFile ? 'var(--mobile-clay-active-border)' : 'var(--frost-card-sub-border)',
                       background: hasRequirementFile ? 'var(--mobile-clay-active-bg)' : 'var(--frost-card-sub-bg)',
@@ -228,18 +235,18 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                       </span>
                     </div>
 
-                    <div className="mt-1 text-[11px] leading-5 text-[var(--text-secondary)]">
+                    <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">
                       {hasRequirementFile ? '已导入需求单，可点击重新上传替换。' : '支持 xlsx / pdf / doc / docx / txt / md'}
                     </div>
                   </div>
                 </div>
               </button>
 
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 {hasRequirementFile ? (
                   <button
                     type="button"
-                    className="inline-flex h-9 items-center justify-center rounded-[12px] border px-3 text-[11px] font-medium transition-all duration-200 hover:bg-[var(--toolbar-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-[12px] border px-3 text-[11px] font-medium transition-all duration-200 hover:bg-[var(--toolbar-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                     style={{
                       borderColor: 'var(--frost-card-sub-border)',
                       color: 'var(--text-secondary)',
@@ -253,7 +260,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
 
                 <button
                   type="button"
-                  className="ml-auto inline-flex h-9 items-center justify-center gap-2 rounded-[12px] border px-3 text-sm font-semibold transition-all duration-200 hover:bg-[var(--toolbar-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="ml-auto inline-flex h-9 !min-w-[132px] items-center justify-center gap-2 whitespace-nowrap rounded-[12px] border px-3 text-sm font-semibold transition-all duration-200 hover:bg-[var(--toolbar-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                   style={{
                     borderColor: 'var(--frost-card-sub-border)',
                     background: 'var(--frost-card-sub-bg)',
@@ -281,9 +288,9 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                 className={cardButtonClass}
                 onClick={() => productInputRef.current?.click()}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-2.5">
                   <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border"
                     style={{
                       borderColor: hasProductFiles ? 'var(--mobile-clay-active-border)' : 'var(--frost-card-sub-border)',
                       background: hasProductFiles ? 'var(--mobile-clay-active-bg)' : 'var(--frost-card-sub-bg)',
@@ -319,7 +326,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                     </div>
 
                     {uploadPreviewModel.productItems.length === 0 ? (
-                      <div className="mt-1 text-[11px] leading-5 text-[var(--text-secondary)]">
+                      <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">
                         最多上传 4 张，可放一个产品的多个角度，或多个产品。
                       </div>
                     ) : null}
@@ -342,9 +349,9 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                 className={cardButtonClass}
                 onClick={() => extraReferenceInputRef.current?.click()}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-2.5">
                   <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border"
                     style={{
                       borderColor: hasExtraReferences ? 'var(--mobile-clay-active-border)' : 'var(--frost-card-sub-border)',
                       background: hasExtraReferences ? 'var(--mobile-clay-active-bg)' : 'var(--frost-card-sub-bg)',
@@ -380,7 +387,7 @@ const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({
                     </div>
 
                     {uploadPreviewModel.extraReferenceItems.length === 0 ? (
-                      <div className="mt-1 text-[11px] leading-5 text-[var(--text-secondary)]">
+                      <div className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">
                         最多上传 4 张，风格、场景、版式参考会全局生效。
                       </div>
                     ) : null}
