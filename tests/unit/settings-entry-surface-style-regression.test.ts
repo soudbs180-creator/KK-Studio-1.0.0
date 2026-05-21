@@ -69,7 +69,7 @@ test('startup screen owns readable light and dark theme tokens outside settings 
   assert.match(cssSource, /--app-startup-warning-text:\s*var\(--clay-brand-peach\);/);
 });
 
-test('startup screen renders a full-screen branded launch hall instead of a tiny toast', () => {
+test('startup screen renders a full-screen branded launch hall instead of a tiny prompt card', () => {
   const startupScreenSource = readSource('src/components/common/AppStartupScreen.tsx');
   const cssSource = readSource('src/index.css');
 
@@ -78,12 +78,25 @@ test('startup screen renders a full-screen branded launch hall instead of a tiny
   assert.match(startupScreenSource, /data-testid="app-startup-progress-track"/);
   assert.match(startupScreenSource, /data-testid="app-startup-status-list"/);
   assert.match(startupScreenSource, /APP_STARTUP_STATUS_ITEMS\.map/);
+  assert.match(startupScreenSource, /KK Studio is restoring your workspace/);
+  assert.match(startupScreenSource, /<strong>\{progress\}%<\/strong>/);
+  assert.match(startupScreenSource, /width:\s*`\$\{progress\}%`/);
   assert.doesNotMatch(startupScreenSource, /<Loader2 className="animate-spin" size=\{20\} \/>/);
 
   assert.match(cssSource, /\.app-startup-shell\s*\{/);
   assert.match(cssSource, /\.app-startup-card\s*\{/);
-  assert.match(cssSource, /\.app-startup-status-list\s*\{/);
+  assert.match(cssSource, /\.app-startup-card__header\s*\{/);
+  assert.match(cssSource, /\.app-startup-brand-mark\s*\{/);
+  assert.match(cssSource, /\.app-startup-subtitle\s*\{/);
+  assert.match(cssSource, /\.app-startup-stage-line\s*\{/);
   assert.match(cssSource, /\.app-startup-progress-track\s*\{/);
+  assert.match(cssSource, /\.app-startup-status-list\s*\{/);
   assert.match(cssSource, /\.app-startup-orbit\s*\{/);
-  assert.doesNotMatch(cssSource, /\.app-startup-card\s*\{[\s\S]*max-width:\s*36rem/);
+  assert.match(cssSource, /\.app-startup-screen\s*\{[\s\S]*min-height:\s*100dvh/);
+  assert.match(cssSource, /\.app-startup-screen\s*\{[\s\S]*place-items:\s*center/);
+  assert.match(cssSource, /\.app-startup-shell\s*\{[\s\S]*width:\s*min\(640px, calc\(100vw - 32px\)\)/);
+  assert.match(cssSource, /\.app-startup-card\s*\{[\s\S]*border-radius:\s*24px;[\s\S]*padding:\s*34px;/);
+  assert.doesNotMatch(cssSource, /\.app-startup-shell\s*\{[\s\S]*width:\s*min\(420px/);
+  assert.doesNotMatch(cssSource, /\.app-startup-message/);
+  assert.doesNotMatch(cssSource, /@keyframes app-startup-progress-shine/);
 });

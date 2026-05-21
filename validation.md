@@ -1,8 +1,26 @@
 # KK-Studio v1.4.6 Single-Line Validation Matrix
 
-Last updated: 2026-05-14
+Last updated: 2026-05-21
 
 Use `npm.cmd` for npm scripts on Windows.
+
+## Current Startup And File UI Density Gate
+
+Use this gate when touching the startup restore screen, ecommerce import file cards, PromptBar-embedded import layout, or text-density guardrails:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/settings-entry-surface-style-regression.test.ts tests/unit/app-startup-screen-localization.test.ts tests/unit/ecommerce-import-panel-density-contract.test.ts tests/unit/tailwind-utility-cascade-contract.test.ts tests/unit/ecommerce-import-panel-preview-loop.test.ts tests/unit/ecommerce-frosted-surface-contract.test.ts tests/unit/clay-frosted-surface-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+```
+
+Expected result: startup restore keeps the full 640px launch hall with branded header, title, progress, and status list; ecommerce import file cards use a component-width-aware compact grid inside PromptBar, avoid oversized empty card height, keep chips/buttons from wrapping into cramped text, and all global reset rules stay layered or padding/margin-free so Tailwind `px-*` / `py-*` / `m*` spacing utilities win over reset defaults.
+
+Fresh result on 2026-05-21: RED confirmed the startup screen had collapsed to a tiny prompt by missing `KK Studio is restoring your workspace` and the brand/status hooks; ecommerce density RED failed on the old `py-3`/viewport-breakpoint grid; Tailwind cascade RED failed because the reset was not in `@layer base`. A follow-up browser/CSSOM check found the remaining live root cause in `index.html`: an unlayered inline `* { margin: 0; padding: 0; }` overrode layered Tailwind utilities even though `.px-3` and `.py-2.5` existed in the generated CSS. GREEN focused density cascade suite passed 2/2; `npm.cmd run typecheck` passed with 133 semantic test files; `npm.cmd run build` passed and produced `dist/assets/index-BD0WEJrr.css` plus `dist/assets/index-CpTmd36I.js`; `npm.cmd run check:encoding` passed. Browser geometry after removing the inline reset and changing the ecommerce import grid minimum to `196px` confirmed panel/card padding `10px 12px`, `mb-2`/`mt-2` restored to `8px`, 3 grid columns at `206px` each, ecommerce panel height `225px` instead of the broken `315px`, and PromptBar height `502px` instead of the broken `592px`. Full screenshot capture timed out in the in-app Browser, so final browser evidence is computed geometry/CSSOM rather than a saved screenshot.
+
+Fresh production result on 2026-05-21: `npx.cmd vercel deploy --prod -y --scope yykks-projects-727e9560` built successfully and produced `https://kk-studio-g58urf6uy-yykks-projects-727e9560.vercel.app`; `vercel alias set` successfully pointed `https://kkai.plus` and `https://www.kkai.plus` to that deployment. `vercel inspect https://kkai.plus --scope yykks-projects-727e9560` reports Production / Ready for deployment `dpl_5yga2WPNKLvFryoM2FNjYo3e2q1e`. Live `app-version.json` returns `1.4.6` with build time `2026-05-21T07:04:58.419Z`, and live HTML no longer includes the unlayered global margin/padding reset. API smoke returned `200` JSON for `https://kkai.plus/healthz`, `/api/healthz`, and `/api/manifest`, expected unauthenticated `401 AUTH_REQUIRED` for `/api/v1/auth/session`, and `selfHostedCoreReady=true` with PostgreSQL-backed `creditProviders`. The active model picker blocker is not an API transport failure: `/api/v1/model-catalog/models?kind=image` returns `Nano Banana`, but `/api/v1/model-catalog/active` and `/api/v1/model-catalog/active-credit-models` return `200` with `items: []`, meaning production has no active `admin_credit_models.is_active = true` credit-provider rows.
 
 ## OpenAI-Compatible Error Helper Gate
 
@@ -129,6 +147,7 @@ Use this gate when touching Vercel API proxy helper files, hosted `/api/v1/*` or
 ```powershell
 node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/hosted-release-guardrails.test.ts tests/unit/vercel-vps-proxy.test.ts tests/unit/kk-api-base-url-hosted-contract.test.ts tests/unit/input-autofill-style-contract.test.ts
 npm.cmd run typecheck
+npm.cmd run test:unit
 npm.cmd run build
 npm.cmd run check:encoding
 npm.cmd run test:unit
@@ -2799,6 +2818,30 @@ git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- `
 ```
 
 Because this slice touches visible UI, record Codex in-app Browser evidence in `status.md`: URL, viewport, theme, ecommerce/mobile surface checked, `.theme-transitioning`, stale chunk text count, and console error count.
+
+## Current Startup Simple Progress UI Gate
+
+Use this gate for the startup loading screen redesign:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/settings-entry-surface-style-regression.test.ts tests/unit/app-startup-screen-localization.test.ts
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/app-startup-coordinator.test.ts tests/unit/workspace-auth-gate.test.ts tests/unit/workspace-startup-skeleton-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run check:encoding
+```
+
+Fresh evidence for this slice:
+
+- RED first: the simple progress regression failed because the current component had no `getStageProgress` stage-driven width contract.
+- GREEN: the startup surface/localization tests passed 5/5.
+- GREEN: startup coordinator/auth gate/skeleton contract tests passed 12/12.
+- Passed: `npm.cmd run typecheck`.
+- Passed: `npm.cmd run test:unit` (1466/1466).
+- Passed: `npm.cmd run build`.
+- Passed: `npm.cmd run check:encoding`.
+- Browser QA: local built-fixture desktop 1280x720 and mobile 390x844 checks passed with a single prompt, a 0-100 progress fill, no overflow, and text-fit true; screenshots are in `output/playwright/`.
+- Vercel preview deploy passed: `https://kk-studio-6n5q1hmzi-yykks-projects-727e9560.vercel.app`.
 
 ## Release Gate
 

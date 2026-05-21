@@ -111,12 +111,22 @@ export const AppStartupScreen: React.FC<{
               <Sparkles size={24} />
             </div>
             <div>
-              <p className="app-startup-eyebrow">{eyebrow}</p>
-              <h2>{title}</h2>
+              <p
+                className="app-startup-eyebrow"
+                style={{ color: 'var(--app-startup-muted)' }}
+              >
+                {eyebrow}
+              </p>
+              <h2 style={{ color: 'var(--app-startup-title)' }}>{title}</h2>
             </div>
           </div>
 
-          <p className="app-startup-subtitle">{subtitle}</p>
+          <p
+            className="app-startup-subtitle"
+            style={{ color: 'var(--app-startup-muted)' }}
+          >
+            {subtitle}
+          </p>
 
           <div className="app-startup-stage-line">
             <span>{getStageLabel(stage)}</span>
