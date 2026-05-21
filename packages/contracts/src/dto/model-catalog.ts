@@ -72,6 +72,8 @@ export interface AdminCreditProviderModelDto {
   requestProfileId?: string;
   routeStrategy?: "priority-failover" | "weighted-random" | "parallel-race";
   creditCost: number;
+  priority?: number;
+  weight?: number;
   isActive: boolean;
   callCount: number;
   maxCallsLimit?: number | null;

@@ -1,9 +1,15 @@
 # KK-Studio v1.4.6 Single-Line Convergence Plan
 
-Last updated: 2026-05-09
+Last updated: 2026-05-22
 Branch policy: continue on the current branch and current workspace unless the user explicitly asks for a branch or worktree.
 
 ## Summary
+
+Current admin credit-provider bootstrap milestone:
+- Root cause: production API transport is healthy, but `/api/v1/model-catalog/active` and `/active-credit-models` return `200` with `items: []`; the PromptBar system-credit model path reads only active admin credit-provider rows, not the public catalog.
+- The ecommerce mode makes the failure more visible because it filters to ecommerce-approved image models such as `gemini-3.1-flash-image-preview`; a public-only `gemini-2.5-flash-image` catalog row is not enough to populate the ecommerce picker.
+- Add an admin provider bootstrap editor so an empty `admin_credit_models` table is no longer a dead end. The draft must create an active `system-image-provider` route for `gemini-3.1-flash-image-preview`, accept new API keys without exposing retained secrets, and preserve priority/weight when saving existing rows.
+- Acceptance: focused admin provider tests pass RED/GREEN; related credit-provider route/repository tests pass; `npm.cmd run admin:build`, `npm.cmd run typecheck`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, path-limited alternate-git `diff --check`, and browser inspection of the admin providers page pass. Production data remains blocked until an admin saves a real provider key/model row or an operator applies a controlled DB fix.
 
 Current 1.4.6 release blocker audit:
 - Treat the current alternate-git worktree as the 1.4.6 release candidate baseline, including the snap-to-grid and collapsed manual group feature line.

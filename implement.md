@@ -1,8 +1,17 @@
 # KK-Studio v1.4.6 Implementation Rules
 
-Last updated: 2026-05-09
+Last updated: 2026-05-22
 
 ## Operating Mode
+
+Current admin credit-provider bootstrap slice (2026-05-22): fix the empty active-model configuration path without weakening runtime routing. Keep changes scoped to the admin providers editor, admin credit-provider DTO mapping, focused tests, and ledgers. Do not fall back from executable model lists to the public model catalog, and do not seed fake provider keys.
+
+Admin provider bootstrap rules:
+- Public `/model-catalog/models` rows are catalog metadata only. They must not be silently promoted into executable PromptBar/system-credit models.
+- The admin app may create a provider draft, but production generation remains unavailable until a real provider API key is saved by an elevated admin session.
+- Never render retained raw API keys; only keep fingerprints and accept new keys through a write-only textarea.
+- Preserve provider route priority/weight from admin DTOs and save payloads so editing a provider does not flatten route ordering.
+- Browser QA is required because this slice changes admin UI. If screenshot capture is unavailable, record the in-app Browser DOM evidence and the screenshot limitation in `status.md`.
 
 Current 1.4.6 release blocker audit (2026-05-09): align the two-feature release line, including desktop snap-to-grid and collapsed manual groups, while preserving hosted/VPS proxy, dependency audit, visible Chinese text, PromptBar QA, and clean-hosted-env guardrails. Use alternate git only.
 
