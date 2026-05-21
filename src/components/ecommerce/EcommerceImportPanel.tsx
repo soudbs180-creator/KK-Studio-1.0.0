@@ -56,7 +56,7 @@ const cardClass = 'rounded-[16px] border px-3 py-2.5';
 const cardButtonClass = 'w-full text-left transition-all duration-200 hover:opacity-90';
 const thumbClass = 'relative h-14 w-14 overflow-hidden rounded-[12px] border';
 const importGridStyle: React.CSSProperties = {
-  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 196px), 1fr))',
 };
 
 const EcommerceImportPanel: React.FC<EcommerceImportPanelProps> = ({

@@ -15,7 +15,7 @@ test('ecommerce import file cards keep readable density inside the prompt bar', 
   assert.match(source, /const chipClass = 'inline-flex items-center whitespace-nowrap/);
   assert.match(source, /const cardClass = 'rounded-\[16px\] border px-3 py-2\.5'/);
   assert.match(source, /const importGridStyle: React\.CSSProperties = \{/);
-  assert.match(source, /gridTemplateColumns: 'repeat\(auto-fit, minmax\(min\(100%, 210px\), 1fr\)\)'/);
+  assert.match(source, /gridTemplateColumns: 'repeat\(auto-fit, minmax\(min\(100%, 196px\), 1fr\)\)'/);
   assert.match(source, /data-ecommerce-import-grid/);
   assert.match(source, /className="grid gap-2"/);
   assert.doesNotMatch(source, /md:col-span-2/);
