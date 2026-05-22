@@ -22,6 +22,12 @@ export function isPrivateNetworkHostname(hostname: string): boolean {
       /^10\./.test(normalized)
       || /^192\.168\./.test(normalized)
       || /^172\.(1[6-9]|2\d|3[0-1])\./.test(normalized)
+      || /^100\.(6[4-9]|[7-9]\d|1[0-1]\d|12[0-7])\./.test(normalized) // 虚拟局域网段 (CGNAT / Tailscale)
+      || /^169\.254\./.test(normalized) // 本地链路地址 (Link-local)
+      || normalized === "0.0.0.0"
+      || normalized === "::"
+      || /^fe[89ab]/i.test(normalized) // IPv6 本地链路地址 (Link-local)
+      || /^f[cd]/i.test(normalized) // IPv6 唯一本地地址 (Unique local)
     ),
   );
 }
@@ -79,13 +85,22 @@ function shouldPreferRuntimeOriginForLocalApi(
   try {
     const configuredUrl = new URL(configuredBaseUrl);
     const runtimeUrl = new URL(runtimeOrigin);
-    const configuredPort = configuredUrl.port || (configuredUrl.protocol === "https:" ? "443" : "80");
-    const runtimePort = runtimeUrl.port || (runtimeUrl.protocol === "https:" ? "443" : "80");
 
-    return (isLoopbackHostname(configuredUrl.hostname) || isPrivateNetworkHostname(configuredUrl.hostname))
-      && configuredPort === "3001"
-      && (isLoopbackHostname(runtimeUrl.hostname) || isPrivateNetworkHostname(runtimeUrl.hostname))
-      && runtimePort === "3000";
+    const isConfiguredLocal = isLoopbackHostname(configuredUrl.hostname) || isPrivateNetworkHostname(configuredUrl.hostname);
+    const isRuntimeLocal = isLoopbackHostname(runtimeUrl.hostname) || isPrivateNetworkHostname(runtimeUrl.hostname);
+
+    if (!isConfiguredLocal || !isRuntimeLocal) {
+      return false;
+    }
+
+    // 如果配置的 API 地址是本地环回（手机端或局域网其他设备绝对无法直接访问 localhost/127.0.0.1），
+    // 并且运行环境是通过局域网非环回地址（即私有 IP）访问的，我们必须将其对齐到 runtimeOrigin
+    if (isLoopbackHostname(configuredUrl.hostname) && !isLoopbackHostname(runtimeUrl.hostname)) {
+      return true;
+    }
+
+    // 两者都在本地运行，且配置满足基本的本地调试，我们直接返回 true 以便局域网共享和代理
+    return true;
   } catch {
     return false;
   }

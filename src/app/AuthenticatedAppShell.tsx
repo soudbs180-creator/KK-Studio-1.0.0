@@ -210,6 +210,7 @@ export const AuthenticatedAppShell: React.FC<AuthenticatedAppShellProps> = ({
   const { session, user, isTempUser, loading, sessionRecoveryWarning } = useAuth();
   const {
     stage,
+    isWorkspaceReady,
     isBackgroundReady,
     lastStartupWarning,
   } = useAppStartup();
@@ -227,7 +228,7 @@ export const AuthenticatedAppShell: React.FC<AuthenticatedAppShellProps> = ({
     return <LoginScreen />;
   }
 
-  if (!isBackgroundReady) {
+  if (!isWorkspaceReady) {
     return <AppStartupScreen stage={stage} warning={sessionRecoveryWarning || lastStartupWarning} />;
   }
 
