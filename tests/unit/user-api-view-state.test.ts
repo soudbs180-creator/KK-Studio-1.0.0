@@ -135,7 +135,7 @@ test("sessionless local workbench reports local runtime outages instead of sign-
   assert.equal(viewState.providerActionsDisabled, true);
 });
 
-test("sessionless local workbench stays editable when loopback mode keeps a local browser draft buffer available", () => {
+test("sessionless local workbench stays locked when the local API is unavailable", () => {
   const viewState = resolveUserApiViewState({
     hasReadonlySnapshot: false,
     hasSessionlessWorkbenchAccess: true,
@@ -147,9 +147,9 @@ test("sessionless local workbench stays editable when loopback mode keeps a loca
     sessionlessWorkbenchActionsEnabled: true,
   });
 
-  assert.equal(viewState.stage, "editable");
-  assert.equal(viewState.userApiActionsDisabled, false);
-  assert.equal(viewState.providerActionsDisabled, false);
-  assert.equal(viewState.userApiEditorDisabled, false);
-  assert.equal(viewState.providerEditorReadOnly, false);
+  assert.equal(viewState.stage, "local-api-unavailable");
+  assert.equal(viewState.userApiActionsDisabled, true);
+  assert.equal(viewState.providerActionsDisabled, true);
+  assert.equal(viewState.userApiEditorDisabled, true);
+  assert.equal(viewState.providerEditorReadOnly, true);
 });

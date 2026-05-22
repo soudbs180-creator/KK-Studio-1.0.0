@@ -330,6 +330,55 @@ try {
   const { chromium } = await import(playwrightModuleUrl);
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
+  page.on('console', msg => {
+    const text = msg.text();
+    if (!text.includes('React DevTools') && !text.includes('Download the React DevTools')) {
+      console.log(`[BROWSER] ${text}`);
+    }
+  });
+
+  await page.addInitScript(() => {
+    const now = Date.now();
+    const expiresAt = now + 24 * 60 * 60 * 1000;
+    const createdAtIso = new Date(now).toISOString();
+    const tempUser = {
+      id: 'smoke-temp-user',
+      aud: 'authenticated',
+      role: 'authenticated',
+      email: 'smoke-temp-user@temp.local',
+      phone: '',
+      created_at: createdAtIso,
+      updated_at: createdAtIso,
+      confirmed_at: createdAtIso,
+      last_sign_in_at: createdAtIso,
+      app_metadata: {
+        isTempUser: true,
+        provider: 'temp',
+      },
+      user_metadata: {
+        avatar_url: 'preset-default-local',
+        full_name: 'Smoke Temp User',
+        isTempUser: true,
+      },
+    };
+
+    window.localStorage.setItem('theme', 'dark');
+    window.localStorage.setItem('kk_theme', 'dark');
+    window.localStorage.setItem('kk_language', 'en-US');
+    window.localStorage.setItem('kk_studio_storage_mode', 'browser');
+    window.localStorage.setItem('kk_tutorial_seen', 'true');
+    window.localStorage.setItem('temp_user_session_v1', JSON.stringify({
+      user: tempUser,
+      createdAt: now,
+      expiresAt,
+      isTempUser: true,
+    }));
+    window.localStorage.setItem('kkai.runtime.user-state.v1', JSON.stringify({
+      user: tempUser,
+      isTempUser: true,
+      tempUserExpiry: expiresAt,
+    }));
+  });
 
   await gotoWithRetry(page, TARGET_URL);
   await page.waitForTimeout(1000);
@@ -384,14 +433,14 @@ try {
   await page.mouse.move(promptBox.x + (promptBox.width / 2), promptBox.y + (promptBox.height / 2));
   await page.mouse.down();
   await page.mouse.move(promptBox.x + (promptBox.width / 2) + 180, promptBox.y + (promptBox.height / 2) + 120, { steps: 12 });
-  await page.waitForTimeout(180);
+  await page.waitForTimeout(1000);
   const mainDragScene = await measureScene(page);
   await page.screenshot({
     path: path.join(ARTIFACT_DIR, "main-drag.png"),
     fullPage: true,
   });
   await page.mouse.up();
-  await page.waitForTimeout(250);
+  await page.waitForTimeout(500);
 
   const mainDragSpread = computeSpread(mainDragScene.imageBoxes);
   const promptBottomDuringMainDrag = mainDragScene.promptBox?.bottom ?? 0;
@@ -407,7 +456,7 @@ try {
   await page.mouse.move(imageBox.x + (imageBox.width / 2), imageBox.y + (imageBox.height / 2));
   await page.mouse.down();
   await page.mouse.move(imageBox.x + (imageBox.width / 2) + 140, imageBox.y + (imageBox.height / 2) - 80, { steps: 12 });
-  await page.waitForTimeout(140);
+  await page.waitForTimeout(500);
   const childDragScene = await measureScene(page);
   await page.screenshot({
     path: path.join(ARTIFACT_DIR, "child-drag.png"),

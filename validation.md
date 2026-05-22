@@ -1,8 +1,49 @@
 # KK-Studio v1.4.6 Single-Line Validation Matrix
 
-Last updated: 2026-05-21
+Last updated: 2026-05-22
 
 Use `npm.cmd` for npm scripts on Windows.
+
+## Current User API Secret Boundary Gate
+
+Use this gate when touching user BYOK/API settings persistence, KeyManager cloud/local payload sync, provider storage, or browser secret-boundary checks:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/frontend-key-boundary-hardening.test.ts tests/unit/key-manager-cloud-sync.test.ts tests/unit/key-manager-runtime-fallback.test.ts tests/unit/key-manager-dead-code-pruning-contract.test.ts tests/unit/user-api-view-state.test.ts tests/unit/runtime-legacy-fallback-guards.test.ts tests/unit/auth-data-routes.test.ts tests/unit/file-auth-data-repository.test.ts
+npm.cmd run governance:security
+npm.cmd run typecheck
+npm.cmd run test:unit
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/services/auth/keyManager.ts src/services/auth/keyManagerProviders.ts src/components/settings/ApiSettingsView.tsx src/services/api/userApiViewState.ts src/vite-env.d.ts scripts/governance/check-sensitive-boundaries.mjs tests/unit/frontend-key-boundary-hardening.test.ts tests/unit/key-manager-cloud-sync.test.ts tests/unit/key-manager-runtime-fallback.test.ts tests/unit/key-manager-dead-code-pruning-contract.test.ts tests/unit/user-api-view-state.test.ts plans.md implement.md status.md validation.md
+```
+
+Expected result: raw user API secrets are never persisted to browser `localStorage` for logged-in, temp, or sessionless local users; local/temp BYOK edits require a reachable persistent local API bridge; server reads return placeholders; system/provider keys remain backend-side; unallowlisted `VITE_*KEY/SECRET/TOKEN` frontend env names fail governance; and cloud/profile reads stay backup/readonly-safe rather than exposing raw secrets to the browser.
+
+Fresh result on 2026-05-22: the targeted security boundary suite passed 50/50, `npm.cmd run governance:security` passed, `npm.cmd run typecheck` passed, `npm.cmd run test:unit` passed 1471/1471, `npm.cmd run build` passed and produced `dist/assets/index-DMW4Ppn9.js`, `npm.cmd run governance:agent-docs` passed, `npm.cmd run check:encoding` passed, and path-limited alternate-git `diff --check` passed with LF/CRLF normalization warnings only.
+
+Production result on 2026-05-22: `cmd /c npx vercel deploy --prod --yes` created `https://kk-studio-bikxw95np-yykks-projects-727e9560.vercel.app`; the deploy status query initially ended with a transient socket hang up, but `vercel inspect` confirmed deployment `dpl_D8tgr52sz26mshnG34Dd3LoJiJPW` became Production / Ready. `vercel alias set` moved `https://kkai.plus` and `https://www.kkai.plus` to that deployment. Live `app-version.json` returns build time `2026-05-22T06:58:20.303Z`; `/healthz`, `/api/healthz`, and direct VPS `/healthz` return `200`; active credit-model endpoints still return `items: []` until a real admin provider key/model row is saved.
+
+## Current Admin Credit-Provider Bootstrap Gate
+
+Use this gate when touching the admin provider editor, active credit-provider DTO mapping, or the empty active-model configuration path:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/admin-providers-page.test.ts
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/credit-provider-routes.test.ts
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/postgres-credit-provider-repository.test.ts
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/admin-model-service-credit-routes.test.ts
+npm.cmd run admin:build
+npm.cmd run typecheck
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- apps/admin/src/features/providers/providerEditorModel.ts apps/admin/src/pages/AdminProvidersPage.tsx apps/admin/src/styles/admin.css apps/api/src/modules/model-catalog/infrastructure/postgres-credit-provider-repository.ts apps/api/src/modules/model-catalog/infrastructure/in-memory-credit-provider-repository.ts packages/contracts/src/dto/model-catalog.ts tests/unit/admin-providers-page.test.ts plans.md implement.md status.md validation.md
+```
+
+Expected result: empty admin credit-provider state has a visible bootstrap path, new API keys are accepted only through a write-only editor field, retained raw keys are never rendered, `gemini-3.1-flash-image-preview` is the default ecommerce-ready system route draft, and admin save payloads preserve priority/weight.
+
+Fresh result on 2026-05-22: RED confirmed the missing bootstrap helper, then a second RED confirmed the missing save guard for providers without any retained or newly entered API key. GREEN passed `admin-providers-page.test.ts` 5/5, `credit-provider-routes.test.ts` 3/3, `postgres-credit-provider-repository.test.ts` 5/5, `admin-model-service-credit-routes.test.ts` 2/2, `npm.cmd run admin:build`, `npm.cmd run typecheck`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, and path-limited alternate-git `diff --check`. Full `npm.cmd run build` passed, and full `npm.cmd run test:unit` passed 1471/1471. Browser inspection opened `http://127.0.0.1:4176/providers` in the in-app Browser, clicked the bootstrap button through DOM CUA, and confirmed the provider/model/API-key fields. Screenshot capture timed out, so final evidence is DOM-based. Production deploy passed with `cmd /c npx vercel deploy --prod --yes`, and `vercel alias set` moved both `https://kkai.plus` and `https://www.kkai.plus` to `https://kk-studio-ge7pnllju-yykks-projects-727e9560.vercel.app`. Live `app-version.json` reports build time `2026-05-22T01:16:49.789Z`; `/healthz` and `/api/healthz` return `200`; `/api/v1/model-catalog/models?kind=image` returns public `Nano Banana`; `/api/v1/model-catalog/active` and `/active-credit-models` still return `items: []` until a real admin key/model row is saved. VPS admin static deploy later completed to `/var/www/kk-admin`; `http://172.245.156.16:4174/login`, `/providers`, and `/assets/index-DYGx7sqD.js` return `200`.
 
 ## Current Startup And File UI Density Gate
 

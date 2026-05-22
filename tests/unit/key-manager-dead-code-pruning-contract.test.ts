@@ -28,5 +28,6 @@ test('keyManager does not retain proven unused local helper definitions', () => 
   assert.doesNotMatch(source, /private getProviderStorageKey\(targetUserId: string \| null = this\.userId\): string/);
   assert.doesNotMatch(source, /const isCreditModel = normalizedModelId\.includes\('nano-banana'\)/);
   assert.doesNotMatch(source, /private flushPendingProviderCloudSync\(\): void/);
-  assert.match(source, /if \(this\.userId && !this\.canUseSessionlessLocalUserApiStorage\(\)\) \{\s*markPendingProviderCloudSync\(this\.cloudSyncState\);\s*void this\.flushPendingCloudSync\(\);\s*\}/);
+  assert.match(source, /if \(this\.userId\) \{\s*markPendingProviderCloudSync\(this\.cloudSyncState\);\s*void this\.flushPendingCloudSync\(\);\s*\}/);
+  assert.doesNotMatch(source, /if \(this\.userId && !this\.canUseSessionlessLocalUserApiStorage\(\)\) \{/);
 });

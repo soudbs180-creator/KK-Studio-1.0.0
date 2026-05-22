@@ -118,6 +118,8 @@ function toAdminModelDto(row: CreditProviderTableRow): AdminCreditProviderDto["m
     description: row.description || undefined,
     endpointType: String(row.endpoint_type || "openai").trim(),
     creditCost: Math.max(1, Number(row.credit_cost || 1)),
+    priority: Number(row.priority || 0),
+    weight: Number(row.weight || 0),
     isActive: row.is_active !== false,
     callCount: Number(row.call_count || 0),
     maxCallsLimit: row.max_calls_limit ?? null,

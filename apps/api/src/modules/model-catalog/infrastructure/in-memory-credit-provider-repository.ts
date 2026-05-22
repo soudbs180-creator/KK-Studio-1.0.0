@@ -168,6 +168,8 @@ function toAdminModelDto(
     description: model.description,
     endpointType: model.endpointType,
     creditCost: model.creditCost,
+    priority: model.priority,
+    weight: model.weight,
     isActive: model.isActive,
     callCount: model.callCount,
     maxCallsLimit: model.maxCallsLimit ?? null,

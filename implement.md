@@ -1,8 +1,27 @@
 # KK-Studio v1.4.6 Implementation Rules
 
-Last updated: 2026-05-09
+Last updated: 2026-05-22
 
 ## Operating Mode
+
+Current user API secret-boundary slice (2026-05-22): keep system/provider keys and user BYOK secrets out of browser persistence. Local mode must persist user API settings through the local API/backend path chosen by the user, and cloud/profile reads are for backup/restore display with redacted placeholders, not raw secret recovery into the frontend.
+
+User API secret-boundary rules:
+- Do not write raw API keys, provider API keys, route configs, or key-manager slot state into browser `localStorage`, `sessionStorage`, IndexedDB, OPFS, or UI snapshots as a compatibility fallback.
+- Sessionless/local/temp users may edit BYOK only when the local API bridge is reachable and reports writable user API persistence. If the local bridge is offline or in memory/degraded mode, UI actions must fail closed.
+- Persist user BYOK through typed auth/local API payload endpoints only. Server repositories own encryption and redaction; frontend reads may receive readonly placeholders.
+- Do not introduce `VITE_*KEY`, `VITE_*SECRET`, or `VITE_*TOKEN` names unless they are intentionally public and explicitly allowlisted in `governance:security`.
+- Admin/system provider keys are written only by elevated admin workflows and must never be rendered back as raw values. Retained secrets may be represented by fingerprints/counts/placeholders only.
+- Browser QA is optional for this slice because it is a security/persistence boundary, but deployment/API smoke is required after the main build is deployed.
+
+Current admin credit-provider bootstrap slice (2026-05-22): fix the empty active-model configuration path without weakening runtime routing. Keep changes scoped to the admin providers editor, admin credit-provider DTO mapping, focused tests, and ledgers. Do not fall back from executable model lists to the public model catalog, and do not seed fake provider keys.
+
+Admin provider bootstrap rules:
+- Public `/model-catalog/models` rows are catalog metadata only. They must not be silently promoted into executable PromptBar/system-credit models.
+- The admin app may create a provider draft, but production generation remains unavailable until a real provider API key is saved by an elevated admin session.
+- Never render retained raw API keys; only keep fingerprints and accept new keys through a write-only textarea.
+- Preserve provider route priority/weight from admin DTOs and save payloads so editing a provider does not flatten route ordering.
+- Browser QA is required because this slice changes admin UI. If screenshot capture is unavailable, record the in-app Browser DOM evidence and the screenshot limitation in `status.md`.
 
 Current 1.4.6 release blocker audit (2026-05-09): align the two-feature release line, including desktop snap-to-grid and collapsed manual groups, while preserving hosted/VPS proxy, dependency audit, visible Chinese text, PromptBar QA, and clean-hosted-env guardrails. Use alternate git only.
 

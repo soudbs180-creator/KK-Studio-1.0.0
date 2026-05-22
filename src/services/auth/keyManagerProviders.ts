@@ -47,21 +47,17 @@ export function persistProvidersLocal<TProvider>(
     allowLocalStorage = false,
 ): ProviderStorageScope {
     const storageKey = getProviderStorageKey(userId);
-    if (!userId) {
-        if (!allowLocalStorage) {
-            purgeAnonymousSensitiveLocalCaches();
-        }
-        return "none";
-    }
+    void providers;
+    void allowLocalStorage;
 
-    if (!allowLocalStorage) {
-        localStorage.removeItem(storageKey);
+    if (!userId) {
         purgeAnonymousSensitiveLocalCaches();
         return "none";
     }
 
-    localStorage.setItem(storageKey, JSON.stringify(providers));
-    return "anonymous";
+    localStorage.removeItem(storageKey);
+    purgeAnonymousSensitiveLocalCaches();
+    return "none";
 }
 
 export function loadProvidersFromLocal<TProvider>(
@@ -73,20 +69,9 @@ export function loadProvidersFromLocal<TProvider>(
     if (!force && existingProviders.length > 0) {
         return null;
     }
+    void allowLocalStorage;
 
     if (!userId) {
-      if (!allowLocalStorage) {
-        purgeAnonymousSensitiveLocalCaches();
-      }
-      return {
-        providers: [],
-        scope: "none",
-      };
-    }
-
-    const storageKey = getProviderStorageKey(userId);
-    if (!allowLocalStorage) {
-      localStorage.removeItem(storageKey);
       purgeAnonymousSensitiveLocalCaches();
       return {
         providers: [],
@@ -94,23 +79,11 @@ export function loadProvidersFromLocal<TProvider>(
       };
     }
 
-    const stored = localStorage.getItem(storageKey);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          return {
-            providers: parsed as TProvider[],
-            scope: "anonymous",
-          };
-        }
-      } catch {
-        localStorage.removeItem(storageKey);
-      }
-    }
-
+    const storageKey = getProviderStorageKey(userId);
+    localStorage.removeItem(storageKey);
+    purgeAnonymousSensitiveLocalCaches();
     return {
       providers: [],
-      scope: allowLocalStorage ? "anonymous" : "none",
+      scope: "none",
     };
 }

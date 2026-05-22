@@ -1,9 +1,22 @@
 # KK-Studio v1.4.6 Single-Line Convergence Plan
 
-Last updated: 2026-05-09
+Last updated: 2026-05-22
 Branch policy: continue on the current branch and current workspace unless the user explicitly asks for a branch or worktree.
 
 ## Summary
+
+Current user API secret-boundary milestone:
+- Root cause: system/provider credit keys were already backend-held on read paths, but user BYOK still had legacy sessionless-local code paths that could write raw key slots/providers into browser `localStorage`, and the API settings UI still advertised a browser-session draft fallback when the local API was offline or degraded.
+- Tighten the local-first contract so user API settings persist only through the backend/local API payload bridge and server-side encrypted repositories. Browser-visible reads may show placeholders and metadata, but not raw secrets.
+- Local/temp users may edit BYOK only when the local API is reachable and user API persistence is backed by a writable local-file or backend repository. When that bridge is unavailable, the UI must fail closed instead of keeping browser drafts.
+- Governance must reject accidental public frontend secret env names such as unallowlisted `VITE_*KEY`, `VITE_*SECRET`, or `VITE_*TOKEN`.
+- Acceptance: focused secret-boundary tests pass RED/GREEN, `npm.cmd run governance:security`, `npm.cmd run typecheck`, full `npm.cmd run test:unit`, `npm.cmd run build`, docs governance, encoding, and path-limited alternate-git `diff --check` pass; Vercel deploy/alias and API smoke prove the frontend/backend/VPS link remains healthy.
+
+Current admin credit-provider bootstrap milestone:
+- Root cause: production API transport is healthy, but `/api/v1/model-catalog/active` and `/active-credit-models` return `200` with `items: []`; the PromptBar system-credit model path reads only active admin credit-provider rows, not the public catalog.
+- The ecommerce mode makes the failure more visible because it filters to ecommerce-approved image models such as `gemini-3.1-flash-image-preview`; a public-only `gemini-2.5-flash-image` catalog row is not enough to populate the ecommerce picker.
+- Add an admin provider bootstrap editor so an empty `admin_credit_models` table is no longer a dead end. The draft must create an active `system-image-provider` route for `gemini-3.1-flash-image-preview`, accept new API keys without exposing retained secrets, and preserve priority/weight when saving existing rows.
+- Acceptance: focused admin provider tests pass RED/GREEN; related credit-provider route/repository tests pass; `npm.cmd run admin:build`, `npm.cmd run typecheck`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, path-limited alternate-git `diff --check`, browser inspection of the admin providers page, Vercel production deploy, alias update for `kkai.plus` / `www.kkai.plus`, production API smoke, and VPS admin static deploy pass. Production data remains blocked until an admin saves a real provider key/model row or an operator applies a controlled DB fix.
 
 Current 1.4.6 release blocker audit:
 - Treat the current alternate-git worktree as the 1.4.6 release candidate baseline, including the snap-to-grid and collapsed manual group feature line.
