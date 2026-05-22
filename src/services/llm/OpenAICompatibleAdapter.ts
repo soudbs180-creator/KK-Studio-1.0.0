@@ -1730,6 +1730,11 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             return this.generateImageStandard_OpenAI_Strict(options, keySlot);
         }
 
+        if (dispatchPlan.kind === 'suxi-openai-compat') {
+            console.log(`[OpenAICompatibleAdapter] suxi 兼容格式生图 -> ${keySlot.name}`);
+            return this.generateImageStandard_Suxi_OpenAI_Compat(options, keySlot);
+        }
+
         if (dispatchPlan.kind === 'gemini-chat-strict-fail-closed') {
             console.log(`[OpenAICompatibleAdapter] Gemini模型优先尝试 Chat API (严格 new-api 兼容层) -> ${keySlot.name}`);
             try {
@@ -2122,6 +2127,47 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         return this.executeImageFormRequest(url, formData, keySlot, options, sizeString);
     }
 
+    private async generateImageStandard_Suxi_OpenAI_Compat(
+        options: ImageGenerationOptions,
+        keySlot: KeySlot
+    ): Promise<ImageGenerationResult> {
+        this.assertOpenAICompatibleRuntimeBaseUrl(keySlot, 'images');
+        const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
+        const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
+        const profile = getOpenAIImageProfile(options.modelId);
+
+        const url = `${cleanBase}/images/generations`;
+        const body: any = {
+            model: options.modelId,
+            messages: [
+                { role: 'user', content: options.prompt }
+            ],
+            n: clampImageCount(options.imageCount, profile === 'dall-e-3' ? 1 : 10),
+            size: resolveOpenAIImageSize(options, profile),
+            response_format: 'b64_json'
+        };
+
+        if (profile === 'dall-e-3') {
+            body.quality = options.providerConfig?.openai?.quality
+                || (String(options.imageSize || '').toUpperCase().includes('2K')
+                    || String(options.imageSize || '').toUpperCase().includes('4K')
+                    ? 'hd'
+                    : 'standard');
+
+            if (options.providerConfig?.openai?.style) {
+                body.style = options.providerConfig.openai.style;
+            }
+        }
+
+        if (options.referenceImages?.length) {
+            const dataUrl = formatOpenAICompatibleReferenceImage(options.referenceImages[0], { preserveHttpUrl: true });
+            body.image = dataUrl;
+        }
+
+        console.log(`[OpenAICompatibleAdapter] Suxi_OpenAI_Compat -> size=${body.size}${body.quality ? `, quality=${body.quality}` : ''}`);
+        return this.executeImageRequest(url, body, keySlot, options);
+    }
+
     private async generateImageStandard_OpenAI_Strict(
         options: ImageGenerationOptions,
         keySlot: KeySlot
@@ -2363,9 +2409,12 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         if (!normalizedKey) {
             throw new Error('Gemini API Key / Token 不能为空');
         }
-        const queryKey = this.getQueryApiKey(normalizedKey);
-        if (!queryKey) {
-            throw new Error('12AI API Key is empty or invalid');
+        let queryKey = '';
+        if (is12AIChannel) {
+            queryKey = this.getQueryApiKey(normalizedKey);
+            if (!queryKey) {
+                throw new Error('12AI API Key is empty or invalid');
+            }
         }
         const url = is12AIChannel
             ? `${cleanBase}/v1beta/models/${effectiveModelId}:generateContent?key=${encodeURIComponent(queryKey)}`
@@ -2435,9 +2484,9 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         const startTime = Date.now();
         const safeUrl = url.replace(/key=[^&]+/, 'key=***'); // 用于日志的安全 URL
-        const maskedKey = queryKey.length > 8
-            ? `${queryKey.slice(0, 4)}***${queryKey.slice(-4)}`
-            : '***';
+        const maskedKey = is12AIChannel
+            ? (queryKey.length > 8 ? `${queryKey.slice(0, 4)}***${queryKey.slice(-4)}` : '***')
+            : (normalizedKey.length > 8 ? `${normalizedKey.slice(0, 4)}***${normalizedKey.slice(-4)}` : '***');
         console.log(`[OpenAICompatibleAdapter] ${is12AIChannel ? '12AI Native' : 'Gemini Native'} Request -> ${safeUrl} | slot=${keySlot.id} | channel=${keySlot.name} | auth=${is12AIChannel ? 'query' : authMethod} | refs=${options.referenceImages?.length || 0} | key=${maskedKey}`);
 
         const bridgedResult = await this.executeRecoverableSyncImageRequest({

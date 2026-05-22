@@ -272,16 +272,16 @@ const GradientBackground = () => (
     >
       <defs>
         <linearGradient id="auth_grad_1" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#0EA5E9" stopOpacity="0.26" />
-          <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.18" />
+          <stop offset="0%" stopColor="#b8a4ed" stopOpacity="0.26" />
+          <stop offset="100%" stopColor="#ff4d8b" stopOpacity="0.18" />
         </linearGradient>
         <linearGradient id="auth_grad_2" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#6366F1" stopOpacity="0.24" />
+          <stop offset="0%" stopColor="#ffb084" stopOpacity="0.24" />
           <stop offset="100%" stopColor="#FB7185" stopOpacity="0.2" />
         </linearGradient>
         <radialGradient id="auth_grad_3" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.25" />
-          <stop offset="100%" stopColor="#F97316" stopOpacity="0" />
+          <stop offset="0%" stopColor="#ff6b5a" stopOpacity="0.25" />
+          <stop offset="100%" stopColor="#ff6b5a" stopOpacity="0" />
         </radialGradient>
         <filter id="auth_blur_1" x="-40%" y="-40%" width="180%" height="180%">
           <feGaussianBlur stdDeviation="50" />
@@ -352,7 +352,7 @@ type RegisterStep = "email" | "password" | "confirmPassword";
 type ModalStatus = "closed" | "loading" | "error" | "success";
 
 const DefaultLogo = () => (
-  <div className="rounded-xl bg-sky-500/90 p-2 text-white shadow-lg shadow-sky-500/30">
+  <div className="rounded-xl bg-[#ff4d8b]/90 p-2 text-white shadow-lg shadow-[#ff4d8b]/30">
     <Sparkles className="h-4 w-4" />
   </div>
 );
@@ -634,7 +634,7 @@ export const AuthComponent = ({
               <TextLoop interval={1.2} stopOnEnd={false}>
                 {modalSteps.map((step, index) => (
                   <div key={index} className="flex flex-col items-center gap-4">
-                    <Loader className="h-12 w-12 animate-spin text-sky-400" />
+                    <Loader className="h-12 w-12 animate-spin text-[#ff4d8b]" />
                     <p className="text-center text-base font-medium">{step}</p>
                   </div>
                 ))}
@@ -662,8 +662,8 @@ export const AuthComponent = ({
         <style>{`
           .auth-grid-bg {
             background-image:
-              linear-gradient(rgba(59, 130, 246, 0.08) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(59, 130, 246, 0.08) 1px, transparent 1px);
+              linear-gradient(rgba(255, 77, 139, 0.08) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255, 77, 139, 0.08) 1px, transparent 1px);
             background-size: 56px 56px;
           }
           .glass-button-wrap {
@@ -677,7 +677,7 @@ export const AuthComponent = ({
             inset: -4px;
             filter: blur(10px);
             opacity: 0.45;
-            background: radial-gradient(circle at 50% 40%, rgba(125, 211, 252, 0.35), transparent 70%);
+            background: radial-gradient(circle at 50% 40%, rgba(255, 176, 132, 0.35), transparent 70%);
           }
           .glass-button {
             border: 1px solid rgba(148, 163, 184, 0.32);
@@ -700,8 +700,8 @@ export const AuthComponent = ({
             backdrop-filter: blur(8px);
           }
           .glass-input:focus-within {
-            border-color: rgba(56, 189, 248, 0.7);
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2), inset 0 1px 0 rgba(148, 163, 184, 0.3);
+            border-color: rgba(255, 77, 139, 0.7);
+            box-shadow: 0 0 0 3px rgba(255, 77, 139, 0.2), inset 0 1px 0 rgba(148, 163, 184, 0.3);
           }
         `}</style>
 
@@ -745,7 +745,7 @@ export const AuthComponent = ({
                 className={cn(
                   "h-9 flex-1 rounded-full transition",
                   mode === "login"
-                    ? "bg-sky-500 text-white shadow-lg shadow-sky-500/35"
+                    ? "bg-[#ff4d8b] text-white shadow-md shadow-[#ff4d8b]/30"
                     : "text-slate-300 hover:text-white"
                 )}
               >
@@ -757,7 +757,7 @@ export const AuthComponent = ({
                 className={cn(
                   "h-9 flex-1 rounded-full transition",
                   mode === "register"
-                    ? "bg-sky-500 text-white shadow-lg shadow-sky-500/35"
+                    ? "bg-[#ff4d8b] text-white shadow-md shadow-[#ff4d8b]/30"
                     : "text-slate-300 hover:text-white"
                 )}
               >
@@ -808,7 +808,7 @@ export const AuthComponent = ({
                           <button
                             type="button"
                             onClick={handleForgotPassword}
-                            className="text-xs font-medium text-sky-300 hover:text-sky-200"
+                            className="text-xs font-medium text-[#ffb084] hover:text-[#ffb084]/80"
                           >
                             忘记密码？
                           </button>
@@ -910,7 +910,7 @@ export const AuthComponent = ({
                         <button
                           type="button"
                           onClick={() => handleModeSwitch("register")}
-                          className="ml-1 font-semibold text-sky-300 hover:text-sky-200"
+                          className="ml-1 font-semibold text-[#ffb084] hover:text-[#ffb084]/80"
                         >
                           立即注册
                         </button>
@@ -930,7 +930,7 @@ export const AuthComponent = ({
                       <button
                         type="button"
                         onClick={() => handleModeSwitch("login")}
-                        className="ml-1 font-semibold text-sky-300 hover:text-sky-200"
+                        className="ml-1 font-semibold text-[#ffb084] hover:text-[#ffb084]/80"
                       >
                         去登录
                       </button>

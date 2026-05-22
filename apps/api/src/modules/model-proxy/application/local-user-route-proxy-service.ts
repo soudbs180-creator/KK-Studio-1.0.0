@@ -1430,6 +1430,87 @@ export class LocalUserRouteProxyService {
       });
     }
 
+    if (endpointType === "gemini" && modelId.startsWith("imagen-")) {
+      const auth = buildGeminiAuth(`${baseUrl}/v1beta/models/${modelId}:predict`, routeConfig);
+
+      const parameters: Record<string, unknown> = {
+        sampleCount: Math.max(1, Number(input.imageCount || 1)),
+      };
+
+      if (input.aspectRatio && String(input.aspectRatio).toLowerCase() !== "auto") {
+        parameters.aspectRatio = normalizeAspectRatio(input.aspectRatio) || input.aspectRatio;
+      }
+
+      if (input.imageSize) {
+        const size = String(input.imageSize).toUpperCase();
+        if (size.includes("2K") || size.includes("4K") || size.includes("HD")) {
+          parameters.sampleImageSize = "2K";
+        } else {
+          parameters.sampleImageSize = "1K";
+        }
+      }
+
+      const instances: any[] = [];
+      if (input.referenceImages && input.referenceImages.length > 0) {
+        const ref = input.referenceImages[0];
+        const inlinePart = await toInlineImagePartWithFormat(ref, false);
+        if (inlinePart?.inlineData?.data) {
+          instances.push({
+            prompt: input.prompt || "",
+            image: { bytesBase64Encoded: inlinePart.inlineData.data }
+          });
+        } else {
+          instances.push({ prompt: input.prompt || "" });
+        }
+      } else {
+        instances.push({ prompt: input.prompt || "" });
+      }
+
+      const payload = {
+        instances,
+        parameters,
+      };
+
+      const imageResponse = await fetch(auth.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(auth.headers as Record<string, string>),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!imageResponse.ok) {
+        const errorText = await imageResponse.text();
+        throw new LocalUserRouteProxyError(`Upstream error: ${imageResponse.status} ${errorText} [surface=${imageSurface};strategy=${routeStrategy}]`, {
+          code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR",
+          statusCode: 502,
+        });
+      }
+
+      const result = await imageResponse.json();
+      const predictions = result.predictions || [];
+      const imageUrls = predictions
+        .map((p: any) => p?.bytesBase64Encoded ? `data:image/png;base64,${String(p.bytesBase64Encoded).replace(/\s+/g, "")}` : null)
+        .filter((value: string | null): value is string => typeof value === "string" && value.length > 0);
+
+      if (!imageUrls.length) {
+        throw new LocalUserRouteProxyError("No image data returned from upstream.", {
+          code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR",
+          statusCode: 502,
+        });
+      }
+
+      return {
+        success: true,
+        urls: imageUrls,
+        deducted: false,
+        endpointType,
+        requestId: input.requestId,
+        attemptId: input.attemptId,
+      };
+    }
+
     if (imageSurface === "async-image") {
       const auth = buildOpenAICompatAuth(`${baseUrl}/v1/images/async/generations`, routeConfig, "openai");
       const requestedSize = normalizeImageSize(input.imageSize);

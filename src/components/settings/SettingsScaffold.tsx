@@ -157,7 +157,7 @@ export const SETTINGS_CONTROL_MOTION_CLASSNAME =
   'settings-control-motion transition-[background-color,border-color,box-shadow,color,transform] duration-[var(--motion-duration-standard)] ease-[var(--motion-ease-standard)] hover:-translate-y-px active:translate-y-0';
 
 export const SettingsViewShell: React.FC<{ children: ReactNode }> = ({ children }) => (
-  <div className="settings-view-shell settings-reference-stack space-y-6 pb-4">{children}</div>
+  <div className="settings-view-shell settings-reference-stack pb-4">{children}</div>
 );
 
 export const SettingsBadge: React.FC<{ children: ReactNode; tone?: Tone; className?: string }> = ({

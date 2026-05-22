@@ -183,15 +183,16 @@ export class AuthService {
       return this.badRequest(emailCheck.error);
     }
 
+    // 速率限制在 Turnstile 验证之前执行，防止攻击者利用无效 token 绕过限流
+    if (!this.rateLimiter.consume("login-ip", context.ip, loginIpRule)) {
+      return this.rateLimited("Too many login attempts from this IP.");
+    }
+
     if (input.turnstileToken || requireTurnstileToken) {
       const turnstileResult = await this.verifyTurnstileToken(input.turnstileToken || "", context.ip);
       if (!turnstileResult.success) {
         return this.forbidden(turnstileResult.error || "Turnstile verification failed.");
       }
-    }
-
-    if (!this.rateLimiter.consume("login-ip", context.ip, loginIpRule)) {
-      return this.rateLimited("Too many login attempts from this IP.");
     }
 
     const session = await this.identityStore.authenticatePassword(

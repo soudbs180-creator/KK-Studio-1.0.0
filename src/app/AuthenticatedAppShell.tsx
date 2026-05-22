@@ -215,7 +215,7 @@ export const AuthenticatedAppShell: React.FC<AuthenticatedAppShellProps> = ({
   const showStartupRuntimeBanner = showStartupBanner && !isBackgroundReady;
 
   if (loading) {
-    return <AppStartupScreen stage={stage} warning={sessionRecoveryWarning} />;
+    return <AppStartupScreen stage="session_ready" warning={sessionRecoveryWarning} />;
   }
 
   if (shouldShowLoginForAuthGate({ user, session, isTempUser })) {

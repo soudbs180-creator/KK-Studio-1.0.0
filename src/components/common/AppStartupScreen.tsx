@@ -89,11 +89,6 @@ export const AppStartupScreen: React.FC<{
         data-testid="app-startup-shell"
         className="app-startup-shell"
       >
-        <div className="app-startup-orbit" aria-hidden>
-          <span />
-          <span />
-          <span />
-        </div>
         <section
           className="app-startup-card"
           style={{

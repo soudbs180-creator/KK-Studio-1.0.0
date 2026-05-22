@@ -52,6 +52,12 @@ export function applyDebitCredits(
   input: DebitCreditsRequestDto,
   now: string,
 ): CreditDebitResult {
+  // 域层自保护：防止任何调用方绕过余额检查导致负余额
+  if (account.balance < input.creditAmount) {
+    throw new Error(
+      `Insufficient credit balance: available=${account.balance}, requested=${input.creditAmount}`,
+    );
+  }
   const nextBalance = account.balance - input.creditAmount;
 
   return {

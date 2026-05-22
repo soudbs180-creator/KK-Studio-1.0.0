@@ -1,4 +1,4 @@
-﻿import type { ApiError } from '../../../packages/contracts/src/index.ts';
+import type { ApiError } from '../../../packages/contracts/src/index.ts';
 import { kkWebApiClient } from '../api/kkApiClient.ts';
 
 
@@ -387,7 +387,7 @@ class AdminModelService {
     return this.mapLegacyProviderRows(response.data.items || []);
   }
 
-  private normalizeHexColor(input?: string | null, fallback = '#3B82F6'): string {
+  private normalizeHexColor(input?: string | null, fallback = '#ff4d8b'): string {
     let color = (input || fallback).trim();
 
     if (/^[A-Fa-f0-9]{3,8}$/.test(color)) {
@@ -401,7 +401,7 @@ class AdminModelService {
     primary?: string | null,
     secondary?: string | null
   ): { colorStart: string; colorEnd: string; colorSecondary: string } {
-    const colorStart = this.normalizeHexColor(primary, '#3B82F6');
+    const colorStart = this.normalizeHexColor(primary, '#ff4d8b');
     const secondaryRaw = secondary ? this.normalizeHexColor(secondary, colorStart) : '';
     const colorEnd = secondaryRaw || darkenColor(colorStart, 20);
     const colorSecondary = secondaryRaw || colorEnd;

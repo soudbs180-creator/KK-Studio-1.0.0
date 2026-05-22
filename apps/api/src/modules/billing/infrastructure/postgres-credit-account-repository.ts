@@ -9,6 +9,7 @@ import {
   type RefundCreditsResponseDto,
 } from "../../../../../../packages/contracts/src/index.ts";
 import { getSharedPostgresPool, hasPostgresConfig, type PostgresQueryable } from "../../../lib/postgres.ts";
+import type { Pool, PoolClient } from "pg";
 import type { CreditLedgerEntry } from "../domain/credit-account.ts";
 import {
   CreditBalanceInsufficientError,
@@ -129,6 +130,30 @@ export class PostgresCreditAccountRepository implements CreditAccountRepository 
     this.initialBalance = initialBalance;
   }
 
+  /**
+   * 在事务中执行回调。如果 queryable 是 Pool，则从池中获取客户端并用
+   * BEGIN/COMMIT/ROLLBACK 包裹；否则降级为直接执行（兼容内存仓库测试场景）。
+   */
+  private async withTransaction<T>(fn: (client: PostgresQueryable) => Promise<T>): Promise<T> {
+    const pool = this.queryable as unknown as Pool;
+    if (typeof pool.connect !== 'function') {
+      // 非 Pool 场景（如测试），直接执行
+      return fn(this.queryable);
+    }
+    const client: PoolClient = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await fn(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
   async getOrCreate(userId: string): Promise<CreditBalanceDto> {
     const existing = await this.getExistingAccount(userId);
     if (existing) {
@@ -159,42 +184,63 @@ export class PostgresCreditAccountRepository implements CreditAccountRepository 
   }
 
   async saveDebit(account: CreditBalanceDto, ledger: CreditLedgerEntry): Promise<PersistedCreditMutation> {
-    const current = await this.getOrCreate(account.userId);
-    if (current.balance < ledger.creditAmount) {
-      throw new CreditBalanceInsufficientError(current.balance);
-    }
+    return this.withTransaction(async (tx) => {
+      // 使用 SELECT ... FOR UPDATE 行级锁，防止并发扣费竞态
+      const lockResult = await tx.query(
+        `SELECT balance, frozen FROM user_credits WHERE user_id = $1 FOR UPDATE`,
+        [account.userId],
+      );
+      let currentBalance: number;
+      let currentFrozen: number;
+      if (lockResult.rows.length === 0) {
+        // 用户不存在，创建账户
+        const created = await this.getOrCreate(account.userId);
+        currentBalance = created.balance;
+        currentFrozen = created.frozenBalance;
+      } else {
+        currentBalance = parseInteger(lockResult.rows[0].balance);
+        currentFrozen = parseInteger(lockResult.rows[0].frozen);
+      }
 
-    const now = ledger.createdAt || new Date().toISOString();
-    const nextBalance = current.balance - ledger.creditAmount;
-    await this.upsertAccount(account.userId, nextBalance, current.frozenBalance, now);
-    await this.insertTransaction({
-      id: ledger.ledgerId,
-      userId: account.userId,
-      type: "consumption",
-      amount: -ledger.creditAmount,
-      balanceAfter: nextBalance,
-      modelId: ledger.modelCode,
-      description: `Debit for ${ledger.businessRefType}:${ledger.businessRefId}`,
-      status: "completed",
-      metadata: { idempotency_key: ledger.idempotencyKey },
-      businessRefType: ledger.businessRefType,
-      businessRefId: ledger.businessRefId,
-      createdAt: now,
-      completedAt: now,
-      idempotencyKey: ledger.idempotencyKey,
-    });
+      if (currentBalance < ledger.creditAmount) {
+        throw new CreditBalanceInsufficientError(currentBalance);
+      }
 
-    return {
-      account: {
-        ...current,
-        balance: nextBalance,
-        updatedAt: now,
-      },
-      ledger: {
-        ...ledger,
+      const now = ledger.createdAt || new Date().toISOString();
+      const nextBalance = currentBalance - ledger.creditAmount;
+      await this.upsertAccountWithQueryable(tx, account.userId, nextBalance, currentFrozen, now);
+      await this.insertTransactionWithQueryable(tx, {
+        id: ledger.ledgerId,
+        userId: account.userId,
+        type: "consumption",
+        amount: -ledger.creditAmount,
         balanceAfter: nextBalance,
-      },
-    };
+        modelId: ledger.modelCode,
+        description: `Debit for ${ledger.businessRefType}:${ledger.businessRefId}`,
+        status: "completed",
+        metadata: { idempotency_key: ledger.idempotencyKey },
+        businessRefType: ledger.businessRefType,
+        businessRefId: ledger.businessRefId,
+        createdAt: now,
+        completedAt: now,
+        idempotencyKey: ledger.idempotencyKey,
+      });
+
+      return {
+        account: {
+          accountId: account.userId,
+          userId: account.userId,
+          balance: nextBalance,
+          frozenBalance: currentFrozen,
+          createdAt: account.createdAt || now,
+          updatedAt: now,
+        },
+        ledger: {
+          ...ledger,
+          balanceAfter: nextBalance,
+        },
+      };
+    });
   }
 
   async saveRecharge(account: CreditBalanceDto, ledger: CreditLedgerEntry): Promise<PersistedCreditMutation> {
@@ -266,6 +312,7 @@ export class PostgresCreditAccountRepository implements CreditAccountRepository 
     transactionId: string,
     reason = "Refund issued by migrated billing API.",
   ): Promise<RefundCreditsResponseDto> {
+    // 先在事务外做只读检查，快速失败
     const source = await this.findTransactionById(userId, transactionId);
     if (!source) {
       throw new CreditTransactionNotFoundError(transactionId);
@@ -274,43 +321,59 @@ export class PostgresCreditAccountRepository implements CreditAccountRepository 
       throw new CreditTransactionNotRefundableError(transactionId);
     }
 
-    const current = await this.getOrCreate(userId);
-    const refundedAmount = Math.abs(source.amount);
-    const now = new Date().toISOString();
-    const nextBalance = current.balance + refundedAmount;
-    await this.upsertAccount(userId, nextBalance, current.frozenBalance, now);
-    await this.queryable.query(
-      `update credit_transactions
-          set status = 'refunded'
-        where id = $1`,
-      [transactionId],
-    );
+    return this.withTransaction(async (tx) => {
+      // 在事务中锁定用户余额行
+      const lockResult = await tx.query(
+        `SELECT balance, frozen FROM user_credits WHERE user_id = $1 FOR UPDATE`,
+        [userId],
+      );
+      const currentBalance = lockResult.rows.length > 0 ? parseInteger(lockResult.rows[0].balance) : 0;
+      const currentFrozen = lockResult.rows.length > 0 ? parseInteger(lockResult.rows[0].frozen) : 0;
 
-    const refundLedgerId = randomUUID();
-    await this.insertTransaction({
-      id: refundLedgerId,
-      userId,
-      type: "refund",
-      amount: refundedAmount,
-      balanceAfter: nextBalance,
-      modelId: source.modelCode || undefined,
-      modelName: source.modelName || undefined,
-      providerId: source.providerCode || undefined,
-      description: reason,
-      status: "completed",
-      metadata: { source_transaction_id: transactionId },
-      businessRefType: source.businessRefType || undefined,
-      businessRefId: source.businessRefId || undefined,
-      createdAt: now,
-      completedAt: now,
+      // 在事务中再次确认交易状态，防止并发重复退款
+      const txCheck = await tx.query(
+        `SELECT status FROM credit_transactions WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+        [transactionId, userId],
+      );
+      if (!txCheck.rows[0] || txCheck.rows[0].status !== 'completed') {
+        throw new CreditTransactionNotRefundableError(transactionId);
+      }
+
+      const refundedAmount = Math.abs(source.amount);
+      const now = new Date().toISOString();
+      const nextBalance = currentBalance + refundedAmount;
+      await this.upsertAccountWithQueryable(tx, userId, nextBalance, currentFrozen, now);
+      await tx.query(
+        `UPDATE credit_transactions SET status = 'refunded' WHERE id = $1`,
+        [transactionId],
+      );
+
+      const refundLedgerId = randomUUID();
+      await this.insertTransactionWithQueryable(tx, {
+        id: refundLedgerId,
+        userId,
+        type: "refund",
+        amount: refundedAmount,
+        balanceAfter: nextBalance,
+        modelId: source.modelCode || undefined,
+        modelName: source.modelName || undefined,
+        providerId: source.providerCode || undefined,
+        description: reason,
+        status: "completed",
+        metadata: { source_transaction_id: transactionId },
+        businessRefType: source.businessRefType || undefined,
+        businessRefId: source.businessRefId || undefined,
+        createdAt: now,
+        completedAt: now,
+      });
+
+      return {
+        originalTransactionId: transactionId,
+        refundedLedgerId: refundLedgerId,
+        balanceAfter: nextBalance,
+        transactionType: CreditTransactionType.Refund,
+      };
     });
-
-    return {
-      originalTransactionId: transactionId,
-      refundedLedgerId: refundLedgerId,
-      balanceAfter: nextBalance,
-      transactionType: CreditTransactionType.Refund,
-    };
   }
 
   async adminRechargeByIdentity(
@@ -416,7 +479,18 @@ export class PostgresCreditAccountRepository implements CreditAccountRepository 
     updatedAt: string,
     email?: string | null,
   ): Promise<void> {
-    await this.queryable.query(
+    await this.upsertAccountWithQueryable(this.queryable, userId, balance, frozen, updatedAt, email);
+  }
+
+  private async upsertAccountWithQueryable(
+    q: PostgresQueryable,
+    userId: string,
+    balance: number,
+    frozen: number,
+    updatedAt: string,
+    email?: string | null,
+  ): Promise<void> {
+    await q.query(
       `insert into user_credits (
          user_id, email, balance, frozen, created_at, updated_at
        ) values (
@@ -468,7 +542,28 @@ export class PostgresCreditAccountRepository implements CreditAccountRepository 
     completedAt?: string;
     idempotencyKey?: string;
   }): Promise<void> {
-    await this.queryable.query(
+    await this.insertTransactionWithQueryable(this.queryable, input);
+  }
+
+  private async insertTransactionWithQueryable(q: PostgresQueryable, input: {
+    id: string;
+    userId: string;
+    type: string;
+    amount: number;
+    balanceAfter: number;
+    modelId?: string;
+    modelName?: string;
+    providerId?: string;
+    description?: string;
+    status: string;
+    metadata?: Record<string, unknown>;
+    businessRefType?: string;
+    businessRefId?: string;
+    createdAt: string;
+    completedAt?: string;
+    idempotencyKey?: string;
+  }): Promise<void> {
+    await q.query(
       `insert into credit_transactions (
          id, user_id, amount, type, balance_after, model_id, model_name, provider_id,
          description, status, metadata_json, completed_at, created_at, idempotency_key,

@@ -13,6 +13,7 @@ export type OpenAICompatibleImageDispatchKind =
     | 'gpt-best-native'
     | '12ai-openai-strict'
     | 'suxi-openai-strict'
+    | 'suxi-openai-compat'
     | 'gemini-chat-strict-fail-closed'
     | 'provider-chat'
     | 'comfly-openai-strict'
@@ -95,7 +96,9 @@ export function resolveOpenAICompatibleImageDispatch(
     }
 
     if (input.runtime.strategyId === 'suxi') {
-        return { kind: 'suxi-openai-strict' };
+        return input.isGeminiImage
+            ? { kind: 'suxi-openai-compat' }
+            : { kind: 'suxi-openai-strict' };
     }
 
     if (input.isGeminiImage) {

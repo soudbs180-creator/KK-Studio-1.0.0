@@ -164,16 +164,44 @@ export async function pollVeoVideoOperation(
 /**
  * 下载视频
  */
-async function downloadVideo(uri: string, apiKey: string): Promise<Blob> {
-    const response = await fetch(uri, {
-        headers: { 'x-goog-api-key': apiKey }
-    });
+async function downloadVideo(uri: string, apiKey: string, maxRetries = 3): Promise<Blob> {
+    let lastError: Error | null = null;
 
-    if (!response.ok) {
-        throw new Error(`Video download failed: HTTP ${response.status}`);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`[VeoVideoService] 下载视频尝试 ${attempt}/${maxRetries}:`, uri);
+
+            const response = await fetch(uri, {
+                headers: {
+                    'x-goog-api-key': apiKey,
+                    'Accept': 'video/mp4,video/*,*/*'
+                },
+                redirect: 'follow'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const blob = await response.blob();
+            console.log('[VeoVideoService] 视频下载成功, 大小:', (blob.size / 1024 / 1024).toFixed(2), 'MB');
+
+            if (blob.size === 0) {
+                throw new Error('下载的视频为空');
+            }
+
+            return blob;
+        } catch (error: any) {
+            lastError = error;
+            console.error(`[VeoVideoService] 下载尝试 ${attempt} 失败:`, error.message);
+
+            if (attempt < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            }
+        }
     }
 
-    return await response.blob();
+    throw lastError || new Error('视频下载失败');
 }
 
 /**

@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ChevronDown,
@@ -222,6 +222,22 @@ const API_MANAGEMENT_HOME_PATH = '/settings/api-management';
 const API_MANAGEMENT_OFFICIAL_PREFIX = '/settings/api-management/official/';
 const API_MANAGEMENT_PROVIDER_PREFIX = '/settings/api-management/provider/';
 const ROUTE_NEW_ITEM = 'new';
+
+interface ProviderPreset {
+  name: string;
+  baseUrl: string;
+  format: ApiProtocolFormat;
+  color: string;
+}
+
+const PROVIDER_PRESETS: ProviderPreset[] = [
+  { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', format: 'openai', color: '#0054ff' },
+  { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', format: 'openai', color: '#ff5a00' },
+  { name: 'Google AI Studio', baseUrl: 'https://generativelanguage.googleapis.com', format: 'gemini', color: '#4285f4' },
+  { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', format: 'openai', color: '#10a37f' },
+  { name: 'Anthropic Claude', baseUrl: 'https://api.anthropic.com', format: 'claude', color: '#d97706' },
+  { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', format: 'openai', color: '#7c3aed' },
+];
 
 const buildOfficialEditorPath = (officialId?: string | null) =>
   officialId
@@ -800,6 +816,100 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       .sort((left, right) => right.updatedAt - left.updatedAt),
   );
 
+  // 1. 第三方供应商 Base URL 与协议冲突诊断
+  const routingConflictWarning = useMemo(() => {
+    const url = providerForm.baseUrl.trim().toLowerCase();
+    const format = providerForm.format;
+
+    if (!url) return '';
+
+    if (url.includes('googleapis.com')) {
+      if (format !== 'gemini' && format !== 'auto') {
+        return pick(
+          '⚠️ 检测到 Google Gemini 官方域名，但通信协议选择为非 Gemini 协议，可能会导致请求 404，建议改选为“Gemini 协议”。',
+          '⚠️ Google Gemini official URL detected, but non-Gemini protocol chosen. This may result in 404 errors. We recommend selecting "Gemini protocol".'
+        );
+      }
+    }
+
+    if (url.includes('api.openai.com')) {
+      if (format === 'gemini' || format === 'claude') {
+        return pick(
+          '⚠️ 检测到 OpenAI 官方域名，但通信协议选择为了非 OpenAI 协议，可能导致密钥校验失败。',
+          '⚠️ OpenAI official URL detected, but non-OpenAI protocol chosen. This may cause authentication failures.'
+        );
+      }
+    }
+
+    if (url.includes('api.anthropic.com')) {
+      if (format !== 'claude' && format !== 'auto') {
+        return pick(
+          '⚠️ 检测到 Anthropic Claude 官方域名，但通信协议未选择为 Claude 协议，可能会导致通信格式错乱。',
+          '⚠️ Anthropic Claude official URL detected, but non-Claude protocol chosen. This may lead to communication format mismatches.'
+        );
+      }
+    }
+
+    return '';
+  }, [providerForm.baseUrl, providerForm.format, pick]);
+
+  // 智能自动纠正第三方协议
+  const autoFixProviderFormat = useCallback(() => {
+    const url = providerForm.baseUrl.trim().toLowerCase();
+    let targetFormat: ApiProtocolFormat = 'auto';
+    if (url.includes('googleapis.com')) targetFormat = 'gemini';
+    else if (url.includes('api.openai.com')) targetFormat = 'openai';
+    else if (url.includes('api.anthropic.com')) targetFormat = 'claude';
+
+    if (targetFormat !== 'auto') {
+      setProviderForm((current) => ({ ...current, format: targetFormat }));
+      notify.success(
+        pick('协议已纠偏', 'Protocol Repaired'),
+        pick(`已自动将协议修正为：${getProtocolLabel(targetFormat)}`, `Automatically corrected protocol to: ${getProtocolLabel(targetFormat)}`)
+      );
+    }
+  }, [providerForm.baseUrl, pick]);
+
+  // 2. 官方接口 Key 格式智能校验
+  const officialKeyDiagnostics = useMemo(() => {
+    const key = officialForm.key.trim();
+    const provider = officialForm.provider;
+
+    if (!key || isReadonlySecretPlaceholder(key)) return '';
+
+    if (provider === 'Google') {
+      if (key.startsWith('sk-')) {
+        return pick(
+          '⚠️ 谷歌官方接口所填写的 Key 似乎是以 "sk-" 开头的 OpenAI 格式 Key，请检查是否填错。',
+          '⚠️ The Google API key seems to start with "sk-", which is typically an OpenAI key. Please double check.'
+        );
+      }
+      if (!key.startsWith('AIzaSy')) {
+        return pick(
+          '💡 提示：谷歌 Gemini 官方 Key 通常以 "AIzaSy" 开头，请确认所填 Key 的格式是否正确。',
+          '💡 Note: Google Gemini API keys typically start with "AIzaSy". Please check if your key is correct.'
+        );
+      }
+    }
+
+    if (provider === 'OpenAI') {
+      if (key.startsWith('AIzaSy')) {
+        return pick(
+          '⚠️ OpenAI 官方接口所填写的 Key 似乎是 Google 格式的 Key（以 "AIzaSy" 开头），请检查是否填错。',
+          '⚠️ The OpenAI key seems to start with "AIzaSy", which is typically a Google API key. Please double check.'
+        );
+      }
+      if (!key.startsWith('sk-')) {
+        return pick(
+          '💡 提示：OpenAI 官方 Key 通常以 "sk-" 开头，请确认填写的 Key 是否正确。',
+          '💡 Note: OpenAI API keys typically start with "sk-". Please check if your key is correct.'
+        );
+      }
+    }
+
+    return '';
+  }, [officialForm.key, officialForm.provider, pick]);
+
   const runtimeOfficialSlots = useMemo(() => slots.filter(isOfficialSlot), [slots]);
   const runtimeThirdPartyProviders = useMemo(() => [...providers].sort((a, b) => b.updatedAt - a.updatedAt), [providers]);
   const isUserApiPersistenceDegraded = isUserApiPersistenceDegradedFromHealth(apiHealth);
@@ -1242,23 +1352,84 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   const capabilityCards = useMemo(() => (
     CAPABILITY_ROLE_META.map((meta) => {
       const assignment = capabilityAssignments.find((item) => item.role === meta.role);
+      const primaryRouteId = assignment?.primaryRouteId || '';
+      
+      let warning = '';
+      if (assignment?.enabled !== false && primaryRouteId) {
+        const channel = allChannelConfigs.find((c) => c.id === primaryRouteId);
+        if (channel) {
+          const slot = keyManager.getKey(primaryRouteId);
+          const provider = keyManager.getProvider(primaryRouteId);
+          const isDisabled = slot ? slot.disabled : provider ? !provider.isActive : false;
+          const isError = slot ? slot.status === 'invalid' : provider ? provider.status === 'error' : false;
+          
+          if (isDisabled) {
+            warning = pick(
+              '⚠️ 所选主链路已被停用，请先在下方链路列表中启用它，否则该功能将无法使用。',
+              '⚠️ The selected primary route is disabled. Please enable it in the list below first, otherwise this function will not work.'
+            );
+          } else if (isError) {
+            warning = pick(
+              '⚠️ 所选主链路当前处于异常状态，可能会导致请求失败。',
+              '⚠️ The selected primary route is currently in an error state. Requests may fail.'
+            );
+          } else {
+            if (meta.role === 'image_generation') {
+              const lowerName = channel.name.toLowerCase();
+              const lowerProvider = String(channel.providerFamily || '').toLowerCase();
+              const supportedModels = channel.supportedModels || [];
+              const hasImageModel = supportedModels.some((m) => {
+                const lm = m.toLowerCase();
+                return lm.includes('imagen') || lm.includes('dall') || lm.includes('flux') || lm.includes('sd-') || lm.includes('stable-diffusion') || lm.includes('midjourney') || lm.includes('mj-') || lm.includes('cogview') || lm.includes('playground');
+              });
+              
+              const isDefinitelyTextOnly = 
+                lowerName.includes('deepseek') || 
+                lowerName.includes('qwen-') || 
+                lowerProvider.includes('anthropic') || 
+                channel.protocolHint === 'claude' || 
+                (!hasImageModel && supportedModels.length > 0 && !lowerName.includes('siliconflow') && !lowerName.includes('openai') && !lowerName.includes('google'));
+                
+              if (isDefinitelyTextOnly) {
+                warning = pick(
+                  '⚠️ 检测到图片生成能力绑定了纯文本或不支持生图的链路，建议改选为支持 Imagen 或 DALL-E 的专用通道。',
+                  '⚠️ Image generation seems to be mapped to a text-only route. We recommend selecting a channel that supports Imagen or DALL-E.'
+                );
+              }
+            } else if (meta.role === 'prompt_optimizer') {
+              const selectedModel = assignment?.primaryModelId || '';
+              if (selectedModel) {
+                const lm = selectedModel.toLowerCase();
+                if (lm.includes('mini') || lm.includes('lite') || lm.includes('flash') || lm.includes('speed') || lm.includes('8b') || lm.includes('7b') || lm.includes('1.5b') || lm.includes('3b')) {
+                  warning = pick(
+                    '💡 提示：提示词优化是一项复杂推理任务，使用轻量或 Flash 模型可能会降低优化质量，建议使用 GPT-4o、Claude 3.5 Sonnet 或 DeepSeek-V3 等强推理模型。',
+                    '💡 Note: Prompt optimization requires complex reasoning. Lightweight or Flash models may degrade optimization quality. GPT-4o or Claude 3.5 Sonnet is recommended.'
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+
       return {
         role: meta.role,
         title: pick(meta.titleZh, meta.titleEn),
         description: pick(meta.descriptionZh, meta.descriptionEn),
         enabled: assignment?.enabled !== false,
-        primaryRouteId: assignment?.primaryRouteId || '',
+        primaryRouteId,
         primaryModelId: assignment?.primaryModelId || '',
         fallbackRouteId: assignment?.fallbackRouteId || '',
         routeOptions: capabilityRouteOptions,
-        modelOptions: getRouteModelOptions(assignment?.primaryRouteId || '', meta.role),
+        modelOptions: getRouteModelOptions(primaryRouteId, meta.role),
+        warning,
         onEnabledChange: (enabled: boolean) => updateCapabilityAssignment(meta.role, { enabled }),
         onPrimaryRouteChange: (value: string) => updateCapabilityAssignment(meta.role, { primaryRouteId: value }),
         onPrimaryModelChange: (value: string) => updateCapabilityAssignment(meta.role, { primaryModelId: value }),
         onFallbackRouteChange: (value: string) => updateCapabilityAssignment(meta.role, { fallbackRouteId: value }),
       };
     })
-  ), [capabilityAssignments, capabilityRouteOptions, getRouteModelOptions, pick, updateCapabilityAssignment]);
+  ), [capabilityAssignments, allChannelConfigs, keyManager, capabilityRouteOptions, getRouteModelOptions, pick, updateCapabilityAssignment]);
 
   const ocrKeySourceLabel = useMemo(() => {
     if (ocrSettings.keySource === 'environment') {
@@ -3032,6 +3203,19 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               disabled={userApiEditorReadOnly}
             />
 
+            {officialKeyDiagnostics ? (
+              <div className="rounded-[22px] border px-4 py-3 text-[13px] leading-6 backdrop-blur-md transition-all duration-300"
+                style={{
+                  ...SETTINGS_WARNING_STYLE,
+                  background: 'rgba(245, 158, 11, 0.08)',
+                  borderColor: 'rgba(245, 158, 11, 0.25)',
+                  color: 'var(--state-warning-text)',
+                }}
+              >
+                {officialKeyDiagnostics}
+              </div>
+            ) : null}
+
             <div>
               <div className="mb-2 text-[13px] font-medium text-[var(--text-primary)]">{pick('预算策略', 'Budget rule')}</div>
               <SegmentedControlMulti options={[...UI_BUDGET_OPTIONS]} value={getModeOption(officialForm.mode)} onChange={(value) => setOfficialForm((current) => ({ ...current, mode: parseModeOption(value) }))} disabled={userApiEditorReadOnly} />
@@ -3135,14 +3319,70 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               />
             </div>
 
-            <SettingInput
-              label={pick('基础地址', 'Base URL')}
-              value={providerForm.baseUrl}
-              onChange={(value) => setProviderForm((current) => ({ ...current, baseUrl: value }))}
-              placeholder="https://api.example.com/v1"
-              helper={pick('通信检测、模型拉取和价格同步都会基于这里的地址。', 'Connectivity checks, model sync, and pricing sync all use this URL.')}
-              disabled={providerEditorReadOnly}
-            />
+            <div>
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <span className="text-[12px] font-medium text-[var(--text-secondary)] mr-1">
+                  {pick('智能预设：', 'Presets: ')}
+                </span>
+                {PROVIDER_PRESETS.map((preset) => (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    disabled={providerEditorReadOnly}
+                    onClick={() => {
+                      setProviderForm((current) => ({
+                        ...current,
+                        name: preset.name,
+                        baseUrl: preset.baseUrl,
+                        format: preset.format,
+                        color: preset.color,
+                      }));
+                      notify.success(
+                        pick('预设已载入', 'Preset Loaded'),
+                        pick(`已成功载入 ${preset.name} 预设配置`, `Successfully loaded preset for ${preset.name}`)
+                      );
+                    }}
+                    className="px-3 py-1 text-[12px] font-semibold rounded-full border border-dashed transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                    style={{
+                      borderColor: preset.color,
+                      color: preset.color,
+                      background: 'rgba(255, 255, 255, 0.03)',
+                    }}
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+              <SettingInput
+                label={pick('基础地址', 'Base URL')}
+                value={providerForm.baseUrl}
+                onChange={(value) => setProviderForm((current) => ({ ...current, baseUrl: value }))}
+                placeholder="https://api.example.com/v1"
+                helper={pick('通信检测、模型拉取和价格同步都会基于这里的地址。', 'Connectivity checks, model sync, and pricing sync all use this URL.')}
+                disabled={providerEditorReadOnly}
+              />
+            </div>
+
+            {routingConflictWarning ? (
+              <div className="flex items-center justify-between gap-4 rounded-[22px] border px-4 py-3 text-[13px] leading-6 backdrop-blur-md transition-all duration-300"
+                style={{
+                  ...SETTINGS_WARNING_STYLE,
+                  background: 'rgba(245, 158, 11, 0.08)',
+                  borderColor: 'rgba(245, 158, 11, 0.25)',
+                  color: 'var(--state-warning-text)',
+                }}
+              >
+                <div className="flex-1 pr-2">{routingConflictWarning}</div>
+                <button
+                  type="button"
+                  disabled={providerEditorReadOnly}
+                  onClick={autoFixProviderFormat}
+                  className="shrink-0 px-3 py-1 text-[12px] font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-full transition-all active:scale-95 shadow-sm"
+                >
+                  {pick('一键纠偏', 'Auto Fix')}
+                </button>
+              </div>
+            ) : null}
 
             <div className="grid gap-4 lg:grid-cols-2">
               <SettingInput

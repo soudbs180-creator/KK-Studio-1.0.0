@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState, useRef } from "react";
 
 import { clearStoredAdminSession } from "../services/api/adminSession";
 import { getStoredKkApiAccessToken, setStoredKkApiAccessToken } from "../services/api/authAccessToken";
@@ -87,7 +87,26 @@ function isSessionRecoveryAuthErrorCode(code: unknown): boolean {
     || normalizedCode === "SESSION_REAUTH_REQUIRED";
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage = "Request timeout"): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(errorMessage));
+    }, timeoutMs);
+    promise.then(
+      (res) => {
+        clearTimeout(timer);
+        resolve(res);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const retryCountRef = useRef(0);
   const [runtimeState, setRuntimeState] = useState<RuntimeAuthState>(() => resolveInitialRuntimeState());
   const [authActionLoading, setAuthActionLoading] = useState(false);
   const [sessionRecoveryLoading, setSessionRecoveryLoading] = useState(false);
@@ -162,6 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     let disposed = false;
     let retryTimer: number | null = null;
+    const MAX_RETRIES = 3;
     const retryableWarning = "Checking your sign-in status. Please try again in a moment.";
 
     const clearRetryTimer = () => {
@@ -173,6 +193,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const scheduleRetry = () => {
       clearRetryTimer();
+      if (retryCountRef.current >= MAX_RETRIES) {
+        console.warn(`[AuthContext] Session recovery failed after ${MAX_RETRIES} retries. Clearing session to allow login.`);
+        clearHostedSession();
+        setSessionRecoveryWarning("服务连接超时，已自动清除会话，请重新登录。");
+        window.setTimeout(() => {
+          setSessionRecoveryWarning(null);
+        }, 5000);
+        return;
+      }
+      retryCountRef.current++;
       retryTimer = window.setTimeout(() => {
         retryTimer = null;
         void recoverRuntimeSession();
@@ -180,6 +210,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const clearHostedSession = () => {
+      retryCountRef.current = 0; // 清空重试计数器
       tempUserService.clearCachedTempUser();
       const nextState = clearHostedSessionRuntime();
       clearStoredAdminSession();
@@ -189,36 +220,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const tryRestoreHostedSession = async (): Promise<boolean> => {
-      const response = await fetchHostedSessionFromServer();
-      if (disposed) {
-        return true;
-      }
+      try {
+        const response = await withTimeout(fetchHostedSessionFromServer(), 10000, "获取托管会话超时");
+        if (disposed) {
+          return true;
+        }
 
-      if (response.success) {
-        const nextState = applyHostedSessionToRuntime(response.data);
-        setSessionRecoveryBlockedBySignOut(false);
-        setSessionRecoveryWarning(null);
-        setSessionRecoveryLoading(false);
-        setRuntimeState(nextState);
-        return true;
-      }
+        if (response.success) {
+          retryCountRef.current = 0; // 成功恢复会话，清空重试计数
+          const nextState = applyHostedSessionToRuntime(response.data);
+          setSessionRecoveryBlockedBySignOut(false);
+          setSessionRecoveryWarning(null);
+          setSessionRecoveryLoading(false);
+          setRuntimeState(nextState);
+          return true;
+        }
 
-      if (isSessionRecoveryAuthErrorCode(response.error?.code)) {
-        clearHostedSession();
-        return true;
-      }
+        if (isSessionRecoveryAuthErrorCode(response.error?.code)) {
+          clearHostedSession();
+          return true;
+        }
 
-      return false;
+        return false;
+      } catch (error) {
+        console.warn("[AuthContext] tryRestoreHostedSession 遇到异常或超时:", error);
+        return false;
+      }
     };
 
     const restoreSessionFromStoredToken = async (accessToken: string) => {
       try {
-        const response = await kkWebApiClient.getProfile({ accessToken });
+        const response = await withTimeout(kkWebApiClient.getProfile({ accessToken }), 10000, "获取用户配置文件超时");
         if (disposed) {
           return;
         }
 
         if (response.success) {
+          retryCountRef.current = 0; // 成功恢复会话，清空重试计数
           const nextState = updateRuntimeAuthStateFromProfile(response.data);
           setSessionRecoveryBlockedBySignOut(false);
           setSessionRecoveryWarning(null);
@@ -234,7 +272,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setSessionRecoveryWarning(retryableWarning);
         scheduleRetry();
-      } catch {
+      } catch (error) {
+        console.warn("[AuthContext] restoreSessionFromStoredToken 遇到异常或超时:", error);
         if (disposed) {
           return;
         }

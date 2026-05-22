@@ -40,7 +40,7 @@ function getRecommendedParticleCount(): number {
 
 const GpuBackground: React.FC<GpuBackgroundProps> = ({
     particleCount,
-    colors = ['#3b82f6', '#8b5cf6', '#06b6d4', '#22c55e'],
+    colors = ['#ff4d8b', '#ffb084', '#b8a4ed', '#a4d4c5'],
     enabled = true,
     opacity = 0.6,
     connectionDistance = 150,

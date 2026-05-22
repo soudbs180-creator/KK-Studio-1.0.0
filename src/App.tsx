@@ -211,8 +211,13 @@ const ConnectorDisconnectButton: React.FC<ConnectorDisconnectButtonProps> = ({ x
     style={{ pointerEvents: 'auto' }}
   >
     <div
-      className="w-6 h-6 rounded-full border border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center cursor-pointer shadow-lg scale-90 hover:scale-110 active:scale-95 transition-all"
-      style={{ backgroundColor: 'var(--bg-secondary)' }}
+      className="w-6 h-6 rounded-full border flex items-center justify-center cursor-pointer scale-90 hover:scale-110 active:scale-95 transition-all hover:bg-[#ff6b5a] hover:text-white hover:border-[#ff6b5a]"
+      style={{
+        borderColor: 'rgba(255, 107, 90, 0.5)',
+        color: 'var(--clay-brand-coral-ink, #7a1f16)',
+        backgroundColor: 'var(--bg-secondary)',
+        boxShadow: 'var(--ui-shadow-control)'
+      }}
       onClick={onClick}
       title="断开连接"
     >
@@ -714,7 +719,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     const timeSinceLastMouseMove = Date.now() - lastMouseMoveRef.current;
     const isMouseActive = timeSinceLastMouseMove < 5000; // Treat the mouse as active if it moved within the last 5 seconds
 
-    console.log('[handleShowMobileNav] isPromptFocused:', isPromptFocused, 'isSidebarHovered:', isSidebarHovered, 'isMouseActive:', isMouseActive);
     setIsMobileNavVisible(true);
     // Clear any existing timer
     if (mobileNavTimerRef.current) {
@@ -722,13 +726,9 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
     // Skip auto-hide while the input is focused, the sidebar is hovered, or the mouse is active
     if (!isPromptFocused && !isSidebarHovered && !isMouseActive) {
-      console.log('[handleShowMobileNav] 设置 5 秒自动隐藏定时器');
       mobileNavTimerRef.current = setTimeout(() => {
-        console.log('[handleShowMobileNav] 5 秒后自动隐藏');
         setIsMobileNavVisible(false);
       }, 5000);
-    } else {
-      console.log('[handleShowMobileNav] 不设置定时器，当前仍有交互', { isPromptFocused, isSidebarHovered, isMouseActive });
     }
   }, [isPromptFocused, isSidebarHovered]);
 
