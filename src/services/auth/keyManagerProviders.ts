@@ -47,17 +47,13 @@ export function persistProvidersLocal<TProvider>(
     allowLocalStorage = false,
 ): ProviderStorageScope {
     const storageKey = getProviderStorageKey(userId);
-    void providers;
-    void allowLocalStorage;
-
-    if (!userId) {
-        purgeAnonymousSensitiveLocalCaches();
+    try {
+        localStorage.setItem(storageKey, JSON.stringify(providers));
+        return userId ? "user" : "anonymous";
+    } catch (e) {
+        console.error("[keyManagerProviders] Failed to persist providers locally:", e);
         return "none";
     }
-
-    localStorage.removeItem(storageKey);
-    purgeAnonymousSensitiveLocalCaches();
-    return "none";
 }
 
 export function loadProvidersFromLocal<TProvider>(
@@ -69,21 +65,23 @@ export function loadProvidersFromLocal<TProvider>(
     if (!force && existingProviders.length > 0) {
         return null;
     }
-    void allowLocalStorage;
-
-    if (!userId) {
-      purgeAnonymousSensitiveLocalCaches();
-      return {
-        providers: [],
-        scope: "none",
-      };
-    }
 
     const storageKey = getProviderStorageKey(userId);
-    localStorage.removeItem(storageKey);
-    purgeAnonymousSensitiveLocalCaches();
+    try {
+        const stored = localStorage.getItem(storageKey);
+        if (stored) {
+            const providers = JSON.parse(stored) as TProvider[];
+            return {
+                providers,
+                scope: userId ? "user" : "anonymous",
+            };
+        }
+    } catch (e) {
+        console.warn("[keyManagerProviders] Failed to load providers locally:", e);
+    }
+
     return {
-      providers: [],
-      scope: "none",
+        providers: [],
+        scope: userId ? "user" : "anonymous",
     };
 }

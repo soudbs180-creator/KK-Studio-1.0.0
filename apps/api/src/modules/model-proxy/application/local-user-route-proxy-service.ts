@@ -1431,7 +1431,7 @@ export class LocalUserRouteProxyService {
     }
 
     if (endpointType === "gemini" && modelId.startsWith("imagen-")) {
-      const auth = buildGeminiAuth(`${baseUrl}/v1beta/models/${modelId}:predict`, routeConfig);
+      const auth = buildGeminiAuth(`${normalizeDirectGeminiBaseUrl(routeConfig.baseUrl)}/v1beta/models/${modelId}:predict`, routeConfig);
 
       const parameters: Record<string, unknown> = {
         sampleCount: Math.max(1, Number(input.imageCount || 1)),
@@ -1512,7 +1512,7 @@ export class LocalUserRouteProxyService {
     }
 
     if (imageSurface === "async-image") {
-      const auth = buildOpenAICompatAuth(`${baseUrl}/v1/images/async/generations`, routeConfig, "openai");
+      const auth = buildOpenAICompatAuth(buildDirectOpenAIEndpoint(routeConfig.baseUrl, "images/async/generations"), routeConfig, "openai");
       const requestedSize = normalizeImageSize(input.imageSize);
       const body: Record<string, unknown> = {
         model: modelId,
@@ -1614,7 +1614,7 @@ export class LocalUserRouteProxyService {
         generationConfig[useSnakeCase ? "image_config" : "imageConfig"] = imageConfig;
       }
 
-      const auth = buildGeminiAuth(`${baseUrl}/v1beta/models/${modelId}:generateContent`, routeConfig);
+      const auth = buildGeminiAuth(`${normalizeDirectGeminiBaseUrl(routeConfig.baseUrl)}/v1beta/models/${modelId}:generateContent`, routeConfig);
       const payload: Record<string, unknown> = {
         contents: [{ parts }],
         [useSnakeCase ? "generation_config" : "generationConfig"]: generationConfig,
@@ -1692,7 +1692,7 @@ export class LocalUserRouteProxyService {
         requestBody.extra_body = extraBody;
       }
 
-      const auth = buildOpenAICompatAuth(`${baseUrl}/v1/chat/completions`, routeConfig, "openai");
+      const auth = buildOpenAICompatAuth(buildDirectOpenAIEndpoint(routeConfig.baseUrl, "chat/completions"), routeConfig, "openai");
       const imageResponse = await fetch(auth.url, {
         method: "POST",
         headers: {
@@ -1732,7 +1732,7 @@ export class LocalUserRouteProxyService {
       };
     }
 
-    const auth = buildOpenAICompatAuth(`${baseUrl}/v1/images/generations`, routeConfig, "openai");
+    const auth = buildOpenAICompatAuth(buildDirectOpenAIEndpoint(routeConfig.baseUrl, "images/generations"), routeConfig, "openai");
     const imageResponse = await fetch(auth.url, {
       method: "POST",
       headers: {

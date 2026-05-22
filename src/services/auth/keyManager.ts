@@ -611,25 +611,9 @@ export class KeyManager {
      * Load state from localStorage
      */
     private loadState(): KeyManagerState {
-        this.purgeAnonymousSensitiveLocalCaches();
-
         try {
             const key = this.getStorageKey();
-            if (this.userId) {
-                localStorage.removeItem(key);
-                return {
-                    slots: [],
-                    currentIndex: 0,
-                    maxFailures: DEFAULT_MAX_FAILURES,
-                    rotationStrategy: 'round-robin'
-                };
-            }
-
             const stored = localStorage.getItem(key);
-
-            // If scoped key not found, DO NOT fallback to global key to prevent leakage.
-            // Only fallback if userId is null (already handled by getStorageKey).
-
             if (stored) {
                 const parsed = JSON.parse(stored);
                 // Migration for existing keys
@@ -677,6 +661,7 @@ export class KeyManager {
 
                     // Normalize and deduplicate the supported model list before storing it.
                     supportedModels = normalizeModelList(supportedModels, provider, baseUrl);
+
 
                     return {
                         ...s,
@@ -729,30 +714,16 @@ export class KeyManager {
         const key = this.getStorageKey();
 
         try {
-            // Security update:
-            // Logged-in users sync through the local API payload bridge and skip plain-text local persistence.
-            // Local temp users also sync through the local API bridge; browser-side secret storage is disabled.
-            if (this.userId) {
-                console.log('[KeyManager] 安全模式：登录用户同步本地 API payload，跳过本地明文存储');
-                // Optional: Clear existing local storage just in case
-                localStorage.removeItem(key);
+            localStorage.setItem(key, JSON.stringify(toSave));
 
+            if (this.userId) {
                 markPendingStateCloudSync(this.cloudSyncState);
                 await this.flushPendingCloudSync(toSave);
-            } else {
-                localStorage.removeItem(key);
-                this.purgeAnonymousSensitiveLocalCaches();
-                console.warn('[KeyManager] Anonymous local key storage is disabled.');
             }
-
         } catch (e) {
             console.error('[KeyManager] Failed to save state:', e);
         }
     }
-
-    /**
-     * Get current user ID
-     */
     getUserId(): string | null {
         return this.userId;
     }

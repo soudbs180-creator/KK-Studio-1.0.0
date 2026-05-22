@@ -1,4 +1,4 @@
-# 2026-04-14 单主线进度报告
+# 2026-05-22 单主线进度报告
 
 ## 1. 总状态
 - 当前主线仍保持为三块：`API 路由与信用计费`、`设置 / 管理后台 / 鉴权`、`移动端 / 电商续作`。
@@ -16,7 +16,7 @@
   - `多供应商 Phase 1`：`进行中`
 
 ## 2. 统一事实基线
-- 当前版本：`1.4.6`
+- 当前版本：`1.4.7`
 - `config/release-manifest.json` 是版本真相源。
 - `src/config/appInfo.ts` 是运行时只读导出。
 - `release/publish/stable/manifest.json` 是 stable 发布清单。
@@ -109,4 +109,4 @@
   - `.tmp-playwright/desktop-settings-smoke`
   - `.tmp-playwright/prompt-group-drag`
 
-*Report Updated: 2026-04-14*
+*Report Updated: 2026-05-22*
