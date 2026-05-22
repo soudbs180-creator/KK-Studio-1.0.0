@@ -62,7 +62,11 @@ test("cloud sync entry points force-refresh the local API payload without skippi
   assert.match(source, /async syncToCloudNow\(\): Promise<void> \{\s*await this\.saveToCloud\(this\.state, \{\s*ignoreBackoff: true,\s*throwOnError: true,\s*\}\);\s*\}/);
   assert.match(
     source,
-    /async refreshFromCloudNow\(\): Promise<void> \{\s*if \(this\.canUseSessionlessLocalUserApiStorage\(\)\) \{\s*return;\s*\}\s*if \(!this\.userId\) \{\s*return;\s*\}\s*await this\.loadFromCloud\(\);\s*\}/,
+    /async refreshFromCloudNow\(\): Promise<void> \{\s*if \(!this\.userId\) \{\s*return;\s*\}\s*await this\.loadFromCloud\(\);\s*\}/,
+  );
+  assert.doesNotMatch(
+    source,
+    /refreshFromCloudNow\(\): Promise<void> \{\s*(?:(?!\b(?:private|public|async)\b)[\s\S])*canUseSessionlessLocalUserApiStorage\(\)/,
   );
   assert.doesNotMatch(source, /async refreshFromCloudNow\(\): Promise<void> \{\s*if \(!this\.userId \|\| this\.userId\.startsWith\('dev-user-'\)\) \{/);
   assert.doesNotMatch(source, /private ensureCloudHydration\(\): void \{\s*if \(!this\.userId \|\| this\.userId\.startsWith\('dev-user-'\)\) \{/);

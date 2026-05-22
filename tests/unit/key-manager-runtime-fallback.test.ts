@@ -20,14 +20,24 @@ test('keyManager reads and writes user slot/provider state through the local API
   assert.doesNotMatch(source, /void getPreferredKkApiAccessToken\(\)\.then\(\(accessToken\) => \(/);
 });
 
-test('keyManager no longer skips local fixed users when hydrating or syncing payload state', () => {
+test('keyManager no longer skips local or temp users when hydrating or syncing payload state', () => {
   const source = readSource('src/services/auth/keyManager.ts');
 
   assert.match(
     source,
-    /private async loadFromCloud\(\) \{\s*if \(this\.canUseSessionlessLocalUserApiStorage\(\)\) \{\s*return;\s*\}\s*if \(!this\.userId\) return;/,
+    /private async loadFromCloud\(\) \{\s*if \(!this\.userId\) return;/,
   );
-  assert.doesNotMatch(source, /private async loadFromCloud\(\) \{[\s\S]*this\.userId\.startsWith\('dev-user-'\)/);
+  assert.doesNotMatch(
+    source,
+    /private async loadFromCloud\(\) \{\s*(?:(?!\b(?:private|public|async)\b)[\s\S])*canUseSessionlessLocalUserApiStorage\(\)/,
+  );
+  assert.doesNotMatch(
+    source,
+    /private async loadFromCloud\(\) \{\s*(?:(?!\b(?:private|public|async)\b)[\s\S])*this\.userId\.startsWith\('dev-user-'\)/,
+  );
+  assert.doesNotMatch(source, /if \(this\.canUseSessionlessLocalUserApiStorage\(\)\) \{\s*console\.log\('\[KeyManager\] Local API temp user payload bridge enabled:', userId\);\s*return;\s*\}/);
+  assert.doesNotMatch(source, /private canHydrateCloudState\(\): boolean \{\s*if \(this\.canUseSessionlessLocalUserApiStorage\(\)\) \{/);
+  assert.doesNotMatch(source, /private canPollCloudState\(\): boolean \{\s*if \(this\.canUseSessionlessLocalUserApiStorage\(\)\) \{/);
   assert.match(source, /const activeUserId = this\.userId;\s*if \(!activeUserId\) \{/);
   assert.doesNotMatch(source, /const activeUserId = this\.userId;\s*if \(!activeUserId \|\| activeUserId\.startsWith\('dev-user-'\)\) \{/);
 });

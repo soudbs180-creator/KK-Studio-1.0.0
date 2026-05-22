@@ -9,9 +9,12 @@ function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
 }
 
-test('keyManager blocks browser-side provider diagnostics while allowing loopback temp-user local persistence', () => {
+test('keyManager blocks browser-side provider diagnostics and browser-side secret persistence', () => {
   const source = readSource('src/services/auth/keyManager.ts');
   const storageSource = readSource('src/services/auth/keyManagerStorage.ts');
+  const providerStorageSource = readSource('src/services/auth/keyManagerProviders.ts');
+  const viteEnvSource = readSource('src/vite-env.d.ts');
+  const securityCheckSource = readSource('scripts/governance/check-sensitive-boundaries.mjs');
 
   assert.match(storageSource, /const LEGACY_API_KEYS_STORAGE_KEY = "kk-api-keys-local";/);
   assert.match(storageSource, /const USER_API_LOGIN_REQUIRED_MESSAGE = "Sign in before adding or updating BYOK providers\. Browser-side key storage is disabled for security\.";/);
@@ -30,8 +33,10 @@ test('keyManager blocks browser-side provider diagnostics while allowing loopbac
   assert.match(source, /return USER_API_LOGIN_REQUIRED_MESSAGE;/);
   assert.doesNotMatch(source, /private getBrowserDirectProviderChecksDisabledMessage\(\): string \{/);
   assert.match(source, /console\.warn\('\[KeyManager\] Anonymous local key storage is disabled\.'\);/);
-  assert.match(source, /if \(this\.canUseSessionlessLocalUserApiStorage\(\)\) \{\s*localStorage\.setItem\(key, JSON\.stringify\(toSave\)\);\s*return;\s*\}/);
-  assert.match(source, /if \(this\.canUseSessionlessLocalUserApiStorage\(\)\) \{\s*console\.log\('\[KeyManager\] Skip local API payload sync \(sessionless local storage active\)'\);\s*return;\s*\}/);
+  assert.doesNotMatch(source, /localStorage\.setItem\(key, JSON\.stringify\(toSave\)\)/);
+  assert.doesNotMatch(source, /Skip local API payload sync \(sessionless local storage active\)/);
+  assert.doesNotMatch(providerStorageSource, /localStorage\.setItem\(storageKey, JSON\.stringify\(providers\)\)/);
+  assert.match(source, /markPendingStateCloudSync\(this\.cloudSyncState\);\s*await this\.flushPendingCloudSync\(toSave\);/);
   assert.match(source, /async testChannel\([\s\S]*?if \(isBrowserRuntime\(\)\) \{\s*return \{\s*success: false,\s*message: BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE,\s*\};\s*\}/);
   assert.match(source, /async fetchRemoteModels\([\s\S]*?if \(isBrowserRuntime\(\)\) \{\s*console\.warn\('\[KeyManager\] Browser-side remote model discovery is disabled\.'\);\s*return \[\];\s*\}/);
   assert.match(source, /async validateKey\([\s\S]*?if \(isBrowserRuntime\(\)\) \{\s*return \{\s*valid: false,\s*error: BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE,\s*\};\s*\}/);
@@ -48,6 +53,9 @@ test('keyManager blocks browser-side provider diagnostics while allowing loopbac
   assert.match(source, /export async function fetchGeminiCompatModels\(apiKey: string, baseUrl\?: string\): Promise<string\[]> \{\s*if \(isBrowserRuntime\(\)\) \{\s*throw createBrowserDirectProviderChecksDisabledError\(\);\s*\}/);
   assert.match(source, /export async function fetchOpenAICompatModels\(apiKey: string, baseUrl: string\): Promise<string\[]> \{\s*if \(isBrowserRuntime\(\)\) \{\s*throw createBrowserDirectProviderChecksDisabledError\(\);\s*\}/);
   assert.match(source, /export async function autoDetectAndConfigureModels\([\s\S]*?if \(isBrowserRuntime\(\)\) \{\s*return \{\s*success: false,\s*models: \[\],\s*categories: categorizeModels\(\[\]\),\s*apiType: 'browser-direct-disabled',\s*\};\s*\}/);
+  assert.doesNotMatch(viteEnvSource, /VITE_API_KEY/);
+  assert.match(securityCheckSource, /VITE_\[A-Z0-9_\]\*\(\?:KEY\|SECRET\|TOKEN\)/);
+  assert.match(securityCheckSource, /publicViteSensitiveEnvAllowlist/);
 });
 
 test('LLMService uses the local user-route proxy first, falls back to cloud secure proxy, and blocks browser direct calls', () => {
@@ -114,8 +122,11 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /const \{ user, isTempUser \} = useAuth\(\);/);
   assert.match(source, /const authenticatedUserId = !isTempUser \? \(user\?\.id \|\| keyManager\.getUserId\(\)\) : null;/);
   assert.match(source, /const hasAuthenticatedUser = Boolean\(authenticatedUserId\);/);
-  assert.match(source, /const canUseSessionlessLocalDraftStorage =/);
+  assert.match(source, /const canUseSessionlessLocalDraftStorage = false;/);
+  assert.match(source, /const canMutateSessionlessLocalWorkbench = canUseSessionlessLocalApiBridge;/);
   assert.match(source, /const sessionlessLocalDraftHelper = canUseSessionlessLocalDraftStorage/);
+  assert.doesNotMatch(source, /browser session until the service comes back/);
+  assert.doesNotMatch(source, /当前浏览器会话/);
   assert.match(source, /const userApiViewState = resolveUserApiViewState\(\{/);
   assert.match(source, /const isHydratingRuntimeUserApis = userApiViewState\.isHydratingRuntimeUserApis;/);
   assert.match(source, /const userApiActionsDisabled = userApiViewState\.userApiActionsDisabled;/);
@@ -191,7 +202,8 @@ test('KeyManager clears prior in-memory user state before hydrating the next acc
   assert.match(source, /this\.loadProviders\(true\);\s*this\.state = this\.loadState\(\);\s*this\.globalModelListCache = null;\s*this\.notifyListeners\(\);/);
   assert.match(source, /if \(this\.state\.slots\.length > 0\) \{\s*console\.log\('\[KeyManager\] Local cache loaded:', this\.state\.slots\.length, 'slots'\);/);
   assert.match(source, /this\.sessionlessLocalUserApiStorageEnabled =/);
-  assert.match(source, /console\.log\('\[KeyManager\] Local-only temp user storage enabled:', userId\);/);
+  assert.match(source, /console\.log\('\[KeyManager\] Local API temp user payload bridge enabled:', userId\);/);
+  assert.doesNotMatch(source, /Local-only temp user storage enabled/);
 });
 
 test('BillingContext clears balance and transaction state immediately when the user scope changes', () => {

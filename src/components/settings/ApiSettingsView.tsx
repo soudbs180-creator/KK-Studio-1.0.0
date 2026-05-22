@@ -810,13 +810,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     && !isUserApiPersistenceDegraded;
   const authenticatedUserId = !isTempUser ? (user?.id || keyManager.getUserId()) : null;
   const hasAuthenticatedUser = Boolean(authenticatedUserId);
-  const canUseSessionlessLocalDraftStorage =
-    hasSessionlessLocalWorkbench
-    && !hasAuthenticatedUser
-    && (apiHealth?.reachable !== true || isUserApiPersistenceDegraded);
-  const canMutateSessionlessLocalWorkbench =
-    canUseSessionlessLocalApiBridge
-    || canUseSessionlessLocalDraftStorage;
+  const canUseSessionlessLocalDraftStorage = false;
+  const canMutateSessionlessLocalWorkbench = canUseSessionlessLocalApiBridge;
   const hasWorkbenchAccess = hasAuthenticatedUser || hasSessionlessLocalWorkbench;
   const hasReadonlySnapshot = readonlyOfficialSlots.length > 0 || readonlyProviders.length > 0;
   const userApiViewState = resolveUserApiViewState({
@@ -913,15 +908,15 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
     if (!apiHealth.reachable) {
       return pick(
-        '本地 API 当前离线。现有配置会先保留在当前工作区里，等服务恢复后再继续检测和同步。',
-        'The local API is offline. Current settings stay available here until the local service recovers.',
+        '本地 API 当前离线。为避免密钥落到浏览器缓存，请先恢复服务后再编辑。',
+        'The local API is offline. Restore it before editing so secrets are not cached in the browser.',
       );
     }
 
     if (!apiHealth.persistence.userApiKeys || !apiHealth.persistence.keyManager) {
       return pick(
-        '本地 API 处于内存模式。当前修改会先保留，等服务恢复后再继续同步。',
-        'The local API is running in memory mode. Current edits will be kept and synced after recovery.',
+        '本地 API 处于内存模式。请先启用本地文件或后端持久化，再编辑 API 设置。',
+        'The local API is running in memory mode. Enable local-file or backend persistence before editing API settings.',
       );
     }
 
@@ -970,14 +965,14 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     && apiHealth
     && !canMutateSessionlessLocalWorkbench
     ? pick(
-        'Local BYOK persistence is not ready yet. Start the local API and enable writable local-file or backend-backed user API storage before editing.',
+        '本地 BYOK 持久化还未就绪。请启动本地 API，并启用可写的本地文件或后端持久化后再编辑。',
         'Local BYOK persistence is not ready yet. Start the local API and enable writable local-file or backend-backed user API storage before editing.',
       )
     : null;
   const sessionlessLocalDraftHelper = canUseSessionlessLocalDraftStorage
     ? pick(
-        '本地 API 当前离线。新的配置会先保存在当前浏览器会话里，服务恢复后再继续检测。',
-        'The local API is offline. New settings stay in this browser session until the service comes back.',
+        '本地 API 当前离线。请恢复后端持久化后再编辑。',
+        'The local API is offline. Restore backend persistence before editing.',
       )
     : null;
   const userApiActionHelper = (canUseSessionlessLocalDraftStorage ? sessionlessLocalDraftHelper : backendUnavailableHelper) ?? (!hasAuthenticatedUser
@@ -999,8 +994,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       ? backendUnavailableHelper
       : isUserApiPersistenceDegraded
       ? pick(
-          '当前保存的配置会先保留，等本地服务恢复后继续同步。',
-          'Saved changes will be kept and synced after the local service recovers.',
+          '本地 API 持久化未就绪。请恢复本地文件或后端存储后再保存密钥。',
+          'Local API persistence is not ready. Restore local-file or backend storage before saving secrets.',
         )
       : null;
   const providerEditorReadOnlyHelper = providerEditorReadOnly
@@ -1011,8 +1006,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       ? backendUnavailableHelper
       : isUserApiPersistenceDegraded
       ? pick(
-          '当前保存的供应商会先保留，等本地服务恢复后继续同步。',
-          'Saved providers will be kept and synced after the local service recovers.',
+          '本地 API 持久化未就绪。请恢复本地文件或后端存储后再保存供应商。',
+          'Local API persistence is not ready. Restore local-file or backend storage before saving providers.',
         )
       : null;
   const browserDirectChecksDisabled = false;

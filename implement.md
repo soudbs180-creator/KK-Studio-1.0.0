@@ -4,6 +4,16 @@ Last updated: 2026-05-22
 
 ## Operating Mode
 
+Current user API secret-boundary slice (2026-05-22): keep system/provider keys and user BYOK secrets out of browser persistence. Local mode must persist user API settings through the local API/backend path chosen by the user, and cloud/profile reads are for backup/restore display with redacted placeholders, not raw secret recovery into the frontend.
+
+User API secret-boundary rules:
+- Do not write raw API keys, provider API keys, route configs, or key-manager slot state into browser `localStorage`, `sessionStorage`, IndexedDB, OPFS, or UI snapshots as a compatibility fallback.
+- Sessionless/local/temp users may edit BYOK only when the local API bridge is reachable and reports writable user API persistence. If the local bridge is offline or in memory/degraded mode, UI actions must fail closed.
+- Persist user BYOK through typed auth/local API payload endpoints only. Server repositories own encryption and redaction; frontend reads may receive readonly placeholders.
+- Do not introduce `VITE_*KEY`, `VITE_*SECRET`, or `VITE_*TOKEN` names unless they are intentionally public and explicitly allowlisted in `governance:security`.
+- Admin/system provider keys are written only by elevated admin workflows and must never be rendered back as raw values. Retained secrets may be represented by fingerprints/counts/placeholders only.
+- Browser QA is optional for this slice because it is a security/persistence boundary, but deployment/API smoke is required after the main build is deployed.
+
 Current admin credit-provider bootstrap slice (2026-05-22): fix the empty active-model configuration path without weakening runtime routing. Keep changes scoped to the admin providers editor, admin credit-provider DTO mapping, focused tests, and ledgers. Do not fall back from executable model lists to the public model catalog, and do not seed fake provider keys.
 
 Admin provider bootstrap rules:

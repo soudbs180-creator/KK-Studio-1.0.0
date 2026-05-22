@@ -10,6 +10,10 @@ const storageAllowlist = new Set([
   "src/services/api/authAccessToken.ts",
 ]);
 
+const publicViteSensitiveEnvAllowlist = new Set([
+  "VITE_TURNSTILE_SITE_KEY",
+]);
+
 function fail(message) {
   failures.push(`[security:check] ${message}`);
 }
@@ -142,6 +146,13 @@ for (const file of sourceRoots.flatMap((dir) => walk(dir))) {
 
     if (lineLooksLikeSensitiveLog(line)) {
       fail(`${file}:${lineNumber} logs a sensitive-looking identifier without an allowlist entry`);
+    }
+
+    for (const match of line.matchAll(/\bVITE_[A-Z0-9_]*(?:KEY|SECRET|TOKEN)[A-Z0-9_]*\b/g)) {
+      const envName = match[0];
+      if (!publicViteSensitiveEnvAllowlist.has(envName)) {
+        fail(`${file}:${lineNumber} references ${envName}; VITE_* key/secret/token names are exposed to the browser and require an explicit public allowlist entry`);
+      }
     }
   }
 

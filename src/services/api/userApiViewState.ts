@@ -53,14 +53,18 @@ export function resolveUserApiViewState(
       )
     );
 
+  const runtimeUnavailable = input.isApiReachable === false;
   const actionsDisabled =
     !input.isAuthenticated
-    && input.sessionlessWorkbenchActionsEnabled !== true;
-  const runtimeUnavailable = input.isApiReachable === false;
+    && (
+      input.sessionlessWorkbenchActionsEnabled !== true
+      || runtimeUnavailable
+    );
   const sessionlessLocalDraftMode =
     !input.isAuthenticated
     && input.hasSessionlessWorkbenchAccess === true
-    && input.sessionlessWorkbenchActionsEnabled === true;
+    && input.sessionlessWorkbenchActionsEnabled === true
+    && input.isApiReachable !== false;
   let stage: UserApiWorkbenchStage;
 
   if (!hasWorkbenchAccess) {
