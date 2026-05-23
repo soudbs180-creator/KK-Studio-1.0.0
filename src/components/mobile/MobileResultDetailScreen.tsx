@@ -232,16 +232,16 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
       </div>
 
       <div className="relative flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+136px)]">
-        <div className="relative overflow-hidden rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]">
+        <div className="relative overflow-hidden rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] max-h-[380px] flex items-center justify-center">
           {entry.displaySrc ? (
-            <img src={entry.displaySrc} alt={promptSummary} className="h-auto w-full object-cover" />
+            <img src={entry.displaySrc} alt={promptSummary} className="max-h-[380px] w-full object-contain block" />
           ) : (
-            <div className="flex aspect-[3/4] items-center justify-center text-[var(--text-secondary)]">
+            <div className="flex aspect-[3/4] h-[320px] items-center justify-center text-[var(--text-secondary)]">
               暂无预览
             </div>
           )}
 
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-4 pt-12 text-white">
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-4 pt-12 text-white z-10">
             <div className="line-clamp-2 text-lg font-semibold leading-7">{promptSummary}</div>
           </div>
         </div>

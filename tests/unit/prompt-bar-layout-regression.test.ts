@@ -99,7 +99,7 @@ test('prompt bar keeps the textarea transparent while reserving the frosted foot
 
   assert.doesNotMatch(desktopFooterSource, /prompt-bar-footer-frost/);
   assert.match(mobileFooterSource, /data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"/);
-  assert.match(mobileFooterSource, /className="input-bar-footer prompt-bar-footer-frost flex w-full flex-nowrap items-center gap-2 overflow-x-auto overflow-y-visible px-1 pb-1 pt-0\.5 min-h-\[44px\]"/);
+  assert.match(mobileFooterSource, /className="input-bar-footer prompt-bar-footer-frost flex w-full flex-nowrap items-center gap-2 overflow-hidden px-1 pb-1 pt-0\.5 min-h-\[44px\]"/);
   assert.match(cssSource, /\.prompt-bar-footer-frost\s*\{/);
   assert.match(cssSource, /\.prompt-bar-footer-frost::before\s*\{/);
   assert.match(cssSource, /border-top: 1px solid var\(--prompt-bar-footer-frost-border\);/);
@@ -199,28 +199,50 @@ test('prompt bar model library and footer controls use frosted flat defaults wit
   assert.match(imageOptionsSource, /boxShadow:\s*'var\(--prompt-bar-toggle-active-shadow\)'/);
 });
 
-test('mobile prompt footer stays single-row and lets controls overflow horizontally instead of wrapping', () => {
+test('mobile prompt footer stays single-row and keeps model settings send controls fitted without wrapping', () => {
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
   const modePanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerModePanel.tsx');
   const footerSource = readSource('src/components/layout/prompt-bar/PromptBarFooterMobile.tsx');
   const cssSource = readSource('src/index.css');
 
   assert.match(footerSource, /data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"/);
-  assert.match(footerSource, /flex-nowrap items-center gap-2 overflow-x-auto overflow-y-visible/);
+  assert.match(footerSource, /flex-nowrap items-center gap-2 overflow-hidden/);
   assert.doesNotMatch(promptBarSource, /isMobile \? 'grid w-full grid-cols-\[minmax\(0,1fr\)_auto\]/);
   assert.doesNotMatch(promptBarSource, /isMobile \? \(isEmbeddedMobileComposer \? '' : 'col-span-2'\)/);
   assert.doesNotMatch(modePanelSource, /isMobile \? 'row-start-2 min-w-0'/);
   assert.match(cssSource, /\.input-bar-footer\[data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"\]/);
   assert.match(cssSource, /flex-wrap: nowrap;/);
-  assert.match(cssSource, /overflow-x: auto;/);
-  assert.match(cssSource, /overflow-y: visible;/);
+  assert.match(cssSource, /overflow-x: hidden;/);
+  assert.match(cssSource, /overflow-y: hidden;/);
   assert.match(cssSource, /\.input-bar-footer\[data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"\] \* \{/);
   assert.doesNotMatch(promptBarSource, /min-w-\[9rem\] max-w-none justify-start flex-shrink-0/);
   assert.doesNotMatch(promptBarSource, /isMobile \? 'w-\[clamp\(6\.75rem,38vw,8\.5rem\)\] max-w-\[42vw\] flex-none justify-start'/);
-  assert.match(promptBarSource, /isMobile \? 'w-\[clamp\(7rem,40vw,9rem\)\] max-w-\[44vw\] flex-none justify-start'/);
+  assert.match(promptBarSource, /isMobile \? 'w-\[clamp\(6rem,34vw,8rem\)\] max-w-\[36vw\] flex-none justify-start'/);
   assert.doesNotMatch(modePanelSource, /isEmbeddedMobileDrawer \? 'px-3 justify-between max-w-none' : 'px-2\.5 max-w-none'/);
   assert.match(modePanelSource, /isMobile \? 'min-w-0 shrink-0'/);
-  assert.match(modePanelSource, /isMobile \? \(isEmbeddedMobileDrawer \? 'px-3 justify-between max-w-\[42vw\] min-w-0 overflow-hidden' : 'px-2\.5 max-w-\[40vw\] min-w-0 overflow-hidden'\)/);
+  assert.match(modePanelSource, /isMobile \? \(isEmbeddedMobileDrawer \? 'px-3 justify-between max-w-\[34vw\] min-w-0 overflow-hidden' : 'px-2\.5 max-w-\[32vw\] min-w-0 overflow-hidden'\)/);
+});
+
+test('mobile prompt composer uses three touch-safe rows and keeps ecommerce out of the mode strip', () => {
+  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const footerSource = readSource('src/components/layout/prompt-bar/PromptBarFooterMobile.tsx');
+
+  assert.match(
+    promptBarSource,
+    /const modeOptions = isMobile\s*\?\s*PROMPT_BAR_MODE_REGISTRY\.filter\(\(item\) => item\.mode !== GenerationMode\.ECOMMERCE\)\s*:\s*PROMPT_BAR_MODE_REGISTRY;/,
+  );
+  assert.match(
+    promptBarSource,
+    /const activePromptBarMode = isMobile && config\.mode === GenerationMode\.ECOMMERCE\s*\?\s*GenerationMode\.IMAGE\s*:\s*config\.mode;/,
+  );
+  assert.match(promptBarSource, /data-mobile-composer-section="mode-strip"/);
+  assert.match(promptBarSource, /data-mobile-composer-section="primary-input"/);
+  assert.match(footerSource, /data-mobile-composer-section="footer-actions"/);
+  assert.match(promptBarSource, /data-mobile-footer-control="model-library"/);
+  assert.match(promptBarSource, /data-mobile-footer-control="settings"/);
+  assert.match(promptBarSource, /data-mobile-footer-control="send"/);
+  assert.doesNotMatch(promptBarSource, /<MobileEmbeddedAdvancedDrawer/);
+  assert.match(footerSource, /data-mobile-action-row="model-settings-send"/);
 });
 
 test('ecommerce main-image ratio choices stay in one equal three-column row', () => {

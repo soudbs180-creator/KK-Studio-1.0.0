@@ -2108,8 +2108,8 @@ body.dark-mode .input-bar {
 
 .input-bar-footer[data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"] {
   flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: visible;
+  overflow-x: hidden;
+  overflow-y: hidden;
   scrollbar-width: none;
 }
 
@@ -2118,11 +2118,11 @@ body.dark-mode .input-bar {
 }
 
 .input-bar-footer[data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"] > * {
-  flex-shrink: 0;
+  min-width: 0;
 }
 
 .input-bar-footer[data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"] * {
-  flex-shrink: 0;
+  min-width: 0;
 }
 
 .prompt-bar-footer-frost {

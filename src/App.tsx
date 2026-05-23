@@ -3602,6 +3602,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       <ImageNode
         {...getSharedImageNodeProps(node)}
         detailLevel={imageDetailLevel}
+        isMobile={isMobile}
         loadPriority={item.loadPriority}
         loadBand={item.loadBand}
         groupLayerZIndex={item.groupLayerZIndex}
@@ -3776,6 +3777,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             <ImageNode
               {...getSharedImageNodeProps(childLayout.childNode)}
               detailLevel="full"
+              isMobile={isMobile}
               loadPriority={1200}
               loadBand={0}
               groupLayerZIndex={promptGroupLayerById.get(node.id) ?? childLayout.childNode.zIndex ?? 0}

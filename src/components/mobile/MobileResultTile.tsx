@@ -71,7 +71,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
       <button
         type="button"
         data-testid={`mobile-result-tile-${entry.id}`}
-        className="group relative block w-full text-left"
+        className="group relative block h-full min-h-0 w-full text-left"
         onClick={() => onEntryOpen(entry.id)}
         title={promptSummary}
       >
@@ -79,12 +79,12 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
           <img
             src={entry.displaySrc}
             alt={promptSummary}
-            className="block w-full bg-[var(--bg-tertiary)] object-cover transition-transform duration-300 group-active:scale-[0.985] group-hover:scale-[1.01]"
+            className="block h-full min-h-0 w-full bg-[var(--bg-tertiary)] object-cover transition-transform duration-300 group-active:scale-[0.985] group-hover:scale-[1.01]"
             style={{ aspectRatio: imageAspectRatio }}
           />
         ) : (
           <div
-            className={`flex w-full items-center justify-center bg-[var(--bg-tertiary)] text-[13px] text-[var(--text-secondary)] ${getFallbackAspectClassName(entry)}`}
+            className={`flex h-full min-h-0 w-full items-center justify-center bg-[var(--bg-tertiary)] text-[13px] text-[var(--text-secondary)] ${getFallbackAspectClassName(entry)}`}
           >
             暂无预览
           </div>

@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { GeneratedImage, GenerationMode, ImageSize } from '../../types';
 import { Download, Trash2, Loader2, ImageOff, Play, Pause, Music } from 'lucide-react';
 import { getCardDimensions } from '../../utils/styleUtils';
@@ -135,7 +135,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     isCanvasTransforming = false,
     snapToGrid = false,
     canvasTransform, // 🚀 [New] 用于计算动画起始位置
-    isChatMode = false // 🚀 [New] 垂直聊天流标识
+    isChatMode = false, // 🚀 [New] 垂直聊天流标识
+    isMobile = false
 }) => {
     const detailQualityBias: ImageQualityBias = detailLevel === 'thumbnail-shell'
         ? 'micro-only'
@@ -1312,7 +1313,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         <div
                             className="relative w-full overflow-hidden rounded-[16px] border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)]"
                             style={{
-                                aspectRatio: image.aspectRatio.replace(':', '/')
+                                aspectRatio: image.aspectRatio.replace(':', '/'),
+                                maxHeight: isMobile ? '280px' : undefined
                             }}
                         >
                             {isAudioLike ? (
@@ -1330,7 +1332,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                     loading="lazy"
                                     referrerPolicy="strict-origin-when-cross-origin"
                                     alt={shellTitle}
-                                    className="w-full h-full object-cover block"
+                                    className={`w-full h-full block ${isMobile ? 'object-contain' : 'object-cover'}`}
                                     onError={() => {
                                         void handleMediaLoadError();
                                     }}
@@ -1458,7 +1460,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                 <div
                                     className="relative w-full overflow-hidden"
                                     style={{
-                                        aspectRatio: image.aspectRatio.replace(':', '/')
+                                        aspectRatio: image.aspectRatio.replace(':', '/'),
+                                        maxHeight: isMobile ? '280px' : undefined
                                     }}
                                 >
                                     {/* 🚀 [Optimization] 只要有图可显 (displaySrc)，我们就尝试渲染。
@@ -1488,7 +1491,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                 <video
                                                     ref={videoRef}
                                                     src={displaySrc}
-                                                    className="w-full h-full object-cover block select-none"
+                                                    className={`w-full h-full block ${isMobile ? 'object-contain' : 'object-cover'} select-none`}
                                                     muted loop playsInline
                                                     onPlay={() => setIsPlaying(true)}
                                                     onPause={() => setIsPlaying(false)}
@@ -1524,7 +1527,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     color: 'transparent',
                                                     width: '100%',
                                                     height: '100%',
-                                                    objectFit: 'cover',
+                                                    objectFit: isMobile ? 'contain' : 'cover',
                                                     display: 'block',
                                                     imageRendering: 'auto',
                                                 }}

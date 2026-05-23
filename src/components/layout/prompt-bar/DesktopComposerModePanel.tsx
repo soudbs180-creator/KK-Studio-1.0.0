@@ -143,10 +143,10 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
 
   return (
     <>
-      <div className={`relative inline-flex ${isMobile ? 'min-w-0 shrink-0' : 'min-w-fit flex-shrink-0'}`}>
+      <div className={isMobile ? 'static min-w-0 shrink-0' : `relative inline-flex min-w-fit flex-shrink-0`}>
         <button
           data-options-toggle
-          className={`${isMobile ? '' : 'prompt-bar-liquid-button'} flex w-full items-center justify-center gap-1.5 h-10 rounded-lg border transition-all text-xs font-medium whitespace-nowrap ${isMobile ? (isEmbeddedMobileDrawer ? 'px-3 justify-between max-w-[42vw] min-w-0 overflow-hidden' : 'px-2.5 max-w-[40vw] min-w-0 overflow-hidden') : 'px-3.5 flex-shrink-0'}`}
+          className={`${isMobile ? '' : 'prompt-bar-liquid-button'} flex w-full items-center justify-center gap-1.5 h-10 rounded-lg border transition-all text-xs font-medium whitespace-nowrap ${isMobile ? (isEmbeddedMobileDrawer ? 'px-3 justify-between max-w-[34vw] min-w-0 overflow-hidden' : 'px-2.5 max-w-[32vw] min-w-0 overflow-hidden') : 'px-3.5 flex-shrink-0'}`}
           style={{
             background: showOptionsPanel ? 'var(--prompt-bar-shell-hover)' : 'var(--prompt-bar-shell-bg)',
             color: 'var(--text-secondary)',
@@ -166,7 +166,7 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
 
         {showOptionsPanel && isMobile ? (
           <div
-            className={isEmbeddedMobileDrawer ? 'mt-2 w-full animate-fadeIn overflow-y-auto' : 'fixed left-3 right-3 z-[1050] ios-mobile-floating-sheet p-2 animate-fadeIn overflow-hidden'}
+            className={isEmbeddedMobileDrawer ? 'mt-2 w-full animate-fadeIn overflow-y-auto' : 'absolute left-3 right-3 z-[1050] ios-mobile-floating-sheet p-2 animate-fadeIn overflow-hidden'}
             style={
               isEmbeddedMobileDrawer
                 ? {
@@ -174,7 +174,7 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
                     overscrollBehavior: 'contain',
                   }
                 : {
-                    bottom: mobileFloatingSheetBottom,
+                    bottom: 'calc(100% + 8px)',
                     maxHeight: mobileFloatingSheetMaxHeight,
                     overscrollBehavior: 'contain',
                   }

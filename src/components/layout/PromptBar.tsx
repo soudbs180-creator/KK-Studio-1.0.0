@@ -32,7 +32,6 @@ import DesktopComposerModeSwitcher from './prompt-bar/DesktopComposerModeSwitche
 import DesktopComposerModePanel from './prompt-bar/DesktopComposerModePanel';
 import DesktopComposerPromptTools from './prompt-bar/DesktopComposerPromptTools';
 import DesktopComposerEcommercePanel from './prompt-bar/DesktopComposerEcommercePanel';
-import MobileEmbeddedAdvancedDrawer from './prompt-bar/MobileEmbeddedAdvancedDrawer';
 import { routeEcommerceDroppedFiles } from './prompt-bar/ecommerceDropRouting';
 import { getCanonicalProviderDisplayName } from '../../utils/providerDisplay';
 import {
@@ -2387,8 +2386,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
         }));
     }, [config.mode, config.pptSlides, parsePptSlides, pptOutlineDraft, setConfig]);
 
-    const modeOptions = PROMPT_BAR_MODE_REGISTRY;
-    const activeModeOption = getPromptBarModeOption(config.mode);
+    const modeOptions = isMobile
+        ? PROMPT_BAR_MODE_REGISTRY.filter((item) => item.mode !== GenerationMode.ECOMMERCE)
+        : PROMPT_BAR_MODE_REGISTRY;
+    const activePromptBarMode = isMobile && config.mode === GenerationMode.ECOMMERCE
+        ? GenerationMode.IMAGE
+        : config.mode;
+    const activeModeOption = getPromptBarModeOption(activePromptBarMode);
 
     const handleSelectPromptBarMode = useCallback((mode: GenerationMode) => {
         commitConfigUpdate((previousConfig) => ({
@@ -2798,29 +2802,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const mobileFloatingSheetBottom = 'calc(env(safe-area-inset-bottom, 0px) + var(--mobile-tabbar-total-height) + var(--mobile-floating-sheet-clearance))';
     const mobileFloatingSheetMaxHeight = 'min(62vh, calc(100vh - var(--mobile-content-top-inset) - env(safe-area-inset-bottom, 0px) - var(--mobile-tabbar-total-height) - var(--mobile-floating-sheet-clearance) - 18px))';
     const shouldRenderInlineMobileUploadButton = isMobile && config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
+    const shouldRenderMobileReferenceTray = isMobile && config.mode !== GenerationMode.ECOMMERCE && ((config.referenceImages && config.referenceImages.length > 0) || uploadingCount > 0);
+    const shouldUseMobileInlineMedia = shouldRenderInlineMobileUploadButton || shouldRenderMobileReferenceTray;
     const shouldRenderStandaloneUploadRow = !isMobile && config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
 
-    const mobileAdvancedPromptToolsNode = (
-        <DesktopComposerPromptTools
-            isMobile={isMobile}
-            config={config}
-            showPptOutlinePanel={showPptOutlinePanel}
-            onTogglePptOutlinePanel={handleTogglePptOutlinePanel}
-            onTogglePromptOptimization={handleTogglePromptOptimization}
-        />
-    );
-
     const activeEcommerceFooterSheet: EcommerceGroupSheet = ecommerceActiveTaskState?.sourceSheet ?? ecommerceActiveGroupSheet ?? '主图';
-    const activeEcommerceSheetSetting = ecommerceSheetSettings?.[activeEcommerceFooterSheet];
-    const activeEcommerceAspectRatio = activeEcommerceSheetSetting?.aspectRatio || config.aspectRatio;
-    const activeEcommerceImageSize = activeEcommerceSheetSetting?.imageSize || config.imageSize;
-    const activeAPlusControlModeLabel = activeEcommerceSheetSetting?.aPlusControlMode === '1464x600'
-        ? '1464x600'
-        : activeEcommerceSheetSetting?.aPlusControlMode === '970x600'
-            ? '970x600'
-            : activeEcommerceSheetSetting?.aPlusControlMode === '600x450'
-                ? '600x450'
-                : '自动';
     const ecommerceOptionsSummary = config.mode === GenerationMode.ECOMMERCE ? (
         <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
             {(['主图', 'A+'] as EcommerceGroupSheet[]).map((sheet) => (
@@ -2847,7 +2833,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
             optionsPanelRef={optionsPanelRef}
             mobileFloatingSheetBottom={mobileFloatingSheetBottom}
             mobileFloatingSheetMaxHeight={mobileFloatingSheetMaxHeight}
-            embeddedMobileDrawer={isEmbeddedMobileComposer}
+            embeddedMobileDrawer={false}
             onToggleOptionsPanel={() => {
                 setActiveMenu(null);
                 setShowOptionsPanel(prev => !prev);
@@ -2917,9 +2903,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
             )}
         />
     );
-    const mobileAdvancedSummaryText = config.mode === GenerationMode.ECOMMERCE
-        ? `${displayModelLabel} · ${activeEcommerceFooterSheet} · ${activeEcommerceFooterSheet === 'A+' ? `尺寸 ${activeAPlusControlModeLabel}` : (activeEcommerceAspectRatio === AspectRatio.AUTO ? '自动比例' : activeEcommerceAspectRatio)} · ${activeEcommerceImageSize}`
-        : `${displayModelLabel} · ${config.aspectRatio === AspectRatio.AUTO ? '自动比例' : config.aspectRatio} · ${config.imageSize}`;
     const dragOverlayLabel = config.mode === GenerationMode.ECOMMERCE && !ecommerceAnalysisConfirmed
         ? '释放导入需求单或产品图'
         : '释放添加参考图';
@@ -3190,7 +3173,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             )}
                         </div>
 
-                        {!isEmbeddedMobileComposer && (
+                        {!isEmbeddedMobileComposer && !isMobile && (
                             <div className={`relative flex items-center gap-1 ${isMobile ? 'flex-wrap' : ''}`}>
                                 <DesktopComposerPromptTools
                                     isMobile={isMobile}
@@ -3356,7 +3339,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                     <div>
                         {/* Reference Images List */}
-                        {config.mode !== GenerationMode.ECOMMERCE && ((config.referenceImages && config.referenceImages.length > 0) || uploadingCount > 0) && (
+                        {!isMobile && config.mode !== GenerationMode.ECOMMERCE && ((config.referenceImages && config.referenceImages.length > 0) || uploadingCount > 0) && (
                             <div
                                 ref={refContainerRef}
                                 className="flex flex-nowrap items-center gap-2 transition-all p-2 px-3 mt-1 rounded-lg overflow-x-auto overflow-y-hidden scrollbar-thin"
@@ -3591,15 +3574,70 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         <div
                             data-mobile-composer-section="primary-input"
                             className={[
-                                shouldRenderInlineMobileUploadButton ? 'mt-1 flex items-end gap-2 px-3' : '',
+                                shouldUseMobileInlineMedia && !isEmbeddedMobileComposer ? 'mt-1 flex items-center gap-2 px-3' : '',
                                 isEmbeddedMobileComposer
-                                    ? 'mt-2 flex items-end gap-2 rounded-[22px] border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-3 py-2.5'
+                                    ? 'mt-2 flex items-center gap-2 rounded-[22px] border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-3 py-2.5'
                                     : '',
                             ].filter(Boolean).join(' ')}
                         >
+                            {shouldRenderMobileReferenceTray && (
+                                <div
+                                    className="flex max-w-[8.25rem] shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden pr-1 scrollbar-none"
+                                    style={{
+                                        WebkitOverflowScrolling: 'touch',
+                                        overscrollBehaviorX: 'contain',
+                                        touchAction: 'pan-x',
+                                    }}
+                                    aria-label="手机端参考图"
+                                >
+                                    {config.referenceImages.map((img) => (
+                                        <div key={`mobile-reference-${img.id}`} className="relative h-12 w-12 shrink-0">
+                                            <ReferenceThumbnail
+                                                image={img}
+                                                onRecovered={handleReferenceRecovered}
+                                                onClick={handleReferencePreview}
+                                            />
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    removeReferenceImage(img.id);
+                                                }}
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                                className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white shadow-sm"
+                                                title="移除参考图"
+                                            >
+                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                            </button>
+                                        </div>
+                                    ))}
+
+                                    {Array.from({ length: uploadingSkeletonCount }).map((_, idx) => (
+                                        <div key={`mobile-uploading-${idx}`} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)]">
+                                            <Loader2 size={16} className="animate-spin text-[var(--text-tertiary)]" />
+                                        </div>
+                                    ))}
+
+                                    <button
+                                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border opacity-70 transition-all duration-200 hover:bg-[var(--toolbar-hover)] hover:opacity-100"
+                                        style={{
+                                            backgroundColor: 'var(--frost-card-sub-bg)',
+                                            color: 'var(--text-secondary)',
+                                            borderColor: 'var(--frost-card-sub-border)',
+                                        }}
+                                        onClick={() => fileInputRef.current?.click()}
+                                        title="上传参考图"
+                                    >
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                            <polyline points="17 8 12 3 7 8" />
+                                            <line x1="12" y1="3" x2="12" y2="15" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            )}
                             {shouldRenderInlineMobileUploadButton && (
                                 <button
-                                    className="mb-1 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-dashed opacity-60 transition-all duration-200 hover:bg-[var(--toolbar-hover)] hover:opacity-100"
+                                    className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-dashed opacity-60 transition-all duration-200 hover:bg-[var(--toolbar-hover)] hover:opacity-100"
                                     style={{
                                         color: 'var(--text-secondary)',
                                         borderColor: 'var(--frost-card-sub-border)',
@@ -3632,7 +3670,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 onCompositionStart={() => { isComposingRef.current = true; }}
                                 onCompositionEnd={handleCompositionEnd}
                                 placeholder={config.mode === GenerationMode.VIDEO ? "描述你想要生成的视频..." : config.mode === GenerationMode.AUDIO ? "描述你想要生成的音频风格、歌词或旋律..." : config.mode === GenerationMode.PPT ? "输入PPT主题，将批量生成图1~图N页面..." : config.mode === GenerationMode.ECOMMERCE ? (ecommerceAnalysisConfirmed ? "输入补充修改指令，将应用到当前选中的电商任务..." : "上传运营需求文件后，在这里补充额外的电商要求...") : "描述你想要生成的图片..."}
-                                className={`input-bar-textarea w-full max-w-full bg-transparent border-none outline-none text-[15px] resize-none box-border overflow-y-auto ${shouldRenderInlineMobileUploadButton ? 'mt-0 flex-1 py-1 px-0' : 'mt-1 py-1 px-3'}`}
+                                className={`input-bar-textarea w-full max-w-full bg-transparent border-none outline-none text-[15px] resize-none box-border overflow-y-auto ${shouldUseMobileInlineMedia ? 'mt-0 min-w-0 flex-1 py-1 px-0' : 'mt-1 py-1 px-3'}`}
                                 style={{
                                     color: 'var(--text-primary)', // 使用 CSS 变量适配主题
                                     minHeight: `${PROMPT_TEXTAREA_MIN_HEIGHT_PX}px`,
@@ -3646,14 +3684,15 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                     {/* Footer - Modified to be a standard flex row, flowing or wrapping lightly on mobile */}
                     <PromptBarFooter isMobile={isMobile}>
-                        <div className={`flex items-center gap-1.5 ${isMobile ? 'flex-1 min-w-0 w-full' : 'min-w-0 flex-1'}`}>
+                        <div className={`flex min-w-0 items-center gap-1.5 ${isMobile ? 'flex-1' : 'flex-1'}`}>
                             {/* Model Button */}
                             <div
                                 ref={modelMenuAnchorRef}
-                                className={`relative inline-flex min-w-0 ${isMobile ? 'flex-1' : 'flex-shrink-0'}`}
+                                data-mobile-footer-control="model-library"
+                                className={isMobile ? 'static min-w-0 flex-1' : `relative inline-flex min-w-0 flex-shrink-0`}
                             >
                                 <button
-                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-[clamp(7rem,40vw,9rem)] max-w-[44vw] flex-none justify-start' : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
+                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-[clamp(6rem,34vw,8rem)] max-w-[36vw] flex-none justify-start' : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
                                         ? 'bg-[var(--frost-input-bg)] text-[var(--text-tertiary)] cursor-not-allowed border-[color:var(--frost-card-sub-border)]'
                                         : 'text-[var(--text-secondary)] !opacity-100 hover:border-[var(--prompt-bar-shell-border-strong)]'
                                         }`}
@@ -3766,8 +3805,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                  {isModelMenuOpen && isMobile && (
                                      <div
                                          ref={modelDropdownRef}
-                                         className="fixed left-3 right-3 z-[1050] ios-mobile-floating-sheet p-2 animate-fadeIn overflow-hidden"
-                                         style={{ bottom: mobileFloatingSheetBottom, maxHeight: mobileFloatingSheetMaxHeight, overscrollBehavior: 'contain' }}
+                                         className="absolute left-3 right-3 z-[1050] ios-mobile-floating-sheet p-2 animate-fadeIn overflow-hidden"
+                                         style={{ bottom: 'calc(100% + 8px)', maxHeight: mobileFloatingSheetMaxHeight, overscrollBehavior: 'contain' }}
                                          onTouchStart={(e) => e.stopPropagation()}
                                      >
                                          {/* 🔍 Search Input Module - Above the list - 只在多个模型时显示 */}
@@ -3927,8 +3966,15 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 )}
                             </div >
 
+                            {isEmbeddedMobileComposer ? (
+                                <div data-mobile-footer-control="settings" className="shrink-0">
+                                    {mobileAdvancedModePanelNode}
+                                </div>
+                            ) : null}
+
                             {/* Options Button - Shows current ratio and size, shrink on mobile */}
                             {!isEmbeddedMobileComposer && (
+                                <div data-mobile-footer-control="settings" className={isMobile ? 'shrink-0' : 'contents'}>
                                 <DesktopComposerModePanel
                                 isMobile={isMobile}
                                 config={config}
@@ -4058,18 +4104,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     </div>
                                 ) : undefined}
                                 />
+                                </div>
                             )}
                         </div>
 
-                        {isEmbeddedMobileComposer ? (
-                            <MobileEmbeddedAdvancedDrawer
-                                summaryText={mobileAdvancedSummaryText}
-                                promptTools={mobileAdvancedPromptToolsNode}
-                                modePanel={mobileAdvancedModePanelNode}
-                            />
-                        ) : null}
-
-                        <div className={`flex items-center gap-1.5 shrink-0 ${isMobile ? 'flex-1 min-w-0 justify-end' : 'ml-auto'}`}>
+                        <div className={`flex items-center gap-1.5 shrink-0 ${isMobile ? 'justify-end' : 'ml-auto'}`}>
                             {/* Group 2: Generation Settings */}
                             {(isMobile || (!isMobile && config.mode !== GenerationMode.ECOMMERCE)) && (
                                 <div className={`${isMobile ? 'flex items-center' : 'prompt-bar-liquid-group flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0'}`}>
@@ -4249,7 +4288,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         )}
                                     </div>
                             )}
-                        <div className={isMobile ? '' : 'flex-shrink-0'}>
+                        <div data-mobile-footer-control="send" className={isMobile ? 'shrink-0' : 'flex-shrink-0'}>
                             {/* 🚀 发送按钮 - 积分专属样式 */}
                             <CreditSendButton
                                 isCreditModel={isSystemCreditModel}

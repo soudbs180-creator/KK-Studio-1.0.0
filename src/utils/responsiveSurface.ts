@@ -4,8 +4,8 @@ export const PHONE_MAX_WIDTH = 768;
 export const TABLET_MAX_WIDTH = 1023;
 const RESULT_GRID_GAP_PX = 12;
 const RESULT_GRID_ROW_HEIGHT_PX = 8;
-const RESULT_GRID_VERTICAL_CHROME_PX = 12;
-const RESULT_GRID_DETAIL_CHROME_PX = 44;
+const RESULT_GRID_STANDARD_MIN_ROWS = 6;
+const RESULT_GRID_DETAIL_MIN_ROWS = 14;
 
 export interface AdaptiveResultTileGridMetrics {
   columnSpan: number;
@@ -90,10 +90,10 @@ export function getAdaptiveResultTileGridMetrics({
   if (viewMode === 'detail') {
     const horizontalPadding = surface === 'phone' ? 24 : surface === 'tablet' ? 32 : 40;
     const availableWidth = Math.max(280, safeWidth - horizontalPadding);
-    const visualHeight = availableWidth / safeAspectRatio + RESULT_GRID_VERTICAL_CHROME_PX;
+    const visualHeight = availableWidth / safeAspectRatio;
     return {
       columnSpan: safeColumnCount,
-      rowSpan: Math.max(28, Math.ceil(visualHeight / RESULT_GRID_ROW_HEIGHT_PX)),
+      rowSpan: getGridRowSpan(visualHeight, RESULT_GRID_DETAIL_MIN_ROWS),
     };
   }
 
@@ -103,10 +103,18 @@ export function getAdaptiveResultTileGridMetrics({
     (availableWidth - RESULT_GRID_GAP_PX * (safeColumnCount - 1)) / safeColumnCount;
   const columnSpan = aspectCategory === 'wide' && safeColumnCount >= 3 ? 2 : 1;
   const tileWidth = baseColumnWidth * columnSpan + RESULT_GRID_GAP_PX * (columnSpan - 1);
-  const visualHeight = tileWidth / safeAspectRatio + RESULT_GRID_VERTICAL_CHROME_PX;
+  const visualHeight = tileWidth / safeAspectRatio;
 
   return {
     columnSpan,
-    rowSpan: Math.max(12, Math.ceil(visualHeight / RESULT_GRID_ROW_HEIGHT_PX)),
+    rowSpan: getGridRowSpan(visualHeight, RESULT_GRID_STANDARD_MIN_ROWS),
   };
+}
+
+function getGridRowSpan(visualHeight: number, minimumRows: number): number {
+  const safeVisualHeight = Number.isFinite(visualHeight) && visualHeight > 0 ? visualHeight : 0;
+  const rowSpan = Math.ceil(
+    (safeVisualHeight + RESULT_GRID_GAP_PX) / (RESULT_GRID_ROW_HEIGHT_PX + RESULT_GRID_GAP_PX),
+  );
+  return Math.max(minimumRows, rowSpan);
 }
