@@ -113,12 +113,12 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
       >
         {/* 核心展示区 */}
         <div
-          className={`relative flex-1 min-h-0 w-full overflow-hidden bg-[var(--bg-tertiary)] ${viewMode === 'detail' ? 'rounded-t-2xl' : 'rounded-2xl'}`}
+          className="relative flex-1 min-h-0 w-full overflow-hidden bg-[var(--bg-tertiary)]"
           style={!entry.isGenerating ? { aspectRatio: imageAspectRatio } : undefined}
         >
           {entry.isGenerating ? (
             /* 占位态：带 Shimmer 扫光和耗时计时器 */
-            <div className={`relative w-full h-full flex flex-col items-center justify-center min-h-[120px] overflow-hidden bg-[var(--bg-secondary)]/50 ${viewMode === 'detail' ? 'rounded-t-2xl' : 'rounded-2xl'}`}>
+            <div className="relative w-full h-full flex flex-col items-center justify-center min-h-[120px] overflow-hidden bg-[var(--bg-secondary)]/50">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-shimmer-sweep" />
               <div className="relative flex flex-col items-center gap-1.5 select-none">
                 <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/5 border border-white/10">
@@ -141,12 +141,12 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
               src={entry.displaySrc}
               alt={promptSummary}
               onError={() => setImgLoadError(true)}
-              className={`block h-full min-h-0 w-full object-cover transition-transform duration-300 group-active:scale-[0.985] group-hover:scale-[1.01] ${isFailed ? 'filter grayscale opacity-40' : ''} ${viewMode === 'detail' ? 'rounded-t-2xl' : 'rounded-2xl'}`}
+              className={`block h-full min-h-0 w-full object-cover transition-transform duration-300 group-active:scale-[0.985] group-hover:scale-[1.01] ${isFailed ? 'filter grayscale opacity-40' : ''}`}
             />
           ) : (
             /* 暂无预览占位 - 去除 fallback aspect 限制以支持铺满 */
             <div
-              className={`flex h-full min-h-0 w-full items-center justify-center bg-[var(--bg-tertiary)] text-[13px] text-[var(--text-secondary)] ${viewMode === 'detail' ? 'rounded-t-2xl' : 'rounded-2xl'}`}
+              className="flex h-full min-h-0 w-full items-center justify-center bg-[var(--bg-tertiary)] text-[13px] text-[var(--text-secondary)]"
             >
               暂无预览
             </div>
@@ -208,7 +208,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
 
         {/* 详细模式毛玻璃参数卡片区域 */}
         {viewMode === 'detail' && !entry.isGenerating && (
-          <div className="shrink-0 p-3 bg-[var(--bg-secondary)]/80 backdrop-blur-md border-t border-white/5 flex flex-col gap-2 w-full rounded-b-2xl">
+          <div className="shrink-0 p-3 bg-[var(--bg-secondary)]/80 backdrop-blur-md border-t border-white/5 flex flex-col gap-2 w-full">
             <p className="line-clamp-2 text-xs leading-relaxed text-[var(--text-secondary)] font-normal">
               {entry.fullPrompt || promptSummary}
             </p>
