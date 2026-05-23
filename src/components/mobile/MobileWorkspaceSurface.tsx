@@ -2,6 +2,7 @@ import React, { useMemo, useState, useRef } from 'react';
 import { Check, Clock3, FolderOpen, MessageSquare, Plus, Search, Settings, ShoppingBag } from 'lucide-react';
 
 import { useCanvas } from '../../context/CanvasContext';
+import { useAdminRole } from '../../hooks/useAdminRole';
 import type {
   MobileResultEntry,
   MobileSurfaceScreen,
@@ -96,6 +97,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   overlays,
 }) => {
   const { state, activeCanvas, switchCanvas, createCanvas, canCreateCanvas } = useCanvas();
+  const { accountRole } = useAdminRole();
   const [showProjectList, setShowProjectList] = useState(false);
   const [resultViewMode, setResultViewMode] = useState<ResultViewMode>('standard');
   
@@ -169,6 +171,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
         title={title}
         userName={userName}
         userAvatarUrl={userAvatarUrl}
+        userRole={accountRole}
       />
     </div>
   );
