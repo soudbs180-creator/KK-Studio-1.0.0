@@ -116,6 +116,11 @@ const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
         setWorkspaceSurface('library');
         setMobileScreen('home');
       }}
+      onOpenHistorySearch={() => {
+        setWorkspaceSurface('library');
+        setIsSearchOpen(true);
+        setMobileScreen('home');
+      }}
       onOpenChat={() => {
         focusWorkspace();
         setIsChatOpen(true);
@@ -137,6 +142,7 @@ const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
       onConfirmEcommerceDesktop={onConfirmEcommerceDesktop}
       onGenerateEcommerceMobile={onGenerateEcommerceMobile}
       onToggleEcommerceSelected={onToggleEcommerceSelected}
+      promptBarProps={promptBarProps}
       composer={(
         <AppPromptComposer
           variant="mobile"

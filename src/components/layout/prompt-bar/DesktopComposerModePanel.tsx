@@ -120,7 +120,8 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
         <>
           {sharedIcon}
           <span className="whitespace-nowrap">
-            {config.aspectRatio === AspectRatio.AUTO ? '自适应' : config.aspectRatio} · {config.imageSize}
+            {config.aspectRatio === AspectRatio.AUTO ? '自适应' : config.aspectRatio}
+            {!isMobile && ` · ${config.imageSize}`}
           </span>
         </>
       );
@@ -130,7 +131,8 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
       <>
         {sharedIcon}
         <span className="whitespace-nowrap">
-          {config.aspectRatio === AspectRatio.AUTO ? '自适应' : config.aspectRatio} · {config.videoResolution || '720p'}
+          {config.aspectRatio === AspectRatio.AUTO ? '自适应' : config.aspectRatio}
+          {!isMobile && ` · ${config.videoResolution || '720p'}`}
         </span>
       </>
     );
@@ -164,7 +166,7 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
 
         {showOptionsPanel && isMobile ? (
           <div
-            className={isEmbeddedMobileDrawer ? 'mt-2 w-full animate-fadeIn overflow-y-auto' : 'fixed left-3 right-3 z-[1005] ios-mobile-floating-sheet p-2 animate-fadeIn overflow-hidden'}
+            className={isEmbeddedMobileDrawer ? 'mt-2 w-full animate-fadeIn overflow-y-auto' : 'fixed left-3 right-3 z-[1050] ios-mobile-floating-sheet p-2 animate-fadeIn overflow-hidden'}
             style={
               isEmbeddedMobileDrawer
                 ? {
@@ -177,6 +179,8 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
                     overscrollBehavior: 'contain',
                   }
             }
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
           >
             <div ref={optionsPanelRef}>{optionsPanelContent}</div>
           </div>

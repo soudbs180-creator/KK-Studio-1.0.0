@@ -92,6 +92,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
   onUseAsSource,
 }) => {
   const { pick } = useLocale();
+  const bottomRef = React.useRef<HTMLDivElement>(null);
   const [measuredWidth, setMeasuredWidth] = React.useState(() => (
     typeof window !== 'undefined' ? window.innerWidth : getFallbackWidth(surface)
   ));
@@ -105,6 +106,15 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
     width: measuredWidth,
     viewMode,
   });
+
+  React.useEffect(() => {
+    if (totalResults > 0) {
+      const timer = setTimeout(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [totalResults]);
 
   React.useEffect(() => {
     if (typeof window === 'undefined') {
@@ -193,6 +203,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                 />
               );
             })}
+            <div ref={bottomRef} style={{ gridColumn: '1 / -1' }} className="h-1 w-full" />
           </div>
         </div>
       )}

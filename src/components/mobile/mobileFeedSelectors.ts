@@ -319,7 +319,7 @@ function resolveEcommerceContinuation(
 }
 
 const compareMobileFeedResults = (left: MobileResultEntry, right: MobileResultEntry): number => {
-  const timeDelta = right.timestamp - left.timestamp;
+  const timeDelta = left.timestamp - right.timestamp;
   if (timeDelta !== 0) {
     return timeDelta;
   }

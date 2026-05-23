@@ -1,7 +1,5 @@
 import React from 'react';
 
-import { Sparkles } from 'lucide-react';
-
 import type { MobileResultEntry, ResultViewMode } from '../../types';
 import type { AdaptiveResultTileGridMetrics } from '../../utils/responsiveSurface';
 
@@ -103,43 +101,22 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
           ) : null}
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent px-3 pb-3 pt-8">
-          <div className="flex items-end justify-between gap-2">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/35 to-transparent px-3 pb-2.5 pt-8">
+          <div className="flex flex-col gap-1">
             <span className="line-clamp-2 text-[11px] font-medium leading-4 text-white/90">
               {promptSummary}
             </span>
-            <span className="max-w-[42%] shrink-0 truncate rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] px-2 py-1 text-[10px] font-medium text-[var(--text-secondary)]">
-              {entry.displayLabel || entry.aspectRatio}
-            </span>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <span className="truncate text-[9px] text-white/70 font-light">
+                {entry.modelLabel}
+              </span>
+              <span className="shrink-0 truncate rounded-full bg-black/35 px-2 py-0.5 text-[9px] font-medium text-white/85">
+                {entry.displayLabel || entry.aspectRatio}
+              </span>
+            </div>
           </div>
         </div>
       </button>
-      {viewMode === 'detail' ? (
-        <div className="flex items-center justify-between gap-2 px-3 pb-3 pt-2">
-          <div className="min-w-0 text-[11px] text-[var(--text-secondary)]">
-            <span className="truncate">{entry.modelLabel}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => onUseAsSource(entry.imageId)}
-            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-2.5 text-[11px] font-medium text-[var(--text-primary)]"
-            title="继续创作"
-          >
-            <Sparkles size={13} />
-            <span className="whitespace-nowrap">继续</span>
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => onUseAsSource(entry.imageId)}
-          className="absolute right-2 top-10 inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--mobile-clay-active-border)] bg-[var(--accent-color)] text-[var(--text-inverse)]"
-          title="继续创作"
-          aria-label="继续创作"
-        >
-          <Sparkles size={14} />
-        </button>
-      )}
     </article>
   );
 };

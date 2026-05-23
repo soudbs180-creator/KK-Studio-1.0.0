@@ -4228,7 +4228,13 @@ const AppContent: React.FC<AppContentProps> = () => {
       activePanel={activeWorkspacePanel}
       isChatOpen={isChatOpen}
       toggleChatPanel={toggleChatPanel}
-      setIsChatOpen={setIsChatOpen}
+      setIsChatOpen={(val) => {
+        setIsChatOpen(val);
+        const nextVal = typeof val === 'function' ? val(isChatOpen) : val;
+        if (!nextVal && isMobile) {
+          setMobileScreen('home');
+        }
+      }}
       isMobile={isMobile}
       openSettingsSurface={openSettingsSurfaceTracked}
       setIsSidebarHovered={setIsSidebarHovered}

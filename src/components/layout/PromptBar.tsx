@@ -17,7 +17,7 @@ import ImageOptionsPanel from '../image/ImageOptionsPanel';
 import VideoOptionsPanel from '../video/VideoOptionsPanel';
 import ImagePreview from '../image/ImagePreview';
 import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
-import { X, Loader2, Sparkles } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
+import { X, Loader2, Sparkles, ChevronDown } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
 import { formatRemainingCredits } from '../../services/billing/remainingBalance';
@@ -287,6 +287,9 @@ interface CreditSendButtonProps {
     className?: string;
     ecommerceConfirmedMode?: boolean;
     onClick: () => void;
+    isMobile?: boolean;
+    parallelCount?: number;
+    onChangeParallelCount?: (count: number) => void;
 }
 
 const CreditSendButton: React.FC<CreditSendButtonProps> = ({
@@ -300,8 +303,170 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     textColor = 'white',
     className = '',
     ecommerceConfirmedMode = false,
-    onClick
+    onClick,
+    isMobile = false,
+    parallelCount = 1,
+    onChangeParallelCount
 }) => {
+    // 🚀 移动端长按多张并发与高质感磨砂呼吸 UI 实现
+    const touchStartRef = React.useRef<{ x: number; y: number; time: number } | null>(null);
+    const [isLongPressing, setIsLongPressing] = React.useState(false);
+    const longPressTimerRef = React.useRef<any>(null);
+    const bubbleRef = React.useRef<HTMLDivElement | null>(null);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (!isMobile || !hasPrompt) return;
+        const touch = e.touches[0];
+        if (!touch) return;
+        touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+        
+        if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = setTimeout(() => {
+            setIsLongPressing(true);
+            try {
+                if (navigator.vibrate) {
+                    navigator.vibrate(15);
+                }
+            } catch (err) {
+                // 拦截可能在某些旧机型不支持的震动API报错
+            }
+        }, 250);
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!isMobile || !isLongPressing) return;
+        const touch = e.touches[0];
+        if (!touch || !bubbleRef.current) return;
+        
+        const rect = bubbleRef.current.getBoundingClientRect();
+        const x = touch.clientX;
+        const pct = (x - rect.left) / rect.width;
+        const index = Math.min(3, Math.max(0, Math.floor(pct * 4)));
+        const newCount = index + 1;
+        if (newCount !== parallelCount && onChangeParallelCount) {
+            try {
+                if (navigator.vibrate) {
+                    navigator.vibrate(5);
+                }
+            } catch (err) {}
+            onChangeParallelCount(newCount);
+        }
+    };
+
+    const handleTouchEnd = (e: React.TouchEvent) => {
+        if (!isMobile) return;
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+        
+        if (isLongPressing) {
+            e.preventDefault();
+            setIsLongPressing(false);
+        } else {
+            e.preventDefault();
+            if (hasPrompt) {
+                onClick();
+            }
+        }
+        touchStartRef.current = null;
+    };
+
+    const handleTouchCancel = () => {
+        if (!isMobile) return;
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+        setIsLongPressing(false);
+        touchStartRef.current = null;
+    };
+
+    if (isMobile) {
+        const isInsufficient = isCreditModel && !balanceLoading && creditCost > 0 && balance < creditCost;
+        const isDisabled = !hasPrompt;
+        
+        return (
+            <div className="relative select-none" style={{ touchAction: 'none' }} onTouchMove={handleTouchMove}>
+                {/* 1-4 张数拖拽滑选气泡 */}
+                {isLongPressing && (
+                    <div 
+                        ref={bubbleRef}
+                        className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-48 h-11 flex items-center justify-around rounded-xl backdrop-blur-xl bg-black/85 dark:bg-black/90 border border-white/20 text-white shadow-2xl z-[1200]"
+                    >
+                        {[1, 2, 3, 4].map((num) => {
+                            const isSelected = parallelCount === num;
+                            return (
+                                <div 
+                                    key={num}
+                                    className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold transition-all duration-150 ${isSelected ? 'bg-gradient-to-r from-[var(--accent-coral)] to-[var(--accent-pink)] text-white scale-125 shadow-md shadow-pink-500/20' : 'text-white/60 scale-100'}`}
+                                >
+                                    {num}
+                                </div>
+                            );
+                        })}
+                        {/* 小气泡箭头 */}
+                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black/85 dark:bg-black/90 border-r border-b border-white/20 rotate-45" />
+                    </div>
+                )}
+
+                {/* 磨砂玻璃呼吸外框按钮 */}
+                <button
+                    disabled={isDisabled}
+                    onTouchStart={handleTouchStart}
+                    onTouchEnd={handleTouchEnd}
+                    onTouchCancel={handleTouchCancel}
+                    className={`
+                        relative flex items-center justify-center gap-1.5 h-10 px-4 rounded-full overflow-hidden select-none active:scale-[0.98] transition-all duration-300
+                        ${isDisabled ? 'bg-[var(--frost-card-sub-bg)] opacity-40 cursor-not-allowed text-[var(--text-tertiary)] border border-[var(--frost-card-sub-border)]' : ''}
+                        ${!isDisabled && isInsufficient ? 'bg-red-500/10 border border-red-500/30 text-red-400' : ''}
+                        ${!isDisabled && !isInsufficient ? 'backdrop-blur-xl bg-white/12 dark:bg-black/24 border border-white/20 dark:border-white/12 shadow-lg shadow-black/10' : ''}
+                    `}
+                    style={{
+                        WebkitTapHighlightColor: 'transparent',
+                    }}
+                >
+                    {/* 呼吸微渐变发光背景外框 - 仅在未禁用且未欠费时 */}
+                    {!isDisabled && !isInsufficient && (
+                        <div className="absolute inset-0 -z-10 rounded-full bg-gradient-to-r from-[var(--accent-coral)]/30 to-[var(--accent-pink)]/30 blur-sm opacity-60 animate-pulse" />
+                    )}
+
+                    {/* 发送按钮的内容 */}
+                    {isCreditModel ? (
+                        <div className="flex items-center gap-1.5 font-bold">
+                            <Sparkles size={13} fill="currentColor" className={isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : 'text-[var(--accent-coral)]'} />
+                            <span className={`text-xs ${isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : 'text-[var(--text-primary)]'}`}>
+                                {isInsufficient ? '积分不足' : `${creditCost} 积分`}
+                            </span>
+                            {parallelCount > 1 && !isInsufficient && (
+                                <span className="text-[10px] text-[var(--text-secondary)] font-normal opacity-90">
+                                    ({parallelCount}张)
+                                </span>
+                            )}
+                        </div>
+                    ) : (
+                        <span className={`text-xs font-bold tracking-wide ${isDisabled ? 'text-gray-400' : 'text-[var(--text-primary)]'}`}>
+                            {ecommerceConfirmedMode ? '补充修改' : parallelCount > 1 ? `发送 (${parallelCount}张)` : '发送'}
+                        </span>
+                    )}
+
+                    {/* 箭头 */}
+                    {!isDisabled && (
+                        <div className={`
+                            flex h-6 w-6 items-center justify-center overflow-hidden rounded-full transition-colors duration-200 ml-0.5
+                            ${isInsufficient ? 'bg-red-500 text-white' : 'bg-white/15 text-[var(--text-primary)]'}
+                        `}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                                <polyline points="12 5 19 12 12 19" />
+                            </svg>
+                        </div>
+                    )}
+                </button>
+            </div>
+        );
+    }
+
     // 判断积分是否不足
     const isInsufficient = isCreditModel && !balanceLoading && creditCost > 0 && balance < creditCost;
 
@@ -882,11 +1047,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
     // Track composition state so IME input is not interrupted by background sync.
     const isComposingRef = useRef(false);
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
+    const [isExpanded, setIsExpanded] = useState(false);
     const [modelMenuLoadingState, setModelMenuLoadingState] = useState<ModelMenuLoadingState>('idle');
     const [modelSearch, setModelSearch] = useState('');
     const deferredModelSearch = useDeferredValue(modelSearch);
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, modelId: string } | null>(null);
     const [modelListWindowStart, setModelListWindowStart] = useState(0);
+    const [mobileScrollTop, setMobileScrollTop] = useState(0);
 
     // [NEW] Model Settings Modal State
     const [modelSettingsModal, setModelSettingsModal] = useState<{ modelId: string; alias: string; description: string } | null>(null);
@@ -1052,6 +1219,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const modelMenuRequestRef = useRef(0);
     const previousActiveMenuRef = useRef<string | null>(null);
     const previousModeRef = useRef<GenerationMode>(config.mode);
+    const modelMenuHasScrolledRef = useRef(false);
 
     const transitionConfigUpdate = useCallback((updater: React.SetStateAction<GenerationConfig>) => {
         startTransition(() => {
@@ -1865,8 +2033,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
             // 始终允许发送新请求，即使正在生成中
             flushPromptDraftToConfig();
             onGenerate(promptDraftRef.current);
+            if (isMobile) {
+                setIsExpanded(false);
+                textareaRef.current?.blur();
+            }
         }
-    }, [flushPromptDraftToConfig, onGenerate]);
+    }, [flushPromptDraftToConfig, onGenerate, isMobile, setIsExpanded, textareaRef]);
 
     const primeClipboardImageFiles = useCallback(async (files: File[]) => {
         const preparedFiles = await Promise.all(files.map(async (file) => {
@@ -2222,7 +2394,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
             ...previousConfig,
             ...getPromptBarModePatch(previousConfig, mode),
         }));
-    }, [commitConfigUpdate]);
+        if (isMobile) {
+            setIsExpanded(true);
+        }
+    }, [commitConfigUpdate, isMobile, setIsExpanded]);
 
     const handleTogglePptOutlinePanel = useCallback(() => {
         setShowPptOutlinePanel((previousValue) => !previousValue);
@@ -2465,6 +2640,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         };
     }, [availableModels, config.imageSize, config.model]);
 
+    const isModelMenuOpen = activeMenu === 'model';
     const isModelListEmpty = availableModels.length === 0;
     const isModelMenuLoading = modelMenuLoadingState !== 'idle';
     const isModelMenuBootstrapping = modelMenuLoadingState === 'bootstrapping_without_cache';
@@ -2620,8 +2796,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
     };
     const mobileFloatingSheetBottom = 'calc(env(safe-area-inset-bottom, 0px) + var(--mobile-tabbar-total-height) + var(--mobile-floating-sheet-clearance))';
     const mobileFloatingSheetMaxHeight = 'min(62vh, calc(100vh - var(--mobile-content-top-inset) - env(safe-area-inset-bottom, 0px) - var(--mobile-tabbar-total-height) - var(--mobile-floating-sheet-clearance) - 18px))';
-    const shouldRenderInlineMobileUploadButton = isMobile && config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
-    const shouldRenderStandaloneUploadRow = !isMobile && config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
+    const shouldRenderInlineMobileUploadButton = false;
+    const shouldRenderStandaloneUploadRow = config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
 
     const mobileAdvancedPromptToolsNode = (
         <DesktopComposerPromptTools
@@ -2746,7 +2922,28 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const dragOverlayLabel = config.mode === GenerationMode.ECOMMERCE && !ecommerceAnalysisConfirmed
         ? '释放导入需求单或产品图'
         : '释放添加参考图';
-    const isModelMenuOpen = activeMenu === 'model' && (!isModelListEmpty || isModelMenuLoading);
+    useEffect(() => {
+        if (!isModelMenuOpen) {
+            modelMenuHasScrolledRef.current = false;
+        }
+    }, [isModelMenuOpen]);
+
+    useEffect(() => {
+        if (isMobile && isModelMenuOpen && modelListScrollRef.current && !modelMenuHasScrolledRef.current) {
+            const index = filteredDisplayModels.findIndex(m => m.id === config.model);
+            if (index !== -1) {
+                modelMenuHasScrolledRef.current = true;
+                const timer = setTimeout(() => {
+                    if (modelListScrollRef.current) {
+                        modelListScrollRef.current.scrollTop = index * 74;
+                        setMobileScrollTop(index * 74);
+                    }
+                }, 80);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [isModelMenuOpen, isMobile, config.model, filteredDisplayModels]);
+
     const modelDropdownContent = (
         <>
             {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
@@ -2854,6 +3051,44 @@ const PromptBar: React.FC<PromptBarProps> = ({
         </>
     );
 
+    if (isMobile && !isExpanded) {
+        return (
+            <div
+                id="prompt-bar-container"
+                className={`input-bar ios-mobile-prompt transition-all duration-300 !overflow-visible w-[calc(100vw-20px)] max-w-full`}
+                style={mobileStyle}
+                onClick={() => {
+                    setIsExpanded(true);
+                }}
+            >
+                <div className="flex items-center justify-between px-3 h-12 w-full select-none cursor-pointer gap-2">
+                    <div 
+                        className="min-w-0 flex-shrink-0"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                        }}
+                    >
+                        <DesktopComposerModeSwitcher
+                            isMobile={isMobile}
+                            activeMode={activeModeOption.mode}
+                            modeOptions={modeOptions}
+                            onSelectMode={(mode) => {
+                                handleSelectPromptBarMode(mode);
+                                setIsExpanded(true);
+                            }}
+                        />
+                    </div>
+                    <div className="flex-1 min-w-0 flex items-center justify-start gap-1 text-[var(--text-tertiary)] text-xs pl-2 border-l border-[var(--frost-card-sub-border)]">
+                        <svg className="w-3.5 h-3.5 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                        </svg>
+                        <span className="truncate">输入提示词...</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <>
             <div
@@ -2932,13 +3167,26 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                     {/* Top Controls Row: desktop keeps tools visible; embedded mobile only keeps the mode strip */}
                     <PromptBarTopRow isMobile={isMobile}>
-                        <div data-mobile-composer-section="mode-strip" className="min-w-0">
+                        <div data-mobile-composer-section="mode-strip" className="min-w-0 flex items-center justify-between w-full">
                             <DesktopComposerModeSwitcher
                                 isMobile={isMobile}
                                 activeMode={activeModeOption.mode}
                                 modeOptions={modeOptions}
                                 onSelectMode={handleSelectPromptBarMode}
                             />
+                            {isMobile && (
+                                <button
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)] shadow-sm active:scale-95 transition-all duration-200"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        setIsExpanded(false);
+                                        textareaRef.current?.blur();
+                                    }}
+                                    title="收起输入面板"
+                                >
+                                    <ChevronDown size={16} />
+                                </button>
+                            )}
                         </div>
 
                         {!isEmbeddedMobileComposer && (
@@ -3397,14 +3645,14 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                     {/* Footer - Modified to be a standard flex row, flowing or wrapping lightly on mobile */}
                     <PromptBarFooter isMobile={isMobile}>
-                        <div className={`flex items-center ${isMobile ? 'min-w-max shrink-0 flex-nowrap gap-2' : 'min-w-0 flex-1 gap-1.5'}`}>
+                        <div className={`flex items-center gap-1.5 ${isMobile ? 'flex-1 min-w-0 w-full' : 'min-w-0 flex-1'}`}>
                             {/* Model Button */}
                             <div
                                 ref={modelMenuAnchorRef}
-                                className={`relative inline-flex min-w-0 ${isMobile ? 'shrink-0' : 'flex-shrink-0'}`}
+                                className={`relative inline-flex min-w-0 ${isMobile ? 'flex-1' : 'flex-shrink-0'}`}
                             >
                                 <button
-                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-[clamp(7rem,40vw,9rem)] max-w-[44vw] flex-none justify-start' : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
+                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'flex-1 min-w-0 w-auto justify-start' : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
                                         ? 'bg-[var(--frost-input-bg)] text-[var(--text-tertiary)] cursor-not-allowed border-[color:var(--frost-card-sub-border)]'
                                         : 'text-[var(--text-secondary)] !opacity-100 hover:border-[var(--prompt-bar-shell-border-strong)]'
                                         }`}
@@ -3451,6 +3699,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     onMouseDown={(e) => e.stopPropagation()} // 🚀 阻止 mousedown 冒泡，防止被 handleClickOutside 误杀
                                     onClick={(e) => {
                                         e.stopPropagation(); // 🚀 阻止冒泡，防止被 handleClickOutside 误杀
+                                        if (isMobile) {
+                                            textareaRef.current?.blur();
+                                        }
                                         void handleToggleModelLibrary();
                                     }}
                                 >
@@ -3510,112 +3761,159 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 </button>
 
                                 {/* Dropdown Menu */}
-                                {isModelMenuOpen && isMobile && (
-                                    <div
-                                        ref={modelDropdownRef}
-                                        className="fixed left-3 right-3 z-[1005] ios-mobile-floating-sheet p-2 animate-fadeIn overflow-hidden"
-                                        style={{ bottom: mobileFloatingSheetBottom, maxHeight: mobileFloatingSheetMaxHeight, overscrollBehavior: 'contain' }}
-                                    >
-                                        {/* 🔍 Search Input Module - Above the list - 只在多个模型时显示 */}
-                                        {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
-                                            <div className="mb-2 p-2.5 border rounded-2xl  animate-scaleIn origin-bottom max-w-[calc(100vw-24px)]" style={{ ...modelLibrarySearchSurfaceStyle, width: 'min(22rem, calc(100vw - 24px))' }}>
-                                                <div className="relative flex items-center">
-                                                    <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                                    </svg>
-                                                    <input
-                                                        type="text"
-                                                        value={modelSearch}
-                                                        onChange={(e) => setModelSearch(e.target.value)}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        placeholder="搜索模型..."
-                                                        className="w-full bg-[var(--frost-input-bg)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-transparent focus:border-[var(--frost-input-border)] placeholder-[var(--text-tertiary)]"
-                                                        autoFocus
-                                                    />
-                                                    {modelSearch && (
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); setModelSearch(''); }}
-                                                            className="absolute right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-                                                        >
-                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                            </svg>
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
+                                 {/* Dropdown Menu */}
+                                 {isModelMenuOpen && isMobile && (
+                                     <div
+                                         ref={modelDropdownRef}
+                                         className="fixed left-3 right-3 z-[1050] ios-mobile-floating-sheet p-2 animate-fadeIn overflow-hidden"
+                                         style={{ bottom: mobileFloatingSheetBottom, maxHeight: mobileFloatingSheetMaxHeight, overscrollBehavior: 'contain' }}
+                                         onTouchStart={(e) => e.stopPropagation()}
+                                     >
+                                         {/* 🔍 Search Input Module - Above the list - 只在多个模型时显示 */}
+                                         {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
+                                             <div className="mb-2 p-2.5 border rounded-2xl  animate-scaleIn origin-bottom max-w-[calc(100vw-24px)]" style={{ ...modelLibrarySearchSurfaceStyle, width: 'min(22rem, calc(100vw - 24px))' }}>
+                                                 <div className="relative flex items-center">
+                                                     <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                                     </svg>
+                                                     <input
+                                                         type="text"
+                                                         value={modelSearch}
+                                                         onChange={(e) => setModelSearch(e.target.value)}
+                                                         onClick={(e) => e.stopPropagation()}
+                                                         placeholder="搜索模型..."
+                                                         className="w-full bg-[var(--frost-input-bg)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-transparent focus:border-[var(--frost-input-border)] placeholder-[var(--text-tertiary)]"
+                                                         autoFocus
+                                                     />
+                                                     {modelSearch && (
+                                                         <button
+                                                             onClick={(e) => { e.stopPropagation(); setModelSearch(''); }}
+                                                             className="absolute right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                                                         >
+                                                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                             </svg>
+                                                         </button>
+                                                     )}
+                                                 </div>
+                                             </div>
+                                         )}
 
-                                        {isModelMenuRefreshingWithCache && (
-                                            <div className="mb-2 flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
-                                                <Loader2 size={14} className="animate-spin" />
-                                                <span>正在同步最新模型库...</span>
-                                            </div>
-                                        )}
+                                         {isModelMenuRefreshingWithCache && (
+                                             <div className="mb-2 flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                 <Loader2 size={14} className="animate-spin" />
+                                                 <span>正在同步最新模型库...</span>
+                                             </div>
+                                         )}
 
-                                        <div
-                                            ref={modelListScrollRef}
-                                            className="dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] max-h-[50vh] overflow-y-auto scrollbar-thin animate-scaleIn origin-bottom p-4"
-                                            style={{ ...modelLibrarySurfaceStyle, borderRadius: '1rem' }}
-                                            onScroll={(e) => {
-                                                const nextTop = e.currentTarget.scrollTop;
-                                                modelListScrollPos.current = nextTop;
-                                                const nextStartIndex = Math.max(
-                                                    0,
-                                                    Math.floor(nextTop / MODEL_LIST_ITEM_HEIGHT) - MODEL_LIST_OVERSCAN
-                                                );
-                                                setModelListWindowStart((prev) => prev === nextStartIndex ? prev : nextStartIndex);
-                                            }}
-                                        >
-                                            {isModelMenuBootstrapping ? (
-                                                <div className="py-6">
-                                                    <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
-                                                        <Loader2 size={14} className="animate-spin" />
-                                                        <span>正在同步最新模型库...</span>
-                                                    </div>
-                                                    <div className="mt-4 space-y-2">
-                                                        {Array.from({ length: MODEL_MENU_SKELETON_COUNT }).map((_, index) => (
-                                                            <div
-                                                                key={`prompt-bar-model-loading-${index}`}
-                                                                className="h-12 rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] animate-pulse"
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ) : (() => {
-                                                const visibleModels = modelListViewport.items;
-                                                const topSpacerHeight = modelListViewport.shouldWindow
-                                                    ? modelListViewport.startIndex * MODEL_LIST_ITEM_HEIGHT
-                                                    : 0;
-                                                const bottomSpacerHeight = modelListViewport.shouldWindow
-                                                    ? Math.max(0, modelListViewport.totalHeight - topSpacerHeight - visibleModels.length * MODEL_LIST_ITEM_HEIGHT)
-                                                    : 0;
+                                         <div
+                                             ref={modelListScrollRef}
+                                             className="dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] h-[240px] max-h-[240px] overflow-y-auto scrollbar-none animate-scaleIn origin-bottom p-0 relative"
+                                             style={{ 
+                                                 ...modelLibrarySurfaceStyle, 
+                                                 borderRadius: '1rem',
+                                                 scrollSnapType: 'y mandatory',
+                                                 paddingTop: '83px',
+                                                 paddingBottom: '83px',
+                                                 overscrollBehavior: 'contain',
+                                                 scrollbarWidth: 'none',
+                                             }}
+                                             onScroll={(e) => {
+                                                 const nextTop = e.currentTarget.scrollTop;
+                                                 modelListScrollPos.current = nextTop;
+                                                 const nextStartIndex = Math.max(
+                                                     0,
+                                                     Math.floor(nextTop / MODEL_LIST_ITEM_HEIGHT) - MODEL_LIST_OVERSCAN
+                                                 );
+                                                 setModelListWindowStart((prev) => prev === nextStartIndex ? prev : nextStartIndex);
+                                                 
+                                                 if (isMobile) {
+                                                     setMobileScrollTop(nextTop);
+                                                     
+                                                     const centerIndex = Math.min(filteredDisplayModels.length - 1, Math.max(0, Math.round(nextTop / MODEL_LIST_ITEM_HEIGHT)));
+                                                     const targetModel = filteredDisplayModels[centerIndex];
+                                                     if (targetModel && targetModel.id !== config.model) {
+                                                         try {
+                                                             if (navigator.vibrate) {
+                                                                 navigator.vibrate(5);
+                                                             }
+                                                         } catch (err) {}
+                                                         handleSelectPromptBarModel(targetModel);
+                                                     }
+                                                 }
+                                             }}
+                                         >
+                                             {isModelMenuBootstrapping ? (
+                                                 <div className="py-6 px-4">
+                                                     <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                         <Loader2 size={14} className="animate-spin" />
+                                                         <span>正在同步最新模型库...</span>
+                                                     </div>
+                                                     <div className="mt-4 space-y-2">
+                                                         {Array.from({ length: MODEL_MENU_SKELETON_COUNT }).map((_, index) => (
+                                                             <div
+                                                                 key={`prompt-bar-model-loading-${index}`}
+                                                                 className="h-12 rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] animate-pulse"
+                                                             />
+                                                         ))}
+                                                     </div>
+                                                 </div>
+                                             ) : (() => {
+                                                 const visibleModels = modelListViewport.items;
+                                                 const topSpacerHeight = modelListViewport.shouldWindow
+                                                     ? modelListViewport.startIndex * MODEL_LIST_ITEM_HEIGHT
+                                                     : 0;
+                                                 const bottomSpacerHeight = modelListViewport.shouldWindow
+                                                     ? Math.max(0, modelListViewport.totalHeight - topSpacerHeight - visibleModels.length * MODEL_LIST_ITEM_HEIGHT)
+                                                     : 0;
 
-                                                return (
-                                                    <>
-                                                        {topSpacerHeight > 0 ? <div style={{ height: `${topSpacerHeight}px` }} /> : null}
-                                                        {visibleModels.map((model: PromptBarModelOption, index: number) => {
-                                                            const isLast = index === visibleModels.length - 1;
-                                                            const description = model.isExclusive ? '' : truncateModelDescription(model.resolvedDescription, 50);
+                                                 return (
+                                                     <>
+                                                         {topSpacerHeight > 0 ? <div style={{ height: `${topSpacerHeight}px` }} /> : null}
+                                                         {visibleModels.map((model: PromptBarModelOption, index: number) => {
+                                                             const isLast = index === visibleModels.length - 1;
+                                                             const description = model.isExclusive ? '' : truncateModelDescription(model.resolvedDescription, 50);
+                                                             const globalIndex = modelListViewport.startIndex + index;
 
-                                                            return (
-                                                                <PromptBarModelMenuButton
-                                                                    key={model.id}
-                                                                    model={model}
-                                                                    imageSize={config.imageSize}
-                                                                    selected={config.model === model.id}
-                                                                    isLast={isLast}
-                                                                    description={description}
-                                                                    onSelect={handleSelectPromptBarModel}
-                                                                    onOpenContextMenu={handlePromptBarModelContextMenu}
-                                                                />
-                                                            );
-                                                        })}
-                                                        {bottomSpacerHeight > 0 ? <div style={{ height: `${bottomSpacerHeight}px` }} /> : null}
-                                                    </>
-                                                );
-                                            })()}
-                                        </div>
+                                                             // 🚀 3D 滚轮运动计算
+                                                             const offset = globalIndex * 74 - mobileScrollTop;
+                                                             const ratio = offset / 74;
+                                                             const absRatio = Math.min(1.5, Math.abs(ratio));
+                                                             const scale = 1.05 - absRatio * 0.12;
+                                                             const rotateX = ratio * -28;
+                                                             const opacity = 1 - absRatio * 0.45;
+
+                                                             const itemStyle = isMobile ? {
+                                                                 transform: `perspective(500px) rotateX(${rotateX}deg) scale(${scale})`,
+                                                                 opacity: opacity,
+                                                                 scrollSnapAlign: 'center' as const,
+                                                                 height: '74px',
+                                                                 transition: 'transform 0.1s ease-out, opacity 0.1s ease-out',
+                                                                 display: 'flex',
+                                                                 alignItems: 'center',
+                                                                 justifyContent: 'center',
+                                                                 contain: 'layout style' as const
+                                                             } : undefined;
+
+                                                             return (
+                                                                 <div key={model.id} style={itemStyle} className="w-full">
+                                                                     <PromptBarModelMenuButton
+                                                                         model={model}
+                                                                         imageSize={config.imageSize}
+                                                                         selected={config.model === model.id}
+                                                                         isLast={isLast}
+                                                                         description={description}
+                                                                         onSelect={handleSelectPromptBarModel}
+                                                                         onOpenContextMenu={handlePromptBarModelContextMenu}
+                                                                     />
+                                                                 </div>
+                                                             );
+                                                         })}
+                                                         {bottomSpacerHeight > 0 ? <div style={{ height: `${bottomSpacerHeight}px` }} /> : null}
+                                                     </>
+                                                 );
+                                             })()}
+                                         </div>
                                     </div >
                                 )}
                                 {isModelMenuOpen && !isMobile && (
@@ -3638,6 +3936,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 mobileFloatingSheetBottom={mobileFloatingSheetBottom}
                                 mobileFloatingSheetMaxHeight={mobileFloatingSheetMaxHeight}
                                 onToggleOptionsPanel={() => {
+                                    if (isMobile) {
+                                        textareaRef.current?.blur();
+                                    }
                                     setActiveMenu(null);
                                     setShowOptionsPanel(prev => !prev);
                                 }}
@@ -3767,47 +4068,50 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             />
                         ) : null}
 
-                        <div className={`flex items-center gap-2 shrink-0 ${isMobile ? '' : 'ml-auto'}`}>
-                            {/* Group 2: Generation Settings - Hidden on mobile for compact footer */}
-                            {!isMobile && config.mode !== GenerationMode.ECOMMERCE && (
-                                <div className="prompt-bar-liquid-group flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0">
+                        <div className={`flex items-center gap-1.5 shrink-0 ${isMobile ? 'flex-1 min-w-0 justify-end' : 'ml-auto'}`}>
+                            {/* Group 2: Generation Settings */}
+                            {(isMobile || (!isMobile && config.mode !== GenerationMode.ECOMMERCE)) && (
+                                <div className={`${isMobile ? 'flex items-center' : 'prompt-bar-liquid-group flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0'}`}>
                                     {/* Parallel Count */}
-                                    <div className="relative h-full w-[58px]">
-                                        <button
-                                            className="prompt-bar-liquid-button flex w-full items-center justify-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-[var(--toolbar-hover)]"
-                                            style={{ color: 'var(--text-secondary)' }}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                toggleMenu('count');
-                                            }}
-                                            title="并发数量"
-                                        >
-                                            <span className="text-[11px] font-medium">{`${config.parallelCount} 张`}</span>
-                                            <svg className={`w-2.5 h-2.5 opacity-50 flex-shrink-0 transition-transform duration-200 ${activeMenu === 'count' ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
-                                        </button>
-                                        {
-                                            activeMenu === 'count' && (
-                                                <div className="absolute bottom-full mb-2 z-20" style={{ left: '50%', transform: 'translateX(-50%)' }}>
-                                                    <div className="dropdown static w-24 animate-scaleIn origin-bottom p-1 flex flex-col gap-1" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)', boxShadow: 'var(--frost-card-sub-shadow)' }}>
-                                                        {(config.mode === GenerationMode.PPT
-                                                            ? Array.from({ length: 20 }, (_, i) => i + 1)
-                                                            : [1, 2, 3, 4]
-                                                        ).map((count) => (
-                                                            <button
-                                                                key={count}
-                                                                className={`dropdown-item justify-between rounded-md ${config.parallelCount === count ? 'active' : ''}`}
-                                                                onClick={() => {
-                                                                    updateConfigFields({ parallelCount: count as number });
-                                                                    setActiveMenu(null);
-                                                                }}
-                                                            >
-                                                                <span>{`${count} 张`}</span>
-                                                            </button>
-                                                        ))}
+                                    {!isMobile && (
+                                        <div className="relative h-10 shrink-0">
+                                            <button
+                                                className="prompt-bar-liquid-button flex w-full items-center justify-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-[var(--toolbar-hover)]"
+                                                style={{ color: 'var(--text-secondary)' }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleMenu('count');
+                                                }}
+                                                title="并发数量"
+                                            >
+                                                <span className="text-[11px] font-medium">{`${config.parallelCount}张`}</span>
+                                                <svg className={`w-2.5 h-2.5 opacity-50 flex-shrink-0 transition-transform duration-200 ${activeMenu === 'count' ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
+                                            </button>
+                                            {
+                                                activeMenu === 'count' && (
+                                                    <div className="absolute bottom-full mb-2 z-20" style={{ left: '50%', transform: 'translateX(-50%)' }}>
+                                                        <div className="dropdown static w-24 animate-scaleIn origin-bottom p-1 flex flex-col gap-1" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)', boxShadow: 'var(--frost-card-sub-shadow)' }}>
+                                                            {(config.mode === GenerationMode.PPT
+                                                                ? Array.from({ length: 20 }, (_, i) => i + 1)
+                                                                : [1, 2, 3, 4]
+                                                            ).map((count) => (
+                                                                <button
+                                                                    key={count}
+                                                                    className={`dropdown-item justify-between rounded-md ${config.parallelCount === count ? 'active' : ''}`}
+                                                                    onClick={() => {
+                                                                        updateConfigFields({ parallelCount: count as number });
+                                                                        setActiveMenu(null);
+                                                                    }}
+                                                                >
+                                                                    <span>{`${count} 张`}</span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            )
-                                        }
+                                                )
+                                            }
+                                        </div>
+                                    )}
 
                                         {/* Context Menu for Pinning */}
                                         {contextMenu && ReactDOM.createPortal(
@@ -3943,7 +4247,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             document.body
                                         )}
                                     </div>
-                                </div>
                             )}
                         <div className={isMobile ? '' : 'flex-shrink-0'}>
                             {/* 🚀 发送按钮 - 积分专属样式 */}
@@ -3958,6 +4261,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 textColor={currentModel?.textColor}
                                 ecommerceConfirmedMode={config.mode === GenerationMode.ECOMMERCE && ecommerceAnalysisConfirmed}
                                 className={isMobile ? '' : 'prompt-bar-liquid-button prompt-bar-liquid-send'}
+                                isMobile={isMobile}
+                                parallelCount={config.parallelCount}
+                                onChangeParallelCount={(count) => updateConfigFields({ parallelCount: count })}
                                 onClick={() => {
                                     if (isSystemCreditModel && authLoading) {
                                         notify.info('账号状态确认中', '正在校验登录状态，请稍后再试。');
@@ -3974,6 +4280,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     }
                                     flushPromptDraftToConfig();
                                     onGenerate(promptDraftRef.current);
+                                    if (isMobile) {
+                                        setIsExpanded(false);
+                                        textareaRef.current?.blur();
+                                    }
                                 }}
                             />
                         </div>
@@ -4006,6 +4316,57 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         />
                     )
                 }
+
+                {/* 移动端并发数 Action Sheet 浮层 */}
+                {isMobile && activeMenu === 'count' && ReactDOM.createPortal(
+                    <div 
+                        className="fixed inset-0 z-[10000] flex items-end justify-center bg-black/45 backdrop-blur-[2px] transition-opacity duration-300"
+                        onClick={() => setActiveMenu(null)}
+                    >
+                        <div 
+                            className="w-full rounded-t-3xl border-t p-5 pb-9 space-y-5 transition-transform duration-300"
+                            style={{ 
+                                background: 'var(--frost-card-framework-bg)', 
+                                borderColor: 'var(--frost-card-framework-border)',
+                                boxShadow: '0 -8px 32px rgba(0,0,0,0.18)',
+                                WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.18)',
+                                backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.18)',
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-[var(--text-primary)]">选择并发张数</span>
+                                <button 
+                                    className="text-xs text-[var(--text-secondary)] font-medium px-3.5 py-1.5 rounded-full border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] active:scale-95 transition-all"
+                                    onClick={() => setActiveMenu(null)}
+                                >
+                                    关闭
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-4 gap-2">
+                                {(config.mode === GenerationMode.PPT
+                                    ? [1, 2, 3, 4, 5, 6, 8, 10]
+                                    : [1, 2, 3, 4]
+                                ).map((count) => (
+                                    <button
+                                        key={count}
+                                        className={`flex flex-col items-center justify-center py-3 rounded-xl border font-semibold transition-all active:scale-95 ${config.parallelCount === count 
+                                            ? 'bg-[var(--prompt-bar-shell-hover)] text-[var(--text-primary)] border-[var(--prompt-bar-shell-border-strong)] shadow-sm' 
+                                            : 'bg-[var(--frost-input-bg)] text-[var(--text-secondary)] border-[var(--frost-card-sub-border)]'}`}
+                                        onClick={() => {
+                                            updateConfigFields({ parallelCount: count });
+                                            setActiveMenu(null);
+                                        }}
+                                    >
+                                        <span className="text-base">{count}</span>
+                                        <span className="text-[10px] font-normal opacity-70">张</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>,
+                    document.body
+                )}
 
             </div>
         </>

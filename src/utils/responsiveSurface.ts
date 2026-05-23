@@ -88,9 +88,12 @@ export function getAdaptiveResultTileGridMetrics({
   const safeWidth = Number.isFinite(width) && width > 0 ? width : surface === 'phone' ? PHONE_MAX_WIDTH : TABLET_MAX_WIDTH;
 
   if (viewMode === 'detail') {
+    const horizontalPadding = surface === 'phone' ? 24 : surface === 'tablet' ? 32 : 40;
+    const availableWidth = Math.max(280, safeWidth - horizontalPadding);
+    const visualHeight = availableWidth / safeAspectRatio + RESULT_GRID_VERTICAL_CHROME_PX;
     return {
       columnSpan: safeColumnCount,
-      rowSpan: Math.max(28, Math.ceil((safeWidth / safeAspectRatio + RESULT_GRID_DETAIL_CHROME_PX) / RESULT_GRID_ROW_HEIGHT_PX)),
+      rowSpan: Math.max(28, Math.ceil(visualHeight / RESULT_GRID_ROW_HEIGHT_PX)),
     };
   }
 
