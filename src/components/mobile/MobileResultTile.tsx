@@ -101,24 +101,26 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
       style={{
         borderColor: isActive || isSource ? 'var(--mobile-clay-active-border)' : 'var(--mobile-clay-border)',
         boxShadow: isActive || isSource ? 'var(--mobile-clay-active-ring)' : 'var(--mobile-clay-shadow)',
+        transform: 'translateZ(0)',
+        WebkitTransform: 'translateZ(0)',
       }}
     >
       <button
         type="button"
         disabled={entry.isGenerating}
         data-testid={`mobile-result-tile-${entry.id}`}
-        className={`group relative flex flex-col h-full min-h-0 w-full text-left ${entry.isGenerating ? 'cursor-default' : 'cursor-pointer'}`}
+        className={`group relative flex flex-col h-full min-h-0 w-full text-left rounded-[inherit] overflow-hidden ${entry.isGenerating ? 'cursor-default' : 'cursor-pointer'}`}
         onClick={() => onEntryOpen(entry.id)}
         title={promptSummary}
       >
         {/* 核心展示区 */}
         <div
-          className={`relative flex-1 min-h-0 w-full overflow-hidden bg-[var(--bg-tertiary)] ${viewMode === 'detail' ? 'rounded-t-[15px]' : 'rounded-[15px]'}`}
+          className="relative flex-1 min-h-0 w-full overflow-hidden bg-[var(--bg-tertiary)]"
           style={!entry.isGenerating ? { aspectRatio: imageAspectRatio } : undefined}
         >
           {entry.isGenerating ? (
             /* 占位态：带 Shimmer 扫光和耗时计时器 */
-            <div className={`relative w-full h-full flex flex-col items-center justify-center min-h-[120px] overflow-hidden bg-[var(--bg-secondary)]/50 ${viewMode === 'detail' ? 'rounded-t-[15px]' : 'rounded-[15px]'}`}>
+            <div className="relative w-full h-full flex flex-col items-center justify-center min-h-[120px] overflow-hidden bg-[var(--bg-secondary)]/50">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-shimmer-sweep" />
               <div className="relative flex flex-col items-center gap-1.5 select-none">
                 <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/5 border border-white/10">
@@ -141,12 +143,12 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
               src={entry.displaySrc}
               alt={promptSummary}
               onError={() => setImgLoadError(true)}
-              className={`block h-full min-h-0 w-full object-cover transition-transform duration-300 group-active:scale-[0.985] group-hover:scale-[1.01] ${isFailed ? 'filter grayscale opacity-40' : ''} ${viewMode === 'detail' ? 'rounded-t-[15px]' : 'rounded-[15px]'}`}
+              className="block h-full min-h-0 w-full object-cover transition-transform duration-300 group-active:scale-[0.985] group-hover:scale-[1.01] ${isFailed ? 'filter grayscale opacity-40' : ''}"
             />
           ) : (
             /* 暂无预览占位 - 去除 fallback aspect 限制以支持铺满 */
             <div
-              className={`flex h-full min-h-0 w-full items-center justify-center bg-[var(--bg-tertiary)] text-[13px] text-[var(--text-secondary)] ${viewMode === 'detail' ? 'rounded-t-[15px]' : 'rounded-[15px]'}`}
+              className="flex h-full min-h-0 w-full items-center justify-center bg-[var(--bg-tertiary)] text-[13px] text-[var(--text-secondary)]"
             >
               暂无预览
             </div>
@@ -166,14 +168,14 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
 
           {/* 顶部暗色渐变过渡（为顶部信息标签提供对比度，防死黑） */}
           {!entry.isGenerating && (
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-black/60 via-black/20 to-transparent z-10" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-black/75 via-black/30 to-transparent z-10" />
           )}
 
           {/* 绝对定位浮动层：时间 / 参考图标记 */}
           {!entry.isGenerating && (
             <div className="pointer-events-none absolute left-2.5 top-2.5 flex items-center gap-1.5 z-20">
               {viewMode === 'detail' && (
-                <span className="rounded-full border border-white/10 bg-black/25 backdrop-blur-md px-2 py-0.5 text-[9.5px] font-medium text-white/90">
+                <span className="text-[10px] font-bold text-white/95 drop-shadow-md">
                   {formatTimestamp(entry.timestamp)}
                 </span>
               )}
@@ -213,7 +215,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
 
         {/* 详细模式毛玻璃参数卡片区域 */}
         {viewMode === 'detail' && !entry.isGenerating && (
-          <div className="shrink-0 p-3 bg-[var(--bg-secondary)]/80 backdrop-blur-md border-t border-white/5 flex flex-col gap-2 w-full rounded-b-[15px]">
+          <div className="shrink-0 p-3 bg-[var(--bg-secondary)]/80 backdrop-blur-md border-t border-white/5 flex flex-col gap-2 w-full">
             <p className="line-clamp-2 text-xs leading-relaxed text-[var(--text-secondary)] font-normal">
               {entry.fullPrompt || promptSummary}
             </p>

@@ -149,7 +149,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
 
   return (
     <section className="relative flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto overscroll-contain pr-1 pb-20">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-3 pr-1 pb-24">
         {totalResults === 0 ? (
           viewMode === 'detail' ? (
             <MobileResultDetailEmptySkeleton />

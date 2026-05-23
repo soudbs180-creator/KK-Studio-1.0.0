@@ -177,7 +177,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   );
 
   const feed = (
-    <div className="h-full px-3 pb-3 pt-1.5">
+    <div className="h-full pt-1.5">
       <MobileResultFeed
         resultEntries={resultEntries}
         activeEntryId={activeEntryId}
