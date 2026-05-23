@@ -729,7 +729,7 @@ interface PromptBarProps {
 }
 
 const MODEL_LIST_VIRTUALIZE_THRESHOLD = 40;
-const MODEL_LIST_ITEM_HEIGHT = 74;
+const MODEL_LIST_ITEM_HEIGHT = 44;
 const MODEL_LIST_OVERSCAN = 6;
 
 const getModelDisplayGroupKey = (model: ActiveModel) => {
@@ -778,6 +778,7 @@ type PromptBarModelMenuButtonProps = {
     onSelect: (model: PromptBarModelOption) => void;
     onOpenContextMenu: (event: React.MouseEvent<HTMLButtonElement>, model: PromptBarModelOption) => void;
     showProviderRight?: boolean;
+    isMobile?: boolean; // [NEW] Mobile adaptive prop
 };
 
 const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
@@ -789,6 +790,7 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
     onSelect,
     onOpenContextMenu,
     showProviderRight = false,
+    isMobile = false, // [NEW] Default to false
 }: PromptBarModelMenuButtonProps) {
     const isExclusive = model.isExclusive;
     const isPinned = model.isPinned;
@@ -805,8 +807,12 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
         <button
             className={`group w-full transition-all duration-300 mx-auto cursor-pointer
             ${isExclusive
-                    ? `h-14 px-5 flex items-center justify-between rounded-full flex-shrink-0 ${textColorClass} active:scale-[0.98] ${isLast ? '' : 'mb-3'} ${selected ? 'ring-2 ring-[color:var(--accent-coral)] scale-[1.02]' : 'hover:scale-[1.02] opacity-80 hover:opacity-100 grayscale-[0.15] hover:grayscale-0'}`
-                    : `px-3 py-2.5 text-left flex flex-col gap-1 hover:bg-black/5 dark:hover:bg-[var(--toolbar-hover)] rounded-md transition-all border-2 ${selected ? 'bg-[var(--frost-card-sub-bg)] ring-2 ring-[color:var(--accent-coral)] border-[color:var(--accent-coral)]' : 'border-transparent opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`}
+                    ? (isMobile
+                        ? `h-10 px-3 flex items-center justify-between rounded-xl flex-shrink-0 ${textColorClass} active:scale-[0.98] ${selected ? 'ring-2 ring-[color:var(--accent-coral)]' : 'opacity-80 hover:opacity-100'}`
+                        : `h-14 px-5 flex items-center justify-between rounded-full flex-shrink-0 ${textColorClass} active:scale-[0.98] ${selected ? 'ring-2 ring-[color:var(--accent-coral)] scale-[1.02]' : 'hover:scale-[1.02] opacity-80 hover:opacity-100 grayscale-[0.15] hover:grayscale-0'}`)
+                    : (isMobile
+                        ? `h-10 px-3 text-left flex items-center justify-between rounded-xl transition-all border-2 ${selected ? 'bg-[var(--frost-card-sub-bg)] ring-2 ring-[color:var(--accent-coral)] border-[color:var(--accent-coral)]' : 'border-transparent opacity-80 hover:opacity-100'}`
+                        : `px-2.5 py-1.5 text-left flex flex-col gap-0.5 hover:bg-black/5 dark:hover:bg-[var(--toolbar-hover)] rounded-xl transition-all border-2 ${selected ? 'bg-[var(--frost-card-sub-bg)] ring-2 ring-[color:var(--accent-coral)] border-[color:var(--accent-coral)]' : 'border-transparent opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`)}
             `}
             style={isExclusive ? (selected ? activeGradientStyle : inactiveGradientStyle) : undefined}
             onMouseEnter={(event) => {
@@ -834,7 +840,7 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
                                 modelId={model.id}
                                 provider={model.provider}
                                 modelName={displayName}
-                                size={20}
+                                size={isMobile ? 16 : 20}
                                 active={selected}
                             />
                         </div>
@@ -844,7 +850,7 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
                         <span
-                            className={`text-xs px-2.5 py-1 rounded-full ${model?.textColor === 'black' ? 'bg-black/10 border-black/20' : 'bg-white/25 border-white/30'} border font-semibold flex items-center gap-1`}
+                            className={`${isMobile ? 'text-[10px] px-2 py-0.5' : 'text-xs px-2.5 py-1'} rounded-full ${model?.textColor === 'black' ? 'bg-black/10 border-black/20' : 'bg-white/25 border-white/30'} border font-semibold flex items-center gap-1`}
                             style={model?.textColor === 'black' ? { color: '#000000' } : { color: '#ffffff' }}
                         >
                             ✨{getModelCredits(model.id || '', imageSize)}
@@ -852,54 +858,45 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
                     </div>
                 </div>
             ) : (
-                <>
-                    <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div className="flex-shrink-0 flex items-center justify-center w-5 h-5">
-                                <ModelLogo
-                                    modelId={model.id}
-                                    provider={model.provider}
-                                    modelName={displayName}
-                                    size={16}
-                                    active={selected}
-                                />
-                            </div>
-                            <span className={`text-sm font-medium ${badgeInfo.colorClass} break-all text-left`} title={displayName}>
-                                {displayName}
-                            </span>
+                <div className={`flex items-center justify-between w-full ${isMobile ? 'h-full' : 'h-7'} min-w-0`}>
+                    {/* 左侧：Logo + 名字 + 供应商 (如果 showProviderRight 为 false) */}
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="flex-shrink-0 flex items-center justify-center w-5 h-5">
+                            <ModelLogo
+                                modelId={model.id}
+                                provider={model.provider}
+                                modelName={displayName}
+                                size={16}
+                                active={selected}
+                            />
                         </div>
-                        {showProviderRight && model.provider && (
-                            <span
-                                className={`text-[10px] px-1.5 py-0.5 rounded border flex-shrink-0 whitespace-nowrap overflow-hidden ${model.providerBadgeColorClass}`}
+                        <span className={`text-[13px] font-semibold ${badgeInfo.colorClass} truncate text-left`} title={displayName}>
+                            {displayName}
+                        </span>
+                        {!showProviderRight && model.provider && (
+                            <span 
+                                className={`text-[8.5px] px-1 py-0.5 rounded border flex-shrink-0 whitespace-nowrap overflow-hidden ${model.providerBadgeColorClass} font-medium leading-none`}
                                 title={model.providerDisplayName}
-                                style={{ maxWidth: '40%', textOverflow: 'ellipsis', ...model.providerBadgeStyle }}
+                                style={{ maxWidth: '35%', textOverflow: 'ellipsis', ...model.providerBadgeStyle }}
                             >
                                 {model.providerDisplayShortName}
                             </span>
                         )}
                     </div>
-                    <div className="flex justify-between items-start mt-1 gap-2">
-                        <div className="flex flex-col gap-1 flex-1 min-w-0">
-                            {!showProviderRight && model.provider && (
-                                <div className="flex items-center gap-1 mb-0.5">
-                                    <span 
-                                        className={`text-[9px] px-1.5 py-0.5 rounded border flex-shrink-0 whitespace-nowrap overflow-hidden ${model.providerBadgeColorClass} font-medium leading-none`}
-                                        title={model.providerDisplayName}
-                                        style={{ maxWidth: '60%', textOverflow: 'ellipsis', ...model.providerBadgeStyle }}
-                                    >
-                                        {model.providerDisplayShortName}
-                                    </span>
-                                </div>
-                            )}
-                            {description && (
-                                <span className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                                    {description}
-                                </span>
-                            )}
-                        </div>
-                        {isPinned && <span className="text-[12px] opacity-80 flex-shrink-0 mr-1 mt-0.5">📌</span>}
+                    {/* 右侧：常用模型的供应商 (如果 showProviderRight 为 true) + Pinned 图标 */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {showProviderRight && model.provider && (
+                            <span
+                                className={`text-[9px] px-1 py-0.5 rounded border flex-shrink-0 whitespace-nowrap overflow-hidden ${model.providerBadgeColorClass} font-medium leading-none`}
+                                title={model.providerDisplayName}
+                                style={{ maxWidth: '70px', textOverflow: 'ellipsis', ...model.providerBadgeStyle }}
+                            >
+                                {model.providerDisplayShortName}
+                            </span>
+                        )}
+                        {isPinned && <span className="text-[11px] opacity-80">📌</span>}
                     </div>
-                </>
+                </div>
             )}
         </button>
     );
@@ -978,7 +975,13 @@ const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
     };
 
     return (
-        <div className="relative w-full overflow-hidden rounded-xl select-none" style={{ touchAction: 'pan-y' }}>
+        <div 
+            className="relative w-full overflow-hidden rounded-xl select-none" 
+            style={{ touchAction: 'pan-y' }}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+        >
             <div 
                 className="absolute right-0 top-0 bottom-0 w-[70px] flex items-center justify-center text-white text-[11px] font-bold z-0 cursor-pointer active:brightness-90 transition-all rounded-r-xl"
                 style={{
@@ -3042,8 +3045,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 modelMenuHasScrolledRef.current = true;
                 const timer = setTimeout(() => {
                     if (modelListScrollRef.current) {
-                        modelListScrollRef.current.scrollTop = index * 74;
-                        setMobileScrollTop(index * 74);
+                        modelListScrollRef.current.scrollTop = index * MODEL_LIST_ITEM_HEIGHT;
+                        setMobileScrollTop(index * MODEL_LIST_ITEM_HEIGHT);
                     }
                 }, 80);
                 return () => clearTimeout(timer);
@@ -3509,7 +3512,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         {!modelSearch && (
                                             <div
                                                 className="w-[100px] shrink-0 overflow-y-auto border-r border-[var(--frost-card-sub-border)] py-1 flex flex-col"
-                                                style={{ backgroundColor: 'rgba(0, 0, 0, 0.06)' }}
+                                                style={{ backgroundColor: 'rgba(0, 0, 0, 0.06)', touchAction: 'pan-y' }}
+                                                onTouchStart={(e) => e.stopPropagation()}
+                                                onTouchMove={(e) => e.stopPropagation()}
+                                                onTouchEnd={(e) => e.stopPropagation()}
                                             >
                                                 {(() => {
                                                     const mobileCategories = [
@@ -3566,7 +3572,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         )}
 
                                         {/* 第二级：右侧模型列表 */}
-                                        <div className="flex-1 overflow-y-auto p-1.5 space-y-1">
+                                        <div 
+                                            className="flex-1 overflow-y-auto p-1.5 space-y-1"
+                                            style={{ touchAction: 'pan-y' }}
+                                            onTouchStart={(e) => e.stopPropagation()}
+                                            onTouchMove={(e) => e.stopPropagation()}
+                                            onTouchEnd={(e) => e.stopPropagation()}
+                                        >
                                             {(() => {
                                                 const handleTogglePin = (modelId: string) => {
                                                     toggleModelPin(modelId);
@@ -3624,6 +3636,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                                 isLast={isLast}
                                                                 description={description}
                                                                 showProviderRight={!modelSearch && mobileCategory === 'featured'}
+                                                                isMobile={true}
                                                                 onSelect={(m) => {
                                                                     handleSelectPromptBarModel(m);
                                                                     setMobileSubView('input');
@@ -4554,7 +4567,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                       paddingBottom: '83px',
                                                       overscrollBehavior: 'contain',
                                                       scrollbarWidth: 'none',
+                                                      touchAction: 'pan-y'
                                                   }}
+                                                  onTouchStart={(e) => e.stopPropagation()}
+                                                  onTouchMove={(e) => e.stopPropagation()}
+                                                  onTouchEnd={(e) => e.stopPropagation()}
                                                   onScroll={(e) => {
                                                       const nextTop = e.currentTarget.scrollTop;
                                                       modelListScrollPos.current = nextTop;
@@ -4613,8 +4630,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                                   const globalIndex = modelListViewport.startIndex + index;
 
                                                                   // 🚀 3D 滚轮运动计算
-                                                                  const offset = globalIndex * 74 - mobileScrollTop;
-                                                                  const ratio = offset / 74;
+                                                                  const offset = globalIndex * MODEL_LIST_ITEM_HEIGHT - mobileScrollTop;
+                                                                  const ratio = offset / MODEL_LIST_ITEM_HEIGHT;
                                                                   const absRatio = Math.min(1.5, Math.abs(ratio));
                                                                   const scale = 1.05 - absRatio * 0.12;
                                                                   const rotateX = ratio * -28;
@@ -4624,7 +4641,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                                       transform: `perspective(500px) rotateX(${rotateX}deg) scale(${scale})`,
                                                                       opacity: opacity,
                                                                       scrollSnapAlign: 'center' as const,
-                                                                      height: '74px',
+                                                                      height: `${MODEL_LIST_ITEM_HEIGHT}px`,
                                                                       transition: 'transform 0.1s ease-out, opacity 0.1s ease-out',
                                                                       display: 'flex',
                                                                       alignItems: 'center',
@@ -4640,6 +4657,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                                               selected={config.model === model.id}
                                                                               isLast={isLast}
                                                                               description={description}
+                                                                              isMobile={true}
                                                                               onSelect={handleSelectPromptBarModel}
                                                                               onOpenContextMenu={handlePromptBarModelContextMenu}
                                                                           />
