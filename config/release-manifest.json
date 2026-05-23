@@ -1,8 +1,8 @@
 {
   "appName": "KK Studio",
-  "version": "1.4.7",
-  "displayVersion": "v1.4.7",
-  "releaseDate": "2026-05-22",
+  "version": "1.4.8",
+  "displayVersion": "v1.4.8",
+  "releaseDate": "2026-05-23",
   "releaseNotes": [
     "Resolved localStorage plain-text encryption and API key boundary hardening in browser-direct environments.",
     "Fixed Imagen 4.0 relative path 404 error during direct image generation.",

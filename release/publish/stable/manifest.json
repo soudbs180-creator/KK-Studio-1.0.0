@@ -1,9 +1,9 @@
 {
   "appName": "KK Studio",
-  "version": "1.4.7",
-  "displayVersion": "v1.4.7",
+  "version": "1.4.8",
+  "displayVersion": "v1.4.8",
   "buildTime": "2026-05-22T12:17:18.786Z",
-  "releaseDate": "2026-05-22",
+  "releaseDate": "2026-05-23",
   "releaseNotes": [
     "Resolved localStorage plain-text encryption and API key boundary hardening in browser-direct environments.",
     "Fixed Imagen 4.0 relative path 404 error during direct image generation.",
@@ -11,7 +11,7 @@
     "verified kkai.plus same-origin API integration with localStorage cloud sync and proxy channels."
   ],
   "channel": "stable",
-  "packageFile": "KK-Studio-Portable-1.4.7.zip",
+  "packageFile": "KK-Studio-Portable-1.4.8.zip",
   "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.4.6/KK-Studio-Portable-1.4.7.zip",
   "sha256": "80109f1f835cbaaa1ecb936ecd5579be18090acc2136fe092ffdbe973175f423",
   "size": 52906697
