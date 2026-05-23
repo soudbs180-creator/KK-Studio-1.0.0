@@ -220,11 +220,11 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
           />
 
           <div
-            className="relative rounded-t-[30px] border px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 text-[var(--text-primary)]"
+            className="relative rounded-t-[30px] border px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 text-[var(--text-primary)] backdrop-blur-xl"
             style={{
-              background: 'var(--mobile-clay-shell-bg)',
-              borderColor: 'var(--mobile-clay-border)',
-              boxShadow: 'var(--mobile-clay-shadow)'
+              background: 'var(--mobile-glass-bg)',
+              borderColor: 'var(--mobile-glass-border)',
+              boxShadow: 'var(--mobile-glass-shadow)'
             }}
           >
             <div className="mb-4 flex items-start justify-between gap-3">
