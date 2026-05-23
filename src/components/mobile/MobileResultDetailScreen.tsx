@@ -162,6 +162,31 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
   onPrevious,
   onNext,
 }) => {
+  const touchStartX = React.useRef(0);
+  const touchEndX = React.useRef(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.targetTouches[0].clientX;
+    touchEndX.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+    e.stopPropagation();
+  };
+
+  const handleTouchEnd = () => {
+    const diffX = touchStartX.current - touchEndX.current;
+    const threshold = 55;
+
+    if (Math.abs(diffX) > threshold) {
+      if (diffX > 0) {
+        if (onNext) onNext();
+      } else {
+        if (onPrevious) onPrevious();
+      }
+    }
+  };
   const { pick } = useLocale();
   const promptSummary = normalizeText(entry.promptSummary, '未命名结果');
   const fullPrompt = normalizeText(entry.fullPrompt, promptSummary);
@@ -231,10 +256,16 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
         </div>
       </div>
 
-      <div className="relative flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+136px)]">
-        <div className="relative overflow-hidden rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] max-h-[380px] flex items-center justify-center">
+      <div className="relative flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] overscroll-contain">
+        <div 
+          className="relative overflow-hidden rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] max-h-[380px] flex items-center justify-center cursor-pointer select-none"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onClick={() => entry.hasOriginal && onPreviewOriginal(entry.imageId)}
+        >
           {entry.displaySrc ? (
-            <img src={entry.displaySrc} alt={promptSummary} className="max-h-[380px] w-full object-contain block" />
+            <img src={entry.displaySrc} alt={promptSummary} className="max-h-[380px] w-full object-contain block pointer-events-none" />
           ) : (
             <div className="flex aspect-[3/4] h-[320px] items-center justify-center text-[var(--text-secondary)]">
               暂无预览
@@ -402,7 +433,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
         </div>
       </div>
 
-      <div className="sticky bottom-0 border-t border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-bottom-bar-bg)] px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
+      <div className="shrink-0 border-t border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-bottom-bar-bg)] px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_48px] gap-2">
           <ActionButton
             label="继续创作"
