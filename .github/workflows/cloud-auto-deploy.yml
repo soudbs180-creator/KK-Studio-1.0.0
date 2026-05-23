@@ -8,15 +8,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  verify:
     runs-on: ubuntu-latest
-    env:
-      KK_VPS_DEPLOY_COMMAND: ${{ secrets.KK_VPS_DEPLOY_COMMAND }}
-      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-      NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,12 +38,35 @@ jobs:
       - name: Build
         run: npm run build
 
-      # --- 部署环节 1: VPS API ---
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-build
+          path: dist
+
+  deploy-vps-api:
+    runs-on: ubuntu-latest
+    needs: verify
+    env:
+      KK_VPS_DEPLOY_COMMAND: ${{ secrets.KK_VPS_DEPLOY_COMMAND }}
+    steps:
       - name: Run VPS deploy command
         if: ${{ env.KK_VPS_DEPLOY_COMMAND != '' }}
         run: bash -lc "$KK_VPS_DEPLOY_COMMAND"
 
-      # --- 部署环节 2: Netlify ---
+  deploy-netlify:
+    runs-on: ubuntu-latest
+    needs: verify
+    env:
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+    steps:
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-build
+          path: dist
+
       - name: Install Netlify CLI
         if: ${{ env.NETLIFY_AUTH_TOKEN != '' && env.NETLIFY_SITE_ID != '' }}
         run: npm install --global netlify-cli@latest
@@ -59,7 +75,26 @@ jobs:
         if: ${{ env.NETLIFY_AUTH_TOKEN != '' && env.NETLIFY_SITE_ID != '' }}
         run: netlify deploy --dir=dist --prod --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
 
-      # --- 部署环节 3: Vercel ---
+  deploy-vercel:
+    runs-on: ubuntu-latest
+    needs:
+      - verify
+      - deploy-vps-api
+    if: always() && needs.verify.result == 'success' && (needs.deploy-vps-api.result == 'success' || needs.deploy-vps-api.result == 'skipped')
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-build
+          path: dist
+
       - name: Install Vercel CLI
         if: ${{ env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != '' }}
         run: npm install --global vercel@latest

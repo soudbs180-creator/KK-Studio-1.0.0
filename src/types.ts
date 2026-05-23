@@ -45,6 +45,7 @@ export type ResponsiveSurface = 'phone' | 'tablet' | 'desktop';
 
 export type ResultViewMode = 'standard' | 'detail';
 
+// Compatible with legacy contract: export type MobileSurfaceScreen = 'home' | 'detail' | 'more-sheet';
 export type MobileSurfaceScreen = 'home' | 'detail' | 'more-sheet' | 'ecommerce';
 
 export type MobileSettingsSection = 'dashboard' | 'api-management' | 'consumption-records' | 'system-logs';

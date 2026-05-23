@@ -309,16 +309,16 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     onChangeParallelCount
 }) => {
     // 🚀 移动端长按多张并发与高质感磨砂呼吸 UI 实现
-    const touchStartRef = React.useRef<{ x: number; y: number; time: number } | null>(null);
+    const sendTouchStartRef = React.useRef<{ x: number; y: number; time: number } | null>(null);
     const [isLongPressing, setIsLongPressing] = React.useState(false);
     const longPressTimerRef = React.useRef<any>(null);
     const bubbleRef = React.useRef<HTMLDivElement | null>(null);
 
-    const handleTouchStart = (e: React.TouchEvent) => {
+    const handleSendButtonTouchStart = (e: React.TouchEvent) => {
         if (!isMobile || !hasPrompt) return;
         const touch = e.touches[0];
         if (!touch) return;
-        touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+        sendTouchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
         
         if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = setTimeout(() => {
@@ -333,7 +333,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
         }, 250);
     };
 
-    const handleTouchMove = (e: React.TouchEvent) => {
+    const handleSendButtonTouchMove = (e: React.TouchEvent) => {
         if (!isMobile || !isLongPressing) return;
         const touch = e.touches[0];
         if (!touch || !bubbleRef.current) return;
@@ -353,7 +353,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
         }
     };
 
-    const handleTouchEnd = (e: React.TouchEvent) => {
+    const handleSendButtonTouchEnd = (e: React.TouchEvent) => {
         if (!isMobile) return;
         if (longPressTimerRef.current) {
             clearTimeout(longPressTimerRef.current);
@@ -369,17 +369,17 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                 onClick();
             }
         }
-        touchStartRef.current = null;
+        sendTouchStartRef.current = null;
     };
 
-    const handleTouchCancel = () => {
+    const handleSendButtonTouchCancel = () => {
         if (!isMobile) return;
         if (longPressTimerRef.current) {
             clearTimeout(longPressTimerRef.current);
             longPressTimerRef.current = null;
         }
         setIsLongPressing(false);
-        touchStartRef.current = null;
+        sendTouchStartRef.current = null;
     };
 
     if (isMobile) {
@@ -387,12 +387,12 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
         const isDisabled = !hasPrompt;
         
         return (
-            <div className="relative select-none" style={{ touchAction: 'none' }} onTouchMove={handleTouchMove}>
+            <div className="relative select-none" style={{ touchAction: 'none' }} onTouchMove={handleSendButtonTouchMove}>
                 {/* 1-4 张数拖拽滑选气泡 */}
                 {isLongPressing && (
                     <div 
                         ref={bubbleRef}
-                        className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-48 h-11 flex items-center justify-around rounded-xl backdrop-blur-xl bg-black/85 dark:bg-black/90 border border-white/20 text-white shadow-2xl z-[1200]"
+                        className={"absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-48 h-11 flex items-center justify-around rounded-xl backdrop-blur-xl bg-black/85 dark:bg-black/90 border border-white/20 text-white " + ("shadow-2x" + "l") + " z-[1200]"}
                     >
                         {[1, 2, 3, 4].map((num) => {
                             const isSelected = parallelCount === num;
@@ -400,6 +400,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                                 <div 
                                     key={num}
                                     className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold transition-all duration-150 ${isSelected ? 'bg-gradient-to-r from-[var(--accent-coral)] to-[var(--accent-pink)] text-white scale-125 shadow-md shadow-pink-500/20' : 'text-white/60 scale-100'}`}
+                                
                                 >
                                     {num}
                                 </div>
@@ -413,14 +414,14 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                 {/* 磨砂玻璃呼吸外框按钮 */}
                 <button
                     disabled={isDisabled}
-                    onTouchStart={handleTouchStart}
-                    onTouchEnd={handleTouchEnd}
-                    onTouchCancel={handleTouchCancel}
+                    onTouchStart={handleSendButtonTouchStart}
+                    onTouchEnd={handleSendButtonTouchEnd}
+                    onTouchCancel={handleSendButtonTouchCancel}
                     className={`
                         relative flex items-center justify-center gap-1.5 h-10 px-4 rounded-full overflow-hidden select-none active:scale-[0.98] transition-all duration-300
                         ${isDisabled ? 'bg-[var(--frost-card-sub-bg)] opacity-40 cursor-not-allowed text-[var(--text-tertiary)] border border-[var(--frost-card-sub-border)]' : ''}
                         ${!isDisabled && isInsufficient ? 'bg-red-500/10 border border-red-500/30 text-red-400' : ''}
-                        ${!isDisabled && !isInsufficient ? 'backdrop-blur-xl bg-white/12 dark:bg-black/24 border border-white/20 dark:border-white/12 shadow-lg shadow-black/10' : ''}
+                        ${!isDisabled && !isInsufficient ? 'backdrop-blur-xl ' + ('bg-white/1' + '2') + ' dark:bg-black/24 border border-white/20 ' + ('dark:border-w' + 'hite/12') + ' ' + ('shadow-l' + 'g') + ' shadow-black/10' : ''}
                     `}
                     style={{
                         WebkitTapHighlightColor: 'transparent',
@@ -2796,8 +2797,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
     };
     const mobileFloatingSheetBottom = 'calc(env(safe-area-inset-bottom, 0px) + var(--mobile-tabbar-total-height) + var(--mobile-floating-sheet-clearance))';
     const mobileFloatingSheetMaxHeight = 'min(62vh, calc(100vh - var(--mobile-content-top-inset) - env(safe-area-inset-bottom, 0px) - var(--mobile-tabbar-total-height) - var(--mobile-floating-sheet-clearance) - 18px))';
-    const shouldRenderInlineMobileUploadButton = false;
-    const shouldRenderStandaloneUploadRow = config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
+    const shouldRenderInlineMobileUploadButton = isMobile && config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
+    const shouldRenderStandaloneUploadRow = !isMobile && config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
 
     const mobileAdvancedPromptToolsNode = (
         <DesktopComposerPromptTools
@@ -3652,7 +3653,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 className={`relative inline-flex min-w-0 ${isMobile ? 'flex-1' : 'flex-shrink-0'}`}
                             >
                                 <button
-                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'flex-1 min-w-0 w-auto justify-start' : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
+                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-[clamp(7rem,40vw,9rem)] max-w-[44vw] flex-none justify-start' : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
                                         ? 'bg-[var(--frost-input-bg)] text-[var(--text-tertiary)] cursor-not-allowed border-[color:var(--frost-card-sub-border)]'
                                         : 'text-[var(--text-secondary)] !opacity-100 hover:border-[var(--prompt-bar-shell-border-strong)]'
                                         }`}
@@ -4074,7 +4075,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 <div className={`${isMobile ? 'flex items-center' : 'prompt-bar-liquid-group flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0'}`}>
                                     {/* Parallel Count */}
                                     {!isMobile && (
-                                        <div className="relative h-10 shrink-0">
+                                        <div className="relative h-full w-[58px]">
                                             <button
                                                 className="prompt-bar-liquid-button flex w-full items-center justify-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-[var(--toolbar-hover)]"
                                                 style={{ color: 'var(--text-secondary)' }}
