@@ -777,6 +777,7 @@ type PromptBarModelMenuButtonProps = {
     description: string;
     onSelect: (model: PromptBarModelOption) => void;
     onOpenContextMenu: (event: React.MouseEvent<HTMLButtonElement>, model: PromptBarModelOption) => void;
+    showProviderRight?: boolean;
 };
 
 const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
@@ -787,6 +788,7 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
     description,
     onSelect,
     onOpenContextMenu,
+    showProviderRight = false,
 }: PromptBarModelMenuButtonProps) {
     const isExclusive = model.isExclusive;
     const isPinned = model.isPinned;
@@ -866,7 +868,7 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
                                 {displayName}
                             </span>
                         </div>
-                        {model.provider && (
+                        {showProviderRight && model.provider && (
                             <span
                                 className={`text-[10px] px-1.5 py-0.5 rounded border flex-shrink-0 whitespace-nowrap overflow-hidden ${model.providerBadgeColorClass}`}
                                 title={model.providerDisplayName}
@@ -878,6 +880,17 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
                     </div>
                     <div className="flex justify-between items-start mt-1 gap-2">
                         <div className="flex flex-col gap-1 flex-1 min-w-0">
+                            {!showProviderRight && model.provider && (
+                                <div className="flex items-center gap-1 mb-0.5">
+                                    <span 
+                                        className={`text-[9px] px-1.5 py-0.5 rounded border flex-shrink-0 whitespace-nowrap overflow-hidden ${model.providerBadgeColorClass} font-medium leading-none`}
+                                        title={model.providerDisplayName}
+                                        style={{ maxWidth: '60%', textOverflow: 'ellipsis', ...model.providerBadgeStyle }}
+                                    >
+                                        {model.providerDisplayShortName}
+                                    </span>
+                                </div>
+                            )}
                             {description && (
                                 <span className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
                                     {description}
@@ -891,6 +904,112 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
         </button>
     );
 });
+
+interface SwipeableModelItemProps {
+    modelId: string;
+    isPinned: boolean;
+    onTogglePin: (modelId: string) => void;
+    children: React.ReactNode;
+    onClick: () => void;
+}
+
+const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
+    modelId,
+    isPinned,
+    onTogglePin,
+    children,
+    onClick,
+}) => {
+    const [translateX, setTranslateX] = useState(0);
+    const [isSwiping, setIsSwiping] = useState(false);
+    const startX = useRef(0);
+    const startY = useRef(0);
+    const currentX = useRef(0);
+    const isHorizontalSwipe = useRef<boolean | null>(null);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        const touch = e.touches[0];
+        startX.current = touch.clientX;
+        startY.current = touch.clientY;
+        currentX.current = touch.clientX;
+        setIsSwiping(true);
+        isHorizontalSwipe.current = null;
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!isSwiping) return;
+        const touch = e.touches[0];
+        const deltaX = touch.clientX - startX.current;
+        const deltaY = touch.clientY - startY.current;
+
+        if (isHorizontalSwipe.current === null) {
+            if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+                isHorizontalSwipe.current = Math.abs(deltaX) > Math.abs(deltaY);
+            }
+        }
+
+        if (isHorizontalSwipe.current) {
+            if (e.cancelable) {
+                e.preventDefault();
+            }
+            let newX = deltaX;
+            if (translateX < 0) {
+                newX = -70 + deltaX;
+            }
+            newX = Math.max(-80, Math.min(10, newX));
+            setTranslateX(newX);
+        }
+    };
+
+    const handleTouchEnd = () => {
+        setIsSwiping(false);
+        if (isHorizontalSwipe.current) {
+            if (translateX < -30) {
+                setTranslateX(-70);
+            } else {
+                setTranslateX(0);
+            }
+        } else {
+            if (Math.abs(translateX) < 5) {
+                onClick();
+            }
+            setTranslateX(0);
+        }
+    };
+
+    return (
+        <div className="relative w-full overflow-hidden rounded-xl select-none" style={{ touchAction: 'pan-y' }}>
+            <div 
+                className="absolute right-0 top-0 bottom-0 w-[70px] flex items-center justify-center text-white text-[11px] font-bold z-0 cursor-pointer active:brightness-90 transition-all rounded-r-xl"
+                style={{
+                    backgroundColor: isPinned ? 'rgba(239, 68, 68, 0.95)' : 'rgba(245, 158, 11, 0.95)',
+                }}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onTogglePin(modelId);
+                    setTranslateX(0);
+                }}
+            >
+                {isPinned ? '取消常用' : '设为常用'}
+            </div>
+
+            <div
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                style={{
+                    transform: `translate3d(${translateX}px, 0, 0)`,
+                    transition: isSwiping ? 'none' : 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                    position: 'relative',
+                    zIndex: 10,
+                    backgroundColor: 'var(--frost-card-sub-bg)'
+                }}
+            >
+                {children}
+            </div>
+        </div>
+    );
+};
 
 const buildPromptBarAvailableModels = (
     globalModels: ReturnType<typeof keyManager.getGlobalModelList>,
@@ -3049,28 +3168,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     setIsExpanded(true);
                 }}
             >
-                <div className="flex items-center justify-between px-3 h-12 w-full select-none cursor-pointer gap-2">
-                    <div 
-                        className="min-w-0 flex-shrink-0"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                        }}
-                    >
-                        <DesktopComposerModeSwitcher
-                            isMobile={isMobile}
-                            activeMode={activeModeOption.mode}
-                            modeOptions={modeOptions}
-                            onSelectMode={(mode) => {
-                                handleSelectPromptBarMode(mode);
-                                setIsExpanded(true);
-                            }}
-                        />
-                    </div>
-                    <div className="flex-1 min-w-0 flex items-center justify-start gap-1 text-[var(--text-tertiary)] text-xs pl-2 border-l border-[var(--frost-card-sub-border)]">
-                        <svg className="w-3.5 h-3.5 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <div className="flex items-center justify-between px-4 h-12 w-full select-none cursor-pointer gap-2">
+                    <div className="flex-1 min-w-0 flex items-center justify-start gap-2.5 text-[var(--text-tertiary)] text-xs pl-1">
+                        <svg className="w-4 h-4 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                         </svg>
-                        <span className="truncate">输入提示词...</span>
+                        <span className="truncate text-[13.5px] font-medium tracking-[0.02em]">输入提示词...</span>
                     </div>
                 </div>
             </div>
@@ -3357,25 +3460,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     {/* 🚀 移动端模型库内嵌独显面板 */}
                     {mobileSubView === 'model' && (
                         <div className="flex flex-col h-[300px] w-full min-w-0 overflow-hidden">
-                            {/* 顶部标题栏 */}
-                            <div className="flex items-center justify-between border-b border-[var(--frost-card-sub-border)] pb-2 shrink-0">
-                                <span className="text-xs font-bold text-[var(--text-primary)]">选择生成模型</span>
-                                <button
-                                    className="text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--accent-coral)] active:scale-95"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setMobileSubView('input');
-                                    }}
-                                >
-                                    完成
-                                </button>
-                            </div>
-
-                            {/* 搜索框 */}
-                            {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
-                                <div className="mt-2 mb-1 p-1.5 border rounded-2xl shrink-0" style={{ ...modelLibrarySearchSurfaceStyle }}>
-                                    <div className="relative flex items-center">
-                                        <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            {/* 顶部一排：搜索框与完成按钮合并 */}
+                            <div className="flex items-center gap-2 border-b border-[var(--frost-card-sub-border)] pb-2 shrink-0 w-full min-w-0">
+                                <div className="flex-1 min-w-0 p-1 border rounded-xl" style={{ ...modelLibrarySearchSurfaceStyle, margin: 0 }}>
+                                    <div className="relative flex items-center h-8">
+                                        <svg className="absolute left-2.5 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                         </svg>
                                         <input
@@ -3383,8 +3472,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             value={modelSearch}
                                             onChange={(e) => setModelSearch(e.target.value)}
                                             onClick={(e) => e.stopPropagation()}
-                                            placeholder="搜索模型..."
-                                            className="w-full bg-[var(--frost-input-bg)] text-[var(--text-primary)] text-xs rounded-xl py-1 pl-7 pr-2 outline-none border border-transparent focus:border-[var(--frost-input-border)] placeholder-[var(--text-tertiary)]"
+                                            placeholder="搜索常用或供应商模型..."
+                                            className="w-full bg-[var(--frost-input-bg)] text-[var(--text-primary)] text-xs rounded-lg py-1 pl-7.5 pr-2 outline-none border border-transparent focus:border-[var(--frost-input-border)] placeholder-[var(--text-tertiary)]"
                                         />
                                         {modelSearch && (
                                             <button
@@ -3396,10 +3485,19 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         )}
                                     </div>
                                 </div>
-                            )}
+                                <button
+                                    className="text-xs font-bold px-3.5 h-[34px] shrink-0 rounded-xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--accent-coral)] flex items-center justify-center active:scale-95"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setMobileSubView('input');
+                                    }}
+                                >
+                                    完成
+                                </button>
+                            </div>
 
                             {/* 二级分栏目录容器 */}
-                            <div className="flex-1 flex overflow-hidden min-h-0 mt-1">
+                            <div className="flex-1 flex overflow-hidden min-h-0 mt-2">
                                 {isModelMenuBootstrapping ? (
                                     <div className="py-6 px-4 w-full flex items-center justify-center">
                                         <Loader2 size={14} className="animate-spin text-[var(--text-secondary)] mr-2" />
@@ -3415,7 +3513,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             >
                                                 {(() => {
                                                     const mobileCategories = [
-                                                        { id: 'featured', name: '热门推荐' },
+                                                        { id: 'featured', name: '常用模型' },
                                                         { id: 'openai', name: 'OpenAI' },
                                                         { id: 'anthropic', name: 'Claude' },
                                                         { id: 'google', name: 'Gemini' },
@@ -3425,7 +3523,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     ];
 
                                                     const getModelCategory = (model: PromptBarModelOption) => {
-                                                        if (model.isExclusive || model.isPinned || model.isSystemInternal) return 'featured';
+                                                        if (model.isExclusive || model.isPinned || model.isSystemInternal || pinnedModels.includes(model.id)) return 'featured';
                                                         const id = model.id.toLowerCase();
                                                         const provider = (model.provider || '').toLowerCase();
                                                         if (provider === 'openai' || id.includes('gpt')) return 'openai';
@@ -3470,8 +3568,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         {/* 第二级：右侧模型列表 */}
                                         <div className="flex-1 overflow-y-auto p-1.5 space-y-1">
                                             {(() => {
+                                                const handleTogglePin = (modelId: string) => {
+                                                    toggleModelPin(modelId);
+                                                    setPinnedVersion(v => v + 1);
+                                                };
+
                                                 const getModelCategory = (model: PromptBarModelOption) => {
-                                                    if (model.isExclusive || model.isPinned || model.isSystemInternal) return 'featured';
+                                                    if (model.isExclusive || model.isPinned || model.isSystemInternal || pinnedModels.includes(model.id)) return 'featured';
                                                     const id = model.id.toLowerCase();
                                                     const provider = (model.provider || '').toLowerCase();
                                                     if (provider === 'openai' || id.includes('gpt')) return 'openai';
@@ -3486,7 +3589,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     ? filteredDisplayModels 
                                                     : filteredDisplayModels.filter(model => {
                                                         if (mobileCategory === 'featured') {
-                                                            return model.isExclusive || model.isPinned || model.isSystemInternal;
+                                                            return model.isExclusive || model.isPinned || model.isSystemInternal || pinnedModels.includes(model.id);
                                                         }
                                                         return getModelCategory(model) === mobileCategory;
                                                     });
@@ -3502,12 +3605,14 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 return categoryModels.map((model, idx) => {
                                                     const isLast = idx === categoryModels.length - 1;
                                                     const description = model.isExclusive ? '' : truncateModelDescription(model.resolvedDescription, 40);
+                                                    const isModelPinned = pinnedModels.includes(model.id);
                                                     return (
-                                                        <div 
-                                                            key={model.id} 
-                                                            className="w-full rounded-xl overflow-hidden active:scale-[0.98] transition-all duration-150"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
+                                                        <SwipeableModelItem
+                                                            key={model.id}
+                                                            modelId={model.id}
+                                                            isPinned={isModelPinned}
+                                                            onTogglePin={handleTogglePin}
+                                                            onClick={() => {
                                                                 handleSelectPromptBarModel(model);
                                                                 setMobileSubView('input');
                                                             }}
@@ -3518,13 +3623,14 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                                 selected={config.model === model.id}
                                                                 isLast={isLast}
                                                                 description={description}
+                                                                showProviderRight={!modelSearch && mobileCategory === 'featured'}
                                                                 onSelect={(m) => {
                                                                     handleSelectPromptBarModel(m);
                                                                     setMobileSubView('input');
                                                                 }}
                                                                 onOpenContextMenu={handlePromptBarModelContextMenu}
                                                             />
-                                                        </div>
+                                                        </SwipeableModelItem>
                                                     );
                                                 });
                                             })()}
