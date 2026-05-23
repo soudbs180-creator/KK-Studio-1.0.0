@@ -894,7 +894,7 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
                                 {model.providerDisplayShortName}
                             </span>
                         )}
-                        {isPinned && <span className="text-[11px] opacity-80">📌</span>}
+                        {isPinned && !isMobile && <span className="text-[11px] opacity-80">📌</span>}
                     </div>
                 </div>
             )}
@@ -4882,17 +4882,19 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     boxShadow: 'var(--frost-card-sub-shadow)',
                                                 }}
                                             >
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        toggleModelPin(contextMenu.modelId);
-                                                        setContextMenu(null);
-                                                    }}
-                                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--prompt-bar-shell-hover)]"
-                                                    style={{ color: 'var(--text-primary)' }}
-                                                >
-                                                    {getPinnedModels().includes(contextMenu.modelId) ? '❌ 取消置顶' : '📌 置顶模型'}
-                                                </button>
+                                                {!isMobile && (
+    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            toggleModelPin(contextMenu.modelId);
+                                                            setContextMenu(null);
+                                                        }}
+                                                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--prompt-bar-shell-hover)]"
+                                                        style={{ color: 'var(--text-primary)' }}
+                                                    >
+                                                        {getPinnedModels().includes(contextMenu.modelId) ? '❌ 取消置顶' : '📌 置顶模型'}
+                                                    </button>
+)}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
