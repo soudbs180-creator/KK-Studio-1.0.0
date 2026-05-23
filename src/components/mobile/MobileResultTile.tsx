@@ -2,6 +2,30 @@ import React from 'react';
 
 import type { MobileResultEntry, ResultViewMode } from '../../types';
 import type { AdaptiveResultTileGridMetrics } from '../../utils/responsiveSurface';
+import { keyManager } from '../../services/auth/keyManager';
+import { calculateCost } from '../../services/billing/costService';
+
+const getCostDisplay = (entry: MobileResultEntry) => {
+  const isUserApi = entry.modelId ? keyManager.hasCustomKeyForModel(entry.modelId) : false;
+
+  if (isUserApi) {
+    try {
+      const sizeStr = String(entry.imageSize || '1024x1024');
+      const { cost } = calculateCost(
+        entry.modelId || '',
+        sizeStr as any,
+        1, // 单张
+        entry.fullPrompt?.length || 0,
+        entry.referenceImages?.length || 0
+      );
+      return `$${cost.toFixed(4)}`;
+    } catch (e) {
+      return '$0.0000';
+    }
+  } else {
+    return entry.creditCost ? `${entry.creditCost} 积分` : '0 积分';
+  }
+};
 
 interface MobileResultTileProps {
   entry: MobileResultEntry;
@@ -92,10 +116,10 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
         title={promptSummary}
       >
         {/* 核心展示区 */}
-        <div className="relative flex-1 min-h-0 w-full overflow-hidden bg-[var(--bg-tertiary)]">
+        <div className={`relative flex-1 min-h-0 w-full overflow-hidden bg-[var(--bg-tertiary)] ${viewMode === 'detail' ? 'rounded-t-2xl' : 'rounded-2xl'}`}>
           {entry.isGenerating ? (
             /* 占位态：带 Shimmer 扫光和耗时计时器 */
-            <div className="relative w-full h-full flex flex-col items-center justify-center min-h-[120px] overflow-hidden bg-[var(--bg-secondary)]/50">
+            <div className={`relative w-full h-full flex flex-col items-center justify-center min-h-[120px] overflow-hidden bg-[var(--bg-secondary)]/50 ${viewMode === 'detail' ? 'rounded-t-2xl' : 'rounded-2xl'}`}>
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-shimmer-sweep" />
               <div className="relative flex flex-col items-center gap-1.5 select-none">
                 <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/5 border border-white/10">
@@ -118,7 +142,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
               src={entry.displaySrc}
               alt={promptSummary}
               onError={() => setImgLoadError(true)}
-              className={`block h-full min-h-0 w-full object-cover transition-transform duration-300 group-active:scale-[0.985] group-hover:scale-[1.01] ${isFailed ? 'filter grayscale opacity-40' : ''}`}
+              className={`block h-full min-h-0 w-full object-cover transition-transform duration-300 group-active:scale-[0.985] group-hover:scale-[1.01] ${isFailed ? 'filter grayscale opacity-40' : ''} ${viewMode === 'detail' ? 'rounded-t-2xl' : 'rounded-2xl'}`}
               style={{ aspectRatio: imageAspectRatio }}
             />
           ) : (
@@ -188,7 +212,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
               <div className="flex items-center gap-1">
                 <span>费用:</span>
                 <span className="text-amber-400 font-semibold font-mono">
-                  {entry.creditCost ? `${entry.creditCost} 积分` : '0 积分'}
+                  {getCostDisplay(entry)}
                 </span>
               </div>
               <div className="flex items-center gap-1">

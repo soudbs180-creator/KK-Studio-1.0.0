@@ -15,6 +15,30 @@ import {
 
 import type { MobileResultEntry, PartialRedrawRequest } from '../../types';
 import { useLocale } from '../../context/LocaleContext';
+import { keyManager } from '../../services/auth/keyManager';
+import { calculateCost } from '../../services/billing/costService';
+
+const getCostDisplay = (entry: MobileResultEntry) => {
+  const isUserApi = entry.modelId ? keyManager.hasCustomKeyForModel(entry.modelId) : false;
+
+  if (isUserApi) {
+    try {
+      const sizeStr = String(entry.imageSize || '1024x1024');
+      const { cost } = calculateCost(
+        entry.modelId || '',
+        sizeStr as any,
+        1, // 单张
+        entry.fullPrompt?.length || 0,
+        entry.referenceImages?.length || 0
+      );
+      return `$${cost.toFixed(4)}`;
+    } catch (e) {
+      return '$0.0000';
+    }
+  } else {
+    return entry.creditCost ? `${entry.creditCost} 积分` : '0 积分';
+  }
+};
 
 interface MobileResultDetailScreenProps {
   entry: MobileResultEntry;
@@ -214,6 +238,8 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
     ecommerceContinuation?.declaredSizeText
       ? { label: '需求尺寸', value: ecommerceContinuation.declaredSizeText }
       : null,
+    { label: '费用', value: getCostDisplay(entry) },
+    entry.generationTime ? { label: '耗时', value: `${(entry.generationTime / 1000).toFixed(1)}s` } : null,
     { label: '比例', value: String(entry.aspectRatio) },
     { label: '尺寸', value: String(entry.imageSize) },
     { label: '素材', value: entry.hasOriginal ? '含原图' : '仅结果图' },
@@ -281,7 +307,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
           onClick={() => entry.hasOriginal && onPreviewOriginal(entry.imageId)}
         >
           {entry.displaySrc ? (
-            <img src={entry.displaySrc} alt={promptSummary} className="max-h-[380px] w-full object-contain block pointer-events-none" />
+            <img src={entry.displaySrc} alt={promptSummary} className="max-h-[380px] w-full object-contain block pointer-events-none rounded-[24px]" />
           ) : (
             <div className="flex aspect-[3/4] h-[320px] items-center justify-center text-[var(--text-secondary)]">
               暂无预览
@@ -433,7 +459,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
                     className="h-16 w-16 shrink-0 overflow-hidden rounded-[16px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]"
                   >
                     {src ? (
-                      <img src={src} alt="Reference" className="h-full w-full object-cover" />
+                      <img src={src} alt="Reference" className="h-full w-full object-cover rounded-[16px]" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-xs text-[var(--text-secondary)]">
                         Ref

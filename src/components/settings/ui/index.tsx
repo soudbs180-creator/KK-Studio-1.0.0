@@ -202,9 +202,9 @@ export const SettingInput: React.FC<{
   disabled?: boolean;
 }> = ({ label, value, onChange, placeholder, type = 'text', helper, disabled = false }) => {
   return (
-    <label className="block">
+    <label className="block mb-4">
       <div
-        className={`mb-2 break-words ${SETTINGS_LABEL_CLASSNAME}`.trim()}
+        className={`mb-2.5 break-words ${SETTINGS_LABEL_CLASSNAME}`.trim()}
       >
         {label}
       </div>
@@ -287,9 +287,9 @@ export const SettingSelect: React.FC<{
   disabled?: boolean;
 }> = ({ label, value, options, onChange, helper, disabled = false }) => {
   return (
-    <label className="block">
+    <label className="block mb-4">
       <div
-        className={`mb-2 break-words ${SETTINGS_LABEL_CLASSNAME}`.trim()}
+        className={`mb-2.5 break-words ${SETTINGS_LABEL_CLASSNAME}`.trim()}
       >
         {label}
       </div>
@@ -531,7 +531,7 @@ export const StatusBadge: React.FC<{
 
   return (
     <div
-      className="inline-flex min-w-0 items-center gap-2 rounded-full border px-3 py-1 uppercase tracking-[0.12em]"
+      className="inline-flex min-w-0 items-center justify-center gap-1.5 rounded-full border px-2.5 py-0.5 uppercase tracking-[0.12em] leading-none"
       style={{
         borderColor: `${config.color}33`,
         backgroundColor: `${config.color}14`,
@@ -540,10 +540,10 @@ export const StatusBadge: React.FC<{
       }}
     >
       <span 
-        className="h-2 w-2 shrink-0 rounded-full"
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
         style={{ backgroundColor: config.color }}
       />
-      <span className="min-w-0 truncate">
+      <span className="min-w-0 truncate leading-none flex items-center">
         {label || config.label}
       </span>
     </div>

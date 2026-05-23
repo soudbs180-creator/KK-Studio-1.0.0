@@ -13392,21 +13392,9 @@ body.dark-mode .input-bar {
   gap: 10px;
 }
 
-.settings-panel .settings-shell-page--desktop .settings-dashboard-overview-grid .settings-reference-ring-row {
-  background: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
 
-.settings-panel .settings-reference-rings--flat .settings-reference-ring-row {
-  background: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
+
+
 
 @media (max-width: 767px) {
   .settings-panel .settings-reference-toolbar--flat .settings-reference-toolbar__filters {

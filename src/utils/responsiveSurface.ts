@@ -49,23 +49,8 @@ export function getAdaptiveResultColumnCount({
     return 1;
   }
 
-  if (surface === 'phone') {
-    if (width <= 360) {
-      return 2;
-    }
-
-    if (width <= 560) {
-      return 3;
-    }
-
-    return 4;
-  }
-
-  if (surface === 'tablet') {
-    return width >= 960 ? 5 : 4;
-  }
-
-  return 6;
+  // 🚀 全平台使用 12 列精细网格，以确保比例整除与防缝隙排版
+  return 12;
 }
 
 export function getAdaptiveResultTileGridMetrics({
@@ -97,11 +82,33 @@ export function getAdaptiveResultTileGridMetrics({
     };
   }
 
+  // 🚀 12列网格系统下的自适应 span 分配
+  let columnSpan = 3; // 默认占 3/12 (一排 4 个)
+
+  if (safeAspectRatio >= 2.0) {
+    // 21:9 超宽图 (放 1 个，占 12/12)
+    columnSpan = 12;
+  } else if (safeAspectRatio >= 1.45) {
+    // 16:9 宽图 (放 2 个，占 6/12)
+    columnSpan = 6;
+  } else {
+    // 其他普通比例：放 3 个到 4 个
+    if (surface === 'phone') {
+      if (safeWidth <= 480) {
+        columnSpan = 4; // 窄屏放 3 个 (占 4/12)
+      } else {
+        columnSpan = 3; // 宽屏放 4 个 (占 3/12)
+      }
+    } else {
+      // 平板和桌面端放 4 个 (占 3/12)
+      columnSpan = 3;
+    }
+  }
+
   const horizontalPadding = surface === 'phone' ? 24 : surface === 'tablet' ? 32 : 40;
   const availableWidth = Math.max(280, safeWidth - horizontalPadding);
   const baseColumnWidth =
     (availableWidth - RESULT_GRID_GAP_PX * (safeColumnCount - 1)) / safeColumnCount;
-  const columnSpan = aspectCategory === 'wide' && safeColumnCount >= 3 ? 2 : 1;
   const tileWidth = baseColumnWidth * columnSpan + RESULT_GRID_GAP_PX * (columnSpan - 1);
   const visualHeight = tileWidth / safeAspectRatio;
 

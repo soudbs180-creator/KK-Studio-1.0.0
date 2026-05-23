@@ -869,9 +869,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               'Keep route, log, and storage readiness in one compact panel.',
             )}
             action={<LayoutDashboard size={18} className="text-[var(--text-primary)]" />}
-            surface="plain"
           >
-            <div className="settings-reference-rings settings-reference-rings--flat">
+            <div className="settings-reference-rings">
               <DashboardRingRow
                 label={pick('路由覆盖', 'Route coverage')}
                 percent={channelCoverage}
