@@ -28,7 +28,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
     userName = '\u7528\u6237',
     userAvatarUrl,
 }) => {
-    const iconButtonClass = 'h-8 w-8 rounded-[10px] flex items-center justify-center border transition-all active:scale-95';
+    const iconButtonClass = 'h-11 w-11 rounded-[14px] flex items-center justify-center border transition-all active:scale-95';
     const handleRechargeClick = onRechargeClick ?? onBillingClick;
     const avatarFallback = userName?.trim()?.[0]?.toUpperCase() || 'U';
     const balanceDisplay = balanceLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');
@@ -48,8 +48,8 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                     <button
                         type="button"
                         onClick={onUserClick}
-                        aria-label="\u6253\u5f00\u4e2a\u4eba\u4e2d\u5fc3"
-                        className="flex min-w-0 flex-1 items-center gap-2 rounded-[14px] border px-2 py-1.5 text-left transition-[background-color,border-color]"
+                        aria-label="打开个人中心"
+                        className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-[14px] border px-2 text-left transition-[background-color,border-color]"
                         style={{
                             background: 'var(--mobile-clay-surface-bg)',
                             borderColor: 'var(--mobile-clay-border)'
@@ -81,7 +81,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                         onClick={handleRechargeClick}
                         data-testid="mobile-header-credit-chip"
                         aria-label="\u67e5\u770b\u79ef\u5206"
-                        className="inline-flex min-w-[76px] h-8 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-[12px] border px-2 py-1 text-left text-[var(--text-primary)] transition-all active:scale-95 disabled:opacity-55"
+                        className="inline-flex min-w-[76px] h-11 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-[14px] border px-2 py-1 text-left text-[var(--text-primary)] transition-all active:scale-95 disabled:opacity-55"
                         style={{
                             background: 'var(--mobile-clay-surface-bg)',
                             borderColor: 'var(--mobile-clay-border)'
