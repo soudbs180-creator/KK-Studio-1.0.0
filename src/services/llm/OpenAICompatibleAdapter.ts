@@ -1622,6 +1622,11 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
     async generateImage(options: ImageGenerationOptions, keySlot: KeySlot): Promise<ImageGenerationResult> {
         // [Note] 内置加速服务 (SystemProxy) 逻辑已移除
 
+        if (keySlot.imageTransport === 'responses') {
+            console.log(`[OpenAICompatibleAdapter] 使用 Responses 图像工具通道 -> ${keySlot.name}`);
+            return this.generateImageViaResponses(options, keySlot);
+        }
+
         const modelLower = options.modelId.toLowerCase();
         const rawBaseUrl = keySlot.baseUrl || '';
         if (isLikelyDocumentationBaseUrl(rawBaseUrl)) {
@@ -2071,15 +2076,20 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             response_format: 'b64_json'
         };
 
-        if (profile === 'dall-e-3') {
-            body.quality = options.providerConfig?.openai?.quality
-                || (String(options.imageSize || '').toUpperCase().includes('2K')
-                    || String(options.imageSize || '').toUpperCase().includes('4K')
-                    ? 'hd'
-                    : 'standard');
-
-            if (options.providerConfig?.openai?.style) {
-                body.style = options.providerConfig.openai.style;
+        // PicGen 高级图像参数注入与过滤
+        const isOfficialOpenAI = keySlot.provider === 'OpenAI' || baseUrl.includes('api.openai.com');
+        if (!isOfficialOpenAI) {
+            if (options.quality) body.quality = options.quality;
+            if (options.background) body.background = options.background;
+            if (options.outputFormat) body.output_format = options.outputFormat;
+            if (options.outputCompression !== undefined) body.output_compression = options.outputCompression;
+            if (options.moderation) body.moderation = options.moderation;
+        } else {
+            if (profile === 'dall-e-3') {
+                body.quality = options.quality === 'hd' ? 'hd' : 'standard';
+                if (options.providerConfig?.openai?.style) {
+                    body.style = options.providerConfig.openai.style;
+                }
             }
         }
 
@@ -2112,6 +2122,16 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         formData.append('n', String(clampImageCount(options.imageCount, 10)));
         formData.append('size', sizeString);
         formData.append('response_format', 'b64_json');
+
+        // PicGen 高级参数注入与过滤
+        const isOfficialOpenAI = keySlot.provider === 'OpenAI' || baseUrl.includes('api.openai.com');
+        if (!isOfficialOpenAI) {
+            if (options.quality) formData.append('quality', options.quality);
+            if (options.background) formData.append('background', options.background);
+            if (options.outputFormat) formData.append('output_format', options.outputFormat);
+            if (options.outputCompression !== undefined) formData.append('output_compression', String(options.outputCompression));
+            if (options.moderation) formData.append('moderation', options.moderation);
+        }
 
         if (!options.referenceImages?.length) {
             throw new Error('OpenAI image edits require at least one reference image.');
@@ -2891,6 +2911,259 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 pythonSnippet: `import requests\n\nurl = "${url}"\nheaders = {"Authorization": "Bearer <API_KEY>", "Content-Type": "application/json"}\npayload = ${requestBodyPreview}\nresp = requests.post(url, headers=headers, json=payload, timeout=150)\nprint(resp.status_code)\nprint(resp.text[:1000])`
             }
         };
+    }
+
+    private async generateImageViaResponses(
+        options: ImageGenerationOptions,
+        keySlot: KeySlot
+    ): Promise<ImageGenerationResult> {
+        const rawBaseUrl = keySlot.responsesUrl || keySlot.baseUrl || '';
+        const baseUrl = rawBaseUrl.replace(/\/+$/, '');
+        const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
+        const url = keySlot.responsesUrl ? keySlot.responsesUrl : `${cleanBase}/responses`;
+        const model = keySlot.responsesModel || 'gpt-5.5';
+
+        let imageFileIds: string[] = [];
+
+        if (options.referenceImages && options.referenceImages.length > 0) {
+            const filesUrl = `${cleanBase}/files`;
+            for (const refImg of options.referenceImages) {
+                try {
+                    const { data: imgData, mimeType } = extractRefImageData(refImg);
+                    const base64Clean = imgData.replace(/^data:[^;]+;base64,/, '');
+                    const byteCharacters = atob(base64Clean);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: mimeType || 'image/png' });
+
+                    const fileFormData = new FormData();
+                    fileFormData.append('purpose', 'vision');
+                    fileFormData.append('file', blob, 'image.png');
+
+                    let uploadHeaders: Record<string, string> = {
+                        'Authorization': this.getAuthorizationHeaderValue(keySlot.key, keySlot)
+                    };
+                    if (keySlot.headerName && keySlot.headerName !== 'Authorization') {
+                        delete uploadHeaders.Authorization;
+                        uploadHeaders[keySlot.headerName] = keySlot.key;
+                    }
+                    uploadHeaders = this.applyCustomHeaders(uploadHeaders, keySlot);
+
+                    const fileResponse = await this.fetchWithTimeout(filesUrl, {
+                        method: 'POST',
+                        headers: uploadHeaders,
+                        body: fileFormData
+                    }, this.getTimeoutMs(keySlot, 60000), 1);
+
+                    if (!fileResponse.ok) {
+                        const errText = await fileResponse.text().catch(() => '');
+                        throw new Error(`Upload failed (${fileResponse.status}): ${errText}`);
+                    }
+
+                    const fileData = await fileResponse.json();
+                    if (fileData.id) {
+                        imageFileIds.push(fileData.id);
+                    } else {
+                        throw new Error('No id returned from files upload');
+                    }
+                } catch (e: any) {
+                    console.warn('[OpenAICompatibleAdapter] Files upload failed:', e);
+                    imageFileIds = [];
+                    break;
+                }
+            }
+        }
+
+        const contentParts: any[] = [{ type: 'input_text', text: options.prompt }];
+        if (imageFileIds.length > 0) {
+            imageFileIds.forEach(id => {
+                contentParts.push({ type: 'input_image', file_id: id });
+            });
+        } else if (options.referenceImages && options.referenceImages.length > 0) {
+            options.referenceImages.forEach(refImg => {
+                const { data: imgData, mimeType } = extractRefImageData(refImg);
+                const prefix = imgData.startsWith('data:') ? '' : `data:${mimeType || 'image/png'};base64,`;
+                contentParts.push({
+                    type: 'input_image',
+                    image_url: `${prefix}${imgData}`
+                });
+            });
+        }
+
+        let sizeStr = options.imageSize || '1024x1024';
+        if (options.aspectRatio && options.aspectRatio !== '1:1') {
+            const parts = options.aspectRatio.split(':');
+            const ratio = parseFloat(parts[0]) / parseFloat(parts[1]);
+            const dim = 1024;
+            if (ratio > 1) sizeStr = `${dim}x${Math.round(dim / ratio)}`;
+            else if (ratio < 1) sizeStr = `${Math.round(dim * ratio)}x${dim}`;
+        }
+
+        const tool: any = {
+            type: 'image_generation',
+            size: sizeStr
+        };
+        if (options.imageCount && options.imageCount > 1) {
+            tool.n = options.imageCount;
+        }
+        if (options.quality) tool.quality = options.quality;
+        if (options.background) tool.background = options.background;
+        if (options.outputFormat) tool.output_format = options.outputFormat;
+        if (options.outputCompression !== undefined) tool.output_compression = options.outputCompression;
+        if (options.moderation) tool.moderation = options.moderation;
+
+        const body: any = {
+            model: model,
+            stream: true,
+            input: [
+                {
+                    role: 'user',
+                    content: contentParts
+                }
+            ],
+            tools: [tool]
+        };
+
+        let headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'Authorization': this.getAuthorizationHeaderValue(keySlot.key, keySlot),
+            'Accept': 'text/event-stream'
+        };
+        if (keySlot.headerName && keySlot.headerName !== 'Authorization') {
+            delete headers.Authorization;
+            headers[keySlot.headerName] = keySlot.key;
+        }
+        headers = this.applyCustomHeaders(headers, keySlot);
+
+        const requestBody = this.applyCustomBody(body, keySlot);
+        const payloadStr = JSON.stringify(requestBody);
+
+        console.log(`[OpenAICompatibleAdapter] Responses Request -> ${url} | model=${model} | filesUploaded=${imageFileIds.length}`);
+
+        const response = await this.fetchWithTimeout(url, {
+            method: 'POST',
+            headers,
+            body: payloadStr,
+            signal: options.signal
+        }, this.getTimeoutMs(keySlot, 400000), 1);
+
+        if (!response.ok) {
+            const errText = await response.text().catch(() => '');
+            throw new Error(`Responses API Error (${response.status}): ${errText}`);
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) {
+            throw new Error('Response body has no reader for SSE');
+        }
+
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        let lastImageB64: string | null = null;
+        let responseJson: any = null;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (trimmed.startsWith('data:')) {
+                    const dataStr = trimmed.substring(5).trim();
+                    if (dataStr && dataStr !== '[DONE]') {
+                        try {
+                            const parsed = JSON.parse(dataStr);
+                            const b64 = this.extractImageB64FromEvent(parsed);
+                            if (b64) {
+                                lastImageB64 = b64;
+                            }
+                            if (parsed.response) {
+                                responseJson = parsed.response;
+                            }
+                        } catch (je) {
+                            // ignore json parse error
+                        }
+                    }
+                }
+            }
+        }
+
+        if (buffer.trim().startsWith('data:')) {
+            const dataStr = buffer.trim().substring(5).trim();
+            if (dataStr && dataStr !== '[DONE]') {
+                try {
+                    const parsed = JSON.parse(dataStr);
+                    const b64 = this.extractImageB64FromEvent(parsed);
+                    if (b64) lastImageB64 = b64;
+                } catch (je) {}
+            }
+        }
+
+        const finalB64 = finalB64Fallback(lastImageB64, responseJson);
+        if (!finalB64) {
+            throw new Error('Responses tool executed but no image was generated in the stream.');
+        }
+
+        const dataPrefix = `data:image/png;base64,`;
+        return {
+            urls: [`${dataPrefix}${finalB64}`],
+            provider: 'OpenAI-Responses',
+            model: model,
+            imageSize: sizeStr,
+            metadata: {
+                requestPath: '/v1/responses',
+                requestBodyPreview: buildSafeRequestBodyPreview(requestBody)
+            }
+        };
+
+        function finalB64Fallback(last: string | null, resp: any) {
+            if (last) return last;
+            if (!resp || !Array.isArray(resp.output)) return null;
+            for (const item of resp.output) {
+                if (item && item.type === 'image_generation_call') {
+                    if (typeof item.result === 'string' && item.result) {
+                        return item.result;
+                    }
+                }
+            }
+            return null;
+        }
+    }
+
+    private extractImageB64FromEvent(event: any): string | null {
+        if (!event) return null;
+        for (const key of ['partial_image_b64', 'result', 'b64_json', 'image_b64']) {
+            if (typeof event[key] === 'string' && event[key]) {
+                return event[key];
+            }
+        }
+        if (event.item && typeof event.item === 'object') {
+            for (const key of ['result', 'b64_json']) {
+                if (typeof event.item[key] === 'string' && event.item[key]) {
+                    return event.item[key];
+                }
+            }
+        }
+        return null;
+    }
+
+    private extractImageB64FromResponse(response: any): string | null {
+        if (!response || !Array.isArray(response.output)) return null;
+        for (const item of response.output) {
+            if (item && item.type === 'image_generation_call') {
+                if (typeof item.result === 'string' && item.result) {
+                    return item.result;
+                }
+            }
+        }
+        return null;
     }
 }
 

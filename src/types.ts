@@ -1049,6 +1049,13 @@ export interface GenerationConfig {
   audioLyrics?: string;
   pptSlides?: string[];
   pptStyleLocked?: boolean;
+  // PicGen 高级图像参数选择
+  quality?: 'auto' | 'low' | 'medium' | 'high' | 'standard' | 'hd';
+  background?: 'auto' | 'opaque' | 'transparent';
+  outputFormat?: 'png' | 'jpeg' | 'webp';
+  outputCompression?: number;
+  moderation?: 'auto' | 'low';
+  sampleCount?: number;
 }
 
 

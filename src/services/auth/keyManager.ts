@@ -193,6 +193,9 @@ export interface KeySlot {
     baseUrl?: string;        // Custom base URL (e.g. for proxies)
     group?: string;          // Group selection for proxies
     compatibilityMode?: 'standard' | 'chat'; // 'standard' = /v1/images, 'chat' = /v1/chat
+    imageTransport?: 'images' | 'responses'; // 图像传输通道: images 或 responses
+    responsesUrl?: string;                   // Responses 接口地址
+    responsesModel?: string;                 // Responses 生图模型
     supportedModels: string[]; // List of model IDs this channel supports
 
     // Proxy Specific
@@ -676,6 +679,9 @@ export class KeyManager {
                         authMethod,
                         headerName,
                         compatibilityMode: runtime.compatibilityMode,
+                        imageTransport: s.imageTransport || 'images',
+                        responsesUrl: s.responsesUrl || '',
+                        responsesModel: s.responsesModel || '',
                         supportedModels,
                         disabled: s.disabled ?? false,
                         status: s.status || 'valid',
