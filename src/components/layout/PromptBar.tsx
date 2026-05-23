@@ -1,4 +1,4 @@
-import React, { startTransition, useDeferredValue, useRef, useState, useCallback, useEffect, useMemo } from 'react';
+﻿import React, { startTransition, useDeferredValue, useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import ReactDOM, { flushSync } from 'react-dom';
 import { GenerationConfig, AspectRatio, ImageSize, GenerationMode, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceSheetSettingPatch, type EcommerceTaskAssetRoleBinding, type ReferenceImage } from '../../types';
 import { ActiveModel } from '../../services/model/modelRegistry';
@@ -3803,159 +3803,200 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 {/* Dropdown Menu */}
                                  {/* Dropdown Menu */}
                                  {isModelMenuOpen && isMobile && (
-                                     <div
-                                         ref={modelDropdownRef}
-                                         className="absolute left-3 right-3 z-[1050] ios-mobile-floating-sheet p-2 animate-fadeIn overflow-hidden"
-                                         style={{ bottom: 'calc(100% + 8px)', maxHeight: mobileFloatingSheetMaxHeight, overscrollBehavior: 'contain' }}
-                                         onTouchStart={(e) => e.stopPropagation()}
-                                     >
-                                         {/* 🔍 Search Input Module - Above the list - 只在多个模型时显示 */}
-                                         {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
-                                             <div className="mb-2 p-2.5 border rounded-2xl  animate-scaleIn origin-bottom max-w-[calc(100vw-24px)]" style={{ ...modelLibrarySearchSurfaceStyle, width: 'min(22rem, calc(100vw - 24px))' }}>
-                                                 <div className="relative flex items-center">
-                                                     <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                                     </svg>
-                                                     <input
-                                                         type="text"
-                                                         value={modelSearch}
-                                                         onChange={(e) => setModelSearch(e.target.value)}
-                                                         onClick={(e) => e.stopPropagation()}
-                                                         placeholder="搜索模型..."
-                                                         className="w-full bg-[var(--frost-input-bg)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-transparent focus:border-[var(--frost-input-border)] placeholder-[var(--text-tertiary)]"
-                                                         autoFocus
-                                                     />
-                                                     {modelSearch && (
-                                                         <button
-                                                             onClick={(e) => { e.stopPropagation(); setModelSearch(''); }}
-                                                             className="absolute right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-                                                         >
-                                                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                             </svg>
-                                                         </button>
-                                                     )}
-                                                 </div>
-                                             </div>
-                                         )}
+                                     <>
+                                      {/* 🚀 移动端模型库 Bottom Sheet 蒙层 */}
+                                      <div
+                                          className="fixed inset-0 z-[1049] bg-black/40"
+                                          style={{ backdropFilter: 'blur(2px)' }}
+                                          onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }}
+                                          onTouchStart={(e) => e.stopPropagation()}
+                                      />
+                                      {/* 🚀 移动端模型库 Bottom Sheet 半屏弹窗 */}
+                                      <div
+                                          className="fixed left-0 right-0 bottom-0 z-[1050] flex flex-col items-center"
+                                          style={{
+                                              animation: 'model-sheet-slide-up 0.28s cubic-bezier(0.32,0.72,0,1) forwards',
+                                              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+                                          }}
+                                          onTouchStart={(e) => e.stopPropagation()}
+                                      >
+                                          <style>{`
+                                              @keyframes model-sheet-slide-up {
+                                                  from { transform: translateY(100%); opacity: 0.6; }
+                                                  to   { transform: translateY(0);    opacity: 1; }
+                                              }
+                                          `}</style>
+                                          <div
+                                              ref={modelDropdownRef}
+                                              className="w-full max-w-[480px] rounded-t-2xl overflow-hidden"
+                                              style={{
+                                                  background: 'var(--frost-card-framework-bg)',
+                                                  borderTop: '1px solid var(--frost-card-framework-border)',
+                                                  borderLeft: '1px solid var(--frost-card-framework-border)',
+                                                  borderRight: '1px solid var(--frost-card-framework-border)',
+                                                  boxShadow: '0 -8px 32px rgba(0,0,0,0.25)',
+                                                  backdropFilter: 'blur(24px) saturate(1.2)',
+                                                  WebkitBackdropFilter: 'blur(24px) saturate(1.2)',
+                                              }}
+                                          >
+                                              {/* 拖拽手柄条 */}
+                                              <div className="flex justify-center pt-3 pb-2">
+                                                  <div className="w-10 h-1 rounded-full bg-[var(--text-tertiary)] opacity-30" />
+                                              </div>
 
-                                         {isModelMenuRefreshingWithCache && (
-                                             <div className="mb-2 flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
-                                                 <Loader2 size={14} className="animate-spin" />
-                                                 <span>正在同步最新模型库...</span>
-                                             </div>
-                                         )}
+                                              {/* 🔍 搜索输入框 */}
+                                              {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
+                                                  <div className="mx-3 mb-2 p-2.5 border rounded-2xl" style={{ ...modelLibrarySearchSurfaceStyle }}>
+                                                      <div className="relative flex items-center">
+                                                          <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                                          </svg>
+                                                          <input
+                                                              type="text"
+                                                              value={modelSearch}
+                                                              onChange={(e) => setModelSearch(e.target.value)}
+                                                              onClick={(e) => e.stopPropagation()}
+                                                              placeholder="搜索模型..."
+                                                              className="w-full bg-[var(--frost-input-bg)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-transparent focus:border-[var(--frost-input-border)] placeholder-[var(--text-tertiary)]"
+                                                              autoFocus
+                                                          />
+                                                          {modelSearch && (
+                                                              <button
+                                                                  onClick={(e) => { e.stopPropagation(); setModelSearch(''); }}
+                                                                  className="absolute right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                                                              >
+                                                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                  </svg>
+                                                              </button>
+                                                          )}
+                                                      </div>
+                                                  </div>
+                                              )}
 
-                                         <div
-                                             ref={modelListScrollRef}
-                                             className="dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] h-[240px] max-h-[240px] overflow-y-auto scrollbar-none animate-scaleIn origin-bottom p-0 relative"
-                                             style={{ 
-                                                 ...modelLibrarySurfaceStyle, 
-                                                 borderRadius: '1rem',
-                                                 scrollSnapType: 'y mandatory',
-                                                 paddingTop: '83px',
-                                                 paddingBottom: '83px',
-                                                 overscrollBehavior: 'contain',
-                                                 scrollbarWidth: 'none',
-                                             }}
-                                             onScroll={(e) => {
-                                                 const nextTop = e.currentTarget.scrollTop;
-                                                 modelListScrollPos.current = nextTop;
-                                                 const nextStartIndex = Math.max(
-                                                     0,
-                                                     Math.floor(nextTop / MODEL_LIST_ITEM_HEIGHT) - MODEL_LIST_OVERSCAN
-                                                 );
-                                                 setModelListWindowStart((prev) => prev === nextStartIndex ? prev : nextStartIndex);
-                                                 
-                                                 if (isMobile) {
-                                                     setMobileScrollTop(nextTop);
-                                                     
-                                                     const centerIndex = Math.min(filteredDisplayModels.length - 1, Math.max(0, Math.round(nextTop / MODEL_LIST_ITEM_HEIGHT)));
-                                                     const targetModel = filteredDisplayModels[centerIndex];
-                                                     if (targetModel && targetModel.id !== config.model) {
-                                                         try {
-                                                             if (navigator.vibrate) {
-                                                                 navigator.vibrate(5);
-                                                             }
-                                                         } catch (err) {}
-                                                         handleSelectPromptBarModel(targetModel);
-                                                     }
-                                                 }
-                                             }}
-                                         >
-                                             {isModelMenuBootstrapping ? (
-                                                 <div className="py-6 px-4">
-                                                     <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
-                                                         <Loader2 size={14} className="animate-spin" />
-                                                         <span>正在同步最新模型库...</span>
-                                                     </div>
-                                                     <div className="mt-4 space-y-2">
-                                                         {Array.from({ length: MODEL_MENU_SKELETON_COUNT }).map((_, index) => (
-                                                             <div
-                                                                 key={`prompt-bar-model-loading-${index}`}
-                                                                 className="h-12 rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] animate-pulse"
-                                                             />
-                                                         ))}
-                                                     </div>
-                                                 </div>
-                                             ) : (() => {
-                                                 const visibleModels = modelListViewport.items;
-                                                 const topSpacerHeight = modelListViewport.shouldWindow
-                                                     ? modelListViewport.startIndex * MODEL_LIST_ITEM_HEIGHT
-                                                     : 0;
-                                                 const bottomSpacerHeight = modelListViewport.shouldWindow
-                                                     ? Math.max(0, modelListViewport.totalHeight - topSpacerHeight - visibleModels.length * MODEL_LIST_ITEM_HEIGHT)
-                                                     : 0;
+                                              {isModelMenuRefreshingWithCache && (
+                                                  <div className="mb-2 flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                      <Loader2 size={14} className="animate-spin" />
+                                                      <span>正在同步最新模型库...</span>
+                                                  </div>
+                                              )}
 
-                                                 return (
-                                                     <>
-                                                         {topSpacerHeight > 0 ? <div style={{ height: `${topSpacerHeight}px` }} /> : null}
-                                                         {visibleModels.map((model: PromptBarModelOption, index: number) => {
-                                                             const isLast = index === visibleModels.length - 1;
-                                                             const description = model.isExclusive ? '' : truncateModelDescription(model.resolvedDescription, 50);
-                                                             const globalIndex = modelListViewport.startIndex + index;
+                                              {/* 模型列表滚动区 */}
+                                              <div
+                                                  ref={modelListScrollRef}
+                                                  className="dropdown w-full overflow-y-auto scrollbar-none p-0 relative"
+                                                  style={{
+                                                      ...modelLibrarySurfaceStyle,
+                                                      borderRadius: '0',
+                                                      border: 'none',
+                                                      boxShadow: 'none',
+                                                      maxHeight: '50vh',
+                                                      scrollSnapType: 'y mandatory',
+                                                      paddingTop: '83px',
+                                                      paddingBottom: '83px',
+                                                      overscrollBehavior: 'contain',
+                                                      scrollbarWidth: 'none',
+                                                  }}
+                                                  onScroll={(e) => {
+                                                      const nextTop = e.currentTarget.scrollTop;
+                                                      modelListScrollPos.current = nextTop;
+                                                      const nextStartIndex = Math.max(
+                                                          0,
+                                                          Math.floor(nextTop / MODEL_LIST_ITEM_HEIGHT) - MODEL_LIST_OVERSCAN
+                                                      );
+                                                      setModelListWindowStart((prev) => prev === nextStartIndex ? prev : nextStartIndex);
 
-                                                             // 🚀 3D 滚轮运动计算
-                                                             const offset = globalIndex * 74 - mobileScrollTop;
-                                                             const ratio = offset / 74;
-                                                             const absRatio = Math.min(1.5, Math.abs(ratio));
-                                                             const scale = 1.05 - absRatio * 0.12;
-                                                             const rotateX = ratio * -28;
-                                                             const opacity = 1 - absRatio * 0.45;
+                                                      if (isMobile) {
+                                                          setMobileScrollTop(nextTop);
 
-                                                             const itemStyle = isMobile ? {
-                                                                 transform: `perspective(500px) rotateX(${rotateX}deg) scale(${scale})`,
-                                                                 opacity: opacity,
-                                                                 scrollSnapAlign: 'center' as const,
-                                                                 height: '74px',
-                                                                 transition: 'transform 0.1s ease-out, opacity 0.1s ease-out',
-                                                                 display: 'flex',
-                                                                 alignItems: 'center',
-                                                                 justifyContent: 'center',
-                                                                 contain: 'layout style' as const
-                                                             } : undefined;
+                                                          const centerIndex = Math.min(filteredDisplayModels.length - 1, Math.max(0, Math.round(nextTop / MODEL_LIST_ITEM_HEIGHT)));
+                                                          const targetModel = filteredDisplayModels[centerIndex];
+                                                          if (targetModel && targetModel.id !== config.model) {
+                                                              try {
+                                                                  if (navigator.vibrate) {
+                                                                      navigator.vibrate(5);
+                                                                  }
+                                                              } catch (err) {}
+                                                              handleSelectPromptBarModel(targetModel);
+                                                          }
+                                                      }
+                                                  }}
+                                              >
+                                                  {isModelMenuBootstrapping ? (
+                                                      <div className="py-6 px-4">
+                                                          <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                              <Loader2 size={14} className="animate-spin" />
+                                                              <span>正在同步最新模型库...</span>
+                                                          </div>
+                                                          <div className="mt-4 space-y-2">
+                                                              {Array.from({ length: MODEL_MENU_SKELETON_COUNT }).map((_, index) => (
+                                                                  <div
+                                                                      key={`prompt-bar-model-loading-${index}`}
+                                                                      className="h-12 rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] animate-pulse"
+                                                                  />
+                                                              ))}
+                                                          </div>
+                                                      </div>
+                                                  ) : (() => {
+                                                      const visibleModels = modelListViewport.items;
+                                                      const topSpacerHeight = modelListViewport.shouldWindow
+                                                          ? modelListViewport.startIndex * MODEL_LIST_ITEM_HEIGHT
+                                                          : 0;
+                                                      const bottomSpacerHeight = modelListViewport.shouldWindow
+                                                          ? Math.max(0, modelListViewport.totalHeight - topSpacerHeight - visibleModels.length * MODEL_LIST_ITEM_HEIGHT)
+                                                          : 0;
 
-                                                             return (
-                                                                 <div key={model.id} style={itemStyle} className="w-full">
-                                                                     <PromptBarModelMenuButton
-                                                                         model={model}
-                                                                         imageSize={config.imageSize}
-                                                                         selected={config.model === model.id}
-                                                                         isLast={isLast}
-                                                                         description={description}
-                                                                         onSelect={handleSelectPromptBarModel}
-                                                                         onOpenContextMenu={handlePromptBarModelContextMenu}
-                                                                     />
-                                                                 </div>
-                                                             );
-                                                         })}
-                                                         {bottomSpacerHeight > 0 ? <div style={{ height: `${bottomSpacerHeight}px` }} /> : null}
-                                                     </>
-                                                 );
-                                             })()}
-                                         </div>
-                                    </div >
-                                )}
+                                                      return (
+                                                          <>
+                                                              {topSpacerHeight > 0 ? <div style={{ height: `${topSpacerHeight}px` }} /> : null}
+                                                              {visibleModels.map((model: PromptBarModelOption, index: number) => {
+                                                                  const isLast = index === visibleModels.length - 1;
+                                                                  const description = model.isExclusive ? '' : truncateModelDescription(model.resolvedDescription, 50);
+                                                                  const globalIndex = modelListViewport.startIndex + index;
+
+                                                                  // 🚀 3D 滚轮运动计算
+                                                                  const offset = globalIndex * 74 - mobileScrollTop;
+                                                                  const ratio = offset / 74;
+                                                                  const absRatio = Math.min(1.5, Math.abs(ratio));
+                                                                  const scale = 1.05 - absRatio * 0.12;
+                                                                  const rotateX = ratio * -28;
+                                                                  const opacity = 1 - absRatio * 0.45;
+
+                                                                  const itemStyle = isMobile ? {
+                                                                      transform: `perspective(500px) rotateX(${rotateX}deg) scale(${scale})`,
+                                                                      opacity: opacity,
+                                                                      scrollSnapAlign: 'center' as const,
+                                                                      height: '74px',
+                                                                      transition: 'transform 0.1s ease-out, opacity 0.1s ease-out',
+                                                                      display: 'flex',
+                                                                      alignItems: 'center',
+                                                                      justifyContent: 'center',
+                                                                      contain: 'layout style' as const
+                                                                  } : undefined;
+
+                                                                  return (
+                                                                      <div key={model.id} style={itemStyle} className="w-full">
+                                                                          <PromptBarModelMenuButton
+                                                                              model={model}
+                                                                              imageSize={config.imageSize}
+                                                                              selected={config.model === model.id}
+                                                                              isLast={isLast}
+                                                                              description={description}
+                                                                              onSelect={handleSelectPromptBarModel}
+                                                                              onOpenContextMenu={handlePromptBarModelContextMenu}
+                                                                          />
+                                                                      </div>
+                                                                  );
+                                                              })}
+                                                              {bottomSpacerHeight > 0 ? <div style={{ height: `${bottomSpacerHeight}px` }} /> : null}
+                                                          </>
+                                                      );
+                                                  })()}
+                                              </div>
+                                          </div>
+                                      </div>
+                                     </>
+                                 )}
                                 {isModelMenuOpen && !isMobile && (
                                     <div
                                         ref={modelDropdownRef}
