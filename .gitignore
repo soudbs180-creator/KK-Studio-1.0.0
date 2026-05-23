@@ -99,6 +99,42 @@ workspace/
 payment-server/.env
 payment-server/node_modules/
 payment-server/*.log
+.tmp-*.js
+.tmp-*.mjs
+.tmp-*.cjs
+.tmp-*.py
+temp_*.js
+temp_*.mjs
+temp_*.cjs
+temp_*.py
+tmp-*.err
+tmp-*.out
+tmp.patch
+current_block.txt
+extracted_section.txt
+turnstile-diagnostic.html
+app-compare.patch
+canvas-compare.patch
+check-tc*.json
+check-tc*.js
+modal-fix-test-*.png
+settings-panel-current.png
+
+# Local release artifacts
+release/*
+!release/publish/
+release/publish/*
+!release/publish/stable/
+release/publish/stable/*
+!release/publish/stable/manifest.json
+!scripts/release/
+!scripts/release/**
+workspace/
+
+# Payment sidecar local files
+payment-server/.env
+payment-server/node_modules/
+payment-server/*.log
 payment-server/*.out.log
 payment-server/*.err.log
 
@@ -107,3 +143,6 @@ supabase/.temp/
 
 .vercel
 .env*.local
+
+# Local temp directories
+.tmp-picgen/

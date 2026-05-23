@@ -134,35 +134,8 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
   }, [surface]);
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="mb-3.5 flex items-center justify-between gap-3 px-3 py-2.5 select-none shrink-0 rounded-2xl border border-white/5 bg-[var(--mobile-clay-surface-bg)]/45 backdrop-blur-md">
-        <div className="min-w-0 flex flex-col gap-0.5">
-          <p className="text-[11px] leading-relaxed text-[var(--text-secondary)]">
-            {pick('点击任意结果查看完整提示词和操作。', 'Tap any result to inspect the full prompt and actions.')}
-          </p>
-          <div className="text-[9.5px] font-semibold uppercase tracking-[0.05em] text-[var(--text-tertiary)]">
-            {hasSelectedSource ? `${counterLabel} / ${selectedSourceLabel}` : counterLabel}
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center">
-          <div className="flex rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)]/85 p-0.5 text-[11px] font-medium text-[var(--text-secondary)] shadow-sm">
-            {(['standard', 'detail'] as ResultViewMode[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => onViewModeChange(mode)}
-                className={`rounded-full px-3 py-1 transition-all duration-150 ${
-                  viewMode === mode ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] font-bold shadow-sm' : 'text-[var(--text-secondary)] active:text-[var(--text-primary)]'
-                }`}
-              >
-                {mode === 'detail' ? pick('详细', 'Detail') : pick('标准', 'Standard')}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
+    <section className="relative flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto overscroll-contain pr-1 pb-20">
         {totalResults === 0 ? (
           viewMode === 'detail' ? (
             <MobileResultDetailEmptySkeleton />
@@ -203,6 +176,34 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
             <div ref={bottomRef} style={{ gridColumn: '1 / -1' }} className="h-1 w-full" />
           </div>
         )}
+      </div>
+
+      {/* 底部悬浮操作与模式切换控制区（带暗色渐变过渡，不遮挡内容） */}
+      <div className="absolute bottom-0 inset-x-0 z-20 flex items-end justify-between gap-4 px-4 pb-4 pt-12 select-none pointer-events-none bg-gradient-to-t from-black/95 via-black/50 to-transparent">
+        <div className="min-w-0 flex flex-col gap-0.5 pointer-events-auto">
+          <p className="text-[11px] leading-relaxed text-white/90 drop-shadow-sm font-medium">
+            {pick('点击任意结果查看完整提示词和操作。', 'Tap any result to inspect the full prompt and actions.')}
+          </p>
+          <div className="text-[9.5px] font-bold uppercase tracking-[0.06em] text-white/55 drop-shadow-sm">
+            {hasSelectedSource ? `${counterLabel} / ${selectedSourceLabel}` : counterLabel}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center pointer-events-auto">
+          <div className="flex rounded-full border border-white/12 bg-black/40 backdrop-blur-md p-0.5 text-[11px] font-medium text-white/80 shadow-lg">
+            {(['standard', 'detail'] as ResultViewMode[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => onViewModeChange(mode)}
+                className={`rounded-full px-3 py-1 transition-all duration-150 ${
+                  viewMode === mode ? 'bg-white text-black font-bold shadow-sm' : 'text-white/70 active:text-white active:bg-white/5'
+                }`}
+              >
+                {mode === 'detail' ? pick('详细', 'Detail') : pick('标准', 'Standard')}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );

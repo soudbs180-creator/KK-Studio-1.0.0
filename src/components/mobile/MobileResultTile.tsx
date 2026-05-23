@@ -137,18 +137,17 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
               </div>
             </div>
           ) : entry.displaySrc ? (
-            /* 渲染图片 */
+            /* 渲染图片 - 去除 aspectRatio 限制以强制 w-full h-full object-cover 占满卡片 */
             <img
               src={entry.displaySrc}
               alt={promptSummary}
               onError={() => setImgLoadError(true)}
               className={`block h-full min-h-0 w-full object-cover transition-transform duration-300 group-active:scale-[0.985] group-hover:scale-[1.01] ${isFailed ? 'filter grayscale opacity-40' : ''} ${viewMode === 'detail' ? 'rounded-t-2xl' : 'rounded-2xl'}`}
-              style={{ aspectRatio: imageAspectRatio }}
             />
           ) : (
-            /* 暂无预览占位 */
+            /* 暂无预览占位 - 去除 fallback aspect 限制以支持铺满 */
             <div
-              className={`flex h-full min-h-0 w-full items-center justify-center bg-[var(--bg-tertiary)] text-[13px] text-[var(--text-secondary)] ${getFallbackAspectClassName(entry)}`}
+              className={`flex h-full min-h-0 w-full items-center justify-center bg-[var(--bg-tertiary)] text-[13px] text-[var(--text-secondary)] ${viewMode === 'detail' ? 'rounded-t-2xl' : 'rounded-2xl'}`}
             >
               暂无预览
             </div>
@@ -210,7 +209,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
 
         {/* 详细模式毛玻璃参数卡片区域 */}
         {viewMode === 'detail' && !entry.isGenerating && (
-          <div className="shrink-0 p-3 bg-[var(--bg-secondary)]/80 backdrop-blur-md border-t border-white/5 flex flex-col gap-2 w-full">
+          <div className="shrink-0 p-3 bg-[var(--bg-secondary)]/80 backdrop-blur-md border-t border-white/5 flex flex-col gap-2 w-full rounded-b-2xl">
             <p className="line-clamp-2 text-xs leading-relaxed text-[var(--text-secondary)] font-normal">
               {entry.fullPrompt || promptSummary}
             </p>

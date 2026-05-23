@@ -286,6 +286,9 @@ export interface ThirdPartyProvider {
     tokenLimit?: number;
     customCostMode?: 'unlimited' | 'amount' | 'tokens';
     customCostValue?: number;
+    imageTransport?: 'images' | 'responses';
+    responsesUrl?: string;
+    responsesModel?: string;
 
     // Cache of pricing data fetched from the provider's pricing endpoint
     pricingSnapshot?: ProviderPricingSnapshot;

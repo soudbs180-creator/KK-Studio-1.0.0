@@ -7,7 +7,7 @@ import {
   EcommerceSheetSettingPatch,
   ImageSize,
 } from '../../types';
-import { Fullscreen } from 'lucide-react';
+import { Fullscreen, ChevronDown } from 'lucide-react';
 
 interface ImageOptionsPanelProps {
   aspectRatio: AspectRatio;
@@ -29,6 +29,16 @@ interface ImageOptionsPanelProps {
   onUpdateEcommerceSheetSetting?: (sheet: EcommerceGroupSheet, patch: EcommerceSheetSettingPatch) => void;
   activeEcommerceSheet?: EcommerceGroupSheet;
   onActiveEcommerceSheetChange?: (sheet: EcommerceGroupSheet) => void;
+  quality?: 'auto' | 'low' | 'medium' | 'high' | 'standard' | 'hd';
+  background?: 'auto' | 'opaque' | 'transparent';
+  outputFormat?: 'png' | 'jpeg' | 'webp';
+  outputCompression?: number;
+  moderation?: 'auto' | 'low';
+  onQualityChange?: (quality: 'auto' | 'low' | 'medium' | 'high' | 'standard' | 'hd') => void;
+  onBackgroundChange?: (background: 'auto' | 'opaque' | 'transparent') => void;
+  onOutputFormatChange?: (format: 'png' | 'jpeg' | 'webp') => void;
+  onOutputCompressionChange?: (compression: number) => void;
+  onModerationChange?: (moderation: 'auto' | 'low') => void;
 }
 
 const aPlusControlModeLabels: Record<EcommerceAPlusControlMode, string> = {
@@ -333,7 +343,18 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
   onUpdateEcommerceSheetSetting,
   activeEcommerceSheet,
   onActiveEcommerceSheetChange,
+  quality,
+  background,
+  outputFormat,
+  outputCompression,
+  moderation,
+  onQualityChange,
+  onBackgroundChange,
+  onOutputFormatChange,
+  onOutputCompressionChange,
+  onModerationChange,
 }) => {
+  const [showAdvanced, setShowAdvanced] = React.useState(false);
   const displaySizes = useMemo(() => getDisplaySizes(availableSizes), [availableSizes]);
   const isEcommercePanel = !!ecommerceSheetSettings && !!onUpdateEcommerceSheetSetting;
   const ecommerceDisplaySizes = useMemo(() => {
@@ -524,6 +545,155 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
           </section>
         </>
       )}
+
+      {/* 比例与画质之后，折叠高级面板 */}
+      <div className="mt-4 pt-3 border-t border-[var(--border-subtle)]">
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="flex items-center justify-between w-full py-1 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors focus:outline-none"
+        >
+          <span className="flex items-center gap-1.5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            高级图像参数
+          </span>
+          <ChevronDown
+            size={16}
+            className="transition-transform duration-200"
+            style={{ transform: showAdvanced ? 'rotate(180deg)' : 'rotate(0deg)' }}
+          />
+        </button>
+
+        {showAdvanced && (
+          <div className="mt-3 space-y-3.5 p-3 rounded-2xl" style={{
+            backgroundColor: 'color-mix(in srgb, var(--bg-input) 36%, transparent)',
+            border: '1px solid var(--border-subtle)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+          }}>
+            {/* 1. 画质选择 */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-[var(--text-secondary)] font-medium">画面质量 (Quality)</label>
+              <select
+                value={quality || 'auto'}
+                onChange={(e) => onQualityChange?.(e.target.value as any)}
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--bg-input) 80%, transparent)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  fontSize: '13px',
+                  outline: 'none',
+                  width: '100%',
+                }}
+              >
+                <option value="auto">自适应 (auto)</option>
+                <option value="low">低质量 (low)</option>
+                <option value="medium">中等 (medium)</option>
+                <option value="high">高质量 (high)</option>
+                <option value="standard">标准 (standard)</option>
+                <option value="hd">超清 HD (hd)</option>
+              </select>
+            </div>
+
+            {/* 2. 背景选择 */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-[var(--text-secondary)] font-medium">背景模式 (Background)</label>
+              <select
+                value={background || 'auto'}
+                onChange={(e) => onBackgroundChange?.(e.target.value as any)}
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--bg-input) 80%, transparent)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  fontSize: '13px',
+                  outline: 'none',
+                  width: '100%',
+                }}
+              >
+                <option value="auto">自适应 (auto)</option>
+                <option value="opaque">不透明 (opaque)</option>
+                <option value="transparent">透明背景 (transparent)</option>
+              </select>
+            </div>
+
+            {/* 3. 输出格式 */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-[var(--text-secondary)] font-medium">输出格式 (Format)</label>
+              <select
+                value={outputFormat || 'webp'}
+                onChange={(e) => onOutputFormatChange?.(e.target.value as any)}
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--bg-input) 80%, transparent)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  fontSize: '13px',
+                  outline: 'none',
+                  width: '100%',
+                }}
+              >
+                <option value="webp">WebP (推荐)</option>
+                <option value="jpeg">JPEG</option>
+                <option value="png">PNG (无损)</option>
+              </select>
+            </div>
+
+            {/* 4. 压缩率 (仅在 webp/jpeg 下展示) */}
+            {(outputFormat === 'jpeg' || outputFormat === 'webp' || !outputFormat) && (
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-[var(--text-secondary)] font-medium">画质压缩率 (Compression)</label>
+                  <span className="text-xs font-mono text-[var(--text-primary)]">{outputCompression ?? 80}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="100"
+                  value={outputCompression ?? 80}
+                  onChange={(e) => onOutputCompressionChange?.(parseInt(e.target.value))}
+                  style={{
+                    width: '100%',
+                    accentColor: 'var(--accent-coral)',
+                    height: '4px',
+                    borderRadius: '2px',
+                    cursor: 'pointer',
+                  }}
+                />
+              </div>
+            )}
+
+            {/* 5. 内容审核 */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-[var(--text-secondary)] font-medium">安全过滤级别 (Moderation)</label>
+              <select
+                value={moderation || 'auto'}
+                onChange={(e) => onModerationChange?.(e.target.value as any)}
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--bg-input) 80%, transparent)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  fontSize: '13px',
+                  outline: 'none',
+                  width: '100%',
+                }}
+              >
+                <option value="auto">自适应/严格 (auto)</option>
+                <option value="low">宽松 (low)</option>
+              </select>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

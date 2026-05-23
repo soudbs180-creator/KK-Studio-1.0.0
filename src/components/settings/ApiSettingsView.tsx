@@ -131,6 +131,9 @@ type ProviderForm = {
   isActive: boolean;
   mode: CostMode;
   value: string;
+  imageTransport: 'images' | 'responses';
+  responsesUrl: string;
+  responsesModel: string;
 };
 
 const officialDefaults: OfficialForm = {
@@ -159,6 +162,9 @@ const providerDefaults: ProviderForm = {
   isActive: true,
   mode: 'unlimited',
   value: '',
+  imageTransport: 'images',
+  responsesUrl: '',
+  responsesModel: '',
 };
 
 const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';
@@ -423,6 +429,9 @@ function toReadonlyOfficialSlot(rawValue: unknown): KeySlot | null {
     totalCost: normalizeNumber(raw.totalCost ?? raw.total_cost),
     budgetLimit: Number.isFinite(Number(raw.budgetLimit)) ? Number(raw.budgetLimit) : -1,
     tokenLimit: Number.isFinite(Number(raw.tokenLimit)) ? Number(raw.tokenLimit) : -1,
+    imageTransport: (raw.imageTransport || raw.image_transport || 'images') as 'images' | 'responses',
+    responsesUrl: normalizeString(raw.responsesUrl ?? raw.responses_url),
+    responsesModel: normalizeString(raw.responsesModel ?? raw.responses_model),
   };
 }
 
@@ -488,6 +497,9 @@ function toReadonlyProvider(rawValue: unknown): ThirdPartyProvider | null {
           updatedAt: normalizeOptionalTimestamp(raw.activitySummary.updatedAt) ?? undefined,
         }
       : undefined,
+    imageTransport: (raw.imageTransport || raw.image_transport || 'images') as 'images' | 'responses',
+    responsesUrl: normalizeString(raw.responsesUrl ?? raw.responses_url),
+    responsesModel: normalizeString(raw.responsesModel ?? raw.responses_model),
   };
 }
 
@@ -743,6 +755,9 @@ const toProviderForm = (provider: ThirdPartyProvider): ProviderForm => ({
         : provider.customCostValue && provider.customCostValue > 0
           ? String(provider.customCostValue)
           : '',
+  imageTransport: provider.imageTransport || 'images',
+  responsesUrl: provider.responsesUrl || '',
+  responsesModel: provider.responsesModel || '',
 });
 
 const toProviderFormFromSupplier = (supplier: Supplier): ProviderForm => ({
@@ -2093,6 +2108,9 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       tokenLimit: providerForm.mode === 'tokens' ? value ?? -1 : -1,
       customCostMode: providerForm.mode,
       customCostValue: value ?? undefined,
+      imageTransport: providerForm.imageTransport,
+      responsesUrl: providerForm.responsesUrl.trim(),
+      responsesModel: providerForm.responsesModel.trim(),
     };
 
     await run(`provider-save:${providerForm.id || 'new'}`, async () => {
@@ -3425,6 +3443,52 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                   onChange={(checked) => setProviderForm((current) => ({ ...current, isActive: checked }))}
                   disabled={providerEditorReadOnly}
                 />
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border p-4 mb-4" style={SETTINGS_OVERLAY_STYLE}>
+              <div>
+                <div className="text-[15px] font-semibold text-[var(--text-primary)]">{pick('PicGen 图像通道设置', 'PicGen Image Transport Settings')}</div>
+                <div className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">
+                  {pick(
+                    '可在这里选择图像生成传输协议。如果是支持 Images API 的代理商，选择 Images 即可；如果是不支持 Images 的 ChatGPT API 代理商，可选择 Responses 通道。',
+                    'Choose the image generation transport protocol. Select Images for traditional OpenAI Images API; select Responses for ChatGPT models with tools.'
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                <SettingSelect
+                  label={pick('传输通道', 'Image Transport')}
+                  value={providerForm.imageTransport}
+                  options={[
+                    { value: 'images', label: pick('Images API (默认)', 'Images API (Default)') },
+                    { value: 'responses', label: pick('Responses 工具通道', 'Responses API (Tools)') },
+                  ]}
+                  onChange={(value) => setProviderForm((current) => ({ ...current, imageTransport: value as 'images' | 'responses' }))}
+                  disabled={providerEditorReadOnly}
+                />
+
+                {providerForm.imageTransport === 'responses' ? (
+                  <>
+                    <SettingInput
+                      label={pick('Responses 接口地址', 'Responses URL')}
+                      value={providerForm.responsesUrl}
+                      onChange={(value) => setProviderForm((current) => ({ ...current, responsesUrl: value }))}
+                      placeholder="https://api.example.com/v1/responses"
+                      helper={pick('Responses 接口的具体路由。如果不填，默认通过 Base URL 拼接。', 'Leave empty to automatically append /responses to the Base URL.')}
+                      disabled={providerEditorReadOnly}
+                    />
+                    <SettingInput
+                      label={pick('Responses 生图模型', 'Responses Model')}
+                      value={providerForm.responsesModel}
+                      onChange={(value) => setProviderForm((current) => ({ ...current, responsesModel: value }))}
+                      placeholder="gpt-5.5"
+                      helper={pick('流式调用工具生图所绑定的核心模型，例如 gpt-5.5', 'The chat model configured for responses tool calling, e.g., gpt-5.5')}
+                      disabled={providerEditorReadOnly}
+                    />
+                  </>
+                ) : null}
               </div>
             </div>
 
