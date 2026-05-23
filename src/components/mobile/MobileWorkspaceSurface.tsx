@@ -57,7 +57,7 @@ export interface MobileWorkspaceSurfaceProps {
 }
 
 const moreSheetActionClass =
-  'rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-3.5 text-left text-[var(--text-primary)] transition-all active:scale-[0.985]';
+  'rounded-[22px] border border-white/8 bg-white/5 backdrop-blur-md p-3.5 text-left text-[var(--text-primary)] transition-all active:scale-[0.985] active:bg-white/10';
 
 const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   activeScreen,
@@ -237,7 +237,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               <button
                 type="button"
                 onClick={() => setShowProjectList((previous) => !previous)}
-                className="inline-flex items-center gap-2 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)]"
+                className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 backdrop-blur-md px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)]"
               >
                 <FolderOpen size={14} />
                 {resolvedProjectCount > 1 ? `项目 ${resolvedProjectCount}` : '当前项目'}
@@ -247,7 +247,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             <button
               type="button"
               onClick={() => setShowProjectList((previous) => !previous)}
-              className="mb-3 flex w-full items-center justify-between rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] px-4 py-3 text-left"
+              className="mb-3 flex w-full items-center justify-between rounded-[24px] border border-white/8 bg-white/5 backdrop-blur-md px-4 py-3 text-left transition-all active:scale-[0.985] active:bg-white/10"
             >
               <div className="min-w-0">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
@@ -259,7 +259,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             </button>
 
             {showProjectList ? (
-              <div className="mb-4 rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-2.5">
+              <div className="mb-4 rounded-[24px] border border-white/8 bg-white/5 backdrop-blur-md p-2.5">
                 <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
                   项目列表
                 </div>
@@ -278,7 +278,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                         className={`flex w-full items-center justify-between gap-3 rounded-[18px] px-3 py-3 text-left transition-all ${
                           isActive
                             ? 'border border-[var(--mobile-clay-active-border)] bg-[var(--mobile-clay-active-bg)] text-[var(--text-primary)]'
-                            : 'border border-transparent bg-[var(--mobile-clay-muted-surface-bg)] text-[var(--text-secondary)]'
+                            : 'border border-white/5 bg-white/5 backdrop-blur-sm text-[var(--text-secondary)]'
                         }`}
                       >
                         <span className="min-w-0 truncate text-sm font-medium">{canvas.name}</span>
@@ -297,7 +297,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                     closeMoreSheet();
                   }}
                   disabled={!canCreateCanvas}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[18px] border border-dashed border-[var(--mobile-clay-border-strong)] bg-[var(--mobile-clay-muted-surface-bg)] px-3 py-3 text-sm font-medium text-[var(--text-secondary)] disabled:opacity-45"
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[18px] border border-dashed border-white/10 bg-white/5 backdrop-blur-sm px-3 py-3 text-sm font-medium text-[var(--text-secondary)] disabled:opacity-45"
                 >
                   <Plus size={16} />
                   {canCreateCanvas ? '新建项目' : '项目已满'}
