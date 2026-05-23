@@ -908,6 +908,8 @@ interface SwipeableModelItemProps {
     onTogglePin: (modelId: string) => void;
     children: React.ReactNode;
     onClick: () => void;
+    activeSwipeModelId?: string | null;
+    setActiveSwipeModelId?: (modelId: string | null) => void;
 }
 
 const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
@@ -916,6 +918,8 @@ const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
     onTogglePin,
     children,
     onClick,
+    activeSwipeModelId = null,
+    setActiveSwipeModelId,
 }) => {
     const [translateX, setTranslateX] = useState(0);
     const [isSwiping, setIsSwiping] = useState(false);
@@ -924,6 +928,13 @@ const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
     const currentX = useRef(0);
     const isHorizontalSwipe = useRef<boolean | null>(null);
 
+    // 🚀 [NEW] 多开互斥：若当前卡片已被滑开，但其他卡片触发了滑动，本卡片自动收起回弹
+    useEffect(() => {
+        if (activeSwipeModelId !== modelId && translateX !== 0) {
+            setTranslateX(0);
+        }
+    }, [activeSwipeModelId, modelId, translateX]);
+
     const handleTouchStart = (e: React.TouchEvent) => {
         const touch = e.touches[0];
         startX.current = touch.clientX;
@@ -931,6 +942,11 @@ const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
         currentX.current = touch.clientX;
         setIsSwiping(true);
         isHorizontalSwipe.current = null;
+        
+        // 🚀 [NEW] 通知全局本卡片进入活跃触控状态，收起其他卡片
+        if (setActiveSwipeModelId) {
+            setActiveSwipeModelId(modelId);
+        }
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
@@ -986,6 +1002,10 @@ const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
                 className="absolute right-0 top-0 bottom-0 w-[70px] flex items-center justify-center text-white text-[11px] font-bold z-0 cursor-pointer active:brightness-90 transition-all rounded-r-xl"
                 style={{
                     backgroundColor: isPinned ? 'rgba(239, 68, 68, 0.95)' : 'rgba(245, 158, 11, 0.95)',
+                    // 🚀 [NEW] 彻底解决半透明卡片穿透：translateX 为 0（未滑动）时完全隐藏底层红橙背景
+                    visibility: translateX === 0 ? 'hidden' : 'visible',
+                    opacity: translateX === 0 ? 0 : 1,
+                    transition: 'opacity 0.15s ease, visibility 0.15s'
                 }}
                 onClick={(e) => {
                     e.stopPropagation();
@@ -1178,6 +1198,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, modelId: string } | null>(null);
     const [modelListWindowStart, setModelListWindowStart] = useState(0);
     const [mobileScrollTop, setMobileScrollTop] = useState(0);
+    const [activeSwipeModelId, setActiveSwipeModelId] = useState<string | null>(null);
 
     // [NEW] Model Settings Modal State
     const [modelSettingsModal, setModelSettingsModal] = useState<{ modelId: string; alias: string; description: string } | null>(null);
@@ -3620,15 +3641,17 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     const isModelPinned = pinnedModels.includes(model.id);
                                                     return (
                                                         <SwipeableModelItem
-                                                            key={model.id}
-                                                            modelId={model.id}
-                                                            isPinned={isModelPinned}
-                                                            onTogglePin={handleTogglePin}
-                                                            onClick={() => {
-                                                                handleSelectPromptBarModel(model);
-                                                                setMobileSubView('input');
-                                                            }}
-                                                        >
+                                                             key={model.id}
+                                                             modelId={model.id}
+                                                             isPinned={isModelPinned}
+                                                             onTogglePin={handleTogglePin}
+                                                             activeSwipeModelId={activeSwipeModelId}
+                                                             setActiveSwipeModelId={setActiveSwipeModelId}
+                                                             onClick={() => {
+                                                                 handleSelectPromptBarModel(model);
+                                                                 setMobileSubView('input');
+                                                             }}
+                                                         >
                                                             <PromptBarModelMenuButton
                                                                 model={model}
                                                                 imageSize={config.imageSize}
