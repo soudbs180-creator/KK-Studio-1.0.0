@@ -58,9 +58,24 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
     ? entry.mobileLayout.aspectRatio
     : 1;
 
+  const [imgLoadError, setImgLoadError] = React.useState(false);
+  const [elapsed, setElapsed] = React.useState(() => {
+    return Math.max(0, Math.floor((Date.now() - entry.timestamp) / 1000));
+  });
+
+  React.useEffect(() => {
+    if (!entry.isGenerating) return;
+    const timer = setInterval(() => {
+      setElapsed(Math.max(0, Math.floor((Date.now() - entry.timestamp) / 1000)));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [entry.isGenerating, entry.timestamp]);
+
+  const isFailed = Boolean(entry.error || imgLoadError);
+
   return (
     <article
-      className="relative min-w-0 overflow-hidden rounded-[20px] border bg-[var(--mobile-clay-surface-bg)] transition-transform duration-200"
+      className="relative min-w-0 overflow-hidden rounded-2xl border bg-[var(--mobile-clay-surface-bg)] transition-transform duration-200"
       style={{
         gridColumnEnd: `span ${gridMetrics.columnSpan}`,
         gridRowEnd: `span ${gridMetrics.rowSpan}`,
@@ -70,52 +85,121 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
     >
       <button
         type="button"
+        disabled={entry.isGenerating}
         data-testid={`mobile-result-tile-${entry.id}`}
-        className="group relative block h-full min-h-0 w-full text-left"
+        className={`group relative flex flex-col h-full min-h-0 w-full text-left ${entry.isGenerating ? 'cursor-default' : 'cursor-pointer'}`}
         onClick={() => onEntryOpen(entry.id)}
         title={promptSummary}
       >
-        {entry.displaySrc ? (
-          <img
-            src={entry.displaySrc}
-            alt={promptSummary}
-            className="block h-full min-h-0 w-full bg-[var(--bg-tertiary)] object-cover transition-transform duration-300 group-active:scale-[0.985] group-hover:scale-[1.01]"
-            style={{ aspectRatio: imageAspectRatio }}
-          />
-        ) : (
-          <div
-            className={`flex h-full min-h-0 w-full items-center justify-center bg-[var(--bg-tertiary)] text-[13px] text-[var(--text-secondary)] ${getFallbackAspectClassName(entry)}`}
-          >
-            暂无预览
-          </div>
-        )}
+        {/* 核心展示区 */}
+        <div className="relative flex-1 min-h-0 w-full overflow-hidden bg-[var(--bg-tertiary)]">
+          {entry.isGenerating ? (
+            /* 占位态：带 Shimmer 扫光和耗时计时器 */
+            <div className="relative w-full h-full flex flex-col items-center justify-center min-h-[120px] overflow-hidden bg-[var(--bg-secondary)]/50">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-shimmer-sweep" />
+              <div className="relative flex flex-col items-center gap-1.5 select-none">
+                <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/5 border border-white/10">
+                  <svg className="h-4.5 w-4.5 animate-spin text-[var(--text-secondary)]" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                </div>
+                <span className="text-[11px] font-semibold text-[var(--text-secondary)] animate-pulse">
+                  生成中...
+                </span>
+                <span className="text-[10px] text-[var(--text-tertiary)] font-mono">
+                  已耗时 {elapsed}s
+                </span>
+              </div>
+            </div>
+          ) : entry.displaySrc ? (
+            /* 渲染图片 */
+            <img
+              src={entry.displaySrc}
+              alt={promptSummary}
+              onError={() => setImgLoadError(true)}
+              className={`block h-full min-h-0 w-full object-cover transition-transform duration-300 group-active:scale-[0.985] group-hover:scale-[1.01] ${isFailed ? 'filter grayscale opacity-40' : ''}`}
+              style={{ aspectRatio: imageAspectRatio }}
+            />
+          ) : (
+            /* 暂无预览占位 */
+            <div
+              className={`flex h-full min-h-0 w-full items-center justify-center bg-[var(--bg-tertiary)] text-[13px] text-[var(--text-secondary)] ${getFallbackAspectClassName(entry)}`}
+            >
+              暂无预览
+            </div>
+          )}
 
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2">
-          <span className="max-w-[65%] truncate rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] px-2 py-1 text-[10px] font-medium text-[var(--text-primary)]">
-            {formatTimestamp(entry.timestamp)}
-          </span>
-          {isSource ? (
-            <span className="rounded-full bg-amber-400/90 px-2 py-1 text-[10px] font-medium text-black">
-              参考图
-            </span>
-          ) : null}
-        </div>
-
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/35 to-transparent px-3 pb-2.5 pt-8">
-          <div className="flex flex-col gap-1">
-            <span className="line-clamp-2 text-[11px] font-medium leading-4 text-white/90">
-              {promptSummary}
-            </span>
-            <div className="flex items-center justify-between gap-2 mt-0.5">
-              <span className="truncate text-[9px] text-white/70 font-light">
-                {entry.modelLabel}
-              </span>
-              <span className="shrink-0 truncate rounded-full bg-black/35 px-2 py-0.5 text-[9px] font-medium text-white/85">
-                {entry.displayLabel || entry.aspectRatio}
+          {/* 绝对定位浮动层：错误遮罩 */}
+          {!entry.isGenerating && isFailed && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[1px] p-3 text-center">
+              <svg className="w-6 h-6 text-red-400 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              </svg>
+              <span className="text-[11px] font-medium text-white/95 leading-4">
+                {entry.error || '图片加载失败'}
               </span>
             </div>
-          </div>
+          )}
+
+          {/* 绝对定位浮动层：时间 / 参考图标记 */}
+          {!entry.isGenerating && (
+            <div className="pointer-events-none absolute left-2.5 top-2.5 flex items-center gap-1.5">
+              {viewMode === 'detail' && (
+                <span className="rounded-full border border-white/10 bg-black/45 backdrop-blur-md px-2 py-0.5 text-[9.5px] font-medium text-white/90">
+                  {formatTimestamp(entry.timestamp)}
+                </span>
+              )}
+              {isSource && (
+                <span className="rounded-full bg-amber-400/90 px-2 py-0.5 text-[9.5px] font-semibold text-black shadow-sm">
+                  参考图
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* 标准模式单行底栏 */}
+          {viewMode === 'standard' && !entry.isGenerating && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-2.5 pb-2 pt-6">
+              <div className="flex items-center justify-between text-[10px] text-white/90">
+                <span className="font-light opacity-80">{formatTimestamp(entry.timestamp)}</span>
+                <span className="truncate mx-1 opacity-70 max-w-[50%]">{entry.modelLabel}</span>
+                <span className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 font-mono scale-90">
+                  {entry.displayLabel || entry.aspectRatio}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* 详细模式毛玻璃参数卡片区域 */}
+        {viewMode === 'detail' && !entry.isGenerating && (
+          <div className="shrink-0 p-3 bg-[var(--bg-secondary)]/80 backdrop-blur-md border-t border-white/5 flex flex-col gap-2 w-full">
+            <p className="line-clamp-2 text-xs leading-relaxed text-[var(--text-secondary)] font-normal">
+              {entry.fullPrompt || promptSummary}
+            </p>
+            <div className="flex items-center justify-between text-[10px] text-[var(--text-tertiary)] border-t border-white/5 pt-1.5 mt-0.5 font-medium">
+              <div className="flex items-center gap-1">
+                <span>耗时:</span>
+                <span className="text-[var(--text-secondary)] font-mono">
+                  {entry.generationTime ? `${(entry.generationTime / 1000).toFixed(1)}s` : '-'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span>费用:</span>
+                <span className="text-amber-400 font-semibold font-mono">
+                  {entry.creditCost ? `${entry.creditCost} 积分` : '0 积分'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span>比例:</span>
+                <span className="text-[var(--text-secondary)] uppercase font-mono">
+                  {entry.displayLabel || entry.aspectRatio}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </button>
     </article>
   );

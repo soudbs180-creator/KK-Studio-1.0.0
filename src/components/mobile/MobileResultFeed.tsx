@@ -134,45 +134,42 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
   }, [surface]);
 
   return (
-    <section className="flex h-full min-h-0 flex-col">
-      <div className="mb-3 flex items-center justify-between gap-3 px-1">
-        <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
-            {pick('结果', 'Results')}
-          </div>
-          <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="mb-3 flex items-center justify-between gap-3 px-1 select-none shrink-0">
+        <div className="min-w-0 flex flex-col gap-0.5">
+          <p className="text-xs leading-5 text-[var(--text-secondary)]">
             {pick('点击任意结果查看完整提示词和操作。', 'Tap any result to inspect the full prompt and actions.')}
           </p>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.05em] text-[var(--text-tertiary)]">
+            {hasSelectedSource ? `${counterLabel} / ${selectedSourceLabel}` : counterLabel}
+          </div>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <div className="flex rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)]/85 p-1 text-[11px] font-medium text-[var(--text-secondary)]">
+        <div className="flex shrink-0 items-center">
+          <div className="flex rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)]/85 p-0.5 text-[11px] font-medium text-[var(--text-secondary)] shadow-sm">
             {(['standard', 'detail'] as ResultViewMode[]).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 onClick={() => onViewModeChange(mode)}
-                className={`rounded-full px-2.5 py-1 transition ${
-                  viewMode === mode ? 'bg-[var(--text-primary)] text-[var(--bg-primary)]' : 'text-[var(--text-secondary)]'
+                className={`rounded-full px-3 py-1 transition-all duration-150 ${
+                  viewMode === mode ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] font-bold shadow-sm' : 'text-[var(--text-secondary)] active:text-[var(--text-primary)]'
                 }`}
               >
                 {mode === 'detail' ? pick('详细', 'Detail') : pick('标准', 'Standard')}
               </button>
             ))}
           </div>
-          <div className="whitespace-nowrap rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)]/85 px-3 py-1.5 text-[11px] font-medium text-[var(--text-secondary)]">
-            {hasSelectedSource ? `${counterLabel} / ${selectedSourceLabel}` : counterLabel}
-          </div>
         </div>
       </div>
 
-      {totalResults === 0 ? (
-        viewMode === 'detail' ? (
-          <MobileResultDetailEmptySkeleton />
+      <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
+        {totalResults === 0 ? (
+          viewMode === 'detail' ? (
+            <MobileResultDetailEmptySkeleton />
+          ) : (
+            <MobileResultStandardEmptySkeleton columnCount={columnCount} />
+          )
         ) : (
-          <MobileResultStandardEmptySkeleton columnCount={columnCount} />
-        )
-      ) : (
-        <div className="min-h-0 flex-1">
           <div
             className="grid gap-3 pb-1 [grid-auto-flow:dense]"
             style={{
@@ -205,8 +202,8 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
             })}
             <div ref={bottomRef} style={{ gridColumn: '1 / -1' }} className="h-1 w-full" />
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </section>
   );
 };

@@ -166,7 +166,7 @@ export const SettingsBadge: React.FC<{ children: ReactNode; tone?: Tone; classNa
   className = '',
 }) => (
   <span
-    className={`inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-full px-3 py-1.5 text-left font-medium uppercase tracking-[0.12em] leading-[1.3] whitespace-nowrap ${className}`.trim()}
+    className={`inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-full px-3 py-1 text-left font-medium uppercase tracking-[0.12em] leading-[1.3] whitespace-nowrap ${className}`.trim()}
     style={{
       ...toneStyles[tone].badgeStyle,
       fontSize: 'var(--type-micro)',

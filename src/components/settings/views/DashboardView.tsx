@@ -26,6 +26,7 @@ import {
 } from '../../../services/system/systemLogService';
 import { SettingsActionButton, SettingsBadge, SettingsViewShell } from '../SettingsScaffold';
 import { EmptyState, ProgressBar, StatusBadge } from '../ui/index';
+import { useAdminRole } from '../../../hooks/useAdminRole';
 
 interface DashboardViewProps {
   onNavigate: (view: string) => void;
@@ -172,6 +173,12 @@ const DashboardStorageRow: React.FC<{ label: string; value: string; helper: stri
 );
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
+  const { user, accountRole } = useAdminRole();
+  const displayName = user?.user_metadata?.full_name ||
+    user?.user_metadata?.display_name ||
+    (user?.email?.endsWith('@users.kkstudio.local') ? '微信用户' : user?.email?.split('@')[0]) ||
+    'Guest';
+
   const { balance, billingLogs, usageLogs, fetchLogs } = useBilling();
   const remainingBalanceDisplay = formatRemainingCredits(balance, 'en-US');
   const { latestRecharge, todayRechargeCount } = useMemo(
@@ -375,6 +382,50 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   return (
     <SettingsViewShell>
       <div className="settings-reference-stack">
+        {/* 我的信息 Clay 实心卡片 */}
+        <section className="settings-reference-card !bg-[var(--settings-surface-overlay)] !border-[var(--settings-border-subtle)] flex items-center justify-between p-5 gap-4">
+          <div className="flex items-center gap-4">
+            {/* 头像 */}
+            <div className="relative w-14 h-14 rounded-2xl overflow-hidden border border-white/10 flex-shrink-0 bg-[var(--bg-tertiary)] flex items-center justify-center shadow-inner">
+              {user?.user_metadata?.avatar_url ? (
+                <img
+                  src={user.user_metadata.avatar_url}
+                  alt="avatar"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="text-xl font-bold uppercase text-[var(--text-secondary)]">
+                  {displayName[0] || 'U'}
+                </div>
+              )}
+            </div>
+            {/* 账户详情 */}
+            <div className="flex flex-col gap-1 min-w-0">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)] truncate">
+                {displayName}
+              </h3>
+              <p className="text-xs text-[var(--text-tertiary)] truncate">
+                {user?.email?.endsWith('@users.kkstudio.local') ? '微信授权用户' : user?.email || '未绑定账号'}
+              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <SettingsBadge tone={accountRole === 'admin' ? 'indigo' : 'neutral'}>
+                  {accountRole === 'admin' ? '系统管理员' : '普通用户'}
+                </SettingsBadge>
+              </div>
+            </div>
+          </div>
+          
+          {/* 实时积分余额 */}
+          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+            <span className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)]">
+              积分余额
+            </span>
+            <span className="text-xl font-bold text-amber-400 font-mono">
+              {remainingBalanceDisplay}
+            </span>
+          </div>
+        </section>
+
         <div className="settings-reference-page-header">
           <div className="settings-reference-page-header__lead">
             <div className="settings-reference-page-header__eyebrow">Advanced Settings</div>

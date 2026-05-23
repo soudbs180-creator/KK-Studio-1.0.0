@@ -319,7 +319,7 @@ function resolveEcommerceContinuation(
 }
 
 const compareMobileFeedResults = (left: MobileResultEntry, right: MobileResultEntry): number => {
-  const timeDelta = right.timestamp - left.timestamp;
+  const timeDelta = left.timestamp - right.timestamp;
   if (timeDelta !== 0) {
     return timeDelta;
   }
@@ -380,6 +380,10 @@ export function selectMobileFeedResults(
         mobileLayout,
         detailEntryId: imageNode.id,
         detailEntry,
+        creditCost: imageNode.creditCost,
+        generationTime: imageNode.generationTime,
+        isGenerating: imageNode.isGenerating,
+        error: imageNode.error,
       } satisfies MobileResultEntry;
     })
     .sort(compareMobileFeedResults);

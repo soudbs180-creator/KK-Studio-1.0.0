@@ -90,7 +90,7 @@ export function getAdaptiveResultTileGridMetrics({
   if (viewMode === 'detail') {
     const horizontalPadding = surface === 'phone' ? 24 : surface === 'tablet' ? 32 : 40;
     const availableWidth = Math.max(280, safeWidth - horizontalPadding);
-    const visualHeight = availableWidth / safeAspectRatio;
+    const visualHeight = (availableWidth / safeAspectRatio) + 110;
     return {
       columnSpan: safeColumnCount,
       rowSpan: getGridRowSpan(visualHeight, RESULT_GRID_DETAIL_MIN_ROWS),

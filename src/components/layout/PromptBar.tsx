@@ -3184,30 +3184,52 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
     if (isMobile && !isExpanded) {
         return (
-            <div
-                id="prompt-bar-container"
-                className={`input-bar ios-mobile-prompt transition-all duration-300 !overflow-visible w-[calc(100vw-20px)] max-w-full`}
-                style={mobileStyle}
-                onClick={() => {
-                    setIsExpanded(true);
-                }}
-            >
-                <div className="flex items-center justify-between px-4 h-12 w-full select-none cursor-pointer gap-2">
-                    <div className="flex-1 min-w-0 flex items-center justify-start gap-2.5 text-[var(--text-tertiary)] text-xs pl-1">
-                        <svg className="w-4 h-4 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                        </svg>
-                        <span className="truncate text-[13.5px] font-medium tracking-[0.02em]">输入提示词...</span>
+            <>
+                <div
+                    id="prompt-bar-container"
+                    className={`input-bar ios-mobile-prompt transition-all duration-300 !overflow-visible w-[calc(100vw-20px)] max-w-full z-[800]`}
+                    style={mobileStyle}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsExpanded(true);
+                    }}
+                    onTouchStart={(e) => {
+                        e.stopPropagation();
+                    }}
+                >
+                    <div className="flex items-center justify-between px-4 h-12 w-full select-none cursor-pointer gap-2">
+                        <div className="flex-1 min-w-0 flex items-center justify-start gap-2.5 text-[var(--text-tertiary)] text-xs pl-1">
+                            <svg className="w-4 h-4 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                            </svg>
+                            <span className="truncate text-[13.5px] font-medium tracking-[0.02em]">输入提示词...</span>
+                        </div>
                     </div>
                 </div>
-            </div>
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => {
+                        if (e.target.files) {
+                            processFiles(e.target.files);
+                        }
+                        // Allow retrying the exact same file after a failed read.
+                        e.target.value = '';
+                    }}
+                />
+            </>
         );
     }
     if (isMobile) {
         return (
             <div
                 id="prompt-bar-container"
-                className="input-bar ios-mobile-prompt transition-all duration-300 !overflow-visible w-full max-w-full"
+                className="input-bar ios-mobile-prompt transition-all duration-300 !overflow-visible w-full max-w-full z-[800]"
+                onClick={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 style={{
                     ...mobileStyle,
                     height: mobileSubView !== 'input' ? '330px' : 'auto',

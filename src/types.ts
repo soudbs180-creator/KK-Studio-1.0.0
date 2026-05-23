@@ -139,6 +139,10 @@ export interface MobileResultEntry {
     imageId: string;
     promptId: string | null;
   };
+  creditCost?: number;
+  generationTime?: number;
+  isGenerating?: boolean;
+  error?: string;
 }
 
 // ============================================
