@@ -1830,7 +1830,7 @@ describe('useImageLoader', () => {
 ---
 
 **KK Studio Design System v3.0**
-Last updated: 2026-05-22
+Last updated: 2026-05-23
 
 ## 📋 变更日志
 

@@ -1,4 +1,4 @@
-# KK-Studio v1.4.7 Single-Line Convergence Plan
+# KK-Studio v1.4.8 Single-Line Convergence Plan
 
 Last updated: 2026-05-22
 Branch policy: continue on the current branch and current workspace unless the user explicitly asks for a branch or worktree.
