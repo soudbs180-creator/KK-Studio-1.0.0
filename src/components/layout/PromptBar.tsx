@@ -795,10 +795,10 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
     const badgeInfo = getModelBadgeInfo({ id: model.id, label: model.label, provider: model.provider });
     const colorStart = normalizeColor(model.colorStart, 'var(--accent-coral)');
     const colorEnd = normalizeColor(model.colorEnd, 'var(--accent-pink)');
-    const modelTextColor = model.textColor || 'white';
+    const modelTextColor = model?.textColor || 'white';
     const textColorClass = modelTextColor === 'black' ? 'text-black' : 'text-white';
-    const inactiveGradientStyle = getCreditModelFlatStyle(colorStart, colorEnd, model.textColor, false);
-    const activeGradientStyle = getCreditModelFlatStyle(colorStart, colorEnd, model.textColor, true);
+    const inactiveGradientStyle = getCreditModelFlatStyle(colorStart, colorEnd, model?.textColor, false);
+    const activeGradientStyle = getCreditModelFlatStyle(colorStart, colorEnd, model?.textColor, true);
 
     return (
         <button
@@ -837,14 +837,14 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
                                 active={selected}
                             />
                         </div>
-                        <span className="text-sm font-semibold truncate text-left" style={model.textColor === 'black' ? { color: '#000000' } : { color: '#ffffff' }}>
+                        <span className="text-sm font-semibold truncate text-left" style={model?.textColor === 'black' ? { color: '#000000' } : { color: '#ffffff' }}>
                             {displayName}
                         </span>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
                         <span
-                            className={`text-xs px-2.5 py-1 rounded-full ${model.textColor === 'black' ? 'bg-black/10 border-black/20' : 'bg-white/25 border-white/30'} border font-semibold flex items-center gap-1`}
-                            style={model.textColor === 'black' ? { color: '#000000' } : { color: '#ffffff' }}
+                            className={`text-xs px-2.5 py-1 rounded-full ${model?.textColor === 'black' ? 'bg-black/10 border-black/20' : 'bg-white/25 border-white/30'} border font-semibold flex items-center gap-1`}
+                            style={model?.textColor === 'black' ? { color: '#000000' } : { color: '#ffffff' }}
                         >
                             ✨{getModelCredits(model.id || '', imageSize)}
                         </span>
@@ -951,7 +951,7 @@ const buildPromptBarAvailableModels = (
             colorStart: resolvedSystemDisplay?.colorStart || m.colorStart,
             colorEnd: resolvedSystemDisplay?.colorEnd || m.colorEnd,
             colorSecondary: resolvedSystemDisplay?.colorSecondary || m.colorSecondary,
-            textColor: resolvedSystemDisplay?.textColor || m.textColor,
+            textColor: resolvedSystemDisplay?.textColor || m?.textColor,
         } as ActiveModel;
     });
 

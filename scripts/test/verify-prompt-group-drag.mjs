@@ -112,7 +112,11 @@ function isBrowserLaunchUnavailable(error) {
   return /spawn EPERM/i.test(message)
     || /Playwright npx cache directory not found/i.test(message)
     || /Playwright module was not found/i.test(message)
-    || /process-spawn-blocked/i.test(message);
+    || /process-spawn-blocked/i.test(message)
+    || /Browser launch unavailable/i.test(message)
+    || /browser-executable-not-found/i.test(message)
+    || /browser-preflight-threw/i.test(message)
+    || /browser-preflight-spawn-error/i.test(message);
 }
 
 async function assertHttpHtml(url) {

@@ -29,7 +29,11 @@ function isBrowserLaunchUnavailable(error) {
   const message = String(error?.message || error || '');
   return /spawn EPERM/i.test(message)
     || /Playwright npx cache directory not found/i.test(message)
-    || /Playwright module was not found/i.test(message);
+    || /Playwright module was not found/i.test(message)
+    || /Browser launch unavailable/i.test(message)
+    || /browser-executable-not-found/i.test(message)
+    || /browser-preflight-threw/i.test(message)
+    || /browser-preflight-spawn-error/i.test(message);
 }
 
 async function assertHttpHtml(url) {
@@ -250,6 +254,13 @@ try {
     viewport: { width: 1600, height: 980 },
   });
 
+  page.on('pageerror', (err) => {
+    console.error('🔴 PAGE EXCEPTION:', err.stack || err);
+  });
+  page.on('console', (msg) => {
+    console.log('[BROWSER]', msg.text());
+  });
+
   await page.addInitScript(() => {
     const originalSetTimeout = window.setTimeout.bind(window);
 
@@ -257,9 +268,7 @@ try {
       const handlerSource = typeof handler === 'function'
         ? Function.prototype.toString.call(handler)
         : String(handler);
-      const isStartupAdvanceTimer = handlerSource.includes('profile_ready')
-        || handlerSource.includes('workspace_ready')
-        || handlerSource.includes('background_ready');
+      const isStartupAdvanceTimer = handlerSource.includes('background_ready');
       const nextDelay = isStartupAdvanceTimer ? 60_000 : timeout;
       return originalSetTimeout(handler, nextDelay, ...args);
     });
