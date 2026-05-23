@@ -2652,6 +2652,13 @@ const AppContent: React.FC<AppContentProps> = () => {
   const handleMobileUseImageAsSource = useCallback((imageId: string) => {
     handleImageClick(imageId);
   }, [handleImageClick]);
+
+  const handleMobileGenerateFollowUp = useCallback((prompt: string, parentImageId: string) => {
+    handleImageClick(parentImageId);
+    setTimeout(() => {
+      void handleGenerate(prompt);
+    }, 50);
+  }, [handleImageClick, handleGenerate]);
   const {
     resolveEcommercePartialRedrawContext,
     finalizeEcommercePartialRedrawResult,
@@ -4484,6 +4491,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         onEntryOpen={handleMobileResultOpen}
         onPreviewImage={handleOpenPreview}
         onUseResultAsSource={handleMobileUseImageAsSource}
+        onGenerateFollowUp={handleMobileGenerateFollowUp}
         onPartialRedraw={handleMobileResultPartialRedraw}
         onDownloadEntry={handleMobileResultDownload}
         onDeleteImage={deleteImageNode}

@@ -42,6 +42,7 @@ export interface MobileWorkspaceSurfaceProps {
   onEntryOpen: (entryId: string) => void;
   onPreviewImage: (imageId: string) => void;
   onUseResultAsSource: (imageId: string) => void;
+  onGenerateFollowUp?: (prompt: string, parentImageId: string) => void;
   onPartialRedraw: (entry: MobileResultEntry, request: PartialRedrawRequest) => void;
   onDownloadEntry: (entry: MobileResultEntry) => void;
   onDeleteImage: (imageId: string) => void;
@@ -82,6 +83,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   onEntryOpen,
   onPreviewImage,
   onUseResultAsSource,
+  onGenerateFollowUp,
   onPartialRedraw,
   onDownloadEntry,
   onDeleteImage,
@@ -345,6 +347,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
           onClose={() => onScreenChange('home')}
           onPreviewOriginal={onPreviewImage}
           onUseAsSource={onUseResultAsSource}
+          onGenerateFollowUp={onGenerateFollowUp}
           onPartialRedraw={onPartialRedraw}
           onDownload={onDownloadEntry}
           onDelete={(imageId) => {

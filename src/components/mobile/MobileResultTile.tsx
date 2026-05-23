@@ -182,6 +182,18 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
             </div>
           )}
 
+          {/* 右上角：组标记 */}
+          {!entry.isGenerating && entry.groupCount && entry.groupCount > 1 && (
+            <div className="pointer-events-none absolute right-2.5 top-2.5 flex items-center">
+              <span className="rounded-full border border-amber-400/20 bg-amber-500/90 backdrop-blur-md px-2.5 py-0.5 text-[9.5px] font-bold text-white shadow-sm flex items-center gap-1">
+                <svg className="w-2.5 h-2.5 text-white shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                {entry.groupCount}张图
+              </span>
+            </div>
+          )}
+
           {/* 标准模式单行底栏 */}
           {viewMode === 'standard' && !entry.isGenerating && (
             <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-2.5 pb-2 pt-6">

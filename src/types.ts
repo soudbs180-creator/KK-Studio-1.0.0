@@ -143,6 +143,8 @@ export interface MobileResultEntry {
   generationTime?: number;
   isGenerating?: boolean;
   error?: string;
+  groupCount?: number;
+  groupEntries?: MobileResultEntry[];
 }
 
 // ============================================

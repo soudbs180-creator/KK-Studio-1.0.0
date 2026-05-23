@@ -135,12 +135,12 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="mb-3 flex items-center justify-between gap-3 px-1 select-none shrink-0">
+      <div className="mb-3.5 flex items-center justify-between gap-3 px-3 py-2.5 select-none shrink-0 rounded-2xl border border-white/5 bg-[var(--mobile-clay-surface-bg)]/45 backdrop-blur-md">
         <div className="min-w-0 flex flex-col gap-0.5">
-          <p className="text-xs leading-5 text-[var(--text-secondary)]">
+          <p className="text-[11px] leading-relaxed text-[var(--text-secondary)]">
             {pick('点击任意结果查看完整提示词和操作。', 'Tap any result to inspect the full prompt and actions.')}
           </p>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.05em] text-[var(--text-tertiary)]">
+          <div className="text-[9.5px] font-semibold uppercase tracking-[0.05em] text-[var(--text-tertiary)]">
             {hasSelectedSource ? `${counterLabel} / ${selectedSourceLabel}` : counterLabel}
           </div>
         </div>

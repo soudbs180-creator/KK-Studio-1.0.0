@@ -54,6 +54,7 @@ interface MobileResultDetailScreenProps {
   onToggleEcommerceSelected: (entry: MobileResultEntry, selected: boolean) => void;
   onPrevious?: () => void;
   onNext?: () => void;
+  onGenerateFollowUp?: (prompt: string, parentImageId: string) => void;
 }
 
 const iconButtonClass =
@@ -185,7 +186,30 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
   onToggleEcommerceSelected,
   onPrevious,
   onNext,
+  onGenerateFollowUp,
 }) => {
+  const [showFollowUpInput, setShowFollowUpInput] = React.useState(false);
+  const [followUpPrompt, setFollowUpPrompt] = React.useState('');
+  const [elapsed, setElapsed] = React.useState(0);
+
+  React.useEffect(() => {
+    const generatingNode = entry.groupEntries?.find(item => item.isGenerating);
+    if (!generatingNode) return;
+
+    setElapsed(Math.max(0, Math.floor((Date.now() - generatingNode.timestamp) / 1000)));
+
+    const timer = setInterval(() => {
+      setElapsed(Math.max(0, Math.floor((Date.now() - generatingNode.timestamp) / 1000)));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [entry.groupEntries]);
+
+  const handleSendFollowUp = () => {
+    if (!followUpPrompt.trim()) return;
+    onGenerateFollowUp?.(followUpPrompt.trim(), entry.imageId);
+    setFollowUpPrompt('');
+    setShowFollowUpInput(false);
+  };
   const touchStartX = React.useRef(0);
   const touchStartY = React.useRef(0);
   const touchEndX = React.useRef(0);
@@ -302,32 +326,96 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        <div 
-          className="relative overflow-hidden rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] max-h-[380px] flex items-center justify-center cursor-pointer select-none"
-          onClick={() => entry.hasOriginal && onPreviewOriginal(entry.imageId)}
-        >
-          {entry.displaySrc ? (
-            <img src={entry.displaySrc} alt={promptSummary} className="max-h-[380px] w-full object-contain block pointer-events-none rounded-[24px]" />
-          ) : (
-            <div className="flex aspect-[3/4] h-[320px] items-center justify-center text-[var(--text-secondary)]">
-              暂无预览
-            </div>
-          )}
+        {/* 🚀 组图垂直平铺展示（时间正序：最早在顶，最新在底） */}
+        <div className="flex flex-col gap-6">
+          {(entry.groupEntries && entry.groupEntries.length > 0 ? entry.groupEntries : [entry]).map((item, idx) => {
+            const itemPromptSummary = normalizeText(item.promptSummary, '未命名结果');
+            const itemFullPrompt = normalizeText(item.fullPrompt, itemPromptSummary);
+            const itemIsFailed = Boolean(item.error);
+            const itemMetadataItems = [
+              item.displayLabel ? { label: '任务', value: item.displayLabel } : null,
+              { label: '费用', value: getCostDisplay(item) },
+              item.generationTime ? { label: '耗时', value: `${(item.generationTime / 1000).toFixed(1)}s` } : null,
+              { label: '比例', value: String(item.aspectRatio) },
+              { label: '尺寸', value: String(item.imageSize) },
+            ].filter(Boolean) as Array<{ label: string; value: string }>;
 
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-4 pt-12 text-white z-10">
-            <div className="line-clamp-2 text-lg font-semibold leading-7">{promptSummary}</div>
-          </div>
-        </div>
+            return (
+              <div key={item.id} className="relative flex flex-col gap-2.5 border-b border-white/5 pb-5 last:border-b-0 last:pb-0">
+                {/* 标号与时间戳 */}
+                <div className="flex items-center justify-between px-1 text-xs select-none">
+                  <div className="flex items-center gap-1.5">
+                    <span className="flex h-4.5 w-4.5 items-center justify-center rounded-full bg-white/10 text-[9.5px] font-bold font-mono text-[var(--text-secondary)]">
+                      #{idx + 1}
+                    </span>
+                    <span className="text-[11px] text-[var(--text-secondary)] font-medium">
+                      {formatTimestamp(item.timestamp)}
+                    </span>
+                  </div>
+                  <span className="text-[9.5px] text-[var(--text-tertiary)] uppercase font-mono tracking-wider font-semibold">
+                    {item.modelLabel}
+                  </span>
+                </div>
 
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-          {metadataItems.map((item) => (
-            <div
-              key={`${item.label}-${item.value}`}
-              className="shrink-0 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/75 px-3 py-1.5 text-xs text-[var(--text-secondary)]"
-            >
-              {item.label}：<span className="font-medium text-[var(--text-primary)]">{item.value}</span>
-            </div>
-          ))}
+                {/* 图片展示卡片 */}
+                <div 
+                  className="relative overflow-hidden rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] max-h-[380px] flex items-center justify-center cursor-pointer select-none"
+                  onClick={() => item.hasOriginal && onPreviewOriginal(item.imageId)}
+                >
+                  {item.isGenerating ? (
+                    /* 生成中占位卡片 */
+                    <div className="relative w-full min-h-[190px] aspect-square h-[300px] flex flex-col items-center justify-center bg-[var(--bg-secondary)]/50 rounded-[24px] overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-shimmer-sweep" />
+                      <div className="relative flex flex-col items-center gap-2 select-none">
+                        <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/5 border border-white/10">
+                          <svg className="h-4.5 w-4.5 animate-spin text-[var(--text-secondary)]" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                        </div>
+                        <span className="text-[11px] font-semibold text-[var(--text-secondary)] animate-pulse">正在生成关联图...</span>
+                        <span className="text-[10px] text-[var(--text-tertiary)] font-mono">已耗时 {elapsed}s</span>
+                      </div>
+                    </div>
+                  ) : item.displaySrc ? (
+                    <img src={item.displaySrc} alt={itemPromptSummary} className="max-h-[380px] w-full object-contain block pointer-events-none rounded-[24px]" />
+                  ) : (
+                    <div className="flex aspect-[3/4] h-[320px] items-center justify-center text-[var(--text-secondary)]">
+                      暂无预览
+                    </div>
+                  )}
+
+                  {!item.isGenerating && itemIsFailed && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[1px] p-3 text-center rounded-[24px]">
+                      <svg className="w-6 h-6 text-red-400 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                      </svg>
+                      <span className="text-[11px] font-medium text-white/95 leading-4">{item.error || '生成失败'}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 子卡片元数据胶囊 */}
+                {!item.isGenerating && (
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 select-none scrollbar-none">
+                    {itemMetadataItems.map((meta) => (
+                      <div key={meta.label} className="shrink-0 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/75 px-2.5 py-1 text-[10px] text-[var(--text-secondary)]">
+                        {meta.label}：<span className="font-semibold text-[var(--text-primary)]">{meta.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 子卡片独立提示词 */}
+                {!item.isGenerating && (
+                  <div className="rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/55 p-3 text-xs leading-relaxed text-[var(--text-secondary)]">
+                    <span className="font-semibold text-[var(--text-tertiary)] block mb-1 uppercase tracking-wider text-[9px]">提示词:</span>
+                    {itemFullPrompt}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {ecommerceContinuation ? (
@@ -441,11 +529,6 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
         ) : null}
 
         <div className="mt-3 rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3.5">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">提示词</div>
-          <div className="mt-2 whitespace-pre-wrap text-sm leading-6">{fullPrompt}</div>
-        </div>
-
-        <div className="mt-3 rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3.5">
           <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
             参考图 ({entry.referenceImages.length})
           </div>
@@ -476,12 +559,38 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
       </div>
 
       <div className="shrink-0 border-t border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-bottom-bar-bg)] px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
+        {showFollowUpInput && (
+          <div className="mb-3 flex flex-col gap-2 rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/95 p-3.5 shadow-md">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">继续创作</div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={followUpPrompt}
+                onChange={(e) => setFollowUpPrompt(e.target.value)}
+                placeholder="输入新提示词以修改生成..."
+                className="flex-1 rounded-[16px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]/80 px-3.5 py-2.5 text-xs text-[var(--text-primary)] outline-none focus:border-amber-400/40"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSendFollowUp();
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleSendFollowUp}
+                disabled={!followUpPrompt.trim()}
+                className="rounded-[16px] bg-amber-400/95 text-black px-4 py-2.5 text-xs font-bold transition active:scale-[0.985] disabled:opacity-40"
+              >
+                发送
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_48px] gap-2">
           <ActionButton
-            label="继续创作"
+            label={showFollowUpInput ? "收起输入" : "继续创作"}
             icon={<Sparkles size={15} />}
-            tone="primary"
-            onClick={() => onUseAsSource(entry.imageId)}
+            tone={showFollowUpInput ? "default" : "primary"}
+            onClick={() => setShowFollowUpInput((prev) => !prev)}
           />
           <ActionButton
             label={previewLabel}
