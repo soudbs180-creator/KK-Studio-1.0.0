@@ -3483,10 +3483,22 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                     {/* 🚀 移动端模型库内嵌独显面板 */}
                     {mobileSubView === 'model' && (
-                        <div className="flex flex-col h-[300px] w-full min-w-0 overflow-hidden">
+                        <div 
+                            className="flex flex-col h-[300px] w-full min-w-0 overflow-hidden"
+                            style={{ touchAction: 'pan-y' }}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onTouchMove={(e) => e.stopPropagation()}
+                            onTouchEnd={(e) => e.stopPropagation()}
+                        >
                             {/* 顶部一排：搜索框与完成按钮合并 */}
                             <div className="flex items-center gap-2 border-b border-[var(--frost-card-sub-border)] pb-2 shrink-0 w-full min-w-0">
-                                <div className="flex-1 min-w-0 p-1 border rounded-xl" style={{ ...modelLibrarySearchSurfaceStyle, margin: 0 }}>
+                                <div 
+                                    className="flex-1 min-w-0 p-1 border rounded-xl" 
+                                    style={{ ...modelLibrarySearchSurfaceStyle, margin: 0 }}
+                                    onTouchStart={(e) => e.stopPropagation()}
+                                    onTouchMove={(e) => e.stopPropagation()}
+                                    onTouchEnd={(e) => e.stopPropagation()}
+                                >
                                     <div className="relative flex items-center h-8">
                                         <svg className="absolute left-2.5 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -3496,12 +3508,18 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             value={modelSearch}
                                             onChange={(e) => setModelSearch(e.target.value)}
                                             onClick={(e) => e.stopPropagation()}
+                                            onTouchStart={(e) => e.stopPropagation()}
+                                            onTouchMove={(e) => e.stopPropagation()}
+                                            onTouchEnd={(e) => e.stopPropagation()}
                                             placeholder="搜索常用或供应商模型..."
                                             className="w-full bg-[var(--frost-input-bg)] text-[var(--text-primary)] text-xs rounded-lg py-1 pl-7.5 pr-2 outline-none border border-transparent focus:border-[var(--frost-input-border)] placeholder-[var(--text-tertiary)]"
                                         />
                                         {modelSearch && (
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); setModelSearch(''); }}
+                                                onTouchStart={(e) => e.stopPropagation()}
+                                                onTouchMove={(e) => e.stopPropagation()}
+                                                onTouchEnd={(e) => e.stopPropagation()}
                                                 className="absolute right-2 text-[var(--text-tertiary)]"
                                             >
                                                 <X size={12} />
@@ -3679,7 +3697,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                     {/* 🚀 移动端高级参数设置内嵌独显面板 */}
                     {mobileSubView === 'settings' && (
-                        <div className="flex flex-col h-[300px] w-full min-w-0 overflow-hidden">
+                        <div 
+                            className="flex flex-col h-[300px] w-full min-w-0 overflow-hidden"
+                            style={{ touchAction: 'pan-y' }}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onTouchMove={(e) => e.stopPropagation()}
+                            onTouchEnd={(e) => e.stopPropagation()}
+                        >
                             {/* 顶部标题栏 */}
                             <div className="flex items-center justify-between border-b border-[var(--frost-card-sub-border)] pb-2 shrink-0">
                                 <span className="text-xs font-bold text-[var(--text-primary)]">高级设置选项</span>
@@ -4513,6 +4537,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                               paddingBottom: 'env(safe-area-inset-bottom, 0px)',
                                           }}
                                           onTouchStart={(e) => e.stopPropagation()}
+                                          onTouchMove={(e) => e.stopPropagation()}
+                                          onTouchEnd={(e) => e.stopPropagation()}
                                       >
                                           <style>{`
                                               @keyframes model-sheet-slide-up {
@@ -4540,7 +4566,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                                               {/* 🔍 搜索输入框 */}
                                               {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
-                                                  <div className="mx-3 mb-2 p-2.5 border rounded-2xl" style={{ ...modelLibrarySearchSurfaceStyle }}>
+                                                  <div 
+                                                      className="mx-3 mb-2 p-2.5 border rounded-2xl" 
+                                                      style={{ ...modelLibrarySearchSurfaceStyle }}
+                                                      onTouchStart={(e) => e.stopPropagation()}
+                                                      onTouchMove={(e) => e.stopPropagation()}
+                                                      onTouchEnd={(e) => e.stopPropagation()}
+                                                  >
                                                       <div className="relative flex items-center">
                                                           <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -4550,6 +4582,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                               value={modelSearch}
                                                               onChange={(e) => setModelSearch(e.target.value)}
                                                               onClick={(e) => e.stopPropagation()}
+                                                              onTouchStart={(e) => e.stopPropagation()}
+                                                              onTouchMove={(e) => e.stopPropagation()}
+                                                              onTouchEnd={(e) => e.stopPropagation()}
                                                               placeholder="搜索模型..."
                                                               className="w-full bg-[var(--frost-input-bg)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-transparent focus:border-[var(--frost-input-border)] placeholder-[var(--text-tertiary)]"
                                                               autoFocus
@@ -4557,6 +4592,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                           {modelSearch && (
                                                               <button
                                                                   onClick={(e) => { e.stopPropagation(); setModelSearch(''); }}
+                                                                  onTouchStart={(e) => e.stopPropagation()}
+                                                                  onTouchMove={(e) => e.stopPropagation()}
+                                                                  onTouchEnd={(e) => e.stopPropagation()}
                                                                   className="absolute right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                                                               >
                                                                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
