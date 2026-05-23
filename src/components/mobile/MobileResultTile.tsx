@@ -45,8 +45,6 @@ const formatTimestamp = (timestamp: number): string => {
   return new Intl.DateTimeFormat('zh-CN', {
     month: 'numeric',
     day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
   }).format(new Date(timestamp));
 };
 
@@ -101,8 +99,6 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
     <article
       className="relative min-w-0 overflow-hidden rounded-2xl border bg-[var(--mobile-clay-surface-bg)] transition-transform duration-200"
       style={{
-        gridColumnEnd: `span ${gridMetrics.columnSpan}`,
-        gridRowEnd: `span ${gridMetrics.rowSpan}`,
         borderColor: isActive || isSource ? 'var(--mobile-clay-active-border)' : 'var(--mobile-clay-border)',
         boxShadow: isActive || isSource ? 'var(--mobile-clay-active-ring)' : 'var(--mobile-clay-shadow)',
       }}
@@ -116,7 +112,10 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
         title={promptSummary}
       >
         {/* 核心展示区 */}
-        <div className={`relative flex-1 min-h-0 w-full overflow-hidden bg-[var(--bg-tertiary)] ${viewMode === 'detail' ? 'rounded-t-2xl' : 'rounded-2xl'}`}>
+        <div
+          className={`relative flex-1 min-h-0 w-full overflow-hidden bg-[var(--bg-tertiary)] ${viewMode === 'detail' ? 'rounded-t-2xl' : 'rounded-2xl'}`}
+          style={!entry.isGenerating ? { aspectRatio: imageAspectRatio } : undefined}
+        >
           {entry.isGenerating ? (
             /* 占位态：带 Shimmer 扫光和耗时计时器 */
             <div className={`relative w-full h-full flex flex-col items-center justify-center min-h-[120px] overflow-hidden bg-[var(--bg-secondary)]/50 ${viewMode === 'detail' ? 'rounded-t-2xl' : 'rounded-2xl'}`}>
