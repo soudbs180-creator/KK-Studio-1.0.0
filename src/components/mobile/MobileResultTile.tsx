@@ -164,11 +164,16 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
             </div>
           )}
 
+          {/* 顶部暗色渐变过渡（为顶部信息标签提供对比度，防死黑） */}
+          {!entry.isGenerating && (
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-black/60 via-black/20 to-transparent z-10" />
+          )}
+
           {/* 绝对定位浮动层：时间 / 参考图标记 */}
           {!entry.isGenerating && (
-            <div className="pointer-events-none absolute left-2.5 top-2.5 flex items-center gap-1.5">
+            <div className="pointer-events-none absolute left-2.5 top-2.5 flex items-center gap-1.5 z-20">
               {viewMode === 'detail' && (
-                <span className="rounded-full border border-white/10 bg-black/45 backdrop-blur-md px-2 py-0.5 text-[9.5px] font-medium text-white/90">
+                <span className="rounded-full border border-white/10 bg-black/25 backdrop-blur-md px-2 py-0.5 text-[9.5px] font-medium text-white/90">
                   {formatTimestamp(entry.timestamp)}
                 </span>
               )}
@@ -182,7 +187,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
 
           {/* 右上角：组标记 */}
           {!entry.isGenerating && entry.groupCount && entry.groupCount > 1 && (
-            <div className="pointer-events-none absolute right-2.5 top-2.5 flex items-center">
+            <div className="pointer-events-none absolute right-2.5 top-2.5 flex items-center z-20">
               <span className="rounded-full border border-amber-400/20 bg-amber-500/90 backdrop-blur-md px-2.5 py-0.5 text-[9.5px] font-bold text-white shadow-sm flex items-center gap-1">
                 <svg className="w-2.5 h-2.5 text-white shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
