@@ -163,23 +163,37 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
   onNext,
 }) => {
   const touchStartX = React.useRef(0);
+  const touchStartY = React.useRef(0);
   const touchEndX = React.useRef(0);
+  const touchEndY = React.useRef(0);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.targetTouches[0].clientX;
+    touchStartY.current = e.targetTouches[0].clientY;
     touchEndX.current = e.targetTouches[0].clientX;
+    touchEndY.current = e.targetTouches[0].clientY;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     touchEndX.current = e.targetTouches[0].clientX;
-    e.stopPropagation();
+    touchEndY.current = e.targetTouches[0].clientY;
   };
 
   const handleTouchEnd = () => {
     const diffX = touchStartX.current - touchEndX.current;
-    const threshold = 55;
+    const diffY = touchStartY.current - touchEndY.current;
+    const thresholdX = 55;
 
-    if (Math.abs(diffX) > threshold) {
+    // 判定为水平滑动的核心：X轴位移大于阈值，且X轴位移是Y轴位移的 1.5 倍以上
+    if (Math.abs(diffX) > thresholdX && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
+      // 🚀 手机端边缘手势返回适配：
+      // 如果是从屏幕最左侧（边缘 45px 内）起手向右滑动（diffX < 0，即右滑），直接关闭详情页
+      if (touchStartX.current < 45 && diffX < 0) {
+        onClose();
+        return;
+      }
+
+      // 正常切图
       if (diffX > 0) {
         if (onNext) onNext();
       } else {
@@ -256,12 +270,14 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
         </div>
       </div>
 
-      <div className="relative flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] overscroll-contain">
+      <div 
+        className="relative flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] overscroll-contain"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <div 
           className="relative overflow-hidden rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] max-h-[380px] flex items-center justify-center cursor-pointer select-none"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
           onClick={() => entry.hasOriginal && onPreviewOriginal(entry.imageId)}
         >
           {entry.displaySrc ? (

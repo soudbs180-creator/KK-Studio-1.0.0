@@ -1192,6 +1192,45 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const [mobileCategory, setMobileCategory] = useState<string>('featured');
     const [mobileSubView, setMobileSubView] = useState<'input' | 'model' | 'settings'>('input');
     const [isExpanded, setIsExpanded] = useState(false);
+
+    // 🚀 [移动端专属] 点击/触摸外部空白处时，自动收起输入面板
+    useEffect(() => {
+        if (!isMobile || !isExpanded) return;
+
+        const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+            const container = document.getElementById('prompt-bar-container');
+            if (!container) return;
+
+            // 1. 若点击在 PromptBar 容器内部，放行
+            if (container.contains(e.target as Node)) {
+                return;
+            }
+
+            // 2. 若点击在移动端模型选择弹窗（Bottom Sheet）或其遮罩层中，放行
+            const target = e.target as HTMLElement;
+            if (target.closest('[class*="z-[1049]"]') || target.closest('[class*="z-[1050]"]')) {
+                return;
+            }
+
+            // 3. 若点击在裁剪、大图预览、电商续作历史等悬浮面板里，放行
+            if (target.closest('[class*="z-[990]"]') || target.closest('[class*="z-[985]"]')) {
+                return;
+            }
+
+            // 4. 收起面板，且使输入框失去焦点（防键盘弹起）
+            setIsExpanded(false);
+            textareaRef.current?.blur();
+        };
+
+        // 使用 capture 阶段在最外层尽早拦截
+        document.addEventListener('click', handleOutsideClick, true);
+        document.addEventListener('touchstart', handleOutsideClick, true);
+        return () => {
+            document.removeEventListener('click', handleOutsideClick, true);
+            document.removeEventListener('touchstart', handleOutsideClick, true);
+        };
+    }, [isMobile, isExpanded, textareaRef]);
+
     const [modelMenuLoadingState, setModelMenuLoadingState] = useState<ModelMenuLoadingState>('idle');
     const [modelSearch, setModelSearch] = useState('');
     const deferredModelSearch = useDeferredValue(modelSearch);
