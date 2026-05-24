@@ -8,7 +8,7 @@ import {
 import { getTurnstileStatusMessage, mapTurnstileErrorMessage } from './authLocalization';
 
 const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-const TURNSTILE_TIMEOUT_MS = 12000;
+const TURNSTILE_TIMEOUT_MS = 6000;
 const TURNSTILE_SCRIPT_SELECTOR = 'script[data-turnstile-script="true"]';
 
 type TurnstileTheme = 'light' | 'dark' | 'auto';
