@@ -388,59 +388,7 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
         ...PANEL_STYLE,
       }}
     >
-      {networkOptions.length > 0 ? (
-        <section className="mb-4 last:mb-0">
-          <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
-            搜索增强
-          </div>
-          <div className="grid grid-cols-1 gap-2">
-            {networkOptions.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={option.onToggle}
-                className="flex items-center justify-between rounded-xl border px-3 py-2 text-sm transition-colors"
-                style={option.active ? ACTIVE_BUTTON_STYLE : INACTIVE_BUTTON_STYLE}
-              >
-                <span>{option.label}</span>
-                <span className="text-xs">{option.active ? '已开启' : '未开启'}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      ) : null}
 
-      {shouldShowThinkingMode ? (
-        <section className="mb-4 last:mb-0">
-          <div className="mb-2 text-sm font-medium" style={TITLE_STYLE}>
-            思考模式
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => onThinkingModeChange?.('minimal')}
-              className="rounded-xl border px-3 py-2 text-sm transition-colors"
-              style={thinkingMode === 'minimal' ? ACTIVE_BUTTON_STYLE : {
-                ...INACTIVE_BUTTON_STYLE,
-                color: 'var(--text-tertiary)',
-              }}
-            >
-              快速 (minimal)
-            </button>
-            <button
-              type="button"
-              onClick={() => onThinkingModeChange?.('high')}
-              className="rounded-xl border px-3 py-2 text-sm transition-colors"
-              style={thinkingMode === 'high' ? ACTIVE_BUTTON_STYLE : {
-                ...INACTIVE_BUTTON_STYLE,
-                color: 'var(--text-tertiary)',
-              }}
-            >
-              深入 (high)
-            </button>
-          </div>
-        </section>
-      ) : null}
 
       {isEcommercePanel ? (
         <>

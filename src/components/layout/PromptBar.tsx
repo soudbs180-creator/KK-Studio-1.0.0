@@ -918,30 +918,128 @@ const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
     children,
     onClick,
 }) => {
-    // 🚀 [1.4.8 Cleanup] 彻底清理旧的 unused touch 侧滑模型逻辑，改为简洁直观的“图钉置顶”按钮。
-    // 这解决了移动端侧滑手势经常与纵向滚动冲突、导致模型列表无法顺畅滚动的顽疾（按钮有效化交互优化）。
+    const [offsetX, setOffsetX] = React.useState(0);
+    const [isOpen, setIsOpen] = React.useState(false);
+    const [isTransitioning, setIsTransitioning] = React.useState(false);
+
+    const touchStart = React.useRef({ x: 0, y: 0 });
+    const isSwiping = React.useRef(false);
+    const maxOffset = -72; // 置顶按钮宽度 72px
+
+    const onSwipeTouchStart = (e: React.TouchEvent) => {
+        const touch = e.touches[0];
+        touchStart.current = { x: touch.clientX, y: touch.clientY };
+        isSwiping.current = false;
+        setIsTransitioning(false);
+    };
+
+    const onSwipeTouchMove = (e: React.TouchEvent) => {
+        const touch = e.touches[0];
+        const deltaX = touch.clientX - touchStart.current.x;
+        const deltaY = touch.clientY - touchStart.current.y;
+
+        // 判断是否为水平手势
+        if (!isSwiping.current) {
+            if (Math.abs(deltaX) > 8 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+                isSwiping.current = true;
+            }
+        }
+
+        if (isSwiping.current) {
+            // 水平滑动中阻止页面上下滚动
+            if (e.cancelable) {
+                e.preventDefault();
+            }
+            
+            // 计算新的偏移量
+            const startOffset = isOpen ? maxOffset : 0;
+            let currentOffset = startOffset + deltaX;
+            // 限制滑动区间在 [maxOffset, 0] 之间
+            currentOffset = Math.max(maxOffset, Math.min(0, currentOffset));
+            setOffsetX(currentOffset);
+        }
+    };
+
+    const onSwipeTouchEnd = () => {
+        setIsTransitioning(true);
+        if (isSwiping.current) {
+            // 如果向左滑动超过一半，则打开；否则关闭
+            if (offsetX < maxOffset / 2) {
+                setIsOpen(true);
+                setOffsetX(maxOffset);
+            } else {
+                setIsOpen(false);
+                setOffsetX(0);
+            }
+        } else {
+            // 如果没有滑动过（仅仅是点击），并且当前是打开状态，则关闭它
+            if (isOpen) {
+                setIsOpen(false);
+                setOffsetX(0);
+            }
+        }
+    };
+
+    const handlePinClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onTogglePin(modelId);
+        // 操作后自动关闭
+        setIsTransitioning(true);
+        setIsOpen(false);
+        setOffsetX(0);
+    };
+
+    const handleItemClick = (e: React.MouseEvent) => {
+        // 如果当前是滑开状态，点击则是关闭它，不触发点击选择模型
+        if (isOpen) {
+            e.stopPropagation();
+            setIsTransitioning(true);
+            setIsOpen(false);
+            setOffsetX(0);
+            return;
+        }
+        onClick();
+    };
+
     return (
         <div 
-            className="relative w-full flex items-center justify-between gap-1 select-none rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] overflow-hidden" 
-            style={{ touchAction: 'pan-y' }}
+            className="relative w-full overflow-hidden rounded-xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] select-none"
+            onTouchStart={onSwipeTouchStart}
+            onTouchMove={onSwipeTouchMove}
+            onTouchEnd={onSwipeTouchEnd}
         >
-            <div className="flex-1 min-w-0" onClick={onClick}>
+            {/* 内容滑动容器 */}
+            <div 
+                className="w-full min-w-0" 
+                style={{
+                    transform: `translateX(${offsetX}px)`,
+                    transition: isTransitioning ? 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
+                    WebkitTransition: isTransitioning ? '-webkit-transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
+                }}
+                onClick={handleItemClick}
+            >
                 {children}
             </div>
+
+            {/* 右侧滑出按钮 */}
             <button
                 type="button"
-                className={`flex items-center justify-center shrink-0 w-10 h-10 mr-1 rounded-lg transition-colors cursor-pointer
-                    ${isPinned 
-                        ? 'text-amber-500 bg-amber-500/10 hover:bg-amber-500/20' 
-                        : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5'
-                    }`}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onTogglePin(modelId);
+                onClick={handlePinClick}
+                className="absolute top-0 bottom-0 right-0 flex items-center justify-center font-semibold text-xs transition-all duration-200 cursor-pointer"
+                style={{
+                    width: `${Math.abs(maxOffset)}px`,
+                    transform: `translateX(${Math.abs(maxOffset) + offsetX}px)`,
+                    transition: isTransitioning ? 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
+                    WebkitTransition: isTransitioning ? '-webkit-transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
+                    backgroundColor: isPinned ? 'rgba(245, 158, 11, 0.15)' : 'rgba(0, 0, 0, 0.05)',
+                    color: isPinned ? '#f59e0b' : 'var(--text-secondary)',
+                    borderLeft: '1px solid var(--frost-card-sub-border)',
                 }}
-                title={isPinned ? '取消常用' : '设为常用'}
             >
-                <span className="text-[14px] leading-none">{isPinned ? '📌' : '📍'}</span>
+                <div className="flex flex-col items-center gap-0.5">
+                    <span className="text-[15px]">{isPinned ? '📌' : '📍'}</span>
+                    <span>{isPinned ? '取消常用' : '设为常用'}</span>
+                </div>
             </button>
         </div>
     );
