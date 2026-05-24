@@ -35,7 +35,7 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
       </div>
 
       <main data-slot="feed" className="flex min-h-0 flex-col overflow-hidden">
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="flex-1 overflow-y-auto overscroll-contain">
           {feed}
         </div>
       </main>

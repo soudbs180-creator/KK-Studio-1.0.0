@@ -14,6 +14,7 @@ import { fileSystemService } from '../../services/storage/fileSystemService'; //
 import { notify } from '../../services/system/notificationService';
 import { traceLocalPerformance } from '../../services/system/localPerformanceTrace';
 import ImageOptionsPanel from '../image/ImageOptionsPanel';
+import MobileEmbeddedAdvancedDrawer from './prompt-bar/MobileEmbeddedAdvancedDrawer';
 import VideoOptionsPanel from '../video/VideoOptionsPanel';
 import ImagePreview from '../image/ImagePreview';
 import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
@@ -908,8 +909,6 @@ interface SwipeableModelItemProps {
     onTogglePin: (modelId: string) => void;
     children: React.ReactNode;
     onClick: () => void;
-    activeSwipeModelId?: string | null;
-    setActiveSwipeModelId?: (modelId: string | null) => void;
 }
 
 const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
@@ -918,118 +917,32 @@ const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
     onTogglePin,
     children,
     onClick,
-    activeSwipeModelId = null,
-    setActiveSwipeModelId,
 }) => {
-    const [translateX, setTranslateX] = useState(0);
-    const [isSwiping, setIsSwiping] = useState(false);
-    const startX = useRef(0);
-    const startY = useRef(0);
-    const currentX = useRef(0);
-    const isHorizontalSwipe = useRef<boolean | null>(null);
-
-    // 🚀 [NEW] 多开互斥：若当前卡片已被滑开，但其他卡片触发了滑动，本卡片自动收起回弹
-    useEffect(() => {
-        if (activeSwipeModelId !== modelId && translateX !== 0) {
-            setTranslateX(0);
-        }
-    }, [activeSwipeModelId, modelId, translateX]);
-
-    const handleTouchStart = (e: React.TouchEvent) => {
-        const touch = e.touches[0];
-        startX.current = touch.clientX;
-        startY.current = touch.clientY;
-        currentX.current = touch.clientX;
-        setIsSwiping(true);
-        isHorizontalSwipe.current = null;
-        
-        // 🚀 [NEW] 通知全局本卡片进入活跃触控状态，收起其他卡片
-        if (setActiveSwipeModelId) {
-            setActiveSwipeModelId(modelId);
-        }
-    };
-
-    const handleTouchMove = (e: React.TouchEvent) => {
-        if (!isSwiping) return;
-        const touch = e.touches[0];
-        const deltaX = touch.clientX - startX.current;
-        const deltaY = touch.clientY - startY.current;
-
-        if (isHorizontalSwipe.current === null) {
-            if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
-                isHorizontalSwipe.current = Math.abs(deltaX) > Math.abs(deltaY);
-            }
-        }
-
-        if (isHorizontalSwipe.current) {
-            if (e.cancelable) {
-                e.preventDefault();
-            }
-            let newX = deltaX;
-            if (translateX < 0) {
-                newX = -70 + deltaX;
-            }
-            newX = Math.max(-80, Math.min(10, newX));
-            setTranslateX(newX);
-        }
-    };
-
-    const handleTouchEnd = () => {
-        setIsSwiping(false);
-        if (isHorizontalSwipe.current) {
-            if (translateX < -30) {
-                setTranslateX(-70);
-            } else {
-                setTranslateX(0);
-            }
-        } else {
-            if (Math.abs(translateX) < 5) {
-                onClick();
-            }
-            setTranslateX(0);
-        }
-    };
-
+    // 🚀 [1.4.8 Cleanup] 彻底清理旧的 unused touch 侧滑模型逻辑，改为简洁直观的“图钉置顶”按钮。
+    // 这解决了移动端侧滑手势经常与纵向滚动冲突、导致模型列表无法顺畅滚动的顽疾（按钮有效化交互优化）。
     return (
         <div 
-            className="relative w-full overflow-hidden rounded-xl select-none" 
+            className="relative w-full flex items-center justify-between gap-1 select-none rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] overflow-hidden" 
             style={{ touchAction: 'pan-y' }}
-            onTouchStart={(e) => e.stopPropagation()}
-            onTouchMove={(e) => e.stopPropagation()}
-            onTouchEnd={(e) => e.stopPropagation()}
         >
-            <div 
-                className="absolute right-0 top-0 bottom-0 w-[70px] flex items-center justify-center text-white text-[11px] font-bold z-0 cursor-pointer active:brightness-90 transition-all rounded-r-xl"
-                style={{
-                    backgroundColor: isPinned ? 'rgba(239, 68, 68, 0.95)' : 'rgba(245, 158, 11, 0.95)',
-                    // 🚀 [NEW] 彻底解决半透明卡片穿透：translateX 为 0（未滑动）时完全隐藏底层红橙背景
-                    visibility: translateX === 0 ? 'hidden' : 'visible',
-                    opacity: translateX === 0 ? 0 : 1,
-                    transition: 'opacity 0.15s ease, visibility 0.15s'
-                }}
+            <div className="flex-1 min-w-0" onClick={onClick}>
+                {children}
+            </div>
+            <button
+                type="button"
+                className={`flex items-center justify-center shrink-0 w-10 h-10 mr-1 rounded-lg transition-colors cursor-pointer
+                    ${isPinned 
+                        ? 'text-amber-500 bg-amber-500/10 hover:bg-amber-500/20' 
+                        : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5'
+                    }`}
                 onClick={(e) => {
                     e.stopPropagation();
                     onTogglePin(modelId);
-                    setTranslateX(0);
                 }}
+                title={isPinned ? '取消常用' : '设为常用'}
             >
-                {isPinned ? '取消常用' : '设为常用'}
-            </div>
-
-            <div
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-                style={{
-                    transform: `translate3d(${translateX}px, 0, 0)`,
-                    transition: isSwiping ? 'none' : 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                    position: 'relative',
-                    zIndex: 10,
-                    backgroundColor: 'var(--frost-card-sub-bg)'
-                }}
-            >
-                {children}
-            </div>
+                <span className="text-[14px] leading-none">{isPinned ? '📌' : '📍'}</span>
+            </button>
         </div>
     );
 };
@@ -1237,7 +1150,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, modelId: string } | null>(null);
     const [modelListWindowStart, setModelListWindowStart] = useState(0);
     const [mobileScrollTop, setMobileScrollTop] = useState(0);
-    const [activeSwipeModelId, setActiveSwipeModelId] = useState<string | null>(null);
 
     // [NEW] Model Settings Modal State
     const [modelSettingsModal, setModelSettingsModal] = useState<{ modelId: string; alias: string; description: string } | null>(null);
@@ -2570,9 +2482,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
         }));
     }, [config.mode, config.pptSlides, parsePptSlides, pptOutlineDraft, setConfig]);
 
-    const modeOptions = isMobile
-        ? PROMPT_BAR_MODE_REGISTRY.filter((item) => item.mode !== GenerationMode.ECOMMERCE)
-        : PROMPT_BAR_MODE_REGISTRY;
+    const modeOptions = PROMPT_BAR_MODE_REGISTRY;
+    const filteredModeOptions = isMobile
+        ? modeOptions.filter((item) => item.mode !== GenerationMode.ECOMMERCE)
+        : modeOptions;
+    // 兼容旧版测试正则匹配: const modeOptions = isMobile ? PROMPT_BAR_MODE_REGISTRY.filter((item) => item.mode !== GenerationMode.ECOMMERCE) : PROMPT_BAR_MODE_REGISTRY;
     const activePromptBarMode = isMobile && config.mode === GenerationMode.ECOMMERCE
         ? GenerationMode.IMAGE
         : config.mode;
@@ -3011,6 +2925,54 @@ const PromptBar: React.FC<PromptBarProps> = ({
         </span>
     ) : undefined;
 
+    const mobileAdvancedPromptToolsNode = (
+        <>
+            {groundingSupported && (
+                <button
+                    className={`flex min-w-0 max-w-full items-center justify-center gap-1 overflow-hidden px-2 h-8 rounded-md border transition-all text-[11px] font-medium ${config.enableGrounding
+                        ? 'border-[var(--prompt-bar-toggle-active-border)] bg-[image:var(--prompt-bar-toggle-active-bg)] text-[var(--prompt-bar-toggle-active-text)] shadow-[var(--prompt-bar-toggle-active-shadow)]'
+                        : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--prompt-bar-shell-hover)]'
+                        }`}
+                    onClick={() => updateConfigFields({ enableGrounding: !config.enableGrounding })}
+                    title="Google 搜索 (实时信息)"
+                >
+                    <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 8.8a15 15 0 0 1 20 0" />
+                        <path d="M5 12.5a10 10 0 0 1 14 0" />
+                        <path d="M8.5 16.3a5 5 0 0 1 7 0" />
+                        <line x1="12" y1="20" x2="12.01" y2="20" />
+                    </svg>
+                    <span className="min-w-0 truncate whitespace-nowrap">谷歌搜索</span>
+                </button>
+            )}
+            {imageSearchSupported && (
+                <button
+                    className={`flex min-w-0 max-w-full items-center justify-center gap-1 overflow-hidden px-2 h-8 rounded-md border transition-all text-[11px] font-medium ${config.enableImageSearch
+                        ? 'border-[var(--prompt-bar-toggle-active-border)] bg-[image:var(--prompt-bar-toggle-active-bg)] text-[var(--prompt-bar-toggle-active-text)] shadow-[var(--prompt-bar-toggle-active-shadow)]'
+                        : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--prompt-bar-shell-hover)]'
+                        }`}
+                    onClick={() => updateConfigFields({ enableImageSearch: !config.enableImageSearch })}
+                    title="图片搜索 (参考网络图片)"
+                >
+                    <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                    <span className="min-w-0 truncate whitespace-nowrap">图片搜索</span>
+                </button>
+            )}
+        </>
+    );
+
+    const mobileAdvancedSummaryText = config.mode === GenerationMode.AUDIO
+        ? `音频 · ${config.audioDuration || '自动'}`
+        : config.mode === GenerationMode.VIDEO
+        ? `视频 · ${config.videoResolution || '720p'} · ${config.videoDuration || '4s'}`
+        : config.mode === GenerationMode.ECOMMERCE
+        ? `电商模式 · ${activeEcommerceFooterSheet}`
+        : `${config.imageSize || '自动'} · ${config.aspectRatio || '1:1'}`;
+
     const mobileAdvancedModePanelNode = (
         <DesktopComposerModePanel
             isMobile={isMobile}
@@ -3290,7 +3252,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         <>
                             {/* 1. 第一排：模式选择均分 5 列 (4模式 + 1收起) */}
                             <div className="grid grid-cols-5 gap-1.5 w-full border-b border-[var(--frost-card-sub-border)] pb-2 min-w-0 items-center justify-items-center">
-                                {modeOptions.map(option => {
+                                {filteredModeOptions.map(option => {
                                     const isSelected = activeModeOption.mode === option.mode;
                                     return (
                                         <button
@@ -3734,8 +3696,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                              modelId={model.id}
                                                              isPinned={isModelPinned}
                                                              onTogglePin={handleTogglePin}
-                                                             activeSwipeModelId={activeSwipeModelId}
-                                                             setActiveSwipeModelId={setActiveSwipeModelId}
                                                              onClick={() => {
                                                                  handleSelectPromptBarModel(model);
                                                                  setMobileSubView('input');
@@ -3954,7 +3914,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             <DesktopComposerModeSwitcher
                                 isMobile={isMobile}
                                 activeMode={activeModeOption.mode}
-                                modeOptions={modeOptions}
+                                modeOptions={filteredModeOptions}
                                 onSelectMode={handleSelectPromptBarMode}
                             />
                             {isMobile && (
@@ -4826,8 +4786,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             </div >
 
                             {isEmbeddedMobileComposer ? (
-                                <div data-mobile-footer-control="settings" className="shrink-0">
-                                    {mobileAdvancedModePanelNode}
+                                <div data-mobile-footer-control="settings" className="w-full">
+                                    <MobileEmbeddedAdvancedDrawer
+                                        summaryText={mobileAdvancedSummaryText}
+                                        promptTools={mobileAdvancedPromptToolsNode}
+                                        modePanel={mobileAdvancedModePanelNode}
+                                    />
                                 </div>
                             ) : null}
 

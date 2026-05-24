@@ -1,9 +1,15 @@
 # KK-Studio v1.4.8 Single-Line Convergence Plan
 
-Last updated: 2026-05-22
+Last updated: 2026-05-24
+
 Branch policy: continue on the current branch and current workspace unless the user explicitly asks for a branch or worktree.
 
 ## Summary
+
+Current mobile model list pin interaction and code cleanup milestone:
+- Root cause: mobile model items used a swipe gesture to toggle favorite/pin state. This touch gesture conflicted heavily with vertical list scrolling and workspace pan gestures, creating a poor touch experience. Additionally, deprecated touch listener helper methods remained in `PromptBar.tsx` and violated source cleanup tests.
+- Remove all touch gestures and helper definitions (`handleTouchStart` etc.) from `PromptBar.tsx` to satisfy the unused code contract. Rebuild the favorite toggle as a lightweight, clean button (📌 / 📍) placed directly on the right edge of each model card.
+- Acceptance: `node --test tests/unit/ui-unused-cleanup-contract.test.ts` passes; `npm run typecheck`, `npm run build`, `npm run governance:check`, and `npm run check:encoding` pass.
 
 Current user API secret-boundary milestone:
 - Root cause: system/provider credit keys were already backend-held on read paths, but user BYOK still had legacy sessionless-local code paths that could write raw key slots/providers into browser `localStorage`, and the API settings UI still advertised a browser-session draft fallback when the local API was offline or degraded.

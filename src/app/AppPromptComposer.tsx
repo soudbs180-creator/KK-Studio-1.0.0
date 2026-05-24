@@ -15,6 +15,7 @@ interface AppPromptComposerProps {
   promptBarProps: AppPromptBarProps;
 }
 
+// 这里的输入作曲器需要适配受控磨砂框架背景以对齐 Clay 设计系统：var(--frost-card-framework-bg)
 const AppPromptComposer: React.FC<AppPromptComposerProps> = ({ variant, promptBarProps }) => {
   if (variant === 'mobile') {
     return (

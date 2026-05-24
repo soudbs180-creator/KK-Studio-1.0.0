@@ -1,6 +1,15 @@
 # KK-Studio v1.4.8 Coordination Status
 
-Last updated: 2026-05-22
+Last updated: 2026-05-24
+
+## Current Mobile Model List Pin Interaction And Code Cleanup
+
+- Active lane: Refactor the mobile favorite/pinned model interaction from swipe gestures to a direct tap-friendly pin icon toggle (📌 / 📍) and clean up all deprecated unused touch gesture codes.
+- Included files for this slice: `src/components/layout/PromptBar.tsx`, `DESIGN.md`, `docs/development/progress.md`, `plans.md`, `status.md`, and `validation.md`.
+- Excluded files/artifacts: generated bundles, third-party libraries, unrelated settings/canvas/auth files, and database schemas.
+- Root cause: mobile model items used a swipe gesture to toggle favorite/pin state. This touch gesture conflicted heavily with vertical list scrolling and workspace pan gestures, creating a poor touch experience. Additionally, deprecated touch listener helper methods remained in `PromptBar.tsx` and violated source cleanup tests.
+- Implemented fix: removed `activeSwipeModelId` state and all touch event listeners (`handleTouchStart`, `handleTouchMove`, `handleTouchEnd`) from `PromptBar.tsx`. Reconstructed `SwipeableModelItem` to render a clean, tap-friendly pin icon button (📌 / 📍) directly on the right edge of each model card.
+- Fresh validation evidence: `node --test tests/unit/ui-unused-cleanup-contract.test.ts` passes; `npm run typecheck`, `npm run build`, `npm run governance:check`, and `npm run check:encoding` pass.
 
 ## Current User API Secret Boundary Hardening
 

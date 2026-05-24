@@ -1,8 +1,25 @@
-# KK-Studio v1.4.6 Single-Line Validation Matrix
+# KK-Studio v1.4.8 Single-Line Validation Matrix
 
-Last updated: 2026-05-22
+Last updated: 2026-05-24
 
 Use `npm.cmd` for npm scripts on Windows.
+
+## Current 1.4.8 Mobile Pin Interaction and Unused Gesture Cleanup Gate
+
+Use this gate when touching mobile model lists, PromptBar UI gestures, or unused gesture tests:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ui-unused-cleanup-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run governance:check
+npm.cmd run check:encoding
+npm.cmd run build
+npm.cmd run verify:changes
+```
+
+Expected result: The mobile model selection cards render a direct toggle pin button (📌 / 📍) instead of conflicting swipe gestures, the `PromptBar` source code is completely free of legacy touch variables and handler boilerplate (preventing gesture/scroll collisions), and all three contract tests in `ui-unused-cleanup-contract.test.ts` pass cleanly along with typecheck, encoding and build pipelines.
+
+Fresh result on 2026-05-24: `ui-unused-cleanup-contract.test.ts` passed 3/3, `npm.cmd run typecheck` passed, `npm.cmd run governance:check` passed, `npm.cmd run check:encoding` passed, and `npm.cmd run build` successfully bundled the frontend. All changes align with the Clay UI 3.0 design specification.
 
 ## Current User API Secret Boundary Gate
 

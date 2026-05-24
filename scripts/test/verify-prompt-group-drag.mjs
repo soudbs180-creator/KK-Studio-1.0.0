@@ -320,6 +320,7 @@ ensureArtifactsDir();
 let browser;
 let viteServer;
 let browserPreflight = null;
+let exitCode = 0;
 
 try {
   const ensured = await ensureLocalViteServer({ root: REPO_ROOT, url: TARGET_URL });
@@ -504,7 +505,8 @@ try {
   if (isBrowserLaunchUnavailable(error)) {
     await runFallbackVerification(error, browserPreflight);
   } else {
-    throw error;
+    console.error(error);
+    exitCode = 1;
   }
 } finally {
   if (browser) {
@@ -513,4 +515,5 @@ try {
   if (viteServer) {
     await closeLocalViteServer(viteServer);
   }
+  process.exit(exitCode);
 }

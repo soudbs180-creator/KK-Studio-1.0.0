@@ -14,6 +14,73 @@ const SETTINGS_HOME_PATH = '/settings';
 const SETTINGS_API_PATH = '/settings/api-management';
 const STORAGE_KEY = 'kk_studio_canvas_state';
 
+const SMOKE_PROFILE = {
+  id: 'smoke-settings-user',
+  email: 'smoke-settings-user@temp.local',
+  nickname: 'Smoke Settings User',
+  avatarUrl: 'preset-default-local',
+  role: 'user',
+  status: 'active',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+};
+const SMOKE_AUTH_SESSION = {
+  accessToken: 'smoke-settings-access-token',
+  refreshToken: 'smoke-settings-refresh-token',
+  expiresIn: 3600,
+  sessionExpiresAt: '2099-01-01T00:00:00.000Z',
+  profile: SMOKE_PROFILE,
+};
+
+function buildSmokeEnvelope(data) {
+  return {
+    success: true,
+    data,
+    meta: {
+      requestId: `mobile-settings-smoke-${Date.now()}`,
+      clientVersion: 'mobile-settings-smoke',
+      timestamp: new Date().toISOString(),
+    },
+  };
+}
+
+async function fulfillSmokeJson(route, data) {
+  await route.fulfill({
+    status: 200,
+    contentType: 'application/json; charset=utf-8',
+    body: JSON.stringify(buildSmokeEnvelope(data)),
+  });
+}
+
+async function installSmokeApiRoutes(page) {
+  await page.route('**/api/v1/**', async (route) => {
+    const url = new URL(route.request().url());
+    const pathname = url.pathname.replace(/\/+$/, '');
+
+    if (pathname.endsWith('/api/v1/auth/session') || pathname.endsWith('/api/v1/auth/refresh')) {
+      await fulfillSmokeJson(route, SMOKE_AUTH_SESSION);
+      return;
+    }
+
+    if (pathname.endsWith('/api/v1/profile')) {
+      await fulfillSmokeJson(route, SMOKE_PROFILE);
+      return;
+    }
+
+    if (pathname.endsWith('/api/v1/profile/user-apis')) {
+      await fulfillSmokeJson(route, { entries: [] });
+      return;
+    }
+
+    if (pathname.endsWith('/api/v1/profile/key-manager-state')) {
+      await fulfillSmokeJson(route, { version: 1, slots: [], providers: [], entries: [] });
+      return;
+    }
+
+    await route.fallback();
+  });
+}
+
 const tinyPng =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9sX6lzQAAAAASUVORK5CYII=';
 
@@ -341,6 +408,7 @@ let browser;
 let viteServer;
 let browserPreflight = null;
 let targetUrl = DEFAULT_TARGET_URL;
+let exitCode = 0;
 
 try {
   const ensured = await ensureLocalViteServer({ root: REPO_ROOT, url: DEFAULT_TARGET_URL });
@@ -357,6 +425,7 @@ try {
     isMobile: true,
     hasTouch: true,
   });
+  await installSmokeApiRoutes(page);
 
   await page.addInitScript(() => {
     const now = Date.now();
@@ -538,13 +607,15 @@ try {
   if (isBrowserLaunchUnavailable(error)) {
     await runFallbackVerification(error, browserPreflight, targetUrl);
   } else {
-    throw error;
+    console.error(error);
+    exitCode = 1;
   }
 } finally {
   if (browser) {
-    await browser.close();
+    await browser.close().catch(() => {});
   }
   if (viteServer) {
     await closeLocalViteServer(viteServer);
   }
+  process.exit(exitCode);
 }

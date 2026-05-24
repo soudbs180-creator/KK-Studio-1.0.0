@@ -157,37 +157,37 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
             <MobileResultStandardEmptySkeleton columnCount={columnCount} />
           )
         ) : (
-          <div className="space-y-3 pb-1">
-            <div className="flex gap-3 items-start w-full">
-              {columnsData.map((columnEntries, colIdx) => (
-                <div key={colIdx} className="flex flex-col gap-3 flex-1 min-w-0">
-                  {columnEntries.map((entry) => {
-                    const gridMetrics = getAdaptiveResultTileGridMetrics({
-                      surface,
-                      width: measuredWidth,
-                      viewMode,
-                      columnCount,
-                      aspectRatio: entry.mobileLayout.aspectRatio,
-                      aspectCategory: entry.mobileLayout.aspectCategory,
-                    });
+          <div
+            className="grid gap-3 pb-1 [grid-auto-flow:dense]"
+            style={{
+              gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
+              gridAutoRows: '8px',
+            }}
+          >
+            {resultEntries.map((entry) => {
+              const gridMetrics = getAdaptiveResultTileGridMetrics({
+                surface,
+                width: measuredWidth,
+                viewMode,
+                columnCount,
+                aspectRatio: entry.mobileLayout.aspectRatio,
+                aspectCategory: entry.mobileLayout.aspectCategory,
+              });
 
-                    return (
-                      <MobileResultTile
-                        key={entry.id}
-                        entry={entry}
-                        isActive={activeEntryId === entry.id}
-                        isSource={activeSourceImage === entry.imageId}
-                        viewMode={viewMode}
-                        gridMetrics={gridMetrics}
-                        onEntryOpen={onEntryOpen}
-                        onUseAsSource={onUseAsSource}
-                      />
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-            <div ref={bottomRef} className="h-1 w-full" />
+              return (
+                <MobileResultTile
+                  key={entry.id}
+                  entry={entry}
+                  isActive={activeEntryId === entry.id}
+                  isSource={activeSourceImage === entry.imageId}
+                  viewMode={viewMode}
+                  gridMetrics={gridMetrics}
+                  onEntryOpen={onEntryOpen}
+                  onUseAsSource={onUseAsSource}
+                />
+              );
+            })}
+            <div ref={bottomRef} style={{ gridColumn: '1 / -1' }} className="h-1 w-full" />
           </div>
         )}
       </div>
@@ -203,7 +203,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
           </div>
         </div>
         <div className="flex shrink-0 items-center pointer-events-auto">
-          <div className="flex rounded-full border border-white/12 bg-black/40 backdrop-blur-md p-0.5 text-[11px] font-medium text-white/80 shadow-lg">
+          <div className="flex rounded-full border border-white/12 bg-black/40 p-0.5 text-[11px] font-medium text-white/80 shadow-lg">
             {(['standard', 'detail'] as ResultViewMode[]).map((mode) => (
               <button
                 key={mode}

@@ -3,6 +3,7 @@ import { Navigate, Route, type RouteObject, useNavigate } from 'react-router-dom
 
 import type { Supplier } from '../../services/billing/supplierService';
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
+import { useAdminRole } from '../../hooks/useAdminRole';
 import {
   buildSettingsPath,
   LEGACY_SETTINGS_ROUTE_REDIRECTS,
@@ -16,6 +17,7 @@ const ApiSettingsView = lazy(() => import('./ApiSettingsView'));
 const CostEstimation = lazy(() => import('../../pages/CostEstimation'));
 const StorageSettingsView = lazy(() => import('./views/StorageSettingsView.localized.tsx'));
 const SystemLogsView = lazy(() => import('./views/SystemLogsView.localized.tsx'));
+const AdminCreditsView = lazy(() => import('./views/AdminCreditsView.tsx'));
 
 type SettingsWorkbenchRouteDefinition =
   | { path: ''; kind: 'dashboard'; index: true }
@@ -27,7 +29,8 @@ type SettingsWorkbenchRouteDefinition =
   | { path: 'api-management/:supplierId'; kind: 'api' }
   | { path: 'consumption-records'; kind: 'billing' }
   | { path: 'storage-settings'; kind: 'storage' }
-  | { path: 'system-logs'; kind: 'logs' };
+  | { path: 'system-logs'; kind: 'logs' }
+  | { path: 'admin-credits'; kind: 'admin-credits' };
 
 const SETTINGS_WORKBENCH_ROUTE_DEFINITIONS: SettingsWorkbenchRouteDefinition[] = [
   { path: '', kind: 'dashboard', index: true },
@@ -40,6 +43,7 @@ const SETTINGS_WORKBENCH_ROUTE_DEFINITIONS: SettingsWorkbenchRouteDefinition[] =
   { path: 'consumption-records', kind: 'billing' },
   { path: 'storage-settings', kind: 'storage' },
   { path: 'system-logs', kind: 'logs' },
+  { path: 'admin-credits', kind: 'admin-credits' },
 ];
 
 interface SettingsRouteOptions {
@@ -70,6 +74,18 @@ const DashboardRouteElement: React.FC<{
   );
 };
 
+const AdminCreditsRouteElement: React.FC = () => {
+  const { isAdmin, checkingAdmin } = useAdminRole();
+  if (checkingAdmin) {
+    return (
+      <div className="p-8 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>
+        正在检查管理员权限...
+      </div>
+    );
+  }
+  return isAdmin ? <AdminCreditsView /> : <Navigate to="/settings" replace />;
+};
+
 function getRouteElement(
   definition: SettingsWorkbenchRouteDefinition,
   options: SettingsRouteOptions,
@@ -95,6 +111,8 @@ function getRouteElement(
       return <StorageSettingsView key={routeRefreshKey} />;
     case 'logs':
       return <SystemLogsView key={routeRefreshKey} />;
+    case 'admin-credits':
+      return <AdminCreditsRouteElement key={routeRefreshKey} />;
     default:
       return <Navigate to={(options.dashboardBasePath || '/settings')} replace />;
   }

@@ -868,9 +868,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               '把路由、日志和存储准备度放在同一个面板里。',
               'Keep route, log, and storage readiness in one compact panel.',
             )}
+            surface="plain"
             action={<LayoutDashboard size={18} className="text-[var(--text-primary)]" />}
           >
-            <div className="settings-reference-rings">
+            <div className="settings-reference-rings settings-reference-rings--flat">
               <DashboardRingRow
                 label={pick('路由覆盖', 'Route coverage')}
                 percent={channelCoverage}

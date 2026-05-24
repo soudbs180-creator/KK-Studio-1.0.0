@@ -57,7 +57,7 @@ export interface MobileWorkspaceSurfaceProps {
 }
 
 const moreSheetActionClass =
-  'rounded-[22px] border border-white/8 bg-white/5 backdrop-blur-md p-3.5 text-left text-[var(--text-primary)] transition-all active:scale-[0.985] active:bg-white/10';
+  'rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-3.5 text-left text-[var(--text-primary)] transition-all active:scale-[0.985]';
 
 const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   activeScreen,
@@ -160,7 +160,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   };
 
   const header = (
-    <div className="px-3 py-1.5">
+    <div className="relative px-3 py-1.5 z-20">
       <MobileHeader
         onMenuClick={() => onScreenChange(showMoreSheet ? 'home' : 'more-sheet')}
         onUserClick={onOpenProfile}
@@ -173,6 +173,8 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
         userAvatarUrl={userAvatarUrl}
         userRole={accountRole}
       />
+      {/* 用户信息积分栏最下方框下面的渐变半透明效果 */}
+      <div className="pointer-events-none absolute inset-x-0 top-full h-10 bg-gradient-to-b from-black/70 via-black/30 to-transparent" />
     </div>
   );
 
@@ -220,7 +222,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
           />
 
           <div
-            className="relative rounded-t-[30px] border px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 text-[var(--text-primary)] backdrop-blur-xl"
+            className="relative rounded-t-[30px] border px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 text-[var(--text-primary)]"
             style={{
               background: 'var(--mobile-glass-bg)',
               borderColor: 'var(--mobile-glass-border)',
@@ -237,7 +239,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               <button
                 type="button"
                 onClick={() => setShowProjectList((previous) => !previous)}
-                className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 backdrop-blur-md px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)]"
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)]"
               >
                 <FolderOpen size={14} />
                 {resolvedProjectCount > 1 ? `项目 ${resolvedProjectCount}` : '当前项目'}
@@ -247,7 +249,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             <button
               type="button"
               onClick={() => setShowProjectList((previous) => !previous)}
-              className="mb-3 flex w-full items-center justify-between rounded-[24px] border border-white/8 bg-white/5 backdrop-blur-md px-4 py-3 text-left transition-all active:scale-[0.985] active:bg-white/10"
+              className="mb-3 flex w-full items-center justify-between rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] px-4 py-3 text-left"
             >
               <div className="min-w-0">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
@@ -259,7 +261,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             </button>
 
             {showProjectList ? (
-              <div className="mb-4 rounded-[24px] border border-white/8 bg-white/5 backdrop-blur-md p-2.5">
+              <div className="mb-4 rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-2.5">
                 <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
                   项目列表
                 </div>
@@ -278,7 +280,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                         className={`flex w-full items-center justify-between gap-3 rounded-[18px] px-3 py-3 text-left transition-all ${
                           isActive
                             ? 'border border-[var(--mobile-clay-active-border)] bg-[var(--mobile-clay-active-bg)] text-[var(--text-primary)]'
-                            : 'border border-white/5 bg-white/5 backdrop-blur-sm text-[var(--text-secondary)]'
+                            : 'border border-transparent bg-[var(--mobile-clay-muted-surface-bg)] text-[var(--text-secondary)]'
                         }`}
                       >
                         <span className="min-w-0 truncate text-sm font-medium">{canvas.name}</span>
@@ -297,7 +299,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                     closeMoreSheet();
                   }}
                   disabled={!canCreateCanvas}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[18px] border border-dashed border-white/10 bg-white/5 backdrop-blur-sm px-3 py-3 text-sm font-medium text-[var(--text-secondary)] disabled:opacity-45"
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[18px] border border-dashed border-[var(--mobile-clay-border-strong)] bg-[var(--mobile-clay-muted-surface-bg)] px-3 py-3 text-sm font-medium text-[var(--text-secondary)] disabled:opacity-45"
                 >
                   <Plus size={16} />
                   {canCreateCanvas ? '新建项目' : '项目已满'}

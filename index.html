@@ -32,12 +32,61 @@
         body {
             font-family: 'Inter', sans-serif;
             background: #09090b;
+            color: #ffffff;
+        }
+
+        body:not(.dark-mode) {
+            background: #fffaf0;
+            color: #0a0a0a;
         }
     </style>
 </head>
 
 <body>
-    <div id="root"></div>
+    <script>
+        (function () {
+            try {
+                var stored = localStorage.getItem('theme') || localStorage.getItem('kk_theme');
+                var isDark = false;
+                if (stored === 'dark') {
+                    isDark = true;
+                } else if (stored === 'light') {
+                    isDark = false;
+                } else {
+                    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                }
+                if (isDark) {
+                    document.documentElement.classList.add('dark');
+                    document.body.classList.add('dark-mode');
+                    document.documentElement.dataset.theme = 'dark';
+                    document.body.dataset.theme = 'dark';
+                    document.documentElement.style.colorScheme = 'dark';
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    document.body.classList.remove('dark-mode');
+                    document.documentElement.dataset.theme = 'light';
+                    document.body.dataset.theme = 'light';
+                    document.documentElement.style.colorScheme = 'light';
+                }
+            } catch (e) {}
+        })();
+    </script>
+    <div id="root">
+        <!-- 静态高保真 Loading 骨架页，React 挂载后会自动替换它 -->
+        <div class="app-startup-screen" style="display: grid; min-height: 100dvh; place-items: center; overflow: hidden; padding: 32px; position: fixed; inset: 0; z-index: 9999;">
+            <div class="app-startup-shell" style="position: relative; z-index: 1; width: min(400px, calc(100vw - 64px)); margin: 0 auto;">
+                <section class="app-startup-card" style="position: relative; overflow: hidden; width: 100%; border: 1px solid var(--app-startup-panel-border, rgba(255, 255, 255, 0.06)); border-radius: 20px; padding: 24px 28px; background: var(--app-startup-panel-bg, #141414); box-shadow: var(--app-startup-panel-shadow, 0 20px 40px rgba(0,0,0,0.3));">
+                    <div class="app-startup-stage-line" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--app-startup-muted, rgba(255, 255, 255, 0.7)); font-size: 13px;">
+                        <span>正在加载中...</span>
+                        <strong style="color: var(--app-startup-title, #ffffff); font-size: 12px; font-weight: 700;">0%</strong>
+                    </div>
+                    <div class="app-startup-progress-track" style="height: 4px; margin-top: 10px; overflow: hidden; background: var(--app-startup-track-bg, rgba(255, 255, 255, 0.06)); border-radius: 999px;">
+                        <span style="display: block; height: 100%; min-width: 12%; background: linear-gradient(90deg, var(--app-startup-accent-strong, #ffb084), var(--app-startup-accent, #ffb084)); border-radius: inherit; width: 12%;"></span>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
     <script>
         (function () {
             var turnstileScriptUrl = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';

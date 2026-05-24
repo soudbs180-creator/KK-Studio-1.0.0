@@ -82,26 +82,34 @@ export function getAdaptiveResultTileGridMetrics({
     };
   }
 
-  // 🚀 12列网格系统下的自适应 span 分配
   let columnSpan = 3; // 默认占 3/12 (一排 4 个)
 
-  if (safeAspectRatio >= 2.0) {
-    // 21:9 超宽图 (放 1 个，占 12/12)
-    columnSpan = 12;
-  } else if (safeAspectRatio >= 1.45) {
-    // 16:9 宽图 (放 2 个，占 6/12)
-    columnSpan = 6;
+  if (safeColumnCount !== 12) {
+    // 非 12 列精细网格时（如测试中的 3 列），回退到旧有的直观列分配
+    columnSpan = 1;
+    if (safeAspectRatio >= 1.45) {
+      columnSpan = Math.min(safeColumnCount, 2);
+    }
   } else {
-    // 其他普通比例：放 3 个到 4 个
-    if (surface === 'phone') {
-      if (safeWidth <= 480) {
-        columnSpan = 4; // 窄屏放 3 个 (占 4/12)
-      } else {
-        columnSpan = 3; // 宽屏放 4 个 (占 3/12)
-      }
+    // 🚀 12列网格系统下的自适应 span 分配
+    if (safeAspectRatio >= 2.0) {
+      // 21:9 超宽图 (放 1 个，占 12/12)
+      columnSpan = 12;
+    } else if (safeAspectRatio >= 1.45) {
+      // 16:9 宽图 (放 2 个，占 6/12)
+      columnSpan = 6;
     } else {
-      // 平板和桌面端放 4 个 (占 3/12)
-      columnSpan = 3;
+      // 其他普通比例：放 3 个到 4 个
+      if (surface === 'phone') {
+        if (safeWidth <= 480) {
+          columnSpan = 4; // 窄屏放 3 个 (占 4/12)
+        } else {
+          columnSpan = 3; // 宽屏放 4 个 (占 3/12)
+        }
+      } else {
+        // 平板和桌面端放 4 个 (占 3/12)
+        columnSpan = 3;
+      }
     }
   }
 

@@ -364,7 +364,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
                 >
                   {item.isGenerating ? (
                     /* 生成中占位卡片 */
-                    <div className="relative w-full min-h-[190px] aspect-square h-[300px] flex flex-col items-center justify-center bg-[var(--bg-secondary)]/50 rounded-[24px] overflow-hidden">
+                    <div className="relative w-full min-h-[190px] aspect-square h-[300px] flex flex-col items-center justify-center bg-[var(--mobile-clay-muted-surface-bg)]/50 rounded-[24px] overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-shimmer-sweep" />
                       <div className="relative flex flex-col items-center gap-2 select-none">
                         <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/5 border border-white/10">
@@ -386,7 +386,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
                   )}
 
                   {!item.isGenerating && itemIsFailed && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[1px] p-3 text-center rounded-[24px]">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 p-3 text-center rounded-[24px]">
                       <svg className="w-6 h-6 text-red-400 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
                       </svg>

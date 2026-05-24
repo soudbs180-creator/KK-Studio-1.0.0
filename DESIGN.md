@@ -1,6 +1,6 @@
 # KK Studio Clay UI Manual
 
-Last updated: 2026-05-01
+Last updated: 2026-05-24
 
 ## Direction
 
@@ -36,6 +36,7 @@ User override for this UI audit: inputs, main cards, sub cards, and framework ca
 - Search, settings, modal, and canvas surfaces must keep readable foreground/background contrast in both light and dark themes.
 - Mobile and desktop surfaces can share tokens, but their layout logic and spacing must be separate.
 - Avoid blue or purple as generic selected states; use Clay pink/coral/teal depending on semantic weight.
+- **Mobile Model List**: Swipe gestures on mobile lists are deprecated due to physical scrolling and workspace drag conflicts. We prefer explicit, lightweight action controls. Pinned/favorite models are toggled directly via a clean, tap-friendly pin icon (📌 / 📍) placed on the right edge of each model card.
 
 ## Typography
 

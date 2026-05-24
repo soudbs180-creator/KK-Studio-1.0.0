@@ -29,13 +29,19 @@ import {
   CreditTransactionNotFoundError,
   CreditTransactionNotRefundableError,
 } from "../infrastructure/in-memory-credit-account-repository.ts";
+import type { CreditProviderRepository } from "../../model-catalog/index.ts";
 
 export class CreditAccountService {
   private readonly logger = consoleLogger.child({ module: "billing.credit-account" });
   private readonly repository: CreditAccountRepository;
+  private readonly creditProviderRepository?: Pick<CreditProviderRepository, "listActiveRuntimeRoutes">;
 
-  constructor(repository: CreditAccountRepository) {
+  constructor(
+    repository: CreditAccountRepository,
+    creditProviderRepository?: Pick<CreditProviderRepository, "listActiveRuntimeRoutes">,
+  ) {
     this.repository = repository;
+    this.creditProviderRepository = creditProviderRepository;
   }
 
   async getBalance(
@@ -58,6 +64,42 @@ export class CreditAccountService {
     requestId: string,
     clientVersion?: string,
   ): Promise<ApiResponse<DebitCreditsResponseDto>> {
+    if (input.modelCode && this.creditProviderRepository) {
+      const routes = await this.creditProviderRepository.listActiveRuntimeRoutes(input.modelCode);
+      if (routes && routes.length > 0) {
+        const costs = routes.map((r) => {
+          let minCost = r.creditCost;
+          if (r.advancedEnabled && r.qualityPricing) {
+            const qualityCosts = Object.values(r.qualityPricing)
+              .filter((q) => q.enabled !== false)
+              .map((q) => q.creditCost);
+            if (qualityCosts.length > 0) {
+              minCost = Math.min(minCost, ...qualityCosts);
+            }
+          }
+          return minCost;
+        });
+        const minAllowedCredits = Math.min(...costs);
+        if (input.creditAmount < minAllowedCredits) {
+          this.logger.warn("Prevented potentially tampered debit request (below model price floor)", {
+            userId,
+            modelCode: input.modelCode,
+            requestedAmount: input.creditAmount,
+            minAllowedCredits,
+            requestId,
+          });
+          return {
+            success: false,
+            error: {
+              code: "INVALID_REQUEST",
+              message: `The requested debit credits amount (${input.creditAmount}) is below the minimum price floor (${minAllowedCredits}) configured for model ${input.modelCode}.`,
+            },
+            meta: buildRequestMeta(requestId, clientVersion),
+          };
+        }
+      }
+    }
+
     const existing = await this.repository.findDebitByIdempotencyKey(userId, input.idempotencyKey);
     if (existing) {
       return {

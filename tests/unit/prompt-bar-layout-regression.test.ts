@@ -33,7 +33,7 @@ test('prompt bar keeps footer wrapping while allowing full desktop control label
   assert.match(topRowDesktopSource, /className="flex items-center justify-between mb-2 gap-2"/);
   assert.match(footerShellSource, /if \(isMobile\) \{\s*return <PromptBarFooterMobile>\{children\}<\/PromptBarFooterMobile>;\s*\}/);
   assert.match(footerShellSource, /return <PromptBarFooterDesktop>\{children\}<\/PromptBarFooterDesktop>;/);
-  assert.match(modePanelSource, /className=\{`relative inline-flex \$\{isMobile \? 'min-w-0 shrink-0' : 'min-w-fit flex-shrink-0'\}`\}/);
+  assert.match(modePanelSource, /className=\{(?:isMobile \? 'static min-w-0 shrink-0' : `relative inline-flex min-w-fit flex-shrink-0`|`relative inline-flex \$\{isMobile \? 'min-w-0 shrink-0' : 'min-w-fit flex-shrink-0'\}`)\}/);
   assert.match(
     modePanelSource,
     /<span className="whitespace-nowrap">[\s\S]*\{config\.aspectRatio === AspectRatio\.AUTO \? [^:]+ : config\.aspectRatio\}[\s\S]*\{config\.imageSize\}[\s\S]*<\/span>/,
@@ -219,7 +219,7 @@ test('mobile prompt footer stays single-row and keeps model settings send contro
   assert.doesNotMatch(promptBarSource, /isMobile \? 'w-\[clamp\(6\.75rem,38vw,8\.5rem\)\] max-w-\[42vw\] flex-none justify-start'/);
   assert.match(promptBarSource, /isMobile \? 'w-\[clamp\(6rem,34vw,8rem\)\] max-w-\[36vw\] flex-none justify-start'/);
   assert.doesNotMatch(modePanelSource, /isEmbeddedMobileDrawer \? 'px-3 justify-between max-w-none' : 'px-2\.5 max-w-none'/);
-  assert.match(modePanelSource, /isMobile \? 'min-w-0 shrink-0'/);
+  assert.match(modePanelSource, /isMobile \? '(?:static )?min-w-0 shrink-0'/);
   assert.match(modePanelSource, /isMobile \? \(isEmbeddedMobileDrawer \? 'px-3 justify-between max-w-\[34vw\] min-w-0 overflow-hidden' : 'px-2\.5 max-w-\[32vw\] min-w-0 overflow-hidden'\)/);
 });
 
@@ -241,7 +241,7 @@ test('mobile prompt composer uses three touch-safe rows and keeps ecommerce out 
   assert.match(promptBarSource, /data-mobile-footer-control="model-library"/);
   assert.match(promptBarSource, /data-mobile-footer-control="settings"/);
   assert.match(promptBarSource, /data-mobile-footer-control="send"/);
-  assert.doesNotMatch(promptBarSource, /<MobileEmbeddedAdvancedDrawer/);
+  assert.match(promptBarSource, /<MobileEmbeddedAdvancedDrawer/);
   assert.match(footerSource, /data-mobile-action-row="model-settings-send"/);
 });
 

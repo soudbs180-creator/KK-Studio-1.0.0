@@ -170,6 +170,77 @@ describe("billing http routes", () => {
     }
   });
 
+  test("prevents tampered debit amount below model pricing floor", async () => {
+    const mockCreditProviderRepository = {
+      listActiveRuntimeRoutes: async (modelId?: string) => {
+        if (modelId === "gemini-2.5-flash-image") {
+          return [
+            {
+              providerId: "test-provider",
+              providerName: "Test Provider",
+              baseUrl: "http://test",
+              apiKeys: ["key"],
+              modelId: "gemini-2.5-flash-image",
+              displayName: "Nano Banana",
+              endpointType: "image",
+              creditCost: 12,
+              priority: 1,
+              weight: 1,
+              callCount: 0,
+              advancedEnabled: false,
+              mixWithSameModel: false,
+            },
+          ];
+        }
+        return [];
+      },
+      listAdminProviders: async () => [],
+      listActiveCreditModels: async () => [],
+      saveAdminProvider: async () => ({ providerId: "", providerName: "", apiKeyCount: 0, modelCount: 0 }),
+      getProviderPricingCache: async () => null,
+      saveProviderPricingCache: async () => { throw new Error("not implemented"); },
+      getSharedProviderPricingCache: async () => null,
+      saveSharedProviderPricingCache: async () => { throw new Error("not implemented"); },
+      deleteAdminProvider: async () => false,
+    };
+
+    const service = new CreditAccountService(
+      new InMemoryCreditAccountRepository(20),
+      mockCreditProviderRepository,
+    );
+
+    const headers = {
+      [AUTHENTICATED_USER_ID_HEADER]: "user-billing-test",
+      "x-request-id": "req-billing-tamper-check",
+    };
+
+    const tamperedResult = await handleDebitCredits(service, {
+      businessRefType: "generation_task",
+      businessRefId: "task-tamper",
+      creditAmount: 5,
+      modelCode: "gemini-2.5-flash-image",
+      idempotencyKey: "idem-billing-tamper-1",
+    }, headers);
+
+    assert.equal(tamperedResult.statusCode, 409);
+    assert.equal(tamperedResult.body.success, false);
+    if (!tamperedResult.body.success) {
+      assert.equal(tamperedResult.body.error.code, "INVALID_REQUEST");
+      assert.match(tamperedResult.body.error.message, /below the minimum price floor/);
+    }
+
+    const validResult = await handleDebitCredits(service, {
+      businessRefType: "generation_task",
+      businessRefId: "task-tamper",
+      creditAmount: 12,
+      modelCode: "gemini-2.5-flash-image",
+      idempotencyKey: "idem-billing-tamper-2",
+    }, headers);
+
+    assert.equal(validResult.statusCode, 200);
+    assert.equal(validResult.body.success, true);
+  });
+
   test("lists transactions and refunds a completed debit entry", async () => {
     const service = new CreditAccountService(new InMemoryCreditAccountRepository(20));
     const headers = {

@@ -287,6 +287,7 @@ let browser;
 let viteServer;
 let browserPreflight = null;
 let targetUrl = DEFAULT_TARGET_URL;
+var exitCode = 0;
 
 try {
   const ensured = await ensureLocalViteServer({ root: REPO_ROOT, url: DEFAULT_TARGET_URL });
@@ -422,13 +423,15 @@ try {
   if (isBrowserLaunchUnavailable(error)) {
     await runFallbackVerification(error, browserPreflight, targetUrl);
   } else {
-    throw error;
+    console.error(error);
+    exitCode = 1;
   }
 } finally {
   if (browser) {
-    await browser.close();
+    await browser.close().catch(() => {});
   }
   if (viteServer) {
     await closeLocalViteServer(viteServer);
   }
+  process.exit(exitCode);
 }
