@@ -226,7 +226,9 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             style={{
               background: 'var(--mobile-glass-bg)',
               borderColor: 'var(--mobile-glass-border)',
-              boxShadow: 'var(--mobile-glass-shadow)'
+              boxShadow: 'var(--mobile-glass-shadow)',
+              backdropFilter: 'blur(20px) saturate(160%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(160%)',
             }}
           >
             <div className="mb-4 flex items-start justify-between gap-3">

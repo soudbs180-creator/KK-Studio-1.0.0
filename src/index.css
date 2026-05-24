@@ -12871,6 +12871,7 @@ body.dark-mode {
   --state-info-border: rgb(255 77 139 / 0.30);
   --state-info-text: var(--clay-brand-peach);
   --mobile-clay-shell-bg: var(--frost-card-framework-bg);
+  --mobile-glass-bg: rgba(14, 14, 15, 0.94);
   --mobile-clay-surface-bg: var(--frost-card-main-bg);
   --mobile-clay-muted-surface-bg: var(--frost-card-sub-bg);
   --mobile-clay-overlay-bg: rgb(0 0 0 / 0.62);
