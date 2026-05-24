@@ -926,59 +926,81 @@ const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
     const isSwiping = React.useRef(false);
     const maxOffset = -72; // 置顶按钮宽度 72px
 
-    const onSwipeTouchStart = (e: React.TouchEvent) => {
-        const touch = e.touches[0];
-        touchStart.current = { x: touch.clientX, y: touch.clientY };
-        isSwiping.current = false;
-        setIsTransitioning(false);
-    };
+    // 用 ref 保存最新的状态以避免频繁解绑和重新绑定
+    const stateRef = React.useRef({ isOpen, offsetX });
+    React.useEffect(() => {
+        stateRef.current = { isOpen, offsetX };
+    }, [isOpen, offsetX]);
 
-    const onSwipeTouchMove = (e: React.TouchEvent) => {
-        const touch = e.touches[0];
-        const deltaX = touch.clientX - touchStart.current.x;
-        const deltaY = touch.clientY - touchStart.current.y;
+    const containerRef = React.useRef<HTMLDivElement>(null);
 
-        // 判断是否为水平手势
-        if (!isSwiping.current) {
-            if (Math.abs(deltaX) > 8 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
-                isSwiping.current = true;
+    React.useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const onSwipeTouchStart = (e: TouchEvent) => {
+            const touch = e.touches[0];
+            touchStart.current = { x: touch.clientX, y: touch.clientY };
+            isSwiping.current = false;
+            setIsTransitioning(false);
+        };
+
+        const onSwipeTouchMove = (e: TouchEvent) => {
+            const touch = e.touches[0];
+            const deltaX = touch.clientX - touchStart.current.x;
+            const deltaY = touch.clientY - touchStart.current.y;
+
+            // 判断是否为水平手势
+            if (!isSwiping.current) {
+                if (Math.abs(deltaX) > 8 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+                    isSwiping.current = true;
+                }
             }
-        }
 
-        if (isSwiping.current) {
-            // 水平滑动中阻止页面上下滚动
-            if (e.cancelable) {
-                e.preventDefault();
+            if (isSwiping.current) {
+                // 水平滑动中阻止页面上下滚动
+                if (e.cancelable) {
+                    e.preventDefault();
+                }
+                
+                // 计算新的偏移量
+                const startOffset = stateRef.current.isOpen ? maxOffset : 0;
+                let currentOffset = startOffset + deltaX;
+                // 限制滑动区间在 [maxOffset, 0] 之间
+                currentOffset = Math.max(maxOffset, Math.min(0, currentOffset));
+                setOffsetX(currentOffset);
             }
-            
-            // 计算新的偏移量
-            const startOffset = isOpen ? maxOffset : 0;
-            let currentOffset = startOffset + deltaX;
-            // 限制滑动区间在 [maxOffset, 0] 之间
-            currentOffset = Math.max(maxOffset, Math.min(0, currentOffset));
-            setOffsetX(currentOffset);
-        }
-    };
+        };
 
-    const onSwipeTouchEnd = () => {
-        setIsTransitioning(true);
-        if (isSwiping.current) {
-            // 如果向左滑动超过一半，则打开；否则关闭
-            if (offsetX < maxOffset / 2) {
-                setIsOpen(true);
-                setOffsetX(maxOffset);
+        const onSwipeTouchEnd = () => {
+            setIsTransitioning(true);
+            if (isSwiping.current) {
+                const currentOffset = stateRef.current.offsetX;
+                if (currentOffset < maxOffset / 2) {
+                    setIsOpen(true);
+                    setOffsetX(maxOffset);
+                } else {
+                    setIsOpen(false);
+                    setOffsetX(0);
+                }
             } else {
-                setIsOpen(false);
-                setOffsetX(0);
+                if (stateRef.current.isOpen) {
+                    setIsOpen(false);
+                    setOffsetX(0);
+                }
             }
-        } else {
-            // 如果没有滑动过（仅仅是点击），并且当前是打开状态，则关闭它
-            if (isOpen) {
-                setIsOpen(false);
-                setOffsetX(0);
-            }
-        }
-    };
+        };
+
+        container.addEventListener('touchstart', onSwipeTouchStart, { passive: true });
+        container.addEventListener('touchmove', onSwipeTouchMove, { passive: false });
+        container.addEventListener('touchend', onSwipeTouchEnd, { passive: true });
+
+        return () => {
+            container.removeEventListener('touchstart', onSwipeTouchStart);
+            container.removeEventListener('touchmove', onSwipeTouchMove);
+            container.removeEventListener('touchend', onSwipeTouchEnd);
+        };
+    }, []);
 
     const handlePinClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -1003,10 +1025,8 @@ const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
 
     return (
         <div 
+            ref={containerRef}
             className="relative w-full overflow-hidden rounded-xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] select-none"
-            onTouchStart={onSwipeTouchStart}
-            onTouchMove={onSwipeTouchMove}
-            onTouchEnd={onSwipeTouchEnd}
         >
             {/* 内容滑动容器 */}
             <div 
@@ -3107,23 +3127,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 <ImageOptionsPanel
                     aspectRatio={config.aspectRatio}
                     imageSize={config.imageSize}
-                    networkOptions={isMobile ? [
-                        ...(groundingSupported ? [{
-                            id: 'grounding',
-                            label: '联网搜索',
-                            active: !!config.enableGrounding,
-                            onToggle: () => updateConfigFields({ enableGrounding: !config.enableGrounding }),
-                        }] : []),
-                        ...(imageSearchSupported ? [{
-                            id: 'image-search',
-                            label: '图片搜索',
-                            active: !!config.enableImageSearch,
-                            onToggle: () => updateConfigFields({ enableImageSearch: !config.enableImageSearch }),
-                        }] : []),
-                    ] : []}
-                    showThinkingMode={config.mode === GenerationMode.ECOMMERCE ? false : thinkingSupported}
-                    thinkingMode={config.thinkingMode || 'minimal'}
-                    onThinkingModeChange={(mode) => updateConfigFields({ thinkingMode: mode })}
                     onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
                     onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
                     availableRatios={availableRatios}
@@ -3871,23 +3874,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     <ImageOptionsPanel
                                         aspectRatio={config.aspectRatio}
                                         imageSize={config.imageSize}
-                                        networkOptions={[
-                                            ...(groundingSupported ? [{
-                                                id: 'grounding',
-                                                label: '联网搜索',
-                                                active: !!config.enableGrounding,
-                                                onToggle: () => updateConfigFields({ enableGrounding: !config.enableGrounding }),
-                                            }] : []),
-                                            ...(imageSearchSupported ? [{
-                                                id: 'image-search',
-                                                label: '图片搜索',
-                                                active: !!config.enableImageSearch,
-                                                onToggle: () => updateConfigFields({ enableImageSearch: !config.enableImageSearch }),
-                                            }] : []),
-                                        ]}
-                                        showThinkingMode={config.mode === GenerationMode.ECOMMERCE ? false : thinkingSupported}
-                                        thinkingMode={config.thinkingMode || 'minimal'}
-                                        onThinkingModeChange={(mode) => updateConfigFields({ thinkingMode: mode })}
                                         onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
                                         onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
                                         availableRatios={availableRatios}
@@ -4933,23 +4919,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     <ImageOptionsPanel
                                         aspectRatio={config.aspectRatio}
                                         imageSize={config.imageSize}
-                                        networkOptions={isMobile ? [
-                                            ...(groundingSupported ? [{
-                                                id: 'grounding',
-                                                label: '联网搜索',
-                                                active: !!config.enableGrounding,
-                                                onToggle: () => updateConfigFields({ enableGrounding: !config.enableGrounding }),
-                                            }] : []),
-                                            ...(imageSearchSupported ? [{
-                                                id: 'image-search',
-                                                label: '图片搜索',
-                                                active: !!config.enableImageSearch,
-                                                onToggle: () => updateConfigFields({ enableImageSearch: !config.enableImageSearch }),
-                                            }] : []),
-                                        ] : []}
-                                        showThinkingMode={config.mode === GenerationMode.ECOMMERCE ? false : thinkingSupported}
-                                        thinkingMode={config.thinkingMode || 'minimal'}
-                                        onThinkingModeChange={(mode) => updateConfigFields({ thinkingMode: mode })}
+                                        
                                         onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
                                         onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
                                         availableRatios={availableRatios}

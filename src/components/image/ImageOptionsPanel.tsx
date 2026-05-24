@@ -12,15 +12,6 @@ import { Fullscreen, ChevronDown } from 'lucide-react';
 interface ImageOptionsPanelProps {
   aspectRatio: AspectRatio;
   imageSize: ImageSize;
-  networkOptions?: Array<{
-    id: string;
-    label: string;
-    active: boolean;
-    onToggle: () => void;
-  }>;
-  showThinkingMode?: boolean;
-  thinkingMode?: 'minimal' | 'high';
-  onThinkingModeChange?: (mode: 'minimal' | 'high') => void;
   onAspectRatioChange: (ratio: AspectRatio) => void;
   onImageSizeChange: (size: ImageSize) => void;
   availableRatios?: AspectRatio[];
@@ -331,10 +322,6 @@ const AspectRatioControlGrid: React.FC<AspectRatioControlGridProps> = ({
 const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
   aspectRatio,
   imageSize,
-  networkOptions = [],
-  showThinkingMode = false,
-  thinkingMode = 'minimal',
-  onThinkingModeChange,
   onAspectRatioChange,
   onImageSizeChange,
   availableRatios = Object.values(AspectRatio),
@@ -377,7 +364,6 @@ const ImageOptionsPanel: React.FC<ImageOptionsPanelProps> = ({
       imageSize,
       aPlusControlMode: 'auto',
     };
-  const shouldShowThinkingMode = !isEcommercePanel && showThinkingMode;
 
   return (
     <div

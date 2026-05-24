@@ -319,7 +319,8 @@ function resolveEcommerceContinuation(
 }
 
 const compareMobileFeedResults = (left: MobileResultEntry, right: MobileResultEntry): number => {
-  const timeDelta = right.timestamp - left.timestamp;
+  // 按照时间戳升序排序，旧时间生成的在上面，越新时间越下面
+  const timeDelta = left.timestamp - right.timestamp;
   if (timeDelta !== 0) {
     return timeDelta;
   }
