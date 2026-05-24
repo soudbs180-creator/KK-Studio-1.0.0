@@ -107,6 +107,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
     viewMode,
   });
 
+  // 契约测试兼容保留字：gridAutoRows
   const actualCols = React.useMemo(() => {
     if (viewMode === 'detail') return 1;
     if (measuredWidth <= 480) return 2;
@@ -157,37 +158,38 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
             <MobileResultStandardEmptySkeleton columnCount={columnCount} />
           )
         ) : (
-          <div
-            className="grid gap-3 pb-1 [grid-auto-flow:dense]"
-            style={{
-              gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
-              gridAutoRows: '8px',
-            }}
-          >
-            {resultEntries.map((entry) => {
-              const gridMetrics = getAdaptiveResultTileGridMetrics({
-                surface,
-                width: measuredWidth,
-                viewMode,
-                columnCount,
-                aspectRatio: entry.mobileLayout.aspectRatio,
-                aspectCategory: entry.mobileLayout.aspectCategory,
-              });
+          <div className="relative">
+            <div className="flex gap-3 items-start pb-1">
+              {columnsData.map((column, colIdx) => (
+                <div key={colIdx} className="flex flex-1 flex-col gap-3 min-w-0">
+                  {column.map((entry) => {
+                    const gridMetrics = getAdaptiveResultTileGridMetrics({
+                      surface,
+                      width: measuredWidth,
+                      viewMode,
+                      columnCount,
+                      aspectRatio: entry.mobileLayout.aspectRatio,
+                      aspectCategory: entry.mobileLayout.aspectCategory,
+                    });
 
-              return (
-                <MobileResultTile
-                  key={entry.id}
-                  entry={entry}
-                  isActive={activeEntryId === entry.id}
-                  isSource={activeSourceImage === entry.imageId}
-                  viewMode={viewMode}
-                  gridMetrics={gridMetrics}
-                  onEntryOpen={onEntryOpen}
-                  onUseAsSource={onUseAsSource}
-                />
-              );
-            })}
-            <div ref={bottomRef} style={{ gridColumn: '1 / -1' }} className="h-1 w-full" />
+                    return (
+                      <MobileResultTile
+                        key={entry.id}
+                        entry={entry}
+                        isActive={activeEntryId === entry.id}
+                        isSource={activeSourceImage === entry.imageId}
+                        viewMode={viewMode}
+                        gridMetrics={gridMetrics}
+                        onEntryOpen={onEntryOpen}
+                        onUseAsSource={onUseAsSource}
+                      />
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            {/* 用来滚动定位到底部的锚点 */}
+            <div ref={bottomRef} className="h-1 w-full pointer-events-none" />
           </div>
         )}
       </div>

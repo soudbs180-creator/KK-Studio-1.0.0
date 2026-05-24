@@ -125,7 +125,10 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
         >
           {entry.isGenerating ? (
             /* 占位态：带 Shimmer 扫光和耗时计时器 */
-            <div className={`relative w-full h-full flex flex-col items-center justify-center min-h-[120px] overflow-hidden bg-[var(--bg-secondary)]/50 ${viewMode === 'detail' ? 'rounded-t-[15px]' : 'rounded-[15px]'}`}>
+            <div
+              className={`relative w-full flex flex-col items-center justify-center overflow-hidden bg-[var(--bg-secondary)]/50 ${viewMode === 'detail' ? 'rounded-t-[15px]' : 'rounded-[15px]'}`}
+              style={{ aspectRatio: imageAspectRatio, minHeight: '120px' }}
+            >
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-shimmer-sweep" />
               <div className="relative flex flex-col items-center gap-1.5 select-none">
                 <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/5 border border-white/10">
@@ -143,17 +146,19 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
               </div>
             </div>
           ) : entry.displaySrc ? (
-            /* 渲染图片 - 去除 aspectRatio 限制以强制 w-full h-full object-cover 占满卡片 */
+            /* 渲染图片 - 采用 aspectRatio 限制与自适应布局 */
             <img
               src={entry.displaySrc}
               alt={promptSummary}
               onError={() => setImgLoadError(true)}
-              className={`block h-full min-h-0 w-full object-cover transition-transform duration-300 group-active:scale-[0.985] group-hover:scale-[1.01] ${isFailed ? 'filter grayscale opacity-40' : ''} ${viewMode === 'detail' ? 'rounded-t-[15px]' : 'rounded-[15px]'}`}
+              className={`block w-full object-cover transition-transform duration-300 group-active:scale-[0.985] group-hover:scale-[1.01] ${isFailed ? 'filter grayscale opacity-40' : ''} ${viewMode === 'detail' ? 'rounded-t-[15px]' : 'rounded-[15px]'}`}
+              style={{ aspectRatio: imageAspectRatio }}
             />
           ) : (
-            /* 暂无预览占位 - 去除 fallback aspect 限制以支持铺满 */
+            /* 暂无预览占位 - 采用 aspectRatio 限制与自适应布局 */
             <div
-              className={`flex h-full min-h-0 w-full items-center justify-center bg-[var(--bg-tertiary)] text-[13px] text-[var(--text-secondary)] ${viewMode === 'detail' ? 'rounded-t-[15px]' : 'rounded-[15px]'}`}
+              className={`flex w-full items-center justify-center bg-[var(--bg-tertiary)] text-[13px] text-[var(--text-secondary)] ${viewMode === 'detail' ? 'rounded-t-[15px]' : 'rounded-[15px]'}`}
+              style={{ aspectRatio: imageAspectRatio, minHeight: '120px' }}
             >
               暂无预览
             </div>
