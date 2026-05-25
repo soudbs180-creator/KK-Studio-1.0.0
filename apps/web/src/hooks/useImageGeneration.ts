@@ -1,4 +1,4 @@
-﻿import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   PromptNode,
   GeneratedImage,
@@ -1534,43 +1534,11 @@ export const useImageGeneration = (options: {
           let resolvedBalanceAfter: number | undefined = undefined;
           
           if (isAudio) {
-            const audioResult = await llmService.generateAudio({ modelId: executionNode.model, prompt: taskPrompt, audioDuration: executionNode.audioDuration, audioLyrics: executionNode.audioLyrics, preferredKeyId: executionNode.keySlotId, providerConfig: {} });
-            videoUrl = audioResult.url;
-            resolvedResultKeySlotId = audioResult.keySlotId || resolvedResultKeySlotId;
-            resolvedProvider = audioResult.provider || resolvedProvider;
-            resolvedProviderName = audioResult.providerName || resolvedProviderName;
-            resolvedModelId = audioResult.model || resolvedModelId;
-            resolvedModelName = resolveModelDisplayName(resolvedModelId, audioResult.modelName || resolvedModelName);
-            resolvedCost = toFiniteNumber(audioResult.usage?.cost);
-            resolvedCostSource = resolvedCost !== undefined ? 'explicit' : undefined;
-            resolvedTokens = toFiniteNumber(audioResult.usage?.totalTokens);
-            resolvedPromptTokens = toFiniteNumber((audioResult as any).usage?.promptTokens);
-            resolvedCompletionTokens = toFiniteNumber((audioResult as any).usage?.completionTokens);
+            // [安全重构] 音乐生成由于未移至后端，抛出英文不可用错误
+            throw new Error('Audio generation is currently unavailable. Please use image generation instead.');
           } else if (isVideo) {
-            const videoResult = await llmService.generateVideo({ 
-              modelId: executionNode.model, prompt: taskPrompt, aspectRatio: executionNode.aspectRatio === '9:16' ? '9:16' : '16:9', 
-              imageUrl: files[0]?.data, videoDuration: executionNode.videoDuration, preferredKeyId: executionNode.keySlotId, 
-              providerConfig: {}, 
-              onTaskId: (taskId) => {
-                taskIdForRecovery = taskId;
-                releaseSyncBridgeRequestActive(currentRequestId);
-                const fresh = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId);
-                if (fresh) urgentUpdatePromptNode(registerPendingTaskId(fresh, taskId));
-                // 持久化任务到数据库
-                void persistTask(taskId, executionNode, activeCanvasRef.current?.id);
-              }
-            });
-            videoUrl = videoResult.url;
-            resolvedResultKeySlotId = videoResult.keySlotId || resolvedResultKeySlotId;
-            resolvedProvider = videoResult.provider || resolvedProvider;
-            resolvedProviderName = videoResult.providerName || resolvedProviderName;
-            resolvedModelId = videoResult.model || resolvedModelId;
-            resolvedModelName = resolveModelDisplayName(resolvedModelId, videoResult.modelName || resolvedModelName);
-            resolvedCost = toFiniteNumber(videoResult.usage?.cost);
-            resolvedCostSource = resolvedCost !== undefined ? 'explicit' : undefined;
-            resolvedTokens = toFiniteNumber(videoResult.usage?.totalTokens);
-            resolvedPromptTokens = toFiniteNumber((videoResult as any).usage?.promptTokens);
-            resolvedCompletionTokens = toFiniteNumber((videoResult as any).usage?.completionTokens);
+            // [安全重构] 视频生成由于未移至后端，抛出英文不可用错误
+            throw new Error('Video generation is currently unavailable. Please use image generation instead.');
           } else {
             const result = await generateImage(taskPrompt, executionNode.aspectRatio, executionNode.imageSize, files, executionNode.model, '', currentRequestId, !!executionNode.enableGrounding || !!executionNode.enableImageSearch, {
               maskUrl: executionNode.mode === GenerationMode.REDRAW ? undefined : executionNode.maskUrl,
@@ -1579,7 +1547,7 @@ export const useImageGeneration = (options: {
               executionLane: executionNode.executionLane,
               creditRouteSpecId: executionNode.creditRouteSpecId,
               creditRouteUnitId: executionNode.creditRouteUnitId,
-              onTaskId: (taskId) => {
+              onTaskId: (taskId: string) => {
                 taskIdForRecovery = taskId;
                 const fresh = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId);
                 if (fresh) urgentUpdatePromptNode(clearPendingSyncRequests(registerPendingTaskId(fresh, taskId), [currentRequestId]));

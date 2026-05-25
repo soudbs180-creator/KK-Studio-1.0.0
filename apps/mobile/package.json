@@ -11,9 +11,9 @@
     "ts:check": "tsc"
   },
   "dependencies": {
-    "@kk/api-client": "workspace:*",
-    "@kk/shared": "workspace:*",
-    "@kk/ui": "workspace:*",
+    "@nano-banana/api-client": "*",
+    "@kk/shared": "*",
+    "@kk/ui": "*",
     "expo": "~50.0.0",
     "expo-image": "~1.10.0",
     "expo-router": "~3.4.0",

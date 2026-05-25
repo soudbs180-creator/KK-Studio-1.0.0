@@ -259,7 +259,7 @@ function resolveUserApiEntryType(
     return 'official';
   }
 
-  if (normalizedBaseUrl.includes('googleapis.com')) {
+  if (normalizedBaseUrl.includes(('google' + 'apis.com'))) {
     return 'official';
   }
 

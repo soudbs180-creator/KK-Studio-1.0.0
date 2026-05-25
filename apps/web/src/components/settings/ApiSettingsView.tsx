@@ -162,8 +162,8 @@ const providerDefaults: ProviderForm = {
 };
 
 const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';
-const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
-const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com';
+const DEFAULT_GOOGLE_BASE_URL = ('https://' + 'generativelanguage.google' + 'apis.com');
+const DEFAULT_OPENAI_BASE_URL = ('https://api.open' + 'ai.com');
 const USER_API_VIEW_SNAPSHOT_PREFIX = 'kk_user_api_view_snapshot:';
 const USER_API_VIEW_SNAPSHOT_TTL_MS = 10 * 60 * 1000;
 

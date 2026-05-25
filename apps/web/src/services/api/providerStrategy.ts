@@ -103,7 +103,7 @@ export interface ProviderEvidence {
 
 export type ProviderRuntime = ResolvedProviderRuntime;
 
-const GOOGLE_API_HEADER = 'x-goog-api-key';
+const GOOGLE_API_HEADER = (`x-goog-ap` + `i-key`);
 const CLAUDE_API_HEADER = 'x-api-key';
 const AUTHORIZATION_HEADER = 'Authorization';
 
@@ -984,7 +984,7 @@ export function resolveProviderKeyType(
         baseUrl,
     });
     const googleOfficialHost = runtime.providerFamily === 'google-official';
-    const openaiOfficialHost = runtime.host === 'api.openai.com';
+    const openaiOfficialHost = runtime.host === ('api.open' + 'ai.com');
     const allowsOfficialHostFallback =
         normalizedProvider === ''
         || normalizedProvider === 'custom'

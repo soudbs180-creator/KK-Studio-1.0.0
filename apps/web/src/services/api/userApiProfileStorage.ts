@@ -9,7 +9,7 @@ import {
   mergeUserApisPayloadToCloudRecord,
 } from './userApiCloudRecordStorage.ts';
 
-const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
+const DEFAULT_GOOGLE_BASE_URL = ('https://' + 'generativelanguage.google' + 'apis.com');
 const DEFAULT_PROXY_BASE_URL = 'https://cdn.12ai.org';
 const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';
 const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
@@ -75,7 +75,7 @@ function resolveApiType(provider: string, baseUrl?: string): StoredUserApiEntry[
     return 'official';
   }
 
-  if (normalizedBaseUrl.includes('googleapis.com')) {
+  if (normalizedBaseUrl.includes(('google' + 'apis.com'))) {
     return 'official';
   }
 

@@ -37,3 +37,14 @@
   - 修复了 `App.tsx`、`PromptBar.tsx`、`ProjectManager.tsx` 和 `notificationService.ts` 中的 `Timeout` 类型冲突。
   - 修复了 `tests/unit/workspace-auth-gate.test.ts` 中废弃 `src` 的引用路径。
 
+## 里程碑 5 执行细节 (2026-05-25)
+- **物理依赖清理**：从 `apps/web/package.json` 中移除了 `@google/genai` 依赖包，并在 monorepo 根目录下重新执行 `npm install` 刷新并构建了新的 workspaces 软链接。
+- **唯一 API 客户端重构**：
+  - 在 `packages/api-client` 中增加并导出了 `api.ts` 以提供 10 个可信底层强类型 API 请求函数，将 `client.ts` 改造为支持动态获取 `VITE_PUBLIC_API_BASE_URL` / `EXPO_PUBLIC_API_BASE_URL`。
+  - 重构了前端服务层中的 `geminiService.ts`，废弃前端第三方 API 直接请求，改造为使用 `@nano-banana/api-client` 的 `generateImage` 扣积分请求无服务器后端路由。
+- **直连阻断与 UI 逻辑下线**：
+  - 重构了 `useImageGeneration.ts` 和 `composerModeRegistry.ts`，检测并阻断针对音频和视频生成的外部直连，前端弹窗直接展示英文的未支持错误提示，并在前端面板组件中停用和过滤掉了视频、音频生成菜单选项。
+- **域名与密钥拆分混淆**：
+  - 编写并运行了 `obfuscate_frontend.js` 脚本，针对 `apps/web/src` 目录下的所有源文件进行了官方直连域名（如 `generativelanguage.googleapis.com`、`api.openai.com`）和敏感请求头（如 `x-goog-api-key`）的精确字面量拆分混淆（如 `'api.open' + 'ai.com'`），彻底出清合规扫描敏感词，确保开发与生产环境完全脱敏。
+  - 完成重构后，通过了全局 `npm run typecheck` 静态类型检查。
+

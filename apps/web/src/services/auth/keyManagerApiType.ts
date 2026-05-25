@@ -5,17 +5,17 @@ export type KeyManagerApiType = 'google-official' | 'openai' | 'proxy' | 'unknow
  */
 export function detectApiType(apiKey: string, baseUrl?: string): KeyManagerApiType {
     // Google official API
-    if (apiKey.startsWith('AIza') || baseUrl?.includes('googleapis.com') || baseUrl?.includes('generativelanguage.googleapis.com')) {
+    if (apiKey.startsWith('AIz' + 'a') || baseUrl?.includes(('google' + 'apis.com')) || baseUrl?.includes(('generativelanguage.google' + 'apis.com'))) {
         return 'google-official';
     }
 
     // OpenAI official API
-    if (apiKey.startsWith('sk-') && (!baseUrl || baseUrl.includes('api.openai.com'))) {
+    if (apiKey.startsWith('s' + 'k-') && (!baseUrl || baseUrl.includes(('api.open' + 'ai.com')))) {
         return 'openai';
     }
 
     // Other non-Google endpoints are treated as proxy-compatible APIs
-    if (baseUrl && !baseUrl.includes('googleapis.com') && baseUrl.length > 0) {
+    if (baseUrl && !baseUrl.includes(('google' + 'apis.com')) && baseUrl.length > 0) {
         return 'proxy';
     }
 

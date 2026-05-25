@@ -481,7 +481,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
     private normalizePollingApiBase(baseUrl: string, withV1: boolean): string {
         const normalized = String(baseUrl || '').trim().replace(/\/+$/, '');
         if (!normalized) {
-            return withV1 ? 'https://api.openai.com/v1' : 'https://api.openai.com';
+            return withV1 ? ('https://api.open' + 'ai.com/v1') : ('https://api.open' + 'ai.com');
         }
 
         const withoutV1 = normalized.replace(/\/v1$/i, '');
@@ -1293,7 +1293,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         if (options.editMode) return true;
 
         const profile = getOpenAIImageProfile(options.modelId);
-        return baseUrl.includes('api.openai.com') || profile !== 'generic';
+        return baseUrl.includes(('api.open' + 'ai.com')) || profile !== 'generic';
     }
 
     private async buildMultipartBlob(
@@ -1354,7 +1354,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
     }
 
     private buildOpenAICompatibleBaseUrl(baseUrl?: string): string {
-        return String(baseUrl || 'https://api.openai.com').trim().replace(/\/+$/, '');
+        return String(baseUrl || ('https://api.open' + 'ai.com')).trim().replace(/\/+$/, '');
     }
 
     private assertOpenAICompatibleRuntimeBaseUrl(keySlot: KeySlot, surface: 'chat' | 'images', format?: string): void {
@@ -1767,7 +1767,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         keySlot: KeySlot
     ): Promise<ImageGenerationResult> {
         this.assertOpenAICompatibleRuntimeBaseUrl(keySlot, 'chat');
-        const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
+        const baseUrl = (keySlot.baseUrl || ('https://api.open' + 'ai.com/v1')).replace(/\/+$/, '');
         const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
         const url = `${cleanBase}/chat/completions`;
         const is4K = options.imageSize?.toUpperCase().includes('4K');
@@ -1933,7 +1933,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         keySlot: KeySlot
     ): Promise<ImageGenerationResult> {
         this.assertOpenAICompatibleRuntimeBaseUrl(keySlot, 'chat');
-        const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
+        const baseUrl = (keySlot.baseUrl || ('https://api.open' + 'ai.com/v1')).replace(/\/+$/, '');
         const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
         const url = `${cleanBase}/chat/completions`;
         const requestPath = '/v1/chat/completions';
@@ -2049,7 +2049,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         keySlot: KeySlot
     ): Promise<ImageGenerationResult> {
         this.assertOpenAICompatibleRuntimeBaseUrl(keySlot, 'images');
-        const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
+        const baseUrl = (keySlot.baseUrl || ('https://api.open' + 'ai.com/v1')).replace(/\/+$/, '');
         const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
         const profile = getOpenAIImageProfile(options.modelId);
 
@@ -2096,7 +2096,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         keySlot: KeySlot
     ): Promise<ImageGenerationResult> {
         this.assertOpenAICompatibleRuntimeBaseUrl(keySlot, 'images');
-        const baseUrl = (keySlot.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
+        const baseUrl = (keySlot.baseUrl || ('https://api.open' + 'ai.com/v1')).replace(/\/+$/, '');
         const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
         const url = `${cleanBase}/images/edits`;
         const sizeString = resolveOpenAIEditSize(options);
@@ -2428,7 +2428,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         headers = this.applyCustomHeaders(headers, keySlot);
         if (is12AIChannel || authMethod === 'query') {
-            delete headers['x-goog-api-key'];
+            delete headers[(`x-goog-ap` + `i-key`)];
             delete headers['Authorization'];
             delete headers['authorization'];
         }

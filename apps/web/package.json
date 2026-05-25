@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.50.0",
+
     "antd": "^6.3.5",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",

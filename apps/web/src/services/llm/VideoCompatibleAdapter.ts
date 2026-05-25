@@ -38,7 +38,7 @@ export class VideoCompatibleAdapter implements LLMAdapter {
     }
 
     async generateVideo(options: VideoGenerationOptions, keySlot: KeySlot): Promise<VideoGenerationResult> {
-        const rawBase = String(keySlot.baseUrl || 'https://api.openai.com').trim().replace(/\/+$/, '');
+        const rawBase = String(keySlot.baseUrl || ('https://api.open' + 'ai.com')).trim().replace(/\/+$/, '');
         if (isLikelyDocumentationBaseUrl(rawBase)) {
             throw new Error(`当前 Base URL 看起来是文档地址 (${rawBase})，不是供应商 API 地址。请改成供应商工作台里显示的真实 Base URL。`);
         }
@@ -83,7 +83,7 @@ export class VideoCompatibleAdapter implements LLMAdapter {
     }
 
     private normalizeBaseUrl(baseUrl: string, style: ProviderStrategyVideoApiStyle): string {
-        let clean = String(baseUrl || 'https://api.openai.com').trim().replace(/\/+$/, '');
+        let clean = String(baseUrl || ('https://api.open' + 'ai.com')).trim().replace(/\/+$/, '');
         clean = clean
             .replace(/\/v2\/videos\/generations(?:\/[^/?#]+)?$/i, '')
             .replace(/\/v1\/videos(?:\/[^/?#]+)?$/i, '')

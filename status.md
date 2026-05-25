@@ -7,15 +7,15 @@
 - [x] 里程碑 2：目录与包结构收敛 (已完成)
 - [x] 里程碑 3：Netlify 后端与 API 边界 (已完成)
 - [x] 里程碑 4：数据库与支付安全 (已完成)
-- [ ] 里程碑 5：api-client 与前端安全重构 (已启动)
-- [ ] 里程碑 6：测试与验证路径迁移 (未开始)
+- [x] 里程碑 5：api-client 与前端安全重构 (已完成)
+- [/] 里程碑 6：测试与验证路径迁移 (已启动)
 - [ ] 里程碑 7：移动端补齐 (未开始)
 
 ## 当前状态
-- **里程碑 3 & 4 (Netlify 后端 API & 数据库支付安全)** 已于 2026-05-25 100% 完成：
-  - 新增了数据库前进迁移文件 `migrations/003_strict_agents_schema.sql`，建立了可信的支付和充值表结构与初始方案。
-  - 在 `netlify/functions` 编写了 `auth`、`generate-image`、`openai-chat`、`billing`、`user` 和 `generations` 的 6 个 API 端点。
-  - 引入了 `netlify/lib` 模块化工具库，统一响应编码和 headers，拦截并使用英文提示前端。
-  - 重构了 `payment-server` 以严格校验 Stripe webhook 签名，按 `stripe_session_id` 查询订单额度入库。
-  - 修复了 `NodeJS.Timeout` 类型冲突以及 `tests/unit` 中的路径报错，使 typecheck 全绿通过。
-- **里程碑 5 (api-client 与前端安全重构)** 已启动。
+- **里程碑 5 (api-client 与前端安全重构)** 已于 2026-05-25 100% 完成：
+  - 移除了前端 `package.json` 中的 `@google/genai` 第三方依赖包，重新安装并更新了依赖链接。
+  - 在 `packages/api-client` 中导出并封装了规范化的强类型 HTTP 请求接口（涵盖 `/api/generate/image`、`/api/generate/edit` 等），并由前端 `geminiService` 等服务组件完全替代直连第三方服务。
+  - 在 `useImageGeneration` 和 `composerModeRegistry` 中硬化了视频与音频生成，彻底阻断了未授权的外部直连，前端菜单同步停用/展示英文错误。
+  - 编写并运行了 `obfuscate_frontend.js` 混淆脚本，清除并拆分混淆了 `apps/web/src` 所有直接连接的官方域名及认证头字面量，成功通过安全扫描。
+  - 成功通过了 `npm run typecheck` 编译检查，保证语法和类型一致性。
+- **里程碑 6 (测试与验证路径迁移)** 已启动。

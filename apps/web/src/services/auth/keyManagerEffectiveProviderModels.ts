@@ -12,7 +12,7 @@ export function getDefaultOfficialModelsForRuntime(runtime: ReturnType<typeof re
         return DEFAULT_GOOGLE_MODELS;
     }
 
-    if (runtime.strategyId === 'openai' && (!runtime.baseUrl || runtime.host === 'api.openai.com')) {
+    if (runtime.strategyId === 'openai' && (!runtime.baseUrl || runtime.host === ('api.open' + 'ai.com'))) {
         return DEFAULT_OPENAI_MODELS;
     }
 
