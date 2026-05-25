@@ -2,6 +2,7 @@
 chcp 65001 >nul
 cls
 cd /d "%~dp0"
+cd ..
 
 echo ================================================
 echo    KK Studio - Stable Dev Server
@@ -48,7 +49,7 @@ echo.
 echo ----------------------------------------
 echo  URL: http://localhost:3000
 echo  Stop: npm run dev:stop
-echo  Logs: .kk-local\logs
+echo  Logs: temp\kk-local\logs
 echo ----------------------------------------
 echo.
 echo [INFO] Keep this window open while using http://localhost:3000

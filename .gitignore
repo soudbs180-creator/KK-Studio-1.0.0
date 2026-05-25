@@ -120,3 +120,12 @@ release/publish/stable/
 dist/
 .netlify/
 node_modules/
+
+# 缓存、临时与编译输出
+temp/*
+!temp/README.md
+
+# 工具箱过滤
+tools/*
+!tools/README.md
+!tools/start.bat

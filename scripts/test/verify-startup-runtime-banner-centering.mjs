@@ -8,7 +8,7 @@ import {
 } from './ensure-local-vite-server.mjs';
 
 const REPO_ROOT = process.cwd();
-const ARTIFACT_DIR = path.join(REPO_ROOT, '.tmp-playwright', 'startup-runtime-banner-centering');
+const ARTIFACT_DIR = path.join(REPO_ROOT, 'temp', 'playwright', 'startup-runtime-banner-centering');
 const TARGET_URL = 'http://127.0.0.1:3000';
 const BANNER_TEST_ID = 'startup-runtime-banner';
 const PROMPT_BAR_CONTAINER_ID = 'prompt-bar-container';

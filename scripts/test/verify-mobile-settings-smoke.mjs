@@ -8,7 +8,7 @@ import {
 } from './ensure-local-vite-server.mjs';
 
 const REPO_ROOT = process.cwd();
-const ARTIFACT_DIR = path.join(REPO_ROOT, '.tmp-playwright', 'mobile-settings-smoke');
+const ARTIFACT_DIR = path.join(REPO_ROOT, 'temp', 'playwright', 'mobile-settings-smoke');
 const DEFAULT_TARGET_URL = 'http://127.0.0.1:3000';
 const SETTINGS_HOME_PATH = '/settings';
 const SETTINGS_API_PATH = '/settings/api-management';

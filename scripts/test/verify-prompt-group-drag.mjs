@@ -8,7 +8,7 @@ import {
 } from './ensure-local-vite-server.mjs';
 
 const REPO_ROOT = process.cwd();
-const ARTIFACT_DIR = path.join(REPO_ROOT, ".tmp-playwright", "prompt-group-drag");
+const ARTIFACT_DIR = path.join(REPO_ROOT, "temp", "playwright", "prompt-group-drag");
 const TARGET_URL = "http://127.0.0.1:3000";
 const STORAGE_KEY = "kk_studio_canvas_state";
 
