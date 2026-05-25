@@ -157,7 +157,7 @@ test("hosted release runbook keeps routing and billing smoke tests explicit", ()
   assert.match(source, /Hosted API on the VPS is still on an older version without `userRoute`/);
   assert.match(source, /Hosted payment runtimes must fail closed when durable storage or settlement auth is unavailable\./);
   assert.match(source, /Legacy `\/api\/pay\*` payment routes stay local-only by default/);
-  assert.match(source, /Current 1\.4\.6 hosted baseline uses `https:\/\/kkai\.plus` as the browser-facing same-origin API/);
+  assert.match(source, /Current 1\.4\.8 hosted baseline uses `https:\/\/kkai\.plus` as the browser-facing same-origin API/);
   assert.match(source, /`https:\/\/172-245-156-16\.sslip\.io`/);
   assert.match(source, /API_DOMAIN=api\.kkai\.plus/);
   assert.match(source, /scripts\/vps\/configure-kk-vps-api-tls\.sh/);

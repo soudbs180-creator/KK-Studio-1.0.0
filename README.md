@@ -1,4 +1,4 @@
-# KK Studio v1.4.6
+# KK Studio v1.4.8
 
 KK Studio is a multimodal canvas workspace for image, video, audio, and presentation workflows. It combines prompt authoring, model routing, user API management, workspace sync, and operational tooling in a single app.
 

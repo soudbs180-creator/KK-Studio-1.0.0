@@ -314,11 +314,16 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     const longPressTimerRef = React.useRef<any>(null);
     const bubbleRef = React.useRef<HTMLDivElement | null>(null);
 
+    // 🚀 [添加] Hover与按压交互状态，提供高品质物理按压与悬停发光反馈
+    const [isHovered, setIsHovered] = React.useState(false);
+    const [isPressed, setIsPressed] = React.useState(false);
+
     const handleSendButtonTouchStart = (e: React.TouchEvent) => {
         if (!isMobile || !hasPrompt) return;
         const touch = e.touches[0];
         if (!touch) return;
         sendTouchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+        setIsPressed(true);
         
         if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = setTimeout(() => {
@@ -354,6 +359,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     };
 
     const handleSendButtonTouchEnd = (e: React.TouchEvent) => {
+        setIsPressed(false);
         if (!isMobile) return;
         if (longPressTimerRef.current) {
             clearTimeout(longPressTimerRef.current);
@@ -373,6 +379,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     };
 
     const handleSendButtonTouchCancel = () => {
+        setIsPressed(false);
         if (!isMobile) return;
         if (longPressTimerRef.current) {
             clearTimeout(longPressTimerRef.current);
@@ -418,7 +425,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                     onTouchEnd={handleSendButtonTouchEnd}
                     onTouchCancel={handleSendButtonTouchCancel}
                     className={`
-                        relative flex items-center justify-center gap-1.5 h-10 px-4 rounded-full overflow-hidden select-none active:scale-[0.98] transition-all duration-300
+                        relative flex items-center justify-center gap-1.5 h-10 px-4 rounded-full overflow-hidden select-none active:scale-[0.95] transition-all duration-300
                         ${isDisabled ? 'bg-[var(--frost-card-sub-bg)] opacity-40 cursor-not-allowed text-[var(--text-tertiary)] border border-[var(--frost-card-sub-border)]' : ''}
                         ${!isDisabled && isInsufficient ? 'bg-red-500/10 border border-red-500/30 text-red-400' : ''}
                         ${!isDisabled && !isInsufficient ? 'backdrop-blur-xl ' + ('bg-white/1' + '2') + ' dark:bg-black/24 border border-white/20 ' + ('dark:border-w' + 'hite/12') + ' ' + ('shadow-l' + 'g') + ' shadow-black/10' : ''}
@@ -486,9 +493,9 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     };
 
     // 🚀 [普通模型/禁用状态] 样式
-    const getDefaultStyle = () => {
+    const getDefaultStyle = (hovered: boolean) => {
         if (isDisabled) {
-            return { className: 'bg-[var(--frost-card-sub-bg)] bg-[var(--frost-card-sub-bg)] cursor-not-allowed opacity-50' };
+            return { className: 'bg-[var(--frost-card-sub-bg)] cursor-not-allowed opacity-45' };
         }
         if (isInsufficient) {
             return { className: 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20' };
@@ -499,21 +506,25 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
             const start = normalizeColor(colorStart, 'var(--accent-coral)');
             const end = normalizeColor(colorEnd, 'var(--accent-pink)');
             return {
-                className: `${textColor === 'black' ? 'text-black' : 'text-white'} transition-colors border`,
+                className: `${textColor === 'black' ? 'text-black font-semibold' : 'text-white font-semibold'} transition-all border`,
                 style: {
-                    background: `linear-gradient(135deg, color-mix(in srgb, ${start} 72%, rgba(255,255,255,0.18)) 0%, color-mix(in srgb, ${end} 82%, rgba(255,255,255,0.08)) 100%)`,
-                    borderColor: 'var(--frost-card-main-border)',
-                    boxShadow: 'none',
+                    background: hovered
+                        ? `linear-gradient(135deg, color-mix(in srgb, ${start} 84%, rgba(255,255,255,0.28)) 0%, color-mix(in srgb, ${end} 92%, rgba(255,255,255,0.16)) 100%)`
+                        : `linear-gradient(135deg, color-mix(in srgb, ${start} 72%, rgba(255,255,255,0.18)) 0%, color-mix(in srgb, ${end} 82%, rgba(255,255,255,0.08)) 100%)`,
+                    borderColor: hovered ? 'rgba(255,255,255,0.38)' : 'var(--frost-card-main-border)',
+                    boxShadow: hovered ? '0 5px 15px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.22)' : '0 2px 6px rgba(0, 0, 0, 0.18)',
                     backdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
                 }
             };
         }
         return {
-            className: `${textColor === 'black' ? 'text-black' : 'text-white'} transition-colors border`,
+            className: `${textColor === 'black' ? 'text-black font-semibold' : 'text-white font-semibold'} transition-all border`,
             style: {
-                background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent-coral) 86%, white 14%) 0%, var(--mobile-clay-active-bg) 45%, var(--accent-pink) 100%)',
-                borderColor: 'var(--frost-card-main-border)',
-                boxShadow: 'none',
+                background: hovered
+                    ? 'linear-gradient(135deg, color-mix(in srgb, var(--accent-coral) 92%, white 20%) 0%, var(--mobile-clay-active-bg) 40%, var(--accent-pink) 100%)'
+                    : 'linear-gradient(135deg, color-mix(in srgb, var(--accent-coral) 86%, white 14%) 0%, var(--mobile-clay-active-bg) 45%, var(--accent-pink) 100%)',
+                borderColor: hovered ? 'rgba(255,255,255,0.35)' : 'var(--frost-card-main-border)',
+                boxShadow: hovered ? '0 5px 15px rgba(244, 63, 94, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3)' : '0 2px 6px rgba(0, 0, 0, 0.18)',
                 backdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
             }
         };
@@ -542,8 +553,19 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                 <style>{arrowAnimStyle}</style>
                 <button
                     onClick={onClick}
+                    onMouseEnter={() => setIsHovered(true)}
+                    onMouseLeave={() => { setIsHovered(false); setIsPressed(false); }}
+                    onMouseDown={() => setIsPressed(true)}
+                    onMouseUp={() => setIsPressed(false)}
+                    onTouchStart={() => setIsPressed(true)}
+                    onTouchEnd={() => setIsPressed(false)}
                     className={`${className} group relative flex h-10 max-w-full min-w-0 shrink items-center gap-2 rounded-full pl-3.5 pr-1 transition-colors duration-200`}
-                    style={getGradientStyle()}
+                    style={{
+                        ...getGradientStyle(),
+                        transform: isPressed ? 'scale(0.96)' : (isHovered ? 'scale(1.04)' : 'scale(1)'),
+                        transition: 'transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.24s ease',
+                        boxShadow: isHovered ? '0 5px 15px rgba(244, 63, 94, 0.35), inset 0 1px 0 rgba(255,255,255,0.3)' : '0 2px 6px rgba(0,0,0,0.18)',
+                    }}
                 >
                     {/* 积分消耗显示 */}
                     <div className="flex items-center gap-1" style={{ color: textColor === 'black' ? 'rgba(0,0,0,0.95)' : 'rgba(255,255,255,0.95)' }}>
@@ -555,7 +577,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                     <div className="w-px h-4" style={{ backgroundColor: textColor === 'black' ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.25)' }} />
 
                     {/* 发送箭头按钮 - 内嵌圆形按钮 🚀 箭头朝右 + 滑动动画 */}
-                    <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full backdrop-blur-sm"
+                    <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full backdrop-blur-sm transition-transform duration-200 group-hover:scale-110"
                          style={{ backgroundColor: textColor === 'black' ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.25)' }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" 
                              style={{ color: textColor === 'black' ? '#000000' : '#ffffff', animation: 'arrow-slide-right 1.5s ease-in-out infinite' }}>
@@ -577,7 +599,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     }
 
     // 🚀 [普通状态/禁用状态] 默认样式 - 用户 API 模型只显示"发送"
-    const defaultStyleProps = getDefaultStyle() as any;
+    const defaultStyleProps = getDefaultStyle(isHovered) as any;
 
     return (
         <>
@@ -585,6 +607,12 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
             <button
                 onClick={onClick}
                 disabled={isDisabled}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => { setIsHovered(false); setIsPressed(false); }}
+                onMouseDown={() => { if (!isDisabled && !isInsufficient) setIsPressed(true); }}
+                onMouseUp={() => setIsPressed(false)}
+                onTouchStart={() => { if (!isDisabled && !isInsufficient) setIsPressed(true); }}
+                onTouchEnd={() => setIsPressed(false)}
                 className={`
                     ${className} group relative flex h-10 max-w-full min-w-0 shrink flex-row items-center whitespace-nowrap rounded-full px-1 py-1 overflow-hidden
                     transition-colors duration-200 ease-out focus-visible:outline-none
@@ -593,6 +621,10 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                 `}
                 style={{
                     paddingRight: '4px',
+                    transform: !isDisabled && !isInsufficient
+                        ? (isPressed ? 'scale(0.96)' : (isHovered ? 'scale(1.04)' : 'scale(1)'))
+                        : 'scale(1)',
+                    transition: 'transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.24s ease, border-color 0.24s ease, background 0.24s ease',
                     ...(defaultStyleProps.style || {}),
                 }}
             >
@@ -623,12 +655,12 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
 
                 {/* 发送箭头 🚀 箭头朝右 + 动画 */}
                 <div className={`
-                    relative z-[1] flex h-8 w-8 items-center justify-center overflow-hidden rounded-full transition-colors duration-200
+                    relative z-[1] flex h-8 w-8 items-center justify-center overflow-hidden rounded-full transition-all duration-200
                     ${isDisabled
-                        ? 'bg-[var(--frost-card-sub-bg)] bg-[var(--frost-card-sub-bg)] text-[var(--text-tertiary)]'
+                        ? 'bg-black/10 dark:bg-white/[0.04] text-[var(--text-tertiary)] opacity-55'
                         : isInsufficient
                             ? 'bg-red-500 text-white'
-                            : `border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-primary)] group-hover:bg-[var(--frost-card-main-bg)]`
+                            : `border border-white/15 bg-white/[0.08] dark:bg-black/25 text-[var(--text-primary)] group-hover:bg-white/[0.22] group-hover:scale-110 group-hover:border-white/25`
                     }
                 `}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"

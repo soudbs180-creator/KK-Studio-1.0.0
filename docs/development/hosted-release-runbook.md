@@ -197,9 +197,9 @@ The command must deploy:
 
 ### 3. Confirm API DNS and TLS
 
-Production hosted builds expect the browser-facing API origin to be HTTPS. Current 1.4.6 hosted baseline uses `https://kkai.plus` as the browser-facing same-origin API. Vercel API functions proxy to the verified HTTPS VPS upstream `https://172-245-156-16.sslip.io` until the permanent `api.kkai.plus` DNS record can be changed in Cloudflare.
+Production hosted builds expect the browser-facing API origin to be HTTPS. Current 1.4.8 hosted baseline uses `https://kkai.plus` as the browser-facing same-origin API. Vercel API functions proxy to the verified HTTPS VPS upstream `https://172-245-156-16.sslip.io` until the permanent `api.kkai.plus` DNS record can be changed in Cloudflare.
 
-Permanent canonical API domain setup remains recommended, but it is a follow-up infrastructure hardening step rather than the active 1.4.6 hosted availability path. For that permanent path, the target public API host is:
+Permanent canonical API domain setup remains recommended, but it is a follow-up infrastructure hardening step rather than the active 1.4.8 hosted availability path. For that permanent path, the target public API host is:
 
 ```text
 api.kkai.plus -> 172.245.156.16
