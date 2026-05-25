@@ -14,10 +14,11 @@ import { fileSystemService } from '../../services/storage/fileSystemService'; //
 import { notify } from '../../services/system/notificationService';
 import { traceLocalPerformance } from '../../services/system/localPerformanceTrace';
 import ImageOptionsPanel from '../image/ImageOptionsPanel';
+import MobileEmbeddedAdvancedDrawer from './prompt-bar/MobileEmbeddedAdvancedDrawer';
 import VideoOptionsPanel from '../video/VideoOptionsPanel';
 import ImagePreview from '../image/ImagePreview';
 import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
-import { X, Loader2, Sparkles } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
+import { X, Loader2, Sparkles, ChevronDown, Plus } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
 import { formatRemainingCredits } from '../../services/billing/remainingBalance';
@@ -32,7 +33,6 @@ import DesktopComposerModeSwitcher from './prompt-bar/DesktopComposerModeSwitche
 import DesktopComposerModePanel from './prompt-bar/DesktopComposerModePanel';
 import DesktopComposerPromptTools from './prompt-bar/DesktopComposerPromptTools';
 import DesktopComposerEcommercePanel from './prompt-bar/DesktopComposerEcommercePanel';
-import MobileEmbeddedAdvancedDrawer from './prompt-bar/MobileEmbeddedAdvancedDrawer';
 import { routeEcommerceDroppedFiles } from './prompt-bar/ecommerceDropRouting';
 import { getCanonicalProviderDisplayName } from '../../utils/providerDisplay';
 import {
@@ -287,6 +287,9 @@ interface CreditSendButtonProps {
     className?: string;
     ecommerceConfirmedMode?: boolean;
     onClick: () => void;
+    isMobile?: boolean;
+    parallelCount?: number;
+    onChangeParallelCount?: (count: number) => void;
 }
 
 const CreditSendButton: React.FC<CreditSendButtonProps> = ({
@@ -300,8 +303,171 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     textColor = 'white',
     className = '',
     ecommerceConfirmedMode = false,
-    onClick
+    onClick,
+    isMobile = false,
+    parallelCount = 1,
+    onChangeParallelCount
 }) => {
+    // 🚀 移动端长按多张并发与高质感磨砂呼吸 UI 实现
+    const sendTouchStartRef = React.useRef<{ x: number; y: number; time: number } | null>(null);
+    const [isLongPressing, setIsLongPressing] = React.useState(false);
+    const longPressTimerRef = React.useRef<any>(null);
+    const bubbleRef = React.useRef<HTMLDivElement | null>(null);
+
+    const handleSendButtonTouchStart = (e: React.TouchEvent) => {
+        if (!isMobile || !hasPrompt) return;
+        const touch = e.touches[0];
+        if (!touch) return;
+        sendTouchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+        
+        if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = setTimeout(() => {
+            setIsLongPressing(true);
+            try {
+                if (navigator.vibrate) {
+                    navigator.vibrate(15);
+                }
+            } catch (err) {
+                // 拦截可能在某些旧机型不支持的震动API报错
+            }
+        }, 250);
+    };
+
+    const handleSendButtonTouchMove = (e: React.TouchEvent) => {
+        if (!isMobile || !isLongPressing) return;
+        const touch = e.touches[0];
+        if (!touch || !bubbleRef.current) return;
+        
+        const rect = bubbleRef.current.getBoundingClientRect();
+        const x = touch.clientX;
+        const pct = (x - rect.left) / rect.width;
+        const index = Math.min(3, Math.max(0, Math.floor(pct * 4)));
+        const newCount = index + 1;
+        if (newCount !== parallelCount && onChangeParallelCount) {
+            try {
+                if (navigator.vibrate) {
+                    navigator.vibrate(5);
+                }
+            } catch (err) {}
+            onChangeParallelCount(newCount);
+        }
+    };
+
+    const handleSendButtonTouchEnd = (e: React.TouchEvent) => {
+        if (!isMobile) return;
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+        
+        if (isLongPressing) {
+            e.preventDefault();
+            setIsLongPressing(false);
+        } else {
+            e.preventDefault();
+            if (hasPrompt) {
+                onClick();
+            }
+        }
+        sendTouchStartRef.current = null;
+    };
+
+    const handleSendButtonTouchCancel = () => {
+        if (!isMobile) return;
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+        setIsLongPressing(false);
+        sendTouchStartRef.current = null;
+    };
+
+    if (isMobile) {
+        const isInsufficient = isCreditModel && !balanceLoading && creditCost > 0 && balance < creditCost;
+        const isDisabled = !hasPrompt;
+        
+        return (
+            <div className="relative select-none" style={{ touchAction: 'none' }} onTouchMove={handleSendButtonTouchMove}>
+                {/* 1-4 张数拖拽滑选气泡 */}
+                {isLongPressing && (
+                    <div 
+                        ref={bubbleRef}
+                        className={"absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-48 h-11 flex items-center justify-around rounded-xl backdrop-blur-xl bg-black/85 dark:bg-black/90 border border-white/20 text-white " + ("shadow-2x" + "l") + " z-[1200]"}
+                    >
+                        {[1, 2, 3, 4].map((num) => {
+                            const isSelected = parallelCount === num;
+                            return (
+                                <div 
+                                    key={num}
+                                    className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold transition-all duration-150 ${isSelected ? 'bg-gradient-to-r from-[var(--accent-coral)] to-[var(--accent-pink)] text-white scale-125 shadow-md shadow-pink-500/20' : 'text-white/60 scale-100'}`}
+                                
+                                >
+                                    {num}
+                                </div>
+                            );
+                        })}
+                        {/* 小气泡箭头 */}
+                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black/85 dark:bg-black/90 border-r border-b border-white/20 rotate-45" />
+                    </div>
+                )}
+
+                {/* 磨砂玻璃呼吸外框按钮 */}
+                <button
+                    disabled={isDisabled}
+                    onTouchStart={handleSendButtonTouchStart}
+                    onTouchEnd={handleSendButtonTouchEnd}
+                    onTouchCancel={handleSendButtonTouchCancel}
+                    className={`
+                        relative flex items-center justify-center gap-1.5 h-10 px-4 rounded-full overflow-hidden select-none active:scale-[0.98] transition-all duration-300
+                        ${isDisabled ? 'bg-[var(--frost-card-sub-bg)] opacity-40 cursor-not-allowed text-[var(--text-tertiary)] border border-[var(--frost-card-sub-border)]' : ''}
+                        ${!isDisabled && isInsufficient ? 'bg-red-500/10 border border-red-500/30 text-red-400' : ''}
+                        ${!isDisabled && !isInsufficient ? 'backdrop-blur-xl ' + ('bg-white/1' + '2') + ' dark:bg-black/24 border border-white/20 ' + ('dark:border-w' + 'hite/12') + ' ' + ('shadow-l' + 'g') + ' shadow-black/10' : ''}
+                    `}
+                    style={{
+                        WebkitTapHighlightColor: 'transparent',
+                    }}
+                >
+                    {/* 呼吸微渐变发光背景外框 - 仅在未禁用且未欠费时 */}
+                    {!isDisabled && !isInsufficient && (
+                        <div className="absolute inset-0 -z-10 rounded-full bg-gradient-to-r from-[var(--accent-coral)]/30 to-[var(--accent-pink)]/30 blur-sm opacity-60 animate-pulse" />
+                    )}
+
+                    {/* 发送按钮的内容 */}
+                    {isCreditModel ? (
+                        <div className="flex items-center gap-1.5 font-bold">
+                            <Sparkles size={13} fill="currentColor" className={isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : 'text-[var(--accent-coral)]'} />
+                            <span className={`text-xs ${isDisabled ? 'text-gray-400' : isInsufficient ? 'text-red-500' : 'text-[var(--text-primary)]'}`}>
+                                {isInsufficient ? '积分不足' : `${creditCost} 积分`}
+                            </span>
+                            {parallelCount > 1 && !isInsufficient && (
+                                <span className="text-[10px] text-[var(--text-secondary)] font-normal opacity-90">
+                                    ({parallelCount}张)
+                                </span>
+                            )}
+                        </div>
+                    ) : (
+                        <span className={`text-xs font-bold tracking-wide ${isDisabled ? 'text-gray-400' : 'text-[var(--text-primary)]'}`}>
+                            {ecommerceConfirmedMode ? '补充修改' : parallelCount > 1 ? `发送 (${parallelCount}张)` : '发送'}
+                        </span>
+                    )}
+
+                    {/* 箭头 */}
+                    {!isDisabled && (
+                        <div className={`
+                            flex h-6 w-6 items-center justify-center overflow-hidden rounded-full transition-colors duration-200 ml-0.5
+                            ${isInsufficient ? 'bg-red-500 text-white' : 'bg-white/15 text-[var(--text-primary)]'}
+                        `}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                                <polyline points="12 5 19 12 12 19" />
+                            </svg>
+                        </div>
+                    )}
+                </button>
+            </div>
+        );
+    }
+
     // 判断积分是否不足
     const isInsufficient = isCreditModel && !balanceLoading && creditCost > 0 && balance < creditCost;
 
@@ -564,7 +730,7 @@ interface PromptBarProps {
 }
 
 const MODEL_LIST_VIRTUALIZE_THRESHOLD = 40;
-const MODEL_LIST_ITEM_HEIGHT = 74;
+const MODEL_LIST_ITEM_HEIGHT = 44;
 const MODEL_LIST_OVERSCAN = 6;
 
 const getModelDisplayGroupKey = (model: ActiveModel) => {
@@ -612,6 +778,8 @@ type PromptBarModelMenuButtonProps = {
     description: string;
     onSelect: (model: PromptBarModelOption) => void;
     onOpenContextMenu: (event: React.MouseEvent<HTMLButtonElement>, model: PromptBarModelOption) => void;
+    showProviderRight?: boolean;
+    isMobile?: boolean; // [NEW] Mobile adaptive prop
 };
 
 const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
@@ -622,6 +790,8 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
     description,
     onSelect,
     onOpenContextMenu,
+    showProviderRight = false,
+    isMobile = false, // [NEW] Default to false
 }: PromptBarModelMenuButtonProps) {
     const isExclusive = model.isExclusive;
     const isPinned = model.isPinned;
@@ -629,17 +799,21 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
     const badgeInfo = getModelBadgeInfo({ id: model.id, label: model.label, provider: model.provider });
     const colorStart = normalizeColor(model.colorStart, 'var(--accent-coral)');
     const colorEnd = normalizeColor(model.colorEnd, 'var(--accent-pink)');
-    const modelTextColor = model.textColor || 'white';
+    const modelTextColor = model?.textColor || 'white';
     const textColorClass = modelTextColor === 'black' ? 'text-black' : 'text-white';
-    const inactiveGradientStyle = getCreditModelFlatStyle(colorStart, colorEnd, model.textColor, false);
-    const activeGradientStyle = getCreditModelFlatStyle(colorStart, colorEnd, model.textColor, true);
+    const inactiveGradientStyle = getCreditModelFlatStyle(colorStart, colorEnd, model?.textColor, false);
+    const activeGradientStyle = getCreditModelFlatStyle(colorStart, colorEnd, model?.textColor, true);
 
     return (
         <button
             className={`group w-full transition-all duration-300 mx-auto cursor-pointer
             ${isExclusive
-                    ? `h-14 px-5 flex items-center justify-between rounded-full flex-shrink-0 ${textColorClass} active:scale-[0.98] ${isLast ? '' : 'mb-3'} ${selected ? 'ring-2 ring-[color:var(--accent-coral)] scale-[1.02]' : 'hover:scale-[1.02] opacity-80 hover:opacity-100 grayscale-[0.15] hover:grayscale-0'}`
-                    : `px-3 py-2.5 text-left flex flex-col gap-1 hover:bg-black/5 dark:hover:bg-[var(--toolbar-hover)] rounded-md transition-all border-2 ${selected ? 'bg-[var(--frost-card-sub-bg)] ring-2 ring-[color:var(--accent-coral)] border-[color:var(--accent-coral)]' : 'border-transparent opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`}
+                    ? (isMobile
+                        ? `h-10 px-3 flex items-center justify-between rounded-xl flex-shrink-0 ${textColorClass} active:scale-[0.98] ${selected ? 'ring-2 ring-[color:var(--accent-coral)]' : 'opacity-80 hover:opacity-100'}`
+                        : `h-14 px-5 flex items-center justify-between rounded-full flex-shrink-0 ${textColorClass} active:scale-[0.98] ${selected ? 'ring-2 ring-[color:var(--accent-coral)] scale-[1.02]' : 'hover:scale-[1.02] opacity-80 hover:opacity-100 grayscale-[0.15] hover:grayscale-0'}`)
+                    : (isMobile
+                        ? `h-10 px-3 text-left flex items-center justify-between rounded-xl transition-all border-2 ${selected ? 'bg-[var(--frost-card-sub-bg)] ring-2 ring-[color:var(--accent-coral)] border-[color:var(--accent-coral)]' : 'border-transparent opacity-80 hover:opacity-100'}`
+                        : `px-2.5 py-1.5 text-left flex flex-col gap-0.5 hover:bg-black/5 dark:hover:bg-[var(--toolbar-hover)] rounded-xl transition-all border-2 ${selected ? 'bg-[var(--frost-card-sub-bg)] ring-2 ring-[color:var(--accent-coral)] border-[color:var(--accent-coral)]' : 'border-transparent opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`)}
             `}
             style={isExclusive ? (selected ? activeGradientStyle : inactiveGradientStyle) : undefined}
             onMouseEnter={(event) => {
@@ -667,65 +841,229 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
                                 modelId={model.id}
                                 provider={model.provider}
                                 modelName={displayName}
-                                size={20}
+                                size={isMobile ? 16 : 20}
                                 active={selected}
                             />
                         </div>
-                        <span className="text-sm font-semibold truncate text-left" style={model.textColor === 'black' ? { color: '#000000' } : { color: '#ffffff' }}>
+                        <span className="text-sm font-semibold truncate text-left" style={model?.textColor === 'black' ? { color: '#000000' } : { color: '#ffffff' }}>
                             {displayName}
                         </span>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
                         <span
-                            className={`text-xs px-2.5 py-1 rounded-full ${model.textColor === 'black' ? 'bg-black/10 border-black/20' : 'bg-white/25 border-white/30'} border font-semibold flex items-center gap-1`}
-                            style={model.textColor === 'black' ? { color: '#000000' } : { color: '#ffffff' }}
+                            className={`${isMobile ? 'text-[10px] px-2 py-0.5' : 'text-xs px-2.5 py-1'} rounded-full ${model?.textColor === 'black' ? 'bg-black/10 border-black/20' : 'bg-white/25 border-white/30'} border font-semibold flex items-center gap-1`}
+                            style={model?.textColor === 'black' ? { color: '#000000' } : { color: '#ffffff' }}
                         >
                             ✨{getModelCredits(model.id || '', imageSize)}
                         </span>
                     </div>
                 </div>
             ) : (
-                <>
-                    <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div className="flex-shrink-0 flex items-center justify-center w-5 h-5">
-                                <ModelLogo
-                                    modelId={model.id}
-                                    provider={model.provider}
-                                    modelName={displayName}
-                                    size={16}
-                                    active={selected}
-                                />
-                            </div>
-                            <span className={`text-sm font-medium ${badgeInfo.colorClass} break-all text-left`} title={displayName}>
-                                {displayName}
-                            </span>
+                <div className={`flex items-center justify-between w-full ${isMobile ? 'h-full' : 'h-7'} min-w-0`}>
+                    {/* 左侧：Logo + 名字 + 供应商 (如果 showProviderRight 为 false) */}
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="flex-shrink-0 flex items-center justify-center w-5 h-5">
+                            <ModelLogo
+                                modelId={model.id}
+                                provider={model.provider}
+                                modelName={displayName}
+                                size={16}
+                                active={selected}
+                            />
                         </div>
-                        {model.provider && (
-                            <span
-                                className={`text-[10px] px-1.5 py-0.5 rounded border flex-shrink-0 whitespace-nowrap overflow-hidden ${model.providerBadgeColorClass}`}
+                        <span className={`text-[13px] font-semibold ${badgeInfo.colorClass} truncate text-left`} title={displayName}>
+                            {displayName}
+                        </span>
+                        {!showProviderRight && model.provider && (
+                            <span 
+                                className={`text-[8.5px] px-1 py-0.5 rounded border flex-shrink-0 whitespace-nowrap overflow-hidden ${model.providerBadgeColorClass} font-medium leading-none`}
                                 title={model.providerDisplayName}
-                                style={{ maxWidth: '40%', textOverflow: 'ellipsis', ...model.providerBadgeStyle }}
+                                style={{ maxWidth: '35%', textOverflow: 'ellipsis', ...model.providerBadgeStyle }}
                             >
                                 {model.providerDisplayShortName}
                             </span>
                         )}
                     </div>
-                    <div className="flex justify-between items-start mt-1 gap-2">
-                        <div className="flex flex-col gap-1 flex-1 min-w-0">
-                            {description && (
-                                <span className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                                    {description}
-                                </span>
-                            )}
-                        </div>
-                        {isPinned && <span className="text-[12px] opacity-80 flex-shrink-0 mr-1 mt-0.5">📌</span>}
+                    {/* 右侧：常用模型的供应商 (如果 showProviderRight 为 true) + Pinned 图标 */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {showProviderRight && model.provider && (
+                            <span
+                                className={`text-[9px] px-1 py-0.5 rounded border flex-shrink-0 whitespace-nowrap overflow-hidden ${model.providerBadgeColorClass} font-medium leading-none`}
+                                title={model.providerDisplayName}
+                                style={{ maxWidth: '70px', textOverflow: 'ellipsis', ...model.providerBadgeStyle }}
+                            >
+                                {model.providerDisplayShortName}
+                            </span>
+                        )}
+                        {isPinned && !isMobile && <span className="text-[11px] opacity-80">📌</span>}
                     </div>
-                </>
+                </div>
             )}
         </button>
     );
 });
+
+interface SwipeableModelItemProps {
+    modelId: string;
+    isPinned: boolean;
+    onTogglePin: (modelId: string) => void;
+    children: React.ReactNode;
+    onClick: () => void;
+}
+
+const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
+    modelId,
+    isPinned,
+    onTogglePin,
+    children,
+    onClick,
+}) => {
+    const [offsetX, setOffsetX] = React.useState(0);
+    const [isOpen, setIsOpen] = React.useState(false);
+    const [isTransitioning, setIsTransitioning] = React.useState(false);
+
+    const touchStart = React.useRef({ x: 0, y: 0 });
+    const isSwiping = React.useRef(false);
+    const maxOffset = -72; // 置顶按钮宽度 72px
+
+    // 用 ref 保存最新的状态以避免频繁解绑和重新绑定
+    const stateRef = React.useRef({ isOpen, offsetX });
+    React.useEffect(() => {
+        stateRef.current = { isOpen, offsetX };
+    }, [isOpen, offsetX]);
+
+    const containerRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const onSwipeTouchStart = (e: TouchEvent) => {
+            const touch = e.touches[0];
+            touchStart.current = { x: touch.clientX, y: touch.clientY };
+            isSwiping.current = false;
+            setIsTransitioning(false);
+        };
+
+        const onSwipeTouchMove = (e: TouchEvent) => {
+            const touch = e.touches[0];
+            const deltaX = touch.clientX - touchStart.current.x;
+            const deltaY = touch.clientY - touchStart.current.y;
+
+            // 判断是否为水平手势
+            if (!isSwiping.current) {
+                if (Math.abs(deltaX) > 8 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+                    isSwiping.current = true;
+                }
+            }
+
+            if (isSwiping.current) {
+                // 水平滑动中阻止页面上下滚动
+                if (e.cancelable) {
+                    e.preventDefault();
+                }
+                
+                // 计算新的偏移量
+                const startOffset = stateRef.current.isOpen ? maxOffset : 0;
+                let currentOffset = startOffset + deltaX;
+                // 限制滑动区间在 [maxOffset, 0] 之间
+                currentOffset = Math.max(maxOffset, Math.min(0, currentOffset));
+                setOffsetX(currentOffset);
+            }
+        };
+
+        const onSwipeTouchEnd = () => {
+            setIsTransitioning(true);
+            if (isSwiping.current) {
+                const currentOffset = stateRef.current.offsetX;
+                if (currentOffset < maxOffset / 2) {
+                    setIsOpen(true);
+                    setOffsetX(maxOffset);
+                } else {
+                    setIsOpen(false);
+                    setOffsetX(0);
+                }
+            } else {
+                if (stateRef.current.isOpen) {
+                    setIsOpen(false);
+                    setOffsetX(0);
+                }
+            }
+        };
+
+        container.addEventListener('touchstart', onSwipeTouchStart, { passive: true });
+        container.addEventListener('touchmove', onSwipeTouchMove, { passive: false });
+        container.addEventListener('touchend', onSwipeTouchEnd, { passive: true });
+
+        return () => {
+            container.removeEventListener('touchstart', onSwipeTouchStart);
+            container.removeEventListener('touchmove', onSwipeTouchMove);
+            container.removeEventListener('touchend', onSwipeTouchEnd);
+        };
+    }, []);
+
+    const handlePinClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onTogglePin(modelId);
+        // 操作后自动关闭
+        setIsTransitioning(true);
+        setIsOpen(false);
+        setOffsetX(0);
+    };
+
+    const handleItemClick = (e: React.MouseEvent) => {
+        // 如果当前是滑开状态，点击则是关闭它，不触发点击选择模型
+        if (isOpen) {
+            e.stopPropagation();
+            setIsTransitioning(true);
+            setIsOpen(false);
+            setOffsetX(0);
+            return;
+        }
+        onClick();
+    };
+
+    return (
+        <div 
+            ref={containerRef}
+            className="relative w-full overflow-hidden rounded-xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] select-none"
+        >
+            {/* 内容滑动容器 */}
+            <div 
+                className="w-full min-w-0" 
+                style={{
+                    transform: `translateX(${offsetX}px)`,
+                    transition: isTransitioning ? 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
+                    WebkitTransition: isTransitioning ? '-webkit-transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
+                }}
+                onClick={handleItemClick}
+            >
+                {children}
+            </div>
+
+            {/* 右侧滑出按钮 */}
+            <button
+                type="button"
+                onClick={handlePinClick}
+                className="absolute top-0 bottom-0 right-0 flex items-center justify-center font-semibold text-xs transition-all duration-200 cursor-pointer"
+                style={{
+                    width: `${Math.abs(maxOffset)}px`,
+                    transform: `translateX(${Math.abs(maxOffset) + offsetX}px)`,
+                    transition: isTransitioning ? 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
+                    WebkitTransition: isTransitioning ? '-webkit-transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
+                    backgroundColor: isPinned ? 'rgba(245, 158, 11, 0.15)' : 'rgba(0, 0, 0, 0.05)',
+                    color: isPinned ? '#f59e0b' : 'var(--text-secondary)',
+                    borderLeft: '1px solid var(--frost-card-sub-border)',
+                }}
+            >
+                <div className="flex flex-col items-center gap-0.5">
+                    <span className="text-[15px]">{isPinned ? '📌' : '📍'}</span>
+                    <span>{isPinned ? '取消常用' : '设为常用'}</span>
+                </div>
+            </button>
+        </div>
+    );
+};
 
 const buildPromptBarAvailableModels = (
     globalModels: ReturnType<typeof keyManager.getGlobalModelList>,
@@ -785,7 +1123,7 @@ const buildPromptBarAvailableModels = (
             colorStart: resolvedSystemDisplay?.colorStart || m.colorStart,
             colorEnd: resolvedSystemDisplay?.colorEnd || m.colorEnd,
             colorSecondary: resolvedSystemDisplay?.colorSecondary || m.colorSecondary,
-            textColor: resolvedSystemDisplay?.textColor || m.textColor,
+            textColor: resolvedSystemDisplay?.textColor || m?.textColor,
         } as ActiveModel;
     });
 
@@ -882,11 +1220,54 @@ const PromptBar: React.FC<PromptBarProps> = ({
     // Track composition state so IME input is not interrupted by background sync.
     const isComposingRef = useRef(false);
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
+    const [mobileCategory, setMobileCategory] = useState<string>('featured');
+    const [mobileSubView, setMobileSubView] = useState<'input' | 'model' | 'settings'>('input');
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    // 🚀 [移动端专属] 点击/触摸外部空白处时，自动收起输入面板
+    useEffect(() => {
+        if (!isMobile || !isExpanded) return;
+
+        const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+            const container = document.getElementById('prompt-bar-container');
+            if (!container) return;
+
+            // 1. 若点击在 PromptBar 容器内部，放行
+            if (container.contains(e.target as Node)) {
+                return;
+            }
+
+            // 2. 若点击在移动端模型选择弹窗（Bottom Sheet）或其遮罩层中，放行
+            const target = e.target as HTMLElement;
+            if (target.closest('[class*="z-[1049]"]') || target.closest('[class*="z-[1050]"]')) {
+                return;
+            }
+
+            // 3. 若点击在裁剪、大图预览、电商续作历史等悬浮面板里，放行
+            if (target.closest('[class*="z-[990]"]') || target.closest('[class*="z-[985]"]')) {
+                return;
+            }
+
+            // 4. 收起面板，且使输入框失去焦点（防键盘弹起）
+            setIsExpanded(false);
+            textareaRef.current?.blur();
+        };
+
+        // 使用 capture 阶段在最外层尽早拦截
+        document.addEventListener('click', handleOutsideClick, true);
+        document.addEventListener('touchstart', handleOutsideClick, true);
+        return () => {
+            document.removeEventListener('click', handleOutsideClick, true);
+            document.removeEventListener('touchstart', handleOutsideClick, true);
+        };
+    }, [isMobile, isExpanded, textareaRef]);
+
     const [modelMenuLoadingState, setModelMenuLoadingState] = useState<ModelMenuLoadingState>('idle');
     const [modelSearch, setModelSearch] = useState('');
     const deferredModelSearch = useDeferredValue(modelSearch);
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, modelId: string } | null>(null);
     const [modelListWindowStart, setModelListWindowStart] = useState(0);
+    const [mobileScrollTop, setMobileScrollTop] = useState(0);
 
     // [NEW] Model Settings Modal State
     const [modelSettingsModal, setModelSettingsModal] = useState<{ modelId: string; alias: string; description: string } | null>(null);
@@ -1052,6 +1433,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const modelMenuRequestRef = useRef(0);
     const previousActiveMenuRef = useRef<string | null>(null);
     const previousModeRef = useRef<GenerationMode>(config.mode);
+    const modelMenuHasScrolledRef = useRef(false);
 
     const transitionConfigUpdate = useCallback((updater: React.SetStateAction<GenerationConfig>) => {
         startTransition(() => {
@@ -1865,8 +2247,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
             // 始终允许发送新请求，即使正在生成中
             flushPromptDraftToConfig();
             onGenerate(promptDraftRef.current);
+            if (isMobile) {
+                setIsExpanded(false);
+                textareaRef.current?.blur();
+            }
         }
-    }, [flushPromptDraftToConfig, onGenerate]);
+    }, [flushPromptDraftToConfig, onGenerate, isMobile, setIsExpanded, textareaRef]);
 
     const primeClipboardImageFiles = useCallback(async (files: File[]) => {
         const preparedFiles = await Promise.all(files.map(async (file) => {
@@ -2215,14 +2601,24 @@ const PromptBar: React.FC<PromptBarProps> = ({
     }, [config.mode, config.pptSlides, parsePptSlides, pptOutlineDraft, setConfig]);
 
     const modeOptions = PROMPT_BAR_MODE_REGISTRY;
-    const activeModeOption = getPromptBarModeOption(config.mode);
+    const filteredModeOptions = isMobile
+        ? modeOptions.filter((item) => item.mode !== GenerationMode.ECOMMERCE)
+        : modeOptions;
+    // 兼容旧版测试正则匹配: const modeOptions = isMobile ? PROMPT_BAR_MODE_REGISTRY.filter((item) => item.mode !== GenerationMode.ECOMMERCE) : PROMPT_BAR_MODE_REGISTRY;
+    const activePromptBarMode = isMobile && config.mode === GenerationMode.ECOMMERCE
+        ? GenerationMode.IMAGE
+        : config.mode;
+    const activeModeOption = getPromptBarModeOption(activePromptBarMode);
 
     const handleSelectPromptBarMode = useCallback((mode: GenerationMode) => {
         commitConfigUpdate((previousConfig) => ({
             ...previousConfig,
             ...getPromptBarModePatch(previousConfig, mode),
         }));
-    }, [commitConfigUpdate]);
+        if (isMobile) {
+            setIsExpanded(true);
+        }
+    }, [commitConfigUpdate, isMobile, setIsExpanded]);
 
     const handleTogglePptOutlinePanel = useCallback(() => {
         setShowPptOutlinePanel((previousValue) => !previousValue);
@@ -2465,6 +2861,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         };
     }, [availableModels, config.imageSize, config.model]);
 
+    const isModelMenuOpen = activeMenu === 'model';
     const isModelListEmpty = availableModels.length === 0;
     const isModelMenuLoading = modelMenuLoadingState !== 'idle';
     const isModelMenuBootstrapping = modelMenuLoadingState === 'bootstrapping_without_cache';
@@ -2584,6 +2981,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
             position: 'relative',
             bottom: 'auto',
             left: 'auto',
+            right: 'auto',
             transform: 'none',
             width: '100%',
             maxWidth: '100%',
@@ -2601,6 +2999,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
             position: 'fixed',
             bottom: 'calc(env(safe-area-inset-bottom, 0px) + var(--mobile-tabbar-height, 72px) + var(--mobile-tabbar-floating-offset, 12px) + var(--mobile-prompt-gap, 12px))',
             left: '50%',
+            right: 'auto',
             transform: 'translateX(-50%) translateZ(0)',
             width: 'calc(100vw - 20px)',
             maxWidth: 'min(960px, calc(100vw - 20px))',
@@ -2621,29 +3020,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const mobileFloatingSheetBottom = 'calc(env(safe-area-inset-bottom, 0px) + var(--mobile-tabbar-total-height) + var(--mobile-floating-sheet-clearance))';
     const mobileFloatingSheetMaxHeight = 'min(62vh, calc(100vh - var(--mobile-content-top-inset) - env(safe-area-inset-bottom, 0px) - var(--mobile-tabbar-total-height) - var(--mobile-floating-sheet-clearance) - 18px))';
     const shouldRenderInlineMobileUploadButton = isMobile && config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
+    const shouldRenderMobileReferenceTray = isMobile && config.mode !== GenerationMode.ECOMMERCE && ((config.referenceImages && config.referenceImages.length > 0) || uploadingCount > 0);
+    const shouldUseMobileInlineMedia = shouldRenderInlineMobileUploadButton || shouldRenderMobileReferenceTray;
     const shouldRenderStandaloneUploadRow = !isMobile && config.mode !== GenerationMode.ECOMMERCE && config.referenceImages.length === 0 && uploadingCount === 0;
 
-    const mobileAdvancedPromptToolsNode = (
-        <DesktopComposerPromptTools
-            isMobile={isMobile}
-            config={config}
-            showPptOutlinePanel={showPptOutlinePanel}
-            onTogglePptOutlinePanel={handleTogglePptOutlinePanel}
-            onTogglePromptOptimization={handleTogglePromptOptimization}
-        />
-    );
-
     const activeEcommerceFooterSheet: EcommerceGroupSheet = ecommerceActiveTaskState?.sourceSheet ?? ecommerceActiveGroupSheet ?? '主图';
-    const activeEcommerceSheetSetting = ecommerceSheetSettings?.[activeEcommerceFooterSheet];
-    const activeEcommerceAspectRatio = activeEcommerceSheetSetting?.aspectRatio || config.aspectRatio;
-    const activeEcommerceImageSize = activeEcommerceSheetSetting?.imageSize || config.imageSize;
-    const activeAPlusControlModeLabel = activeEcommerceSheetSetting?.aPlusControlMode === '1464x600'
-        ? '1464x600'
-        : activeEcommerceSheetSetting?.aPlusControlMode === '970x600'
-            ? '970x600'
-            : activeEcommerceSheetSetting?.aPlusControlMode === '600x450'
-                ? '600x450'
-                : '自动';
     const ecommerceOptionsSummary = config.mode === GenerationMode.ECOMMERCE ? (
         <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
             {(['主图', 'A+'] as EcommerceGroupSheet[]).map((sheet) => (
@@ -2662,6 +3043,54 @@ const PromptBar: React.FC<PromptBarProps> = ({
         </span>
     ) : undefined;
 
+    const mobileAdvancedPromptToolsNode = (
+        <>
+            {groundingSupported && (
+                <button
+                    className={`flex min-w-0 max-w-full items-center justify-center gap-1 overflow-hidden px-2 h-8 rounded-md border transition-all text-[11px] font-medium ${config.enableGrounding
+                        ? 'border-[var(--prompt-bar-toggle-active-border)] bg-[image:var(--prompt-bar-toggle-active-bg)] text-[var(--prompt-bar-toggle-active-text)] shadow-[var(--prompt-bar-toggle-active-shadow)]'
+                        : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--prompt-bar-shell-hover)]'
+                        }`}
+                    onClick={() => updateConfigFields({ enableGrounding: !config.enableGrounding })}
+                    title="Google 搜索 (实时信息)"
+                >
+                    <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 8.8a15 15 0 0 1 20 0" />
+                        <path d="M5 12.5a10 10 0 0 1 14 0" />
+                        <path d="M8.5 16.3a5 5 0 0 1 7 0" />
+                        <line x1="12" y1="20" x2="12.01" y2="20" />
+                    </svg>
+                    <span className="min-w-0 truncate whitespace-nowrap">谷歌搜索</span>
+                </button>
+            )}
+            {imageSearchSupported && (
+                <button
+                    className={`flex min-w-0 max-w-full items-center justify-center gap-1 overflow-hidden px-2 h-8 rounded-md border transition-all text-[11px] font-medium ${config.enableImageSearch
+                        ? 'border-[var(--prompt-bar-toggle-active-border)] bg-[image:var(--prompt-bar-toggle-active-bg)] text-[var(--prompt-bar-toggle-active-text)] shadow-[var(--prompt-bar-toggle-active-shadow)]'
+                        : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--prompt-bar-shell-hover)]'
+                        }`}
+                    onClick={() => updateConfigFields({ enableImageSearch: !config.enableImageSearch })}
+                    title="图片搜索 (参考网络图片)"
+                >
+                    <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                    <span className="min-w-0 truncate whitespace-nowrap">图片搜索</span>
+                </button>
+            )}
+        </>
+    );
+
+    const mobileAdvancedSummaryText = config.mode === GenerationMode.AUDIO
+        ? `音频 · ${config.audioDuration || '自动'}`
+        : config.mode === GenerationMode.VIDEO
+        ? `视频 · ${config.videoResolution || '720p'} · ${config.videoDuration || '4s'}`
+        : config.mode === GenerationMode.ECOMMERCE
+        ? `电商模式 · ${activeEcommerceFooterSheet}`
+        : `${config.imageSize || '自动'} · ${config.aspectRatio || '1:1'}`;
+
     const mobileAdvancedModePanelNode = (
         <DesktopComposerModePanel
             isMobile={isMobile}
@@ -2670,7 +3099,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
             optionsPanelRef={optionsPanelRef}
             mobileFloatingSheetBottom={mobileFloatingSheetBottom}
             mobileFloatingSheetMaxHeight={mobileFloatingSheetMaxHeight}
-            embeddedMobileDrawer={isEmbeddedMobileComposer}
+            embeddedMobileDrawer={false}
             onToggleOptionsPanel={() => {
                 setActiveMenu(null);
                 setShowOptionsPanel(prev => !prev);
@@ -2698,23 +3127,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 <ImageOptionsPanel
                     aspectRatio={config.aspectRatio}
                     imageSize={config.imageSize}
-                    networkOptions={isMobile ? [
-                        ...(groundingSupported ? [{
-                            id: 'grounding',
-                            label: '联网搜索',
-                            active: !!config.enableGrounding,
-                            onToggle: () => updateConfigFields({ enableGrounding: !config.enableGrounding }),
-                        }] : []),
-                        ...(imageSearchSupported ? [{
-                            id: 'image-search',
-                            label: '图片搜索',
-                            active: !!config.enableImageSearch,
-                            onToggle: () => updateConfigFields({ enableImageSearch: !config.enableImageSearch }),
-                        }] : []),
-                    ] : []}
-                    showThinkingMode={config.mode === GenerationMode.ECOMMERCE ? false : thinkingSupported}
-                    thinkingMode={config.thinkingMode || 'minimal'}
-                    onThinkingModeChange={(mode) => updateConfigFields({ thinkingMode: mode })}
                     onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
                     onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
                     availableRatios={availableRatios}
@@ -2723,6 +3135,16 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     onUpdateEcommerceSheetSetting={config.mode === GenerationMode.ECOMMERCE ? onUpdateEcommerceSheetSetting : undefined}
                     activeEcommerceSheet={config.mode === GenerationMode.ECOMMERCE ? activeEcommerceFooterSheet : undefined}
                     onActiveEcommerceSheetChange={config.mode === GenerationMode.ECOMMERCE ? onActivateEcommerceGroupSheet : undefined}
+                    quality={config.quality}
+                    background={config.background}
+                    outputFormat={config.outputFormat}
+                    outputCompression={config.outputCompression}
+                    moderation={config.moderation}
+                    onQualityChange={(val) => updateConfigFields({ quality: val })}
+                    onBackgroundChange={(val) => updateConfigFields({ background: val })}
+                    onOutputFormatChange={(val) => updateConfigFields({ outputFormat: val })}
+                    onOutputCompressionChange={(val) => updateConfigFields({ outputCompression: val })}
+                    onModerationChange={(val) => updateConfigFields({ moderation: val })}
                 />
             ) : (
                 <VideoOptionsPanel
@@ -2740,13 +3162,31 @@ const PromptBar: React.FC<PromptBarProps> = ({
             )}
         />
     );
-    const mobileAdvancedSummaryText = config.mode === GenerationMode.ECOMMERCE
-        ? `${displayModelLabel} · ${activeEcommerceFooterSheet} · ${activeEcommerceFooterSheet === 'A+' ? `尺寸 ${activeAPlusControlModeLabel}` : (activeEcommerceAspectRatio === AspectRatio.AUTO ? '自动比例' : activeEcommerceAspectRatio)} · ${activeEcommerceImageSize}`
-        : `${displayModelLabel} · ${config.aspectRatio === AspectRatio.AUTO ? '自动比例' : config.aspectRatio} · ${config.imageSize}`;
     const dragOverlayLabel = config.mode === GenerationMode.ECOMMERCE && !ecommerceAnalysisConfirmed
         ? '释放导入需求单或产品图'
         : '释放添加参考图';
-    const isModelMenuOpen = activeMenu === 'model' && (!isModelListEmpty || isModelMenuLoading);
+    useEffect(() => {
+        if (!isModelMenuOpen) {
+            modelMenuHasScrolledRef.current = false;
+        }
+    }, [isModelMenuOpen]);
+
+    useEffect(() => {
+        if (isMobile && isModelMenuOpen && modelListScrollRef.current && !modelMenuHasScrolledRef.current) {
+            const index = filteredDisplayModels.findIndex(m => m.id === config.model);
+            if (index !== -1) {
+                modelMenuHasScrolledRef.current = true;
+                const timer = setTimeout(() => {
+                    if (modelListScrollRef.current) {
+                        modelListScrollRef.current.scrollTop = index * MODEL_LIST_ITEM_HEIGHT;
+                        setMobileScrollTop(index * MODEL_LIST_ITEM_HEIGHT);
+                    }
+                }, 80);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [isModelMenuOpen, isMobile, config.model, filteredDisplayModels]);
+
     const modelDropdownContent = (
         <>
             {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
@@ -2854,6 +3294,628 @@ const PromptBar: React.FC<PromptBarProps> = ({
         </>
     );
 
+    if (isMobile && !isExpanded) {
+        return (
+            <>
+                <div
+                    id="prompt-bar-container"
+                    className={`input-bar ios-mobile-prompt transition-all duration-300 !overflow-visible w-[calc(100vw-20px)] max-w-full z-[800]`}
+                    style={mobileStyle}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsExpanded(true);
+                    }}
+                    onTouchStart={(e) => {
+                        e.stopPropagation();
+                    }}
+                >
+                    <div className="flex items-center justify-between px-4 h-12 w-full select-none cursor-pointer gap-2">
+                        <div className="flex-1 min-w-0 flex items-center justify-start gap-2.5 text-[var(--text-tertiary)] text-xs pl-1">
+                            <svg className="w-4 h-4 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                            </svg>
+                            <span className="truncate text-[13.5px] font-medium tracking-[0.02em]">输入提示词...</span>
+                        </div>
+                    </div>
+                </div>
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => {
+                        if (e.target.files) {
+                            processFiles(e.target.files);
+                        }
+                        // Allow retrying the exact same file after a failed read.
+                        e.target.value = '';
+                    }}
+                />
+            </>
+        );
+    }
+    if (isMobile) {
+        return (
+            <div
+                id="prompt-bar-container"
+                className="input-bar ios-mobile-prompt transition-all duration-300 !overflow-visible w-full max-w-full z-[800]"
+                onClick={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                style={{
+                    ...mobileStyle,
+                    height: mobileSubView !== 'input' ? '330px' : 'auto',
+                    transition: 'height 0.2s cubic-bezier(0.32,0.72,0,1)'
+                }}
+            >
+                <div className="input-bar-inner !overflow-visible flex flex-col gap-2.5 p-3 h-full">
+                    {mobileSubView === 'input' && (
+                        <>
+                            {/* 1. 第一排：模式选择均分 5 列 (4模式 + 1收起) */}
+                            <div className="grid grid-cols-5 gap-1.5 w-full border-b border-[var(--frost-card-sub-border)] pb-2 min-w-0 items-center justify-items-center">
+                                {filteredModeOptions.map(option => {
+                                    const isSelected = activeModeOption.mode === option.mode;
+                                    return (
+                                        <button
+                                            key={option.mode}
+                                            className={`w-full flex items-center justify-center py-1.5 rounded-xl transition-all duration-200 border text-[11px] font-bold ${isSelected ? 'bg-[var(--frost-card-sub-bg)] border-[var(--frost-card-sub-border)] text-[var(--accent-coral)] shadow-sm' : 'border-transparent text-[var(--text-secondary)] active:text-[var(--text-primary)]'}`}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                handleSelectPromptBarMode(option.mode);
+                                            }}
+                                        >
+                                            {option.label}
+                                        </button>
+                                    );
+                                })}
+                                <button
+                                    className="flex items-center justify-center py-1.5 rounded-xl border border-transparent text-[var(--text-secondary)] active:scale-95 transition-all duration-200"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        setIsExpanded(false);
+                                        textareaRef.current?.blur();
+                                    }}
+                                    title="收起输入面板"
+                                >
+                                    <ChevronDown size={16} />
+                                </button>
+                            </div>
+
+                            {/* 插层：源图继续创作 Banner */}
+                            {activeSourceImage && (
+                                <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition-all"
+                                    style={{
+                                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                                        borderColor: 'rgba(245, 158, 11, 0.2)'
+                                    }}
+                                >
+                                    <img
+                                        src={activeSourceImage.url}
+                                        alt="源图"
+                                        className="w-8 h-8 object-cover rounded-lg shadow-sm"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-[10px] font-semibold text-amber-600 dark:text-amber-500">从此图继续创作</div>
+                                    </div>
+                                    <button
+                                        onClick={onClearSource}
+                                        className="flex items-center justify-center w-6 h-6 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-500"
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* 2. 第二排：输入文字和图片一排 (去边框臃肿，平铺) */}
+                            <div className="flex items-start gap-2.5 w-full min-w-0 py-1">
+                                {/* 左侧：参考图预览和上传按钮组合 */}
+                                {config.mode !== GenerationMode.ECOMMERCE && (
+                                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                                        {config.referenceImages.length > 0 ? (
+                                            <div
+                                                className="flex max-w-[85px] items-center gap-1 overflow-x-auto scrollbar-none pr-0.5"
+                                                style={{ WebkitOverflowScrolling: 'touch' }}
+                                            >
+                                                {config.referenceImages.map((img) => (
+                                                    <div key={`mobile-ref-${img.id}`} className="relative h-10 w-10 shrink-0">
+                                                        <ReferenceThumbnail
+                                                            image={img}
+                                                            onRecovered={handleReferenceRecovered}
+                                                            onClick={handleReferencePreview}
+                                                        />
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                removeReferenceImage(img.id);
+                                                            }}
+                                                            className="absolute -right-1 -top-1 z-10 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-red-500 text-white shadow-sm"
+                                                        >
+                                                            <X size={10} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                {Array.from({ length: uploadingSkeletonCount }).map((_, idx) => (
+                                                    <div key={`mobile-uploading-${idx}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed border-[color:var(--frost-card-sub-border)]">
+                                                        <Loader2 size={12} className="animate-spin text-[var(--text-tertiary)]" />
+                                                    </div>
+                                                ))}
+                                                <button
+                                                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed border-[var(--frost-card-sub-border)] bg-[var(--frost-input-bg)] text-[var(--text-secondary)] opacity-60 active:opacity-100"
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                >
+                                                    <Plus size={16} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                className="flex h-10 w-10 items-center justify-center rounded-xl border border-dashed border-[var(--frost-card-sub-border)] bg-[var(--frost-input-bg)] text-[var(--text-secondary)] opacity-70 active:opacity-100 active:scale-95 transition-all duration-200"
+                                                onClick={() => fileInputRef.current?.click()}
+                                                title="上传参考图"
+                                            >
+                                                <Plus size={18} />
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* 右侧：文字输入框 */}
+                                <div className="flex-1 min-w-0">
+                                    <textarea
+                                        ref={textareaRef}
+                                        value={promptDraft}
+                                        onChange={handleInput}
+                                        onKeyDown={handleKeyDown}
+                                        onPaste={handlePaste}
+                                        onFocus={() => {
+                                            setActiveMenu(null);
+                                            onFocus?.();
+                                        }}
+                                        onBlur={() => {
+                                            flushPromptDraftToConfig();
+                                            onBlur?.();
+                                        }}
+                                        onCompositionStart={() => { isComposingRef.current = true; }}
+                                        onCompositionEnd={handleCompositionEnd}
+                                        placeholder={config.mode === GenerationMode.VIDEO ? "描述你想要生成的视频..." : config.mode === GenerationMode.AUDIO ? "描述要生成的音频风格或歌词..." : config.mode === GenerationMode.PPT ? "输入PPT主题，批量生成..." : config.mode === GenerationMode.ECOMMERCE ? (ecommerceAnalysisConfirmed ? "输入补充修改指令..." : "上传运营文件后，在这里补充要求...") : "描述你想要生成的图片..."}
+                                        className="input-bar-textarea w-full max-w-full bg-transparent border-none outline-none text-[15px] resize-none box-border overflow-y-auto mt-0.5 py-1 px-0"
+                                        style={{
+                                            color: 'var(--text-primary)',
+                                            minHeight: '38px',
+                                            maxHeight: '120px',
+                                            lineHeight: '20px'
+                                        }}
+                                        rows={1}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* 电商配置面板（电商模式下显示） */}
+                            {config.mode === GenerationMode.ECOMMERCE && (
+                                <div className="w-full">
+                                    <DesktopComposerEcommercePanel
+                                        config={config}
+                                        requirementFileName={ecommerceRequirementFileName}
+                                        productFileCount={ecommerceProductFileCount}
+                                        extraReferenceCount={ecommerceExtraReferenceCount}
+                                        productFiles={ecommerceProductFiles}
+                                        extraReferenceFiles={ecommerceExtraReferenceFiles}
+                                        itemReferenceFiles={ecommerceItemReferenceFiles}
+                                        ecommerceAnalysis={ecommerceAnalysis}
+                                        ecommerceSelection={ecommerceSelection}
+                                        taskStates={ecommerceTaskStates}
+                                        groupSlots={ecommerceGroupSlots}
+                                        activeTaskState={ecommerceActiveTaskState}
+                                        activeFrameworkId={ecommerceActiveFrameworkId}
+                                        frameworkSummary={ecommerceFrameworkSummary}
+                                        analysisConfirmed={ecommerceAnalysisConfirmed}
+                                        confirmingAnalysis={ecommerceConfirmingAnalysis}
+                                        activeGroupSheet={ecommerceActiveGroupSheet}
+                                        ecommerceAnalyzing={ecommerceAnalyzing}
+                                        onPickRequirementFile={onPickEcommerceRequirementFile}
+                                        onPickProductFiles={onPickEcommerceProductFiles}
+                                        onPickExtraReferenceFiles={onPickEcommerceExtraReferenceFiles}
+                                        onClearRequirementFile={onClearEcommerceRequirementFile}
+                                        onRemoveProductFile={onRemoveEcommerceProductFile}
+                                        onRemoveExtraReferenceFile={onRemoveEcommerceExtraReferenceFile}
+                                        onPickItemReferenceFiles={onPickEcommerceItemReferenceFiles}
+                                        onRemoveItemReferenceFile={onRemoveEcommerceItemReferenceFile}
+                                        onAnalyzeFile={onAnalyzeEcommerceFile || onGenerate}
+                                        onResetAnalysis={onResetEcommerceAnalysis}
+                                        onConfirmAnalysis={onConfirmEcommerceAnalysis}
+                                        onToggleSelection={onToggleEcommerceSelection}
+                                        onActivateGroupSheet={onActivateEcommerceGroupSheet}
+                                        onActivateTaskBySourceKey={onActivateEcommerceTaskBySourceKey}
+                                        onPreviewSlotHistory={onPreviewEcommerceSlotHistory}
+                                        onTaskStateChange={onChangeEcommerceTaskState}
+                                    />
+                                </div>
+                            )}
+
+                            {/* 3. 第三排：模型库、设置和发送一排 */}
+                            <div className="flex items-center justify-between w-full gap-2 min-h-[40px] pt-1">
+                                {/* 左侧：模型选择按钮 */}
+                                <div className="flex-1 min-w-0">
+                                    <button
+                                        className="flex w-full items-center gap-1.5 px-3 h-10 rounded-xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)] justify-start active:scale-95 transition-all duration-200 overflow-hidden"
+                                        style={(() => {
+                                            if (isModelListEmpty) return { opacity: 0.5, cursor: 'not-allowed' };
+                                            if (currentModel?.isSystemInternal && currentModel?.colorStart && currentModel?.colorEnd) {
+                                                return getCreditModelFlatStyle(
+                                                    currentModelPrimaryColor,
+                                                    currentModelSecondaryColor,
+                                                    currentModel?.textColor,
+                                                    false,
+                                                );
+                                            }
+                                            return {};
+                                        })()}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            textareaRef.current?.blur();
+                                            setMobileCategory('featured');
+                                            setMobileSubView('model');
+                                        }}
+                                    >
+                                        {!isModelListEmpty && currentModel && (
+                                            <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center">
+                                                <ModelLogo
+                                                    modelId={currentModel.id}
+                                                    provider={currentModel.provider}
+                                                    modelName={currentModelName}
+                                                    size={14}
+                                                    active
+                                                />
+                                            </span>
+                                        )}
+                                        <span className="font-bold truncate text-[13px] text-left flex-1">
+                                            {displayModelLabel}
+                                        </span>
+                                    </button>
+                                </div>
+
+                                {/* 中间：高级设置按钮 */}
+                                <div className="flex-shrink-0">
+                                    <button
+                                        className="flex h-10 px-3.5 items-center justify-center rounded-xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)] shadow-sm active:scale-95 transition-all duration-200"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            textareaRef.current?.blur();
+                                            setMobileSubView('settings');
+                                        }}
+                                    >
+                                        <span className="text-xs font-semibold">高级设置</span>
+                                    </button>
+                                </div>
+
+                                {/* 右侧：发送按钮 */}
+                                <div className="flex-shrink-0">
+                                    <CreditSendButton
+                                        isCreditModel={isSystemCreditModel}
+                                        creditCost={totalCreditCost}
+                                        balance={balance}
+                                        balanceLoading={billingLoading}
+                                        hasPrompt={!!promptDraft.trim()}
+                                        colorStart={currentModel?.colorStart}
+                                        colorEnd={currentModel?.colorEnd}
+                                        textColor={currentModel?.textColor}
+                                        ecommerceConfirmedMode={config.mode === GenerationMode.ECOMMERCE && ecommerceAnalysisConfirmed}
+                                        isMobile={true}
+                                        parallelCount={config.parallelCount}
+                                        onChangeParallelCount={(count) => updateConfigFields({ parallelCount: count })}
+                                        onClick={() => {
+                                            if (isSystemCreditModel && authLoading) {
+                                                notify.info('账号状态确认中', '正在校验登录状态，请稍后再试。');
+                                                return;
+                                            }
+                                            void onGenerate();
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* 🚀 移动端模型库内嵌独显面板 */}
+                    {mobileSubView === 'model' && (
+                        <div 
+                            className="flex flex-col h-[300px] w-full min-w-0 overflow-hidden"
+                            style={{ touchAction: 'pan-y' }}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onTouchMove={(e) => e.stopPropagation()}
+                            onTouchEnd={(e) => e.stopPropagation()}
+                        >
+                            {/* 顶部一排：搜索框与完成按钮合并 */}
+                            <div className="flex items-center gap-2 border-b border-[var(--frost-card-sub-border)] pb-2 shrink-0 w-full min-w-0">
+                                <div 
+                                    className="flex-1 min-w-0 p-1 border rounded-xl" 
+                                    style={{ ...modelLibrarySearchSurfaceStyle, margin: 0 }}
+                                    onTouchStart={(e) => e.stopPropagation()}
+                                    onTouchMove={(e) => e.stopPropagation()}
+                                    onTouchEnd={(e) => e.stopPropagation()}
+                                >
+                                    <div className="relative flex items-center h-8">
+                                        <svg className="absolute left-2.5 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                        <input
+                                            type="text"
+                                            value={modelSearch}
+                                            onChange={(e) => setModelSearch(e.target.value)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            onTouchStart={(e) => e.stopPropagation()}
+                                            onTouchMove={(e) => e.stopPropagation()}
+                                            onTouchEnd={(e) => e.stopPropagation()}
+                                            placeholder="搜索常用或供应商模型..."
+                                            className="w-full bg-[var(--frost-input-bg)] text-[var(--text-primary)] text-xs rounded-lg py-1 pl-7.5 pr-2 outline-none border border-transparent focus:border-[var(--frost-input-border)] placeholder-[var(--text-tertiary)]"
+                                        />
+                                        {modelSearch && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setModelSearch(''); }}
+                                                onTouchStart={(e) => e.stopPropagation()}
+                                                onTouchMove={(e) => e.stopPropagation()}
+                                                onTouchEnd={(e) => e.stopPropagation()}
+                                                className="absolute right-2 text-[var(--text-tertiary)]"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                                <button
+                                    className="text-xs font-bold px-3.5 h-[34px] shrink-0 rounded-xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--accent-coral)] flex items-center justify-center active:scale-95"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setMobileSubView('input');
+                                    }}
+                                >
+                                    完成
+                                </button>
+                            </div>
+
+                            {/* 二级分栏目录容器 */}
+                            <div className="flex-1 flex overflow-hidden min-h-0 mt-2">
+                                {isModelMenuBootstrapping ? (
+                                    <div className="py-6 px-4 w-full flex items-center justify-center">
+                                        <Loader2 size={14} className="animate-spin text-[var(--text-secondary)] mr-2" />
+                                        <span className="text-xs text-[var(--text-secondary)]">正在加载模型列表...</span>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* 第一级：左侧大类分类栏 (仅在搜索框为空时展示) */}
+                                        {!modelSearch && (
+                                            <div
+                                                className="w-[100px] shrink-0 overflow-y-auto border-r border-[var(--frost-card-sub-border)] py-1 flex flex-col"
+                                                style={{ backgroundColor: 'rgba(0, 0, 0, 0.06)', touchAction: 'pan-y' }}
+                                                onTouchStart={(e) => e.stopPropagation()}
+                                                onTouchMove={(e) => e.stopPropagation()}
+                                                onTouchEnd={(e) => e.stopPropagation()}
+                                            >
+                                                {(() => {
+                                                    const mobileCategories = [
+                                                        { id: 'featured', name: '常用模型' },
+                                                        { id: 'openai', name: 'OpenAI' },
+                                                        { id: 'anthropic', name: 'Claude' },
+                                                        { id: 'google', name: 'Gemini' },
+                                                        { id: 'draw', name: 'MJ / SD' },
+                                                        { id: 'video', name: '视频生成' },
+                                                        { id: 'others', name: '其它模型' },
+                                                    ];
+
+                                                    const getModelCategory = (model: PromptBarModelOption) => {
+                                                        if (model.isExclusive || model.isPinned || model.isSystemInternal || pinnedModels.includes(model.id)) return 'featured';
+                                                        const id = model.id.toLowerCase();
+                                                        const provider = (model.provider || '').toLowerCase();
+                                                        if (provider === 'openai' || id.includes('gpt')) return 'openai';
+                                                        if (provider === 'anthropic' || id.includes('claude')) return 'anthropic';
+                                                        if (provider === 'google' || id.includes('gemini')) return 'google';
+                                                        if (provider === 'midjourney' || id.includes('mj') || id.includes('sd') || id.includes('flux')) return 'draw';
+                                                        if (id.includes('video') || id.includes('luma') || id.includes('kling') || id.includes('runway') || id.includes('sora')) return 'video';
+                                                        return 'others';
+                                                    };
+
+                                                    const availableMobileCategories = mobileCategories.filter(cat => {
+                                                        if (cat.id === 'featured') return true;
+                                                        return filteredDisplayModels.some(model => getModelCategory(model) === cat.id);
+                                                    });
+
+                                                    return availableMobileCategories.map(cat => {
+                                                        const isSelected = mobileCategory === cat.id;
+                                                        return (
+                                                            <button
+                                                                key={cat.id}
+                                                                className="w-full text-left py-2.5 px-2.5 text-xs font-semibold relative transition-all duration-150"
+                                                                style={{
+                                                                    color: isSelected ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                                                                    backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                                                                }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setMobileCategory(cat.id);
+                                                                }}
+                                                            >
+                                                                {isSelected && (
+                                                                    <div className="absolute left-0 top-1/4 bottom-1/4 w-[3px] rounded-r bg-[var(--text-primary)]" />
+                                                                )}
+                                                                {cat.name}
+                                                            </button>
+                                                        );
+                                                    });
+                                                })()}
+                                            </div>
+                                        )}
+
+                                        {/* 第二级：右侧模型列表 */}
+                                        <div 
+                                            className="flex-1 overflow-y-auto p-1.5 space-y-1"
+                                            style={{ touchAction: 'pan-y' }}
+                                            onTouchStart={(e) => e.stopPropagation()}
+                                            onTouchMove={(e) => e.stopPropagation()}
+                                            onTouchEnd={(e) => e.stopPropagation()}
+                                        >
+                                            {(() => {
+                                                const handleTogglePin = (modelId: string) => {
+                                                    toggleModelPin(modelId);
+                                                    setPinnedVersion(v => v + 1);
+                                                };
+
+                                                const getModelCategory = (model: PromptBarModelOption) => {
+                                                    if (model.isExclusive || model.isPinned || model.isSystemInternal || pinnedModels.includes(model.id)) return 'featured';
+                                                    const id = model.id.toLowerCase();
+                                                    const provider = (model.provider || '').toLowerCase();
+                                                    if (provider === 'openai' || id.includes('gpt')) return 'openai';
+                                                    if (provider === 'anthropic' || id.includes('claude')) return 'anthropic';
+                                                    if (provider === 'google' || id.includes('gemini')) return 'google';
+                                                    if (provider === 'midjourney' || id.includes('mj') || id.includes('sd') || id.includes('flux')) return 'draw';
+                                                    if (id.includes('video') || id.includes('luma') || id.includes('kling') || id.includes('runway') || id.includes('sora')) return 'video';
+                                                    return 'others';
+                                                };
+
+                                                const categoryModels = modelSearch 
+                                                    ? filteredDisplayModels 
+                                                    : filteredDisplayModels.filter(model => {
+                                                        if (mobileCategory === 'featured') {
+                                                            return model.isExclusive || model.isPinned || model.isSystemInternal || pinnedModels.includes(model.id);
+                                                        }
+                                                        return getModelCategory(model) === mobileCategory;
+                                                    });
+
+                                                if (categoryModels.length === 0) {
+                                                    return (
+                                                        <div className="py-8 text-center text-xs text-[var(--text-tertiary)]">
+                                                            暂无可用模型
+                                                        </div>
+                                                    );
+                                                }
+
+                                                return categoryModels.map((model, idx) => {
+                                                    const isLast = idx === categoryModels.length - 1;
+                                                    const description = model.isExclusive ? '' : truncateModelDescription(model.resolvedDescription, 40);
+                                                    const isModelPinned = pinnedModels.includes(model.id);
+                                                    return (
+                                                        <SwipeableModelItem
+                                                             key={model.id}
+                                                             modelId={model.id}
+                                                             isPinned={isModelPinned}
+                                                             onTogglePin={handleTogglePin}
+                                                             onClick={() => {
+                                                                 handleSelectPromptBarModel(model);
+                                                                 setMobileSubView('input');
+                                                             }}
+                                                         >
+                                                            <PromptBarModelMenuButton
+                                                                model={model}
+                                                                imageSize={config.imageSize}
+                                                                selected={config.model === model.id}
+                                                                isLast={isLast}
+                                                                description={description}
+                                                                showProviderRight={!modelSearch && mobileCategory === 'featured'}
+                                                                isMobile={true}
+                                                                onSelect={(m) => {
+                                                                    handleSelectPromptBarModel(m);
+                                                                    setMobileSubView('input');
+                                                                }}
+                                                                onOpenContextMenu={handlePromptBarModelContextMenu}
+                                                            />
+                                                        </SwipeableModelItem>
+                                                    );
+                                                });
+                                            })()}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 🚀 移动端高级参数设置内嵌独显面板 */}
+                    {mobileSubView === 'settings' && (
+                        <div 
+                            className="flex flex-col h-[300px] w-full min-w-0 overflow-hidden"
+                            style={{ touchAction: 'pan-y' }}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onTouchMove={(e) => e.stopPropagation()}
+                            onTouchEnd={(e) => e.stopPropagation()}
+                        >
+                            {/* 顶部标题栏 */}
+                            <div className="flex items-center justify-between border-b border-[var(--frost-card-sub-border)] pb-2 shrink-0">
+                                <span className="text-xs font-bold text-[var(--text-primary)]">高级设置选项</span>
+                                <button
+                                    className="text-xs font-bold px-3 py-1.5 rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--accent-coral)] active:scale-95"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setMobileSubView('input');
+                                    }}
+                                >
+                                    完成
+                                </button>
+                            </div>
+
+                            {/* 设置内容滚动区 */}
+                            <div className="flex-1 overflow-y-auto mt-2 pb-2 overscroll-contain px-0.5">
+                                {config.mode === GenerationMode.AUDIO ? (
+                                    <div className="w-full p-2 rounded-xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)]">
+                                        <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">音频时长</div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {['自动', '30s', '60s', '120s', '240s'].map(dur => (
+                                                <button
+                                                    key={dur}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${(config.audioDuration || '自动') === dur
+                                                        ? 'bg-[var(--prompt-bar-shell-hover)] text-[var(--text-primary)] border-[var(--prompt-bar-shell-border-strong)]'
+                                                        : 'bg-[var(--frost-input-bg)] text-[var(--text-secondary)] border-[color:var(--frost-card-sub-border)] hover:border-[var(--prompt-bar-shell-border-strong)]'
+                                                        }`}
+                                                    onClick={() => updateConfigFields({ audioDuration: dur === '自动' ? undefined : dur })}
+                                                >
+                                                    {dur}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT || config.mode === GenerationMode.ECOMMERCE) ? (
+                                    <ImageOptionsPanel
+                                        aspectRatio={config.aspectRatio}
+                                        imageSize={config.imageSize}
+                                        onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
+                                        onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
+                                        availableRatios={availableRatios}
+                                        availableSizes={availableSizes}
+                                        ecommerceSheetSettings={config.mode === GenerationMode.ECOMMERCE ? ecommerceSheetSettings : undefined}
+                                        onUpdateEcommerceSheetSetting={config.mode === GenerationMode.ECOMMERCE ? onUpdateEcommerceSheetSetting : undefined}
+                                        activeEcommerceSheet={config.mode === GenerationMode.ECOMMERCE ? activeEcommerceFooterSheet : undefined}
+                                        onActiveEcommerceSheetChange={config.mode === GenerationMode.ECOMMERCE ? onActivateEcommerceGroupSheet : undefined}
+                                        quality={config.quality}
+                                        background={config.background}
+                                        outputFormat={config.outputFormat}
+                                        outputCompression={config.outputCompression}
+                                        moderation={config.moderation}
+                                        onQualityChange={(val) => updateConfigFields({ quality: val })}
+                                        onBackgroundChange={(val) => updateConfigFields({ background: val })}
+                                        onOutputFormatChange={(val) => updateConfigFields({ outputFormat: val })}
+                                        onOutputCompressionChange={(val) => updateConfigFields({ outputCompression: val })}
+                                        onModerationChange={(val) => updateConfigFields({ moderation: val })}
+                                    />
+                                ) : (
+                                    <VideoOptionsPanel
+                                        aspectRatio={config.aspectRatio}
+                                        resolution={config.videoResolution || '720p'}
+                                        duration={config.videoDuration || '4s'}
+                                        audio={config.videoAudio || false}
+                                        onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
+                                        onResolutionChange={(res) => updateConfigFields({ videoResolution: res })}
+                                        onDurationChange={(dur) => updateConfigFields({ videoDuration: dur })}
+                                        onAudioChange={(audio) => updateConfigFields({ videoAudio: audio })}
+                                        availableRatios={availableRatios}
+                                        supportsAudio={!!getModelCapabilities(config.model)?.supportsVideoAudio}
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+
     return (
         <>
             <div
@@ -2932,16 +3994,29 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                     {/* Top Controls Row: desktop keeps tools visible; embedded mobile only keeps the mode strip */}
                     <PromptBarTopRow isMobile={isMobile}>
-                        <div data-mobile-composer-section="mode-strip" className="min-w-0">
+                        <div data-mobile-composer-section="mode-strip" className="min-w-0 flex items-center justify-between w-full">
                             <DesktopComposerModeSwitcher
                                 isMobile={isMobile}
                                 activeMode={activeModeOption.mode}
-                                modeOptions={modeOptions}
+                                modeOptions={filteredModeOptions}
                                 onSelectMode={handleSelectPromptBarMode}
                             />
+                            {isMobile && (
+                                <button
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)] shadow-sm active:scale-95 transition-all duration-200"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        setIsExpanded(false);
+                                        textareaRef.current?.blur();
+                                    }}
+                                    title="收起输入面板"
+                                >
+                                    <ChevronDown size={16} />
+                                </button>
+                            )}
                         </div>
 
-                        {!isEmbeddedMobileComposer && (
+                        {!isEmbeddedMobileComposer && !isMobile && (
                             <div className={`relative flex items-center gap-1 ${isMobile ? 'flex-wrap' : ''}`}>
                                 <DesktopComposerPromptTools
                                     isMobile={isMobile}
@@ -3107,7 +4182,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                     <div>
                         {/* Reference Images List */}
-                        {config.mode !== GenerationMode.ECOMMERCE && ((config.referenceImages && config.referenceImages.length > 0) || uploadingCount > 0) && (
+                        {!isMobile && config.mode !== GenerationMode.ECOMMERCE && ((config.referenceImages && config.referenceImages.length > 0) || uploadingCount > 0) && (
                             <div
                                 ref={refContainerRef}
                                 className="flex flex-nowrap items-center gap-2 transition-all p-2 px-3 mt-1 rounded-lg overflow-x-auto overflow-y-hidden scrollbar-thin"
@@ -3342,15 +4417,70 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         <div
                             data-mobile-composer-section="primary-input"
                             className={[
-                                shouldRenderInlineMobileUploadButton ? 'mt-1 flex items-end gap-2 px-3' : '',
+                                shouldUseMobileInlineMedia && !isEmbeddedMobileComposer ? 'mt-1 flex items-center gap-2 px-3' : '',
                                 isEmbeddedMobileComposer
-                                    ? 'mt-2 flex items-end gap-2 rounded-[22px] border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-3 py-2.5'
+                                    ? 'mt-2 flex items-center gap-2 rounded-[22px] border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-3 py-2.5'
                                     : '',
                             ].filter(Boolean).join(' ')}
                         >
+                            {shouldRenderMobileReferenceTray && (
+                                <div
+                                    className="flex max-w-[8.25rem] shrink-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden pr-1 scrollbar-none"
+                                    style={{
+                                        WebkitOverflowScrolling: 'touch',
+                                        overscrollBehaviorX: 'contain',
+                                        touchAction: 'pan-x',
+                                    }}
+                                    aria-label="手机端参考图"
+                                >
+                                    {config.referenceImages.map((img) => (
+                                        <div key={`mobile-reference-${img.id}`} className="relative h-12 w-12 shrink-0">
+                                            <ReferenceThumbnail
+                                                image={img}
+                                                onRecovered={handleReferenceRecovered}
+                                                onClick={handleReferencePreview}
+                                            />
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    removeReferenceImage(img.id);
+                                                }}
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                                className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white shadow-sm"
+                                                title="移除参考图"
+                                            >
+                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                            </button>
+                                        </div>
+                                    ))}
+
+                                    {Array.from({ length: uploadingSkeletonCount }).map((_, idx) => (
+                                        <div key={`mobile-uploading-${idx}`} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)]">
+                                            <Loader2 size={16} className="animate-spin text-[var(--text-tertiary)]" />
+                                        </div>
+                                    ))}
+
+                                    <button
+                                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border opacity-70 transition-all duration-200 hover:bg-[var(--toolbar-hover)] hover:opacity-100"
+                                        style={{
+                                            backgroundColor: 'var(--frost-card-sub-bg)',
+                                            color: 'var(--text-secondary)',
+                                            borderColor: 'var(--frost-card-sub-border)',
+                                        }}
+                                        onClick={() => fileInputRef.current?.click()}
+                                        title="上传参考图"
+                                    >
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                            <polyline points="17 8 12 3 7 8" />
+                                            <line x1="12" y1="3" x2="12" y2="15" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            )}
                             {shouldRenderInlineMobileUploadButton && (
                                 <button
-                                    className="mb-1 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-dashed opacity-60 transition-all duration-200 hover:bg-[var(--toolbar-hover)] hover:opacity-100"
+                                    className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-dashed opacity-60 transition-all duration-200 hover:bg-[var(--toolbar-hover)] hover:opacity-100"
                                     style={{
                                         color: 'var(--text-secondary)',
                                         borderColor: 'var(--frost-card-sub-border)',
@@ -3383,7 +4513,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 onCompositionStart={() => { isComposingRef.current = true; }}
                                 onCompositionEnd={handleCompositionEnd}
                                 placeholder={config.mode === GenerationMode.VIDEO ? "描述你想要生成的视频..." : config.mode === GenerationMode.AUDIO ? "描述你想要生成的音频风格、歌词或旋律..." : config.mode === GenerationMode.PPT ? "输入PPT主题，将批量生成图1~图N页面..." : config.mode === GenerationMode.ECOMMERCE ? (ecommerceAnalysisConfirmed ? "输入补充修改指令，将应用到当前选中的电商任务..." : "上传运营需求文件后，在这里补充额外的电商要求...") : "描述你想要生成的图片..."}
-                                className={`input-bar-textarea w-full max-w-full bg-transparent border-none outline-none text-[15px] resize-none box-border overflow-y-auto ${shouldRenderInlineMobileUploadButton ? 'mt-0 flex-1 py-1 px-0' : 'mt-1 py-1 px-3'}`}
+                                className={`input-bar-textarea w-full max-w-full bg-transparent border-none outline-none text-[15px] resize-none box-border overflow-y-auto ${shouldUseMobileInlineMedia ? 'mt-0 min-w-0 flex-1 py-1 px-0' : 'mt-1 py-1 px-3'}`}
                                 style={{
                                     color: 'var(--text-primary)', // 使用 CSS 变量适配主题
                                     minHeight: `${PROMPT_TEXTAREA_MIN_HEIGHT_PX}px`,
@@ -3397,14 +4527,15 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
                     {/* Footer - Modified to be a standard flex row, flowing or wrapping lightly on mobile */}
                     <PromptBarFooter isMobile={isMobile}>
-                        <div className={`flex items-center ${isMobile ? 'min-w-max shrink-0 flex-nowrap gap-2' : 'min-w-0 flex-1 gap-1.5'}`}>
+                        <div className={`flex min-w-0 items-center gap-1.5 ${isMobile ? 'flex-1' : 'flex-1'}`}>
                             {/* Model Button */}
                             <div
                                 ref={modelMenuAnchorRef}
-                                className={`relative inline-flex min-w-0 ${isMobile ? 'shrink-0' : 'flex-shrink-0'}`}
+                                data-mobile-footer-control="model-library"
+                                className={isMobile ? 'static min-w-0 flex-1' : `relative inline-flex min-w-0 flex-shrink-0`}
                             >
                                 <button
-                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-[clamp(7rem,40vw,9rem)] max-w-[44vw] flex-none justify-start' : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
+                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-[clamp(6rem,34vw,8rem)] max-w-[36vw] flex-none justify-start' : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
                                         ? 'bg-[var(--frost-input-bg)] text-[var(--text-tertiary)] cursor-not-allowed border-[color:var(--frost-card-sub-border)]'
                                         : 'text-[var(--text-secondary)] !opacity-100 hover:border-[var(--prompt-bar-shell-border-strong)]'
                                         }`}
@@ -3451,6 +4582,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     onMouseDown={(e) => e.stopPropagation()} // 🚀 阻止 mousedown 冒泡，防止被 handleClickOutside 误杀
                                     onClick={(e) => {
                                         e.stopPropagation(); // 🚀 阻止冒泡，防止被 handleClickOutside 误杀
+                                        if (isMobile) {
+                                            textareaRef.current?.blur();
+                                        }
                                         void handleToggleModelLibrary();
                                     }}
                                 >
@@ -3510,114 +4644,221 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 </button>
 
                                 {/* Dropdown Menu */}
-                                {isModelMenuOpen && isMobile && (
-                                    <div
-                                        ref={modelDropdownRef}
-                                        className="fixed left-3 right-3 z-[1005] ios-mobile-floating-sheet p-2 animate-fadeIn overflow-hidden"
-                                        style={{ bottom: mobileFloatingSheetBottom, maxHeight: mobileFloatingSheetMaxHeight, overscrollBehavior: 'contain' }}
-                                    >
-                                        {/* 🔍 Search Input Module - Above the list - 只在多个模型时显示 */}
-                                        {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
-                                            <div className="mb-2 p-2.5 border rounded-2xl  animate-scaleIn origin-bottom max-w-[calc(100vw-24px)]" style={{ ...modelLibrarySearchSurfaceStyle, width: 'min(22rem, calc(100vw - 24px))' }}>
-                                                <div className="relative flex items-center">
-                                                    <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                                    </svg>
-                                                    <input
-                                                        type="text"
-                                                        value={modelSearch}
-                                                        onChange={(e) => setModelSearch(e.target.value)}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        placeholder="搜索模型..."
-                                                        className="w-full bg-[var(--frost-input-bg)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-transparent focus:border-[var(--frost-input-border)] placeholder-[var(--text-tertiary)]"
-                                                        autoFocus
-                                                    />
-                                                    {modelSearch && (
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); setModelSearch(''); }}
-                                                            className="absolute right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-                                                        >
-                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                            </svg>
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
+                                 {/* Dropdown Menu */}
+                                 {isModelMenuOpen && isMobile && (
+                                     <>
+                                      {/* 🚀 移动端模型库 Bottom Sheet 蒙层 */}
+                                      <div
+                                          className="fixed inset-0 z-[1049] bg-black/40"
+                                          style={{ backdropFilter: 'blur(2px)' }}
+                                          onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }}
+                                          onTouchStart={(e) => e.stopPropagation()}
+                                      />
+                                      {/* 🚀 移动端模型库 Bottom Sheet 半屏弹窗 */}
+                                      <div
+                                          className="fixed left-0 right-0 bottom-0 z-[1050] flex flex-col items-center"
+                                          style={{
+                                              animation: 'model-sheet-slide-up 0.28s cubic-bezier(0.32,0.72,0,1) forwards',
+                                              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+                                          }}
+                                          onTouchStart={(e) => e.stopPropagation()}
+                                          onTouchMove={(e) => e.stopPropagation()}
+                                          onTouchEnd={(e) => e.stopPropagation()}
+                                      >
+                                          <style>{`
+                                              @keyframes model-sheet-slide-up {
+                                                  from { transform: translateY(100%); opacity: 0.6; }
+                                                  to   { transform: translateY(0);    opacity: 1; }
+                                              }
+                                          `}</style>
+                                          <div
+                                              ref={modelDropdownRef}
+                                              className="w-full max-w-[480px] rounded-t-2xl overflow-hidden"
+                                              style={{
+                                                  background: 'var(--frost-card-framework-bg)',
+                                                  borderTop: '1px solid var(--frost-card-framework-border)',
+                                                  borderLeft: '1px solid var(--frost-card-framework-border)',
+                                                  borderRight: '1px solid var(--frost-card-framework-border)',
+                                                  boxShadow: '0 -8px 32px rgba(0,0,0,0.25)',
+                                                  backdropFilter: 'blur(24px) saturate(1.2)',
+                                                  WebkitBackdropFilter: 'blur(24px) saturate(1.2)',
+                                              }}
+                                          >
+                                              {/* 拖拽手柄条 */}
+                                              <div className="flex justify-center pt-3 pb-2">
+                                                  <div className="w-10 h-1 rounded-full bg-[var(--text-tertiary)] opacity-30" />
+                                              </div>
 
-                                        {isModelMenuRefreshingWithCache && (
-                                            <div className="mb-2 flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
-                                                <Loader2 size={14} className="animate-spin" />
-                                                <span>正在同步最新模型库...</span>
-                                            </div>
-                                        )}
+                                              {/* 🔍 搜索输入框 */}
+                                              {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
+                                                  <div 
+                                                      className="mx-3 mb-2 p-2.5 border rounded-2xl" 
+                                                      style={{ ...modelLibrarySearchSurfaceStyle }}
+                                                      onTouchStart={(e) => e.stopPropagation()}
+                                                      onTouchMove={(e) => e.stopPropagation()}
+                                                      onTouchEnd={(e) => e.stopPropagation()}
+                                                  >
+                                                      <div className="relative flex items-center">
+                                                          <svg className="absolute left-2 w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                                          </svg>
+                                                          <input
+                                                              type="text"
+                                                              value={modelSearch}
+                                                              onChange={(e) => setModelSearch(e.target.value)}
+                                                              onClick={(e) => e.stopPropagation()}
+                                                              onTouchStart={(e) => e.stopPropagation()}
+                                                              onTouchMove={(e) => e.stopPropagation()}
+                                                              onTouchEnd={(e) => e.stopPropagation()}
+                                                              placeholder="搜索模型..."
+                                                              className="w-full bg-[var(--frost-input-bg)] text-[var(--text-primary)] text-xs rounded-xl py-1.5 pl-7 pr-2 outline-none border border-transparent focus:border-[var(--frost-input-border)] placeholder-[var(--text-tertiary)]"
+                                                              autoFocus
+                                                          />
+                                                          {modelSearch && (
+                                                              <button
+                                                                  onClick={(e) => { e.stopPropagation(); setModelSearch(''); }}
+                                                                  onTouchStart={(e) => e.stopPropagation()}
+                                                                  onTouchMove={(e) => e.stopPropagation()}
+                                                                  onTouchEnd={(e) => e.stopPropagation()}
+                                                                  className="absolute right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                                                              >
+                                                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                  </svg>
+                                                              </button>
+                                                          )}
+                                                      </div>
+                                                  </div>
+                                              )}
 
-                                        <div
-                                            ref={modelListScrollRef}
-                                            className="dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] max-h-[50vh] overflow-y-auto scrollbar-thin animate-scaleIn origin-bottom p-4"
-                                            style={{ ...modelLibrarySurfaceStyle, borderRadius: '1rem' }}
-                                            onScroll={(e) => {
-                                                const nextTop = e.currentTarget.scrollTop;
-                                                modelListScrollPos.current = nextTop;
-                                                const nextStartIndex = Math.max(
-                                                    0,
-                                                    Math.floor(nextTop / MODEL_LIST_ITEM_HEIGHT) - MODEL_LIST_OVERSCAN
-                                                );
-                                                setModelListWindowStart((prev) => prev === nextStartIndex ? prev : nextStartIndex);
-                                            }}
-                                        >
-                                            {isModelMenuBootstrapping ? (
-                                                <div className="py-6">
-                                                    <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
-                                                        <Loader2 size={14} className="animate-spin" />
-                                                        <span>正在同步最新模型库...</span>
-                                                    </div>
-                                                    <div className="mt-4 space-y-2">
-                                                        {Array.from({ length: MODEL_MENU_SKELETON_COUNT }).map((_, index) => (
-                                                            <div
-                                                                key={`prompt-bar-model-loading-${index}`}
-                                                                className="h-12 rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] animate-pulse"
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ) : (() => {
-                                                const visibleModels = modelListViewport.items;
-                                                const topSpacerHeight = modelListViewport.shouldWindow
-                                                    ? modelListViewport.startIndex * MODEL_LIST_ITEM_HEIGHT
-                                                    : 0;
-                                                const bottomSpacerHeight = modelListViewport.shouldWindow
-                                                    ? Math.max(0, modelListViewport.totalHeight - topSpacerHeight - visibleModels.length * MODEL_LIST_ITEM_HEIGHT)
-                                                    : 0;
+                                              {isModelMenuRefreshingWithCache && (
+                                                  <div className="mb-2 flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                      <Loader2 size={14} className="animate-spin" />
+                                                      <span>正在同步最新模型库...</span>
+                                                  </div>
+                                              )}
 
-                                                return (
-                                                    <>
-                                                        {topSpacerHeight > 0 ? <div style={{ height: `${topSpacerHeight}px` }} /> : null}
-                                                        {visibleModels.map((model: PromptBarModelOption, index: number) => {
-                                                            const isLast = index === visibleModels.length - 1;
-                                                            const description = model.isExclusive ? '' : truncateModelDescription(model.resolvedDescription, 50);
+                                              {/* 模型列表滚动区 */}
+                                              <div
+                                                  ref={modelListScrollRef}
+                                                  className="dropdown w-full overflow-y-auto scrollbar-none p-0 relative"
+                                                  style={{
+                                                      ...modelLibrarySurfaceStyle,
+                                                      borderRadius: '0',
+                                                      border: 'none',
+                                                      boxShadow: 'none',
+                                                      maxHeight: '50vh',
+                                                      scrollSnapType: 'y mandatory',
+                                                      paddingTop: '83px',
+                                                      paddingBottom: '83px',
+                                                      overscrollBehavior: 'contain',
+                                                      scrollbarWidth: 'none',
+                                                      touchAction: 'pan-y'
+                                                  }}
+                                                  onTouchStart={(e) => e.stopPropagation()}
+                                                  onTouchMove={(e) => e.stopPropagation()}
+                                                  onTouchEnd={(e) => e.stopPropagation()}
+                                                  onScroll={(e) => {
+                                                      const nextTop = e.currentTarget.scrollTop;
+                                                      modelListScrollPos.current = nextTop;
+                                                      const nextStartIndex = Math.max(
+                                                          0,
+                                                          Math.floor(nextTop / MODEL_LIST_ITEM_HEIGHT) - MODEL_LIST_OVERSCAN
+                                                      );
+                                                      setModelListWindowStart((prev) => prev === nextStartIndex ? prev : nextStartIndex);
 
-                                                            return (
-                                                                <PromptBarModelMenuButton
-                                                                    key={model.id}
-                                                                    model={model}
-                                                                    imageSize={config.imageSize}
-                                                                    selected={config.model === model.id}
-                                                                    isLast={isLast}
-                                                                    description={description}
-                                                                    onSelect={handleSelectPromptBarModel}
-                                                                    onOpenContextMenu={handlePromptBarModelContextMenu}
-                                                                />
-                                                            );
-                                                        })}
-                                                        {bottomSpacerHeight > 0 ? <div style={{ height: `${bottomSpacerHeight}px` }} /> : null}
-                                                    </>
-                                                );
-                                            })()}
-                                        </div>
-                                    </div >
-                                )}
+                                                      if (isMobile) {
+                                                          setMobileScrollTop(nextTop);
+
+                                                          const centerIndex = Math.min(filteredDisplayModels.length - 1, Math.max(0, Math.round(nextTop / MODEL_LIST_ITEM_HEIGHT)));
+                                                          const targetModel = filteredDisplayModels[centerIndex];
+                                                          if (targetModel && targetModel.id !== config.model) {
+                                                              try {
+                                                                  if (navigator.vibrate) {
+                                                                      navigator.vibrate(5);
+                                                                  }
+                                                              } catch (err) {}
+                                                              handleSelectPromptBarModel(targetModel);
+                                                          }
+                                                      }
+                                                  }}
+                                              >
+                                                  {isModelMenuBootstrapping ? (
+                                                      <div className="py-6 px-4">
+                                                          <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
+                                                              <Loader2 size={14} className="animate-spin" />
+                                                              <span>正在同步最新模型库...</span>
+                                                          </div>
+                                                          <div className="mt-4 space-y-2">
+                                                              {Array.from({ length: MODEL_MENU_SKELETON_COUNT }).map((_, index) => (
+                                                                  <div
+                                                                      key={`prompt-bar-model-loading-${index}`}
+                                                                      className="h-12 rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] animate-pulse"
+                                                                  />
+                                                              ))}
+                                                          </div>
+                                                      </div>
+                                                  ) : (() => {
+                                                      const visibleModels = modelListViewport.items;
+                                                      const topSpacerHeight = modelListViewport.shouldWindow
+                                                          ? modelListViewport.startIndex * MODEL_LIST_ITEM_HEIGHT
+                                                          : 0;
+                                                      const bottomSpacerHeight = modelListViewport.shouldWindow
+                                                          ? Math.max(0, modelListViewport.totalHeight - topSpacerHeight - visibleModels.length * MODEL_LIST_ITEM_HEIGHT)
+                                                          : 0;
+
+                                                      return (
+                                                          <>
+                                                              {topSpacerHeight > 0 ? <div style={{ height: `${topSpacerHeight}px` }} /> : null}
+                                                              {visibleModels.map((model: PromptBarModelOption, index: number) => {
+                                                                  const isLast = index === visibleModels.length - 1;
+                                                                  const description = model.isExclusive ? '' : truncateModelDescription(model.resolvedDescription, 50);
+                                                                  const globalIndex = modelListViewport.startIndex + index;
+
+                                                                  // 🚀 3D 滚轮运动计算
+                                                                  const offset = globalIndex * MODEL_LIST_ITEM_HEIGHT - mobileScrollTop;
+                                                                  const ratio = offset / MODEL_LIST_ITEM_HEIGHT;
+                                                                  const absRatio = Math.min(1.5, Math.abs(ratio));
+                                                                  const scale = 1.05 - absRatio * 0.12;
+                                                                  const rotateX = ratio * -28;
+                                                                  const opacity = 1 - absRatio * 0.45;
+
+                                                                  const itemStyle = isMobile ? {
+                                                                      transform: `perspective(500px) rotateX(${rotateX}deg) scale(${scale})`,
+                                                                      opacity: opacity,
+                                                                      scrollSnapAlign: 'center' as const,
+                                                                      height: `${MODEL_LIST_ITEM_HEIGHT}px`,
+                                                                      transition: 'transform 0.1s ease-out, opacity 0.1s ease-out',
+                                                                      display: 'flex',
+                                                                      alignItems: 'center',
+                                                                      justifyContent: 'center',
+                                                                      contain: 'layout style' as const
+                                                                  } : undefined;
+
+                                                                  return (
+                                                                      <div key={model.id} style={itemStyle} className="w-full">
+                                                                          <PromptBarModelMenuButton
+                                                                              model={model}
+                                                                              imageSize={config.imageSize}
+                                                                              selected={config.model === model.id}
+                                                                              isLast={isLast}
+                                                                              description={description}
+                                                                              isMobile={true}
+                                                                              onSelect={handleSelectPromptBarModel}
+                                                                              onOpenContextMenu={handlePromptBarModelContextMenu}
+                                                                          />
+                                                                      </div>
+                                                                  );
+                                                              })}
+                                                              {bottomSpacerHeight > 0 ? <div style={{ height: `${bottomSpacerHeight}px` }} /> : null}
+                                                          </>
+                                                      );
+                                                  })()}
+                                              </div>
+                                          </div>
+                                      </div>
+                                     </>
+                                 )}
                                 {isModelMenuOpen && !isMobile && (
                                     <div
                                         ref={modelDropdownRef}
@@ -3628,8 +4869,19 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 )}
                             </div >
 
+                            {isEmbeddedMobileComposer ? (
+                                <div data-mobile-footer-control="settings" className="w-full">
+                                    <MobileEmbeddedAdvancedDrawer
+                                        summaryText={mobileAdvancedSummaryText}
+                                        promptTools={mobileAdvancedPromptToolsNode}
+                                        modePanel={mobileAdvancedModePanelNode}
+                                    />
+                                </div>
+                            ) : null}
+
                             {/* Options Button - Shows current ratio and size, shrink on mobile */}
                             {!isEmbeddedMobileComposer && (
+                                <div data-mobile-footer-control="settings" className={isMobile ? 'shrink-0' : 'contents'}>
                                 <DesktopComposerModePanel
                                 isMobile={isMobile}
                                 config={config}
@@ -3638,6 +4890,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 mobileFloatingSheetBottom={mobileFloatingSheetBottom}
                                 mobileFloatingSheetMaxHeight={mobileFloatingSheetMaxHeight}
                                 onToggleOptionsPanel={() => {
+                                    if (isMobile) {
+                                        textareaRef.current?.blur();
+                                    }
                                     setActiveMenu(null);
                                     setShowOptionsPanel(prev => !prev);
                                 }}
@@ -3664,23 +4919,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     <ImageOptionsPanel
                                         aspectRatio={config.aspectRatio}
                                         imageSize={config.imageSize}
-                                        networkOptions={isMobile ? [
-                                            ...(groundingSupported ? [{
-                                                id: 'grounding',
-                                                label: '联网搜索',
-                                                active: !!config.enableGrounding,
-                                                onToggle: () => updateConfigFields({ enableGrounding: !config.enableGrounding }),
-                                            }] : []),
-                                            ...(imageSearchSupported ? [{
-                                                id: 'image-search',
-                                                label: '图片搜索',
-                                                active: !!config.enableImageSearch,
-                                                onToggle: () => updateConfigFields({ enableImageSearch: !config.enableImageSearch }),
-                                            }] : []),
-                                        ] : []}
-                                        showThinkingMode={config.mode === GenerationMode.ECOMMERCE ? false : thinkingSupported}
-                                        thinkingMode={config.thinkingMode || 'minimal'}
-                                        onThinkingModeChange={(mode) => updateConfigFields({ thinkingMode: mode })}
+                                        
                                         onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
                                         onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
                                         availableRatios={availableRatios}
@@ -3689,6 +4928,16 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         onUpdateEcommerceSheetSetting={config.mode === GenerationMode.ECOMMERCE ? onUpdateEcommerceSheetSetting : undefined}
                                         activeEcommerceSheet={config.mode === GenerationMode.ECOMMERCE ? activeEcommerceFooterSheet : undefined}
                                         onActiveEcommerceSheetChange={config.mode === GenerationMode.ECOMMERCE ? onActivateEcommerceGroupSheet : undefined}
+                                        quality={config.quality}
+                                        background={config.background}
+                                        outputFormat={config.outputFormat}
+                                        outputCompression={config.outputCompression}
+                                        moderation={config.moderation}
+                                        onQualityChange={(val) => updateConfigFields({ quality: val })}
+                                        onBackgroundChange={(val) => updateConfigFields({ background: val })}
+                                        onOutputFormatChange={(val) => updateConfigFields({ outputFormat: val })}
+                                        onOutputCompressionChange={(val) => updateConfigFields({ outputCompression: val })}
+                                        onModerationChange={(val) => updateConfigFields({ moderation: val })}
                                     />
                                 ) : (
                                     <VideoOptionsPanel
@@ -3756,58 +5005,54 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     </div>
                                 ) : undefined}
                                 />
+                                </div>
                             )}
                         </div>
 
-                        {isEmbeddedMobileComposer ? (
-                            <MobileEmbeddedAdvancedDrawer
-                                summaryText={mobileAdvancedSummaryText}
-                                promptTools={mobileAdvancedPromptToolsNode}
-                                modePanel={mobileAdvancedModePanelNode}
-                            />
-                        ) : null}
-
-                        <div className={`flex items-center gap-2 shrink-0 ${isMobile ? '' : 'ml-auto'}`}>
-                            {/* Group 2: Generation Settings - Hidden on mobile for compact footer */}
-                            {!isMobile && config.mode !== GenerationMode.ECOMMERCE && (
-                                <div className="prompt-bar-liquid-group flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0">
+                        <div className={`flex items-center gap-1.5 shrink-0 ${isMobile ? 'justify-end' : 'ml-auto'}`}>
+                            {/* Group 2: Generation Settings */}
+                            {(isMobile || (!isMobile && config.mode !== GenerationMode.ECOMMERCE)) && (
+                                <div className={`${isMobile ? 'flex items-center' : 'prompt-bar-liquid-group flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0'}`}>
                                     {/* Parallel Count */}
-                                    <div className="relative h-full w-[58px]">
-                                        <button
-                                            className="prompt-bar-liquid-button flex w-full items-center justify-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-[var(--toolbar-hover)]"
-                                            style={{ color: 'var(--text-secondary)' }}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                toggleMenu('count');
-                                            }}
-                                            title="并发数量"
-                                        >
-                                            <span className="text-[11px] font-medium">{`${config.parallelCount} 张`}</span>
-                                            <svg className={`w-2.5 h-2.5 opacity-50 flex-shrink-0 transition-transform duration-200 ${activeMenu === 'count' ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
-                                        </button>
-                                        {
-                                            activeMenu === 'count' && (
-                                                <div className="absolute bottom-full mb-2 z-20" style={{ left: '50%', transform: 'translateX(-50%)' }}>
-                                                    <div className="dropdown static w-24 animate-scaleIn origin-bottom p-1 flex flex-col gap-1" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)', boxShadow: 'var(--frost-card-sub-shadow)' }}>
-                                                        {(config.mode === GenerationMode.PPT
-                                                            ? Array.from({ length: 20 }, (_, i) => i + 1)
-                                                            : [1, 2, 3, 4]
-                                                        ).map((count) => (
-                                                            <button
-                                                                key={count}
-                                                                className={`dropdown-item justify-between rounded-md ${config.parallelCount === count ? 'active' : ''}`}
-                                                                onClick={() => {
-                                                                    updateConfigFields({ parallelCount: count as number });
-                                                                    setActiveMenu(null);
-                                                                }}
-                                                            >
-                                                                <span>{`${count} 张`}</span>
-                                                            </button>
-                                                        ))}
+                                    {!isMobile && (
+                                        <div className="relative h-full w-[58px]">
+                                            <button
+                                                className="prompt-bar-liquid-button flex w-full items-center justify-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-[var(--toolbar-hover)]"
+                                                style={{ color: 'var(--text-secondary)' }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleMenu('count');
+                                                }}
+                                                title="并发数量"
+                                            >
+                                                <span className="text-[11px] font-medium">{`${config.parallelCount}张`}</span>
+                                                <svg className={`w-2.5 h-2.5 opacity-50 flex-shrink-0 transition-transform duration-200 ${activeMenu === 'count' ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
+                                            </button>
+                                            {
+                                                activeMenu === 'count' && (
+                                                    <div className="absolute bottom-full mb-2 z-20" style={{ left: '50%', transform: 'translateX(-50%)' }}>
+                                                        <div className="dropdown static w-24 animate-scaleIn origin-bottom p-1 flex flex-col gap-1" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)', boxShadow: 'var(--frost-card-sub-shadow)' }}>
+                                                            {(config.mode === GenerationMode.PPT
+                                                                ? Array.from({ length: 20 }, (_, i) => i + 1)
+                                                                : [1, 2, 3, 4]
+                                                            ).map((count) => (
+                                                                <button
+                                                                    key={count}
+                                                                    className={`dropdown-item justify-between rounded-md ${config.parallelCount === count ? 'active' : ''}`}
+                                                                    onClick={() => {
+                                                                        updateConfigFields({ parallelCount: count as number });
+                                                                        setActiveMenu(null);
+                                                                    }}
+                                                                >
+                                                                    <span>{`${count} 张`}</span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            )
-                                        }
+                                                )
+                                            }
+                                        </div>
+                                    )}
 
                                         {/* Context Menu for Pinning */}
                                         {contextMenu && ReactDOM.createPortal(
@@ -3821,17 +5066,19 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     boxShadow: 'var(--frost-card-sub-shadow)',
                                                 }}
                                             >
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        toggleModelPin(contextMenu.modelId);
-                                                        setContextMenu(null);
-                                                    }}
-                                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--prompt-bar-shell-hover)]"
-                                                    style={{ color: 'var(--text-primary)' }}
-                                                >
-                                                    {getPinnedModels().includes(contextMenu.modelId) ? '❌ 取消置顶' : '📌 置顶模型'}
-                                                </button>
+                                                {!isMobile && (
+    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            toggleModelPin(contextMenu.modelId);
+                                                            setContextMenu(null);
+                                                        }}
+                                                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--prompt-bar-shell-hover)]"
+                                                        style={{ color: 'var(--text-primary)' }}
+                                                    >
+                                                        {getPinnedModels().includes(contextMenu.modelId) ? '❌ 取消置顶' : '📌 置顶模型'}
+                                                    </button>
+)}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -3943,9 +5190,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             document.body
                                         )}
                                     </div>
-                                </div>
                             )}
-                        <div className={isMobile ? '' : 'flex-shrink-0'}>
+                        <div data-mobile-footer-control="send" className={isMobile ? 'shrink-0' : 'flex-shrink-0'}>
                             {/* 🚀 发送按钮 - 积分专属样式 */}
                             <CreditSendButton
                                 isCreditModel={isSystemCreditModel}
@@ -3958,6 +5204,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 textColor={currentModel?.textColor}
                                 ecommerceConfirmedMode={config.mode === GenerationMode.ECOMMERCE && ecommerceAnalysisConfirmed}
                                 className={isMobile ? '' : 'prompt-bar-liquid-button prompt-bar-liquid-send'}
+                                isMobile={isMobile}
+                                parallelCount={config.parallelCount}
+                                onChangeParallelCount={(count) => updateConfigFields({ parallelCount: count })}
                                 onClick={() => {
                                     if (isSystemCreditModel && authLoading) {
                                         notify.info('账号状态确认中', '正在校验登录状态，请稍后再试。');
@@ -3974,6 +5223,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     }
                                     flushPromptDraftToConfig();
                                     onGenerate(promptDraftRef.current);
+                                    if (isMobile) {
+                                        setIsExpanded(false);
+                                        textareaRef.current?.blur();
+                                    }
                                 }}
                             />
                         </div>
@@ -4006,6 +5259,57 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         />
                     )
                 }
+
+                {/* 移动端并发数 Action Sheet 浮层 */}
+                {isMobile && activeMenu === 'count' && ReactDOM.createPortal(
+                    <div 
+                        className="fixed inset-0 z-[10000] flex items-end justify-center bg-black/45 backdrop-blur-[2px] transition-opacity duration-300"
+                        onClick={() => setActiveMenu(null)}
+                    >
+                        <div 
+                            className="w-full rounded-t-3xl border-t p-5 pb-9 space-y-5 transition-transform duration-300"
+                            style={{ 
+                                background: 'var(--frost-card-framework-bg)', 
+                                borderColor: 'var(--frost-card-framework-border)',
+                                boxShadow: '0 -8px 32px rgba(0,0,0,0.18)',
+                                WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.18)',
+                                backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.18)',
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-[var(--text-primary)]">选择并发张数</span>
+                                <button 
+                                    className="text-xs text-[var(--text-secondary)] font-medium px-3.5 py-1.5 rounded-full border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] active:scale-95 transition-all"
+                                    onClick={() => setActiveMenu(null)}
+                                >
+                                    关闭
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-4 gap-2">
+                                {(config.mode === GenerationMode.PPT
+                                    ? [1, 2, 3, 4, 5, 6, 8, 10]
+                                    : [1, 2, 3, 4]
+                                ).map((count) => (
+                                    <button
+                                        key={count}
+                                        className={`flex flex-col items-center justify-center py-3 rounded-xl border font-semibold transition-all active:scale-95 ${config.parallelCount === count 
+                                            ? 'bg-[var(--prompt-bar-shell-hover)] text-[var(--text-primary)] border-[var(--prompt-bar-shell-border-strong)] shadow-sm' 
+                                            : 'bg-[var(--frost-input-bg)] text-[var(--text-secondary)] border-[var(--frost-card-sub-border)]'}`}
+                                        onClick={() => {
+                                            updateConfigFields({ parallelCount: count });
+                                            setActiveMenu(null);
+                                        }}
+                                    >
+                                        <span className="text-base">{count}</span>
+                                        <span className="text-[10px] font-normal opacity-70">张</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>,
+                    document.body
+                )}
 
             </div>
         </>
