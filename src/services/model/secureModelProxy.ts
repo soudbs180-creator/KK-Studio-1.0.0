@@ -5,7 +5,7 @@ import {
   waitForAuthSessionChange,
 } from '../auth/authSessionEvents';
 import { getPreferredKkApiAccessToken, refreshPreferredKkApiAccessToken } from '../api/authAccessToken';
-import { kkWebApiClient, resolveKkApiBaseUrl } from '../api/kkApiClient';
+import { kkWebApiClient, resolveKkApiModelProxyBaseUrl } from '../api/kkApiClient';
 import { compressReferenceImagesIfNeeded } from '../../utils/imageUtils';
 
 export interface SecureProxyChatMessage {
@@ -180,11 +180,11 @@ const MAX_TRANSIENT_PROXY_FETCH_ATTEMPTS = 2;
 const TRANSIENT_PROXY_RETRY_BASE_DELAY_MS = 250;
 
 function getLocalUserRouteApiEndpoint(): string {
-  return `${resolveKkApiBaseUrl().replace(/\/+$/, '')}/api/v1/model-proxy/user`;
+  return `${resolveKkApiModelProxyBaseUrl().replace(/\/+$/, '')}/api/v1/model-proxy/user`;
 }
 
 function getLocalSystemProxyEndpoint(): string {
-  return `${resolveKkApiBaseUrl().replace(/\/+$/, '')}/api/v1/model-proxy/system`;
+  return `${resolveKkApiModelProxyBaseUrl().replace(/\/+$/, '')}/api/v1/model-proxy/system`;
 }
 
 function shouldUseLocalSystemProxy(): boolean {

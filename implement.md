@@ -1,8 +1,18 @@
 # KK-Studio v1.4.8 Implementation Rules
 
-Last updated: 2026-05-22
+Last updated: 2026-05-25
 
 ## Operating Mode
+
+Current hosted model-proxy timeout fix (2026-05-25): keep normal hosted API calls on the same-origin runtime API, but do not send long-running model-proxy generation calls through Vercel serverless when a direct HTTPS VPS API route is available.
+
+Hosted model-proxy rules:
+- `resolveKkApiBaseUrl()` remains the default for normal auth/profile/catalog/settings API calls.
+- `/api/v1/model-proxy/user` and `/api/v1/model-proxy/system` must use the model-proxy-specific API base resolver so image/video/audio generation can run from the VPS API runtime.
+- A configured public HTTPS `VITE_KK_API_BASE_URL` is valid as the direct model-proxy target, including temporary `*.sslip.io` VPS hosts.
+- Hosted same-origin or missing API-base configuration falls back to the verified HTTPS VPS API default for model-proxy calls, avoiding `FUNCTION_INVOCATION_TIMEOUT` on `kkai.plus` Vercel functions.
+- Remote HTTP API bases must not become direct model-proxy targets from hosted HTTPS pages.
+- Do not change Gemini request payload shape, user-route credential lookup, credit billing, provider selection, or browser direct-provider blocking in this slice.
 
 Current user API secret-boundary slice (2026-05-22): keep system/provider keys and user BYOK secrets out of browser persistence. Local mode must persist user API settings through the local API/backend path chosen by the user, and cloud/profile reads are for backup/restore display with redacted placeholders, not raw secret recovery into the frontend.
 

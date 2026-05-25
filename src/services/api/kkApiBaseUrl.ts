@@ -1,5 +1,7 @@
 import { readRuntimeEnv, readRuntimeOrigin } from "../../utils/runtimeEnv.ts";
 
+const DEFAULT_HOSTED_MODEL_PROXY_API_BASE_URL = "https://172-245-156-16.sslip.io";
+
 function normalizeHostname(value: unknown): string | undefined {
   const normalized = typeof value === "string"
     ? value.trim().toLowerCase().replace(/^\[|\]$/g, "")
@@ -157,6 +159,30 @@ function shouldPreferRuntimeOriginForHostedTemporaryVpsApi(
   }
 }
 
+function isDirectHostedModelProxyBaseUrl(
+  configuredBaseUrl: string,
+  runtimeOrigin?: string,
+): boolean {
+  try {
+    const configuredUrl = new URL(configuredBaseUrl);
+    const runtimeUrl = runtimeOrigin ? new URL(runtimeOrigin) : undefined;
+
+    if (configuredUrl.protocol !== "https:") {
+      return false;
+    }
+    if (isLoopbackHostname(configuredUrl.hostname) || isPrivateNetworkHostname(configuredUrl.hostname)) {
+      return false;
+    }
+    if (runtimeUrl && configuredUrl.origin === runtimeUrl.origin) {
+      return false;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function resolveKkApiBaseUrl(): string {
   const configuredBaseUrl = normalizeConfiguredApiBaseUrl(readRuntimeEnv("VITE_KK_API_BASE_URL") || "");
   const runtimeOrigin = readRuntimeOrigin();
@@ -174,6 +200,36 @@ export function resolveKkApiBaseUrl(): string {
   }
 
   if (runtimeOrigin) {
+    return runtimeOrigin;
+  }
+
+  return "http://127.0.0.1:3001";
+}
+
+export function resolveKkApiModelProxyBaseUrl(): string {
+  const configuredBaseUrl = normalizeConfiguredApiBaseUrl(readRuntimeEnv("VITE_KK_API_BASE_URL") || "");
+  const runtimeOrigin = readRuntimeOrigin();
+
+  if (configuredBaseUrl) {
+    if (shouldPreferRuntimeOriginForLocalApi(configuredBaseUrl, runtimeOrigin)) {
+      return runtimeOrigin!;
+    }
+    if (isDirectHostedModelProxyBaseUrl(configuredBaseUrl, runtimeOrigin)) {
+      return configuredBaseUrl;
+    }
+    if (shouldPreferRuntimeOriginForHostedHttpApi(configuredBaseUrl, runtimeOrigin)) {
+      return runtimeOrigin!;
+    }
+    if (isHostedRuntimeOrigin(runtimeOrigin)) {
+      return DEFAULT_HOSTED_MODEL_PROXY_API_BASE_URL;
+    }
+    return configuredBaseUrl;
+  }
+
+  if (runtimeOrigin) {
+    if (isHostedRuntimeOrigin(runtimeOrigin)) {
+      return DEFAULT_HOSTED_MODEL_PROXY_API_BASE_URL;
+    }
     return runtimeOrigin;
   }
 

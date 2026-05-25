@@ -1,6 +1,19 @@
 # KK-Studio v1.4.8 Coordination Status
 
-Last updated: 2026-05-24
+Last updated: 2026-05-25
+
+## Current Hosted Model Proxy Direct VPS Timeout Fix
+
+- Active lane: generation API transport fix for hosted image generation failures where user-route Google/Nano Banana calls timed out through the same-origin Vercel API proxy.
+- Included files for this slice: `src/services/api/kkApiBaseUrl.ts`, `src/services/api/kkApiClient.ts`, `src/services/model/secureModelProxy.ts`, `tests/unit/kk-api-base-url-hosted-contract.test.ts`, `docs/development/hosted-release-runbook.md`, `plans.md`, `implement.md`, `status.md`, and `validation.md`.
+- Excluded files/artifacts: existing unrelated dirty UI/auth/billing/mobile/settings/provider files, `dist/`, deployment credentials, provider API keys, production DB rows, and generated output.
+- Root cause evidence: the browser error included Vercel `FUNCTION_INVOCATION_TIMEOUT`. The current hosted resolver intentionally maps temporary HTTPS VPS API bases back to `https://kkai.plus` for normal API calls, so `/api/v1/model-proxy/user` image generation was going through Vercel serverless before reaching the overseas VPS. That hop can time out before the provider response returns, causing both the local user-route attempt and fallback path to fail.
+- Implemented fix: added `resolveKkApiModelProxyBaseUrl()` so normal KK API calls still resolve through same-origin where required, while model-proxy endpoints use a direct public HTTPS VPS API base. `secureModelProxy` now builds `/api/v1/model-proxy/user` and `/system` URLs from that model-proxy resolver. Hosted `kkai.plus` without a direct override defaults model-proxy calls to `https://172-245-156-16.sslip.io`.
+- RED/GREEN evidence: `node --test tests/unit/kk-api-base-url-hosted-contract.test.ts` first failed because `resolveKkApiModelProxyBaseUrl` did not exist. After the fix it passed 5/5, including the contract that normal API remains same-origin while model-proxy calls direct the temporary VPS API origin.
+- Fresh validation evidence: `node --test tests/unit/user-route-proxy-routing.test.ts` passed 4/4; `node --test tests/unit/local-user-route-auth-contract.test.ts` passed 7/7; `node --test tests/unit/google-official-gemini-protocol-guards.test.ts` passed 3/3; `node --test tests/unit/vercel-vps-proxy.test.ts` passed 8/8; `npm.cmd run typecheck` passed; `npm.cmd run build` passed and produced `dist/assets/model-services-8iunw8Zh.js`.
+- Browser QA: skipped because this slice changes service URL resolution only and has no JSX/CSS/rendered UI surface. The user-visible verification is the next real hosted generation attempt after deploy.
+- Remaining risk/follow-up: direct VPS model-proxy calls require the VPS API CORS allowlist to continue allowing `https://kkai.plus` and `https://www.kkai.plus`. Once `api.kkai.plus` DNS/TLS is fully healthy, configure `VITE_KK_API_BASE_URL=https://api.kkai.plus` so the direct model-proxy target is the canonical API host instead of the temporary `sslip.io` host.
+- Next step: run docs governance, encoding, path-limited diff check, stage only this slice, and commit.
 
 ## Current Mobile Model List Pin Interaction And Code Cleanup
 

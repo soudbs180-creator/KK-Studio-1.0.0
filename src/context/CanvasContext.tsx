@@ -1536,6 +1536,55 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const deletePromptNode = useCallback((id: string) => {
         pushToHistory();
 
+        // 1. 物理删除所有与此 promptNode (或其级联删除的 promptNodes) 关联的生成的图片文件
+        const currentState = stateRef.current;
+        const activeCanvas = currentState.canvases.find(c => c.id === currentState.activeCanvasId);
+        if (activeCanvas) {
+            const targetNode = activeCanvas.promptNodes.find(n => n.id === id);
+            if (targetNode) {
+                const toDeletePromptIds = new Set<string>([id]);
+                if (targetNode.mode === GenerationMode.ECOMMERCE && targetNode.ecommerce?.kind === 'framework') {
+                    activeCanvas.promptNodes.forEach(node => {
+                        if (node.ecommerce?.frameworkId === id) {
+                            toDeletePromptIds.add(node.id);
+                        }
+                    });
+                } else if (targetNode.mode === GenerationMode.ECOMMERCE && targetNode.ecommerce?.kind === 'a-plus-group') {
+                    activeCanvas.promptNodes.forEach(node => {
+                        if (node.ecommerce?.groupId === id) {
+                            toDeletePromptIds.add(node.id);
+                        }
+                    });
+                }
+
+                // 如果是电商节点（包括级联被删的电商子节点），我们需要物理删除其图片
+                const isEcommerceNode = targetNode.mode === GenerationMode.ECOMMERCE;
+                if (isEcommerceNode) {
+                    const imagesToDelete = activeCanvas.imageNodes.filter(image => 
+                        image.parentPromptId && toDeletePromptIds.has(image.parentPromptId)
+                    );
+
+                    imagesToDelete.forEach(img => {
+                        // 物理删除 IndexedDB
+                        deleteImage(img.id);
+                        // 物理删除 磁盘
+                        import('../services/storage/storageAdapter').then(({ deleteImage: deleteImageFromDisk }) => {
+                            deleteImageFromDisk({
+                                id: img.id,
+                                type: 'native',
+                                width: 0,
+                                height: 0,
+                                x: 0,
+                                y: 0
+                            });
+                        }).catch(e => console.error('Failed to invoke safe physical deletion', e));
+                        // 释放 Blob URL
+                        safeRevokeBlobUrl(img.url);
+                    });
+                }
+            }
+        }
+
         urgentSaveRef.current = true; // 父节点删除后同步存盘
         updateCanvas(canvas => deleteCanvasPromptNode(canvas, id));
     }, [updateCanvas, pushToHistory]);

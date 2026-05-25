@@ -1,4 +1,4 @@
-import type { Canvas } from '../types.ts';
+import { GenerationMode, type Canvas } from '../types.ts';
 
 export function deleteCanvasImageNode(canvas: Canvas, id: string): Canvas {
     return {
@@ -13,14 +13,78 @@ export function deleteCanvasImageNode(canvas: Canvas, id: string): Canvas {
 }
 
 export function deleteCanvasPromptNode(canvas: Canvas, id: string): Canvas {
+    const targetNode = canvas.promptNodes.find(node => node.id === id);
+    if (!targetNode) {
+        return canvas;
+    }
+
+    const toDeletePromptIds = new Set<string>([id]);
+    
+    // 如果是电商框架卡片，级联删除所有的子分组和子任务卡片
+    if (targetNode.mode === GenerationMode.ECOMMERCE && targetNode.ecommerce?.kind === 'framework') {
+        canvas.promptNodes.forEach(node => {
+            if (node.ecommerce?.frameworkId === id) {
+                toDeletePromptIds.add(node.id);
+            }
+        });
+    }
+    // 如果是电商分组卡片，级联删除该分组下所有的子任务卡片
+    else if (targetNode.mode === GenerationMode.ECOMMERCE && targetNode.ecommerce?.kind === 'a-plus-group') {
+        canvas.promptNodes.forEach(node => {
+            if (node.ecommerce?.groupId === id) {
+                toDeletePromptIds.add(node.id);
+            }
+        });
+    }
+
+    // 从 promptNodes 中过滤掉所有需要删除的卡片
+    let nextPromptNodes = canvas.promptNodes.filter(node => !toDeletePromptIds.has(node.id));
+
+    // 如果删除了某个具体的电商任务卡片，我们需要更新它所属的 framework 节点中的 taskNodeIds 列表
+    if (targetNode.mode === GenerationMode.ECOMMERCE && (targetNode.ecommerce?.kind === 'main-image' || targetNode.ecommerce?.kind === 'a-plus-module')) {
+        const frameworkId = targetNode.ecommerce.frameworkId;
+        if (frameworkId) {
+            nextPromptNodes = nextPromptNodes.map(node => {
+                if (node.id === frameworkId && node.ecommerce?.frameworkMeta) {
+                    const taskNodeIds = node.ecommerce.frameworkMeta.taskNodeIds || [];
+                    return {
+                        ...node,
+                        ecommerce: {
+                            ...node.ecommerce,
+                            frameworkMeta: {
+                                ...node.ecommerce.frameworkMeta,
+                                taskNodeIds: taskNodeIds.filter(taskId => taskId !== id),
+                            }
+                        }
+                    };
+                }
+                return node;
+            });
+        }
+    }
+
+    // 更新 imageNodes：
+    // 电商任务卡片生成的图片：直接彻底删除
+    // 普通节点生成的图片：保留，但清空 parentPromptId 关联
+    const nextImageNodes = canvas.imageNodes.filter(image => {
+        if (image.parentPromptId && toDeletePromptIds.has(image.parentPromptId)) {
+            const parentPrompt = canvas.promptNodes.find(p => p.id === image.parentPromptId);
+            if (parentPrompt && parentPrompt.mode === GenerationMode.ECOMMERCE) {
+                return false; // 电商图片直接过滤掉，一并删除
+            }
+        }
+        return true;
+    }).map(image => {
+        if (image.parentPromptId && toDeletePromptIds.has(image.parentPromptId)) {
+            return { ...image, parentPromptId: '' };
+        }
+        return image;
+    });
+
     return {
         ...canvas,
-        promptNodes: canvas.promptNodes.filter(node => node.id !== id),
-        imageNodes: canvas.imageNodes.map(image =>
-            image.parentPromptId === id
-                ? { ...image, parentPromptId: '' }
-                : image
-        ),
+        promptNodes: nextPromptNodes,
+        imageNodes: nextImageNodes,
     };
 }
 

@@ -1,10 +1,15 @@
 # KK-Studio v1.4.8 Single-Line Convergence Plan
 
-Last updated: 2026-05-24
+Last updated: 2026-05-25
 
 Branch policy: continue on the current branch and current workspace unless the user explicitly asks for a branch or worktree.
 
 ## Summary
+
+Current hosted model-proxy timeout fix:
+- Root cause: hosted image generation was using the same-origin `https://kkai.plus/api/v1/model-proxy/*` Vercel function proxy for long-running model proxy calls. Ordinary API requests tolerate that hop, but image generation can exceed the Vercel invocation window and surface as `FUNCTION_INVOCATION_TIMEOUT`, after which the local user-route path and fallback both fail before the VPS/provider result can return.
+- Keep ordinary KK API resolution on the hosted same-origin path for auth/profile/catalog calls, but route model-proxy endpoints directly to the HTTPS VPS API base (`https://172-245-156-16.sslip.io` by default, or a configured public HTTPS API origin) so provider calls run from the overseas server instead of the browser or Vercel serverless.
+- Acceptance: RED/GREEN hosted API base contract proves ordinary API remains same-origin while model-proxy calls use the direct VPS base; user-route, local auth, Gemini protocol, and Vercel proxy contracts pass; `npm.cmd run typecheck`, `npm.cmd run build`, docs governance, and encoding checks pass.
 
 Current mobile model list pin interaction and code cleanup milestone:
 - Root cause: mobile model items used a swipe gesture to toggle favorite/pin state. This touch gesture conflicted heavily with vertical list scrolling and workspace pan gestures, creating a poor touch experience. Additionally, deprecated touch listener helper methods remained in `PromptBar.tsx` and violated source cleanup tests.
