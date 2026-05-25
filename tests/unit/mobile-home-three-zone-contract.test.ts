@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -8,9 +9,7 @@ import { selectMobileFeedResults } from '../../apps/web/src/components/mobile/mo
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 function createPromptNode(overrides: Partial<PromptNode> = {}): PromptNode {
   return {
@@ -114,7 +113,7 @@ describe('mobile home three-zone contract', () => {
 
   test('mobile prompt-bar cleanup removes the obsolete embedded composer shell file', () => {
     assert.equal(
-      existsSync(path.join(ROOT_DIR, 'src/components/layout/prompt-bar/MobileEmbeddedComposerShell.tsx')),
+      existsSync(path.join(ROOT_DIR, 'apps/web/src/components/layout/prompt-bar/MobileEmbeddedComposerShell.tsx')),
       false,
     );
   });

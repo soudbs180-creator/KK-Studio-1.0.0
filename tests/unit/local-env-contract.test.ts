@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -9,9 +10,7 @@ const ROOT_DIR = process.cwd();
 const helperModuleUrl = pathToFileURL(path.join(ROOT_DIR, "scripts", "lib", "env-contract.mjs")).href;
 const envHelper = await import(helperModuleUrl);
 
-function readSource(relativePath: string): string {
-  return fs.readFileSync(path.join(ROOT_DIR, relativePath), "utf8");
-}
+
 
 const trackedEnvKeys = [
   "VITE_KK_API_BASE_URL",
@@ -176,6 +175,6 @@ test(".env.example does not activate a non-local KK API base URL by default", ()
     source,
     /^VITE_KK_API_BASE_URL\s*=\s*https?:\/\/(?!localhost(?::|\/|$)|127\.|0\.0\.0\.0(?::|\/|$))/m,
   );
-  assert.match(source, /^# VITE_KK_API_BASE_URL=https:\/\/your-kk-studio-api\.example\.com/m);
-  assert.match(source, /^# VITE_KK_ADMIN_URL=https:\/\/your-kk-studio-admin\.example\.com/m);
+  assert.match(source, /^VITE_PUBLIC_API_BASE_URL\s*=\s*\/api/m);
+  assert.match(source, /^EXPO_PUBLIC_API_BASE_URL\s*=\s*https:\/\/your-site\.netlify\.app\/api/m);
 });

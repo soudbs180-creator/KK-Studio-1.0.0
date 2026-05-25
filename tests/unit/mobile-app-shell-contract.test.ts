@@ -1,3 +1,4 @@
+import { readSource, workspacePath } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -6,9 +7,7 @@ import { test } from 'node:test';
 const ROOT_DIR = process.cwd();
 const MOBILE_APP_SHELL_PATH = 'src/components/mobile/MobileAppShell.tsx';
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
-}
+
 
 test('mobile component index exports MobileAppShell', () => {
   const indexSource = readSource('src/components/mobile/index.ts');
@@ -17,7 +16,7 @@ test('mobile component index exports MobileAppShell', () => {
 });
 
 test('MobileAppShell keeps the mobile three-layer slot contract and stays tab-bar agnostic', () => {
-  const shellExists = existsSync(path.join(ROOT_DIR, MOBILE_APP_SHELL_PATH));
+  const shellExists = existsSync(workspacePath(MOBILE_APP_SHELL_PATH));
 
   assert.equal(shellExists, true, 'expected MobileAppShell.tsx to exist');
 

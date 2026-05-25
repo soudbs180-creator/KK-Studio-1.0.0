@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -5,9 +6,7 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 test('billing balance refresh still resolves remaining balance from canonical sources', () => {
   const billingContextSource = readSource('src/context/BillingContext.tsx');
@@ -156,7 +155,7 @@ test('user api settings keep working when local API persistence degrades to memo
   const apiSettingsViewSource = readSource('src/components/settings/ApiSettingsView.tsx');
   const userApiCloudRecordStorageSource = readSource('src/services/api/userApiCloudRecordStorage.ts');
   const userApiPayloadSource = readSource('src/services/api/userApiPayload.ts');
-  const shimPath = path.join(ROOT_DIR, 'src/services/api/supabaseUserApiCloudStorage.ts');
+  const shimPath = path.join(ROOT_DIR, 'apps/web/src/services/api/supabaseUserApiCloudStorage.ts');
 
   assert.ok(apiSettingsViewSource.includes('const providerActionsDisabled = userApiViewState.providerActionsDisabled;'));
   assert.ok(apiSettingsViewSource.includes('const providerEditorReadOnly = userApiViewState.providerEditorReadOnly;'));

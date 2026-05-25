@@ -1,9 +1,10 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+//
 import { test } from 'node:test';
 
 test('tutorial overlay keeps onboarding copy readable on mobile and desktop', () => {
-  const source = readFileSync('src/components/common/TutorialOverlay.tsx', 'utf8');
+  const source = readSource('src/components/common/TutorialOverlay.tsx');
 
   assert.match(source, /TUTORIAL_MOBILE_CARD_MAX_WIDTH\s*=\s*460/);
   assert.match(source, /TUTORIAL_DESKTOP_CARD_MAX_WIDTH\s*=\s*560/);

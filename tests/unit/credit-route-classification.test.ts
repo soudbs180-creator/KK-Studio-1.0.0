@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -7,9 +8,7 @@ import { resolveModelExecutionLane } from '../../apps/web/src/services/model/mod
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 describe('credit route classification', () => {
   test('classifies system credit models into the cloud execution lane only when the model route is system-owned', () => {

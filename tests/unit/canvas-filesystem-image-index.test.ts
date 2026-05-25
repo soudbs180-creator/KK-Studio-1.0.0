@@ -1,11 +1,10 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 
-function readSource(relativePath: string): string {
-  return readFileSync(resolve(process.cwd(), relativePath), "utf8");
-}
+
 
 test("canvas file-system persistence indexes image nodes before blob collection", () => {
   const source = readSource("src/context/useCanvasFileSystemPersistence.ts");

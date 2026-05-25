@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -14,20 +15,17 @@ type EffectiveProviderModelsModule = {
   }) => string[];
 };
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, "utf-8") : "";
-}
+
 
 async function loadEffectiveProviderModels(): Promise<EffectiveProviderModelsModule> {
-  const fullPath = path.join(ROOT_DIR, "src/services/auth/keyManagerEffectiveProviderModels.ts");
-  assert.equal(existsSync(fullPath), true, "src/services/auth/keyManagerEffectiveProviderModels.ts must exist");
+  const fullPath = path.join(ROOT_DIR, "apps/web/src/services/auth/keyManagerEffectiveProviderModels.ts");
+  assert.equal(existsSync(fullPath), true, "apps/web/src/services/auth/keyManagerEffectiveProviderModels.ts must exist");
   return await import("../../apps/web/src/services/auth/keyManagerEffectiveProviderModels.ts") as EffectiveProviderModelsModule;
 }
 
 test("keyManager effective provider model boundary lives outside the monolithic key manager", () => {
-  const keyManagerSource = readSource("src/services/auth/keyManager.ts");
-  const helperSource = readSource("src/services/auth/keyManagerEffectiveProviderModels.ts");
+  const keyManagerSource = readSource("apps/web/src/services/auth/keyManager.ts");
+  const helperSource = readSource("apps/web/src/services/auth/keyManagerEffectiveProviderModels.ts");
   const testConfigSource = readSource("tsconfig.tests.json");
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-effective-provider-models-contract\.test\.ts/);

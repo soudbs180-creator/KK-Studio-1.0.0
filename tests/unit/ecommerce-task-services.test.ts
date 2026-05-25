@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -12,9 +13,7 @@ import { mergeEcommerceTaskState } from '../../apps/web/src/services/ecommerce/t
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 function createSeriesTemplate(): EcommerceSeriesTemplate {
   return {

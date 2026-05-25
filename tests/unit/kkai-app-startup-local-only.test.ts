@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -6,10 +7,7 @@ import { test } from 'node:test';
 const ROOT_DIR = process.cwd();
 
 test('AppStartupProvider skips canonical cloud warnings in KKAI local-only mode', () => {
-  const startupSource = readFileSync(
-    path.join(ROOT_DIR, 'src', 'context', 'AppStartupContext.tsx'),
-    'utf-8',
-  );
+  const startupSource = readSource('src/context/AppStartupContext.tsx');
 
   assert.match(startupSource, /import \{ KKAI_FEATURE_FLAGS \} from '\.\.\/app\/kkaiFeatureFlags';/);
   assert.match(

@@ -21,12 +21,28 @@ export const PROMPT_BAR_MODE_REGISTRY: PromptBarModeOption[] = [
     activeBorder: 'rgba(56, 189, 248, 0.4)',
   },
   {
+    mode: GenerationMode.VIDEO,
+    label: '视频',
+    icon: Video,
+    color: '#f472b6',
+    activeBg: 'rgba(244, 114, 182, 0.16)',
+    activeBorder: 'rgba(244, 114, 182, 0.4)',
+  },
+  {
     mode: GenerationMode.ECOMMERCE,
     label: '电商',
     icon: PackageOpen,
     color: '#34d399',
     activeBg: 'rgba(16, 185, 129, 0.16)',
     activeBorder: 'rgba(52, 211, 153, 0.4)',
+  },
+  {
+    mode: GenerationMode.AUDIO,
+    label: '音频',
+    icon: Mic,
+    color: '#a78bfa',
+    activeBg: 'rgba(167, 139, 250, 0.16)',
+    activeBorder: 'rgba(167, 139, 250, 0.4)',
   },
   {
     mode: GenerationMode.PPT,

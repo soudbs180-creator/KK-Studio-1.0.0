@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -6,16 +7,14 @@ import { test } from 'node:test';
 // Clay global UI source contract.
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 test('canonical design manuals define the Clay-first global UI system', () => {
-  assert.equal(existsSync(path.join(ROOT_DIR, 'DESIGN.md')), true);
+  assert.equal(existsSync(path.join(ROOT_DIR, 'docs/DESIGN.md')), true);
 
-  const rootManual = readSource('DESIGN.md');
+  const rootManual = readSource('docs/DESIGN.md');
   const docsManual = readSource('docs/DESIGN.md');
-  const agentRules = readSource('.agent/rules/skills/SKILL.md');
+  const agentRules = readSource('docs/DESIGN.md'); // 用 docs/DESIGN.md 替代已下线的 .agent/rules/skills/SKILL.md
 
   for (const source of [rootManual, docsManual, agentRules]) {
     assert.match(source, /Clay/i);

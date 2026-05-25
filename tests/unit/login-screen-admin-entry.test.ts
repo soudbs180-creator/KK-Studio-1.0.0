@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -15,7 +16,7 @@ test('buildAdminLoginUrl keeps the admin app external and lands on /login', () =
 });
 
 test('LoginScreen source contains a dedicated administrator redirect button', () => {
-  const source = readFileSync('src/components/auth/LoginScreen.tsx', 'utf8');
+  const source = readSource('src/components/auth/LoginScreen.tsx');
 
   assert.match(source, /buildAdminLoginUrl/);
   assert.match(source, /readRuntimeEnv\('VITE_KK_ADMIN_URL'\)/);
@@ -23,7 +24,7 @@ test('LoginScreen source contains a dedicated administrator redirect button', ()
 });
 
 test('LoginScreen keeps manual local access beside the administrator entry', () => {
-  const source = readFileSync('src/components/auth/LoginScreen.tsx', 'utf8');
+  const source = readSource('src/components/auth/LoginScreen.tsx');
 
   assert.match(source, /className="auth-aux-actions"/);
   assert.match(source, /handleTempUserEntry/);

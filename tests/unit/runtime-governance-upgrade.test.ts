@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -5,9 +6,7 @@ import { test } from "node:test";
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), "utf8");
-}
+
 
 test("project docs publish one runtime truth table for current and transitional runtimes", () => {
   const projectStructureSource = readSource("docs/PROJECT_STRUCTURE.md");
@@ -21,9 +20,9 @@ test("project docs publish one runtime truth table for current and transitional 
   assert.match(projectStructureSource, /\| `apps\/payment-sidecar\/` \| `canonical-payment` \|/);
   assert.match(projectStructureSource, /\| `payment-server\/` \| `transition-bridge` \|/);
 
-  assert.match(rootGuideSource, /current live web runtime is root `src\/`/);
-  assert.match(rootGuideSource, /target web runtime is `apps\/web\/`/);
-  assert.match(rootGuideSource, /`server\/`, `api\/`, and `payment-server\/` remain transitional/);
+  assert.match(rootGuideSource, /### Runtime Layout \(严格 AGENTS\)/);
+  assert.match(rootGuideSource, /- `apps\/web\/` 为唯一的桌面端 Web 前端运行时。/);
+  assert.match(rootGuideSource, /- `apps\/mobile\/` 为手机端 Expo 应用。/);
 
   assert.match(handoffSource, /当前在线前端运行时：根目录 `src\/`/);
   assert.match(handoffSource, /目标前端运行时：`apps\/web\/`/);
@@ -50,7 +49,7 @@ test("verification chain includes integration tests and payment-server static ch
   assert.match(packageJson.scripts["verify:changes"], /verify:mobile-settings-smoke/);
   assert.match(packageJson.scripts["verify:changes"], /verify:desktop-settings-smoke/);
   assert.ok(testsTsconfig.include.includes("tests/integration/**/*.ts"));
-  assert.ok(testsTsconfig.include.includes("tests/unit/governance-contract.test.ts"));
+  assert.ok(testsTsconfig.include.includes("tests/unit/**/*.ts"));
   assert.ok(testsTsconfig.include.includes("tests/unit/runtime-governance-upgrade.test.ts"));
   assert.ok(testsTsconfig.include.includes("tests/contract/**/*.ts"));
   assert.ok((testsTsconfig.exclude || []).includes("tests/e2e/**/*.ts"));

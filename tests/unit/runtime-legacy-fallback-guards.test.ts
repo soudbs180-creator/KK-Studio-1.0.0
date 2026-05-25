@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -5,9 +6,7 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 test('runtime-sensitive services keep legacy fallback guarded while routing guest and workspace flows through the API layer', () => {
   const userApiCloudRecordSource = readSource('src/services/api/userApiCloudRecordStorage.ts');
@@ -72,6 +71,6 @@ test('register form now routes through the KK API instead of browser-side Supaba
 test('frontend runtime no longer exposes the disabled Supabase browser shim', () => {
   const servicesIndexSource = readSource('src/services/index.ts');
 
-  assert.equal(existsSync(path.join(ROOT_DIR, 'src/lib/supabase.ts')), false);
+  assert.equal(existsSync(path.join(ROOT_DIR, 'apps/web/src/lib/supabase.ts')), false);
   assert.doesNotMatch(servicesIndexSource, /supabase/);
 });

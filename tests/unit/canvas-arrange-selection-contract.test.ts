@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -36,13 +37,10 @@ type CanvasArrangeSelectionModule = {
   ) => { canvas: Canvas; subCardLayoutMode: 'row' | 'grid' | 'column' } | null;
 };
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
-}
+
 
 async function loadCanvasArrangeSelectionModule(): Promise<CanvasArrangeSelectionModule> {
-  const fullPath = path.join(ROOT_DIR, 'src/context/canvasArrangeSelection.ts');
+  const fullPath = path.join(ROOT_DIR, 'apps/web/src/context/canvasArrangeSelection.ts');
   assert.equal(existsSync(fullPath), true, 'src/context/canvasArrangeSelection.ts must exist');
   return await import('../../apps/web/src/context/canvasArrangeSelection.ts') as CanvasArrangeSelectionModule;
 }

@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -33,20 +34,17 @@ type KeyManagerProviderUsageModule = {
   }) => boolean;
 };
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
-}
+
 
 async function loadProviderUsageHelpers(): Promise<KeyManagerProviderUsageModule> {
-  const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerProviderUsage.ts');
-  assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerProviderUsage.ts must exist');
+  const fullPath = path.join(ROOT_DIR, 'apps/web/src/services/auth/keyManagerProviderUsage.ts');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/services/auth/keyManagerProviderUsage.ts must exist');
   return await import('../../apps/web/src/services/auth/keyManagerProviderUsage.ts') as KeyManagerProviderUsageModule;
 }
 
 test('provider usage math lives outside the monolithic key manager', () => {
-  const keyManagerSource = readSource('src/services/auth/keyManager.ts');
-  const helperSource = readSource('src/services/auth/keyManagerProviderUsage.ts');
+  const keyManagerSource = readSource('apps/web/src/services/auth/keyManager.ts');
+  const helperSource = readSource('apps/web/src/services/auth/keyManagerProviderUsage.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-provider-usage-contract\.test\.ts/);

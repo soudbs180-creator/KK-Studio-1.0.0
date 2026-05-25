@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -5,9 +6,7 @@ import { test } from "node:test";
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  const actualPath = relativePath.replace(/packages[/\\]contracts[/\\]/, "packages/shared/src/contracts/").replace(/^src[/\\]/, "apps/web/src/"); return readFileSync(path.join(ROOT_DIR, actualPath), "utf8");
-}
+
 
 test("workspace layout contract exposes explicit canvas fields instead of a generic record bag", () => {
   const dtoSource = readSource(path.join("packages", "contracts", "src", "dto", "workspace-canvas.ts"));

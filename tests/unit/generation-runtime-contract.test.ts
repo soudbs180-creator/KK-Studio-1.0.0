@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -22,9 +23,7 @@ type GenerationRuntimePublicBoundary = {
   completeRetryBatch: CompleteRetryGeneratedMediaBatchParams;
 }
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8').replace(/\r\n/g, '\n');
-}
+
 
 describe('generation runtime extraction contract', () => {
   test('generation runtime public boundary types are semantically checked', () => {
@@ -53,7 +52,7 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('cancel generation ownership lives in useGenerationRuntime', () => {
-    const hookPath = path.join(ROOT_DIR, 'src/app/useGenerationRuntime.ts');
+    const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useGenerationRuntime.ts');
     assert.equal(existsSync(hookPath), true, 'src/app/useGenerationRuntime.ts should exist');
 
     const hookSource = readSource('src/app/useGenerationRuntime.ts');
@@ -77,7 +76,7 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('generation submit guard owns cooldown and duplicate signature state outside App', () => {
-    const guardPath = path.join(ROOT_DIR, 'src/app/useGenerationSubmitGuard.ts');
+    const guardPath = path.join(ROOT_DIR, 'apps/web/src/app/useGenerationSubmitGuard.ts');
 
     assert.equal(existsSync(guardPath), true);
 

@@ -1,5 +1,6 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+//
 import path from 'node:path';
 import { afterEach, test } from 'node:test';
 import vm from 'node:vm';
@@ -67,8 +68,8 @@ class MemoryStorage implements StorageLike {
 
 const ROOT_DIR = process.cwd();
 const TEMP_USER_STORAGE_KEY = 'temp_user_session_v1';
-const TEMP_USER_SERVICE_PATH = path.join(ROOT_DIR, 'src/services/auth/tempUserService.ts');
-const TEMP_USER_SERVICE_SOURCE = readFileSync(TEMP_USER_SERVICE_PATH, 'utf-8');
+const TEMP_USER_SERVICE_PATH = path.join(ROOT_DIR, 'apps/web/src/services/auth/tempUserService.ts');
+const TEMP_USER_SERVICE_SOURCE = readSource('src/services/auth/tempUserService.ts');
 
 function loadTempUserService(options: {
   createTempUser: () => Promise<TempUserEnvelope>;

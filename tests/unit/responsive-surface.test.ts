@@ -1,5 +1,6 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+//
 import { describe, test } from 'node:test';
 
 import {
@@ -52,20 +53,20 @@ describe('responsive surface utilities', () => {
     ];
 
     for (const file of phoneSurfaceFiles) {
-      const source = readFileSync(file, 'utf8');
+      const source = readSource(file);
       assert.match(source, /isPhoneResponsiveWidth\(window\.innerWidth\)/, `${file} should use phone surface helper`);
       assert.doesNotMatch(source, /window\.innerWidth\s*(?:<|<=)\s*768/, `${file} should not hard-code the phone breakpoint`);
     }
 
     for (const file of compactSurfaceFiles) {
-      const source = readFileSync(file, 'utf8');
+      const source = readSource(file);
       assert.match(source, /isCompactResponsiveWidth\(window\.innerWidth\)/, `${file} should use compact surface helper`);
       assert.doesNotMatch(source, /window\.innerWidth\s*(?:<|<=)\s*1024/, `${file} should not hard-code the compact breakpoint`);
     }
   });
 
   test('tutorial overlay keeps separate mobile and desktop onboarding flows', () => {
-    const source = readFileSync('src/components/common/TutorialOverlay.tsx', 'utf8');
+    const source = readSource('src/components/common/TutorialOverlay.tsx');
 
     assert.match(source, /const DESKTOP_TUTORIAL_STEPS:\s*TutorialStep\[\]\s*=/);
     assert.match(source, /const MOBILE_TUTORIAL_STEPS:\s*TutorialStep\[\]\s*=/);
@@ -93,8 +94,8 @@ describe('responsive surface utilities', () => {
   });
 
   test('Clay settings shell keeps separate mobile and desktop surface tokens', () => {
-    const cssSource = readFileSync('src/index.css', 'utf8');
-    const settingsSource = readFileSync('src/components/settings/SettingsPanel.localized.tsx', 'utf8');
+    const cssSource = readSource('src/index.css');
+    const settingsSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
 
     assert.match(settingsSource, /settings-shell-page--desktop/);
     assert.match(settingsSource, /settings-shell-page--mobile/);
@@ -105,7 +106,7 @@ describe('responsive surface utilities', () => {
   });
 
   test('Clay search palette keeps distinct mobile sheet and desktop command surface', () => {
-    const source = readFileSync('src/components/layout/SearchPalette.tsx', 'utf8');
+    const source = readSource('src/components/layout/SearchPalette.tsx');
 
     assert.match(source, /const DESKTOP_SEARCH_SHORTCUTS/);
     assert.match(source, /const MOBILE_SEARCH_HINTS/);

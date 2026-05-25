@@ -33,8 +33,8 @@ test("encoding check scans root docs and env examples with readable messaging", 
 
 test("encoding check blocks visible mojibake text in release UI surfaces", () => {
   const source = readFileSync(path.join(ROOT_DIR, "scripts", "ci", "check-encoding.js"), "utf-8");
-  const generationRuntime = readFileSync(path.join(ROOT_DIR, "src", "app", "useGenerationRuntime.ts"), "utf-8");
-  const pendingNode = readFileSync(path.join(ROOT_DIR, "src", "components", "canvas", "PendingNode.tsx"), "utf-8");
+  const generationRuntime = readFileSync(path.join(ROOT_DIR, "apps/web/src", "app", "useGenerationRuntime.ts"), "utf-8");
+  const pendingNode = readFileSync(path.join(ROOT_DIR, "apps/web/src", "components", "canvas", "PendingNode.tsx"), "utf-8");
 
   assert.match(source, /suspiciousMojibakePatterns/);
   assert.match(source, /\\u00e9\[\\u00a0-\\u00bf\]/i);

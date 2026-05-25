@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -5,9 +6,7 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 test('partial redraw modal exposes supported models, supported ratios, selection state, and reference uploads', () => {
   const modalSource = readSource('src/components/image/PartialRedrawModal.tsx');

@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -14,9 +15,7 @@ import {
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), "utf-8");
-}
+
 
 test("cloud sync helper tracks pending state and revision changes", () => {
   const state = createKeyManagerCloudSyncState();
@@ -57,7 +56,7 @@ test("cloud sync helper can fully reset state", () => {
 });
 
 test("cloud sync entry points force-refresh the local API payload without skipping fixed local users", () => {
-  const source = readSource("src/services/auth/keyManager.ts");
+  const source = readSource("apps/web/src/services/auth/keyManager.ts");
 
   assert.match(source, /async syncToCloudNow\(\): Promise<void> \{\s*await this\.saveToCloud\(this\.state, \{\s*ignoreBackoff: true,\s*throwOnError: true,\s*\}\);\s*\}/);
   assert.match(

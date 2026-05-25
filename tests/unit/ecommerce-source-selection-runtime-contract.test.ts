@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -5,9 +6,7 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8').replace(/\r\n/g, '\n');
-}
+
 
 function readInterfaceBlock(source: string, interfaceName: string): string {
   const match = source.match(new RegExp(`export interface ${interfaceName} \\{[\\s\\S]*?\\n\\}`));
@@ -16,7 +15,7 @@ function readInterfaceBlock(source: string, interfaceName: string): string {
 }
 
 test('ecommerce source selection runtime owns image-source reset behavior', () => {
-  const hookPath = path.join(ROOT_DIR, 'src/app/useEcommerceSourceSelectionRuntime.ts');
+  const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceSourceSelectionRuntime.ts');
   assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceSourceSelectionRuntime.ts should exist');
 
   const appSource = readSource('src/App.tsx');

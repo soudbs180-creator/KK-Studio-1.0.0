@@ -331,6 +331,9 @@ try {
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 
+  page.on('console', msg => console.log('BROWSER_CONSOLE:', msg.text()));
+  page.on('pageerror', err => console.error('BROWSER_PAGE_ERROR:', err.stack || err.message));
+
   await page.addInitScript(() => {
     const now = Date.now();
     const expiresAt = now + 24 * 60 * 60 * 1000;

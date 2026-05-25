@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -8,9 +9,7 @@ const ROOT_DIR = process.cwd();
 const LOGIN_SCREEN_PATH = 'apps/web/src/components/auth/LoginScreen.tsx';
 const LOGIN_SCREEN_CSS_PATH = 'apps/web/src/components/auth/LoginScreen.css';
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 test('LoginScreen stays parseable and keeps the server-backed sign-in actions compact', () => {
   const source = readSource(LOGIN_SCREEN_PATH);

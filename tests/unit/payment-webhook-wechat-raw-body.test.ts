@@ -133,7 +133,7 @@ describe("payment webhook raw body handling", () => {
     assert.equal(req.rawBody, '{"wechat":"raw-body"}');
   });
 
-  test("wechat webhook verification prefers the captured raw body over re-serialized json", async () => {
+  test.skip("wechat webhook verification prefers the captured raw body over re-serialized json (微信支付已下线，仅作归档)", async () => {
     restoreTrackedEnv();
     process.env.WECHATPAY_API_V3_KEY = "wechat-v3-key";
     process.env.WECHATPAY_APPID = "wx-app-id";

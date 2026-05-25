@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -8,9 +9,7 @@ import { resolveOpenAICompatibleImageDispatch } from "../../apps/web/src/service
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), "utf-8");
-}
+
 
 describe("OpenAI-compatible image dispatch plan", () => {
   test("keeps surface router output separate from endpoint execution methods", () => {

@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -5,9 +6,7 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 test('LLMService does not retain source-proven direct-call dead code', () => {
   const source = readSource('src/services/llm/LLMService.ts');
@@ -56,6 +55,6 @@ test('geminiService does not retain compiler-proven unused imports and helpers',
   assert.doesNotMatch(source, /const isLocalDev =/);
   assert.doesNotMatch(source, /function calculateImageTokens/);
   assert.match(source, /_negativePrompt: string = '',/);
-  assert.match(source, /const result = await llmService\.generateImage\(llmOptions\);/);
-  assert.match(source, /const estimate = calculateCost\(/);
+  assert.match(source, /const response = await apiClient\.post\('\/generate-image', \{/);
+  assert.match(source, /cost: referenceImageBase64 \? 15 : 10/);
 });

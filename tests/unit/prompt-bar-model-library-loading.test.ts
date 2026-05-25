@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -5,9 +6,7 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8').replace(/\r\n/g, '\n');
-}
+
 
 test('model pickers define explicit cached-refresh and bootstrap loading states', () => {
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
@@ -76,7 +75,7 @@ test('model pickers reserve three skeleton rows for empty-library bootstrap load
 });
 
 test('prompt bar initializes available models before model-library effects run on first render', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const promptBarSource = readSource('src/components/layout/PromptBar.tsx').replace(/\r\n/g, '\n');
 
   const availableModelsIndex = promptBarSource.indexOf('const availableModels = useMemo(() => {');
   const subscriptionEffectIndex = promptBarSource.indexOf('useEffect(() => {\n        refreshModelLibraryDataInBackground();');

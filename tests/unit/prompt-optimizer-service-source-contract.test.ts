@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -5,9 +6,7 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 test('prompt optimizer service relies on autoroute helpers and neutral route naming instead of legacy template fields', () => {
   const serviceSource = readSource('src/services/llm/promptOptimizerService.ts');
@@ -39,9 +38,9 @@ test('legacy prompt optimizer config fields and prompt library artifacts are rem
   assert.doesNotMatch(typesSource, /promptOptimizationCustomPrompt\?:/);
   assert.doesNotMatch(typesSource, /type PromptOptimizationMode/);
 
-  assert.equal(existsSync(path.join(ROOT_DIR, 'src/config/promptLibrary.ts')), false);
-  assert.equal(existsSync(path.join(ROOT_DIR, 'src/utils/promptFeatureHealth.ts')), false);
-  assert.equal(existsSync(path.join(ROOT_DIR, 'src/config/promptOptimizerTemplates.ts')), false);
+  assert.equal(existsSync(path.join(ROOT_DIR, 'apps/web/src/config/promptLibrary.ts')), false);
+  assert.equal(existsSync(path.join(ROOT_DIR, 'apps/web/src/utils/promptFeatureHealth.ts')), false);
+  assert.equal(existsSync(path.join(ROOT_DIR, 'apps/web/src/config/promptOptimizerTemplates.ts')), false);
 });
 
 test('prompt optimizer service prioritizes autoroute-specific missing hints ahead of generic hints', () => {

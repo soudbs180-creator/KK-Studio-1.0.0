@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -6,9 +7,7 @@ import { test } from 'node:test';
 const ROOT_DIR = process.cwd();
 const API_SETTINGS_VIEW_PATH = 'src/components/settings/ApiSettingsView.tsx';
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 test('ApiSettingsView keeps editor save buttons behind inline validation feedback', () => {
   const source = readSource(API_SETTINGS_VIEW_PATH);

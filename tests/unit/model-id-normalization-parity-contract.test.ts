@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -17,18 +18,16 @@ type ModelNormalizationModule = {
   };
 };
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 async function loadCanonicalHelpers(): Promise<ModelNormalizationModule> {
-  const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerModelHelpers.ts');
+  const fullPath = path.join(ROOT_DIR, 'apps/web/src/services/auth/keyManagerModelHelpers.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerModelHelpers.ts must exist');
   return await import('../../apps/web/src/services/auth/keyManagerModelHelpers.ts') as ModelNormalizationModule;
 }
 
 async function loadCompatibilityFacade(): Promise<ModelNormalizationModule> {
-  const fullPath = path.join(ROOT_DIR, 'src/utils/modelIdNormalization.ts');
+  const fullPath = path.join(ROOT_DIR, 'apps/web/src/utils/modelIdNormalization.ts');
   assert.equal(existsSync(fullPath), true, 'src/utils/modelIdNormalization.ts must exist');
   return await import('../../apps/web/src/utils/modelIdNormalization.ts') as ModelNormalizationModule;
 }

@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -17,9 +18,7 @@ type GenerationBillingRuntimePublicBoundary = {
   attemptNode: GenerationCreditAttemptNode;
 }
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 test('frontend generation flow uses the shared billing coordinator and persists attempt ids on prompt nodes', () => {
   const appSource = readSource('src/App.tsx');

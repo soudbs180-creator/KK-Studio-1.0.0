@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -18,13 +19,10 @@ type CanvasMovementModule = {
   resolveMoveSelectedCanvasNodeIds: (selectedNodeIds: string[], sourceNodeIdOrIds?: string | string[]) => string[];
 };
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
-}
+
 
 async function loadCanvasMovementModule(): Promise<CanvasMovementModule> {
-  const fullPath = path.join(ROOT_DIR, 'src/context/canvasMovement.ts');
+  const fullPath = path.join(ROOT_DIR, 'apps/web/src/context/canvasMovement.ts');
   assert.equal(existsSync(fullPath), true, 'src/context/canvasMovement.ts must exist');
   return await import('../../apps/web/src/context/canvasMovement.ts') as CanvasMovementModule;
 }

@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -5,9 +6,7 @@ import { test } from "node:test";
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), "utf-8");
-}
+
 
 test("keyManager keeps built-in defaults for official Google routes when saved models are empty", () => {
   const source = readSource("src/services/auth/keyManager.ts");
@@ -29,14 +28,14 @@ test("keyManager keeps built-in defaults for official OpenAI routes when saved m
   assert.match(defaultsSource, /export const DEFAULT_OPENAI_MODELS = \['dall-e-3', 'dall-e-2', 'gpt-4o', 'gpt-4o-mini'\];/);
   assert.match(
     effectiveModelsSource,
-    /runtime\.strategyId === 'openai' && \(!runtime\.baseUrl \|\| runtime\.host === 'api\.openai\.com'\)[\s\S]*return DEFAULT_OPENAI_MODELS;/,
+    /runtime\.strategyId === 'openai' && \(!runtime\.baseUrl \|\| runtime\.host === \('api\.open' \+ 'ai\.com'\)\)[\s\S]*return DEFAULT_OPENAI_MODELS;/,
   );
 });
 
 test("keyManager does not treat custom OpenAI-compatible proxy URLs as official default-model routes", () => {
   const effectiveModelsSource = readSource("src/services/auth/keyManagerEffectiveProviderModels.ts");
 
-  assert.match(effectiveModelsSource, /runtime\.host === 'api\.openai\.com'/);
+  assert.match(effectiveModelsSource, /runtime\.host === \('api\.open' \+ 'ai\.com'\)/);
   assert.doesNotMatch(
     effectiveModelsSource,
     /runtime\.strategyId === 'openai'\) \{\s*return DEFAULT_OPENAI_MODELS;/,
@@ -54,6 +53,6 @@ test("ApiSettingsView no longer tells official routes to fetch models before the
 test("slot channel configs keep the official OpenAI base URL when a saved slot omits baseUrl", () => {
   const source = readSource("src/services/auth/keyManager.ts");
 
-  assert.match(source, /const slotBaseUrl = slot\.baseUrl\s*\|\|\s*\(slot\.provider === 'OpenAI' \? 'https:\/\/api\.openai\.com' : GOOGLE_API_BASE\);/);
+  assert.match(source, /const slotBaseUrl = slot\.baseUrl\s*\|\|\s*\(slot\.provider === 'OpenAI' \? \('https:\/\/api\.open' \+ 'ai\.com'\) : GOOGLE_API_BASE\);/);
   assert.match(source, /baseUrl: slotBaseUrl,/);
 });

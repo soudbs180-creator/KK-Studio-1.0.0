@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -12,9 +13,7 @@ import {
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 function createTask(overrides: Partial<EcommerceEditableTaskState> = {}): EcommerceEditableTaskState {
   return {
@@ -140,7 +139,7 @@ function createAnalysis(): EcommerceAnalysisResult {
 }
 
 test('ecommerce task state runtime owns initial task-state sizing and App wiring', () => {
-  const hookPath = path.join(ROOT_DIR, 'src/app/useEcommerceTaskStateRuntime.ts');
+  const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceTaskStateRuntime.ts');
   assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceTaskStateRuntime.ts should exist');
 
   const appSource = readSource('src/App.tsx');

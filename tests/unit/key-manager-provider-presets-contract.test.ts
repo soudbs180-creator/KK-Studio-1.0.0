@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -5,23 +6,20 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
-}
+
 
 async function loadProviderPresets(): Promise<{
   PROVIDER_PRESETS: Record<string, { name: string; baseUrl: string; models: string[]; format: string; icon?: string; defaultApiKey?: string }>;
   getDocumentedStaticModelsForProvider: (strategyId: string) => string[];
 }> {
-  const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerProviderPresets.ts');
-  assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerProviderPresets.ts must exist');
+  const fullPath = path.join(ROOT_DIR, 'apps/web/src/services/auth/keyManagerProviderPresets.ts');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/services/auth/keyManagerProviderPresets.ts must exist');
   return await import('../../apps/web/src/services/auth/keyManagerProviderPresets.ts') as Awaited<ReturnType<typeof loadProviderPresets>>;
 }
 
 test('keyManager provider presets live outside the monolithic key manager', () => {
-  const keyManagerSource = readSource('src/services/auth/keyManager.ts');
-  const helperSource = readSource('src/services/auth/keyManagerProviderPresets.ts');
+  const keyManagerSource = readSource('apps/web/src/services/auth/keyManager.ts');
+  const helperSource = readSource('apps/web/src/services/auth/keyManagerProviderPresets.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-provider-presets-contract\.test\.ts/);

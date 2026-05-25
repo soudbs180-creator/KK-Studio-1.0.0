@@ -1,4 +1,5 @@
 import { createServer as createViteServer } from 'vite';
+import path from 'node:path';
 
 async function isUrlReady(url, timeoutMs = 5000) {
   const controller = new AbortController();
@@ -41,9 +42,10 @@ export async function ensureLocalViteServer({
 
     try {
       const server = await createViteServer({
-        root,
+        root: path.join(root, 'apps/web'),
         logLevel: 'error',
         configLoader: 'native',
+        configFile: path.join(root, 'apps/web/vite.config.ts'),
         server: {
           host: requestedUrl.hostname,
           port,

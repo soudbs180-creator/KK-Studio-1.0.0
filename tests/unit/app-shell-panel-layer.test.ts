@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 ﻿import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -5,9 +6,7 @@ import { test } from "node:test";
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath) {
-  return readFileSync(path.join(ROOT_DIR, relativePath), "utf8");
-}
+
 
 test("App delegates workspace panel rendering to a dedicated shell component", () => {
   const appSource = readSource("src/App.tsx");

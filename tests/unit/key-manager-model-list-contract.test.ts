@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -10,20 +11,17 @@ type KeyManagerModelListModule = {
   normalizeModelList: (models: string[], provider?: string, baseUrl?: string) => string[];
 };
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
-}
+
 
 async function loadKeyManagerModelList(): Promise<KeyManagerModelListModule> {
-  const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerModelList.ts');
-  assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerModelList.ts must exist');
+  const fullPath = path.join(ROOT_DIR, 'apps/web/src/services/auth/keyManagerModelList.ts');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/services/auth/keyManagerModelList.ts must exist');
   return await import('../../apps/web/src/services/auth/keyManagerModelList.ts') as KeyManagerModelListModule;
 }
 
 test('keyManager model-list normalization lives outside the monolithic key manager', () => {
-  const keyManagerSource = readSource('src/services/auth/keyManager.ts');
-  const modelListSource = readSource('src/services/auth/keyManagerModelList.ts');
+  const keyManagerSource = readSource('apps/web/src/services/auth/keyManager.ts');
+  const modelListSource = readSource('apps/web/src/services/auth/keyManagerModelList.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-model-list-contract\.test\.ts/);

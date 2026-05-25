@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -19,9 +20,7 @@ import type { EcommerceEditableTaskState } from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 function createAnalysis(): EcommerceAnalysisResult {
   return {
@@ -51,7 +50,7 @@ function createAnalysis(): EcommerceAnalysisResult {
 }
 
 test('ecommerce requirement analysis runtime owns reset, file, and analyze callbacks', () => {
-  const hookPath = path.join(ROOT_DIR, 'src/app/useEcommerceRequirementAnalysisRuntime.ts');
+  const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceRequirementAnalysisRuntime.ts');
   assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceRequirementAnalysisRuntime.ts should exist');
 
   const appSource = readSource('src/App.tsx');

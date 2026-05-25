@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -5,9 +6,7 @@ import { test } from "node:test";
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), "utf-8");
-}
+
 
 test("postgres migration scripts exist for Supabase runtime export and VPS import", () => {
   const envTemplate = "scripts/postgres/runtime-migration.env.example";

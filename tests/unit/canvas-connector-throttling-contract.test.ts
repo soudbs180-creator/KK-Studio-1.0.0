@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -16,9 +17,7 @@ type ConnectorRendererPublicBoundary = {
 
 const ROOT_DIR = process.cwd()
 
-function readSource(relativePath: string) {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf8')
-}
+
 
 describe('canvas connector throttling contract', () => {
   test('connector renderer exposes explicit hook boundary types', () => {

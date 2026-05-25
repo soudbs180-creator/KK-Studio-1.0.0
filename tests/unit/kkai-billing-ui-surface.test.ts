@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -5,10 +6,7 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  const absolutePath = path.join(ROOT_DIR, relativePath);
-  return existsSync(absolutePath) ? readFileSync(absolutePath, 'utf-8') : '';
-}
+
 
 test('KKAI keeps billing surfaces feature-gated and restores the desktop assistant trigger', () => {
   const appSource = readSource('src/App.tsx');

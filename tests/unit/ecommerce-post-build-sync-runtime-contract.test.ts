@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -5,12 +6,10 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 test('ecommerce post-build sync runtime owns built-card upload and active-task effects', () => {
-  const hookPath = path.join(ROOT_DIR, 'src/app/useEcommercePostBuildSyncRuntime.ts');
+  const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommercePostBuildSyncRuntime.ts');
   assert.equal(existsSync(hookPath), true, 'src/app/useEcommercePostBuildSyncRuntime.ts should exist');
 
   const appSource = readSource('src/App.tsx');

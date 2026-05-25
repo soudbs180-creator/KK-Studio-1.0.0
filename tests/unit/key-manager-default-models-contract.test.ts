@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -5,10 +6,7 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
-}
+
 
 async function loadDefaultModels(): Promise<{
   GOOGLE_IMAGE_WHITELIST: string[];
@@ -18,14 +16,14 @@ async function loadDefaultModels(): Promise<{
   DEFAULT_GOOGLE_MODELS: string[];
   DEFAULT_OPENAI_MODELS: string[];
 }> {
-  const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerDefaultModels.ts');
-  assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerDefaultModels.ts must exist');
+  const fullPath = path.join(ROOT_DIR, 'apps/web/src/services/auth/keyManagerDefaultModels.ts');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/services/auth/keyManagerDefaultModels.ts must exist');
   return await import('../../apps/web/src/services/auth/keyManagerDefaultModels.ts') as Awaited<ReturnType<typeof loadDefaultModels>>;
 }
 
 test('keyManager default model constants live outside the monolithic key manager', () => {
-  const keyManagerSource = readSource('src/services/auth/keyManager.ts');
-  const helperSource = readSource('src/services/auth/keyManagerDefaultModels.ts');
+  const keyManagerSource = readSource('apps/web/src/services/auth/keyManager.ts');
+  const helperSource = readSource('apps/web/src/services/auth/keyManagerDefaultModels.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-default-models-contract\.test\.ts/);

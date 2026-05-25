@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -5,9 +6,7 @@ import { describe, test } from 'node:test'
 
 const ROOT_DIR = process.cwd()
 
-function readSource(relativePath: string) {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf8')
-}
+
 
 describe('prompt click local performance trace contract', () => {
   test('App instruments prompt-click selection handoff with local performance traces', () => {

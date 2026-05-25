@@ -1,3 +1,4 @@
+import { readSource, workspacePath } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -6,12 +7,10 @@ import { test } from 'node:test';
 const ROOT_DIR = process.cwd();
 const MOBILE_SURFACE_PATH = 'src/components/mobile/MobileWorkspaceSurface.tsx';
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
-}
+
 
 test('mobile workspace surface exists as the dedicated mobile orchestration entry', () => {
-  assert.equal(existsSync(path.join(ROOT_DIR, MOBILE_SURFACE_PATH)), true);
+  assert.equal(existsSync(workspacePath(MOBILE_SURFACE_PATH)), true);
 });
 
 test('mobile workspace surface exposes the planned mobile screen contract', () => {

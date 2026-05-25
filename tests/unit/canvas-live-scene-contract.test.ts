@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -13,9 +14,7 @@ import {
 
 const ROOT_DIR = process.cwd()
 
-function readSource(relativePath: string) {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf8')
-}
+
 
 describe('canvas live scene contract', () => {
   test('expanded mode keeps child render positions on logical positions', () => {

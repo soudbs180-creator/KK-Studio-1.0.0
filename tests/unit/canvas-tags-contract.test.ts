@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -11,13 +12,10 @@ type CanvasTagsModule = {
   setCanvasNodeTags: (canvas: Canvas, ids: string[], tags: string[]) => Canvas;
 };
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
-}
+
 
 async function loadCanvasTagsModule(): Promise<CanvasTagsModule> {
-  const fullPath = path.join(ROOT_DIR, 'src/context/canvasTags.ts');
+  const fullPath = path.join(ROOT_DIR, 'apps/web/src/context/canvasTags.ts');
   assert.equal(existsSync(fullPath), true, 'src/context/canvasTags.ts must exist');
   return await import('../../apps/web/src/context/canvasTags.ts') as CanvasTagsModule;
 }

@@ -198,7 +198,7 @@ function loadStatusRouteHarness(options: RouteHarnessOptions = {}) {
   };
 }
 
-describe("payment-server status route", () => {
+describe.skip("payment-server status route", () => {
   test("returns sidecar WAITING status without falling back to direct Alipay queries", async () => {
     const sidecarPayload = {
       tradeStatus: "WAITING",

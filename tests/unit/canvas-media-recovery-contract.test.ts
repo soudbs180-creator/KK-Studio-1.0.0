@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -7,10 +8,7 @@ import type { LocalMediaCacheEntry } from '../../apps/web/src/context/canvasMedi
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
-}
+
 
 test('canvas media recovery boundary lives outside CanvasContext', () => {
   const contextSource = readSource('src/context/CanvasContext.tsx');

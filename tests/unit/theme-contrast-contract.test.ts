@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -8,9 +9,7 @@ const MIN_NORMAL_TEXT_CONTRAST = 4.5;
 
 type RgbaColor = { r: number; g: number; b: number; a: number };
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 function parseCssColor(value: string, variables: Record<string, string> = {}): RgbaColor {
   const color = value.trim().replace(/\s*!important$/, '');

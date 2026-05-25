@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -8,9 +9,7 @@ import { selectMobileFeedResults } from '../../apps/web/src/components/mobile/mo
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 function createPromptNode(overrides: Partial<PromptNode> = {}): PromptNode {
   return {

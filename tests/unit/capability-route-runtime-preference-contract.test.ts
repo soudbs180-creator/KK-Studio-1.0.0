@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -13,9 +14,7 @@ import {
 const ROOT_DIR = process.cwd();
 const CAPABILITY_STORAGE_KEY = 'kk_capability_route_assignments_v1';
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 function withLocalStorageValue(value: string, run: () => void): void {
   const originalWindow = (globalThis as typeof globalThis & { window?: any }).window;

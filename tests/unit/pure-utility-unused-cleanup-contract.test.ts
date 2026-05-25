@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
@@ -5,9 +6,7 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 function listSourceFiles(relativeDirectory: string): string[] {
   const directory = path.join(ROOT_DIR, relativeDirectory);
@@ -48,10 +47,10 @@ test('pure utility modules do not retain source-proven unused locals', () => {
 });
 
 test('pure image utilities do not retain orphaned imageCompression module imports', () => {
-  const removedServicePath = path.join(ROOT_DIR, 'src/services/image/imageCompression.ts');
+  const removedServicePath = path.join(ROOT_DIR, 'apps/web/src/services/image/imageCompression.ts');
   assert.equal(existsSync(removedServicePath), false);
 
-  const sourceFiles = listSourceFiles('src');
+  const sourceFiles = listSourceFiles('apps/web/src');
   for (const sourceFile of sourceFiles) {
     const source = readFileSync(sourceFile, 'utf-8');
     assert.doesNotMatch(source, /from ['"][^'"]*imageCompression(?:\.ts)?['"]/);

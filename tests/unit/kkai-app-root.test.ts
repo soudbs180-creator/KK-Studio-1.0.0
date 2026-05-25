@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -10,10 +11,7 @@ import {
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  const absolutePath = path.join(ROOT_DIR, relativePath);
-  return existsSync(absolutePath) ? readFileSync(absolutePath, 'utf-8') : '';
-}
+
 
 test('createKkaiRuntimeAuthSnapshot produces a non-loading fixed local runtime user', () => {
   const snapshot = createKkaiRuntimeAuthSnapshot();

@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -7,10 +8,7 @@ import { isKkApiSelfHostedCoreReadyFromHealth } from '../../apps/web/src/service
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  const absolutePath = path.join(ROOT_DIR, relativePath);
-  return existsSync(absolutePath) ? readFileSync(absolutePath, 'utf-8') : '';
-}
+
 
 test('app startup coordinator drives staged post-login bootstrapping', () => {
   const startupSource = readSource('src/context/AppStartupContext.tsx');

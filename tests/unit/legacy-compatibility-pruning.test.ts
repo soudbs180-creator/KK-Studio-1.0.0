@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -9,9 +10,7 @@ function resolveWorkspacePath(relativePath: string): string {
   return path.join(ROOT_DIR, relativePath);
 }
 
-function readSource(relativePath: string): string {
-  return readFileSync(resolveWorkspacePath(relativePath), "utf8");
-}
+
 
 test("dead browser payment compatibility client is removed once the static recharge flow is canonical", () => {
   assert.equal(

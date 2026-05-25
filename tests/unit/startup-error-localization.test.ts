@@ -1,15 +1,13 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
+//
+//
 import { test } from 'node:test';
 
-const ROOT_DIR = process.cwd();
+//
 
 test('bootstrap fatal screen localizes startup errors for both document languages', () => {
-  const source = readFileSync(
-    path.join(ROOT_DIR, 'src/main.tsx'),
-    'utf-8',
-  );
+  const source = readSource('src/main.tsx');
 
   assert.doesNotMatch(
     source,
@@ -19,10 +17,7 @@ test('bootstrap fatal screen localizes startup errors for both document language
 });
 
 test('common error boundary localizes captured errors for both document languages', () => {
-  const source = readFileSync(
-    path.join(ROOT_DIR, 'src/components/common/ErrorBoundary.tsx'),
-    'utf-8',
-  );
+  const source = readSource('src/components/common/ErrorBoundary.tsx');
 
   assert.match(
     source,

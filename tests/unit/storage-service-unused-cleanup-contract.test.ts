@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
@@ -6,9 +7,7 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 test('storage adapter does not retain compiler-proven unused OPFS import or promise reject parameter', () => {
   const adapterSource = readSource('src/services/storage/storageAdapter.ts');
@@ -46,7 +45,7 @@ test('image storage cleanupOriginals does not retain an unread database handle',
 test('dead Gemini response cache module and prompt-content logging stay removed', () => {
   const testConfigSource = readSource('tsconfig.tests.json');
   const canvasSource = readSource('src/context/CanvasContext.tsx');
-  const cachePath = path.join(ROOT_DIR, 'src/services/storage/cache.ts');
+  const cachePath = path.join(ROOT_DIR, 'apps/web/src/services/storage/cache.ts');
 
   assert.match(testConfigSource, /tests\/unit\/storage-service-unused-cleanup-contract\.test\.ts/);
   assert.equal(existsSync(cachePath), false);

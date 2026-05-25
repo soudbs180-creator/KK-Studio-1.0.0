@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -26,19 +27,17 @@ type KeyManagerProviderLinksModule = {
   ) => TSlot[];
 };
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 async function loadProviderLinks(): Promise<KeyManagerProviderLinksModule> {
-  const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerProviderLinks.ts');
-  assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerProviderLinks.ts must exist');
+  const fullPath = path.join(ROOT_DIR, 'apps/web/src/services/auth/keyManagerProviderLinks.ts');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/services/auth/keyManagerProviderLinks.ts must exist');
   return await import('../../apps/web/src/services/auth/keyManagerProviderLinks.ts') as KeyManagerProviderLinksModule;
 }
 
 test('provider linked-slot matching lives outside the monolithic key manager', () => {
-  const keyManagerSource = readSource('src/services/auth/keyManager.ts');
-  const providerLinksSource = readSource('src/services/auth/keyManagerProviderLinks.ts');
+  const keyManagerSource = readSource('apps/web/src/services/auth/keyManager.ts');
+  const providerLinksSource = readSource('apps/web/src/services/auth/keyManagerProviderLinks.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-provider-links-contract\.test\.ts/);

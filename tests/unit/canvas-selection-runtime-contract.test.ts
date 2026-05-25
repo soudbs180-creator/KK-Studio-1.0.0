@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -15,10 +16,7 @@ type CanvasSelectionPublicBoundary = {
   resolve: typeof resolveCanvasSelectionIds;
 };
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
-}
+
 
 test('canvas selection reducer owns selection mode semantics outside CanvasContext', () => {
   const contextSource = readSource('src/context/CanvasContext.tsx');

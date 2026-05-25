@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -7,9 +8,7 @@ import ts from 'typescript';
 const ROOT_DIR = process.cwd();
 const API_SETTINGS_VIEW_PATH = 'apps/web/src/components/settings/ApiSettingsView.tsx';
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 test('ApiSettingsView stays parseable and keeps core Chinese labels free of mojibake regressions', () => {
   const source = readSource(API_SETTINGS_VIEW_PATH);

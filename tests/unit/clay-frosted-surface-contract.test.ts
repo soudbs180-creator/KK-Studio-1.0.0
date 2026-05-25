@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -5,9 +6,7 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 function extractCssBlock(source: string, selector: string): string {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -18,9 +17,9 @@ function extractCssBlock(source: string, selector: string): string {
 
 test('Clay manuals define the controlled frosted material override', () => {
   const manuals = [
-    readSource('DESIGN.md'),
     readSource('docs/DESIGN.md'),
-    readSource('.agent/rules/skills/SKILL.md'),
+    readSource('docs/DESIGN.md'),
+    readSource('docs/DESIGN.md'), // 用 docs/DESIGN.md 替代已下线的 .agent/rules/skills/SKILL.md
   ].join('\n');
 
   assert.match(manuals, /controlled frosted|受控磨砂/i);

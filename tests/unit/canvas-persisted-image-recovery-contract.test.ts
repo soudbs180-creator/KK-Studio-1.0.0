@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -16,10 +17,7 @@ type RequiredPersistedImageRecoveryExports = Pick<
 const typedPersistedImageRecoveryExport: keyof RequiredPersistedImageRecoveryExports = 'buildPromptRecoveryEntries';
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
-}
+
 
 function loadPersistedImageRecoveryModuleForBehaviorTest(options: {
   cachedImages?: Record<string, string>;

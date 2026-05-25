@@ -1,11 +1,10 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 
-function readSource(relativePath: string): string {
-  return readFileSync(resolve(process.cwd(), relativePath), "utf8");
-}
+
 
 test("canvas cloud sync is driven by a memoized sync signature instead of raw canvases", () => {
   const source = readSource("src/context/CanvasContext.tsx");

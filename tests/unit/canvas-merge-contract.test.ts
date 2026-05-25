@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -14,10 +15,7 @@ import type { Canvas } from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
-}
+
 
 function canvas(input: Partial<Canvas> & Pick<Canvas, 'id'>): Canvas {
   return {

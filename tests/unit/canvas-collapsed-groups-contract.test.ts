@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -11,12 +12,10 @@ type CollapsedCanvasGroupsModule = {
   getCollapsedCanvasGroupNodeIds: (groups: readonly CanvasGroup[] | null | undefined) => Set<string>;
 };
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 async function loadCollapsedCanvasGroupsModule(): Promise<CollapsedCanvasGroupsModule> {
-  const fullPath = path.join(ROOT_DIR, 'src/app/collapsedCanvasGroups.ts');
+  const fullPath = path.join(ROOT_DIR, 'apps/web/src/app/collapsedCanvasGroups.ts');
   assert.equal(existsSync(fullPath), true, 'src/app/collapsedCanvasGroups.ts must exist');
   return await import('../../apps/web/src/app/collapsedCanvasGroups.ts') as CollapsedCanvasGroupsModule;
 }

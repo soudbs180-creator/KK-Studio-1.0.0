@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -24,13 +25,10 @@ type CanvasPositionUpdatesModule = {
   ) => Canvas;
 };
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
-}
+
 
 async function loadCanvasPositionUpdatesModule(): Promise<CanvasPositionUpdatesModule> {
-  const fullPath = path.join(ROOT_DIR, 'src/context/canvasPositionUpdates.ts');
+  const fullPath = path.join(ROOT_DIR, 'apps/web/src/context/canvasPositionUpdates.ts');
   assert.equal(existsSync(fullPath), true, 'src/context/canvasPositionUpdates.ts must exist');
   return await import('../../apps/web/src/context/canvasPositionUpdates.ts') as CanvasPositionUpdatesModule;
 }

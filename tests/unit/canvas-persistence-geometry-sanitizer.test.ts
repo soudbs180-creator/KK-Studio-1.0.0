@@ -153,7 +153,7 @@ test('persisted canvas sanitizer tolerates malformed canvas collections', () => 
 });
 
 test('canvas view restore rejects thumbnail-scale persisted views', () => {
-  const source = readFileSync(path.join(ROOT_DIR, 'src/components/canvas/InfiniteCanvas.tsx'), 'utf-8');
+  const source = readFileSync(path.join(ROOT_DIR, 'apps/web/src/components/canvas/InfiniteCanvas.tsx'), 'utf-8');
 
   assert.match(source, /const MIN_RESTORED_CANVAS_VIEW_SCALE = 0\.35;/);
   assert.match(source, /scale >= MIN_RESTORED_CANVAS_VIEW_SCALE/);

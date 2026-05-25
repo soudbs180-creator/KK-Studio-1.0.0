@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -13,12 +14,10 @@ type CanvasSnapToGridModule = {
   ) => { x: number; y: number };
 };
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 async function loadCanvasSnapToGridModule(): Promise<CanvasSnapToGridModule> {
-  const fullPath = path.join(ROOT_DIR, 'src/utils/canvasSnapToGrid.ts');
+  const fullPath = path.join(ROOT_DIR, 'apps/web/src/utils/canvasSnapToGrid.ts');
   assert.equal(existsSync(fullPath), true, 'src/utils/canvasSnapToGrid.ts must exist');
   return await import('../../apps/web/src/utils/canvasSnapToGrid.ts') as CanvasSnapToGridModule;
 }

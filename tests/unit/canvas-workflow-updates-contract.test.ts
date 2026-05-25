@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -21,13 +22,10 @@ type CanvasWorkflowUpdatesModule = {
   deleteCanvasWorkflowNode: (canvas: Canvas, id: string) => Canvas;
 };
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
-}
+
 
 async function loadCanvasWorkflowUpdatesModule(): Promise<CanvasWorkflowUpdatesModule> {
-  const fullPath = path.join(ROOT_DIR, 'src/context/canvasWorkflowUpdates.ts');
+  const fullPath = path.join(ROOT_DIR, 'apps/web/src/context/canvasWorkflowUpdates.ts');
   assert.equal(existsSync(fullPath), true, 'src/context/canvasWorkflowUpdates.ts must exist');
   return await import('../../apps/web/src/context/canvasWorkflowUpdates.ts') as CanvasWorkflowUpdatesModule;
 }

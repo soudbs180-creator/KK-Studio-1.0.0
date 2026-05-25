@@ -1,6 +1,10 @@
 import path from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // 本地 Inline 兼容性与 Stub 插件实现
 const addRenderIds = (): Plugin => ({ name: 'add-render-ids' });

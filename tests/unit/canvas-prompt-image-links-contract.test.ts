@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -21,13 +22,10 @@ type CanvasPromptImageLinksModule = {
   unlinkCanvasPromptFromImage: (canvas: Canvas, promptId: string, imageId: string) => Canvas;
 };
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
-}
+
 
 async function loadPromptImageLinksModule(): Promise<CanvasPromptImageLinksModule> {
-  const fullPath = path.join(ROOT_DIR, 'src/context/canvasPromptImageLinks.ts');
+  const fullPath = path.join(ROOT_DIR, 'apps/web/src/context/canvasPromptImageLinks.ts');
   assert.equal(existsSync(fullPath), true, 'src/context/canvasPromptImageLinks.ts must exist');
   return await import('../../apps/web/src/context/canvasPromptImageLinks.ts') as CanvasPromptImageLinksModule;
 }

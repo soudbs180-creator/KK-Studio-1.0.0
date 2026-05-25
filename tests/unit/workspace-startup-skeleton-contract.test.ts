@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -5,9 +6,7 @@ import { describe, test } from 'node:test'
 
 const ROOT_DIR = process.cwd()
 
-function readSource(relativePath: string) {
-  const actualPath = relativePath.startsWith('src/') ? 'apps/web/' + relativePath : relativePath; return readFileSync(path.join(ROOT_DIR, actualPath), 'utf8')
-}
+
 
 describe('workspace startup shell contract', () => {
   test('AuthenticatedAppShell keeps the real workspace visible and only uses the runtime banner during startup', () => {

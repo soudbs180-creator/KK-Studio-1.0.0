@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -21,10 +22,7 @@ type CanvasContextStatePublicBoundary = {
   subCardLayout: SubCardLayout;
 };
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
-}
+
 
 test('CanvasContext delegates state model and defaults to a focused boundary module', () => {
   const contextSource = readSource('src/context/CanvasContext.tsx');

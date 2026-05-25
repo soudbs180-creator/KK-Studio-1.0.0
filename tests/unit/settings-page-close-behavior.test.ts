@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -7,9 +8,7 @@ import { shouldUseHistoryBackForSettingsClose } from '../../apps/web/src/app/set
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 test('settings page close uses history back only for same-origin non-settings referrers', () => {
   assert.equal(shouldUseHistoryBackForSettingsClose({

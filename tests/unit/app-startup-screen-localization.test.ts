@@ -7,7 +7,7 @@ const ROOT_DIR = process.cwd();
 
 test('AppStartupScreen follows the shared document language helpers', () => {
   const source = readFileSync(
-    path.join(ROOT_DIR, 'src/components/common/AppStartupScreen.tsx'),
+    path.join(ROOT_DIR, 'apps/web/src/components/common/AppStartupScreen.tsx'),
     'utf-8',
   );
 

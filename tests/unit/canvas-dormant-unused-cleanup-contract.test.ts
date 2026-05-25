@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
@@ -5,9 +6,7 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(absolutePath: string): string {
-  return readFileSync(absolutePath, 'utf-8');
-}
+
 
 function readRelativeSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
@@ -36,18 +35,18 @@ test('dormant Pixi canvas renderer remains removed from source', () => {
   const testConfigSource = readFileSync(path.join(ROOT_DIR, 'tsconfig.tests.json'), 'utf-8');
   assert.match(testConfigSource, /tests\/unit\/canvas-dormant-unused-cleanup-contract\.test\.ts/);
 
-  const pixiCanvasPath = path.join(ROOT_DIR, 'src/components/canvas/PixiCanvas.tsx');
+  const pixiCanvasPath = path.join(ROOT_DIR, 'apps/web/src/components/canvas/PixiCanvas.tsx');
   assert.equal(existsSync(pixiCanvasPath), false);
 
-  for (const sourceFile of listSourceFiles('src')) {
-    const source = readSource(sourceFile);
+  for (const sourceFile of listSourceFiles('apps/web/src')) {
+    const source = readFileSync(sourceFile, 'utf-8');
     assert.doesNotMatch(source, /\b(PixiCanvas|preloadPixi|isPixiAvailable)\b/);
   }
 });
 
 test('dormant canvas support files do not retain compiler-proven unused destructures', () => {
-  const canvasSource = readRelativeSource('src/components/canvas/Canvas.tsx');
-  const pendingNodeSource = readRelativeSource('src/components/canvas/PendingNode.tsx');
+  const canvasSource = readRelativeSource('apps/web/src/components/canvas/Canvas.tsx');
+  const pendingNodeSource = readRelativeSource('apps/web/src/components/canvas/PendingNode.tsx');
 
   assert.doesNotMatch(canvasSource, /cardPositions\s*=\s*\[\],\s*onAutoArrange\s*\}\)/);
   assert.match(canvasSource, /onAutoArrange\?: \(\) => void;/);

@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -19,20 +20,17 @@ type BuildChannelCapabilities = (
   managementApi: boolean;
 };
 
-function readSource(relativePath: string): string {
-  const fullPath = path.join(ROOT_DIR, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, 'utf-8') : '';
-}
+
 
 async function loadChannelCapabilities(): Promise<{ buildChannelCapabilities: BuildChannelCapabilities }> {
-  const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerChannelCapabilities.ts');
-  assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerChannelCapabilities.ts must exist');
+  const fullPath = path.join(ROOT_DIR, 'apps/web/src/services/auth/keyManagerChannelCapabilities.ts');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/services/auth/keyManagerChannelCapabilities.ts must exist');
   return await import('../../apps/web/src/services/auth/keyManagerChannelCapabilities.ts') as { buildChannelCapabilities: BuildChannelCapabilities };
 }
 
 test('keyManager channel capabilities boundary lives outside the monolithic key manager', () => {
-  const keyManagerSource = readSource('src/services/auth/keyManager.ts');
-  const helperSource = readSource('src/services/auth/keyManagerChannelCapabilities.ts');
+  const keyManagerSource = readSource('apps/web/src/services/auth/keyManager.ts');
+  const helperSource = readSource('apps/web/src/services/auth/keyManagerChannelCapabilities.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-channel-capabilities-contract\.test\.ts/);

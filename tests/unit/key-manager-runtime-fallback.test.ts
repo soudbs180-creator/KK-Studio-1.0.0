@@ -1,3 +1,4 @@
+import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -5,12 +6,10 @@ import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
 
-function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
-}
+
 
 test('keyManager reads and writes user slot/provider state through the local API payload route', () => {
-  const source = readSource('src/services/auth/keyManager.ts');
+  const source = readSource('apps/web/src/services/auth/keyManager.ts');
 
   assert.doesNotMatch(source, /loadUserApisPayloadFromCloudRecord/);
   assert.doesNotMatch(source, /mergeUserApisPayloadToCloudRecord/);
@@ -21,7 +20,7 @@ test('keyManager reads and writes user slot/provider state through the local API
 });
 
 test('keyManager no longer skips local or temp users when hydrating or syncing payload state', () => {
-  const source = readSource('src/services/auth/keyManager.ts');
+  const source = readSource('apps/web/src/services/auth/keyManager.ts');
 
   assert.match(
     source,
@@ -43,8 +42,8 @@ test('keyManager no longer skips local or temp users when hydrating or syncing p
 });
 
 test('keyManager preserves local provider pricing snapshots when cloud payloads refresh provider config', () => {
-  const source = readSource('src/services/auth/keyManager.ts');
-  const providerSource = readSource('src/services/auth/keyManagerProviders.ts');
+  const source = readSource('apps/web/src/services/auth/keyManager.ts');
+  const providerSource = readSource('apps/web/src/services/auth/keyManagerProviders.ts');
 
   assert.match(source, /mergeCloudProvidersWithLocalRuntimeState/);
   assert.doesNotMatch(source, /private mergeCloudProvidersWithLocalRuntimeState/);
@@ -53,7 +52,7 @@ test('keyManager preserves local provider pricing snapshots when cloud payloads 
 });
 
 test('keyManager reapplies cloud provider state to linked legacy slots before rebuilding the model library', () => {
-  const source = readSource('src/services/auth/keyManager.ts');
+  const source = readSource('apps/web/src/services/auth/keyManager.ts');
 
   assert.match(
     source,
@@ -63,7 +62,7 @@ test('keyManager reapplies cloud provider state to linked legacy slots before re
 });
 
 test('keyManager clears stale provider models from runtime providers and linked slots when a provider connection changes', () => {
-  const source = readSource('src/services/auth/keyManager.ts');
+  const source = readSource('apps/web/src/services/auth/keyManager.ts');
 
   assert.match(source, /const nextProviderModels = updates\.models !== undefined[\s\S]*connectionFieldsChanged[\s\S]*\[\][\s\S]*previousProvider\.models;/);
   assert.match(source, /const nextSupportedModels = normalizeModelList\(provider\.models \|\| \[\], slot\.provider, nextBaseUrl\);/);
@@ -71,7 +70,7 @@ test('keyManager clears stale provider models from runtime providers and linked 
 });
 
 test('effective linked slots no longer fall back to stale slot models when the provider model list is empty', () => {
-  const source = readSource('src/services/auth/keyManagerEffectiveSlot.ts');
+  const source = readSource('apps/web/src/services/auth/keyManagerEffectiveSlot.ts');
 
   assert.match(
     source,
@@ -80,7 +79,7 @@ test('effective linked slots no longer fall back to stale slot models when the p
 });
 
 test('keyManager clears linked legacy slots when a provider is removed locally or disappears from cloud payloads', () => {
-  const source = readSource('src/services/auth/keyManager.ts');
+  const source = readSource('apps/web/src/services/auth/keyManager.ts');
 
   assert.match(source, /private clearLegacySlotsForRemovedProvider\(/);
   assert.match(source, /slot\.disabled = true;\s*slot\.supportedModels = \[\];/);
@@ -92,7 +91,7 @@ test('keyManager clears linked legacy slots when a provider is removed locally o
 });
 
 test('keyManager uses effective provider models for routing and cache invalidation, not raw provider.models length only', () => {
-  const source = readSource('src/services/auth/keyManager.ts');
+  const source = readSource('apps/web/src/services/auth/keyManager.ts');
 
   assert.match(source, /const effectiveProviderModels = resolveEffectiveProviderModels\(\{\s*provider: p\.name,\s*baseUrl: p\.baseUrl,\s*format: p\.format,\s*models: p\.models,\s*\}\);[\s\S]*supportedModels: effectiveProviderModels,/);
   assert.match(source, /const effectiveProviderModels = resolveEffectiveProviderModels\(\{\s*provider: p\.name,\s*baseUrl: p\.baseUrl,\s*format: p\.format,\s*models: p\.models,\s*\}\);[\s\S]*if \(effectiveProviderModels\.includes\('\*'\) \|\| effectiveProviderModels\.includes\(normalizedModelId\)\) return true;/);
@@ -101,7 +100,7 @@ test('keyManager uses effective provider models for routing and cache invalidati
 });
 
 test('keyManager projects linked provider state through getSlots and channel config reads', () => {
-  const source = readSource('src/services/auth/keyManager.ts');
+  const source = readSource('apps/web/src/services/auth/keyManager.ts');
 
   assert.match(source, /private getProjectedSlots\(\): KeySlot\[] \{\s*return this\.state\.slots\.map\(\(slot\) => \{\s*const linkedProvider = this\.findLinkedProviderForSlot\(slot\);\s*return linkedProvider \? this\.buildEffectiveSlotFromProvider\(slot, linkedProvider\) : slot;\s*\}\);\s*\}/);
   assert.match(source, /getSlots\(\): KeySlot\[] \{\s*this\.ensureCloudHydration\(\);\s*return this\.getProjectedSlots\(\);\s*\}/);
@@ -110,7 +109,7 @@ test('keyManager projects linked provider state through getSlots and channel con
 });
 
 test('keyManager public slot reads and custom-key checks use projected slots instead of raw state slots', () => {
-  const source = readSource('src/services/auth/keyManager.ts');
+  const source = readSource('apps/web/src/services/auth/keyManager.ts');
 
   assert.match(source, /public getKey\(id: string\): KeySlot \| undefined \{\s*return this\.getProjectedSlots\(\)\.find\(s => s\.id === id\);\s*\}/);
   assert.match(source, /public getEffectiveKey\(id: string\): KeySlot \| undefined \{\s*return this\.getProjectedSlots\(\)\.find\(\(item\) => item\.id === id\);\s*\}/);
@@ -120,7 +119,7 @@ test('keyManager public slot reads and custom-key checks use projected slots ins
 });
 
 test('keyManager refreshKey clears stale models and syncs linked provider model lists', () => {
-  const source = readSource('src/services/auth/keyManager.ts');
+  const source = readSource('apps/web/src/services/auth/keyManager.ts');
 
   assert.match(source, /const linkedProvider = this\.findLinkedProviderForSlot\(slot\);/);
   assert.match(source, /Refresh valid but no models found for \$\{id\}\. Clearing stale model list\./);
