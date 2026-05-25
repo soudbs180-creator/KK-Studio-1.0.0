@@ -4,7 +4,7 @@ import { describe, test } from 'node:test';
 import {
   isEcommerceRequirementFile,
   routeEcommerceDroppedFiles,
-} from '../../src/components/layout/prompt-bar/ecommerceDropRouting.ts';
+} from '../../apps/web/src/components/layout/prompt-bar/ecommerceDropRouting.ts';
 
 type DropLikeFile = Pick<File, 'name' | 'type'>;
 

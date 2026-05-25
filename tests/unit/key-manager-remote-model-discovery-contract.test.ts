@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { DEFAULT_GOOGLE_MODELS } from '../../src/services/auth/keyManagerDefaultModels.ts';
+import { DEFAULT_GOOGLE_MODELS } from '../../apps/web/src/services/auth/keyManagerDefaultModels.ts';
 
 const ROOT_DIR = process.cwd();
 
@@ -32,7 +32,7 @@ function readSource(relativePath: string): string {
 async function loadRemoteDiscovery(): Promise<RemoteDiscoveryModule> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerRemoteModelDiscovery.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerRemoteModelDiscovery.ts must exist');
-  return await import('../../src/services/auth/keyManagerRemoteModelDiscovery.ts') as RemoteDiscoveryModule;
+  return await import('../../apps/web/src/services/auth/keyManagerRemoteModelDiscovery.ts') as RemoteDiscoveryModule;
 }
 
 test('keyManager remote model discovery parsing lives outside the monolithic key manager', () => {

@@ -33,7 +33,7 @@ function readSource(relativePath: string): string {
 async function loadProviderLinks(): Promise<KeyManagerProviderLinksModule> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerProviderLinks.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerProviderLinks.ts must exist');
-  return await import('../../src/services/auth/keyManagerProviderLinks.ts') as KeyManagerProviderLinksModule;
+  return await import('../../apps/web/src/services/auth/keyManagerProviderLinks.ts') as KeyManagerProviderLinksModule;
 }
 
 test('provider linked-slot matching lives outside the monolithic key manager', () => {

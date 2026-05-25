@@ -7,7 +7,7 @@ import {
   getMobileRetentionCutoff,
   getMobileRetentionPolicy,
   getMobileRetentionRule,
-} from '../../src/services/storage/mobileRetentionPolicy.ts';
+} from '../../apps/web/src/services/storage/mobileRetentionPolicy.ts';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 3, 11, 0, 0, 0);

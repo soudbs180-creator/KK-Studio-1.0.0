@@ -9,7 +9,7 @@ import type {
   CanvasContextType,
   CanvasState,
   SubCardLayout,
-} from '../../src/context/canvasContextState.ts';
+} from '../../apps/web/src/context/canvasContextState.ts';
 
 const ROOT_DIR = process.cwd();
 

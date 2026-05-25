@@ -22,7 +22,7 @@ function readSource(relativePath: string): string {
 async function loadEffectiveProviderModels(): Promise<EffectiveProviderModelsModule> {
   const fullPath = path.join(ROOT_DIR, "src/services/auth/keyManagerEffectiveProviderModels.ts");
   assert.equal(existsSync(fullPath), true, "src/services/auth/keyManagerEffectiveProviderModels.ts must exist");
-  return await import("../../src/services/auth/keyManagerEffectiveProviderModels.ts") as EffectiveProviderModelsModule;
+  return await import("../../apps/web/src/services/auth/keyManagerEffectiveProviderModels.ts") as EffectiveProviderModelsModule;
 }
 
 test("keyManager effective provider model boundary lives outside the monolithic key manager", () => {

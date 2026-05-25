@@ -3,9 +3,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import type { EcommerceManualReferenceBinding } from '../../src/app/useEcommerceUploadReferenceRuntime.ts';
-import type { EcommerceAnalysisAsset } from '../../src/services/ecommerce/types.ts';
-import type { EcommerceEditableTaskState, ReferenceImage } from '../../src/types.ts';
+import type { EcommerceManualReferenceBinding } from '../../apps/web/src/app/useEcommerceUploadReferenceRuntime.ts';
+import type { EcommerceAnalysisAsset } from '../../apps/web/src/services/ecommerce/types.ts';
+import type { EcommerceEditableTaskState, ReferenceImage } from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 
@@ -87,7 +87,7 @@ test('ecommerce upload helper functions preserve identity, signatures, and manua
   const hookPath = path.join(ROOT_DIR, 'src/app/useEcommerceUploadReferenceRuntime.ts');
   assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceUploadReferenceRuntime.ts should exist');
 
-  const runtime = await import('../../src/app/useEcommerceUploadReferenceRuntime.ts');
+  const runtime = await import('../../apps/web/src/app/useEcommerceUploadReferenceRuntime.ts');
   const productFile = new File(['abc'], 'Product Shot 01.PNG', {
     type: 'image/png',
     lastModified: 1234,
@@ -184,7 +184,7 @@ test('ecommerce upload helper functions preserve identity, signatures, and manua
 });
 
 test('ecommerce upload removal helpers avoid no-op state churn and clean empty manual buckets', async () => {
-  const runtime = await import('../../src/app/useEcommerceUploadReferenceRuntime.ts');
+  const runtime = await import('../../apps/web/src/app/useEcommerceUploadReferenceRuntime.ts');
   const first = new File(['a'], 'first.png', { type: 'image/png', lastModified: 1 });
   const second = new File(['b'], 'second.png', { type: 'image/png', lastModified: 2 });
   const referenceImage: ReferenceImage = {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { resolveUserApiViewState } from "../../src/services/api/userApiViewState.ts";
+import { resolveUserApiViewState } from "../../apps/web/src/services/api/userApiViewState.ts";
 
 test("readonly snapshot hydration stays interactive when display data exists", () => {
   const viewState = resolveUserApiViewState({

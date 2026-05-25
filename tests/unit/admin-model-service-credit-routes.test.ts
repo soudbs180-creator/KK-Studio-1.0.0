@@ -5,12 +5,12 @@ import {
   adminModelService,
   type AdminModelConfig,
   type AdminProvider,
-} from "../../src/services/model/adminModelService.ts";
+} from "../../apps/web/src/services/model/adminModelService.ts";
 import {
   buildCreditModelCatalog,
   type CreditModelCatalogEntry,
-} from "../../src/services/model/adminRouteUnits.ts";
-import type { AdminModelQualityPricing } from "../../src/services/model/adminModelQuality.ts";
+} from "../../apps/web/src/services/model/adminRouteUnits.ts";
+import type { AdminModelQualityPricing } from "../../apps/web/src/services/model/adminModelQuality.ts";
 
 type AdminModelServiceHarness = {
   providers: AdminProvider[];

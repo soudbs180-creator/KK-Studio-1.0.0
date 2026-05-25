@@ -8,7 +8,7 @@ import {
   isCapabilityRouteAssignmentRouteDisabled,
   resolveCapabilityRouteAssignment,
   resolveEnabledCapabilityRouteAssignment,
-} from '../../src/services/api/capabilityRouteAssignments.ts';
+} from '../../apps/web/src/services/api/capabilityRouteAssignments.ts';
 
 const ROOT_DIR = process.cwd();
 const CAPABILITY_STORAGE_KEY = 'kk_capability_route_assignments_v1';
@@ -18,9 +18,9 @@ function readSource(relativePath: string): string {
 }
 
 function withLocalStorageValue(value: string, run: () => void): void {
-  const originalWindow = (globalThis as typeof globalThis & { window?: unknown }).window;
+  const originalWindow = (globalThis as typeof globalThis & { window?: any }).window;
   const store = new Map<string, string>([[CAPABILITY_STORAGE_KEY, value]]);
-  (globalThis as typeof globalThis & { window?: unknown }).window = {
+  (globalThis as typeof globalThis & { window?: any }).window = {
     localStorage: {
       getItem(key: string) {
         return store.get(key) ?? null;
@@ -31,7 +31,7 @@ function withLocalStorageValue(value: string, run: () => void): void {
       removeItem(key: string) {
         store.delete(key);
       },
-    },
+    } as any,
   };
 
   try {
@@ -46,7 +46,7 @@ function withLocalStorageValue(value: string, run: () => void): void {
 }
 
 test('generation mode key preference reads capability route assignments before falling back to per-mode local memory', () => {
-  const appSource = readSource('src/App.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
 
   assert.match(appSource, /m === GenerationMode\.PPT[\s\S]*'ppt_generation'/);
   assert.match(appSource, /m === GenerationMode\.ECOMMERCE[\s\S]*'ecommerce_generation'/);
@@ -88,7 +88,7 @@ test('enabled-only capability resolver preserves raw assignments while blocking 
 });
 
 test('chat sidebar prefers the assistant capability route as its default model and preferred key source without removing manual model choice', () => {
-  const chatSidebarSource = readSource('src/components/layout/ChatSidebar.tsx');
+  const chatSidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
 
   assert.match(chatSidebarSource, /resolveEnabledCapabilityRouteAssignment\('assistant'\)/);
   assert.match(chatSidebarSource, /subscribeCapabilityRouteAssignments\(updateModels\)/);

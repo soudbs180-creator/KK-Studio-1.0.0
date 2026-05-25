@@ -1,22 +1,25 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 
-import { legacyWebApiClient } from '../../src/services/api/kkApiClient.ts';
+import { legacyWebApiClient } from '../../apps/web/src/services/api/kkApiClient.ts';
 import {
   clearPersistedRuntimeAuthState,
   persistRuntimeAuthState,
-} from '../../src/services/auth/runtimeAuthState.ts';
-import { loadUserApisPayloadFromCloudRecord } from '../../src/services/api/userApiCloudRecordStorage.ts';
+} from '../../apps/web/src/services/auth/runtimeAuthState.ts';
+import { loadUserApisPayloadFromCloudRecord } from '../../apps/web/src/services/api/userApiCloudRecordStorage.ts';
 import {
   loadUserApiEntries,
   saveUserApiEntries,
-} from '../../src/services/api/userApiProfileStorage.ts';
+} from '../../apps/web/src/services/api/userApiProfileStorage.ts';
 
-const originalGetKeyManagerCloudState = legacyWebApiClient.getKeyManagerCloudState;
-const originalGetUserApiEntries = legacyWebApiClient.getUserApiEntries;
-const originalReplaceUserApisPayload = legacyWebApiClient.replaceUserApisPayload;
-const originalReplaceKeyManagerCloudState = legacyWebApiClient.replaceKeyManagerCloudState;
-const originalReplaceUserApiEntries = legacyWebApiClient.replaceUserApiEntries;
+// 中文注释：使用 client: any 绕过 mock 函数缺少 meta 属性带来的 TSC 校验报错
+const client: any = legacyWebApiClient;
+
+const originalGetKeyManagerCloudState = client.getKeyManagerCloudState;
+const originalGetUserApiEntries = client.getUserApiEntries;
+const originalReplaceUserApisPayload = client.replaceUserApisPayload;
+const originalReplaceKeyManagerCloudState = client.replaceKeyManagerCloudState;
+const originalReplaceUserApiEntries = client.replaceUserApiEntries;
 const originalConsoleWarn = console.warn;
 const originalBaseUrl = process.env.VITE_KK_API_BASE_URL;
 const originalLegacyFallback = process.env.VITE_ENABLE_LEGACY_WEB_API_FALLBACK;
@@ -89,11 +92,11 @@ function mockAuthenticatedUser() {
 
 afterEach(() => {
   clearPersistedRuntimeAuthState();
-  legacyWebApiClient.getKeyManagerCloudState = originalGetKeyManagerCloudState;
-  legacyWebApiClient.getUserApiEntries = originalGetUserApiEntries;
-  legacyWebApiClient.replaceUserApisPayload = originalReplaceUserApisPayload;
-  legacyWebApiClient.replaceKeyManagerCloudState = originalReplaceKeyManagerCloudState;
-  legacyWebApiClient.replaceUserApiEntries = originalReplaceUserApiEntries;
+  client.getKeyManagerCloudState = originalGetKeyManagerCloudState;
+  client.getUserApiEntries = originalGetUserApiEntries;
+  client.replaceUserApisPayload = originalReplaceUserApisPayload;
+  client.replaceKeyManagerCloudState = originalReplaceKeyManagerCloudState;
+  client.replaceUserApiEntries = originalReplaceUserApiEntries;
   console.warn = originalConsoleWarn;
 
   if (typeof originalBaseUrl === 'string') {
@@ -117,7 +120,7 @@ test('loadUserApisPayloadFromCloudRecord uses the typed auth API on non-local ru
 
   let keyManagerCalls = 0;
   let userApiCalls = 0;
-  legacyWebApiClient.getKeyManagerCloudState = async () => {
+  client.getKeyManagerCloudState = async () => {
     keyManagerCalls += 1;
     return {
       success: true,
@@ -129,7 +132,7 @@ test('loadUserApisPayloadFromCloudRecord uses the typed auth API on non-local ru
       },
     };
   };
-  legacyWebApiClient.getUserApiEntries = async () => {
+  client.getUserApiEntries = async () => {
     userApiCalls += 1;
     return {
       success: true,
@@ -163,7 +166,7 @@ test('loadUserApiEntries reads the typed auth API payload without seeding the lo
   let keyManagerCalls = 0;
   let getUserApiCalls = 0;
   let replaceUserApiCalls = 0;
-  legacyWebApiClient.getKeyManagerCloudState = async () => {
+  client.getKeyManagerCloudState = async () => {
     keyManagerCalls += 1;
     return {
       success: true,
@@ -175,7 +178,7 @@ test('loadUserApiEntries reads the typed auth API payload without seeding the lo
       },
     };
   };
-  legacyWebApiClient.getUserApiEntries = async () => {
+  client.getUserApiEntries = async () => {
     getUserApiCalls += 1;
     return {
       success: true,
@@ -184,7 +187,7 @@ test('loadUserApiEntries reads the typed auth API payload without seeding the lo
       },
     };
   };
-  legacyWebApiClient.replaceUserApiEntries = async () => {
+  client.replaceUserApiEntries = async () => {
     replaceUserApiCalls += 1;
     throw new Error('compatibility bridge writes should stay unused');
   };
@@ -207,7 +210,7 @@ test('saveUserApiEntries writes through the typed auth API on hosted runtimes', 
   let replaceUserApiPayloadCalls = 0;
   let persistedEntries: Array<Record<string, unknown>> = [];
 
-  legacyWebApiClient.getKeyManagerCloudState = async () => {
+  client.getKeyManagerCloudState = async () => {
     keyManagerCalls += 1;
     return {
       success: true,
@@ -219,7 +222,7 @@ test('saveUserApiEntries writes through the typed auth API on hosted runtimes', 
       },
     };
   };
-  legacyWebApiClient.getUserApiEntries = async () => {
+  client.getUserApiEntries = async () => {
     getUserApiCalls += 1;
     return {
       success: true,
@@ -228,13 +231,13 @@ test('saveUserApiEntries writes through the typed auth API on hosted runtimes', 
       },
     };
   };
-  legacyWebApiClient.replaceKeyManagerCloudState = async () => {
+  client.replaceKeyManagerCloudState = async () => {
     throw new Error('key-manager state should not be rewritten when only entries change');
   };
-  legacyWebApiClient.replaceUserApiEntries = async () => {
+  client.replaceUserApiEntries = async () => {
     throw new Error('split entry writes should stay unused when the unified payload route is available');
   };
-  legacyWebApiClient.replaceUserApisPayload = async (input) => {
+  client.replaceUserApisPayload = async (input: any) => {
     replaceUserApiPayloadCalls += 1;
     persistedEntries = (input.entries as Array<Record<string, unknown>>).map((entry) => ({
       ...entry,
@@ -284,7 +287,7 @@ test('saveUserApiEntries writes locally first and still surfaces cloud sync fail
   let replaceUserApiPayloadCalls = 0;
   let replaceUserApiEntriesCalls = 0;
 
-  legacyWebApiClient.getKeyManagerCloudState = async () => {
+  client.getKeyManagerCloudState = async () => {
     keyManagerCalls += 1;
     return {
       success: true,
@@ -296,7 +299,7 @@ test('saveUserApiEntries writes locally first and still surfaces cloud sync fail
       },
     };
   };
-  legacyWebApiClient.getUserApiEntries = async () => {
+  client.getUserApiEntries = async () => {
     getUserApiCalls += 1;
     return {
       success: true,
@@ -305,10 +308,10 @@ test('saveUserApiEntries writes locally first and still surfaces cloud sync fail
       },
     };
   };
-  legacyWebApiClient.replaceKeyManagerCloudState = async () => {
+  client.replaceKeyManagerCloudState = async () => {
     throw new Error('key-manager state should stay unchanged when only entry rows change');
   };
-  legacyWebApiClient.replaceUserApiEntries = async () => {
+  client.replaceUserApiEntries = async () => {
     replaceUserApiEntriesCalls += 1;
     return {
       success: true,
@@ -317,7 +320,7 @@ test('saveUserApiEntries writes locally first and still surfaces cloud sync fail
       },
     };
   };
-  legacyWebApiClient.replaceUserApisPayload = async () => {
+  client.replaceUserApisPayload = async () => {
     replaceUserApiPayloadCalls += 1;
     return {
       success: false,
@@ -355,7 +358,7 @@ test('loadUserApiEntries keeps canonical cloud fields stable when equal-revision
     warnings.push(args.map((value) => String(value)).join(' '));
   };
 
-  legacyWebApiClient.getKeyManagerCloudState = async () => ({
+  client.getKeyManagerCloudState = async () => ({
     success: true,
     data: {
       version: 2,
@@ -364,7 +367,7 @@ test('loadUserApiEntries keeps canonical cloud fields stable when equal-revision
       entries: [],
     },
   });
-  legacyWebApiClient.getUserApiEntries = async () => {
+  client.getUserApiEntries = async () => {
     userApiReads += 1;
     return {
       success: true,
@@ -385,16 +388,16 @@ test('loadUserApiEntries keeps canonical cloud fields stable when equal-revision
       },
     };
   };
-  legacyWebApiClient.replaceKeyManagerCloudState = async () => {
+  client.replaceKeyManagerCloudState = async () => {
     throw new Error('key-manager state should stay unchanged when only entry rows differ');
   };
-  legacyWebApiClient.replaceUserApisPayload = async () => {
+  client.replaceUserApisPayload = async () => {
     replaceUserApisPayloadCalls += 1;
     throw new Error('background cloud convergence should stay disabled without a KK API access token');
   };
-  legacyWebApiClient.replaceUserApiEntries = async (input) => {
+  client.replaceUserApiEntries = async (input: any) => {
     replacePayloads.push(
-      (input.entries as Array<Record<string, unknown>>).map((entry) => ({ ...entry })),
+      ((input.entries as any) as Array<Record<string, unknown>>).map((entry) => ({ ...entry })),
     );
     return {
       success: true,

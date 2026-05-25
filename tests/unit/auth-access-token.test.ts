@@ -7,8 +7,8 @@ import {
   refreshPreferredKkApiAccessToken,
   setStoredKkApiAccessToken,
   syncStoredKkApiAccessTokenWithHostedSession,
-} from "../../src/services/api/authAccessToken.ts";
-import { emitAuthSessionChange } from "../../src/services/auth/authSessionEvents.ts";
+} from "../../apps/web/src/services/api/authAccessToken.ts";
+import { emitAuthSessionChange } from "../../apps/web/src/services/auth/authSessionEvents.ts";
 
 const ACCESS_TOKEN_STORAGE_KEY = "kk.api.access_token";
 const originalFetch = globalThis.fetch;

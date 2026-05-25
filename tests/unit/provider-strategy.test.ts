@@ -7,7 +7,7 @@ import {
   resolveProviderModelCompatibilityIssue,
   resolveProviderRuntime,
   shouldBypassChatCompatibilityForImages,
-} from "../../src/services/api/providerStrategy.ts";
+} from "../../apps/web/src/services/api/providerStrategy.ts";
 
 describe("provider strategy", () => {
   test("treats hyphenated one-api hosts as NewAPI providers", () => {

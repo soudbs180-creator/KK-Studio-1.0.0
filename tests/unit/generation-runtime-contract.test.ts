@@ -9,7 +9,7 @@ import type {
   RetryGeneratedMediaResultContext,
   UseGenerationRuntimeDeps,
   UseGenerationRuntimeResult,
-} from '../../src/app/useGenerationRuntime.ts';
+} from '../../apps/web/src/app/useGenerationRuntime.ts';
 
 const ROOT_DIR = process.cwd();
 const APP_RETRY_NODE_END_MARKER = 'const {\n    updateEcommerceNodeState,';

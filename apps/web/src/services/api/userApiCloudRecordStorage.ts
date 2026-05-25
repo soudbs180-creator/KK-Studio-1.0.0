@@ -1,4 +1,4 @@
-﻿import type { KeyManagerCloudStateDto, UserApiEntryDto } from '../../../packages/contracts/src/index.ts';
+import type { KeyManagerCloudStateDto, UserApiEntryDto } from '@kk/shared';
 import {
   getLegacyWebApiFallbackState,
   legacyWebApiClient,

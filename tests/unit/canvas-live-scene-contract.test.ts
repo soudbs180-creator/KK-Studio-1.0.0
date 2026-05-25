@@ -9,7 +9,7 @@ import {
   resolveLiveSceneNodePosition,
   type LiveSceneSnapshot,
   type PromptGroupLayoutMode,
-} from '../../src/canvas/liveScene.ts'
+} from '../../apps/web/src/canvas/liveScene.ts'
 
 const ROOT_DIR = process.cwd()
 

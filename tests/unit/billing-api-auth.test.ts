@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { isBillingAuthFailure } from "../../src/services/billing/billingApiAuth.ts";
+import { isBillingAuthFailure } from "../../apps/web/src/services/billing/billingApiAuth.ts";
 
 test("treats billing auth envelope failures as non-fatal auth gaps", () => {
   assert.equal(

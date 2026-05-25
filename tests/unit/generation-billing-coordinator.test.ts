@@ -8,7 +8,7 @@ import {
   buildGenerationAttemptRequestId,
   buildGenerationBillingAttempt,
   resolveGenerationAttemptFailureState,
-} from "../../src/services/billing/generationBillingCoordinator.ts";
+} from "../../apps/web/src/services/billing/generationBillingCoordinator.ts";
 
 const ROOT_DIR = process.cwd();
 

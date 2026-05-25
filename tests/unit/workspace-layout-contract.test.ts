@@ -6,7 +6,7 @@ import { test } from "node:test";
 const ROOT_DIR = process.cwd();
 
 function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), "utf8");
+  const actualPath = relativePath.replace(/packages[/\\]contracts[/\\]/, "packages/shared/src/contracts/").replace(/^src[/\\]/, "apps/web/src/"); return readFileSync(path.join(ROOT_DIR, actualPath), "utf8");
 }
 
 test("workspace layout contract exposes explicit canvas fields instead of a generic record bag", () => {

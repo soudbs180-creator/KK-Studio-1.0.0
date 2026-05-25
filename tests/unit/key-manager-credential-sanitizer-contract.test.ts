@@ -17,7 +17,7 @@ function readSource(relativePath: string): string {
 async function loadCredentialSanitizer(): Promise<CredentialSanitizerModule> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerCredentialSanitizer.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerCredentialSanitizer.ts must exist');
-  return await import('../../src/services/auth/keyManagerCredentialSanitizer.ts') as CredentialSanitizerModule;
+  return await import('../../apps/web/src/services/auth/keyManagerCredentialSanitizer.ts') as CredentialSanitizerModule;
 }
 
 test('credential sanitizer lives outside the monolithic key manager', () => {

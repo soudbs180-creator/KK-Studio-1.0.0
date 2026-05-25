@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import type { EcommerceAnalysisResult } from '../../src/services/ecommerce/types.ts';
+import type { EcommerceAnalysisResult } from '../../apps/web/src/services/ecommerce/types.ts';
 import {
   buildEcommerceAnalysisCounts,
   buildEcommerceAnalysisSuccessPatch,
@@ -14,8 +14,8 @@ import {
   normalizeEcommerceAnalysisResult,
   runEcommerceRequirementAnalysis,
   type EcommerceRequirementAnalysisRuntimeState,
-} from '../../src/app/useEcommerceRequirementAnalysisRuntime.ts';
-import type { EcommerceEditableTaskState } from '../../src/types.ts';
+} from '../../apps/web/src/app/useEcommerceRequirementAnalysisRuntime.ts';
+import type { EcommerceEditableTaskState } from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 

@@ -31,7 +31,7 @@ async function loadHelper(): Promise<{
     true,
     "OpenAI-compatible errors should live in a focused helper module",
   );
-  return import("../../src/services/llm/openAICompatibleErrors.ts");
+  return import("../../apps/web/src/services/llm/openAICompatibleErrors.ts");
 }
 
 test("OpenAI-compatible HTTP errors preserve diagnostic metadata", async () => {

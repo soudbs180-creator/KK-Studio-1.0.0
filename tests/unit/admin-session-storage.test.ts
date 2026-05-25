@@ -5,7 +5,7 @@ import {
   clearStoredAdminSession,
   getStoredAdminSessionToken,
   setStoredAdminSession,
-} from "../../src/services/api/adminSession.ts";
+} from "../../apps/web/src/services/api/adminSession.ts";
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();

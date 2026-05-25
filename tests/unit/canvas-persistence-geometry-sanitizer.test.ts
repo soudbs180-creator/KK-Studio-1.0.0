@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { restoreCanvasStateFromLocalStorage } from '../../src/context/canvasPersistence.ts';
-import { sanitizePersistedCanvases } from '../../src/context/canvasGeometrySanitizer.ts';
+import { restoreCanvasStateFromLocalStorage } from '../../apps/web/src/context/canvasPersistence.ts';
+import { sanitizePersistedCanvases } from '../../apps/web/src/context/canvasGeometrySanitizer.ts';
 
 const ROOT_DIR = process.cwd();
 

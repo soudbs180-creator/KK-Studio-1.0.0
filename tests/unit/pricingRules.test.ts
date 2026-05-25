@@ -7,7 +7,7 @@ import {
   normalizeApiResponse,
   ProviderPriceMap,
   inferProviderFromModel,
-} from '../../src/services/billing/pricingRules.ts';
+} from '../../apps/web/src/services/billing/pricingRules.ts';
 
 test('pricingRules: inferProviderFromModel should detect provider correctly', () => {
   assert.strictEqual(inferProviderFromModel('gpt-4o-mini'), 'OpenAI');

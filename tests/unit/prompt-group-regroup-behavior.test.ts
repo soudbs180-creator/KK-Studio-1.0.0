@@ -9,8 +9,8 @@ import type {
   UsePromptGroupLayoutResult,
   UsePromptGroupStackingDeps,
   UsePromptGroupStackingResult,
-} from '../../src/app/usePromptGroupLayout.ts';
-import { buildDockedPromptChildRegroupLayout } from '../../src/utils/generatedImageLayout.ts';
+} from '../../apps/web/src/app/usePromptGroupLayout.ts';
+import { buildDockedPromptChildRegroupLayout } from '../../apps/web/src/utils/generatedImageLayout.ts';
 
 type PromptGroupLayoutPublicBoundary = {
   bounds: PromptGroupBounds;

@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import {
   resolveCanvasSelectionIds,
   type CanvasSelectionMode,
-} from '../../src/context/canvasSelection.ts';
+} from '../../apps/web/src/context/canvasSelection.ts';
 
 const ROOT_DIR = process.cwd();
 

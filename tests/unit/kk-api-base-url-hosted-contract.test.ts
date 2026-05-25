@@ -4,7 +4,7 @@ import { test } from "node:test";
 import {
   resolveKkApiBaseUrl,
   resolveKkApiModelProxyBaseUrl,
-} from "../../src/services/api/kkApiClient.ts";
+} from "../../apps/web/src/services/api/kkApiClient.ts";
 
 test("hosted HTTPS runtimes use same-origin API rewrites when build env points at an HTTP VPS", () => {
   const originalBaseUrl = process.env.VITE_KK_API_BASE_URL;

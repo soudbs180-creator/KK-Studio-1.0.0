@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import {
   KKAI_FEATURE_FLAGS,
   shouldEnableWorkspaceCloudSync,
-} from '../../src/app/kkaiFeatureFlags.ts';
+} from '../../apps/web/src/app/kkaiFeatureFlags.ts';
 
 test('KKAI keeps billing on while admin and workspace cloud sync stay disabled', () => {
   assert.deepEqual(KKAI_FEATURE_FLAGS, {

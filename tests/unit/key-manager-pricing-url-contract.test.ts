@@ -17,7 +17,7 @@ function readSource(relativePath: string): string {
 async function loadKeyManagerPricingUrl(): Promise<KeyManagerPricingUrlModule> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerPricingUrl.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerPricingUrl.ts must exist');
-  return await import('../../src/services/auth/keyManagerPricingUrl.ts') as KeyManagerPricingUrlModule;
+  return await import('../../apps/web/src/services/auth/keyManagerPricingUrl.ts') as KeyManagerPricingUrlModule;
 }
 
 test('keyManager silent pricing URL builder lives outside the monolithic key manager', () => {

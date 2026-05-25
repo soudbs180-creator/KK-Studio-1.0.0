@@ -12,8 +12,8 @@ import type {
   PptStackPreviewState,
   UsePptRuntimeDeps,
   UsePptRuntimeResult,
-} from '../../src/app/usePptRuntime.ts';
-import type { PptRuntimeCanvasSnapshot } from '../../src/app/pptRuntimeHelpers.ts';
+} from '../../apps/web/src/app/usePptRuntime.ts';
+import type { PptRuntimeCanvasSnapshot } from '../../apps/web/src/app/pptRuntimeHelpers.ts';
 
 const ROOT_DIR = process.cwd();
 

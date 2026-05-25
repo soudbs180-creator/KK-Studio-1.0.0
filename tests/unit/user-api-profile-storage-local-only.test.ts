@@ -1,16 +1,17 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 
-import { legacyWebApiClient } from '../../src/services/api/kkApiClient.ts';
+import { legacyWebApiClient as originalClient } from '../../apps/web/src/services/api/kkApiClient.ts';
+const legacyWebApiClient = originalClient as any;
 import {
   clearPersistedRuntimeAuthState,
   persistRuntimeAuthState,
-} from '../../src/services/auth/runtimeAuthState.ts';
+} from '../../apps/web/src/services/auth/runtimeAuthState.ts';
 import {
   isKkApiBillingAvailableFromHealth,
   isKkApiUserDataWritableFromHealth,
-} from '../../src/services/api/kkApiServerHealth.ts';
-import { saveUserApiEntries } from '../../src/services/api/userApiProfileStorage.ts';
+} from '../../apps/web/src/services/api/kkApiServerHealth.ts';
+import { saveUserApiEntries } from '../../apps/web/src/services/api/userApiProfileStorage.ts';
 
 const originalGetKeyManagerCloudState = legacyWebApiClient.getKeyManagerCloudState;
 const originalGetUserApiEntries = legacyWebApiClient.getUserApiEntries;
@@ -100,6 +101,7 @@ test('treats local-file auth storage as writable user API persistence', () => {
     verified: true,
     service: 'kk-studio-api',
     status: 'ok',
+    selfHostedCoreReady: true,
     config: {
       hasPostgresConfig: false,
       hasAuthKey: true,
@@ -118,6 +120,9 @@ test('treats local-file auth storage as writable user API persistence', () => {
       credits: false,
       creditProviders: false,
       workspaceLayout: false,
+      authData: false,
+      authSessions: false,
+      tempUsers: false,
     },
     fetchedAt: Date.now(),
   }), true);
@@ -129,6 +134,7 @@ test('treats local-file credit storage as readable billing persistence', () => {
     verified: true,
     service: 'kk-studio-api',
     status: 'ok',
+    selfHostedCoreReady: true,
     config: {
       hasPostgresConfig: false,
       hasAuthKey: true,
@@ -147,6 +153,9 @@ test('treats local-file credit storage as readable billing persistence', () => {
       credits: true,
       creditProviders: false,
       workspaceLayout: false,
+      authData: false,
+      authSessions: false,
+      tempUsers: false,
     },
     fetchedAt: Date.now(),
   }), true);

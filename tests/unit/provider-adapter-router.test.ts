@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { resolveProviderRuntime } from "../../src/services/api/providerStrategy.ts";
-import { resolveAdapterKind } from "../../src/services/llm/providerAdapterRouter.ts";
+import { resolveProviderRuntime } from "../../apps/web/src/services/api/providerStrategy.ts";
+import { resolveAdapterKind } from "../../apps/web/src/services/llm/providerAdapterRouter.ts";
 
 describe("provider adapter router", () => {
   test("routes claude-native runtimes to the claude adapter", () => {

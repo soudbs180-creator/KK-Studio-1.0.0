@@ -10,7 +10,7 @@ import {
   type Canvas,
   type PromptNode,
   type WorkflowNode,
-} from '../../src/types.ts';
+} from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 
@@ -29,7 +29,7 @@ function readSource(relativePath: string): string {
 async function loadCanvasWorkflowUpdatesModule(): Promise<CanvasWorkflowUpdatesModule> {
   const fullPath = path.join(ROOT_DIR, 'src/context/canvasWorkflowUpdates.ts');
   assert.equal(existsSync(fullPath), true, 'src/context/canvasWorkflowUpdates.ts must exist');
-  return await import('../../src/context/canvasWorkflowUpdates.ts') as CanvasWorkflowUpdatesModule;
+  return await import('../../apps/web/src/context/canvasWorkflowUpdates.ts') as CanvasWorkflowUpdatesModule;
 }
 
 function promptNode(input: Partial<PromptNode> & Pick<PromptNode, 'id'>): PromptNode {

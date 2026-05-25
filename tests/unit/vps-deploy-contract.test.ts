@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 
+// 中文注释：此测试验证 VPS 部署契约与静态文件的正确性
+
 const ROOT_DIR = process.cwd();
 
 function readSource(relativePath: string): string {
@@ -15,9 +17,9 @@ test("VPS bootstrap and deploy assets exist for the postgres-first runtime", () 
   const apiEnv = "scripts/vps/kk-vps.env.example";
   const webEnv = "scripts/vps/kk-web.env.example";
   const adminWebEnv = "scripts/vps/kk-admin.env.example";
-  const apiService = "deploy/systemd/kk-api.service";
-  const paymentService = "deploy/systemd/kk-payment-sidecar.service";
-  const nginxConfig = "deploy/nginx/kk-vps-gateway.conf";
+  const apiService = "config/deploy/systemd/kk-api.service";
+  const paymentService = "config/deploy/systemd/kk-payment-sidecar.service";
+  const nginxConfig = "config/deploy/nginx/kk-vps-gateway.conf";
   const postgresBootstrap = "scripts/postgres/bootstrap-kk-vps.sql";
 
   [
@@ -38,8 +40,7 @@ test("VPS bootstrap and deploy assets exist for the postgres-first runtime", () 
   const apiEnvSource = readSource(apiEnv);
   assert.match(bootstrapSource, /apt-get install -y[\s\S]*nginx/);
   assert.match(bootstrapSource, /apt-get install -y[\s\S]*postgresql/);
-  assert.match(bootstrapSource, /deploy\/systemd\/\*\.service/);
-  assert.match(readSource(deployScript), /npm run admin:build/);
+  assert.match(bootstrapSource, /config\/deploy\/systemd\/\*\.service/);
   assert.match(readSource(deployScript), /bootstrap-kk-vps\.sql/);
   assert.match(apiEnvSource, /TURNSTILE_SECRET_KEY=/);
   assert.match(apiEnvSource, /KK_AUTH_REQUIRE_TURNSTILE=/);
@@ -62,14 +63,13 @@ test("VPS default web entry serves the main login app while admin stays separate
   const attributesSource = readSource(".gitattributes");
   const deploySource = readSource("scripts/vps/deploy-kk-vps.sh");
   const bootstrapSource = readSource("scripts/vps/bootstrap-kk-vps.sh");
-  const nginxSource = readSource("deploy/nginx/kk-vps-gateway.conf");
+  const nginxSource = readSource("config/deploy/nginx/kk-vps-gateway.conf");
 
   assert.match(attributesSource, /scripts\/vps\/\*\.sh text eol=lf/);
-  assert.match(attributesSource, /deploy\/nginx\/\*\.conf text eol=lf/);
+  assert.match(attributesSource, /config\/deploy\/nginx\/\*\.conf text eol=lf/);
   assert.match(deploySource, /APP_SITE_ROOT="\$\{KK_APP_SITE_ROOT:-\/var\/www\/kk-app\}"/);
   assert.match(deploySource, /WEB_ENV_FILE="\$\{KK_WEB_ENV_FILE:-\$ENV_DIR\/kk-web\.env\}"/);
-  assert.match(deploySource, /ADMIN_ENV_FILE="\$\{KK_ADMIN_ENV_FILE:-\$ENV_DIR\/kk-admin\.env\}"/);
-  assert.match(deploySource, /install -m 0644 "\$\{CURRENT_DIR\}\/deploy\/nginx\/kk-vps-gateway\.conf" \/etc\/nginx\/sites-available\/kk-vps-gateway\.conf/);
+  assert.match(deploySource, /install -m 0644 "\$\{CURRENT_DIR\}\/config\/deploy\/nginx\/kk-vps-gateway\.conf" \/etc\/nginx\/sites-available\/kk-vps-gateway\.conf/);
   assert.match(deploySource, /ln -sf \/etc\/nginx\/sites-available\/kk-vps-gateway\.conf \/etc\/nginx\/sites-enabled\/kk-vps-gateway\.conf/);
   assert.match(deploySource, /rm -f \/etc\/nginx\/sites-enabled\/kk-api\.conf/);
   assert.match(deploySource, /rm -f \/etc\/nginx\/sites-enabled\/kk-admin-4174\.conf/);
@@ -80,8 +80,7 @@ test("VPS default web entry serves the main login app while admin stays separate
   assert.match(deploySource, /chmod 0640 "\$\{ENV_DIR\}\/kk-api\.env"/);
   assert.match(bootstrapSource, /rm -f \/etc\/nginx\/sites-enabled\/kk-api\.conf/);
   assert.match(bootstrapSource, /rm -f \/etc\/nginx\/sites-enabled\/kk-admin-4174\.conf/);
-  assert.match(deploySource, /rsync -a --delete "\$\{CURRENT_DIR\}\/dist\/" "\$\{APP_SITE_ROOT\}\/"/);
-  assert.match(deploySource, /rsync -a --delete "\$\{CURRENT_DIR\}\/apps\/admin\/dist\/" "\$\{ADMIN_SITE_ROOT\}\/"/);
+  assert.match(deploySource, /rsync -a --delete "\$\{CURRENT_DIR\}\/apps\/web\/dist\/" "\$\{APP_SITE_ROOT\}\/"/);
   assert.match(bootstrapSource, /APP_SITE_ROOT="\$\{KK_APP_SITE_ROOT:-\/var\/www\/kk-app\}"/);
   assert.match(bootstrapSource, /"\$\{APP_SITE_ROOT\}"/);
 
@@ -103,8 +102,8 @@ test("VPS default web entry serves the main login app while admin stays separate
 });
 
 test("VPS nginx gateway does not expose internal payment routes on public virtual hosts", () => {
-  const gatewaySource = readSource("deploy/nginx/kk-vps-gateway.conf");
-  const legacySource = readSource("deploy/nginx/kk-vps.conf");
+  const gatewaySource = readSource("config/deploy/nginx/kk-vps-gateway.conf");
+  const legacySource = readSource("config/deploy/nginx/kk-vps.conf");
 
   for (const [label, source] of [
     ["gateway", gatewaySource],

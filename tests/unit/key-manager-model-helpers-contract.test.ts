@@ -37,7 +37,7 @@ function readSource(relativePath: string): string {
 async function loadKeyManagerModelHelpers(): Promise<KeyManagerModelHelpersModule> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerModelHelpers.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerModelHelpers.ts must exist');
-  return await import('../../src/services/auth/keyManagerModelHelpers.ts') as KeyManagerModelHelpersModule;
+  return await import('../../apps/web/src/services/auth/keyManagerModelHelpers.ts') as KeyManagerModelHelpersModule;
 }
 
 test('keyManager model helper boundary lives outside the monolithic key manager', () => {

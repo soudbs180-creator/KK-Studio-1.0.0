@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { RuntimeAuthUser } from '../../services/auth/runtimeAuthTypes.ts';
 import {
   AlertCircle,
@@ -905,7 +905,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                         key={option.id}
                         type="button"
                         onClick={() => setAvatarUrl(option.id)}
-                        className={`rounded-xl border p-2 text-left transition-all ${selected ? 'scale-[1.02]' : 'hover:-translate-y-0.5'}`}
+                        className={`rounded-xl border p-2 text-left transition-all ${selected ? 'scale-[1.02]' : 'hover:border-zinc-400 dark:hover:border-zinc-600'}`}
                         style={{
                           borderColor: selected ? 'rgb(255 107 90 / 0.56)' : 'var(--frost-card-sub-border)',
                           background: selected ? 'rgb(255 107 90 / 0.12)' : 'var(--frost-card-sub-bg)',

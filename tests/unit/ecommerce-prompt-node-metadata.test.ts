@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { resolveEcommercePromptNodeMetadata } from '../../src/services/ecommerce/ecommercePromptNodeMetadata.ts';
+import { resolveEcommercePromptNodeMetadata } from '../../apps/web/src/services/ecommerce/ecommercePromptNodeMetadata.ts';
 
 test('main-image metadata resolves source row key and theme from the main image item', () => {
   const result = resolveEcommercePromptNodeMetadata({

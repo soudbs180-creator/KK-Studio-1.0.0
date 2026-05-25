@@ -5,7 +5,7 @@ import {
   getRequestProfile,
   getRequestProfiles,
   resolveLocalRequestProfile,
-} from "../../src/services/api/requestProfileRegistry.ts";
+} from "../../apps/web/src/services/api/requestProfileRegistry.ts";
 
 describe("request profile registry", () => {
   test("exposes the expected built-in request profiles", () => {

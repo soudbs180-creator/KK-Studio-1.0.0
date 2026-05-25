@@ -7,7 +7,7 @@ import {
   resolveBindCallbackProvider,
   resolveBindFailureMessage,
   resolveBindSuccessMessage,
-} from '../../src/services/auth/identityLinking.ts';
+} from '../../apps/web/src/services/auth/identityLinking.ts';
 
 describe('identity linking helpers', () => {
   test('builds a provider-specific bind callback url', () => {

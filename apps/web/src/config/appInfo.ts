@@ -1,4 +1,4 @@
-import releaseManifest from "../../config/release-manifest.json" with { type: "json" };
+import releaseManifest from "../../../../config/release-manifest.json" with { type: "json" };
 
 export const APP_NAME = releaseManifest.appName;
 export const APP_VERSION = releaseManifest.version;

@@ -5,7 +5,7 @@ import {
   applyEcommerceSlotResult,
   buildEcommerceSlotPreviewBundle,
   buildInitialEcommerceGroupSlotState,
-} from '../../src/services/ecommerce/groupSlotState.ts';
+} from '../../apps/web/src/services/ecommerce/groupSlotState.ts';
 
 test('buildInitialEcommerceGroupSlotState creates stable slots with selected state per source key', () => {
   const state = buildInitialEcommerceGroupSlotState({

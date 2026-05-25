@@ -3,8 +3,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { cleanupInvalidCanvasCardsForCanvas } from '../../src/context/canvasCleanup.ts';
-import type { Canvas, WorkflowNode } from '../../src/types.ts';
+import { cleanupInvalidCanvasCardsForCanvas } from '../../apps/web/src/context/canvasCleanup.ts';
+import type { Canvas, WorkflowNode } from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 

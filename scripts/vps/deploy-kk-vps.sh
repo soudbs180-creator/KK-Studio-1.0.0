@@ -17,7 +17,7 @@ BOOTSTRAP_SQL_PATH="${KK_BOOTSTRAP_SQL:-scripts/postgres/bootstrap-kk-vps.sql}"
 SYSTEMD_SERVICES=("kk-api" "kk-payment-sidecar")
 
 require_repo_root() {
-  if [[ ! -f package.json || ! -d apps/api || ! -d apps/admin ]]; then
+  if [[ ! -f package.json || ! -d apps/web ]]; then
     echo "[deploy-kk-vps] Run this script from the repository root." >&2
     exit 1
   fi
@@ -52,10 +52,8 @@ run_npm_script_with_optional_env() {
 
 build_static_sites() {
   run_npm_script_with_optional_env "npm run build" "${WEB_ENV_FILE}"
-  run_npm_script_with_optional_env "npm run admin:build" "${ADMIN_ENV_FILE}"
-  install -d -m 0755 "${APP_SITE_ROOT}" "${ADMIN_SITE_ROOT}"
-  rsync -a --delete "${CURRENT_DIR}/dist/" "${APP_SITE_ROOT}/"
-  rsync -a --delete "${CURRENT_DIR}/apps/admin/dist/" "${ADMIN_SITE_ROOT}/"
+  install -d -m 0755 "${APP_SITE_ROOT}"
+  rsync -a --delete "${CURRENT_DIR}/apps/web/dist/" "${APP_SITE_ROOT}/"
 }
 
 harden_env_permissions() {
@@ -66,12 +64,12 @@ harden_env_permissions() {
 }
 
 install_nginx_gateway() {
-  if [[ ! -f "${CURRENT_DIR}/deploy/nginx/kk-vps-gateway.conf" ]]; then
-    echo "[deploy-kk-vps] Nginx gateway config not found at ${CURRENT_DIR}/deploy/nginx/kk-vps-gateway.conf" >&2
+  if [[ ! -f "${CURRENT_DIR}/config/deploy/nginx/kk-vps-gateway.conf" ]]; then
+    echo "[deploy-kk-vps] Nginx gateway config not found at ${CURRENT_DIR}/config/deploy/nginx/kk-vps-gateway.conf" >&2
     exit 1
   fi
 
-  install -m 0644 "${CURRENT_DIR}/deploy/nginx/kk-vps-gateway.conf" /etc/nginx/sites-available/kk-vps-gateway.conf
+  install -m 0644 "${CURRENT_DIR}/config/deploy/nginx/kk-vps-gateway.conf" /etc/nginx/sites-available/kk-vps-gateway.conf
   ln -sf /etc/nginx/sites-available/kk-vps-gateway.conf /etc/nginx/sites-enabled/kk-vps-gateway.conf
   rm -f /etc/nginx/sites-enabled/default
   rm -f /etc/nginx/sites-enabled/kk-api.conf

@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import type { LocalMediaCacheEntry } from '../../src/context/canvasMediaRecovery.ts';
+import type { LocalMediaCacheEntry } from '../../apps/web/src/context/canvasMediaRecovery.ts';
 
 const ROOT_DIR = process.cwd();
 

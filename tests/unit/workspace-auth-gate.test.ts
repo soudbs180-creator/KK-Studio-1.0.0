@@ -12,7 +12,7 @@ import {
 const ROOT_DIR = process.cwd();
 
 function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
+  const actualPath = relativePath.startsWith('src/') ? 'apps/web/' + relativePath : relativePath; return readFileSync(path.join(ROOT_DIR, actualPath), 'utf-8');
 }
 
 test('default runtime auth state starts signed out until a server session exists', () => {

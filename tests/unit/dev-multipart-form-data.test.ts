@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { normalizeDevMultipartFormDataBody } from '../../src/utils/devMultipartFormData.ts';
+import { normalizeDevMultipartFormDataBody } from '../../apps/web/src/utils/devMultipartFormData.ts';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -44,7 +44,7 @@ function buildMultipartRequest(body: Uint8Array): Request {
     headers: {
       'Content-Type': `multipart/form-data; boundary=${boundary}`,
     },
-    body,
+    body: body as any,
   });
 }
 

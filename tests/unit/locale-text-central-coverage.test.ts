@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, test } from "node:test";
 
-import { localizeUserFacingText } from "../../src/utils/localeText.ts";
+import { localizeUserFacingText } from "../../apps/web/src/utils/localeText.ts";
 
 type MockDocument = {
   documentElement: {
@@ -22,11 +22,7 @@ type MockWindow = {
   localStorage: MockLocalStorage;
 };
 
-const globalLike = globalThis as typeof globalThis & {
-  document?: MockDocument;
-  window?: MockWindow;
-  localStorage?: MockLocalStorage;
-};
+const globalLike = globalThis as any;
 
 const originalDocument = globalLike.document;
 const originalWindow = globalLike.window;

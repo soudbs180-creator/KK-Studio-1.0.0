@@ -3,8 +3,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { bringCanvasNodesToFront } from '../../src/context/canvasLayering.ts';
-import { AspectRatio, ImageSize, KnownModel, type Canvas, type CanvasGroup, type GeneratedImage, type PromptNode, type WorkflowNode } from '../../src/types.ts';
+import { bringCanvasNodesToFront } from '../../apps/web/src/context/canvasLayering.ts';
+import { AspectRatio, ImageSize, KnownModel, type Canvas, type CanvasGroup, type GeneratedImage, type PromptNode, type WorkflowNode } from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 

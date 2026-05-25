@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { AspectRatio } from "../../src/types.ts";
+import type { AspectRatio } from "../../apps/web/src/types.ts";
 import {
   buildDockedPromptChildRegroupLayout,
   buildGeneratedImageBatchPositions,
-} from "../../src/utils/generatedImageLayout.ts";
+} from "../../apps/web/src/utils/generatedImageLayout.ts";
 
 const SQUARE: AspectRatio = "1:1";
 

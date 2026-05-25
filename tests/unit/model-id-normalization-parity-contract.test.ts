@@ -24,13 +24,13 @@ function readSource(relativePath: string): string {
 async function loadCanonicalHelpers(): Promise<ModelNormalizationModule> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerModelHelpers.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerModelHelpers.ts must exist');
-  return await import('../../src/services/auth/keyManagerModelHelpers.ts') as ModelNormalizationModule;
+  return await import('../../apps/web/src/services/auth/keyManagerModelHelpers.ts') as ModelNormalizationModule;
 }
 
 async function loadCompatibilityFacade(): Promise<ModelNormalizationModule> {
   const fullPath = path.join(ROOT_DIR, 'src/utils/modelIdNormalization.ts');
   assert.equal(existsSync(fullPath), true, 'src/utils/modelIdNormalization.ts must exist');
-  return await import('../../src/utils/modelIdNormalization.ts') as ModelNormalizationModule;
+  return await import('../../apps/web/src/utils/modelIdNormalization.ts') as ModelNormalizationModule;
 }
 
 test('modelIdNormalization stays a thin compatibility facade over keyManager model helpers', () => {

@@ -142,7 +142,7 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
                         borderColor: 'var(--frost-card-sub-border)'
                     }}
                 >
-                    <h3 className="text-sm font-medium flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                    <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                         <Tag size={16} style={{ color: 'var(--accent-green)' }} />
                         编辑标签 {isSubCard && <span className="text-xs dark:text-zinc-500">(副卡)</span>}
                     </h3>
@@ -288,7 +288,7 @@ const TagInputModal: React.FC<TagInputModalProps> = ({
                                         <button
                                             key={tag}
                                             onClick={() => handleAddSuggestion(tag)}
-                                            className="px-2 py-0.5 text-xs rounded-full border transition-all hover:scale-105 active:scale-95"
+                                            className="px-2 py-0.5 text-xs rounded-full border transition-all active:scale-95"
                                             style={{
                                                 backgroundColor: 'transparent',
                                                 color: colors.text,

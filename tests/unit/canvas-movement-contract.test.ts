@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { AspectRatio, ImageSize, KnownModel, type Canvas, type GeneratedImage, type PromptNode, type WorkflowNode } from '../../src/types.ts';
+import { AspectRatio, ImageSize, KnownModel, type Canvas, type GeneratedImage, type PromptNode, type WorkflowNode } from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 
@@ -26,7 +26,7 @@ function readSource(relativePath: string): string {
 async function loadCanvasMovementModule(): Promise<CanvasMovementModule> {
   const fullPath = path.join(ROOT_DIR, 'src/context/canvasMovement.ts');
   assert.equal(existsSync(fullPath), true, 'src/context/canvasMovement.ts must exist');
-  return await import('../../src/context/canvasMovement.ts') as CanvasMovementModule;
+  return await import('../../apps/web/src/context/canvasMovement.ts') as CanvasMovementModule;
 }
 
 function promptNode(input: Partial<PromptNode> & Pick<PromptNode, 'id'>): PromptNode {

@@ -20,7 +20,7 @@ export function base64ToBlob(base64: string, contentType: string = ''): Blob {
     }
 
     const byteCharacters = atob(pureBase64);
-    const byteArrays = [];
+    const byteArrays: any[] = [];
 
     for (let offset = 0; offset < byteCharacters.length; offset += 512) {
         const slice = byteCharacters.slice(offset, offset + 512);

@@ -3,12 +3,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import type { EcommerceAnalysisResult } from '../../src/services/ecommerce/types.ts';
-import type { EcommerceEditableTaskState } from '../../src/types.ts';
+import type { EcommerceAnalysisResult } from '../../apps/web/src/services/ecommerce/types.ts';
+import type { EcommerceEditableTaskState } from '../../apps/web/src/types.ts';
 import {
   buildInitialEcommerceTaskStatesFromAnalysis,
   resolveNextEcommerceTaskStatePatch,
-} from '../../src/app/useEcommerceTaskStateRuntime.ts';
+} from '../../apps/web/src/app/useEcommerceTaskStateRuntime.ts';
 
 const ROOT_DIR = process.cwd();
 

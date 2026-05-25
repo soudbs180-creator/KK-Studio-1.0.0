@@ -6,7 +6,7 @@ import { describe, test } from "node:test";
 import {
   parseWechatAuthorizationUrl,
   resolveWechatStartErrorMessage,
-} from "../../src/services/auth/wechatAuthUtils.ts";
+} from "../../apps/web/src/services/auth/wechatAuthUtils.ts";
 
 const ROOT_DIR = process.cwd();
 

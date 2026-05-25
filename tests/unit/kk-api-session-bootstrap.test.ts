@@ -1,17 +1,17 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 
-import { getStoredKkApiAccessToken, setStoredKkApiAccessToken } from "../../src/services/api/authAccessToken.ts";
+import { getStoredKkApiAccessToken, setStoredKkApiAccessToken } from "../../apps/web/src/services/api/authAccessToken.ts";
 import {
   logoutHostedSessionFromServer,
   restoreHostedSessionFromServer,
-} from "../../src/services/auth/kkApiSessionBootstrap.ts";
+} from "../../apps/web/src/services/auth/kkApiSessionBootstrap.ts";
 import {
   createDefaultRuntimeAuthState,
   getLatestRuntimeAuthState,
   persistRuntimeAuthState,
   updateRuntimeAuthStateFromProfile,
-} from "../../src/services/auth/runtimeAuthState.ts";
+} from "../../apps/web/src/services/auth/runtimeAuthState.ts";
 
 class MemoryStorage implements Storage {
   private readonly store = new Map<string, string>();

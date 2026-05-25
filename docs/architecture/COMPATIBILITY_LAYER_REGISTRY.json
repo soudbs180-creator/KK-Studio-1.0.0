@@ -11,7 +11,7 @@
       ],
       "riskLevel": "medium",
       "regressionTests": [
-        "tests/integration/billing_physical_separation.test.ts"
+        "tests/unit/generation-billing-coordinator.test.ts"
       ],
       "removalCondition": "Delete when billing refresh and pricing sync are requested only through typed billing clients."
     },
@@ -25,7 +25,7 @@
       ],
       "riskLevel": "medium",
       "regressionTests": [
-        "tests/unit/generation-service.test.ts"
+        "tests/unit/generation-runtime-contract.test.ts"
       ],
       "removalCondition": "Delete when image sync events are emitted natively from the generation module end-to-end."
     },
@@ -53,7 +53,7 @@
       ],
       "riskLevel": "medium",
       "regressionTests": [
-        "tests/unit/workflow-service.test.ts"
+        "tests/unit/canvas-workflow-updates-contract.test.ts"
       ],
       "removalCondition": "Delete when all workflow-aware UI surfaces consume the migrated workflow shape directly."
     },
@@ -72,50 +72,6 @@
       "removalCondition": "Delete once the production settings routes no longer depend on scaffold composition."
     },
     {
-      "path": "apps/api/src/modules/auth/presentation/mount-legacy-auth-routes.ts",
-      "role": "compatibility-layer",
-      "currentPurpose": "Mounts migration-era auth routes that forward into the typed auth module.",
-      "upstreamCanonicalSource": "apps/api/src/modules/auth",
-      "downstreamDependents": [
-        "apps/api/src/app.ts"
-      ],
-      "riskLevel": "high",
-      "regressionTests": [
-        "tests/unit/auth-http-routes.test.ts",
-        "tests/unit/auth-data-routes.test.ts"
-      ],
-      "removalCondition": "Delete once all callers use the typed /api/v1/auth and /api/v1/profile surfaces."
-    },
-    {
-      "path": "apps/api/src/modules/billing/presentation/mount-legacy-billing-routes.ts",
-      "role": "compatibility-layer",
-      "currentPurpose": "Mounts migration-era billing routes that forward into the typed billing module.",
-      "upstreamCanonicalSource": "apps/api/src/modules/billing",
-      "downstreamDependents": [
-        "apps/api/src/app.ts"
-      ],
-      "riskLevel": "high",
-      "regressionTests": [
-        "tests/unit/billing-http-routes.test.ts"
-      ],
-      "removalCondition": "Delete once all billing consumers use the typed /api/v1/billing surface."
-    },
-    {
-      "path": "apps/api/src/modules/billing/infrastructure/legacy-billing-router-adapter.ts",
-      "role": "compatibility-layer",
-      "currentPurpose": "Infrastructure adapter that maps legacy billing router behavior onto the migrated billing module.",
-      "upstreamCanonicalSource": "apps/api/src/modules/billing",
-      "downstreamDependents": [
-        "apps/api/src/modules/billing/presentation/mount-legacy-billing-routes.ts"
-      ],
-      "riskLevel": "high",
-      "regressionTests": [
-        "tests/unit/billing-http-routes.test.ts",
-        "tests/integration/billing_physical_separation.test.ts"
-      ],
-      "removalCondition": "Delete once the migrated billing module no longer needs legacy router behavior translation."
-    },
-    {
       "path": "payment-server/sidecar_compat_bridge.js",
       "role": "compatibility-layer",
       "currentPurpose": "Routes legacy payment-server create/status/redirect flows into the sidecar payment module while Express and Alipay SDK runtime remain in place.",
@@ -125,8 +81,7 @@
       ],
       "riskLevel": "high",
       "regressionTests": [
-        "tests/unit/payment-sidecar-service.test.ts",
-        "tests/unit/governance-contract.test.ts"
+        "tests/unit/kk-api-server-health-vps-contract.test.ts"
       ],
       "removalCondition": "Delete once payment-server/index.js no longer serves checkout/status requests and the legacy shell is reduced to a thin runtime wrapper or removed."
     },

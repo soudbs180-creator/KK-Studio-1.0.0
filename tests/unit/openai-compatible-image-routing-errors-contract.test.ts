@@ -7,7 +7,7 @@ import {
   isChatEndpointCompatibilityError,
   isImageEndpointCompatibilityError,
   isQuotaLikeImageError,
-} from "../../src/services/llm/openAICompatibleImageRoutingErrors.ts";
+} from "../../apps/web/src/services/llm/openAICompatibleImageRoutingErrors.ts";
 
 const ROOT_DIR = process.cwd();
 

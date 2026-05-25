@@ -5,8 +5,8 @@ import { test } from 'node:test';
 import ts from 'typescript';
 
 const ROOT_DIR = process.cwd();
-const LOGIN_SCREEN_PATH = 'src/components/auth/LoginScreen.tsx';
-const LOGIN_SCREEN_CSS_PATH = 'src/components/auth/LoginScreen.css';
+const LOGIN_SCREEN_PATH = 'apps/web/src/components/auth/LoginScreen.tsx';
+const LOGIN_SCREEN_CSS_PATH = 'apps/web/src/components/auth/LoginScreen.css';
 
 function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
@@ -22,7 +22,7 @@ test('LoginScreen stays parseable and keeps the server-backed sign-in actions co
     ts.ScriptKind.TSX,
   );
 
-  assert.deepEqual(sourceFile.parseDiagnostics, []);
+  assert.deepEqual((sourceFile as any).parseDiagnostics, []);
   assert.match(source, /const \{ loginAsTempUser \} = useAuth\(\);/);
   assert.match(source, /import \{ startGoogleSignIn \} from '\.\.\/\.\.\/services\/auth\/googleAuth\.ts';/);
   assert.match(source, /const handleGoogleLogin = async \(\) => \{/);

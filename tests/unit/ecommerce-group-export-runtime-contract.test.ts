@@ -7,9 +7,9 @@ import {
   buildNextEcommerceGroupSlots,
   resolveLatestEcommerceSlotImageFromCanvas,
   sanitizeEcommerceExportName,
-} from '../../src/app/useEcommerceGroupExportRuntime.ts';
-import { AspectRatio, GenerationMode, ImageSize, type GeneratedImage, type PromptNode } from '../../src/types.ts';
-import type { EcommerceGroupSlotState } from '../../src/services/ecommerce/groupSlotState.ts';
+} from '../../apps/web/src/app/useEcommerceGroupExportRuntime.ts';
+import { AspectRatio, GenerationMode, ImageSize, type GeneratedImage, type PromptNode } from '../../apps/web/src/types.ts';
+import type { EcommerceGroupSlotState } from '../../apps/web/src/services/ecommerce/groupSlotState.ts';
 
 const ROOT_DIR = process.cwd();
 
@@ -82,7 +82,7 @@ function createSlot(sourceKey: string): EcommerceGroupSlotState {
         currentImageId: null,
         currentSource: null,
         history: [],
-      },
+      } as any,
     ],
     history: [],
   };
@@ -106,11 +106,11 @@ function createImage(
 }
 
 test('ecommerce group export runtime owns slot sync and export wiring', () => {
-  const hookPath = path.join(ROOT_DIR, 'src/app/useEcommerceGroupExportRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceGroupExportRuntime.ts should exist');
+  const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceGroupExportRuntime.ts');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommerceGroupExportRuntime.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceGroupExportRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceGroupExportRuntime.ts');
 
   assert.match(hookSource, /export interface UseEcommerceGroupExportRuntimeDeps \{/);
   assert.match(hookSource, /export interface UseEcommerceGroupExportRuntimeResult \{/);

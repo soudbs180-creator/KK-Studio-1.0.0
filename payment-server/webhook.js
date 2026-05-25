@@ -1,11 +1,72 @@
 require('dotenv').config();
 const express = require('express');
 const { AlipaySdk } = require('alipay-sdk');
+const { Pool } = require('pg');
 const {
     handleLegacyPaymentCallbackThroughSidecar,
 } = require('./sidecar_compat_bridge');
 
 const router = express.Router();
+
+let pgPool = null;
+
+function getPgPool() {
+    if (!pgPool) {
+        const connectionString = process.env.DATABASE_URL;
+        if (!connectionString) {
+            console.warn('[payment-webhook] DATABASE_URL is not configured.');
+        }
+        pgPool = new Pool({
+            connectionString,
+            ssl: connectionString && (connectionString.includes('sslmode=require') || process.env.NODE_ENV === 'production')
+                ? { rejectUnauthorized: false }
+                : false,
+        });
+    }
+    return pgPool;
+}
+
+async function handleStripePaymentSettlement(sessionId, userId, credits, planId) {
+    const pool = getPgPool();
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        // 1. 尝试以 status = 'created' 锁定并更新订单为 'paid'
+        const orderRes = await client.query(
+            "UPDATE orders SET status = 'paid', updated_at = NOW() WHERE stripe_session_id = $1 AND status = 'created' RETURNING id",
+            [sessionId]
+        );
+        
+        if (orderRes.rowCount === 0) {
+            // 订单不存在或者已经被更新过了（重复的 webhook），回滚并返回 true（表示幂等已处理）
+            await client.query('ROLLBACK');
+            console.log(`[payment-webhook] Stripe session ${sessionId} already processed or order not found. Skipping.`);
+            return true;
+        }
+        
+        // 2. 更新用户的 credits 和 plan
+        const parsedCredits = parseInt(credits, 10);
+        const userRes = await client.query(
+            "UPDATE users SET credits = COALESCE(credits, 0) + $1, plan = $2, updated_at = NOW() WHERE id = $3",
+            [parsedCredits, planId, userId]
+        );
+        
+        if (userRes.rowCount === 0) {
+            throw new Error(`User ${userId} not found when settling Stripe payment`);
+        }
+        
+        await client.query('COMMIT');
+        console.log(`[payment-webhook] Stripe settlement success for user ${userId}, session ${sessionId}, added ${parsedCredits} credits, plan: ${planId}`);
+        return true;
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('[payment-webhook] Stripe settlement transaction failed:', error);
+        return false;
+    } finally {
+        client.release();
+    }
+}
 
 function getWebhookSettlementToken() {
     return String(
@@ -278,6 +339,77 @@ router.post('/wechat', async (req, res) => {
         console.error('[payment-webhook] Failed to process WeChat webhook:', error);
         res.status(500).json({ code: 'FAIL', message: 'internal error' });
     }
+});
+
+// ============================================
+// 3. Stripe Webhook
+// ============================================
+router.post('/stripe', async (req, res) => {
+    console.log('[payment-webhook] Received Stripe notify');
+    
+    const sig = req.headers['stripe-signature'];
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!stripeSecretKey) {
+        console.error('[payment-webhook] Stripe secret key is missing.');
+        return res.status(500).send('Stripe secret key missing on server');
+    }
+
+    if (!endpointSecret) {
+        console.error('[payment-webhook] Stripe webhook secret key is missing.');
+        return res.status(500).send('Stripe webhook secret missing on server');
+    }
+
+    const stripe = require('stripe')(stripeSecretKey);
+    let event;
+
+    try {
+        const rawBody = resolveWebhookRawBody(req);
+        event = stripe.webhooks.constructEvent(rawBody, sig, endpointSecret);
+    } catch (err) {
+        console.error('[payment-webhook] Stripe signature verification failed:', err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === 'checkout.session.completed') {
+        const session = event.data.object;
+        const { userId, planId, credits } = session.metadata || {};
+        const stripeSessionId = session.id;
+
+        console.log('[payment-webhook] Processing Stripe checkout.session.completed:', {
+            stripeSessionId,
+            userId,
+            planId,
+            credits
+        });
+
+        if (!userId || !planId || !credits) {
+            console.error('[payment-webhook] Stripe checkout session missing metadata:', {
+                stripeSessionId,
+                userId,
+                planId,
+                credits
+            });
+            return res.status(400).send('Missing session metadata');
+        }
+
+        const rechargeSuccess = await handleStripePaymentSettlement(
+            stripeSessionId,
+            userId,
+            credits,
+            planId
+        );
+
+        if (rechargeSuccess) {
+            return res.json({ received: true });
+        }
+
+        return res.status(500).send('database error during settlement');
+    }
+
+    // 默认返回 200 OK 以响应其他未处理事件
+    return res.json({ received: true });
 });
 
 module.exports = router;

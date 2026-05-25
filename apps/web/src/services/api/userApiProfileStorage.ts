@@ -1,4 +1,4 @@
-import type { ApiResponse } from '../../../packages/contracts/src/index.ts';
+import type { ApiResponse } from '@kk/shared';
 import type { ApiProtocolFormat } from './apiConfig.ts';
 import { getStoredKkApiAccessToken } from './authAccessToken.ts';
 import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from './kkApiClient.ts';
@@ -300,7 +300,7 @@ async function loadLocalUserApiEntriesViaApi(): Promise<StoredUserApiEntry[]> {
 
   const response = await legacyWebApiClient.getUserApiEntries();
   const data = unwrapOrThrow(response, 'Failed to load local user API entries.');
-  return normalizeEntries(data.entries);
+  return normalizeEntries((data as any).entries);
 }
 
 async function saveLocalUserApiEntriesViaApi(entries: StoredUserApiEntry[]): Promise<void> {

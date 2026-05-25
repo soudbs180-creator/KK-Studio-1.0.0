@@ -6,8 +6,8 @@ import {
   isKkApiCanonicalCloudReadyFromHealth,
   isKkApiCreditProviderCatalogPersistedInCloudFromHealth,
   isKkApiUserDataPersistedInCloudFromHealth,
-} from '../../src/services/api/kkApiServerHealth.ts';
-import { resolveKkaiUserApiStorageMode } from '../../src/services/api/kkaiUserApiStorageMode.ts';
+} from '../../apps/web/src/services/api/kkApiServerHealth.ts';
+import { resolveKkaiUserApiStorageMode } from '../../apps/web/src/services/api/kkaiUserApiStorageMode.ts';
 
 const postgresHealth = {
   reachable: true,

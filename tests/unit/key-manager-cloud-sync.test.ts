@@ -10,7 +10,7 @@ import {
   markPendingProviderCloudSync,
   markPendingStateCloudSync,
   resetCloudSyncState,
-} from "../../src/services/auth/keyManagerCloudSync.ts";
+} from "../../apps/web/src/services/auth/keyManagerCloudSync.ts";
 
 const ROOT_DIR = process.cwd();
 

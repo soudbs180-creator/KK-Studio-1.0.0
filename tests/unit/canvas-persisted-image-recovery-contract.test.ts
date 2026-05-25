@@ -4,7 +4,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import * as ts from 'typescript';
 
-type PersistedImageRecoveryModule = typeof import('../../src/context/canvasPersistedImageRecovery.ts');
+type PersistedImageRecoveryModule = typeof import('../../apps/web/src/context/canvasPersistedImageRecovery.ts');
 type RequiredPersistedImageRecoveryExports = Pick<
   PersistedImageRecoveryModule,
   | 'buildPersistedImageRecoverySignature'

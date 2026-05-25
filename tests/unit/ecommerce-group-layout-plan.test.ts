@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildEcommerceCanvasGroupLayout } from '../../src/services/ecommerce/groupCanvasLayout.ts';
+import { buildEcommerceCanvasGroupLayout } from '../../apps/web/src/services/ecommerce/groupCanvasLayout.ts';
 
 test('buildEcommerceCanvasGroupLayout places main and A+ shells into fixed left/right columns with vertical slots', () => {
   const plan = buildEcommerceCanvasGroupLayout({

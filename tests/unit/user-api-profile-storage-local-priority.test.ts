@@ -1,16 +1,17 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 
-import { setStoredKkApiAccessToken } from '../../src/services/api/authAccessToken.ts';
-import { legacyWebApiClient } from '../../src/services/api/kkApiClient.ts';
+import { setStoredKkApiAccessToken } from '../../apps/web/src/services/api/authAccessToken.ts';
+import { legacyWebApiClient as originalClient } from '../../apps/web/src/services/api/kkApiClient.ts';
+const legacyWebApiClient = originalClient as any;
 import {
   clearPersistedRuntimeAuthState,
   persistRuntimeAuthState,
-} from '../../src/services/auth/runtimeAuthState.ts';
+} from '../../apps/web/src/services/auth/runtimeAuthState.ts';
 import {
   loadUserApiEntries,
   saveUserApiEntries,
-} from '../../src/services/api/userApiProfileStorage.ts';
+} from '../../apps/web/src/services/api/userApiProfileStorage.ts';
 
 const originalGetKeyManagerCloudState = legacyWebApiClient.getKeyManagerCloudState;
 const originalGetUserApiEntries = legacyWebApiClient.getUserApiEntries;
@@ -178,7 +179,7 @@ test('saveUserApiEntries writes the local bridge before surfacing cloud sync fai
       entries: [],
     },
   });
-  legacyWebApiClient.replaceUserApiEntries = async (input) => {
+  legacyWebApiClient.replaceUserApiEntries = async (input: any) => {
     callOrder.push('local');
     localWrites.push(
       (input.entries as Array<Record<string, unknown>>).map((entry) => ({ ...entry })),

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { buildChannelSurfaceView } from "../../src/services/api/providerChannelSurfaceView.ts";
-import { resolveProviderRuntime } from "../../src/services/api/providerStrategy.ts";
+import { buildChannelSurfaceView } from "../../apps/web/src/services/api/providerChannelSurfaceView.ts";
+import { resolveProviderRuntime } from "../../apps/web/src/services/api/providerStrategy.ts";
 
 describe("provider channel surface view", () => {
   test("builds documented discovery and async image visibility for 12AI channels", () => {

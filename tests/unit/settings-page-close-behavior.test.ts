@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
-import { shouldUseHistoryBackForSettingsClose } from '../../src/app/settingsPageClose.ts';
+import { shouldUseHistoryBackForSettingsClose } from '../../apps/web/src/app/settingsPageClose.ts';
 
 const ROOT_DIR = process.cwd();
 

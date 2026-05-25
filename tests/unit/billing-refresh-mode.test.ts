@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { resolveBillingRefreshMode } from "../../src/services/billing/billingRefreshMode.ts";
+import { resolveBillingRefreshMode } from "../../apps/web/src/services/billing/billingRefreshMode.ts";
 
 test("visible billing seed keeps background refresh silent", () => {
   assert.deepEqual(

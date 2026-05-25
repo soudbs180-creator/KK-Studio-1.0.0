@@ -7,7 +7,7 @@ import {
   buildOpenAICompatibleImageContentParts,
   formatOpenAICompatibleReferenceImage,
   formatOpenAICompatibleReferenceImages,
-} from "../../src/services/llm/openAICompatibleImageReferences.ts";
+} from "../../apps/web/src/services/llm/openAICompatibleImageReferences.ts";
 
 const ROOT_DIR = process.cwd();
 

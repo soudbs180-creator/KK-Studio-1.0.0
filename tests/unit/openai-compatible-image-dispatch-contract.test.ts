@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, test } from "node:test";
 
-import { resolveProviderRuntime } from "../../src/services/api/providerStrategy.ts";
-import { resolveOpenAICompatibleImageDispatch } from "../../src/services/llm/openAICompatibleImageDispatch.ts";
+import { resolveProviderRuntime } from "../../apps/web/src/services/api/providerStrategy.ts";
+import { resolveOpenAICompatibleImageDispatch } from "../../apps/web/src/services/llm/openAICompatibleImageDispatch.ts";
 
 const ROOT_DIR = process.cwd();
 

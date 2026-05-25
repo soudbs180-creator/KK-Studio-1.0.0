@@ -3,11 +3,16 @@
   node_bundler = "esbuild"
 
 [build]
-  command = "npm ci && node node_modules/vite/bin/vite.js build"
-  publish = "dist"
+  command = "npm run build"
+  publish = "apps/web/dist"
 
 [dev]
   command = "npm run dev"
   targetPort = 3000
   port = 8888
   autoLaunch = false
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

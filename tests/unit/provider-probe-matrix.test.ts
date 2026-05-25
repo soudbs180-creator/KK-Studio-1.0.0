@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { resolveProviderRuntime } from "../../src/services/api/providerStrategy.ts";
-import { resolveProviderProbeMatrix } from "../../src/services/api/providerProbeMatrix.ts";
+import { resolveProviderRuntime } from "../../apps/web/src/services/api/providerStrategy.ts";
+import { resolveProviderProbeMatrix } from "../../apps/web/src/services/api/providerProbeMatrix.ts";
 
 describe("provider probe matrix", () => {
   test("uses documented static model discovery for 12AI and keeps async image in available surfaces", () => {

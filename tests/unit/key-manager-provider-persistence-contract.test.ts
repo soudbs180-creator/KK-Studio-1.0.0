@@ -26,7 +26,7 @@ function readSource(relativePath: string): string {
 async function loadProviderHelpers(): Promise<KeyManagerProvidersModule> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerProviders.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerProviders.ts must exist');
-  return await import('../../src/services/auth/keyManagerProviders.ts') as KeyManagerProvidersModule;
+  return await import('../../apps/web/src/services/auth/keyManagerProviders.ts') as KeyManagerProvidersModule;
 }
 
 test('provider runtime-state merge lives with provider persistence helpers', () => {

@@ -9,7 +9,7 @@ import {
   resolveEcommercePromptBarAspectContext,
   resolveEffectiveEcommerceAPlusPolicy,
   resolveEcommerceAspectPolicy,
-} from '../../src/services/ecommerce/ecommerceModelPolicy.ts';
+} from '../../apps/web/src/services/ecommerce/ecommerceModelPolicy.ts';
 
 describe('ecommerce model policy', () => {
   test('normalizes Nano Banana aliases to canonical model ids', () => {
@@ -177,7 +177,7 @@ describe('ecommerce model policy', () => {
             aspectRatio: '16:9',
             imageSize: '4K',
             aPlusControlMode: '970x600',
-          },
+          } as any,
         },
       }),
       {

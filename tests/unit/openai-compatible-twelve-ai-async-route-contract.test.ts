@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, test } from "node:test";
 
-import type { ImageGenerationOptions } from "../../src/services/llm/LLMAdapter.ts";
+import type { ImageGenerationOptions } from "../../apps/web/src/services/llm/LLMAdapter.ts";
 import {
   is12AIAsyncImageModel,
   normalize12AIAsyncReferenceImage,
@@ -11,7 +11,7 @@ import {
   resolve12AIAsyncImageQuality,
   resolve12AIAsyncImageSize,
   shouldUse12AIAsyncImageRoute,
-} from "../../src/services/llm/openAICompatible12AIAsyncRoute.ts";
+} from "../../apps/web/src/services/llm/openAICompatible12AIAsyncRoute.ts";
 
 const ROOT_DIR = process.cwd();
 

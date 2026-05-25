@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, test } from "node:test";
 
-import type { ImageGenerationOptions } from "../../src/services/llm/LLMAdapter.ts";
+import type { ImageGenerationOptions } from "../../apps/web/src/services/llm/LLMAdapter.ts";
 import {
   clampImageCount,
   getAspectOrientation,
@@ -12,7 +12,7 @@ import {
   normalizeRequestedAspectRatio,
   resolveOpenAIEditSize,
   resolveOpenAIImageSize,
-} from "../../src/services/llm/openAICompatibleImageSizing.ts";
+} from "../../apps/web/src/services/llm/openAICompatibleImageSizing.ts";
 
 const ROOT_DIR = process.cwd();
 

@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
-import type { CreditTransactionDto } from '../../packages/contracts/src/index.ts';
+import type { CreditTransactionDto } from '@kk/shared';
 import { KKAI_FEATURE_FLAGS } from '../app/kkaiFeatureFlags';
 import { isBillingAuthFailure } from '../services/billing/billingApiAuth';
 import { buildGenerationAttemptIdempotencyKey } from '../services/billing/generationBillingCoordinator';
@@ -406,7 +406,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return undefined;
       }
 
-      const rows = sortCreditLogs((response.data.items || []).map((item) => mapCreditTransaction(item)));
+      const rows = sortCreditLogs((response.data.items || []).map((item: CreditTransactionDto) => mapCreditTransaction(item)));
       const hasForeignRows = rows.some((row) => row.user_id && row.user_id !== user.id);
       if (hasForeignRows) {
         console.warn('[BillingContext] Credit transaction API returned rows for a different user, ignoring mismatched payload.', {
@@ -476,10 +476,12 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (refreshMode.markRefreshing) {
       setRefreshing(true);
     }
-    const refreshPromise = (includeTransactions
+    const refreshPromise: Promise<void> = (includeTransactions
       ? Promise.all([refreshBalanceOnly(), loadCreditTransactions(false)])
-      : refreshBalanceOnly().then((canonicalBalance) => [canonicalBalance, undefined] as const))
-      .then(([canonicalBalance, latestBalanceAfter]) => {
+      : refreshBalanceOnly().then((canonicalBalance) => [canonicalBalance, undefined] as const)
+    )
+      .then((results: readonly [number | undefined, number | undefined | undefined]) => {
+        const [canonicalBalance, latestBalanceAfter] = results;
         const resolvedBalance = typeof canonicalBalance === 'number'
           ? canonicalBalance
           : latestBalanceAfter;
@@ -498,7 +500,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (refreshMode.markRefreshing) {
           setRefreshing(false);
         }
-      });
+      }) as unknown as Promise<void>;
 
     refreshPromiseRef.current = refreshPromise;
     return refreshPromise;

@@ -16,7 +16,7 @@ async function loadProviderPresets(): Promise<{
 }> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerProviderPresets.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerProviderPresets.ts must exist');
-  return await import('../../src/services/auth/keyManagerProviderPresets.ts') as Awaited<ReturnType<typeof loadProviderPresets>>;
+  return await import('../../apps/web/src/services/auth/keyManagerProviderPresets.ts') as Awaited<ReturnType<typeof loadProviderPresets>>;
 }
 
 test('keyManager provider presets live outside the monolithic key manager', () => {

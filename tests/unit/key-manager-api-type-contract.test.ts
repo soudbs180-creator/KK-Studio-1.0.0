@@ -15,7 +15,7 @@ function readSource(relativePath: string): string {
 async function loadApiTypeHelper(): Promise<{ detectApiType: DetectApiType }> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerApiType.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerApiType.ts must exist');
-  return await import('../../src/services/auth/keyManagerApiType.ts') as { detectApiType: DetectApiType };
+  return await import('../../apps/web/src/services/auth/keyManagerApiType.ts') as { detectApiType: DetectApiType };
 }
 
 test('keyManager API type detection boundary lives outside the monolithic key manager', () => {

@@ -11,7 +11,7 @@ import {
   resolveCanvasInteractionPhase,
   shouldSimplifyCard,
   shouldThrottleEdges,
-} from '../../src/canvas/performanceProfile.ts'
+} from '../../apps/web/src/canvas/performanceProfile.ts'
 
 describe('canvas performance profile', () => {
   test('classifies project sizes using locked thresholds', () => {

@@ -6,7 +6,7 @@ import {
   finishProviderManagerBusy,
   isAnyProviderManagerBusy,
   startProviderManagerBusy,
-} from "../../src/services/api/providerManagerBusyState.ts";
+} from "../../apps/web/src/services/api/providerManagerBusyState.ts";
 
 test("provider refresh only marks the targeted provider as busy", () => {
   const busyState = startProviderManagerBusy(

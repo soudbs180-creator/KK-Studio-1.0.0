@@ -18,7 +18,7 @@ function readSource(relativePath: string): string {
 async function loadKeyManagerModelList(): Promise<KeyManagerModelListModule> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerModelList.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerModelList.ts must exist');
-  return await import('../../src/services/auth/keyManagerModelList.ts') as KeyManagerModelListModule;
+  return await import('../../apps/web/src/services/auth/keyManagerModelList.ts') as KeyManagerModelListModule;
 }
 
 test('keyManager model-list normalization lives outside the monolithic key manager', () => {

@@ -20,7 +20,7 @@ function readSource(relativePath: string): string {
 async function loadCanvasSnapToGridModule(): Promise<CanvasSnapToGridModule> {
   const fullPath = path.join(ROOT_DIR, 'src/utils/canvasSnapToGrid.ts');
   assert.equal(existsSync(fullPath), true, 'src/utils/canvasSnapToGrid.ts must exist');
-  return await import('../../src/utils/canvasSnapToGrid.ts') as CanvasSnapToGridModule;
+  return await import('../../apps/web/src/utils/canvasSnapToGrid.ts') as CanvasSnapToGridModule;
 }
 
 test('snap-to-grid helper uses the visible canvas grid size and preserves free drag when disabled', async () => {

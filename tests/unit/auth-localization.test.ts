@@ -5,8 +5,8 @@ import {
   getDocumentLanguage,
   localizeUserFacingText,
   pickByResolvedLanguage,
-} from "../../src/utils/localeText.ts";
-import { resolveWechatStartErrorMessage } from "../../src/services/auth/wechatAuthUtils.ts";
+} from "../../apps/web/src/utils/localeText.ts";
+import { resolveWechatStartErrorMessage } from "../../apps/web/src/services/auth/wechatAuthUtils.ts";
 
 type MockDocument = {
   documentElement: {
@@ -23,10 +23,7 @@ type MockWindow = {
   };
 };
 
-const globalLike = globalThis as typeof globalThis & {
-  document?: MockDocument;
-  window?: MockWindow;
-};
+const globalLike = globalThis as any;
 
 const originalDocument = globalLike.document;
 const originalWindow = globalLike.window;
@@ -110,7 +107,7 @@ describe("auth-facing localization helpers", () => {
   });
 
   test("maps login and Turnstile messages through the shared auth localization module", async () => {
-    const authLocalization = await import("../../src/components/auth/authLocalization.ts");
+    const authLocalization = await import("../../apps/web/src/components/auth/authLocalization.ts");
 
     assert.equal(
       authLocalization.mapAuthErrorMessage("en-US", new Error("Invalid login credentials"), "login"),
@@ -131,7 +128,7 @@ describe("auth-facing localization helpers", () => {
   });
 
   test("maps hosted password login failures to actionable Chinese copy", async () => {
-    const authLocalization = await import("../../src/components/auth/authLocalization.ts");
+    const authLocalization = await import("../../apps/web/src/components/auth/authLocalization.ts");
 
     assert.equal(
       authLocalization.mapAuthErrorMessage("zh-CN", new Error("AUTH_REQUIRED: Invalid email or password."), "login"),

@@ -31,13 +31,13 @@ function readSource(relativePath: string): string {
 async function loadChannelConfigSecrets(): Promise<ChannelConfigSecretsModule> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerChannelConfigSecrets.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerChannelConfigSecrets.ts must exist');
-  return await import('../../src/services/auth/keyManagerChannelConfigSecrets.ts') as ChannelConfigSecretsModule;
+  return await import('../../apps/web/src/services/auth/keyManagerChannelConfigSecrets.ts') as ChannelConfigSecretsModule;
 }
 
 async function loadKeyUpdateDiagnostics(): Promise<KeyUpdateDiagnosticsModule> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerUpdateDiagnostics.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerUpdateDiagnostics.ts must exist');
-  return await import('../../src/services/auth/keyManagerUpdateDiagnostics.ts') as KeyUpdateDiagnosticsModule;
+  return await import('../../apps/web/src/services/auth/keyManagerUpdateDiagnostics.ts') as KeyUpdateDiagnosticsModule;
 }
 
 test('channel config api key redaction lives outside the monolithic key manager', () => {

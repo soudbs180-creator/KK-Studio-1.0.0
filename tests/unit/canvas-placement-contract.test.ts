@@ -7,8 +7,8 @@ import {
   resolveNextCardPosition,
   resolveNextGroupPosition,
   resolveSmartCanvasPosition,
-} from '../../src/context/canvasPlacement.ts';
-import type { Canvas, WorkflowNode } from '../../src/types.ts';
+} from '../../apps/web/src/context/canvasPlacement.ts';
+import type { Canvas, WorkflowNode } from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 

@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   resolveApiWorkbenchDiagnosticsAvailability,
   resolveApiWorkbenchStageMeta,
-} from "../../src/components/settings/apiWorkbenchState.ts";
+} from "../../apps/web/src/components/settings/apiWorkbenchState.ts";
 
 const pick = (zhText: string, enText: string) => enText;
 

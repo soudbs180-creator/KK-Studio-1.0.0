@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
 
-import { legacyWebApiClient } from '../../src/services/api/kkApiClient.ts';
+import { legacyWebApiClient as originalClient } from '../../apps/web/src/services/api/kkApiClient.ts';
+const legacyWebApiClient = originalClient as any;
 import {
   clearPersistedRuntimeAuthState,
   persistRuntimeAuthState,
-} from '../../src/services/auth/runtimeAuthState.ts';
+} from '../../apps/web/src/services/auth/runtimeAuthState.ts';
 import {
   combineUserApisEnvelopeSources,
   getUserApisPayloadDensity,
@@ -16,11 +17,11 @@ import {
   saveUserApisPayloadToCloudRecord,
   upsertUserApiProviderToCloudRecord,
   upsertUserApiSlotToCloudRecord,
-} from '../../src/services/api/userApiCloudRecordStorage.ts';
+} from '../../apps/web/src/services/api/userApiCloudRecordStorage.ts';
 import {
   compactUserApisPayloadForTransport,
   mergeUserApisPayload,
-} from '../../src/services/api/userApiPayload.ts';
+} from '../../apps/web/src/services/api/userApiPayload.ts';
 
 const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
 

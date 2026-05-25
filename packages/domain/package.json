@@ -1,9 +1,0 @@
-{
-  "name": "@kk/domain",
-  "private": true,
-  "version": "1.4.8",
-  "type": "module",
-  "exports": {
-    ".": "./src/index.ts"
-  }
-}

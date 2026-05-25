@@ -7,8 +7,8 @@ import {
   getKnownModelDisplayName,
   isRawModelDisplayName,
   resolveModelDisplayName,
-} from '../../src/utils/modelDisplayName.ts';
-import { normalizeModelId } from '../../src/utils/modelIdNormalization.ts';
+} from '../../apps/web/src/utils/modelDisplayName.ts';
+import { normalizeModelId } from '../../apps/web/src/utils/modelIdNormalization.ts';
 
 const ROOT_DIR = process.cwd();
 

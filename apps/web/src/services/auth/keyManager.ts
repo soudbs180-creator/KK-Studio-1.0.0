@@ -2510,7 +2510,7 @@ export class KeyManager {
 
         try {
             let isValid = false;
-            let errorMsg = undefined;
+            let errorMsg: string | undefined = undefined;
             let fetchedModels: string[] | undefined = undefined;
 
             if (provider === 'Gemini' || provider === 'Google') {

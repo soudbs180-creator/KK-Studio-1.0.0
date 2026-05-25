@@ -9,8 +9,8 @@ import {
   mergeCanvases,
   mergeSingleCanvas,
   resolvePreferredActiveCanvasId,
-} from '../../src/context/canvasMerge.ts';
-import type { Canvas } from '../../src/types.ts';
+} from '../../apps/web/src/context/canvasMerge.ts';
+import type { Canvas } from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 

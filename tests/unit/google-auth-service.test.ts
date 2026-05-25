@@ -4,8 +4,8 @@ import { afterEach, test } from 'node:test';
 import {
   buildGoogleSignInRedirectUrl,
   startGoogleSignIn,
-} from '../../src/services/auth/googleAuth.ts';
-import { startGoogleBind } from '../../src/services/auth/identityLinking.ts';
+} from '../../apps/web/src/services/auth/googleAuth.ts';
+import { startGoogleBind } from '../../apps/web/src/services/auth/identityLinking.ts';
 
 const originalWindow = (globalThis as typeof globalThis & { window?: unknown }).window;
 const originalRedirectOrigin = process.env.VITE_AUTH_REDIRECT_ORIGIN;
@@ -31,12 +31,12 @@ test('buildGoogleSignInRedirectUrl always points to /auth/callback', () => {
 test('startGoogleSignIn launches KK API Google auth and redirects the browser to the returned authorization url', async () => {
   let capturedRedirectTo = '';
   let redirectedTo = '';
-  (globalThis as typeof globalThis & { window?: unknown }).window = {
+  (globalThis as typeof globalThis & { window?: any }).window = {
     location: {
       assign: (value: string) => {
         redirectedTo = value;
       },
-    },
+    } as any,
   };
 
   await startGoogleSignIn({

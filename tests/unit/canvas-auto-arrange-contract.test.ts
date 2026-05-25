@@ -11,7 +11,7 @@ import {
   type Canvas,
   type GeneratedImage,
   type PromptNode,
-} from '../../src/types.ts';
+} from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 const MAIN_SHEET = '\u4e3b\u56fe';
@@ -28,7 +28,7 @@ function readSource(relativePath: string): string {
 async function loadCanvasAutoArrangeModule(): Promise<CanvasAutoArrangeModule> {
   const fullPath = path.join(ROOT_DIR, 'src/context/canvasAutoArrange.ts');
   assert.equal(existsSync(fullPath), true, 'src/context/canvasAutoArrange.ts must exist');
-  return await import('../../src/context/canvasAutoArrange.ts') as CanvasAutoArrangeModule;
+  return await import('../../apps/web/src/context/canvasAutoArrange.ts') as CanvasAutoArrangeModule;
 }
 
 function promptNode(input: Partial<PromptNode> & Pick<PromptNode, 'id'>): PromptNode {

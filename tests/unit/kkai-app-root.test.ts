@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import {
   createAppRootMode,
   createKkaiRuntimeAuthSnapshot,
-} from '../../src/context/kkaiRuntimeContext.ts';
+} from '../../apps/web/src/context/kkaiRuntimeContext.ts';
 
 const ROOT_DIR = process.cwd();
 

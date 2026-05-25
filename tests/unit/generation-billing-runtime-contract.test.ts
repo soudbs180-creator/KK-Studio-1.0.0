@@ -7,7 +7,7 @@ import type {
   EnsureCreditAttemptChargedParams,
   EnsureCreditAttemptChargedResult,
   GenerationCreditAttemptNode,
-} from '../../src/app/useGenerationRuntime.ts';
+} from '../../apps/web/src/app/useGenerationRuntime.ts';
 
 const ROOT_DIR = process.cwd();
 

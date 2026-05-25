@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   getAdminModelAutoRefreshDelay,
   shouldStartAdminModelRefresh,
-} from "../../src/services/model/adminModelRefreshPolicy.ts";
+} from "../../apps/web/src/services/model/adminModelRefreshPolicy.ts";
 
 test("visible tabs use the fast admin catalog refresh interval", () => {
   assert.equal(getAdminModelAutoRefreshDelay("visible"), 10_000);

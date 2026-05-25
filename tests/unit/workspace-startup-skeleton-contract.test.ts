@@ -6,7 +6,7 @@ import { describe, test } from 'node:test'
 const ROOT_DIR = process.cwd()
 
 function readSource(relativePath: string) {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf8')
+  const actualPath = relativePath.startsWith('src/') ? 'apps/web/' + relativePath : relativePath; return readFileSync(path.join(ROOT_DIR, actualPath), 'utf8')
 }
 
 describe('workspace startup shell contract', () => {

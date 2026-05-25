@@ -9,8 +9,8 @@ import {
   resolveEcommerceAPlusControlModeValue,
   resolveEcommerceNodeGenerationSettingsForSheet,
   resolveNextEcommerceSheetSetting,
-} from '../../src/app/useEcommerceSheetSettingsRuntime.ts';
-import { AspectRatio, GenerationMode, ImageSize, type EcommerceEditableTaskState, type PromptNode } from '../../src/types.ts';
+} from '../../apps/web/src/app/useEcommerceSheetSettingsRuntime.ts';
+import { AspectRatio, GenerationMode, ImageSize, type EcommerceEditableTaskState, type PromptNode } from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 

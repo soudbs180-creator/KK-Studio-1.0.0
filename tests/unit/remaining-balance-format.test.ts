@@ -5,7 +5,7 @@ import {
   formatRemainingCredits,
   getRemainingCreditsFractionDigits,
   normalizeRemainingCredits,
-} from '../../src/services/billing/remainingBalance.ts';
+} from '../../apps/web/src/services/billing/remainingBalance.ts';
 
 test('remaining balance helpers normalize invalid values safely', () => {
   assert.equal(normalizeRemainingCredits(undefined), 0);

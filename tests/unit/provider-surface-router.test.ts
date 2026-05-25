@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import { resolveProviderRuntime } from "../../src/services/api/providerStrategy.ts";
-import { resolveChatSurface, resolveImageSurface } from "../../src/services/api/providerSurfaceRouter.ts";
+import { resolveProviderRuntime } from "../../apps/web/src/services/api/providerStrategy.ts";
+import { resolveChatSurface, resolveImageSurface } from "../../apps/web/src/services/api/providerSurfaceRouter.ts";
 
 describe("provider surface router", () => {
   test("routes New Suxi image models to provider images even when chat compatibility is stored", () => {

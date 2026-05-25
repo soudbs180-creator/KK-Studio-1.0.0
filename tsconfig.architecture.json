@@ -7,7 +7,7 @@
             "DOM.Iterable"
         ],
         "module": "ESNext",
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "allowImportingTsExtensions": true,
         "resolveJsonModule": true,
         "jsx": "react-jsx",
@@ -16,10 +16,16 @@
             "vite/client"
         ],
         "strict": true,
+        "noImplicitAny": false,
         "ignoreDeprecations": "6.0",
         "skipLibCheck": true,
-        "ignoreDeprecations": "6.0",
         "allowSyntheticDefaultImports": true,
+        "paths": {
+            "@/*": ["./apps/web/src/*"],
+            "@kk/shared": ["./packages/shared/src/index.ts"],
+            "@kk/ui": ["./packages/ui/src/index.ts"],
+            "@nano-banana/api-client": ["./packages/api-client/src/index.ts"]
+        },
         "noEmit": true
     },
     "include": [
@@ -30,6 +36,7 @@
     ],
     "exclude": [
         "dist",
-        "node_modules"
+        "node_modules",
+        "apps/api"
     ]
 }

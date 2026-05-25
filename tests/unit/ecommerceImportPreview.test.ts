@@ -5,7 +5,7 @@ import {
   appendUploadFilesWithinLimit,
   buildEcommerceUploadPreviewModel,
   removeUploadFileAtIndex,
-} from '../../src/components/ecommerce/ecommerceImportPreview.ts';
+} from '../../apps/web/src/components/ecommerce/ecommerceImportPreview.ts';
 
 type MockUploadFile = {
   name: string;

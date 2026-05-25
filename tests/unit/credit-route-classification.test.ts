@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 
-import { resolveModelExecutionLane } from '../../src/services/model/modelExecutionLane.ts';
+import { resolveModelExecutionLane } from '../../apps/web/src/services/model/modelExecutionLane.ts';
 
 const ROOT_DIR = process.cwd();
 

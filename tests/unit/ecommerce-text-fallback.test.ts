@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { analyzeFallbackEcommerceText } from '../../src/services/ecommerce/text/fallbackTextAnalysis.ts';
+import { analyzeFallbackEcommerceText } from '../../apps/web/src/services/ecommerce/text/fallbackTextAnalysis.ts';
 
 describe('ecommerce text fallback analysis', () => {
   test('builds a draft analysis result from extracted doc text', () => {

@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { isKkApiSelfHostedCoreReadyFromHealth } from '../../src/services/api/kkApiServerHealth.ts';
+import { isKkApiSelfHostedCoreReadyFromHealth } from '../../apps/web/src/services/api/kkApiServerHealth.ts';
 
 const ROOT_DIR = process.cwd();
 

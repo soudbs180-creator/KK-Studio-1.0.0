@@ -3,8 +3,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 
-import type { GeneratedImage, PromptNode } from '../../src/types.ts';
-import { selectMobileFeedResults } from '../../src/components/mobile/mobileFeedSelectors.ts';
+import type { GeneratedImage, PromptNode } from '../../apps/web/src/types.ts';
+import { selectMobileFeedResults } from '../../apps/web/src/components/mobile/mobileFeedSelectors.ts';
 
 const ROOT_DIR = process.cwd();
 

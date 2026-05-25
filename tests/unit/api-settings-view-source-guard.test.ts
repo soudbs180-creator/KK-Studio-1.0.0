@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import ts from 'typescript';
 
 const ROOT_DIR = process.cwd();
-const API_SETTINGS_VIEW_PATH = 'src/components/settings/ApiSettingsView.tsx';
+const API_SETTINGS_VIEW_PATH = 'apps/web/src/components/settings/ApiSettingsView.tsx';
 
 function readSource(relativePath: string): string {
   return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
@@ -21,7 +21,7 @@ test('ApiSettingsView stays parseable and keeps core Chinese labels free of moji
     ts.ScriptKind.TSX,
   );
 
-  const parseDiagnostics = sourceFile.parseDiagnostics.map((diagnostic) => ({
+  const parseDiagnostics = (sourceFile as any).parseDiagnostics.map((diagnostic: any) => ({
     line: diagnostic.file?.getLineAndCharacterOfPosition(diagnostic.start ?? 0).line ?? 0,
     message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
   }));

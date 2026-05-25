@@ -6,7 +6,7 @@ import { test } from "node:test";
 import {
   buildSafeFormDataPreview,
   buildSafeRequestBodyPreview,
-} from "../../src/services/llm/openAICompatibleDiagnostics.ts";
+} from "../../apps/web/src/services/llm/openAICompatibleDiagnostics.ts";
 
 const ROOT_DIR = process.cwd();
 

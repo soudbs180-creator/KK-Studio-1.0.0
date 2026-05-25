@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { buildAdminLoginUrl } from '../../src/services/admin/adminEntry.ts';
+import { buildAdminLoginUrl } from '../../apps/web/src/services/admin/adminEntry.ts';
 
 test('buildAdminLoginUrl keeps the admin app external and lands on /login', () => {
   assert.equal(

@@ -1,11 +1,9 @@
 import {
   createKkApiClient,
   type KkApiClient,
-} from "../../../packages/contracts/src/index.ts";
-import {
   ADMIN_SESSION_TOKEN_HEADER,
   TEMP_USER_ID_HEADER,
-} from "../../../packages/shared/src/index.ts";
+} from "@kk/shared";
 import { readRuntimeEnv, readRuntimeOrigin } from "../../utils/runtimeEnv.ts";
 import {
   getPreferredKkApiAccessToken,

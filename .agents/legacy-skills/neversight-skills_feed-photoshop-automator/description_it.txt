@@ -1,1 +1,0 @@
-Automazione professionale di Adobe Photoshop tramite bridge COM/ExtendScript. Supporta aggiornamenti di testo, filtri e riproduzione di azioni.

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import type { GeneratedImage, PromptNode, ReferenceImage } from '../../src/types.ts';
-import { selectMobileFeedResults } from '../../src/components/mobile/mobileFeedSelectors.ts';
+import type { GeneratedImage, PromptNode, ReferenceImage } from '../../apps/web/src/types.ts';
+import { selectMobileFeedResults } from '../../apps/web/src/components/mobile/mobileFeedSelectors.ts';
 
 function createReferenceImage(overrides: Partial<ReferenceImage> = {}): ReferenceImage {
   return {

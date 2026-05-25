@@ -27,7 +27,7 @@ function readSource(relativePath: string): string {
 async function loadChannelCapabilities(): Promise<{ buildChannelCapabilities: BuildChannelCapabilities }> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerChannelCapabilities.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerChannelCapabilities.ts must exist');
-  return await import('../../src/services/auth/keyManagerChannelCapabilities.ts') as { buildChannelCapabilities: BuildChannelCapabilities };
+  return await import('../../apps/web/src/services/auth/keyManagerChannelCapabilities.ts') as { buildChannelCapabilities: BuildChannelCapabilities };
 }
 
 test('keyManager channel capabilities boundary lives outside the monolithic key manager', () => {

@@ -29,7 +29,7 @@ function readSource(relativePath: string): string {
 async function loadRouteIdHelpers(): Promise<RouteIdModule> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerRouteIds.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerRouteIds.ts must exist');
-  return await import('../../src/services/auth/keyManagerRouteIds.ts') as RouteIdModule;
+  return await import('../../apps/web/src/services/auth/keyManagerRouteIds.ts') as RouteIdModule;
 }
 
 test('key manager route id helpers live outside the monolithic key manager', () => {

@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 
+// 中文注释：此测试验证 VPS 部署相关的构建脚本和配置文件引用正确性
+
 const ROOT_DIR = process.cwd();
 
 function readSource(relativePath: string): string {
@@ -17,9 +19,9 @@ test("VPS bootstrap and deploy scripts reference the expected runtime artifacts"
   const paymentEntrySource = readSource("scripts/run-payment-sidecar-vps.mjs");
   const movedApiEntrySource = readSource("scripts/dev/run-api-vps.mjs");
   const movedPaymentEntrySource = readSource("scripts/dev/run-payment-sidecar-vps.mjs");
-  const apiServiceSource = readSource("deploy/systemd/kk-api.service");
-  const paymentServiceSource = readSource("deploy/systemd/kk-payment-sidecar.service");
-  const nginxSource = readSource("deploy/nginx/kk-vps.conf");
+  const apiServiceSource = readSource("config/deploy/systemd/kk-api.service");
+  const paymentServiceSource = readSource("config/deploy/systemd/kk-payment-sidecar.service");
+  const nginxSource = readSource("config/deploy/nginx/kk-vps.conf");
   const postgresAccessSource = readSource("scripts/vps/repair-postgres-client-access.sh");
 
   assert.match(bootstrapSource, /bootstrap-kk-vps\.sql/);
@@ -27,7 +29,6 @@ test("VPS bootstrap and deploy scripts reference the expected runtime artifacts"
   assert.match(bootstrapSource, /kk-vps\.env\.example/);
   assert.match(deploySource, /npm ci/);
   assert.match(deploySource, /npm run build/);
-  assert.match(deploySource, /npm run admin:build/);
   assert.match(deploySource, /bootstrap-kk-vps\.sql/);
   assert.match(deploySource, /SYSTEMD_SERVICES=\("kk-api" "kk-payment-sidecar"\)/);
   assert.match(deploySource, /systemctl restart "\$\{service\}"/);

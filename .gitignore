@@ -107,3 +107,16 @@ supabase/.temp/
 
 .vercel
 .env*.local
+
+# Refactor Additions
+.npm-cache/
+release/
+release/publish/
+release/publish/stable/
+*.log
+.env
+.env.local
+.env.production
+dist/
+.netlify/
+node_modules/

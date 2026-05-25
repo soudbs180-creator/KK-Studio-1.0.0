@@ -9,7 +9,7 @@ import {
   isCompactResponsiveSurface,
   isPhoneResponsiveWidth,
   resolveResponsiveSurface,
-} from '../../src/utils/responsiveSurface.ts';
+} from '../../apps/web/src/utils/responsiveSurface.ts';
 
 describe('responsive surface utilities', () => {
   test('classifies phone, tablet, and desktop at the planned breakpoints', () => {

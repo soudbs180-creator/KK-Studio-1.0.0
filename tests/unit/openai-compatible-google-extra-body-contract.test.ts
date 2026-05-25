@@ -3,11 +3,11 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, test } from "node:test";
 
-import type { ImageGenerationOptions } from "../../src/services/llm/LLMAdapter.ts";
+import type { ImageGenerationOptions } from "../../apps/web/src/services/llm/LLMAdapter.ts";
 import {
   buildNewApiGoogleExtraBody,
   mergeExtraBody,
-} from "../../src/services/llm/openAICompatibleGoogleExtraBody.ts";
+} from "../../apps/web/src/services/llm/openAICompatibleGoogleExtraBody.ts";
 
 const ROOT_DIR = process.cwd();
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildEcommerceAssetRoleBindings } from '../../src/services/ecommerce/assetRoleBindings.ts';
+import { buildEcommerceAssetRoleBindings } from '../../apps/web/src/services/ecommerce/assetRoleBindings.ts';
 
 test('buildEcommerceAssetRoleBindings resets reference labels per item and assigns unified figure aliases', () => {
   const bindings = buildEcommerceAssetRoleBindings({

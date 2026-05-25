@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import {
   KKAI_LOCAL_USER_ID,
   createKkaiLocalRuntime,
-} from '../../src/app/kkaiLocalRuntime.ts';
+} from '../../apps/web/src/app/kkaiLocalRuntime.ts';
 
 test('createKkaiLocalRuntime returns the fixed local profile and restores the latest local workspace when available', () => {
   assert.deepEqual(

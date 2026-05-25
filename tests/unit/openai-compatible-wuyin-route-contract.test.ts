@@ -13,7 +13,7 @@ import {
   normalizeWuyinImageSize,
   normalizeWuyinReferenceImage,
   resolveWuyinRequestRoute,
-} from "../../src/services/llm/openAICompatibleWuyinRoute.ts";
+} from "../../apps/web/src/services/llm/openAICompatibleWuyinRoute.ts";
 
 const ROOT_DIR = process.cwd();
 

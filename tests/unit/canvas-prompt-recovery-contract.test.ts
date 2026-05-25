@@ -4,7 +4,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import * as ts from 'typescript';
 
-type PromptRecoveryModule = typeof import('../../src/context/canvasPromptRecovery.ts');
+type PromptRecoveryModule = typeof import('../../apps/web/src/context/canvasPromptRecovery.ts');
 type RequiredPromptRecoveryExports = Pick<
   PromptRecoveryModule,
   'normalizeCanvasPromptRecovery' | 'markInterruptedSyncPromptGenerations' | 'hasUnrecoverableSyncGenerationInFlight'

@@ -20,7 +20,7 @@ async function loadDefaultModels(): Promise<{
 }> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerDefaultModels.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerDefaultModels.ts must exist');
-  return await import('../../src/services/auth/keyManagerDefaultModels.ts') as Awaited<ReturnType<typeof loadDefaultModels>>;
+  return await import('../../apps/web/src/services/auth/keyManagerDefaultModels.ts') as Awaited<ReturnType<typeof loadDefaultModels>>;
 }
 
 test('keyManager default model constants live outside the monolithic key manager', () => {

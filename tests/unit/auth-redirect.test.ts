@@ -5,7 +5,7 @@ import {
   buildAuthRedirectUrl,
   normalizeAuthRedirectOrigin,
   resolveAuthRedirectOrigin,
-} from '../../src/config/authRedirect.ts';
+} from '../../apps/web/src/config/authRedirect.ts';
 
 const originalLocationDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'location');
 

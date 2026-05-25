@@ -1,7 +1,7 @@
 -- Token schema for physical separation (Token Engine)
 CREATE SCHEMA IF NOT EXISTS billing_token;
 
-CREATE TABLE billing_token.token_accounts (
+CREATE TABLE IF NOT EXISTS billing_token.token_accounts (
   id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
   user_id VARCHAR(255) NOT NULL,
   currency VARCHAR(3) NOT NULL DEFAULT 'USD',
@@ -11,7 +11,7 @@ CREATE TABLE billing_token.token_accounts (
   updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
 );
 
-CREATE TABLE billing_token.token_usage (
+CREATE TABLE IF NOT EXISTS billing_token.token_usage (
   id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
   user_account_id BIGINT REFERENCES billing_token.token_accounts(id),
   action_id VARCHAR(255),
@@ -21,7 +21,7 @@ CREATE TABLE billing_token.token_usage (
   engine_type VARCHAR(32) DEFAULT 'token'
 );
 
-CREATE TABLE billing_token.token_pricing (
+CREATE TABLE IF NOT EXISTS billing_token.token_pricing (
   id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
   tier_id VARCHAR(100),
   price_per_token_usd DECIMAL(20,6),
@@ -29,7 +29,7 @@ CREATE TABLE billing_token.token_pricing (
   effective_from TIMESTAMP WITHOUT TIME ZONE
 );
 
-CREATE TABLE billing_token.token_invoices (
+CREATE TABLE IF NOT EXISTS billing_token.token_invoices (
   id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
   user_account_id BIGINT,
   period_start TIMESTAMP WITHOUT TIME ZONE,
@@ -38,7 +38,7 @@ CREATE TABLE billing_token.token_invoices (
   status VARCHAR(64)
 );
 
-CREATE TABLE billing_token.tax_rules (
+CREATE TABLE IF NOT EXISTS billing_token.tax_rules (
   id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
   rule_name VARCHAR(128),
   percentage DECIMAL(5,4),

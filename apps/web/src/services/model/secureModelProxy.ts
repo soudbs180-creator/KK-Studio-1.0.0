@@ -9,6 +9,7 @@ import { StandardizedProxyRequest } from './ProxyRequestBuilder';
 import { kkWebApiClient, resolveKkApiModelProxyBaseUrl } from '../api/kkApiClient';
 import { compressReferenceImagesIfNeeded } from '../../utils/imageUtils';
 import { kernelFetch } from '../http/requestKernel';
+import { apiClient } from '@nano-banana/api-client';
 
 export interface SecureProxyChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -1339,48 +1340,34 @@ export async function checkLocalUserRouteProxyTaskStatus(
 export async function callZeroKeyModelProxyChat(
   payload: StandardizedProxyRequest
 ): Promise<string> {
-  const token = await resolvePreferredRuntimeAccessToken(false);
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch('/api/secure-proxy', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
-  });
-
-  if (response.status === 401) {
-    throw new Error('Unauthorized: 匿名用户无法直接访问模型代理，请先登录。');
-  }
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Proxy chat failed (${response.status}): ${errorText}`);
-  }
-
-  const data = await response.json();
-  
-  if (payload.provider === 'claude') {
-    if (typeof data?.content === 'string') return data.content;
-    if (Array.isArray(data?.content)) {
-      return data.content
-        .map((block: any) => block?.text || block || '')
-        .join('');
+  try {
+    const response = await apiClient.post('/secure-proxy', payload);
+    const data = response.data;
+    
+    if (payload.provider === 'claude') {
+      if (typeof data?.content === 'string') return data.content;
+      if (Array.isArray(data?.content)) {
+        return data.content
+          .map((block: any) => block?.text || block || '')
+          .join('');
+      }
     }
-  }
-  
-  if (data?.choices?.[0]?.message?.content) {
-    return data.choices[0].message.content;
-  }
-  if (data?.output?.text) {
-    return data.output.text;
-  }
+    
+    if (data?.choices?.[0]?.message?.content) {
+      return data.choices[0].message.content;
+    }
+    if (data?.output?.text) {
+      return data.output.text;
+    }
 
-  return JSON.stringify(data);
+    return JSON.stringify(data);
+  } catch (error: any) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: 匿名用户无法直接访问模型代理，请先登录。');
+    }
+    const errorText = error.response?.data ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data)) : error.message;
+    throw new Error(`Proxy chat failed (${error.response?.status ?? 'unknown'}): ${errorText}`);
+  }
 }
 
 export async function callZeroKeyModelProxyChatStream(
@@ -1395,7 +1382,9 @@ export async function callZeroKeyModelProxyChatStream(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch('/api/secure-proxy', {
+  const baseURL = apiClient.defaults.baseURL || '/api';
+  const url = `${baseURL.replace(/\/+$/, '')}/secure-proxy`;
+  const response = await fetch(url, {
     method: 'POST',
     headers,
     body: JSON.stringify(payload),

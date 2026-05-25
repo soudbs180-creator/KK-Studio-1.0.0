@@ -11,7 +11,7 @@ import {
   type CanvasGroup,
   type GeneratedImage,
   type PromptNode,
-} from '../../src/types.ts';
+} from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 
@@ -39,7 +39,7 @@ function readSource(relativePath: string): string {
 async function loadCanvasMergeIntoModule(): Promise<CanvasMergeIntoModule> {
   const fullPath = path.join(ROOT_DIR, 'src/context/canvasMergeInto.ts');
   assert.equal(existsSync(fullPath), true, 'src/context/canvasMergeInto.ts must exist');
-  return await import('../../src/context/canvasMergeInto.ts') as CanvasMergeIntoModule;
+  return await import('../../apps/web/src/context/canvasMergeInto.ts') as CanvasMergeIntoModule;
 }
 
 function promptNode(input: Partial<PromptNode> & Pick<PromptNode, 'id'>): PromptNode {

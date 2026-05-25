@@ -7,7 +7,7 @@ import {
   ensureMobileRetentionPreference,
   getMobileRetentionPreference,
   setMobileRetentionPreference,
-} from '../../src/services/storage/mobileRetentionPreference.ts';
+} from '../../apps/web/src/services/storage/mobileRetentionPreference.ts';
 
 test('mobile retention preference defaults new phone-first sessions to 7d', () => {
   const storage = new Map<string, string>();

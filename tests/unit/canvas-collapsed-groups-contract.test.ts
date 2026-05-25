@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import type { CanvasGroup } from '../../src/types.ts';
+import type { CanvasGroup } from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 
@@ -18,7 +18,7 @@ function readSource(relativePath: string): string {
 async function loadCollapsedCanvasGroupsModule(): Promise<CollapsedCanvasGroupsModule> {
   const fullPath = path.join(ROOT_DIR, 'src/app/collapsedCanvasGroups.ts');
   assert.equal(existsSync(fullPath), true, 'src/app/collapsedCanvasGroups.ts must exist');
-  return await import('../../src/app/collapsedCanvasGroups.ts') as CollapsedCanvasGroupsModule;
+  return await import('../../apps/web/src/app/collapsedCanvasGroups.ts') as CollapsedCanvasGroupsModule;
 }
 
 test('CanvasGroup persists collapsed state for lightweight manual groups', () => {

@@ -9,7 +9,7 @@ import {
   extractProviderMessage,
   extractTaskItemsFromPayload,
   mapGenericTaskStatus,
-} from "../../src/services/llm/openAICompatibleTaskPayload.ts";
+} from "../../apps/web/src/services/llm/openAICompatibleTaskPayload.ts";
 
 const ROOT_DIR = process.cwd();
 

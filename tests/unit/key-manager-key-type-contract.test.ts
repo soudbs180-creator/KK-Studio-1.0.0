@@ -17,7 +17,7 @@ function readSource(relativePath: string): string {
 async function loadKeyTypeModule(): Promise<KeyManagerKeyTypeModule> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerKeyType.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerKeyType.ts must exist');
-  return await import('../../src/services/auth/keyManagerKeyType.ts') as KeyManagerKeyTypeModule;
+  return await import('../../apps/web/src/services/auth/keyManagerKeyType.ts') as KeyManagerKeyTypeModule;
 }
 
 test('keyManager key type boundary removes the effective-slot back edge', () => {

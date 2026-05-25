@@ -6,7 +6,7 @@ import type {
   ConnectorRenderSnapshot,
   UseConnectorRendererDeps,
   UseConnectorRendererResult,
-} from '../../src/app/useConnectorRenderer.ts'
+} from '../../apps/web/src/app/useConnectorRenderer.ts'
 
 type ConnectorRendererPublicBoundary = {
   snapshot: ConnectorRenderSnapshot

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, test } from "node:test";
 
-import type { ImageGenerationOptions } from "../../src/services/llm/LLMAdapter.ts";
+import type { ImageGenerationOptions } from "../../apps/web/src/services/llm/LLMAdapter.ts";
 import {
   ACEDATA_DEFAULT_BASE_URL,
   extractAceDataDirectRoute,
@@ -12,7 +12,7 @@ import {
   resolveAceDataCandidateRoutes,
   resolveAceDataImageRoute,
   resolveAceDataImageSize,
-} from "../../src/services/llm/openAICompatibleAceDataRoute.ts";
+} from "../../apps/web/src/services/llm/openAICompatibleAceDataRoute.ts";
 
 const ROOT_DIR = process.cwd();
 

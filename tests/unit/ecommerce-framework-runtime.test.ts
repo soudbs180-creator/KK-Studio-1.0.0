@@ -7,7 +7,7 @@ import {
   ImageSize,
   type Canvas,
   type PromptNode,
-} from '../../src/types.ts';
+} from '../../apps/web/src/types.ts';
 import {
   cancelEcommerceFrameworkNodeQueue,
   createEcommerceFrameworkRuntimeState,
@@ -16,7 +16,7 @@ import {
   pauseEcommerceFrameworkRuntime,
   resolveEcommerceFrameworkDispatchPlan,
   resumeEcommerceFrameworkRuntime,
-} from '../../src/services/ecommerce/frameworkRuntime.ts';
+} from '../../apps/web/src/services/ecommerce/frameworkRuntime.ts';
 
 function createEcommerceNode(
   id: string,

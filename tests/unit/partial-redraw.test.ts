@@ -6,7 +6,7 @@ import {
   expandSelectionToAspectRatio,
   resolvePixelRect,
   resolveRelativeSelectionRect,
-} from '../../src/services/image/partialRedraw.ts';
+} from '../../apps/web/src/services/image/partialRedraw.ts';
 
 test('expandSelectionToAspectRatio grows the selection outward to the target ratio without leaving image bounds', () => {
   const selection = { x: 0.42, y: 0.2, width: 0.1, height: 0.27 };

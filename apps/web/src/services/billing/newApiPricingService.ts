@@ -1082,7 +1082,7 @@ export async function getCachedPricing(
 
         if (!response.success) return null;
         return Array.isArray(response.data.pricing)
-            ? response.data.pricing.map((item) => mapCachedPricingItem(item))
+            ? response.data.pricing.map((item: any) => mapCachedPricingItem(item))
             : [];
     } catch (e) {
         return null;
@@ -1107,7 +1107,7 @@ export async function getCachedPricingByBaseUrl(
 
         if (!response.success) return null;
         return Array.isArray(response.data.pricing)
-            ? response.data.pricing.map((item) => mapCachedPricingItem(item))
+            ? response.data.pricing.map((item: any) => mapCachedPricingItem(item))
             : [];
     } catch (e) {
         return null;

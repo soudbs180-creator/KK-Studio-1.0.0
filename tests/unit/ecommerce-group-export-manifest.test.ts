@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildEcommerceGroupExportManifest } from '../../src/services/ecommerce/groupExportManifest.ts';
+import { buildEcommerceGroupExportManifest } from '../../apps/web/src/services/ecommerce/groupExportManifest.ts';
 
 test('buildEcommerceGroupExportManifest derives exported, skipped, and missing slot states', () => {
   const manifest = buildEcommerceGroupExportManifest({

@@ -6,7 +6,7 @@ import { describe, test } from "node:test";
 import {
   extractImageUrlsFromPayload,
   extractOpenAICompatibleChatImageUrls,
-} from "../../src/services/llm/openAICompatibleImagePayload.ts";
+} from "../../apps/web/src/services/llm/openAICompatibleImagePayload.ts";
 
 const ROOT_DIR = process.cwd();
 

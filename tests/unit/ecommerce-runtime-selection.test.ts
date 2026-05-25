@@ -6,9 +6,9 @@ import {
   applyEcommerceGroupSelectionState,
   applyEcommerceNodeSelectionState,
   resolveEcommerceGroupSelectionTargets,
-} from '../../src/app/ecommerceSelectionRuntime.ts';
-import { AspectRatio, GenerationMode, ImageSize, type PromptNode } from '../../src/types.ts';
-import type { EcommerceGroupSlotState } from '../../src/services/ecommerce/groupSlotState.ts';
+} from '../../apps/web/src/app/ecommerceSelectionRuntime.ts';
+import { AspectRatio, GenerationMode, ImageSize, type PromptNode } from '../../apps/web/src/types.ts';
+import type { EcommerceGroupSlotState } from '../../apps/web/src/services/ecommerce/groupSlotState.ts';
 
 type SelectionState = {
   selectedItems: Record<string, boolean>;

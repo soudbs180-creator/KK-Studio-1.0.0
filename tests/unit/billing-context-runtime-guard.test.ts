@@ -8,7 +8,7 @@ import {
   createBillingDisabledConsumeResult,
   createBillingDisabledRefundResult,
   createBillingRuntimeGuard,
-} from '../../src/context/billingRuntimeGuard.ts';
+} from '../../apps/web/src/context/billingRuntimeGuard.ts';
 
 const ROOT_DIR = process.cwd();
 

@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import JSZip from 'jszip';
 
-import { normalizeEcommerceAnalysis } from '../../src/services/ecommerce/normalize/ecommerceAnalysisNormalizer.ts';
-import { parseOpenXmlWorkbook } from '../../src/services/ecommerce/xlsx/openXmlWorkbookParser.ts';
+import { normalizeEcommerceAnalysis } from '../../apps/web/src/services/ecommerce/normalize/ecommerceAnalysisNormalizer.ts';
+import { parseOpenXmlWorkbook } from '../../apps/web/src/services/ecommerce/xlsx/openXmlWorkbookParser.ts';
 
 const TINY_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9pTnGoQAAAAASUVORK5CYII=';

@@ -3,12 +3,12 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, test } from "node:test";
 
-import type { ChatOptions } from "../../src/services/llm/LLMAdapter.ts";
+import type { ChatOptions } from "../../apps/web/src/services/llm/LLMAdapter.ts";
 import {
   buildChatCompletionsBody,
   buildOpenAICompatibleMessages,
   type OpenAICompatibleChatMessage,
-} from "../../src/services/llm/openAICompatibleChatPayload.ts";
+} from "../../apps/web/src/services/llm/openAICompatibleChatPayload.ts";
 
 const ROOT_DIR = process.cwd();
 

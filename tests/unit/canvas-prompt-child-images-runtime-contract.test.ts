@@ -3,8 +3,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { resolvePromptChildImageIds } from '../../src/context/canvasPromptChildImages.ts';
-import type { GeneratedImage, PromptNode } from '../../src/types.ts';
+import { resolvePromptChildImageIds } from '../../apps/web/src/context/canvasPromptChildImages.ts';
+import type { GeneratedImage, PromptNode } from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 

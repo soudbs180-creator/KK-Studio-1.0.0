@@ -5,7 +5,7 @@ import {
   buildApiManagementListState,
   deriveApiManagementListStateFromPath,
   readApiManagementListState,
-} from '../../src/components/settings/apiManagementRouteState.ts';
+} from '../../apps/web/src/components/settings/apiManagementRouteState.ts';
 
 test('deriveApiManagementListStateFromPath maps official editor routes back to the official API list tab', () => {
   assert.deepEqual(

@@ -5,7 +5,7 @@ import {
   buildAutomaticOptimizationInstruction,
   inferPromptOptimizationArchetype,
   resolveAutomaticOptimizationRoute,
-} from '../../src/services/llm/promptOptimizerAutoroute.ts';
+} from '../../apps/web/src/services/llm/promptOptimizerAutoroute.ts';
 
 test('short product prompts auto-route to the product archetype', () => {
   assert.equal(

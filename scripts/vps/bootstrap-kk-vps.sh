@@ -100,12 +100,12 @@ SQL"
 }
 
 install_runtime_templates() {
-  if [[ -d deploy/systemd ]]; then
-    install -m 0644 deploy/systemd/*.service /etc/systemd/system/
+  if [[ -d config/deploy/systemd ]]; then
+    install -m 0644 config/deploy/systemd/*.service /etc/systemd/system/
   fi
 
-  if [[ -f deploy/nginx/kk-vps-gateway.conf ]]; then
-    install -m 0644 deploy/nginx/kk-vps-gateway.conf /etc/nginx/sites-available/kk-vps-gateway.conf
+  if [[ -f config/deploy/nginx/kk-vps-gateway.conf ]]; then
+    install -m 0644 config/deploy/nginx/kk-vps-gateway.conf /etc/nginx/sites-available/kk-vps-gateway.conf
     ln -sf /etc/nginx/sites-available/kk-vps-gateway.conf /etc/nginx/sites-enabled/kk-vps-gateway.conf
     rm -f /etc/nginx/sites-enabled/default
     rm -f /etc/nginx/sites-enabled/kk-api.conf

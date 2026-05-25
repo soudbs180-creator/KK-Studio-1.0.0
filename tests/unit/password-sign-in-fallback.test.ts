@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 
-import { getStoredKkApiAccessToken, setStoredKkApiAccessToken } from '../../src/services/api/authAccessToken.ts';
-import { kkWebApiClient } from '../../src/services/api/kkApiClient.ts';
+import { getStoredKkApiAccessToken, setStoredKkApiAccessToken } from '../../apps/web/src/services/api/authAccessToken.ts';
+import { kkWebApiClient } from '../../apps/web/src/services/api/kkApiClient.ts';
 import {
   signInWithPasswordWithFallback,
-} from '../../src/services/auth/passwordSignIn.ts';
-import { getLatestRuntimeAuthState, persistRuntimeAuthState, createDefaultRuntimeAuthState } from '../../src/services/auth/runtimeAuthState.ts';
+} from '../../apps/web/src/services/auth/passwordSignIn.ts';
+import { getLatestRuntimeAuthState, persistRuntimeAuthState, createDefaultRuntimeAuthState } from '../../apps/web/src/services/auth/runtimeAuthState.ts';
 
 describe('password sign-in fallback', () => {
   const originalFetch = globalThis.fetch;

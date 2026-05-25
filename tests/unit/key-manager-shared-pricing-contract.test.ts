@@ -11,8 +11,8 @@ function readSource(relativePath: string): string {
 }
 
 test('keyManager shared pricing helpers live outside the monolithic key manager', () => {
-  const keyManagerSource = readSource('src/services/auth/keyManager.ts');
-  const helperSource = readSource('src/services/auth/keyManagerSharedPricing.ts');
+  const keyManagerSource = readSource('apps/web/src/services/auth/keyManager.ts');
+  const helperSource = readSource('apps/web/src/services/auth/keyManagerSharedPricing.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/key-manager-shared-pricing-contract\.test\.ts/);
@@ -25,7 +25,7 @@ test('keyManager shared pricing helpers live outside the monolithic key manager'
 
 test('keyManager shared pricing helpers preserve raw shared catalog normalization', async () => {
   const { buildSharedPricingItemsFromRawCatalog } = await import(
-    '../../src/services/auth/keyManagerSharedPricing.ts'
+    '../../apps/web/src/services/auth/keyManagerSharedPricing.ts'
   );
 
   const pricing = buildSharedPricingItemsFromRawCatalog([
@@ -88,7 +88,7 @@ test('keyManager shared pricing helpers preserve raw shared catalog normalizatio
 
 test('keyManager shared pricing helpers preserve provider snapshot construction', async () => {
   const { buildPricingSnapshotFromSharedCache } = await import(
-    '../../src/services/auth/keyManagerSharedPricing.ts'
+    '../../apps/web/src/services/auth/keyManagerSharedPricing.ts'
   );
 
   assert.equal(buildPricingSnapshotFromSharedCache([]), undefined);

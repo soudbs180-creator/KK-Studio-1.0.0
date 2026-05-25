@@ -5,7 +5,7 @@ import {
   buildCreditModelCatalog,
   pickCreditModelSpec,
   pickCreditRouteUnit,
-} from "../../src/services/model/adminRouteUnits.ts";
+} from "../../apps/web/src/services/model/adminRouteUnits.ts";
 
 describe("admin credit model specs", () => {
   test("expands advanced quality pricing into size-specific specs", () => {

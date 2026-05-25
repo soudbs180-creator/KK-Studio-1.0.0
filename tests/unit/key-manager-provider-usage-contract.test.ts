@@ -41,7 +41,7 @@ function readSource(relativePath: string): string {
 async function loadProviderUsageHelpers(): Promise<KeyManagerProviderUsageModule> {
   const fullPath = path.join(ROOT_DIR, 'src/services/auth/keyManagerProviderUsage.ts');
   assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerProviderUsage.ts must exist');
-  return await import('../../src/services/auth/keyManagerProviderUsage.ts') as KeyManagerProviderUsageModule;
+  return await import('../../apps/web/src/services/auth/keyManagerProviderUsage.ts') as KeyManagerProviderUsageModule;
 }
 
 test('provider usage math lives outside the monolithic key manager', () => {

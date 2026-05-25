@@ -3,12 +3,12 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import type { EcommerceEditableTaskState, EcommerceSeriesTemplate } from '../../src/types.ts';
-import { resolveEcommerceCopy } from '../../src/services/ecommerce/copyResolver.ts';
-import { buildEcommerceDisplayLabel, buildEcommerceRenderTask } from '../../src/services/ecommerce/renderTaskBuilder.ts';
-import { extractSeriesTemplateFromAnalysis } from '../../src/services/ecommerce/seriesTemplateExtractor.ts';
-import { parseSparseEcommerceIntent } from '../../src/services/ecommerce/sparseIntentParser.ts';
-import { mergeEcommerceTaskState } from '../../src/services/ecommerce/taskMerger.ts';
+import type { EcommerceEditableTaskState, EcommerceSeriesTemplate } from '../../apps/web/src/types.ts';
+import { resolveEcommerceCopy } from '../../apps/web/src/services/ecommerce/copyResolver.ts';
+import { buildEcommerceDisplayLabel, buildEcommerceRenderTask } from '../../apps/web/src/services/ecommerce/renderTaskBuilder.ts';
+import { extractSeriesTemplateFromAnalysis } from '../../apps/web/src/services/ecommerce/seriesTemplateExtractor.ts';
+import { parseSparseEcommerceIntent } from '../../apps/web/src/services/ecommerce/sparseIntentParser.ts';
+import { mergeEcommerceTaskState } from '../../apps/web/src/services/ecommerce/taskMerger.ts';
 
 const ROOT_DIR = process.cwd();
 

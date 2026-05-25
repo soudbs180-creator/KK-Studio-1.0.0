@@ -1,17 +1,18 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
 
-import { legacyWebApiClient } from '../../src/services/api/kkApiClient.ts';
+import { legacyWebApiClient as originalClient } from '../../apps/web/src/services/api/kkApiClient.ts';
+const legacyWebApiClient = originalClient as any;
 import {
   clearPersistedRuntimeAuthState,
   persistRuntimeAuthState,
-} from '../../src/services/auth/runtimeAuthState.ts';
-import { resetUserApisPayloadCacheForTests } from '../../src/services/api/userApiCloudRecordStorage.ts';
+} from '../../apps/web/src/services/auth/runtimeAuthState.ts';
+import { resetUserApisPayloadCacheForTests } from '../../apps/web/src/services/api/userApiCloudRecordStorage.ts';
 import {
   loadUserApiEntries,
   resetUserApiProfileStorageStateForTests,
   saveUserApiEntries,
-} from '../../src/services/api/userApiProfileStorage.ts';
+} from '../../apps/web/src/services/api/userApiProfileStorage.ts';
 
 const originalGetKeyManagerCloudState = legacyWebApiClient.getKeyManagerCloudState;
 const originalGetUserApiEntries = legacyWebApiClient.getUserApiEntries;
@@ -177,7 +178,7 @@ describe('user api profile storage runtime fallback', () => {
     legacyWebApiClient.replaceUserApiEntries = async () => {
       throw new Error('split entry writes should stay unused when the unified payload route is available');
     };
-    legacyWebApiClient.replaceUserApisPayload = async (input) => {
+    legacyWebApiClient.replaceUserApisPayload = async (input: any) => {
       unifiedWrites += 1;
       persistedEntries = (input.entries as Array<Record<string, unknown>>).map((entry) => ({
         ...entry,

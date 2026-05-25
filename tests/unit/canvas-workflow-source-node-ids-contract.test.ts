@@ -3,8 +3,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { getWorkflowSourceNodeIds } from '../../src/context/canvasWorkflowSourceNodeIds.ts';
-import type { WorkflowNode } from '../../src/types.ts';
+import { getWorkflowSourceNodeIds } from '../../apps/web/src/context/canvasWorkflowSourceNodeIds.ts';
+import type { WorkflowNode } from '../../apps/web/src/types.ts';
 
 const ROOT_DIR = process.cwd();
 
