@@ -1,6 +1,6 @@
 {
   "name": "@kk/ui",
-  "version": "1.4.8",
+  "version": "1.4.9",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",

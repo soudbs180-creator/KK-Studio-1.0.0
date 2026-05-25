@@ -110,9 +110,6 @@ supabase/.temp/
 
 # Refactor Additions
 .npm-cache/
-release/
-release/publish/
-release/publish/stable/
 *.log
 .env
 .env.local

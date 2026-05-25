@@ -15,7 +15,7 @@
 
 ### 1. 静态代码治理与一致性校验
 运行指令：`npm run governance:check`
-- `version:check`: 对齐根目录与子工作区包的版本为 `1.4.8`。
+- `version:check`: 对齐根目录与子工作区包的版本为 `1.4.9`。
 - `agent-docs:check`: 确保根目录仅保留 `AGENTS.md`、`plans.md`、`implement.md`、`status.md`、`validation.md`。
 - `compat:check`: 兼容性注册列表通过。
 - `security:check`: 敏感数据落盘与敏感日志边界校验全部绿灯。

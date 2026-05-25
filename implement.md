@@ -14,7 +14,7 @@
 - **代码物理合并与清理**：
   - 合并 `@kk/contracts` 与 `@kk/domain` 模块的所有代码到 `packages/shared/src/contracts` 和 `packages/shared/src/domain`，在 `packages/shared/src/index.ts` 重新导出，并彻底删除了旧包目录。
   - 全局替换 `apps/web/src` 和其他配置文件中对 `@kk/contracts` 的引用，重定向至 `@kk/shared`。
-  - 升级 `packages/ui` 拥有真实的独立 `package.json` 工作区，同步版本为 `1.4.8`，导出安全设计令牌。
+  - 升级 `packages/ui` 拥有真实的独立 `package.json` 工作区，同步版本为 `1.4.9`，导出安全设计令牌。
   - 物理清理已废弃的过渡目录 `apps/api`、`apps/admin`、`apps/payment-sidecar`、根 `billing/`。
 - **部署脚本与测试路径重组**：
   - 迁移 `deploy` 至 `config/deploy`，同步重构了 vps 部署脚本 and 部署断言测试中的指向别名。

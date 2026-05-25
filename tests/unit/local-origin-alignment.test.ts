@@ -19,7 +19,7 @@ test("app treats localhost and loopback IPs as the same local dev runtime", () =
 
 test("local dev launch keeps localhost as the browser-facing origin while loopback IP stays supported internally", () => {
   const devLaunchSource = readSource("scripts/dev/dev-launch.ps1");
-  const startScriptSource = readSource("start.bat");
+  const startScriptSource = readSource("tools/start.bat");
 
   assert.match(devLaunchSource, /\$viteUrl = 'http:\/\/127\.0\.0\.1:3000\/'/);
   assert.match(devLaunchSource, /Start-Process 'http:\/\/localhost:3000'/);

@@ -2,6 +2,7 @@
   "appName": "KK Studio",
   "version": "1.4.9",
   "displayVersion": "v1.4.9",
+  "buildTime": "2026-05-26T01:00:00.000Z",
   "releaseDate": "2026-05-26",
   "releaseNotes": [
     "Desktop canvas now includes a snap-to-grid toggle for more precise prompt, image, workflow, and grouped-card positioning.",
@@ -9,21 +10,9 @@
     "Hosted/VPS release guardrails, package metadata, workspace packages, and portable version manifests are aligned to version 1.4.9.",
     "The 1.4.9 hosted release now uses the verified kkai.plus same-origin API with an HTTPS VPS upstream while the permanent api.kkai.plus DNS record awaits Cloudflare access."
   ],
-  "versionTargets": {
-    "releaseManifest": "config/release-manifest.json",
-    "rootPackage": "package.json",
-    "paymentServerPackage": "payment-server/package.json",
-    "workspacePackages": [
-      "packages/shared/package.json",
-      "packages/api-client/package.json",
-      "packages/ui/package.json",
-      "apps/web/package.json",
-      "apps/mobile/package.json"
-    ],
-    "runtimeAppInfo": "apps/web/src/config/appInfo.ts",
-    "readme": "docs/README.md",
-    "sessionHandoff": "docs/development/session-handoff.md",
-    "progressReport": "docs/development/progress.md",
-    "stablePortableManifest": "release/publish/stable/manifest.json"
-  }
+  "channel": "stable",
+  "packageFile": "KK-Studio-Portable-1.4.9.zip",
+  "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.4.9/KK-Studio-Portable-1.4.9.zip",
+  "sha256": "9bce82c7a9bb2a74d0f14648b6093050352c116b3bcc50f43b6c2c15bb777316",
+  "size": 52917247
 }

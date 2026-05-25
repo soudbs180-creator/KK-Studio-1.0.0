@@ -1,5 +1,5 @@
 {
-  "generatedFromPlan": "KK Studio 1.4.8 module isolation and linkage safety plan (Strict AGENTS 收敛版)",
+  "generatedFromPlan": "KK Studio 1.4.9 module isolation and linkage safety plan (Strict AGENTS 收敛版)",
   "entries": [
     {
       "path": "apps/web/src/services/billing/costSyncBridge.ts",
