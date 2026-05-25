@@ -1503,7 +1503,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                     {isEcommerceFrameworkCard ? (
                         <div data-testid="ecommerce-canvas-framework-workbench">
                         <EcommerceCanvasWorkbenchCard
-                            node={node}
+                            node={node} onDeleteTask={onDelete ? (taskNode) => onDelete(taskNode.id) : undefined}
                             taskNodes={ecommerceFrameworkTaskNodes}
                             activeTaskState={activeEcommerceTaskState}
                             frameworkStatus={ecommerceFrameworkStatus}

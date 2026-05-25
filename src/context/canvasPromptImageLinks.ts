@@ -63,15 +63,20 @@ export function deleteCanvasPromptNode(canvas: Canvas, id: string): Canvas {
         }
     }
 
+    // 找出所有属于电商模式的即将被删除的卡片 ID
+    const ecommercePromptIds = new Set<string>();
+    canvas.promptNodes.forEach(node => {
+        if (node.mode === GenerationMode.ECOMMERCE && toDeletePromptIds.has(node.id)) {
+            ecommercePromptIds.add(node.id);
+        }
+    });
+
     // 更新 imageNodes：
     // 电商任务卡片生成的图片：直接彻底删除
     // 普通节点生成的图片：保留，但清空 parentPromptId 关联
     const nextImageNodes = canvas.imageNodes.filter(image => {
-        if (image.parentPromptId && toDeletePromptIds.has(image.parentPromptId)) {
-            const parentPrompt = canvas.promptNodes.find(p => p.id === image.parentPromptId);
-            if (parentPrompt && parentPrompt.mode === GenerationMode.ECOMMERCE) {
-                return false; // 电商图片直接过滤掉，一并删除
-            }
+        if (image.parentPromptId && ecommercePromptIds.has(image.parentPromptId)) {
+            return false; // 电商图片直接过滤掉，一并删除
         }
         return true;
     }).map(image => {

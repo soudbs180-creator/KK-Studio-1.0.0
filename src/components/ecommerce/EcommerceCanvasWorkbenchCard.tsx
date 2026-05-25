@@ -37,6 +37,7 @@ interface EcommerceCanvasWorkbenchCardProps {
   onCancelNodeQueue?: (node: PromptNode) => void;
   onConfirmDesktop?: (node: PromptNode) => void;
   onGenerateMobile?: (node: PromptNode) => void;
+  onDeleteTask?: (node: PromptNode) => void;
 }
 
 const panelStyle: React.CSSProperties = {
@@ -106,6 +107,7 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
   onCancelNodeQueue,
   onConfirmDesktop,
   onGenerateMobile,
+  onDeleteTask,
 }) => {
   const { pick } = useLocale();
   const editableTaskNodes = React.useMemo(() => (
@@ -395,19 +397,34 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
                     {resolveTaskSummary(selectedTaskNode)}
                   </div>
                 </div>
-                {onToggleSelected ? (
-                  <button
-                    type="button"
-                    className="rounded-lg border px-3 py-2 text-[11px] font-medium"
-                    style={actionButtonStyle}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onToggleSelected(selectedTaskNode, selectedTaskNode.ecommerce?.selectedForGeneration === false);
-                    }}
-                  >
-                    {selectedTaskNode.ecommerce?.selectedForGeneration === false ? pick('纳入生成', 'Include') : pick('跳过生成', 'Skip')}
-                  </button>
-                ) : null}
+                <div className="flex items-center gap-2">
+                  {onToggleSelected ? (
+                    <button
+                      type="button"
+                      className="rounded-lg border px-3 py-2 text-[11px] font-medium"
+                      style={actionButtonStyle}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onToggleSelected(selectedTaskNode, selectedTaskNode.ecommerce?.selectedForGeneration === false);
+                      }}
+                    >
+                      {selectedTaskNode.ecommerce?.selectedForGeneration === false ? pick('纳入生成', 'Include') : pick('跳过生成', 'Skip')}
+                    </button>
+                  ) : null}
+                  {onDeleteTask ? (
+                    <button
+                      type="button"
+                      className="rounded-lg border px-3 py-2 text-[11px] font-medium transition-colors text-[var(--clay-brand-coral)] hover:bg-[rgba(239,68,68,0.10)]"
+                      style={{ ...actionButtonStyle, borderColor: 'var(--clay-brand-coral)' }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onDeleteTask(selectedTaskNode);
+                      }}
+                    >
+                      {pick('删除卡片', 'Delete')}
+                    </button>
+                  ) : null}
+                </div>
               </div>
               <EcommerceTaskEditorPanel
                 taskState={activeTaskState?.taskId === selectedTaskState.taskId ? activeTaskState : selectedTaskState}
