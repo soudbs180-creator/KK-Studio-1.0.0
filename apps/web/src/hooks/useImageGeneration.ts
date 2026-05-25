@@ -1901,25 +1901,25 @@ export const useImageGeneration = (options: {
         const remainingSyncRequests = getPendingSyncRequests(nextNodeBase);
         const isStillRecovering = remainingPendingTaskIds.length > 0 || remainingSyncRequests.length > 0;
 
-        await updatePromptNode({
-          ...nextNodeBase,
-          isGenerating: isStillRecovering,
-          jobId: remainingPendingTaskIds[0],
-          childImageIds: [],
-          lastGenerationSuccessCount: 0,
-          lastGenerationFailCount: isStillRecovering ? nonRecoverableFailureCount : (nonRecoverableFailureCount || actualCount),
-          lastGenerationTotalCount: actualCount,
-          error: isStillRecovering ? undefined : (failedImageData[0]?.error || 'Generation failed'),
-          errorDetails: isStillRecovering
-            ? undefined
-            : (failedImageData[0]?.errorDetails || extractErrorDetails(new Error(failedImageData[0]?.error || 'Generation failed'), executionNode.model))
-        });
-        completedSyncRequestIds.forEach((requestId) => {
-          void clearSyncImageBridgeRequest(requestId).catch(() => undefined);
-          clearSyncBridgeRecoveryTimer(requestId);
-        });
-
         if (isStillRecovering) {
+          // 如果有部分任务仍在异步轮询/恢复中，则只更新状态而不抛出错误
+          await updatePromptNode({
+            ...nextNodeBase,
+            isGenerating: isStillRecovering,
+            jobId: remainingPendingTaskIds[0],
+            childImageIds: [],
+            lastGenerationSuccessCount: 0,
+            lastGenerationFailCount: nonRecoverableFailureCount,
+            lastGenerationTotalCount: actualCount,
+            error: undefined,
+            errorDetails: undefined
+          });
+
+          completedSyncRequestIds.forEach((requestId) => {
+            void clearSyncImageBridgeRequest(requestId).catch(() => undefined);
+            clearSyncBridgeRecoveryTimer(requestId);
+          });
+
           remainingPendingTaskIds.forEach((taskId) => {
             setTimeout(() => {
               const fresh = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId);
@@ -1934,21 +1934,35 @@ export const useImageGeneration = (options: {
           return;
         }
 
-        throw new Error(failedImageData[0]?.error || 'Generation failed');
+        // 如果没有正在异步恢复的任务，且所有生成全部失败，则释放同步锁
+        completedSyncRequestIds.forEach((requestId) => {
+          void clearSyncImageBridgeRequest(requestId).catch(() => undefined);
+          clearSyncBridgeRecoveryTimer(requestId);
+        });
+
+        // 统一在外层 catch 中进行失败状态更新，此处只抛出包装后的详细错误
+        const errToThrow = new Error(failedImageData[0]?.error || 'Generation failed');
+        (errToThrow as any).details = failedImageData[0]?.errorDetails || extractErrorDetails(new Error(failedImageData[0]?.error || 'Generation failed'), executionNode.model);
+        throw errToThrow;
       }
 
     } catch (err: any) {
       console.error('[useImageGeneration] Execution error:', err);
       const latest = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId) || node;
       const failedBillingState = await resolveFailedBillingState(latest);
+      // 优先从异常自带的 details 获取详尽错误信息，防范信息丢失
+      const errDetails = err.details || extractErrorDetails(err, node.model);
+      
+      // 统一在 catch 中更新最终失败态，防止 React 异步更新引起的竞态数据覆盖
       await updatePromptNode({
         ...latest,
         isGenerating: false,
-        lastGenerationSuccessCount: latest.lastGenerationSuccessCount ?? 0,
+        lastGenerationSuccessCount: 0, // 强制全失败时成功计数为 0
+        childImageIds: [], // 确保主卡清空子图片 ID 呈现纯错误态
         lastGenerationFailCount: Math.max(latest.lastGenerationFailCount ?? 0, actualCount),
         lastGenerationTotalCount: latest.lastGenerationTotalCount ?? actualCount,
         error: getDisplayableGenerationError(err),
-        errorDetails: extractErrorDetails(err, node.model),
+        errorDetails: errDetails,
         ...failedBillingState,
       });
       return;

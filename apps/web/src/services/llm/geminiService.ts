@@ -135,12 +135,30 @@ export const generateImage = async (
       groundingSources: [],
     };
   } catch (error: any) {
-    console.error('[GeminiService] 后端请求失败:', error);
-    // 采用更稳健的防御性结构解析 Axios 的响应错误，防范 [object Object] 现象
-    const rawError = error.response?.data?.error;
-    const msg = (typeof rawError === 'string' ? rawError : (typeof rawError === 'object' && rawError?.message ? rawError.message : null))
-      || error.message
-      || 'Image generation failed. Please try again.';
+    // 打印后端请求失败的完整上下文，方便线上调试与环境定位
+    console.error('[GeminiService] 后端请求失败详情:', {
+      message: error.message,
+      status: error.response?.status,
+      url: error.config?.url,
+      baseURL: error.config?.baseURL,
+      method: error.config?.method,
+      responseData: error.response?.data,
+    });
+
+    const status = error.response?.status;
+    let msg = '';
+    
+    // 如果返回 404，往往是因为托管环境（例如 Vercel）缺少对应的 API 反代配置，或者未正确配置 VITE_PUBLIC_API_BASE_URL 指向 Netlify 后端
+    if (status === 404) {
+      msg = '图像生成接口返回了 404 错误。请确认环境变量 VITE_PUBLIC_API_BASE_URL 已正确配置，且后端 API / Netlify Function 已部署成功。';
+    } else {
+      // 采用更稳健的防御性结构解析 Axios 的响应错误，防范 [object Object] 现象
+      const rawError = error.response?.data?.error;
+      msg = (typeof rawError === 'string' ? rawError : (typeof rawError === 'object' && rawError?.message ? rawError.message : null))
+        || error.message
+        || 'Image generation failed. Please try again.';
+    }
+    
     throw new Error(msg);
   }
 };
