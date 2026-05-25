@@ -24,8 +24,8 @@ const nextPublicProcessEnv = (): Plugin => ({
 });
 
 export default defineConfig({
-  // Keep them available via import.meta.env.NEXT_PUBLIC_*
-  envPrefix: 'NEXT_PUBLIC_',
+  // 必须允许 VITE_ 前缀的环境变量，否则以 VITE_ 开头的 Turnstile 密钥等变量将无法在浏览器端被正确读取
+  envPrefix: ['NEXT_PUBLIC_', 'VITE_'],
   optimizeDeps: {
     // Explicitly include fast-glob, since it gets dynamically imported and we
     // don't want that to cause a re-bundle.
