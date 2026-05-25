@@ -142,21 +142,9 @@ function shouldPreferRuntimeOriginForHostedTemporaryVpsApi(
   configuredBaseUrl: string,
   runtimeOrigin?: string,
 ): boolean {
-  if (!runtimeOrigin) {
-    return false;
-  }
-
-  try {
-    const configuredUrl = new URL(configuredBaseUrl);
-    const runtimeUrl = new URL(runtimeOrigin);
-
-    return runtimeUrl.protocol === "https:"
-      && configuredUrl.protocol === "https:"
-      && isHostedRuntimeOrigin(runtimeOrigin)
-      && isTemporaryVpsApiHostname(configuredUrl.hostname);
-  } catch {
-    return false;
-  }
+  // 中文注释：在生产环境中，前端托管在 Vercel (kkai.plus)，而后端在独立 VPS (sslip.io)。
+  // 如果此处返回 true，前端请求会被错误地重定向到前端自身的域名导致 404 报错。因此此处统一返回 false。
+  return false;
 }
 
 function isDirectHostedModelProxyBaseUrl(
