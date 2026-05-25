@@ -3,11 +3,11 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { shouldShowLoginForAuthGate } from '../../src/app/authGate.ts';
+import { shouldShowLoginForAuthGate } from '../../apps/web/src/app/authGate.ts';
 import {
   createDefaultRuntimeAuthState,
   createFixedLocalRuntimeAuthState,
-} from '../../src/services/auth/runtimeAuthState.ts';
+} from '../../apps/web/src/services/auth/runtimeAuthState.ts';
 
 const ROOT_DIR = process.cwd();
 

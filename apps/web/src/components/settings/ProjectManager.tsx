@@ -102,7 +102,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     const [isCollapsed, setIsCollapsed] = useState(false);
 
     const dragStartRef = useRef({ y: 0, startTop: 0 });
-    const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const inactivityTimerRef = useRef<any>(null);
     const initialTop = 60;
     const activeProjectName = activeCanvas?.name || '项目';
 

@@ -2333,7 +2333,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
     const dragCounter = useRef(0);
     const [isDragging, setIsDragging] = useState(false);
-    const dragSafetyTimer = useRef<NodeJS.Timeout | null>(null);
+    const dragSafetyTimer = useRef<any>(null);
 
     // [FIX] 4秒无操作自动复位（防止卡顿）
     const resetDragSafetyTimer = useCallback(() => {

@@ -705,7 +705,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
   // Mobile Nav Bar Visibility (Swipe to Show, Auto Hide)
   const [isMobileNavVisible, setIsMobileNavVisible] = useState(false);
-  const mobileNavTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const mobileNavTimerRef = useRef<any>(null);
   const [isPromptFocused, setIsPromptFocused] = useState(false); // Track prompt input focus state
   const [isSidebarHovered, setIsSidebarHovered] = useState(false); // Track sidebar hover state
   const lastMouseMoveRef = useRef<number>(Date.now()); // Track the last mouse movement time
@@ -876,7 +876,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   useEffect(() => {
     if (authLoading) return;
     let active = true;
-    let backgroundReadyTimer: number | null = null;
+    let backgroundReadyTimer: any = null;
 
     const init = async () => {
       advanceTo('session_ready');

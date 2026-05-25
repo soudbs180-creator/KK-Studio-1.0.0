@@ -5,17 +5,17 @@
 ## 整体进度 (截至 2026-05-25)
 - [x] 里程碑 1：治理与文档基线 (已完成)
 - [x] 里程碑 2：目录与包结构收敛 (已完成)
-- [ ] 里程碑 3：Netlify 后端与 API 边界 (已启动)
-- [ ] 里程碑 4：数据库与支付安全 (未开始)
-- [ ] 里程碑 5：api-client 与前端安全重构 (未开始)
+- [x] 里程碑 3：Netlify 后端与 API 边界 (已完成)
+- [x] 里程碑 4：数据库与支付安全 (已完成)
+- [ ] 里程碑 5：api-client 与前端安全重构 (已启动)
 - [ ] 里程碑 6：测试与验证路径迁移 (未开始)
 - [ ] 里程碑 7：移动端补齐 (未开始)
 
 ## 当前状态
-- **里程碑 2 (目录与包结构收敛)** 已于 2026-05-25 100% 完成：
-  - 废弃的 `@kk/contracts` 与 `@kk/domain` 物理清理并并入 `@kk/shared`，全局替换了相关引用。
-  - 过渡目录 `apps/api`、`apps/admin`、`apps/payment-sidecar`、`billing` 物理删除。
-  - `deploy` 成功迁移至 `config/deploy`，并完成自动化和测试关联更新。
-  - `packages/ui` 升级为真实工作区且输出规范设计令牌。
-  - `apps/mobile` 初始化了符合 Expo Managed + expo-router 的最小应用结构和依赖链接。
-- 所有编译与基础架构治理校验脚本均已修正并全绿通过。
+- **里程碑 3 & 4 (Netlify 后端 API & 数据库支付安全)** 已于 2026-05-25 100% 完成：
+  - 新增了数据库前进迁移文件 `migrations/003_strict_agents_schema.sql`，建立了可信的支付和充值表结构与初始方案。
+  - 在 `netlify/functions` 编写了 `auth`、`generate-image`、`openai-chat`、`billing`、`user` 和 `generations` 的 6 个 API 端点。
+  - 引入了 `netlify/lib` 模块化工具库，统一响应编码和 headers，拦截并使用英文提示前端。
+  - 重构了 `payment-server` 以严格校验 Stripe webhook 签名，按 `stripe_session_id` 查询订单额度入库。
+  - 修复了 `NodeJS.Timeout` 类型冲突以及 `tests/unit` 中的路径报错，使 typecheck 全绿通过。
+- **里程碑 5 (api-client 与前端安全重构)** 已启动。

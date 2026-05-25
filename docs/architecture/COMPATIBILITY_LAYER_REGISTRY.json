@@ -72,20 +72,6 @@
       "removalCondition": "Delete once the production settings routes no longer depend on scaffold composition."
     },
     {
-      "path": "payment-server/sidecar_compat_bridge.js",
-      "role": "compatibility-layer",
-      "currentPurpose": "Routes legacy payment-server create/status/redirect flows into the sidecar payment module while Express and Alipay SDK runtime remain in place.",
-      "upstreamCanonicalSource": "apps/payment-sidecar/src/modules/payment",
-      "downstreamDependents": [
-        "payment-server/index.js"
-      ],
-      "riskLevel": "high",
-      "regressionTests": [
-        "tests/unit/kk-api-server-health-vps-contract.test.ts"
-      ],
-      "removalCondition": "Delete once payment-server/index.js no longer serves checkout/status requests and the legacy shell is reduced to a thin runtime wrapper or removed."
-    },
-    {
       "path": "apps/web/public/sync-image-bridge-sw.js",
       "role": "compatibility-layer",
       "currentPurpose": "Service worker bridge for image synchronization.",

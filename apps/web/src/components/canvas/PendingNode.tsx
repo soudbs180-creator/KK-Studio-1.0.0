@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AspectRatio } from '../../types';
 import { getCardDimensions } from '../../utils/styleUtils';
@@ -51,11 +51,11 @@ const PendingNode: React.FC<PendingNodeProps> = ({
 
     // 鐢熸垚璁℃椂鍣?
     const [elapsedTime, setElapsedTime] = useState(0);
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const timerRef = useRef<any>(null);
 
     // 棰勮鍗?0绉掕秴鏃堕攢姣?
     const [, setIdleTime] = useState(0);
-    const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const idleTimerRef = useRef<any>(null);
 
     // 璁℃椂鍣ㄩ€昏緫 (鐢熸垚涓鏃?
     useEffect(() => {
