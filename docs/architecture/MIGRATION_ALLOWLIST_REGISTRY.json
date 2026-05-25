@@ -13,23 +13,6 @@
         "tests/unit/payment-sidecar-service.test.ts"
       ],
       "removalCondition": "Delete once internal service-to-service authentication is provided through packages/shared or a dedicated internal contract package."
-    },
-    {
-      "source": "apps/api/src/modules/model-proxy/application/local-user-route-proxy-service.ts",
-      "targets": [
-        "src/services/auth/keyManager.ts",
-        "src/services/llm/LLMAdapter.ts",
-        "src/services/llm/VideoCompatibleAdapter.ts",
-        "src/services/llm/AudioCompatibleAdapter.ts"
-      ],
-      "reason": "The local user-route proxy still bridges migration-era browser-side adapter shapes while the server-safe route adapter contract is being extracted.",
-      "canonicalSource": "apps/api/src/modules/model-proxy",
-      "riskLevel": "high",
-      "regressionTests": [
-        "tests/unit/local-model-proxy-trace-contract.test.ts",
-        "tests/unit/governance-contract.test.ts"
-      ],
-      "removalCondition": "Delete once local-user-route-proxy no longer imports legacy src/services runtime types or adapters and the shared route adapter contract lives outside src/."
     }
   ],
   "legacyZoneModuleImports": [
@@ -61,5 +44,5 @@
       "removalCondition": "Delete once the legacy server bootstrap no longer mounts billing routes directly."
     }
   ],
-  "frontendDirectDataAccess": []
+  "frontendSupabaseAccess": []
 }

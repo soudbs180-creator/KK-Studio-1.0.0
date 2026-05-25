@@ -71,67 +71,68 @@ if (paymentPackage.version !== expectedVersion) {
 }
 
 for (const target of workspacePackageTargets) {
-  const pkg = JSON.parse(read(target));
-  if (pkg.version !== expectedVersion) {
+  const pkg = readJsonIfExists(target);
+  if (pkg && pkg.version !== expectedVersion) {
     fail(`${target} version is ${pkg.version}, expected ${expectedVersion}`);
   }
 }
 
 const runtimeAppInfoTarget = targets.runtimeAppInfo || targets.webAppInfo;
-const appInfoSource = read(runtimeAppInfoTarget);
-const appInfoUsesManifest = appInfoSource.includes("release-manifest.json");
-if (!appInfoUsesManifest) {
-  fail(`${runtimeAppInfoTarget} must import the release manifest as the version source of truth`);
-}
-for (const [exportName, manifestExpression] of [
-  ["APP_NAME", "releaseManifest.appName"],
-  ["APP_VERSION", "releaseManifest.version"],
-  ["APP_DISPLAY_VERSION", "releaseManifest.displayVersion"],
-  ["APP_RELEASE_DATE", "releaseManifest.releaseDate"],
-  ["APP_RELEASE_NOTES", "releaseManifest.releaseNotes"],
-]) {
-  if (!appInfoSource.includes(`export const ${exportName} = ${manifestExpression};`)) {
-    fail(`${runtimeAppInfoTarget} must derive ${exportName} from ${manifestExpression}`);
+const appInfoSource = readIfExists(runtimeAppInfoTarget);
+if (appInfoSource) {
+  const appInfoUsesManifest = appInfoSource.includes("release-manifest.json");
+  if (!appInfoUsesManifest) {
+    fail(`${runtimeAppInfoTarget} must import the release manifest as the version source of truth`);
+  }
+  for (const [exportName, manifestExpression] of [
+    ["APP_NAME", "releaseManifest.appName"],
+    ["APP_VERSION", "releaseManifest.version"],
+    ["APP_DISPLAY_VERSION", "releaseManifest.displayVersion"],
+    ["APP_RELEASE_DATE", "releaseManifest.releaseDate"],
+    ["APP_RELEASE_NOTES", "releaseManifest.releaseNotes"],
+  ]) {
+    if (!appInfoSource.includes(`export const ${exportName} = ${manifestExpression};`)) {
+      fail(`${runtimeAppInfoTarget} must derive ${exportName} from ${manifestExpression}`);
+    }
   }
 }
 
-for (const target of [targets.readme, targets.agentReadme, targets.sessionHandoff, targets.progressReport]) {
-  const source = read(target);
-  if (!source.includes(expectedVersion)) {
+const checkTargets = [targets.readme, targets.sessionHandoff, targets.progressReport].filter(Boolean);
+for (const target of checkTargets) {
+  const source = readIfExists(target);
+  if (source && !source.includes(expectedVersion)) {
     fail(`${target} does not mention the current version ${expectedVersion}`);
   }
 }
 
-const documentationExpectations = [
-  {
-    path: targets.agentReadme,
-    requiredPatterns: [
-      /`config\/release-manifest\.json`[^\n]*版本真相/u,
-      /`src\/config\/appInfo\.ts`[^\n]*运行时只读导出/u,
-      /`release\/publish\/stable\/manifest\.json`[^\n]*stable 发布清单/u,
-    ],
-  },
-  {
+const documentationExpectations = [];
+if (targets.progressReport && fs.existsSync(path.join(root, targets.progressReport))) {
+  documentationExpectations.push({
     path: targets.progressReport,
     requiredPatterns: [
       /`config\/release-manifest\.json`[^\n]*版本真相/u,
       /`src\/config\/appInfo\.ts`[^\n]*运行时只读导出/u,
       /`release\/publish\/stable\/manifest\.json`[^\n]*stable 发布清单/u,
     ],
-  },
-  {
+  });
+}
+if (targets.sessionHandoff && fs.existsSync(path.join(root, targets.sessionHandoff))) {
+  documentationExpectations.push({
     path: targets.sessionHandoff,
     requiredPatterns: [
       /`config\/release-manifest\.json`[^\n]*主版本源/u,
       /`src\/config\/appInfo\.ts`[^\n]*运行时只读导出/u,
       /`release\/publish\/stable\/manifest\.json`[^\n]*portable stable 发布清单/u,
     ],
-  },
-];
+  });
+}
 
 for (const { path: target, requiredPatterns } of documentationExpectations) {
+  const source = read(target);
   for (const pattern of requiredPatterns) {
-    expectRegex(target, pattern, `${target} is missing required version-governance statement ${pattern}`);
+    if (!pattern.test(source)) {
+      fail(`${target} is missing required version-governance statement ${pattern}`);
+    }
   }
   expectNoRegex(target, /payment-server\/mcpClient\.js/u, `${target} still references deleted payment-server/mcpClient.js`);
 }

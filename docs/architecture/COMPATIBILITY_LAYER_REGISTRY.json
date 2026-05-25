@@ -1,13 +1,13 @@
 {
-  "generatedFromPlan": "KK Studio 1.4.0 module isolation and linkage safety plan",
+  "generatedFromPlan": "KK Studio 1.4.8 module isolation and linkage safety plan (Strict AGENTS 收敛版)",
   "entries": [
     {
-      "path": "src/services/billing/costSyncBridge.ts",
+      "path": "apps/web/src/services/billing/costSyncBridge.ts",
       "role": "compatibility-layer",
       "currentPurpose": "Translates legacy frontend billing refresh triggers into the migrated billing/runtime model.",
       "upstreamCanonicalSource": "apps/api/src/modules/billing",
       "downstreamDependents": [
-        "src/services/auth/keyManager.ts"
+        "apps/web/src/services/auth/keyManager.ts"
       ],
       "riskLevel": "medium",
       "regressionTests": [
@@ -16,12 +16,12 @@
       "removalCondition": "Delete when billing refresh and pricing sync are requested only through typed billing clients."
     },
     {
-      "path": "src/services/llm/syncImageBridge.ts",
+      "path": "apps/web/src/services/llm/syncImageBridge.ts",
       "role": "compatibility-layer",
       "currentPurpose": "Bridges legacy image-generation responses into the synchronized workspace/update pipeline.",
       "upstreamCanonicalSource": "apps/api/src/modules/generation",
       "downstreamDependents": [
-        "src/services/llm/LLMService.ts"
+        "apps/web/src/services/llm/LLMService.ts"
       ],
       "riskLevel": "medium",
       "regressionTests": [
@@ -30,12 +30,12 @@
       "removalCondition": "Delete when image sync events are emitted natively from the generation module end-to-end."
     },
     {
-      "path": "src/services/model/modelPricingOverrideBridge.ts",
+      "path": "apps/web/src/services/model/modelPricingOverrideBridge.ts",
       "role": "compatibility-layer",
       "currentPurpose": "Applies pricing overrides while old provider pricing snapshots coexist with migrated model catalog data.",
       "upstreamCanonicalSource": "apps/api/src/modules/model-catalog",
       "downstreamDependents": [
-        "src/services/auth/keyManager.ts"
+        "apps/web/src/services/auth/keyManager.ts"
       ],
       "riskLevel": "medium",
       "regressionTests": [
@@ -44,12 +44,12 @@
       "removalCondition": "Delete when pricing overrides live entirely in typed model-catalog responses."
     },
     {
-      "path": "src/workflow/adapters/workflowToLegacy.ts",
+      "path": "apps/web/src/workflow/adapters/workflowToLegacy.ts",
       "role": "compatibility-layer",
       "currentPurpose": "Maps migrated workflow structures back into legacy canvas consumers during transition.",
       "upstreamCanonicalSource": "apps/api/src/modules/workflow",
       "downstreamDependents": [
-        "src/workflow/adapters/canvasToWorkflow.ts"
+        "apps/web/src/workflow/adapters/canvasToWorkflow.ts"
       ],
       "riskLevel": "medium",
       "regressionTests": [
@@ -57,14 +57,13 @@
       ],
       "removalCondition": "Delete when all workflow-aware UI surfaces consume the migrated workflow shape directly."
     },
-
     {
-      "path": "src/components/settings/SettingsScaffold.tsx",
+      "path": "apps/web/src/components/settings/SettingsScaffold.tsx",
       "role": "compatibility-layer",
       "currentPurpose": "Scaffold shell kept during the settings-area migration to avoid breaking route composition while final views stabilize.",
-      "upstreamCanonicalSource": "src/components/settings/SettingsPanel.tsx",
+      "upstreamCanonicalSource": "apps/web/src/components/settings/SettingsPanel.tsx",
       "downstreamDependents": [
-        "src/routes/settingsRoutes.tsx"
+        "apps/web/src/routes/settingsRoutes.tsx"
       ],
       "riskLevel": "low",
       "regressionTests": [
@@ -132,68 +131,32 @@
       "removalCondition": "Delete once payment-server/index.js no longer serves checkout/status requests and the legacy shell is reduced to a thin runtime wrapper or removed."
     },
     {
-      "path": "server/index.ts",
+      "path": "apps/web/public/sync-image-bridge-sw.js",
       "role": "compatibility-layer",
-      "runtimeStatus": "bridge",
-      "currentPurpose": "Legacy Express shell that keeps old route mounts alive while forwarding auth and billing traffic into migrated apps/api modules.",
-      "upstreamCanonicalSource": "apps/api/src/server.ts",
+      "currentPurpose": "Service worker bridge for image synchronization.",
+      "upstreamCanonicalSource": "apps/web/src/services/llm",
       "downstreamDependents": [
-        "server/auth_routes.ts",
-        "server/billing_routes.ts"
+        "apps/web/src/main.tsx"
       ],
-      "riskLevel": "high",
+      "riskLevel": "low",
       "regressionTests": [
-        "tests/unit/runtime-legacy-fallback-guards.test.ts",
-        "tests/unit/hosted-release-guardrails.test.ts"
+        "tests/unit/canvas-live-unused-cleanup-contract.test.ts"
       ],
-      "removalCondition": "Delete once all local and hosted callers stop booting the legacy server shell and only apps/api remains as the business API entrypoint."
+      "removalCondition": "Delete once native service worker handles image prefetching."
     },
     {
-      "path": "server/auth_routes.ts",
+      "path": "apps/web/src/services/ecommerce/text/fallbackTextAnalysis.ts",
       "role": "compatibility-layer",
-      "runtimeStatus": "bridge",
-      "currentPurpose": "Bridge mount that preserves legacy auth route paths while delegating behavior into the migrated apps/api auth module.",
-      "upstreamCanonicalSource": "apps/api/src/modules/auth",
+      "currentPurpose": "Provides text fallback analysis capability.",
+      "upstreamCanonicalSource": "apps/web/src/services/ecommerce",
       "downstreamDependents": [
-        "server/index.ts"
+        "apps/web/src/services/ecommerce/text/fallbackTextAnalysis.ts"
       ],
-      "riskLevel": "high",
+      "riskLevel": "low",
       "regressionTests": [
-        "tests/unit/auth-http-routes.test.ts",
-        "tests/unit/runtime-legacy-fallback-guards.test.ts"
+        "tests/unit/ecommerce-text-fallback.test.ts"
       ],
-      "removalCondition": "Delete once no caller depends on the legacy server auth route mount and hosted/browser auth stays on the hosted session/API path only."
-    },
-    {
-      "path": "server/billing_routes.ts",
-      "role": "compatibility-layer",
-      "runtimeStatus": "bridge",
-      "currentPurpose": "Bridge mount that preserves legacy billing route paths while delegating behavior into the migrated apps/api billing module.",
-      "upstreamCanonicalSource": "apps/api/src/modules/billing",
-      "downstreamDependents": [
-        "server/index.ts"
-      ],
-      "riskLevel": "high",
-      "regressionTests": [
-        "tests/unit/billing-http-routes.test.ts",
-        "tests/unit/runtime-legacy-fallback-guards.test.ts"
-      ],
-      "removalCondition": "Delete once local and hosted runtimes stop exposing the legacy billing mount and only the typed /api/v1/billing surface remains."
-    },
-    {
-      "path": "src/services/ecommerce/text/fallbackTextAnalysis.ts",
-      "role": "compatibility-layer",
-      "currentPurpose": "Converts document-text fallback extraction into the structured ecommerce analysis/task shape while spreadsheet and richer parsers still coexist.",
-      "upstreamCanonicalSource": "src/services/ecommerce/normalize/ecommerceAnalysisNormalizer.ts",
-      "downstreamDependents": [
-        "api/ecommerce-analysis.ts"
-      ],
-      "riskLevel": "medium",
-      "regressionTests": [
-        "tests/unit/ecommerce-text-fallback.test.ts",
-        "tests/unit/ecommerce-task-services.test.ts"
-      ],
-      "removalCondition": "Delete once document and spreadsheet ecommerce intake both emit the canonical structured analysis shape without a text-only fallback adapter."
+      "removalCondition": "Delete when final ML analysis API is online."
     }
   ]
 }

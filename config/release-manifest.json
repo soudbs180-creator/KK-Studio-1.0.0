@@ -14,13 +14,14 @@
     "rootPackage": "package.json",
     "paymentServerPackage": "payment-server/package.json",
     "workspacePackages": [
-      "packages/contracts/package.json",
-      "packages/domain/package.json",
-      "packages/shared/package.json"
+      "packages/shared/package.json",
+      "packages/api-client/package.json",
+      "packages/ui/package.json",
+      "apps/web/package.json",
+      "apps/mobile/package.json"
     ],
-    "runtimeAppInfo": "src/config/appInfo.ts",
-    "readme": "README.md",
-    "agentReadme": ".agent/README.md",
+    "runtimeAppInfo": "apps/web/src/config/appInfo.ts",
+    "readme": "docs/README.md",
     "sessionHandoff": "docs/development/session-handoff.md",
     "progressReport": "docs/development/progress.md",
     "stablePortableManifest": "release/publish/stable/manifest.json"

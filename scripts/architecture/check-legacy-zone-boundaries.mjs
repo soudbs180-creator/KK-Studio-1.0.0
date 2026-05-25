@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const legacyRoots = ["server", "api", "billing", "payment-server"];
+// 中文注释：仅保留 payment-server 作为遗留兼容区，下线 api 和 billing 兼容区检查
+const legacyRoots = ["payment-server"];
 const supportedExtensions = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs", ".mts", ".cts"]);
 const excludeSegments = new Set(["node_modules", "dist", "release", ".git"]);
 

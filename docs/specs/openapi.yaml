@@ -65,7 +65,7 @@ paths:
   /api/v1/auth/temp-users:
     post:
       tags: [Auth API]
-      summary: Create a guest temp-user session without a full account login
+      summary: Create a guest temp-user session without a full Supabase login
       operationId: createTempUser
       security: []
       parameters:
@@ -956,7 +956,7 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponseEnvelope'
     RouteDisabled:
-      description: Legacy password-auth route is intentionally disabled; use the hosted KK API auth flow instead
+      description: Legacy password-auth route is intentionally disabled; use the hosted Supabase auth flow instead
       content:
         application/json:
           schema:

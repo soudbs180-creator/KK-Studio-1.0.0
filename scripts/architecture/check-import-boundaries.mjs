@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const sourceRoots = ["apps", "packages", "src", "tests"];
+// 中文注释：仅扫描 apps、packages 和 tests 目录，根目录的 src 已被收敛
+const sourceRoots = ["apps", "packages", "tests"];
 const supportedExtensions = [".ts", ".tsx", ".mts", ".cts"];
 
 const importPattern =

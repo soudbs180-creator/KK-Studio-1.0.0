@@ -7,7 +7,7 @@
 
 ## 1. 目标与边界
 
-本规格书用于把当前仓库收敛为“模块化单体 + BFF/API + 独立支付边车 + VPS/PostgreSQL 数据底座”的标准全栈工程。
+本规格书用于把当前仓库收敛为“模块化单体 + BFF/API + 独立支付边车 + Supabase/PostgreSQL 数据底座”的标准全栈工程。
 
 本次规格冻结以下内容：
 
@@ -21,20 +21,20 @@
 
 本次规格不直接要求：
 
-- 一次性搬迁现有 `src/`、`server/`、`payment-server/`、历史数据库迁移目录
+- 一次性搬迁现有 `src/`、`server/`、`payment-server/`、`supabase/`
 - 一次性切换所有前端调用方式
 - 一次性替换所有历史表名与 RPC 名称
 
 ## 2. 现状摘要
 
-当前仓库已经具备前端、轻量后端、支付边车、VPS/PostgreSQL 与测试基线，但职责分布较散：
+当前仓库已经具备前端、轻量后端、支付边车、Supabase 与测试基线，但职责分布较散：
 
 - 前端主应用位于根目录 [src](/Users/Administrator/Downloads/KK-Studio-1.0.0/src)
 - 轻量 API 入口位于 [server](/Users/Administrator/Downloads/KK-Studio-1.0.0/server)
 - Serverless/边缘接口位于 [api](/Users/Administrator/Downloads/KK-Studio-1.0.0/api)
 - 支付服务位于 [payment-server](/Users/Administrator/Downloads/KK-Studio-1.0.0/payment-server)
 - 账务路由与引擎位于 [billing](/Users/Administrator/Downloads/KK-Studio-1.0.0/billing)
-- 数据迁移与 VPS bootstrap 位于 [scripts/postgres](/Users/Administrator/Downloads/KK-Studio-1.0.0/scripts/postgres) 与 [apps/api/sql](/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/api/sql)
+- 数据迁移与函数位于 [supabase](/Users/Administrator/Downloads/KK-Studio-1.0.0/supabase) 与 [migrations](/Users/Administrator/Downloads/KK-Studio-1.0.0/migrations)
 - 集成测试位于 [tests/integration](/Users/Administrator/Downloads/KK-Studio-1.0.0/tests/integration)
 
 现状盘点详见 [current-state-inventory.md](/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/specs/current-state-inventory.md)。
@@ -53,7 +53,7 @@ repo/
     ui/                     # 可复用 UI 基元与设计系统
     shared/                 # 通用工具、常量、日志、配置装载
   infra/
-    scripts/postgres/       # VPS PostgreSQL bootstrap、导入脚本、迁移规范
+    supabase/               # migrations、functions、seed、RLS 策略
   docs/specs/               # 项目规格、接口规格、数据规格、ADR
   tests/
     unit/
@@ -66,14 +66,14 @@ repo/
 
 | 目录 | 职责 | 禁止事项 |
 | --- | --- | --- |
-| `apps/web` | 页面、容器、交互状态、typed client 调用 | 直接写数据库业务 RPC、直接保存敏感密钥 |
+| `apps/web` | 页面、容器、交互状态、typed client 调用 | 直接写 Supabase 业务 RPC、直接保存敏感密钥 |
 | `apps/api` | 路由、控制器、鉴权、编排、审计、幂等 | 直接承载 React/UI 逻辑 |
 | `apps/payment-sidecar` | 支付下单、回调验签、支付对账、内部回写 | 直接改前端状态或渲染页面 |
 | `packages/contracts` | DTO、API Envelope、错误码、Domain Event 契约 | 放数据库 SDK、HTTP 服务实现 |
-| `packages/domain` | 实体、聚合、值对象、仓储接口、领域服务 | 依赖 React、Express、具体数据库 SDK |
+| `packages/domain` | 实体、聚合、值对象、仓储接口、领域服务 | 依赖 React、Express、Supabase SDK |
 | `packages/ui` | 设计系统与可复用组件基元 | 放业务流程与账务逻辑 |
 | `packages/shared` | 配置、日志、常量、通用 helper | 放具体业务状态机 |
-| `scripts/postgres` | VPS PostgreSQL 表结构、种子数据、迁移和导入规范 | 放 UI 组件、路由控制器 |
+| `infra/supabase` | 表结构、RLS、函数、种子数据、迁移规范 | 放 UI 组件、路由控制器 |
 
 ## 4. 业务模块与 MVC 闭环
 
@@ -102,7 +102,7 @@ repo/
 | --- | --- | --- |
 | View | `apps/web` | 页面、容器、表单、列表、状态展示、乐观交互 |
 | Controller | `apps/api` | 校验请求、解析 DTO、鉴权、编排命令/查询、返回响应信封 |
-| Model | `packages/domain` + `scripts/postgres` | 聚合、值对象、仓储接口、持久化模型、状态机 |
+| Model | `packages/domain` + `infra/supabase` | 聚合、值对象、仓储接口、持久化模型、状态机 |
 
 ### 4.2 闭环交互流
 
@@ -124,7 +124,7 @@ repo/
 | Application Service | Domain Aggregate | 值对象、命令上下文 | TypeScript object | 领域状态变化、领域事件 | TypeScript object |
 | Application Service | Repository | 仓储写入/查询参数 | TypeScript object | 持久化实体/投影 | TypeScript object |
 | Payment Sidecar | Main API Internal Endpoint | 支付结果、对账结果、回调载荷 | `application/json` + internal token | 记账结果、审计结果 | `application/json` |
-| API / Sidecar | VPS PostgreSQL | SQL / API service 调用 | SQL / typed route | 表记录 / 执行结果 | Row / JSON |
+| API / Sidecar | Supabase | SQL / RPC / Edge Function 调用 | SQL / RPC | 表记录 / 执行结果 | Row / JSON |
 
 ## 5. 对外 API 契约规范
 
@@ -238,7 +238,7 @@ repo/
 
 - `App.tsx` 只做路由与 Provider 组合，不承载业务流程细节。
 - 页面层不直接 `fetch`。
-- 页面层不直接调用数据库 RPC。
+- 页面层不直接调用 Supabase/RPC。
 - 敏感密钥、计费逻辑、支付签名必须在服务端。
 - 共享类型统一来自 `packages/contracts` 或 `packages/domain`。
 
@@ -339,7 +339,7 @@ repo/
 | `api` | `apps/api` | 将 serverless handler 归并为模块路由 |
 | `payment-server` | `apps/payment-sidecar` | 保留独立服务，定义内部回写契约 |
 | `billing` | `apps/api/modules/billing` + `packages/domain` | 拆分为路由、应用、领域与引擎 |
-| legacy database migrations | `scripts/postgres` | 迁移规范先统一，文件逐步收口 |
+| `supabase` / `migrations` | `infra/supabase` | 迁移规范先统一，文件逐步收口 |
 
 ## 12. 交付物
 
