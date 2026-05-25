@@ -14054,3 +14054,181 @@ body.dark-mode .app-startup-screen::after {
     backdrop-filter: none;
   }
 }
+
+/* ==========================================================================
+   控制台设置面板高保真样式 (Console Settings Panel High-Fidelity Style)
+   ========================================================================== */
+
+.settings-console-panel {
+  background: rgba(17, 24, 39, 0.45) !important;
+  backdrop-filter: blur(16px) saturate(1.2) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  padding: 20px !important;
+  margin-top: 16px;
+  box-shadow: none !important;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+body:not(.dark-mode) .settings-console-panel {
+  background: rgba(255, 255, 255, 0.65) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.settings-console-panel:hover {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+body:not(.dark-mode) .settings-console-panel:hover {
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+.settings-console-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.settings-console-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 40px;
+}
+
+@media (max-width: 768px) {
+  .settings-console-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+.settings-console-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+}
+
+.settings-console-item:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+body:not(.dark-mode) .settings-console-item:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* 自定义复选框的精美高保真样式 */
+.settings-console-checkbox-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+}
+
+.settings-console-checkbox-wrapper input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  z-index: 2;
+  margin: 0;
+}
+
+.settings-console-checkbox-custom {
+  width: 15px;
+  height: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+body:not(.dark-mode) .settings-console-checkbox-custom {
+  border-color: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.settings-console-checkbox-wrapper input[type="checkbox"]:checked ~ .settings-console-checkbox-custom {
+  background: var(--settings-accent, #2563eb);
+  border-color: var(--settings-accent, #2563eb);
+}
+
+/* 勾选框内对勾标记 */
+.settings-console-checkbox-custom::after {
+  content: "";
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg) translate(-0.5px, -0.5px) scale(0);
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  display: block;
+}
+
+.settings-console-checkbox-wrapper input[type="checkbox"]:checked ~ .settings-console-checkbox-custom::after {
+  transform: rotate(45deg) translate(-0.5px, -0.5px) scale(1);
+}
+
+.settings-console-item:hover .settings-console-checkbox-custom {
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
+}
+
+body:not(.dark-mode) .settings-console-item:hover .settings-console-checkbox-custom {
+  border-color: rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.03);
+}
+
+.settings-console-checkbox-wrapper input[type="checkbox"]:focus-visible ~ .settings-console-checkbox-custom {
+  outline: 2px solid var(--settings-accent, #2563eb);
+  outline-offset: 2px;
+}
+
+.settings-console-label {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+/* 连续相同日志折叠徽章样式 */
+.settings-log-group-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 9px;
+  background: var(--settings-accent-soft, rgba(37, 99, 235, 0.15));
+  color: var(--settings-accent, #2563eb);
+  border: 1px solid var(--settings-accent-border, rgba(37, 99, 235, 0.2));
+  margin-left: 8px;
+  vertical-align: middle;
+  font-feature-settings: "tnum";
+}
+
+/* 日志流项的微调，确保折叠时更整洁 */
+.settings-log-entry__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
