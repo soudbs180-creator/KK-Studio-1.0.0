@@ -239,12 +239,14 @@ function isLightSeriesTextColor(textColor: string | undefined): boolean {
         || normalized === '#111827';
 }
 
+// 🚀 [优化] 模型库下拉面板的毛玻璃磨砂效果
+// 提高模糊半径并进行微弱的不透明背景混合，确保在画布有复杂高对比度图像节点透过来时，依旧保持出色的文字对比度和可读性
 const modelLibrarySurfaceStyle: React.CSSProperties = {
-    background: 'var(--frost-card-framework-bg)',
+    background: 'color-mix(in srgb, var(--frost-card-framework-bg) 92%, var(--frost-card-framework-bg-solid))',
     borderColor: 'var(--frost-card-framework-border)',
     boxShadow: 'var(--frost-card-framework-shadow)',
-    WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.18)',
-    backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.18)',
+    WebkitBackdropFilter: 'blur(30px) saturate(1.22)',
+    backdropFilter: 'blur(30px) saturate(1.22)',
 };
 
 const modelLibrarySearchSurfaceStyle: React.CSSProperties = {
@@ -521,8 +523,8 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
             className: `${textColor === 'black' ? 'text-black font-semibold' : 'text-white font-semibold'} transition-all border`,
             style: {
                 background: hovered
-                    ? 'linear-gradient(135deg, color-mix(in srgb, var(--accent-coral) 92%, white 20%) 0%, var(--mobile-clay-active-bg) 40%, var(--accent-pink) 100%)'
-                    : 'linear-gradient(135deg, color-mix(in srgb, var(--accent-coral) 86%, white 14%) 0%, var(--mobile-clay-active-bg) 45%, var(--accent-pink) 100%)',
+                    ? 'linear-gradient(135deg, color-mix(in srgb, var(--accent-coral) 90%, white 10%) 0%, var(--accent-pink) 100%)' // 移除了不协调的移动端变量，改用平滑的珊瑚橙到粉红渐变，避免断层黑带
+                    : 'linear-gradient(135deg, var(--accent-coral) 0%, var(--accent-pink) 100%)',
                 borderColor: hovered ? 'rgba(255,255,255,0.35)' : 'var(--frost-card-main-border)',
                 boxShadow: hovered ? '0 5px 15px rgba(244, 63, 94, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3)' : '0 2px 6px rgba(0, 0, 0, 0.18)',
                 backdropFilter: 'blur(var(--frost-card-main-blur)) saturate(1.12)',
@@ -3147,68 +3149,74 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 </div>
             )}
 
+            {/* 🚀 [重构] 拆分为外层非滚动玻璃层 + 内层滚动区域
+                解决 Chrome/WebKit 的经典复合渲染层 Bug：当元素既有 overflow 滚动限制又有 backdrop-filter 时，毛玻璃效果会彻底失效。 */}
             <div
-                ref={modelListScrollRef}
-                className="dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] max-h-[50vh] overflow-y-auto scrollbar-thin origin-bottom p-4"
+                className="dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] origin-bottom overflow-hidden"
                 style={{ ...modelLibrarySurfaceStyle, borderRadius: '1rem' }}
-                onScroll={(e) => {
-                    const nextTop = e.currentTarget.scrollTop;
-                    modelListScrollPos.current = nextTop;
-                    const nextStartIndex = Math.max(
-                        0,
-                        Math.floor(nextTop / MODEL_LIST_ITEM_HEIGHT) - MODEL_LIST_OVERSCAN
-                    );
-                    setModelListWindowStart((prev) => prev === nextStartIndex ? prev : nextStartIndex);
-                }}
             >
-                {isModelMenuBootstrapping ? (
-                    <div className="py-6">
-                        <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
-                            <Loader2 size={14} className="animate-spin" />
-                            <span>正在同步最新模型库...</span>
-                        </div>
-                        <div className="mt-4 space-y-2">
-                            {Array.from({ length: MODEL_MENU_SKELETON_COUNT }).map((_, index) => (
-                                <div
-                                    key={`prompt-bar-model-loading-${index}`}
-                                    className="h-12 rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] animate-pulse"
-                                />
-                            ))}
-                        </div>
-                    </div>
-                ) : (() => {
-                    const visibleModels = modelListViewport.items;
-                    const topSpacerHeight = modelListViewport.shouldWindow
-                        ? modelListViewport.startIndex * MODEL_LIST_ITEM_HEIGHT
-                        : 0;
-                    const bottomSpacerHeight = modelListViewport.shouldWindow
-                        ? Math.max(0, modelListViewport.totalHeight - topSpacerHeight - visibleModels.length * MODEL_LIST_ITEM_HEIGHT)
-                        : 0;
-
-                    return (
-                        <>
-                            {topSpacerHeight > 0 ? <div style={{ height: `${topSpacerHeight}px` }} /> : null}
-                            {visibleModels.map((model: PromptBarModelOption, index: number) => {
-                                const isLast = index === visibleModels.length - 1;
-                                const description = model.isExclusive ? '' : truncateModelDescription(model.resolvedDescription, 50);
-
-                                return (
-                                    <PromptBarModelMenuButton
-                                        key={model.id}
-                                        model={model}
-                                        imageSize={config.imageSize}
-                                        selected={config.model === model.id}
-                                        isLast={isLast}
-                                        description={description}
-                                        onSelect={handleSelectPromptBarModel}
-                                        onOpenContextMenu={handlePromptBarModelContextMenu}
+                <div
+                    ref={modelListScrollRef}
+                    className="w-full max-h-[50vh] overflow-y-auto scrollbar-thin p-4"
+                    onScroll={(e) => {
+                        const nextTop = e.currentTarget.scrollTop;
+                        modelListScrollPos.current = nextTop;
+                        const nextStartIndex = Math.max(
+                            0,
+                            Math.floor(nextTop / MODEL_LIST_ITEM_HEIGHT) - MODEL_LIST_OVERSCAN
+                        );
+                        setModelListWindowStart((prev) => prev === nextStartIndex ? prev : nextStartIndex);
+                    }}
+                >
+                    {isModelMenuBootstrapping ? (
+                        <div className="py-6">
+                            <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
+                                <Loader2 size={14} className="animate-spin" />
+                                <span>正在同步最新模型库...</span>
+                            </div>
+                            <div className="mt-4 space-y-2">
+                                {Array.from({ length: MODEL_MENU_SKELETON_COUNT }).map((_, index) => (
+                                    <div
+                                        key={`prompt-bar-model-loading-${index}`}
+                                        className="h-12 rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] animate-pulse"
                                     />
-                                );
-                            })}
-                            {bottomSpacerHeight > 0 ? <div style={{ height: `${bottomSpacerHeight}px` }} /> : null}
-                        </>
-                    );
-                })()}
+                                ))}
+                            </div>
+                        </div>
+                    ) : (() => {
+                        const visibleModels = modelListViewport.items;
+                        const topSpacerHeight = modelListViewport.shouldWindow
+                            ? modelListViewport.startIndex * MODEL_LIST_ITEM_HEIGHT
+                            : 0;
+                        const bottomSpacerHeight = modelListViewport.shouldWindow
+                            ? Math.max(0, modelListViewport.totalHeight - topSpacerHeight - visibleModels.length * MODEL_LIST_ITEM_HEIGHT)
+                            : 0;
+
+                        return (
+                            <>
+                                {topSpacerHeight > 0 ? <div style={{ height: `${topSpacerHeight}px` }} /> : null}
+                                {visibleModels.map((model: PromptBarModelOption, index: number) => {
+                                    const isLast = index === visibleModels.length - 1;
+                                    const description = model.isExclusive ? '' : truncateModelDescription(model.resolvedDescription, 50);
+
+                                    return (
+                                        <PromptBarModelMenuButton
+                                            key={model.id}
+                                            model={model}
+                                            imageSize={config.imageSize}
+                                            selected={config.model === model.id}
+                                            isLast={isLast}
+                                            description={description}
+                                            onSelect={handleSelectPromptBarModel}
+                                            onOpenContextMenu={handlePromptBarModelContextMenu}
+                                        />
+                                    );
+                                })}
+                                {bottomSpacerHeight > 0 ? <div style={{ height: `${bottomSpacerHeight}px` }} /> : null}
+                            </>
+                        );
+                    })()}
+                </div>
             </div>
         </>
     );
