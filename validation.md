@@ -1,8 +1,46 @@
-# KK-Studio v1.4.6 Single-Line Validation Matrix
+# KK-Studio v1.4.8 Single-Line Validation Matrix
 
-Last updated: 2026-05-22
+Last updated: 2026-05-25
 
 Use `npm.cmd` for npm scripts on Windows.
+
+## Current Hosted Model Proxy Direct VPS Timeout Fix Gate
+
+Use this gate when touching hosted KK API base resolution, model-proxy endpoint construction, or Vercel/VPS proxy timeout behavior:
+
+```powershell
+node --test tests/unit/kk-api-base-url-hosted-contract.test.ts
+node --test tests/unit/user-route-proxy-routing.test.ts
+node --test tests/unit/local-user-route-auth-contract.test.ts
+node --test tests/unit/google-official-gemini-protocol-guards.test.ts
+node --test tests/unit/vercel-vps-proxy.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run governance:agent-docs
+npm.cmd run check:encoding
+git --git-dir=node_modules/.codex-git-full --work-tree=. diff --check -- src/services/api/kkApiBaseUrl.ts src/services/api/kkApiClient.ts src/services/model/secureModelProxy.ts tests/unit/kk-api-base-url-hosted-contract.test.ts docs/development/hosted-release-runbook.md plans.md implement.md status.md validation.md
+```
+
+Expected result: ordinary hosted KK API calls still use the same-origin API path when required, while `/api/v1/model-proxy/user` and `/system` generation calls use a direct public HTTPS VPS API base so long-running Google/Gemini image generation does not depend on Vercel serverless invocation duration.
+
+Fresh result on 2026-05-25: `kk-api-base-url-hosted-contract.test.ts` passed 5/5 after the initial RED failure for the missing model-proxy resolver; user-route proxy routing passed 4/4; local user-route auth passed 7/7; Google Gemini protocol guards passed 3/3; Vercel VPS proxy passed 8/8; `npm.cmd run typecheck` passed; `npm.cmd run build` passed.
+
+## Current 1.4.8 Mobile Pin Interaction and Unused Gesture Cleanup Gate
+
+Use this gate when touching mobile model lists, PromptBar UI gestures, or unused gesture tests:
+
+```powershell
+node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/ui-unused-cleanup-contract.test.ts
+npm.cmd run typecheck
+npm.cmd run governance:check
+npm.cmd run check:encoding
+npm.cmd run build
+npm.cmd run verify:changes
+```
+
+Expected result: The mobile model selection cards render a direct toggle pin button (📌 / 📍) instead of conflicting swipe gestures, the `PromptBar` source code is completely free of legacy touch variables and handler boilerplate (preventing gesture/scroll collisions), and all three contract tests in `ui-unused-cleanup-contract.test.ts` pass cleanly along with typecheck, encoding and build pipelines.
+
+Fresh result on 2026-05-24: `ui-unused-cleanup-contract.test.ts` passed 3/3, `npm.cmd run typecheck` passed, `npm.cmd run governance:check` passed, `npm.cmd run check:encoding` passed, and `npm.cmd run build` successfully bundled the frontend. All changes align with the Clay UI 3.0 design specification.
 
 ## Current User API Secret Boundary Gate
 

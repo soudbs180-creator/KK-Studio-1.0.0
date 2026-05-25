@@ -1,9 +1,20 @@
-# KK-Studio v1.4.6 Single-Line Convergence Plan
+# KK-Studio v1.4.8 Single-Line Convergence Plan
 
-Last updated: 2026-05-22
+Last updated: 2026-05-25
+
 Branch policy: continue on the current branch and current workspace unless the user explicitly asks for a branch or worktree.
 
 ## Summary
+
+Current hosted model-proxy timeout fix:
+- Root cause: hosted image generation was using the same-origin `https://kkai.plus/api/v1/model-proxy/*` Vercel function proxy for long-running model proxy calls. Ordinary API requests tolerate that hop, but image generation can exceed the Vercel invocation window and surface as `FUNCTION_INVOCATION_TIMEOUT`, after which the local user-route path and fallback both fail before the VPS/provider result can return.
+- Keep ordinary KK API resolution on the hosted same-origin path for auth/profile/catalog calls, but route model-proxy endpoints directly to the HTTPS VPS API base (`https://172-245-156-16.sslip.io` by default, or a configured public HTTPS API origin) so provider calls run from the overseas server instead of the browser or Vercel serverless.
+- Acceptance: RED/GREEN hosted API base contract proves ordinary API remains same-origin while model-proxy calls use the direct VPS base; user-route, local auth, Gemini protocol, and Vercel proxy contracts pass; `npm.cmd run typecheck`, `npm.cmd run build`, docs governance, and encoding checks pass.
+
+Current mobile model list pin interaction and code cleanup milestone:
+- Root cause: mobile model items used a swipe gesture to toggle favorite/pin state. This touch gesture conflicted heavily with vertical list scrolling and workspace pan gestures, creating a poor touch experience. Additionally, deprecated touch listener helper methods remained in `PromptBar.tsx` and violated source cleanup tests.
+- Remove all touch gestures and helper definitions (`handleTouchStart` etc.) from `PromptBar.tsx` to satisfy the unused code contract. Rebuild the favorite toggle as a lightweight, clean button (📌 / 📍) placed directly on the right edge of each model card.
+- Acceptance: `node --test tests/unit/ui-unused-cleanup-contract.test.ts` passes; `npm run typecheck`, `npm run build`, `npm run governance:check`, and `npm run check:encoding` pass.
 
 Current user API secret-boundary milestone:
 - Root cause: system/provider credit keys were already backend-held on read paths, but user BYOK still had legacy sessionless-local code paths that could write raw key slots/providers into browser `localStorage`, and the API settings UI still advertised a browser-session draft fallback when the local API was offline or degraded.
@@ -18,13 +29,13 @@ Current admin credit-provider bootstrap milestone:
 - Add an admin provider bootstrap editor so an empty `admin_credit_models` table is no longer a dead end. The draft must create an active `system-image-provider` route for `gemini-3.1-flash-image-preview`, accept new API keys without exposing retained secrets, and preserve priority/weight when saving existing rows.
 - Acceptance: focused admin provider tests pass RED/GREEN; related credit-provider route/repository tests pass; `npm.cmd run admin:build`, `npm.cmd run typecheck`, `npm.cmd run governance:agent-docs`, `npm.cmd run check:encoding`, path-limited alternate-git `diff --check`, browser inspection of the admin providers page, Vercel production deploy, alias update for `kkai.plus` / `www.kkai.plus`, production API smoke, and VPS admin static deploy pass. Production data remains blocked until an admin saves a real provider key/model row or an operator applies a controlled DB fix.
 
-Current 1.4.6 release blocker audit:
-- Treat the current alternate-git worktree as the 1.4.6 release candidate baseline, including the snap-to-grid and collapsed manual group feature line.
+Current 1.4.7 release blocker audit:
+- Treat the current alternate-git worktree as the 1.4.7 release candidate baseline, including the snap-to-grid and collapsed manual group feature line.
 - Security/proxy milestone: move hosted `/api/v1/*`, `/api/auth/*`, `/api/manifest`, and `/healthz` onto tracked Vercel API functions backed by `api/_vpsProxy.ts`; default the upstream to HTTPS; dynamically derive upstream host/proto; and fail closed before forwarding Authorization, cookies, session, csrf, or token headers to a production HTTP upstream.
 - Hosted environment milestone: make `resolveKkApiBaseUrl()` prefer the HTTPS runtime origin when a hosted build still carries an HTTP remote VPS base URL, and make `release:hosted:check` block `VITE_TURNSTILE_LOCAL_BYPASS` plus remote HTTP `VITE_KK_API_BASE_URL` snapshots.
 - Dependency/VPS milestone: clear the `payment-server` moderate dependency audit by overriding `express-rate-limit` to `8.5.1`/`ip-address` `10.2.0`, and document secure cookie plus payment sidecar settlement/internal tokens in VPS env examples.
 - UI/localization milestone: keep PromptBar active toggles on `bg-[image:var(--prompt-bar-toggle-active-bg)]`, widen the 390px mobile model control, and replace remaining visible PendingNode English fallback text/alt strings with Simplified Chinese.
-- Browser QA milestone: run real Chromium QA across login, temporary local workspace, PromptBar/model menu, settings, recharge/balance entry, and 390px mobile surfaces. Record screenshots and JSON under `output/playwright/1.4.6-release-qa/`, but do not commit artifacts.
+- Browser QA milestone: run real Chromium QA across login, temporary local workspace, PromptBar/model menu, settings, recharge/balance entry, and 390px mobile surfaces. Record screenshots and JSON under `output/playwright/1.4.7-release-qa/`, but do not commit artifacts.
 - VPS exposure milestone: public nginx configs must return `404` for `/internal/` instead of proxying it to the payment sidecar; internal settlement/callback traffic must stay service-to-service with scoped tokens.
 - Release remains blocked until the production `api.kkai.plus` DNS and HTTPS endpoint are fixed and smoked successfully. Clean-env `release:hosted:check` now passes when local dev env files are isolated and hosted process env is supplied, but the public HTTPS VPS API is not yet reachable.
 
@@ -324,7 +335,7 @@ Commit:
 
 ### 1. Refactor Ledger Alignment
 
-Goal: make `plans.md`, `implement.md`, `status.md`, and `validation.md` describe the v1.4.6 refactor line.
+Goal: make `plans.md`, `implement.md`, `status.md`, and `validation.md` describe the v1.4.7 refactor line.
 
 Acceptance:
 - The four ledger files identify `d12731ce` as the then-current alternate-git baseline, name plain `.git` as stale/historical, and describe the single merged execution line.
@@ -337,7 +348,7 @@ Validation:
 - `npm.cmd run check:encoding`
 
 Commit:
-- `docs: align v1.4.6 refactor plan`
+- `docs: align v1.4.7 refactor plan`
 
 ### 2. Stage One M6 Closeout: Remaining Ecommerce Branch Scan (Completed)
 

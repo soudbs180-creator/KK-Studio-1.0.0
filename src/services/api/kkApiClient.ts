@@ -18,6 +18,7 @@ import {
   isLoopbackHostname,
   isPrivateNetworkHostname,
   resolveKkApiBaseUrl,
+  resolveKkApiModelProxyBaseUrl,
   resolveOriginHostname,
 } from "./kkApiBaseUrl.ts";
 
@@ -147,5 +148,6 @@ export {
   isLoopbackHostname,
   isPrivateNetworkHostname,
   resolveKkApiBaseUrl,
+  resolveKkApiModelProxyBaseUrl,
   resolveOriginHostname,
 };
