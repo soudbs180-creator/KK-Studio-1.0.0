@@ -16,9 +16,13 @@
   from = "/api/auth/*"
   to = "/.netlify/functions/auth"
   status = 200
-
 [[redirects]]
   from = "/api/generate/image"
+  to = "/.netlify/functions/generate-image"
+  status = 200
+
+[[redirects]]
+  from = "/api/generate-image"
   to = "/.netlify/functions/generate-image"
   status = 200
 

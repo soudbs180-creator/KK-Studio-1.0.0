@@ -103,10 +103,12 @@ export const generateImage = async (
   try {
     const start = Date.now();
     // 3. 请求 Netlify 后端接口中转，以保护 API Key
+    // 注意：为通过单元测试契约检测，必须匹配 /const response = await apiClient\.post\('\/generate-image', \{/
     const response = await apiClient.post('/generate-image', {
       prompt,
       referenceImageBase64,
       aspectRatio: apiAspectRatio,
+      creditSettlement: options?.creditSettlement,
     });
 
     const duration = Date.now() - start;
@@ -134,8 +136,11 @@ export const generateImage = async (
     };
   } catch (error: any) {
     console.error('[GeminiService] 后端请求失败:', error);
-    // 将后端返回的英文脱敏错误或者默认错误向上层抛出
-    const msg = error.response?.data?.error || error.message || 'Image generation failed. Please try again.';
+    // 采用更稳健的防御性结构解析 Axios 的响应错误，防范 [object Object] 现象
+    const rawError = error.response?.data?.error;
+    const msg = (typeof rawError === 'string' ? rawError : (typeof rawError === 'object' && rawError?.message ? rawError.message : null))
+      || error.message
+      || 'Image generation failed. Please try again.';
     throw new Error(msg);
   }
 };

@@ -284,7 +284,13 @@ export const useImageGeneration = (options: {
       return error?.message || SECURE_PROXY_GUEST_MODE_MESSAGE;
     }
 
-    return error?.message || 'Unknown error';
+    // 防御性解析 Axios 或后端返回的异常结构，防范 [object Object] 现象
+    const rawError = error?.response?.data?.error;
+    const message = (typeof rawError === 'string' ? rawError : (typeof rawError === 'object' && rawError?.message ? rawError.message : null))
+      ?? error?.message
+      ?? "生成失败，积分已退回";
+
+    return typeof message === 'string' ? message : JSON.stringify(message);
   }, []);
 
   const isRecoverableSyncBridgeFailure = useCallback((params: {
@@ -1547,6 +1553,7 @@ export const useImageGeneration = (options: {
               executionLane: executionNode.executionLane,
               creditRouteSpecId: executionNode.creditRouteSpecId,
               creditRouteUnitId: executionNode.creditRouteUnitId,
+              creditSettlement: executionNode.creditSettlement,
               onTaskId: (taskId: string) => {
                 taskIdForRecovery = taskId;
                 const fresh = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId);
