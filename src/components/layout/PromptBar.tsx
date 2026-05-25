@@ -18,7 +18,7 @@ import MobileEmbeddedAdvancedDrawer from './prompt-bar/MobileEmbeddedAdvancedDra
 import VideoOptionsPanel from '../video/VideoOptionsPanel';
 import ImagePreview from '../image/ImagePreview';
 import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
-import { X, Loader2, Sparkles, ChevronDown, Plus } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
+import { X, Loader2, Sparkles, ChevronDown, Plus, Pin } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
 import { formatRemainingCredits } from '../../services/billing/remainingBalance';
@@ -812,7 +812,7 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
                         ? `h-10 px-3 flex items-center justify-between rounded-xl flex-shrink-0 ${textColorClass} active:scale-[0.98] ${selected ? 'ring-2 ring-[color:var(--accent-coral)]' : 'opacity-80 hover:opacity-100'}`
                         : `h-14 px-5 flex items-center justify-between rounded-full flex-shrink-0 ${textColorClass} active:scale-[0.98] ${selected ? 'ring-2 ring-[color:var(--accent-coral)] scale-[1.02]' : 'hover:scale-[1.02] opacity-80 hover:opacity-100 grayscale-[0.15] hover:grayscale-0'}`)
                     : (isMobile
-                        ? `h-10 px-3 text-left flex items-center justify-between rounded-xl transition-all border-2 ${selected ? 'bg-[var(--frost-card-sub-bg)] ring-2 ring-[color:var(--accent-coral)] border-[color:var(--accent-coral)]' : 'border-transparent opacity-80 hover:opacity-100'}`
+                        ? `h-10 px-3 text-left flex items-center justify-between rounded-xl transition-all bg-transparent border-transparent`
                         : `px-2.5 py-1.5 text-left flex flex-col gap-0.5 hover:bg-black/5 dark:hover:bg-[var(--toolbar-hover)] rounded-xl transition-all border-2 ${selected ? 'bg-[var(--frost-card-sub-bg)] ring-2 ring-[color:var(--accent-coral)] border-[color:var(--accent-coral)]' : 'border-transparent opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`)}
             `}
             style={isExclusive ? (selected ? activeGradientStyle : inactiveGradientStyle) : undefined}
@@ -909,6 +909,8 @@ interface SwipeableModelItemProps {
     onTogglePin: (modelId: string) => void;
     children: React.ReactNode;
     onClick: () => void;
+    selected?: boolean;
+    isExclusive?: boolean;
 }
 
 const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
@@ -917,149 +919,44 @@ const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
     onTogglePin,
     children,
     onClick,
+    selected = false,
+    isExclusive = false,
 }) => {
-    const [offsetX, setOffsetX] = React.useState(0);
-    const [isOpen, setIsOpen] = React.useState(false);
-    const [isTransitioning, setIsTransitioning] = React.useState(false);
-
-    const touchStart = React.useRef({ x: 0, y: 0 });
-    const isSwiping = React.useRef(false);
-    const maxOffset = -72; // 置顶按钮宽度 72px
-
-    // 用 ref 保存最新的状态以避免频繁解绑和重新绑定
-    const stateRef = React.useRef({ isOpen, offsetX });
-    React.useEffect(() => {
-        stateRef.current = { isOpen, offsetX };
-    }, [isOpen, offsetX]);
-
-    const containerRef = React.useRef<HTMLDivElement>(null);
-
-    React.useEffect(() => {
-        const container = containerRef.current;
-        if (!container) return;
-
-        const onSwipeTouchStart = (e: TouchEvent) => {
-            const touch = e.touches[0];
-            touchStart.current = { x: touch.clientX, y: touch.clientY };
-            isSwiping.current = false;
-            setIsTransitioning(false);
-        };
-
-        const onSwipeTouchMove = (e: TouchEvent) => {
-            const touch = e.touches[0];
-            const deltaX = touch.clientX - touchStart.current.x;
-            const deltaY = touch.clientY - touchStart.current.y;
-
-            // 判断是否为水平手势
-            if (!isSwiping.current) {
-                if (Math.abs(deltaX) > 8 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
-                    isSwiping.current = true;
-                }
-            }
-
-            if (isSwiping.current) {
-                // 水平滑动中阻止页面上下滚动
-                if (e.cancelable) {
-                    e.preventDefault();
-                }
-                
-                // 计算新的偏移量
-                const startOffset = stateRef.current.isOpen ? maxOffset : 0;
-                let currentOffset = startOffset + deltaX;
-                // 限制滑动区间在 [maxOffset, 0] 之间
-                currentOffset = Math.max(maxOffset, Math.min(0, currentOffset));
-                setOffsetX(currentOffset);
-            }
-        };
-
-        const onSwipeTouchEnd = () => {
-            setIsTransitioning(true);
-            if (isSwiping.current) {
-                const currentOffset = stateRef.current.offsetX;
-                if (currentOffset < maxOffset / 2) {
-                    setIsOpen(true);
-                    setOffsetX(maxOffset);
-                } else {
-                    setIsOpen(false);
-                    setOffsetX(0);
-                }
-            } else {
-                if (stateRef.current.isOpen) {
-                    setIsOpen(false);
-                    setOffsetX(0);
-                }
-            }
-        };
-
-        container.addEventListener('touchstart', onSwipeTouchStart, { passive: true });
-        container.addEventListener('touchmove', onSwipeTouchMove, { passive: false });
-        container.addEventListener('touchend', onSwipeTouchEnd, { passive: true });
-
-        return () => {
-            container.removeEventListener('touchstart', onSwipeTouchStart);
-            container.removeEventListener('touchmove', onSwipeTouchMove);
-            container.removeEventListener('touchend', onSwipeTouchEnd);
-        };
-    }, []);
-
-    const handlePinClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        onTogglePin(modelId);
-        // 操作后自动关闭
-        setIsTransitioning(true);
-        setIsOpen(false);
-        setOffsetX(0);
-    };
-
-    const handleItemClick = (e: React.MouseEvent) => {
-        // 如果当前是滑开状态，点击则是关闭它，不触发点击选择模型
-        if (isOpen) {
-            e.stopPropagation();
-            setIsTransitioning(true);
-            setIsOpen(false);
-            setOffsetX(0);
-            return;
-        }
-        onClick();
-    };
+    if (isExclusive) {
+        return (
+            <div className="relative w-full overflow-hidden" onClick={onClick}>
+                {children}
+            </div>
+        );
+    }
 
     return (
         <div 
-            ref={containerRef}
-            className="relative w-full overflow-hidden rounded-xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] select-none"
+            className={`relative w-full flex items-center rounded-xl border-2 transition-all select-none
+            ${selected 
+                ? 'bg-[var(--frost-card-sub-bg)] border-[color:var(--accent-coral)] ring-2 ring-[color:var(--accent-coral)]' 
+                : 'border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] hover:opacity-100 opacity-90'}`}
         >
-            {/* 内容滑动容器 */}
-            <div 
-                className="w-full min-w-0" 
-                style={{
-                    transform: `translateX(${offsetX}px)`,
-                    transition: isTransitioning ? 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
-                    WebkitTransition: isTransitioning ? '-webkit-transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
-                }}
-                onClick={handleItemClick}
-            >
+            {/* 模型选择主体 */}
+            <div className="flex-1 min-w-0" onClick={onClick}>
                 {children}
             </div>
-
-            {/* 右侧滑出按钮 */}
+            {/* 常驻右侧置顶图标 */}
             <button
                 type="button"
-                onClick={handlePinClick}
-                className="absolute top-0 bottom-0 right-0 flex items-center justify-center font-semibold text-xs transition-all duration-200 cursor-pointer"
-                style={{
-                    width: `${Math.abs(maxOffset)}px`,
-                    transform: `translateX(${Math.abs(maxOffset) + offsetX}px)`,
-                    transition: isTransitioning ? 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
-                    WebkitTransition: isTransitioning ? '-webkit-transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
-                    backgroundColor: isPinned ? 'rgba(245, 158, 11, 0.15)' : 'rgba(0, 0, 0, 0.05)',
-                    color: isPinned ? '#f59e0b' : 'var(--text-secondary)',
-                    borderLeft: '1px solid var(--frost-card-sub-border)',
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onTogglePin(modelId);
                 }}
+                className="flex-shrink-0 flex items-center justify-center w-9 h-9 active:scale-90 transition-all cursor-pointer mr-1"
+                title={isPinned ? '取消常用' : '设为常用'}
             >
-                <div className="flex flex-col items-center gap-0.5">
-                    <span className="text-[15px]">{isPinned ? '📌' : '📍'}</span>
-                    <span>{isPinned ? '取消常用' : '设为常用'}</span>
-                </div>
+                <Pin 
+                    size={14} 
+                    className={`transition-colors duration-200 ${isPinned 
+                        ? 'text-amber-500 fill-amber-500' 
+                        : 'text-neutral-400 dark:text-neutral-500'}`}
+                />
             </button>
         </div>
     );
@@ -3797,6 +3694,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                              modelId={model.id}
                                                              isPinned={isModelPinned}
                                                              onTogglePin={handleTogglePin}
+                                                             selected={config.model === model.id}
+                                                             isExclusive={model.isExclusive}
                                                              onClick={() => {
                                                                  handleSelectPromptBarModel(model);
                                                                  setMobileSubView('input');
