@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, startTransition } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, startTransition } from 'react';
 import InfiniteCanvas, { InfiniteCanvasHandle } from './components/canvas/InfiniteCanvas';
 import ImageNode from './components/image/ImageCard';
 import PromptNodeComponent from './components/canvas/PromptNodeComponent';

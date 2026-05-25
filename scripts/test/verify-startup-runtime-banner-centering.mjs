@@ -270,6 +270,41 @@ try {
     window.localStorage.setItem('kk_studio_storage_mode', 'browser');
     window.localStorage.setItem('kk_tutorial_seen', 'true');
     window.localStorage.setItem('kk_has_logged_in', 'true');
+
+    const now = Date.now();
+    const expiresAt = now + 24 * 60 * 60 * 1000;
+    const createdAtIso = new Date(now).toISOString();
+    const tempUser = {
+      id: 'banner-smoke-temp-user',
+      aud: 'authenticated',
+      role: 'authenticated',
+      email: 'banner-smoke-temp-user@temp.local',
+      phone: '',
+      created_at: createdAtIso,
+      updated_at: createdAtIso,
+      confirmed_at: createdAtIso,
+      last_sign_in_at: createdAtIso,
+      app_metadata: {
+        isTempUser: true,
+        provider: 'temp',
+      },
+      user_metadata: {
+        avatar_url: 'preset-default-local',
+        full_name: 'Banner Smoke Temp User',
+        isTempUser: true,
+      },
+    };
+    window.localStorage.setItem('temp_user_session_v1', JSON.stringify({
+      user: tempUser,
+      createdAt: now,
+      expiresAt,
+      isTempUser: true,
+    }));
+    window.localStorage.setItem('kkai.runtime.user-state.v1', JSON.stringify({
+      user: tempUser,
+      isTempUser: true,
+      tempUserExpiry: expiresAt,
+    }));
   });
 
   await gotoWithRetry(page, targetUrl);

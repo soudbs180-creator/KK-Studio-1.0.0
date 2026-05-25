@@ -1,4 +1,4 @@
-﻿import * as React from 'react';
+import * as React from 'react';
 import { createRoot } from 'react-dom/client';
 // import { SpeedInsights } from '@vercel/speed-insights/react';
 import './index.css';
@@ -62,6 +62,18 @@ function localizeStartupErrorText(value?: string) {
 }
 
 syncStartupLanguage();
+
+// 清理 URL 中的防缓存更新参数 __kk_update__，保持普通用户地址栏的干净整洁
+try {
+  const url = new URL(window.location.href);
+  if (url.searchParams.has('__kk_update__')) {
+    url.searchParams.delete('__kk_update__');
+    const newUrl = url.pathname + url.search + url.hash;
+    window.history.replaceState({}, '', newUrl);
+  }
+} catch (e) {
+  console.warn('Failed to clean up URL update query parameter:', e);
+}
 
 const rootElement = document.getElementById('root');
 

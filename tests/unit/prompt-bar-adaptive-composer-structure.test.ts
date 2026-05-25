@@ -23,7 +23,7 @@ test('PromptBar keeps adaptive composer registry wiring aligned with dedicated p
   assert.match(promptBarSource, /import DesktopComposerModePanel from '\.\/prompt-bar\/DesktopComposerModePanel';/);
   assert.match(promptBarSource, /import DesktopComposerPromptTools from '\.\/prompt-bar\/DesktopComposerPromptTools';/);
   assert.match(promptBarSource, /const modeOptions = PROMPT_BAR_MODE_REGISTRY;/);
-  assert.match(promptBarSource, /const activeModeOption = getPromptBarModeOption\(config\.mode\);/);
+  assert.match(promptBarSource, /const activeModeOption = getPromptBarModeOption\(activePromptBarMode\);/);
   assert.match(promptBarSource, /\.\.\.getPromptBarModePatch\(previousConfig, mode\),/);
   assert.doesNotMatch(promptBarSource, /const modeOptions = useMemo\(\(\) => \(\[/);
 

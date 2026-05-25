@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { GeneratedImage, GenerationMode, ImageSize } from '../../types';
 import { Download, Trash2, Loader2, ImageOff, Play, Pause, Music } from 'lucide-react';
 import { getCardDimensions } from '../../utils/styleUtils';

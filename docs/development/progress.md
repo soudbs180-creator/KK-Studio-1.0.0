@@ -15,7 +15,7 @@
   - `多供应商 Phase 1`：`进行中`
 
 ## 2. 统一事实基线
-- 当前版本：`1.4.8`
+- 当前版本：`1.4.6`
 - `config/release-manifest.json` 是版本真相源。
 - `src/config/appInfo.ts` 是运行时只读导出。
 - `release/publish/stable/manifest.json` 是 stable 发布清单。
@@ -74,7 +74,7 @@
 ## 5. 2026-05-24 今日变化
 - 移动端常用模型选择的侧滑手势转换为直观的“图钉置顶”（📌 / 📍）按钮，避免与滚动/拖拽发生手势争夺。
 - 彻底清理了 `src/components/layout/PromptBar.tsx` 中的无用/垃圾侧滑手势触控代码，跑通了 `ui-unused-cleanup-contract` 契约单元测试。
-- 对齐项目全部说明文档（README.md, DESIGN.md 等）至 1.4.8 版本，规范化最新的 Clay UI v3.0 及 API 架构。
+- 对齐项目全部说明文档（README.md, DESIGN.md 等）至 1.4.6 版本，规范化最新的 Clay UI v3.0 及 API 架构。
 
 ## 6. 未收口项
 - 剩余手工确认已收窄为：

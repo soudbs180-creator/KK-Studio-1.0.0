@@ -3032,16 +3032,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     onUpdateEcommerceSheetSetting={config.mode === GenerationMode.ECOMMERCE ? onUpdateEcommerceSheetSetting : undefined}
                     activeEcommerceSheet={config.mode === GenerationMode.ECOMMERCE ? activeEcommerceFooterSheet : undefined}
                     onActiveEcommerceSheetChange={config.mode === GenerationMode.ECOMMERCE ? onActivateEcommerceGroupSheet : undefined}
-                    quality={config.quality}
-                    background={config.background}
-                    outputFormat={config.outputFormat}
-                    outputCompression={config.outputCompression}
-                    moderation={config.moderation}
-                    onQualityChange={(val) => updateConfigFields({ quality: val })}
-                    onBackgroundChange={(val) => updateConfigFields({ background: val })}
-                    onOutputFormatChange={(val) => updateConfigFields({ outputFormat: val })}
-                    onOutputCompressionChange={(val) => updateConfigFields({ outputCompression: val })}
-                    onModerationChange={(val) => updateConfigFields({ moderation: val })}
                 />
             ) : (
                 <VideoOptionsPanel
@@ -3781,16 +3771,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         onUpdateEcommerceSheetSetting={config.mode === GenerationMode.ECOMMERCE ? onUpdateEcommerceSheetSetting : undefined}
                                         activeEcommerceSheet={config.mode === GenerationMode.ECOMMERCE ? activeEcommerceFooterSheet : undefined}
                                         onActiveEcommerceSheetChange={config.mode === GenerationMode.ECOMMERCE ? onActivateEcommerceGroupSheet : undefined}
-                                        quality={config.quality}
-                                        background={config.background}
-                                        outputFormat={config.outputFormat}
-                                        outputCompression={config.outputCompression}
-                                        moderation={config.moderation}
-                                        onQualityChange={(val) => updateConfigFields({ quality: val })}
-                                        onBackgroundChange={(val) => updateConfigFields({ background: val })}
-                                        onOutputFormatChange={(val) => updateConfigFields({ outputFormat: val })}
-                                        onOutputCompressionChange={(val) => updateConfigFields({ outputCompression: val })}
-                                        onModerationChange={(val) => updateConfigFields({ moderation: val })}
                                     />
                                 ) : (
                                     <VideoOptionsPanel
@@ -4827,16 +4807,6 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         onUpdateEcommerceSheetSetting={config.mode === GenerationMode.ECOMMERCE ? onUpdateEcommerceSheetSetting : undefined}
                                         activeEcommerceSheet={config.mode === GenerationMode.ECOMMERCE ? activeEcommerceFooterSheet : undefined}
                                         onActiveEcommerceSheetChange={config.mode === GenerationMode.ECOMMERCE ? onActivateEcommerceGroupSheet : undefined}
-                                        quality={config.quality}
-                                        background={config.background}
-                                        outputFormat={config.outputFormat}
-                                        outputCompression={config.outputCompression}
-                                        moderation={config.moderation}
-                                        onQualityChange={(val) => updateConfigFields({ quality: val })}
-                                        onBackgroundChange={(val) => updateConfigFields({ background: val })}
-                                        onOutputFormatChange={(val) => updateConfigFields({ outputFormat: val })}
-                                        onOutputCompressionChange={(val) => updateConfigFields({ outputCompression: val })}
-                                        onModerationChange={(val) => updateConfigFields({ moderation: val })}
                                     />
                                 ) : (
                                     <VideoOptionsPanel

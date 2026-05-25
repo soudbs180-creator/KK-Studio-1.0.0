@@ -23,7 +23,7 @@ type GenerationRuntimePublicBoundary = {
 }
 
 function readSource(relativePath: string): string {
-  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8');
+  return readFileSync(path.join(ROOT_DIR, relativePath), 'utf-8').replace(/\r\n/g, '\n');
 }
 
 describe('generation runtime extraction contract', () => {

@@ -57,6 +57,43 @@ async function fulfillSmokeJson(route, data) {
 }
 
 async function installSmokeApiRoutes(page) {
+  await page.route('**/healthz', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json; charset=utf-8',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          service: 'kk-studio-api',
+          status: 'ok',
+          selfHostedCoreReady: true,
+          config: {
+            hasPostgresConfig: true,
+            hasAuthKey: true,
+            hasUserApiEncryptionSecret: true,
+          },
+          repositories: {
+            adminConsole: 'postgres',
+            authData: 'postgres',
+            creditAccounts: 'postgres',
+            creditProviders: 'postgres',
+            workspaceLayout: 'postgres',
+          },
+          persistence: {
+            userApiKeys: true,
+            keyManager: true,
+            authData: true,
+            authSessions: true,
+            tempUsers: true,
+            credits: true,
+            creditProviders: true,
+            workspaceLayout: true,
+          },
+        },
+      }),
+    });
+  });
+
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url());
     const pathname = url.pathname.replace(/\/+$/, '');

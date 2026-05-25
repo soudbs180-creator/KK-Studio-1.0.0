@@ -2374,7 +2374,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         prev.ecommerceFrameworkStatus === next.ecommerceFrameworkStatus &&
         prev.ecommerceFrameworkTaskNodes === next.ecommerceFrameworkTaskNodes &&
         prev.sourcePosition?.x === next.sourcePosition?.x &&
-        prev.sourcePosition?.y === next.sourcePosition?.y
+        prev.sourcePosition?.y === next.sourcePosition?.y &&
+        prev.onDragDelta === next.onDragDelta &&
+        prev.onDragCommit === next.onDragCommit
     );
 });
 
