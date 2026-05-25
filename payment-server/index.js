@@ -10,6 +10,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const webhookRouter = require('./webhook');
+const generateImageRouter = require('./generate-image');
 
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://kkai.plus',
@@ -64,6 +65,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // 唯一挂载点：Stripe Webhook 支付回调路由（最终形成 /webhook/stripe 端点）
 app.use('/webhook', webhookRouter);
+
+// 挂载图像生成与编辑中转 API 路由（最终形成 /api/generate-image 端点）
+app.use('/api', generateImageRouter);
 
 // 兜底 404 路由
 app.use((req, res) => {

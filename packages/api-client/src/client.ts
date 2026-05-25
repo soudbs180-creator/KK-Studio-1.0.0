@@ -6,8 +6,19 @@ import axios from 'axios';
 // 声明全局变量以避免 import.meta 编译错误 (部分旧版 Webpack/CRA 的兼容处理)
 const getBaseURL = (): string => {
   if (typeof window !== 'undefined') {
-    // 优先读取 Vite 桌面端环境变量，否则回退到相对路径 /api
-    return (import.meta.env?.VITE_PUBLIC_API_BASE_URL as string) || '/api';
+    // 优先读取 Vite 桌面端专属的 API 环境变量
+    if (import.meta.env?.VITE_PUBLIC_API_BASE_URL) {
+      return import.meta.env.VITE_PUBLIC_API_BASE_URL as string;
+    }
+    // 自动兼容对齐 VITE_KK_API_BASE_URL 指向的 VPS 独立服务器后端，实现无感直连
+    const kkApiBase = import.meta.env?.VITE_KK_API_BASE_URL as string;
+    if (kkApiBase) {
+      const cleanBase = kkApiBase.replace(/\/+$/, "");
+      // 中文注释：如果配置的地址不以 /api 结尾，则自动拼装 /api 以请求 VPS 的 Express 中转端点
+      return cleanBase.endsWith('/api') ? cleanBase : `${cleanBase}/api`;
+    }
+    // 否则回退至相对本域路径 /api
+    return '/api';
   }
   // 移动端/NodeJS 环境读取 Expo 环境变量
   return (process.env.EXPO_PUBLIC_API_BASE_URL) || '/api';
