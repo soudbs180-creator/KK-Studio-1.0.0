@@ -2,6 +2,8 @@ import type { KeySlot } from '../auth/keyManager.ts';
 import { formatAuthorizationHeaderValue } from '../api/apiConfig.ts';
 import { isLikelyDocumentationBaseUrl, resolveProviderRuntime, type ProviderStrategyVideoApiStyle } from '../api/providerStrategy.ts';
 import type { LLMAdapter, VideoGenerationOptions, VideoGenerationResult } from './LLMAdapter.ts';
+import { AsyncTaskPoller, PollCancelledError } from '../http/AsyncTaskPoller';
+import { forwardUserRouteGenericRequest } from '../model/secureModelProxy';
 
 export class VideoCompatibleAdapter implements LLMAdapter {
     id = 'video-compatible-adapter';
@@ -327,10 +329,10 @@ export class VideoCompatibleAdapter implements LLMAdapter {
         formData.append('image', imageSource);
     }
 
-    private async fetchContentUrl(
+    private async fetchContentUrlViaProxy(
         cleanBase: string,
         taskId: string,
-        headers: Record<string, string>,
+        keySlotId: string,
         signal?: AbortSignal,
     ): Promise<string> {
         const contentUrls = [
@@ -339,27 +341,39 @@ export class VideoCompatibleAdapter implements LLMAdapter {
         ];
 
         for (const contentUrl of contentUrls) {
-            const response = await fetch(contentUrl, { headers, signal });
-            if (!response.ok) {
-                continue;
-            }
-
-            const contentType = response.headers.get('content-type') || '';
-            if (contentType.includes('application/json')) {
-                const payload = await response.json().catch(() => ({}));
-                const videoUrl = this.extractVideoUrl(payload);
-                if (videoUrl) {
-                    return videoUrl;
+            try {
+                // 改为调用 forwardUserRouteGenericRequest 代理中转
+                const response = await forwardUserRouteGenericRequest(
+                    contentUrl,
+                    'GET',
+                    keySlotId,
+                    undefined,
+                    undefined,
+                    signal,
+                );
+                if (!response.ok) {
+                    continue;
                 }
-                continue;
-            }
 
-            const blob = await response.blob();
-            if (!blob.size || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
-                continue;
-            }
+                const contentType = response.headers.get('content-type') || '';
+                if (contentType.includes('application/json')) {
+                    const payload = await response.json().catch(() => ({}));
+                    const videoUrl = this.extractVideoUrl(payload);
+                    if (videoUrl) {
+                        return videoUrl;
+                    }
+                    continue;
+                }
 
-            return URL.createObjectURL(blob);
+                const blob = await response.blob();
+                if (!blob.size || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
+                    continue;
+                }
+
+                return URL.createObjectURL(blob);
+            } catch (error) {
+                console.warn(`[VideoCompatibleAdapter] Failed to fetch content URL via proxy: ${contentUrl}`, error);
+            }
         }
 
         return '';
@@ -371,9 +385,8 @@ export class VideoCompatibleAdapter implements LLMAdapter {
         cleanBase: string,
     ): Promise<VideoGenerationResult> {
         const submitUrl = `${cleanBase}/videos`;
-        const headers = this.buildHeaders(keySlot, false, cleanBase, options.modelId);
-        const formData = new FormData();
 
+        const formData = new FormData();
         formData.append('model', options.modelId);
         formData.append('prompt', options.prompt);
 
@@ -391,12 +404,15 @@ export class VideoCompatibleAdapter implements LLMAdapter {
             await this.appendInputReference(formData, options.imageUrl);
         }
 
-        const response = await fetch(submitUrl, {
-            method: 'POST',
-            headers,
-            body: formData,
-            signal: options.signal,
-        });
+        // 改为使用 forwardUserRouteGenericRequest 提交任务到代理
+        const response = await forwardUserRouteGenericRequest(
+            submitUrl,
+            'POST',
+            keySlot.id,
+            formData,
+            undefined,
+            options.signal,
+        );
 
         if (!response.ok) {
             const errText = await response.text().catch(() => '');
@@ -420,86 +436,119 @@ export class VideoCompatibleAdapter implements LLMAdapter {
             throw new Error('Video API returned success without a task id or output URL.');
         }
 
-        return this.pollNewApiTask(taskId, options, keySlot, cleanBase);
-    }
-
-    private async pollNewApiTask(
-        taskId: string,
-        options: VideoGenerationOptions,
-        keySlot: KeySlot,
-        cleanBase: string,
-    ): Promise<VideoGenerationResult> {
-        const headers = this.buildHeaders(keySlot, false, cleanBase, options.modelId);
+        // 轮询 URL 列表 (有序)
         const pollUrls = [
             `${cleanBase}/videos/${encodeURIComponent(taskId)}`,
             `${cleanBase}/video/generations/${encodeURIComponent(taskId)}`,
         ];
-        const maxDurationMs = 30 * 60 * 1000;
-        const startTime = Date.now();
-        let pollInterval = 3000;
-        const maxInterval = 15000;
 
-        while (Date.now() - startTime < maxDurationMs) {
-            if (options.signal?.aborted) {
-                throw new Error('Video generation was aborted.');
-            }
-
-            await this.delay(pollInterval);
-            pollInterval = Math.min(Math.round(pollInterval * 1.5), maxInterval);
-
-            let response: Response | null = null;
-            let fatalError: Error | null = null;
-
-            for (const pollUrl of pollUrls) {
-                const candidate = await fetch(pollUrl, {
-                    headers,
-                    signal: options.signal,
-                });
-
-                if (!candidate.ok) {
-                    const errText = await candidate.text().catch(() => '');
-                    if (candidate.status >= 500 || candidate.status === 404) {
-                        continue;
-                    }
-                    fatalError = new Error(`Video poll error ${candidate.status}: ${errText.slice(0, 200)}`);
-                    break;
+        let lastError: Error | null = null;
+        for (const pollUrl of pollUrls) {
+            try {
+                // 在外部按需捕获并重新实例化 Poller 执行轮询
+                return await this.runPollerWithUrl(taskId, pollUrl, options, keySlot, cleanBase);
+            } catch (error: any) {
+                if (error instanceof PollCancelledError || options.signal?.aborted) {
+                    throw error;
                 }
+                lastError = error;
+                console.warn(`[VideoCompatibleAdapter] Poll failed for URL ${pollUrl}, attempting fallback. Error:`, error);
+            }
+        }
 
-                response = candidate;
-                break;
+        throw lastError || new Error('Video generation polling failed on all configured URLs.');
+    }
+
+    private async runPollerWithUrl(
+        taskId: string,
+        pollUrl: string,
+        options: VideoGenerationOptions,
+        keySlot: KeySlot,
+        cleanBase: string,
+    ): Promise<VideoGenerationResult> {
+        // 轮询查询函数，只负责处理单个 URL 的网络请求，通过 forwardUserRouteGenericRequest 代理
+        const pollFn = async (id: string, signal?: AbortSignal) => {
+            const response = await forwardUserRouteGenericRequest(
+                pollUrl,
+                'GET',
+                keySlot.id,
+                undefined,
+                undefined,
+                signal,
+            );
+
+            if (!response.ok) {
+                const errText = await response.text().catch(() => '');
+                throw new Error(`Video poll error ${response.status}: ${errText.slice(0, 200)}`);
             }
 
-            if (!response) {
-                if (fatalError) {
-                    throw fatalError;
+            return await response.json().catch(() => ({}));
+        };
+
+        // 实例化通用的轮询管理器 AsyncTaskPoller
+        const poller = new AsyncTaskPoller<any, any>({
+            submitFn: async () => ({ taskId }), // 模拟已提交的任务
+            pollFn: (id, signal) => pollFn(id, signal),
+            extractId: (submit) => submit.taskId,
+            isDone: (result) => {
+                const status = this.extractStatus(result);
+                const directUrl = this.extractVideoUrl(result);
+                return (directUrl && this.isSuccessStatus(status || 'SUCCESS')) || this.isSuccessStatus(status);
+            },
+            isFailed: (result) => {
+                const status = this.extractStatus(result);
+                return this.isFailureStatus(status);
+            },
+            // 使用自定义的指数退避轮询间隔，最大 15 秒
+            interval: (pollCount) => {
+                let interval = 3000;
+                for (let i = 0; i < pollCount; i++) {
+                    interval = Math.min(Math.round(interval * 1.5), 15000);
                 }
-                continue;
-            }
+                return interval;
+            },
+            // 最大等待时间限制 (30分钟)
+            maxWait: 30 * 60 * 1000,
+        });
 
-            const payload = await response.json().catch(() => ({}));
-            const status = this.extractStatus(payload);
-            const directUrl = this.extractVideoUrl(payload);
+        // 联动外部取消信号
+        let onAbort: (() => void) | undefined;
+        if (options.signal) {
+            if (options.signal.aborted) {
+                poller.cancel();
+                throw new PollCancelledError();
+            }
+            onAbort = () => {
+                poller.cancel();
+            };
+            options.signal.addEventListener('abort', onAbort);
+        }
+
+        try {
+            const pollResult = await poller.start();
+            const status = this.extractStatus(pollResult);
+            const directUrl = this.extractVideoUrl(pollResult);
 
             if (directUrl && this.isSuccessStatus(status || 'SUCCESS')) {
                 return this.buildResult(options, keySlot, { url: directUrl, taskId, status: 'success' });
             }
 
             if (this.isSuccessStatus(status)) {
-                const contentUrl = await this.fetchContentUrl(cleanBase, taskId, headers, options.signal);
+                // 若状态为成功但无直接链接，从内容接口代理获取
+                const contentUrl = await this.fetchContentUrlViaProxy(cleanBase, taskId, keySlot.id, options.signal);
                 if (contentUrl) {
                     return this.buildResult(options, keySlot, { url: contentUrl, taskId, status: 'success' });
                 }
-
                 throw new Error('Video task completed without a usable output URL.');
             }
 
-            if (this.isFailureStatus(status)) {
-                const reason = payload?.error || payload?.message || payload?.data?.error || JSON.stringify(payload);
-                throw new Error(`Video generation failed: ${reason}`);
+            throw new Error('Video task failed with unknown status.');
+        } finally {
+            // 清理取消监听
+            if (options.signal && onAbort) {
+                options.signal.removeEventListener('abort', onAbort);
             }
         }
-
-        throw new Error('Video generation timed out after 30 minutes.');
     }
 
     private async generateVideoViaUnifiedV2(

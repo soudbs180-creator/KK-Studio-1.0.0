@@ -1,9 +1,6 @@
 import {
     buildClaudeEndpoint,
-    buildClaudeHeaders,
-    type AuthMethod,
 } from '../api/apiConfig';
-import { resolveProviderRuntime } from '../api/providerStrategy';
 import type {
     AudioGenerationOptions,
     AudioGenerationResult,
@@ -16,6 +13,8 @@ import type {
     VideoGenerationResult,
 } from './LLMAdapter';
 import type { KeySlot } from '../auth/keyManager';
+import { assertNoDirectCall } from '../../utils/security';
+import { forwardUserRouteGenericRequest } from '../model/secureModelProxy';
 
 type ClaudeContentBlock = {
     type: 'text';
@@ -85,44 +84,33 @@ export class ClaudeNativeAdapter implements LLMAdapter {
         return /claude/i.test(modelId) || true;
     }
 
-    private resolveRuntime(keySlot: KeySlot) {
-        return resolveProviderRuntime({
-            provider: keySlot.provider,
-            baseUrl: keySlot.baseUrl,
-            format: 'claude',
-            authMethod: keySlot.authMethod,
-            headerName: keySlot.headerName,
-            compatibilityMode: keySlot.compatibilityMode,
-        });
-    }
-
-    private getHeaders(keySlot: KeySlot): Record<string, string> {
-        const runtime = this.resolveRuntime(keySlot);
-        return buildClaudeHeaders(
-            runtime.authMethod as AuthMethod,
-            keySlot.key,
-            runtime.headerName,
-            runtime.authorizationValueFormat,
-        );
-    }
-
     private getMessagesEndpoint(keySlot: KeySlot): string {
         return buildClaudeEndpoint(keySlot.baseUrl || 'https://api.anthropic.com', '/messages');
     }
 
     async chat(options: ChatOptions, keySlot: KeySlot): Promise<string> {
+        const url = this.getMessagesEndpoint(keySlot);
+        
+        // 步骤 C: 安全守卫
+        assertNoDirectCall(url);
+
         const { system, messages } = normalizeClaudeMessages(options.messages);
-        const response = await fetch(this.getMessagesEndpoint(keySlot), {
+
+        // 步骤 B & A: 改为代理转发，彻底下沉密钥
+        const response = await forwardUserRouteGenericRequest({
+            provider: 'claude',
+            keyId: keySlot.id,
+            url,
             method: 'POST',
-            headers: this.getHeaders(keySlot),
-            body: JSON.stringify({
+            rawBody: {
                 model: options.modelId,
                 messages,
                 system: options.systemPrompt || system,
                 stream: false,
                 temperature: options.temperature,
                 max_tokens: options.maxTokens || 2048,
-            }),
+            },
+            headers: { 'Content-Type': 'application/json' },
             signal: options.signal,
         });
 
@@ -136,18 +124,29 @@ export class ClaudeNativeAdapter implements LLMAdapter {
     }
 
     async chatStream(options: ChatOptions, keySlot: KeySlot): Promise<void> {
+        const url = this.getMessagesEndpoint(keySlot);
+        
+        // 步骤 C: 安全守卫
+        assertNoDirectCall(url);
+
         const { system, messages } = normalizeClaudeMessages(options.messages);
-        const response = await fetch(this.getMessagesEndpoint(keySlot), {
+
+        // 步骤 B & A: 改为代理转发，且流式响应携带 stream: true
+        const response = await forwardUserRouteGenericRequest({
+            provider: 'claude',
+            keyId: keySlot.id,
+            url,
             method: 'POST',
-            headers: this.getHeaders(keySlot),
-            body: JSON.stringify({
+            stream: true,
+            rawBody: {
                 model: options.modelId,
                 messages,
                 system: options.systemPrompt || system,
                 stream: true,
                 temperature: options.temperature,
                 max_tokens: options.maxTokens || 2048,
-            }),
+            },
+            headers: { 'Content-Type': 'application/json' },
             signal: options.signal,
         });
 

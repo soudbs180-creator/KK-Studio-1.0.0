@@ -6,6 +6,9 @@ import {
     supportsInstrumental,
     supportsAudioContinuation 
 } from '../model/audioModelCapabilities.ts';
+import { assertNoDirectCall } from '../../utils/security';
+import { forwardUserRouteGenericRequest } from '../model/secureModelProxy';
+import { AsyncTaskPoller, PollCancelledError } from '../http/AsyncTaskPoller';
 
 /**
  * 音频生成适配器
@@ -42,14 +45,8 @@ export class AudioCompatibleAdapter implements LLMAdapter {
         const submitUrl = `${cleanBase}/audio/generations`;
         const pollBaseUrl = submitUrl;
 
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${keySlot.key}`
-        };
-        if (keySlot.headerName && keySlot.headerName !== 'Authorization') {
-            delete headers.Authorization;
-            headers[keySlot.headerName] = keySlot.key;
-        }
+        // 安全守卫：禁止直连外部
+        assertNoDirectCall(submitUrl);
 
         // 获取模型音频能力
         const maxDuration = getMaxAudioDuration(options.modelId);
@@ -145,11 +142,16 @@ export class AudioCompatibleAdapter implements LLMAdapter {
 
         try {
             console.log(`[AudioAdapter] 提交音频生成: ${submitUrl}, 模型: ${options.modelId}`);
-            const response = await fetch(submitUrl, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(body),
-            });
+            
+            // 步骤 B & A: 改为使用 forwardUserRouteGenericRequest 代理中转提交任务
+            const response = await forwardUserRouteGenericRequest(
+                submitUrl,
+                'POST',
+                keySlot.id,
+                JSON.stringify(body),
+                { 'Content-Type': 'application/json' },
+                options.signal,
+            );
 
             if (!response.ok) {
                 const errText = await response.text();
@@ -179,61 +181,82 @@ export class AudioCompatibleAdapter implements LLMAdapter {
                 };
             }
 
-            // 异步轮询 - 指数退避
+            // 异步轮询 - AsyncTaskPoller 替换
             if (taskId) {
                 const pollUrl = `${pollBaseUrl}/${taskId}`;
-                const maxDuration = 20 * 60 * 1000; // 最长 20 分钟
-                const startTime = Date.now();
-                let pollInterval = 5000; // 起始 5 秒（音频通常比视频慢）
-                const maxInterval = 15000;
 
-                while (Date.now() - startTime < maxDuration) {
-                    await new Promise(r => setTimeout(r, pollInterval));
-                    pollInterval = Math.min(pollInterval * 1.5, maxInterval);
-
-                    try {
-                        const pollRes = await fetch(pollUrl, { headers });
-                        if (!pollRes.ok) {
-                            console.warn(`[AudioAdapter] 轮询返回 ${pollRes.status}, 继续...`);
-                            continue;
+                const poller = new AsyncTaskPoller<any, any>({
+                    submitFn: async () => ({ taskId }),
+                    pollFn: async (id, signal) => {
+                        const pollResponse = await forwardUserRouteGenericRequest(
+                            pollUrl,
+                            'GET',
+                            keySlot.id,
+                            undefined,
+                            undefined,
+                            signal,
+                        );
+                        if (!pollResponse.ok) {
+                            throw new Error(`音频轮询请求错误: ${pollResponse.status}`);
                         }
+                        return await pollResponse.json().catch(() => ({}));
+                    },
+                    extractId: (submit) => submit.taskId,
+                    isDone: (result) => {
+                        const s = result.status || result.data?.status || status;
+                        return this.isSuccessStatus(s);
+                    },
+                    isFailed: (result) => {
+                        const s = result.status || result.data?.status || status;
+                        return this.isFailureStatus(s);
+                    },
+                    interval: (count) => Math.min(2000 * Math.pow(1.5, count - 1), 10000),
+                    maxWait: 10 * 60 * 1000, // 10 分钟
+                });
 
-                        const pollData = await pollRes.json();
-                        status = pollData.status || pollData.data?.status || status;
-
-                        // 音频 URL - 兼容多种格式
-                        audioUrl = pollData.audio_url || pollData.data?.audio_url ||
-                            pollData.data?.output ||
-                            pollData.audio?.url ||
-                            (pollData.data?.outputs && pollData.data.outputs[0]) ||
-                            audioUrl;
-
-                        // 封面 URL
-                        if (pollData.image_url || pollData.data?.image_url) {
-                            metadata.coverUrl = pollData.image_url || pollData.data?.image_url;
-                        }
-                        // Suno 额外元数据
-                        if (pollData.data?.title) metadata.title = pollData.data.title;
-                        if (pollData.data?.lyrics) metadata.lyrics = pollData.data.lyrics;
-                        if (pollData.data?.duration) metadata.duration = pollData.data.duration;
-
-                        if (this.isSuccessStatus(status)) {
-                            if (!audioUrl) throw new Error('任务完成但未返回音频 URL');
-                            break;
-                        }
-                        if (this.isFailureStatus(status)) {
-                            const reason = pollData.fail_reason || pollData.error ||
-                                pollData.data?.error || JSON.stringify(pollData);
-                            throw new Error(`音频生成失败: ${reason}`);
-                        }
-                    } catch (pollErr: any) {
-                        if (pollErr.message.includes('音频生成失败')) throw pollErr;
-                        console.warn(`[AudioAdapter] 轮询异常:`, pollErr.message);
+                // 联动取消信号
+                let onAbort: (() => void) | undefined;
+                if (options.signal) {
+                    if (options.signal.aborted) {
+                        poller.cancel();
+                        throw new PollCancelledError();
                     }
+                    onAbort = () => poller.cancel();
+                    options.signal.addEventListener('abort', onAbort);
                 }
 
-                if (!this.isSuccessStatus(status)) {
-                    throw new Error(`音频生成超时 (20分钟)。最后状态: ${status}`);
+                try {
+                    const pollResult = await poller.start();
+                    status = pollResult.status || pollResult.data?.status || status;
+                    
+                    audioUrl = pollResult.audio_url || pollResult.data?.audio_url ||
+                        pollResult.data?.output ||
+                        pollResult.audio?.url ||
+                        (pollResult.data?.outputs && pollResult.data.outputs[0]) ||
+                        audioUrl;
+
+                    if (pollResult.image_url || pollResult.data?.image_url) {
+                        metadata.coverUrl = pollResult.image_url || pollResult.data?.image_url;
+                    }
+                    if (pollResult.data?.title) metadata.title = pollResult.data.title;
+                    if (pollResult.data?.lyrics) metadata.lyrics = pollResult.data.lyrics;
+                    if (pollResult.data?.duration) metadata.duration = pollResult.data.duration;
+
+                    if (!this.isSuccessStatus(status)) {
+                        throw new Error(`音频生成未完成。状态: ${status}`);
+                    }
+                    if (!audioUrl) {
+                        throw new Error('任务完成但未返回音频 URL');
+                    }
+                } catch (pollErr: any) {
+                    if (pollErr instanceof PollCancelledError) {
+                        throw pollErr;
+                    }
+                    throw new Error(`音频生成轮询失败: ${pollErr.message || pollErr}`);
+                } finally {
+                    if (options.signal && onAbort) {
+                        options.signal.removeEventListener('abort', onAbort);
+                    }
                 }
             }
 

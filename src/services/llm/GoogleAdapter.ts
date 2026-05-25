@@ -3,11 +3,11 @@ import { GenerationMode } from '../../types';
 import { KeySlot } from '../auth/keyManager';
 import { GOOGLE_API_BASE } from '../api/apiConfig';
 import { logError } from '../system/systemLogService';
+import { assertNoDirectCall } from '../../utils/security';
+import { forwardUserRouteGenericRequest } from '../model/secureModelProxy';
+import { AsyncTaskPoller, PollCancelledError } from '../http/AsyncTaskPoller';
+import { kernelFetch } from '../http/requestKernel';
 
-/**
- * Helper: Convert image data (blob URL, data URL, or base64) to base64 string
- * Gemini API requires base64 encoded image data
- */
 export async function convertImageToBase64(imageData: string): Promise<string | null> {
     // If it's already a pure base64 string (no prefix), return as-is
     if (!imageData.includes(':') && !imageData.includes('/')) {
@@ -22,7 +22,7 @@ export async function convertImageToBase64(imageData: string): Promise<string | 
         }
         // If data URL but not base64, try to fetch and convert
         try {
-            const response = await fetch(imageData);
+            const response = await kernelFetch(imageData);
             const blob = await response.blob();
             return await blobToBase64(blob);
         } catch (e) {
@@ -34,7 +34,7 @@ export async function convertImageToBase64(imageData: string): Promise<string | 
     // If it's a blob URL (blob:http://...), fetch and convert
     if (imageData.startsWith('blob:')) {
         try {
-            const response = await fetch(imageData);
+            const response = await kernelFetch(imageData);
             const blob = await response.blob();
             return await blobToBase64(blob);
         } catch (e) {
@@ -276,9 +276,13 @@ export class GoogleAdapter implements LLMAdapter {
     async chat(options: ChatOptions, keySlot: KeySlot): Promise<string> {
         const baseUrl = keySlot.baseUrl || GOOGLE_API_BASE;
         const cleanBase = baseUrl.replace(/\/+$/, '');
-        // 12AI 文档要求使用 Google 官方字段命名（camelCase）
         const useSnakeCase = false;
-        const url = `${cleanBase}/v1beta/models/${options.modelId}:generateContent?key=${keySlot.key}`;
+        
+        // 步骤 A: 移除 URL 中的 ?key=${keySlot.key}
+        const url = `${cleanBase}/v1beta/models/${options.modelId}:generateContent`;
+
+        // 步骤 C: 安全守卫
+        assertNoDirectCall(url);
 
         const contents = options.messages.map((msg, idx) => {
             const parts: any[] = [{ text: msg.content }];
@@ -297,9 +301,7 @@ export class GoogleAdapter implements LLMAdapter {
             };
         });
 
-        // 🚀 [12AI 对齐] maxOutputTokens 安全钳位 (限制在 65535 以内)
-        // 官方文档指出：maxOutputTokens 设置为 65537 或更大，Google 会拒绝请求。
-        let maxTokens = options.maxTokens || 20480; // 12AI 建议在 10000～30000 之间以兼顾质量
+        let maxTokens = options.maxTokens || 20480;
         if (maxTokens > 65535) {
             console.warn(`[GoogleAdapter] maxOutputTokens (${maxTokens}) 超过 Google 限制，自动钳位至 65535`);
             maxTokens = 65535;
@@ -310,7 +312,6 @@ export class GoogleAdapter implements LLMAdapter {
             maxOutputTokens: maxTokens
         };
 
-        // 🚀 支持 Provider Config
         if (options.providerConfig?.google) {
             if (options.providerConfig.google.responseModalities) {
                 generationConfig.responseModalities = options.providerConfig.google.responseModalities;
@@ -322,13 +323,11 @@ export class GoogleAdapter implements LLMAdapter {
             generationConfig
         };
 
-        // 安全性检查: 12AI 限制 Payload 体积 (HK线路 25MB, 主站 50MB)
         const payloadStr = JSON.stringify(payload);
         if (payloadStr.length > 45 * 1024 * 1024) {
             console.error(`[GoogleAdapter] 请求体积 (${(payloadStr.length / 1024 / 1024).toFixed(2)}MB) 接近 50MB 上限，可能导致 413 错误`);
         }
 
-        // Safety Settings
         if (options.providerConfig?.google?.safetySettings) {
             payload.safetySettings = options.providerConfig.google.safetySettings;
         }
@@ -336,17 +335,21 @@ export class GoogleAdapter implements LLMAdapter {
             payload.tools = normalizeToolsForGateway(options.providerConfig.google.tools, useSnakeCase);
         }
 
-        const response = await fetch(url, {
+        // 步骤 B: 替换裸 fetch 为代理转发
+        const response = await forwardUserRouteGenericRequest({
+            provider: 'google',
+            keyId: keySlot.id,
+            url,
             method: 'POST',
+            rawBody: payload,
             headers: { 'Content-Type': 'application/json' },
-            body: payloadStr,
             signal: options.signal
         });
 
         if (!response.ok) {
             const err = await response.json().catch(() => ({}));
             const errMsg = err.error?.message || `Google API Error: ${response.statusText}`;
-            logError('GoogleAdapter', new Error(errMsg), `URL: ${url.replace(/key=[^&]+/, 'key=***')}\nStatus: ${response.status}\nResponse: ${JSON.stringify(err)}`);
+            logError('GoogleAdapter', new Error(errMsg), `URL: ${url}\nStatus: ${response.status}\nResponse: ${JSON.stringify(err)}`);
             throw new Error(errMsg);
         }
 
@@ -357,22 +360,14 @@ export class GoogleAdapter implements LLMAdapter {
     async generateImage(options: ImageGenerationOptions, keySlot: KeySlot): Promise<ImageGenerationResult> {
         const modelId = options.modelId.toLowerCase();
 
-        // 1. Veo (Video)
         if (modelId.startsWith('veo-')) {
             return this.generateVeoVideo(options, keySlot);
         }
 
-        // 2. Imagen (Image)
         if (modelId.startsWith('imagen-')) {
             return this.generateImagenImage(options, keySlot);
         }
 
-        // 3. Gemini (Image via generateContent)
-        if (modelId.includes('gemini') && modelId.includes('image')) {
-            return this.generateGeminiImage(options, keySlot);
-        }
-
-        // Default or older Gemini models that might support IMAGE modality
         return this.generateGeminiImage(options, keySlot);
     }
 
@@ -382,16 +377,18 @@ export class GoogleAdapter implements LLMAdapter {
     private async generateGeminiImage(options: ImageGenerationOptions, keySlot: KeySlot): Promise<ImageGenerationResult> {
         const cleanBase = (keySlot.baseUrl || GOOGLE_API_BASE).replace(/\/+$/, '');
         const is12AI = is12AIGateway(cleanBase);
-        // 严格对齐 12AI 文档：使用 Google 官方 camelCase 字段
         const useSnakeCase = false;
 
-        // 🚀 [Suffix Strip] 剔除 ID 后缀（如 @system 或 @CustomName）以获取真实模型 ID
         const realModelId = (options.modelId || '').split('@')[0];
-        const url = `${cleanBase}/v1beta/models/${realModelId}:generateContent?key=${keySlot.key}`;
+        
+        // 步骤 A: 移除 URL 中的 ?key=${keySlot.key}
+        const url = `${cleanBase}/v1beta/models/${realModelId}:generateContent`;
+
+        // 步骤 C: 安全守卫
+        assertNoDirectCall(url);
 
         const parts: any[] = [];
 
-        // 🚀 [Ref Image Order] 12AI/Gemini documentation shows images preceding text in the content parts array
         if (options.referenceImages?.length) {
             const convertedImages = await Promise.all(
                 options.referenceImages.map(async (refImg) => {
@@ -408,11 +405,9 @@ export class GoogleAdapter implements LLMAdapter {
             });
         }
 
-        // Add prompt text last (preferred by some strict parsers for image-to-image)
         parts.push({ text: options.prompt });
 
         const generationConfig: any = {
-            // 🚀 [Fix] 使用 providerConfig 中的 responseModalities（含 TEXT + IMAGE）
             responseModalities: options.providerConfig?.google?.responseModalities || ["TEXT", "IMAGE"]
         };
         const thinkingLevel = options.providerConfig?.google?.thinkingConfig?.thinkingLevel;
@@ -420,10 +415,9 @@ export class GoogleAdapter implements LLMAdapter {
             generationConfig.thinkingConfig = { thinkingLevel };
         }
         if (!is12AI) {
-            generationConfig.temperature = 0.9; // Gemini Image defaults
+            generationConfig.temperature = 0.9;
         }
 
-        // 🚀 [Inpainting Support] If in inpaint mode, we must include the mask
         if (options.editMode === 'inpaint' && options.maskUrl) {
             const maskBase64 = await convertImageToBase64(options.maskUrl);
             if (maskBase64) {
@@ -432,16 +426,12 @@ export class GoogleAdapter implements LLMAdapter {
             }
         }
 
-        // Map Options -> ImageConfig
         const imageConfig: any = {};
 
-        // Aspect Ratio
         if (options.aspectRatio && String(options.aspectRatio).toLowerCase() !== 'auto') {
             imageConfig.aspectRatio = options.aspectRatio;
         }
 
-        // Image Size (1K/2K/4K)
-        // 兼容策略：先按请求携带 imageSize；若上游不支持再自动回退
         const requestedSize = normalizeGeminiImageSize(
             options.providerConfig?.google?.imageConfig?.imageSize || options.imageSize
         );
@@ -465,23 +455,28 @@ export class GoogleAdapter implements LLMAdapter {
             lastRequestPayload = JSON.stringify(payload);
             lastRequestPayloadObj = payload;
 
-            // 🚀 Inject Tools if present (like Google Search Grounding for Gemini 3)
             if (options.providerConfig?.google?.tools) {
                 payload.tools = normalizeToolsForGateway(options.providerConfig.google.tools, useSnakeCase);
             }
 
             const startAt = Date.now();
-            const response = await fetch(url, {
+            
+            // 步骤 B: 替换裸 fetch 为代理转发
+            const response = await forwardUserRouteGenericRequest({
+                provider: 'google',
+                keyId: keySlot.id,
+                url,
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                rawBody: payload,
+                headers: { 'Content-Type': 'application/json' }
             });
+            
             lastApiDurationMs = Date.now() - startAt;
 
             if (!response.ok) {
                 const err = await response.json().catch(() => ({}));
                 const msg = err?.error?.message || `Gemini Image Error: ${response.status}`;
-                logError('GoogleAdapter', new Error(msg), `URL: ${url.replace(/key=[^&]+/, 'key=***')}\nStatus: ${response.status}\nResponse: ${JSON.stringify(err)}`);
+                logError('GoogleAdapter', new Error(msg), `URL: ${url}\nStatus: ${response.status}\nResponse: ${JSON.stringify(err)}`);
                 throw new Error(msg);
             }
 
@@ -511,15 +506,12 @@ export class GoogleAdapter implements LLMAdapter {
             }
         }
 
-        // 🚀 Robust Multimodal Response Parsing
-        // Google API can return multiple candidates. Usually we want the first.
         const candidate = data.candidates?.[0];
         const usage = extractUsageMetadata(data);
         if (!candidate) {
             throw new Error(`Google API returned no candidates. Finish Reason: ${data.candidates?.[0]?.finishReason || 'Unknown'}`);
         }
 
-        // Parts can be many: Text description + Image data
         const candidateParts = candidate.content?.parts || [];
         const imageParts = candidateParts.filter((p: any) => {
             const inlineData = p?.inlineData || p?.inline_data;
@@ -528,9 +520,6 @@ export class GoogleAdapter implements LLMAdapter {
         });
 
         if (imageParts.length > 0) {
-            // 🚀 [CRITICAL FIX] 4K Support: API returns multiple images (preview + final)
-            // When requesting 4K, we get: 1) Low-res preview (768×1376) 2) High-res final (3072×5504)
-            // We need to select the largest image by data size (base64 length)
             let bestImage = imageParts[0];
             let maxDataLength = 0;
 
@@ -574,21 +563,12 @@ export class GoogleAdapter implements LLMAdapter {
                     })(),
                     requestBodyPreview: buildSafeRequestBodyPreview(lastRequestPayloadObj),
                     pythonSnippet: (() => {
-                        const safeUrl = (() => {
-                            try {
-                                const u = new URL(url);
-                                return `${u.origin}${u.pathname}?key=<API_KEY>`;
-                            } catch {
-                                return url;
-                            }
-                        })();
-                        return `import requests\n\nurl = "${safeUrl}"\npayload = ${lastRequestPayload || '{}'}\nresp = requests.post(url, json=payload, timeout=150)\nprint(resp.status_code)\nprint(resp.text[:1000])`;
+                        return `import requests\n\nurl = "${url}?key=<API_KEY>"\npayload = ${lastRequestPayload || '{}'}\nresp = requests.post(url, json=payload, timeout=150)\nprint(resp.status_code)\nprint(resp.text[:1000])`;
                     })()
                 }
             };
         }
 
-        // Fallback A: Some gateways return file URI in fileData instead of inlineData
         const fileUri = candidateParts
             .map((p: any) => p?.fileData?.fileUri || p?.file_data?.file_uri || p?.fileData?.uri || p?.file_data?.uri)
             .find((u: any) => typeof u === 'string' && /^https?:\/\//i.test(u));
@@ -610,7 +590,6 @@ export class GoogleAdapter implements LLMAdapter {
             };
         }
 
-        // Fallback B: Proxy may transform to OpenAI-like data[]
         const proxyData = data?.data?.[0];
         if (proxyData?.b64_json) {
             const b64 = String(proxyData.b64_json).replace(/\s+/g, '');
@@ -648,7 +627,6 @@ export class GoogleAdapter implements LLMAdapter {
             };
         }
 
-        // Fallback: Check if there's any text describing why it failed (e.g. Safety)
         const textPart = candidateParts.find((p: any) => p.text);
         if (textPart?.text) {
             throw new Error(`Gemini Image Generation Fail: ${textPart.text}`);
@@ -661,29 +639,28 @@ export class GoogleAdapter implements LLMAdapter {
      * Imagen Image Generation (:predict)
      */
     private async generateImagenImage(options: ImageGenerationOptions, keySlot: KeySlot): Promise<ImageGenerationResult> {
-        // Delegate to shared ImagenService logic but keep it inside adapter if possible or import
-        // For strictness, let's reimplement clean logic here to avoid Service circular deps
-
         const cleanBase = (keySlot.baseUrl || GOOGLE_API_BASE).replace(/\/+$/, '');
-        const url = `${cleanBase}/v1beta/models/${options.modelId}:predict?key=${keySlot.key}`; // Note: key param preferred over header if key in slot is just a string
+        
+        // 步骤 A: 移除 URL 中的 ?key=${keySlot.key}
+        const url = `${cleanBase}/v1beta/models/${options.modelId}:predict`;
+
+        // 步骤 C: 安全守卫
+        assertNoDirectCall(url);
 
         const parameters: any = {
             sampleCount: options.imageCount || 1,
         };
 
-        // Aspect Ratio
         if (options.aspectRatio && String(options.aspectRatio).toLowerCase() !== 'auto') {
             parameters.aspectRatio = options.aspectRatio;
         }
 
-        // Image Size (1K/2K) - Imagen 4 Only supports up to 2K
         if (options.imageSize) {
             const size = options.imageSize.toUpperCase();
             if (size.includes('2K') || size.includes('4K') || size.includes('HD')) parameters.sampleImageSize = '2K';
             else parameters.sampleImageSize = '1K';
         }
 
-        // Person Gen
         if (options.providerConfig?.imagen?.personGeneration) {
             parameters.personGeneration = options.providerConfig.imagen.personGeneration;
         }
@@ -691,7 +668,6 @@ export class GoogleAdapter implements LLMAdapter {
         const instances: any[] = [];
 
         if (options.editMode === 'inpaint' && options.maskUrl && options.referenceImages?.length) {
-            // Google Imagen explicitly expects pure base64 strings
             const { data: refData } = extractRefImageData(options.referenceImages[0]);
             const originalBase64 = await convertImageToBase64(refData);
             const maskBase64 = await convertImageToBase64(options.maskUrl);
@@ -709,7 +685,6 @@ export class GoogleAdapter implements LLMAdapter {
                     }
                 };
             } else {
-                // Fallback to text + img if conversion failed silently (shouldn't happen)
                 instances.push({ prompt: options.prompt });
             }
         } else {
@@ -721,18 +696,16 @@ export class GoogleAdapter implements LLMAdapter {
             parameters
         };
 
-        // Auth Header if key not in URL (Google supports both, but key query param is easiest)
-        // Check if we need to use header
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        // if (!keySlot.key) ... throw
 
-        // Actually, for Imagen, let's stick to the URL key pattern unless it fails,
-        // to be consistent with Gemini. Docs say :predict accepts key param.
-
-        const response = await fetch(url, {
+        // 步骤 B: 替换裸 fetch 为代理转发 (使用 rawBody 透传模式)
+        const response = await forwardUserRouteGenericRequest({
+            provider: 'google',
+            keyId: keySlot.id,
+            url,
             method: 'POST',
-            headers,
-            body: JSON.stringify(payload)
+            rawBody: payload,
+            headers
         });
 
         if (!response.ok) {
@@ -767,7 +740,7 @@ export class GoogleAdapter implements LLMAdapter {
                         try { return new URL(url).pathname; } catch { return url; }
                     })(),
                     requestBodyPreview: buildSafeRequestBodyPreview(payload),
-                    pythonSnippet: `import requests\n\nurl = "${url.replace(/key=[^&]+/, 'key=<API_KEY>')}"\npayload = ${JSON.stringify(payload)}\nresp = requests.post(url, json=payload, timeout=150)\nprint(resp.status_code)\nprint(resp.text[:1000])`
+                    pythonSnippet: `import requests\n\nurl = "${url}?key=<API_KEY>"\npayload = ${JSON.stringify(payload)}\nresp = requests.post(url, json=payload, timeout=150)\nprint(resp.status_code)\nprint(resp.text[:1000])`
                 }
             };
             return result;
@@ -776,89 +749,374 @@ export class GoogleAdapter implements LLMAdapter {
         throw new Error("No image data in Imagen response");
     }
 
+    /**
+     * Veo 视频生成 - 异步轮询实现
+     */
     private async generateVeoVideo(options: ImageGenerationOptions, keySlot: KeySlot): Promise<ImageGenerationResult> {
-        const { startVeoVideoGeneration, pollVeoVideoOperation } = await import('../video/VeoVideoService');
         const cleanBase = (keySlot.baseUrl || GOOGLE_API_BASE).replace(/\/+$/, '');
+        const model = options.modelId || 'veo-3.1-generate-preview';
+        
+        // 步骤 A: 移除 URL 中的 ?key= 拼接
+        const submitUrl = `${cleanBase}/v1beta/models/${model}:predictLongRunning`;
 
-        // Map options to Veo Config
-        const { operationId } = await startVeoVideoGeneration({
-            prompt: options.prompt,
-            aspectRatio: options.aspectRatio as any, // Cast or map strictly
-            model: options.modelId
-        }, keySlot.key, cleanBase);
+        // 步骤 C: 安全守卫
+        assertNoDirectCall(submitUrl);
 
-        // 🚀 [Persistence] Report Task ID early
+        const payload: any = {
+            instances: [{ prompt: options.prompt }]
+        };
+        if (options.aspectRatio && options.aspectRatio !== 'auto') {
+            payload.parameters = {
+                aspectRatio: options.aspectRatio
+            };
+        }
+
+        // 步骤 B: 使用 forwardUserRouteGenericRequest 代理提交
+        const response = await forwardUserRouteGenericRequest({
+            provider: 'google',
+            keyId: keySlot.id,
+            url: submitUrl,
+            method: 'POST',
+            rawBody: payload,
+            headers: { 'Content-Type': 'application/json' },
+            signal: options.signal
+        });
+
+        if (!response.ok) {
+            const errText = await response.text().catch(() => '');
+            throw new Error(`Veo submit failed (${response.status}): ${errText.slice(0, 300)}`);
+        }
+
+        const initData = await response.json();
+        const operationId = initData.name;
+        if (!operationId) {
+            throw new Error('No operation name returned from Veo API');
+        }
+
         if (options.onTaskId) {
             options.onTaskId(operationId);
         }
 
-        const result = await pollVeoVideoOperation(operationId, keySlot.key, cleanBase);
+        // 轮询 URL，同样使用代理获取状态，不需要 query params 携带 key
+        const pollUrl = `${cleanBase}/v1beta/${operationId}`;
+        
+        const poller = new AsyncTaskPoller<any, any>({
+            submitFn: async () => ({ operationId }),
+            pollFn: async (id, sig) => {
+                const pollResponse = await forwardUserRouteGenericRequest({
+                    provider: 'google',
+                    keyId: keySlot.id,
+                    url: pollUrl,
+                    method: 'GET',
+                    signal: sig
+                });
+                if (!pollResponse.ok) {
+                    throw new Error(`Veo poll failed (${pollResponse.status})`);
+                }
+                return await pollResponse.json().catch(() => ({}));
+            },
+            extractId: (submit) => submit.operationId,
+            isDone: (result) => !!result.done,
+            isFailed: (result) => !!result.error,
+            interval: 10000,
+            maxWait: 30 * 60 * 1000, // 30 分钟
+        });
 
-        return {
-            urls: [result.url],
-            provider: 'Google',
-            model: options.modelId
-        };
+        let onAbort: (() => void) | undefined;
+        if (options.signal) {
+            if (options.signal.aborted) {
+                poller.cancel();
+                throw new PollCancelledError();
+            }
+            onAbort = () => poller.cancel();
+            options.signal.addEventListener('abort', onAbort);
+        }
+
+        try {
+            const pollResult = await poller.start();
+            if (pollResult.error) {
+                throw new Error(pollResult.error.message || 'Veo video generation failed');
+            }
+
+            const videoUri = pollResult.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
+            if (!videoUri) {
+                throw new Error('No video URI in Veo response');
+            }
+
+            // 代理下载视频流
+            const downloadResponse = await forwardUserRouteGenericRequest({
+                provider: 'google',
+                keyId: keySlot.id,
+                url: videoUri,
+                method: 'GET',
+                headers: { 'Accept': 'video/mp4,video/*,*/*' },
+                signal: options.signal
+            });
+
+            if (!downloadResponse.ok) {
+                throw new Error(`Veo video download failed via proxy: HTTP ${downloadResponse.status}`);
+            }
+
+            const blob = await downloadResponse.blob();
+            const reader = new FileReader();
+            const videoDataUrl = await new Promise<string>((res, rej) => {
+                reader.onloadend = () => res(reader.result as string);
+                reader.onerror = rej;
+                reader.readAsDataURL(blob);
+            });
+
+            return {
+                urls: [videoDataUrl],
+                provider: 'Google',
+                model: options.modelId
+            };
+
+        } catch (err: any) {
+            if (err instanceof PollCancelledError) {
+                throw err;
+            }
+            throw new Error(err.message || 'Veo video generation failed');
+        } finally {
+            if (options.signal && onAbort) {
+                options.signal.removeEventListener('abort', onAbort);
+            }
+        }
     }
 
+    /**
+     * Veo 视频生成 - 异步轮询实现
+     */
     async generateVideo(options: import('./LLMAdapter').VideoGenerationOptions, keySlot: KeySlot): Promise<import('./LLMAdapter').VideoGenerationResult> {
-        const { generateVideo } = await import('../video/videoService');
         const cleanBase = (keySlot.baseUrl || GOOGLE_API_BASE).replace(/\/+$/, '');
+        const model = options.modelId || 'veo-3.1-generate-preview';
+        
+        // 步骤 A: 移除 URL 中的 ?key= 拼接
+        const submitUrl = `${cleanBase}/v1beta/models/${model}:predictLongRunning`;
 
-        // Convert to reference config expected by old service
-        const images = [];
-        if (options.imageUrl) images.push(options.imageUrl);
-        if (options.imageTailUrl) images.push(options.imageTailUrl);
+        // 步骤 C: 安全守卫
+        assertNoDirectCall(submitUrl);
 
-        const videoResult = await generateVideo(
-            {
-                prompt: options.prompt,
-                model: options.modelId,
-                aspectRatio: (options.aspectRatio && String(options.aspectRatio).toLowerCase() !== 'auto'
-                    ? options.aspectRatio
-                    : undefined) as any,
-                resolution: (options.resolution || '720p') as any,
-                referenceImages: images.length > 0 ? images.map(i => i.replace(/^data:image\/[^;]+;base64,/, '')) : undefined
-            },
-            keySlot.key,
-            cleanBase
-        );
+        const images: string[] = [];
+        if (options.imageUrl) images.push(options.imageUrl.replace(/^data:image\/[^;]+;base64,/, ''));
+        if (options.imageTailUrl) images.push(options.imageTailUrl.replace(/^data:image\/[^;]+;base64,/, ''));
 
-        return {
-            url: videoResult.videoUrl, // Comes back as dataUrl or blob url from videoService
-            status: 'success',
-            provider: this.provider,
-            model: options.modelId
+        const instance: any = {
+            prompt: options.prompt
         };
+        if (images.length === 1) {
+            instance.image = { bytesBase64Encoded: images[0] };
+        } else if (images.length === 2) {
+            instance.image = { bytesBase64Encoded: images[0] };
+            instance.lastFrame = { bytesBase64Encoded: images[1] };
+        }
+
+        const payload: any = {
+            instances: [instance]
+        };
+        const parameters: any = {};
+        if (options.aspectRatio && String(options.aspectRatio).toLowerCase() !== 'auto') {
+            parameters.aspectRatio = options.aspectRatio;
+        }
+        if (options.resolution) {
+            parameters.resolution = options.resolution;
+        }
+        if (Object.keys(parameters).length > 0) {
+            payload.parameters = parameters;
+        }
+
+        // 步骤 B: 使用 forwardUserRouteGenericRequest 代理提交
+        const response = await forwardUserRouteGenericRequest({
+            provider: 'google',
+            keyId: keySlot.id,
+            url: submitUrl,
+            method: 'POST',
+            rawBody: payload,
+            headers: { 'Content-Type': 'application/json' },
+            signal: options.signal
+        });
+
+        if (!response.ok) {
+            const errText = await response.text().catch(() => '');
+            throw new Error(`Video generation submit failed (${response.status}): ${errText.slice(0, 300)}`);
+        }
+
+        const initData = await response.json();
+        const operationId = initData.name;
+        if (!operationId) {
+            throw new Error('No operation name returned from Veo Video API');
+        }
+
+        if (options.onTaskId) {
+            options.onTaskId(operationId);
+        }
+
+        // 轮询
+        const pollUrl = `${cleanBase}/v1beta/${operationId}`;
+        
+        const poller = new AsyncTaskPoller<any, any>({
+            submitFn: async () => ({ operationId }),
+            pollFn: async (id, sig) => {
+                const pollResponse = await forwardUserRouteGenericRequest({
+                    provider: 'google',
+                    keyId: keySlot.id,
+                    url: pollUrl,
+                    method: 'GET',
+                    signal: sig
+                });
+                if (!pollResponse.ok) {
+                    throw new Error(`Video poll failed (${pollResponse.status})`);
+                }
+                return await pollResponse.json().catch(() => ({}));
+            },
+            extractId: (submit) => submit.operationId,
+            isDone: (result) => !!result.done,
+            isFailed: (result) => !!result.error,
+            interval: 10000,
+            maxWait: 30 * 60 * 1000, // 30 分钟
+        });
+
+        let onAbort: (() => void) | undefined;
+        if (options.signal) {
+            if (options.signal.aborted) {
+                poller.cancel();
+                throw new PollCancelledError();
+            }
+            onAbort = () => poller.cancel();
+            options.signal.addEventListener('abort', onAbort);
+        }
+
+        try {
+            const pollResult = await poller.start();
+            if (pollResult.error) {
+                throw new Error(pollResult.error.message || 'Video generation failed');
+            }
+
+            const videoUri = pollResult.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
+            if (!videoUri) {
+                throw new Error('No video URI in Veo Video response');
+            }
+
+            // 代理下载视频
+            const downloadResponse = await forwardUserRouteGenericRequest({
+                provider: 'google',
+                keyId: keySlot.id,
+                url: videoUri,
+                method: 'GET',
+                headers: { 'Accept': 'video/mp4,video/*,*/*' },
+                signal: options.signal
+            });
+
+            if (!downloadResponse.ok) {
+                throw new Error(`Video download failed via proxy: HTTP ${downloadResponse.status}`);
+            }
+
+            const blob = await downloadResponse.blob();
+            const reader = new FileReader();
+            const videoDataUrl = await new Promise<string>((res, rej) => {
+                reader.onloadend = () => res(reader.result as string);
+                reader.onerror = rej;
+                reader.readAsDataURL(blob);
+            });
+
+            return {
+                url: videoDataUrl,
+                status: 'success',
+                provider: this.provider,
+                model: options.modelId
+            };
+
+        } catch (err: any) {
+            if (err instanceof PollCancelledError) {
+                throw err;
+            }
+            throw new Error(err.message || 'Video generation failed');
+        } finally {
+            if (options.signal && onAbort) {
+                options.signal.removeEventListener('abort', onAbort);
+            }
+        }
     }
 
     async checkTaskStatus(taskId: string, mode: GenerationMode, keySlot: KeySlot): Promise<any> {
         if (mode === GenerationMode.VIDEO) {
-            const { pollVeoVideoOperation } = await import('../video/VeoVideoService');
             const cleanBase = (keySlot.baseUrl || GOOGLE_API_BASE).replace(/\/+$/, '');
-            const result = await pollVeoVideoOperation(taskId, keySlot.key, cleanBase);
-            return {
-                url: result.url,
-                status: 'success',
-                provider: 'Google',
-                model: 'veo-3.1'
-            };
+            const pollUrl = `${cleanBase}/v1beta/${taskId}`;
+
+            assertNoDirectCall(pollUrl);
+
+            // 获取单次状态
+            const response = await forwardUserRouteGenericRequest({
+                provider: 'google',
+                keyId: keySlot.id,
+                url: pollUrl,
+                method: 'GET'
+            });
+
+            if (!response.ok) {
+                throw new Error(`Check task status failed via proxy: HTTP ${response.status}`);
+            }
+
+            const statusData = await response.json();
+            if (statusData.error) {
+                throw new Error(statusData.error.message || 'Task failed');
+            }
+
+            if (statusData.done) {
+                const videoUri = statusData.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
+                if (!videoUri) {
+                    throw new Error('No video URI in response');
+                }
+
+                const downloadResponse = await forwardUserRouteGenericRequest({
+                    provider: 'google',
+                    keyId: keySlot.id,
+                    url: videoUri,
+                    method: 'GET',
+                    headers: { 'Accept': 'video/mp4,video/*,*/*' }
+                });
+
+                if (!downloadResponse.ok) {
+                    throw new Error(`Download video failed: HTTP ${downloadResponse.status}`);
+                }
+
+                const blob = await downloadResponse.blob();
+                const reader = new FileReader();
+                const videoDataUrl = await new Promise<string>((res, rej) => {
+                    reader.onloadend = () => res(reader.result as string);
+                    reader.onerror = rej;
+                    reader.readAsDataURL(blob);
+                });
+
+                return {
+                    url: videoDataUrl,
+                    status: 'success',
+                    provider: 'Google',
+                    model: 'veo-3.1'
+                };
+            } else {
+                return {
+                    status: 'processing',
+                    provider: 'Google',
+                    model: 'veo-3.1'
+                };
+            }
         }
         throw new Error(`Polling not supported for mode ${mode} on Google provider`);
     }
 
     /**
      * Google Audio/Music Generation
-     * Handles:
-     * - Lyria-family music requests (:generateContent)
-     * - Gemini 2.0+ (:generateContent with responseModalities)
      */
     async generateAudio(options: AudioGenerationOptions, keySlot: KeySlot): Promise<AudioGenerationResult> {
         const cleanBase = (keySlot.baseUrl || GOOGLE_API_BASE).replace(/\/+$/, '');
 
-        // Strategy A: Lyria-family music generation (:generateContent)
         if (options.modelId.includes('lyria')) {
-            const url = `${cleanBase}/v1beta/models/${options.modelId}:generateContent?key=${keySlot.key}`;
+            // 步骤 A: 移除 URL 中的 ?key= 拼接
+            const url = `${cleanBase}/v1beta/models/${options.modelId}:generateContent`;
+            
+            // 步骤 C: 安全守卫
+            assertNoDirectCall(url);
+
             const payload = {
                 contents: [{ role: "user", parts: [{ text: options.prompt }] }],
                 generationConfig: {
@@ -866,10 +1124,14 @@ export class GoogleAdapter implements LLMAdapter {
                 }
             };
 
-            const response = await fetch(url, {
+            // 步骤 B: 替换裸 fetch 为代理转发
+            const response = await forwardUserRouteGenericRequest({
+                provider: 'google',
+                keyId: keySlot.id,
+                url,
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                rawBody: payload,
+                headers: { 'Content-Type': 'application/json' }
             });
 
             if (!response.ok) {
@@ -896,8 +1158,12 @@ export class GoogleAdapter implements LLMAdapter {
             }
         }
 
-        // Strategy B: Gemini Multimodal (:generateContent)
-        const url = `${cleanBase}/v1beta/models/${options.modelId}:generateContent?key=${keySlot.key}`;
+        // 步骤 A: 移除 URL 中的 ?key= 拼接
+        const url = `${cleanBase}/v1beta/models/${options.modelId}:generateContent`;
+        
+        // 步骤 C: 安全守卫
+        assertNoDirectCall(url);
+
         const payload = {
             contents: [{ role: "user", parts: [{ text: options.prompt }] }],
             generationConfig: {
@@ -906,10 +1172,14 @@ export class GoogleAdapter implements LLMAdapter {
             }
         };
 
-        const response = await fetch(url, {
+        // 步骤 B: 替换裸 fetch 为代理转发
+        const response = await forwardUserRouteGenericRequest({
+            provider: 'google',
+            keyId: keySlot.id,
+            url,
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            rawBody: payload,
+            headers: { 'Content-Type': 'application/json' }
         });
 
         if (!response.ok) {

@@ -17,9 +17,10 @@ import { resolveProviderRuntime } from '../api/providerStrategy';
 import { GenerationMode } from '../../types';
 import {
     buildGeminiEndpoint,
-    buildGeminiHeaders,
     type AuthMethod,
 } from '../api/apiConfig';
+import { assertNoDirectCall } from '../../utils/security';
+import { forwardUserRouteGenericRequest } from '../model/secureModelProxy';
 
 export class GeminiNativeAdapter implements LLMAdapter {
     id = 'gemini-native-adapter';
@@ -58,14 +59,20 @@ export class GeminiNativeAdapter implements LLMAdapter {
         ]
             .map((value) => String(value || '').trim())
             .filter((value) => value.length > 0);
+
+        // 步骤 A: 传入空字符串作为 apiKey，完全防止 URL 拼接明文 key
         const endpoint = buildGeminiEndpoint(
             keySlot.baseUrl,
             options.modelId,
             'generateContent',
-            keySlot.key,
+            '',
             authMethod,
             keySlot.provider,
         );
+
+        // 步骤 C: 安全守卫
+        assertNoDirectCall(endpoint);
+
         const contents = options.messages
             .filter((message) => message.role !== 'system')
             .map((message) => ({
@@ -111,10 +118,14 @@ export class GeminiNativeAdapter implements LLMAdapter {
             payload.tools = groundingTools;
         }
 
-        const response = await fetch(endpoint, {
+        // 步骤 B & A: 改为使用 forwardUserRouteGenericRequest 代理中转，只传 keySlot.id
+        const response = await forwardUserRouteGenericRequest({
+            provider: 'gemini',
+            keyId: keySlot.id,
+            url: endpoint,
             method: 'POST',
-            headers: buildGeminiHeaders(authMethod, keySlot.key, runtime.headerName, runtime.authorizationValueFormat),
-            body: JSON.stringify(payload),
+            rawBody: payload,
+            headers: { 'Content-Type': 'application/json' },
             signal: options.signal,
         });
 

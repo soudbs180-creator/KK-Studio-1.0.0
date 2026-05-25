@@ -5,8 +5,10 @@ import {
   waitForAuthSessionChange,
 } from '../auth/authSessionEvents';
 import { getPreferredKkApiAccessToken, refreshPreferredKkApiAccessToken } from '../api/authAccessToken';
+import { StandardizedProxyRequest } from './ProxyRequestBuilder';
 import { kkWebApiClient, resolveKkApiModelProxyBaseUrl } from '../api/kkApiClient';
 import { compressReferenceImagesIfNeeded } from '../../utils/imageUtils';
+import { kernelFetch } from '../http/requestKernel';
 
 export interface SecureProxyChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -1332,4 +1334,200 @@ export async function checkLocalUserRouteProxyTaskStatus(
     attemptId: typeof data.attemptId === 'string' ? data.attemptId : undefined,
     ...extractSecureProxyBillingMetadata(data),
   };
+}
+
+export async function callZeroKeyModelProxyChat(
+  payload: StandardizedProxyRequest
+): Promise<string> {
+  const token = await resolvePreferredRuntimeAccessToken(false);
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch('/api/secure-proxy', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (response.status === 401) {
+    throw new Error('Unauthorized: 匿名用户无法直接访问模型代理，请先登录。');
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Proxy chat failed (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json();
+  
+  if (payload.provider === 'claude') {
+    if (typeof data?.content === 'string') return data.content;
+    if (Array.isArray(data?.content)) {
+      return data.content
+        .map((block: any) => block?.text || block || '')
+        .join('');
+    }
+  }
+  
+  if (data?.choices?.[0]?.message?.content) {
+    return data.choices[0].message.content;
+  }
+  if (data?.output?.text) {
+    return data.output.text;
+  }
+
+  return JSON.stringify(data);
+}
+
+export async function callZeroKeyModelProxyChatStream(
+  payload: StandardizedProxyRequest,
+  onStream?: (chunk: string) => void
+): Promise<void> {
+  const token = await resolvePreferredRuntimeAccessToken(false);
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch('/api/secure-proxy', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (response.status === 401) {
+    throw new Error('Unauthorized: 匿名用户无法直接访问模型代理，请先登录。');
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Proxy stream failed (${response.status}): ${errorText}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('Response body has no reader for stream');
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split('\n\n');
+      buffer = events.pop() || '';
+
+      for (const eventChunk of events) {
+        const lines = eventChunk.split('\n');
+        const dataLine = lines.find(line => line.startsWith('data:'));
+        if (!dataLine) continue;
+
+        const raw = dataLine.slice(5).trim();
+        if (!raw || raw === '[DONE]') continue;
+
+        try {
+          const parsed = JSON.parse(raw);
+          let chunk = '';
+          
+          if (payload.provider === 'claude') {
+            chunk = parsed?.delta?.text || 
+                    parsed?.content_block?.text || 
+                    parsed?.content?.[0]?.text || 
+                    (parsed?.type === 'content_block_delta' ? parsed?.delta?.text : '');
+          } else {
+            chunk = parsed?.choices?.[0]?.delta?.content || parsed?.output?.choices?.[0]?.message?.content || '';
+          }
+
+          if (chunk && onStream) {
+            onStream(chunk);
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+/**
+ * 用户路由代理中转接口配置项
+ */
+export interface ForwardUserRouteGenericRequestOptions {
+  provider?: string;
+  model?: string;
+  messages?: any[];
+  keyId?: string;
+  stream?: boolean;
+  rawBody?: any;
+  signal?: AbortSignal;
+  url?: string;
+  method?: string;
+  body?: BodyInit;
+  headers?: Record<string, string>;
+}
+
+/**
+ * 通用的用户路由代理透传请求转发 (支持 GET/POST FormData 等，兼容位置参数与 options 传参)
+ */
+export async function forwardUserRouteGenericRequest(
+  optionsOrUrl: ForwardUserRouteGenericRequestOptions | string,
+  method?: string,
+  keySlotId?: string,
+  body?: BodyInit,
+  headers?: Record<string, string>,
+  signal?: AbortSignal,
+): Promise<Response> {
+  let targetUrl = '';
+  let targetMethod = 'GET';
+  let targetKeyId = '';
+  let targetBody: BodyInit | undefined;
+  let targetHeaders: Record<string, string> | undefined;
+  let targetSignal: AbortSignal | undefined;
+
+  if (typeof optionsOrUrl === 'string') {
+    targetUrl = optionsOrUrl;
+    targetMethod = method || 'GET';
+    targetKeyId = keySlotId || '';
+    targetBody = body;
+    targetHeaders = headers;
+    targetSignal = signal;
+  } else {
+    targetUrl = optionsOrUrl.url || '';
+    targetMethod = optionsOrUrl.method || 'POST';
+    targetKeyId = optionsOrUrl.keyId || '';
+    targetBody = optionsOrUrl.body || (optionsOrUrl.rawBody ? (typeof optionsOrUrl.rawBody === 'string' ? optionsOrUrl.rawBody : JSON.stringify(optionsOrUrl.rawBody)) : undefined);
+    targetHeaders = optionsOrUrl.headers;
+    targetSignal = optionsOrUrl.signal;
+  }
+
+  const token = await resolvePreferredRuntimeAccessToken(false);
+  const proxyHeaders: Record<string, string> = {
+    ...targetHeaders,
+    'X-Proxy-Target-Url': targetUrl,
+    'X-Key-Slot-Id': targetKeyId,
+  };
+
+  if (token) {
+    proxyHeaders['Authorization'] = `Bearer ${token}`;
+  }
+
+  const proxyUrl = getLocalUserRouteApiEndpoint();
+  return await kernelFetch(proxyUrl, {
+    method: targetMethod,
+    headers: proxyHeaders,
+    body: targetBody,
+    signal: targetSignal,
+  });
 }

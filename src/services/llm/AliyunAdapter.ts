@@ -1,5 +1,7 @@
 import { LLMAdapter, ChatOptions, ImageGenerationOptions } from './LLMAdapter';
 import { KeySlot } from '../auth/keyManager';
+import { assertNoDirectCall } from '../../utils/security';
+import { forwardUserRouteGenericRequest } from '../model/secureModelProxy';
 
 export class AliyunAdapter implements LLMAdapter {
     id = 'aliyun-adapter';
@@ -18,27 +20,28 @@ export class AliyunAdapter implements LLMAdapter {
     }
 
     async generateImage(options: ImageGenerationOptions, keySlot: KeySlot): Promise<import('./LLMAdapter').ImageGenerationResult> {
-        // Wanx (Tongyi Wanxiang)
-        // If the user uses OpenAI compatible endpoint for Wanx, we use that.
-        // DashScope has valid OpenAI image endpoint? 
-        // Docs say: https://help.aliyun.com/zh/dashscope/developer-reference/openai-interface-compatibility
-        // It supports /v1/images/generations for wanx-v1
-
         const baseUrl = keySlot.baseUrl || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
         const url = `${baseUrl}/images/generations`;
 
-        const response = await fetch(url, {
+        // 步骤 C: 安全守卫
+        assertNoDirectCall(url);
+
+        // 步骤 B & A: 改为代理转发，彻底下沉密钥
+        const response = await forwardUserRouteGenericRequest({
+            provider: 'aliyun',
+            keyId: keySlot.id,
+            url,
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${keySlot.key}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
+            rawBody: {
                 model: options.modelId, // e.g. wanx-v1
                 prompt: options.prompt,
                 n: options.imageCount || 1,
                 size: '1024x1024' // Validate supported sizes for Wanx
-            })
+            },
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            signal: options.signal
         });
 
         if (!response.ok) {
@@ -54,14 +57,25 @@ export class AliyunAdapter implements LLMAdapter {
 
     private async openaiFetch(baseUrl: string, options: ChatOptions, keySlot: KeySlot): Promise<string> {
         const url = `${baseUrl}/chat/completions`;
-        const response = await fetch(url, {
+
+        // 步骤 C: 安全守卫
+        assertNoDirectCall(url);
+
+        // 步骤 B & A: 改为代理转发，彻底下沉密钥
+        const response = await forwardUserRouteGenericRequest({
+            provider: 'aliyun',
+            keyId: keySlot.id,
+            url,
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${keySlot.key}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+            rawBody: {
                 model: options.modelId,
                 messages: options.messages.map(m => ({ role: m.role, content: m.content })),
                 stream: false
-            })
+            },
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            signal: options.signal
         });
 
         if (!response.ok) {

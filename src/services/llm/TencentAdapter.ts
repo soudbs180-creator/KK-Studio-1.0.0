@@ -1,5 +1,8 @@
 import { LLMAdapter, ChatOptions, ImageGenerationOptions } from './LLMAdapter';
 import { KeySlot } from '../auth/keyManager';
+import { assertNoDirectCall } from '../../utils/security';
+import { forwardUserRouteGenericRequest } from '../model/secureModelProxy';
+import { AsyncTaskPoller, PollCancelledError } from '../http/AsyncTaskPoller';
 
 export class TencentAdapter implements LLMAdapter {
     id = 'tencent-adapter';
@@ -10,95 +13,135 @@ export class TencentAdapter implements LLMAdapter {
     }
 
     async chat(options: ChatOptions, keySlot: KeySlot): Promise<string> {
-        // Assume OpenAI compatible for chat for now, or implement Tencent specific chat if needed.
-        // Hunyuan Chat is often compatible via proxies. 
-        // If direct, we need signature logic. 
-        // For now, let's assume valid OpenAI-format URL is provided in baseUrl, 
-        // or we throw "Not Implemented" for direct SDK usage without a proxy.
         if (keySlot.baseUrl) {
-            // Re-use generic fetch or delegate? 
-            // Ideally we shouldn't duplicate. 
-            // Let's implement basic fetch assuming OpenAI format for Chat.
-            // If strictly Tencent SDK is needed, it's much more complex (signing).
-            // Assuming Proxy usage for Chat.
             return this.openaiFetch(options, keySlot);
         }
         throw new Error("Tencent Chat requires a Base URL (Proxy) or full SDK implementation.");
     }
 
     private async openaiFetch(options: ChatOptions, keySlot: KeySlot): Promise<string> {
-        // Minimal OpenAI fetch
         const url = `${keySlot.baseUrl}/chat/completions`;
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${keySlot.key}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        
+        // 安全守卫
+        assertNoDirectCall(url);
+
+        const response = await forwardUserRouteGenericRequest(
+            url,
+            'POST',
+            keySlot.id,
+            JSON.stringify({
                 model: options.modelId,
                 messages: options.messages.map(m => ({ role: m.role, content: m.content })),
                 stream: false
-            })
-        });
+            }),
+            { 'Content-Type': 'application/json' },
+            options.signal,
+        );
+
+        if (!response.ok) {
+            const errText = await response.text().catch(() => '');
+            throw new Error(`腾讯 API 错误 ${response.status}: ${errText.slice(0, 300)}`);
+        }
+
         const data = await response.json();
         return data.choices?.[0]?.message?.content || '';
     }
 
     async generateImage(options: ImageGenerationOptions, keySlot: KeySlot): Promise<import('./LLMAdapter').ImageGenerationResult> {
-        // Async Polling Logic
-        const submitUrl = `${keySlot.baseUrl}/v1/images/generations`; // Adjust endpoint if needed
-        // If strict Tencent API, endpoints are different. 
-        // Assuming the user meant "Tencent *Type* behavior" on a proxy or specific endpoint.
+        const submitUrl = `${keySlot.baseUrl}/v1/images/generations`;
 
-        // However, the requirement says "Tencent's API requires an asynchronous polling mechanism".
-        // Let's assume a "Submit" -> "TaskID" -> "Query" flow.
+        // 安全守卫
+        assertNoDirectCall(submitUrl);
 
-        // 1. Submit
-        const taskResponse = await fetch(submitUrl, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${keySlot.key}`, 'Content-Type': 'application/json', 'X-Async-Task': 'true' }, // Fictional header or specific param?
-            body: JSON.stringify({
+        // 提交任务到代理
+        const taskResponse = await forwardUserRouteGenericRequest(
+            submitUrl,
+            'POST',
+            keySlot.id,
+            JSON.stringify({
                 model: options.modelId,
                 prompt: options.prompt,
                 size: '1024x1024',
                 n: 1
-            })
-        });
+            }),
+            { 'Content-Type': 'application/json', 'X-Async-Task': 'true' },
+            options.signal,
+        );
+
+        if (!taskResponse.ok) {
+            const errText = await taskResponse.text().catch(() => '');
+            throw new Error(`腾讯图像提交 API 错误 ${taskResponse.status}: ${errText.slice(0, 300)}`);
+        }
 
         const taskData = await taskResponse.json();
         const taskId = taskData.id || taskData.task_id;
 
         if (!taskId) {
-            // Maybe it returned result immediately?
-            if (taskData.data && taskData.data.length > 0) return { urls: taskData.data.map((d: any) => d.url) };
+            if (taskData.data && taskData.data.length > 0) {
+                return { urls: taskData.data.map((d: any) => d.url) };
+            }
             throw new Error(`Failed to get Task ID from Tencent API: ${JSON.stringify(taskData)}`);
         }
 
-        // 2. Poll
-        const urls = await this.pollTask(taskId, keySlot);
-        return { urls };
-    }
+        // 轮询：接入 AsyncTaskPoller
+        const pollUrl = `${keySlot.baseUrl}/v1/tasks/${taskId}`;
+        
+        const poller = new AsyncTaskPoller<any, any>({
+            submitFn: async () => ({ taskId }),
+            pollFn: async (id, signal) => {
+                const pollResponse = await forwardUserRouteGenericRequest(
+                    pollUrl,
+                    'GET',
+                    keySlot.id,
+                    undefined,
+                    undefined,
+                    signal,
+                );
+                if (!pollResponse.ok) {
+                    throw new Error(`腾讯轮询请求错误: ${pollResponse.status}`);
+                }
+                return await pollResponse.json().catch(() => ({}));
+            },
+            extractId: (submit) => submit.taskId,
+            isDone: (result) => {
+                const status = String(result.JobStatus || result.Status || result.status || '').toUpperCase();
+                return status === 'SUCCEEDED' || status === 'SUCCESS' || status === 'DONE';
+            },
+            isFailed: (result) => {
+                const status = String(result.JobStatus || result.Status || result.status || '').toUpperCase();
+                return status === 'FAILED' || status === 'ERROR';
+            },
+            interval: 2000,
+            maxWait: 10 * 60 * 1000,
+        });
 
-    private async pollTask(taskId: string, keySlot: KeySlot): Promise<string[]> {
-        const pollUrl = `${keySlot.baseUrl}/v1/tasks/${taskId}`; // Standard-ish async task endpoint
-        const maxAttempts = 30;
-        const delayMs = 2000;
-
-        for (let i = 0; i < maxAttempts; i++) {
-            await new Promise(r => setTimeout(r, delayMs));
-
-            const req = await fetch(pollUrl, {
-                headers: { 'Authorization': `Bearer ${keySlot.key}` }
-            });
-            const res = await req.json();
-
-            if (res.status === 'SUCCEEDED' || res.status === 'SUCCESS') {
-                return res.data.map((d: any) => d.url);
+        // 联动取消信号
+        let onAbort: (() => void) | undefined;
+        if (options.signal) {
+            if (options.signal.aborted) {
+                poller.cancel();
+                throw new PollCancelledError();
             }
-            if (res.status === 'FAILED') {
-                throw new Error(`Tencent Task Failed: ${res.error || 'Unknown error'}`);
-            }
-            // 'PENDING', 'RUNNING' -> continue
+            onAbort = () => poller.cancel();
+            options.signal.addEventListener('abort', onAbort);
         }
 
-        throw new Error("Tencent Task Timed Out");
+        try {
+            const pollResult = await poller.start();
+            const urls = pollResult.data?.map((d: any) => d.url) || [];
+            if (!urls.length && pollResult.url) {
+                urls.push(pollResult.url);
+            }
+            return { urls };
+        } catch (err: any) {
+            if (err instanceof PollCancelledError) {
+                throw err;
+            }
+            throw new Error(err.message || '腾讯图像生成轮询失败');
+        } finally {
+            if (options.signal && onAbort) {
+                options.signal.removeEventListener('abort', onAbort);
+            }
+        }
     }
 }
