@@ -93,6 +93,7 @@ test("Postgres credit account repository fails on insufficient balance", async (
 test("Postgres credit account repository refunds a completed transaction", async () => {
   const fakeQueryable = new FakeQueryable();
   fakeQueryable.nextRowsQueue = [
+    // findTransactionById: SELECT * FROM credit_transactions WHERE id=$1 AND user_id=$2
     [{
       id: "txn-1",
       user_id: "user-1",
@@ -105,7 +106,16 @@ test("Postgres credit account repository refunds a completed transaction", async
       created_at: "2026-04-13T10:00:00.000Z",
       completed_at: "2026-04-13T10:00:00.000Z",
     }],
-    [{ user_id: "user-1", balance: 10, frozen: 0, created_at: "2026-04-13T10:00:00.000Z", updated_at: "2026-04-13T10:00:00.000Z" }],
+    // withTransaction: SELECT balance, frozen FROM user_credits WHERE user_id=$1 FOR UPDATE
+    [{ balance: 10, frozen: 0 }],
+    // withTransaction: SELECT status FROM credit_transactions WHERE id=$1 AND user_id=$2 FOR UPDATE
+    [{ status: "completed" }],
+    // upsertAccountWithQueryable
+    [],
+    // UPDATE credit_transactions SET status='refunded'
+    [],
+    // insertTransactionWithQueryable
+    [],
   ];
   const repository = new PostgresCreditAccountRepository(fakeQueryable as never);
 

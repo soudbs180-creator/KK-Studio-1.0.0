@@ -1,4 +1,4 @@
-﻿import { randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { URL } from "node:url";
 
@@ -1261,7 +1261,7 @@ function buildApiServer(
     primaryAdminUserId: serverAdminConfig.primaryAdminUserId,
   });
   const assetLibraryService = new AssetLibraryService(new InMemoryAssetLibraryRepository());
-  const creditAccountService = new CreditAccountService(creditAccountRepository);
+  const creditAccountService = new CreditAccountService(creditAccountRepository, creditProviderRepository);
   const localSystemProxyService = new LocalSystemProxyService({
     creditProviderRepository,
     creditAccountService,

@@ -83,9 +83,17 @@ test("Postgres credit account repository writes debit, recharge, and refund ledg
   );
 
   fakeQueryable.nextRowsQueue = [
+    // findTransactionById
     [{ id: "txn-1", user_id: "user-1", amount: -20, type: "consumption", balance_after: 80, status: "completed", created_at: "2026-04-13T10:00:00.000Z", completed_at: "2026-04-13T10:00:00.000Z", metadata_json: {}, business_ref_type: "generation", business_ref_id: "job-1" }],
-    [{ user_id: "user-1", balance: 80, frozen: 0, created_at: "2026-04-13T10:00:00.000Z", updated_at: "2026-04-13T10:00:00.000Z" }],
+    // SELECT balance, frozen ... FOR UPDATE
+    [{ balance: 80, frozen: 0 }],
+    // SELECT status ... FOR UPDATE
+    [{ status: "completed" }],
+    // upsertAccountWithQueryable
     [],
+    // UPDATE credit_transactions SET status='refunded'
+    [],
+    // insertTransactionWithQueryable
     [],
   ];
   const refund = await repository.refundTransaction("user-1", "txn-1");
