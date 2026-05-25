@@ -1,0 +1,22 @@
+{
+  "outputDirectory": "apps/web/dist",
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/healthz",
+      "destination": "/api/healthz"
+    },
+    {
+      "source": "/api/v1/:path*",
+      "destination": "/api/v1?__kk_path=:path*"
+    },
+    {
+      "source": "/api/auth/:path*",
+      "destination": "/api/auth?__kk_path=:path*"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
