@@ -125,10 +125,10 @@ export async function assertLocalApiConfig(options = {}) {
   }
 
   if (problems.length > 0) {
-    console.warn(
-      "[run-api-dev] WARNING: Local API startup warning (VPS PostgreSQL config is incomplete).\n"
+    throw new Error(
+      "[run-api-dev] Local API startup blocked because the VPS PostgreSQL config is incomplete.\n"
       + `${problems.map((problem) => `- ${problem}`).join("\n")}\n`
-      + `Searched primary env files: ${formatSearchedFiles(snapshots, repoRoot)}`
+      + `Searched primary env files: ${formatSearchedFiles(snapshots, repoRoot)}`,
     );
   }
 }

@@ -120,8 +120,7 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
         <>
           {sharedIcon}
           <span className="whitespace-nowrap">
-            {config.aspectRatio === AspectRatio.AUTO ? '自适应' : config.aspectRatio}
-            {!isMobile && ` · ${config.imageSize}`}
+            {config.aspectRatio === AspectRatio.AUTO ? '自适应' : config.aspectRatio} · {config.imageSize}
           </span>
         </>
       );
@@ -131,8 +130,7 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
       <>
         {sharedIcon}
         <span className="whitespace-nowrap">
-          {config.aspectRatio === AspectRatio.AUTO ? '自适应' : config.aspectRatio}
-          {!isMobile && ` · ${config.videoResolution || '720p'}`}
+          {config.aspectRatio === AspectRatio.AUTO ? '自适应' : config.aspectRatio} · {config.videoResolution || '720p'}
         </span>
       </>
     );
@@ -143,10 +141,10 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
 
   return (
     <>
-      <div className={isMobile ? 'static min-w-0 shrink-0' : `relative inline-flex min-w-fit flex-shrink-0`}>
+      <div className={`relative inline-flex ${isMobile ? 'min-w-0 shrink-0' : 'min-w-fit flex-shrink-0'}`}>
         <button
           data-options-toggle
-          className={`${isMobile ? '' : 'prompt-bar-liquid-button'} flex w-full items-center justify-center gap-1.5 h-10 rounded-lg border transition-all text-xs font-medium whitespace-nowrap ${isMobile ? (isEmbeddedMobileDrawer ? 'px-3 justify-between max-w-[34vw] min-w-0 overflow-hidden' : 'px-2.5 max-w-[32vw] min-w-0 overflow-hidden') : 'px-3.5 flex-shrink-0'}`}
+          className={`${isMobile ? '' : 'prompt-bar-liquid-button'} flex w-full items-center justify-center gap-1.5 h-10 rounded-lg border transition-all text-xs font-medium whitespace-nowrap ${isMobile ? (isEmbeddedMobileDrawer ? 'px-3 justify-between max-w-[42vw] min-w-0 overflow-hidden' : 'px-2.5 max-w-[40vw] min-w-0 overflow-hidden') : 'px-3.5 flex-shrink-0'}`}
           style={{
             background: showOptionsPanel ? 'var(--prompt-bar-shell-hover)' : 'var(--prompt-bar-shell-bg)',
             color: 'var(--text-secondary)',
@@ -165,71 +163,23 @@ const DesktopComposerModePanel: React.FC<DesktopComposerModePanelProps> = ({
         </button>
 
         {showOptionsPanel && isMobile ? (
-          isEmbeddedMobileDrawer ? (
-            <div
-              className="mt-2 w-full animate-fadeIn overflow-y-auto"
-              style={{
-                maxHeight: mobileFloatingSheetMaxHeight,
-                overscrollBehavior: 'contain',
-              }}
-              onTouchStart={(e) => e.stopPropagation()}
-              onTouchMove={(e) => e.stopPropagation()}
-            >
-              <div ref={optionsPanelRef}>{optionsPanelContent}</div>
-            </div>
-          ) : (
-            <>
-              {/* 🚀 移动端 Bottom Sheet 蒙层 - 点击关闭 */}
-              <div
-                className="fixed inset-0 z-[1049] bg-black/40"
-                style={{ backdropFilter: 'blur(2px)' }}
-                onClick={(e) => { e.stopPropagation(); onToggleOptionsPanel(); }}
-                onTouchStart={(e) => e.stopPropagation()}
-              />
-              {/* 🚀 移动端 Bottom Sheet 半屏弹窗 */}
-              <div
-                className="fixed left-0 right-0 bottom-0 z-[1050] flex flex-col items-center"
-                style={{
-                  animation: 'bottom-sheet-slide-up 0.28s cubic-bezier(0.32,0.72,0,1) forwards',
-                  paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-                }}
-                onTouchStart={(e) => e.stopPropagation()}
-                onTouchMove={(e) => e.stopPropagation()}
-              >
-                <style>{`
-                  @keyframes bottom-sheet-slide-up {
-                    from { transform: translateY(100%); opacity: 0.6; }
-                    to   { transform: translateY(0);    opacity: 1; }
+          <div
+            className={isEmbeddedMobileDrawer ? 'mt-2 w-full animate-fadeIn overflow-y-auto' : 'fixed left-3 right-3 z-[1005] ios-mobile-floating-sheet p-2 animate-fadeIn overflow-hidden'}
+            style={
+              isEmbeddedMobileDrawer
+                ? {
+                    maxHeight: mobileFloatingSheetMaxHeight,
+                    overscrollBehavior: 'contain',
                   }
-                `}</style>
-                <div
-                  className="w-full max-w-[480px] rounded-t-2xl overflow-hidden"
-                  style={{
-                    background: 'var(--frost-card-framework-bg)',
-                    borderTop: '1px solid var(--frost-card-framework-border)',
-                    borderLeft: '1px solid var(--frost-card-framework-border)',
-                    borderRight: '1px solid var(--frost-card-framework-border)',
-                    boxShadow: '0 -8px 32px rgba(0,0,0,0.25)',
-                    backdropFilter: 'blur(24px) saturate(1.2)',
-                    WebkitBackdropFilter: 'blur(24px) saturate(1.2)',
-                  }}
-                >
-                  {/* 拖拽手柄条 */}
-                  <div className="flex justify-center pt-3 pb-2">
-                    <div className="w-10 h-1 rounded-full bg-[var(--text-tertiary)] opacity-30" />
-                  </div>
-                  {/* 内容滚动区 */}
-                  <div
-                    ref={optionsPanelRef}
-                    className="px-3 pb-4 overflow-y-auto"
-                    style={{ maxHeight: '50vh', overscrollBehavior: 'contain' }}
-                  >
-                    {optionsPanelContent}
-                  </div>
-                </div>
-              </div>
-            </>
-          )
+                : {
+                    bottom: mobileFloatingSheetBottom,
+                    maxHeight: mobileFloatingSheetMaxHeight,
+                    overscrollBehavior: 'contain',
+                  }
+            }
+          >
+            <div ref={optionsPanelRef}>{optionsPanelContent}</div>
+          </div>
         ) : null}
         {shouldRenderDesktopPanel ? (
           <div

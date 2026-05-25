@@ -262,8 +262,7 @@ const LoginScreen: React.FC = () => {
       setError(t('请先修正表单错误后再提交。', 'Fix the form errors before submitting.'));
       return;
     }
-    const isWidgetFailed = turnstileWidgetStatus === 'error';
-    if (turnstileAvailable && !turnstileToken && !isWidgetFailed) {
+    if (turnstileAvailable && !turnstileToken) {
       setCaptchaRequiredByBackend(true);
       setError(turnstileError || t('请完成 Cloudflare 安全验证后再登录。', 'Complete the Cloudflare security check before signing in.'));
       return;
@@ -294,15 +293,15 @@ const LoginScreen: React.FC = () => {
         hostedRuntime
           ? t(`连续 ${MAX_RETRY} 次请求失败，请检查 VPS 登录服务是否可达后重试。`, `Network request failed after ${MAX_RETRY} attempts. Check whether the VPS sign-in service is reachable and try again.`)
           : t(`连续 ${MAX_RETRY} 次请求失败，可先使用临时账号进入本地工作区。`, `Network request failed after ${MAX_RETRY} attempts. You can continue with a temporary account for local-only access.`)
-      ) : resolveAuthErrorMessage(lastError, view));
+      )
+      : resolveAuthErrorMessage(lastError, view));
     if (turnstileAvailable) resetTurnstile();
     setLoading(false);
   };
 
   const handleWechatLogin = async () => {
     if (loading || wechatLoading || googleLoading) return;
-    const isWidgetFailed = turnstileWidgetStatus === 'error';
-    if (turnstileAvailable && !turnstileToken && !isWidgetFailed) {
+    if (turnstileAvailable && !turnstileToken) {
       setCaptchaRequiredByBackend(true);
       setError(turnstileError || t('请先完成人机验证后再使用微信扫码登录。', 'Complete CAPTCHA verification before signing in with WeChat QR.'));
       return;
@@ -399,9 +398,7 @@ const LoginScreen: React.FC = () => {
     ? getTurnstileMissingSiteKeyMessage(language)
     : turnstileDisabledByRuntime
       ? getTurnstileDisabledMessage(language)
-      : turnstileWidgetFailed
-        ? t('验证服务加载失败（网络受限），已自动开启免验证模式，可直接登录。', 'Security check failed to load. Auto-bypass mode is active, you can sign in directly.')
-        : turnstileError || (captchaRequiredByBackend && !turnstileToken ? t('请完成 Cloudflare 安全验证后再登录。', 'Complete the Cloudflare security check before signing in.') : turnstileToken ? t('安全验证已完成。', 'Security verification is complete.') : turnstileAwaitingVerification ? t('请完成 Cloudflare 安全验证后再登录。', 'Complete the Cloudflare security check before signing in.') : t('页面打开后会自动加载 Turnstile，用于阻挡机器请求。', 'Turnstile loads automatically when the page opens to help block bots.'));
+      : turnstileError || (captchaRequiredByBackend && !turnstileToken ? t('请完成 Cloudflare 安全验证后再登录。', 'Complete the Cloudflare security check before signing in.') : turnstileToken ? t('安全验证已完成。', 'Security verification is complete.') : turnstileAwaitingVerification ? t('请完成 Cloudflare 安全验证后再登录。', 'Complete the Cloudflare security check before signing in.') : t('页面打开后会自动加载 Turnstile，用于阻挡机器请求。', 'Turnstile loads automatically when the page opens to help block bots.'));
 
   return (
     <div className={`auth-page auth-page--${resolvedTheme}`}>

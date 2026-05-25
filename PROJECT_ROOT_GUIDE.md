@@ -1,4 +1,4 @@
-## Project Root Guide v1.4.8
+## Project Root Guide
 
 This repository is in a deliberate migration state, so the quickest way to stay oriented is to separate the current live runtimes from the target layout.
 

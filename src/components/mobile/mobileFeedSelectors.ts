@@ -319,8 +319,7 @@ function resolveEcommerceContinuation(
 }
 
 const compareMobileFeedResults = (left: MobileResultEntry, right: MobileResultEntry): number => {
-  // 按照时间戳升序排序，旧时间生成的在上面，越新时间越下面
-  const timeDelta = left.timestamp - right.timestamp;
+  const timeDelta = right.timestamp - left.timestamp;
   if (timeDelta !== 0) {
     return timeDelta;
   }
@@ -348,7 +347,7 @@ export function selectMobileFeedResults(
       ] as const),
   );
 
-  const flatEntries = imageNodes
+  return imageNodes
     .map((imageNode) => {
       const parentPromptId = normalizeOptionalId(imageNode.parentPromptId);
       const promptNode = parentPromptId ? promptNodeById.get(parentPromptId) : undefined;
@@ -381,73 +380,7 @@ export function selectMobileFeedResults(
         mobileLayout,
         detailEntryId: imageNode.id,
         detailEntry,
-        creditCost: imageNode.creditCost,
-        generationTime: imageNode.generationTime,
-        isGenerating: imageNode.isGenerating,
-        error: imageNode.error,
       } satisfies MobileResultEntry;
-    });
-
-  // 🚀 图片组归集折叠核心算法
-  const parentMap = new Map<string, string>();
-  const imageIds = new Set(imageNodes.map(img => img.id));
-  
-  imageNodes.forEach((imageNode) => {
-    let parentImageId = imageNode.partialRedraw?.sourceImageId;
-    if (!parentImageId && imageNode.parentPromptId) {
-      const promptNode = promptNodeById.get(imageNode.parentPromptId);
-      if (promptNode?.sourceImageId) {
-        parentImageId = promptNode.sourceImageId;
-      }
-    }
-    // 确保指向的直系父图片确属当前画布/列表，避免引用断裂
-    if (parentImageId && imageIds.has(parentImageId)) {
-      parentMap.set(imageNode.id, parentImageId);
-    }
-  });
-
-  const rootIdMap = new Map<string, string>();
-  flatEntries.forEach((entry) => {
-    let currentId = entry.id;
-    const path = new Set<string>([currentId]);
-    while (parentMap.has(currentId)) {
-      const parentId = parentMap.get(currentId)!;
-      if (path.has(parentId)) {
-        break; // 防死循环
-      }
-      path.add(parentId);
-      currentId = parentId;
-    }
-    rootIdMap.set(entry.id, currentId);
-  });
-
-  // 基于根节点 rootId 进行分包并汇总
-  const groupItemsMap = new Map<string, MobileResultEntry[]>();
-  flatEntries.forEach((entry) => {
-    const rootId = rootIdMap.get(entry.id)!;
-    if (!groupItemsMap.has(rootId)) {
-      groupItemsMap.set(rootId, []);
-    }
-    groupItemsMap.get(rootId)!.push(entry);
-  });
-
-  const foldedEntries: MobileResultEntry[] = [];
-  groupItemsMap.forEach((entriesInGroup) => {
-    // 组内时间正序排列（最顶上是最早的图，最底下是最新的图）
-    entriesInGroup.sort((a, b) => a.timestamp - b.timestamp);
-    
-    // 取本组最新生成的一张作为对外的卡片主 entry
-    const latestEntry = entriesInGroup[entriesInGroup.length - 1];
-    
-    const mainEntry: MobileResultEntry = {
-      ...latestEntry,
-      groupCount: entriesInGroup.length,
-      groupEntries: entriesInGroup,
-    };
-    
-    foldedEntries.push(mainEntry);
-  });
-
-  // 按各组代表图的 compare 排序返回 outside 主列表
-  return foldedEntries.sort(compareMobileFeedResults);
+    })
+    .sort(compareMobileFeedResults);
 }

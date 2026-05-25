@@ -15,12 +15,22 @@ interface AppPromptComposerProps {
   promptBarProps: AppPromptBarProps;
 }
 
-// 这里的输入作曲器需要适配受控磨砂框架背景以对齐 Clay 设计系统：var(--frost-card-framework-bg)
 const AppPromptComposer: React.FC<AppPromptComposerProps> = ({ variant, promptBarProps }) => {
   if (variant === 'mobile') {
     return (
       <div className="h-full px-3 pb-3 pt-2">
-        <PromptBarCompat {...promptBarProps} />
+        <div
+          className="flex h-full flex-col rounded-[30px] border p-2"
+          style={{
+            background: 'var(--frost-card-framework-bg)',
+            borderColor: 'var(--frost-card-framework-border)',
+            boxShadow: 'var(--frost-card-framework-shadow)',
+            WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+            backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)'
+          }}
+        >
+          <PromptBarCompat {...promptBarProps} />
+        </div>
       </div>
     );
   }

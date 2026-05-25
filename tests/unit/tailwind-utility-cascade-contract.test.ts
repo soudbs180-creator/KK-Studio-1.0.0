@@ -14,9 +14,7 @@ test('global reset stays in the base layer so Tailwind spacing utilities keep pr
   const htmlSource = readSource('index.html');
   const resetHeaderIndex = source.indexOf('Reset & Base Styles');
   const layeredResetIndex = source.indexOf('@layer base', resetHeaderIndex);
-  const resetBlockEndIndex = source.includes('\r\n') 
-    ? source.indexOf('\r\n\r\nhtml,', layeredResetIndex)
-    : source.indexOf('\n\nhtml,', layeredResetIndex);
+  const resetBlockEndIndex = source.indexOf('\n\nhtml,', layeredResetIndex);
   const resetBlock = source.slice(layeredResetIndex, resetBlockEndIndex);
   const htmlInlineResetStart = htmlSource.indexOf('<style>');
   const htmlInlineResetEnd = htmlSource.indexOf('</style>', htmlInlineResetStart);

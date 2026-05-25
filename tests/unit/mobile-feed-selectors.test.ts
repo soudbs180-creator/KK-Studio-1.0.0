@@ -81,18 +81,17 @@ describe('selectMobileFeedResults', () => {
       [imageBeta, imageGamma, imageAlpha],
     );
 
-    // 现在修改为了升序（越旧的在最上面，越新的在最下面）
     assert.deepEqual(
       results.map((item) => item.id),
-      ['image-gamma', 'image-alpha', 'image-beta'],
+      ['image-alpha', 'image-beta', 'image-gamma'],
     );
     assert.deepEqual(
       results.map((item) => item.timestamp),
-      [700, 900, 900],
+      [900, 900, 700],
     );
     assert.deepEqual(
       results.map((item) => item.parentPromptId),
-      [null, 'prompt-alpha', 'prompt-beta'],
+      ['prompt-alpha', 'prompt-beta', null],
     );
   });
 

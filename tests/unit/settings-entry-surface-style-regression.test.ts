@@ -91,6 +91,7 @@ test('startup screen renders a full-screen branded launch hall instead of a tiny
   assert.match(cssSource, /\.app-startup-stage-line\s*\{/);
   assert.match(cssSource, /\.app-startup-progress-track\s*\{/);
   assert.match(cssSource, /\.app-startup-status-list\s*\{/);
+  assert.match(cssSource, /\.app-startup-orbit\s*\{/);
   assert.match(cssSource, /\.app-startup-screen\s*\{[\s\S]*min-height:\s*100dvh/);
   assert.match(cssSource, /\.app-startup-screen\s*\{[\s\S]*place-items:\s*center/);
   assert.match(cssSource, /\.app-startup-shell\s*\{[\s\S]*width:\s*min\(640px, calc\(100vw - 32px\)\)/);

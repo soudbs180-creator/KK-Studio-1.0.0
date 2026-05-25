@@ -122,11 +122,11 @@ describe('responsive surface utilities', () => {
   });
 
   test('caps standard result columns by compact surface while detail mode is single column', () => {
-    assert.equal(getAdaptiveResultColumnCount({ surface: 'phone', width: 320, viewMode: 'standard' }), 12);
-    assert.equal(getAdaptiveResultColumnCount({ surface: 'phone', width: 520, viewMode: 'standard' }), 12);
-    assert.equal(getAdaptiveResultColumnCount({ surface: 'phone', width: 768, viewMode: 'standard' }), 12);
-    assert.equal(getAdaptiveResultColumnCount({ surface: 'tablet', width: 900, viewMode: 'standard' }), 12);
-    assert.equal(getAdaptiveResultColumnCount({ surface: 'tablet', width: 1024, viewMode: 'standard' }), 12);
+    assert.equal(getAdaptiveResultColumnCount({ surface: 'phone', width: 320, viewMode: 'standard' }), 2);
+    assert.equal(getAdaptiveResultColumnCount({ surface: 'phone', width: 520, viewMode: 'standard' }), 3);
+    assert.equal(getAdaptiveResultColumnCount({ surface: 'phone', width: 768, viewMode: 'standard' }), 4);
+    assert.equal(getAdaptiveResultColumnCount({ surface: 'tablet', width: 900, viewMode: 'standard' }), 4);
+    assert.equal(getAdaptiveResultColumnCount({ surface: 'tablet', width: 1024, viewMode: 'standard' }), 5);
     assert.equal(getAdaptiveResultColumnCount({ surface: 'phone', width: 768, viewMode: 'detail' }), 1);
     assert.equal(getAdaptiveResultColumnCount({ surface: 'tablet', width: 1024, viewMode: 'detail' }), 1);
   });
@@ -174,9 +174,9 @@ describe('responsive surface utilities', () => {
       aspectCategory: 'landscape',
     });
 
-    assert.equal(phoneColumns, 12);
-    assert.equal(widePhoneTile.columnSpan, 12);
-    assert.equal(tabletWideTile.columnSpan, 12);
+    assert.equal(phoneColumns, 4);
+    assert.equal(widePhoneTile.columnSpan, 2);
+    assert.equal(tabletWideTile.columnSpan, 2);
     assert.equal(detailTile.columnSpan, 1);
     assert.ok(portraitPhoneTile.rowSpan > squarePhoneTile.rowSpan);
   });

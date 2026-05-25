@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, startTransition } from 'react';
+﻿import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, startTransition } from 'react';
 import InfiniteCanvas, { InfiniteCanvasHandle } from './components/canvas/InfiniteCanvas';
 import ImageNode from './components/image/ImageCard';
 import PromptNodeComponent from './components/canvas/PromptNodeComponent';
@@ -211,13 +211,8 @@ const ConnectorDisconnectButton: React.FC<ConnectorDisconnectButtonProps> = ({ x
     style={{ pointerEvents: 'auto' }}
   >
     <div
-      className="w-6 h-6 rounded-full border flex items-center justify-center cursor-pointer scale-90 hover:scale-110 active:scale-95 transition-all hover:bg-[#ff6b5a] hover:text-white hover:border-[#ff6b5a]"
-      style={{
-        borderColor: 'rgba(255, 107, 90, 0.5)',
-        color: 'var(--clay-brand-coral-ink, #7a1f16)',
-        backgroundColor: 'var(--bg-secondary)',
-        boxShadow: 'var(--ui-shadow-control)'
-      }}
+      className="w-6 h-6 rounded-full border border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center cursor-pointer shadow-lg scale-90 hover:scale-110 active:scale-95 transition-all"
+      style={{ backgroundColor: 'var(--bg-secondary)' }}
       onClick={onClick}
       title="断开连接"
     >
@@ -719,6 +714,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     const timeSinceLastMouseMove = Date.now() - lastMouseMoveRef.current;
     const isMouseActive = timeSinceLastMouseMove < 5000; // Treat the mouse as active if it moved within the last 5 seconds
 
+    console.log('[handleShowMobileNav] isPromptFocused:', isPromptFocused, 'isSidebarHovered:', isSidebarHovered, 'isMouseActive:', isMouseActive);
     setIsMobileNavVisible(true);
     // Clear any existing timer
     if (mobileNavTimerRef.current) {
@@ -726,9 +722,13 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
     // Skip auto-hide while the input is focused, the sidebar is hovered, or the mouse is active
     if (!isPromptFocused && !isSidebarHovered && !isMouseActive) {
+      console.log('[handleShowMobileNav] 设置 5 秒自动隐藏定时器');
       mobileNavTimerRef.current = setTimeout(() => {
+        console.log('[handleShowMobileNav] 5 秒后自动隐藏');
         setIsMobileNavVisible(false);
       }, 5000);
+    } else {
+      console.log('[handleShowMobileNav] 不设置定时器，当前仍有交互', { isPromptFocused, isSidebarHovered, isMouseActive });
     }
   }, [isPromptFocused, isSidebarHovered]);
 
@@ -2652,13 +2652,6 @@ const AppContent: React.FC<AppContentProps> = () => {
   const handleMobileUseImageAsSource = useCallback((imageId: string) => {
     handleImageClick(imageId);
   }, [handleImageClick]);
-
-  const handleMobileGenerateFollowUp = useCallback((prompt: string, parentImageId: string) => {
-    handleImageClick(parentImageId);
-    setTimeout(() => {
-      void handleGenerate(prompt);
-    }, 50);
-  }, [handleImageClick, handleGenerate]);
   const {
     resolveEcommercePartialRedrawContext,
     finalizeEcommercePartialRedrawResult,
@@ -3322,7 +3315,6 @@ const AppContent: React.FC<AppContentProps> = () => {
     visibleImageNodes,
     visiblePromptNodes,
     workflowUtilityNodesById,
-    subCardLayoutMode: state.subCardLayoutMode,
   });
 
   const {
@@ -3609,7 +3601,6 @@ const AppContent: React.FC<AppContentProps> = () => {
       <ImageNode
         {...getSharedImageNodeProps(node)}
         detailLevel={imageDetailLevel}
-        isMobile={isMobile}
         loadPriority={item.loadPriority}
         loadBand={item.loadBand}
         groupLayerZIndex={item.groupLayerZIndex}
@@ -3784,7 +3775,6 @@ const AppContent: React.FC<AppContentProps> = () => {
             <ImageNode
               {...getSharedImageNodeProps(childLayout.childNode)}
               detailLevel="full"
-              isMobile={isMobile}
               loadPriority={1200}
               loadBand={0}
               groupLayerZIndex={promptGroupLayerById.get(node.id) ?? childLayout.childNode.zIndex ?? 0}
@@ -4237,13 +4227,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       activePanel={activeWorkspacePanel}
       isChatOpen={isChatOpen}
       toggleChatPanel={toggleChatPanel}
-      setIsChatOpen={(val) => {
-        setIsChatOpen(val);
-        const nextVal = typeof val === 'function' ? val(isChatOpen) : val;
-        if (!nextVal && isMobile) {
-          setMobileScreen('home');
-        }
-      }}
+      setIsChatOpen={setIsChatOpen}
       isMobile={isMobile}
       openSettingsSurface={openSettingsSurfaceTracked}
       setIsSidebarHovered={setIsSidebarHovered}
@@ -4491,7 +4475,6 @@ const AppContent: React.FC<AppContentProps> = () => {
         onEntryOpen={handleMobileResultOpen}
         onPreviewImage={handleOpenPreview}
         onUseResultAsSource={handleMobileUseImageAsSource}
-        onGenerateFollowUp={handleMobileGenerateFollowUp}
         onPartialRedraw={handleMobileResultPartialRedraw}
         onDownloadEntry={handleMobileResultDownload}
         onDeleteImage={deleteImageNode}

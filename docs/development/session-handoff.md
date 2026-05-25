@@ -1,4 +1,4 @@
-# 2026-05-22 单主线交接
+# 2026-04-14 单主线交接
 
 ## 1. 总状态
 - 当前仍只保留一条执行主线：`API 路由与信用计费`、`设置 / 管理后台 / 鉴权`、`移动端 / 电商续作`。
@@ -10,7 +10,7 @@
 - 当前对外口径继续保守：除非再补完手工烟测，否则 `设置 / 管理后台 / 鉴权` 继续写成 `已落地待回归`。
 
 ## 2. 当前事实基线
-- 当前版本：`1.4.8`
+- 当前版本：`1.4.6`
 - `config/release-manifest.json` 是主版本源。
 - `src/config/appInfo.ts` 是运行时只读导出。
 - `release/publish/stable/manifest.json` 是 portable stable 发布清单。
@@ -85,4 +85,4 @@ npm run dev:status
 - prompt-group / mobile-ecommerce / three-zone -> 归入 `移动端 / 电商续作`
 - settings-router / workbench-shell -> 归入 `设置 / 管理后台 / 鉴权`
 
-*Handoff Updated: 2026-05-22*
+*Handoff Updated: 2026-04-14*

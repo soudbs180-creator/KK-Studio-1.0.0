@@ -93,11 +93,7 @@ function isBrowserLaunchUnavailable(error) {
   const message = String(error?.message || error || '');
   return /spawn EPERM/i.test(message)
     || /Playwright npx cache directory not found/i.test(message)
-    || /Playwright module was not found/i.test(message)
-    || /Browser launch unavailable/i.test(message)
-    || /browser-executable-not-found/i.test(message)
-    || /browser-preflight-threw/i.test(message)
-    || /browser-preflight-spawn-error/i.test(message);
+    || /Playwright module was not found/i.test(message);
 }
 
 async function resolvePlaywrightModuleUrl() {
@@ -287,7 +283,6 @@ let browser;
 let viteServer;
 let browserPreflight = null;
 let targetUrl = DEFAULT_TARGET_URL;
-var exitCode = 0;
 
 try {
   const ensured = await ensureLocalViteServer({ root: REPO_ROOT, url: DEFAULT_TARGET_URL });
@@ -423,15 +418,13 @@ try {
   if (isBrowserLaunchUnavailable(error)) {
     await runFallbackVerification(error, browserPreflight, targetUrl);
   } else {
-    console.error(error);
-    exitCode = 1;
+    throw error;
   }
 } finally {
   if (browser) {
-    await browser.close().catch(() => {});
+    await browser.close();
   }
   if (viteServer) {
     await closeLocalViteServer(viteServer);
   }
-  process.exit(exitCode);
 }

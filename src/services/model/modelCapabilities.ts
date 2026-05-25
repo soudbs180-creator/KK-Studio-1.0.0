@@ -121,9 +121,9 @@ export const BUILTIN_MODEL_CAPABILITIES: Record<string, ModelCapability> = {
             AspectRatio.LANDSCAPE_21_9
         ],
         supportedSizes: [ImageSize.SIZE_05K, ImageSize.SIZE_1K, ImageSize.SIZE_2K, ImageSize.SIZE_4K],
-        supportsGrounding: false,
-        supportsThinking: false,      // 🚀 不在图像模型开启思考模式支持
-        supportsImageSearch: false,   // 🚀 不在图像模型开启图片搜索支持
+        supportsGrounding: true,
+        supportsThinking: true,      // 🚀 开启思考模式支持
+        supportsImageSearch: true,   // 🚀 开启图片搜索支持
         maxRefImages: 14 // 🚀 Update: Gemini 3.1 Flash specifies up to 14 reference images
     },
 
@@ -146,9 +146,9 @@ export const BUILTIN_MODEL_CAPABILITIES: Record<string, ModelCapability> = {
             AspectRatio.LANDSCAPE_21_9
         ],
         supportedSizes: [ImageSize.SIZE_1K, ImageSize.SIZE_2K, ImageSize.SIZE_4K],
-        supportsGrounding: false,
-        supportsThinking: false,      // 🚀 图像模型不支持思考模式
-        supportsImageSearch: false,   // 🚀 图像模型不支持图片搜索
+        supportsGrounding: true,
+        supportsThinking: true,      // 🚀 Gemini 3 Pro 也支持思考模式
+        supportsImageSearch: false,   // 🚀 3 Pro 不支持图片搜索，仅 3.1 Flash 支持
         maxRefImages: 14  // 🚀 Update: Gemini 3 Pro specifies up to 14 reference images
     },
 

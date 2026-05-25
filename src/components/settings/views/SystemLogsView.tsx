@@ -8,7 +8,7 @@ import {
   type SystemLogEntry,
 } from '../../../services/system/systemLogService';
 import { notify } from '../../../services/system/notificationService';
-import { SettingsActionButton, SettingsBadge, SettingsHero, SettingsViewShell } from '../SettingsScaffold';
+import { SettingsActionButton, SettingsBadge, SettingsViewShell } from '../SettingsScaffold';
 import { EmptyState, SegmentedControlMulti, SettingSelect, StatusBadge } from '../ui/index';
 
 type LevelFilter = 'all' | 'error' | 'warning' | 'info';
@@ -198,54 +198,55 @@ export const SystemLogsView: React.FC = () => {
   return (
     <SettingsViewShell>
       <div className="settings-reference-stack">
-        <SettingsHero
-          eyebrow="Advanced Settings"
-          title="System Logs"
-          description="The logs page now mirrors the reference live-stream layout: a compact filter bar, a darker scrolling feed, and a right-side alert summary that keeps the settings area visually consistent with the rest of the control console."
-          badge={
+        <div className="settings-reference-page-header">
+          <div className="settings-reference-page-header__lead">
+            <div className="settings-reference-page-header__eyebrow">Advanced Settings</div>
+            <h2>System Logs</h2>
+            <p>
+              The logs page now mirrors the reference live-stream layout: a compact filter bar, a darker
+              scrolling feed, and a right-side alert summary that keeps the settings area visually
+              consistent with the rest of the control console.
+            </p>
+          </div>
+          <div className="settings-reference-actions">
             <SettingsBadge tone={isStreamPaused ? 'neutral' : errorLogs.length > 0 ? 'amber' : 'emerald'}>
               {isStreamPaused ? 'Stream Paused' : 'Live Stream'}
             </SettingsBadge>
-          }
-          actions={
-            <>
-              <SettingsActionButton icon={isStreamPaused ? Play : Pause} onClick={handleToggleStream}>
-                {isStreamPaused ? 'Resume Stream' : 'Pause Stream'}
-              </SettingsActionButton>
-              <SettingsActionButton icon={Download} tone="primary" onClick={handleDownload}>
-                Export Logs
-              </SettingsActionButton>
-            </>
-          }
-          metrics={
-            <>
-              <LogMetricCard
-                label="Today"
-                value={`${logs.length} rows`}
-                helper="All log entries recorded during the current local day."
-                badge={<SettingsBadge tone="indigo">Total</SettingsBadge>}
-              />
-              <LogMetricCard
-                label="Visible"
-                value={`${filteredLogs.length} rows`}
-                helper={hasFilters ? 'Current filters are limiting the live stream.' : 'The stream is showing every available log row.'}
-                badge={<SettingsBadge tone={hasFilters ? 'amber' : 'neutral'}>{hasFilters ? 'Filtered' : 'All'}</SettingsBadge>}
-              />
-              <LogMetricCard
-                label="Errors"
-                value={`${errorLogs.length}`}
-                helper={errorLogs.length > 0 ? 'Critical or error entries should be triaged first.' : 'No critical or error entries are present right now.'}
-                badge={<StatusBadge status={errorLogs.length > 0 ? 'error' : 'online'} label={errorLogs.length > 0 ? 'Attention' : 'Healthy'} />}
-              />
-              <LogMetricCard
-                label="Sources"
-                value={`${sourceOptions.length}`}
-                helper={latestLog ? `Latest update ${formatLogTime(latestLog.timestamp)}` : 'No live updates have arrived yet.'}
-                badge={<SettingsBadge tone="neutral">Feeds</SettingsBadge>}
-              />
-            </>
-          }
-        />
+            <SettingsActionButton icon={isStreamPaused ? Play : Pause} onClick={handleToggleStream}>
+              {isStreamPaused ? 'Resume Stream' : 'Pause Stream'}
+            </SettingsActionButton>
+            <SettingsActionButton icon={Download} tone="primary" onClick={handleDownload}>
+              Export Logs
+            </SettingsActionButton>
+          </div>
+        </div>
+
+        <div className="settings-reference-grid-4">
+          <LogMetricCard
+            label="Today"
+            value={`${logs.length} rows`}
+            helper="All log entries recorded during the current local day."
+            badge={<SettingsBadge tone="indigo">Total</SettingsBadge>}
+          />
+          <LogMetricCard
+            label="Visible"
+            value={`${filteredLogs.length} rows`}
+            helper={hasFilters ? 'Current filters are limiting the live stream.' : 'The stream is showing every available log row.'}
+            badge={<SettingsBadge tone={hasFilters ? 'amber' : 'neutral'}>{hasFilters ? 'Filtered' : 'All'}</SettingsBadge>}
+          />
+          <LogMetricCard
+            label="Errors"
+            value={`${errorLogs.length}`}
+            helper={errorLogs.length > 0 ? 'Critical or error entries should be triaged first.' : 'No critical or error entries are present right now.'}
+            badge={<StatusBadge status={errorLogs.length > 0 ? 'error' : 'online'} label={errorLogs.length > 0 ? 'Attention' : 'Healthy'} />}
+          />
+          <LogMetricCard
+            label="Sources"
+            value={`${sourceOptions.length}`}
+            helper={latestLog ? `Latest update ${formatLogTime(latestLog.timestamp)}` : 'No live updates have arrived yet.'}
+            badge={<SettingsBadge tone="neutral">Feeds</SettingsBadge>}
+          />
+        </div>
 
         <section className="settings-reference-card settings-reference-card--soft">
           <div className="settings-reference-toolbar">

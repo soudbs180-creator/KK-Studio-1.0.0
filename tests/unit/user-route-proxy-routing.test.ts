@@ -84,7 +84,7 @@ test("user-route proxy auth failures keep their specific diagnostic message and 
   assert.match(localProxySource, /private async invokeDirectVideoRoute\(/);
   assert.match(localProxySource, /private async invokeDirectAudioRoute\(/);
   assert.match(localProxySource, /private async invokeDirectImageRoute\(/);
-  assert.match(localProxySource, /const auth = buildGeminiAuth\(`\$\{normalizeDirectGeminiBaseUrl\(routeConfig\.baseUrl\)\}\/v1beta\/models\/\$\{modelId\}:generateContent`, routeConfig\);/);
+  assert.match(localProxySource, /const auth = buildGeminiAuth\(`\$\{baseUrl\}\/v1beta\/models\/\$\{modelId\}:generateContent`, routeConfig\);/);
 });
 
 test("hosted release workflow deploys the VPS API instead of Supabase edge proxies", () => {

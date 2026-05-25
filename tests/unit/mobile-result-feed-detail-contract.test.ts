@@ -3,8 +3,6 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { getAdaptiveResultTileGridMetrics } from '../../src/utils/responsiveSurface.ts';
-
 const ROOT_DIR = process.cwd();
 
 function readSource(relativePath: string): string {
@@ -88,35 +86,4 @@ test('mobile shell breakpoint and result grid width stay reactive across tablet 
   assert.match(feedSource, /window\.addEventListener\('resize', syncMeasuredWidth\);/);
   assert.match(feedSource, /window\.removeEventListener\('resize', syncMeasuredWidth\);/);
   assert.match(feedSource, /getFallbackWidth\(surface\)/);
-});
-
-test('mobile result grid row spans account for CSS grid gaps instead of reserving blank chrome', () => {
-  const square = getAdaptiveResultTileGridMetrics({
-    surface: 'phone',
-    width: 390,
-    viewMode: 'standard',
-    columnCount: 3,
-    aspectRatio: 1,
-    aspectCategory: 'square',
-  });
-  const wide = getAdaptiveResultTileGridMetrics({
-    surface: 'phone',
-    width: 390,
-    viewMode: 'standard',
-    columnCount: 3,
-    aspectRatio: 2,
-    aspectCategory: 'wide',
-  });
-  const portrait = getAdaptiveResultTileGridMetrics({
-    surface: 'phone',
-    width: 390,
-    viewMode: 'standard',
-    columnCount: 3,
-    aspectRatio: 0.75,
-    aspectCategory: 'portrait',
-  });
-
-  assert.deepEqual(square, { columnSpan: 1, rowSpan: 7 });
-  assert.deepEqual(wide, { columnSpan: 2, rowSpan: 7 });
-  assert.deepEqual(portrait, { columnSpan: 1, rowSpan: 9 });
 });

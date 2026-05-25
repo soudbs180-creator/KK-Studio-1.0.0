@@ -86,7 +86,6 @@ export interface UsePromptGroupLayoutDeps {
   ) => GeneratedImage[];
   selectNodes: SelectNodes;
   selectedNodeIds: string[] | null | undefined;
-  subCardLayoutMode?: 'row' | 'grid' | 'column';
   setFocusedGroupId: Dispatch<SetStateAction<string | null>>;
   setGroupOverlapMap: Dispatch<SetStateAction<Record<string, string[]>>>;
   setImageCardHeightById: Dispatch<SetStateAction<Record<string, number>>>;
@@ -258,7 +257,6 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     selectNodes,
     selectedNodeIds,
     setFocusedGroupId,
-    subCardLayoutMode = 'row',
     setGroupOverlapMap,
     setImageCardHeightById,
     setLockedGroupBoundsById,
@@ -374,16 +372,6 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     const liveStartPositions = childImages.map((imageNode) => (
       liveNodePositionByIdRef.current[imageNode.id] ?? imageNode.position
     ));
-
-    let columns: number | undefined = undefined;
-    if (subCardLayoutMode === 'row') {
-      columns = childImages.length;
-    } else if (subCardLayoutMode === 'column') {
-      columns = 1;
-    } else if (subCardLayoutMode === 'grid') {
-      columns = Math.min(childImages.length, 2);
-    }
-
     const layouts = buildDockedPromptChildRegroupLayout({
       basePosition: promptPosition,
       items: childImages.map((imageNode) => ({
@@ -392,7 +380,6 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
       })),
       mode: promptNode.mode,
       isMobile,
-      columns,
       regroupStartPositions: liveStartPositions,
       fastRegroupProgress,
       settleRegroupProgress,
@@ -413,7 +400,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
         return [imageNode.id, { renderPosition, settledPosition }] as const;
       })
     );
-  }, [isMobile, liveNodePositionByIdRef, parseImageDimensions, subCardLayoutMode]);
+  }, [isMobile, liveNodePositionByIdRef, parseImageDimensions]);
 
   const promptGroupRegroupLayoutsById = useMemo(() => {
     const promptGroupLayoutEntries = Object.entries(promptGroupLayoutStateByIdRef.current);
@@ -1101,24 +1088,11 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
     promptNode: PromptNode,
     childImages: GeneratedImage[],
     sourceNodeId: string,
-  ) => {
-    const isSourcePrompt = sourceNodeId === promptNode.id;
-    const isSingleSelection = currentSelectedNodeIds.length <= 1;
-    const hasChildImages = childImages.length > 0;
-    const res = isSourcePrompt && isSingleSelection && hasChildImages;
-    console.log('[DEBUG-REGROUP]', {
-      sourceNodeId,
-      promptNodeId: promptNode.id,
-      selectedCount: currentSelectedNodeIds.length,
-      selectedIds: currentSelectedNodeIds,
-      childImagesCount: childImages.length,
-      isSourcePrompt,
-      isSingleSelection,
-      hasChildImages,
-      res
-    });
-    return res;
-  }, [currentSelectedNodeIds.length, currentSelectedNodeIds]);
+  ) => (
+    sourceNodeId === promptNode.id
+    && currentSelectedNodeIds.length <= 1
+    && childImages.length > 0
+  ), [currentSelectedNodeIds.length]);
 
   const computedGroupOverlapMap = useMemo(() => {
     if (isNodeDragActive) {

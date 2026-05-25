@@ -29,11 +29,7 @@ function isBrowserLaunchUnavailable(error) {
   const message = String(error?.message || error || '');
   return /spawn EPERM/i.test(message)
     || /Playwright npx cache directory not found/i.test(message)
-    || /Playwright module was not found/i.test(message)
-    || /Browser launch unavailable/i.test(message)
-    || /browser-executable-not-found/i.test(message)
-    || /browser-preflight-threw/i.test(message)
-    || /browser-preflight-spawn-error/i.test(message);
+    || /Playwright module was not found/i.test(message);
 }
 
 async function assertHttpHtml(url) {
@@ -239,7 +235,6 @@ let page;
 let viteServer;
 let browserPreflight = null;
 let targetUrl = TARGET_URL;
-let exitCode = 0;
 
 try {
   const ensured = await ensureLocalViteServer({ root: REPO_ROOT, url: TARGET_URL });
@@ -255,13 +250,6 @@ try {
     viewport: { width: 1600, height: 980 },
   });
 
-  page.on('pageerror', (err) => {
-    console.error('🔴 PAGE EXCEPTION:', err.stack || err);
-  });
-  page.on('console', (msg) => {
-    console.log('[BROWSER]', msg.text());
-  });
-
   await page.addInitScript(() => {
     const originalSetTimeout = window.setTimeout.bind(window);
 
@@ -269,34 +257,12 @@ try {
       const handlerSource = typeof handler === 'function'
         ? Function.prototype.toString.call(handler)
         : String(handler);
-      const isStartupAdvanceTimer = handlerSource.includes('background_ready');
+      const isStartupAdvanceTimer = handlerSource.includes('profile_ready')
+        || handlerSource.includes('workspace_ready')
+        || handlerSource.includes('background_ready');
       const nextDelay = isStartupAdvanceTimer ? 60_000 : timeout;
       return originalSetTimeout(handler, nextDelay, ...args);
     });
-
-    const now = Date.now();
-    const expiresAt = now + 24 * 60 * 60 * 1000;
-    const createdAtIso = new Date(now).toISOString();
-    const tempUser = {
-      id: 'smoke-temp-user',
-      aud: 'authenticated',
-      role: 'authenticated',
-      email: 'smoke-temp-user@temp.local',
-      phone: '',
-      created_at: createdAtIso,
-      updated_at: createdAtIso,
-      confirmed_at: createdAtIso,
-      last_sign_in_at: createdAtIso,
-      app_metadata: {
-        isTempUser: true,
-        provider: 'temp',
-      },
-      user_metadata: {
-        avatar_url: 'preset-default-local',
-        full_name: 'Smoke Temp User',
-        isTempUser: true,
-      },
-    };
 
     window.localStorage.setItem('theme', 'dark');
     window.localStorage.setItem('kk_theme', 'dark');
@@ -304,17 +270,6 @@ try {
     window.localStorage.setItem('kk_studio_storage_mode', 'browser');
     window.localStorage.setItem('kk_tutorial_seen', 'true');
     window.localStorage.setItem('kk_has_logged_in', 'true');
-    window.localStorage.setItem('temp_user_session_v1', JSON.stringify({
-      user: tempUser,
-      createdAt: now,
-      expiresAt,
-      isTempUser: true,
-    }));
-    window.localStorage.setItem('kkai.runtime.user-state.v1', JSON.stringify({
-      user: tempUser,
-      isTempUser: true,
-      tempUserExpiry: expiresAt,
-    }));
   });
 
   await gotoWithRetry(page, targetUrl);
@@ -356,8 +311,7 @@ try {
   if (isBrowserLaunchUnavailable(error)) {
     await runFallbackVerification(error, browserPreflight, targetUrl);
   } else {
-    console.error(error);
-    exitCode = 1;
+    throw error;
   }
 } finally {
   if (page) {
@@ -369,5 +323,4 @@ try {
   if (viteServer) {
     await closeLocalViteServer(viteServer);
   }
-  process.exit(exitCode);
 }

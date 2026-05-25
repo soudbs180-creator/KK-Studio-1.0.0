@@ -1,8 +1,7 @@
-import React, { useMemo, useState, useRef } from 'react';
-import { Check, Clock3, FolderOpen, MessageSquare, Plus, Search, Settings, ShoppingBag } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Check, Clock3, FolderOpen, MessageSquare, Plus, Search, Settings } from 'lucide-react';
 
 import { useCanvas } from '../../context/CanvasContext';
-import { useAdminRole } from '../../hooks/useAdminRole';
 import type {
   MobileResultEntry,
   MobileSurfaceScreen,
@@ -10,12 +9,10 @@ import type {
   ResponsiveSurface,
   ResultViewMode,
 } from '../../types';
-import type { AppPromptBarProps } from '../../app/AppPromptComposer';
 import MobileAppShell from './MobileAppShell';
 import MobileHeader from './MobileHeader';
 import MobileResultDetailScreen from './MobileResultDetailScreen';
 import MobileResultFeed from './MobileResultFeed';
-import MobileEcommerceScreen from './MobileEcommerceScreen';
 
 export interface MobileWorkspaceSurfaceProps {
   activeScreen: MobileSurfaceScreen;
@@ -32,7 +29,6 @@ export interface MobileWorkspaceSurfaceProps {
   onOpenProjects: () => void;
   onOpenSearch: () => void;
   onOpenHistory: () => void;
-  onOpenHistorySearch?: () => void;
   onOpenChat: () => void;
   onOpenProfile: () => void;
   onBillingClick?: () => void;
@@ -43,7 +39,6 @@ export interface MobileWorkspaceSurfaceProps {
   onEntryOpen: (entryId: string) => void;
   onPreviewImage: (imageId: string) => void;
   onUseResultAsSource: (imageId: string) => void;
-  onGenerateFollowUp?: (prompt: string, parentImageId: string) => void;
   onPartialRedraw: (entry: MobileResultEntry, request: PartialRedrawRequest) => void;
   onDownloadEntry: (entry: MobileResultEntry) => void;
   onDeleteImage: (imageId: string) => void;
@@ -52,7 +47,6 @@ export interface MobileWorkspaceSurfaceProps {
   onGenerateEcommerceMobile: (entry: MobileResultEntry) => void;
   onToggleEcommerceSelected: (entry: MobileResultEntry, selected: boolean) => void;
   composer: React.ReactNode;
-  promptBarProps: AppPromptBarProps;
   overlays?: React.ReactNode;
 }
 
@@ -73,7 +67,6 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   projectCount,
   onOpenSearch,
   onOpenHistory,
-  onOpenHistorySearch,
   onOpenChat,
   onOpenProfile,
   onBillingClick,
@@ -84,7 +77,6 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   onEntryOpen,
   onPreviewImage,
   onUseResultAsSource,
-  onGenerateFollowUp,
   onPartialRedraw,
   onDownloadEntry,
   onDeleteImage,
@@ -93,46 +85,11 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   onGenerateEcommerceMobile,
   onToggleEcommerceSelected,
   composer,
-  promptBarProps,
   overlays,
 }) => {
   const { state, activeCanvas, switchCanvas, createCanvas, canCreateCanvas } = useCanvas();
-  const { accountRole } = useAdminRole();
   const [showProjectList, setShowProjectList] = useState(false);
   const [resultViewMode, setResultViewMode] = useState<ResultViewMode>('standard');
-  
-  // 边缘手势返回识别逻辑
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    // 仅在非 home 状态下激活手势返回
-    if (activeScreen === 'home') return;
-    
-    const touch = e.touches[0];
-    const width = window.innerWidth;
-    
-    // 严格限制在屏幕边缘 40px 内起手
-    if (touch.clientX < 40 || touch.clientX > width - 40) {
-      touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!touchStartRef.current) return;
-    
-    const touch = e.changedTouches[0];
-    const deltaX = touch.clientX - touchStartRef.current.x;
-    const deltaY = touch.clientY - touchStartRef.current.y;
-    
-    // 重置起手状态
-    touchStartRef.current = null;
-    
-    // 判定水平滑动的阈值：距离 > 100px 且垂直变动 < 60px
-    if (Math.abs(deltaX) > 100 && Math.abs(deltaY) < 60) {
-      onScreenChange('home');
-    }
-  };
-
   const activeEntryIndex = useMemo(
     () => resultEntries.findIndex((entry) => entry.id === activeEntryId),
     [activeEntryId, resultEntries],
@@ -140,7 +97,6 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   const activeEntry = activeEntryIndex >= 0 ? resultEntries[activeEntryIndex] : null;
   const showDetail = activeScreen === 'detail' && Boolean(activeEntry);
   const showMoreSheet = activeScreen === 'more-sheet';
-  const showEcommerce = activeScreen === 'ecommerce';
   const resolvedProjectName = activeCanvas?.name || projectName;
   const resolvedProjectCount = state.canvases.length || projectCount;
 
@@ -160,7 +116,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   };
 
   const header = (
-    <div className="relative px-3 py-1.5 z-20">
+    <div className="px-3 pb-3 pt-2">
       <MobileHeader
         onMenuClick={() => onScreenChange(showMoreSheet ? 'home' : 'more-sheet')}
         onUserClick={onOpenProfile}
@@ -171,15 +127,12 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
         title={title}
         userName={userName}
         userAvatarUrl={userAvatarUrl}
-        userRole={accountRole}
       />
-      {/* 用户信息积分栏最下方框下面的渐变半透明效果 */}
-      <div className="pointer-events-none absolute inset-x-0 top-full h-10 bg-gradient-to-b from-black/70 via-black/30 to-transparent" />
     </div>
   );
 
   const feed = (
-    <div className="h-full pt-1.5">
+    <div className="h-full px-3 pb-3 pt-2">
       <MobileResultFeed
         resultEntries={resultEntries}
         activeEntryId={activeEntryId}
@@ -194,13 +147,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   );
 
   return (
-    <div
-      data-testid="mobile-workspace-surface"
-      data-mobile-home-shell="three-zone"
-      className="relative"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
+    <div data-testid="mobile-workspace-surface" data-mobile-home-shell="three-zone" className="relative">
       <MobileAppShell
         header={header}
         feed={feed}
@@ -224,11 +171,9 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
           <div
             className="relative rounded-t-[30px] border px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 text-[var(--text-primary)]"
             style={{
-              background: 'var(--mobile-glass-bg)',
-              borderColor: 'var(--mobile-glass-border)',
-              boxShadow: 'var(--mobile-glass-shadow)',
-              backdropFilter: 'blur(20px) saturate(160%)',
-              WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+              background: 'var(--mobile-clay-shell-bg)',
+              borderColor: 'var(--mobile-clay-border)',
+              boxShadow: 'var(--mobile-clay-shadow)'
             }}
           >
             <div className="mb-4 flex items-start justify-between gap-3">
@@ -310,23 +255,15 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             ) : null}
 
             <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => runFromMoreSheet(onOpenHistorySearch || onOpenSearch)}
-                className={moreSheetActionClass}
-              >
+              <button type="button" onClick={() => runFromMoreSheet(onOpenSearch)} className={moreSheetActionClass}>
                 <Search size={17} className="mb-2.5" />
-                <div className="text-sm font-semibold">历史搜索</div>
-                <div className="mt-1 text-xs text-white/55">检索历史或查看生成库</div>
+                <div className="text-sm font-semibold">搜索</div>
+                <div className="mt-1 text-xs text-white/55">查找历史提示词和结果</div>
               </button>
-              <button
-                type="button"
-                onClick={() => runFromMoreSheet(() => onScreenChange('ecommerce'))}
-                className={moreSheetActionClass}
-              >
-                <ShoppingBag size={17} className="mb-2.5" />
-                <div className="text-sm font-semibold">电商功能</div>
-                <div className="mt-1 text-xs text-white/55">一键批量生成电商主图与A+</div>
+              <button type="button" onClick={() => runFromMoreSheet(onOpenHistory)} className={moreSheetActionClass}>
+                <Clock3 size={17} className="mb-2.5" />
+                <div className="text-sm font-semibold">历史</div>
+                <div className="mt-1 text-xs text-white/55">查看最近生成内容</div>
               </button>
               <button type="button" onClick={() => runFromMoreSheet(onOpenChat)} className={moreSheetActionClass}>
                 <MessageSquare size={17} className="mb-2.5" />
@@ -354,7 +291,6 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
           onClose={() => onScreenChange('home')}
           onPreviewOriginal={onPreviewImage}
           onUseAsSource={onUseResultAsSource}
-          onGenerateFollowUp={onGenerateFollowUp}
           onPartialRedraw={onPartialRedraw}
           onDownload={onDownloadEntry}
           onDelete={(imageId) => {
@@ -375,15 +311,6 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               ? () => onEntryOpen(resultEntries[activeEntryIndex + 1].id)
               : undefined
           }
-        />
-      ) : null}
-
-      {showEcommerce ? (
-        <MobileEcommerceScreen
-          onClose={() => onScreenChange('home')}
-          balance={balance}
-          balanceLoading={balanceLoading}
-          promptBarProps={promptBarProps}
         />
       ) : null}
     </div>

@@ -220,8 +220,7 @@ const SettingsMobileShell: React.FC<{
   isApiManagementEditorRoute,
 }) => {
   const { language, pick } = useLocale();
-  const { isAdmin } = useAdminRole();
-  const items = getSettingsNavItems(language, isAdmin);
+  const items = getSettingsNavItems(language);
   const activeNavItem = items.find((item) => item.id === activeView) || items[0];
   const mobileBillingLabel = pickByLanguage(language, '计费', 'Billing');
   const activeTitle = activeView === 'consumption-records' ? mobileBillingLabel : activeNavItem.label;
@@ -369,8 +368,7 @@ const SettingsRouterShell: React.FC<{
     () => deriveApiManagementListStateFromPath(location.pathname),
     [location.pathname],
   );
-  const { isAdmin } = useAdminRole();
-  const navItems = useMemo(() => getSettingsNavItems(language, isAdmin), [language, isAdmin]);
+  const navItems = useMemo(() => getSettingsNavItems(language), [language]);
 
   useEffect(() => {
     setNavQuery('');

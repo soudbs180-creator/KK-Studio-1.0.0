@@ -193,9 +193,6 @@ export interface KeySlot {
     baseUrl?: string;        // Custom base URL (e.g. for proxies)
     group?: string;          // Group selection for proxies
     compatibilityMode?: 'standard' | 'chat'; // 'standard' = /v1/images, 'chat' = /v1/chat
-    imageTransport?: 'images' | 'responses'; // 图像传输通道: images 或 responses
-    responsesUrl?: string;                   // Responses 接口地址
-    responsesModel?: string;                 // Responses 生图模型
     supportedModels: string[]; // List of model IDs this channel supports
 
     // Proxy Specific
@@ -286,9 +283,6 @@ export interface ThirdPartyProvider {
     tokenLimit?: number;
     customCostMode?: 'unlimited' | 'amount' | 'tokens';
     customCostValue?: number;
-    imageTransport?: 'images' | 'responses';
-    responsesUrl?: string;
-    responsesModel?: string;
 
     // Cache of pricing data fetched from the provider's pricing endpoint
     pricingSnapshot?: ProviderPricingSnapshot;
@@ -617,9 +611,25 @@ export class KeyManager {
      * Load state from localStorage
      */
     private loadState(): KeyManagerState {
+        this.purgeAnonymousSensitiveLocalCaches();
+
         try {
             const key = this.getStorageKey();
+            if (this.userId) {
+                localStorage.removeItem(key);
+                return {
+                    slots: [],
+                    currentIndex: 0,
+                    maxFailures: DEFAULT_MAX_FAILURES,
+                    rotationStrategy: 'round-robin'
+                };
+            }
+
             const stored = localStorage.getItem(key);
+
+            // If scoped key not found, DO NOT fallback to global key to prevent leakage.
+            // Only fallback if userId is null (already handled by getStorageKey).
+
             if (stored) {
                 const parsed = JSON.parse(stored);
                 // Migration for existing keys
@@ -668,7 +678,6 @@ export class KeyManager {
                     // Normalize and deduplicate the supported model list before storing it.
                     supportedModels = normalizeModelList(supportedModels, provider, baseUrl);
 
-
                     return {
                         ...s,
                         name: s.name || 'Unnamed Channel',
@@ -682,9 +691,6 @@ export class KeyManager {
                         authMethod,
                         headerName,
                         compatibilityMode: runtime.compatibilityMode,
-                        imageTransport: s.imageTransport || 'images',
-                        responsesUrl: s.responsesUrl || '',
-                        responsesModel: s.responsesModel || '',
                         supportedModels,
                         disabled: s.disabled ?? false,
                         status: s.status || 'valid',
@@ -723,16 +729,30 @@ export class KeyManager {
         const key = this.getStorageKey();
 
         try {
-            localStorage.setItem(key, JSON.stringify(toSave));
-
+            // Security update:
+            // Logged-in users sync through the local API payload bridge and skip plain-text local persistence.
+            // Local temp users also sync through the local API bridge; browser-side secret storage is disabled.
             if (this.userId) {
+                console.log('[KeyManager] 安全模式：登录用户同步本地 API payload，跳过本地明文存储');
+                // Optional: Clear existing local storage just in case
+                localStorage.removeItem(key);
+
                 markPendingStateCloudSync(this.cloudSyncState);
                 await this.flushPendingCloudSync(toSave);
+            } else {
+                localStorage.removeItem(key);
+                this.purgeAnonymousSensitiveLocalCaches();
+                console.warn('[KeyManager] Anonymous local key storage is disabled.');
             }
+
         } catch (e) {
             console.error('[KeyManager] Failed to save state:', e);
         }
     }
+
+    /**
+     * Get current user ID
+     */
     getUserId(): string | null {
         return this.userId;
     }

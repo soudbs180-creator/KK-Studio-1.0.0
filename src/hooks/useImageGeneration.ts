@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+﻿import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   PromptNode,
   GeneratedImage,
@@ -15,7 +15,7 @@ import { generateImage, cancelGeneration } from '../services/llm/geminiService';
 import { useCanvas } from '../context/CanvasContext';
 import { useBilling } from '../context/BillingContext';
 import { useAppStartup } from '../context/AppStartupContext';
-import { calculateCost, resolveImageCost, recordCost } from '../services/billing/costService';
+import { calculateCost, resolveImageCost } from '../services/billing/costService';
 import {
   buildGenerationAttemptRequestId,
   resolveGenerationAttemptFailureState,
@@ -1262,20 +1262,6 @@ export const useImageGeneration = (options: {
               addImageNodes(recoveredImageNodes as any, {
                 [latestNode.id]: nextPromptState
               });
-              
-              recordCost(
-                latestNode.model,
-                latestNode.imageSize || '1K',
-                recoveredImageNodes.length,
-                latestNode.prompt || '',
-                latestNode.referenceImages?.length || 0,
-                {
-                  cost: recoveredUsage.cost,
-                  totalTokens: recoveredUsage.tokens,
-                },
-                undefined,
-                latestNode.keySlotId
-              );
             } else {
               urgentUpdatePromptNode(nextPromptState);
             }
@@ -1289,7 +1275,9 @@ export const useImageGeneration = (options: {
               finalizedCompletedTasks.find((task) => task.taskId === targetTaskId)?.resultStorageIds
             );
 
-            await refreshBilling();
+            if (shouldRefreshServerBillingState(latestNode)) {
+              await refreshBilling();
+            }
             
             if (nextPendingTaskIds.length > 0) {
               setTimeout(() => {
@@ -1892,23 +1880,6 @@ export const useImageGeneration = (options: {
         
         if (results.length > 0) {
           addImageNodes(results as any, { [updatedNode.id]: updatedNode });
-          const firstSuccess = results[0];
-          recordCost(
-            updatedNode.model,
-            updatedNode.imageSize || '1K',
-            results.length,
-            updatedNode.prompt || '',
-            updatedNode.referenceImages?.length || 0,
-            {
-              cost: firstSuccess?.cost || 0,
-              promptTokens: firstSuccess?.promptTokens,
-              completionTokens: firstSuccess?.completionTokens,
-              totalTokens: firstSuccess?.tokens,
-            },
-            undefined,
-            updatedNode.keySlotId
-          );
-          await refreshBilling();
         } else {
           await updatePromptNode(updatedNode);
         }

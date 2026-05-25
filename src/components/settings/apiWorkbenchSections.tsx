@@ -543,7 +543,6 @@ type ApiWorkbenchCapabilityDraft = {
   title: string;
   description: string;
   enabled: boolean;
-  warning?: string;
   primaryRouteId: string;
   primaryModelId: string;
   fallbackRouteId: string;
@@ -617,11 +616,6 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                 </button>
               </div>
             </div>
-            {item.warning && item.enabled && (
-              <div className="mx-2 mt-1 rounded-[12px] border px-3 py-2 text-[12px] leading-5 text-[var(--state-warning-text)]" style={SETTINGS_WARNING_STYLE}>
-                {item.warning}
-              </div>
-            )}
             <div className="settings-capability-card__controls">
               <SettingSelect
                 label={pick('主链路', 'Primary route')}

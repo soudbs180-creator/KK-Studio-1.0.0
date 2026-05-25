@@ -8,7 +8,6 @@ import { useAuth } from '../context/AuthContext';
 import { useAppStartup } from '../context/AppStartupContext';
 import { shouldShowLoginForAuthGate } from './authGate';
 import { pickByDocumentLanguage } from '../utils/localeText';
-import { getStoredKkApiAccessToken } from '../services/api/authAccessToken';
 
 const CostEstimation = lazy(() => import('../pages/CostEstimation'));
 const PROMPT_BAR_CONTAINER_ID = 'prompt-bar-container';
@@ -209,27 +208,16 @@ export const AuthenticatedAppShell: React.FC<AuthenticatedAppShellProps> = ({
 }) => {
   const { session, user, isTempUser, loading, sessionRecoveryWarning } = useAuth();
   const {
-    stage,
-    isWorkspaceReady,
     isBackgroundReady,
-    lastStartupWarning,
   } = useAppStartup();
   const showStartupRuntimeBanner = showStartupBanner && !isBackgroundReady;
 
   if (loading) {
-    const hasStoredToken = typeof window !== 'undefined' && Boolean(getStoredKkApiAccessToken());
-    if (!hasStoredToken) {
-      return null;
-    }
-    if (loading) { return <AppStartupScreen stage="session_ready" warning={sessionRecoveryWarning} />; }
+    return <AppStartupScreen stage="session_ready" warning={sessionRecoveryWarning} />;
   }
 
   if (shouldShowLoginForAuthGate({ user, session, isTempUser })) {
     return <LoginScreen />;
-  }
-
-  if (!isWorkspaceReady) {
-    return <AppStartupScreen stage={stage} warning={sessionRecoveryWarning || lastStartupWarning} />;
   }
 
   return (

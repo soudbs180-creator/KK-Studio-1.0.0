@@ -4,8 +4,8 @@ export const PHONE_MAX_WIDTH = 768;
 export const TABLET_MAX_WIDTH = 1023;
 const RESULT_GRID_GAP_PX = 12;
 const RESULT_GRID_ROW_HEIGHT_PX = 8;
-const RESULT_GRID_STANDARD_MIN_ROWS = 6;
-const RESULT_GRID_DETAIL_MIN_ROWS = 14;
+const RESULT_GRID_VERTICAL_CHROME_PX = 12;
+const RESULT_GRID_DETAIL_CHROME_PX = 44;
 
 export interface AdaptiveResultTileGridMetrics {
   columnSpan: number;
@@ -49,8 +49,23 @@ export function getAdaptiveResultColumnCount({
     return 1;
   }
 
-  // 🚀 全平台使用 12 列精细网格，以确保比例整除与防缝隙排版
-  return 12;
+  if (surface === 'phone') {
+    if (width <= 360) {
+      return 2;
+    }
+
+    if (width <= 560) {
+      return 3;
+    }
+
+    return 4;
+  }
+
+  if (surface === 'tablet') {
+    return width >= 960 ? 5 : 4;
+  }
+
+  return 6;
 }
 
 export function getAdaptiveResultTileGridMetrics({
@@ -73,63 +88,22 @@ export function getAdaptiveResultTileGridMetrics({
   const safeWidth = Number.isFinite(width) && width > 0 ? width : surface === 'phone' ? PHONE_MAX_WIDTH : TABLET_MAX_WIDTH;
 
   if (viewMode === 'detail') {
-    const horizontalPadding = surface === 'phone' ? 24 : surface === 'tablet' ? 32 : 40;
-    const availableWidth = Math.max(280, safeWidth - horizontalPadding);
-    const visualHeight = (availableWidth / safeAspectRatio) + 110;
     return {
       columnSpan: safeColumnCount,
-      rowSpan: getGridRowSpan(visualHeight, RESULT_GRID_DETAIL_MIN_ROWS),
+      rowSpan: Math.max(28, Math.ceil((safeWidth / safeAspectRatio + RESULT_GRID_DETAIL_CHROME_PX) / RESULT_GRID_ROW_HEIGHT_PX)),
     };
-  }
-
-  let columnSpan = 3; // 默认占 3/12 (一排 4 个)
-
-  if (safeColumnCount !== 12) {
-    // 非 12 列精细网格时（如测试中的 3 列），回退到旧有的直观列分配
-    columnSpan = 1;
-    if (safeAspectRatio >= 1.45) {
-      columnSpan = Math.min(safeColumnCount, 2);
-    }
-  } else {
-    // 🚀 12列网格系统下的自适应 span 分配
-    if (safeAspectRatio >= 2.0) {
-      // 21:9 超宽图 (放 1 个，占 12/12)
-      columnSpan = 12;
-    } else if (safeAspectRatio >= 1.45) {
-      // 16:9 宽图 (放 2 个，占 6/12)
-      columnSpan = 6;
-    } else {
-      // 其他普通比例：放 3 个到 4 个
-      if (surface === 'phone') {
-        if (safeWidth <= 480) {
-          columnSpan = 4; // 窄屏放 3 个 (占 4/12)
-        } else {
-          columnSpan = 3; // 宽屏放 4 个 (占 3/12)
-        }
-      } else {
-        // 平板和桌面端放 4 个 (占 3/12)
-        columnSpan = 3;
-      }
-    }
   }
 
   const horizontalPadding = surface === 'phone' ? 24 : surface === 'tablet' ? 32 : 40;
   const availableWidth = Math.max(280, safeWidth - horizontalPadding);
   const baseColumnWidth =
     (availableWidth - RESULT_GRID_GAP_PX * (safeColumnCount - 1)) / safeColumnCount;
+  const columnSpan = aspectCategory === 'wide' && safeColumnCount >= 3 ? 2 : 1;
   const tileWidth = baseColumnWidth * columnSpan + RESULT_GRID_GAP_PX * (columnSpan - 1);
-  const visualHeight = tileWidth / safeAspectRatio;
+  const visualHeight = tileWidth / safeAspectRatio + RESULT_GRID_VERTICAL_CHROME_PX;
 
   return {
     columnSpan,
-    rowSpan: getGridRowSpan(visualHeight, RESULT_GRID_STANDARD_MIN_ROWS),
+    rowSpan: Math.max(12, Math.ceil(visualHeight / RESULT_GRID_ROW_HEIGHT_PX)),
   };
-}
-
-function getGridRowSpan(visualHeight: number, minimumRows: number): number {
-  const safeVisualHeight = Number.isFinite(visualHeight) && visualHeight > 0 ? visualHeight : 0;
-  const rowSpan = Math.ceil(
-    (safeVisualHeight + RESULT_GRID_GAP_PX) / (RESULT_GRID_ROW_HEIGHT_PX + RESULT_GRID_GAP_PX),
-  );
-  return Math.max(minimumRows, rowSpan);
 }

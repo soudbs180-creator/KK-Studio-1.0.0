@@ -126,9 +126,6 @@ export function resolveCurrentPromptChildImagesForPptRuntime(
       orderedOwnedImages.push(imageNode);
     });
 
-    // 按照时间戳升序排序，使新生成的在最下面，旧时间生成的在上面，同时防止 React 更新时元素微抖动导致卡片错位
-    orderedOwnedImages.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-
     return orderedOwnedImages;
   }
 
@@ -150,9 +147,6 @@ export function resolveCurrentPromptChildImagesForPptRuntime(
     seenIds.add(imageNode.id);
     legacyOwnedImages.push(imageNode);
   });
-
-  // 按照时间戳升序排序
-  legacyOwnedImages.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
   return legacyOwnedImages;
 }

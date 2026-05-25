@@ -888,36 +888,9 @@ body.auth-screen-active.auth-screen-active--light #root {
 }
 
 @media (max-width: 767px) {
-  .auth-page {
-    overflow-y: auto;
-  }
-
   .auth-version-badge {
     right: 16px;
     bottom: 14px;
-  }
-
-  /* 🚀 移动端居中适配：修复登录框左右间距不对称问题，并增加底部 padding 确保安全滚动 */
-  .auth-side-form {
-    justify-content: center;
-    align-items: center;
-    padding: 16px 16px 80px;
-    min-height: 100vh;
-  }
-
-  .auth-panel {
-    width: calc(100% - 8px);
-    max-width: 440px;
-    max-height: none;
-    overflow: visible;
-    margin: 0 auto;
-    padding: 20px 16px;
-    border-radius: 22px;
-    box-sizing: border-box;
-  }
-
-  .auth-header h2 {
-    font-size: clamp(24px, 5.5vw, 30px);
   }
 }
 

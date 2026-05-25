@@ -40,7 +40,6 @@ import {
   getSettingsViewMeta,
 } from '../settingsRegistry';
 import { ProgressBar, StatusBadge } from '../ui/index';
-import { useAdminRole } from '../../../hooks/useAdminRole';
 
 interface DashboardViewProps {
   onNavigate: (view: string) => void;
@@ -279,12 +278,6 @@ const DashboardSignalHero: React.FC<{
 );
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
-  const { user, accountRole } = useAdminRole();
-  const displayName = user?.user_metadata?.full_name ||
-    user?.user_metadata?.display_name ||
-    (user?.email?.endsWith('@users.kkstudio.local') ? '微信用户' : user?.email?.split('@')[0]) ||
-    'Guest';
-
   const { locale, pick } = useLocale();
   const registryLanguage = locale.startsWith('zh') ? 'zh-CN' : 'en-US';
   const dashboardMeta = useMemo(
@@ -718,50 +711,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   return (
     <SettingsViewShell>
       <div className="settings-reference-stack">
-        {/* 我的信息 Clay 实心卡片 */}
-        <section className="settings-reference-card !bg-[var(--settings-surface-overlay)] !border-[var(--settings-border-subtle)] flex items-center justify-between p-5 gap-4">
-          <div className="flex items-center gap-4">
-            {/* 头像 */}
-            <div className="relative w-14 h-14 rounded-2xl overflow-hidden border border-white/10 flex-shrink-0 bg-[var(--bg-tertiary)] flex items-center justify-center shadow-inner">
-              {user?.user_metadata?.avatar_url ? (
-                <img
-                  src={user.user_metadata.avatar_url}
-                  alt="avatar"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="text-xl font-bold uppercase text-[var(--text-secondary)]">
-                  {displayName[0] || 'U'}
-                </div>
-              )}
-            </div>
-            {/* 账户详情 */}
-            <div className="flex flex-col gap-1 min-w-0">
-              <h3 className="text-sm font-semibold text-[var(--text-primary)] truncate">
-                {displayName}
-              </h3>
-              <p className="text-xs text-[var(--text-tertiary)] truncate">
-                {user?.email?.endsWith('@users.kkstudio.local') ? pick('微信授权用户', 'WeChat Authorized User') : user?.email || pick('未绑定账号', 'No account bound')}
-              </p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <SettingsBadge tone={accountRole === 'admin' ? 'indigo' : 'neutral'}>
-                  {accountRole === 'admin' ? pick('系统管理员', 'Administrator') : pick('普通用户', 'User')}
-                </SettingsBadge>
-              </div>
-            </div>
-          </div>
-          
-          {/* 实时积分余额 */}
-          <div className="flex flex-col items-end gap-1 flex-shrink-0">
-            <span className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)]">
-              {pick('积分余额', 'Credits Balance')}
-            </span>
-            <span className="text-xl font-bold text-amber-400 font-mono">
-              {remainingBalanceDisplay}
-            </span>
-          </div>
-        </section>
-
         <SettingsHero
           className="settings-dashboard-hero"
           eyebrow={pick('高级设置', 'Advanced settings')}
@@ -868,8 +817,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               '把路由、日志和存储准备度放在同一个面板里。',
               'Keep route, log, and storage readiness in one compact panel.',
             )}
-            surface="plain"
             action={<LayoutDashboard size={18} className="text-[var(--text-primary)]" />}
+            surface="plain"
           >
             <div className="settings-reference-rings settings-reference-rings--flat">
               <DashboardRingRow

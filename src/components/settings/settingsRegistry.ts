@@ -15,8 +15,7 @@ export type CanonicalSettingsViewId =
   | 'api-management'
   | 'consumption-records'
   | 'storage-settings'
-  | 'system-logs'
-  | 'admin-credits';
+  | 'system-logs';
 
 export type LegacySettingsViewId =
   | 'admin-console'
@@ -89,7 +88,6 @@ interface SettingsNavItemDefinition {
   descriptionZh: string;
   descriptionEn: string;
   featureFlag?: 'billing';
-  adminOnly?: boolean;
 }
 
 const SHELL_COPY = {
@@ -129,7 +127,6 @@ export const SETTINGS_PATHS: Record<CanonicalSettingsViewId, string> = {
   'consumption-records': 'consumption-records',
   'storage-settings': 'storage-settings',
   'system-logs': 'system-logs',
-  'admin-credits': 'admin-credits',
 };
 
 export const LEGACY_SETTINGS_VIEW_ALIASES: Record<LegacySettingsViewId, CanonicalSettingsViewId> = {
@@ -217,18 +214,6 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     statusSummaryLabelZh: '日志状态',
     statusSummaryLabelEn: 'Log status',
   },
-  'admin-credits': {
-    eyebrow: 'Admin',
-    titleZh: '积分配置',
-    titleEn: 'Credit Models',
-    descriptionZh: '管理各大模型 API 的扣费积分与渠道 Keys。',
-    descriptionEn: 'Manage model credits, channels and API keys.',
-    primaryActionLabelZh: '返回 API 工作台',
-    primaryActionLabelEn: 'Back to API Workspace',
-    primaryActionTarget: 'api-management',
-    statusSummaryLabelZh: '积分配置状态',
-    statusSummaryLabelEn: 'Credits config status',
-  },
 };
 
 export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
@@ -282,17 +267,6 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     icon: HardDrive,
     section: 'system',
     path: SETTINGS_PATHS['storage-settings'],
-  },
-  {
-    id: 'admin-credits',
-    labelZh: '积分配置',
-    labelEn: 'Credit Models',
-    descriptionZh: '模型积分与渠道 Keys。',
-    descriptionEn: 'Model credits & keys.',
-    icon: Coins,
-    section: 'system',
-    path: SETTINGS_PATHS['admin-credits'],
-    adminOnly: true,
   },
 ];
 
@@ -350,9 +324,9 @@ export function getSettingsNavSections(language: AppLanguage): SettingsNavSectio
   ];
 }
 
-export function getSettingsNavItems(language: AppLanguage, isAdmin = false): SettingsNavItem[] {
+export function getSettingsNavItems(language: AppLanguage): SettingsNavItem[] {
   return SETTINGS_NAV_ITEM_DEFINITIONS
-    .filter((item) => isNavItemEnabled(item) && (!item.adminOnly || isAdmin))
+    .filter(isNavItemEnabled)
     .map((item) => ({
       id: item.id,
       label: pickByLanguage(language, item.labelZh, item.labelEn),

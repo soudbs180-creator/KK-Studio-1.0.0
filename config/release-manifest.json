@@ -1,13 +1,13 @@
 {
   "appName": "KK Studio",
-  "version": "1.4.8",
-  "displayVersion": "v1.4.8",
-  "releaseDate": "2026-05-23",
+  "version": "1.4.6",
+  "displayVersion": "v1.4.6",
+  "releaseDate": "2026-05-09",
   "releaseNotes": [
-    "Resolved localStorage plain-text encryption and API key boundary hardening in browser-direct environments.",
-    "Fixed Imagen 4.0 relative path 404 error during direct image generation.",
-    "Corrected a major syntax error (bracket mismatch) inside the loadState method of KeyManager.",
-    "verified kkai.plus same-origin API integration with localStorage cloud sync and proxy channels."
+    "Desktop canvas now includes a snap-to-grid toggle for more precise prompt, image, workflow, and grouped-card positioning.",
+    "Manual canvas groups can now collapse into compact cards and expand back without rendering hidden members or connectors.",
+    "Hosted/VPS release guardrails, package metadata, workspace packages, and portable version manifests are aligned to version 1.4.6.",
+    "The 1.4.6 hosted release now uses the verified kkai.plus same-origin API with an HTTPS VPS upstream while the permanent api.kkai.plus DNS record awaits Cloudflare access."
   ],
   "versionTargets": {
     "releaseManifest": "config/release-manifest.json",

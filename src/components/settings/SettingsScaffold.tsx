@@ -157,7 +157,7 @@ export const SETTINGS_CONTROL_MOTION_CLASSNAME =
   'settings-control-motion transition-[background-color,border-color,box-shadow,color,transform] duration-[var(--motion-duration-standard)] ease-[var(--motion-ease-standard)] hover:-translate-y-px active:translate-y-0';
 
 export const SettingsViewShell: React.FC<{ children: ReactNode }> = ({ children }) => (
-  <div className="settings-view-shell settings-reference-stack pb-4">{children}</div>
+  <div className="settings-view-shell settings-reference-stack space-y-6 pb-4">{children}</div>
 );
 
 export const SettingsBadge: React.FC<{ children: ReactNode; tone?: Tone; className?: string }> = ({
@@ -166,13 +166,13 @@ export const SettingsBadge: React.FC<{ children: ReactNode; tone?: Tone; classNa
   className = '',
 }) => (
   <span
-    className={`inline-flex max-w-full min-w-0 items-center justify-center overflow-hidden rounded-full px-3 py-1 text-left font-medium uppercase tracking-[0.12em] leading-none whitespace-nowrap ${className}`.trim()}
+    className={`inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-full px-3 py-1.5 text-left font-medium uppercase tracking-[0.12em] leading-[1.3] whitespace-nowrap ${className}`.trim()}
     style={{
       ...toneStyles[tone].badgeStyle,
       fontSize: 'var(--type-micro)',
     }}
   >
-    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap leading-none flex items-center">{children}</span>
+    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{children}</span>
   </span>
 );
 

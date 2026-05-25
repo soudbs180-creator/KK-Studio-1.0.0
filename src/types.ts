@@ -45,8 +45,7 @@ export type ResponsiveSurface = 'phone' | 'tablet' | 'desktop';
 
 export type ResultViewMode = 'standard' | 'detail';
 
-// Compatible with legacy contract: export type MobileSurfaceScreen = 'home' | 'detail' | 'more-sheet';
-export type MobileSurfaceScreen = 'home' | 'detail' | 'more-sheet' | 'ecommerce';
+export type MobileSurfaceScreen = 'home' | 'detail' | 'more-sheet';
 
 export type MobileSettingsSection = 'dashboard' | 'api-management' | 'consumption-records' | 'system-logs';
 
@@ -139,12 +138,6 @@ export interface MobileResultEntry {
     imageId: string;
     promptId: string | null;
   };
-  creditCost?: number;
-  generationTime?: number;
-  isGenerating?: boolean;
-  error?: string;
-  groupCount?: number;
-  groupEntries?: MobileResultEntry[];
 }
 
 // ============================================
@@ -1049,13 +1042,6 @@ export interface GenerationConfig {
   audioLyrics?: string;
   pptSlides?: string[];
   pptStyleLocked?: boolean;
-  // PicGen 高级图像参数选择
-  quality?: 'auto' | 'low' | 'medium' | 'high' | 'standard' | 'hd';
-  background?: 'auto' | 'opaque' | 'transparent';
-  outputFormat?: 'png' | 'jpeg' | 'webp';
-  outputCompression?: number;
-  moderation?: 'auto' | 'low';
-  sampleCount?: number;
 }
 
 

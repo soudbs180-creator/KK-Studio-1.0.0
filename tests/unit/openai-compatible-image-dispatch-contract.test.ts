@@ -73,15 +73,6 @@ describe("OpenAI-compatible image dispatch plan", () => {
         isGeminiImage: true,
         useChatEndpoint: true,
       }),
-      { kind: "suxi-openai-compat" },
-    );
-    assert.deepEqual(
-      resolveOpenAICompatibleImageDispatch({
-        runtime: suxiRuntime,
-        imageSurface: "provider-images",
-        isGeminiImage: false,
-        useChatEndpoint: true,
-      }),
       { kind: "suxi-openai-strict" },
     );
     assert.deepEqual(

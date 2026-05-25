@@ -38,7 +38,6 @@ interface AppMobileWorkspaceProps {
   onEntryOpen: (entryId: string) => void;
   onPreviewImage: (imageId: string) => void;
   onUseResultAsSource: (imageId: string) => void;
-  onGenerateFollowUp?: (prompt: string, parentImageId: string) => void;
   onPartialRedraw: (entry: MobileResultEntry, request: PartialRedrawRequest) => void;
   onDownloadEntry: (entry: MobileResultEntry) => void;
   onDeleteImage: (imageId: string) => void;
@@ -75,7 +74,6 @@ const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
   onEntryOpen,
   onPreviewImage,
   onUseResultAsSource,
-  onGenerateFollowUp,
   onPartialRedraw,
   onDownloadEntry,
   onDeleteImage,
@@ -118,11 +116,6 @@ const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
         setWorkspaceSurface('library');
         setMobileScreen('home');
       }}
-      onOpenHistorySearch={() => {
-        setWorkspaceSurface('library');
-        setIsSearchOpen(true);
-        setMobileScreen('home');
-      }}
       onOpenChat={() => {
         focusWorkspace();
         setIsChatOpen(true);
@@ -137,7 +130,6 @@ const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
       onEntryOpen={onEntryOpen}
       onPreviewImage={onPreviewImage}
       onUseResultAsSource={onUseResultAsSource}
-      onGenerateFollowUp={onGenerateFollowUp}
       onPartialRedraw={onPartialRedraw}
       onDownloadEntry={onDownloadEntry}
       onDeleteImage={onDeleteImage}
@@ -145,7 +137,6 @@ const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
       onConfirmEcommerceDesktop={onConfirmEcommerceDesktop}
       onGenerateEcommerceMobile={onGenerateEcommerceMobile}
       onToggleEcommerceSelected={onToggleEcommerceSelected}
-      promptBarProps={promptBarProps}
       composer={(
         <AppPromptComposer
           variant="mobile"

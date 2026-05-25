@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { GeneratedImage, GenerationMode, type PartialRedrawRequest } from '../../types';
-import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, RotateCw, Pen, Copy } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy } from 'lucide-react';
 import { PartialRedrawModal } from './PartialRedrawModal';
 import { notify } from '../../services/system/notificationService';
 import { getImage, getStrictOriginalImage } from '../../services/storage/imageStorage';
@@ -10,27 +10,6 @@ import { generateDownloadFilename, triggerDownload } from '../../utils/downloadU
 import { clampGenerationDurationMs, formatGenerationDurationSeconds } from '../../utils/timeUtils';
 import { pickByDocumentLanguage } from '../../utils/localeText';
 import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
-
-const FlipHorizontalIcon: React.FC<{ size?: number }> = ({ size = 16 }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-        <path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3" />
-        <path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3" />
-        <path d="M12 2v20" strokeDasharray="4" />
-        <path d="m10 8-4 4 4 4" />
-        <path d="m14 8 4 4-4 4" />
-    </svg>
-);
-
-const FlipVerticalIcon: React.FC<{ size?: number }> = ({ size = 16 }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-        <path d="M3 8V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3" />
-        <path d="M3 16v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3" />
-        <path d="M2 12h20" strokeDasharray="4" />
-        <path d="m8 10 4-4 4 4" />
-        <path d="m8 14 4 4 4-4" />
-    </svg>
-);
-
 
 interface GlobalLightboxProps {
     images: GeneratedImage[];
@@ -62,12 +41,6 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false
     );
 
-    // Image transformation states
-    const [rotate, setRotate] = useState(0);
-    const [flipX, setFlipX] = useState(false);
-    const [flipY, setFlipY] = useState(false);
-
-
     // Image loading state
     const [displaySrc, setDisplaySrc] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -82,18 +55,8 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     const clampedGenerationTime = clampGenerationDurationMs(image.generationTime);
     const isPptSubCard = image.mode === GenerationMode.PPT && Boolean(image.parentPromptId);
     const downloadMenuRef = useRef<HTMLDivElement>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const touchGestureActiveRef = useRef(false);
     const panStartRef = useRef({ x: 0, y: 0 });
     const panStartPosRef = useRef({ x: 0, y: 0 });
-
-    // Touch gesture references for mobile devices
-    const touchStartRef = useRef<{ x: number; y: number }[]>([]);
-    const initialTouchDistanceRef = useRef<number>(0);
-    const initialTouchZoomRef = useRef<number>(1);
-    const initialTouchPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-    const lastTapRef = useRef<number>(0);
-
 
     // Track the actual loaded media dimensions.
     const [realDimensions, setRealDimensions] = useState<string | null>(null);
@@ -320,11 +283,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         setRealDimensions(null);
         setZoom(1);
         setPan({ x: 0, y: 0 });
-        setRotate(0);
-        setFlipX(false);
-        setFlipY(false);
         applyDisplaySource(null, { loading: true });
-
 
         const initialOriginalHint = sanitizeUrl(image.originalUrl || image.apiResultUrl || null);
         const initialFallbackSrc = sanitizeUrl(image.url || image.apiResultUrl || null);
@@ -442,243 +401,6 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
             };
         }
     }, [isPanning, handleMouseMove, handleMouseUp]);
-
-    // 桥接 Refs，保持事件处理器中能访问到最新的状态
-    const zoomRef = useRef(zoom);
-    zoomRef.current = zoom;
-    const panRef = useRef(pan);
-    panRef.current = pan;
-    const rotateRef = useRef(rotate);
-    rotateRef.current = rotate;
-    const flipXRef = useRef(flipX);
-    flipXRef.current = flipX;
-    const flipYRef = useRef(flipY);
-    flipYRef.current = flipY;
-    const onCloseRef = useRef(onClose);
-    onCloseRef.current = onClose;
-    const handlePrevRef = useRef(handlePrev);
-    handlePrevRef.current = handlePrev;
-    const handleNextRef = useRef(handleNext);
-    handleNextRef.current = handleNext;
-
-    // 阻止移动端页面双指缩放和背景滚动
-    useEffect(() => {
-        if (!isMobile) return;
-
-        const preventDefaultScale = (e: TouchEvent) => {
-            if (e.touches && e.touches.length > 1) {
-                if (e.cancelable) {
-                    e.preventDefault();
-                }
-            }
-        };
-
-        const preventGesture = (e: Event) => {
-            if (e.cancelable) {
-                e.preventDefault();
-            }
-        };
-
-        // 备份并隐藏背景滚动
-        const originalOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-
-        document.addEventListener('touchstart', preventDefaultScale, { passive: false });
-        document.addEventListener('touchmove', preventDefaultScale, { passive: false });
-        document.addEventListener('gesturestart', preventGesture, { passive: false });
-        document.addEventListener('gesturechange', preventGesture, { passive: false });
-
-        return () => {
-            document.body.style.overflow = originalOverflow;
-            document.removeEventListener('touchstart', preventDefaultScale);
-            document.removeEventListener('touchmove', preventDefaultScale);
-            document.removeEventListener('gesturestart', preventGesture);
-            document.removeEventListener('gesturechange', preventGesture);
-        };
-    }, [isMobile]);
-
-    // 容器的原生手势事件处理（缩放、滑动切换与上下拉拽关闭）
-    useEffect(() => {
-        const container = containerRef.current;
-        if (!container || !isMobile) return;
-
-        let startTouches: { clientX: number; clientY: number }[] = [];
-        let initialDist = 0;
-        let initialZoomVal = 1;
-        let initialPanVal = { x: 0, y: 0 };
-        let swipeDirection: 'none' | 'horizontal' | 'vertical' = 'none';
-        let isGestureActive = false;
-        let lastTap = 0;
-
-        const isControlElement = (target: HTMLElement) => {
-            return (
-                target.closest('button') ||
-                target.closest('audio') ||
-                target.closest('a') ||
-                target.tagName === 'VIDEO'
-            );
-        };
-
-        const onTouchStart = (e: TouchEvent) => {
-            const target = e.target as HTMLElement;
-            if (isControlElement(target)) {
-                return;
-            }
-
-            isGestureActive = true;
-            const currentZoom = zoomRef.current;
-            const currentPan = panRef.current;
-
-            if (e.touches.length === 1) {
-                const touch = e.touches[0];
-                startTouches = [{ clientX: touch.clientX, clientY: touch.clientY }];
-                initialPanVal = { ...currentPan };
-                swipeDirection = 'none';
-
-                // 双击重置或放大
-                const now = Date.now();
-                if (now - lastTap < 300) {
-                    if (currentZoom !== 1 || currentPan.x !== 0 || currentPan.y !== 0 || rotateRef.current !== 0 || flipXRef.current || flipYRef.current) {
-                        setZoom(1);
-                        setPan({ x: 0, y: 0 });
-                        setRotate(0);
-                        setFlipX(false);
-                        setFlipY(false);
-                    } else {
-                        setZoom(2);
-                    }
-                    lastTap = 0;
-                } else {
-                    lastTap = now;
-                }
-            } else if (e.touches.length === 2) {
-                const t1 = e.touches[0];
-                const t2 = e.touches[1];
-                startTouches = [
-                    { clientX: t1.clientX, clientY: t1.clientY },
-                    { clientX: t2.clientX, clientY: t2.clientY }
-                ];
-                initialDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-                initialZoomVal = currentZoom;
-                initialPanVal = { ...currentPan };
-                swipeDirection = 'none';
-            }
-        };
-
-        const onTouchMove = (e: TouchEvent) => {
-            if (!isGestureActive) return;
-
-            const currentZoom = zoomRef.current;
-
-            if (e.touches.length === 1 && startTouches.length === 1) {
-                const touch = e.touches[0];
-                const dx = touch.clientX - startTouches[0].clientX;
-                const dy = touch.clientY - startTouches[0].clientY;
-
-                if (currentZoom > 1) {
-                    // 已放大状态：平移图片
-                    if (e.cancelable) e.preventDefault();
-                    touchGestureActiveRef.current = true;
-                    setPan({
-                        x: initialPanVal.x + dx,
-                        y: initialPanVal.y + dy
-                    });
-                } else {
-                    // 未放大状态：确定滑动方向
-                    if (swipeDirection === 'none') {
-                        const absX = Math.abs(dx);
-                        const absY = Math.abs(dy);
-                        if (absX > 10 || absY > 10) {
-                            if (absX > absY) {
-                                swipeDirection = 'horizontal';
-                            } else {
-                                swipeDirection = 'vertical';
-                            }
-                        }
-                    }
-
-                    if (swipeDirection === 'horizontal') {
-                        // 水平滑动：左滑/右滑
-                        if (e.cancelable) e.preventDefault();
-                        touchGestureActiveRef.current = true;
-                        setPan({
-                            x: dx * 0.8,
-                            y: 0
-                        });
-                    } else if (swipeDirection === 'vertical') {
-                        // 垂直滑动：上下滑动拉拽
-                        if (e.cancelable) e.preventDefault();
-                        touchGestureActiveRef.current = true;
-                        setPan({
-                            x: 0,
-                            y: dy
-                        });
-                    }
-                }
-            } else if (e.touches.length === 2 && startTouches.length === 2) {
-                // 双指缩放
-                if (e.cancelable) e.preventDefault();
-                touchGestureActiveRef.current = true;
-                const t1 = e.touches[0];
-                const t2 = e.touches[1];
-                const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-                if (initialDist > 0) {
-                    const ratio = currentDist / initialDist;
-                    const targetZoom = initialZoomVal * ratio;
-                    setZoom(Math.min(5, Math.max(0.5, targetZoom)));
-                }
-            }
-        };
-
-        const onTouchEnd = (e: TouchEvent) => {
-            if (!isGestureActive) return;
-            isGestureActive = false;
-            touchGestureActiveRef.current = false;
-
-            const currentZoom = zoomRef.current;
-
-            if (currentZoom < 1) {
-                setZoom(1);
-                setPan({ x: 0, y: 0 });
-            } else if (currentZoom === 1) {
-                if (startTouches.length === 1 && e.changedTouches.length === 1) {
-                    const touch = e.changedTouches[0];
-                    const dx = touch.clientX - startTouches[0].clientX;
-                    const dy = touch.clientY - startTouches[0].clientY;
-
-                    if (swipeDirection === 'horizontal') {
-                        if (Math.abs(dx) > 80) {
-                            if (dx > 0) {
-                                handlePrevRef.current();
-                            } else {
-                                handleNextRef.current();
-                            }
-                        }
-                    } else if (swipeDirection === 'vertical') {
-                        if (Math.abs(dy) > 120) {
-                            onCloseRef.current();
-                            return;
-                        }
-                    }
-                }
-                setPan({ x: 0, y: 0 });
-            }
-            startTouches = [];
-        };
-
-        container.addEventListener('touchstart', onTouchStart, { passive: false });
-        container.addEventListener('touchmove', onTouchMove, { passive: false });
-        container.addEventListener('touchend', onTouchEnd, { passive: false });
-        container.addEventListener('touchcancel', onTouchEnd, { passive: false });
-
-        return () => {
-            container.removeEventListener('touchstart', onTouchStart);
-            container.removeEventListener('touchmove', onTouchMove);
-            container.removeEventListener('touchend', onTouchEnd);
-            container.removeEventListener('touchcancel', onTouchEnd);
-        };
-    }, [isMobile]);
-
 
     useEffect(() => {
         setShowDownloadMenu(false);
@@ -798,7 +520,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         if (!videoEl) return;
 
         const handleNativeMousedown = (e: MouseEvent) => {
-// Check if this is the second click (or more) of a double-click
+            // Check if this is the second click (or more) of a double-click
             if (e.detail > 1) {
                 // Stop everything immediately
                 e.preventDefault();
@@ -817,38 +539,19 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
 
     if (!image) return null;
 
-    const getOpacity = () => {
-        if (zoom === 1 && Math.abs(pan.y) > 0) {
-            const ratio = Math.max(0.2, 1 - Math.abs(pan.y) / 400);
-            return ratio * 0.95;
-        }
-        return 0.95;
-    };
-
-    const getScale = () => {
-        if (zoom === 1 && Math.abs(pan.y) > 0) {
-            return Math.max(0.7, 1 - Math.abs(pan.y) / 800);
-        }
-        return 1;
-    };
-
     const isVideo = image.mode === GenerationMode.VIDEO || displaySrc?.startsWith('data:video') || displaySrc?.endsWith('.mp4');
     const isAudio = image.mode === GenerationMode.AUDIO || displaySrc?.endsWith('.mp3') || displaySrc?.endsWith('.wav');
-    const actionButtonClass = 'shrink-0 flex items-center gap-2 rounded-lg border border-[var(--border-medium)] bg-[var(--bg-tertiary)] px-4 h-10 text-sm font-medium transition-all hover:bg-[var(--bg-secondary)]';
+    const actionButtonClass = 'shrink-0 flex items-center gap-2 rounded-lg border border-[var(--border-medium)] bg-[var(--bg-tertiary)] px-4 py-2 text-sm font-medium transition-all hover:bg-[var(--bg-secondary)]';
     const iconActionButtonClass = 'shrink-0 inline-flex h-10 items-center justify-center rounded-lg border border-[var(--border-medium)] bg-[var(--bg-tertiary)] px-3 text-sm font-medium transition-all hover:bg-[var(--bg-secondary)]';
 
     return ReactDOM.createPortal(
         <div
-            className="fixed inset-0 z-[99999] flex flex-col animate-fadeIn select-none overflow-hidden"
+            className="fixed inset-0 z-[99999] flex flex-col bg-black/95 animate-fadeIn select-none overflow-hidden"
             onClick={handleBackgroundClick}
-            style={{
-                backgroundColor: `rgba(0, 0, 0, ${getOpacity()})`,
-                transition: (isPanning || zoomRef.current !== 1 || Math.abs(pan.y) > 0) ? 'none' : 'background-color 0.15s ease-out',
-                ...(isMobile ? {
-                    paddingTop: 'max(10px, env(safe-area-inset-top, 0px))',
-                    paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))',
-                } : {})
-            }}
+            style={isMobile ? {
+                paddingTop: 'max(10px, env(safe-area-inset-top, 0px))',
+                paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))',
+            } : undefined}
         >
             {/* Top bar: close button */}
             <button
@@ -890,7 +593,6 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
             {/* Main content area */}
             {/* Height budget: 100vh minus footer space */}
             <div
-                ref={containerRef}
                 className="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden"
                 onWheel={handleWheel}
                 onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the panel.
@@ -949,26 +651,11 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                         src={displaySrc!}
                         alt={image.prompt}
                         referrerPolicy="strict-origin-when-cross-origin"
-                        className={`max-w-full max-h-full object-contain ${!displaySrc || hasError || isLoading ? 'opacity-0 pointer-events-none' : ''}`}
+                        className={`max-w-full max-h-full object-contain transition-transform duration-100 ${!displaySrc || hasError || isLoading ? 'opacity-0 pointer-events-none' : ''}`}
                         draggable={false}
                         onLoad={handleImageLoad} // Capture real rendered dimensions.
                         onMouseDown={handleMouseDown}
-                        onDoubleClick={(e) => {
-                            e.preventDefault();
-                            if (isMobile) {
-                                if (zoom !== 1 || pan.x !== 0 || pan.y !== 0 || rotate !== 0 || flipX || flipY) {
-                                    setZoom(1);
-                                    setPan({ x: 0, y: 0 });
-                                    setRotate(0);
-                                    setFlipX(false);
-                                    setFlipY(false);
-                                } else {
-                                    setZoom(2);
-                                }
-                            } else {
-                                onClose();
-                            }
-                        }}
+                        onDoubleClick={(e) => { e.preventDefault(); onClose(); }}
                         onContextMenu={(e) => {
                             if (isLoading) {
                                 e.preventDefault();
@@ -980,9 +667,8 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                             void recoverLightboxSource();
                         }}
                         style={{
-                            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom * getScale()}) rotate(${rotate}deg) scaleX(${flipX ? -1 : 1}) scaleY(${flipY ? -1 : 1})`,
-                            cursor: isPanning ? 'grabbing' : 'grab',
-                            transition: (isPanning || touchGestureActiveRef.current) ? 'none' : 'transform 0.15s ease-out'
+                            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                            cursor: isPanning ? 'grabbing' : 'grab'
                         }}
                     />
                 ) : null}
@@ -1038,42 +724,27 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                     </div>
                 </div>
 
-                <div className={isMobile ? "mt-3 flex w-full items-center justify-between h-10 gap-2" : `mt-3 flex w-full items-center gap-2 ${isMobile ? 'overflow-x-auto pb-1' : 'self-center sm:mt-0 sm:w-auto sm:flex-nowrap sm:justify-end sm:justify-self-end sm:gap-3'}`}>
-                    {/* Action controls (Unified premium look controller) */}
-                    <div className="flex shrink-0 items-center h-10 rounded-lg bg-[var(--bg-tertiary)] p-1 gap-0.5">
-                        <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="缩小"><ZoomOut size={16} /></button>
-                        <span className="w-12 text-center text-xs font-mono select-none">{Math.round(zoom * 100)}%</span>
-                        <button onClick={() => setZoom(z => Math.min(5, z + 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="放大"><ZoomIn size={16} /></button>
-                        
-                        <div className="mx-1 h-4 w-[1px] bg-[var(--border-light)] shrink-0" />
-                        
-                        <button onClick={() => setFlipX(f => !f)} className={`p-2 rounded hover:bg-[var(--bg-secondary)] ${flipX ? 'text-indigo-400' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="水平翻转">
-                            <FlipHorizontalIcon size={16} />
-                        </button>
-                        <button onClick={() => setFlipY(f => !f)} className={`p-2 rounded hover:bg-[var(--bg-secondary)] ${flipY ? 'text-indigo-400' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="垂直翻转">
-                            <FlipVerticalIcon size={16} />
-                        </button>
-                        <button onClick={() => setRotate(r => (r + 90) % 360)} className={`p-2 rounded hover:bg-[var(--bg-secondary)] ${rotate !== 0 ? 'text-indigo-400' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="顺时针旋转">
-                            <RotateCw size={16} />
-                        </button>
-
-                        <button 
-                            onClick={() => { 
-                                setZoom(1); 
-                                setPan({ x: 0, y: 0 }); 
-                                setRotate(0); 
-                                setFlipX(false); 
-                                setFlipY(false); 
-                            }} 
-                            className="p-2 hover:bg-[var(--bg-secondary)] rounded ml-1 border-l border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]" 
-                            title="还原默认状态"
-                        >
-                            <RotateCcw size={16} />
-                        </button>
+                <div className={`mt-3 flex w-full items-center gap-2 ${isMobile ? 'overflow-x-auto pb-1' : 'self-center sm:mt-0 sm:w-auto sm:flex-nowrap sm:justify-end sm:justify-self-end sm:gap-3'}`}>
+                    {isMobile && images.length > 1 && (
+                        <>
+                            <button onClick={handlePrev} className={iconActionButtonClass} title="上一张">
+                                <ChevronLeft size={16} />
+                            </button>
+                            <button onClick={handleNext} className={iconActionButtonClass} title="下一张">
+                                <ChevronRight size={16} />
+                            </button>
+                        </>
+                    )}
+                    {/* Action controls */}
+                    <div className="flex shrink-0 items-center rounded-lg bg-[var(--bg-tertiary)] p-1">
+                        <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded" title="缩小"><ZoomOut size={16} /></button>
+                        <span className="w-12 text-center text-xs">{Math.round(zoom * 100)}%</span>
+                        <button onClick={() => setZoom(z => Math.min(5, z + 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded" title="放大"><ZoomIn size={16} /></button>
+                        <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }} className="p-2 hover:bg-[var(--bg-secondary)] rounded ml-1 border-l border-[var(--border-light)]" title="重置"><RotateCcw size={16} /></button>
                     </div>
 
-                    {/* Partial redraw actions for images only - Hide on mobile */}
-                    {!isMobile && onPartialRedraw && !isVideo && !isAudio && displaySrc && (
+                    {/* Partial redraw actions for images only */}
+                    {onPartialRedraw && !isVideo && !isAudio && displaySrc && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -1087,8 +758,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                         </button>
                     )}
 
-                    {/* Layered deck actions - Hide on mobile */}
-                    {!isMobile && onEditPptDeck && image.mode === GenerationMode.PPT && !isVideo && !isAudio && (
+                    {onEditPptDeck && image.mode === GenerationMode.PPT && !isVideo && !isAudio && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -1102,8 +772,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                         </button>
                     )}
 
-                    {/* Quick text actions - Hide on mobile */}
-                    {!isMobile && onEditText && image.mode === GenerationMode.PPT && !isVideo && !isAudio && (
+                    {onEditText && image.mode === GenerationMode.PPT && !isVideo && !isAudio && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -1117,8 +786,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                         </button>
                     )}
 
-                    {/* Copy actions - Hide on mobile */}
-                    {!isMobile && !isVideo && !isAudio && (
+                    {!isVideo && !isAudio && (
                         <button
                             onClick={handleCopyOriginal}
                             className={`${actionButtonClass} hover:border-cyan-500 hover:bg-cyan-600/80`}
@@ -1132,14 +800,14 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                     <div className="relative" ref={downloadMenuRef}>
                         <button
                             onClick={handleDownload}
-                            className="shrink-0 flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 h-10 text-sm font-medium transition-colors hover:bg-indigo-500"
+                            className="shrink-0 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium transition-colors hover:bg-indigo-500"
                             title={isPptSubCard && onDownloadPptComposite ? '下载选项' : '下载原图'}
                         >
                             <Download size={16} />
                             下载
                         </button>
                         {showDownloadMenu && isPptSubCard && onDownloadPptComposite && (
-                            <div className="absolute right-0 bottom-full z-20 mb-2 w-36 rounded-xl border border-[var(--border-medium)] bg-[var(--bg-secondary)] p-1.5 shadow-2xl">
+                            <div className="absolute right-0 top-full z-20 mt-2 w-36 rounded-xl border border-[var(--border-medium)] bg-[var(--bg-secondary)] p-1.5 shadow-2xl">
                                 <button
                                     onClick={(e) => {
                                         setShowDownloadMenu(false);

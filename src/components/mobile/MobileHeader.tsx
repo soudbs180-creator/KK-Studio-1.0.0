@@ -15,7 +15,6 @@ interface MobileHeaderProps {
     title?: string;
     userName?: string;
     userAvatarUrl?: string;
-    userRole?: string;
 }
 
 const MobileHeader: React.FC<MobileHeaderProps> = ({
@@ -28,9 +27,8 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
     title = 'KK Studio',
     userName = '\u7528\u6237',
     userAvatarUrl,
-    userRole = 'user',
 }) => {
-    const iconButtonClass = 'h-11 w-11 rounded-[14px] flex items-center justify-center border transition-all active:scale-95';
+    const iconButtonClass = 'h-10 w-10 rounded-2xl flex items-center justify-center border transition-all active:scale-95';
     const handleRechargeClick = onRechargeClick ?? onBillingClick;
     const avatarFallback = userName?.trim()?.[0]?.toUpperCase() || 'U';
     const balanceDisplay = balanceLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');
@@ -39,19 +37,19 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
     return (
         <div className="w-full lg:hidden">
             <div
-                className="ios-mobile-header-glass rounded-[20px] border px-2.5 py-1.5"
+                className="ios-mobile-header-glass rounded-[30px] border px-3 py-3"
                 style={{
                     background: 'var(--mobile-clay-shell-bg)',
                     borderColor: 'var(--mobile-clay-border)',
                     boxShadow: 'var(--mobile-clay-shadow)'
                 }}
             >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                     <button
                         type="button"
                         onClick={onUserClick}
-                        aria-label="打开个人中心"
-                        className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-[14px] border px-2 text-left transition-[background-color,border-color]"
+                        aria-label="\u6253\u5f00\u4e2a\u4eba\u4e2d\u5fc3"
+                        className="flex min-w-0 flex-1 items-center gap-3 rounded-[22px] border px-2.5 py-2.5 text-left transition-[background-color,border-color]"
                         style={{
                             background: 'var(--mobile-clay-surface-bg)',
                             borderColor: 'var(--mobile-clay-border)'
@@ -59,7 +57,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                         title={userName}
                     >
                         <span
-                            className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[10px] text-xs font-bold text-white"
+                            className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[18px] text-sm font-bold text-white"
                             style={{ background: 'linear-gradient(135deg, var(--clay-brand-coral), var(--clay-brand-pink))' }}
                         >
                             {resolvedAvatarUrl ? (
@@ -69,35 +67,11 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                             )}
                         </span>
                         <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[9px] font-semibold uppercase tracking-[0.15em] text-[var(--text-tertiary)] leading-tight">
+                            <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
                                 {title}
                             </span>
-                            <span className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                                <span className="truncate text-[13px] font-semibold text-[var(--text-primary)] leading-tight">
-                                    {userName}
-                                </span>
-                                {(() => {
-                                    const role = String(userRole || 'user').toLowerCase();
-                                    if (role === 'admin') {
-                                        return (
-                                            <span className="shrink-0 inline-flex items-center rounded-full bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 text-[8px] font-bold text-red-400 tracking-wider scale-90 origin-left">
-                                                管理员
-                                            </span>
-                                        );
-                                    }
-                                    if (role.startsWith('member')) {
-                                        return (
-                                            <span className="shrink-0 inline-flex items-center rounded-full bg-amber-500/10 border border-amber-400/20 px-1.5 py-0.5 text-[8px] font-bold text-amber-400 tracking-wider scale-90 origin-left">
-                                                高级会员
-                                            </span>
-                                        );
-                                    }
-                                    return (
-                                        <span className="shrink-0 inline-flex items-center rounded-full bg-slate-500/10 border border-slate-500/15 px-1.5 py-0.5 text-[8px] font-bold text-slate-400 tracking-wider scale-90 origin-left">
-                                            普通用户
-                                        </span>
-                                    );
-                                })()}
+                            <span className="mt-1 block truncate text-[15px] font-semibold text-[var(--text-primary)]">
+                                {userName}
                             </span>
                         </span>
                     </button>
@@ -107,20 +81,18 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                         onClick={handleRechargeClick}
                         data-testid="mobile-header-credit-chip"
                         aria-label="\u67e5\u770b\u79ef\u5206"
-                        className="inline-flex min-w-[76px] h-11 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-[14px] border px-2 py-1 text-left text-[var(--text-primary)] transition-all active:scale-95 disabled:opacity-55"
+                        className="inline-flex min-w-[92px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[20px] border px-3 py-2 text-left text-[var(--text-primary)] transition-all active:scale-95 disabled:opacity-55"
                         style={{
                             background: 'var(--mobile-clay-surface-bg)',
                             borderColor: 'var(--mobile-clay-border)'
                         }}
                         disabled={!handleRechargeClick}
                     >
-                        <div className="flex flex-col items-center justify-center">
-                            <span className="inline-flex items-center gap-0.5 text-[8px] font-semibold uppercase tracking-[0.1em] text-[var(--text-tertiary)] leading-none">
-                                <Sparkles size={8} className="text-amber-300" />
-                                {'\u79ef\u5206'}
-                            </span>
-                            <span className="text-[12px] font-semibold leading-tight mt-0.5">{balanceDisplay}</span>
-                        </div>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
+                            <Sparkles size={12} className="text-amber-300" />
+                            {'\u79ef\u5206'}
+                        </span>
+                        <span className="text-[15px] font-semibold leading-none">{balanceDisplay}</span>
                     </button>
 
                     <button
@@ -134,7 +106,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                             borderColor: 'var(--mobile-clay-border)'
                         }}
                     >
-                        <Menu size={16} strokeWidth={2.15} />
+                        <Menu size={18} strokeWidth={2.15} />
                     </button>
                 </div>
             </div>

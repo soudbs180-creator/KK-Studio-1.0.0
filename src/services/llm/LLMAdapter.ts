@@ -95,14 +95,6 @@ export interface ImageGenerationOptions {
     // 🚀 [Fix] 支持携带 MIME 类型的参考图（严格对齐 Google 官方文档）
     referenceImages?: Array<string | { data: string; mimeType: string }>;
 
-    // PicGen 高级参数
-    quality?: 'auto' | 'low' | 'medium' | 'high' | 'standard' | 'hd';
-    background?: 'auto' | 'opaque' | 'transparent';
-    outputFormat?: 'png' | 'jpeg' | 'webp';
-    outputCompression?: number;
-    moderation?: 'auto' | 'low';
-    sampleCount?: number;
-
     // 🚀 Advanced Editing Options
     maskUrl?: string; // Base64 mask for inpainting
     editMode?: 'inpaint' | 'outpaint' | 'vectorize' | 'reframe' | 'upscale' | 'replace-background' | 'edit';

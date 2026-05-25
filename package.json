@@ -1,7 +1,7 @@
 {
   "name": "kk-studio",
   "private": true,
-  "version": "1.4.8",
+  "version": "1.4.6",
   "workspaces": [
     "packages/*"
   ],
@@ -38,7 +38,7 @@
     "governance:compat": "node scripts/governance/check-compatibility-registry.mjs",
     "governance:security": "node scripts/governance/check-sensitive-boundaries.mjs",
     "governance:check": "npm run governance:version && npm run governance:agent-docs && npm run governance:compat && npm run governance:security",
-    "audit:dependencies": "(npm audit --omit=dev --audit-level=moderate || echo \"Warning: npm audit failed, skipping due to network issues\") && (npm audit --omit=dev --audit-level=moderate --prefix payment-server || echo \"Warning: npm audit failed, skipping due to network issues\")",
+    "audit:dependencies": "npm audit --omit=dev --audit-level=moderate && npm audit --omit=dev --audit-level=moderate --prefix payment-server",
     "typecheck:tests": "node scripts/ci/check-tests-types.mjs tsconfig.tests.json",
     "typecheck:payment-server": "node scripts/ci/check-payment-server.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.architecture.json && node scripts/ci/check-tests-types.mjs tsconfig.tests.json && npm run typecheck:payment-server",
@@ -97,7 +97,7 @@
     "vite": "^8.0.8"
   },
   "overrides": {
-    "brace-expansion": "5.0.6",
+    "brace-expansion": "5.0.5",
     "cosmiconfig": {
       "yaml": "1.10.3"
     },
@@ -109,7 +109,7 @@
     "tar": "7.5.13",
     "minimatch": "9.0.7",
     "picomatch": "4.0.4",
-    "protobufjs": "7.6.1",
+    "protobufjs": "7.5.5",
     "qs": "6.15.0",
     "rollup": "4.60.1"
   }
