@@ -1430,8 +1430,103 @@ export class LocalUserRouteProxyService {
       });
     }
 
+    if (endpointType === "gemini" && modelId.startsWith("imagen-")) {
+      const auth = buildGeminiAuth(`${normalizeDirectGeminiBaseUrl(routeConfig.baseUrl)}/v1beta/models/${modelId}:predict`, routeConfig);
+
+      const parameters: Record<string, unknown> = {
+        sampleCount: Math.max(1, Number(input.imageCount || 1)),
+      };
+
+      if (input.aspectRatio && String(input.aspectRatio).toLowerCase() !== "auto") {
+        parameters.aspectRatio = normalizeAspectRatio(input.aspectRatio) || input.aspectRatio;
+      }
+
+      if (input.imageSize) {
+        const size = String(input.imageSize).toUpperCase();
+        if (size.includes("2K") || size.includes("4K") || size.includes("HD")) {
+          parameters.sampleImageSize = "2K";
+        } else {
+          parameters.sampleImageSize = "1K";
+        }
+      }
+
+      const instances: any[] = [];
+      if (input.referenceImages && input.referenceImages.length > 0) {
+        const ref = input.referenceImages[0];
+        const inlinePart = await toInlineImagePartWithFormat(ref, false);
+        if (inlinePart?.inlineData?.data) {
+          instances.push({
+            prompt: input.prompt || "",
+            image: { bytesBase64Encoded: inlinePart.inlineData.data }
+          });
+        } else {
+          instances.push({ prompt: input.prompt || "" });
+        }
+      } else {
+        instances.push({ prompt: input.prompt || "" });
+      }
+
+      const payload = {
+        instances,
+        parameters,
+      };      const controller = new AbortController();
+      const timeoutId = globalThis.setTimeout(() => controller.abort(), 15000);
+      let imageResponse;
+      try {
+        imageResponse = await fetch(auth.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(auth.headers as Record<string, string>),
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });      } catch (err) {
+        const error = err as any;
+        if (error?.name === "AbortError" || String(error?.message || "").includes("aborted")) {
+          throw new LocalUserRouteProxyError("请求上游 Google Imagen 图像生成超时（15秒）。这通常是因为本地 API 服务直连外部域名网络隔离，请确保本地科学上网工具的代理已正确开启并畅通访问外部接口。", {
+            code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_TIMEOUT",
+            statusCode: 504,
+          });
+        }
+        throw err;
+      } finally {
+        globalThis.clearTimeout(timeoutId);
+      }
+
+      if (!imageResponse.ok) {
+        const errorText = await imageResponse.text();
+        throw new LocalUserRouteProxyError(`Upstream error: ${imageResponse.status} ${errorText} [surface=${imageSurface};strategy=${routeStrategy}]`, {
+          code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR",
+          statusCode: 502,
+        });
+      }
+
+      const result = await imageResponse.json();
+      const predictions = result.predictions || [];
+      const imageUrls = predictions
+        .map((p: any) => p?.bytesBase64Encoded ? `data:image/png;base64,${String(p.bytesBase64Encoded).replace(/\s+/g, "")}` : null)
+        .filter((value: string | null): value is string => typeof value === "string" && value.length > 0);
+
+      if (!imageUrls.length) {
+        throw new LocalUserRouteProxyError("No image data returned from upstream.", {
+          code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR",
+          statusCode: 502,
+        });
+      }
+
+      return {
+        success: true,
+        urls: imageUrls,
+        deducted: false,
+        endpointType,
+        requestId: input.requestId,
+        attemptId: input.attemptId,
+      };
+    }
+
     if (imageSurface === "async-image") {
-      const auth = buildOpenAICompatAuth(`${baseUrl}/v1/images/async/generations`, routeConfig, "openai");
+      const auth = buildOpenAICompatAuth(buildDirectOpenAIEndpoint(routeConfig.baseUrl, "images/async/generations"), routeConfig, "openai");
       const requestedSize = normalizeImageSize(input.imageSize);
       const body: Record<string, unknown> = {
         model: modelId,
@@ -1448,16 +1543,30 @@ export class LocalUserRouteProxyService {
         body.image = refs[0];
       } else if (refs.length > 1) {
         body.images = refs;
+      }      const controller = new AbortController();
+      const timeoutId = globalThis.setTimeout(() => controller.abort(), 15000);
+      let imageResponse;
+      try {
+        imageResponse = await fetch(auth.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(auth.headers as Record<string, string>),
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });      } catch (err) {
+        const error = err as any;
+        if (error?.name === "AbortError" || String(error?.message || "").includes("aborted")) {
+          throw new LocalUserRouteProxyError("提交 12AI 异步图像生成任务超时（15秒）。请检查您的网络连接与本地代理配置是否畅通访问外部接口。", {
+            code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_TIMEOUT",
+            statusCode: 504,
+          });
+        }
+        throw err;
+      } finally {
+        globalThis.clearTimeout(timeoutId);
       }
-
-      const imageResponse = await fetch(auth.url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(auth.headers as Record<string, string>),
-        },
-        body: JSON.stringify(body),
-      });
 
       const responseText = await imageResponse.text();
       if (!imageResponse.ok) {
@@ -1533,19 +1642,34 @@ export class LocalUserRouteProxyService {
         generationConfig[useSnakeCase ? "image_config" : "imageConfig"] = imageConfig;
       }
 
-      const auth = buildGeminiAuth(`${baseUrl}/v1beta/models/${modelId}:generateContent`, routeConfig);
+      const auth = buildGeminiAuth(`${normalizeDirectGeminiBaseUrl(routeConfig.baseUrl)}/v1beta/models/${modelId}:generateContent`, routeConfig);
       const payload: Record<string, unknown> = {
         contents: [{ parts }],
         [useSnakeCase ? "generation_config" : "generationConfig"]: generationConfig,
-      };
-      const imageResponse = await fetch(auth.url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(auth.headers as Record<string, string>),
-        },
-        body: JSON.stringify(payload),
-      });
+      };      const controller = new AbortController();
+      const timeoutId = globalThis.setTimeout(() => controller.abort(), 15000);
+      let imageResponse;
+      try {
+        imageResponse = await fetch(auth.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(auth.headers as Record<string, string>),
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });      } catch (err) {
+        const error = err as any;
+        if (error?.name === "AbortError" || String(error?.message || "").includes("aborted")) {
+          throw new LocalUserRouteProxyError("请求 Gemini Native 图像生成超时（15秒）。这通常是因为本地 API 服务直连外部域名网络隔离，请确保本地科学上网工具的代理已正确开启并畅通访问外部接口。", {
+            code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_TIMEOUT",
+            statusCode: 504,
+          });
+        }
+        throw err;
+      } finally {
+        globalThis.clearTimeout(timeoutId);
+      }
 
       if (!imageResponse.ok) {
         const errorText = await imageResponse.text();
@@ -1611,15 +1735,30 @@ export class LocalUserRouteProxyService {
         requestBody.extra_body = extraBody;
       }
 
-      const auth = buildOpenAICompatAuth(`${baseUrl}/v1/chat/completions`, routeConfig, "openai");
-      const imageResponse = await fetch(auth.url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(auth.headers as Record<string, string>),
-        },
-        body: JSON.stringify(requestBody),
-      });
+      const auth = buildOpenAICompatAuth(buildDirectOpenAIEndpoint(routeConfig.baseUrl, "chat/completions"), routeConfig, "openai");      const controller = new AbortController();
+      const timeoutId = globalThis.setTimeout(() => controller.abort(), 15000);
+      let imageResponse;
+      try {
+        imageResponse = await fetch(auth.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(auth.headers as Record<string, string>),
+          },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal,
+        });      } catch (err) {
+        const error = err as any;
+        if (error?.name === "AbortError" || String(error?.message || "").includes("aborted")) {
+          throw new LocalUserRouteProxyError("请求 OpenAI Chat-Image 兼容模式生成超时（15秒）。这通常是因为本地 API 服务直连外部域名网络隔离，请确保本地科学上网工具的代理已正确开启并畅通访问外部接口。", {
+            code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_TIMEOUT",
+            statusCode: 504,
+          });
+        }
+        throw err;
+      } finally {
+        globalThis.clearTimeout(timeoutId);
+      }
 
       if (!imageResponse.ok) {
         const errorText = await imageResponse.text();
@@ -1651,15 +1790,30 @@ export class LocalUserRouteProxyService {
       };
     }
 
-    const auth = buildOpenAICompatAuth(`${baseUrl}/v1/images/generations`, routeConfig, "openai");
-    const imageResponse = await fetch(auth.url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(auth.headers as Record<string, string>),
-      },
-      body: JSON.stringify(buildProviderImagesBody(routeConfig, modelId, input)),
-    });
+    const auth = buildOpenAICompatAuth(buildDirectOpenAIEndpoint(routeConfig.baseUrl, "images/generations"), routeConfig, "openai");    const controller = new AbortController();
+    const timeoutId = globalThis.setTimeout(() => controller.abort(), 15000);
+    let imageResponse;
+    try {
+      imageResponse = await fetch(auth.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(auth.headers as Record<string, string>),
+        },
+        body: JSON.stringify(buildProviderImagesBody(routeConfig, modelId, input)),
+        signal: controller.signal,
+      });      } catch (err) {
+        const error = err as any;
+        if (error?.name === "AbortError" || String(error?.message || "").includes("aborted")) {
+        throw new LocalUserRouteProxyError("请求标准 OpenAI-format 图像生成超时（15秒）。这通常是因为本地 API 服务直连外部域名网络隔离，请确保本地科学上网工具的代理已正确开启并畅通访问外部接口。", {
+          code: "LOCAL_USER_ROUTE_PROXY_UPSTREAM_TIMEOUT",
+          statusCode: 504,
+        });
+      }
+      throw err;
+    } finally {
+      globalThis.clearTimeout(timeoutId);
+    }
 
     if (!imageResponse.ok) {
       const errorText = await imageResponse.text();
