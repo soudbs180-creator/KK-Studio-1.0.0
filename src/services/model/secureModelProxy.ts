@@ -1,4 +1,4 @@
-﻿import { tempUserService } from '../auth/tempUserService';
+import { tempUserService } from '../auth/tempUserService';
 import {
   getLatestAuthSessionChange,
   requestAuthSessionInvalidation,
@@ -6,6 +6,7 @@ import {
 } from '../auth/authSessionEvents';
 import { getPreferredKkApiAccessToken, refreshPreferredKkApiAccessToken } from '../api/authAccessToken';
 import { kkWebApiClient, resolveKkApiBaseUrl } from '../api/kkApiClient';
+import { compressReferenceImagesIfNeeded } from '../../utils/imageUtils';
 
 export interface SecureProxyChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -1137,6 +1138,7 @@ export async function callSecureSystemProxyImage(
     });
   }
 
+  const compressedRefs = await compressReferenceImagesIfNeeded(payload.referenceImages || []);
   const data = await invokeLocalSystemProxy('image generation', {
     mode: 'image',
     modelId: payload.modelId,
@@ -1148,7 +1150,7 @@ export async function callSecureSystemProxyImage(
     aspectRatio: payload.aspectRatio,
     imageSize: payload.imageSize,
     imageCount: payload.imageCount ?? 1,
-    referenceImages: payload.referenceImages ?? [],
+    referenceImages: compressedRefs,
   });
 
   return {
@@ -1166,6 +1168,7 @@ export async function callSecureSystemProxyImage(
 export async function callLocalUserRouteProxyImage(
   payload: SecureProxyImageRequest & { routeId: string },
 ): Promise<SecureProxyImageResponse> {
+  const compressedRefs = await compressReferenceImagesIfNeeded(payload.referenceImages || []);
   const data = await invokeLocalUserRouteProxy('local image generation', {
     mode: 'image',
     routeId: payload.routeId,
@@ -1178,7 +1181,7 @@ export async function callLocalUserRouteProxyImage(
     aspectRatio: payload.aspectRatio,
     imageSize: payload.imageSize,
     imageCount: payload.imageCount ?? 1,
-    referenceImages: payload.referenceImages ?? [],
+    referenceImages: compressedRefs,
   });
 
   return {
