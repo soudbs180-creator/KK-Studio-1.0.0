@@ -14196,3 +14196,34 @@ body:not(.dark-mode) .settings-console-checkbox {
 body:not(.dark-mode) .settings-log-group-badge {
   background-color: rgba(0, 0, 0, 0.08);
 }
+
+/* ==========================================
+   KK-Studio 设置页详情卡片响应式锁定规范
+   ========================================== */
+
+/* 手机端二级菜单中，卡片网格强制一排只能有一个卡片 */
+@media (max-width: 767px) {
+  .settings-panel .settings-capability-grid,
+  .settings-panel .settings-provider-grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+}
+
+/* 电脑/平板端自适应：中等屏幕一排 2 个卡片 */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .settings-panel .settings-capability-grid,
+  .settings-panel .settings-provider-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+/* 电脑端宽屏自适应：一排可以展示 3 到 4 个卡片 */
+@media (min-width: 1024px) {
+  .settings-panel .settings-capability-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+  .settings-panel .settings-provider-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+

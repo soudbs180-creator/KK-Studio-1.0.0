@@ -377,6 +377,13 @@ const SettingsRouterShell: React.FC<{
     setNavQuery('');
   }, [initialView]);
 
+  useEffect(() => {
+    if (!isMobile && activeView === 'dashboard') {
+      // 电脑端默认静默重定向到第一个核心二级设置详情页，避免重复展示大卡片，彻底转化为 Master-Detail
+      navigate('/settings/api-management', { replace: true });
+    }
+  }, [isMobile, activeView, navigate]);
+
   const handleNavigate = (view: CanonicalSettingsViewId) => {
     navigate(buildSettingsPath(view));
   };
