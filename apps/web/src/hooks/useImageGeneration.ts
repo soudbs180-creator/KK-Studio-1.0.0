@@ -275,22 +275,36 @@ export const useImageGeneration = (options: {
     return details;
   }, []);
 
-  const getDisplayableGenerationError = useCallback((error: any) => {
-    if (isSecureProxySessionReauthError(error)) {
-      return error?.message || SECURE_PROXY_SESSION_REAUTH_MESSAGE;
+  const getDisplayableGenerationError = useCallback((error: any): string => {
+    // 中文注释：根据规范提取 Axios 的异常响应，若包含积分不足则提示充值，若包含 refunded 等则提示生成失败积分已退回
+    const apiError = error?.response?.data?.error;
+    if (typeof apiError === 'string' && apiError) {
+      if (apiError.includes("积分不足") || apiError.toLowerCase().includes("insufficient credits")) {
+        return "积分不足，请充值后重试";
+      }
+      if (apiError.toLowerCase().includes("refunded") || apiError.toLowerCase().includes("generation failed") || apiError.toLowerCase().includes("failed")) {
+        return "生成失败，积分已退回";
+      }
+      return apiError;
     }
 
-    if (isSecureProxyGuestModeError(error)) {
-      return error?.message || SECURE_PROXY_GUEST_MODE_MESSAGE;
+    // 中文注释：判断是否为网络异常
+    if (error?.code === "ERR_NETWORK" || error?.message?.toLowerCase().includes("network error") || error?.message?.toLowerCase().includes("failed to fetch")) {
+      return "网络连接失败，请稍后重试";
     }
 
-    // 防御性解析 Axios 或后端返回的异常结构，防范 [object Object] 现象
-    const rawError = error?.response?.data?.error;
-    const message = (typeof rawError === 'string' ? rawError : (typeof rawError === 'object' && rawError?.message ? rawError.message : null))
-      ?? error?.message
-      ?? "生成失败，积分已退回";
+    const msg = error?.message;
+    if (typeof msg === 'string' && msg) {
+      if (msg.includes("积分不足") || msg.toLowerCase().includes("insufficient credits")) {
+        return "积分不足，请充值后重试";
+      }
+      if (msg.toLowerCase().includes("refunded") || msg.toLowerCase().includes("generation failed") || msg.toLowerCase().includes("failed")) {
+        return "生成失败，积分已退回";
+      }
+      return msg;
+    }
 
-    return typeof message === 'string' ? message : JSON.stringify(message);
+    return "生成失败，积分已退回";
   }, []);
 
   const isRecoverableSyncBridgeFailure = useCallback((params: {

@@ -1,13 +1,12 @@
 // netlify/lib/response.ts
-// 职责：定义后端统一响应头 (包括 Content-Type、X-Content-Type-Options 及 CORS 跨域请求头)；
+// 职责：定义后端统一响应头 (包括 Content-Type、CORS 跨域请求头)；
 // 提供一致的成功及英文错误响应封装方法。
 
 export const COMMON_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
-  "X-Content-Type-Options": "nosniff",
-  "Access-Control-Allow-Origin": "*", // 允许桌面端与移动端跨域访问
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
 
 /**

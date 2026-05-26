@@ -41,6 +41,7 @@ const FORBIDDEN_HOSTNAME_SUFFIXES = [
   '.localhost',
   '.home',
   '.lan',
+  '.lan',
 ];
 
 const normalizeHostForChecks = (hostname: string) =>
@@ -176,26 +177,27 @@ const buildSuccessResponse = (
     }),
     {
       status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      headers: { ...corsHeaders },
     }
   );
 };
 
 export default async function handler(request: Request) {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+  const COMMON_HEADERS = {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
   };
 
   if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return new Response(null, { status: 204, headers: COMMON_HEADERS });
   }
 
   if (request.method !== 'POST') {
     return new Response(JSON.stringify({ error: '仅支持 POST 请求' }), {
       status: 405,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      headers: COMMON_HEADERS,
     });
   }
 
@@ -205,7 +207,7 @@ export default async function handler(request: Request) {
     if (!baseUrl) {
       return new Response(JSON.stringify({ error: '缺少 baseUrl' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        headers: COMMON_HEADERS,
       });
     }
 
@@ -248,7 +250,7 @@ export default async function handler(request: Request) {
       results.push(result);
 
       if (result.parsed?.data?.length) {
-        return buildSuccessResponse(results, discoveredUrls, corsHeaders);
+        return buildSuccessResponse(results, discoveredUrls, COMMON_HEADERS);
       }
 
       if (!allowDiscovery || !result.ok || !looksLikeHtml(result.text)) {
@@ -267,7 +269,7 @@ export default async function handler(request: Request) {
         results.push(discoveredResult);
 
         if (discoveredResult.parsed?.data?.length) {
-          return buildSuccessResponse(results, discoveredUrls, corsHeaders);
+          return buildSuccessResponse(results, discoveredUrls, COMMON_HEADERS);
         }
       }
 
@@ -298,12 +300,12 @@ export default async function handler(request: Request) {
 
     return new Response(JSON.stringify({ error: upstreamError }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      headers: COMMON_HEADERS,
     });
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error?.message || '价格代理请求失败' }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      headers: COMMON_HEADERS,
     });
   }
 }

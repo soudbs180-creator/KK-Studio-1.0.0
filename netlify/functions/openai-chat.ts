@@ -11,7 +11,6 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { query } from "../lib/db";
 import { verifyJWT } from "../lib/jwt";
-import { makeResponse, makeErrorResponse, COMMON_HEADERS } from "../lib/response";
 
 // 初始化 OpenAI 客户端
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "" });
@@ -27,48 +26,71 @@ const ChatRequestSchema = z.object({
 });
 
 export const handler: Handler = async (event) => {
-  // 拦截 OPTIONS 预检请求以支持跨域
+  const COMMON_HEADERS = {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+  };
+
+  // 1. 处理 OPTIONS 预检请求以支持跨域
   if (event.httpMethod === "OPTIONS") {
-    return {
-      statusCode: 200,
-      headers: COMMON_HEADERS,
-      body: "",
-    };
+    return { statusCode: 204, headers: COMMON_HEADERS, body: "" };
   }
 
   if (event.httpMethod !== "POST") {
-    return makeErrorResponse(405, "Method not allowed.");
+    return {
+      statusCode: 405,
+      headers: COMMON_HEADERS,
+      body: JSON.stringify({ error: "Method not allowed." }),
+    };
   }
 
-  // 1. JWT 鉴权
+  // 2. JWT 鉴权
   const userId = verifyJWT(event.headers.authorization);
   if (!userId) {
-    return makeErrorResponse(401, "Unauthorized.");
+    return {
+      statusCode: 401,
+      headers: COMMON_HEADERS,
+      body: JSON.stringify({ error: "Unauthorized." }),
+    };
   }
 
-  // 2. 校验参数
+  // 3. 校验参数
   try {
     const payload = JSON.parse(event.body || "{}");
     const parsed = ChatRequestSchema.safeParse(payload);
     if (!parsed.success) {
-      return makeErrorResponse(400, "Invalid chat messages payload.");
+      return {
+        statusCode: 400,
+        headers: COMMON_HEADERS,
+        body: JSON.stringify({ error: "Invalid chat messages payload." }),
+      };
     }
     const { messages } = parsed.data;
 
     const requiredCredits = 2; // 对话统一扣减 2 积分
 
-    // 3. 校验用户积分余额
+    // 4. 校验用户积分余额
     const userRes = await query("SELECT credits FROM public.users WHERE id = $1", [userId]);
     if (userRes.rows.length === 0) {
-      return makeErrorResponse(401, "User not found.");
+      return {
+        statusCode: 401,
+        headers: COMMON_HEADERS,
+        body: JSON.stringify({ error: "User not found." }),
+      };
     }
 
     const currentCredits = parseInt(userRes.rows[0].credits);
     if (currentCredits < requiredCredits) {
-      return makeErrorResponse(402, "Insufficient credits. Please recharge.");
+      return {
+        statusCode: 402,
+        headers: COMMON_HEADERS,
+        body: JSON.stringify({ error: "Insufficient credits. Please recharge." }),
+      };
     }
 
-    // 4. 调用 OpenAI API
+    // 5. 调用 OpenAI API
     const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
     const completion = await openai.chat.completions.create(
       {
@@ -86,21 +108,33 @@ export const handler: Handler = async (event) => {
       throw new Error("OpenAI API failed to return content.");
     }
 
-    // 5. 扣减积分
+    // 6. 扣减积分
     const nextCredits = currentCredits - requiredCredits;
     await query("UPDATE public.users SET credits = $1, updated_at = NOW() WHERE id = $2", [nextCredits, userId]);
 
-    // 6. 返回回复消息与最新余额
-    return makeResponse(200, {
-      message: replyMessage,
-      credits: nextCredits,
-    });
+    // 7. 返回回复消息与最新余额
+    return {
+      statusCode: 200,
+      headers: COMMON_HEADERS,
+      body: JSON.stringify({
+        message: replyMessage,
+        credits: nextCredits,
+      }),
+    };
   } catch (err: any) {
     console.error("[OpenAI Chat Error]", err);
     // 处理 429 速率限制
     if (err?.status === 429) {
-      return makeErrorResponse(429, "Rate limit reached. Please try again later.");
+      return {
+        statusCode: 429,
+        headers: COMMON_HEADERS,
+        body: JSON.stringify({ error: "Rate limit reached. Please try again later." }),
+      };
     }
-    return makeErrorResponse(500, "Chat request failed. Server error.");
+    return {
+      statusCode: 500,
+      headers: COMMON_HEADERS,
+      body: JSON.stringify({ error: "Chat request failed. Server error." }),
+    };
   }
 };

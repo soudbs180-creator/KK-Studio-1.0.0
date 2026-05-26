@@ -5,18 +5,38 @@
 // 3. 将结果按时间倒序排列并返回给前端。
 // 所有注释均使用中文，错误描述采用脱敏的英文。
 
-import type { Handler, HandlerEvent } from "@netlify/functions";
+import type { Handler } from "@netlify/functions";
 import { query } from "../lib/db";
 import { verifyJWT } from "../lib/jwt";
-import { makeResponse, makeErrorResponse, COMMON_HEADERS } from "../lib/response";
 
-/**
- * 查询当前用户的图像生成/编辑历史记录
- */
-async function handleGetGenerations(event: HandlerEvent) {
+export const handler: Handler = async (event) => {
+  const COMMON_HEADERS = {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+  };
+
+  // 1. 处理 OPTIONS 预检请求以支持跨域
+  if (event.httpMethod === "OPTIONS") {
+    return { statusCode: 204, headers: COMMON_HEADERS, body: "" };
+  }
+
+  if (event.httpMethod !== "GET") {
+    return {
+      statusCode: 405,
+      headers: COMMON_HEADERS,
+      body: JSON.stringify({ error: "Method not allowed." }),
+    };
+  }
+
   const userId = verifyJWT(event.headers.authorization);
   if (!userId) {
-    return makeErrorResponse(401, "Unauthorized.");
+    return {
+      statusCode: 401,
+      headers: COMMON_HEADERS,
+      body: JSON.stringify({ error: "Unauthorized." }),
+    };
   }
 
   try {
@@ -25,38 +45,26 @@ async function handleGetGenerations(event: HandlerEvent) {
       [userId]
     );
 
-    return makeResponse(200, {
-      generations: historyRes.rows.map((row) => ({
-        id: row.id,
-        prompt: row.prompt,
-        image: row.image,
-        model: row.model,
-        type: row.type,
-        createdAt: row.createdat,
-      })),
-    });
-  } catch (err: any) {
-    console.error("[Get Generations Failed]", err);
-    return makeErrorResponse(500, "Failed to retrieve generation history.");
-  }
-}
-
-/**
- * Netlify Function 入口 handler
- */
-export const handler: Handler = async (event) => {
-  // 拦截 OPTIONS 预检请求以支持跨域
-  if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
       headers: COMMON_HEADERS,
-      body: "",
+      body: JSON.stringify({
+        generations: historyRes.rows.map((row) => ({
+          id: row.id,
+          prompt: row.prompt,
+          image: row.image,
+          model: row.model,
+          type: row.type,
+          createdAt: row.createdat,
+        })),
+      }),
+    };
+  } catch (err: any) {
+    console.error("[Get Generations Failed]", err);
+    return {
+      statusCode: 500,
+      headers: COMMON_HEADERS,
+      body: JSON.stringify({ error: "Failed to retrieve generation history." }),
     };
   }
-
-  if (event.httpMethod !== "GET") {
-    return makeErrorResponse(405, "Method not allowed.");
-  }
-
-  return await handleGetGenerations(event);
 };
