@@ -48,7 +48,7 @@ export const handler: Handler = async (event) => {
 
   const path = event.path || "";
 
-  // 注册逻辑：创建新用户并赠送 100 积分
+  // 注册逻辑：创建新用户且默认不赠送积分
   if (path.endsWith("/register")) {
     try {
       const payload = JSON.parse(event.body || "{}");
@@ -75,10 +75,10 @@ export const handler: Handler = async (event) => {
       const userId = crypto.randomUUID();
       const passwordHash = hashPassword(password);
 
-      // 插入新用户并赠送 100 默认积分
+      // 插入新用户并赠送 0 默认积分
       await query(
         "INSERT INTO public.users (id, email, password_hash, credits) VALUES ($1, $2, $3, $4)",
-        [userId, email, passwordHash, 100]
+        [userId, email, passwordHash, 0]
       );
 
       // 签发新 JWT
@@ -90,7 +90,7 @@ export const handler: Handler = async (event) => {
         body: JSON.stringify({
           message: "Register success.",
           token,
-          user: { id: userId, email, credits: 100 },
+          user: { id: userId, email, credits: 0 },
         }),
       };
     } catch (err: any) {
