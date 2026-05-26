@@ -11,7 +11,7 @@ import {
     subscribeCapabilityRouteAssignments,
 } from '../../services/api/capabilityRouteAssignments';
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
-import { agentService, AgentConfig } from '../../services/chat/agentService';
+import { agentService, type AgentConfig} from '../../services/chat/agentService';
 import { getModelDisplayInfo, getModelThemeColor } from '../../services/model/modelCapabilities';
 import { getModelCredits } from '../../services/model/modelPricing';
 import { refreshModelLibraryData } from '../../services/model/modelLibraryRefresh';

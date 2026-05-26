@@ -29,5 +29,11 @@
   },
   "include": [
     "apps/web/src"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/__create/**/*",
+    "**/__create",
+    "apps/web/src/app/api/vitest.config.ts"
   ]
 }

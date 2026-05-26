@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { X } from 'lucide-react';
-import { GeneratedImage } from '../../types';
+import { type GeneratedImage} from '../../types';
 
 interface PptStackPreviewModalProps {
   images: GeneratedImage[];

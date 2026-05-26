@@ -1,6 +1,6 @@
 import { Camera, LayoutDashboard, Mic, PackageOpen, Video } from 'lucide-react';
 
-import { GenerationConfig, GenerationMode } from '../../../types';
+import { type GenerationConfig, GenerationMode } from '../../../types';
 
 export interface PromptBarModeOption {
   mode: GenerationMode;

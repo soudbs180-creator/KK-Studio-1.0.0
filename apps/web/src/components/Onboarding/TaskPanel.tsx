@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { X, Check, Lock, Gift, ChevronRight, Trophy, Star } from 'lucide-react';
-import { OnboardingProgress, OnboardingTask, OnboardingPhase } from './types';
+import { type OnboardingProgress, type OnboardingTask, type OnboardingPhase} from './types';
 import { 
   TASKS_WELCOME, 
   TASKS_BASICS, 

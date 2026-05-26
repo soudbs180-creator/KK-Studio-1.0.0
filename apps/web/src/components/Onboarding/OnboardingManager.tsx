@@ -15,10 +15,9 @@ import { TaskPanel } from './TaskPanel';
 import { TooltipGuide } from './TooltipGuide';
 import { AchievementToast } from './AchievementToast';
 import { 
-  OnboardingPhase, 
-  OnboardingTask, 
-  OnboardingContextType 
-} from './types';
+  type OnboardingPhase, 
+  type OnboardingTask, 
+  type OnboardingContextType} from './types';
 import { useOnboardingProgress } from './useOnboardingProgress';
 import { pickByDocumentLanguage } from '../../utils/localeText';
 import './Onboarding.css';

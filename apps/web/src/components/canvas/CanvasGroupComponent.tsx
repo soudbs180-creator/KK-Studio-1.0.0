@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback, useLayoutEffect } from 'react';
-import { CanvasGroup } from '../../types';
+import { type CanvasGroup} from '../../types';
 import { Type, GripHorizontal, Trash2, Eye, EyeOff } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';

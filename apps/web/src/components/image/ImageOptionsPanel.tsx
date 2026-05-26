@@ -1,10 +1,10 @@
 import React, { useMemo, useRef } from 'react';
 import {
   AspectRatio,
-  EcommerceAPlusControlMode,
-  EcommerceGroupSheet,
-  EcommerceSheetSetting,
-  EcommerceSheetSettingPatch,
+  type EcommerceAPlusControlMode,
+  type EcommerceGroupSheet,
+  type EcommerceSheetSetting,
+  type EcommerceSheetSettingPatch,
   ImageSize,
 } from '../../types';
 import { Fullscreen } from 'lucide-react';

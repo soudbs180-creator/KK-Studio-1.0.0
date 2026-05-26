@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { ArrangeMode } from '../context/CanvasContext';
+import { type ArrangeMode} from '../context/CanvasContext';
 import { SelectionMenu } from '../components/canvas/SelectionMenu';
 import type { SelectionBoxState } from './appCanvasTypes';
 

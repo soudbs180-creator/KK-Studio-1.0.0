@@ -1,4 +1,4 @@
-import { Canvas } from '../../types';
+import { type Canvas} from '../../types';
 import { logError, logInfo, logWarning } from '../system/systemLogService';
 import { getRuntimeOwnerId } from '../auth/runtimeSessionProfile.ts';
 import { sanitizeWorkflowForStorage } from '../../workflow/persistence/workflowSerializer';

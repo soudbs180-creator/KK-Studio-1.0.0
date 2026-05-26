@@ -1,4 +1,4 @@
-import { Provider } from '../../types';
+import { type Provider} from '../../types';
 
 export interface ProviderMetadata {
     id: Provider;

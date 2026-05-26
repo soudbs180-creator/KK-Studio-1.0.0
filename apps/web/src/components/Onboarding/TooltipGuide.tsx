@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Lightbulb, ChevronRight } from 'lucide-react';
-import { OnboardingProgress } from './types';
+import { type OnboardingProgress} from './types';
 
 interface TooltipGuideProps {
   progress: OnboardingProgress;

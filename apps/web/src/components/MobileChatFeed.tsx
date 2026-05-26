@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { ChevronRight, Download, Loader2, Sparkles, Trash2 } from 'lucide-react';
-import { GeneratedImage, GenerationMode, ImageSize, PromptNode } from '../types';
+import { type GeneratedImage, GenerationMode, ImageSize, type PromptNode} from '../types';
 import { resolveImageCost } from '../services/billing/costService';
 import { notify } from '../services/system/notificationService';
 import { generateTagColor } from '../utils/colorUtils';

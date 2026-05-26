@@ -11,7 +11,7 @@ const ROOT_DIR = process.cwd();
 test('generated image layout reuses shared enum members for aspect and mode defaults', () => {
   const source = readSource('src/utils/generatedImageLayout.ts');
 
-  assert.match(source, /import type \{ AspectRatio, GenerationMode \} from '\.\.\/types\.ts';/);
+  assert.match(source, /import type \{ AspectRatio, GenerationMode \} from '\.\.\/types';/);
   assert.match(source, /const coerceAspectRatio = \(value: string\): AspectRatio => value as unknown as AspectRatio;/);
   assert.match(source, /const coerceGenerationMode = \(value: string\): GenerationMode => value as unknown as GenerationMode;/);
   assert.match(source, /const ASPECT_RATIO_AUTO = coerceAspectRatio\('auto'\);/);
@@ -21,7 +21,7 @@ test('generated image layout reuses shared enum members for aspect and mode defa
 test('style utils derive layout ratio constants from the shared AspectRatio enum', () => {
   const source = readSource('src/utils/styleUtils.ts');
 
-  assert.match(source, /import type \{ AspectRatio \} from '\.\.\/types\.ts';/);
+  assert.match(source, /import type \{ AspectRatio \} from '\.\.\/types';/);
   assert.match(source, /const coerceAspectRatio = \(value: string\): AspectRatio => value as unknown as AspectRatio;/);
   assert.match(source, /AUTO: coerceAspectRatio\('auto'\),/);
   assert.match(source, /SQUARE: coerceAspectRatio\('1:1'\),/);

@@ -4,10 +4,10 @@ import type {
   GeneratedImage,
   PromptNode,
   WorkflowNode,
-} from '../../types';
+} from '../../types/index.ts';
 import { isLegacyWorkflowNodeKind } from '../schema.ts';
 import { normalizeWorkflowGraph } from '../persistence/workflowSerializer.ts';
-import { createEmptyWorkflowGraph } from '../types';
+import { createEmptyWorkflowGraph } from '../types.ts';
 
 const toPromptWorkflowNode = (node: PromptNode): WorkflowNode => ({
   id: node.id,

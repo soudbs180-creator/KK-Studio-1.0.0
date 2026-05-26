@@ -1,10 +1,10 @@
-import { AspectRatio, ImageSize, ModelType, ReferenceImage } from "../../types";
+import { AspectRatio, ImageSize, type ModelType, type ReferenceImage} from '../../types';
 import { calculateCost } from '../billing/costService';
 import { classifyApiFailure } from '../api/errorClassification';
 import { logError } from '../system/systemLogService';
 import { getImage } from '../storage/imageStorage';
 import { llmService } from './LLMService';
-import { ImageGenerationOptions, ProviderConfig } from './LLMAdapter';
+import { type ImageGenerationOptions, type ProviderConfig} from './LLMAdapter';
 import { getMaxRefImages } from '../model/modelCapabilities';
 import { abortSyncImageBridgeRequest } from './syncImageBridge';
 import {

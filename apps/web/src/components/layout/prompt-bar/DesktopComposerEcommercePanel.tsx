@@ -1,7 +1,7 @@
 import React from 'react';
 
 import {
-  GenerationConfig,
+  type GenerationConfig,
   GenerationMode,
   type EcommerceEditableTaskState,
   type EcommerceGroupSheet,

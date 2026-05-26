@@ -14,7 +14,7 @@ import type {
   SubmitRechargeRequestDto,
   SubmitRechargeResponseDto,
   SupportedRechargeCurrencyDto,
-} from '../../../../../packages/shared/src/contracts/index.ts';
+} from '../../../../../packages/shared/src/index.ts';
 import { kkWebApiClient } from '../api/kkApiClient.ts';
 import { localizeUserFacingText } from '../../utils/localeText.ts';
 

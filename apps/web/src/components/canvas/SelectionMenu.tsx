@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Trash2, Group, Tag, FolderOutput, LayoutGrid, Rows, Columns, GripHorizontal } from 'lucide-react';
-import { ArrangeMode } from '../../context/CanvasContext';
+import { type ArrangeMode} from '../../context/CanvasContext';
 
 interface SelectionMenuProps {
     position: { x: number; y: number };

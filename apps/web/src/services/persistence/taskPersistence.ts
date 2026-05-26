@@ -1,4 +1,4 @@
-import { GenerationMode, TaskProviderType } from '../../types';
+import { GenerationMode, type TaskProviderType} from '../../types';
 import { getLatestAuthSessionChange } from '../auth/authSessionEvents';
 import { resolveRuntimeAuthenticatedProfileContext } from '../auth/runtimeSessionProfile.ts';
 import { tempUserService } from '../auth/tempUserService';

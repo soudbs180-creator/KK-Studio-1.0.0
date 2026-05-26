@@ -1,5 +1,5 @@
-import type { Canvas, GeneratedImage, PromptNode } from '../types';
-import { GenerationMode, type AspectRatio } from '../types';
+import type { Canvas, GeneratedImage, PromptNode } from '../types/index.ts';
+import { GenerationMode, type AspectRatio } from '../types/index.ts';
 import { getCardDimensions } from '../utils/styleUtils.ts';
 
 export type CanvasSubCardLayout = 'row' | 'grid' | 'column';

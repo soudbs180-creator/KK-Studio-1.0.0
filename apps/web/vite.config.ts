@@ -434,42 +434,11 @@ function isAddressInUseError(error: unknown): boolean {
 
     return message.includes('EADDRINUSE') || message.includes('address already in use');
 }
-
 async function ensureLocalApiServer(targetOrigin: string): Promise<void> {
     if (await canReachLocalApi(targetOrigin)) {
         return;
     }
-
-    if (!localApiServerPromise) {
-        localApiServerPromise = (async () => {
-            const { startLocalApiServer } = await import('./scripts/lib/local-api-bootstrap.mjs');
-
-            try {
-                await startLocalApiServer();
-            } catch (error) {
-                // `npm run dev:start` manages the API separately. If that server already owns
-                // port 3001, treat the address-in-use failure as a signal to re-check health
-                // instead of crashing the Vite process.
-                if (!isAddressInUseError(error)) {
-                    throw error;
-                }
-            }
-
-            for (let attempt = 0; attempt < 40; attempt += 1) {
-                if (await canReachLocalApi(targetOrigin)) {
-                    return;
-                }
-
-                await new Promise((resolve) => setTimeout(resolve, 250));
-            }
-
-            throw new Error(`Timed out waiting for local API at ${targetOrigin}`);
-        })().finally(() => {
-            localApiServerPromise = null;
-        });
-    }
-
-    await localApiServerPromise;
+    console.warn(`[API Proxy] 无法连接到本地 API 服务 ${targetOrigin}，请确保 backend 服务已启动。`);
 }
 
 function kkApiProxyPlugin(targetOrigin = 'http://127.0.0.1:3001'): Plugin {
@@ -610,65 +579,6 @@ function pricingProxyPlugin(): Plugin {
     };
 }
 
-function nutrientDocumentProxyPlugin(): Plugin {
-    return {
-        name: 'nutrient-document-proxy',
-        configureServer(server) {
-            server.middlewares.use(async (req, res, next) => {
-                const requestPath = getRequestPath(req.url);
-                if (requestPath !== '/api/nutrient-document') {
-                    return next();
-                }
-
-                if (req.method !== 'POST' && req.method !== 'OPTIONS') {
-                    return next();
-                }
-
-                const body = req.method === 'POST' ? await readIncomingBody(req) : undefined;
-                const { default: nutrientDocumentHandler } = await import('./api/nutrient-document.ts');
-
-                const response = await nutrientDocumentHandler(new Request(`http://localhost${req.url || '/api/nutrient-document'}`, {
-                    method: req.method,
-                    headers: createProxyRequestHeaders(req.headers),
-                    body,
-                }));
-
-                await writeFetchResponse(res, response);
-            });
-        },
-    };
-}
-
-function ecommerceAnalysisProxyPlugin(): Plugin {
-    return {
-        name: 'ecommerce-analysis-proxy',
-        configureServer(server) {
-            server.middlewares.use(async (req, res, next) => {
-                const requestPath = getRequestPath(req.url);
-                if (requestPath !== '/api/ecommerce-analysis') {
-                    return next();
-                }
-
-                if (req.method !== 'POST' && req.method !== 'OPTIONS') {
-                    return next();
-                }
-
-                const body = req.method === 'POST' ? await readIncomingBody(req) : undefined;
-                const { default: ecommerceAnalysisHandler } = await import('./api/ecommerce-analysis.ts');
-                const proxyHeaders = createProxyRequestHeaders(req.headers);
-                const normalizedBody = body ? normalizeMultipartProxyBody(proxyHeaders, body) : body;
-
-                const response = await ecommerceAnalysisHandler(new Request(`http://localhost${req.url || '/api/ecommerce-analysis'}`, {
-                    method: req.method,
-                    headers: proxyHeaders,
-                    body: normalizedBody,
-                }));
-
-                await writeFetchResponse(res, response);
-            });
-        },
-    };
-}
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
@@ -706,7 +616,7 @@ export default defineConfig(({ mode }) => {
                 ignored: shouldIgnoreWatchPath
             }
         },
-        plugins: [kkApiProxyPlugin(), pricingProxyPlugin(), nutrientDocumentProxyPlugin(), ecommerceAnalysisProxyPlugin(), buildVersionManifestPlugin()],
+        plugins: [kkApiProxyPlugin(), pricingProxyPlugin(), buildVersionManifestPlugin()],
         resolve: {
             dedupe: ['react', 'react-dom'],
             alias: {

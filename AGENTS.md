@@ -1,3 +1,9 @@
+# KK-Studio 项目开发规范与架构黄金法则 (AGENTS.md - AI Agent 项目总指导文件)
+
+本规范文档（[AGENTS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/AGENTS.md)）为 KK-Studio 项目的核心架构与开发准则。任何新功能的开发、重构、维护，以及 AI 辅助编程，均必须严格遵循本规范。
+
+---
+
 // ✅ 正确：中文注释，说明"为什么"
 // Gemini 要求 base64 字符串不能带 data URI 前缀，否则报 400 错误
 const cleanBase64 = raw.replace(/^data:image\/\w+;base64,/, "");

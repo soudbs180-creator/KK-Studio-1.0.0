@@ -1,4 +1,4 @@
-import type { ApiError } from '../../../../../packages/shared/src/contracts/index.ts';
+import type { ApiError } from '../../../../../packages/shared/src/index.ts';
 import { kkWebApiClient } from '../api/kkApiClient.ts';
 
 

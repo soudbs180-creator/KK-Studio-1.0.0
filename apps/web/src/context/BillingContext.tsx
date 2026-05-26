@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
-import type { CreditTransactionDto } from '../../../../packages/shared/src/contracts/index.ts';
+import type { CreditTransactionDto } from '../../../../packages/shared/src/index.ts';
 import { KKAI_FEATURE_FLAGS } from '../app/kkaiFeatureFlags';
 import { isBillingAuthFailure } from '../services/billing/billingApiAuth';
 import { buildGenerationAttemptIdempotencyKey } from '../services/billing/generationBillingCoordinator';
@@ -476,9 +476,9 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (refreshMode.markRefreshing) {
       setRefreshing(true);
     }
-    const refreshPromise = (includeTransactions
+    const refreshPromise: Promise<void> = (includeTransactions
       ? Promise.all([refreshBalanceOnly(), loadCreditTransactions(false)])
-      : refreshBalanceOnly().then((canonicalBalance) => [canonicalBalance, undefined] as const))
+      : refreshBalanceOnly().then((canonicalBalance) => [canonicalBalance, undefined] as [number | undefined, number | undefined]))
       .then(([canonicalBalance, latestBalanceAfter]) => {
         const resolvedBalance = typeof canonicalBalance === 'number'
           ? canonicalBalance

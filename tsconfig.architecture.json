@@ -37,6 +37,13 @@
     "exclude": [
         "dist",
         "node_modules",
-        "apps/api"
+        "apps/api",
+        "apps/mobile",
+        "apps/web/__create",
+        "apps/web/src/__create",
+        "apps/web/plugins",
+        "apps/web/vite.config.ts",
+        "**/__create/**/*",
+        "**/__create"
     ]
 }

@@ -1,7 +1,7 @@
 import { normalizeApiProtocolFormat, type ApiProtocolFormat, type AuthMethod } from "../api/apiConfig";
 import { determineKeyType } from "./keyManagerKeyType";
 import { parseModelString } from "./keyManagerModelHelpers";
-import { ProviderLinkProvider } from "./keyManagerProviderLinks";
+import { type ProviderLinkProvider} from './keyManagerProviderLinks';
 import type { Provider } from "../../types";
 
 export interface EffectiveKeySlot {

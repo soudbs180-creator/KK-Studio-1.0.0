@@ -1,7 +1,7 @@
 {
   "name": "mobile",
   "main": "index",
-  "version": "1.0.0",
+  "version": "1.4.9",
   "scripts": {
     "postinstall": "patch-package"
   },

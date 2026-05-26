@@ -50,7 +50,7 @@ test('billing balance refresh still resolves remaining balance from canonical so
   );
   assert.match(
     billingContextSource,
-    /const refreshPromise = \(includeTransactions\s*\?\s*Promise\.all\(\[refreshBalanceOnly\(\), loadCreditTransactions\(false\)\]\)\s*:\s*refreshBalanceOnly\(\)\.then\(\(canonicalBalance\) => \[canonicalBalance, undefined\] as const\)\)\s*\.then\(\(\[canonicalBalance, latestBalanceAfter\]\) => \{\s*const resolvedBalance = typeof canonicalBalance === 'number'\s*\?\s*canonicalBalance\s*:\s*latestBalanceAfter;/,
+    /const refreshPromise: Promise<void> = \(includeTransactions\s*\?\s*Promise\.all\(\[refreshBalanceOnly\(\), loadCreditTransactions\(false\)\]\)\s*:\s*refreshBalanceOnly\(\)\.then\(\(canonicalBalance\) => \[canonicalBalance, undefined\] as \[number \| undefined, number \| undefined\]\)\)\s*\.then\(\(\[canonicalBalance, latestBalanceAfter\]\) => \{\s*const resolvedBalance = typeof canonicalBalance === 'number'\s*\?\s*canonicalBalance\s*:\s*latestBalanceAfter;/,
   );
   assert.match(
     billingContextSource,

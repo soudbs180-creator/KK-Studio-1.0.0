@@ -1,4 +1,4 @@
-import { GeneratedImage } from '../types';
+import { type GeneratedImage} from '../types';
 import { getModelCredits, isCreditBasedModel } from '../services/model/modelPricing';
 
 type CreditBillingTarget = Pick<GeneratedImage, 'billingMode' | 'creditCost' | 'model' | 'provider' | 'imageSize' | 'keySlotId'>;

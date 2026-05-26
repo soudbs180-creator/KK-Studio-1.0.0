@@ -3,7 +3,7 @@ import {
   type AuthSessionDto,
   type ApiResponse,
   type LogoutResponseDto,
-} from "../../../../../packages/shared/src/contracts/index.ts";
+} from "../../../../../packages/shared/src/index.ts";
 import {
   setStoredKkApiAccessToken,
 } from "../api/authAccessToken.ts";

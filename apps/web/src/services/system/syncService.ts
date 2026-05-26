@@ -1,6 +1,6 @@
 import type { Canvas } from '../../types';
 import { shouldEnableWorkspaceCloudSync } from '../../app/kkaiFeatureFlags';
-import type { CanvasLayoutRecordDto } from '../../../../../packages/shared/src/contracts/index.ts';
+import type { CanvasLayoutRecordDto } from '../../../../../packages/shared/src/index.ts';
 import { kkWebApiClient } from '../api/kkApiClient';
 
 function unwrapOrThrow<T>(

@@ -14,7 +14,10 @@ test('production settings entry delegates to the localized router-backed workben
   const settingsEntrySource = readSource('src/components/settings/SettingsPanel.tsx');
 
   assert.match(appSource, /import SettingsPageRoot from '\.\/app\/SettingsPageRoot';/);
-  assert.match(appSource, /AppContentComponent=\{rootMode === 'settings' \? SettingsPageRoot : AppContent\}/);
+  assert.match(
+    appSource,
+    /AppContentComponent=\{\s*(?:rootMode === 'admin'\s*\?\s*AdminLayout\s*:\s*)?rootMode === 'settings'\s*\?\s*SettingsPageRoot\s*:\s*AppContent\s*\}/
+  );
   assert.match(settingsPageRootSource, /const SettingsPanel = lazy\(\(\) => import\('\.\.\/components\/settings\/SettingsPanel'\)\);/);
   assert.match(settingsPageRootSource, /presentation="page"/);
   assert.match(settingsPageRootSource, /initialPathname=\{window\.location\.pathname\}/);

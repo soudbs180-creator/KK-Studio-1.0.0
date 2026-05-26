@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AspectRatio, GenerationConfig, GenerationMode } from '../../../types';
+import { AspectRatio, type GenerationConfig, GenerationMode } from '../../../types';
 
 interface DesktopComposerModePanelProps {
   isMobile: boolean;

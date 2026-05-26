@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, ExternalLink, Loader2 } from 'lucide-react';
 
-import type { AdminRechargeSubmissionDto } from '../../../../../packages/shared/src/contracts/index.ts';
+import type { AdminRechargeSubmissionDto } from '../../../../../packages/shared/src/index.ts';
 import { useAdminRole } from '../../hooks/useAdminRole';
 import { kkWebApiClient } from '../../services/api/kkApiClient';
 import { listAdminRechargeSubmissions } from '../../services/billing/rechargeSubmissionService';

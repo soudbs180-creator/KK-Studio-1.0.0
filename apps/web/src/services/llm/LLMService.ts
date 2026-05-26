@@ -1,11 +1,11 @@
-﻿import { ChatOptions, ImageGenerationOptions, ImageGenerationResult, VideoGenerationOptions, VideoGenerationResult, AudioGenerationOptions, AudioGenerationResult } from './LLMAdapter';
+﻿import { type ChatOptions, type ImageGenerationOptions, type ImageGenerationResult, type VideoGenerationOptions, type VideoGenerationResult, type AudioGenerationOptions, type AudioGenerationResult} from './LLMAdapter';
 import { GenerationMode } from '../../types';
-import { KeySlot, getModelMetadata } from '../auth/keyManager';
+import { type KeySlot, getModelMetadata } from '../auth/keyManager';
 import { keyManager } from '../auth/keyManager';
 import * as costService from '../billing/costService';
 import { logWarning } from '../system/systemLogService';
-import { ImageSize, Provider } from '../../types';
-import { getProviderCapability, modelSupportedByProvider, ProviderCapabilityProfile } from './providerCapabilities';
+import { ImageSize, type Provider} from '../../types';
+import { getProviderCapability, modelSupportedByProvider, type ProviderCapabilityProfile} from './providerCapabilities';
 import {
     buildSecureProxyUserRouteFromSlotId,
     callLocalUserRouteProxyAudio,

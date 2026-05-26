@@ -1,5 +1,5 @@
-import { LLMAdapter, ChatOptions, ImageGenerationOptions } from './LLMAdapter';
-import { KeySlot } from '../auth/keyManager';
+import { type LLMAdapter, type ChatOptions, type ImageGenerationOptions} from './LLMAdapter';
+import { type KeySlot} from '../auth/keyManager';
 import { assertNoDirectCall } from '../../utils/security';
 import { forwardUserRouteGenericRequest } from '../model/secureModelProxy';
 import { AsyncTaskPoller, PollCancelledError } from '../http/AsyncTaskPoller';

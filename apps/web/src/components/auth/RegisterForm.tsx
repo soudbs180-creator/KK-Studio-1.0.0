@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Loader2, Lock, Mail, User } from "lucide-react";
 
-import type { RegisterResponseDto } from "../../../../../packages/shared/src/contracts/index.ts";
+import type { RegisterResponseDto } from "../../../../../packages/shared/src/index.ts";
 import { useLocale } from "../../context/LocaleContext";
 import { kkWebApiClient } from "../../services/api/kkApiClient";
 import { notify } from "../../services/system/notificationService";

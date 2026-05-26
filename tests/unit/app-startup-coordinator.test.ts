@@ -55,7 +55,7 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
   assert.match(appSource, /showCostEstimation=\{rootMode === 'workspace' \? showCostEstimation : false\}/);
   assert.match(appSource, /onExitCostEstimation=\{\(\) => setShowCostEstimation\(false\)\}/);
   assert.match(appSource, /showStartupBanner=\{rootMode === 'workspace'\}/);
-  assert.match(appSource, /AppContentComponent=\{rootMode === 'settings' \? SettingsPageRoot : AppContent\}/);
+  assert.match(appSource, /AppContentComponent=\{\s*rootMode === 'admin'[\s\S]*\? AdminLayout[\s\S]*: rootMode === 'settings'[\s\S]*\? SettingsPageRoot[\s\S]*: AppContent\s*\}/);
   assert.doesNotMatch(appSource, /const StartupRuntimeBanner: React\.FC = \(\) => \{/);
   assert.doesNotMatch(appSource, /const AuthenticatedAppShell: React\.FC/);
   assert.doesNotMatch(appSource, /import \{ AppStartupScreen \} from '\.\/components\/common\/AppStartupScreen';/);

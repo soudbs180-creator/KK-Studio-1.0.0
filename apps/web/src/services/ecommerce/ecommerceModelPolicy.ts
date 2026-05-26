@@ -6,7 +6,7 @@ import {
   type EcommerceGroupSheet,
   type EcommerceSheetSetting,
   type EcommerceSizePolicy,
-} from '../../types';
+} from '../../types/index.ts';
 
 const ECOMMERCE_MODEL_ALIASES: Record<string, string> = {
   'nano banana 2': 'gemini-3.1-flash-image-preview',

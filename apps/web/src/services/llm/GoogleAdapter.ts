@@ -1,6 +1,6 @@
-import { LLMAdapter, ChatOptions, ImageGenerationOptions, ImageGenerationResult, extractRefImageData, AudioGenerationOptions, AudioGenerationResult } from './LLMAdapter';
+import { type LLMAdapter, type ChatOptions, type ImageGenerationOptions, type ImageGenerationResult, extractRefImageData, type AudioGenerationOptions, type AudioGenerationResult} from './LLMAdapter';
 import { GenerationMode } from '../../types';
-import { KeySlot } from '../auth/keyManager';
+import { type KeySlot} from '../auth/keyManager';
 import { GOOGLE_API_BASE } from '../api/apiConfig';
 import { logError } from '../system/systemLogService';
 import { assertNoDirectCall } from '../../utils/security';

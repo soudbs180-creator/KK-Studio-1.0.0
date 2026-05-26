@@ -33,7 +33,7 @@ import { serializeError } from 'serialize-error';
 import { Toaster, toast } from 'sonner';
 import { useDevServerHeartbeat } from '../__create/useDevServerHeartbeat';
 import '../__create/design-mode';
-import type { Route } from './+types/root';
+import { Route } from './+types/root';
 
 export const links = () => [];
 

@@ -54,7 +54,9 @@ export interface UserMeResponse {
   email: string;
   credits: number;
   created_at: string;
+  adminLevel?: number;
 }
+
 
 export interface UpdateUserPayload {
   email?: string;
@@ -134,8 +136,9 @@ export async function chat(payload: ChatPayload): Promise<ChatResponse> {
 /**
  * 6. 获取当前用户信息
  */
-export async function getUserMe(): Promise<UserMeResponse> {
-  const { data } = await apiClient.get<UserMeResponse>('/user/me');
+export async function getUserMe(token?: string): Promise<UserMeResponse> {
+  const config = token ? { headers: { Authorization: `Bearer ${token}` } } : undefined;
+  const { data } = await apiClient.get<UserMeResponse>('/user/me', config);
   return data;
 }
 
@@ -168,5 +171,53 @@ export async function createCheckout(planId: string): Promise<CreateCheckoutResp
  */
 export async function getGenerations(): Promise<GenerationsResponse> {
   const { data } = await apiClient.get<GenerationsResponse>('/generations');
+  return data;
+}
+
+/**
+ * 11. 管理员：获取用户列表
+ */
+export async function adminGetUsers(params: { page?: number; limit?: number; search?: string }, token?: string): Promise<any> {
+  const { data } = await apiClient.get('/admin/users', { params });
+  return data;
+}
+
+/**
+ * 12. 管理员：充值积分
+ */
+export async function adminRechargeUser(userId: string, amount: number, note: string, token?: string): Promise<any> {
+  const { data } = await apiClient.post(`/admin/users/${userId}/recharge`, { amount, note });
+  return data;
+}
+
+/**
+ * 13. 管理员：调整积分
+ */
+export async function adminAdjustCredits(userId: string, delta: number, note: string, token?: string): Promise<any> {
+  const { data } = await apiClient.patch(`/admin/users/${userId}/credits`, { delta, note });
+  return data;
+}
+
+/**
+ * 14. 管理员：获取 API 配置列表
+ */
+export async function adminGetApiConfig(token?: string): Promise<any> {
+  const { data } = await apiClient.get('/admin/api-config');
+  return data;
+}
+
+/**
+ * 15. 管理员：修改定价
+ */
+export async function adminUpdateApiConfig(operationKey: string, cost: number, token?: string): Promise<any> {
+  const { data } = await apiClient.patch('/admin/api-config', { operation_key: operationKey, cost });
+  return data;
+}
+
+/**
+ * 16. 管理员：设置/取消管理员级别
+ */
+export async function adminSetAdminLevel(userId: string, adminLevel: number, token?: string): Promise<any> {
+  const { data } = await apiClient.patch(`/admin/users/${userId}/admin-level`, { admin_level: adminLevel });
   return data;
 }

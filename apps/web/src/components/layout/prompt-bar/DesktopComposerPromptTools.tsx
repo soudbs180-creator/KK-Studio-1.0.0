@@ -1,7 +1,7 @@
 import React from 'react';
 import { Wand2 } from 'lucide-react';
 
-import { GenerationConfig, GenerationMode } from '../../../types';
+import { type GenerationConfig, GenerationMode } from '../../../types';
 
 type DesktopComposerPromptToolsProps = {
   isMobile: boolean;

@@ -5,7 +5,7 @@ import {
   waitForAuthSessionChange,
 } from '../auth/authSessionEvents';
 import { getPreferredKkApiAccessToken, refreshPreferredKkApiAccessToken } from '../api/authAccessToken';
-import { StandardizedProxyRequest } from './ProxyRequestBuilder';
+import { type StandardizedProxyRequest} from './ProxyRequestBuilder';
 import { kkWebApiClient, resolveKkApiModelProxyBaseUrl } from '../api/kkApiClient';
 import { compressReferenceImagesIfNeeded } from '../../utils/imageUtils';
 import { kernelFetch } from '../http/requestKernel';

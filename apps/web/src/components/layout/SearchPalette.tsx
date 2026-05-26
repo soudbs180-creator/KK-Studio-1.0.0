@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { PromptNode, CanvasGroup } from '../../types';
+import { type PromptNode, type CanvasGroup} from '../../types';
 import { Search, MapPin, CornerDownLeft, X, Layers } from 'lucide-react';
 import { generateTagColor } from '../../utils/colorUtils';
 import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';

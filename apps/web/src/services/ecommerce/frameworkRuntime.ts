@@ -9,7 +9,7 @@ import {
   type EcommerceFrameworkSchedulerConfig,
   type EcommerceGroupSheet,
   type PromptNode,
-} from '../../types';
+} from '../../types/index.ts';
 
 const DEFAULT_LOCAL_CONCURRENCY = 4;
 const DEFAULT_REMOTE_CONCURRENCY = 2;

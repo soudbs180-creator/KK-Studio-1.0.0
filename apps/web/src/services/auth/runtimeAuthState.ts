@@ -1,4 +1,4 @@
-import type { ProfileDto } from "../../../../../packages/shared/src/contracts/index.ts";
+import type { ProfileDto } from "../../../../../packages/shared/src/index.ts";
 import type { RuntimeAuthUser } from "./runtimeAuthTypes.ts";
 
 import { KKAI_LOCAL_USER_ID } from "../../app/kkaiLocalRuntime.ts";

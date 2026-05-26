@@ -1,4 +1,4 @@
-import type { WechatAuthStartResponseDto } from "../../../../../packages/shared/src/contracts/index.ts";
+import type { WechatAuthStartResponseDto } from "../../../../../packages/shared/src/index.ts";
 
 import { buildAuthRedirectUrl, resolveAuthRedirectOrigin } from "../../config/authRedirect.ts";
 import { kkWebApiClient } from "../api/kkApiClient.ts";

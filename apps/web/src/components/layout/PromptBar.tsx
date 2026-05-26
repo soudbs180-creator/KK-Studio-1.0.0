@@ -1,7 +1,7 @@
 import React, { startTransition, useDeferredValue, useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import ReactDOM, { flushSync } from 'react-dom';
-import { GenerationConfig, AspectRatio, ImageSize, GenerationMode, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceSheetSettingPatch, type EcommerceTaskAssetRoleBinding, type ReferenceImage } from '../../types';
-import { ActiveModel } from '../../services/model/modelRegistry';
+import { type GenerationConfig, AspectRatio, ImageSize, GenerationMode, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceSheetSettingPatch, type EcommerceTaskAssetRoleBinding, type ReferenceImage } from '../../types';
+import { type ActiveModel} from '../../services/model/modelRegistry';
 import { keyManager } from '../../services/auth/keyManager'; // Added getter
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
 import { getModelCapabilities, modelSupportsGrounding, getModelDisplayInfo, getModelDescription, getModelDisplayName } from '../../services/model/modelCapabilities';

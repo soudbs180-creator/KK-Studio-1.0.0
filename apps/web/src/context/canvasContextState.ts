@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import { Canvas, PromptNode, GeneratedImage, CanvasGroup, CanvasDrawing, type WorkflowNode } from '../types';
+import { type Canvas, type PromptNode, type GeneratedImage, type CanvasGroup, type CanvasDrawing, type WorkflowNode } from '../types';
 import { featureFlags } from '../config/featureFlags';
 import { createEmptyWorkflowGraph } from '../workflow/types';
 

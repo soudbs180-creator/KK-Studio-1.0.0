@@ -99,7 +99,7 @@ export { getDocumentedStaticModelsForProvider, PROVIDER_PRESETS } from './keyMan
 import {
     applyOpenAICompatAuthToUrl,
     type ApiProtocolFormat,
-    AuthMethod,
+    type AuthMethod,
     buildGeminiHeaders,
     buildGeminiModelsEndpoint,
     buildOpenAIEndpoint,
@@ -2510,7 +2510,7 @@ export class KeyManager {
 
         try {
             let isValid = false;
-            let errorMsg = undefined;
+            let errorMsg: string | undefined = undefined;
             let fetchedModels: string[] | undefined = undefined;
 
             if (provider === 'Gemini' || provider === 'Google') {

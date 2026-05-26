@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { OnboardingProgress, OnboardingPhase } from './types';
+import { type OnboardingProgress, type OnboardingPhase} from './types';
 
 const STORAGE_KEY = 'kk_studio_onboarding_progress';
 

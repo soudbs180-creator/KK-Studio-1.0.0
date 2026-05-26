@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info, Copy, Check } from 'lucide-react';
-import { notificationService, Notification, NotificationType } from '../../services/system/notificationService';
+import { notificationService, type Notification, type NotificationType} from '../../services/system/notificationService';
 import { writeTextToClipboard } from '../../utils/clipboard';
 import { useLocale } from '../../context/LocaleContext';
 

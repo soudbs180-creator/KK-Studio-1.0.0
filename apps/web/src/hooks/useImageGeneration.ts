@@ -1,14 +1,14 @@
 ﻿import { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  PromptNode,
-  GeneratedImage,
+  type PromptNode,
+  type GeneratedImage,
   GenerationMode,
   AspectRatio,
   ImageSize,
-  ReferenceImage,
-  PromptPendingSyncRequest,
-  PromptCompletedTask,
-  TaskProviderType,
+  type ReferenceImage,
+  type PromptPendingSyncRequest,
+  type PromptCompletedTask,
+  type TaskProviderType,
 } from '../types';
 import { llmService } from '../services/llm/LLMService';
 import { generateImage, cancelGeneration } from '../services/llm/geminiService';

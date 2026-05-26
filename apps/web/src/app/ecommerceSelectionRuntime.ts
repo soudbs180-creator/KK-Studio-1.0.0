@@ -1,5 +1,5 @@
 import type { EcommerceGroupSlotState } from '../services/ecommerce/groupSlotState.ts';
-import { GenerationMode, type EcommerceGroupSheet, type PromptNode } from '../types';
+import { GenerationMode, type EcommerceGroupSheet, type PromptNode } from '../types/index.ts';
 
 export type EcommerceSelectionRuntimeState = {
   selectedItems: Record<string, boolean>;

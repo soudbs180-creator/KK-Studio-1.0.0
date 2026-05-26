@@ -1,5 +1,5 @@
-import { LLMAdapter, ChatOptions, ImageGenerationOptions, ImageGenerationResult, extractRefImageData } from './LLMAdapter';
-import { KeySlot, getModelMetadata, keyManager } from '../auth/keyManager';
+import { type LLMAdapter, type ChatOptions, type ImageGenerationOptions, type ImageGenerationResult, extractRefImageData } from './LLMAdapter';
+import { type KeySlot, getModelMetadata, keyManager } from '../auth/keyManager';
 import {
     type AuthMethod,
     applyOpenAICompatAuthToUrl,
@@ -28,7 +28,7 @@ import { logError } from '../system/systemLogService';
 import { buildInlineImagePart, buildGeminiNativeGroundingTools } from './GoogleAdapter';
 import { RegionService } from '../system/RegionService';
 import {
-    SyncImageBridgeParserType,
+    type SyncImageBridgeParserType,
     isSyncImageBridgeSupported,
     startSyncImageBridgeRequest,
     waitForSyncImageBridgeResult

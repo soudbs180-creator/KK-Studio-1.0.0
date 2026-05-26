@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Canvas } from '../../types';
+import { type Canvas} from '../../types';
 import { X, FolderOutput, Check, Plus } from 'lucide-react';
 import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 
