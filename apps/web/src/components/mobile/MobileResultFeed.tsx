@@ -106,6 +106,17 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
     viewMode,
   });
 
+  const bottomRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (totalResults > 0) {
+      const timer = setTimeout(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [totalResults]);
+
   React.useEffect(() => {
     if (typeof window === 'undefined') {
       setMeasuredWidth(getFallbackWidth(surface));
@@ -194,6 +205,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
               );
             })}
           </div>
+          <div ref={bottomRef} className="h-1 w-full flex-shrink-0" />
         </div>
       )}
     </section>

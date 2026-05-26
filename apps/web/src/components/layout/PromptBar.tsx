@@ -3032,6 +3032,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
             mobileFloatingSheetMaxHeight={mobileFloatingSheetMaxHeight}
             embeddedMobileDrawer={false}
             onToggleOptionsPanel={() => {
+                if (isMobile) {
+                    textareaRef.current?.blur();
+                }
                 setActiveMenu(null);
                 setShowOptionsPanel(prev => !prev);
             }}
