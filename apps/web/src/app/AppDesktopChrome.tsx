@@ -3,6 +3,7 @@ import { LayoutDashboard, LogOut, Sparkles, User, Zap } from 'lucide-react';
 
 import type { UserProfileView } from '../components/modals/UserProfileModal';
 import type { RuntimeAuthUser } from '../services/auth/runtimeAuthTypes.ts';
+import { useAuth } from '../context/AuthContext.tsx';
 
 interface AppDesktopChromeProps {
   isMobile: boolean;
@@ -75,6 +76,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
   isChatOpen,
   onToggleChat,
 }) => {
+  const { adminLevel } = useAuth();
   if (isMobile) {
     return null;
   }
@@ -216,6 +218,18 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
                       setShowUserMenu(false);
                     }}
                   />
+
+                  {adminLevel > 0 && (
+                    <DesktopMenuActionButton
+                      icon={<LayoutDashboard size={14} />}
+                      label="管理后台"
+                      accentColor="var(--clay-brand-coral)"
+                      onClick={() => {
+                        window.location.href = "/admin";
+                        setShowUserMenu(false);
+                      }}
+                    />
+                  )}
 
                   <div className="my-1 h-px" style={{ backgroundColor: 'var(--border-light)' }} />
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { PromptNode, CanvasGroup } from '../../types';
 import { Search, MapPin, CornerDownLeft, X, Layers } from 'lucide-react';
 import { generateTagColor } from '../../utils/colorUtils';
@@ -432,7 +432,7 @@ const SearchPalette: React.FC<SearchPaletteProps> = ({ isOpen, onClose, promptNo
                             {isMultiSelectMode && multiSelectedIds.size > 0 && (
                                 <button
                                     type="button"
-                                    className="inline-flex min-h-[32px] max-w-full items-center gap-1.5 overflow-hidden rounded-[var(--radius-control-md)] border px-3 py-1.5 text-xs font-medium text-white transition-[background-color,border-color,box-shadow]"
+                                    className="inline-flex min-h-[32px] max-w-full items-center gap-1.5 overflow-hidden rounded-[var(--radius-control-md)] border px-3 py-1.5 text-xs font-medium text-white transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-px active:translate-y-0"
                                     style={{
                                         background: 'var(--search-palette-accent)',
                                         borderColor: 'var(--search-palette-selected-border)',

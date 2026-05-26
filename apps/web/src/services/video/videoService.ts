@@ -36,7 +36,7 @@ export interface VideoGenerationResult {
     mode: 'text-to-video' | 'first-frame' | 'interpolation' | 'reference';
 }
 
-const DEFAULT_GOOGLE_BASE_URL = ('https://' + 'generativelanguage.google' + 'apis.com');
+const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
 
 /**
  * 生成视频 - 使用 Veo 3.1 API
@@ -184,7 +184,7 @@ async function executeVideoGeneration(
             headers: {
                 'Content-Type': 'application/json',
                 // 同时保留 header 认证以增强兼容性
-                [`x-goog-ap` + `i-key`]: apiKey,
+                'x-goog-api-key': apiKey,
             },
             body: JSON.stringify(requestBody),
             signal,
@@ -222,7 +222,7 @@ async function executeVideoGeneration(
             `${apiBase}/${operationName}?key=${apiKey}`, // 🚀 使用 apiBase
             {
                 headers: {
-                    [`x-goog-ap` + `i-key`]: apiKey,
+                    'x-goog-api-key': apiKey,
                 },
                 signal,
             }
@@ -278,7 +278,7 @@ async function executeVideoGeneration(
 }
 
 /**
- * 下载视频 (使用 (`x-goog-ap` + `i-key`) header 认证)
+ * 下载视频 (使用 x-goog-api-key header 认证)
  * 这是推荐的下载方式,避免在URL中暴露API Key
  */
 export async function downloadVideoWithAuth(
@@ -296,7 +296,7 @@ export async function downloadVideoWithAuth(
             const response = await fetch(videoUri, {
                 signal,
                 headers: {
-                    [`x-goog-ap` + `i-key`]: apiKey,
+                    'x-goog-api-key': apiKey,
                     'Accept': 'video/mp4,video/*,*/*'
                 },
                 redirect: 'follow' // 自动跟随重定向

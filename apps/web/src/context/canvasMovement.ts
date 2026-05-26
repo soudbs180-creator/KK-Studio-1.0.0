@@ -1,4 +1,4 @@
-import type { Canvas } from '../types.ts';
+import type { Canvas } from '../types';
 import { snapCanvasPointToGrid } from '../utils/canvasSnapToGrid.ts';
 import { isWorkflowUtilityNodeKind } from '../workflow/schema.ts';
 

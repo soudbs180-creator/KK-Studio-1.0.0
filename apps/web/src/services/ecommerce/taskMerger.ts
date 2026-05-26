@@ -6,7 +6,7 @@ import type {
   EcommerceSeriesTemplate,
   EcommerceSparseIntentPatch,
   EcommerceStyleTaskState,
-} from '../../types.ts';
+} from '../../types';
 import { resolveEcommerceCopy } from './copyResolver.ts';
 import { parseSparseEcommerceIntent } from './sparseIntentParser.ts';
 

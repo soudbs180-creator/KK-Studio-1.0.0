@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, ExternalLink, Loader2 } from 'lucide-react';
 
-import type { AdminRechargeSubmissionDto } from '@kk/shared';
+import type { AdminRechargeSubmissionDto } from '../../../../../packages/shared/src/contracts/index.ts';
 import { useAdminRole } from '../../hooks/useAdminRole';
 import { kkWebApiClient } from '../../services/api/kkApiClient';
 import { listAdminRechargeSubmissions } from '../../services/billing/rechargeSubmissionService';
@@ -9,7 +9,7 @@ import { notify } from '../../services/system/notificationService';
 import { readRuntimeEnv } from '../../utils/runtimeEnv';
 
 function formatAmount(value: number | undefined, currencyCode: string | undefined): string {
-  const symbol = currencyCode === 'USD' ? '$' : '¥';
+  const symbol = currencyCode === 'USD' ? '$' : '楼';
   return `${symbol}${Number(value || 0).toFixed(2)}`;
 }
 
@@ -252,3 +252,4 @@ const AdminRechargeFloatingPanel: React.FC = () => {
 };
 
 export default AdminRechargeFloatingPanel;
+

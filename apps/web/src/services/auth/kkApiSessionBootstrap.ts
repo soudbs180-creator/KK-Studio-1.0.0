@@ -3,7 +3,7 @@ import {
   type AuthSessionDto,
   type ApiResponse,
   type LogoutResponseDto,
-} from "@kk/shared";
+} from "../../../../../packages/shared/src/contracts/index.ts";
 import {
   setStoredKkApiAccessToken,
 } from "../api/authAccessToken.ts";
@@ -71,3 +71,4 @@ export async function logoutHostedSessionFromServer(): Promise<ApiResponse<Logou
     clearHostedSessionRuntime();
   }
 }
+

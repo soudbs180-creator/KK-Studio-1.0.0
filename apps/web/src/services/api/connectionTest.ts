@@ -104,7 +104,7 @@ function resolveOfficialCompatibleBaseUrl(runtime: ReturnType<typeof resolveConn
     throw new Error(`${runtime.strategy.label || runtime.strategyId} ${surfaceLabel} test requires a Base URL from the provider workbench; documentation hosts must not fall back to official OpenAI.`);
   }
 
-  return ('https://api.open' + 'ai.com');
+  return 'https://api.openai.com';
 }
 
 function assertNativeProtocolBaseUrl(runtime: ReturnType<typeof resolveConnectionRuntime>, cleanBase: string, surface: 'models'): void {

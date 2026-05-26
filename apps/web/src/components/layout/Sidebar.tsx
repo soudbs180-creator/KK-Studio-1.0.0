@@ -215,7 +215,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     {/* User Section */}
                     <div className="p-2 rounded-xl mb-2 transition-colors" style={frostedSidebarSubSurfaceStyle}>
                         <div className="flex items-center gap-3 mb-3 p-1">
-                            <div className="sidebar-avatar relative shrink-0 overflow-hidden cursor-pointer transition-transform" onClick={onOpenProfile} role="button">
+                            <div className="sidebar-avatar relative shrink-0 overflow-hidden cursor-pointer hover:scale-105 transition-transform" onClick={onOpenProfile} role="button">
                                 {avatarUrl ? (
                                     <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                                 ) : (

@@ -1,5 +1,5 @@
-import type { ReferenceImage, EcommerceTaskAssetRoleBinding } from '../../types.ts';
-import type { EcommerceAnalysisAsset, EcommerceReferenceMention } from './types.ts';
+import type { ReferenceImage, EcommerceTaskAssetRoleBinding } from '../../types';
+import type { EcommerceAnalysisAsset, EcommerceReferenceMention } from './types';
 
 type ManualReferenceBindingLike = {
   assetRole: EcommerceTaskAssetRoleBinding;

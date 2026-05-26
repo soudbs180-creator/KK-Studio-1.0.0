@@ -1,7 +1,7 @@
 import { useCallback, type RefObject } from 'react';
 
 import { buildEcommerceSlotPreviewBundle, type EcommerceGroupSlotState } from '../services/ecommerce/groupSlotState.ts';
-import type { EcommerceGroupSheet, GeneratedImage, PromptNode } from '../types.ts';
+import type { EcommerceGroupSheet, GeneratedImage, PromptNode } from '../types';
 
 type EcommerceSlotHistoryCanvasSnapshot = {
   imageNodes: GeneratedImage[];

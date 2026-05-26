@@ -36,9 +36,9 @@ export const DEFAULT_PROVIDERS: ApiProvider[] = [
     {
         id: 'google',
         name: 'Google Official',
-        baseUrl: ('https://' + 'generativelanguage.google' + 'apis.com'),
+        baseUrl: 'https://generativelanguage.googleapis.com',
         authMethod: 'query',
-        headerName: (`x-goog-ap` + `i-key`),
+        headerName: 'x-goog-api-key',
     },
     {
         id: 'custom',
@@ -52,7 +52,7 @@ export const DEFAULT_PROVIDERS: ApiProvider[] = [
 /**
  * Google official API base URL
  */
-export const GOOGLE_API_BASE = ('https://' + 'generativelanguage.google' + 'apis.com');
+export const GOOGLE_API_BASE = 'https://generativelanguage.googleapis.com';
 
 export function normalizeApiProtocolFormat(
     format: unknown,
@@ -137,7 +137,7 @@ export function buildHeaders(
     };
 
     if (authMethod === 'header') {
-        const effectiveHeaderName = headerName || (`x-goog-ap` + `i-key`);
+        const effectiveHeaderName = headerName || 'x-goog-api-key';
         headers[effectiveHeaderName] = effectiveHeaderName === 'Authorization'
             ? formatAuthorizationHeaderValue(apiKey, authorizationValueFormat)
             : getApiKeyToken(apiKey);

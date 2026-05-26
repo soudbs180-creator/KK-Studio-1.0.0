@@ -2,7 +2,7 @@ import type {
   EcommerceCopyTaskState,
   EcommerceEditableTaskState,
   EcommerceSeriesTemplate,
-} from '../../types.ts';
+} from '../../types';
 
 export interface ResolveEcommerceCopyInput {
   taskState: EcommerceEditableTaskState;

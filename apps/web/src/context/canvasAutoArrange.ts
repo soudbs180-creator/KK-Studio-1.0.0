@@ -1,5 +1,5 @@
-import type { Canvas, GeneratedImage, PromptNode } from '../types.ts';
-import { type AspectRatio } from '../types.ts';
+import type { Canvas, GeneratedImage, PromptNode } from '../types';
+import { type AspectRatio } from '../types';
 import { getCardDimensions } from '../utils/styleUtils.ts';
 
 export type CanvasAutoArrangePositions = Record<string, { x: number; y: number }>;

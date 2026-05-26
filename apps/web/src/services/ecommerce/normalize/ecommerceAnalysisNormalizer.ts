@@ -1,4 +1,4 @@
-import type { EcommerceEditableTaskState, EcommerceTaskAssetRoleBinding } from '../../../types.ts';
+import type { EcommerceEditableTaskState, EcommerceTaskAssetRoleBinding } from '../../../types';
 import { resolveEcommerceAspectPolicy } from '../ecommerceModelPolicy.ts';
 import { buildEcommerceRenderTask } from '../renderTaskBuilder.ts';
 import { buildEcommerceAssetRoleBindings } from '../assetRoleBindings.ts';
@@ -12,7 +12,7 @@ import type {
   OpenXmlParsedRow,
   OpenXmlParsedSheet,
   OpenXmlWorkbookParseResult,
-} from '../types.ts';
+} from '../types';
 import { resolveReferenceBindings } from '../xlsx/referenceBindingResolver.ts';
 
 const CANONICAL_MAIN_SHEET = '主图' as const;

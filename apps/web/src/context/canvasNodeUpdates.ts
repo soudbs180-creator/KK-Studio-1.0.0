@@ -1,4 +1,4 @@
-import type { Canvas, GeneratedImage, PromptNode } from '../types.ts';
+import type { Canvas, GeneratedImage, PromptNode } from '../types';
 import { resolvePromptChildImageIds } from './canvasPromptChildImages.ts';
 
 export type CanvasNodeUpdateBatch = {

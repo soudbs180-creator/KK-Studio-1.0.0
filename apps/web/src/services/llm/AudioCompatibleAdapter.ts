@@ -40,7 +40,7 @@ export class AudioCompatibleAdapter implements LLMAdapter {
     }
 
     async generateAudio(options: AudioGenerationOptions, keySlot: KeySlot): Promise<AudioGenerationResult> {
-        const baseUrl = (keySlot.baseUrl || ('https://api.open' + 'ai.com')).replace(/\/+$/, '');
+        const baseUrl = (keySlot.baseUrl || 'https://api.openai.com').replace(/\/+$/, '');
         const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
         const submitUrl = `${cleanBase}/audio/generations`;
         const pollBaseUrl = submitUrl;

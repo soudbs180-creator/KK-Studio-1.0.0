@@ -6,7 +6,7 @@ import {
   type MobileResultEntry,
   type MobileSurfaceScreen,
   type PromptNode,
-} from '../types.ts';
+} from '../types';
 
 type EcommerceMobileContinuationCanvasSnapshot = {
   promptNodes: PromptNode[];

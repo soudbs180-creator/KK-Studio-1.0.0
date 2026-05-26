@@ -12,7 +12,7 @@ import { adminModelService } from './services/model/adminModelService';
 import { unifiedModelService } from './services/model/unifiedModelService';
 import { buildPartialRedrawReferenceImage } from './services/image/partialRedraw';
 import { analyzeEcommerceRequirementFile } from './services/ecommerce/ecommerceAnalysisClient.ts';
-import type { EcommerceAnalysisResult } from './services/ecommerce/types.ts';
+import type { EcommerceAnalysisResult } from './services/ecommerce/types';
 import type { EcommerceGroupSlotState } from './services/ecommerce/groupSlotState.ts';
 import { llmService } from './services/llm/LLMService';
 import { cancelSecureSystemProxyTask } from './services/model/secureModelProxy';
@@ -263,6 +263,7 @@ import { traceLocalPerformance } from './services/system/localPerformanceTrace';
 import { cleanupLogsOlderThan } from './services/system/systemLogService';
 import { ensureMobileRetentionPreference, getMobileRetentionPreference, MOBILE_RETENTION_PREFERENCE_KEY } from './services/storage/mobileRetentionPreference';
 import SettingsPageRoot from './app/SettingsPageRoot';
+import { AdminLayout } from './pages/admin/AdminLayout.tsx';
 import { WorkspaceShell } from './components/workspace';
 import {
   createWorkflowNodeRendererRegistry,
@@ -705,7 +706,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
   // Mobile Nav Bar Visibility (Swipe to Show, Auto Hide)
   const [isMobileNavVisible, setIsMobileNavVisible] = useState(false);
-  const mobileNavTimerRef = useRef<any>(null);
+  const mobileNavTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isPromptFocused, setIsPromptFocused] = useState(false); // Track prompt input focus state
   const [isSidebarHovered, setIsSidebarHovered] = useState(false); // Track sidebar hover state
   const lastMouseMoveRef = useRef<number>(Date.now()); // Track the last mouse movement time
@@ -876,7 +877,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   useEffect(() => {
     if (authLoading) return;
     let active = true;
-    let backgroundReadyTimer: any = null;
+    let backgroundReadyTimer: number | null = null;
 
     const init = async () => {
       advanceTo('session_ready');
@@ -4892,7 +4893,13 @@ const App: React.FC = () => {
               showCostEstimation={rootMode === 'workspace' ? showCostEstimation : false}
               onExitCostEstimation={() => setShowCostEstimation(false)}
               showStartupBanner={rootMode === 'workspace'}
-              AppContentComponent={rootMode === 'settings' ? SettingsPageRoot : AppContent}
+              AppContentComponent={
+                rootMode === 'admin'
+                  ? AdminLayout
+                  : rootMode === 'settings'
+                    ? SettingsPageRoot
+                    : AppContent
+              }
             />
           </CanvasProvider>
         </BillingProvider>

@@ -108,21 +108,7 @@ supabase/.temp/
 .vercel
 .env*.local
 
-# Refactor Additions
-.npm-cache/
-*.log
-.env
-.env.local
-.env.production
-dist/
-.netlify/
-node_modules/
-
-# 缓存、临时与编译输出
-temp/*
+# KK-Studio Specific
+temp/
 !temp/README.md
-
-# 工具箱过滤
-tools/*
-!tools/README.md
-!tools/start.bat
+tools/

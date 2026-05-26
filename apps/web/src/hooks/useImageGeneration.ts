@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+﻿import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   PromptNode,
   GeneratedImage,
@@ -275,36 +275,16 @@ export const useImageGeneration = (options: {
     return details;
   }, []);
 
-  const getDisplayableGenerationError = useCallback((error: any): string => {
-    // 中文注释：根据规范提取 Axios 的异常响应，若包含积分不足则提示充值，若包含 refunded 等则提示生成失败积分已退回
-    const apiError = error?.response?.data?.error;
-    if (typeof apiError === 'string' && apiError) {
-      if (apiError.includes("积分不足") || apiError.toLowerCase().includes("insufficient credits")) {
-        return "积分不足，请充值后重试";
-      }
-      if (apiError.toLowerCase().includes("refunded") || apiError.toLowerCase().includes("generation failed") || apiError.toLowerCase().includes("failed")) {
-        return "生成失败，积分已退回";
-      }
-      return apiError;
+  const getDisplayableGenerationError = useCallback((error: any) => {
+    if (isSecureProxySessionReauthError(error)) {
+      return error?.message || SECURE_PROXY_SESSION_REAUTH_MESSAGE;
     }
 
-    // 中文注释：判断是否为网络异常
-    if (error?.code === "ERR_NETWORK" || error?.message?.toLowerCase().includes("network error") || error?.message?.toLowerCase().includes("failed to fetch")) {
-      return "网络连接失败，请稍后重试";
+    if (isSecureProxyGuestModeError(error)) {
+      return error?.message || SECURE_PROXY_GUEST_MODE_MESSAGE;
     }
 
-    const msg = error?.message;
-    if (typeof msg === 'string' && msg) {
-      if (msg.includes("积分不足") || msg.toLowerCase().includes("insufficient credits")) {
-        return "积分不足，请充值后重试";
-      }
-      if (msg.toLowerCase().includes("refunded") || msg.toLowerCase().includes("generation failed") || msg.toLowerCase().includes("failed")) {
-        return "生成失败，积分已退回";
-      }
-      return msg;
-    }
-
-    return "生成失败，积分已退回";
+    return error?.message || 'Unknown error';
   }, []);
 
   const isRecoverableSyncBridgeFailure = useCallback((params: {
@@ -1554,11 +1534,43 @@ export const useImageGeneration = (options: {
           let resolvedBalanceAfter: number | undefined = undefined;
           
           if (isAudio) {
-            // [安全重构] 音乐生成由于未移至后端，抛出英文不可用错误
-            throw new Error('Audio generation is currently unavailable. Please use image generation instead.');
+            const audioResult = await llmService.generateAudio({ modelId: executionNode.model, prompt: taskPrompt, audioDuration: executionNode.audioDuration, audioLyrics: executionNode.audioLyrics, preferredKeyId: executionNode.keySlotId, providerConfig: {} });
+            videoUrl = audioResult.url;
+            resolvedResultKeySlotId = audioResult.keySlotId || resolvedResultKeySlotId;
+            resolvedProvider = audioResult.provider || resolvedProvider;
+            resolvedProviderName = audioResult.providerName || resolvedProviderName;
+            resolvedModelId = audioResult.model || resolvedModelId;
+            resolvedModelName = resolveModelDisplayName(resolvedModelId, audioResult.modelName || resolvedModelName);
+            resolvedCost = toFiniteNumber(audioResult.usage?.cost);
+            resolvedCostSource = resolvedCost !== undefined ? 'explicit' : undefined;
+            resolvedTokens = toFiniteNumber(audioResult.usage?.totalTokens);
+            resolvedPromptTokens = toFiniteNumber((audioResult as any).usage?.promptTokens);
+            resolvedCompletionTokens = toFiniteNumber((audioResult as any).usage?.completionTokens);
           } else if (isVideo) {
-            // [安全重构] 视频生成由于未移至后端，抛出英文不可用错误
-            throw new Error('Video generation is currently unavailable. Please use image generation instead.');
+            const videoResult = await llmService.generateVideo({ 
+              modelId: executionNode.model, prompt: taskPrompt, aspectRatio: executionNode.aspectRatio === '9:16' ? '9:16' : '16:9', 
+              imageUrl: files[0]?.data, videoDuration: executionNode.videoDuration, preferredKeyId: executionNode.keySlotId, 
+              providerConfig: {}, 
+              onTaskId: (taskId) => {
+                taskIdForRecovery = taskId;
+                releaseSyncBridgeRequestActive(currentRequestId);
+                const fresh = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId);
+                if (fresh) urgentUpdatePromptNode(registerPendingTaskId(fresh, taskId));
+                // 持久化任务到数据库
+                void persistTask(taskId, executionNode, activeCanvasRef.current?.id);
+              }
+            });
+            videoUrl = videoResult.url;
+            resolvedResultKeySlotId = videoResult.keySlotId || resolvedResultKeySlotId;
+            resolvedProvider = videoResult.provider || resolvedProvider;
+            resolvedProviderName = videoResult.providerName || resolvedProviderName;
+            resolvedModelId = videoResult.model || resolvedModelId;
+            resolvedModelName = resolveModelDisplayName(resolvedModelId, videoResult.modelName || resolvedModelName);
+            resolvedCost = toFiniteNumber(videoResult.usage?.cost);
+            resolvedCostSource = resolvedCost !== undefined ? 'explicit' : undefined;
+            resolvedTokens = toFiniteNumber(videoResult.usage?.totalTokens);
+            resolvedPromptTokens = toFiniteNumber((videoResult as any).usage?.promptTokens);
+            resolvedCompletionTokens = toFiniteNumber((videoResult as any).usage?.completionTokens);
           } else {
             const result = await generateImage(taskPrompt, executionNode.aspectRatio, executionNode.imageSize, files, executionNode.model, '', currentRequestId, !!executionNode.enableGrounding || !!executionNode.enableImageSearch, {
               maskUrl: executionNode.mode === GenerationMode.REDRAW ? undefined : executionNode.maskUrl,
@@ -1567,8 +1579,7 @@ export const useImageGeneration = (options: {
               executionLane: executionNode.executionLane,
               creditRouteSpecId: executionNode.creditRouteSpecId,
               creditRouteUnitId: executionNode.creditRouteUnitId,
-              creditSettlement: executionNode.creditSettlement,
-              onTaskId: (taskId: string) => {
+              onTaskId: (taskId) => {
                 taskIdForRecovery = taskId;
                 const fresh = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId);
                 if (fresh) urgentUpdatePromptNode(clearPendingSyncRequests(registerPendingTaskId(fresh, taskId), [currentRequestId]));
@@ -1915,25 +1926,25 @@ export const useImageGeneration = (options: {
         const remainingSyncRequests = getPendingSyncRequests(nextNodeBase);
         const isStillRecovering = remainingPendingTaskIds.length > 0 || remainingSyncRequests.length > 0;
 
+        await updatePromptNode({
+          ...nextNodeBase,
+          isGenerating: isStillRecovering,
+          jobId: remainingPendingTaskIds[0],
+          childImageIds: [],
+          lastGenerationSuccessCount: 0,
+          lastGenerationFailCount: isStillRecovering ? nonRecoverableFailureCount : (nonRecoverableFailureCount || actualCount),
+          lastGenerationTotalCount: actualCount,
+          error: isStillRecovering ? undefined : (failedImageData[0]?.error || 'Generation failed'),
+          errorDetails: isStillRecovering
+            ? undefined
+            : (failedImageData[0]?.errorDetails || extractErrorDetails(new Error(failedImageData[0]?.error || 'Generation failed'), executionNode.model))
+        });
+        completedSyncRequestIds.forEach((requestId) => {
+          void clearSyncImageBridgeRequest(requestId).catch(() => undefined);
+          clearSyncBridgeRecoveryTimer(requestId);
+        });
+
         if (isStillRecovering) {
-          // 如果有部分任务仍在异步轮询/恢复中，则只更新状态而不抛出错误
-          await updatePromptNode({
-            ...nextNodeBase,
-            isGenerating: isStillRecovering,
-            jobId: remainingPendingTaskIds[0],
-            childImageIds: [],
-            lastGenerationSuccessCount: 0,
-            lastGenerationFailCount: nonRecoverableFailureCount,
-            lastGenerationTotalCount: actualCount,
-            error: undefined,
-            errorDetails: undefined
-          });
-
-          completedSyncRequestIds.forEach((requestId) => {
-            void clearSyncImageBridgeRequest(requestId).catch(() => undefined);
-            clearSyncBridgeRecoveryTimer(requestId);
-          });
-
           remainingPendingTaskIds.forEach((taskId) => {
             setTimeout(() => {
               const fresh = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId);
@@ -1948,35 +1959,21 @@ export const useImageGeneration = (options: {
           return;
         }
 
-        // 如果没有正在异步恢复的任务，且所有生成全部失败，则释放同步锁
-        completedSyncRequestIds.forEach((requestId) => {
-          void clearSyncImageBridgeRequest(requestId).catch(() => undefined);
-          clearSyncBridgeRecoveryTimer(requestId);
-        });
-
-        // 统一在外层 catch 中进行失败状态更新，此处只抛出包装后的详细错误
-        const errToThrow = new Error(failedImageData[0]?.error || 'Generation failed');
-        (errToThrow as any).details = failedImageData[0]?.errorDetails || extractErrorDetails(new Error(failedImageData[0]?.error || 'Generation failed'), executionNode.model);
-        throw errToThrow;
+        throw new Error(failedImageData[0]?.error || 'Generation failed');
       }
 
     } catch (err: any) {
       console.error('[useImageGeneration] Execution error:', err);
       const latest = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId) || node;
       const failedBillingState = await resolveFailedBillingState(latest);
-      // 优先从异常自带的 details 获取详尽错误信息，防范信息丢失
-      const errDetails = err.details || extractErrorDetails(err, node.model);
-      
-      // 统一在 catch 中更新最终失败态，防止 React 异步更新引起的竞态数据覆盖
       await updatePromptNode({
         ...latest,
         isGenerating: false,
-        lastGenerationSuccessCount: 0, // 强制全失败时成功计数为 0
-        childImageIds: [], // 确保主卡清空子图片 ID 呈现纯错误态
+        lastGenerationSuccessCount: latest.lastGenerationSuccessCount ?? 0,
         lastGenerationFailCount: Math.max(latest.lastGenerationFailCount ?? 0, actualCount),
         lastGenerationTotalCount: latest.lastGenerationTotalCount ?? actualCount,
         error: getDisplayableGenerationError(err),
-        errorDetails: errDetails,
+        errorDetails: extractErrorDetails(err, node.model),
         ...failedBillingState,
       });
       return;

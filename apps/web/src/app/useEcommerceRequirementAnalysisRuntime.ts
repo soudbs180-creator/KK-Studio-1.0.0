@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 
 import type { EcommerceGroupSlotState } from '../services/ecommerce/groupSlotState.ts';
-import type { EcommerceAnalysisResult } from '../services/ecommerce/types.ts';
-import type { EcommerceEditableTaskState, EcommerceGroupSheet } from '../types.ts';
+import type { EcommerceAnalysisResult } from '../services/ecommerce/types';
+import type { EcommerceEditableTaskState, EcommerceGroupSheet } from '../types';
 import type { EcommerceManualReferenceBinding } from './useEcommerceUploadReferenceRuntime.ts';
 
 export interface EcommerceRequirementAnalysisRuntimeState {

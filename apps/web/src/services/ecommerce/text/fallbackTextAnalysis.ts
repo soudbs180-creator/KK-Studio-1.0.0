@@ -7,7 +7,7 @@ import type {
   EcommerceAnalysisMainImageItem,
   EcommerceAnalysisResult,
   EcommerceReferenceMention,
-} from '../types.ts';
+} from '../types';
 
 type FallbackTextInput = {
   text: string;

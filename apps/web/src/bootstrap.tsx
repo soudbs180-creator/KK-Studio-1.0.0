@@ -1,17 +1,298 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import './index.css';
+import * as React from 'react';
+import { createRoot } from 'react-dom/client';
 import { SpeedInsights } from '@vercel/speed-insights/react';
+import './index.css';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
+import { LocaleProvider } from './context/LocaleContext';
+import { initializeThemeOnBoot } from './context/ThemeContext';
+import { isLoopbackHostname, isPrivateNetworkHostname } from './services/api/kkApiBaseUrl';
+import { disableVercelToolbar } from './utils/disableVercelToolbar';
+import {
+  DEFAULT_LANGUAGE,
+  LANGUAGE_STORAGE_KEY,
+  type ResolvedLanguage,
+  localizeUserFacingText,
+  normalizeLanguage,
+  pickByResolvedLanguage,
+} from './utils/localeText';
 
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean; error: Error | null; errorInfo: React.ErrorInfo | null }
-> {
+type FatalError = {
+  message: string;
+  details?: string;
+};
+
+// 获取存储的初始语言，用于渲染启动错误屏幕
+function getStoredStartupLanguage(): ResolvedLanguage {
+  if (typeof window === 'undefined') {
+    return DEFAULT_LANGUAGE;
+  }
+
+  try {
+    return normalizeLanguage(window.localStorage.getItem(LANGUAGE_STORAGE_KEY));
+  } catch {
+    return DEFAULT_LANGUAGE;
+  }
+}
+
+// 应用启动语言设置
+function applyStartupLanguage(language: ResolvedLanguage) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  document.documentElement.lang = language;
+  document.documentElement.dataset.language = language;
+}
+
+// 同步启动语言并返回当前语言类型
+function syncStartupLanguage() {
+  const language = getStoredStartupLanguage();
+  applyStartupLanguage(language);
+  return language;
+}
+
+// 根据当前启动语言选择对应中文或英文文本
+function pickStartupText<T>(zh: T, en: T): T {
+  return pickByResolvedLanguage(getStoredStartupLanguage(), zh, en);
+}
+
+// 对启动错误文本进行本地化转换
+function localizeStartupErrorText(value?: string) {
+  if (!value) {
+    return value;
+  }
+
+  return localizeUserFacingText(value) || value;
+}
+
+// 执行启动语言同步
+syncStartupLanguage();
+
+// 清理 URL 中的防缓存更新参数 __kk_update__，保持普通用户地址栏的干净整洁
+try {
+  const url = new URL(window.location.href);
+  if (url.searchParams.has('__kk_update__')) {
+    url.searchParams.delete('__kk_update__');
+    const newUrl = url.pathname + url.search + url.hash;
+    window.history.replaceState({}, '', newUrl);
+  }
+} catch (e) {
+  console.warn('Failed to clean up URL update query parameter:', e);
+}
+
+const rootElement = document.getElementById('root');
+
+if (!rootElement) {
+  throw new Error(pickStartupText('找不到根节点 #root，应用无法挂载。', 'Could not find root element to mount to.'));
+}
+
+const root = createRoot(rootElement);
+let hasMountedApp = false;
+
+disableVercelToolbar();
+initializeThemeOnBoot();
+
+// 将捕获的任意错误对象格式化为 FatalError 结构
+function normalizeError(error: unknown): FatalError {
+  if (error instanceof Error) {
+    return {
+      message: error.message || pickStartupText('应用启动失败', 'App failed to start'),
+      details: error.stack || error.toString(),
+    };
+  }
+
+  if (typeof error === 'string') {
+    return { message: error };
+  }
+
+  try {
+    return {
+      message: pickStartupText('应用启动失败', 'App failed to start'),
+      details: JSON.stringify(error, null, 2),
+    };
+  } catch {
+    return { message: pickStartupText('应用启动失败', 'App failed to start') };
+  }
+}
+
+// 检查并生成部署相关的友好提示
+function getDeploymentHints(): string[] {
+  const hints: string[] = [];
+  const hostname = typeof window !== 'undefined'
+    ? String(window.location.hostname || '').trim()
+    : '';
+
+  if (
+    !import.meta.env.VITE_KK_API_BASE_URL
+    && hostname
+    && !isLoopbackHostname(hostname)
+    && !isPrivateNetworkHostname(hostname)
+  ) {
+    hints.push(pickStartupText('缺少 VITE_KK_API_BASE_URL 环境变量', 'Missing VITE_KK_API_BASE_URL environment variable'));
+  }
+
+  return hints;
+}
+
+// 渲染致命启动错误诊断屏幕
+function FatalScreen({ error }: { error: FatalError }) {
+  const language = syncStartupLanguage();
+  const hints = getDeploymentHints();
+
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        background: 'var(--bg-canvas, #0b0b0c)',
+        color: 'var(--text-primary, #fffaf0)',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '32px',
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '920px',
+          background: 'var(--frost-card-framework-bg, #141414)',
+          border: '1px solid var(--frost-card-framework-border, rgba(255,250,240,0.14))',
+          borderRadius: '24px',
+          padding: '28px',
+          boxShadow: 'var(--frost-card-framework-shadow, 0 12px 28px rgba(0,0,0,0.24))',
+          backdropFilter: 'blur(var(--frost-card-framework-blur, 24px)) saturate(160%)',
+        }}
+      >
+        <div style={{ marginBottom: '18px' }}>
+          <div style={{ fontSize: '14px', color: 'var(--text-secondary, #d6d0c4)', marginBottom: '8px' }}>
+            {pickByResolvedLanguage(language, 'KK Studio 启动诊断', 'KK Studio Startup Diagnostics')}
+          </div>
+          <h1 style={{ fontSize: '28px', lineHeight: 1.2, color: 'var(--state-danger-text, #f87171)', margin: 0 }}>
+            {pickByResolvedLanguage(language, '应用启动失败，已拦截白屏', 'The app failed to start and the blank screen was blocked')}
+          </h1>
+        </div>
+
+        <div
+          style={{
+            background: 'var(--frost-card-sub-bg, #1f1f1f)',
+            border: '1px solid var(--frost-card-sub-border, rgba(255,250,240,0.12))',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '16px',
+          }}
+        >
+          <div style={{ fontSize: '14px', color: 'var(--text-secondary, #d6d0c4)', marginBottom: '6px' }}>
+            {pickByResolvedLanguage(language, '错误信息', 'Error details')}
+          </div>
+          <div style={{ fontSize: '16px', color: 'var(--text-primary, #fffaf0)', fontWeight: 600, marginBottom: '10px' }}>
+            {localizeStartupErrorText(error.message)}
+          </div>
+          {error.details && (
+            <pre
+              style={{
+                margin: 0,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                fontSize: '12px',
+                lineHeight: 1.6,
+                color: 'var(--text-secondary, #d6d0c4)',
+                maxHeight: '320px',
+                overflow: 'auto',
+              }}
+            >
+              {error.details}
+            </pre>
+          )}
+        </div>
+
+        {hints.length > 0 && (
+          <div
+            style={{
+              background: 'rgba(245, 158, 11, 0.08)',
+              border: '1px solid rgba(245, 158, 11, 0.28)',
+              borderRadius: '12px',
+              padding: '16px',
+              marginBottom: '16px',
+            }}
+          >
+            <div style={{ fontSize: '14px', color: '#fbbf24', marginBottom: '8px', fontWeight: 600 }}>
+              {pickByResolvedLanguage(language, '部署检查项', 'Deployment checks')}
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '18px', color: '#fde68a', lineHeight: 1.7 }}>
+              {hints.map((hint) => (
+                <li key={hint}>{hint}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              border: 'none',
+              background: 'var(--accent-coral, #ff6b5a)',
+              color: '#fff',
+              borderRadius: '10px',
+              padding: '10px 16px',
+              cursor: 'pointer',
+            }}
+          >
+            {pickByResolvedLanguage(language, '重新加载', 'Reload')}
+          </button>
+          <button
+            onClick={() => {
+              localStorage.clear();
+              sessionStorage.clear();
+              window.location.reload();
+            }}
+            style={{
+              border: '1px solid var(--frost-card-sub-border, rgba(255,250,240,0.12))',
+              background: 'var(--frost-card-sub-bg, #1f1f1f)',
+              color: 'var(--text-primary, #fff)',
+              borderRadius: '10px',
+              padding: '10px 16px',
+              cursor: 'pointer',
+            }}
+          >
+            {pickByResolvedLanguage(language, '清理本地缓存后重试', 'Clear local cache and retry')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 统一渲染致命错误页面
+function renderFatalScreen(error: unknown) {
+  const normalized = normalizeError(error);
+  console.error('[Bootstrap Fatal Error]', normalized.message, normalized.details || '');
+  root.render(<FatalScreen error={normalized} />);
+}
+
+// 监听未捕获的全局同步/异步异常
+window.addEventListener('error', (event) => {
+  console.error('[Global Error]', event.message, event.error);
+  if (!hasMountedApp) {
+    renderFatalScreen(event.error || event.message);
+  }
+});
+
+// 监听未处理的 Promise 拒绝异常
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[Unhandled Rejection]', event.reason);
+  if (!hasMountedApp) {
+    renderFatalScreen(event.reason);
+  }
+});
+
+// React 全局错误边界组件
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
+    this.state = { hasError: false, error: null };
   }
 
   static getDerivedStateFromError(error: Error) {
@@ -19,101 +300,36 @@ class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Uncaught error:', error, errorInfo);
-    this.setState({ errorInfo });
+    console.error('[Render Error]', error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
-      return (
-        <div
-          style={{
-            padding: '40px',
-            color: '#e4e4e7',
-            background: '#09090b',
-            height: '100vh',
-            fontFamily: 'monospace',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '20px'
-          }}
-        >
-          <div style={{ maxWidth: '800px', width: '100%' }}>
-            <h1 style={{ fontSize: '24px', marginBottom: '16px', color: '#ef4444' }}>
-              应用进程遇到错误
-            </h1>
-            <div
-              style={{
-                background: '#18181b',
-                padding: '20px',
-                borderRadius: '8px',
-                border: '1px solid #27272a',
-                marginBottom: '20px',
-                overflow: 'auto',
-                maxHeight: '400px'
-              }}
-            >
-              <p style={{ color: '#f87171', fontWeight: 'bold', marginBottom: '8px' }}>
-                {this.state.error?.toString()}
-              </p>
-              <pre style={{ fontSize: '12px', color: '#a1a1aa' }}>
-                {this.state.errorInfo?.componentStack || this.state.error?.stack}
-              </pre>
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              <button
-                onClick={() => window.location.reload()}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '6px',
-                  background: '#27272a',
-                  color: 'white',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                刷新页面
-              </button>
-              <button
-                onClick={() => {
-                  localStorage.clear();
-                  window.location.reload();
-                }}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '6px',
-                  background: '#ef4444',
-                  color: 'white',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                清除缓存并重置
-              </button>
-            </div>
-          </div>
-        </div>
-      );
+      return <FatalScreen error={normalizeError(this.state.error)} />;
     }
 
     return this.props.children;
   }
 }
 
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error('Could not find root element to mount to');
+// 启动入口引导逻辑
+function bootstrap() {
+  try {
+    hasMountedApp = true;
+
+    root.render(
+      <ErrorBoundary>
+        <LocaleProvider>
+          <AuthProvider>
+            <App />
+            <SpeedInsights />
+          </AuthProvider>
+        </LocaleProvider>
+      </ErrorBoundary>
+    );
+  } catch (error) {
+    renderFatalScreen(error);
+  }
 }
 
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <ErrorBoundary>
-    <AuthProvider>
-      <App />
-      <SpeedInsights />
-    </AuthProvider>
-  </ErrorBoundary>
-);
+bootstrap();

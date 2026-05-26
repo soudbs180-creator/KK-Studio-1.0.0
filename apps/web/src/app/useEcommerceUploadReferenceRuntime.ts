@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 
 import { appendUploadFilesWithinLimit } from '../components/ecommerce/ecommerceImportPreview.ts';
-import type { EcommerceAnalysisAsset } from '../services/ecommerce/types.ts';
+import type { EcommerceAnalysisAsset } from '../services/ecommerce/types';
 import type {
   EcommerceEditableTaskState,
   EcommerceImageRef,

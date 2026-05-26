@@ -1,4 +1,4 @@
-import type { Canvas, CanvasWorkflow, WorkflowNode } from '../types.ts';
+import type { Canvas, CanvasWorkflow, WorkflowNode } from '../types';
 import { dedupeWorkflowEdges, isWorkflowUtilityNodeKind } from '../workflow/schema.ts';
 import { getWorkflowSourceNodeIds } from './canvasWorkflowSourceNodeIds.ts';
 

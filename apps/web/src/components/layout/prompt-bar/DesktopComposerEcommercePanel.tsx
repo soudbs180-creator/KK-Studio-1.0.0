@@ -12,7 +12,7 @@ import type {
   EcommerceAnalysisAPlusModule,
   EcommerceAnalysisMainImageItem,
   EcommerceAnalysisResult,
-} from '../../../services/ecommerce/types.ts';
+} from '../../../services/ecommerce/types';
 import type { EcommerceGroupSlotState } from '../../../services/ecommerce/groupSlotState.ts';
 import EcommerceImportPanel from '../../ecommerce/EcommerceImportPanel';
 import EcommerceAnalysisReviewPanel from '../../ecommerce/EcommerceAnalysisReviewPanel';

@@ -1,4 +1,4 @@
-import type { GenerationMode } from '../../types.ts';
+import type { GenerationMode } from '../../types';
 import type { KeySlot } from '../auth/keyManager.ts';
 
 export interface ChatMessage {

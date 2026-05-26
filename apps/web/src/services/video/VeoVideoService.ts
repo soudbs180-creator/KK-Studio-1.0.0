@@ -54,13 +54,13 @@ export async function startVeoVideoGeneration(
     baseUrl?: string
 ): Promise<{ operationId: string }> {
     const model = config.model || 'veo-3.1-generate-preview';
-    const cleanBase = baseUrl || ('https://' + 'generativelanguage.google' + 'apis.com');
+    const cleanBase = baseUrl || 'https://generativelanguage.googleapis.com';
 
     // 构建请求 - 使用 header 认证 (官方文档标准)
     const apiUrl = `${cleanBase}/v1beta/models/${model}:predictLongRunning`;
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        [`x-goog-ap` + `i-key`]: apiKey
+        'x-goog-api-key': apiKey
     };
 
     const payload: any = {
@@ -104,7 +104,7 @@ export async function pollVeoVideoOperation(
     onProgress?: (percent: number) => void,
     signal?: AbortSignal
 ): Promise<VeoVideoResult> {
-    const cleanBase = baseUrl || ('https://' + 'generativelanguage.google' + 'apis.com');
+    const cleanBase = baseUrl || 'https://generativelanguage.googleapis.com';
     // 轮询 URL: 使用 header 认证 (不需要 query 参数)
     const pollUrl = `${cleanBase}/v1beta/${operationId}`;
 
@@ -117,7 +117,7 @@ export async function pollVeoVideoOperation(
         }
 
         const response = await fetch(pollUrl, {
-            headers: { [`x-goog-ap` + `i-key`]: apiKey }
+            headers: { 'x-goog-api-key': apiKey }
         });
 
         if (!response.ok) {
@@ -166,7 +166,7 @@ export async function pollVeoVideoOperation(
  */
 async function downloadVideo(uri: string, apiKey: string): Promise<Blob> {
     const response = await fetch(uri, {
-        headers: { [`x-goog-ap` + `i-key`]: apiKey }
+        headers: { 'x-goog-api-key': apiKey }
     });
 
     if (!response.ok) {
@@ -184,13 +184,13 @@ export async function cancelVeoVideoOperation(
     apiKey: string,
     baseUrl?: string
 ): Promise<void> {
-    const cleanBase = baseUrl || ('https://' + 'generativelanguage.google' + 'apis.com');
+    const cleanBase = baseUrl || 'https://generativelanguage.googleapis.com';
     // 取消 URL: 使用 header 认证
     const cancelUrl = `${cleanBase}/v1beta/${operationId}:cancel`;
 
     const response = await fetch(cancelUrl, {
         method: 'POST',
-        headers: { [`x-goog-ap` + `i-key`]: apiKey }
+        headers: { 'x-goog-api-key': apiKey }
     });
 
     if (!response.ok) {

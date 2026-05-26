@@ -1,4 +1,4 @@
-import type { Canvas, CanvasGroup } from '../types.ts';
+import type { Canvas, CanvasGroup } from '../types';
 import { isWorkflowUtilityNodeKind } from '../workflow/schema.ts';
 
 export function bringCanvasNodesToFront(canvas: Canvas, nodeIds: string[]): Canvas {

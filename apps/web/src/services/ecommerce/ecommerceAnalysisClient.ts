@@ -1,4 +1,3 @@
-import { apiClient } from '@nano-banana/api-client';
 import { nutrientDocumentService } from '../document/nutrientDocumentService.ts';
 import { normalizeEcommerceAnalysis } from './normalize/ecommerceAnalysisNormalizer.ts';
 import { analyzeEcommerceTextFallback } from './text/fallbackTextAnalysis.ts';
@@ -112,13 +111,49 @@ export async function analyzeEcommerceRequirementFile(file: File): Promise<Ecomm
   formData.append('file', file, file.name);
 
   try {
-    const response = await apiClient.post('/ecommerce-analysis', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    const response = await fetch('/api/ecommerce-analysis', {
+      method: 'POST',
+      body: formData,
     });
 
-    const payload = response.data as { analysis?: EcommerceAnalysisResult };
+    if (!response.ok) {
+      if (!hasJsonContentType(response) && shouldUseLocalFallback(file, { nonJsonResponse: true })) {
+        return analyzeRequirementFileLocally(file);
+      }
+
+      if (shouldUseLocalFallback(file, { status: response.status })) {
+        return analyzeRequirementFileLocally(file);
+      }
+
+      let message = '电商需求单解析失败';
+      try {
+        const payload = await response.json() as Record<string, unknown>;
+        message = String(payload.error || payload.message || message);
+      } catch {
+        // Keep fallback.
+      }
+      throw new Error(message);
+    }
+
+    if (!hasJsonContentType(response)) {
+      if (shouldUseLocalFallback(file, { nonJsonResponse: true })) {
+        return analyzeRequirementFileLocally(file);
+      }
+
+      throw new Error('电商需求单解析接口返回了非 JSON 数据，当前文件类型暂不支持本地解析。');
+    }
+
+    let payload: { analysis?: EcommerceAnalysisResult };
+    try {
+      payload = await response.json() as { analysis?: EcommerceAnalysisResult };
+    } catch {
+      if (shouldUseLocalFallback(file, { nonJsonResponse: true })) {
+        return analyzeRequirementFileLocally(file);
+      }
+
+      throw new Error('电商需求单返回数据格式无效。');
+    }
+
     if (!payload.analysis) {
       throw new Error('电商需求单返回数据格式无效。');
     }

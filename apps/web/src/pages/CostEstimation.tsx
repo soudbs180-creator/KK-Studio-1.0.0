@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   Clock3,
@@ -721,8 +721,7 @@ export const CostEstimation: React.FC<CostEstimationProps> = ({
               />
             </div>
 
-            // 只有在管理员身份且会话激活（可操作）时才显示核销台，避免在用户账单中多余渲染
-            {canManageRechargeSubmissions ? (
+            {isAdmin ? (
               <section className="settings-reference-card settings-reference-card--soft">
                 <div className="settings-reference-card__header">
                   <div>

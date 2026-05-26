@@ -9,7 +9,7 @@ import {
   type EcommerceFrameworkRuntimeState,
   type EcommerceGroupSheet,
   type PromptNode,
-} from '../types.ts';
+} from '../types';
 
 type EcommercePromptActivationCanvasSnapshot = {
   promptNodes: PromptNode[];

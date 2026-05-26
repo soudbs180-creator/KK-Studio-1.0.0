@@ -1,4 +1,4 @@
-import type { AspectRatio, GenerationMode } from '../types.ts';
+import type { AspectRatio, GenerationMode } from '../types';
 import { FOOTER_HEIGHT, getCardDimensions } from './styleUtils.ts';
 
 const coerceAspectRatio = (value: string): AspectRatio => value as unknown as AspectRatio;

@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
-import type { CreditTransactionDto } from '@kk/shared';
+import type { CreditTransactionDto } from '../../../../packages/shared/src/contracts/index.ts';
 import { KKAI_FEATURE_FLAGS } from '../app/kkaiFeatureFlags';
 import { isBillingAuthFailure } from '../services/billing/billingApiAuth';
 import { buildGenerationAttemptIdempotencyKey } from '../services/billing/generationBillingCoordinator';
@@ -476,9 +476,13 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (refreshMode.markRefreshing) {
       setRefreshing(true);
     }
-    // @ts-ignore
-    const refreshPromise = (includeTransactions ? Promise.all([refreshBalanceOnly(), loadCreditTransactions(false)]) : refreshBalanceOnly().then((canonicalBalance) => [canonicalBalance, undefined] as const)).then(([canonicalBalance, latestBalanceAfter]) => {
-        const resolvedBalance = typeof canonicalBalance === 'number' ? canonicalBalance : latestBalanceAfter;
+    const refreshPromise = (includeTransactions
+      ? Promise.all([refreshBalanceOnly(), loadCreditTransactions(false)])
+      : refreshBalanceOnly().then((canonicalBalance) => [canonicalBalance, undefined] as const))
+      .then(([canonicalBalance, latestBalanceAfter]) => {
+        const resolvedBalance = typeof canonicalBalance === 'number'
+          ? canonicalBalance
+          : latestBalanceAfter;
 
         if (typeof resolvedBalance === 'number') {
           setBalance(resolvedBalance);
@@ -494,7 +498,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (refreshMode.markRefreshing) {
           setRefreshing(false);
         }
-      }) as unknown as Promise<void>;
+      });
 
     refreshPromiseRef.current = refreshPromise;
     return refreshPromise;
@@ -877,3 +881,4 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     </BillingContext.Provider>
   );
 };
+

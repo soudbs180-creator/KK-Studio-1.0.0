@@ -1,6 +1,6 @@
 import { useEffect, type Dispatch, type SetStateAction } from 'react';
 
-import { AspectRatio, GenerationMode, type EcommerceEditableTaskState, type GenerationConfig } from '../types.ts';
+import { AspectRatio, GenerationMode, type EcommerceEditableTaskState, type GenerationConfig } from '../types';
 
 export interface EcommerceModeRuntimeState {
   activeTaskNodeId: string | null;

@@ -1,6 +1,6 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 
-import { type AspectRatio, type EcommerceEditableTaskState, type EcommerceGroupSheet } from '../types.ts';
+import { type AspectRatio, type EcommerceEditableTaskState, type EcommerceGroupSheet } from '../types';
 
 export interface EcommerceSourceSelectionRuntimeState {
   activeTaskNodeId: string | null;

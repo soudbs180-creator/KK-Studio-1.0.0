@@ -9,7 +9,7 @@ import {
   ImageSize,
   type EcommerceEditableTaskState,
   type PromptNode,
-} from '../types.ts';
+} from '../types';
 import { optimizeGenerationPrompt, summarizePromptOptimizationError } from './optimizeGenerationPrompt.ts';
 import type { ApplyEffectiveSizingToEcommerceTaskState } from './useEcommerceBuildRuntime.ts';
 import type { EcommerceNodeGenerationSettings } from './useEcommerceSheetSettingsRuntime.ts';

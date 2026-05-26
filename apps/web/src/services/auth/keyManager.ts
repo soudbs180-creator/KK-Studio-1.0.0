@@ -202,7 +202,7 @@ export interface KeySlot {
 
     // Auth Configuration
     authMethod?: AuthMethod; // 'query' | 'header'
-    headerName?: string;     // Custom header name (default: (`x-goog-ap` + `i-key`))
+    headerName?: string;     // Custom header name (default: x-goog-api-key)
     customHeaders?: Record<string, string>; // Provider-specific custom request headers
     customBody?: Record<string, any>; // Provider-specific custom request body template
 
@@ -315,7 +315,7 @@ export interface ThirdPartyProvider {
 const DEFAULT_MAX_FAILURES = 3;
 const CLOUD_SYNC_POLL_INTERVAL_MS = 60 * 1000;
 
-const GOOGLE_HEADER_NAME = (`x-goog-ap` + `i-key`);
+const GOOGLE_HEADER_NAME = 'x-goog-api-key';
 
 const GOOGLE_CHAT_MODELS = [
     // Gemini 2.5 series - best value
@@ -996,7 +996,7 @@ export class KeyManager {
             const isGoogle = s.provider === 'Google' || (s.provider as string) === 'Gemini';
             let newProvider = s.provider;
             if ((s.provider as string) === 'Gemini' && !s.baseUrl) newProvider = 'Google' as Provider;
-            if (s.provider === 'Google' && s.baseUrl && !s.baseUrl.includes(('google' + 'apis.com'))) newProvider = 'Custom' as Provider;
+            if (s.provider === 'Google' && s.baseUrl && !s.baseUrl.includes('googleapis.com')) newProvider = 'Custom' as Provider;
 
             const runtime = resolveProviderRuntime({
                 provider: newProvider,
@@ -1411,7 +1411,7 @@ export class KeyManager {
 
             if (runtime.geminiNative || runtime.resolvedFormat === 'gemini') {
                 // Google Native Logic
-                if (cleanUrl === ('https://' + 'generativelanguage.google' + 'apis.com')) {
+                if (cleanUrl === 'https://generativelanguage.googleapis.com') {
                     // Default Google Base
                     targetUrl = `${cleanUrl}/v1beta/models`;
                 } else if (!cleanUrl.endsWith('/models')) {
@@ -1419,7 +1419,7 @@ export class KeyManager {
                     targetUrl = `${cleanUrl}/models`;
                 }
 
-                // Google uses Query Param or (`x-goog-ap` + `i-key`) header
+                // Google uses Query Param or x-goog-api-key header
                 // We'll use the header for cleanliness, works on v1beta
                 if (resolvedAuthMethod === 'query') {
                     targetUrl = `${targetUrl}?key=${cleanKey}`;
@@ -2510,12 +2510,12 @@ export class KeyManager {
 
         try {
             let isValid = false;
-            let errorMsg: string | undefined = undefined;
+            let errorMsg = undefined;
             let fetchedModels: string[] | undefined = undefined;
 
             if (provider === 'Gemini' || provider === 'Google') {
                 const response = await fetch(
-                    `https://${'generativelanguage.google' + 'apis.com'}/v1beta/models?key=${key}`,
+                    `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`,
                     { method: 'GET' }
                 );
 
@@ -3107,7 +3107,7 @@ export class KeyManager {
 
     private buildSlotChannelConfig(slot: KeySlot): ChannelConfig {
         const slotBaseUrl = slot.baseUrl
-            || (slot.provider === 'OpenAI' ? ('https://api.open' + 'ai.com') : GOOGLE_API_BASE);
+            || (slot.provider === 'OpenAI' ? 'https://api.openai.com' : GOOGLE_API_BASE);
         const runtime = resolveProviderRuntime({
             provider: slot.provider,
             baseUrl: slotBaseUrl,
@@ -3887,7 +3887,7 @@ export async function fetchGoogleModels(apiKey: string): Promise<string[]> {
 
     try {
         const response = await fetch(
-            `https://${'generativelanguage.google' + 'apis.com'}/v1beta/models?key=${apiKey}`
+            `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
         );
 
         if (!response.ok) {
@@ -3923,7 +3923,7 @@ export async function fetchGeminiCompatModels(apiKey: string, baseUrl?: string):
     }
 
     const lowerBase = String(baseUrl || '').toLowerCase();
-    if (!baseUrl || lowerBase.includes(('google' + 'apis.com')) || lowerBase.includes(('generativelanguage.google' + 'apis.com'))) {
+    if (!baseUrl || lowerBase.includes('googleapis.com') || lowerBase.includes('generativelanguage.googleapis.com')) {
         return fetchGoogleModels(apiKey);
     }
 

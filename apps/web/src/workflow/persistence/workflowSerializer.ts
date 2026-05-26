@@ -1,7 +1,7 @@
 import type { CanvasWorkflow, PromptNode, WorkflowNode } from '../../types';
 import { normalizeReferenceImagesStorage } from '../../utils/referenceImageStorage.ts';
 import { dedupeWorkflowEdges } from '../schema.ts';
-import { createEmptyWorkflowGraph } from '../types.ts';
+import { createEmptyWorkflowGraph } from '../types';
 
 const stripReferenceImageData = (
   referenceImages: PromptNode['referenceImages'],

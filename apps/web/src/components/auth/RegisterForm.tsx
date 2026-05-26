@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Loader2, Lock, Mail, User } from "lucide-react";
 
-import type { RegisterResponseDto } from "@kk/shared";
+import type { RegisterResponseDto } from "../../../../../packages/shared/src/contracts/index.ts";
 import { useLocale } from "../../context/LocaleContext";
 import { kkWebApiClient } from "../../services/api/kkApiClient";
 import { notify } from "../../services/system/notificationService";
@@ -16,7 +16,7 @@ function buildAuthErrorMessage(code: string | undefined, fallback: string): stri
   const normalizedCode = String(code || "").trim();
 
   if (normalizedCode === "AUTH_ROUTE_DISABLED" || normalizedCode === "HTTP_404" || normalizedCode === "HTTP_405") {
-    return "当前本地运行时的注册接口尚未接管，请等待后端认证链路补齐。";
+    return "当前本地运行时的工作区注册接口尚未接管，请等待后端认证链路补齐。";
   }
 
   return fallback;
@@ -254,3 +254,4 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
     </div>
   );
 };
+

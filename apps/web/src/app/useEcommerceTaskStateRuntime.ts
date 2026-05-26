@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 
-import type { EcommerceAnalysisResult } from '../services/ecommerce/types.ts';
-import type { EcommerceEditableTaskState } from '../types.ts';
+import type { EcommerceAnalysisResult } from '../services/ecommerce/types';
+import type { EcommerceEditableTaskState } from '../types';
 
 export interface EcommerceTaskStateRuntimeState {
   taskStates: Record<string, EcommerceEditableTaskState>;

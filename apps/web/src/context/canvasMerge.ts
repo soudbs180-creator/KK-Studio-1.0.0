@@ -1,4 +1,4 @@
-import type { Canvas } from '../types.ts';
+import type { Canvas } from '../types';
 
 export type NormalizeCanvasForMerge = (canvas: Canvas) => Canvas;
 

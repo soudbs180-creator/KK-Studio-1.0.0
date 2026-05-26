@@ -5,7 +5,7 @@ import type {
   MobileResultEntry,
   MobileResultLayout,
   PromptNode,
-} from '../../types.ts';
+} from '../../types';
 import { resolveEcommerceFrameworkSummary } from '../../services/ecommerce/frameworkRuntime.ts';
 
 const DEFAULT_RESULT_ACTIONS: MobileResultEntry['actions'] = {

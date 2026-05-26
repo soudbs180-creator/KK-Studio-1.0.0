@@ -6,7 +6,7 @@ import type {
   OpenXmlParsedReferenceSlot,
   OpenXmlWorkbookAsset,
   OpenXmlWorkbookParseResult,
-} from '../types.ts';
+} from '../types';
 
 const XML_ENTITY_MAP: Record<string, string> = {
   '&amp;': '&',

@@ -1,4 +1,4 @@
-import type { AspectRatio } from '../types.ts';
+import type { AspectRatio } from '../types';
 
 const coerceAspectRatio = (value: string): AspectRatio => value as unknown as AspectRatio;
 

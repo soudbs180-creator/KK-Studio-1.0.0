@@ -118,7 +118,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                 : (navigator as Navigator & { deviceMemory?: number }).deviceMemory,
         })
     );
-    const interactionIdleTimeoutRef = useRef<any>(null);
+    const interactionIdleTimeoutRef = useRef<number | null>(null);
     const interactionStateRef = useRef<CanvasInteractionState>({
         isDragging: false,
         isZooming: false,
@@ -127,8 +127,8 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
     });
 
     // 🚀 性能优化：缩放防抖
-    const zoomTimeoutRef = useRef<any>(null);
-    const zoomIndicatorTimeoutRef = useRef<any>(null);
+    const zoomTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const zoomIndicatorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const [isImageDragOver, setIsImageDragOver] = useState(false); // 图片拖拽悬停状态
     const dragCounter = useRef(0); // 防止拖拽事件抖动

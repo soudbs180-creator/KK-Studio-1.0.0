@@ -1,4 +1,4 @@
-import type { EcommerceSlotDeliveryKind } from '../../types.ts';
+import type { EcommerceSlotDeliveryKind } from '../../types';
 
 export type EcommerceGroupPackageType = 'main-image-group' | 'a-plus-group';
 export type EcommerceGroupExportSlotStatus = 'exported' | 'skipped' | 'missing';

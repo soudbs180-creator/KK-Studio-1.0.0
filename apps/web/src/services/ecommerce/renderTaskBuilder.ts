@@ -3,7 +3,7 @@ import type {
   EcommerceEditableTaskState,
   EcommerceSeriesTemplate,
   EcommerceTaskAssetRoleBinding,
-} from '../../types.ts';
+} from '../../types';
 import { resolveEcommerceCopy } from './copyResolver.ts';
 
 type EcommerceAspectRatio = 'auto' | '1:1' | '3:4' | '4:3' | '16:9' | '21:9' | (string & {});

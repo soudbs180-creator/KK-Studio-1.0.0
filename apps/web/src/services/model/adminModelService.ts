@@ -1,4 +1,4 @@
-import type { ApiError } from '@kk/shared';
+import type { ApiError } from '../../../../../packages/shared/src/contracts/index.ts';
 import { kkWebApiClient } from '../api/kkApiClient.ts';
 
 
@@ -857,3 +857,4 @@ class AdminModelService {
 }
 
 export const adminModelService = new AdminModelService();
+

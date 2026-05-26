@@ -11,7 +11,7 @@ import {
   resolveFrameworkLane,
   resumeEcommerceFrameworkRuntime,
 } from '../services/ecommerce/frameworkRuntime.ts';
-import { GenerationMode, type EcommerceFrameworkQueueItem, type EcommerceGroupSheet, type PromptNode } from '../types.ts';
+import { GenerationMode, type EcommerceFrameworkQueueItem, type EcommerceGroupSheet, type PromptNode } from '../types';
 import { pickByDocumentLanguage } from '../utils/localeText';
 import {
   applyEcommerceAnalysisSelectionState,

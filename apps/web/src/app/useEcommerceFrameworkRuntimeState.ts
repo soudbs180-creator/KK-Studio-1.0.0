@@ -6,8 +6,8 @@ import type {
   EcommerceFrameworkRuntimeState,
   EcommerceGroupSheet,
   PromptNode,
-} from '../types.ts';
-import { GenerationMode } from '../types.ts';
+} from '../types';
+import { GenerationMode } from '../types';
 
 export type EcommerceFrameworkCanvasSnapshot = {
   promptNodes: PromptNode[];

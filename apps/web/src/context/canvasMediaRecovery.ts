@@ -1,4 +1,4 @@
-import { GenerationMode, type GeneratedImage } from '../types.ts';
+import { GenerationMode, type GeneratedImage } from '../types';
 import { ImageQuality, getQualityStorageId } from '../services/image/imageQuality.ts';
 import { getStrictOriginalImage, saveImage, saveOriginalImage } from '../services/storage/imageStorage.ts';
 

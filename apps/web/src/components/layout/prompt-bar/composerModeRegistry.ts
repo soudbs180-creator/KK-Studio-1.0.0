@@ -24,9 +24,9 @@ export const PROMPT_BAR_MODE_REGISTRY: PromptBarModeOption[] = [
     mode: GenerationMode.VIDEO,
     label: '视频',
     icon: Video,
-    color: '#f472b6',
-    activeBg: 'rgba(244, 114, 182, 0.16)',
-    activeBorder: 'rgba(244, 114, 182, 0.4)',
+    color: '#a78bfa',
+    activeBg: 'rgba(139, 92, 246, 0.16)',
+    activeBorder: 'rgba(167, 139, 250, 0.4)',
   },
   {
     mode: GenerationMode.ECOMMERCE,
@@ -38,11 +38,11 @@ export const PROMPT_BAR_MODE_REGISTRY: PromptBarModeOption[] = [
   },
   {
     mode: GenerationMode.AUDIO,
-    label: '音频',
+    label: '音乐',
     icon: Mic,
-    color: '#a78bfa',
-    activeBg: 'rgba(167, 139, 250, 0.16)',
-    activeBorder: 'rgba(167, 139, 250, 0.4)',
+    color: '#f9a8d4',
+    activeBg: 'rgba(236, 72, 153, 0.16)',
+    activeBorder: 'rgba(244, 114, 182, 0.4)',
   },
   {
     mode: GenerationMode.PPT,

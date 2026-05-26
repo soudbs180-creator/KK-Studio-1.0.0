@@ -1,6 +1,6 @@
 import { useCallback, type RefObject } from 'react';
 
-import { GenerationMode, type EcommerceEditableTaskState, type GeneratedImage, type PromptNode } from '../types.ts';
+import { GenerationMode, type EcommerceEditableTaskState, type GeneratedImage, type PromptNode } from '../types';
 
 type EcommercePartialRedrawCanvasSnapshot = {
   imageNodes: GeneratedImage[];

@@ -1,4 +1,4 @@
-import type { Canvas } from '../types.ts';
+import type { Canvas } from '../types';
 import { isWorkflowUtilityNodeKind } from '../workflow/schema.ts';
 
 export type CanvasPosition = { x: number; y: number };

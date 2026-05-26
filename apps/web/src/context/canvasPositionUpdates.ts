@@ -1,4 +1,4 @@
-import type { Canvas } from '../types.ts';
+import type { Canvas } from '../types';
 
 export type PromptPositionUpdateOptions = {
     moveChildren?: boolean;

@@ -1,5 +1,5 @@
-import type { EcommerceSeriesTemplate } from '../../types.ts';
-import type { EcommerceAnalysisResult } from './types.ts';
+import type { EcommerceSeriesTemplate } from '../../types';
+import type { EcommerceAnalysisResult } from './types';
 
 type SeriesTemplateAnalysis = EcommerceAnalysisResult & {
   seriesTemplate?: EcommerceSeriesTemplate;

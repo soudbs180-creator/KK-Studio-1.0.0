@@ -1,4 +1,4 @@
-import type { Canvas, CanvasGroup, WorkflowNode } from '../types.ts';
+import type { Canvas, CanvasGroup, WorkflowNode } from '../types';
 
 const MAX_CANVAS_COORDINATE = 200000;
 const MIN_PROMPT_HEIGHT = 32;

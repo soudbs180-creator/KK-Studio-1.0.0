@@ -1,7 +1,7 @@
 import type {
   EcommerceAnalysisAPlusModule,
   EcommerceAnalysisMainImageItem,
-} from './types.ts';
+} from './types';
 
 export type EcommercePromptNodeMetadataSeed =
   | {

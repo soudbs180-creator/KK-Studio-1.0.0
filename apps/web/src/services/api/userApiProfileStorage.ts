@@ -1,4 +1,4 @@
-import type { ApiResponse } from '@kk/shared';
+import type { ApiResponse } from '../../../../../packages/shared/src/contracts/index.ts';
 import type { ApiProtocolFormat } from './apiConfig.ts';
 import { getStoredKkApiAccessToken } from './authAccessToken.ts';
 import { legacyWebApiClient, shouldUseLegacyWebApiFallback } from './kkApiClient.ts';
@@ -9,7 +9,7 @@ import {
   mergeUserApisPayloadToCloudRecord,
 } from './userApiCloudRecordStorage.ts';
 
-const DEFAULT_GOOGLE_BASE_URL = ('https://' + 'generativelanguage.google' + 'apis.com');
+const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
 const DEFAULT_PROXY_BASE_URL = 'https://cdn.12ai.org';
 const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';
 const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
@@ -75,7 +75,7 @@ function resolveApiType(provider: string, baseUrl?: string): StoredUserApiEntry[
     return 'official';
   }
 
-  if (normalizedBaseUrl.includes(('google' + 'apis.com'))) {
+  if (normalizedBaseUrl.includes('googleapis.com')) {
     return 'official';
   }
 
@@ -300,7 +300,7 @@ async function loadLocalUserApiEntriesViaApi(): Promise<StoredUserApiEntry[]> {
 
   const response = await legacyWebApiClient.getUserApiEntries();
   const data = unwrapOrThrow(response, 'Failed to load local user API entries.');
-  return normalizeEntries((data as any).entries);
+  return normalizeEntries(data.entries);
 }
 
 async function saveLocalUserApiEntriesViaApi(entries: StoredUserApiEntry[]): Promise<void> {
@@ -440,3 +440,4 @@ export function createUserApiEntry(input: {
     lastError: null,
   });
 }
+

@@ -1,4 +1,4 @@
-import type { EcommerceSparseIntentPatch } from '../../types.ts';
+import type { EcommerceSparseIntentPatch } from '../../types';
 
 function cleanIntentText(value: string): string {
   return String(value || '')

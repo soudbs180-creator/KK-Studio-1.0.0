@@ -13,7 +13,7 @@ import {
   type EcommerceSheetSettingPatch,
   type GenerationConfig,
   type PromptNode,
-} from '../types.ts';
+} from '../types';
 
 export interface EcommerceSheetSettingsCanvasSnapshot {
   promptNodes: PromptNode[];

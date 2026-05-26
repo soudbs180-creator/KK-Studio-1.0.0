@@ -1,4 +1,4 @@
-import type { Canvas } from '../types.ts';
+import type { Canvas } from '../types';
 
 export function setCanvasNodeTags(canvas: Canvas, ids: string[], tags: string[]): Canvas {
     return {

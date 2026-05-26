@@ -103,7 +103,7 @@ export async function listCreditExchangeRates(): Promise<CreditExchangeRate[]> {
       return Object.values(DEFAULT_CREDIT_EXCHANGE_RATES);
     }
 
-    const mapped = (response.data.items || []).map((row: any) => mapApiRate(row as CreditExchangeRate));
+    const mapped = (response.data.items || []).map((row) => mapApiRate(row as CreditExchangeRate));
     return Object.values(mergeWithDefaults(mapped));
   } catch (error) {
     console.warn('[creditExchangeRateService] Canonical API exchange-rate read failed, using defaults:', error);
@@ -125,7 +125,7 @@ export async function getCreditExchangeRateMap(): Promise<Record<SupportedRechar
       return mergeWithDefaults([]);
     }
 
-    const mapped = (response.data.items || []).map((row: any) => mapApiRate(row as CreditExchangeRate));
+    const mapped = (response.data.items || []).map((row) => mapApiRate(row as CreditExchangeRate));
     return mergeWithInactiveFallback(mapped);
   } catch (error) {
     console.warn('[creditExchangeRateService] Canonical API exchange-rate map failed, using defaults:', error);

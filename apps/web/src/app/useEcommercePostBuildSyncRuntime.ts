@@ -9,7 +9,7 @@ import type {
   EcommerceAnalysisAsset,
   EcommerceAnalysisMainImageItem,
   EcommerceAnalysisResult,
-} from '../services/ecommerce/types.ts';
+} from '../services/ecommerce/types';
 import {
   AspectRatio,
   GenerationMode,
@@ -20,7 +20,7 @@ import {
   type EcommerceTaskAssetRoleBinding,
   type PromptNode,
   type ReferenceImage,
-} from '../types.ts';
+} from '../types';
 import type {
   EcommerceManualReferenceBinding,
   EcommerceUploadReferenceBundle,

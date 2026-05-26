@@ -59,13 +59,17 @@ export function createKkaiRuntimeAuthSnapshot(): KkaiRuntimeAuthSnapshot {
   };
 }
 
-export type KkaiAppRootMode = 'workspace' | 'settings';
+export type KkaiAppRootMode = 'workspace' | 'settings' | 'admin';
 
 export function createAppRootMode(input: { pathname: string }): KkaiAppRootMode {
   const normalizedPathname = String(input.pathname || '').trim().toLowerCase();
 
   if (normalizedPathname === '/settings' || normalizedPathname.startsWith('/settings/')) {
     return 'settings';
+  }
+
+  if (normalizedPathname === '/admin' || normalizedPathname.startsWith('/admin/')) {
+    return 'admin';
   }
 
   return 'workspace';

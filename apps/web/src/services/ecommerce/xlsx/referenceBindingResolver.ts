@@ -1,4 +1,4 @@
-import type { EcommerceReferenceMention, OpenXmlWorkbookAsset } from '../types.ts';
+import type { EcommerceReferenceMention, OpenXmlWorkbookAsset } from '../types';
 
 const RIGHT_TOKENS = ['右边', '右侧', '右图', '参考右边', '参考右侧', '参考右图'];
 const LEFT_TOKENS = ['左边', '左侧', '左图', '参考左边', '参考左侧', '参考左图'];

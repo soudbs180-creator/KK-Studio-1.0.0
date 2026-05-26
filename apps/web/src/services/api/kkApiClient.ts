@@ -1,9 +1,11 @@
 import {
   createKkApiClient,
   type KkApiClient,
+} from "../../../../../packages/shared/src/contracts/index.ts";
+import {
   ADMIN_SESSION_TOKEN_HEADER,
   TEMP_USER_ID_HEADER,
-} from "@kk/shared";
+} from "../../../../../packages/shared/src/index.ts";
 import { readRuntimeEnv, readRuntimeOrigin } from "../../utils/runtimeEnv.ts";
 import {
   getPreferredKkApiAccessToken,
@@ -149,3 +151,4 @@ export {
   resolveKkApiModelProxyBaseUrl,
   resolveOriginHostname,
 };
+

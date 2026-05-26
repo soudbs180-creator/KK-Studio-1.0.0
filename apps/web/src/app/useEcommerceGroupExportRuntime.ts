@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 
 import { buildEcommerceGroupExportManifest } from '../services/ecommerce/groupExportManifest.ts';
 import { applyEcommerceSlotResult, type EcommerceGroupSlotState } from '../services/ecommerce/groupSlotState.ts';
-import { type EcommerceGroupSheet, type GeneratedImage, type PromptNode } from '../types.ts';
+import { type EcommerceGroupSheet, type GeneratedImage, type PromptNode } from '../types';
 
 export interface EcommerceLatestSlotImage {
   image: GeneratedImage;

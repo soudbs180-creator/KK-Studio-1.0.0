@@ -1,4 +1,4 @@
-import type { Canvas, CanvasGroup } from '../types.ts';
+import type { Canvas, CanvasGroup } from '../types';
 
 function resolveNextGroupZIndex(canvas: Canvas): number {
     return Math.max(

@@ -28,6 +28,8 @@ import { tempUserService } from "../services/auth/tempUserService";
 import { setTaskPersistenceStorageUserId } from "../services/persistence/taskPersistence";
 import { createKkaiRuntimeAuthSnapshot } from "./kkaiRuntimeContext";
 
+import { getUserMe } from "@nano-banana/api-client";
+
 interface AuthContextType {
   session: RuntimeAuthSession | null;
   user: RuntimeAuthUser | null;
@@ -37,11 +39,15 @@ interface AuthContextType {
   isTempUser: boolean;
   tempUserExpiry: number | null;
   sessionRecoveryWarning: string | null;
+  adminLevel: number;
 }
 
 const DEFAULT_AUTH_CONTEXT = createKkaiRuntimeAuthSnapshot();
 
-const AuthContext = createContext<AuthContextType>(DEFAULT_AUTH_CONTEXT);
+const AuthContext = createContext<AuthContextType>({
+  ...DEFAULT_AUTH_CONTEXT,
+  adminLevel: 0,
+});
 
 function createSession(user: RuntimeAuthUser | null, accessToken?: string): RuntimeAuthSession | null {
   const normalizedAccessToken = String(accessToken || "").trim();
@@ -93,10 +99,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [sessionRecoveryLoading, setSessionRecoveryLoading] = useState(false);
   const [sessionRecoveryBlockedBySignOut, setSessionRecoveryBlockedBySignOut] = useState(false);
   const [sessionRecoveryWarning, setSessionRecoveryWarning] = useState<string | null>(null);
+  const [adminLevel, setAdminLevel] = useState<number>(0);
   const hostedRuntime = useMemo(() => isHostedRuntime(), []);
   const runtimeUserId = runtimeState.user?.id || null;
   const sessionAccessToken = runtimeState.isTempUser ? undefined : getStoredKkApiAccessToken();
   const loading = authActionLoading || sessionRecoveryLoading;
+
+  useEffect(() => {
+    if (sessionAccessToken && !runtimeState.isTempUser) {
+      getUserMe(sessionAccessToken)
+        .then((res) => {
+          if (res && typeof res.adminLevel === "number") {
+            setAdminLevel(res.adminLevel);
+          }
+        })
+        .catch((err) => {
+          console.error("[AuthContext] Fetch adminLevel failed:", err);
+          setAdminLevel(0);
+        });
+    } else {
+      setAdminLevel(0);
+    }
+  }, [sessionAccessToken, runtimeState.isTempUser]);
 
   useLayoutEffect(() => {
     const allowSessionlessLocalUserApiStorage =
@@ -313,8 +337,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isTempUser: runtimeState.isTempUser,
       tempUserExpiry: runtimeState.tempUserExpiry,
       sessionRecoveryWarning,
+      adminLevel,
     };
-  }, [loading, runtimeState, sessionAccessToken, sessionRecoveryWarning]);
+  }, [loading, runtimeState, sessionAccessToken, sessionRecoveryWarning, adminLevel]);
 
   return (
     <AuthContext.Provider value={value}>

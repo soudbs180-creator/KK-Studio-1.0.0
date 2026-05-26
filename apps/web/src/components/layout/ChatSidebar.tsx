@@ -2033,7 +2033,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                     {msg.attachments && msg.attachments.length > 0 && (
                                         <div className="flex flex-wrap gap-2 mt-1">
                                             {msg.attachments.map(att => (
-                                                <div key={att.id} className="relative group overflow-hidden rounded-xl border border-[var(--border-light)] transition-colors hover:border-[var(--border-medium)]">
+                                                <div key={att.id} className="relative group overflow-hidden rounded-xl border border-[var(--border-light)] shadow-sm transition-transform hover:scale-[1.02]">
                                                     {att.type === 'image' ? (
                                                         <a href={att.data} target="_blank" rel="noopener noreferrer" className="block cursor-zoom-in">
                                                             <img

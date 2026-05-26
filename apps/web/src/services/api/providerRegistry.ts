@@ -13,14 +13,14 @@ export const PROVIDER_REGISTRY: Record<Provider, ProviderMetadata> = {
     Google: {
         id: 'Google',
         label: 'Google Cloud / Gemini',
-        defaultBaseUrl: ('https://' + 'generativelanguage.google' + 'apis.com'),
+        defaultBaseUrl: 'https://generativelanguage.googleapis.com',
         description: 'Official Google Gemini & Imagen API',
         docsUrl: 'https://ai.google.dev/'
     },
     OpenAI: {
         id: 'OpenAI',
         label: 'OpenAI',
-        defaultBaseUrl: ('https://api.open' + 'ai.com/v1'),
+        defaultBaseUrl: 'https://api.openai.com/v1',
         description: 'Standard OpenAI API',
         docsUrl: 'https://platform.openai.com/docs/api-reference'
     },

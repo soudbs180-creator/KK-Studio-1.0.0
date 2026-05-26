@@ -1,4 +1,4 @@
-import type { EcommerceSlotDeliveryKind } from '../../types.ts';
+import type { EcommerceSlotDeliveryKind } from '../../types';
 
 type EcommerceGroupKey = 'main' | 'aplus';
 type EcommerceSlotResultSource = 'generated' | 'redraw';

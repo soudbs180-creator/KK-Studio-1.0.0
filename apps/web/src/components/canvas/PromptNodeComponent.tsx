@@ -39,11 +39,8 @@ const getCreditFailureSuffix = (
 };
 
 const getPromptFailureLabel = (
-    node: Pick<PromptNode, 'billingMode' | 'creditCost' | 'model' | 'provider' | 'imageSize' | 'refundStatus' | 'error'>
-) => {
-    // 中文注释：若节点包含错误描述，则在头部状态栏直观展示错误原因以防 [object Object] 的出现
-    return node.error || '生成失败';
-};
+    node: Pick<PromptNode, 'billingMode' | 'creditCost' | 'model' | 'provider' | 'imageSize' | 'refundStatus'>
+) => `生成失败${getCreditFailureSuffix(node)}`;
 
 const CARD_LAUNCH_OVERLAY_Z_INDEX = 980;
 
@@ -1369,7 +1366,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                         <span className="text-[var(--text-secondary)]">
                                             {renderedFailCount > 0
                                                 ? `成功 ${renderedSuccessCount} 张，失败 ${renderedFailCount} 张`
-                                                : '生成成功'}
+                                                : `已生成 ${renderedSuccessCount} 张`}
                                         </span>
                                     ) : (
                                         <span className="text-[var(--text-tertiary)]">

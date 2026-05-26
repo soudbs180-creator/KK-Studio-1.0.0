@@ -1,4 +1,4 @@
-import { GenerationMode, type Canvas } from '../types.ts';
+import { GenerationMode, type Canvas } from '../types';
 
 export function deleteCanvasImageNode(canvas: Canvas, id: string): Canvas {
     return {

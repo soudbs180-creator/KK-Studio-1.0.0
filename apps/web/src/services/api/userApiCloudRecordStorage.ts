@@ -1,4 +1,4 @@
-import type { KeyManagerCloudStateDto, UserApiEntryDto } from '@kk/shared';
+import type { KeyManagerCloudStateDto, UserApiEntryDto } from '../../../../../packages/shared/src/contracts/index.ts';
 import {
   getLegacyWebApiFallbackState,
   legacyWebApiClient,
@@ -259,7 +259,7 @@ function resolveUserApiEntryType(
     return 'official';
   }
 
-  if (normalizedBaseUrl.includes(('google' + 'apis.com'))) {
+  if (normalizedBaseUrl.includes('googleapis.com')) {
     return 'official';
   }
 
@@ -838,3 +838,4 @@ export async function mergeUserApisPayloadToCloudRecord(
     normalizeEnvelope(existingPayload),
   );
 }
+

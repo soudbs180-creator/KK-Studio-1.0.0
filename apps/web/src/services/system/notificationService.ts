@@ -25,7 +25,7 @@ class NotificationService {
     private notifications: Notification[] = [];
     private listeners: Set<NotificationListener> = new Set();
     private maxNotifications = 5;
-    private timers: Map<string, any> = new Map();
+    private timers: Map<string, NodeJS.Timeout> = new Map();
 
     /**
      * Show a notification

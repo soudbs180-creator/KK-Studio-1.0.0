@@ -9,7 +9,7 @@ import type {
 import type {
   EcommerceAnalysisAsset,
   EcommerceAnalysisResult,
-} from '../../services/ecommerce/types.ts';
+} from '../../services/ecommerce/types';
 import { buildEcommerceUploadPreviewModel } from './ecommerceImportPreview.ts';
 import EcommerceTaskEditorPanel, {
   type EcommerceTaskStateChangeHandler,

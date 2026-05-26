@@ -11,7 +11,7 @@ import type {
   EcommerceAnalysisAsset,
   EcommerceAnalysisMainImageItem,
   EcommerceAnalysisResult,
-} from '../services/ecommerce/types.ts';
+} from '../services/ecommerce/types';
 import { buildEcommerceRenderTask } from '../services/ecommerce/renderTaskBuilder.ts';
 import { buildEcommerceCanvasGroupLayout } from '../services/ecommerce/groupCanvasLayout.ts';
 import { buildEcommerceAssetRoleBindings } from '../services/ecommerce/assetRoleBindings.ts';
@@ -35,7 +35,7 @@ import {
   type GenerationConfig,
   type PromptNode,
   type ReferenceImage,
-} from '../types.ts';
+} from '../types';
 import { createDefaultEcommerceSheetSettings } from './useEcommerceSheetSettingsRuntime.ts';
 import type {
   EcommerceManualReferenceBinding,

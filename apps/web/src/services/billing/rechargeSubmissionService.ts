@@ -14,7 +14,7 @@ import type {
   SubmitRechargeRequestDto,
   SubmitRechargeResponseDto,
   SupportedRechargeCurrencyDto,
-} from '@kk/shared';
+} from '../../../../../packages/shared/src/contracts/index.ts';
 import { kkWebApiClient } from '../api/kkApiClient.ts';
 import { localizeUserFacingText } from '../../utils/localeText.ts';
 
@@ -341,7 +341,7 @@ function buildDefaultRechargePaymentChannelConfigs(): RechargePaymentChannelConf
     {
       channel: 'paypal',
       label: 'PayPal',
-      instructionText: '国际付款完成后，再提交账单编号和流水尾号。',
+      instructionText: '国际付款完成后，再提交账单编号 and 流水尾号。',
       isActive: false,
       qrImageDataUrl: null,
       qrImagePath: null,
@@ -745,3 +745,4 @@ export async function submitRechargeRequest(
     options?.requestId ? { requestId: options.requestId } : undefined,
   );
 }
+

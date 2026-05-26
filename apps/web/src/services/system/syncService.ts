@@ -1,6 +1,6 @@
 import type { Canvas } from '../../types';
 import { shouldEnableWorkspaceCloudSync } from '../../app/kkaiFeatureFlags';
-import type { CanvasLayoutRecordDto } from '@kk/shared';
+import type { CanvasLayoutRecordDto } from '../../../../../packages/shared/src/contracts/index.ts';
 import { kkWebApiClient } from '../api/kkApiClient';
 
 function unwrapOrThrow<T>(
@@ -131,7 +131,7 @@ export const syncService = {
         return [];
       }
 
-      const data = unwrapOrThrow(response, 'Failed to load workspace layout.') as any;
+      const data = unwrapOrThrow(response, 'Failed to load workspace layout.');
       return normalizeCanvasArray(data.canvases);
     } catch (e) {
       console.error('[SyncService] Failed to load layout:', e);
@@ -156,7 +156,7 @@ export const syncService = {
         throw new Error('Authenticated KK API session is required to clean up cloud images.');
       }
 
-      const data = unwrapOrThrow(response, 'Failed to cleanup cloud images.') as any;
+      const data = unwrapOrThrow(response, 'Failed to cleanup cloud images.');
       return { count: data.deletedCount, success: true };
     } catch (e) {
       console.error('[Cloud Cleanup] Failed:', e);
@@ -175,3 +175,4 @@ export const syncService = {
     void count;
   }
 };
+
