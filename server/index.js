@@ -77,6 +77,7 @@ app.use(cors({
     callback(null, allowedOrigins.has(String(origin).toLowerCase()));
   },
   credentials: true,
+  exposedHeaders: ['X-Refresh-Token'],
 }));
 
 // 应用解析中间件，通过 verify 钩子自动暂存 rawBody 用于签名校验

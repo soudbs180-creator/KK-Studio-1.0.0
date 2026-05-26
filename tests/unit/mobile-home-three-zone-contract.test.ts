@@ -44,7 +44,7 @@ describe('mobile home three-zone contract', () => {
     const shellSource = readSource('src/components/mobile/MobileAppShell.tsx');
     const surfaceSource = readSource('src/components/mobile/MobileWorkspaceSurface.tsx');
 
-    assert.match(shellSource, /gridTemplateRows:\s*'auto minmax\(0, 1fr\) auto'/);
+    assert.match(shellSource, /gridTemplateRows:\s*'minmax\(0, 1fr\) auto'/);
     assert.match(shellSource, /className="[^"]* h-dvh max-h-dvh [^"]*"/);
     assert.doesNotMatch(shellSource, /min-h-dvh/);
     assert.doesNotMatch(shellSource, /sticky top-0/);

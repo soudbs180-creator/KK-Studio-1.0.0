@@ -49,7 +49,19 @@ apiClient.interceptors.request.use(
 
 // 响应拦截器：统一处理常见错误
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // 中文注释：滑动过期会话续期，拦截X-Refresh-Token响应头并覆盖本地Token存储
+    const refreshToken = response.headers?.['x-refresh-token'] || response.headers?.['X-Refresh-Token'];
+    if (refreshToken && typeof window !== 'undefined') {
+      const storageKey = 'kk.api.access_token';
+      window.sessionStorage?.setItem(storageKey, refreshToken);
+      if (window.localStorage?.getItem(storageKey)) {
+        window.localStorage.setItem(storageKey, refreshToken);
+      }
+      window.dispatchEvent(new CustomEvent('kk-api-token-refreshed', { detail: { token: refreshToken } }));
+    }
+    return response;
+  },
   (error) => {
     if (error.response) {
       const { status, data } = error.response;

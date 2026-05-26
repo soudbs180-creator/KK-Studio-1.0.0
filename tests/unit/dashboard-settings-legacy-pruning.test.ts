@@ -12,12 +12,9 @@ test('DashboardView.localized removes the hidden legacy overview header block af
   const source = readSource('src/components/settings/views/DashboardView.localized.tsx');
 
   assert.doesNotMatch(source, /\{false && \(/);
-  assert.match(source, /<SettingsHero/);
-  assert.match(source, /Traffic overview/);
-  assert.match(source, /Operational health/);
-  assert.match(source, /Quick routes/);
-  assert.match(source, /Recent signals/);
-  assert.doesNotMatch(source, /Quick access/);
-  assert.doesNotMatch(source, /Status and next step/);
-  assert.doesNotMatch(source, /System overview/);
+  assert.match(source, /SettingsViewShell/);
+  assert.match(source, /dashboard-grid-container/);
+  assert.match(source, /dashboard-grid-card/);
+  assert.doesNotMatch(source, /Quick routes/);
+  assert.doesNotMatch(source, /Recent signals/);
 });

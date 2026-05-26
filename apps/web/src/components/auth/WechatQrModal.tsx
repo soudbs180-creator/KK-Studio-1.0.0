@@ -29,6 +29,7 @@ interface WechatLoginWidgetOptions {
   lang?: 'en';
   color_scheme?: 'auto' | 'dark' | 'light';
   self_redirect?: boolean;
+  href?: string;
   onReady?: (ready: boolean) => void;
 }
 
@@ -195,6 +196,17 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
         }
 
         mountNode.innerHTML = '';
+        const customCss = `
+          .impowerBox .qrcode { width: 280px !important; height: 280px !important; margin: 20px auto !important; border-radius: 16px !important; }
+          .impowerBox .title { display: none !important; }
+          .impowerBox .info { display: none !important; }
+          .status_icon { display: none !important; }
+          .impowerBox .status { display: none !important; }
+          .impowerBox .wrp_code { border: none !important; margin-bottom: 0px !important; }
+          body { background-color: transparent !important; }
+        `;
+        const cssBase64 = `data:text/css;base64,${window.btoa(customCss)}`;
+
         window.WxLogin({
           id: widgetMountId,
           appid: widgetConfig.appId,
@@ -204,6 +216,7 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
           lang: widgetConfig.language,
           color_scheme: 'light',
           self_redirect: false,
+          href: cssBase64,
           onReady: () => {
             if (!disposed) {
               setWidgetState('ready');
@@ -257,7 +270,7 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl overflow-hidden rounded-3xl border border-white/10 bg-[#081629] text-white shadow-[0_30px_90px_rgba(0,0,0,0.45)]"
+        className="w-full max-w-md overflow-hidden rounded-[28px] border border-white/10 bg-[#081629] text-white shadow-[0_30px_90px_rgba(0,0,0,0.45)]"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
@@ -308,12 +321,12 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
                   <iframe
                     src={authorizationUrl}
                     title={title}
-                    className="h-[420px] w-full bg-white"
+                    className="h-[360px] w-full bg-white"
                     allow="local-network-access"
                     referrerPolicy="strict-origin-when-cross-origin"
                   />
                 ) : (
-                  <div className="relative min-h-[420px] bg-white">
+                  <div className="relative min-h-[360px] bg-white">
                     {widgetState === 'loading' && (
                       <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white/90 text-slate-500">
                         <Loader2 size={24} className="animate-spin" />
@@ -322,7 +335,7 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
                     )}
                     <div
                       id={widgetMountId}
-                      className="flex min-h-[420px] w-full items-center justify-center bg-white"
+                      className="flex min-h-[360px] w-full items-center justify-center bg-white"
                     />
                   </div>
                 )}

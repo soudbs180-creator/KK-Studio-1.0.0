@@ -107,18 +107,18 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                         onClick={handleRechargeClick}
                         data-testid="mobile-header-credit-chip"
                         aria-label="\u67e5\u770b\u79ef\u5206"
-                        className="inline-flex h-12 min-w-[84px] shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[16px] border px-2.5 text-left text-[var(--text-primary)] transition-all active:scale-95 disabled:opacity-55"
+                        className="flex flex-col h-12 min-w-[84px] shrink-0 items-center justify-center gap-0.5 whitespace-nowrap rounded-[16px] border px-2 text-center text-[var(--text-primary)] transition-all active:scale-95 disabled:opacity-55"
                         style={{
                             background: 'var(--mobile-clay-surface-bg)',
                             borderColor: 'var(--mobile-clay-border)'
                         }}
                         disabled={!handleRechargeClick}
                     >
-                        <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--text-tertiary)]">
+                        <span className="inline-flex items-center gap-0.5 text-[8px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
                             <Sparkles size={10} className="text-amber-300 animate-pulse" />
                             {'\u79ef\u5206'}
                         </span>
-                        <span className="text-[14px] font-semibold leading-none">{balanceDisplay}</span>
+                        <span className="text-[13px] font-semibold leading-tight">{balanceDisplay}</span>
                     </button>
 
                     <button

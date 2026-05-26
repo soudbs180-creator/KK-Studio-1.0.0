@@ -44,8 +44,8 @@ test('mobile settings opens directly on overview instead of a separate overview 
   assert.doesNotMatch(settingsSource, /settingsMobileDetail/);
   assert.match(settingsSource, /activeView === 'dashboard' \? onClose\(\) : onNavigate\('dashboard'\);/);
   assert.match(registrySource, /primaryActionLabelEn: 'Open API Workspace'/);
-  assert.match(dashboardSource, /dashboardPrimaryAction\.label/);
-  assert.match(dashboardSource, /Quick routes/);
+  assert.match(dashboardSource, /dashboardPrimaryAction/);
+  assert.match(dashboardSource, /dashboard-grid-container/);
 });
 
 test('settings search copy now describes navigation filtering instead of page-content search', () => {
@@ -73,17 +73,14 @@ test('logs filter controls stay as a plain toolbar instead of a large nested car
   assert.doesNotMatch(filterSectionMatch[0], /settings-reference-card|settings-section-card|rounded-\[|border p-/);
 });
 
-test('dashboard overview uses chart and health visual blocks instead of only route cards', () => {
+test('dashboard overview uses card-based grid layout', () => {
   const dashboardSource = readSource('src/components/settings/views/DashboardView.localized.tsx');
 
-  assert.match(dashboardSource, /const buildChartPaths = \(points: number\[]\) =>/);
-  assert.match(dashboardSource, /className="settings-reference-chart"/);
-  assert.match(dashboardSource, /DashboardRingRow/);
+  assert.match(dashboardSource, /dashboard-grid-container/);
+  assert.match(dashboardSource, /dashboard-grid-card/);
   assert.match(dashboardSource, /ProgressBar/);
-  assert.match(
-    dashboardSource,
-    /<SettingsSection[\s\S]*title=\{pick\([^,]+, 'Operational health'\)\}[\s\S]*surface="plain"[\s\S]*>\s*<div className="settings-reference-rings settings-reference-rings--flat">/,
-  );
+  assert.match(dashboardSource, /api-management/);
+  assert.match(dashboardSource, /consumption-records/);
 });
 
 test('destructive settings maintenance actions require confirmation before mutating local data', () => {

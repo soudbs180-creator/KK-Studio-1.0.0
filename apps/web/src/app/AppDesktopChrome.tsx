@@ -252,57 +252,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
         </div>
       </div>
 
-      <div
-        className="absolute bottom-6 z-50 hidden transition-all duration-300 md:block"
-        style={{ right: rightOffset }}
-      >
-        <button
-          id="chat-trigger-button"
-          className="ai-chat-btn relative flex aspect-square h-10 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-transparent p-2 text-xs transition-all duration-300 hover:scale-110 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-          type="button"
-          onClick={onToggleChat}
-          aria-pressed={isChatOpen}
-          style={{ boxShadow: isChatOpen ? '0 0 0 2px rgb(255 107 90 / 0.28)' : undefined }}
-        >
-          <div className="uiverse visible absolute left-0 top-0 z-[-1] h-full w-full">
-            <div className="circle circle-12"></div>
-            <div className="circle circle-11"></div>
-            <div className="circle circle-10"></div>
-            <div className="circle circle-9"></div>
-            <div className="circle circle-8"></div>
-            <div className="circle circle-7"></div>
-            <div className="circle circle-6"></div>
-            <div className="circle circle-5"></div>
-            <div className="circle circle-4"></div>
-            <div className="circle circle-3"></div>
-            <div className="circle circle-2"></div>
-            <div className="circle circle-1"></div>
-          </div>
-          <div className="absolute inset-0 z-[1] rounded-full bg-[var(--accent-coral)]/15"></div>
-          <svg
-            className="ai-chat-icon relative z-10"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="rgba(255, 255, 255, 0.95)"
-            xmlns="http://www.w3.org/2000/svg"
-            style={{ filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5))' }}
-          >
-            <path d="M11.6061 4.23218C11.6838 3.79153 12.3162 3.79153 12.3939 4.23218L12.5268 4.98521C13.1111 8.29642 15.7036 10.8889 19.0148 11.4732L19.7678 11.6061C20.2085 11.6838 20.2085 12.3162 19.7678 12.3939L19.0148 12.5268C15.7036 13.1111 13.1111 15.7036 12.5268 19.0148L12.3939 19.7678C12.3162 20.2085 11.6838 20.2085 11.6061 19.7678L11.4732 19.0148C10.8889 15.7036 8.29642 13.1111 4.98521 12.5268L4.23218 12.3939C3.79153 12.3162 3.79153 11.6838 4.23218 11.6061L4.98521 11.4732C8.29642 10.8889 10.8889 8.29642 11.4732 4.98521L11.6061 4.23218Z" fill="rgba(255, 255, 255, 0.95)"></path>
-          </svg>
-          <style>{`
-            .ai-chat-icon {
-              transition: transform 0.7s ease-out;
-            }
-            .ai-chat-btn:hover .ai-chat-icon {
-              transform: rotate(90deg);
-            }
-            .ai-chat-btn:hover .uiverse .circle {
-              animation-duration: calc(var(--duration) / 3) !important;
-            }
-          `}</style>
-        </button>
-      </div>
+
     </>
   );
 };

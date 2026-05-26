@@ -982,45 +982,51 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             </div>
 
             {/* Zoom Slider & Version - Bottom Left */}
-            <div className="absolute bottom-4 left-4 z-50 hidden md:flex items-center gap-3">
+            <div className="absolute bottom-4 left-4 z-50 hidden md:flex flex-col items-center gap-3 select-none">
                 {/* Zoom Slider */}
-                <div className="glass h-10 px-4 rounded-xl flex items-center gap-3">
-                    <input
-                        type="range"
-                        min="10"
-                        max="300"
-                        value={Math.round(transform.scale * 100)}
-                        onChange={(e) => {
-                            const newScale = parseInt(e.target.value) / 100;
-                            const container = containerRef.current;
-                            if (!container) return;
+                <div className="glass w-10 py-4 px-2 rounded-xl flex flex-col items-center gap-3">
+                    <div className="h-32 flex items-center justify-center relative w-full">
+                        <input
+                            type="range"
+                            min="10"
+                            max="300"
+                            value={Math.round(transform.scale * 100)}
+                            onChange={(e) => {
+                                const newScale = parseInt(e.target.value) / 100;
+                                const container = containerRef.current;
+                                if (!container) return;
 
-                            const rect = container.getBoundingClientRect();
-                            const centerX = rect.width / 2;
-                            const centerY = rect.height / 2;
+                                const rect = container.getBoundingClientRect();
+                                const centerX = rect.width / 2;
+                                const centerY = rect.height / 2;
 
-                            const scaleRatio = newScale / transform.scale;
-                            const newX = centerX - (centerX - transform.x) * scaleRatio;
-                            const newY = centerY - (centerY - transform.y) * scaleRatio;
+                                const scaleRatio = newScale / transform.scale;
+                                const newX = centerX - (centerX - transform.x) * scaleRatio;
+                                const newY = centerY - (centerY - transform.y) * scaleRatio;
 
-                            const newTransform = snapTransformForText({ x: newX, y: newY, scale: newScale });
-                            syncTransformRef.current = newTransform;
-                            setTransform(newTransform);
-                            activateInteractionPhase('zoom');
-                            scheduleZoomIdleSettle();
-                            emitTransformChange(newTransform);
-                        }}
-                        className="zoom-slider w-32 cursor-pointer"
-                        style={{ '--zoom-slider-progress': `${zoomSliderProgress}%` } as React.CSSProperties}
-                    />
-                    <span className="text-xs text-gray-500 dark:text-zinc-400 font-semibold min-w-[3ch] text-right">
+                                const newTransform = snapTransformForText({ x: newX, y: newY, scale: newScale });
+                                syncTransformRef.current = newTransform;
+                                setTransform(newTransform);
+                                activateInteractionPhase('zoom');
+                                scheduleZoomIdleSettle();
+                                emitTransformChange(newTransform);
+                            }}
+                            className="zoom-slider cursor-pointer origin-center -rotate-90"
+                            style={{ 
+                                '--zoom-slider-progress': `${zoomSliderProgress}%`,
+                                width: '128px',
+                                position: 'absolute'
+                            } as React.CSSProperties}
+                        />
+                    </div>
+                    <span className="text-[10px] text-gray-500 dark:text-zinc-400 font-semibold min-w-[3ch] text-center">
                         {Math.round(transform.scale * 100)}%
                     </span>
                 </div>
 
                 {/* Version Badge */}
-                <div className="glass h-10 px-3 rounded-xl flex items-center">
-                    <span className="text-xs text-gray-400 dark:text-zinc-500 font-semibold">{APP_DISPLAY_VERSION}</span>
+                <div className="glass w-10 h-10 rounded-xl flex items-center justify-center">
+                    <span className="text-[9px] text-gray-400 dark:text-zinc-500 font-semibold text-center leading-tight">{APP_DISPLAY_VERSION}</span>
                 </div>
 
                 {/* Update Notification */}

@@ -148,8 +148,7 @@ const RechargeModal: React.FC = () => {
   const [paymentChannels, setPaymentChannels] = useState<RechargePaymentChannelConfig[]>(FALLBACK_CHANNELS);
   const [currency, setCurrency] = useState<SupportedRechargeCurrency>('CNY');
   const [amount, setAmount] = useState(20);
-  const [selectedChannel, setSelectedChannel] = useState<ReservedChannel>('manual');
-  const [manualProvider, setManualProvider] = useState<ManualProvider>('alipay');
+  const [rechargeType, setRechargeType] = useState<'alipay' | 'wechat' | 'international' | 'manual'>('alipay');
   const [billSnapshot, setBillSnapshot] = useState<RechargeBillSnapshot | null>(null);
   const [transferReferenceLast4, setTransferReferenceLast4] = useState('');
   const [secondsLeft, setSecondsLeft] = useState(0);
@@ -162,7 +161,38 @@ const RechargeModal: React.FC = () => {
   const maxAmount = currentRate.maxAmount ?? (currency === 'CNY' ? 500 : 100);
   const baseCreditsPreview = Math.max(0, Math.round(amount * currentRate.creditsPerUnit));
   const isExpired = Boolean(billSnapshot?.expiresAt && secondsLeft <= 0 && billSnapshot.status !== 'credited');
-  const activeProvider = billSnapshot?.manualProvider || manualProvider;
+
+  // 氛围灯与高光颜色动态绑定：支付宝(alipay)->蓝，微信(wechat)->绿，国际支付(international)->金，人工客服(manual)->系统主题色
+  const glowStyles = useMemo(() => {
+    switch (rechargeType) {
+      case 'alipay':
+        return {
+          glowColor: '#1677ff',
+          shadowStyle: '0 0 32px rgba(22, 119, 255, 0.3), 0 28px 80px rgba(2, 7, 18, 0.45)',
+          borderColor: 'rgba(22, 119, 255, 0.4)',
+        };
+      case 'wechat':
+        return {
+          glowColor: '#22c55e',
+          shadowStyle: '0 0 32px rgba(34, 197, 94, 0.3), 0 28px 80px rgba(2, 7, 18, 0.45)',
+          borderColor: 'rgba(34, 197, 94, 0.4)',
+        };
+      case 'international':
+        return {
+          glowColor: '#eab308',
+          shadowStyle: '0 0 32px rgba(234, 179, 8, 0.3), 0 28px 80px rgba(2, 7, 18, 0.45)',
+          borderColor: 'rgba(234, 179, 8, 0.4)',
+        };
+      default:
+        return {
+          glowColor: 'var(--clay-brand-peach)',
+          shadowStyle: 'var(--frost-card-framework-shadow)',
+          borderColor: 'var(--frost-card-framework-border)',
+        };
+    }
+  }, [rechargeType]);
+
+  const activeProvider = billSnapshot?.manualProvider || (rechargeType === 'wechat' ? 'wechat' : 'alipay');
   const activeChannelConfig = useMemo(
     () => paymentChannels.find((channel) => channel.channel === activeProvider)
       || FALLBACK_CHANNELS.find((channel) => channel.channel === activeProvider)
@@ -208,8 +238,7 @@ const RechargeModal: React.FC = () => {
     if (!showRechargeModal) {
       setCurrency('CNY');
       setAmount(20);
-      setSelectedChannel('manual');
-      setManualProvider('alipay');
+      setRechargeType('alipay');
       setBillSnapshot(null);
       setTransferReferenceLast4('');
       setMessage('');
@@ -221,19 +250,6 @@ const RechargeModal: React.FC = () => {
   if (!showRechargeModal) {
     return null;
   }
-
-  const showNotConfigured = () => {
-    const text = '当前渠道未配置，请使用人工充值或联系客服';
-    setMessage(text);
-    notify.warning('渠道未配置', text);
-  };
-
-  const handleReservedChannelClick = (channel: ReservedChannel) => {
-    setSelectedChannel(channel);
-    if (channel !== 'manual') {
-      showNotConfigured();
-    }
-  };
 
   const clampAmount = (value: number) => {
     if (!Number.isFinite(value)) {
@@ -248,6 +264,20 @@ const RechargeModal: React.FC = () => {
       return;
     }
 
+    if (rechargeType === 'international') {
+      const text = '国际支付通道暂未配置，请使用支付宝或微信扫码。';
+      setMessage(text);
+      notify.warning('通道未配置', text);
+      return;
+    }
+
+    if (rechargeType === 'manual') {
+      const text = '人工充值客服通道当前暂未配置自动对账，请联系管理员微信。';
+      setMessage(text);
+      notify.info('联系客服', text);
+      return;
+    }
+
     setCreating(true);
     setMessage('');
     try {
@@ -256,7 +286,7 @@ const RechargeModal: React.FC = () => {
           amount,
           currencyCode: currency,
           paymentChannel: 'manual',
-          manualProvider,
+          manualProvider: rechargeType, // 简体中文：直接绑定支付宝或微信人工静态收款码
         },
         { requestId: buildRechargeSubmissionRequestId(user.id, 'bill') },
       );
@@ -269,7 +299,7 @@ const RechargeModal: React.FC = () => {
         amount,
         currencyCode: currency,
         paymentChannel: 'manual',
-        manualProvider,
+        manualProvider: rechargeType,
         baseCredits: baseCreditsPreview,
         estimatedCredits: baseCreditsPreview,
         status: 'paying',
@@ -337,11 +367,28 @@ const RechargeModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-[220] flex items-center justify-center p-4 backdrop-blur-sm" style={{ backgroundColor: 'var(--settings-backdrop)' }}>
-      <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl border" style={modalShellStyle}>
+      <div 
+        className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl border transition-all duration-300" 
+        style={{
+          ...modalShellStyle,
+          borderColor: glowStyles.borderColor,
+          boxShadow: glowStyles.shadowStyle,
+        }}
+      >
         <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: 'var(--frost-card-framework-border)' }}>
-          <div>
-            <h2 className="text-xl font-semibold text-[var(--text-primary)]">充值积分</h2>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">人工充值较慢，请等待 1-5 分钟</p>
+          <div className="flex items-center gap-3">
+            {/* 简体中文注释：动态高光呼吸灯，指示当前选中充值通道的色调 */}
+            <span 
+              className="h-3 w-3 rounded-full animate-pulse transition-all duration-300"
+              style={{
+                backgroundColor: glowStyles.glowColor,
+                boxShadow: `0 0 12px ${glowStyles.glowColor}`,
+              }}
+            />
+            <div>
+              <h2 className="text-xl font-semibold text-[var(--text-primary)]">充值积分</h2>
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">人工充值较慢，请等待 1-5 分钟</p>
+            </div>
           </div>
           <button
             type="button"
@@ -353,208 +400,250 @@ const RechargeModal: React.FC = () => {
           </button>
         </div>
 
-        <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <section className="space-y-5">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {RESERVED_CHANNELS.map((channel) => {
-                const selected = selectedChannel === channel.id;
-                return (
-                  <button
-                    key={channel.id}
-                    type="button"
-                    onClick={() => handleReservedChannelClick(channel.id)}
-                    className="rounded-xl border p-4 text-left transition"
-                    style={modalSelectableStyle(selected)}
-                  >
-                    <div className="text-sm font-semibold text-[var(--text-primary)]">{channel.title}</div>
-                    <div className="mt-1 text-xs text-[var(--text-secondary)]">{channel.caption}</div>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="rounded-xl border p-4" style={modalSubPanelStyle}>
-              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
-                <QrCode size={16} />
-                人工充值
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {MANUAL_PROVIDERS.map((provider) => (
-                  <button
-                    key={provider.id}
-                    type="button"
-                    onClick={() => {
-                      setManualProvider(provider.id);
-                      setSelectedChannel('manual');
-                    }}
-                    disabled={Boolean(billSnapshot)}
-                    className="flex items-center gap-3 rounded-xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60"
-                    style={modalSelectableStyle(manualProvider === provider.id)}
-                  >
-                    <img src={provider.icon} alt={provider.title} className="h-9 w-9 rounded-lg object-contain" />
-                    <div>
-                      <div className="text-sm font-semibold text-[var(--text-primary)]">{provider.title}</div>
-                      <div className="text-xs text-[var(--text-secondary)]">静态码人工确认</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-xl border p-4" style={modalSubPanelStyle}>
-              <div className="mb-3 text-sm font-semibold text-[var(--text-primary)]">充值金额</div>
-              <div className="flex gap-2">
-                {(['CNY', 'USD'] as SupportedRechargeCurrency[]).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setCurrency(item)}
-                    disabled={Boolean(billSnapshot)}
-                    className="rounded-lg border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                    style={modalSelectableStyle(currency === item)}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_140px]">
-                <input
-                  type="range"
-                  min={minAmount}
-                  max={maxAmount}
-                  step={currency === 'CNY' ? 5 : 1}
-                  value={amount}
-                  disabled={Boolean(billSnapshot)}
-                  onChange={(event) => setAmount(clampAmount(Number(event.target.value)))}
-                  className="w-full"
-                  style={{ accentColor: 'var(--settings-button-primary-bg)' }}
-                />
-                <input
-                  type="number"
-                  min={minAmount}
-                  max={maxAmount}
-                  value={amount}
-                  disabled={Boolean(billSnapshot)}
-                  onChange={(event) => setAmount(clampAmount(Number(event.target.value)))}
-                  className="rounded-lg border px-3 py-2 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                  style={modalInputStyle}
-                />
-              </div>
-              <div className="mt-2 text-xs text-[var(--text-secondary)]">
-                当前预计基础积分：{baseCreditsPreview}，创建订单后会显示随机服务费和赠送积分。
-              </div>
-            </div>
-
-            {message ? (
-              <div className="flex items-start gap-2 rounded-xl border p-3 text-sm" style={modalWarningStyle}>
-                <AlertCircle size={16} className="mt-0.5 shrink-0" />
-                <span>{message}</span>
-              </div>
-            ) : null}
-
-            {billSnapshot ? (
-              <label className="block rounded-xl border p-3 text-sm" style={modalSubPanelStyle}>
-                <span className="mb-2 block text-xs text-[var(--text-secondary)]">转账流水后四位</span>
-                <input
-                  value={transferReferenceLast4}
-                  onChange={(event) => setTransferReferenceLast4(
-                    event.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(-4),
-                  )}
-                  placeholder="例如 8X9Z"
-                  className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                  style={modalInputStyle}
-                />
-              </label>
-            ) : null}
-
+        {/* 2*4 网格布局，左侧 2*2 为充值通道，右侧 2*2 为确认及金额 */}
+        <div className="grid gap-4 p-5 grid-cols-1 md:grid-cols-4 grid-rows-none md:grid-rows-2">
+          
+          {/* 左侧占 2*2 格：4 个充值方式 */}
+          <div className="col-span-1 md:col-span-2 row-span-1 md:row-span-2 grid grid-cols-2 grid-rows-2 gap-3">
+            {/* 支付宝 */}
             <button
               type="button"
-              onClick={billSnapshot ? handleMarkPaid : handleCreateOrder}
-              disabled={creating || markingPaid || isExpired || (Boolean(billSnapshot) && transferReferenceLast4.trim().length !== 4)}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
-              style={modalPrimaryButtonStyle}
+              onClick={() => {
+                if (billSnapshot) return;
+                setRechargeType('alipay');
+              }}
+              disabled={Boolean(billSnapshot)}
+              className="rounded-xl border p-4 text-left transition flex flex-col justify-between h-full min-h-[110px] disabled:cursor-not-allowed disabled:opacity-60"
+              style={modalSelectableStyle(rechargeType === 'alipay')}
             >
-              {creating || markingPaid ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-              {billSnapshot ? '我已支付' : '创建人工充值订单'}
+              <div className="flex items-center gap-2">
+                <img src={alipayIcon} alt="支付宝" className="h-6 w-6 object-contain" />
+                <span className="text-sm font-semibold text-[var(--text-primary)]">支付宝</span>
+              </div>
+              <div className="text-[10px] text-[var(--text-secondary)] mt-2">
+                {billSnapshot ? '订单锁定中' : '静态收款码对账'}
+              </div>
             </button>
-          </section>
 
-          <aside className="rounded-2xl border p-4" style={modalPanelStyle}>
-            {billSnapshot ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <img src={providerIcon} alt={providerTitle} className="h-10 w-10 rounded-xl object-contain" />
-                    <div>
-                      <div className="text-sm font-semibold text-[var(--text-primary)]">{providerTitle}静态码</div>
-                      <div className="text-xs text-[var(--text-secondary)]">订单号 {billSnapshot.submissionId}</div>
-                    </div>
+            {/* 微信 */}
+            <button
+              type="button"
+              onClick={() => {
+                if (billSnapshot) return;
+                setRechargeType('wechat');
+              }}
+              disabled={Boolean(billSnapshot)}
+              className="rounded-xl border p-4 text-left transition flex flex-col justify-between h-full min-h-[110px] disabled:cursor-not-allowed disabled:opacity-60"
+              style={modalSelectableStyle(rechargeType === 'wechat')}
+            >
+              <div className="flex items-center gap-2">
+                <img src={wechatIcon} alt="微信" className="h-6 w-6 object-contain" />
+                <span className="text-sm font-semibold text-[var(--text-primary)]">微信支付</span>
+              </div>
+              <div className="text-[10px] text-[var(--text-secondary)] mt-2">
+                {billSnapshot ? '订单锁定中' : '微信静态码对账'}
+              </div>
+            </button>
+
+            {/* 国际支付 */}
+            <button
+              type="button"
+              onClick={() => {
+                if (billSnapshot) return;
+                setRechargeType('international');
+                const text = '国际支付通道暂未配置，请使用支付宝或微信扫码。';
+                setMessage(text);
+                notify.warning('通道未配置', text);
+              }}
+              disabled={Boolean(billSnapshot)}
+              className="rounded-xl border p-4 text-left transition flex flex-col justify-between h-full min-h-[110px] disabled:cursor-not-allowed disabled:opacity-60"
+              style={modalSelectableStyle(rechargeType === 'international')}
+            >
+              <div className="flex items-center gap-2">
+                <img src={cardIcon} alt="国际卡" className="h-6 w-6 object-contain" />
+                <span className="text-sm font-semibold text-[var(--text-primary)]">国际卡/Stripe</span>
+              </div>
+              <div className="text-[10px] text-[var(--text-secondary)] mt-2">海外通道暂未配置</div>
+            </button>
+
+            {/* 人工充值 */}
+            <button
+              type="button"
+              onClick={() => {
+                if (billSnapshot) return;
+                setRechargeType('manual');
+                const text = '人工充值客服通道当前暂未配置自动对账，请联系管理员微信。';
+                setMessage(text);
+                notify.info('联系客服', text);
+              }}
+              disabled={Boolean(billSnapshot)}
+              className="rounded-xl border p-4 text-left transition flex flex-col justify-between h-full min-h-[110px] disabled:cursor-not-allowed disabled:opacity-60"
+              style={modalSelectableStyle(rechargeType === 'manual')}
+            >
+              <div className="flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded bg-slate-500/10 text-slate-300 font-bold text-[10px]">客服</span>
+                <span className="text-sm font-semibold text-[var(--text-primary)]">人工客服</span>
+              </div>
+              <div className="text-[10px] text-[var(--text-secondary)] mt-2">联系管理员手动充值</div>
+            </button>
+          </div>
+
+          {/* 右侧占 2*2 格：确认充值与金额选择区域 */}
+          <div className="col-span-1 md:col-span-2 row-span-1 md:row-span-2 flex flex-col justify-between rounded-xl border p-4 min-h-[236px]" style={modalSubPanelStyle}>
+            {!billSnapshot ? (
+              // 未创建订单状态：选择金额
+              <div className="flex flex-col gap-3 justify-between h-full">
+                <div className="space-y-3">
+                  <div className="text-xs font-semibold text-[var(--text-primary)]">第一步：选择币种与输入金额</div>
+                  <div className="flex gap-2">
+                    {(['CNY', 'USD'] as SupportedRechargeCurrency[]).map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => setCurrency(item)}
+                        className="rounded-lg border px-3 py-1.5 text-xs font-medium transition"
+                        style={modalSelectableStyle(currency === item)}
+                      >
+                        {item}
+                      </button>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-1 rounded-full border px-2 py-1 text-xs" style={modalPillStyle}>
-                    <Clock3 size={13} />
-                    {isExpired ? '已超时' : formatCountdown(secondsLeft)}
+                  
+                  <div className="grid gap-3 grid-cols-[1fr_90px] items-center">
+                    <input
+                      type="range"
+                      min={minAmount}
+                      max={maxAmount}
+                      step={currency === 'CNY' ? 5 : 1}
+                      value={amount}
+                      onChange={(event) => setAmount(clampAmount(Number(event.target.value)))}
+                      className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-slate-700"
+                      style={{ accentColor: glowStyles.glowColor }}
+                    />
+                    <input
+                      type="number"
+                      min={minAmount}
+                      max={maxAmount}
+                      value={amount}
+                      onChange={(event) => setAmount(clampAmount(Number(event.target.value)))}
+                      className="w-full rounded-lg border px-2 py-1.5 text-xs text-center outline-none"
+                      style={modalInputStyle}
+                    />
+                  </div>
+                  
+                  <div className="text-[11px] text-[var(--text-secondary)]">
+                    预计基础积分：<span className="font-bold text-amber-300">{baseCreditsPreview}</span>
                   </div>
                 </div>
 
-                <div className="flex justify-center rounded-2xl border p-4" style={{ background: 'var(--bg-surface)', borderColor: 'var(--frost-card-sub-border)' }}>
-                  {activeChannelConfig.qrImageDataUrl ? (
-                    <img
-                      src={activeChannelConfig.qrImageDataUrl}
-                      alt={`${providerTitle}静态码`}
-                      className="h-48 w-48 rounded-xl object-contain"
-                    />
-                  ) : (
-                    <div className="flex h-48 w-48 flex-col items-center justify-center rounded-xl border text-center" style={{ background: 'var(--bg-overlay)', borderColor: 'var(--border-light)', color: 'var(--text-secondary)' }}>
-                      <img src={providerIcon} alt={providerTitle} className="mb-3 h-12 w-12 object-contain" />
-                      <span className="text-sm font-semibold text-[var(--text-primary)]">等待管理员配置静态码</span>
+                <div className="space-y-2">
+                  {message && (
+                    <div className="flex items-start gap-1.5 rounded-lg border p-2 text-[10px]" style={modalWarningStyle}>
+                      <AlertCircle size={12} className="mt-0.5 shrink-0" />
+                      <span>{message}</span>
                     </div>
                   )}
-                </div>
 
-                <div className="space-y-2 rounded-xl border p-3 text-sm" style={modalSubPanelStyle}>
-                  <div className="flex justify-between">
-                    <span className="text-[var(--text-secondary)]">充值金额</span>
-                    <span>{formatMoney(baseAmount, currency)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[var(--text-secondary)]">服务费</span>
-                    <span>{formatMoney(serviceFee, currency)}</span>
-                  </div>
-                  <div className="flex justify-between text-base font-semibold">
-                    <span>实付金额</span>
-                    <span>{formatMoney(payableAmount, currency)}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2 rounded-xl border p-3 text-sm" style={modalSubPanelStyle}>
-                  <div className="flex justify-between">
-                    <span className="text-[var(--text-secondary)]">充值积分</span>
-                    <span>{baseCredits}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[var(--text-secondary)]">赠送积分</span>
-                    <span>+{bonusCredits}</span>
-                  </div>
-                  <div className="flex justify-between text-base font-semibold">
-                    <span>到账积分</span>
-                    <span>{creditAmount}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2 text-xs leading-5 text-[var(--text-secondary)]">
-                  <p>人工充值较慢，请等待 1-5 分钟。</p>
-                  <p>支付成功但积分未到账，请联系客服处理。</p>
-                  {isExpired ? <p className="font-semibold text-[var(--settings-state-danger-text)]">支付失败，请联系客服处理。</p> : null}
+                  <button
+                    type="button"
+                    onClick={handleCreateOrder}
+                    disabled={creating || rechargeType === 'international' || rechargeType === 'manual'}
+                    className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl px-4 text-xs font-bold transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                    style={{
+                      background: glowStyles.glowColor,
+                      color: '#ffffff',
+                      boxShadow: `0 4px 12px ${glowStyles.glowColor}3f`
+                    }}
+                  >
+                    {creating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                    创建充值订单
+                  </button>
                 </div>
               </div>
             ) : (
-              <div className="flex min-h-[420px] flex-col items-center justify-center text-center text-sm text-[var(--text-secondary)]">
-                <img src={cardIcon} alt="人工充值" className="mb-4 h-14 w-14 opacity-80" />
-                <div className="text-base font-semibold text-[var(--text-primary)]">等待创建人工充值订单</div>
-                <p className="mt-2 max-w-xs">动态码支付宝、动态码微信和国际支付当前暂未配置，请使用人工充值。</p>
+              // 已创建订单状态：扫码付款与输入流水
+              <div className="flex flex-col gap-2 justify-between h-full">
+                <div className="flex items-center justify-between border-b pb-2 border-white/5">
+                  <div className="flex items-center gap-2">
+                    <img src={providerIcon} alt={providerTitle} className="h-6 w-6 object-contain" />
+                    <div>
+                      <div className="text-xs font-semibold text-[var(--text-primary)]">{providerTitle}付款</div>
+                      <div className="text-[9px] text-[var(--text-secondary)]">单号: {billSnapshot.submissionId}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] bg-white/5 border-white/10" style={{ color: 'var(--text-secondary)' }}>
+                    <Clock3 size={11} />
+                    {isExpired ? '超时' : formatCountdown(secondsLeft)}
+                  </div>
+                </div>
+
+                <div className="flex gap-3 items-center py-1">
+                  {/* 收款二维码 */}
+                  <div className="h-28 w-28 shrink-0 flex items-center justify-center rounded-xl bg-white border border-white/10 p-1.5">
+                    {activeChannelConfig.qrImageDataUrl ? (
+                      <img
+                        src={activeChannelConfig.qrImageDataUrl}
+                        alt={`${providerTitle}静态码`}
+                        className="h-full w-full object-contain"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full flex-col items-center justify-center text-center text-slate-500">
+                        <QrCode size={20} />
+                        <span className="text-[8px] mt-1">未配置二维码</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 实付金额与流水 */}
+                  <div className="flex-1 space-y-1.5 min-w-0">
+                    <div className="text-[10px] text-slate-400">
+                      实付金额: <span className="font-bold text-white text-xs">{formatMoney(payableAmount, currency)}</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      到账积分: <span className="font-bold text-amber-300 text-xs">{creditAmount}</span>
+                    </div>
+                    
+                    <label className="block mt-1">
+                      <span className="text-[9px] text-[var(--text-secondary)] block">流水后 4 位:</span>
+                      <input
+                        value={transferReferenceLast4}
+                        onChange={(event) => setTransferReferenceLast4(
+                          event.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(-4),
+                        )}
+                        placeholder="流水后四位"
+                        className="w-full rounded-lg border px-2 py-1 text-[11px] outline-none mt-0.5"
+                        style={modalInputStyle}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  {message && (
+                    <div className="flex items-start gap-1 rounded-lg border p-1.5 text-[9px]" style={modalWarningStyle}>
+                      <AlertCircle size={10} className="mt-0.5 shrink-0" />
+                      <span className="truncate">{message}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleMarkPaid}
+                    disabled={markingPaid || isExpired || transferReferenceLast4.trim().length !== 4}
+                    className="flex h-9 w-full items-center justify-center gap-1.5 rounded-xl px-4 text-xs font-bold transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                    style={{
+                      background: glowStyles.glowColor,
+                      color: '#ffffff',
+                      boxShadow: `0 4px 12px ${glowStyles.glowColor}3f`
+                    }}
+                  >
+                    {markingPaid ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                    我已支付
+                  </button>
+                </div>
               </div>
             )}
-          </aside>
+          </div>
         </div>
       </div>
     </div>

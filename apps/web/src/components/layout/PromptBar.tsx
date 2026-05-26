@@ -684,6 +684,8 @@ interface PromptBarProps {
     setConfig: React.Dispatch<React.SetStateAction<GenerationConfig>>;
     onGenerate: (promptOverride?: string) => void;
     isGenerating: boolean;
+    isChatOpen?: boolean;
+    chatSidebarWidth?: number;
     onFilesDrop?: (files: File[]) => void;
     activeSourceImage?: { id: string; url: string; prompt: string } | null;
     onClearSource?: () => void;
@@ -1146,6 +1148,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
     onPreviewEcommerceSlotHistory,
     ecommerceRatioOverride,
     onAnalyzeEcommerceFile,
+    isChatOpen = false,
+    chatSidebarWidth = 420,
 }) => {
     const { pick } = useLocale();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -3845,7 +3849,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                style={isMobile ? mobileStyle : { bottom: '32px' }}
+                style={isMobile ? mobileStyle : { 
+                    bottom: '32px',
+                    left: isChatOpen ? `calc(50% - ${chatSidebarWidth / 2}px)` : '50%',
+                    transform: 'translateX(-50%)',
+                    transition: 'left 0.3s ease-out'
+                }}
             >
                 {/* Drag Overlay */}
                 {isDragging && (

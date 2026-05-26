@@ -14,8 +14,8 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
   overlays,
 }) => {
   const shellStyle = {
-    gridTemplateRows: 'auto minmax(0, 1fr) auto',
-    '--mobile-content-top-inset': 'calc(env(safe-area-inset-top, 0px) + 12px)',
+    gridTemplateRows: 'minmax(0, 1fr) auto',
+    '--mobile-content-top-inset': 'calc(env(safe-area-inset-top, 0px) + 76px)',
     '--mobile-content-bottom-inset': 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
     '--mobile-tabbar-total-height': '0px',
   } as React.CSSProperties;
@@ -28,8 +28,11 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
     >
       <div
         data-slot="header"
-        className="z-20 min-h-0 overflow-hidden"
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+        className="absolute top-0 left-0 right-0 z-20 min-h-0 overflow-hidden"
+        style={{
+          paddingTop: 'env(safe-area-inset-top)',
+          background: 'linear-gradient(to bottom, #000000 0%, rgba(0, 0, 0, 0) 100%)' // 简体中文：顶部为黑色遮挡状态栏，向下过渡为100%透明以透出底部画布
+        }}
       >
         {header}
       </div>

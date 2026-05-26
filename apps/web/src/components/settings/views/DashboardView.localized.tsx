@@ -40,6 +40,8 @@ import {
   getSettingsViewMeta,
 } from '../settingsRegistry';
 import { ProgressBar, StatusBadge } from '../ui/index';
+import { useAdminRole } from '../../../hooks/useAdminRole';
+import { resolveAvatarUrl } from '../../../utils/presetAvatars';
 
 interface DashboardViewProps {
   onNavigate: (view: string) => void;
@@ -309,7 +311,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     () => getSettingsStatusSummaryLabel('dashboard', registryLanguage),
     [registryLanguage],
   );
-  const { balance, loading: billingLoading, billingLogs, usageLogs, fetchLogs } = useBilling();
+  const { authLoading, checkingAdmin, isAdmin, user } = useAdminRole();
+  const { balance, loading: billingLoading, billingLogs, usageLogs, fetchLogs, setShowRechargeModal } = useBilling();
+  const accountName = user?.email || user?.phone || pick('当前账户', 'Current account');
+  const accountMeta = !authLoading && !checkingAdmin && isAdmin
+    ? pick('管理员', 'Administrator')
+    : pick('标准账户', 'Standard account');
+  const avatarUrl = resolveAvatarUrl(user?.user_metadata?.avatar_url);
   const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);
   const { latestRecharge, todayRechargeCount } = useMemo(
     () => selectRemainingBalanceSummary(billingLogs),
@@ -659,287 +667,284 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     ],
   );
 
-  const statusTone = hasCriticalLogs ? 'rose' : hasAvailableRoute ? 'emerald' : 'amber';
-  const statusLabel = hasCriticalLogs
-    ? pick('需要处理', 'Needs attention')
-    : hasAvailableRoute
-      ? pick('已就绪', 'Ready')
-      : pick('待配置', 'Setup required');
-  const dashboardReadiness = Math.round((channelCoverage + logHealth + storageHealth) / 3);
-  const dashboardSignalSummary = hasCriticalLogs
-    ? pick(`${importantLogCount} 条异常需要处理`, `${importantLogCount} alerts need review`)
-    : hasAvailableRoute
-      ? pick('链路、账本、日志和存储已接入', 'Routes, billing, logs, and storage are connected')
-      : pick('先添加本地或官方 API', 'Add a local or official API first');
-  const cockpitNodes = useMemo<DashboardSignalNode[]>(
-    () => [
-      {
-        key: 'api',
-        label: 'API',
-        value: String(channelCount),
-        helper: hasAvailableRoute ? pick('链路可用', 'routes ready') : pick('待添加', 'setup'),
-        icon: <KeyRound size={17} />,
-        target: 'api-management',
-        tone: hasAvailableRoute ? 'green' : 'amber',
-      },
-      {
-        key: 'billing',
-        label: pick('账本', 'Billing'),
-        value: formatUsd(todayCostUsd),
-        helper: pick('今日消耗', 'today spend'),
-        icon: <Coins size={17} />,
-        target: 'consumption-records',
-        tone: todayCostUsd > 0 ? 'blue' : 'green',
-      },
-      {
-        key: 'logs',
-        label: pick('日志', 'Logs'),
-        value: importantLogCount > 0 ? String(importantLogCount) : pick('稳', 'OK'),
-        helper: importantLogCount > 0 ? pick('需要关注', 'watch') : pick('无告警', 'clear'),
-        icon: <ScrollText size={17} />,
-        target: 'system-logs',
-        tone: hasCriticalLogs ? 'rose' : importantLogCount > 0 ? 'amber' : 'green',
-      },
-      {
-        key: 'storage',
-        label: pick('存储', 'Storage'),
-        value: storageSnapshotPending ? '...' : `${storageUsageMb.toFixed(0)} MB`,
-        helper: storageMode ? storageModeLabel : pick('未固定', 'unassigned'),
-        icon: <HardDrive size={17} />,
-        target: 'storage-settings',
-        tone: storageMode ? 'green' : 'amber',
-      },
-    ],
-    [
-      channelCount,
-      formatUsd,
-      hasAvailableRoute,
-      hasCriticalLogs,
-      importantLogCount,
-      pick,
-      storageMode,
-      storageModeLabel,
-      storageSnapshotPending,
-      storageUsageMb,
-      todayCostUsd,
-    ],
-  );
-
   return (
     <SettingsViewShell>
-      <div className="settings-reference-stack">
-        <SettingsHero
-          className="settings-dashboard-hero"
-          eyebrow={pick('高级设置', 'Advanced settings')}
-          title={dashboardMeta.title}
-          description={pick(
-            '一屏查看状态、流量、消耗和告警，再进入具体设置页。',
-            'See status, traffic, spend, and alerts in one screen before opening a detailed settings page.',
-          )}
-          badge={<SettingsBadge tone={statusTone}>{statusLabel}</SettingsBadge>}
-          actions={(
-            <>
-              <SettingsActionButton icon={RefreshCw} loading={refreshing} onClick={() => void refreshDashboard()}>
-                {pick('刷新', 'Refresh')}
-              </SettingsActionButton>
-              <SettingsActionButton
-                className="settings-dashboard-hero__mobile-action"
-                icon={ArrowRight}
-                tone="primary"
-                onClick={() => onNavigate(dashboardPrimaryAction.target)}
-              >
-                {dashboardPrimaryAction.label}
-              </SettingsActionButton>
-            </>
-          )}
-          metrics={(
-            <>
-              {snapshotTiles.map((item) => (
-                <MetricTile key={item.label} label={item.label} value={item.value} helper={item.helper} />
-              ))}
-            </>
-          )}
-        />
+      <style>{`
+        .dashboard-grid-container {
+          display: grid;
+          grid-template-columns: repeat(1, minmax(0, 1fr));
+          gap: 16px;
+          padding: 16px;
+          overflow-y: auto;
+          max-height: calc(100vh - 120px);
+        }
+        @media (min-width: 768px) {
+          .dashboard-grid-container {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+        @media (min-width: 1024px) {
+          .dashboard-grid-container {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            max-height: none;
+          }
+        }
+        .dashboard-grid-card {
+          position: relative;
+          overflow: hidden;
+          border-radius: 22px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: linear-gradient(135deg, rgba(22, 28, 45, 0.76) 0%, rgba(12, 15, 26, 0.92) 100%);
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          transition: all 0.25s ease-in-out;
+          cursor: pointer;
+          min-height: 150px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+        }
+        .dashboard-grid-card:hover {
+          transform: translateY(-2px);
+          border-color: rgba(255, 255, 255, 0.16);
+          background: linear-gradient(135deg, rgba(27, 34, 54, 0.84) 0%, rgba(16, 20, 33, 0.96) 100%);
+          box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+        }
+        .card-col-2 {
+          grid-column: span 1 / span 1;
+        }
+        .card-row-2 {
+          grid-row: span 1 / span 1;
+        }
+        @media (min-width: 1024px) {
+          .card-col-2 {
+            grid-column: span 2 / span 2;
+          }
+          .card-row-2 {
+            grid-row: span 2 / span 2;
+          }
+        }
+        .dashboard-card-glow {
+          position: absolute;
+          top: -30px;
+          right: -30px;
+          width: 100px;
+          height: 100px;
+          border-radius: 50%;
+          filter: blur(45px);
+          opacity: 0.12;
+          pointer-events: none;
+        }
+      `}</style>
 
-        <DashboardSignalHero
-          statusLabel={statusLabel}
-          statusMeta={dashboardSignalSummary}
-          statusTone={statusTone}
-          readiness={dashboardReadiness}
-          usageBuckets={usageBuckets}
-          nodes={cockpitNodes}
-          statusKicker={dashboardStatusSummaryLabel}
-          readinessLabel={pick('就绪度', 'Ready')}
-          requestLabel={pick('今日请求活跃度', 'Today request activity')}
-          navigationLabel={pick('仪表盘快捷导航', 'Dashboard quick navigation')}
-          onNavigate={onNavigate}
-        />
-
-        <div className="settings-dashboard-overview-grid">
-          <SettingsSection
-            title={pick('流量曲线', 'Traffic overview')}
-            eyebrow={pick('请求趋势', 'Request trend')}
-            description={pick(
-              '按 4 小时窗口查看今天的请求节奏。',
-              'Read today’s request rhythm by 4-hour window.',
-            )}
-          >
-            <div className="settings-reference-chart">
-              <div className="settings-reference-chart__frame">
-                <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
-                  <defs>
-                    <linearGradient id="dashboardAreaLocalized" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="rgb(123 179 255 / 0.42)" />
-                      <stop offset="100%" stopColor="rgb(123 179 255 / 0)" />
-                    </linearGradient>
-                  </defs>
-                  {areaPath ? <path d={areaPath} fill="url(#dashboardAreaLocalized)" /> : null}
-                  {linePath ? (
-                    <path
-                      d={linePath}
-                      fill="none"
-                      stroke="rgb(123 179 255)"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  ) : null}
-                </svg>
+      <div className="dashboard-grid-container">
+        {/* 卡片 1: 总览 (Overview) - 电脑端占 2*2 格 */}
+        <div 
+          className="dashboard-grid-card card-col-2 card-row-2"
+          onClick={() => onNavigate('consumption-records')}
+        >
+          <div className="dashboard-card-glow" style={{ background: 'var(--accent-color)' }} />
+          <div className="flex flex-col gap-3 h-full justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-slate-400">
+                <LayoutDashboard size={16} />
+                <span className="text-[10px] font-bold uppercase tracking-wider">{pick('总览', 'Overview')}</span>
               </div>
-              <div className="settings-reference-chart__labels">
-                {usageBuckets.map((bucket) => (
-                  <span key={bucket.label}>{bucket.label}</span>
-                ))}
+              <h3 className="text-lg font-bold text-white mt-2">{pick('系统消耗与状态', 'Usage & Status')}</h3>
+              
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <div className="rounded-xl bg-white/5 p-3 border border-white/5">
+                  <div className="text-[10px] text-slate-400">{pick('积分余额', 'Credits Balance')}</div>
+                  <div className="text-base font-bold text-amber-300 mt-1">{remainingBalanceDisplay}</div>
+                </div>
+                <div className="rounded-xl bg-white/5 p-3 border border-white/5">
+                  <div className="text-[10px] text-slate-400">{pick('今日消耗金额', 'Today Cost')}</div>
+                  <div className="text-base font-bold text-emerald-400 mt-1">{formatUsd(todayCostUsd)}</div>
+                </div>
+                <div className="rounded-xl bg-white/5 p-3 border border-white/5">
+                  <div className="text-[10px] text-slate-400">{pick('今日 API 词元', 'Today Tokens')}</div>
+                  <div className="text-base font-bold text-blue-400 mt-1">{formatCompactNumber(todayTokens)}</div>
+                </div>
+                <div className="rounded-xl bg-white/5 p-3 border border-white/5">
+                  <div className="text-[10px] text-slate-400">{pick('可用链路数', 'Active Routes')}</div>
+                  <div className="text-base font-bold text-indigo-400 mt-1">{channelCount}</div>
+                </div>
               </div>
             </div>
-
-            <div className="settings-dashboard-chart-metrics mt-5 grid gap-3 md:grid-cols-2">
-              <MetricTile
-                label={pick('高峰窗口', 'Peak window')}
-                value={peakUsageBucket?.label || '00:00'}
-                helper={pick('今日最活跃时段', 'Most active window today')}
-              />
-              <MetricTile
-                label={pick('今日词元', 'Tokens today')}
-                value={formatCompactNumber(todayTokens)}
-                helper={pick('来自今日请求记录', 'Measured from today’s requests')}
-              />
-            </div>
-          </SettingsSection>
-
-          <SettingsSection
-            title={pick('运行健康', 'Operational health')}
-            eyebrow={pick('当前状态', 'Current state')}
-            description={pick(
-              '把路由、日志和存储准备度放在同一个面板里。',
-              'Keep route, log, and storage readiness in one compact panel.',
-            )}
-            action={<LayoutDashboard size={18} className="text-[var(--text-primary)]" />}
-            surface="plain"
-          >
-            <div className="settings-reference-rings settings-reference-rings--flat">
-              <DashboardRingRow
-                label={pick('路由覆盖', 'Route coverage')}
-                percent={channelCoverage}
-                helper={
-                  hasAvailableRoute
-                    ? pick(`${channelCount} 条链路可用`, `${channelCount} routes are available`)
-                    : pick('还没有可调度链路', 'No ready route is available')
-                }
-                color="rgb(123 179 255)"
-                centerLabel={pick('健康', 'Health')}
-              />
-              <DashboardRingRow
-                label={pick('日志健康', 'Log health')}
-                percent={logHealth}
-                helper={
-                  importantLogCount > 0
-                    ? pick(`${importantLogCount} 条告警或错误`, `${importantLogCount} warning or error rows`)
-                    : pick('当前没有高优先级异常', 'No warning or error rows right now')
-                }
-                color={hasCriticalLogs ? 'rgb(255 122 122)' : 'rgb(52 211 153)'}
-                centerLabel={pick('健康', 'Health')}
-              />
-              <DashboardRingRow
-                label={pick('存储准备度', 'Storage readiness')}
-                percent={storageHealth}
-                helper={
-                  storageMode
-                    ? pick(`${storageModeLabel} 已启用`, `${storageModeLabel} is active`)
-                    : pick('还没有固定存储目标', 'No storage target is pinned yet')
-                }
-                color={storageMode ? 'rgb(52 211 153)' : 'rgb(245 158 11)'}
-                centerLabel={pick('健康', 'Health')}
-              />
-            </div>
-
-            <div className="settings-dashboard-storage-pressure mt-5">
-              <div className="mb-2 flex items-center justify-between text-[length:var(--type-caption)] text-[var(--text-secondary)]">
-                <span>{pick('存储压力', 'Storage pressure')}</span>
-                <span>{storageUsageMb.toFixed(0)} MB</span>
+            
+            <div className="mt-4 pt-3 border-t border-white/5 space-y-2 text-xs text-slate-400">
+              <div className="flex items-center gap-2">
+                <span className={`h-1.5 w-1.5 rounded-full ${hasAvailableRoute ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                <span className="truncate">{hasAvailableRoute ? pick('API 链路测试正常，状态健康', 'API routes ready') : pick('无可用 API 路由，请在工作台添加', 'API setup required')}</span>
               </div>
-              <ProgressBar
-                progress={storageProgress}
-                tone={storageProgress >= 85 ? 'rose' : storageProgress >= 60 ? 'amber' : 'indigo'}
-                showLabel={false}
-              />
+              <div className="flex items-center gap-2">
+                <span className={`h-1.5 w-1.5 rounded-full ${storageMode ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                <span className="truncate">{storageMode ? pick(`存储健康 (${storageModeLabel})`, `Storage OK (${storageModeLabel})`) : pick('本地存储待配置', 'Storage setup required')}</span>
+              </div>
+              <div className="text-[9px] text-slate-500 mt-1 font-medium">
+                * {pick('所有运行数据及生成的图片均托管在您的 VPS 服务器中', '* All runtime data is securely hosted on your VPS')}
+              </div>
             </div>
-          </SettingsSection>
+          </div>
         </div>
 
-        <div className="settings-dashboard-secondary-grid">
-          <div className="settings-dashboard-quick-routes">
-            <SettingsSection
-              title={pick('快捷入口', 'Quick routes')}
-              eyebrow={pick('直接进入', 'Jump in')}
-              description={pick(
-                '常用设置都放在第一屏。',
-                'Keep the most-used settings surfaces on the first screen.',
-              )}
-            >
-              <div className="settings-dashboard-mobile-flow-strip">
-                <QuickActionCard
-                  title={pick('配置 API', 'Configure API')}
-                  description={pick('本地接口与供应商', 'Local APIs and providers')}
-                  icon={<KeyRound size={18} />}
-                  onClick={() => onNavigate('api-management')}
-                />
-                <QuickActionCard
-                  title={pick('计费账本', 'Billing')}
-                  description={pick('充值、消耗、账本', 'Recharge, spend, ledger')}
-                  icon={<Coins size={18} />}
-                  onClick={() => onNavigate('consumption-records')}
-                />
-                <QuickActionCard
-                  title={pick('日志', 'Logs')}
-                  description={pick('错误、告警、排障', 'Errors, warnings, triage')}
-                  icon={<ScrollText size={18} />}
-                  onClick={() => onNavigate('system-logs')}
-                />
-                <QuickActionCard
-                  title={pick('存储', 'Storage')}
-                  description={pick('模式、容量、修复', 'Modes, capacity, repair')}
-                  icon={<HardDrive size={18} />}
-                  onClick={() => onNavigate('storage-settings')}
+        {/* 卡片 2: API 工作台 (API Workspace) - 电脑端占 2 列 */}
+        <div 
+          className="dashboard-grid-card card-col-2"
+          onClick={() => onNavigate('api-management')}
+        >
+          <div className="dashboard-card-glow" style={{ background: '#3b82f6' }} />
+          <div className="flex flex-col gap-3 w-full justify-between h-full">
+            <div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-slate-400">
+                  <KeyRound size={16} />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">{pick('API 工作台', 'API Workspace')}</span>
+                </div>
+                <span className="text-[9px] bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-full px-2 py-0.5 font-semibold">
+                  {officialCount} {pick('官方', 'Official')} / {activeProviderCount} {pick('在线', 'Online')}
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-white mt-2">{pick('多供应商与能力分配', 'API & Capability Routing')}</h3>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                {pick('管理本地 API 密钥与第三方中转。直接替代旧版 EchoBird 核心，接入后可用于在能力分配中自由绑定官方和中转的各厂家模型。', 'Manage API keys and external proxies. Binds providers for models.')}
+              </p>
+            </div>
+            
+            <div className="flex gap-2 mt-4" onClick={(e) => e.stopPropagation()}>
+              <button 
+                type="button" 
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-2 px-3 text-xs font-bold transition active:scale-95"
+                onClick={() => onNavigate('api-management')}
+              >
+                + {pick('添加 API', 'Add API')}
+              </button>
+              <button 
+                type="button" 
+                className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 rounded-xl py-2 px-3 text-xs font-bold transition active:scale-95"
+                onClick={() => onNavigate('api-management')}
+              >
+                {pick('高级设置', 'Advanced')}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 卡片 3: 用户信息与充值 (User & Recharge) - 电脑端占 2 列 */}
+        <div 
+          className="dashboard-grid-card card-col-2"
+          onClick={() => setShowRechargeModal(true)}
+        >
+          <div className="dashboard-card-glow" style={{ background: '#ec4899' }} />
+          <div className="flex flex-col gap-3 w-full justify-between h-full">
+            <div>
+              <div className="flex items-center gap-2 text-slate-400">
+                <Wallet size={16} />
+                <span className="text-[10px] font-bold uppercase tracking-wider">{pick('个人中心与充值', 'Account & Recharge')}</span>
+              </div>
+              
+              <div className="flex items-center gap-3 mt-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--settings-avatar-bg)] text-[var(--settings-avatar-text)] font-bold text-xs">
+                  {avatarUrl ? <img src={avatarUrl} alt={accountName} className="h-full w-full object-cover" /> : accountName.slice(0, 1).toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-semibold text-white">{accountName}</span>
+                  <span className="block truncate text-[9px] text-slate-400 mt-0.5">{accountMeta}</span>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-[9px] text-slate-400">{pick('积分余额', 'Credits')}</div>
+                  <div className="text-xs font-bold text-amber-300 mt-0.5">{remainingBalanceDisplay}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-4" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2.5 px-3 text-xs font-bold transition active:scale-95"
+                onClick={() => setShowRechargeModal(true)}
+              >
+                ⚡ {pick('立即充值积分', 'Recharge Credits')}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 卡片 4: 计费账本 (Billing Ledger) - 占 1 列 */}
+        <div 
+          className="dashboard-grid-card"
+          onClick={() => onNavigate('consumption-records')}
+        >
+          <div className="dashboard-card-glow" style={{ background: '#f59e0b' }} />
+          <div className="flex flex-col gap-2 justify-between h-full">
+            <div>
+              <div className="flex items-center gap-2 text-slate-400">
+                <Coins size={15} />
+                <span className="text-[10px] font-bold uppercase tracking-wider">{pick('计费账本', 'Billing')}</span>
+              </div>
+              <h3 className="text-sm font-bold text-white mt-2">{pick('账户交易记录', 'Transaction History')}</h3>
+            </div>
+            <div className="text-[11px] text-slate-400 mt-2 truncate">
+              {latestRecharge ? pick(`最近充值：${formatDateTime(latestRecharge.created_at)}`, `Recharged: ${formatDateTime(latestRecharge.created_at)}`) : pick('本周暂无充值记录', 'No recent recharge')}
+            </div>
+          </div>
+        </div>
+
+        {/* 卡片 5: 系统日志 (Logs) - 占 1 列 */}
+        <div 
+          className="dashboard-grid-card"
+          onClick={() => onNavigate('system-logs')}
+        >
+          <div className="dashboard-card-glow" style={{ background: '#ef4444' }} />
+          <div className="flex flex-col gap-2 justify-between h-full">
+            <div>
+              <div className="flex items-center gap-2 text-slate-400">
+                <ScrollText size={15} />
+                <span className="text-[10px] font-bold uppercase tracking-wider">{pick('日志诊断', 'System Logs')}</span>
+              </div>
+              <h3 className="text-sm font-bold text-white mt-2">{pick('错误排障与告警', 'Triage & Diagnostics')}</h3>
+            </div>
+            <div className="text-[11px] text-slate-400 mt-2 truncate flex items-center gap-1.5">
+              <span className={`h-1.5 w-1.5 rounded-full ${hasCriticalLogs ? 'bg-red-400 animate-pulse' : 'bg-emerald-400'}`} />
+              <span className="truncate">{importantLogCount > 0 ? pick(`${importantLogCount} 条运行告警`, `${importantLogCount} alerts`) : pick('系统无异常记录', 'Logs clear')}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 卡片 6: 存储管理 (Storage) - 电脑端占 2 列 */}
+        <div 
+          className="dashboard-grid-card card-col-2"
+          onClick={() => onNavigate('storage-settings')}
+        >
+          <div className="dashboard-card-glow" style={{ background: '#10b981' }} />
+          <div className="flex flex-col gap-3 w-full justify-between h-full">
+            <div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-slate-400">
+                  <HardDrive size={15} />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">{pick('存储容量', 'Storage Settings')}</span>
+                </div>
+                <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full px-2 py-0.5 font-semibold">
+                  {storageModeLabel}
+                </span>
+              </div>
+              <h3 className="text-sm font-bold text-white mt-2">{pick('画布资源与空间清理', 'Usage & Cache')}</h3>
+              
+              <div className="mt-3">
+                <div className="flex justify-between text-[11px] text-slate-400 mb-1.5">
+                  <span>{storageSnapshotPending ? pick('更新中...', 'Updating...') : pick(`已存 ${storedImages} 张图`, `${storedImages} images`)}</span>
+                  <span>{storageUsageMb.toFixed(1)} MB / 1 GB</span>
+                </div>
+                <ProgressBar
+                  progress={storageProgress}
+                  tone={storageProgress >= 85 ? 'rose' : storageProgress >= 60 ? 'amber' : 'indigo'}
+                  showLabel={false}
                 />
               </div>
-            </SettingsSection>
-          </div>
-
-          <SettingsSection
-            title={pick('最近信号', 'Recent signals')}
-            eyebrow={pick('实时摘要', 'Live summary')}
-            description={pick(
-              '把最近的请求、账本、日志和路由状态集中显示。',
-              'Bring recent requests, billing, logs, and route state into one list.',
-            )}
-          >
-            <div className="settings-reference-list">
-              {recentActivity.map(({ key, ...item }) => (
-                <DashboardActivityRow key={key} {...item} />
-              ))}
             </div>
-          </SettingsSection>
+          </div>
         </div>
       </div>
     </SettingsViewShell>

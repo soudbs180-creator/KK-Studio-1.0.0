@@ -10,21 +10,15 @@ const ROOT_DIR = process.cwd();
 
 test('model pickers define explicit cached-refresh and bootstrap loading states', () => {
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const chatSidebarSource = readSource('src/components/layout/ChatSidebar.tsx');
 
   assert.match(
     promptBarSource,
-    /type ModelMenuLoadingState = 'idle' \| 'refreshing_with_cache' \| 'bootstrapping_without_cache';/,
-  );
-  assert.match(
-    chatSidebarSource,
     /type ModelMenuLoadingState = 'idle' \| 'refreshing_with_cache' \| 'bootstrapping_without_cache';/,
   );
 });
 
 test('model pickers keep cached lists interactive while showing a lightweight sync indicator', () => {
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const chatSidebarSource = readSource('src/components/layout/ChatSidebar.tsx');
 
   assert.match(
     promptBarSource,
@@ -38,38 +32,17 @@ test('model pickers keep cached lists interactive while showing a lightweight sy
     promptBarSource,
     /isModelMenuRefreshingWithCache && \(\s*<div className="mb-2 flex items-center justify-center gap-2 text-xs text-\[var\(--text-secondary\)\]">/s,
   );
-  assert.match(
-    chatSidebarSource,
-    /const isModelMenuBootstrapping = modelMenuLoadingState === 'bootstrapping_without_cache';/,
-  );
-  assert.match(
-    chatSidebarSource,
-    /const isModelMenuRefreshingWithCache = modelMenuLoadingState === 'refreshing_with_cache';/,
-  );
-  assert.match(
-    chatSidebarSource,
-    /isModelMenuRefreshingWithCache && \(\s*<div className="px-2 pb-2">[\s\S]*?正在同步最新模型库\.\.\./,
-  );
 });
 
 test('model pickers reserve three skeleton rows for empty-library bootstrap loading', () => {
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const chatSidebarSource = readSource('src/components/layout/ChatSidebar.tsx');
 
   assert.match(
     promptBarSource,
     /const MODEL_MENU_SKELETON_COUNT = 3;/,
   );
   assert.match(
-    chatSidebarSource,
-    /const MODEL_MENU_SKELETON_COUNT = 3;/,
-  );
-  assert.match(
     promptBarSource,
-    /Array\.from\(\{ length: MODEL_MENU_SKELETON_COUNT \}\)/,
-  );
-  assert.match(
-    chatSidebarSource,
     /Array\.from\(\{ length: MODEL_MENU_SKELETON_COUNT \}\)/,
   );
 });

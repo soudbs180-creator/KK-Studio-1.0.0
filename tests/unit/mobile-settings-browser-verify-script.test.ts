@@ -66,8 +66,8 @@ test('mobile settings smoke verification opens settings directly on overview bef
   assert.match(mobileSurfaceSource, /data-testid="mobile-more-menu-settings"/);
   assert.match(mobileSurfaceSource, /data-testid="mobile-more-sheet"/);
   assert.match(mobileTileSource, /data-testid=\{`mobile-result-tile-\$\{entry\.id\}`\}/);
-  assert.match(dashboardSource, /settings-dashboard-cockpit__node/);
-  assert.match(dashboardSource, /dashboardPrimaryAction\.label/);
+  assert.match(dashboardSource, /dashboard-grid-card/);
+  assert.match(dashboardSource, /dashboardPrimaryAction/);
   assert.match(scaffoldSource, /testId\?: string;/);
   assert.match(scaffoldSource, /data-testid=\{testId\}/);
   assert.match(workbenchSectionsSource, /testId="settings-workbench-overview"/);

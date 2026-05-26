@@ -724,12 +724,20 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         <>
             <div
                 id="project-manager-container"
-                className={`fixed left-4 z-50 flex flex-col items-center gap-2 select-none transition-all duration-300 ease-out ${isCollapsed ? 'translate-x-0 opacity-45 hover:opacity-100' : 'translate-x-0 opacity-100'}`}
-                style={{ top: topPosition }}
-                onMouseEnter={() => setIsCollapsed(false)}
+                onClick={() => {
+                    if (isCollapsed) {
+                        setIsCollapsed(false);
+                        resetInactivityTimer();
+                    }
+                }}
+                className={`fixed left-4 z-50 flex flex-col items-center select-none transition-all duration-300 ease-out ${isCollapsed ? 'cursor-pointer w-2.5 h-24 opacity-60 hover:opacity-100 hover:scale-y-105' : 'w-14 opacity-100'}`}
+                style={{ 
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                }}
             >
                 <div
-                    className={`flex cursor-grab flex-col items-center gap-2 rounded-2xl p-1.5 transition-all duration-300 active:cursor-grabbing ${isDragging ? 'scale-[0.98]' : ''}`}
+                    className={`flex flex-col items-center rounded-2xl transition-all duration-300 ${isCollapsed ? 'w-2 h-full py-3 px-0 justify-center' : 'w-full p-1.5 gap-2'}`}
                     style={{
                         background: 'var(--frost-card-framework-bg)',
                         border: '1px solid var(--frost-card-framework-border)',
@@ -737,119 +745,141 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
                         backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
                     }}
-                    onMouseDown={handleDragStart}
-                    onTouchStart={handleDragStart}
                 >
-                    <div className="flex w-full justify-center py-0.5 opacity-20 hover:opacity-50">
-                        <div className="h-0.5 w-4 rounded-full" style={{ backgroundColor: isDarkMode ? '#ffffff' : 'var(--text-muted)' }} />
-                    </div>
-
-                    <div className="relative">
-                        <button
-                            id="project-manager-trigger"
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                setShowDropdown((prev) => !prev);
+                    {isCollapsed ? (
+                        /* 收起状态：显示精致的发光珊瑚色小竖线条 */
+                        <div 
+                            className="w-1 h-12 rounded-full transition-all duration-300"
+                            style={{
+                                background: 'var(--accent-coral)',
+                                boxShadow: '0 0 8px var(--accent-coral)'
                             }}
-                            className={`${desktopIconButtonClass} ${showDropdown ? 'bg-[var(--toolbar-hover)] text-[var(--accent-coral)]' : ''}`}
-                            title={activeProjectName}
-                            tabIndex={-1}
-                        >
-                            <Layers size={20} />
-                            <div className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-[var(--accent-coral)] border border-[var(--frost-card-framework-border)]" />
-                        </button>
-                        {projectDropdown}
-                    </div>
+                        />
+                    ) : (
+                        /* 展开状态 */
+                        <>
+                            {/* 顶部指示条：点击它可以收起，且形状和 collapsed 有过渡的动态 */}
+                            <button
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    setIsCollapsed(true);
+                                }}
+                                className="flex w-full justify-center py-1 opacity-30 hover:opacity-100 transition-opacity"
+                                title="收起工具栏"
+                            >
+                                <div className="h-1 w-6 rounded-full bg-[var(--text-secondary)] hover:bg-[var(--accent-coral)] transition-all duration-300 transform hover:scale-x-110" />
+                            </button>
 
-                    <button
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            onSearch();
-                        }}
-                        className={desktopIconButtonClass}
-                        title="搜索提示词"
-                        tabIndex={-1}
-                    >
-                        <Search size={20} />
-                    </button>
+                            <div className="flex flex-col items-center gap-2 w-full">
+                                <div className="relative">
+                                    <button
+                                        id="project-manager-trigger"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            setShowDropdown((prev) => !prev);
+                                        }}
+                                        className={`${desktopIconButtonClass} ${showDropdown ? 'bg-[var(--toolbar-hover)] text-[var(--accent-coral)]' : ''}`}
+                                        title={activeProjectName}
+                                        tabIndex={-1}
+                                    >
+                                        <Layers size={20} />
+                                        <div className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-[var(--accent-coral)] border border-[var(--frost-card-framework-border)]" />
+                                    </button>
+                                    {projectDropdown}
+                                </div>
 
-                    <div className="my-1 h-px w-full" style={{ backgroundColor: 'var(--frost-card-framework-border)' }} />
+                                <button
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onSearch();
+                                    }}
+                                    className={desktopIconButtonClass}
+                                    title="搜索提示词"
+                                    tabIndex={-1}
+                                >
+                                    <Search size={20} />
+                                </button>
 
-                    <button
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            onFitToAll();
-                        }}
-                        className={desktopIconButtonClass}
-                        title="缩放到全局"
-                        tabIndex={-1}
-                    >
-                        <Maximize2 size={20} />
-                    </button>
+                                <div className="my-1 h-px w-full" style={{ backgroundColor: 'var(--frost-card-framework-border)' }} />
 
-                    <button
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            onResetView();
-                        }}
-                        className={desktopIconButtonClass}
-                        title="定位卡组"
-                        tabIndex={-1}
-                    >
-                        <Focus size={20} />
-                    </button>
+                                <button
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onFitToAll();
+                                    }}
+                                    className={desktopIconButtonClass}
+                                    title="缩放到全局"
+                                    tabIndex={-1}
+                                >
+                                    <Maximize2 size={20} />
+                                </button>
 
-                    <button
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            onToggleGrid();
-                        }}
-                        className={desktopIconButtonClass}
-                        title="显示或隐藏网格"
-                        tabIndex={-1}
-                    >
-                        {showGrid ? <Grid3x3 size={20} /> : <Square size={20} />}
-                    </button>
+                                <button
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onResetView();
+                                    }}
+                                    className={desktopIconButtonClass}
+                                    title="定位卡组"
+                                    tabIndex={-1}
+                                >
+                                    <Focus size={20} />
+                                </button>
 
-                    <button
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            onToggleSnapToGrid();
-                        }}
-                        className={`${desktopIconButtonClass} ${showSnapToGrid ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
-                        title={showSnapToGrid ? '关闭吸附' : '开启吸附'}
-                        aria-pressed={showSnapToGrid}
-                        data-testid="canvas-snap-to-grid-toggle"
-                        tabIndex={-1}
-                    >
-                        <Magnet size={20} />
-                    </button>
+                                <button
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onToggleGrid();
+                                    }}
+                                    className={desktopIconButtonClass}
+                                    title="显示或隐藏网格"
+                                    tabIndex={-1}
+                                >
+                                    {showGrid ? <Grid3x3 size={20} /> : <Square size={20} />}
+                                </button>
 
-                    <button
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            onAutoArrange();
-                        }}
-                        className={desktopIconButtonClass}
-                        title="自动整理"
-                        tabIndex={-1}
-                    >
-                        <LayoutDashboard size={20} />
-                    </button>
+                                <button
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onToggleSnapToGrid();
+                                    }}
+                                    className={`${desktopIconButtonClass} ${showSnapToGrid ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
+                                    title={showSnapToGrid ? '关闭吸附' : '开启吸附'}
+                                    aria-pressed={showSnapToGrid}
+                                    data-testid="canvas-snap-to-grid-toggle"
+                                    tabIndex={-1}
+                                >
+                                    <Magnet size={20} />
+                                </button>
 
-                    <div className="my-1 h-px w-full" style={{ backgroundColor: 'var(--frost-card-framework-border)' }} />
+                                <button
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onAutoArrange();
+                                    }}
+                                    className={desktopIconButtonClass}
+                                    title="自动整理"
+                                    tabIndex={-1}
+                                >
+                                    <LayoutDashboard size={20} />
+                                </button>
 
-                    <button
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            toggleTheme();
-                        }}
-                        className={desktopIconButtonClass}
-                        title={isDarkMode ? '切换到浅色模式' : '切换到深色模式'}
-                        tabIndex={-1}
-                    >
-                        {isDarkMode ? <Moon size={20} /> : <Sun size={20} />}
-                    </button>
+                                <div className="my-1 h-px w-full" style={{ backgroundColor: 'var(--frost-card-framework-border)' }} />
+
+                                <button
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        toggleTheme();
+                                    }}
+                                    className={desktopIconButtonClass}
+                                    title={isDarkMode ? '切换到浅色模式' : '切换到深色模式'}
+                                    tabIndex={-1}
+                                >
+                                    {isDarkMode ? <Moon size={20} /> : <Sun size={20} />}
+                                </button>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
             {deleteConfirmModal}

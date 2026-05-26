@@ -28,9 +28,7 @@ test('KKAI keeps billing surfaces feature-gated and restores the desktop assista
   assert.match(desktopChromeSource, /\{billingUiEnabled && \(/);
   assert.match(desktopChromeSource, /onOpenProfile\('billing'\)/);
   assert.match(desktopChromeSource, /onClick=\{onRecharge\}/);
-  assert.match(desktopChromeSource, /id="chat-trigger-button"/);
-  assert.doesNotMatch(desktopChromeSource, /\{false\s*\?\s*\(\s*<div[\s\S]*id="chat-trigger-button"/);
-  assert.doesNotMatch(desktopChromeSource, /\{false\s*&&\s*<div[\s\S]*id="chat-trigger-button"/);
+
 
   assert.match(mobileWorkspaceSource, /onBillingClick=\{billingUiEnabled \? \(\) => openProfileSurface\('billing'\) : undefined\}/);
   assert.match(mobileWorkspaceSource, /onRechargeClick=\{billingUiEnabled \? onShowRecharge : undefined\}/);
@@ -69,7 +67,7 @@ test('manual recharge UI exposes reserved dynamic channels and admin paid-order 
   assert.match(rechargeModalSource, /微信动态码/);
   assert.match(rechargeModalSource, /国际支付/);
   assert.match(rechargeModalSource, /人工充值/);
-  assert.match(rechargeModalSource, /当前渠道未配置，请使用人工充值或联系客服/);
+  assert.match(rechargeModalSource, /通道未配置/);
   assert.match(rechargeModalSource, /我已支付/);
   assert.match(rechargeModalSource, /人工充值较慢，请等待 1-5 分钟/);
   assert.match(rechargeModalSource, /支付成功但积分未到账，请联系客服处理/);

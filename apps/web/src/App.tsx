@@ -4469,6 +4469,12 @@ const AppContent: React.FC<AppContentProps> = () => {
 
       {/* Main Infinite Canvas - 仅在非手机端显示 */}
       {!isMobile && (
+      <div
+        className="absolute inset-y-0 left-0 transition-all duration-300 ease-out"
+        style={{
+          right: isChatOpen ? `${chatSidebarWidth}px` : 0,
+        }}
+      >
       <InfiniteCanvas
         id="canvas-container"
         ref={canvasRef}
@@ -4786,6 +4792,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         {/* 4. Pending / Typing Node - Removed (Now handled by Persistent Draft DraftNode) */}
         {/* <PendingNode ... /> removed */}
       </InfiniteCanvas>
+      </div>
       )}
 
 
@@ -4793,7 +4800,11 @@ const AppContent: React.FC<AppContentProps> = () => {
       {!isMobile && (
         <AppPromptComposer
           variant="desktop"
-          promptBarProps={desktopPromptBarProps}
+          promptBarProps={{
+            ...desktopPromptBarProps,
+            isChatOpen,
+            chatSidebarWidth
+          }}
         />
       )}
 

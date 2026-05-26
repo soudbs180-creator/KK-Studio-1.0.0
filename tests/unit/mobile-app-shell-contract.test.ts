@@ -42,7 +42,7 @@ test('MobileAppShell keeps the mobile three-layer slot contract and stays tab-ba
   assert.match(shellSource, /env\(safe-area-inset-bottom\)/);
   assert.match(
     shellSource,
-    /gridTemplateRows:\s*'auto minmax\(0, 1fr\) auto'/,
+    /gridTemplateRows:\s*'minmax\(0, 1fr\) auto'/,
   );
   assert.doesNotMatch(shellSource, /sticky top-0/);
   assert.doesNotMatch(shellSource, /sticky bottom-0/);

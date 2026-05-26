@@ -38,6 +38,11 @@ router.post('/generate-image', async (req, res) => {
     return res.status(401).json({ error: "Unauthorized." });
   }
 
+  // 滑动过期续约机制：一旦鉴权通过，在响应头注入新签发的7天有效期Token
+  const { signJWT } = require('../lib/jwt');
+  const newToken = signJWT({ userId });
+  res.setHeader('X-Refresh-Token', newToken);
+
   let creditsDeducted = false;
   let requiredCredits = 10;
   let currentCredits = 0;

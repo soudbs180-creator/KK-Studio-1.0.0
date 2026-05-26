@@ -234,6 +234,15 @@ export function startKkApiAccessTokenSessionSync(): () => void {
     return stopAccessTokenSessionSync;
   }
 
+  // 中文注释：监听底层的Token滑动刷新派发事件并覆盖内存与缓存Token，实现前端全状态同步
+  const handleTokenRefreshed = (event: Event) => {
+    const detail = (event as CustomEvent)?.detail;
+    if (detail?.token) {
+      setStoredKkApiAccessToken(detail.token);
+    }
+  };
+  window.addEventListener("kk-api-token-refreshed", handleTokenRefreshed);
+
   const unsubscribe = subscribeAuthSessionChange((detail) => {
     if (!detail.hasSession || detail.isTempUser) {
       setStoredKkApiAccessToken(undefined);
@@ -248,6 +257,7 @@ export function startKkApiAccessTokenSessionSync(): () => void {
   syncFromLatestAuthSessionChange();
 
   stopAccessTokenSessionSync = () => {
+    window.removeEventListener("kk-api-token-refreshed", handleTokenRefreshed);
     unsubscribe();
     stopAccessTokenSessionSync = null;
   };
