@@ -1,36 +1,28 @@
 {
 	"include": [
-		"src/**/*.ts",
-		"src/**/*.tsx",
-		"src/**/*.js",
-		"src/**/*.jsx",
+		"**/*.{ts,tsx,js,jsx}",
 		"**/.server/**/*",
 		"**/.client/**/*",
 		".react-router/types/**/*",
 		"./src/global.d.ts"
 	],
 	"compilerOptions": {
-		"ignoreDeprecations": "6.0",
 		"lib": ["DOM", "DOM.Iterable", "ES2022"],
 		"types": ["node", "vite/client"],
 		"target": "ES2022",
-		"module": "ESNext",
+		"module": "ES2022",
 		"moduleResolution": "bundler",
 		"jsx": "react-jsx",
 		"rootDirs": [".", "./.react-router/types"],
 		"baseUrl": ".",
 		"esModuleInterop": true,
-		"allowImportingTsExtensions": true,
-		"verbatimModuleSyntax": false,
+		"verbatimModuleSyntax": true,
 		"noEmit": true,
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
 		"strict": true,
 		"paths": {
-			"@/*": ["./src/*"],
-			"@kk/shared": ["../../packages/shared/src/index.ts"],
-			"@kk/ui": ["../../packages/ui/src/index.ts"],
-			"@nano-banana/api-client": ["../../packages/api-client/src/index.ts"]
+			"@/*": ["./src/*"]
 		}
 	}
 }

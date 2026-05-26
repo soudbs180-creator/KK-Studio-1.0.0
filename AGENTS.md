@@ -1,1099 +1,1170 @@
-# AGENTS.md - AI Agent 项目总指导文件
-# 这是本项目最重要的文件。
-# 所有 AI（Cursor、Claude Code、Copilot、Codex）在碰任何代码之前，必须完整读完本文件。
-# 本项目以中文为主：所有注释、文档、提交信息、回复、变量说明，一律用中文。
+// ✅ 正确：中文注释，说明"为什么"
+// Gemini 要求 base64 字符串不能带 data URI 前缀，否则报 400 错误
+const cleanBase64 = raw.replace(/^data:image\/\w+;base64,/, "");
 
----
+// ✅ 正确：复杂函数头部说明处理顺序
+// 处理顺序：① 验证 JWT → ② 校验入参 → ③ 检查积分 → ④ 先扣积分 → ⑤ 调 Gemini → ⑥ 失败退款
+// 顺序不能乱：鉴权失败时不应浪费 Gemini 配额
+async function handleGenerateImage(req, res) { ... }
 
-## 【语言规范 - 最高优先级】
+// ❌ 错误：英文注释
+// Remove data URI prefix before sending to Gemini
 
-**本项目是中文项目，以下规则不得违反：**
-
-1. 所有代码注释必须用中文写，解释这段代码在做什么、为什么这么做
-2. 所有 AI 回复、解释、建议必须用中文
-3. 所有 Git commit 信息用中文（遵循 Conventional Commits 格式，但描述部分写中文）
-4. 所有文档（docs/ 目录）用中文撰写
-5. 所有报错信息在后端 console.error 时可以用中文，但返回给前端的 Response body 用英文（防止编码乱码）
-6. 变量名、函数名、类名用英文命名（遵循代码规范），但旁边必须有中文注释解释用途
-
-**注释格式要求：**
-```typescript
-// 正确：中文注释，解释"为什么"和"做什么"
-// Gemini 要求 base64 字符串不能带 data URI 前缀，否则会报 400 错误
-const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-
-// 正确：复杂逻辑前面加一段说明
-// 这里先验证 JWT，再校验入参，最后才调用 Gemini API
-// 顺序不能乱，否则会在鉴权失败时浪费 API 配额
-export const handler: Handler = async (event) => { ... };
-
-// 错误：英文注释（除非是第三方库的类型签名）
-// Gemini requires base64 without data URI prefix
-const base64Data = ...;
-
-// 错误：没有注释的复杂逻辑
+// ❌ 错误：无注释的复杂逻辑
 const parts = response.candidates?.[0]?.content?.parts ?? [];
-```
-
----
-
-## 0. 核心规则（最高优先级，任何情况下不得违反）
-
-1. **绝不**在前端代码里使用 API Key，所有密钥只存在于后端环境变量中
-2. **绝不**混用桌面端和手机端的代码路径，两端有严格的目录隔离
-3. **绝不**直接修改数据库，必须通过 migrations/ 下的迁移文件
-4. **绝不**在前端直接请求第三方 AI API，必须走自家后端中转
-5. **绝不**在 netlify/functions/ 之外的地方定义 HTTP 路由
-6. **绝不**在根目录新建 .md 文档，文档统一放 docs/
-7. **绝不**写没有中文注释的复杂逻辑代码
-
----
-
-## 1. 项目概览
-
-| 属性 | 值 |
-|------|----|
-| 项目名称 | nano-banana-KK |
-| 核心功能 | AI 图像生成 / 编辑（Gemini nano-banana 模型） |
-| 主要 AI 模型 | gemini-2.5-flash-image（图像）、gpt-4o-mini（文本） |
-| 前端语言 | TypeScript (87%) + React |
-| 部署平台 | Netlify（前端 + Functions）+ VPS（支付/队列） |
-| 数据库 | PostgreSQL（通过 migrations/ 管理 schema） |
-| 项目语言 | 中文为主（注释、文档、回复全部中文） |
-| 设计系统 | High-Fidelity SaaS，详见第 9 节 |
-
----
-
-## 2. 双端平台架构（核心，绝不混淆）
-
-```
+feat(server): 新增图像编辑接口，支持参考图多模态输入
+fix(auth): 修复 JWT 过期后未返回 401 响应的问题
+refactor(api-client): 统一桌面端与手机端的 baseURL 解析逻辑
+chore(deps): 升级 @google/genai 至 1.50.0，修复图像生成空响应
+test(credits): 补充 Gemini 安全过滤触发时积分退款的单元测试
+docs(agents): 更新 R5 路由表，补充 /api/generate/edit 端点说明
 nano-banana-KK/
+│
 ├── apps/
-│   ├── web/          <- 桌面端（Vite + React + TypeScript）
-│   │   └── src/
-│   │       ├── components/   <- 桌面端专用组件
-│   │       ├── pages/        <- 桌面端页面
-│   │       ├── hooks/        <- 桌面端 hooks
-│   │       └── styles/       <- 桌面端样式
-│   └── mobile/       <- 手机端（Expo / React Native）
+│   ├── web/                        ← 桌面端（Vite + React + TypeScript）
+│   │   ├── src/
+│   │   │   ├── app/                ← 应用入口 / 全局 Provider
+│   │   │   ├── assets/             ← 图片、字体等静态资源
+│   │   │   ├── canvas/             ← 画布相关逻辑（Three.js / Canvas API）
+│   │   │   ├── components/         ← 桌面端专用组件（禁止 RN 导入）
+│   │   │   ├── config/             ← 前端配置常量（无密钥）
+│   │   │   ├── context/            ← React Context（全局状态）
+│   │   │   ├── hooks/              ← 桌面端专用 hooks
+│   │   │   ├── icons/              ← 自定义图标
+│   │   │   ├── lib/                ← 工具库封装（日期、格式化等）
+│   │   │   ├── pages/              ← 页面组件（对应路由）
+│   │   │   │   ├── admin/              ← 管理员后台页面（admin_level > 0 才可访问）
+│   │   │   │   │   ├── AdminLayout.tsx ← 管理员后台公共布局（Tab 导航）
+│   │   │   │   │   ├── RechargePanel.tsx   ← 充值管理（Level 1 & 2）
+│   │   │   │   │   ├── CreditsPanel.tsx    ← 积分管理（Level 1 & 2）
+│   │   │   │   │   ├── ApiConfigPanel.tsx  ← API 设置/定价（Level 1 & 2）
+│   │   │   │   │   └── StaffPanel.tsx      ← 人员管理（仅 Level 1）
+│   │   │   ├── routes/             ← React Router v7 路由配置
+│   │   │   ├── services/           ← API 调用层（封装 packages/api-client）
+│   │   │   ├── types/              ← 桌面端专用类型定义
+│   │   │   ├── utils/              ← 桌面端工具函数
+│   │   │   ├── workers/            ← Web Workers（重计算任务）
+│   │   │   ├── workflow/           ← 业务流程状态机
+│   │   │   ├── App.tsx             ← 根组件
+│   │   │   └── bootstrap.tsx       ← 应用启动入口
+│   │   ├── public/                 ← 静态文件（不走 Vite 处理）
+│   │   ├── index.html
+│   │   ├── vite.config.ts
+│   │   └── tsconfig.json
+│   │
+│   └── mobile/                     ← 手机端（Expo Managed Workflow）
 │       └── src/
-│           ├── app/          <- expo-router 路由页面
-│           ├── components/   <- 手机端专用组件
-│           └── hooks/        <- 手机端 hooks
+│           ├── app/                ← expo-router 路由页面（禁止 DOM API）
+│           ├── components/         ← 手机端专用组件
+│           └── hooks/              ← 手机端专用 hooks
+│
 ├── packages/
-│   ├── shared/       <- 两端共用（类型定义、纯工具函数）
-│   ├── api-client/   <- 统一 API 调用层（桌面端和手机端都用这个）
-│   └── ui/           <- 共享基础 UI 组件（谨慎使用）
-├── netlify/
-│   └── functions/    <- 后端短任务（小于 10 秒，Netlify Functions）
-├── payment-server/   <- VPS 长任务服务（支付/队列/定时任务）
-├── migrations/       <- PostgreSQL 迁移文件（按版本号命名）
-├── scripts/          <- 构建/部署/维护脚本
-├── docs/             <- 所有文档（中文撰写）
-├── config/           <- 全局配置（不含密钥）
-├── tests/            <- 测试文件（目录结构镜像 src）
-├── .claude/          <- AI Agent 配置（唯一 agent 配置目录）
-├── AGENTS.md         <- 本文件（始终保持最新）
-├── .env.example      <- 环境变量模板
-├── netlify.toml      <- Netlify 部署配置
-└── package.json      <- 根 package.json（workspaces 配置）
-```
+│   ├── shared/                     ← 两端共用（纯 TypeScript，零平台依赖）
+│   │   ├── types/                  ← API 请求/响应类型、数据模型
+│   │   └── utils/                  ← 纯函数工具（无 window/document/RN）
+│   ├── api-client/                 ← 统一 HTTP 调用层（两端共用）
+│   │   └── src/
+│   │       ├── client.ts           ← baseURL 智能解析 + fetch 封装 + JWT 注入
+│   │       ├── api.ts              ← 各 API endpoint 函数（一函数一端点）
+│   │       └── hooks.ts            ← React Query hooks
+│   └── ui/                         ← 共享基础 UI（必须能在两端无副作用运行）
+│
+├── server/                         ← ⭐ VPS 后端主服务（Express.js，所有 API 路由）
+│   ├── index.js                    ← 服务入口，挂载所有路由，启动 Express
+│   ├── routes/                     ← 路由模块（每个业务一个文件）
+│   │   ├── auth.js                 ← 注册 / 登录 / JWT 刷新
+│   │   ├── generate-image.js       ← Gemini 图像生成 / 编辑
+│   │   ├── chat.js                 ← OpenAI 对话
+│   │   ├── user.js                 ← 用户信息 CRUD
+│   │   ├── billing.js              ← Stripe 结账会话 / 套餐列表
+│   │   ├── generations.js          ← 生成历史查询
+│   │   ├── webhook.js              ← Stripe Webhook 积分充值
+│   │   └── admin.js              ← 管理员后台 API（充值/积分/API配置/人员管理）
+│   ├── lib/                        ← 后端内部工具
+│   │   ├── db.js                   ← PostgreSQL Pool 单例
+│   │   ├── jwt.js                  ← signJWT / verifyJWT
+│   │   ├── cors.js                 ← CORS Origin 白名单工厂
+│   │   └── credits.js              ← 含 getOperationCost()，从数据库动态读取定价
+│   ├── middleware/                 ← Express 中间件
+│   │   ├── auth.js                 ← 普通 JWT 鉴权（req.userId + req.adminLevel）
+│   │   ├── adminAuth.js          ← 管理员鉴权中间件（需要 admin_level >= 指定等级）
+│   │   ├── rateLimit.js            ← 速率限制（每 IP / 每用户）
+│   │   └── validate.js             ← zod 请求体校验中间件工厂
+│   ├── .env.example                ← VPS 环境变量模板
+│   └── package.json                ← VPS 独立依赖（CommonJS / ESM 按需选择）
+│
+├── migrations/                     ← PostgreSQL schema 迁移（唯一可改 schema 的地方）
+│   ├── 001_create_users.sql
+│   ├── 002_create_generations.sql
+│   ├── 003_add_admin_level.sql       ← 新增：用户管理员等级字段
+│   ├── 004_create_api_cost_config.sql ← 新增：AI 操作定价配置表
+│   └── ...（按序号递增）
+│
+├── scripts/                        ← 构建 / 发布 / 维护脚本
+├── docs/                           ← 所有文档（中文，不得放根目录）
+├── config/                         ← 全局配置（无密钥）
+├── tests/                          ← 测试（unit / integration / contract / e2e）
+├── tools/                          ← 本地开发者工具箱（不进生产）
+├── temp/                           ← 临时文件（gitignore，仅 README.md 保留）
+├── release/publish/stable/         ← 发布清单（仅 manifest.json 进 git）
+├── .claude/                        ← Claude Code Agent 配置
+├── .github/workflows/              ← CI/CD（GitHub Actions）
+├── AGENTS.md                       ← 本文件（根目录唯一 .md）
+├── .env.example                    ← 根环境变量模板（无真实值）
+├── .gitignore
+├── vercel.json                     ← Vercel 部署配置（替代已废弃的 netlify.toml）
+└── package.json                    ← 根 workspace（Node 24.x，npm@11.12.1）
+❌ netlify/                  → 全部删除
+❌ netlify.toml              → 删除，替换为 vercel.json
+❌ payment-server/           → 路由迁移到 server/routes/，迁移完成后删除此目录
+┌──────────────────────────────────────────────────────────────┐
+│                          用户终端                             │
+│  ┌───────────────────────┐    ┌──────────────────────────┐  │
+│  │    桌面端 Web App      │    │   手机端 Expo App         │  │
+│  │    apps/web/           │    │   apps/mobile/            │  │
+│  │    Vite 8 + React 19   │    │   Expo Router + RN        │  │
+│  │    TypeScript          │    │   iOS 16+ / Android 11+   │  │
+│  └──────────┬─────────────┘    └────────────┬──────────────┘  │
+└─────────────┼──────────────────────────────┼──────────────────┘
+              │      packages/api-client      │
+              │  （统一 HTTP 调用层，两端共用）│
+              └──────────────┬────────────────┘
+                             │ HTTPS → VPS_BASE_URL/api/*
+                             ▼
+              ┌──────────────────────────────┐
+              │      Vercel（前端托管）       │
+              │  静态资源 CDN + SPA 路由      │
+              │  build: apps/web/dist         │
+              │  vercel.json 配置 SPA 回退   │
+              └──────────────────────────────┘
 
----
+              ┌──────────────────────────────────────────────┐
+              │            VPS 服务器（后端核心）             │
+              │           server/  （Express.js）            │
+              │                                              │
+              │  POST /api/auth/register   ← 注册            │
+              │  POST /api/auth/login      ← 登录            │
+              │  POST /api/auth/refresh    ← 刷新 JWT        │
+              │  POST /api/generate/image  ← Gemini 图像生成 │
+              │  POST /api/generate/edit   ← Gemini 图像编辑 │
+              │  POST /api/chat            ← OpenAI 对话     │
+              │  GET  /api/user/me         ← 用户信息        │
+              │  PATCH /api/user/me        ← 更新用户        │
+              │  GET  /api/billing/plans   ← 定价方案        │
+              │  POST /api/billing/checkout← Stripe 结账     │
+              │  GET  /api/generations     ← 生成历史        │
+              │  POST /webhook/stripe      ← Stripe 回调     │
+              │                                              │
+              └────┬──────────────┬──────────────┬───────────┘
+                   │              │              │
+                   ▼              ▼              ▼
+          ┌──────────────┐ ┌──────────────┐ ┌────────────────┐
+          │  Gemini API  │ │  OpenAI API  │ │  PostgreSQL DB │
+          │ gemini-2.5-  │ │  gpt-4o-mini │ │（migrations/） │
+          │ flash-image  │ │  （可配置）  │ │  public.users  │
+          └──────────────┘ └──────────────┘ │  public.genera-│
+                                             │  tions         │
+                                             └────────────────┘
+本地开发时：
 
-## 3. 双端职责边界（严格执行，不得混淆）
+浏览器 → http://localhost:5173  (Vite dev server，apps/web)
+              │
+              │ fetch /api/*
+              ▼
+VPS 本地实例 → http://localhost:8080  (server/index.js，npm run dev)
+              │
+              ├─→ Gemini API (cloud)
+              ├─→ OpenAI API (cloud)
+              └─→ PostgreSQL (本地 or 远端测试库)
 
-### 3.1 桌面端（apps/web/）
-- 目标设备：PC 浏览器（Chrome、Safari、Firefox）
-- 最小宽度：1024px（可适配到 768px，但不做手机端 UI）
-- 交互方式：鼠标 hover、键盘快捷键、多列布局
-- 路由：React Router v6，基于 apps/web/src/pages/
-- **禁止**：任何 react-native 导入、任何 Expo API
+VITE_PUBLIC_API_BASE_URL=http://localhost:8080/api  (本地 .env)
+VITE_PUBLIC_API_BASE_URL=https://api.kkai.plus/api  (Vercel 生产)
+// server/routes/generate-image.js
+// 职责：Gemini 图像生成/编辑中转接口，实现先扣后退积分机制
 
-### 3.2 手机端（apps/mobile/）
-- 目标设备：iOS 16+、Android 11+
-- 框架：Expo Managed Workflow + expo-router
-- 交互方式：触摸手势、滑动、SafeArea
-- **禁止**：任何 window. / document. / DOM API 调用
-- 图片：必须用 expo-image，不能用 HTML 的 img 标签
-- 图标：lucide-react-native
-- 字体：@expo-google-fonts/* 系列
+const { GoogleGenAI, Modality } = require("@google/genai");
 
-### 3.3 共享层（packages/）
-- packages/shared/types/ -- TypeScript 类型，两端共用
-- packages/shared/utils/ -- 纯函数工具，不含任何平台 API
-- packages/api-client/ -- 封装所有 HTTP 调用，两端共用
-- **判断原则**：代码里只要出现 Platform.OS、window、document、React Native 导入 -> 不能放 shared
+// ✅ API Key 只从后端环境变量读取，启动时检查
+if (!process.env.GEMINI_API_KEY) {
+  throw new Error("[严重] GEMINI_API_KEY 未配置，服务拒绝启动");
+}
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
----
-
-## 4. 完整系统架构图
-
-```
-+--------------------------------------------------------------+
-|                        用户终端                               |
-|   +---------------------+    +----------------------------+  |
-|   |  桌面端（Web）       |    |  手机端（Expo App）         |  |
-|   |  apps/web/          |    |  apps/mobile/              |  |
-|   |  Vite + React + TS  |    |  Expo Router + RN          |  |
-|   +----------+----------+    +-------------+--------------+  |
-+--------------|-----------------------------|-----------------+
-               |    packages/api-client      |
-               |      （统一 API 调用层）     |
-               +--------------+--------------+
-                              | HTTPS /api/*
-                              v
-+--------------------------------------------------------------+
-|                    Netlify 平台                               |
-|   +----------------+  +----------------------------------+   |
-|   | 静态资源托管   |  | netlify/functions/（短任务<10s）  |   |
-|   | apps/web/dist  |  |                                  |   |
-|   +----------------+  | generate-image.ts  （Gemini）    |   |
-|                        | openai-chat.ts    （OpenAI）     |   |
-|                        | auth.ts           （JWT 鉴权）   |   |
-|                        | billing.ts        （订单）       |   |
-|                        | user.ts           （用户 CRUD）  |   |
-|                        +---------------+------------------+   |
-+-------------------------------|------------------------------+
-                                |
-         +----------------------+--------------------+
-         v                      v                   v
-+------------------+  +------------------+  +---------------------+
-|  Gemini API      |  |  OpenAI API      |  |  VPS 服务器          |
-|  （Google Cloud）|  |                  |  |  payment-server/    |
-|  模型：          |  |  模型：          |  |                     |
-|  gemini-2.5-     |  |  gpt-4o-mini     |  | - Stripe Webhook   |
-|  flash-image     |  |                  |  | - BullMQ 队列       |
-+------------------+  +------------------+  +---------+-----------+
-                                                      |
-                                            +---------v-----------+
-                                            |  PostgreSQL 数据库  |
-                                            |  （migrations/ 管理）|
-                                            +---------------------+
-```
-
----
-
-## 5. 后端 API 路由表
-
-所有路由定义在 netlify/functions/，前端通过 packages/api-client/ 调用。
-
-| 路由 | 方法 | 文件位置 | 鉴权 | 功能说明 |
-|------|------|----------|------|---------|
-| /api/auth/login | POST | netlify/functions/auth.ts | 无 | 登录，返回 JWT |
-| /api/auth/register | POST | netlify/functions/auth.ts | 无 | 注册新用户 |
-| /api/auth/refresh | POST | netlify/functions/auth.ts | JWT | 刷新 token |
-| /api/generate/image | POST | netlify/functions/generate-image.ts | JWT | Gemini 图像生成 |
-| /api/generate/edit | POST | netlify/functions/generate-image.ts | JWT | Gemini 图像编辑 |
-| /api/chat | POST | netlify/functions/openai-chat.ts | JWT | OpenAI 对话 |
-| /api/user/me | GET | netlify/functions/user.ts | JWT | 获取当前用户信息 |
-| /api/user/me | PATCH | netlify/functions/user.ts | JWT | 更新用户信息 |
-| /api/billing/create-checkout | POST | netlify/functions/billing.ts | JWT | 创建 Stripe 支付会话 |
-| /api/billing/plans | GET | netlify/functions/billing.ts | 无 | 获取定价方案 |
-| /api/generations | GET | netlify/functions/generations.ts | JWT | 获取生成历史 |
-| /webhook/stripe | POST | payment-server/routes/stripe.ts | Stripe 签名 | Stripe Webhook（VPS） |
-
-**规则：**
-- 新增 API 必须先更新本表，再写实现代码
-- 所有需要鉴权的路由，Function 第一步必须验证 JWT
-
----
-
-## 6. AI API 正确接入规范
-
-### 6.1 Gemini API（图像生成/编辑）
-
-**SDK：@google/genai（必须用这个，旧的 @google/generative-ai 已废弃）**
-
-```typescript
-// netlify/functions/generate-image.ts
-// 职责：接收前端的图像生成请求，调用 Gemini API，返回生成的图像 base64
-
-import { GoogleGenAI, Modality } from "@google/genai";
-import type { Handler } from "@netlify/functions";
-import { verifyJWT } from "../lib/auth";
-import { z } from "zod";
-
-// 初始化 Gemini 客户端，API Key 只能从后端环境变量读取
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-
-// 定义请求参数的 schema，用 zod 做入参校验，防止非法输入
-const RequestSchema = z.object({
-  prompt: z.string().min(1).max(1000),           // 生成提示词，最长 1000 字
-  referenceImageBase64: z.string().optional(),    // 可选：图像编辑时传入参考图
-  aspectRatio: z.enum(["1:1", "16:9", "9:16"]).default("1:1"), // 输出比例
-});
-
-// 所有后端响应必须带这两个 header，缺一不可
-// Content-Type 中的 charset=utf-8 是解决中文乱码的关键
-const COMMON_HEADERS = {
-  "Content-Type": "application/json; charset=utf-8",
-  "X-Content-Type-Options": "nosniff",
-};
-
-export const handler: Handler = async (event) => {
-  // 第一步：验证 JWT，鉴权失败直接返回 401，不浪费后续资源
-  const userId = await verifyJWT(event.headers.authorization);
-  if (!userId) {
-    return {
-      statusCode: 401,
-      headers: COMMON_HEADERS,
-      body: JSON.stringify({ error: "Unauthorized" }),
-    };
-  }
-
-  // 第二步：校验请求参数，防止空 prompt 或超长输入
-  const parsed = RequestSchema.safeParse(JSON.parse(event.body || "{}"));
-  if (!parsed.success) {
-    return {
-      statusCode: 400,
-      headers: COMMON_HEADERS,
-      body: JSON.stringify(parsed.error.flatten()),
-    };
-  }
-  const { prompt, referenceImageBase64 } = parsed.data;
-
-  // 第三步：组装 contents 数组
-  // Gemini 支持多模态输入，文字和图片可以混合传入
-  const contents: any[] = [{ text: prompt }];
-  if (referenceImageBase64) {
-    // 图像编辑模式：把参考图和文字提示一起传给 Gemini
-    contents.push({
-      inlineData: { mimeType: "image/png", data: referenceImageBase64 },
-    });
-  }
-
-  // 第四步：调用 Gemini（nano-banana 就是 gemini-2.5-flash-image 这个模型）
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-image",  // nano-banana 模型，必须填这个
-      contents,
-      config: {
-        // 必须声明 responseModalities，否则 Gemini 不会返回图像数据
-        responseModalities: [Modality.IMAGE, Modality.TEXT],
-      },
-    });
-
-    // 从响应中提取图像 part（Gemini 返回的是一个 parts 数组）
-    const parts = response.candidates?.[0]?.content?.parts ?? [];
-    const imagePart = parts.find((p: any) => p.inlineData);
-    if (!imagePart?.inlineData) {
-      throw new Error("Gemini 没有返回图像数据，可能是 prompt 被安全过滤拦截");
-    }
-
-    return {
-      statusCode: 200,
-      headers: COMMON_HEADERS,
-      body: JSON.stringify({
-        // 拼成标准的 data URI，前端可以直接用 <img src={image} /> 显示
-        image: `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`,
-        // 有时候 Gemini 会同时返回文字说明
-        text: parts.find((p: any) => p.text)?.text ?? "",
-      }),
-    };
-  } catch (err: unknown) {
-    // 后端记录完整错误信息（包括中文），方便排查
-    console.error("[Gemini 生成失败]", err instanceof Error ? err.message : String(err));
-
-    // 前端只看到脱敏后的英文错误，避免暴露内部实现细节
-    return {
-      statusCode: 500,
-      headers: COMMON_HEADERS,
-      body: JSON.stringify({ error: "Generation failed. Please try again." }),
-    };
-  }
-};
-```
-
-**常见错误：**
-- 错误：model: "gemini-pro-vision" -> 正确：model: "gemini-2.5-flash-image"
-- 错误：缺少 responseModalities: [Modality.IMAGE] -> 后果：不返回图像
-- 错误：在前端直接 fetch Google API 并传 key -> 后果：API Key 泄漏
-
-### 6.2 OpenAI API（对话/文本）
-
-**SDK：openai（官方 npm 包，不能手写 fetch）**
-
-```typescript
-// netlify/functions/openai-chat.ts
-// 职责：接收前端的对话请求，调用 OpenAI API，返回 AI 回复
-
-import OpenAI from "openai";
-import type { Handler } from "@netlify/functions";
-import { verifyJWT } from "../lib/auth";
-
-// 初始化 OpenAI 客户端，Key 只能在后端
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-
-// 统一响应头，必须带 charset=utf-8 防止中文乱码
-const COMMON_HEADERS = {
-  "Content-Type": "application/json; charset=utf-8",
-  "X-Content-Type-Options": "nosniff",
-};
-
-export const handler: Handler = async (event) => {
-  // 先鉴权，再做任何操作
-  const userId = await verifyJWT(event.headers.authorization);
-  if (!userId) {
-    return {
-      statusCode: 401,
-      headers: COMMON_HEADERS,
-      body: JSON.stringify({ error: "Unauthorized" }),
-    };
-  }
-
-  const { messages } = JSON.parse(event.body || "{}");
-
-  try {
-    const completion = await openai.chat.completions.create(
-      {
-        // 模型名从环境变量读取，方便统一切换，默认用 gpt-4o-mini 节省费用
-        model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
-        messages,
-        max_tokens: 1000,
-      },
-      {
-        // OpenAI 官方文档推荐加这个 header，便于支持排查线上问题
-        headers: { "X-Client-Request-Id": crypto.randomUUID() },
-      }
-    );
-
-    return {
-      statusCode: 200,
-      headers: COMMON_HEADERS,
-      body: JSON.stringify(completion.choices[0].message),
-    };
-  } catch (err: any) {
-    // 429 是速率限制，给用户友好提示，不要直接暴露技术细节
-    if (err?.status === 429) {
-      return {
-        statusCode: 429,
-        headers: COMMON_HEADERS,
-        body: JSON.stringify({ error: "Rate limit reached. Please wait a moment." }),
-      };
-    }
-    // 其他错误后端记录，前端只看到通用提示
-    console.error("[OpenAI 调用失败]", err?.message);
-    return {
-      statusCode: 500,
-      headers: COMMON_HEADERS,
-      body: JSON.stringify({ error: "AI request failed." }),
-    };
-  }
-};
-```
-
----
-
-## 7. 前端 API 调用层规范（packages/api-client）
-
-**所有前端代码（桌面端 + 手机端）必须通过这一层调用后端，禁止直接写 fetch。**
-
-```typescript
-// packages/api-client/src/client.ts
-// 职责：创建统一的 axios 实例，自动处理鉴权 token 和错误响应
-
-import axios from "axios";
-
-// 根据运行环境自动选择 baseURL
-// 桌面端（Vite）用 VITE_PUBLIC_API_BASE_URL
-// 手机端（Expo）用 EXPO_PUBLIC_API_BASE_URL
-export const apiClient = axios.create({
-  baseURL: typeof window !== "undefined"
-    ? (import.meta.env?.VITE_PUBLIC_API_BASE_URL ?? "/api")
-    : (process.env.EXPO_PUBLIC_API_BASE_URL ?? "/api"),
-  timeout: 30000,
-  headers: {
-    // 请求头明确声明 UTF-8，防止中文乱码
-    "Content-Type": "application/json; charset=utf-8",
-    "Accept": "application/json; charset=utf-8",
+// ✅ 正确的 generateContent 调用
+const response = await ai.models.generateContent({
+  model: "gemini-2.5-flash-image",   // 固定模型名，不得用变量替换
+  contents: [
+    { text: prompt },
+    // 图像编辑模式追加（参考图必须去除 data URI 前缀）：
+    // { inlineData: { mimeType: "image/png", data: cleanBase64 } }
+  ],
+  config: {
+    // ✅ 必须用 Modality 枚举，不能用字符串 "IMAGE"
+    responseModalities: [Modality.IMAGE, Modality.TEXT],
+    // ✅ aspectRatio 正确位置：config.imageConfig.aspectRatio
+    // ❌ 错误位置：config.aspectRatio（会被静默忽略）
+    imageConfig: {
+      aspectRatio: aspectRatio, // "1:1" | "16:9" | "9:16"
+    },
   },
 });
+// 提取响应中的图像 part
+const parts = response.candidates?.[0]?.content?.parts ?? [];
+const imagePart = parts.find((p) => p.inlineData);
 
-// 请求拦截器：每次请求自动附加 JWT token
-// 桌面端从 localStorage 读，手机端从 expo-secure-store 读（在各端的 api-client 实例里配置）
-apiClient.interceptors.request.use((config) => {
-  const token = typeof localStorage !== "undefined"
-    ? localStorage.getItem("token")
-    : null;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// ✅ 必须检查 imagePart，Gemini 安全过滤触发时不返回图像
+if (!imagePart?.inlineData) {
+  // 这不是代码 bug，是 Gemini 的安全过滤，需要退还积分
+  throw new Error("Gemini 未返回图像数据，可能触发了内容安全过滤");
+}
+
+// ✅ 图像编辑模式：传入参考图前必须去除 data URI 前缀
+const cleanBase64 = referenceImageBase64.replace(/^data:image\/\w+;base64,/, "");
+
+// ✅ 拼装标准 data URI 返回给前端
+const imageDataUri = `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+// server/routes/chat.js
+const OpenAI = require("openai");
+const { randomUUID } = require("crypto"); // ✅ 必须显式 require，不依赖全局
+
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error("[严重] OPENAI_API_KEY 未配置，服务拒绝启动");
+}
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// ✅ 模型从环境变量读取
+const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+
+// ✅ 带 X-Client-Request-Id 用于链路追踪（OpenAI 官方推荐）
+const completion = await openai.chat.completions.create(
+  {
+    model,
+    messages, // 已通过 zod 校验的消息数组
+    max_tokens: 1000,
+  },
+  {
+    headers: { "X-Client-Request-Id": randomUUID() },
   }
-  return config;
+);
+const { z } = require("zod");
+
+// ✅ 必须用 zod 校验，防止 role 注入
+const MessageSchema = z.object({
+  role: z.enum(["system", "user", "assistant"]),
+  content: z.string().min(1).max(4000),
 });
 
-// 响应拦截器：统一处理常见错误
-apiClient.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    if (err.response?.status === 401) {
-      // token 过期或无效，触发重新登录
-      // 清除本地 token，跳转登录页
-    }
-    if (err.response?.status === 429) {
-      // 速率限制，提示用户稍后重试
-    }
-    return Promise.reject(err);
+const ChatSchema = z.object({
+  messages: z.array(MessageSchema).min(1).max(20),
+});
+// server/index.js 启动时必须检查所有必需密钥
+const REQUIRED_ENV_VARS = [
+  "GEMINI_API_KEY",
+  "OPENAI_API_KEY",
+  "JWT_SECRET",
+  "PASSWORD_SALT",
+  "DATABASE_URL",
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+];
+
+for (const key of REQUIRED_ENV_VARS) {
+  if (!process.env[key]) {
+    // 快速失败：缺少密钥时拒绝启动，而不是用弱兜底值
+    throw new Error(`[严重] 环境变量 ${key} 未配置，服务拒绝启动`);
   }
-);
-```
-
-**React Query hook 封装示例（桌面端和手机端共用）：**
-```typescript
-// packages/api-client/src/hooks/useGenerateImage.ts
-// 职责：把图像生成 API 封装成 React Query mutation，自动管理 loading/error 状态
-
-import { useMutation } from "@tanstack/react-query";
-import { generateImage } from "../index";
-
-export function useGenerateImage() {
-  return useMutation({
-    mutationFn: generateImage,
-    onError: (err) => {
-      // 错误统一在这里记录，组件里只需要判断 isError 就够了
-      console.error("[useGenerateImage 调用失败]", err);
-    },
-  });
 }
-```
+// ❌ 绝不：硬编码兜底值
+const JWT_SECRET = process.env.JWT_SECRET || "nano-banana-fallback-secret";
 
----
+// ❌ 绝不：空字符串兜底
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
-## 8. 环境变量规范
+// ✅ 正确：启动时检查，无值则抛错（见 7.3）
+// server/lib/credits.js
+// 职责：封装所有积分操作，所有路由通过此模块操作积分
+// ⚠️ 禁止在任何路由中硬编码积分消耗数值，必须通过 getOperationCost() 读取
 
-### 8.1 必须存在的环境变量
+const { getPool } = require("./db");
 
-| 变量名 | 平台 | 是否可前端访问 | 用途 |
-|--------|------|--------------|------|
-| GEMINI_API_KEY | Netlify / VPS | 绝不可以 | Gemini API 认证 |
-| OPENAI_API_KEY | Netlify / VPS | 绝不可以 | OpenAI API 认证 |
-| DATABASE_URL | Netlify / VPS | 绝不可以 | PostgreSQL 连接字符串 |
-| JWT_SECRET | Netlify / VPS | 绝不可以 | JWT 签发和验证 |
-| STRIPE_SECRET_KEY | VPS | 绝不可以 | Stripe 支付 |
-| STRIPE_WEBHOOK_SECRET | VPS | 绝不可以 | Stripe Webhook 验签 |
-| INTERNAL_API_TOKEN | Netlify + VPS | 绝不可以 | Netlify 调用 VPS 的内部认证 |
-| VPS_BASE_URL | Netlify | 绝不可以 | VPS 服务地址 |
-| VITE_PUBLIC_API_BASE_URL | 桌面端 | 可以 | 桌面端 API 基础路径 |
-| EXPO_PUBLIC_API_BASE_URL | 手机端 | 可以 | 手机端 API 基础路径 |
-| OPENAI_MODEL | Netlify | 绝不可以 | 控制使用的 OpenAI 模型 |
-
-### 8.2 前端环境变量命名规则
-- 桌面端：必须以 VITE_PUBLIC_ 开头
-- 手机端：必须以 EXPO_PUBLIC_ 开头
-- 任何不以上述前缀开头的变量，前端代码不得访问
-
----
-
-## 9. 设计系统规范（High-Fidelity SaaS）
-
-### 9.1 核心设计令牌
-
-```
-background:      #FFFFFF  - 默认背景（纯白）
-canvasMuted:     #F9FAFB  - 次级背景（Gray-50，用于交替区域）
-foreground:      #111827  - 主要文字（Gray-900）
-foregroundMuted: #6B7280  - 次要文字（Gray-500，用于副标题/描述）
-borderGhost:     #E5E7EB  - 边框颜色（Gray-200，卡片/分隔线）
-primary:         #2563EB  - 主操作色（Blue-600，主按钮/激活状态）
-primarySoft:     #EFF6FF  - 软操作背景（Blue-50，次要按钮背景）
-chartOrange:     #EA580C  - 数据可视化（Orange-600，进度环等）
-
-字体：Inter（项目唯一字体）
-```
-
-### 9.2 桌面端组件规范
-
-**卡片容器（必须严格使用，禁止加阴影）：**
-```tsx
-{/* 卡片容器：用边框定义层级，不用阴影 */}
-<div className="bg-white rounded-xl border border-gray-200 p-6">
-  <h2 className="text-base font-semibold text-gray-900">卡片标题</h2>
-  <p className="text-sm text-gray-500 mt-1">卡片描述文字</p>
-</div>
-```
-
-**Tab 导航（-mb-[1px] 是关键，让激活线精确覆盖底部分隔线）：**
-```tsx
-<div className="border-b border-gray-200 flex gap-6">
-  {/* 激活状态：蓝色下边框，用 -mb-[1px] 精确覆盖灰色分隔线 */}
-  <button className="text-gray-900 font-medium border-b-2 border-blue-600 pb-3 -mb-[1px] px-1 text-sm">
-    激活标签
-  </button>
-  {/* 未激活状态：透明下边框，hover 时文字变深 */}
-  <button className="text-gray-500 font-normal border-b-2 border-transparent hover:text-gray-700 pb-3 px-1 text-sm">
-    未激活标签
-  </button>
-</div>
-```
-
-**三种 Pill 形态：**
-```tsx
-{/* Outline Pill：用于展示元数据、分类标签 */}
-<span className="bg-white border border-gray-200 rounded-full px-3 py-1 text-xs text-gray-700 inline-flex items-center gap-1.5">
-  图像生成
-</span>
-
-{/* Soft Action Pill：用于次要操作按钮 */}
-<button className="bg-blue-50 text-blue-600 rounded-full px-3 py-1.5 text-sm font-medium inline-flex items-center gap-1.5">
-  AI 优化
-</button>
-
-{/* Status Pill：用于展示状态，带颜色圆点 */}
-<span className="bg-white border border-gray-200 rounded-full px-3 py-1 text-xs text-gray-700 inline-flex items-center gap-1.5">
-  <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-  运行中
-</span>
-```
-
-**功能列表（必须用连字符，禁止 HTML bullet）：**
-```tsx
-{/* 列表项用 - 前缀，不用 list-disc 或 ul/li 的默认样式 */}
-<li className="text-sm text-gray-600 py-1 flex items-start">
-  <span className="text-gray-400 mr-2 shrink-0">-</span>
-  批量图像处理
-</li>
-```
-
-**主按钮：**
-```tsx
-<button className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
-  开始生成
-</button>
-```
-
-### 9.3 手机端组件规范
-
-```tsx
-{/* 手机端卡片：用 borderWidth 替代 shadow */}
-<View style={{
-  backgroundColor: "#FFFFFF",
-  borderRadius: 12,
-  borderWidth: 1,
-  borderColor: "#E5E7EB",
-  padding: 16,
-}}>
-  <Text style={{ fontSize: 15, fontWeight: "600", color: "#111827" }}>标题</Text>
-  <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 4 }}>描述</Text>
-</View>
-
-{/* 手机端主按钮 */}
-<TouchableOpacity style={{
-  backgroundColor: "#2563EB",
-  borderRadius: 8,
-  paddingVertical: 12,
-  paddingHorizontal: 16,
-  alignItems: "center",
-}}>
-  <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "600" }}>开始生成</Text>
-</TouchableOpacity>
-```
-
-### 9.4 设计禁止项（AI 不得违反）
-
-| 禁止 | 替代方案 |
-|------|---------|
-| shadow-sm / shadow-md 用于卡片 | border border-gray-200 |
-| font-medium 用于标题 | font-semibold |
-| font-light 用于正文 | font-normal |
-| hover:scale-105 hover 动画 | hover:border-gray-300 颜色切换 |
-| HTML bullet list-disc | 连字符 - 前缀 |
-| 卡片上的 drop shadow | 只有浮层/Dropdown 可用 shadow |
-
----
-
-## 10. 数据库 Schema 规范
-
-```sql
--- migrations/001_init.sql
--- 用户表：存储用户基本信息、订阅方案和剩余额度
-CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  plan TEXT NOT NULL DEFAULT 'free',   -- 订阅方案：free / pro / team
-  credits INTEGER NOT NULL DEFAULT 10, -- 剩余生成额度
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- migrations/002_generations.sql
--- 生成历史表：记录每次 AI 生成的详情
-CREATE TABLE IF NOT EXISTS generations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  prompt TEXT NOT NULL,
-  image_url TEXT,
-  model TEXT NOT NULL DEFAULT 'gemini-2.5-flash-image',
-  status TEXT NOT NULL DEFAULT 'pending', -- pending / done / failed
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- migrations/003_orders.sql
--- 订单表：记录支付订单，price 只存后端，单位是分（避免浮点精度问题）
-CREATE TABLE IF NOT EXISTS orders (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id),
-  stripe_session_id TEXT UNIQUE,           -- Stripe session ID，UNIQUE 保证幂等
-  plan TEXT NOT NULL,
-  amount_cents INTEGER NOT NULL,           -- 金额，单位：分，后端查 DB 得到，前端不传
-  status TEXT NOT NULL DEFAULT 'created',  -- created -> paid -> fulfilled
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-```
-
-**迁移文件规则：**
-- 命名格式：NNN_描述.sql（三位数字前缀，例如 001_init.sql）
-- 只增不减（不在迁移中 DROP 列，用 nullable 替代）
-- 每个迁移必须幂等（用 IF NOT EXISTS）
-- 禁止修改已有的迁移文件
-
----
-
-## 11. 支付流程规范（防篡改）
-
-```
-前端                     Netlify Function           VPS（payment-server）
-  |                           |                           |
-  |-- GET /api/billing/plans ->                          |
-  |   （获取展示价格）         |                           |
-  |<-- [从 DB 读取定价] ------                           |
-  |                           |                           |
-  |-- POST /api/billing/create-checkout                  |
-  |   { planId: "pro" }       |                          |
-  |   （只传 planId，不传价格！）                         |
-  |                           |-- 根据 planId 查 DB 得价格|
-  |                           |-- 创建 Stripe Session    |
-  |<-- { sessionUrl } --------|                          |
-  |                           |                           |
-  |-- 跳转 Stripe 支付页面    |                           |
-  |                           |    Stripe Webhook ------->
-  |                           |               验签        |
-  |                           |           更新订单状态    |
-  |                           |           orders.status  |
-  |                           |           = 'paid'       |
-```
-
-**规则：**
-- 前端只传 planId，不传任何金额
-- 后端根据 planId 查数据库获取金额
-- Stripe Webhook 必须验签：stripe.webhooks.constructEvent(body, sig, secret)
-- 订单状态只能单向流转：created -> paid -> fulfilled
-
----
-
-## 12. 安全清单（每次发布前执行）
-
-```bash
-# 扫描前端代码是否有 API Key 泄漏（结果必须为空）
-grep -rE "(sk-|AIza|GEMINI_API_KEY|OPENAI_API_KEY)" apps/web/src apps/mobile/src
-
-# 确认 .env 在 .gitignore 中
-grep "^\.env$" .gitignore
-
-# 确认缓存目录在 .gitignore 中
-grep -E "\.npm-cache|release/" .gitignore
-```
-
-- [ ] 所有 Netlify Functions 第一步验证 JWT（除 auth 和 public 路由）
-- [ ] Stripe Webhook 路由有签名验证
-- [ ] netlify.toml 包含 CORS 白名单 header
-- [ ] 所有 Response header 包含：Content-Type: application/json; charset=utf-8
-
----
-
-## 13. 开发命令速查
-
-```bash
-npm install              # 安装所有依赖（monorepo）
-npm run dev:web          # 启动桌面端开发服务器
-npm run dev:mobile       # 启动手机端（需要 Expo Go 或模拟器）
-npm run dev:functions    # 本地运行 Netlify Functions
-npm run dev:payment      # 本地运行支付服务器
-npm run db:migrate       # 运行数据库迁移
-npm run test             # 运行全部测试
-npm run build:web        # 构建桌面端生产包
-npm run audit:keys       # 安全扫描，检查是否有泄漏的 API Key
-```
-
----
-
-## 14. 禁止 AI 做的操作
-
-```
-禁止：在 apps/web/ 或 apps/mobile/ 中直接 fetch 第三方 AI API
-禁止：在任何代码文件中硬编码 API Key
-禁止：在 netlify/functions/ 之外添加 HTTP handler
-禁止：在 apps/mobile/ 中使用 window / document / localStorage
-禁止：在 apps/web/ 中使用 React Native / Expo 组件
-禁止：导入 @google/generative-ai（已废弃，改用 @google/genai）
-禁止：在根目录新建 .md 文档（全部放 docs/）
-禁止：在前端代码中使用无 VITE_PUBLIC_ 或 EXPO_PUBLIC_ 前缀的环境变量
-禁止：在卡片/容器上使用 drop shadow（shadow-sm / shadow-md）
-禁止：使用 font-light 作为正文，使用 font-medium 作为标题
-禁止：在订单创建接口中接受前端传来的 price 字段
-禁止：修改 migrations/ 中已有的迁移文件
-禁止：在 Response body 中返回带中文的错误信息（中文只能在后端 console.error）
-禁止：任何后端 Response 缺少 charset=utf-8
-禁止：写没有中文注释的复杂逻辑代码
-禁止：用英文回复用户（本项目以中文为主）
-```
-
----
-
-## 15. AI 操作前必做的三件事
-
-在修改任何代码之前，AI 必须按顺序确认：
-
-1. **确认平台**：我现在修改的是 apps/web（桌面端）、apps/mobile（手机端），还是 packages/（共享层）？
-2. **确认 API 路径**：如果涉及 API 调用，是否走 packages/api-client/？handler 是否在 netlify/functions/ 中定义？
-3. **确认安全**：这次修改会不会让任何密钥出现在前端代码中？
-
----
-
-## 16. 代码规范（AI 生成的每行代码都必须符合）
-
----
-
-### 16.1 注释规范（核心，必须执行）
-
-**本项目所有代码注释必须用中文。注释要解释"为什么"和"这段代码在做什么"，让任何人看到注释就能理解意图。**
-
-```typescript
-// ===========================
-// 正确的中文注释示例
-// ===========================
-
-// 正确：解释为什么，而不只是复述代码
-// Gemini API 要求 base64 字符串不能带 "data:image/png;base64," 前缀
-// 否则会报 400 错误，这是 Google 官方文档里的已知限制
-const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-
-// 正确：复杂业务逻辑前加一段总结
-// 整体流程：先鉴权 -> 再校验入参 -> 最后调 Gemini
-// 顺序必须按这个来，鉴权放最前面可以在非法请求时节省 API 配额
-export const handler: Handler = async (event) => { ... };
-
-// 正确：标记已知问题或临时方案，注明何时可以移除
-// TODO(2026-08): Gemini 3.0 发布后这个 workaround 可以移除
-// 目前 gemini-2.5-flash-image 有时候会漏掉 text part，需要做空值保护
-const textPart = parts.find((p: any) => p.text)?.text ?? "";
-
-// 正确：JSDoc 用中文写，解释参数和返回值
 /**
- * 创建 Stripe Checkout Session
- * @param planId - 订阅方案 ID（如 "pro"/"team"），后端根据此 ID 查 DB 确定价格
- * @returns Stripe 托管结账页面的 URL
- * @throws 如果 planId 在 DB 中不存在，抛出 404 错误
+ * 获取指定操作的积分消耗量（从数据库动态读取，管理员可配置）
+ * @param {string} operationKey - 操作类型 key（'image_generation' | 'image_edit' | 'chat'）
+ * @returns {number} 该操作消耗的积分数
  */
-export async function createCheckout(planId: string): Promise<string> { ... }
+async function getOperationCost(operationKey) {
+  const pool = getPool();
+  const result = await pool.query(
+    "SELECT cost FROM public.api_cost_config WHERE operation_key = $1 AND is_active = true",
+    [operationKey]
+  );
+  if (result.rows.length === 0) {
+    // 找不到配置时记录告警，不能静默失败
+    console.error(`[积分配置] 未找到操作 "${operationKey}" 的定价配置，拒绝本次请求`);
+    throw new Error(`Missing cost config for operation: ${operationKey}`);
+  }
+  return parseInt(result.rows[0].cost, 10);
+}
 
-// ===========================
-// 错误的注释示例（禁止这样写）
-// ===========================
+/**
+ * 查询用户当前积分（用户不存在返回 -1）
+ */
+async function getUserCredits(userId) {
+  const pool = getPool();
+  const result = await pool.query(
+    "SELECT credits FROM public.users WHERE id = $1",
+    [userId]
+  );
+  if (result.rows.length === 0) return -1;
+  return parseInt(result.rows[0].credits, 10);
+}
 
-// 错误：英文注释
-// Gemini requires base64 without data URI prefix
-const base64Data = ...;
+/**
+ * 先扣积分（调用 AI API 之前执行）
+ * 使用 WHERE credits >= cost 的原子更新，防止积分变成负数
+ * @returns {number} 扣除后的积分余额
+ */
+async function deductCredits(userId, amount, operationKey, operatorNote = "") {
+  const pool = getPool();
+  // 使用事务保证扣减和日志写入的原子性
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
 
-// 错误：废话注释（注释和代码说的是同一件事，没有附加信息）
-// 把 loading 设为 true
-setLoading(true);
+    // 原子扣减：AND credits >= amount 保证不会扣成负数
+    const result = await client.query(
+      "UPDATE public.users SET credits = credits - $1, updated_at = NOW() WHERE id = $2 AND credits >= $1 RETURNING credits",
+      [amount, userId]
+    );
+    if (result.rows.length === 0) {
+      await client.query("ROLLBACK");
+      throw new Error("积分不足，原子扣减失败");
+    }
+    const remaining = parseInt(result.rows[0].credits, 10);
 
-// 错误：注释掉的旧代码（用 git 管理，不要留在代码里）
-// const oldWay = fetch("/api/old-endpoint");
-// const result = await oldWay.json();
-```
+    // 写入积分变动日志
+    await client.query(
+      "INSERT INTO public.credit_logs (user_id, delta, reason, operation_key, balance_after) VALUES ($1, $2, $3, $4, $5)",
+      [userId, -amount, "ai_deduct", operationKey, remaining]
+    );
 
-**每个文件顶部必须有一行中文说明这个文件的职责：**
-```typescript
-// 职责：接收前端的图像生成请求，调用 Gemini API，返回生成图像的 base64 字符串
-// 路由：POST /api/generate/image
-// 鉴权：需要 JWT token
-```
-
----
-
-### 16.2 TypeScript 规范
-
-**严格模式（所有 tsconfig.json 必须开启）：**
-```json
-{
-  "compilerOptions": {
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "exactOptionalPropertyTypes": true,
-    "forceConsistentCasingInFileNames": true
+    await client.query("COMMIT");
+    return remaining;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
   }
 }
-```
 
-**类型声明规则：**
-```typescript
-// 正确：函数参数和返回值明确声明类型
-async function generateImage(prompt: string): Promise<GenerationResult> {}
-
-// 错误：用 any（必须有 eslint 注释说明原因才能用）
-function doSomething(data: any): any {}
-
-// 正确：用 unknown 替代 any，再做类型收窄
-function handleError(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  return String(err);
+/**
+ * 退款积分（AI API 调用失败时执行，必须在 catch 里调用）
+ */
+async function refundCredits(userId, amount, operationKey) {
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      "UPDATE public.users SET credits = credits + $1, updated_at = NOW() WHERE id = $2 RETURNING credits",
+      [amount, userId]
+    );
+    const remaining = parseInt(result.rows[0].credits, 10);
+    await client.query(
+      "INSERT INTO public.credit_logs (user_id, delta, reason, operation_key, balance_after) VALUES ($1, $2, $3, $4, $5)",
+      [userId, amount, "ai_refund", operationKey, remaining]
+    );
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
-```
 
-**类型断言规则：**
-```typescript
-// 禁止：as any
-const data = response as any;
-
-// 禁止：! 非空断言（除非有注释说明为什么保证非空）
-const el = document.getElementById("root")!;
-
-// 正确：显式做空值判断
-const el = document.getElementById("root");
-if (!el) throw new Error("找不到根节点 #root，请检查 index.html");
-```
-
----
-
-### 16.3 命名规范
-
-| 对象 | 规范 | 示例 |
-|------|------|------|
-| React/RN 组件 | PascalCase | GeneratePanel, ImageCard |
-| 页面文件 | kebab-case | generate-image.tsx, user-profile.tsx |
-| Hook | camelCase + use 前缀 | useGenerateImage, useUserProfile |
-| 普通函数 | camelCase | formatDate, parseError |
-| 常量 | UPPER_SNAKE_CASE | MAX_RETRY_COUNT, DEFAULT_MODEL |
-| TypeScript 类型/接口 | PascalCase | GenerationResult, UserProfile |
-| 数据库表名 | snake_case（复数） | users, generations, orders |
-| 数据库列名 | snake_case | user_id, created_at, image_url |
-| 环境变量 | UPPER_SNAKE_CASE | GEMINI_API_KEY, DATABASE_URL |
-| API 路由 | kebab-case | /api/generate-image, /api/user-profile |
-
----
-
-### 16.4 文件结构规范
-
-**文件内代码顺序（必须按此顺序）：**
-```typescript
-// 1. 外部包 import（按字母排序）
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-
-// 2. 内部 packages/ import
-import { generateImage } from "@nano-banana/api-client";
-import type { GenerationResult } from "@nano-banana/shared/types";
-
-// 3. 相对路径 import（从远到近）
-import { ImageCard } from "../../components/ImageCard";
-
-// 4. 本文件私有的类型定义
-interface LocalState { prompt: string; }
-
-// 5. 常量
-const MAX_PROMPT_LENGTH = 1000;
-
-// 6. 组件/函数主体
-export default function GeneratePage() { ... }
-```
-
-**一个文件只能有一个导出组件：**
-```typescript
-// 错误：一个文件里导出多个组件
-export function Header() { ... }
-export function Footer() { ... }
-export default function Page() { ... }
-
-// 正确：拆分成 Header.tsx、Footer.tsx、Page.tsx
-```
-
----
-
-### 16.5 错误处理规范
-
-**前端（桌面端 + 手机端）：**
-```typescript
-// 正确：用 React Query 的 isError + error 状态，不用 try/catch 包 UI 逻辑
-const { mutate, isPending, isError, error } = useMutation({
-  mutationFn: generateImage,
-});
-
-// 在 JSX 中展示错误
-{isError && (
-  <p className="text-sm text-red-600 mt-2">
-    {error instanceof Error ? error.message : "生成失败，请重试"}
-  </p>
-)}
-
-// 错误：吞掉错误，用户看不到任何反馈
-try {
-  await generateImage(prompt);
-} catch (e) {
-  console.log(e); // 用户完全不知道出错了
+/**
+ * 充值积分（Stripe Webhook 或管理员手动操作时调用）
+ * @param {string} reason - 充值原因，如 'stripe_webhook' | 'admin_recharge' | 'admin_adjust'
+ * @param {string|null} operatorId - 操作人 userId（管理员手动充值时填，Stripe 自动充值时填 null）
+ */
+async function addCredits(userId, amount, reason, operatorId = null) {
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      "UPDATE public.users SET credits = credits + $1, updated_at = NOW() WHERE id = $2 RETURNING credits",
+      [amount, userId]
+    );
+    const remaining = parseInt(result.rows[0].credits, 10);
+    await client.query(
+      "INSERT INTO public.credit_logs (user_id, delta, reason, operator_id, balance_after) VALUES ($1, $2, $3, $4, $5)",
+      [userId, amount, reason, operatorId, remaining]
+    );
+    await client.query("COMMIT");
+    return remaining;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
-```
 
-**后端（Netlify Functions）：**
-- 后端 console.error 可以用中文记录详细错误
-- 返回给前端的 Response body 只能是英文的脱敏信息
-- 所有 Response 必须带 COMMON_HEADERS（含 charset=utf-8）
+/**
+ * 管理员手动调整积分（可正可负，需要管理员鉴权后调用）
+ * @param {number} delta - 变化量（正数加积分，负数扣积分）
+ */
+async function adminAdjustCredits(targetUserId, delta, adminUserId, note = "") {
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    // 防止积分被调整为负数
+    const result = await client.query(
+      "UPDATE public.users SET credits = GREATEST(0, credits + $1), updated_at = NOW() WHERE id = $2 RETURNING credits",
+      [delta, targetUserId]
+    );
+    if (result.rows.length === 0) {
+      await client.query("ROLLBACK");
+      throw new Error("目标用户不存在");
+    }
+    const remaining = parseInt(result.rows[0].credits, 10);
+    await client.query(
+      "INSERT INTO public.credit_logs (user_id, delta, reason, operator_id, note, balance_after) VALUES ($1, $2, $3, $4, $5, $6)",
+      [targetUserId, delta, "admin_adjust", adminUserId, note, remaining]
+    );
+    await client.query("COMMIT");
+    return remaining;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
 
----
-
-### 16.6 状态管理规范
-
-| 场景 | 使用方案 |
-|------|---------|
-| 服务端数据（API 请求） | @tanstack/react-query（必须，禁止 useEffect+fetch） |
-| 表单状态 | useState（简单）/ react-hook-form（复杂） |
-| 单组件内 UI 状态 | useState |
-| 跨组件共享 UI 状态 | zustand（最多 3 个 store） |
-| URL 状态（筛选/分页） | URL query params via React Router |
-
-```typescript
-// 错误：用 useEffect + fetch 获取远程数据
-useEffect(() => {
-  fetch("/api/user/me").then(r => r.json()).then(setUser);
-}, []);
-
-// 正确：用 react-query
-const { data: user } = useQuery({ queryKey: ["user"], queryFn: getMe });
-```
-
----
-
-### 16.7 CSS 样式规范
-
-**桌面端（Tailwind 规则）：**
-```tsx
-// 正确：响应式用断点
-<div className="flex flex-col md:flex-row gap-4">
-
-// 错误：inline style 做布局
-<div style={{ display: "flex", flexDirection: "column" }}>
-
-// 错误：在组件文件里写 style 标签
-<style>{`.card { ... }`}</style>
-```
-
-**手机端（StyleSheet 规则）：**
-```tsx
-// 正确：inline style 对象
-<View style={{ flex: 1, padding: 16 }}>
-
-// 错误：用 Tailwind className（React Native 不支持）
-<View className="flex-1 p-4">
-```
-
----
-
-### 16.8 Git Commit 规范
-
-**格式（Conventional Commits，描述部分用中文）：**
-```
-<type>(<scope>): <中文描述>
-
-type:
-  feat     - 新功能
-  fix      - 修复 bug
-  refactor - 重构（不改变功能）
-  style    - 代码格式（不影响逻辑）
-  docs     - 文档
-  test     - 测试
-  chore    - 构建/依赖/配置
-  security - 安全修复
-
-scope:
-  web      - 桌面端
-  mobile   - 手机端
-  api      - Netlify Functions
-  payment  - 支付服务
-  shared   - 共享包
-  db       - 数据库
-
-示例：
-  feat(web): 新增图像生成面板，接入 Gemini API
-  fix(api): 所有响应头补充 charset=utf-8，解决中文乱码
-  security(api): 把 API Key 从前端移到后端 Netlify Functions
-  refactor(shared): 把 api-client 抽取为独立 package
-  fix(mobile): 把 SafeAreaView 替换为 useSafeAreaInsets
-```
-
-**禁止的 commit message：**
-```
-错误："fix bug"
-错误："update"
-错误："修改了一些东西"
-错误："asdfgh"
-错误：空提交信息
-```
-
----
-
-### 16.9 编码与字符集规范（解决乱码问题）
-
-**所有文件必须使用 UTF-8 编码，无 BOM。**
-
-后端所有 Response 必须声明编码（这是解决乱码的根本）：
-```typescript
-// 所有 Netlify Function 的 return 必须带这个 header，缺一不可
-const COMMON_HEADERS = {
-  "Content-Type": "application/json; charset=utf-8",
-  "X-Content-Type-Options": "nosniff",
+module.exports = {
+  getOperationCost,
+  getUserCredits,
+  deductCredits,
+  refundCredits,
+  addCredits,
+  adminAdjustCredits,
 };
-```
+// ✅ 所有 AI 路由必须遵循此模式（以图像生成为例）
+const { getOperationCost, getUserCredits, deductCredits, refundCredits } = require("../lib/credits");
 
-Windows 开发环境（start.bat 第一行必须加）：
-```bat
-@echo off
-chcp 65001 >nul
-:: 65001 = UTF-8 代码页，解决 Windows cmd 中文乱码
-```
+router.post("/image", authMiddleware, async (req, res) => {
+  const { userId } = req;
+  const OPERATION_KEY = "image_generation"; // 与 api_cost_config 表的 operation_key 对应
+  let cost = 0;
+  let creditsDeducted = false;
 
-PowerShell 等效写法：
-```powershell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-```
+  try {
+    // ① 从数据库动态读取本次操作的积分消耗量（管理员可配置）
+    cost = await getOperationCost(OPERATION_KEY);
 
-**错误信息处理规则：**
-- 中文错误详情：只在后端 console.error，便于排查
-- 返回给前端的 Response body：只用英文，脱敏处理
-- 禁止用字符串拼接把 err.message 直接放进 Response body（可能含特殊字符引发乱码）
+    // ② 检查积分是否充足（友好提示）
+    const currentCredits = await getUserCredits(userId);
+    if (currentCredits < cost) {
+      return res.status(402).json({ error: "Insufficient credits. Please recharge." });
+    }
 
----
+    // ③ 先扣（在调用 AI 之前，原子操作防止负数）
+    const remaining = await deductCredits(userId, cost, OPERATION_KEY);
+    creditsDeducted = true;
 
-### 16.10 测试规范
+    // ④ 调用 Gemini AI
+    const imageDataUri = await callGemini(prompt, referenceBase64, aspectRatio);
 
-**测试文件位置：**
-```
-tests/
-├── unit/
-│   ├── web/          <- 桌面端单元测试
-│   ├── mobile/       <- 手机端单元测试
-│   └── shared/       <- 共享层单元测试
-├── integration/
-│   └── api/          <- API 集成测试（Netlify Functions）
-└── e2e/              <- 端到端测试（Playwright）
-```
+    // ⑤ 写入生成历史
+    await insertGenerationLog(userId, prompt, imageDataUri, "done");
 
-**必须覆盖的测试场景：**
-```typescript
-// 每个 Netlify Function 都必须有这些测试
-describe("generate-image handler", () => {
-  it("没有 token 时返回 401", async () => { ... });
-  it("prompt 为空时返回 400", async () => { ... });
-  it("正常调用返回 200 和图像数据", async () => { ... });
-  it("Gemini 失败时不向前端暴露内部错误", async () => { ... });
-  it("Response header 包含 charset=utf-8", async () => { ... });
+    return res.json({ image: imageDataUri, credits: remaining });
+
+  } catch (err) {
+    console.error("[图像生成失败]", { userId, error: err.message });
+
+    // ⑥ 失败退款（必须在 catch 里）
+    if (creditsDeducted) {
+      try {
+        await refundCredits(userId, cost, OPERATION_KEY);
+        console.log(`[退款成功] 用户 ${userId} 退回 ${cost} 积分`);
+      } catch (refundErr) {
+        // ⚠️ 退款失败绝不能 silent catch，必须告警人工介入
+        console.error("[严重] 退款失败！需要人工介入！", { userId, cost, refundErr });
+      }
+    }
+
+    await insertGenerationLog(userId, prompt, null, "failed").catch(console.error);
+
+    return res.status(500).json({
+      error: creditsDeducted ? "Generation failed. Credits refunded." : "Generation failed.",
+    });
+  }
 });
-```
+用户登录后，前端从 /api/user/me 接口获取 adminLevel 字段：
+- adminLevel === 0 → 不显示任何管理员入口
+- adminLevel === 1 或 2 → 在导航栏显示「管理后台」入口，跳转到 /admin
+// server/middleware/adminAuth.js
+// 职责：验证管理员权限，所有 /api/admin/* 路由必须经过此中间件
+// 使用方式：router.patch("/users/:id/admin-level", adminAuth(1), handler)
+//           router.get("/users", adminAuth(2), handler)
 
----
+const { verifyJWT } = require("../lib/jwt");
+const { getPool } = require("../lib/db");
 
-最后更新：2026-05-25 | 版本：v4.0（中文版）
-如有任何代码或文档与本文件冲突，以本文件为准。
+/**
+ * 管理员鉴权中间件工厂
+ * @param {number} requiredLevel - 最低需要的管理员级别（1 或 2）
+ */
+function adminAuth(requiredLevel) {
+  return async (req, res, next) => {
+    // ① 先验证 JWT
+    const userId = verifyJWT(req.headers.authorization);
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized." });
+    }
+
+    try {
+      // ② 从数据库实时查询管理员级别（不信任 JWT payload，防止降权后仍持有旧 token）
+      // 实时查数据库是必要的：如果管理员被降级，立即失效，不用等 token 过期
+      const pool = getPool();
+      const result = await pool.query(
+        "SELECT id, admin_level FROM public.users WHERE id = $1",
+        [userId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(401).json({ error: "User not found." });
+      }
+
+      const adminLevel = parseInt(result.rows[0].admin_level, 10);
+
+      // ③ 检查权限级别是否足够
+      if (adminLevel < requiredLevel) {
+        // 已登录但权限不足，返回 403（不是 401）
+        return res.status(403).json({ error: "Insufficient admin privileges." });
+      }
+
+      // ④ 将 userId 和 adminLevel 注入 req，供 handler 使用
+      req.userId = userId;
+      req.adminLevel = adminLevel;
+      next();
+
+    } catch (err) {
+      console.error("[管理员鉴权失败]", { userId, err: err.message });
+      return res.status(500).json({ error: "Auth check failed." });
+    }
+  };
+}
+
+module.exports = { adminAuth };
+// server/routes/admin.js
+// 职责：管理员后台所有 API，每个操作都有权限检查和完整日志
+
+const express = require("express");
+const router = express.Router();
+const { z } = require("zod");
+const { adminAuth } = require("../middleware/adminAuth");
+const { adminAdjustCredits, addCredits, getOperationCost } = require("../lib/credits");
+const { getPool } = require("../lib/db");
+
+// ────────────────────────────────────────────────────────
+// 充值管理：给用户直接加积分（Level 2+）
+// ────────────────────────────────────────────────────────
+const RechargeSchema = z.object({
+  amount: z.number().int().min(1).max(100000), // 单次充值上限，防止误操作
+  note: z.string().max(200).optional(),
+});
+
+router.post("/users/:id/recharge", adminAuth(2), async (req, res) => {
+  const parsed = RechargeSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid recharge amount." });
+
+  const { amount, note } = parsed.data;
+  try {
+    // 充值日志会记录操作人 ID（req.userId 由 adminAuth 中间件注入）
+    const newBalance = await addCredits(req.params.id, amount, "admin_recharge", req.userId);
+    console.log(`[管理员充值] 管理员 ${req.userId} 给用户 ${req.params.id} 充值 ${amount} 积分，备注：${note}`);
+    return res.json({ success: true, newBalance });
+  } catch (err) {
+    console.error("[管理员充值失败]", err);
+    return res.status(500).json({ error: "Recharge failed." });
+  }
+});
+
+// ────────────────────────────────────────────────────────
+// 积分管理：手动调整积分（Level 2+）
+// ────────────────────────────────────────────────────────
+const AdjustSchema = z.object({
+  delta: z.number().int().min(-100000).max(100000), // 正数加分，负数扣分
+  note: z.string().max(200).optional(),
+});
+
+router.patch("/users/:id/credits", adminAuth(2), async (req, res) => {
+  const parsed = AdjustSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid delta value." });
+
+  const { delta, note } = parsed.data;
+  try {
+    const newBalance = await adminAdjustCredits(req.params.id, delta, req.userId, note || "");
+    console.log(`[管理员调分] 管理员 ${req.userId} 调整用户 ${req.params.id} 积分 ${delta > 0 ? "+" : ""}${delta}，备注：${note}`);
+    return res.json({ success: true, newBalance });
+  } catch (err) {
+    console.error("[管理员调分失败]", err);
+    return res.status(500).json({ error: "Adjustment failed." });
+  }
+});
+
+// ────────────────────────────────────────────────────────
+// API 设置：查询当前定价配置（Level 2+）
+// ────────────────────────────────────────────────────────
+router.get("/api-config", adminAuth(2), async (req, res) => {
+  try {
+    const pool = getPool();
+    const result = await pool.query(
+      "SELECT operation_key, operation_name, cost, is_active FROM public.api_cost_config ORDER BY operation_key"
+    );
+    return res.json({ config: result.rows });
+  } catch (err) {
+    console.error("[API配置查询失败]", err);
+    return res.status(500).json({ error: "Failed to fetch config." });
+  }
+});
+
+// ────────────────────────────────────────────────────────
+// API 设置：修改定价（Level 2+）
+// ────────────────────────────────────────────────────────
+const ApiConfigSchema = z.object({
+  operation_key: z.enum(["image_generation", "image_edit", "chat"]),
+  cost: z.number().int().min(0).max(10000),
+});
+
+router.patch("/api-config", adminAuth(2), async (req, res) => {
+  const parsed = ApiConfigSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid config." });
+
+  const { operation_key, cost } = parsed.data;
+  try {
+    const pool = getPool();
+    await pool.query(
+      "UPDATE public.api_cost_config SET cost = $1, updated_at = NOW(), updated_by = $2 WHERE operation_key = $3",
+      [cost, req.userId, operation_key]
+    );
+    console.log(`[API配置] 管理员 ${req.userId} 将 ${operation_key} 定价修改为 ${cost} 积分`);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("[API配置修改失败]", err);
+    return res.status(500).json({ error: "Config update failed." });
+  }
+});
+
+// ────────────────────────────────────────────────────────
+// 人员管理：设置/取消管理员级别（Level 1 ONLY）
+// ────────────────────────────────────────────────────────
+const SetAdminSchema = z.object({
+  admin_level: z.number().int().min(0).max(2),
+  // 注意：目标用户的 admin_level 只能被设为 0 或 2
+  // 1 号超级管理员的级别不能通过 API 修改（防止误操作降级唯一超管）
+});
+
+router.patch("/users/:id/admin-level", adminAuth(1), async (req, res) => {
+  const parsed = SetAdminSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid admin level." });
+
+  const { admin_level } = parsed.data;
+
+  // 禁止将任何人设为 admin_level = 1（1 号超管只能在数据库里手动设置，防止接口被滥用）
+  if (admin_level === 1) {
+    return res.status(403).json({ error: "Cannot set admin_level to 1 via API. Use database directly." });
+  }
+
+  // 禁止操作自己的权限（防止超管意外降级自己）
+  if (req.params.id === req.userId) {
+    return res.status(403).json({ error: "Cannot modify your own admin level." });
+  }
+
+  try {
+    const pool = getPool();
+    const result = await pool.query(
+      "UPDATE public.users SET admin_level = $1, updated_at = NOW() WHERE id = $2 RETURNING email, admin_level",
+      [admin_level, req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    const levelName = admin_level === 2 ? "普通管理员" : "普通用户";
+    console.log(`[人员管理] 超级管理员 ${req.userId} 将用户 ${req.params.id}(${result.rows[0].email}) 设为 ${levelName}`);
+    return res.json({ success: true, adminLevel: admin_level });
+  } catch (err) {
+    console.error("[人员管理操作失败]", err);
+    return res.status(500).json({ error: "Operation failed." });
+  }
+});
+
+// ────────────────────────────────────────────────────────
+// 用户列表（Level 2+）
+// ────────────────────────────────────────────────────────
+router.get("/users", adminAuth(2), async (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, parseInt(req.query.limit) || 20);
+  const search = req.query.search || "";
+  const offset = (page - 1) * limit;
+
+  try {
+    const pool = getPool();
+    // 支持按邮箱模糊搜索
+    const result = await pool.query(
+      `SELECT id, email, credits, admin_level, created_at, updated_at
+       FROM public.users
+       WHERE email ILIKE $1
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [`%${search}%`, limit, offset]
+    );
+    const countResult = await pool.query(
+      "SELECT COUNT(*) FROM public.users WHERE email ILIKE $1",
+      [`%${search}%`]
+    );
+    return res.json({
+      users: result.rows,
+      total: parseInt(countResult.rows[0].count, 10),
+      page,
+      limit,
+    });
+  } catch (err) {
+    console.error("[用户列表查询失败]", err);
+    return res.status(500).json({ error: "Failed to fetch users." });
+  }
+});
+
+module.exports = router;
+// apps/web/src/pages/admin/AdminLayout.tsx
+// 职责：管理员后台公共布局，包含 Tab 导航和权限守卫
+// 用户 adminLevel 从全局 Context 获取（登录时已写入）
+
+// ✅ Tab 显示规则
+// - adminLevel >= 2：显示「充值管理」「积分管理」「API 设置」
+// - adminLevel === 1：额外显示「人员管理」
+// - adminLevel === 0：不应出现在此页面（路由守卫重定向到首页）
+
+// ✅ 路由守卫（必须实现）
+// 访问 /admin/* 时：
+// 1. 从 Context 取 user.adminLevel
+// 2. 如果 adminLevel === 0，立即 navigate("/")，不渲染任何内容
+// 3. 访问 /admin/staff 时，如果 adminLevel !== 1，navigate("/admin") 不渲染
+
+// ✅ 前端只负责 UI 展示，不做权限实质判断
+// 权限的最终判断在后端 adminAuth() 中间件完成
+// 前端的路由守卫只是 UX 层面的优化，不是安全措施
+// packages/api-client/src/api.ts 需要新增的管理员 API 函数
+
+export async function adminGetUsers(params: { page?: number; limit?: number; search?: string }, token: string) {
+  return apiFetch(`/admin/users?page=${params.page}&limit=${params.limit}&search=${params.search || ""}`, {}, token);
+}
+
+export async function adminRechargeUser(userId: string, amount: number, note: string, token: string) {
+  return apiFetch(`/admin/users/${userId}/recharge`, { method: "POST", body: JSON.stringify({ amount, note }) }, token);
+}
+
+export async function adminAdjustCredits(userId: string, delta: number, note: string, token: string) {
+  return apiFetch(`/admin/users/${userId}/credits`, { method: "PATCH", body: JSON.stringify({ delta, note }) }, token);
+}
+
+export async function adminGetApiConfig(token: string) {
+  return apiFetch("/admin/api-config", {}, token);
+}
+
+export async function adminUpdateApiConfig(operationKey: string, cost: number, token: string) {
+  return apiFetch("/admin/api-config", { method: "PATCH", body: JSON.stringify({ operation_key: operationKey, cost }) }, token);
+}
+
+export async function adminSetAdminLevel(userId: string, adminLevel: 0 | 2, token: string) {
+  return apiFetch(`/admin/users/${userId}/admin-level`, { method: "PATCH", body: JSON.stringify({ admin_level: adminLevel }) }, token);
+}
+// server/routes/user.js 的 GET /me 接口必须返回 admin_level
+// 前端依赖此字段决定是否显示管理员入口
+
+router.get("/me", authMiddleware, async (req, res) => {
+  const pool = getPool();
+  const result = await pool.query(
+    // ✅ 必须查询并返回 admin_level 字段
+    "SELECT id, email, credits, admin_level, created_at FROM public.users WHERE id = $1",
+    [req.userId]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: "User not found." });
+  const user = result.rows[0];
+  return res.json({
+    id: user.id,
+    email: user.email,
+    credits: parseInt(user.credits, 10),
+    adminLevel: parseInt(user.admin_level, 10), // ✅ 驼峰命名，前端统一使用 adminLevel
+    createdAt: user.created_at,
+  });
+});
+❌ 绝不：Access-Control-Allow-Origin: * + credentials: true
+✅ 正确：精确 Origin 白名单 + 动态反射匹配
+// server/lib/cors.js
+// 职责：提供统一 CORS Origin 验证逻辑，所有路由通过 cors 中间件使用此函数
+
+// 生产环境白名单（硬编码兜底）
+const PRODUCTION_ORIGINS = ["https://kkai.plus", "https://www.kkai.plus"];
+
+// 本地开发允许的 Origin 正则
+const LOCALHOST_PATTERN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
+function getAllowedOrigins() {
+  const envOrigins = (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  return envOrigins.length > 0 ? envOrigins : PRODUCTION_ORIGINS;
+}
+
+function originValidator(origin, callback) {
+  const allowed = getAllowedOrigins();
+  // 非浏览器请求（curl、Postman）：origin 为 undefined，服务端工具调用允许
+  if (!origin) { callback(null, true); return; }
+  // 精确匹配白名单 或 本地开发 localhost
+  if (allowed.includes(origin) || LOCALHOST_PATTERN.test(origin)) {
+    callback(null, true);
+  } else {
+    callback(new Error(`CORS 拒绝：Origin "${origin}" 不在白名单中`));
+  }
+}
+
+const corsOptions = {
+  origin: originValidator,
+  credentials: true,                           // ✅ 允许携带 Cookie / Authorization
+  allowedHeaders: ["Authorization", "Content-Type"],
+  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+};
+
+module.exports = { corsOptions };
+
+// server/index.js 使用：
+// const cors = require("cors");
+// const { corsOptions } = require("./lib/cors");
+// app.use(cors(corsOptions));
+// 通过 cors 中间件自动注入以下 header：
+// Access-Control-Allow-Origin: [精确 Origin]
+// Access-Control-Allow-Credentials: true
+// Vary: Origin
+
+// 所有路由额外添加：
+res.setHeader("X-Content-Type-Options", "nosniff");
+res.setHeader("X-Frame-Options", "DENY");
+// Content-Type 由 express.json() 自动设置
+// /webhook/stripe 不走普通 cors，因为请求方是 Stripe 服务器（无 Origin）
+// 此路由单独处理，不使用全局 cors 中间件
+router.post("/stripe", express.raw({ type: "application/json" }), (req, res) => {
+  // 必须用 express.raw 获取原始 Buffer，否则 Stripe 签名验证失败
+  ...
+});
+// ✅ 参数化查询（防 SQL 注入）
+await pool.query("SELECT credits FROM public.users WHERE id = $1", [userId]);
+
+// ❌ 字符串拼接（SQL 注入漏洞）
+await pool.query(`SELECT credits FROM public.users WHERE id = '${userId}'`);
+// server/lib/db.js
+// 职责：提供 PostgreSQL 连接池单例，统一管理数据库连接
+
+const { Pool } = require("pg");
+
+let pool = null;
+
+function getPool() {
+  if (!pool) {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      // 生产环境启用 SSL
+      ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+      max: 10,              // 连接池最大连接数
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    });
+    pool.on("error", (err) => {
+      console.error("[数据库连接池错误]", err.message);
+    });
+  }
+  return pool;
+}
+
+module.exports = { getPool };
+migrations/
+├── 001_create_users.sql
+├── 002_create_generations.sql
+├── 003_add_users_updated_at.sql
+└── ...（按序号递增，禁止修改已执行的历史文件）
+// ✅ 所有错误响应必须遵循此格式（英文，给前端展示）
+{ "error": "Insufficient credits. Please recharge." }
+
+// ✅ 成功响应：涉及积分的操作必须返回最新余额
+{ "image": "data:image/png;base64,...", "credits": 80 }
+// ✅ 错误日志带完整上下文（后端 console.error，中文）
+console.error("[模块 操作]", {
+  userId,
+  prompt: prompt?.substring(0, 100), // 截断防止日志过大
+  error: err instanceof Error ? err.message : String(err),
+  stack: process.env.NODE_ENV !== "production" ? err?.stack : undefined,
+});
+
+// ❌ 绝不 silent catch
+try { ... } catch (_) { }  // 禁止！
+// server/middleware/rateLimit.js
+// 职责：防止 API 被滥用，所有路由默认启用速率限制
+
+const rateLimit = require("express-rate-limit");
+
+// 通用速率限制：每 IP 每 15 分钟最多 100 次
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: "Too many requests. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// AI 生成专用速率限制：每 IP 每分钟最多 10 次（防盗刷）
+const generateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: "Generation rate limit exceeded. Please wait a moment." },
+});
+
+module.exports = { generalLimiter, generateLimiter };
+main           ← 生产分支，只接受 PR 合并
+  └─ feat/xxx  ← 新功能
+  └─ fix/xxx   ← 修复
+  └─ refactor/ ← 重构
+  └─ chore/    ← 依赖/配置更新
+┌─ 本地开发 ──────────────────────────────────┐
+│  npm run dev          → Vite dev server :5173 │
+│  cd server && node index.js → Express :8080   │
+│  .env: VITE_PUBLIC_API_BASE_URL=:8080/api     │
+└────────────────────────────────────────────────┘
+              ↓ git push → main
+
+┌─ GitHub Actions (.github/workflows/) ────────┐
+│  npm run verify:changes  (typecheck+test+build)│
+└────────────────────────────────────────────────┘
+              ↓ 通过
+
+┌─ Vercel（前端自动部署） ──────────────────────┐
+│  build: npm run build → apps/web/dist          │
+│  vercel.json: SPA 路由回退 /index.html         │
+│  环境变量: VITE_PUBLIC_API_BASE_URL            │
+└────────────────────────────────────────────────┘
+
+┌─ VPS（手动 or CI 部署） ──────────────────────┐
+│  cd server && npm install && pm2 restart all   │
+│  .env: 所有后端密钥                            │
+│  pm2 / systemd 保活                            │
+└────────────────────────────────────────────────┘
+// ❌ 禁止在 apps/web/ 中出现：
+import { View, Text } from "react-native";
+import { Platform } from "react-native";
+import { Image } from "expo-image";
+import { useRouter } from "expo-router";
+// ❌ 禁止任何 Netlify Functions 调用
+fetch("/.netlify/functions/xxx");
+// ✅ 所有 API 调用链路：
+// 页面组件 → src/services/*.ts → packages/api-client → VPS
+// 不得在页面组件中直接写 fetch
+
+// src/services/generate.ts 示例：
+import { generateImage } from "@nano-banana/api-client";
+export function useGenerate() {
+  return useMutation({ mutationFn: generateImage });
+}
+// ✅ 手机端同样通过 packages/api-client 调用 VPS
+// api-client 内 baseURL 自动区分环境：
+// - Expo: process.env.EXPO_PUBLIC_API_BASE_URL
+// - Vite: import.meta.env.VITE_PUBLIC_API_BASE_URL
+// ❌ 禁止在 apps/mobile/ 中出现：
+window.location.href = "...";
+document.getElementById("...");
+import { BrowserRouter } from "react-router-dom";
+// ❌ 禁止 Netlify 相关任何内容
+// ✅ 可以放 shared/
+export type GenerateImageRequest = {
+  prompt: string;
+  aspectRatio: "1:1" | "16:9" | "9:16";
+};
+
+// ❌ 禁止放 shared/（含平台依赖）
+import { Platform } from "react-native";  // RN 平台 API
+import { useState } from "react";         // React Hook
+window.localStorage.setItem(...);         // DOM API
+// packages/api-client/src/client.ts
+// 职责：baseURL 智能解析（这是全项目唯一写 baseURL 逻辑的地方）
+
+function getBaseUrl(): string {
+  // ① 手机端（Expo Runtime）
+  if (typeof process !== "undefined" && process.env.EXPO_PUBLIC_API_BASE_URL) {
+    return process.env.EXPO_PUBLIC_API_BASE_URL;
+  }
+  // ② 桌面端（Vite 构建注入）
+  if (typeof import.meta !== "undefined" && import.meta.env?.VITE_PUBLIC_API_BASE_URL) {
+    return import.meta.env.VITE_PUBLIC_API_BASE_URL;
+  }
+  // ③ 本地开发默认（VPS 本地实例）
+  return "http://localhost:8080/api";
+}
+
+async function apiFetch(path: string, options?: RequestInit, token?: string) {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...options?.headers,
+  };
+  const res = await fetch(`${getBaseUrl()}${path}`, { ...options, headers });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw Object.assign(new Error(body.error || "Request failed"), { status: res.status });
+  }
+  return res.json();
+}
+// server/index.js
+// 职责：VPS 服务入口，挂载所有路由，初始化中间件，启动 Express
+
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, ".env") });
+
+// ① 启动时检查所有必需密钥
+const REQUIRED_ENVS = ["GEMINI_API_KEY", "OPENAI_API_KEY", "JWT_SECRET",
+  "PASSWORD_SALT", "DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"];
+for (const key of REQUIRED_ENVS) {
+  if (!process.env[key]) throw new Error(`[严重] ${key} 未配置，服务拒绝启动`);
+}
+
+const express = require("express");
+const cors = require("cors");
+const { corsOptions } = require("./lib/cors");
+const { generalLimiter, generateLimiter } = require("./middleware/rateLimit");
+
+// 路由模块
+const authRouter = require("./routes/auth");
+const generateRouter = require("./routes/generate-image");
+const chatRouter = require("./routes/chat");
+const userRouter = require("./routes/user");
+const billingRouter = require("./routes/billing");
+const generationsRouter = require("./routes/generations");
+const webhookRouter = require("./routes/webhook"); // ⚠️ 必须在 express.json 之前挂载
+const adminRouter = require("./routes/admin");
+
+const app = express();
+app.disable("x-powered-by");
+
+// ② Stripe Webhook 路由必须在 JSON 解析中间件之前注册（需要原始 Buffer）
+app.use("/webhook/stripe", express.raw({ type: "application/json" }), webhookRouter);
+
+// ③ 全局中间件
+app.use(cors(corsOptions));
+app.use(express.json({ limit: "10mb" })); // 图像 base64 体积大，需放宽限制
+app.use(express.urlencoded({ extended: true }));
+app.use(generalLimiter);
+
+// ④ API 路由
+app.use("/api/auth", authRouter);
+app.use("/api/generate", generateLimiter, generateRouter); // AI 生成额外限速
+app.use("/api/chat", chatRouter);
+app.use("/api/user", userRouter);
+app.use("/api/billing", billingRouter);
+app.use("/api/generations", generationsRouter);
+app.use("/api/admin", adminRouter);
+
+// ⑤ 兜底 404
+app.use((req, res) => {
+  res.status(404).json({ error: "Endpoint not found." });
+});
+
+// ⑥ 全局错误处理
+app.use((err, req, res, next) => {
+  console.error("[未捕获异常]", err);
+  res.status(500).json({ error: "Internal server error." });
+});
+
+const PORT = Number(process.env.PORT || 8080);
+app.listen(PORT, () => {
+  console.log(`[KK-API] VPS 服务已启动，端口 :${PORT}`);
+});
+// ❌ 引用已废弃的 Netlify
+import { Handler } from "@netlify/functions";
+fetch("/.netlify/functions/generate-image");
+// netlify.toml 中的任何配置
+
+// ❌ 在 Vercel 上实现 API 路由（Vercel 只托管前端静态资源）
+// vercel.json 中加 /api/* → serverless function 映射
+// ❌ 硬编码密钥兜底
+const JWT_SECRET = process.env.JWT_SECRET || "my-fallback-secret";
+
+// ❌ 前端直连 AI API
+fetch("https://generativelanguage.googleapis.com/v1beta/...", { key: GEMINI_KEY });
+
+// ❌ CORS 通配符 + Authorization（浏览器拒绝）
+res.setHeader("Access-Control-Allow-Origin", "*");
+res.setHeader("Access-Control-Allow-Headers", "Authorization");
+// ❌ 错误模型名
+model: "gemini-pro-vision"        // → "gemini-2.5-flash-image"
+model: "gemini-2.5-flash"         // → "gemini-2.5-flash-image"
+
+// ❌ 字符串代替枚举
+responseModalities: ["IMAGE"]     // → [Modality.IMAGE, Modality.TEXT]
+
+// ❌ aspectRatio 位置错误
+config: { aspectRatio: "16:9" }   // → config: { imageConfig: { aspectRatio: "16:9" } }
+
+// ❌ 参考图带 data URI 前缀
+inlineData: { data: "data:image/png;base64,..." } // 先 .replace() 去前缀
+// ❌ 前端直接修改积分（不经过后端）
+localStorage.setItem("credits", 99999);     // 无效，前端只是展示层
+userStore.credits = 99999;                   // 同上，后端不知情
+
+// ❌ JWT payload 里存管理员级别并信任它
+const { adminLevel } = decodeJWT(token);
+if (adminLevel >= 2) { ... }                 // 不安全！必须从数据库实时查
+
+// ❌ 2 号管理员操作人员权限
+router.patch("/users/:id/admin-level", adminAuth(2), handler); // 错误：应为 adminAuth(1)
+
+// ❌ 允许通过 API 将用户设为 1 号超管
+if (admin_level === 1) { /* 设置 */ }        // 1 号超管只能在数据库直接设置
+
+// ❌ 积分调整允许变为负数
+"UPDATE users SET credits = credits + $1"    // 缺少 GREATEST(0, ...) 保护
+
+// ❌ 管理员操作不留痕
+await pool.query("UPDATE users SET credits = ...");  // 未写 credit_logs，无法审计
+
+// ❌ 硬编码积分消耗量
+const COST = 10;                             // 应通过 getOperationCost("image_generation") 动态读取
+// ❌ 注册时赠送积分
+await pool.query("INSERT INTO users (credits) VALUES (100)");  // 应为 0
+
+// ❌ 积分扣减不用动态配置
+const cost = isEdit ? 15 : 10;              // 硬编码！应从 api_cost_config 表读取
+
+// ❌ 先调 API 后扣积分
+const result = await callGemini();
+await deductCredits(userId, cost);           // 如果扣减失败，用户白嫖
+
+// ❌ 退款失败 silent catch
+try { await refundCredits(); } catch (_) {} // 禁止！退款失败必须告警
+// ❌ SQL 字符串拼接
+pool.query(`SELECT * FROM users WHERE id = '${userId}'`);
+
+// ❌ 直接修改 schema（不走 migrations）
+pool.query("ALTER TABLE users ADD COLUMN ...");
+// ❌ 手机端 DOM API
+document.getElementById("...");        // apps/mobile/ 禁用
+
+// ❌ 桌面端 RN 组件
+import { View } from "react-native";   // apps/web/ 禁用
+
+// ❌ shared/ 含平台代码
+import { Platform } from "react-native"; // packages/shared/ 禁用
