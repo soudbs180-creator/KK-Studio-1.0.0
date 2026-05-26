@@ -197,7 +197,7 @@ const WechatQrModal: React.FC<WechatQrModalProps> = ({
 
         mountNode.innerHTML = '';
         const customCss = `
-          .impowerBox .qrcode { width: 280px !important; height: 280px !important; margin: 20px auto !important; border-radius: 16px !important; }
+          .impowerBox .qrcode { width: 320px !important; height: 320px !important; margin: 20px auto !important; border-radius: 24px !important; }
           .impowerBox .title { display: none !important; }
           .impowerBox .info { display: none !important; }
           .status_icon { display: none !important; }
