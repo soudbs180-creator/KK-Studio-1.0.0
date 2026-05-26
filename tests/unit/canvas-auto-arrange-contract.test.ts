@@ -104,12 +104,12 @@ test('resolveCanvasAutoArrangePositions preserves normal, follow-up, orphan, and
   const positions = resolveCanvasAutoArrangePositions(source);
 
   assert.deepEqual(positions['prompt-1'], { x: -1840, y: 400 });
-  assert.deepEqual(positions['image-1'], { x: -1840, y: 776 });
+  assert.deepEqual(positions['image-1'], { x: -1840, y: 819 });
   assert.deepEqual(positions['prompt-2'], { x: -1464, y: 400 });
-  assert.deepEqual(positions['image-2'], { x: -1464, y: 776 });
-  assert.deepEqual(positions['image-4'], { x: -1484, y: 776 });
-  assert.deepEqual(positions['prompt-3'], { x: -1840, y: 1266 });
-  assert.deepEqual(positions['image-3'], { x: -1840, y: 1642 });
+  assert.deepEqual(positions['image-2'], { x: -1464, y: 819 });
+  assert.deepEqual(positions['image-4'], { x: -1484, y: 819 });
+  assert.deepEqual(positions['prompt-3'], { x: -1840, y: 1309 });
+  assert.deepEqual(positions['image-3'], { x: -1840, y: 1728 });
 });
 
 test('resolveCanvasAutoArrangePositions places ecommerce framework workbench to the right of its card groups', async () => {

@@ -149,8 +149,8 @@ test('arrangeSingleSelectedPromptChildren lays out one selected prompt children 
   assert.equal(result?.subCardLayoutMode, 'row');
   assert.equal(result?.canvas.lastModified, 123);
   assert.deepEqual(result?.canvas.imageNodes.map((image) => [image.id, image.position]), [
-    ['image-1', { x: 344, y: 476 }],
-    ['image-2', { x: 656, y: 476 }],
+    ['image-1', { x: 344, y: 519 }],
+    ['image-2', { x: 656, y: 519 }],
     ['image-3', { x: 1, y: 2 }],
   ]);
 });
@@ -178,8 +178,8 @@ test('arrangeSingleSelectedPromptChildren forces PPT prompts into column layout'
 
   assert.equal(result?.subCardLayoutMode, 'column');
   assert.deepEqual(result?.canvas.imageNodes.map((image) => [image.id, image.position]), [
-    ['image-1', { x: 500, y: 476 }],
-    ['image-2', { x: 500, y: 828 }],
+    ['image-1', { x: 500, y: 519 }],
+    ['image-2', { x: 500, y: 914 }],
   ]);
 });
 
@@ -281,12 +281,12 @@ test('arrangeSelectedGroupedNodes lays out a selected prompt child group', async
   assert.equal(result?.subCardLayoutMode, 'row');
   assert.equal(result?.canvas.lastModified, 127);
   assert.deepEqual(result?.canvas.promptNodes.map((prompt) => [prompt.id, prompt.position]), [
-    ['prompt-1', { x: 500, y: 112 }],
+    ['prompt-1', { x: 500, y: 90.5 }],
     ['prompt-2', { x: 900, y: 200 }],
   ]);
   assert.deepEqual(result?.canvas.imageNodes.map((image) => [image.id, image.position]), [
-    ['image-1', { x: 344, y: 488 }],
-    ['image-2', { x: 656, y: 488 }],
+    ['image-1', { x: 344, y: 509.5 }],
+    ['image-2', { x: 656, y: 509.5 }],
     ['image-3', { x: 1000, y: 600 }],
   ]);
 });

@@ -1,7 +1,7 @@
 import type { CanvasCardDetailLevel } from '../canvas/performanceProfile';
 import { buildDockedVerticalConnectorPath } from '../canvas/connectorGeometry';
 import type { GeneratedImage, PromptNode } from '../types';
-import { getCardDimensions } from '../utils/styleUtils';
+import { getCardDimensions, FOOTER_HEIGHT } from '../utils/styleUtils';
 import type {
   Point,
   PromptGroupLayoutPresentationState,
@@ -32,7 +32,7 @@ function resolveChildImageHeight(childNode: GeneratedImage, renderedWidth: numbe
       const width = parseInt(match[1], 10);
       const height = parseInt(match[2], 10);
       if (width > 0 && height > 0) {
-        imageHeight = (renderedWidth / (width / height)) + 40;
+        imageHeight = (renderedWidth / (width / height)) + FOOTER_HEIGHT;
       }
     }
   }

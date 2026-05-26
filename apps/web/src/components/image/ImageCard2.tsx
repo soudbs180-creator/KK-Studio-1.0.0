@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { type GeneratedImage, GenerationMode, ImageSize } from '../../types';
 import { Download, Trash2, Loader2, ImageOff, Play, Pause, Music } from 'lucide-react';
-import { getCardDimensions } from '../../utils/styleUtils';
+import { getCardDimensions, FOOTER_HEIGHT } from '../../utils/styleUtils';
 import { getLaunchTimelineByOffset, getPromptBarLaunchPoint } from '../../utils/cardLaunch';
 import { generateTagColor } from '../../utils/colorUtils';
 import { getImage, getStrictOriginalImage } from '../../services/storage/imageStorage';
@@ -306,7 +306,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     const aspect = w / h;
                     const { width: realWidth } = getCardDimensions(image.aspectRatio, false);
                     finalWidth = realWidth;
-                    finalHeight = (realWidth / aspect) + 40; // 40px for footer
+                    finalHeight = (realWidth / aspect) + FOOTER_HEIGHT; // 40px for footer
                 }
             }
         }
@@ -318,8 +318,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const originX = renderOrigin?.x ?? 0;
     const originY = renderOrigin?.y ?? 0;
 
+    const lastImageIdRef = useRef(image.id);
     useEffect(() => {
-        setCardHeight((prev) => (Math.abs(prev - nodeHeight) > 2 ? nodeHeight : prev));
+        if (lastImageIdRef.current !== image.id) {
+            lastImageIdRef.current = image.id;
+            setCardHeight(nodeHeight);
+        }
     }, [image.id, nodeHeight]);
 
     // Local display position to avoid global re-renders during drag
