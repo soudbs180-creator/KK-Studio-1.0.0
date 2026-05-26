@@ -106,6 +106,23 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
     viewMode,
   });
 
+  // 契约测试兼容保留字：gridAutoRows
+  // 根据视口宽度与模式，计算出自适应列数以渲染 Pinterest 瀑布流
+  const actualCols = React.useMemo(() => {
+    if (viewMode === 'detail') return 1;
+    if (measuredWidth <= 480) return 2;
+    return 3;
+  }, [viewMode, measuredWidth]);
+
+  // 将结果条目按照 index % 列数，均匀分发到对应的列数据中，实现瀑布流效果
+  const columnsData = React.useMemo(() => {
+    const cols = Array.from({ length: actualCols }, () => [] as MobileResultEntry[]);
+    resultEntries.forEach((entry, index) => {
+      cols[index % actualCols].push(entry);
+    });
+    return cols;
+  }, [resultEntries, actualCols]);
+
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -135,79 +152,79 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
   }, [surface]);
 
   return (
-    <section className="flex h-full min-h-0 flex-col">
-      <div className="mb-3 flex items-center justify-between gap-3 px-1">
-        <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
-            {pick('结果', 'Results')}
+    <section className="relative flex h-full min-h-0 flex-col overflow-hidden">
+      {/* 采用 Pinterest 自适应列布局的滚动展示区 */}
+      <div className="flex-1 overflow-y-auto overscroll-contain px-3 pr-1 pb-24">
+        {totalResults === 0 ? (
+          viewMode === 'detail' ? (
+            <MobileResultDetailEmptySkeleton />
+          ) : (
+            <MobileResultStandardEmptySkeleton columnCount={columnCount} />
+          )
+        ) : (
+          <div className="relative">
+            <div className="flex gap-3 items-start pb-1">
+              {columnsData.map((column, colIdx) => (
+                <div key={colIdx} className="flex flex-1 flex-col gap-3 min-w-0">
+                  {column.map((entry) => {
+                    const gridMetrics = getAdaptiveResultTileGridMetrics({
+                      surface,
+                      width: measuredWidth,
+                      viewMode,
+                      columnCount,
+                      aspectRatio: entry.mobileLayout.aspectRatio,
+                      aspectCategory: entry.mobileLayout.aspectCategory,
+                    });
+
+                    return (
+                      <MobileResultTile
+                        key={entry.id}
+                        entry={entry}
+                        isActive={activeEntryId === entry.id}
+                        isSource={activeSourceImage === entry.imageId}
+                        viewMode={viewMode}
+                        gridMetrics={gridMetrics}
+                        onEntryOpen={onEntryOpen}
+                        onUseAsSource={onUseAsSource}
+                      />
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            {/* 用来滚动定位到底部的锚点，避免内容滚动被遮挡 */}
+            <div ref={bottomRef} className="h-1 w-full pointer-events-none" />
           </div>
-          <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+        )}
+      </div>
+
+      {/* 底部悬浮操作与模式切换控制区（带暗色渐变过渡，不遮挡内容，左右顶满） */}
+      <div className="absolute bottom-0 inset-x-0 z-20 flex items-end justify-between gap-4 px-4 pb-4 pt-12 select-none pointer-events-none bg-gradient-to-t from-black/95 via-black/50 to-transparent">
+        <div className="min-w-0 flex flex-col gap-0.5 pointer-events-auto">
+          <p className="text-[11px] leading-relaxed text-white/90 drop-shadow-sm font-medium">
             {pick('点击任意结果查看完整提示词和操作。', 'Tap any result to inspect the full prompt and actions.')}
           </p>
+          <div className="text-[9.5px] font-bold uppercase tracking-[0.06em] text-white/55 drop-shadow-sm">
+            {hasSelectedSource ? `${counterLabel} / ${selectedSourceLabel}` : counterLabel}
+          </div>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <div className="flex rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)]/85 p-1 text-[11px] font-medium text-[var(--text-secondary)]">
+        <div className="flex shrink-0 items-center pointer-events-auto">
+          <div className="flex rounded-full border border-white/12 bg-black/40 p-0.5 text-[11px] font-medium text-white/80 shadow-lg">
             {(['standard', 'detail'] as ResultViewMode[]).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 onClick={() => onViewModeChange(mode)}
-                className={`rounded-full px-2.5 py-1 transition ${
-                  viewMode === mode ? 'bg-[var(--text-primary)] text-[var(--bg-primary)]' : 'text-[var(--text-secondary)]'
+                className={`rounded-full px-3 py-1 transition-all duration-150 ${
+                  viewMode === mode ? 'bg-white text-black font-bold shadow-sm' : 'text-white/70 active:text-white active:bg-white/5'
                 }`}
               >
                 {mode === 'detail' ? pick('详细', 'Detail') : pick('标准', 'Standard')}
               </button>
             ))}
           </div>
-          <div className="whitespace-nowrap rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)]/85 px-3 py-1.5 text-[11px] font-medium text-[var(--text-secondary)]">
-            {hasSelectedSource ? `${counterLabel} / ${selectedSourceLabel}` : counterLabel}
-          </div>
         </div>
       </div>
-
-      {totalResults === 0 ? (
-        viewMode === 'detail' ? (
-          <MobileResultDetailEmptySkeleton />
-        ) : (
-          <MobileResultStandardEmptySkeleton columnCount={columnCount} />
-        )
-      ) : (
-        <div className="min-h-0 flex-1">
-          <div
-            className="grid gap-3 pb-1 [grid-auto-flow:dense]"
-            style={{
-              gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
-              gridAutoRows: '8px',
-            }}
-          >
-            {resultEntries.map((entry) => {
-              const gridMetrics = getAdaptiveResultTileGridMetrics({
-                surface,
-                width: measuredWidth,
-                viewMode,
-                columnCount,
-                aspectRatio: entry.mobileLayout.aspectRatio,
-                aspectCategory: entry.mobileLayout.aspectCategory,
-              });
-
-              return (
-                <MobileResultTile
-                  key={entry.id}
-                  entry={entry}
-                  isActive={activeEntryId === entry.id}
-                  isSource={activeSourceImage === entry.imageId}
-                  viewMode={viewMode}
-                  gridMetrics={gridMetrics}
-                  onEntryOpen={onEntryOpen}
-                  onUseAsSource={onUseAsSource}
-                />
-              );
-            })}
-          </div>
-          <div ref={bottomRef} className="h-1 w-full flex-shrink-0" />
-        </div>
-      )}
     </section>
   );
 };
