@@ -213,7 +213,8 @@ export const AuthenticatedAppShell: React.FC<AuthenticatedAppShellProps> = ({
   const showStartupRuntimeBanner = showStartupBanner && !isBackgroundReady;
 
   if (loading) {
-    return <AppStartupScreen stage="session_ready" warning={sessionRecoveryWarning} />;
+    // 简体中文注释：登录态检测期间直接显示纯黑占位，不使用大型进度条，秒进登录页面
+    return <div className="fixed inset-0 bg-[#09090b]" />;
   }
 
   if (shouldShowLoginForAuthGate({ user, session, isTempUser })) {

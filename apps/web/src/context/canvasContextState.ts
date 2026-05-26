@@ -71,6 +71,8 @@ export interface CanvasContextType {
     updateGroup: (group: CanvasGroup) => void;
     setNodeTags: (ids: string[], tags: string[]) => void;
     isReady: boolean;
+    isLoading: boolean;
+    loadingProgress: number;
     setViewportCenter: (center: { x: number; y: number }) => void;
     migrateNodes: (nodeIds: string[], targetCanvasId: string) => void;
     mergeCanvasInto: (sourceCanvasId: string, targetCanvasId: string, options?: { deleteSource?: boolean }) => {

@@ -73,35 +73,13 @@
         })();
     </script>
     <div id="root">
-        <!-- 简体中文注释：静态高保真极简加载进度条，在 React 挂载前展示，挂载后会被 AppStartupScreen 替换 -->
-        <div class="app-startup-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100dvh; overflow: hidden; padding: 32px; background: #09090b; transition: opacity 0.3s ease;">
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; width: 100%; max-width: 280px;">
-                <!-- 进度数字：初始显示 99% 并在 React 未加载时由进度条补充动感 -->
-                <div style="font-size: 36px; font-weight: 600; color: #f4f4f5; letter-spacing: -0.02em;">99%</div>
-                <!-- 极细渐变进度条：珊瑚橙到粉红渐变色 -->
-                <div style="width: 100%; height: 6px; border-radius: 9999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; position: relative;">
-                    <div style="height: 100%; width: 0%; background: linear-gradient(90deg, #6366f1, #ec4899); border-radius: 9999px; animation: progress-fill 1.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;"></div>
-                </div>
-                <!-- 正在载入文本 -->
-                <p style="margin: 0; font-size: 13px; font-weight: 500; color: #a1a1aa; opacity: 0.8; animation: pulse-text 1.5s ease-in-out infinite;">正在载入创作空间...</p>
-            </div>
+        <!-- 简体中文注释：静态极简加载圆环，在 React 挂载前展示 -->
+        <div class="app-startup-screen" style="display: flex; align-items: center; justify-content: center; min-height: 100dvh; background: #09090b;">
+            <div class="spinner" style="width: 24px; height: 24px; border: 2px solid rgba(56, 189, 248, 0.2); border-top-color: rgb(56, 189, 248); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
         </div>
         <style>
-            @keyframes progress-fill {
-                0% { width: 0%; }
-                100% { width: 99%; }
-            }
-            @keyframes pulse-text {
-                0%, 100% { opacity: 0.5; }
-                50% { opacity: 0.8; }
-            }
-            .dark-mode .app-startup-screen {
-                --text-primary: #f4f4f5;
-                --text-secondary: #a1a1aa;
-            }
-            body:not(.dark-mode) .app-startup-screen {
-                --text-primary: #18181b;
-                --text-secondary: #71717a;
+            @keyframes spin {
+                to { transform: rotate(360deg); }
             }
         </style>
     </div>

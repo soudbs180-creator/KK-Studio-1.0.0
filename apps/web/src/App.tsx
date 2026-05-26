@@ -337,6 +337,8 @@ const AppContent: React.FC<AppContentProps> = () => {
     updateWorkflowNodePosition,
     deleteWorkflowNode,
     isReady,
+    isLoading,
+    loadingProgress,
     setViewportCenter, // 🎯 视口中心动态优先级
     state, // 🎯 迁移功能需要访问 canvases 列表
     migrateNodes, // 🎯 迁移节点到其他项目
@@ -4842,6 +4844,30 @@ const AppContent: React.FC<AppContentProps> = () => {
         );
       })()} */}
 
+
+      {isLoading && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-[320px] rounded-2xl border border-white/10 bg-[#121214]/90 p-6 shadow-2xl backdrop-blur-xl">
+            {/* 简体中文注释：标题文字 */}
+            <div className="mb-4 text-sm font-medium text-white/95 text-left">
+              正在加载画布
+            </div>
+            <div className="flex items-center gap-3">
+              {/* 简体中文注释：淡蓝色进度条轨道 */}
+              <div className="h-2 flex-1 rounded-full bg-white/10 overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-sky-400 transition-all duration-300 ease-out" 
+                  style={{ width: `${loadingProgress}%` }}
+                />
+              </div>
+              {/* 简体中文注释：进度百分比数值 */}
+              <span className="min-w-[42px] text-right text-sm font-semibold text-sky-400">
+                {loadingProgress}%
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
     </WorkspaceShell>
   );

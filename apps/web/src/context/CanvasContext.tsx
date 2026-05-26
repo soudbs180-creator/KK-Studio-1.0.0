@@ -144,6 +144,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const { user, session, isTempUser } = useAuth();
     const { isStageReady } = useAppStartup();
     const [isLoading, setIsLoading] = useState(true);
+    const [loadingProgress, setLoadingProgress] = useState(0);
     const [isShellReady, setIsShellReady] = useState(false);
     const [state, setState] = useState<CanvasState>(DEFAULT_STATE);
 
@@ -264,7 +265,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
     }, []);
 
-    const hydrateStartupPreviewImages = useCallback(async (startupState: CanvasState) => {
+    const hydrateStartupPreviewImages = useCallback(async (startupState: CanvasState, onProgress?: (pct: number) => void) => {
+        // 简体中文注释：通知图片加载已开始
+        onProgress?.(30);
         console.log('[CanvasContext] Starting optimized image loading...');
 
         // Collect the image IDs required by the current state.
@@ -340,6 +343,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }
         }
 
+        // 简体中文注释：生成图加载完成，进度推进至 45%
+        onProgress?.(45);
+
         const imageIdsArray = Array.from(referenceImageIds);
 
         if (generatedImageIds.size > MAX_GENERATED_LOAD) {
@@ -363,6 +369,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     finalHydrationMap.set(id, url);
                 }
             });
+
+            // 简体中文注释：根据批次计算真实的参考图加载进度百分比（从 45% 爬升至 80%）
+            const batchPct = 45 + Math.round((Math.min(i + BATCH_SIZE, imageIdsArray.length) / Math.max(imageIdsArray.length, 1)) * 35);
+            onProgress?.(batchPct);
 
             console.log(`[CanvasContext] Loaded batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(imageIdsArray.length / BATCH_SIZE)} (${imageMap.size}/${imageIdsArray.length})`);
         }
@@ -402,10 +412,15 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
         });
 
+        let migratedCount = 0;
         for (const img of imagesToMigrate) {
             await saveImage(img.id, img.url);
             imageMap.set(img.id, img.url);
             finalHydrationMap.set(img.id, img.url);
+            migratedCount++;
+            // 简体中文注释：迁移图存储进度计算（从 80% 爬升至 90%）
+            const migratePct = 80 + Math.round((migratedCount / imagesToMigrate.length) * 10);
+            onProgress?.(migratePct);
         }
 
         if (needsMigration) {
@@ -415,6 +430,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (finalHydrationMap.size > 0) {
             applyStartupHydratedImages(finalHydrationMap);
         }
+        // 简体中文注释：图片载入及迁移全流程完毕，更新至 90%
+        onProgress?.(90);
     }, [applyStartupHydratedImages]);
 
     // Load image URLs from IndexedDB AND Restore Folder Handle
@@ -422,6 +439,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!isShellReady) return;
 
         const init = async () => {
+            // 简体中文注释：初始进度设为 10%
+            setLoadingProgress(10);
             await traceLocalPerformance('canvas-startup.restore-total', async () => {
                 const restoredState = traceLocalPerformance('canvas-startup.restore-local-state', () => restoreCanvasStateFromLocalStorage(STORAGE_KEY));
                 const startupState = restoredState
@@ -433,8 +452,12 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         setState(startupState);
                     });
                 }
+                // 简体中文注释：恢复初始状态完成，进度设为 20%
+                setLoadingProgress(20);
 
-                const startupImageHydrationPromise = traceLocalPerformance('canvas-startup.preview-hydration', () => hydrateStartupPreviewImages(startupState));
+                const startupImageHydrationPromise = traceLocalPerformance('canvas-startup.preview-hydration', () => 
+                    hydrateStartupPreviewImages(startupState, (pct) => setLoadingProgress(pct))
+                );
 
             try {
                 // 1. Restore Local Folder Handle (Fix for 0B issue)
@@ -446,6 +469,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         const perm = await handle.queryPermission({ mode: 'readwrite' });
                         if (perm === 'granted') {
                             logInfo('CanvasContext', '已恢复本地文件夹', `folder: ${handle.name}`);
+                            // 简体中文注释：检测到文件夹权限已恢复，设置进度为 92% 并开始磁盘加载
+                            setLoadingProgress(92);
 
                             // [NEW] Load actual project data from disk to ensure sync
                             // This overrides localStorage state with the true file state
@@ -518,6 +543,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                         setState(prev => ({ ...prev, fileSystemHandle: handle, folderName: handle.name }));
                                     });
                                 }
+                                // 简体中文注释：磁盘工程数据载入完成，进度推进至 98%
+                                setLoadingProgress(98);
                             } catch (err) {
                                 console.error('Failed to load project from restored handle', err);
                                 // Fallback just connect
@@ -543,7 +570,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 } catch (error) {
                     console.error('Failed to load startup preview images:', error);
                 }
-                setIsLoading(false);
+                // 简体中文注释：所有核心加载任务均完毕，设定进度为 100% 并延迟 300ms 关闭加载状态
+                setLoadingProgress(100);
+                setTimeout(() => {
+                    setIsLoading(false);
+                }, 300);
             }
             });
         };
@@ -2543,6 +2574,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updateGroup,
         setNodeTags,
         isReady: isShellReady,
+        isLoading,
+        loadingProgress,
         setViewportCenter,
         migrateNodes,
         mergeCanvasInto,
@@ -2556,7 +2589,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         deleteImageNode, deletePromptNode, linkNodes, unlinkNodes, clearAllData, canCreateCanvas,
         undo, redo, pushToHistory, canUndo, canRedo, arrangeAllNodes, getNextCardPosition,
         connectLocalFolder, disconnectLocalFolder, changeLocalFolder, refreshLocalFolder,
-        isShellReady, selectNodes, clearSelection, bringNodesToFront, moveSelectedNodes, moveSelectedNodesImmediate, findSmartPosition, findNextGroupPosition, addGroup, removeGroup, updateGroup, setNodeTags, setViewportCenter, migrateNodes, mergeCanvasInto, cleanupInvalidCards, urgentUpdatePromptNode
+        isShellReady, isLoading, loadingProgress, selectNodes, clearSelection, bringNodesToFront, moveSelectedNodes, moveSelectedNodesImmediate, findSmartPosition, findNextGroupPosition, addGroup, removeGroup, updateGroup, setNodeTags, setViewportCenter, migrateNodes, mergeCanvasInto, cleanupInvalidCards, urgentUpdatePromptNode
     ]);
 
     return (
