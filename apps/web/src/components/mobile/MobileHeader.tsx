@@ -30,7 +30,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
     userAvatarUrl,
     userRole = 'user',
 }) => {
-    const iconButtonClass = 'h-10 w-10 rounded-2xl flex items-center justify-center border transition-all active:scale-95';
+    const iconButtonClass = 'h-14 w-14 rounded-[20px] flex items-center justify-center border transition-all active:scale-95';
     const handleRechargeClick = onRechargeClick ?? onBillingClick;
     const avatarFallback = userName?.trim()?.[0]?.toUpperCase() || 'U';
     const balanceDisplay = balanceLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');
@@ -51,7 +51,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                         type="button"
                         onClick={onUserClick}
                         aria-label="\u6253\u5f00\u4e2a\u4eba\u4e2d\u5fc3"
-                        className="flex min-w-0 flex-1 items-center gap-3 rounded-[22px] border px-2.5 py-2.5 text-left transition-[background-color,border-color]"
+                        className="flex h-14 min-w-0 flex-1 items-center gap-3 rounded-[20px] border px-3 text-left transition-[background-color,border-color]"
                         style={{
                             background: 'var(--mobile-clay-surface-bg)',
                             borderColor: 'var(--mobile-clay-border)'
@@ -59,7 +59,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                         title={userName}
                     >
                         <span
-                            className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[18px] text-sm font-bold text-white"
+                            className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[14px] text-sm font-bold text-white"
                             style={{ background: 'linear-gradient(135deg, var(--clay-brand-coral), var(--clay-brand-pink))' }}
                         >
                             {resolvedAvatarUrl ? (
@@ -68,7 +68,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                                 <span>{avatarFallback}</span>
                             )}
                         </span>
-                        <span className="min-w-0 flex-1">
+                        <span className="min-w-0 flex-1 flex flex-col justify-center">
                             <span className="block truncate text-[9px] font-semibold uppercase tracking-[0.15em] text-[var(--text-tertiary)] leading-tight">
                                 {title}
                             </span>
@@ -107,7 +107,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                         onClick={handleRechargeClick}
                         data-testid="mobile-header-credit-chip"
                         aria-label="\u67e5\u770b\u79ef\u5206"
-                        className="inline-flex min-w-[92px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[20px] border px-3 py-2 text-left text-[var(--text-primary)] transition-all active:scale-95 disabled:opacity-55"
+                        className="inline-flex h-14 min-w-[92px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[20px] border px-3 text-left text-[var(--text-primary)] transition-all active:scale-95 disabled:opacity-55"
                         style={{
                             background: 'var(--mobile-clay-surface-bg)',
                             borderColor: 'var(--mobile-clay-border)'

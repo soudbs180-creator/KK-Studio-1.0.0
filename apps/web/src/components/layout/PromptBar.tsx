@@ -4924,43 +4924,45 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             {(isMobile || (!isMobile && config.mode !== GenerationMode.ECOMMERCE)) && (
                                 <div className={`${isMobile ? 'flex items-center' : 'prompt-bar-liquid-group flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0'}`}>
                                     {/* Parallel Count */}
-                                    <div className="relative h-full w-[58px]">
-                                        <button
-                                            className="prompt-bar-liquid-button flex w-full items-center justify-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-[var(--toolbar-hover)]"
-                                            style={{ color: 'var(--text-secondary)' }}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                toggleMenu('count');
-                                            }}
-                                            title="并发数量"
-                                        >
-                                            <span className="text-[11px] font-medium">{`${config.parallelCount}张`}</span>
-                                            <svg className={`w-2.5 h-2.5 opacity-50 flex-shrink-0 transition-transform duration-200 ${activeMenu === 'count' ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
-                                        </button>
-                                        {
-                                            !isMobile && activeMenu === 'count' && (
-                                                <div className="absolute bottom-full mb-2 z-20" style={{ left: '50%', transform: 'translateX(-50%)' }}>
-                                                    <div className="dropdown static w-24 animate-scaleIn origin-bottom p-1 flex flex-col gap-1" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)', boxShadow: 'var(--frost-card-sub-shadow)' }}>
-                                                        {(config.mode === GenerationMode.PPT
-                                                            ? Array.from({ length: 20 }, (_, i) => i + 1)
-                                                            : [1, 2, 3, 4]
-                                                        ).map((count) => (
-                                                            <button
-                                                                key={count}
-                                                                className={`dropdown-item justify-between rounded-md ${config.parallelCount === count ? 'active' : ''}`}
-                                                                onClick={() => {
-                                                                    updateConfigFields({ parallelCount: count as number });
-                                                                    setActiveMenu(null);
-                                                                }}
-                                                            >
-                                                                <span>{`${count} 张`}</span>
-                                                            </button>
-                                                        ))}
+                                    {!isMobile && (
+                                        <div className="relative h-full w-[58px]">
+                                            <button
+                                                className="prompt-bar-liquid-button flex w-full items-center justify-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-[var(--toolbar-hover)]"
+                                                style={{ color: 'var(--text-secondary)' }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleMenu('count');
+                                                }}
+                                                title="并发数量"
+                                            >
+                                                <span className="text-[11px] font-medium">{`${config.parallelCount}张`}</span>
+                                                <svg className={`w-2.5 h-2.5 opacity-50 flex-shrink-0 transition-transform duration-200 ${activeMenu === 'count' ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
+                                            </button>
+                                            {
+                                                activeMenu === 'count' && (
+                                                    <div className="absolute bottom-full mb-2 z-20" style={{ left: '50%', transform: 'translateX(-50%)' }}>
+                                                        <div className="dropdown static w-24 animate-scaleIn origin-bottom p-1 flex flex-col gap-1" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)', boxShadow: 'var(--frost-card-sub-shadow)' }}>
+                                                            {(config.mode === GenerationMode.PPT
+                                                                ? Array.from({ length: 20 }, (_, i) => i + 1)
+                                                                : [1, 2, 3, 4]
+                                                            ).map((count) => (
+                                                                <button
+                                                                    key={count}
+                                                                    className={`dropdown-item justify-between rounded-md ${config.parallelCount === count ? 'active' : ''}`}
+                                                                    onClick={() => {
+                                                                        updateConfigFields({ parallelCount: count as number });
+                                                                        setActiveMenu(null);
+                                                                    }}
+                                                                >
+                                                                    <span>{`${count} 张`}</span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            )
-                                        }
-                                    </div>
+                                                )
+                                            }
+                                        </div>
+                                    )}
 
                                         {/* Context Menu for Pinning */}
                                         {contextMenu && ReactDOM.createPortal(
