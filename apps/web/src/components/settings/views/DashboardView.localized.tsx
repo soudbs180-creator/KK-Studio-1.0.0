@@ -693,24 +693,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           position: relative;
           overflow: hidden;
           border-radius: 22px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          background: linear-gradient(135deg, rgba(22, 28, 45, 0.76) 0%, rgba(12, 15, 26, 0.92) 100%);
+          border: 1px solid var(--frost-card-framework-border, rgba(255, 255, 255, 0.08));
+          background: var(--frost-card-framework-bg, rgba(22, 28, 45, 0.76));
           padding: 20px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
+          backdrop-filter: blur(var(--frost-card-framework-blur, 20px)) saturate(160%);
+          -webkit-backdrop-filter: blur(var(--frost-card-framework-blur, 20px)) saturate(160%);
           transition: all 0.25s ease-in-out;
           cursor: pointer;
           min-height: 150px;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+          box-shadow: var(--frost-card-framework-shadow, 0 8px 32px rgba(0, 0, 0, 0.35));
         }
         .dashboard-grid-card:hover {
           transform: translateY(-2px);
-          border-color: rgba(255, 255, 255, 0.16);
-          background: linear-gradient(135deg, rgba(27, 34, 54, 0.84) 0%, rgba(16, 20, 33, 0.96) 100%);
-          box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+          border-color: var(--frost-card-sub-border, rgba(255, 255, 255, 0.16));
+          background: var(--frost-card-sub-bg, rgba(27, 34, 54, 0.84));
+          box-shadow: var(--frost-card-sub-shadow, 0 16px 48px rgba(0, 0, 0, 0.5));
         }
         .card-col-2 {
           grid-column: span 1 / span 1;

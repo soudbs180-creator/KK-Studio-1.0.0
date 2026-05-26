@@ -42,6 +42,7 @@ export function WorkspaceSurfacePanels({
     <WorkspacePanels
       activeSurface={activeSurface}
       activePanel={activePanel}
+      isMobile={isMobile}
       renderChatSidebar={() => (
         <div id="chat-sidebar-wrapper">
           <ChatSidebar
