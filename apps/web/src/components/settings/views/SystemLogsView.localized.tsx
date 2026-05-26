@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Download, Pause, Play, ScrollText, ShieldAlert, Trash2 } from 'lucide-react';
 import { useLocale } from '../../../context/LocaleContext';
 import {
@@ -22,12 +22,60 @@ import { EmptyState, SegmentedControlMulti, SettingSelect, StatusBadge } from '.
 
 type LevelFilter = 'all' | 'error' | 'warning' | 'info';
 
+// 简体中文注释：获取本地存储布尔值的辅助函数
+const getLocalStorageBool = (key: string, defaultValue: boolean): boolean => {
+  if (typeof window === 'undefined') return defaultValue;
+  const val = localStorage.getItem(key);
+  return val !== null ? val === 'true' : defaultValue;
+};
+
+// 简体中文注释：设置本地存储布尔值的辅助函数
+const setLocalStorageBool = (key: string, value: boolean) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(key, String(value));
+  }
+};
+
 export const SystemLogsView: React.FC = () => {
   const { locale, pick } = useLocale();
   const [logs, setLogs] = useState<SystemLogEntry[]>([]);
   const [levelFilter, setLevelFilter] = useState<LevelFilter>('all');
   const [sourceFilter, setSourceFilter] = useState('ALL');
   const [isStreamPaused, setIsStreamPaused] = useState(false);
+
+  // 简体中文注释：控制台配置选项的状态声明（均与 localStorage 持久化绑定）
+  const [networkMessages, setNetworkMessages] = useState(() => getLocalStorageBool('console_network_messages', true));
+  const [preserveLog, setPreserveLog] = useState(() => getLocalStorageBool('console_preserve_log', false));
+  const [selectedContextOnly, setSelectedContextOnly] = useState(() => getLocalStorageBool('console_selected_context_only', false));
+  const [groupSimilar, setGroupSimilar] = useState(() => getLocalStorageBool('console_group_similar', true));
+  const [corsErrors, setCorsErrors] = useState(() => getLocalStorageBool('console_cors_errors', true));
+  const [logXHR, setLogXHR] = useState(() => getLocalStorageBool('console_log_xhr', true));
+  const [eagerEval, setEagerEval] = useState(() => getLocalStorageBool('console_eager_eval', true));
+  const [autocomplete, setAutocomplete] = useState(() => getLocalStorageBool('console_autocomplete', true));
+  const [evaluateAsUser, setEvaluateAsUser] = useState(() => getLocalStorageBool('console_evaluate_as_user', false));
+
+  // 简体中文注释：处理控制台复选框选项切换的函数
+  const handleToggleOption = (key: string) => {
+    if (key === 'console_network_messages') {
+      setNetworkMessages(prev => { const next = !prev; setLocalStorageBool(key, next); return next; });
+    } else if (key === 'console_preserve_log') {
+      setPreserveLog(prev => { const next = !prev; setLocalStorageBool(key, next); return next; });
+    } else if (key === 'console_selected_context_only') {
+      setSelectedContextOnly(prev => { const next = !prev; setLocalStorageBool(key, next); return next; });
+    } else if (key === 'console_group_similar') {
+      setGroupSimilar(prev => { const next = !prev; setLocalStorageBool(key, next); return next; });
+    } else if (key === 'console_cors_errors') {
+      setCorsErrors(prev => { const next = !prev; setLocalStorageBool(key, next); return next; });
+    } else if (key === 'console_log_xhr') {
+      setLogXHR(prev => { const next = !prev; setLocalStorageBool(key, next); return next; });
+    } else if (key === 'console_eager_eval') {
+      setEagerEval(prev => { const next = !prev; setLocalStorageBool(key, next); return next; });
+    } else if (key === 'console_autocomplete') {
+      setAutocomplete(prev => { const next = !prev; setLocalStorageBool(key, next); return next; });
+    } else if (key === 'console_evaluate_as_user') {
+      setEvaluateAsUser(prev => { const next = !prev; setLocalStorageBool(key, next); return next; });
+    }
+  };
 
   const levelOptions = useMemo(
     () => [
@@ -145,23 +193,94 @@ export const SystemLogsView: React.FC = () => {
   }, [sourceFilter, sourceOptions]);
 
   const filteredLogs = useMemo(() => {
-    return logs
-      .filter((log) => {
-        if (levelFilter === 'error') {
-          return log.level === LogLevel.ERROR || log.level === LogLevel.CRITICAL;
+    let result = logs;
+
+    // 简体中文注释：根据网络消息（networkMessages）配置过滤网络日志
+    if (!networkMessages) {
+      result = result.filter((log) => {
+        const isNetworkSource = ['API', 'Billing'].includes(log.source);
+        const msg = (log.message || '').toLowerCase();
+        const details = (log.details || '').toLowerCase();
+        const isNetworkMsg = msg.includes('fetch') || msg.includes('axios') || msg.includes('http') || msg.includes('/api/') || msg.includes('xmlhttprequest') ||
+                             details.includes('fetch') || details.includes('axios') || details.includes('http') || details.includes('/api/') || details.includes('xmlhttprequest');
+        return !isNetworkSource && !isNetworkMsg;
+      });
+    }
+
+    // 简体中文注释：根据CORS错误（corsErrors）配置过滤CORS相关日志
+    if (!corsErrors) {
+      result = result.filter((log) => {
+        const msg = (log.message || '').toLowerCase();
+        const details = (log.details || '').toLowerCase();
+        const stack = (log.stack || '').toLowerCase();
+        const isCors = msg.includes('cors') || msg.includes('cross-origin') ||
+                       details.includes('cors') || details.includes('cross-origin') ||
+                       stack.includes('cors') || stack.includes('cross-origin');
+        return !isCors;
+      });
+    }
+
+    // 简体中文注释：根据仅选中上下文（selectedContextOnly）配置进行关联过滤
+    if (selectedContextOnly) {
+      result = result.filter((log) => {
+        if (sourceFilter !== 'ALL') {
+          return log.source === sourceFilter;
         }
-        if (levelFilter === 'warning') {
-          return log.level === LogLevel.WARNING;
-        }
-        if (levelFilter === 'info') {
-          return log.level === LogLevel.INFO;
-        }
-        return true;
-      })
-      .filter((log) => (sourceFilter === 'ALL' ? true : log.source === sourceFilter))
-      .slice()
-      .sort((a, b) => b.timestamp - a.timestamp);
-  }, [levelFilter, logs, sourceFilter]);
+        // 如果没有单独选中，只显示核心 SYSTEM 和 INTERNAL 来源
+        return ['SYSTEM', 'INTERNAL'].includes(log.source.toUpperCase());
+      });
+    } else {
+      // 原有的普通 sourceFilter 过滤
+      if (sourceFilter !== 'ALL') {
+        result = result.filter((log) => log.source === sourceFilter);
+      }
+    }
+
+    // 基础级别过滤
+    result = result.filter((log) => {
+      if (levelFilter === 'error') {
+        return log.level === LogLevel.ERROR || log.level === LogLevel.CRITICAL;
+      }
+      if (levelFilter === 'warning') {
+        return log.level === LogLevel.WARNING;
+      }
+      if (levelFilter === 'info') {
+        return log.level === LogLevel.INFO;
+      }
+      return true;
+    });
+
+    // 统一按时间倒序排列并返回切片
+    return result.slice().sort((a, b) => b.timestamp - a.timestamp);
+  }, [levelFilter, logs, sourceFilter, networkMessages, corsErrors, selectedContextOnly]);
+
+  // 简体中文注释：用于实现相邻或连续相同日志的折叠聚合
+  const groupedLogs = useMemo(() => {
+    if (!groupSimilar) {
+      return filteredLogs.map(log => ({ ...log, count: 1 }));
+    }
+
+    const grouped: (SystemLogEntry & { count: number })[] = [];
+    for (const log of filteredLogs) {
+      if (grouped.length === 0) {
+        grouped.push({ ...log, count: 1 });
+        continue;
+      }
+
+      const prev = grouped[grouped.length - 1];
+      // 如果消息相同、级别相同且来源相同，则视为相似，进行折叠
+      const isSimilar = prev.message === log.message &&
+                        prev.level === log.level &&
+                        prev.source === log.source;
+
+      if (isSimilar) {
+        prev.count += 1;
+      } else {
+        grouped.push({ ...log, count: 1 });
+      }
+    }
+    return grouped;
+  }, [filteredLogs, groupSimilar]);
 
   const errorLogs = useMemo(
     () => logs.filter((item) => item.level === LogLevel.ERROR || item.level === LogLevel.CRITICAL),
@@ -198,6 +317,15 @@ export const SystemLogsView: React.FC = () => {
   };
 
   const handleClearLogs = () => {
+    // 简体中文注释：若开启了“保留日志”，则不清除控制台日志，并给出相应提示
+    if (preserveLog) {
+      notify.info(
+        pick('保留日志已开启', 'Preserve log enabled'),
+        pick('日志已被保留，未从控制台清除。', 'Logs were preserved and not cleared from console.')
+      );
+      return;
+    }
+
     const confirmed = typeof window === 'undefined'
       ? true
       : window.confirm(
@@ -275,12 +403,13 @@ export const SystemLogsView: React.FC = () => {
           title={pick('过滤与流控制', 'Filters and stream control')}
           eyebrow={pick('查看范围', 'View scope')}
           description={pick(
-            '统一控制级别、来源和流状态。',
-            'Control severity, source, and stream state in one place.'
+            '配置控制台参数并统一控制级别 and 来源。',
+            'Configure console parameters and control severity and source.'
           )}
           surface="plain"
         >
           <div className="settings-reference-toolbar settings-reference-toolbar--flat">
+            {/* 简体中文注释：上方：紧凑的过滤与级别控制栏 */}
             <div className="settings-reference-toolbar__filters">
               <div className="min-w-[280px] max-w-full">
                 <SegmentedControlMulti
@@ -310,6 +439,128 @@ export const SystemLogsView: React.FC = () => {
               <StatusBadge status={isStreamPaused ? 'paused' : 'online'} label={isStreamPaused ? pick('已暂停', 'Paused') : pick('运行中', 'Running')} />
             </div>
           </div>
+
+          {/* 简体中文注释：下方：磨砂高保真控制台配置选项面板，支持本地化翻译 */}
+          <div className="settings-console-panel">
+            <div className="settings-console-title">{pick('控制台设置选项', 'Console Configuration Options')}</div>
+            <div className="settings-console-grid">
+              {/* 左侧列 */}
+              <div className="flex flex-col gap-2">
+                <div 
+                  className="settings-console-item"
+                  onClick={() => handleToggleOption('console_network_messages')}
+                >
+                  <input 
+                    type="checkbox" 
+                    checked={networkMessages} 
+                    onChange={() => {}}
+                    className="settings-console-checkbox" 
+                  />
+                  <span className="settings-console-label">{pick('显示网络消息', 'Show Network Messages')}</span>
+                </div>
+                <div 
+                  className="settings-console-item"
+                  onClick={() => handleToggleOption('console_preserve_log')}
+                >
+                  <input 
+                    type="checkbox" 
+                    checked={preserveLog} 
+                    onChange={() => {}}
+                    className="settings-console-checkbox" 
+                  />
+                  <span className="settings-console-label">{pick('保留日志', 'Preserve Log')}</span>
+                </div>
+                <div 
+                  className="settings-console-item"
+                  onClick={() => handleToggleOption('console_selected_context_only')}
+                >
+                  <input 
+                    type="checkbox" 
+                    checked={selectedContextOnly} 
+                    onChange={() => {}}
+                    className="settings-console-checkbox" 
+                  />
+                  <span className="settings-console-label">{pick('仅选中上下文', 'Selected Context Only')}</span>
+                </div>
+                <div 
+                  className="settings-console-item"
+                  onClick={() => handleToggleOption('console_group_similar')}
+                >
+                  <input 
+                    type="checkbox" 
+                    checked={groupSimilar} 
+                    onChange={() => {}}
+                    className="settings-console-checkbox" 
+                  />
+                  <span className="settings-console-label">{pick('折叠相似消息', 'Group Similar Messages')}</span>
+                </div>
+                <div 
+                  className="settings-console-item"
+                  onClick={() => handleToggleOption('console_cors_errors')}
+                >
+                  <input 
+                    type="checkbox" 
+                    checked={corsErrors} 
+                    onChange={() => {}}
+                    className="settings-console-checkbox" 
+                  />
+                  <span className="settings-console-label">{pick('过滤 CORS 错误', 'Filter CORS Errors')}</span>
+                </div>
+              </div>
+
+              {/* 右侧列 */}
+              <div className="flex flex-col gap-2">
+                <div 
+                  className="settings-console-item"
+                  onClick={() => handleToggleOption('console_log_xhr')}
+                >
+                  <input 
+                    type="checkbox" 
+                    checked={logXHR} 
+                    onChange={() => {}}
+                    className="settings-console-checkbox" 
+                  />
+                  <span className="settings-console-label">{pick('记录 XMLHttpRequests', 'Log XMLHttpRequests')}</span>
+                </div>
+                <div 
+                  className="settings-console-item"
+                  onClick={() => handleToggleOption('console_eager_eval')}
+                >
+                  <input 
+                    type="checkbox" 
+                    checked={eagerEval} 
+                    onChange={() => {}}
+                    className="settings-console-checkbox" 
+                  />
+                  <span className="settings-console-label">{pick('预估算求值', 'Eager Evaluation')}</span>
+                </div>
+                <div 
+                  className="settings-console-item"
+                  onClick={() => handleToggleOption('console_autocomplete')}
+                >
+                  <input 
+                    type="checkbox" 
+                    checked={autocomplete} 
+                    onChange={() => {}}
+                    className="settings-console-checkbox" 
+                  />
+                  <span className="settings-console-label">{pick('历史记录自动补全', 'Autocomplete From History')}</span>
+                </div>
+                <div 
+                  className="settings-console-item"
+                  onClick={() => handleToggleOption('console_evaluate_as_user')}
+                >
+                  <input 
+                    type="checkbox" 
+                    checked={evaluateAsUser} 
+                    onChange={() => {}}
+                    className="settings-console-checkbox" 
+                  />
+                  <span className="settings-console-label">{pick('以用户身份执行表达式', 'Evaluate Expressions As User')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </SettingsSection>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
@@ -326,7 +577,7 @@ export const SystemLogsView: React.FC = () => {
               <ScrollText size={18} className="text-[var(--text-primary)]" />
             </div>
 
-            {filteredLogs.length === 0 ? (
+            {groupedLogs.length === 0 ? (
               <div className="mt-5">
                 <EmptyState
                   title={logs.length === 0 ? pick('今天还没有日志', 'No logs recorded yet') : pick('当前筛选条件下没有结果', 'No rows match the current filters')}
@@ -339,11 +590,14 @@ export const SystemLogsView: React.FC = () => {
               </div>
             ) : (
               <div className="mt-5 settings-log-stream">
-                {filteredLogs.map((log) => (
+                {groupedLogs.map((log) => (
                   <div key={log.id} className={getLevelClassName(log.level)}>
                     <div className="settings-log-entry__meta">
                       <StatusBadge status={getLevelStatus(log.level)} label={getLevelLabel(log.level)} />
                       <SettingsBadge tone="neutral">{log.source}</SettingsBadge>
+                      {log.count > 1 && (
+                        <span className="settings-log-group-badge">{log.count}</span>
+                      )}
                       <span className="text-[12px] text-[var(--text-tertiary)]">{formatLogTime(log.timestamp)}</span>
                     </div>
                     <div className="settings-log-entry__title">{log.message}</div>
