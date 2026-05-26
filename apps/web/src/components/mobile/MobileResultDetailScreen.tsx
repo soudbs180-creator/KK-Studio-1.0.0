@@ -162,6 +162,50 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
   onPrevious,
   onNext,
 }) => {
+  // 🚀 [移动端专属] 手势检测坐标 Refs
+  const touchStartX = React.useRef(0);
+  const touchStartY = React.useRef(0);
+  const touchEndX = React.useRef(0);
+  const touchEndY = React.useRef(0);
+
+  // 记录开始触摸坐标
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.targetTouches[0].clientX;
+    touchStartY.current = e.targetTouches[0].clientY;
+    touchEndX.current = e.targetTouches[0].clientX;
+    touchEndY.current = e.targetTouches[0].clientY;
+  };
+
+  // 记录滑动坐标变更
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+    touchEndY.current = e.targetTouches[0].clientY;
+  };
+
+  // 触摸结束时进行手势逻辑判定
+  const handleTouchEnd = () => {
+    const diffX = touchStartX.current - touchEndX.current;
+    const diffY = touchStartY.current - touchEndY.current;
+    const thresholdX = 55;
+
+    // 判定为水平滑动的核心：X轴位移大于阈值，且X轴位移是Y轴位移的 1.5 倍以上
+    if (Math.abs(diffX) > thresholdX && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
+      // 🚀 手机端边缘手势返回适配：
+      // 如果是从屏幕最左侧（边缘 45px 内）起手向右滑动（diffX < 0，即右滑），直接关闭详情页
+      if (touchStartX.current < 45 && diffX < 0) {
+        onClose();
+        return;
+      }
+
+      // 正常滑屏切换图片
+      if (diffX > 0) {
+        if (onNext) onNext();
+      } else {
+        if (onPrevious) onPrevious();
+      }
+    }
+  };
+
   const { pick } = useLocale();
   const promptSummary = normalizeText(entry.promptSummary, '未命名结果');
   const fullPrompt = normalizeText(entry.fullPrompt, promptSummary);
@@ -183,7 +227,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
   const ecommerceRequirementText = normalizeText(ecommerceContinuation?.taskPrompt, fullPrompt);
   const frameworkStatus = ecommerceContinuation?.frameworkStatus;
   const [showSecondaryActions, setShowSecondaryActions] = React.useState(false);
-
+ 
   return (
     <section
       data-testid="mobile-result-detail-screen"
@@ -230,8 +274,14 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
           </button>
         </div>
       </div>
-
-      <div className="relative flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+136px)]">
+ 
+      {/* 绑定全屏滑动手势的滚动主体容器 */}
+      <div 
+        className="relative flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+136px)]"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <div className="relative overflow-hidden rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]">
           {entry.displaySrc ? (
             <img src={entry.displaySrc} alt={promptSummary} className="h-auto w-full object-cover" />

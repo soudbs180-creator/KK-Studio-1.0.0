@@ -15,6 +15,7 @@ interface MobileHeaderProps {
     title?: string;
     userName?: string;
     userAvatarUrl?: string;
+    userRole?: string;
 }
 
 const MobileHeader: React.FC<MobileHeaderProps> = ({
@@ -27,6 +28,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
     title = 'KK Studio',
     userName = '\u7528\u6237',
     userAvatarUrl,
+    userRole = 'user',
 }) => {
     const iconButtonClass = 'h-10 w-10 rounded-2xl flex items-center justify-center border transition-all active:scale-95';
     const handleRechargeClick = onRechargeClick ?? onBillingClick;
@@ -67,11 +69,35 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                             )}
                         </span>
                         <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
+                            <span className="block truncate text-[9px] font-semibold uppercase tracking-[0.15em] text-[var(--text-tertiary)] leading-tight">
                                 {title}
                             </span>
-                            <span className="mt-1 block truncate text-[15px] font-semibold text-[var(--text-primary)]">
-                                {userName}
+                            <span className="mt-0.5 flex items-center gap-1.5 min-w-0">
+                                <span className="truncate text-[13px] font-semibold text-[var(--text-primary)] leading-tight">
+                                    {userName}
+                                </span>
+                                {(() => {
+                                    const role = String(userRole || 'user').toLowerCase();
+                                    if (role === 'admin') {
+                                        return (
+                                            <span className="shrink-0 inline-flex items-center rounded-full bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 text-[8px] font-bold text-red-400 tracking-wider scale-90 origin-left">
+                                                管理员
+                                            </span>
+                                        );
+                                    }
+                                    if (role.startsWith('member')) {
+                                        return (
+                                            <span className="shrink-0 inline-flex items-center rounded-full bg-amber-500/10 border border-amber-400/20 px-1.5 py-0.5 text-[8px] font-bold text-amber-400 tracking-wider scale-90 origin-left">
+                                                高级会员
+                                            </span>
+                                        );
+                                    }
+                                    return (
+                                        <span className="shrink-0 inline-flex items-center rounded-full bg-slate-500/10 border border-slate-500/15 px-1.5 py-0.5 text-[8px] font-bold text-slate-400 tracking-wider scale-90 origin-left">
+                                            普通用户
+                                        </span>
+                                    );
+                                })()}
                             </span>
                         </span>
                     </button>

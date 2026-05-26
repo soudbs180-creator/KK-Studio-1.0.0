@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Check, Clock3, FolderOpen, MessageSquare, Plus, Search, Settings } from 'lucide-react';
 
 import { useCanvas } from '../../context/CanvasContext';
+import { useAdminRole } from '../../hooks/useAdminRole';
 import type {
   MobileResultEntry,
   MobileSurfaceScreen,
@@ -50,8 +51,9 @@ export interface MobileWorkspaceSurfaceProps {
   overlays?: React.ReactNode;
 }
 
+// 磨砂玻璃风格按钮样式定义，带背景和边框的半透明组合
 const moreSheetActionClass =
-  'rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-3.5 text-left text-[var(--text-primary)] transition-all active:scale-[0.985]';
+  'rounded-[22px] border border-white/8 bg-white/5 p-3.5 text-left text-[var(--text-primary)] transition-all active:scale-[0.985] active:bg-white/10';
 
 const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   activeScreen,
@@ -88,6 +90,8 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   overlays,
 }) => {
   const { state, activeCanvas, switchCanvas, createCanvas, canCreateCanvas } = useCanvas();
+  // 🚀 [移动端专属] 提取真实的用户角色，以在头部用户名右侧进行徽章渲染
+  const { accountRole } = useAdminRole();
   const [showProjectList, setShowProjectList] = useState(false);
   const [resultViewMode, setResultViewMode] = useState<ResultViewMode>('standard');
   const activeEntryIndex = useMemo(
@@ -127,6 +131,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
         title={title}
         userName={userName}
         userAvatarUrl={userAvatarUrl}
+        userRole={accountRole}
       />
     </div>
   );
@@ -168,12 +173,13 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             aria-label="关闭更多菜单"
           />
 
+          {/* 更多操作底部滑出式抽屉面板，整体重构为精美的半透明磨砂玻璃质感 */}
           <div
             className="relative rounded-t-[30px] border px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 text-[var(--text-primary)]"
             style={{
-              background: 'var(--mobile-clay-shell-bg)',
-              borderColor: 'var(--mobile-clay-border)',
-              boxShadow: 'var(--mobile-clay-shadow)'
+              background: 'var(--mobile-glass-bg)',
+              borderColor: 'var(--mobile-glass-border)',
+              boxShadow: 'var(--mobile-glass-shadow)'
             }}
           >
             <div className="mb-4 flex items-start justify-between gap-3">
@@ -186,7 +192,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               <button
                 type="button"
                 onClick={() => setShowProjectList((previous) => !previous)}
-                className="inline-flex items-center gap-2 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)]"
+                className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)]"
               >
                 <FolderOpen size={14} />
                 {resolvedProjectCount > 1 ? `项目 ${resolvedProjectCount}` : '当前项目'}
@@ -196,7 +202,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             <button
               type="button"
               onClick={() => setShowProjectList((previous) => !previous)}
-              className="mb-3 flex w-full items-center justify-between rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] px-4 py-3 text-left"
+              className="mb-3 flex w-full items-center justify-between rounded-[24px] border border-white/8 bg-white/5 px-4 py-3 text-left transition-all active:scale-[0.985] active:bg-white/10"
             >
               <div className="min-w-0">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
@@ -208,7 +214,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             </button>
 
             {showProjectList ? (
-              <div className="mb-4 rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-2.5">
+              <div className="mb-4 rounded-[24px] border border-white/8 bg-white/5 p-2.5">
                 <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
                   项目列表
                 </div>
@@ -227,7 +233,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                         className={`flex w-full items-center justify-between gap-3 rounded-[18px] px-3 py-3 text-left transition-all ${
                           isActive
                             ? 'border border-[var(--mobile-clay-active-border)] bg-[var(--mobile-clay-active-bg)] text-[var(--text-primary)]'
-                            : 'border border-transparent bg-[var(--mobile-clay-muted-surface-bg)] text-[var(--text-secondary)]'
+                            : 'border border-white/5 bg-white/5 text-[var(--text-secondary)]'
                         }`}
                       >
                         <span className="min-w-0 truncate text-sm font-medium">{canvas.name}</span>
@@ -246,7 +252,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                     closeMoreSheet();
                   }}
                   disabled={!canCreateCanvas}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[18px] border border-dashed border-[var(--mobile-clay-border-strong)] bg-[var(--mobile-clay-muted-surface-bg)] px-3 py-3 text-sm font-medium text-[var(--text-secondary)] disabled:opacity-45"
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[18px] border border-dashed border-white/10 bg-white/5 px-3 py-3 text-sm font-medium text-[var(--text-secondary)] disabled:opacity-45"
                 >
                   <Plus size={16} />
                   {canCreateCanvas ? '新建项目' : '项目已满'}
