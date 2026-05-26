@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { type GeneratedImage, GenerationMode, type PartialRedrawRequest } from '../../types';
 import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy } from 'lucide-react';
@@ -55,6 +55,8 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     const clampedGenerationTime = clampGenerationDurationMs(image.generationTime);
     const isPptSubCard = image.mode === GenerationMode.PPT && Boolean(image.parentPromptId);
     const downloadMenuRef = useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const touchGestureActiveRef = useRef(false);
     const panStartRef = useRef({ x: 0, y: 0 });
     const panStartPosRef = useRef({ x: 0, y: 0 });
 
@@ -402,6 +404,181 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         }
     }, [isPanning, handleMouseMove, handleMouseUp]);
 
+    // 简体中文注释：桥接 Refs，保持事件处理器中能访问到最新的状态，避免事件流因 React 重绘闭包获取旧值
+    const zoomRef = useRef(zoom);
+    zoomRef.current = zoom;
+    const panRef = useRef(pan);
+    panRef.current = pan;
+    const onCloseRef = useRef(onClose);
+    onCloseRef.current = onClose;
+    const handlePrevRef = useRef(handlePrev);
+    handlePrevRef.current = handlePrev;
+    const handleNextRef = useRef(handleNext);
+    handleNextRef.current = handleNext;
+
+    // 简体中文注释：阻止移动端页面双指缩放和背景滚动，接管大图的原生手势事件流
+    useEffect(() => {
+        if (!isMobile) return;
+
+        const preventDefaultScale = (e: TouchEvent) => {
+            if (e.touches && e.touches.length > 1) {
+                if (e.cancelable) {
+                    e.preventDefault();
+                }
+            }
+        };
+
+        const preventGesture = (e: Event) => {
+            if (e.cancelable) {
+                e.preventDefault();
+            }
+        };
+
+        // 备份并隐藏背景滚动
+        const originalOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+
+        document.addEventListener('touchstart', preventDefaultScale, { passive: false });
+        document.addEventListener('touchmove', preventDefaultScale, { passive: false });
+        document.addEventListener('gesturestart', preventGesture, { passive: false });
+        document.addEventListener('gesturechange', preventGesture, { passive: false });
+
+        return () => {
+            document.body.style.overflow = originalOverflow;
+            document.removeEventListener('touchstart', preventDefaultScale);
+            document.removeEventListener('touchmove', preventDefaultScale);
+            document.removeEventListener('gesturestart', preventGesture);
+            document.removeEventListener('gesturechange', preventGesture);
+        };
+    }, [isMobile]);
+
+    // 简体中文注释：移动端 Touch 事件原生绑定，支持单指跟手微缩拖拽、双 Tap 缩放以及双指捏合捏放
+    const touchStartRef = useRef<{ x: number; y: number }[]>([]);
+    const initialTouchDistanceRef = useRef(0);
+    const initialTouchZoomRef = useRef(1);
+    const initialTouchPanRef = useRef({ x: 0, y: 0 });
+    const lastTapRef = useRef(0);
+
+    const handleTouchStart = useCallback((e: TouchEvent) => {
+        if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            touchStartRef.current = [{ x: touch.clientX, y: touch.clientY }];
+            initialTouchPanRef.current = { ...panRef.current };
+
+            // 双击放大/重置逻辑
+            const now = Date.now();
+            if (now - lastTapRef.current < 300) {
+                if (zoomRef.current !== 1 || panRef.current.x !== 0 || panRef.current.y !== 0) {
+                    setZoom(1);
+                    setPan({ x: 0, y: 0 });
+                } else {
+                    setZoom(2);
+                    setPan({ x: 0, y: 0 });
+                }
+                lastTapRef.current = 0;
+            } else {
+                lastTapRef.current = now;
+            }
+        } else if (e.touches.length === 2) {
+            const t1 = e.touches[0];
+            const t2 = e.touches[1];
+            touchStartRef.current = [
+                { x: t1.clientX, y: t1.clientY },
+                { x: t2.clientX, y: t2.clientY }
+            ];
+            initialTouchDistanceRef.current = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+            initialTouchZoomRef.current = zoomRef.current;
+            initialTouchPanRef.current = { ...panRef.current };
+        }
+    }, []);
+
+    const handleTouchMove = useCallback((e: TouchEvent) => {
+        if (e.touches.length === 1 && touchStartRef.current.length === 1) {
+            const touch = e.touches[0];
+            const dx = touch.clientX - touchStartRef.current[0].x;
+            const dy = touch.clientY - touchStartRef.current[0].y;
+
+            if (zoomRef.current > 1) {
+                if (e.cancelable) e.preventDefault();
+                setPan({
+                    x: initialTouchPanRef.current.x + dx,
+                    y: initialTouchPanRef.current.y + dy
+                });
+            } else {
+                if (Math.abs(dy) > Math.abs(dx)) {
+                    if (e.cancelable) e.preventDefault();
+                    setPan({
+                        x: 0,
+                        y: dy
+                    });
+                }
+            }
+        } else if (e.touches.length === 2 && touchStartRef.current.length === 2) {
+            if (e.cancelable) e.preventDefault();
+            const t1 = e.touches[0];
+            const t2 = e.touches[1];
+            const distance = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+            const factor = distance / initialTouchDistanceRef.current;
+            
+            const nextZoom = Math.min(5, Math.max(0.5, initialTouchZoomRef.current * factor));
+            setZoom(nextZoom);
+
+            const dx = (t1.clientX + t2.clientX) / 2 - (touchStartRef.current[0].x + touchStartRef.current[1].x) / 2;
+            const dy = (t1.clientY + t2.clientY) / 2 - (touchStartRef.current[0].y + touchStartRef.current[1].y) / 2;
+            setPan({
+                x: initialTouchPanRef.current.x + dx,
+                y: initialTouchPanRef.current.y + dy
+            });
+        }
+    }, []);
+
+    const handleTouchEnd = useCallback((e: TouchEvent) => {
+        if (zoomRef.current < 1) {
+            setZoom(1);
+            setPan({ x: 0, y: 0 });
+        }
+
+        if (zoomRef.current === 1 && touchStartRef.current.length === 1) {
+            const touch = e.changedTouches[0];
+            if (touch) {
+                const deltaX = touch.clientX - touchStartRef.current[0].x;
+                const deltaY = touch.clientY - touchStartRef.current[0].y;
+
+                if (Math.abs(deltaY) > 140) {
+                    onCloseRef.current();
+                } else if (Math.abs(deltaX) > 80 && Math.abs(deltaY) < 60) {
+                    if (deltaX > 0) {
+                        handlePrevRef.current();
+                    } else {
+                        handleNextRef.current();
+                    }
+                    setPan({ x: 0, y: 0 });
+                } else {
+                    setPan({ x: 0, y: 0 });
+                }
+            }
+        } else if (zoomRef.current > 1) {
+            // 保持放大状态
+        }
+        
+        touchStartRef.current = [];
+    }, []);
+
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container || !isMobile) return;
+
+        container.addEventListener('touchstart', handleTouchStart, { passive: false });
+        container.addEventListener('touchmove', handleTouchMove, { passive: false });
+        container.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+        return () => {
+            container.removeEventListener('touchstart', handleTouchStart);
+            container.removeEventListener('touchmove', handleTouchMove);
+            container.removeEventListener('touchend', handleTouchEnd);
+        };
+    }, [isMobile, handleTouchStart, handleTouchMove, handleTouchEnd]);
+
     useEffect(() => {
         setShowDownloadMenu(false);
     }, [currentIndex]);
@@ -541,17 +718,39 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
 
     const isVideo = image.mode === GenerationMode.VIDEO || displaySrc?.startsWith('data:video') || displaySrc?.endsWith('.mp4');
     const isAudio = image.mode === GenerationMode.AUDIO || displaySrc?.endsWith('.mp3') || displaySrc?.endsWith('.wav');
-    const actionButtonClass = 'shrink-0 flex items-center gap-2 rounded-lg border border-[var(--border-medium)] bg-[var(--bg-tertiary)] px-4 py-2 text-sm font-medium transition-all hover:bg-[var(--bg-secondary)]';
+    const getOpacity = () => {
+        // 简体中文注释：仅在未放大状态且垂直拖动时，按比例调低背景透明度以透出下层内容
+        if (zoom === 1 && Math.abs(pan.y) > 0) {
+            const ratio = Math.max(0.2, 1 - Math.abs(pan.y) / 400);
+            return ratio * 0.95;
+        }
+        return 0.95;
+    };
+
+    const getScale = () => {
+        // 简体中文注释：仅在未放大状态且垂直拖动时，按比例缩小大图以实现微缩拖动回弹效果
+        if (zoom === 1 && Math.abs(pan.y) > 0) {
+            return Math.max(0.7, 1 - Math.abs(pan.y) / 800);
+        }
+        return 1;
+    };
+
+    const actionButtonClass = 'shrink-0 flex items-center gap-2 rounded-lg border border-[var(--border-medium)] bg-[var(--bg-tertiary)] px-4 h-10 text-sm font-medium transition-all hover:bg-[var(--bg-secondary)]';
     const iconActionButtonClass = 'shrink-0 inline-flex h-10 items-center justify-center rounded-lg border border-[var(--border-medium)] bg-[var(--bg-tertiary)] px-3 text-sm font-medium transition-all hover:bg-[var(--bg-secondary)]';
 
     return ReactDOM.createPortal(
         <div
-            className="fixed inset-0 z-[99999] flex flex-col bg-black/95 animate-fadeIn select-none overflow-hidden"
+            ref={containerRef}
+            className="fixed inset-0 z-[99999] flex flex-col animate-fadeIn select-none overflow-hidden"
             onClick={handleBackgroundClick}
-            style={isMobile ? {
-                paddingTop: 'max(10px, env(safe-area-inset-top, 0px))',
-                paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))',
-            } : undefined}
+            style={{
+                backgroundColor: `rgba(0, 0, 0, ${getOpacity()})`,
+                transition: (isPanning || zoomRef.current !== 1 || Math.abs(pan.y) > 0) ? 'none' : 'background-color 0.15s ease-out',
+                ...(isMobile ? {
+                    paddingTop: 'max(10px, env(safe-area-inset-top, 0px))',
+                    paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))',
+                } : {})
+            }}
         >
             {/* Top bar: close button */}
             <button
@@ -622,7 +821,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                     <div
                         className="max-w-full max-h-full flex items-center justify-center"
                         style={{
-                            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom * getScale()})`,
                             cursor: isPanning ? 'grabbing' : 'grab' // Apply cursor to wrapper
                         }}
                         onDoubleClick={(e) => {
@@ -659,178 +858,169 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                         onContextMenu={(e) => {
                             if (isLoading) {
                                 e.preventDefault();
-                                return;
-                            }
-                            e.stopPropagation();
-                        }}
-                        onError={() => {
-                            void recoverLightboxSource();
-                        }}
-                        style={{
-                            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                            cursor: isPanning ? 'grabbing' : 'grab'
-                        }}
-                    />
-                ) : null}
-                {displaySrc && isLoading && !hasError && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="rounded-full bg-black/50 px-4 py-2 text-sm text-white">
-                            加载原图...
-                        </div>
-                    </div>
-                )}
-                {/* Error Fallback */}
-                {hasError && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="bg-[var(--bg-tertiary)] p-4 rounded-lg text-red-400 flex flex-col items-center gap-2">
-                            <ZoomOut size={24} />
-                            <span>图片加载失败 (Image Load Failed)</span>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Footer metadata panel */}
-            {/* Fixed footer below the media to avoid overlap */}
-            <div
-                className={`w-full shrink-0 border-t border-[var(--border-light)] bg-[var(--bg-secondary)]/90 text-[var(--text-primary)] backdrop-blur-xl ${isMobile ? 'px-3 py-3' : 'grid min-h-[100px] grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-8'}`}
-                onClick={e => e.stopPropagation()}
-            >
-                <div className="flex min-w-0 flex-col text-left justify-center">
-                    <div
-                        className="text-left text-sm font-medium line-clamp-2 cursor-pointer hover:text-indigo-300 transition-colors"
-                        title="点击复制提示词"
-                        onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                                await writeTextToClipboard(image.prompt);
-                                notify.success('已复制', '提示词已复制到剪贴板');
-                            } catch (err) {
-                                console.error('Copy failed', err);
-                                notify.warning('复制失败', '当前环境无法复制提示词。');
-                            }
-                        }}
-                    >
-                        {image.prompt}
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-left text-xs text-[var(--text-tertiary)] sm:gap-3">
-                        <span className="bg-[var(--bg-tertiary)] px-2 py-0.5 rounded border border-[var(--border-medium)]">
-                            {currentIndex + 1} / {images.length}
-                        </span>
-                        <span>{image.model.split('/').pop()}</span>
-                        {/* Prefer loaded dimensions, then fall back to metadata */}
-                        <span>{realDimensions || image.dimensions || '加载中...'}</span>
-                        {clampedGenerationTime > 0 && <span>{formatGenerationDurationSeconds(clampedGenerationTime)}s</span>}
-                    </div>
-                </div>
-
-                <div className={`mt-3 flex w-full items-center gap-2 ${isMobile ? 'overflow-x-auto pb-1' : 'self-center sm:mt-0 sm:w-auto sm:flex-nowrap sm:justify-end sm:justify-self-end sm:gap-3'}`}>
-                    {isMobile && images.length > 1 && (
-                        <>
-                            <button onClick={handlePrev} className={iconActionButtonClass} title="上一张">
-                                <ChevronLeft size={16} />
-                            </button>
-                            <button onClick={handleNext} className={iconActionButtonClass} title="下一张">
-                                <ChevronRight size={16} />
-                            </button>
-                        </>
-                    )}
-                    {/* Action controls */}
-                    <div className="flex shrink-0 items-center rounded-lg bg-[var(--bg-tertiary)] p-1">
-                        <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded" title="缩小"><ZoomOut size={16} /></button>
-                        <span className="w-12 text-center text-xs">{Math.round(zoom * 100)}%</span>
-                        <button onClick={() => setZoom(z => Math.min(5, z + 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded" title="放大"><ZoomIn size={16} /></button>
-                        <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }} className="p-2 hover:bg-[var(--bg-secondary)] rounded ml-1 border-l border-[var(--border-light)]" title="重置"><RotateCcw size={16} /></button>
-                    </div>
-
-                    {/* Partial redraw actions for images only */}
-                    {onPartialRedraw && !isVideo && !isAudio && displaySrc && (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setShowPartialRedraw(true);
-                            }}
-                            className={`${actionButtonClass} hover:border-purple-500 hover:bg-purple-600/80`}
-                            title="局部重绘"
-                        >
-                            <Pen size={16} />
-                            重绘
-                        </button>
-                    )}
-
-                    {onEditPptDeck && image.mode === GenerationMode.PPT && !isVideo && !isAudio && (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onEditPptDeck(image);
-                            }}
-                            className={`${actionButtonClass} hover:border-emerald-500 hover:bg-emerald-600/80`}
-                            title={pickByDocumentLanguage('编辑分层页面包', 'Edit layered deck')}
-                        >
-                            <Pen size={16} />
-                            {pickByDocumentLanguage('编辑页面包', 'Edit Deck')}
-                        </button>
-                    )}
-
-                    {onEditText && image.mode === GenerationMode.PPT && !isVideo && !isAudio && (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onEditText(image);
-                            }}
-                            className={`${actionButtonClass} hover:border-sky-500 hover:bg-sky-600/80`}
-                            title="编辑当前页文字"
-                        >
-                            <Pen size={16} />
-                            {pickByDocumentLanguage('快速改字', 'Quick Text')}
-                        </button>
-                    )}
-
-                    {!isVideo && !isAudio && (
-                        <button
-                            onClick={handleCopyOriginal}
-                            className={`${actionButtonClass} hover:border-cyan-500 hover:bg-cyan-600/80`}
-                            title="复制原图"
-                        >
-                            <Copy size={16} />
-                            复制
-                        </button>
-                    )}
-
-                    <div className="relative" ref={downloadMenuRef}>
-                        <button
-                            onClick={handleDownload}
-                            className="shrink-0 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium transition-colors hover:bg-indigo-500"
-                            title={isPptSubCard && onDownloadPptComposite ? '下载选项' : '下载原图'}
-                        >
-                            <Download size={16} />
-                            下载
-                        </button>
-                        {showDownloadMenu && isPptSubCard && onDownloadPptComposite && (
-                            <div className="absolute right-0 top-full z-20 mt-2 w-36 rounded-xl border border-[var(--border-medium)] bg-[var(--bg-secondary)] p-1.5 shadow-2xl">
-                                <button
-                                    onClick={(e) => {
-                                        setShowDownloadMenu(false);
-                                        void handleSingleDownload(e);
-                                    }}
-                                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
-                                >
-                                    <span>下载单图</span>
-                                </button>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setShowDownloadMenu(false);
-                                        onDownloadPptComposite(image.id);
-                                    }}
-                                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
-                                >
-                                    <span>下载整屏</span>
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                                  return;
+                              }
+                              e.stopPropagation();
+                          }}
+                          onError={() => {
+                              void recoverLightboxSource();
+                          }}
+                          style={{
+                              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom * getScale()})`,
+                              transition: isPanning ? 'none' : 'transform 0.15s ease-out',
+                              cursor: isPanning ? 'grabbing' : 'grab'
+                          }}
+                      />
+                  ) : null}
+                  {displaySrc && isLoading && !hasError && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="rounded-full bg-black/50 px-4 py-2 text-sm text-white">
+                              加载原图...
+                          </div>
+                      </div>
+                  )}
+                  {/* Error Fallback */}
+                  {hasError && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="bg-[var(--bg-tertiary)] p-4 rounded-lg text-red-400 flex flex-col items-center gap-2">
+                              <ZoomOut size={24} />
+                              <span>图片加载失败 (Image Load Failed)</span>
+                          </div>
+                      </div>
+                  )}
+              </div>
+  
+              {/* Footer metadata panel */}
+              {/* Fixed footer below the media to avoid overlap */}
+              <div
+                  className={`w-full shrink-0 border-t border-[var(--border-light)] bg-[var(--bg-secondary)]/90 text-[var(--text-primary)] backdrop-blur-xl ${isMobile ? 'px-3 py-3' : 'grid min-h-[100px] grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-8'}`}
+                  onClick={e => e.stopPropagation()}
+              >
+                  <div className="flex min-w-0 flex-col text-left justify-center">
+                      <div
+                          className="text-left text-sm font-medium line-clamp-2 cursor-pointer hover:text-indigo-300 transition-colors"
+                          title="点击复制提示词"
+                          onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                  await writeTextToClipboard(image.prompt);
+                                  notify.success('已复制', '提示词已复制到剪贴板');
+                              } catch (err) {
+                                  console.error('Copy failed', err);
+                                  notify.warning('复制失败', '当前环境无法复制提示词。');
+                              }
+                          }}
+                      >
+                          {image.prompt}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-left text-xs text-[var(--text-tertiary)] sm:gap-3">
+                          <span className="bg-[var(--bg-tertiary)] px-2 py-0.5 rounded border border-[var(--border-medium)]">
+                              {currentIndex + 1} / {images.length}
+                          </span>
+                          <span>{image.model.split('/').pop()}</span>
+                          {/* Prefer loaded dimensions, then fall back to metadata */}
+                          <span>{realDimensions || image.dimensions || '加载中...'}</span>
+                          {clampedGenerationTime > 0 && <span>{formatGenerationDurationSeconds(clampedGenerationTime)}s</span>}
+                      </div>
+                  </div>
+  
+                  <div className={isMobile ? "mt-3 flex w-full items-center justify-between h-10 gap-2" : `mt-3 flex w-full items-center gap-2 ${isMobile ? 'overflow-x-auto pb-1' : 'self-center sm:mt-0 sm:w-auto sm:flex-nowrap sm:justify-end sm:justify-self-end sm:gap-3'}`}>
+                      {/* Action controls */}
+                      <div className="flex shrink-0 items-center h-10 rounded-lg bg-[var(--bg-tertiary)] p-1 gap-0.5">
+                          <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="缩小"><ZoomOut size={16} /></button>
+                          <span className="w-12 text-center text-xs font-mono select-none">{Math.round(zoom * 100)}%</span>
+                          <button onClick={() => setZoom(z => Math.min(5, z + 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="放大"><ZoomIn size={16} /></button>
+                          <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-1 border-l border-[var(--border-light)]" title="重置"><RotateCcw size={16} /></button>
+                      </div>
+  
+                      {/* Partial redraw actions for images only */}
+                      {onPartialRedraw && !isVideo && !isAudio && displaySrc && (
+                          <button
+                              onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowPartialRedraw(true);
+                              }}
+                              className={`${actionButtonClass} hover:border-purple-500 hover:bg-purple-600/80`}
+                              title="局部重绘"
+                          >
+                              <Pen size={16} />
+                              重绘
+                          </button>
+                      )}
+  
+                      {onEditPptDeck && image.mode === GenerationMode.PPT && !isVideo && !isAudio && (
+                          <button
+                              onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditPptDeck(image);
+                              }}
+                              className={`${actionButtonClass} hover:border-emerald-500 hover:bg-emerald-600/80`}
+                              title={pickByDocumentLanguage('编辑分层页面包', 'Edit layered deck')}
+                          >
+                              <Pen size={16} />
+                              {pickByDocumentLanguage('编辑页面包', 'Edit Deck')}
+                          </button>
+                      )}
+  
+                      {onEditText && image.mode === GenerationMode.PPT && !isVideo && !isAudio && (
+                          <button
+                              onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditText(image);
+                              }}
+                              className={`${actionButtonClass} hover:border-sky-500 hover:bg-sky-600/80`}
+                              title="编辑当前页文字"
+                          >
+                              <Pen size={16} />
+                              {pickByDocumentLanguage('快速改字', 'Quick Text')}
+                          </button>
+                      )}
+  
+                      {!isVideo && !isAudio && (
+                          <button
+                              onClick={handleCopyOriginal}
+                              className={`${actionButtonClass} hover:border-cyan-500 hover:bg-cyan-600/80`}
+                              title="复制原图"
+                          >
+                              <Copy size={16} />
+                              复制
+                          </button>
+                      )}
+  
+                      <div className="relative" ref={downloadMenuRef}>
+                          <button
+                              onClick={handleDownload}
+                              className="shrink-0 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 h-10 text-sm font-medium transition-colors hover:bg-indigo-500"
+                              title={isPptSubCard && onDownloadPptComposite ? '下载选项' : '下载原图'}
+                          >
+                              <Download size={16} />
+                              下载
+                          </button>
+                          {showDownloadMenu && isPptSubCard && onDownloadPptComposite && (
+                              <div className="absolute right-0 bottom-full z-20 mb-2 w-36 rounded-xl border border-[var(--border-medium)] bg-[var(--bg-secondary)] p-1.5 shadow-2xl">
+                                  <button
+                                      onClick={(e) => {
+                                          setShowDownloadMenu(false);
+                                          void handleSingleDownload(e);
+                                      }}
+                                      className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                  >
+                                      <span>下载单图</span>
+                                  </button>
+                                  <button
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          setShowDownloadMenu(false);
+                                          onDownloadPptComposite(image.id);
+                                      }}
+                                      className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                  >
+                                      <span>下载整屏</span>
+                                  </button>
+                              </div>
+                          )}
+                      </div>
+                  </div>
             </div>
 
             {/* Partial redraw modal */}

@@ -12284,6 +12284,12 @@ body.dark-mode .settings-panel {
   padding: 10px 12px;
 }
 
+.settings-panel .settings-shell-page--desktop .settings-dashboard-overview-grid .settings-reference-ring-row {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
 .settings-panel .settings-shell-page--desktop .settings-reference-ring {
   width: 58px;
   min-width: 58px;

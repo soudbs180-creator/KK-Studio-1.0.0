@@ -32,12 +32,86 @@
         body {
             font-family: 'Inter', sans-serif;
             background: #09090b;
+            color: #ffffff;
+        }
+
+        body:not(.dark-mode) {
+            background: #fffaf0;
+            color: #0a0a0a;
         }
     </style>
 </head>
 
 <body>
-    <div id="root"></div>
+    <script>
+        // 简体中文注释：立即执行脚本，避免 React 挂载前由于亮暗色状态不同产生首屏闪白
+        (function () {
+            try {
+                var stored = localStorage.getItem('theme') || localStorage.getItem('kk_theme');
+                var isDark = false;
+                if (stored === 'dark') {
+                    isDark = true;
+                } else if (stored === 'light') {
+                    isDark = false;
+                } else {
+                    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                }
+                if (isDark) {
+                    document.documentElement.classList.add('dark');
+                    document.body.classList.add('dark-mode');
+                    document.documentElement.dataset.theme = 'dark';
+                    document.body.dataset.theme = 'dark';
+                    document.documentElement.style.colorScheme = 'dark';
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    document.body.classList.remove('dark-mode');
+                    document.documentElement.dataset.theme = 'light';
+                    document.body.dataset.theme = 'light';
+                    document.documentElement.style.colorScheme = 'light';
+                }
+            } catch (e) {}
+        })();
+    </script>
+    <div id="root">
+        <!-- 简体中文注释：静态高保真 Loading 骨架页，在 React 挂载后会自动被替换 -->
+        <div class="app-startup-screen" style="display: grid; min-height: 100dvh; place-items: center; overflow: hidden; padding: 32px; background: inherit; transition: opacity 0.3s ease;">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 24px; text-align: center; max-width: 320px;">
+                <div style="position: relative; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center;">
+                    <div class="spinner-ring" style="position: absolute; inset: 0; border-radius: 50%; border: 3px solid transparent; border-top-color: #6366f1; border-right-color: #ec4899; animation: spin 1s linear infinite;"></div>
+                    <div style="position: absolute; inset: 6px; border-radius: 50%; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #6366f1; animation: pulse 2s ease-in-out infinite;">
+                            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+                        </svg>
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <h1 style="margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary, inherit); opacity: 0.9;">KK Studio</h1>
+                    <p style="margin: 0; font-size: 13px; font-weight: 500; color: var(--text-secondary, inherit); opacity: 0.6; animation: pulse-text 1.5s ease-in-out infinite;">正在载入创作空间...</p>
+                </div>
+            </div>
+        </div>
+        <style>
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+            @keyframes pulse {
+                0%, 100% { opacity: 0.6; transform: scale(0.95); }
+                50% { opacity: 1; transform: scale(1.05); }
+            }
+            @keyframes pulse-text {
+                0%, 100% { opacity: 0.5; }
+                50% { opacity: 0.8; }
+            }
+            .dark-mode .app-startup-screen {
+                --text-primary: #f4f4f5;
+                --text-secondary: #a1a1aa;
+            }
+            body:not(.dark-mode) .app-startup-screen {
+                --text-primary: #18181b;
+                --text-secondary: #71717a;
+            }
+        </style>
+    </div>
     <script>
         (function () {
             var turnstileScriptUrl = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';

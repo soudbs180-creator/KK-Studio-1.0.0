@@ -320,7 +320,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
     const [isHovered, setIsHovered] = React.useState(false);
     const [isPressed, setIsPressed] = React.useState(false);
 
-    const handleSendButtonTouchStart = (e: React.TouchEvent) => {
+    const sendTouchStart = (e: React.TouchEvent) => {
         if (!isMobile || !hasPrompt) return;
         const touch = e.touches[0];
         if (!touch) return;
@@ -340,7 +340,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
         }, 250);
     };
 
-    const handleSendButtonTouchMove = (e: React.TouchEvent) => {
+    const sendTouchMove = (e: React.TouchEvent) => {
         if (!isMobile || !isLongPressing) return;
         const touch = e.touches[0];
         if (!touch || !bubbleRef.current) return;
@@ -360,7 +360,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
         }
     };
 
-    const handleSendButtonTouchEnd = (e: React.TouchEvent) => {
+    const sendTouchEnd = (e: React.TouchEvent) => {
         setIsPressed(false);
         if (!isMobile) return;
         if (longPressTimerRef.current) {
@@ -380,7 +380,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
         sendTouchStartRef.current = null;
     };
 
-    const handleSendButtonTouchCancel = () => {
+    const sendTouchCancel = () => {
         setIsPressed(false);
         if (!isMobile) return;
         if (longPressTimerRef.current) {
@@ -396,7 +396,7 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
         const isDisabled = !hasPrompt;
         
         return (
-            <div className="relative select-none" style={{ touchAction: 'none' }} onTouchMove={handleSendButtonTouchMove}>
+            <div className="relative select-none" style={{ touchAction: 'none' }} onTouchMove={sendTouchMove}>
                 {/* 1-4 张数拖拽滑选气泡 */}
                 {isLongPressing && (
                     <div 
@@ -423,9 +423,9 @@ const CreditSendButton: React.FC<CreditSendButtonProps> = ({
                 {/* 磨砂玻璃呼吸外框按钮 */}
                 <button
                     disabled={isDisabled}
-                    onTouchStart={handleSendButtonTouchStart}
-                    onTouchEnd={handleSendButtonTouchEnd}
-                    onTouchCancel={handleSendButtonTouchCancel}
+                    onTouchStart={sendTouchStart}
+                    onTouchEnd={sendTouchEnd}
+                    onTouchCancel={sendTouchCancel}
                     className={`
                         relative flex items-center justify-center gap-1.5 h-10 px-4 rounded-full overflow-hidden select-none active:scale-[0.95] transition-all duration-300
                         ${isDisabled ? 'bg-[var(--frost-card-sub-bg)] opacity-40 cursor-not-allowed text-[var(--text-tertiary)] border border-[var(--frost-card-sub-border)]' : ''}
@@ -3226,25 +3226,17 @@ const PromptBar: React.FC<PromptBarProps> = ({
             <>
                 <div
                     id="prompt-bar-container"
-                    className={`input-bar ios-mobile-prompt transition-all duration-300 !overflow-visible w-[calc(100vw-20px)] max-w-full z-[800]`}
-                    style={mobileStyle}
+                    className="fixed bottom-[10px] left-1/2 -translate-x-1/2 w-[80px] h-[12px] bg-neutral-400/30 hover:bg-neutral-400/50 dark:bg-neutral-500/30 dark:hover:bg-neutral-500/50 rounded-full transition-all duration-300 z-[800] cursor-pointer"
                     onClick={(e) => {
                         e.stopPropagation();
                         setIsExpanded(true);
                     }}
                     onTouchStart={(e) => {
                         e.stopPropagation();
+                        setIsExpanded(true);
                     }}
-                >
-                    <div className="flex items-center justify-between px-4 h-12 w-full select-none cursor-pointer gap-2">
-                        <div className="flex-1 min-w-0 flex items-center justify-start gap-2.5 text-[var(--text-tertiary)] text-xs pl-1">
-                            <svg className="w-4 h-4 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                            </svg>
-                            <span className="truncate text-[13.5px] font-medium tracking-[0.02em]">输入提示词...</span>
-                        </div>
-                    </div>
-                </div>
+                    title={pick('展开输入栏', 'Expand input bar')}
+                />
                 <input
                     type="file"
                     ref={fileInputRef}
@@ -3535,6 +3527,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 return;
                                             }
                                             void onGenerate();
+                                            if (isMobile) {
+                                                setIsExpanded(false);
+                                                textareaRef.current?.blur();
+                                            }
                                         }}
                                     />
                                 </div>
@@ -4923,45 +4919,43 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             {(isMobile || (!isMobile && config.mode !== GenerationMode.ECOMMERCE)) && (
                                 <div className={`${isMobile ? 'flex items-center' : 'prompt-bar-liquid-group flex items-center gap-0.5 rounded-lg border p-0.5 h-10 shrink-0'}`}>
                                     {/* Parallel Count */}
-                                    {!isMobile && (
-                                        <div className="relative h-full w-[58px]">
-                                            <button
-                                                className="prompt-bar-liquid-button flex w-full items-center justify-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-[var(--toolbar-hover)]"
-                                                style={{ color: 'var(--text-secondary)' }}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    toggleMenu('count');
-                                                }}
-                                                title="并发数量"
-                                            >
-                                                <span className="text-[11px] font-medium">{`${config.parallelCount}张`}</span>
-                                                <svg className={`w-2.5 h-2.5 opacity-50 flex-shrink-0 transition-transform duration-200 ${activeMenu === 'count' ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
-                                            </button>
-                                            {
-                                                activeMenu === 'count' && (
-                                                    <div className="absolute bottom-full mb-2 z-20" style={{ left: '50%', transform: 'translateX(-50%)' }}>
-                                                        <div className="dropdown static w-24 animate-scaleIn origin-bottom p-1 flex flex-col gap-1" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)', boxShadow: 'var(--frost-card-sub-shadow)' }}>
-                                                            {(config.mode === GenerationMode.PPT
-                                                                ? Array.from({ length: 20 }, (_, i) => i + 1)
-                                                                : [1, 2, 3, 4]
-                                                            ).map((count) => (
-                                                                <button
-                                                                    key={count}
-                                                                    className={`dropdown-item justify-between rounded-md ${config.parallelCount === count ? 'active' : ''}`}
-                                                                    onClick={() => {
-                                                                        updateConfigFields({ parallelCount: count as number });
-                                                                        setActiveMenu(null);
-                                                                    }}
-                                                                >
-                                                                    <span>{`${count} 张`}</span>
-                                                                </button>
-                                                            ))}
-                                                        </div>
+                                    <div className="relative h-full w-[58px]">
+                                        <button
+                                            className="prompt-bar-liquid-button flex w-full items-center justify-center gap-1.5 px-3 h-full rounded-md transition-all whitespace-nowrap text-[11px] font-medium hover:bg-[var(--toolbar-hover)]"
+                                            style={{ color: 'var(--text-secondary)' }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleMenu('count');
+                                            }}
+                                            title="并发数量"
+                                        >
+                                            <span className="text-[11px] font-medium">{`${config.parallelCount}张`}</span>
+                                            <svg className={`w-2.5 h-2.5 opacity-50 flex-shrink-0 transition-transform duration-200 ${activeMenu === 'count' ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
+                                        </button>
+                                        {
+                                            !isMobile && activeMenu === 'count' && (
+                                                <div className="absolute bottom-full mb-2 z-20" style={{ left: '50%', transform: 'translateX(-50%)' }}>
+                                                    <div className="dropdown static w-24 animate-scaleIn origin-bottom p-1 flex flex-col gap-1" style={{ backgroundColor: 'var(--frost-card-framework-bg)', borderColor: 'var(--frost-card-framework-border)', boxShadow: 'var(--frost-card-sub-shadow)' }}>
+                                                        {(config.mode === GenerationMode.PPT
+                                                            ? Array.from({ length: 20 }, (_, i) => i + 1)
+                                                            : [1, 2, 3, 4]
+                                                        ).map((count) => (
+                                                            <button
+                                                                key={count}
+                                                                className={`dropdown-item justify-between rounded-md ${config.parallelCount === count ? 'active' : ''}`}
+                                                                onClick={() => {
+                                                                    updateConfigFields({ parallelCount: count as number });
+                                                                    setActiveMenu(null);
+                                                                }}
+                                                            >
+                                                                <span>{`${count} 张`}</span>
+                                                            </button>
+                                                        ))}
                                                     </div>
-                                                )
-                                            }
-                                        </div>
-                                    )}
+                                                </div>
+                                            )
+                                        }
+                                    </div>
 
                                         {/* Context Menu for Pinning */}
                                         {contextMenu && ReactDOM.createPortal(

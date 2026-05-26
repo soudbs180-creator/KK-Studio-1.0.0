@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ChevronDown,
@@ -222,6 +222,22 @@ const API_MANAGEMENT_HOME_PATH = '/settings/api-management';
 const API_MANAGEMENT_OFFICIAL_PREFIX = '/settings/api-management/official/';
 const API_MANAGEMENT_PROVIDER_PREFIX = '/settings/api-management/provider/';
 const ROUTE_NEW_ITEM = 'new';
+
+interface ProviderPreset {
+  name: string;
+  baseUrl: string;
+  format: ApiProtocolFormat;
+  color: string;
+}
+
+const PROVIDER_PRESETS: ProviderPreset[] = [
+  { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', format: 'openai', color: '#0054ff' },
+  { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', format: 'openai', color: '#ff5a00' },
+  { name: 'Google AI Studio', baseUrl: 'https://generativelanguage.googleapis.com', format: 'gemini', color: '#4285f4' },
+  { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', format: 'openai', color: '#10a37f' },
+  { name: 'Anthropic Claude', baseUrl: 'https://api.anthropic.com', format: 'claude', color: '#d97706' },
+  { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', format: 'openai', color: '#7c3aed' },
+];
 
 const buildOfficialEditorPath = (officialId?: string | null) =>
   officialId
@@ -799,6 +815,98 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       .filter((provider): provider is ThirdPartyProvider => Boolean(provider))
       .sort((left, right) => right.updatedAt - left.updatedAt),
   );
+
+  // 1. 简体中文注释：第三方供应商 Base URL 与协议冲突诊断
+  const routingConflictWarning = useMemo(() => {
+    const url = providerForm.baseUrl.trim().toLowerCase();
+    const format = providerForm.format;
+
+    if (!url) return '';
+
+    if (url.includes('googleapis.com')) {
+      if (format !== 'gemini' && format !== 'auto') {
+        return pick(
+          '⚠️ 检测到 Google Gemini 官方域名，但通信协议选择为非 Gemini 协议，可能会导致请求 404，建议改选为“Gemini 协议”。',
+          '⚠️ Google Gemini official URL detected, but non-Gemini protocol chosen. This may result in 404 errors. We recommend selecting "Gemini protocol".'
+        );
+      }
+    }
+
+    if (url.includes('api.openai.com')) {
+      if (format === 'gemini' || format === 'claude') {
+        return pick(
+          '⚠️ 检测到 OpenAI 官方域名，但通信协议选择为了非 OpenAI 协议，可能导致密钥校验失败。',
+          '⚠️ OpenAI official URL detected, but non-OpenAI protocol chosen. This may cause authentication failures.'
+        );
+      }
+    }
+
+    if (url.includes('api.anthropic.com')) {
+      if (format !== 'claude' && format !== 'auto') {
+        return pick(
+          '⚠️ 检测到 Anthropic Claude 官方域名，但通信协议未选择为 Claude 协议，可能会导致通信格式错乱。',
+          '⚠️ Anthropic Claude official URL detected, but non-Claude protocol chosen. This may lead to communication format mismatches.'
+        );
+      }
+    }
+
+    return '';
+  }, [providerForm.baseUrl, providerForm.format, pick]);
+
+  // 2. 简体中文注释：智能自动纠正第三方协议
+  const autoFixProviderFormat = useCallback(() => {
+    const url = providerForm.baseUrl.trim().toLowerCase();
+    let targetFormat: ApiProtocolFormat = 'auto';
+    if (url.includes('googleapis.com')) targetFormat = 'gemini';
+    else if (url.includes('api.openai.com')) targetFormat = 'openai';
+    else if (url.includes('api.anthropic.com')) targetFormat = 'claude';
+    
+    if (targetFormat !== 'auto' && providerForm.format !== targetFormat) {
+      setProviderForm(current => ({ ...current, format: targetFormat }));
+      notify.success(
+        pick('协议已自动修正', 'Protocol Auto-fixed'),
+        pick(`根据 Base URL，通信协议已自动修正为 ${targetFormat === 'openai' ? 'OpenAI' : targetFormat === 'gemini' ? 'Gemini' : 'Claude'} 协议。`, `Based on Base URL, the protocol format was auto-fixed to ${targetFormat}.`)
+      );
+    }
+  }, [providerForm.baseUrl, providerForm.format, pick]);
+
+  // 3. 简体中文注释：官方接口密钥格式诊断
+  const officialKeyDiagnostics = useMemo(() => {
+    const key = officialForm.key.trim();
+    if (!key || isReadonlySecretPlaceholder(key)) return '';
+
+    if (officialForm.provider === 'Google') {
+      if (/\s/.test(officialForm.key)) {
+        return pick(
+          '⚠️ 密钥中包含空格或换行，可能会导致接口认证失败，请检查。',
+          '⚠️ The key contains spaces or newlines, which may cause authentication failure. Please check.'
+        );
+      }
+      if (!key.startsWith('AIzaSy')) {
+        return pick(
+          '⚠️ Google AI Studio 密钥通常以 "AIzaSy" 开头，请确保您输入了正确的 API 密钥。',
+          '⚠️ Google AI Studio keys typically start with "AIzaSy". Please ensure you entered the correct API key.'
+        );
+      }
+    }
+
+    if (officialForm.provider === 'OpenAI') {
+      if (/\s/.test(officialForm.key)) {
+        return pick(
+          '⚠️ 密钥中包含空格或换行，可能会导致接口认证失败，请检查。',
+          '⚠️ The key contains spaces or newlines, which may cause authentication failure. Please check.'
+        );
+      }
+      if (!key.startsWith('sk-')) {
+        return pick(
+          '⚠️ OpenAI 官方密钥通常以 "sk-" 开头，请确保您输入了正确的 API 密钥。',
+          '⚠️ OpenAI keys typically start with "sk-". Please ensure you entered the correct API key.'
+        );
+      }
+    }
+
+    return '';
+  }, [officialForm.key, officialForm.provider, pick]);
 
   const runtimeOfficialSlots = useMemo(() => slots.filter(isOfficialSlot), [slots]);
   const runtimeThirdPartyProviders = useMemo(() => [...providers].sort((a, b) => b.updatedAt - a.updatedAt), [providers]);
@@ -3028,9 +3136,15 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               onChange={(value) => setOfficialForm((current) => ({ ...current, key: value }))}
               placeholder={pick('输入本地 API 的 API Key', 'Enter the local API key')}
               type="password"
-              helper={pick('这里只保存当前接口使用的密钥，不会和刷新动作混用。', 'This field only saves the key for this endpoint and does not trigger refresh behavior.')}
+              helper={pick('这里只保存当前接口使用的密钥，不会 and 刷新动作混用。', 'This field only saves the key for this endpoint and does not trigger refresh behavior.')}
               disabled={userApiEditorReadOnly}
             />
+
+            {officialKeyDiagnostics ? (
+              <div className="mt-2 rounded-[18px] border px-4 py-2.5 text-[12px] leading-5 text-[var(--state-warning-text)] bg-[var(--state-warning-bg)]/10 border-[var(--state-warning-border)] animate-fadeIn">
+                {officialKeyDiagnostics}
+              </div>
+            ) : null}
 
             <div>
               <div className="mb-2 text-[13px] font-medium text-[var(--text-primary)]">{pick('预算策略', 'Budget rule')}</div>
@@ -3135,14 +3249,60 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               />
             </div>
 
+            <div className="mb-2">
+              <div className="mb-2 text-[13px] font-medium text-[var(--text-primary)]">{pick('智能预设 (快捷填充)', 'Smart Presets')}</div>
+              <div className="flex flex-wrap gap-2">
+                {PROVIDER_PRESETS.map((preset) => (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    className="px-3 py-1 text-xs rounded-full border bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] transition-all cursor-pointer font-medium"
+                    style={{ borderColor: preset.color }}
+                    onClick={() => {
+                      setProviderForm((current) => ({
+                        ...current,
+                        name: preset.name,
+                        baseUrl: preset.baseUrl,
+                        format: preset.format,
+                        color: preset.color,
+                      }));
+                      notify.success(
+                        pick('已载入预设', 'Preset Loaded'),
+                        pick(`已载入 ${preset.name} 预设配置，通信协议已设为 ${preset.format}。`, `Loaded ${preset.name} preset configuration, format set to ${preset.format}.`)
+                      );
+                    }}
+                  >
+                    <span style={{ color: preset.color }} className="mr-1">●</span>
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <SettingInput
               label={pick('基础地址', 'Base URL')}
               value={providerForm.baseUrl}
               onChange={(value) => setProviderForm((current) => ({ ...current, baseUrl: value }))}
+              onBlur={autoFixProviderFormat}
               placeholder="https://api.example.com/v1"
               helper={pick('通信检测、模型拉取和价格同步都会基于这里的地址。', 'Connectivity checks, model sync, and pricing sync all use this URL.')}
               disabled={providerEditorReadOnly}
             />
+
+            {routingConflictWarning ? (
+              <div className="mt-2 rounded-[18px] border px-4 py-2.5 text-[12px] leading-5 text-[var(--state-warning-text)] bg-[var(--state-warning-bg)]/10 border-[var(--state-warning-border)] animate-fadeIn">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">{routingConflictWarning}</div>
+                  <button
+                    type="button"
+                    className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold underline shrink-0 cursor-pointer"
+                    onClick={autoFixProviderFormat}
+                  >
+                    {pick('一键纠正', 'Auto-fix')}
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             <div className="grid gap-4 lg:grid-cols-2">
               <SettingInput

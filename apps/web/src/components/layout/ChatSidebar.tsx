@@ -1,6 +1,6 @@
 
 import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Bot, Check, ChevronDown, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2 } from 'lucide-react';
+import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2 } from 'lucide-react';
 import { generateImage } from '../../services/llm/geminiService';
 import { llmService } from '../../services/llm/LLMService';
 import { notify } from '../../services/system/notificationService';
@@ -1768,21 +1768,21 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                     }}
                     onMouseDown={registerActivity}
                     onWheel={registerActivity}
-                    className={`fixed z-[100] flex flex-col border overflow-hidden ${isMobile
-                        ? 'left-2 right-2 rounded-[32px] border pb-0'
-                        : 'top-0 right-0 bottom-0 border-l'
+                    className={`fixed z-[100] flex flex-col overflow-hidden ${isMobile
+                        ? 'left-0 right-0 top-0 bottom-0 border-none pb-0'
+                        : 'top-0 right-0 bottom-0 border-l border-[var(--border-light)]'
                         }`}
                     style={isMobile ? {
-                        top: 'calc(env(safe-area-inset-top, 0px) + var(--mobile-header-height, 56px) + 10px)',
-                        bottom: keyboardHeight > 0
-                            ? 'max(env(safe-area-inset-bottom, 0px), 6px)'
-                            : 'calc(env(safe-area-inset-bottom, 0px) + var(--mobile-tabbar-height, 72px) + var(--mobile-tabbar-floating-offset, 12px) + 8px)',
-                        background: 'var(--frost-card-framework-bg)',
-                        borderColor: 'var(--frost-card-framework-border)',
-                        boxShadow: 'var(--frost-card-framework-shadow)',
-                        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
-                        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
-                        transition: 'top 0.25s ease, bottom 0.25s ease'
+                        top: 0,
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        height: '100%',
+                        width: '100%',
+                        background: 'var(--bg-primary)',
+                        paddingTop: 'env(safe-area-inset-top, 0px)',
+                        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+                        transition: 'none'
                     } : {
                         // Full height sidebar on the right
                         width: `${sidebarWidth}px`,
@@ -1826,29 +1826,40 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
                     {/* Session Header */}
                     <div
-                        className={`relative z-10 flex flex-col border-b shrink-0 ${isMobile ? 'pt-3' : 'pt-4'}`}
+                        className={`relative z-10 flex flex-col border-b shrink-0 ${isMobile ? 'pt-1.5' : 'pt-4'}`}
                         style={{
-                            background: 'var(--frost-card-main-bg)',
-                            borderColor: 'var(--frost-card-main-border)',
+                            background: 'var(--bg-secondary)',
+                            borderColor: 'var(--border-light)',
                         }}
                     >
-                        <div className="flex items-center justify-between px-4 pb-3">
-                            {/* Left: Active Session Title */}
-                            <div className="flex-1 min-w-0 flex items-center gap-2">
+                        <div className="flex items-center justify-between px-4 pb-3 pt-2">
+                            {/* 左侧：返回/关闭（仅移动端显示，高原生体验） */}
+                            {isMobile ? (
+                                <button
+                                    onClick={onClose || onToggle}
+                                    className="p-2 -ml-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] active:bg-[var(--toolbar-hover)] rounded-full transition-colors flex items-center justify-center shrink-0"
+                                    title="返回"
+                                >
+                                    <ChevronLeft size={22} />
+                                </button>
+                            ) : null}
+
+                            {/* 中间：会话标题重命名 */}
+                            <div className={`flex-1 min-w-0 flex items-center ${isMobile ? 'justify-center px-2' : 'gap-2'}`}>
                                 <button
                                     onClick={() => handleRenameSession(activeSessionId)}
-                                    className="flex items-center gap-2 max-w-full group hover:bg-[var(--toolbar-hover)] px-2 py-1 rounded-lg transition-colors cursor-text"
+                                    className={`flex items-center max-w-full group hover:bg-[var(--toolbar-hover)] px-2.5 py-1 rounded-lg transition-colors cursor-text ${isMobile ? 'justify-center gap-1.5' : 'gap-2'}`}
                                     title="点击重命名"
                                 >
-                                    <MessageSquare size={16} className="text-[var(--primary)] shrink-0" />
-                                    <span className="font-medium text-sm text-[var(--text-primary)] truncate">
+                                    {!isMobile && <MessageSquare size={16} className="text-[var(--primary)] shrink-0" />}
+                                    <span className="font-semibold text-sm text-[var(--text-primary)] truncate">
                                         {activeSession?.title || '新对话'}
                                     </span>
                                 </button>
                             </div>
 
-                            {/* Right: Actions */}
-                            <div className="flex items-center gap-1 shrink-0 ml-4 mb-2">
+                            {/* 右侧：控制动作组 */}
+                            <div className="flex items-center gap-1 shrink-0">
                                 <button
                                     onClick={handleNewSession}
                                     className="p-1.5 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--primary)] hover:bg-[var(--primary-light)] rounded-md transition-colors"
@@ -1863,14 +1874,18 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                 >
                                     <Layout size={18} />
                                 </button>
-                                <div className="w-px h-4 bg-white/10 mx-1 border-[var(--border-light)]" />
-                                <button
-                                    onClick={onToggle}
-                                    className="p-1.5 flex items-center justify-center text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors"
-                                    title="关闭侧边栏"
-                                >
-                                    <X size={18} />
-                                </button>
+                                {!isMobile && (
+                                    <>
+                                        <div className="w-px h-4 bg-white/10 mx-1 border-[var(--border-light)]" />
+                                        <button
+                                            onClick={onToggle}
+                                            className="p-1.5 flex items-center justify-center text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors"
+                                            title="关闭侧边栏"
+                                        >
+                                            <X size={18} />
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
 
