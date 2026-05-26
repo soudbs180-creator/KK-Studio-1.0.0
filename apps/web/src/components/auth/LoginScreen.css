@@ -157,11 +157,12 @@ body.auth-screen-active.auth-screen-active--light #root {
   margin-right: auto;
   max-height: calc(100vh - 36px);
   overflow: auto;
-  background: linear-gradient(180deg, rgba(13, 22, 40, 0.9), rgba(8, 14, 26, 0.84));
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(20px);
+  background: var(--frost-card-framework-bg, linear-gradient(180deg, rgba(13, 22, 40, 0.9), rgba(8, 14, 26, 0.84)));
+  border: 1px solid var(--frost-card-framework-border, rgba(255, 255, 255, 0.2));
+  backdrop-filter: blur(var(--frost-card-framework-blur, 20px));
+  -webkit-backdrop-filter: blur(var(--frost-card-framework-blur, 20px));
   border-radius: 26px;
-  box-shadow: 0 28px 80px rgba(2, 7, 18, 0.45);
+  box-shadow: var(--frost-card-framework-shadow, 0 28px 80px rgba(2, 7, 18, 0.45));
   padding: 26px;
 }
 
@@ -714,9 +715,9 @@ body.auth-screen-active.auth-screen-active--light #root {
 }
 
 .auth-page--light .auth-panel {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 248, 255, 0.92));
-  border: 1px solid rgba(120, 150, 200, 0.26);
-  box-shadow: 0 28px 80px rgba(77, 109, 163, 0.18);
+  background: var(--frost-card-framework-bg, linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 248, 255, 0.92)));
+  border: 1px solid var(--frost-card-framework-border, rgba(120, 150, 200, 0.26));
+  box-shadow: var(--frost-card-framework-shadow, 0 28px 80px rgba(77, 109, 163, 0.18));
 }
 
 .auth-page--light .auth-link-back {

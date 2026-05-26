@@ -1757,11 +1757,14 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             {!isOpen && !isMobile && (
                 <button
                     onClick={onToggle}
-                    className="fixed right-0 top-1/2 -translate-y-1/2 z-[100] flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b border-[var(--frost-card-framework-border)] hover:bg-[var(--toolbar-hover)] transition-all group shadow-md"
+                    className="fixed right-0 top-1/2 -translate-y-1/2 z-[2000] flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b border-[var(--frost-card-framework-border)] hover:bg-[var(--toolbar-hover)] transition-all group shadow-md"
                     style={{
                         background: 'var(--frost-card-framework-bg)',
-                        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
-                        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                        borderColor: 'var(--frost-card-framework-border)',
+                        borderWidth: '1px 0 1px 1px',
+                        borderStyle: 'solid',
+                        backdropFilter: 'blur(var(--frost-card-framework-blur, 20px)) saturate(160%)',
+                        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur, 20px)) saturate(160%)',
                     }}
                     title="展开 AI 助手"
                 >
@@ -1823,11 +1826,14 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                     {!isMobile && (
                         <button
                             onClick={onToggle}
-                            className="absolute -left-6 top-1/2 -translate-y-1/2 z-[100] flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b border-[var(--frost-card-framework-border)] hover:bg-[var(--toolbar-hover)] transition-all group shadow-md"
+                            className="absolute -left-6 top-1/2 -translate-y-1/2 z-[2000] flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b border-[var(--frost-card-framework-border)] hover:bg-[var(--toolbar-hover)] transition-all group shadow-md"
                             style={{
                                 background: 'var(--frost-card-framework-bg)',
-                                backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
-                                WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+                                borderColor: 'var(--frost-card-framework-border)',
+                                borderWidth: '1px 0 1px 1px',
+                                borderStyle: 'solid',
+                                backdropFilter: 'blur(var(--frost-card-framework-blur, 20px)) saturate(160%)',
+                                WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur, 20px)) saturate(160%)',
                             }}
                             title="折叠 AI 助手"
                         >
