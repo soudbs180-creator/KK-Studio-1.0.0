@@ -9,7 +9,7 @@ $PortableDistDir = Join-Path $AppDir 'dist'
 $WebScript = Join-Path $AppDir 'portable-app-server.cjs'
 $UpdateScript = Join-Path $ReleaseRoot 'support\portable-self-update.ps1'
 $UpdateConfig = Join-Path $ReleaseRoot 'support\update-config.json'
-$PaymentDir = Join-Path $AppDir 'payment-server'
+$PaymentDir = Join-Path $AppDir 'server'
 $PaymentScript = Join-Path $PaymentDir 'index.js'
 $PaymentEnv = Join-Path $PaymentDir '.env'
 $WebPidFile = Join-Path $RunDir 'web.pid'
@@ -364,7 +364,7 @@ if ((Test-Path -LiteralPath $PaymentScript) -and (Test-Path -LiteralPath $Paymen
         -StdErrLog (Join-Path $LogDir 'payment.err.log') | Out-Null
 } elseif (Test-Path -LiteralPath $PaymentScript) {
     $note = @(
-        "Payment sidecar was not started because app\payment-server\.env is missing.",
+        "Payment sidecar was not started because app\server\.env is missing.",
         "The main app still works. Payment features stay disabled until that file is provided."
     ) -join [Environment]::NewLine
     Set-Content -LiteralPath (Join-Path $LogDir 'payment.note.txt') -Value $note -Encoding utf8

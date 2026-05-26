@@ -2608,8 +2608,9 @@ const AppContent: React.FC<AppContentProps> = () => {
     setFocusedGroupId(sourceImage?.parentPromptId || null);
     selectNodes([imageId], (window.event as any)?.shiftKey ? 'toggle' : 'replace');
 
+    resetEcommerceSourceSelectionState();
     // 🚀 点击卡片时不再在画布自动生成 Draft 框和拉连线，相关交互已转移至灯箱
-  }, [imageNodesById, selectNodes]);
+  }, [imageNodesById, selectNodes, resetEcommerceSourceSelectionState]);
 
   const handleMobileUseImageAsSource = useCallback((imageId: string) => {
     handleImageClick(imageId);
@@ -2627,7 +2628,9 @@ const AppContent: React.FC<AppContentProps> = () => {
       ...prev,
       referenceImages: [refImg]
     }));
-    notify.success('参考图已设置', '已将当前图像设为参考图继续创作');
+    import('./services/system/notificationService').then(({ notify }) => {
+      notify.success('参考图已设置', '已将当前图像设为参考图继续创作');
+    });
   }, [setConfig]);
   const {
     resolveEcommercePartialRedrawContext,

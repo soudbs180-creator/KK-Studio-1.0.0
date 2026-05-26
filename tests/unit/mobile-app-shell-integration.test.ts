@@ -14,7 +14,7 @@ test('App delegates mobile rendering to MobileWorkspaceSurface instead of assemb
 
   assert.match(appSource, /import AppMobileWorkspace from '\.\/app\/AppMobileWorkspace';/);
   assert.match(appSource, /<AppMobileWorkspace/);
-  assert.match(appMobileWorkspaceSource, /import \{ MobileWorkspaceSurface \} from '\.\.\/components\/mobile';/);
+  assert.match(appMobileWorkspaceSource, /import \{[\s\S]*?MobileWorkspaceSurface[\s\S]*?\} from '\.\.\/components\/mobile';/);
   assert.match(appMobileWorkspaceSource, /<MobileWorkspaceSurface/);
   assert.doesNotMatch(appSource, /const mobileHeader = isMobile \?/);
   assert.doesNotMatch(appSource, /const mobileFeed = isMobile \?/);

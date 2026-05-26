@@ -12,7 +12,7 @@
   "versionTargets": {
     "releaseManifest": "config/release-manifest.json",
     "rootPackage": "package.json",
-    "paymentServerPackage": "payment-server/package.json",
+    "paymentServerPackage": "server/package.json",
     "workspacePackages": [
       "packages/shared/package.json",
       "packages/api-client/package.json",

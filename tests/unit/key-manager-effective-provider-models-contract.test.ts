@@ -56,7 +56,7 @@ test("effective provider model helper preserves official defaults and custom pro
   });
   assert.equal(officialGoogleModels[0], "gemini-3.1-pro-preview");
   assert.ok(officialGoogleModels.includes("gemini-3.1-flash-image-preview"));
-  assert.ok(officialGoogleModels.includes("imagen-4.0-fast-generate-001"));
+  assert.ok(officialGoogleModels.includes("gemini-2.5-flash-image"));
 
   assert.deepEqual(resolveEffectiveProviderModels({
     provider: "OpenAI",

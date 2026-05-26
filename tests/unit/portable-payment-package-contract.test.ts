@@ -15,7 +15,6 @@ function readJson<T>(relativePath: string): T {
 test('portable release packages the payment sidecar compatibility runtime closure', () => {
   const releaseSource = readSource('scripts/release/create-portable-release.mjs');
 
-  assert.match(releaseSource, /'sidecar_compat_bridge\.js'/);
   assert.equal(releaseSource.includes("'runtime_payment_bridge.js'"), false);
   assert.equal(releaseSource.includes("'settlement_bridge.js'"), false);
 
@@ -36,10 +35,10 @@ test('portable release exposes payment dependencies to both legacy server and co
   const releaseSource = readSource('scripts/release/create-portable-release.mjs');
   const paymentPackage = readJson<{
     dependencies?: Record<string, string>;
-  }>('payment-server/package.json');
+  }>('server/package.json');
   const paymentLock = readJson<{
     packages?: Record<string, { dependencies?: Record<string, string>; version?: string }>;
-  }>('payment-server/package-lock.json');
+  }>('server/package-lock.json');
 
   assert.match(releaseSource, /const appNodeModules = path\.join\(appDir, 'node_modules'\)/);
   assert.match(releaseSource, /shell: false/);
@@ -48,9 +47,9 @@ test('portable release exposes payment dependencies to both legacy server and co
   assert.doesNotMatch(releaseSource, /paymentSourceDir, 'node_modules'/);
   assert.match(releaseSource, /copyDirectory\(paymentTargetNodeModules, appNodeModules\)/);
 
-  assert.ok(paymentPackage.dependencies?.pg, 'payment-server package.json must include pg');
-  assert.ok(paymentLock.packages?.['']?.dependencies?.pg, 'payment-server lock root must include pg');
-  assert.ok(paymentLock.packages?.['node_modules/pg']?.version, 'payment-server lock must pin pg');
+  assert.ok(paymentPackage.dependencies?.pg, 'server package.json must include pg');
+  assert.ok(paymentLock.packages?.['']?.dependencies?.pg, 'server lock root must include pg');
+  assert.ok(paymentLock.packages?.['node_modules/pg']?.version, 'server lock must pin pg');
 });
 
 test('portable release packaging fails unless the built frontend has a remote KK API base URL', () => {

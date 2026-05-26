@@ -167,7 +167,7 @@ function loadStatusRouteHarness(options: RouteHarnessOptions = {}) {
   console.error = () => undefined;
   console.log = () => undefined;
 
-  const modulePath = require.resolve("../../payment-server/index.js");
+  const modulePath = require.resolve("../../server/index.js");
   delete require.cache[modulePath];
 
   try {

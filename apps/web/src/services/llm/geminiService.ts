@@ -13,6 +13,7 @@ import {
   SECURE_PROXY_GUEST_MODE_MESSAGE,
   SECURE_PROXY_SESSION_REAUTH_MESSAGE,
 } from '../model/secureModelProxy';
+import { normalizeModelId } from '../../utils/modelIdNormalization';
 
 // AbortController map to track active requests
 const abortControllers = new Map<string, AbortController>();
@@ -228,6 +229,9 @@ export const generateImage = async (
     onSyncBridgeRegistered?: (requestId: string, startedAt?: number) => void;
   }
 ): Promise<GenerateImageResult> => {
+  // 🚀 优先对传入的模型 ID 进行归一化，将可能包含的废弃或未公开模型（如 Imagen 系列）自动迁移到最新的可用模型
+  model = normalizeModelId(model) as ModelType;
+
   // 🚀 Parse Model Suffix (Consistency)
   const parsedSuffix = parseModelSuffix(model);
   if (parsedSuffix.baseModel !== model) {

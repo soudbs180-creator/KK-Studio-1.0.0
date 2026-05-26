@@ -162,9 +162,9 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
           )
         ) : (
           <div className="relative">
-            <div className="flex gap-3 items-start pb-1">
+            <div className="flex gap-2 items-start pb-1">
               {columnsData.map((column, colIdx) => (
-                <div key={colIdx} className="flex flex-1 flex-col gap-3 min-w-0">
+                <div key={colIdx} className="flex flex-1 flex-col gap-2 min-w-0">
                   {column.map((entry) => {
                     const gridMetrics = getAdaptiveResultTileGridMetrics({
                       surface,

@@ -70,6 +70,12 @@ export const MODEL_MIGRATION_MAP: Record<string, string> = {
     'gemini-flash-latest': 'gemini-2.5-flash',
     'gemini-pro-latest': 'gemini-2.5-pro',
     'gemini-3-pro-image': 'gemini-3-pro-image-preview',
+    // 迁移废弃或未公开的 Imagen 图像模型至最新的 Gemini 原生图像模型（Nano Banana 系列）以避免 404 错误
+    'imagen-4.0-ultra-generate-001': 'gemini-3-pro-image-preview',
+    'imagen-4.0-generate-001': 'gemini-2.5-flash-image',
+    'imagen-4.0-fast-generate-001': 'gemini-2.5-flash-image',
+    'imagen-3.0-generate-001': 'gemini-2.5-flash-image',
+    'imagen-3.0-generate-002': 'gemini-2.5-flash-image',
 };
 
 /**

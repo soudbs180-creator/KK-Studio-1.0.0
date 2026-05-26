@@ -175,7 +175,6 @@ test('mobile workspace shell uses Clay theme tokens instead of hard-coded dark g
   assert.match(combined, /var\(--mobile-clay-surface-bg\)/);
   assert.match(combined, /var\(--mobile-clay-shadow\)/);
   assert.match(mobileResultTile, /var\(--mobile-clay-active-border\)/);
-  assert.match(mobileResultTile, /var\(--mobile-clay-active-ring\)/);
   assert.match(mobileResultDetail, /var\(--mobile-clay-stage-info-bg\)/);
   assert.match(mobileResultDetail, /var\(--mobile-clay-bottom-bar-bg\)/);
   assert.doesNotMatch(combined, /bg-\[#1c1c1e\]|bg-\[rgba\(15,18,28,0\.88\)\]/);

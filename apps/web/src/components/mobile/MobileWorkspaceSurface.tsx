@@ -177,7 +177,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
           <div
             className="relative rounded-t-[30px] border px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 text-[var(--text-primary)]"
             style={{
-              background: 'rgba(20, 20, 22, 0.90)',
+              background: 'linear-gradient(to bottom, rgba(20, 20, 22, 0.95) 0%, rgba(20, 20, 22, 0.65) 100%)',
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)',
               borderColor: 'rgba(255, 255, 255, 0.08)',

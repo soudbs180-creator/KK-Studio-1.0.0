@@ -439,8 +439,35 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!isShellReady) return;
 
         const init = async () => {
-            // 简体中文注释：初始进度设为 10%
-            setLoadingProgress(10);
+            // 简体中文注释：启动假进度条定时器以在手机端/电脑端均能平滑看到 1~100 加载过程
+            let progress = 0;
+            const progressTimer = setInterval(() => {
+                progress += Math.random() * 15 + 5;
+                if (progress >= 99) {
+                    progress = 99;
+                    clearInterval(progressTimer);
+                }
+                setLoadingProgress(Math.floor(progress));
+            }, 40);
+
+            const smoothProgressTo100 = () => {
+                return new Promise<void>((resolve) => {
+                    clearInterval(progressTimer);
+                    let current = progress;
+                    const endTimer = setInterval(() => {
+                        current += Math.random() * 25 + 15;
+                        if (current >= 100) {
+                            current = 100;
+                            setLoadingProgress(100);
+                            clearInterval(endTimer);
+                            resolve();
+                        } else {
+                            setLoadingProgress(Math.floor(current));
+                        }
+                    }, 30);
+                });
+            };
+
             await traceLocalPerformance('canvas-startup.restore-total', async () => {
                 const restoredState = traceLocalPerformance('canvas-startup.restore-local-state', () => restoreCanvasStateFromLocalStorage(STORAGE_KEY));
                 const startupState = restoredState
@@ -452,11 +479,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         setState(startupState);
                     });
                 }
-                // 简体中文注释：恢复初始状态完成，进度设为 20%
-                setLoadingProgress(20);
 
                 const startupImageHydrationPromise = traceLocalPerformance('canvas-startup.preview-hydration', () => 
-                    hydrateStartupPreviewImages(startupState, (pct) => setLoadingProgress(pct))
+                    hydrateStartupPreviewImages(startupState)
                 );
 
             try {
@@ -469,8 +494,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         const perm = await handle.queryPermission({ mode: 'readwrite' });
                         if (perm === 'granted') {
                             logInfo('CanvasContext', '已恢复本地文件夹', `folder: ${handle.name}`);
-                            // 简体中文注释：检测到文件夹权限已恢复，设置进度为 92% 并开始磁盘加载
-                            setLoadingProgress(92);
 
                             // [NEW] Load actual project data from disk to ensure sync
                             // This overrides localStorage state with the true file state
@@ -543,8 +566,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                         setState(prev => ({ ...prev, fileSystemHandle: handle, folderName: handle.name }));
                                     });
                                 }
-                                // 简体中文注释：磁盘工程数据载入完成，进度推进至 98%
-                                setLoadingProgress(98);
                             } catch (err) {
                                 console.error('Failed to load project from restored handle', err);
                                 // Fallback just connect
@@ -570,11 +591,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 } catch (error) {
                     console.error('Failed to load startup preview images:', error);
                 }
-                // 简体中文注释：所有核心加载任务均完毕，设定进度为 100% 并延迟 300ms 关闭加载状态
-                setLoadingProgress(100);
+                // 简体中文注释：所有核心加载任务均完毕，极速平滑飙升到 100% 并延迟 200ms 关闭加载状态
+                await smoothProgressTo100();
                 setTimeout(() => {
                     setIsLoading(false);
-                }, 300);
+                }, 200);
             }
             });
         };

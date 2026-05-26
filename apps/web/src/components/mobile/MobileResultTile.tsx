@@ -96,7 +96,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
 
   return (
     <article
-      className="relative min-w-0 rounded-[15px] border bg-[var(--mobile-clay-surface-bg)] transition-all duration-200"
+      className="relative min-w-0 rounded-[12px] border bg-[var(--mobile-clay-surface-bg)] transition-all duration-200 p-2 flex flex-col gap-2"
       style={{
         borderColor: isActive || isSource ? 'var(--mobile-clay-active-border)' : 'var(--mobile-clay-border)',
         boxShadow: 'none', // 简体中文注释：去除卡片外部阴影以保持扁平化设计
@@ -119,7 +119,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
       >
         {/* 核心展示区 */}
         <div
-          className="relative flex-1 min-h-0 w-full overflow-hidden bg-[var(--bg-tertiary)]"
+          className="relative flex-1 min-h-0 w-full overflow-hidden bg-[var(--bg-tertiary)] rounded-[8px]"
           style={!entry.isGenerating ? { aspectRatio: imageAspectRatio } : undefined}
         >
           {entry.isGenerating ? (
@@ -175,10 +175,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
             </div>
           )}
 
-          {/* 顶部暗色渐变过渡（为顶部时间/标签提供较高对比度，防死黑） */}
-          {!entry.isGenerating && (
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-black/75 via-black/30 to-transparent z-10" />
-          )}
+          {/* 简体中文注释：已移除顶部暗色渐变过渡，还原画面亮度和纯净度 */}
 
           {/* 绝对定位浮动层：时间（无框化） / 参考图标记 */}
           {!entry.isGenerating && (
@@ -210,7 +207,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
 
           {/* 标准模式单行底栏 */}
           {viewMode === 'standard' && !entry.isGenerating && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent px-2.5 pb-2 pt-5">
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 px-2.5 pb-2 pt-5">
               <div className="flex items-center justify-between text-[10px] text-white/90">
                 <span className="font-light opacity-80">{formatTimestamp(entry.timestamp)}</span>
                 <span className="truncate mx-1 opacity-70 max-w-[50%]">{entry.modelLabel}</span>

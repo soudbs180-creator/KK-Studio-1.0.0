@@ -77,9 +77,11 @@ describe('mobile home three-zone contract', () => {
       ],
     );
 
-    const wide = entries.find((entry) => entry.id === 'wide-hero');
-    const square = entries.find((entry) => entry.id === 'square-compact');
-    const portrait = entries.find((entry) => entry.id === 'portrait-standard');
+    const group = entries[0];
+    assert.ok(group, 'expected at least one group entry');
+    const wide = group.groupEntries?.find((entry) => entry.id === 'wide-hero');
+    const square = group.groupEntries?.find((entry) => entry.id === 'square-compact');
+    const portrait = group.groupEntries?.find((entry) => entry.id === 'portrait-standard');
 
     assert.equal(wide?.mobileLayout.aspectCategory, 'wide');
     assert.equal(wide?.mobileLayout.emphasis, 'wide');

@@ -18,7 +18,7 @@ test("project docs publish one runtime truth table for current and transitional 
   assert.match(projectStructureSource, /\| `apps\/web\/` \| `target-web` \|/);
   assert.match(projectStructureSource, /\| `apps\/api\/` \| `canonical-api` \|/);
   assert.match(projectStructureSource, /\| `apps\/payment-sidecar\/` \| `canonical-payment` \|/);
-  assert.match(projectStructureSource, /\| `payment-server\/` \| `transition-bridge` \|/);
+  assert.match(projectStructureSource, /\| `server\/` \| `transition-bridge` \|/);
 
   assert.match(rootGuideSource, /### Runtime Layout \(严格 AGENTS\)/);
   assert.match(rootGuideSource, /- `apps\/web\/` 为唯一的桌面端 Web 前端运行时。/);
@@ -42,8 +42,8 @@ test("verification chain includes integration tests and payment-server static ch
   assert.equal(packageJson.scripts["test:contract"], "node --test --test-isolation=none \"tests/contract/*.test.ts\"");
   assert.equal(packageJson.scripts["test:e2e"], "node --test --test-isolation=none \"tests/e2e/*.test.ts\"");
   assert.match(packageJson.scripts.test, /npm run test:integration/);
-  assert.match(packageJson.scripts.typecheck, /npm run typecheck:payment-server/);
-  assert.equal(packageJson.scripts["typecheck:payment-server"], "node scripts/ci/check-payment-server.mjs");
+  assert.match(packageJson.scripts.typecheck, /npm run typecheck:server/);
+  assert.equal(packageJson.scripts["typecheck:server"], "node scripts/ci/check-server.mjs");
   assert.match(packageJson.scripts["verify:changes"], /npm run test/);
   assert.match(packageJson.scripts["verify:changes"], /verify:prompt-group-drag/);
   assert.match(packageJson.scripts["verify:changes"], /verify:mobile-settings-smoke/);

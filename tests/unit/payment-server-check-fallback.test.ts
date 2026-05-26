@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('payment-server check script falls back to in-process syntax parsing when spawnSync is blocked', () => {
-  const source = readSource('scripts/check-payment-server.mjs');
+  const source = readSource('scripts/check-server.mjs');
 
   assert.match(source, /spawnSync\(process\.execPath, \["--check", file\]/);
   assert.match(source, /code === ['"]EPERM['"]/);

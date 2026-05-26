@@ -147,6 +147,8 @@ body.auth-screen-active.auth-screen-active--light #root {
   align-items: center;
   justify-content: center;
   padding: 18px;
+  min-height: 100vh; /* 简体中文注释：确保容器在手机端占满视口高度，使卡片垂直居中 */
+  width: 100%;
 }
 
 .auth-panel {

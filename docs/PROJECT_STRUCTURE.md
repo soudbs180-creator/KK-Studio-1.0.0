@@ -27,6 +27,35 @@ workspace/
 - `packages/ui`: reusable UI primitives only
 - `packages/contracts`: DTOs, envelopes, and generated/manual API clients
 - `packages/shared`: cross-runtime utilities such as env access, auth headers, and logging
+# Project Structure
+
+This document defines ownership rules for the KK Studio repository during the migration to the final `apps/* + packages/*` layout.
+
+## Target top-level layout
+
+```text
+apps/
+  web/
+  api/
+  payment-sidecar/
+packages/
+  ui/
+  contracts/
+  shared/
+  domain/
+docs/
+scripts/
+workspace/
+```
+
+## Ownership summary
+
+- `apps/web`: browser app shell, routes, modules, and typed API clients
+- `apps/api`: main API and privileged business logic
+- `apps/payment-sidecar`: payment providers, callbacks, order persistence, and settlement write-back
+- `packages/ui`: reusable UI primitives only
+- `packages/contracts`: DTOs, envelopes, and generated/manual API clients
+- `packages/shared`: cross-runtime utilities such as env access, auth headers, and logging
 - `packages/domain`: pure rules, policies, state machines, and repository interfaces
 
 ## Legacy status
@@ -37,7 +66,6 @@ The repository still contains frozen legacy roots:
 - `server/`
 - `api/`
 - `billing/`
-- `payment-server/`
 
 These paths are transitional. Do not introduce new primary logic there.
 
@@ -55,7 +83,6 @@ The repo is still mid-migration, so this table is the source of truth for what i
 | `apps/payment-sidecar/` | `canonical-payment` | Canonical payment service and settlement write-back runtime. |
 | `server/` | `transition-bridge` | Transitional server mounts kept alive during API migration. |
 | `api/` | `transition-bridge` | Root compatibility handlers and local-only edge-style entrypoints. |
-| `payment-server/` | `transition-bridge` | Legacy payment bridge and webhook shell that still exists during payment migration. |
 
 ## Runtime topology truth table
 
@@ -66,13 +93,11 @@ Use this table when deciding which runtime path is canonical versus transitional
 | `apps/api/` | `canonical` | Main business API / BFF | Owns auth-adjacent business routes, profile persistence, billing, workspace sync, generation, and model-proxy entrypoints. |
 | `apps/payment-sidecar/` | `canonical` | Main payment runtime | Owns checkout, callback handling, and settlement write-back. |
 | `server/` | `bridge` | Transitional wrapper only | Keeps old local/server entrypoints alive by mounting migrated `apps/api` route modules. Do not add new primary logic here. |
-| `payment-server/` | `bridge` | Transitional wrapper only | Forwards legacy payment-server flows into `apps/payment-sidecar`. Hosted deployments must not treat it as a second primary payment writer. |
 
 ### Hosted default
 
 - Hosted/Web must default to `apps/api` + PostgreSQL-backed hosted session/auth + `apps/payment-sidecar`.
-- `server/` and `payment-server/` are not canonical Hosted entrypoints.
-- If a hosted environment re-enables one of these paths, treat it as an explicit migration override and document it in the release runbook before shipping.
+- `server/` is not a canonical Hosted entrypoint.
 
 ## Web boundary
 

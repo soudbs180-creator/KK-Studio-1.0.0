@@ -30,7 +30,7 @@ test('AuthenticatedAppShell routes only fully signed-out users back to LoginScre
   assert.match(source, /import \{ useAuth \} from '\.\.\/context\/AuthContext';/);
   assert.match(source, /import \{ shouldShowLoginForAuthGate \} from '\.\/authGate';/);
   assert.match(source, /const \{ session, user, isTempUser, loading, sessionRecoveryWarning \} = useAuth\(\);/);
-  assert.match(source, /if \(loading\) \{\s*return <AppStartupScreen stage="session_ready" warning=\{sessionRecoveryWarning\} \/>\s*;\s*\}/);
+  assert.match(source, /if \(loading\) \{\s*\/\/ 简体中文注释：登录态检测期间直接显示纯黑占位，不使用大型进度条，秒进登录页面\s*return <div className="fixed inset-0 bg-\[#09090b\]" \/>;\s*\}/);
   assert.match(source, /if \(shouldShowLoginForAuthGate\(\{ user, session, isTempUser \}\)\) \{\s*return <LoginScreen \/>\s*;\s*\}/);
   assert.doesNotMatch(source, /if \(!user \|\| \(!session && !isTempUser\)\) \{\s*return <LoginScreen \/>\s*;\s*\}/);
   assert.doesNotMatch(source, /if \(!session \|\| !user \|\| isTempUser\) \{\s*return <LoginScreen \/>\s*;\s*\}/);

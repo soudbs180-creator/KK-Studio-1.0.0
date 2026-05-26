@@ -311,7 +311,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        <div className="relative overflow-hidden rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]">
+        <div className="relative overflow-hidden rounded-[12px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]">
           {currentActiveEntry.displaySrc ? (
             <img src={currentActiveEntry.displaySrc} alt={promptSummary} className="h-auto w-full object-cover" />
           ) : (
@@ -339,7 +339,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
         {ecommerceContinuation ? (
           <div
             data-testid="mobile-ecommerce-continuation-panel"
-            className="mt-3 rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3.5"
+            className="mt-3 rounded-[10px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3.5"
           >
             <div data-testid="mobile-ecommerce-stage-card" className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
@@ -365,7 +365,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
             </div>
 
             {frameworkStatus ? (
-              <div className="mt-3 rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]/45 p-3">
+              <div className="mt-3 rounded-[8px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]/45 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
@@ -409,7 +409,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
               </div>
             ) : null}
 
-            <div className="mt-3 rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]/45 p-3">
+            <div className="mt-3 rounded-[8px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]/45 p-3">
               <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
                 当前需求
               </div>
@@ -418,7 +418,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
               </div>
             </div>
 
-            <div className="mt-3 rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]/45 p-3">
+            <div className="mt-3 rounded-[8px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]/45 p-3">
               <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
                 素材角色
               </div>
@@ -442,12 +442,12 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
           </div>
         ) : null}
 
-        <div className="mt-3 rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3.5">
+        <div className="mt-3 rounded-[10px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3.5">
           <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">提示词</div>
           <div className="mt-2 whitespace-pre-wrap text-sm leading-6">{fullPrompt}</div>
         </div>
 
-        <div className="mt-3 rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3.5">
+        <div className="mt-3 rounded-[10px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3.5">
           <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
             参考图 ({currentActiveEntry.referenceImages.length})
           </div>
@@ -458,7 +458,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
                 return (
                   <div
                     key={referenceImage.id}
-                    className="h-16 w-16 shrink-0 overflow-hidden rounded-[16px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]"
+                    className="h-16 w-16 shrink-0 overflow-hidden rounded-[6px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]"
                   >
                     {src ? (
                       <img src={src} alt="Reference" className="h-full w-full object-cover" />

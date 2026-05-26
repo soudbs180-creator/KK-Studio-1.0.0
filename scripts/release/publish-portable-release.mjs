@@ -20,7 +20,7 @@ function printUsage() {
     "Options:",
     "  --base-url <url>        Public URL prefix for portable artifacts.",
     "  --channel <name>        Output channel under release/publish/. Default: stable.",
-    "  --allow-payment-env     Allow publishing a portable bundle that still contains app/payment-server/.env.",
+    "  --allow-payment-env     Allow publishing a portable bundle that still contains app/server/.env.",
     "",
   ].join("\n"));
 }
@@ -127,9 +127,9 @@ async function main() {
   const publishManifestPath = path.join(publishDir, "manifest.json");
   const existingPublishManifest = fs.existsSync(publishManifestPath) ? readJson(publishManifestPath) : null;
 
-  const paymentEnvPath = path.join(portableBundleDir, "app", "payment-server", ".env");
+  const paymentEnvPath = path.join(portableBundleDir, "app", "server", ".env");
   if (fs.existsSync(paymentEnvPath) && !options.allowPaymentEnv && process.env.KK_STUDIO_ALLOW_PORTABLE_PAYMENT_ENV !== "1") {
-    throw new Error("Portable bundle still contains app/payment-server/.env. Remove it or pass --allow-payment-env.");
+    throw new Error("Portable bundle still contains app/server/.env. Remove it or pass --allow-payment-env.");
   }
 
   const baseUrl = normalizeBaseUrl(options.baseUrl || process.env.KK_PORTABLE_PUBLISH_BASE_URL || deriveBaseUrlFromManifest(existingPublishManifest));

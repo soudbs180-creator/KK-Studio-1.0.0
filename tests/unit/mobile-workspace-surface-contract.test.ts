@@ -19,7 +19,7 @@ test('mobile workspace surface exposes the planned mobile screen contract', () =
   const headerSource = readSource('src/components/mobile/MobileHeader.tsx');
   const appShellSource = readSource('src/components/mobile/MobileAppShell.tsx');
 
-  assert.match(typesSource, /export type MobileSurfaceScreen = 'home' \| 'detail' \| 'more-sheet';/);
+  assert.match(typesSource, /export type MobileSurfaceScreen = 'home' \| 'detail' \| 'more-sheet' \| 'ecommerce';/);
   assert.match(typesSource, /export type ResponsiveSurface = 'phone' \| 'tablet' \| 'desktop';/);
   assert.match(typesSource, /export type ResultViewMode = 'standard' \| 'detail';/);
   assert.match(typesSource, /export type MobileSettingsSection = 'dashboard' \| 'api-management' \| 'consumption-records' \| 'system-logs';/);

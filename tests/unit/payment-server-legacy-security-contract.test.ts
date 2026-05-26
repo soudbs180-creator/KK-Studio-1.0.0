@@ -132,7 +132,7 @@ describe.skip("legacy payment-server security boundaries", () => {
       return originalModuleLoad.call(this, request, parent, isMain);
     };
 
-    const modulePath = require.resolve("../../payment-server/webhook.js");
+    const modulePath = require.resolve("../../server/routes/webhook.js");
     delete require.cache[modulePath];
 
     try {
@@ -238,7 +238,7 @@ describe.skip("legacy payment-server security boundaries", () => {
       return originalModuleLoad.call(this, request, parent, isMain);
     };
 
-    const modulePath = require.resolve("../../payment-server/index.js");
+    const modulePath = require.resolve("../../server/index.js");
     delete require.cache[modulePath];
 
     try {

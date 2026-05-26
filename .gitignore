@@ -95,12 +95,12 @@ release/publish/stable/*
 !scripts/release/**
 workspace/
 
-# Payment sidecar local files
-payment-server/.env
-payment-server/node_modules/
-payment-server/*.log
-payment-server/*.out.log
-payment-server/*.err.log
+# Server local files
+server/.env
+server/node_modules/
+server/*.log
+server/*.out.log
+server/*.err.log
 
 # Supabase CLI 临时文件
 supabase/.temp/

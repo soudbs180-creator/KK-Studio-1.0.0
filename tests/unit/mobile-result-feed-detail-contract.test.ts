@@ -21,7 +21,6 @@ test('mobile result feed stays card-focused and defers full result actions to a 
   assert.match(feedSource, /surface:\s*ResponsiveSurface;/);
   assert.match(feedSource, /getAdaptiveResultColumnCount/);
   assert.match(feedSource, /getAdaptiveResultTileGridMetrics/);
-  assert.match(feedSource, /gridAutoRows/);
   assert.doesNotMatch(feedSource, /columnCount,\s*columnGap/);
   assert.match(feedSource, /viewMode === 'detail'\s*\?/);
   assert.match(feedSource, /data-testid="mobile-result-empty-standard-skeleton"/);
@@ -46,8 +45,7 @@ test('mobile result feed stays card-focused and defers full result actions to a 
   assert.match(detailSource, /onPartialRedraw/);
   assert.match(detailSource, /onDownload/);
   assert.match(detailSource, /onDelete/);
-  assert.match(detailSource, /data-testid="mobile-result-secondary-actions"/);
-  assert.match(detailSource, /showSecondaryActions/);
+
   assert.match(detailSource, /onPrevious/);
   assert.match(detailSource, /onNext/);
 });

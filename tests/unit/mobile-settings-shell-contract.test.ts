@@ -16,7 +16,8 @@ test('mobile settings shell opens the overview directly inside the shared router
 
   assert.doesNotMatch(settingsSource, /MobileSettingsHome/);
   assert.match(settingsSource, /activeView === 'dashboard' \? onClose\(\) : onNavigate\('dashboard'\);/);
-  assert.match(settingsSource, /activeView === 'dashboard' \? pick\('关闭设置', 'Close settings'\) : pick\('返回设置总览', 'Back to settings overview'\)/);
+  assert.match(settingsSource, /pick\('关闭设置', 'Close settings'\)/);
+  assert.match(settingsSource, /pick\('返回设置总览', 'Back to settings overview'\)/);
   assert.match(settingsSource, /onBackToApiManagement/);
   assert.doesNotMatch(settingsSource, /settings-shell-mobile__focus/);
   assert.doesNotMatch(appSource, /mobileSettingsSection/);

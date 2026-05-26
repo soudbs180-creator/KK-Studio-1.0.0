@@ -12,8 +12,8 @@ const logsDir = path.join(releaseRoot, 'logs');
 const runDir = path.join(releaseRoot, 'run');
 
 const distSourceDir = path.join(rootDir, 'dist');
-const paymentSourceDir = path.join(rootDir, 'payment-server');
-const paymentTargetDir = path.join(appDir, 'payment-server');
+const paymentSourceDir = path.join(rootDir, 'server');
+const paymentTargetDir = path.join(appDir, 'server');
 const includePaymentEnv = process.argv.includes('--include-payment-env') || process.env.KK_STUDIO_INCLUDE_PAYMENT_ENV === '1';
 const releaseScriptSourceDir = path.join(rootDir, 'scripts', 'release');
 const portableAppServerSource = path.join(releaseScriptSourceDir, 'portable-app-server.cjs');
@@ -138,7 +138,7 @@ async function runCommand(command, args, options = {}) {
 async function ensurePaymentDependencies() {
   const paymentTargetNodeModules = path.join(paymentTargetDir, 'node_modules');
   const appNodeModules = path.join(appDir, 'node_modules');
-  ensureExists(path.join(paymentTargetDir, 'package-lock.json'), 'payment-server/package-lock.json was not found.');
+  ensureExists(path.join(paymentTargetDir, 'package-lock.json'), 'server/package-lock.json was not found.');
 
   const npmArgs = ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'];
   if (process.platform === 'win32') {
@@ -203,8 +203,8 @@ function buildStopBat() {
 
 function buildReadme() {
   const paymentNote = includePaymentEnv
-    ? 'payment-server/.env was included in this build.'
-    : 'payment-server/.env was intentionally not included. Local payment stays disabled until you add it manually.';
+    ? 'server/.env was included in this build.'
+    : 'server/.env was intentionally not included. Local payment stays disabled until you add it manually.';
 
   return [
     'KK Studio Portable',
@@ -226,7 +226,7 @@ function buildReadme() {
     '',
     'Payment note',
     `- ${paymentNote}`,
-    '- If you need local payment, place a valid .env file inside app/payment-server/.',
+    '- If you need local payment, place a valid .env file inside app/server/.',
     '',
     'Cloud deployment',
     '- This folder is only for portable local distribution.',
@@ -294,26 +294,22 @@ async function main() {
   }
 
   if (fs.existsSync(paymentSourceDir)) {
-    const paymentFiles = [
-      '.env.example',
-      'index.js',
-      'package-lock.json',
-      'package.json',
-      'sidecar_compat_bridge.js',
-      'webhook.js',
-    ];
+    await copyDirectory(paymentSourceDir, paymentTargetDir);
 
-    for (const relativeFile of paymentFiles) {
-      const sourcePath = path.join(paymentSourceDir, relativeFile);
-      if (fs.existsSync(sourcePath)) {
-        await copyFile(sourcePath, path.join(paymentTargetDir, relativeFile));
-      }
+    const targetNodeModules = path.join(paymentTargetDir, 'node_modules');
+    if (fs.existsSync(targetNodeModules)) {
+      await rm(targetNodeModules, { recursive: true, force: true });
+    }
+
+    const targetEnv = path.join(paymentTargetDir, '.env');
+    if (fs.existsSync(targetEnv)) {
+      await rm(targetEnv, { force: true });
     }
 
     if (includePaymentEnv) {
       const paymentEnvPath = path.join(paymentSourceDir, '.env');
       if (fs.existsSync(paymentEnvPath)) {
-        await copyFile(paymentEnvPath, path.join(paymentTargetDir, '.env'));
+        await copyFile(paymentEnvPath, targetEnv);
       }
     }
 

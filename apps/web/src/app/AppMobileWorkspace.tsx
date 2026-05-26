@@ -120,8 +120,8 @@ const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
       title="KK Studio"
       userName={userName}
       userAvatarUrl={userAvatarUrl}
-      balance={billingUiEnabled ? balance : 0}
-      balanceLoading={billingUiEnabled ? billingLoading : false}
+      balance={balance}
+      balanceLoading={billingLoading}
       projectName={activeCanvas?.name || '项目'}
       projectCount={projectCount}
       onOpenProjects={() => setMobileScreen('more-sheet')}

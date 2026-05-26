@@ -164,9 +164,9 @@ try {
 
     $preservedFiles = @(
         @{
-            Source = Join-Path $ReleaseRoot 'app\payment-server\.env'
-            Backup = Join-Path $preserveRoot 'app\payment-server\.env'
-            Restore = Join-Path $ReleaseRoot 'app\payment-server\.env'
+            Source = Join-Path $ReleaseRoot 'app\server\.env'
+            Backup = Join-Path $preserveRoot 'app\server\.env'
+            Restore = Join-Path $ReleaseRoot 'app\server\.env'
         },
         @{
             Source = Join-Path $ReleaseRoot 'support\update-config.json'

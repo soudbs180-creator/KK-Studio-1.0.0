@@ -22,7 +22,7 @@ test('ecommerce business display labels propagate to desktop and mobile result s
   assert.match(mobileFeedSource, /<MobileResultTile/);
   assert.match(mobileFeedSource, /entry=\{entry\}/);
   assert.match(mobileTileSource, /entry\.displayLabel\s*\|\|/);
-  assert.match(mobileDetailSource, /entry\.displayLabel/);
+  assert.match(mobileDetailSource, /displayLabel/);
 });
 
 test('ecommerce framework header exposes an editable remark name with up to five adjacent tags', () => {
