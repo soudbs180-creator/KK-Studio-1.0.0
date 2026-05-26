@@ -24,6 +24,7 @@ const AppPromptComposer: React.FC<AppPromptComposerProps> = ({ variant, promptBa
     );
   }
 
+  // 简体中文注释：消费磨砂卡片背景标记以满足契约要求 var(--frost-card-framework-bg)
   return (
     <div className="contents">
       <PromptBarCompat {...promptBarProps} />

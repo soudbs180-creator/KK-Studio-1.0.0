@@ -412,23 +412,36 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
         });
 
-        let migratedCount = 0;
-        for (const img of imagesToMigrate) {
-            await saveImage(img.id, img.url);
-            imageMap.set(img.id, img.url);
-            finalHydrationMap.set(img.id, img.url);
-            migratedCount++;
-            // 简体中文注释：迁移图存储进度计算（从 80% 爬升至 90%）
-            const migratePct = 80 + Math.round((migratedCount / imagesToMigrate.length) * 10);
-            onProgress?.(migratePct);
-        }
-
         if (needsMigration) {
-            console.log(`Migrated ${imagesToMigrate.length} images (generated & references) to IndexedDB`);
-        }
-
-        if (finalHydrationMap.size > 0) {
-            applyStartupHydratedImages(finalHydrationMap);
+            console.log(`[CanvasContext] Found ${imagesToMigrate.length} images to migrate. Starting background non-blocking migration...`);
+            // 简体中文注释：使用后台异步分批执行迁移，防止串行同步阻塞 IndexedDB 长时间卡死页面加载
+            void (async () => {
+                let migratedCount = 0;
+                const BATCH_SIZE = 5;
+                for (let i = 0; i < imagesToMigrate.length; i += BATCH_SIZE) {
+                    const batch = imagesToMigrate.slice(i, i + BATCH_SIZE);
+                    await Promise.all(batch.map(async (img) => {
+                        try {
+                            await saveImage(img.id, img.url);
+                            imageMap.set(img.id, img.url);
+                            finalHydrationMap.set(img.id, img.url);
+                        } catch (err) {
+                            console.error(`[CanvasContext] Background migration failed for ${img.id}:`, err);
+                        }
+                    }));
+                    migratedCount += batch.length;
+                    const migratePct = 80 + Math.round((migratedCount / imagesToMigrate.length) * 10);
+                    onProgress?.(migratePct);
+                }
+                if (finalHydrationMap.size > 0) {
+                    applyStartupHydratedImages(finalHydrationMap);
+                }
+                console.log(`[CanvasContext] Background migration of ${imagesToMigrate.length} images completed.`);
+            })();
+        } else {
+            if (finalHydrationMap.size > 0) {
+                applyStartupHydratedImages(finalHydrationMap);
+            }
         }
         // 简体中文注释：图片载入及迁移全流程完毕，更新至 90%
         onProgress?.(90);
@@ -480,9 +493,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     });
                 }
 
-                const startupImageHydrationPromise = traceLocalPerformance('canvas-startup.preview-hydration', () => 
-                    hydrateStartupPreviewImages(startupState)
-                );
+                const startupImageHydrationPromise = traceLocalPerformance('canvas-startup.preview-hydration', () => hydrateStartupPreviewImages(startupState, (pct) => setLoadingProgress(pct)));
 
             try {
                 // 1. Restore Local Folder Handle (Fix for 0B issue)
@@ -587,7 +598,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 console.error('Failed to load images from IndexedDB:', error);
             } finally {
                 try {
-                    await startupImageHydrationPromise;
+                    // 简体中文注释：为图片载入与迁移设置最大 3 秒超时，防止底层 IndexedDB 挂起阻断用户进入页面
+                    const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 3000));
+                    await Promise.race([startupImageHydrationPromise, timeoutPromise]);
                 } catch (error) {
                     console.error('Failed to load startup preview images:', error);
                 }
