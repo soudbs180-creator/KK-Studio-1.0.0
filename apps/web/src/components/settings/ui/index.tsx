@@ -196,11 +196,12 @@ export const SettingInput: React.FC<{
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   placeholder?: string;
   type?: 'text' | 'password' | 'number';
   helper?: string;
   disabled?: boolean;
-}> = ({ label, value, onChange, placeholder, type = 'text', helper, disabled = false }) => {
+}> = ({ label, value, onChange, onBlur, placeholder, type = 'text', helper, disabled = false }) => {
   return (
     <label className="block">
       <div
@@ -212,6 +213,7 @@ export const SettingInput: React.FC<{
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
         placeholder={placeholder}
         disabled={disabled}
         className={`${SETTINGS_INPUT_CLASSNAME} px-4`.trim()}

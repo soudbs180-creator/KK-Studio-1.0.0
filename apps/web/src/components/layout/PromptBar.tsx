@@ -21,6 +21,7 @@ import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../util
 import { X, Loader2, Sparkles, ChevronDown, Plus, Pin } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
+import { useLocale } from '../../context/LocaleContext';
 import { formatRemainingCredits } from '../../services/billing/remainingBalance';
 import { getModelCredits } from '../../services/model/modelPricing';
 import { adminModelService } from '../../services/model/adminModelService';
@@ -1146,6 +1147,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     ecommerceRatioOverride,
     onAnalyzeEcommerceFile,
 }) => {
+    const { pick } = useLocale();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     // Track composition state so IME input is not interrupted by background sync.
