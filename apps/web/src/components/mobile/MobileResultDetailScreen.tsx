@@ -162,6 +162,36 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
   onPrevious,
   onNext,
 }) => {
+  const [currentGroupImageIndex, setCurrentGroupImageIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    setCurrentGroupImageIndex(0);
+  }, [entry.id]);
+
+  const hasGroup = entry.groupEntries && entry.groupEntries.length > 0;
+  const currentActiveEntry = hasGroup && entry.groupEntries![currentGroupImageIndex]
+    ? entry.groupEntries![currentGroupImageIndex]
+    : entry;
+
+  const handlePrevAction = () => {
+    if (currentGroupImageIndex > 0) {
+      setCurrentGroupImageIndex((prev) => prev - 1);
+    } else if (onPrevious) {
+      onPrevious();
+    }
+  };
+
+  const handleNextAction = () => {
+    if (hasGroup && entry.groupEntries && currentGroupImageIndex < entry.groupEntries.length - 1) {
+      setCurrentGroupImageIndex((prev) => prev + 1);
+    } else if (onNext) {
+      onNext();
+    }
+  };
+
+  const canGoPrevious = currentGroupImageIndex > 0 || Boolean(onPrevious);
+  const canGoNext = (hasGroup && entry.groupEntries && currentGroupImageIndex < entry.groupEntries.length - 1) || Boolean(onNext);
+
   // 🚀 [移动端专属] 手势检测坐标 Refs
   const touchStartX = React.useRef(0);
   const touchStartY = React.useRef(0);
@@ -199,35 +229,34 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
 
       // 正常滑屏切换图片
       if (diffX > 0) {
-        if (onNext) onNext();
+        handleNextAction();
       } else {
-        if (onPrevious) onPrevious();
+        handlePrevAction();
       }
     }
   };
 
   const { pick } = useLocale();
-  const promptSummary = normalizeText(entry.promptSummary, '未命名结果');
-  const fullPrompt = normalizeText(entry.fullPrompt, promptSummary);
-  const ecommerceContinuation = entry.ecommerceContinuation;
+  const promptSummary = normalizeText(currentActiveEntry.promptSummary, '未命名结果');
+  const fullPrompt = normalizeText(currentActiveEntry.fullPrompt, promptSummary);
+  const ecommerceContinuation = currentActiveEntry.ecommerceContinuation;
   const metadataItems = [
-    entry.displayLabel ? { label: '任务', value: entry.displayLabel } : null,
+    currentActiveEntry.displayLabel ? { label: '任务', value: currentActiveEntry.displayLabel } : null,
     ecommerceContinuation?.outputTypeLabel &&
-    ecommerceContinuation.outputTypeLabel !== entry.displayLabel
+    ecommerceContinuation.outputTypeLabel !== currentActiveEntry.displayLabel
       ? { label: '模块', value: ecommerceContinuation.outputTypeLabel }
       : null,
     ecommerceContinuation?.declaredSizeText
       ? { label: '需求尺寸', value: ecommerceContinuation.declaredSizeText }
       : null,
-    { label: '比例', value: String(entry.aspectRatio) },
-    { label: '尺寸', value: String(entry.imageSize) },
-    { label: '素材', value: entry.hasOriginal ? '含原图' : '仅结果图' },
+    { label: '比例', value: String(currentActiveEntry.aspectRatio) },
+    { label: '尺寸', value: String(currentActiveEntry.imageSize) },
+    { label: '素材', value: currentActiveEntry.hasOriginal ? '含原图' : '仅结果图' },
   ].filter(Boolean) as Array<{ label: string; value: string }>;
-  const previewLabel = entry.hasOriginal ? '原图' : '无原图';
+  const previewLabel = currentActiveEntry.hasOriginal ? '原图' : '无原图';
   const ecommerceRequirementText = normalizeText(ecommerceContinuation?.taskPrompt, fullPrompt);
   const frameworkStatus = ecommerceContinuation?.frameworkStatus;
-  const [showSecondaryActions, setShowSecondaryActions] = React.useState(false);
- 
+
   return (
     <section
       data-testid="mobile-result-detail-screen"
@@ -236,30 +265,30 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
       <div className="flex items-start justify-between gap-3 px-4 pb-2 pt-[calc(env(safe-area-inset-top)+10px)]">
         <div className="min-w-0 flex-1">
           <div className="text-[10px] uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
-            结果详情
+            结果详情 {hasGroup ? `(${currentGroupImageIndex + 1}/${entry.groupEntries!.length})` : ''}
           </div>
           <div className="mt-1 truncate text-base font-semibold leading-6">{promptSummary}</div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-secondary)]">
-            <span>{formatTimestamp(entry.timestamp)}</span>
+            <span>{formatTimestamp(currentActiveEntry.timestamp)}</span>
             <span className="text-[var(--text-tertiary)]">路</span>
-            <span className="truncate">{entry.modelLabel}</span>
+            <span className="truncate">{currentActiveEntry.modelLabel}</span>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
-            onClick={onPrevious}
+            onClick={handlePrevAction}
             className={iconButtonClass}
-            disabled={!onPrevious}
+            disabled={!canGoPrevious}
             aria-label="查看上一张结果"
           >
             <ChevronLeft size={17} />
           </button>
           <button
             type="button"
-            onClick={onNext}
+            onClick={handleNextAction}
             className={iconButtonClass}
-            disabled={!onNext}
+            disabled={!canGoNext}
             aria-label="查看下一张结果"
           >
             <ChevronRight size={17} />
@@ -274,17 +303,17 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
           </button>
         </div>
       </div>
- 
+
       {/* 绑定全屏滑动手势的滚动主体容器 */}
-      <div 
-        className="relative flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+136px)]"
+      <div
+        className="relative flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+145px)]"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
         <div className="relative overflow-hidden rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]">
-          {entry.displaySrc ? (
-            <img src={entry.displaySrc} alt={promptSummary} className="h-auto w-full object-cover" />
+          {currentActiveEntry.displaySrc ? (
+            <img src={currentActiveEntry.displaySrc} alt={promptSummary} className="h-auto w-full object-cover" />
           ) : (
             <div className="flex aspect-[3/4] items-center justify-center text-[var(--text-secondary)]">
               暂无预览
@@ -410,10 +439,6 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
                 </div>
               )}
             </div>
-
-            <div className="mt-3 text-xs leading-5 text-[var(--text-tertiary)]">
-              编辑、确认生成和后续电商动作已收进底部更多菜单，避免详情首层按钮拥挤。
-            </div>
           </div>
         ) : null}
 
@@ -424,11 +449,11 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
 
         <div className="mt-3 rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3.5">
           <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-            参考图 ({entry.referenceImages.length})
+            参考图 ({currentActiveEntry.referenceImages.length})
           </div>
-          {entry.referenceImages.length > 0 ? (
+          {currentActiveEntry.referenceImages.length > 0 ? (
             <div className="mt-2.5 flex gap-2.5 overflow-x-auto pb-1">
-              {entry.referenceImages.map((referenceImage) => {
+              {currentActiveEntry.referenceImages.map((referenceImage) => {
                 const src = resolveReferenceImageSource(referenceImage);
                 return (
                   <div
@@ -453,83 +478,80 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
       </div>
 
       <div className="sticky bottom-0 border-t border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-bottom-bar-bg)] px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_48px] gap-2">
+        {/* 第一排平铺按钮 */}
+        <div className="grid grid-cols-3 gap-2">
           <ActionButton
             label="继续创作"
             icon={<Sparkles size={15} />}
             tone="primary"
-            onClick={() => onUseAsSource(entry.imageId)}
+            onClick={() => onUseAsSource(currentActiveEntry.imageId)}
           />
+          <ActionButton
+            label="局部重绘"
+            icon={<Wand2 size={15} />}
+            tone="primary"
+            onClick={() => onPartialRedraw(currentActiveEntry, noopPartialRedrawRequest(currentActiveEntry))}
+          />
+          <ActionButton
+            label="下载"
+            icon={<Download size={15} />}
+            onClick={() => onDownload(currentActiveEntry)}
+          />
+        </div>
+
+        {/* 第二排平铺按钮 */}
+        <div className="mt-2 grid grid-cols-2 gap-2">
           <ActionButton
             label={previewLabel}
             icon={<Eye size={15} />}
-            disabled={!entry.hasOriginal}
-            onClick={() => onPreviewOriginal(entry.imageId)}
+            disabled={!currentActiveEntry.hasOriginal}
+            onClick={() => onPreviewOriginal(currentActiveEntry.imageId)}
           />
-          <button
-            type="button"
-            onClick={() => setShowSecondaryActions((next) => !next)}
-            className="inline-flex min-h-[44px] items-center justify-center rounded-[16px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] text-[var(--text-primary)] transition active:scale-[0.99]"
-            aria-label="更多操作"
-            aria-expanded={showSecondaryActions}
-          >
-            <MoreHorizontal size={18} />
-          </button>
+          <ActionButton
+            label="删除"
+            icon={<Trash2 size={15} />}
+            tone="danger"
+            onClick={() => onDelete(currentActiveEntry.imageId)}
+          />
         </div>
 
-        {showSecondaryActions ? (
-          <div data-testid="mobile-result-secondary-actions" className="mt-2 grid grid-cols-2 gap-2">
-            <ActionButton
-              label="局部重绘"
-              icon={<Wand2 size={15} />}
-              tone="primary"
-              onClick={() => onPartialRedraw(entry, noopPartialRedrawRequest(entry))}
-            />
-            <ActionButton
-              label="下载"
-              icon={<Download size={15} />}
-              onClick={() => onDownload(entry)}
-            />
-            {ecommerceContinuation?.canToggleSelection ? (
+        {/* 电商专属动作排在底层 */}
+        {ecommerceContinuation ? (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {ecommerceContinuation.canToggleSelection ? (
               <ActionButton
                 label={ecommerceContinuation.selectedForGeneration ? '取消确认生成' : '确认生成'}
                 icon={<CheckCircle2 size={15} />}
                 tone={ecommerceContinuation.selectedForGeneration ? 'default' : 'primary'}
                 onClick={() =>
-                  onToggleEcommerceSelected(entry, !ecommerceContinuation.selectedForGeneration)
+                  onToggleEcommerceSelected(currentActiveEntry, !ecommerceContinuation.selectedForGeneration)
                 }
               />
             ) : null}
-            {ecommerceContinuation?.canEditTask ? (
+            {ecommerceContinuation.canEditTask ? (
               <ActionButton
                 label="编辑任务"
                 icon={<FileText size={15} />}
                 tone="primary"
-                onClick={() => onEditEcommerceTask(entry)}
+                onClick={() => onEditEcommerceTask(currentActiveEntry)}
               />
             ) : null}
-            {ecommerceContinuation?.kind === 'a-plus-module' ? (
+            {ecommerceContinuation.kind === 'a-plus-module' ? (
               <>
                 <ActionButton
                   label="确认桌面版"
                   icon={<CheckCircle2 size={15} />}
                   disabled={!ecommerceContinuation.canConfirmDesktop}
-                  onClick={() => onConfirmEcommerceDesktop(entry)}
+                  onClick={() => onConfirmEcommerceDesktop(currentActiveEntry)}
                 />
                 <ActionButton
                   label="生成手机版"
                   icon={<Sparkles size={15} />}
                   disabled={!ecommerceContinuation.canGenerateMobile}
-                  onClick={() => onGenerateEcommerceMobile(entry)}
+                  onClick={() => onGenerateEcommerceMobile(currentActiveEntry)}
                 />
               </>
             ) : null}
-            <ActionButton
-              label="删除"
-              icon={<Trash2 size={15} />}
-              tone="danger"
-              onClick={() => onDelete(entry.imageId)}
-            />
           </div>
         ) : null}
       </div>

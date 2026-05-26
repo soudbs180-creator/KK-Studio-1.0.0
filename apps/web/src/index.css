@@ -4808,7 +4808,7 @@ body.dark-mode .settings-panel {
 .settings-shell-mobile__topbar {
   margin: 12px 14px 0;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   background: var(--settings-nav-glass-bg);
@@ -7143,8 +7143,7 @@ body.dark-mode .settings-panel .apple-glass-card {
 .settings-panel .settings-action-row,
 .settings-panel .api-settings-provider-shell,
 .settings-panel .api-settings-editor-toolbar,
-.settings-panel .settings-shell-main__topbar,
-.settings-panel .settings-shell-mobile__topbar {
+.settings-panel .settings-shell-main__topbar {
   flex-wrap: wrap;
 }
 
@@ -9351,7 +9350,7 @@ body.dark-mode .settings-panel {
 
 .settings-shell-mobile__topbar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 14px;
   padding: calc(env(safe-area-inset-top, 0px) + 18px) 18px 18px;
@@ -10636,10 +10635,11 @@ body.dark-mode .settings-panel {
 
 .settings-panel .settings-reference-list-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  flex-wrap: nowrap;
   justify-content: space-between;
   gap: 14px;
-  border: none; /* Ƴɱ߿ */
+  border: none; /* 移除边框 */
   border-radius: 22px;
   padding: 15px 16px;
   background: var(--settings-surface-elevated);
@@ -12318,6 +12318,7 @@ body.dark-mode .settings-panel {
 .settings-panel .settings-shell-mobile__topbar {
   padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px 12px;
   gap: 10px;
+  align-items: center;
 }
 
 .settings-panel .settings-shell-mobile__title {
@@ -12564,7 +12565,9 @@ body.dark-mode .settings-panel {
 
 .settings-panel .settings-shell-page--mobile .settings-reference-list-item {
   border-radius: 14px;
-  padding: 12px;
+  padding: 10px 14px;
+  align-items: center;
+  flex-wrap: nowrap;
 }
 
 .settings-panel .settings-shell-page--mobile .settings-reference-list-item .h-10,

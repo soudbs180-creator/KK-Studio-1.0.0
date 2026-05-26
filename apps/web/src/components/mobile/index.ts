@@ -6,3 +6,4 @@ export { default as MobileResultDetailScreen } from './MobileResultDetailScreen'
 export { default as MobileTabBar } from './MobileTabBar';
 export { default as MobileWorkspaceQuickBar } from './MobileWorkspaceQuickBar';
 export { default as MobileWorkspaceSurface } from './MobileWorkspaceSurface';
+export { default as MobileEcommercePanel } from './MobileEcommercePanel';

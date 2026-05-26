@@ -41,16 +41,20 @@ interface MobileResultTileProps {
   onUseAsSource: (imageId: string) => void;
 }
 
-// 格式化时间戳，仅提取月和日，防止移动端布局过长折行
+// 格式化时间戳，仅提取月和日，防止移动端布局过长折行，加入 try-catch 防御 RangeError
 const formatTimestamp = (timestamp: number): string => {
-  if (!timestamp) {
+  try {
+    if (!timestamp || isNaN(new Date(timestamp).getTime())) {
+      return '刚刚更新';
+    }
+
+    return new Intl.DateTimeFormat('zh-CN', {
+      month: 'numeric',
+      day: 'numeric',
+    }).format(new Date(timestamp));
+  } catch (e) {
     return '刚刚更新';
   }
-
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: 'numeric',
-    day: 'numeric',
-  }).format(new Date(timestamp));
 };
 
 const normalizePromptSummary = (value: string): string => {
@@ -95,7 +99,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
       className="relative min-w-0 rounded-[15px] border bg-[var(--mobile-clay-surface-bg)] transition-all duration-200"
       style={{
         borderColor: isActive || isSource ? 'var(--mobile-clay-active-border)' : 'var(--mobile-clay-border)',
-        boxShadow: isActive || isSource ? 'var(--mobile-clay-active-ring)' : 'var(--mobile-clay-shadow)',
+        boxShadow: 'none', // 简体中文注释：去除卡片外部阴影以保持扁平化设计
         // 开启 GPU 硬件加速，防止在 iOS 等移动端浏览器下溢出圆角裁剪失效导致漏直角
         transform: 'translateZ(0)',
         WebkitTransform: 'translateZ(0)',
@@ -247,34 +251,6 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
           </div>
         )}
       </button>
-
-      {/* 支持两端操作按钮的交互 */}
-      {viewMode === 'detail' ? (
-        <div className="flex items-center justify-between gap-2 px-3 pb-3 pt-2">
-          <div className="min-w-0 text-[11px] text-[var(--text-secondary)]">
-            <span className="truncate">{entry.modelLabel}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => onUseAsSource(entry.imageId)}
-            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-2.5 text-[11px] font-medium text-[var(--text-primary)]"
-            title="继续创作"
-          >
-            <Sparkles size={13} />
-            <span className="whitespace-nowrap">继续</span>
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => onUseAsSource(entry.imageId)}
-          className="absolute right-2 top-10 inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--mobile-clay-active-border)] bg-[var(--accent-color)] text-[var(--text-inverse)] z-20"
-          title="继续创作"
-          aria-label="继续创作"
-        >
-          <Sparkles size={14} />
-        </button>
-      )}
     </article>
   );
 };

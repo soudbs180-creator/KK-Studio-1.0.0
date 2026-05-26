@@ -109,17 +109,19 @@ const DashboardRingRow: React.FC<{
   percent: number;
   helper: string;
   color: string;
-}> = ({ label, percent, helper, color }) => (
-  <div className="settings-reference-ring-row">
-    <div className="settings-reference-ring" style={{ ['--value' as string]: String(percent), ['--ring-color' as string]: color }}>
+  centerLabel?: string;
+}> = ({ label, percent, helper, color, centerLabel = 'Health' }) => (
+  // 简体中文注释：使用 items-center 居中对齐，调整 padding 使得其与 ActivityRow 一致
+  <div className="settings-reference-ring-row flex items-center gap-3" style={{ padding: '10px 14px' }}>
+    <div className="settings-reference-ring shrink-0" style={{ ['--value' as string]: String(percent), ['--ring-color' as string]: color }}>
       <div>
         <strong>{percent}%</strong>
-        <span>Health</span>
+        <span>{centerLabel}</span>
       </div>
     </div>
-    <div className="min-w-0 flex-1">
-      <div className="settings-reference-list-item__title">{label}</div>
-      <div className="settings-reference-list-item__meta">{helper}</div>
+    <div className="min-w-0 flex-1 flex flex-col justify-center">
+      <div className="settings-reference-list-item__title" style={{ fontSize: '13px', fontWeight: 600 }}>{label}</div>
+      <div className="settings-reference-list-item__meta truncate text-[11px]" style={{ marginTop: '2px', opacity: 0.7 }}>{helper}</div>
     </div>
   </div>
 );
@@ -133,29 +135,40 @@ const DashboardActivityRow: React.FC<{
   status?: React.ReactNode;
   onClick?: () => void;
 }> = ({ icon, title, summary, meta, value, status, onClick }) => (
-  <button type="button" className="settings-reference-list-item w-full text-left" onClick={onClick}>
-    <div className="flex min-w-0 flex-1 items-start gap-3">
+  <button 
+    type="button" 
+    className="settings-reference-list-item w-full text-left" 
+    onClick={onClick}
+    style={{ minHeight: '60px', display: 'flex', alignItems: 'center', padding: '10px 14px' }}
+  >
+    {/* 简体中文注释：使用 items-center 替换原本的 items-start，实现左侧图标、中间内容、右侧控件的整体垂向居中对齐 */}
+    <div className="flex min-w-0 flex-1 items-center gap-3">
       <div
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
         style={{
           border: '1px solid var(--settings-border-subtle)',
-          background:
-            'linear-gradient(180deg, rgb(255 255 255 / 0.03) 0%, transparent 100%), var(--settings-surface-overlay)',
+          background: 'var(--settings-surface-overlay)',
           color: 'var(--text-primary)',
         }}
       >
         {icon}
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="settings-reference-list-item__title">{title}</div>
+      <div className="min-w-0 flex-1 flex flex-col justify-center">
+        <div className="flex items-center gap-2">
+          <div className="settings-reference-list-item__title" style={{ fontSize: '13px', fontWeight: 600 }}>{title}</div>
           {status}
         </div>
-        <div className="settings-reference-list-item__meta">{summary}</div>
-        <div className="mt-2 text-[11px] uppercase tracking-[0.16em] text-[var(--text-tertiary)]">{meta}</div>
+        {/* 简体中文注释：将 meta 信息与 summary 拼合在同一行，从而完全杜绝第三排描述文案的出现，保证视觉行数严禁多于 2 行 */}
+        <div className="settings-reference-list-item__meta truncate text-[11px]" style={{ marginTop: '2px', opacity: 0.7 }}>
+          {summary}{meta ? ` · ${meta}` : ''}
+        </div>
       </div>
     </div>
-    {value ? <div className="settings-reference-list-item__value">{value}</div> : null}
+    {value ? (
+      <div className="settings-reference-list-item__value shrink-0 flex items-center" style={{ fontSize: '13px', fontWeight: 600 }}>
+        {value}
+      </div>
+    ) : null}
   </button>
 );
 

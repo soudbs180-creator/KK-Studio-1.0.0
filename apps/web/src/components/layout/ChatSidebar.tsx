@@ -1766,7 +1766,15 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                         scheduleAutoClose();
                         onHoverChange?.(false); // 通知App组件
                     }}
-                    onMouseDown={registerActivity}
+                    onClick={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => {
+                        registerActivity();
+                        e.stopPropagation();
+                    }}
+                    onMouseUp={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onTouchEnd={(e) => e.stopPropagation()}
                     onWheel={registerActivity}
                     className={`fixed z-[100] flex flex-col overflow-hidden ${isMobile
                         ? 'left-0 right-0 top-0 bottom-0 border-none pb-0'

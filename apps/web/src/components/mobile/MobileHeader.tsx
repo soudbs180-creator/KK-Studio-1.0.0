@@ -30,7 +30,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
     userAvatarUrl,
     userRole = 'user',
 }) => {
-    const iconButtonClass = 'h-14 w-14 rounded-[20px] flex items-center justify-center border transition-all active:scale-95';
+    const iconButtonClass = 'h-12 w-12 rounded-[16px] flex items-center justify-center border transition-all active:scale-95';
     const handleRechargeClick = onRechargeClick ?? onBillingClick;
     const avatarFallback = userName?.trim()?.[0]?.toUpperCase() || 'U';
     const balanceDisplay = balanceLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');
@@ -39,19 +39,19 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
     return (
         <div className="w-full lg:hidden">
             <div
-                className="ios-mobile-header-glass rounded-[30px] border px-3 py-3"
+                className="ios-mobile-header-glass rounded-[24px] border px-3 py-1.5"
                 style={{
                     background: 'var(--mobile-clay-shell-bg)',
                     borderColor: 'var(--mobile-clay-border)',
                     boxShadow: 'var(--mobile-clay-shadow)'
                 }}
             >
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2">
                     <button
                         type="button"
                         onClick={onUserClick}
                         aria-label="\u6253\u5f00\u4e2a\u4eba\u4e2d\u5fc3"
-                        className="flex h-14 min-w-0 flex-1 items-center gap-3 rounded-[20px] border px-3 text-left transition-[background-color,border-color]"
+                        className="flex h-12 min-w-0 flex-1 items-center gap-2 rounded-[16px] border px-2.5 text-left transition-[background-color,border-color]"
                         style={{
                             background: 'var(--mobile-clay-surface-bg)',
                             borderColor: 'var(--mobile-clay-border)'
@@ -59,7 +59,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                         title={userName}
                     >
                         <span
-                            className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[14px] text-sm font-bold text-white"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[10px] text-xs font-bold text-white"
                             style={{ background: 'linear-gradient(135deg, var(--clay-brand-coral), var(--clay-brand-pink))' }}
                         >
                             {resolvedAvatarUrl ? (
@@ -69,31 +69,31 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                             )}
                         </span>
                         <span className="min-w-0 flex-1 flex flex-col justify-center">
-                            <span className="block truncate text-[9px] font-semibold uppercase tracking-[0.15em] text-[var(--text-tertiary)] leading-tight">
+                            <span className="block truncate text-[8px] font-semibold uppercase tracking-[0.12em] text-[var(--text-tertiary)] leading-tight">
                                 {title}
                             </span>
-                            <span className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                                <span className="truncate text-[13px] font-semibold text-[var(--text-primary)] leading-tight">
+                            <span className="mt-0.5 flex items-center gap-1 min-w-0">
+                                <span className="truncate text-[12px] font-semibold text-[var(--text-primary)] leading-tight">
                                     {userName}
                                 </span>
                                 {(() => {
                                     const role = String(userRole || 'user').toLowerCase();
                                     if (role === 'admin') {
                                         return (
-                                            <span className="shrink-0 inline-flex items-center rounded-full bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 text-[8px] font-bold text-red-400 tracking-wider scale-90 origin-left">
+                                            <span className="shrink-0 inline-flex items-center rounded-full bg-red-500/10 border border-red-500/20 px-1 py-0.5 text-[7px] font-bold text-red-400 tracking-wider scale-90 origin-left">
                                                 管理员
                                             </span>
                                         );
                                     }
                                     if (role.startsWith('member')) {
                                         return (
-                                            <span className="shrink-0 inline-flex items-center rounded-full bg-amber-500/10 border border-amber-400/20 px-1.5 py-0.5 text-[8px] font-bold text-amber-400 tracking-wider scale-90 origin-left">
+                                            <span className="shrink-0 inline-flex items-center rounded-full bg-amber-500/10 border border-amber-400/20 px-1 py-0.5 text-[7px] font-bold text-amber-400 tracking-wider scale-90 origin-left">
                                                 高级会员
                                             </span>
                                         );
                                     }
                                     return (
-                                        <span className="shrink-0 inline-flex items-center rounded-full bg-slate-500/10 border border-slate-500/15 px-1.5 py-0.5 text-[8px] font-bold text-slate-400 tracking-wider scale-90 origin-left">
+                                        <span className="shrink-0 inline-flex items-center rounded-full bg-slate-500/10 border border-slate-500/15 px-1 py-0.5 text-[7px] font-bold text-slate-400 tracking-wider scale-90 origin-left">
                                             普通用户
                                         </span>
                                     );
@@ -107,18 +107,18 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                         onClick={handleRechargeClick}
                         data-testid="mobile-header-credit-chip"
                         aria-label="\u67e5\u770b\u79ef\u5206"
-                        className="inline-flex h-14 min-w-[92px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[20px] border px-3 text-left text-[var(--text-primary)] transition-all active:scale-95 disabled:opacity-55"
+                        className="inline-flex h-12 min-w-[84px] shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[16px] border px-2.5 text-left text-[var(--text-primary)] transition-all active:scale-95 disabled:opacity-55"
                         style={{
                             background: 'var(--mobile-clay-surface-bg)',
                             borderColor: 'var(--mobile-clay-border)'
                         }}
                         disabled={!handleRechargeClick}
                     >
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
-                            <Sparkles size={12} className="text-amber-300" />
+                        <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--text-tertiary)]">
+                            <Sparkles size={10} className="text-amber-300 animate-pulse" />
                             {'\u79ef\u5206'}
                         </span>
-                        <span className="text-[15px] font-semibold leading-none">{balanceDisplay}</span>
+                        <span className="text-[14px] font-semibold leading-none">{balanceDisplay}</span>
                     </button>
 
                     <button
@@ -132,7 +132,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                             borderColor: 'var(--mobile-clay-border)'
                         }}
                     >
-                        <Menu size={18} strokeWidth={2.15} />
+                        <Menu size={16} strokeWidth={2.15} />
                     </button>
                 </div>
             </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { MobileWorkspaceSurface } from '../components/mobile';
+import { MobileWorkspaceSurface, MobileEcommercePanel } from '../components/mobile';
 import { selectMobileFeedResults } from '../components/mobile/mobileFeedSelectors';
 import type { UserProfileView } from '../components/modals/UserProfileModal';
 import type {
@@ -91,6 +91,24 @@ const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
 
   if (!isMobile) {
     return null;
+  }
+
+  // 🚀 如果当前切换到电商生图独立页面，渲染电商生图面板
+  if (mobileScreen === 'ecommerce') {
+    return (
+      <MobileEcommercePanel
+        onClose={() => setMobileScreen('home')}
+        config={promptBarProps.config}
+        setConfig={promptBarProps.setConfig}
+        onGenerate={promptBarProps.onGenerate}
+        ecommerceProductFiles={promptBarProps.ecommerceProductFiles}
+        ecommerceExtraReferenceFiles={promptBarProps.ecommerceExtraReferenceFiles}
+        onPickEcommerceProductFiles={promptBarProps.onPickEcommerceProductFiles}
+        onPickEcommerceExtraReferenceFiles={promptBarProps.onPickEcommerceExtraReferenceFiles}
+        onRemoveEcommerceProductFile={promptBarProps.onRemoveEcommerceProductFile}
+        onRemoveEcommerceExtraReferenceFile={promptBarProps.onRemoveEcommerceExtraReferenceFile}
+      />
+    );
   }
 
   return (

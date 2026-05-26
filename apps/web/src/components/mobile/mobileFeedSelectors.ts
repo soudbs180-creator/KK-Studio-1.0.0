@@ -347,40 +347,58 @@ export function selectMobileFeedResults(
       ] as const),
   );
 
-  return imageNodes
-    .map((imageNode) => {
-      const parentPromptId = normalizeOptionalId(imageNode.parentPromptId);
-      const promptNode = parentPromptId ? promptNodeById.get(parentPromptId) : undefined;
-      const promptSummary = resolvePromptSummary(promptNode, imageNode);
-      const displaySrc = resolveDisplaySource(imageNode);
-      const mobileLayout = resolveMobileResultLayout(imageNode);
-      const detailEntry = {
-        imageId: imageNode.id,
-        promptId: parentPromptId,
-      };
+  const rawEntries = imageNodes.map((imageNode) => {
+    const parentPromptId = normalizeOptionalId(imageNode.parentPromptId);
+    const promptNode = parentPromptId ? promptNodeById.get(parentPromptId) : undefined;
+    const promptSummary = resolvePromptSummary(promptNode, imageNode);
+    const displaySrc = resolveDisplaySource(imageNode);
+    const mobileLayout = resolveMobileResultLayout(imageNode);
+    const detailEntry = {
+      imageId: imageNode.id,
+      promptId: parentPromptId,
+    };
 
-      return {
-        id: imageNode.id,
-        imageId: imageNode.id,
-        displaySrc,
-        displayLabel: resolveDisplayLabel(imageNode, promptNode),
-        hasOriginal: Boolean(imageNode.originalUrl || imageNode.apiResultUrl),
-        timestamp: resolveTimestamp(imageNode, promptNode),
-        parentPromptId,
-        promptSummary,
-        fullPrompt: normalizeText(promptNode?.originalPrompt || promptNode?.prompt || promptSummary) || promptSummary,
-        referenceImages: promptNode?.referenceImages || [],
-        modelId: imageNode.model,
-        modelLabel: resolveModelLabel(imageNode),
-        aspectRatio: imageNode.aspectRatio || 'AUTO',
-        imageSize: imageNode.imageSize || '1K',
-        actions: { ...DEFAULT_RESULT_ACTIONS },
-        primaryImageSource: displaySrc,
-        ecommerceContinuation: resolveEcommerceContinuation(imageNode, promptNode, frameworkSummaryById),
-        mobileLayout,
-        detailEntryId: imageNode.id,
-        detailEntry,
-      } satisfies MobileResultEntry;
-    })
-    .sort(compareMobileFeedResults);
+    return {
+      id: imageNode.id,
+      imageId: imageNode.id,
+      displaySrc,
+      displayLabel: resolveDisplayLabel(imageNode, promptNode),
+      hasOriginal: Boolean(imageNode.originalUrl || imageNode.apiResultUrl),
+      timestamp: resolveTimestamp(imageNode, promptNode),
+      parentPromptId,
+      promptSummary,
+      fullPrompt: normalizeText(promptNode?.originalPrompt || promptNode?.prompt || promptSummary) || promptSummary,
+      referenceImages: promptNode?.referenceImages || [],
+      modelId: imageNode.model,
+      modelLabel: resolveModelLabel(imageNode),
+      aspectRatio: imageNode.aspectRatio || 'AUTO',
+      imageSize: imageNode.imageSize || '1K',
+      actions: { ...DEFAULT_RESULT_ACTIONS },
+      primaryImageSource: displaySrc,
+      ecommerceContinuation: resolveEcommerceContinuation(imageNode, promptNode, frameworkSummaryById),
+      mobileLayout,
+      detailEntryId: imageNode.id,
+      detailEntry,
+    } satisfies MobileResultEntry;
+  });
+
+  const groupsMap = new Map<string, MobileResultEntry[]>();
+  rawEntries.forEach((entry) => {
+    const key = entry.parentPromptId || `standalone-${entry.id}`;
+    if (!groupsMap.has(key)) {
+      groupsMap.set(key, []);
+    }
+    groupsMap.get(key)!.push(entry);
+  });
+
+  const aggregatedEntries: MobileResultEntry[] = [];
+  groupsMap.forEach((groupItems) => {
+    groupItems.sort((a, b) => b.timestamp - a.timestamp);
+    const representative = { ...groupItems[0] };
+    representative.groupCount = groupItems.length;
+    representative.groupEntries = groupItems;
+    aggregatedEntries.push(representative);
+  });
+
+  return aggregatedEntries.sort(compareMobileFeedResults);
 }

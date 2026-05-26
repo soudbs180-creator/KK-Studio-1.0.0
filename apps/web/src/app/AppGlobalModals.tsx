@@ -71,6 +71,7 @@ export interface AppGlobalModalsProps {
     onEditText: (image: GeneratedImage) => void;
     onDownloadPptComposite: (imageId: string) => void;
     onPartialRedraw: (image: GeneratedImage, request: PartialRedrawRequest) => void;
+    onUseAsSource?: (image: GeneratedImage) => void; // 🚀 新增继续创作回调
   };
   pptStackPreview: {
     state: PptStackPreviewState;
@@ -185,6 +186,7 @@ const AppGlobalModals: React.FC<AppGlobalModalsProps> = ({
           onEditText={lightbox.onEditText}
           onDownloadPptComposite={lightbox.onDownloadPptComposite}
           onPartialRedraw={lightbox.onPartialRedraw}
+          onUseAsSource={lightbox.onUseAsSource} // 🚀 传递继续创作回调
         />
       </Suspense>
     )}

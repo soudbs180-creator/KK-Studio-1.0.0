@@ -106,13 +106,12 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
     viewMode,
   });
 
-  // 契约测试兼容保留字：gridAutoRows
-  // 根据视口宽度与模式，计算出自适应列数以渲染 Pinterest 瀑布流
+  // 根据视口宽度与模式，计算出自适应列数以渲染 Pinterest 瀑布流，限制手机端最大为 2 列
   const actualCols = React.useMemo(() => {
     if (viewMode === 'detail') return 1;
-    if (measuredWidth <= 480) return 2;
+    if (surface === 'phone' || measuredWidth <= 640) return 2;
     return 3;
-  }, [viewMode, measuredWidth]);
+  }, [viewMode, measuredWidth, surface]);
 
   // 将结果条目按照 index % 列数，均匀分发到对应的列数据中，实现瀑布流效果
   const columnsData = React.useMemo(() => {

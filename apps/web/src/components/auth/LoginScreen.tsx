@@ -113,6 +113,7 @@ const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [tempLoading, setTempLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -254,7 +255,7 @@ const LoginScreen: React.FC = () => {
 
   const handleAuth = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (loading) return;
+    if (loading || tempLoading || googleLoading || wechatLoading) return;
     setSubmitted(true);
     setFieldTouched({ email: true, password: true, confirmPassword: true });
     setFieldErrors(localErrors);
@@ -300,7 +301,7 @@ const LoginScreen: React.FC = () => {
   };
 
   const handleWechatLogin = async () => {
-    if (loading || wechatLoading || googleLoading) return;
+    if (loading || tempLoading || wechatLoading || googleLoading) return;
     if (turnstileAvailable && !turnstileToken) {
       setCaptchaRequiredByBackend(true);
       setError(turnstileError || t('请先完成人机验证后再使用微信扫码登录。', 'Complete CAPTCHA verification before signing in with WeChat QR.'));
@@ -325,7 +326,7 @@ const LoginScreen: React.FC = () => {
   };
 
   const handleGoogleLogin = async () => {
-    if (loading || googleLoading || wechatLoading) {
+    if (loading || tempLoading || googleLoading || wechatLoading) {
       return;
     }
 
@@ -361,13 +362,13 @@ const LoginScreen: React.FC = () => {
   };
 
   const handleTempUserEntry = async () => {
-    if (loading || googleLoading || wechatLoading) {
+    if (loading || tempLoading || googleLoading || wechatLoading) {
       return;
     }
 
     setError(null);
     setMessage(null);
-    setLoading(true);
+    setTempLoading(true);
 
     try {
       await loginAsTempUser();
@@ -375,7 +376,7 @@ const LoginScreen: React.FC = () => {
     } catch (authError) {
       setError(resolveAuthErrorMessage(authError, 'login'));
     } finally {
-      setLoading(false);
+      setTempLoading(false);
     }
   };
 
@@ -460,16 +461,16 @@ const LoginScreen: React.FC = () => {
               </div>
             )}
 
-            <button type="submit" className="auth-btn auth-btn-main" disabled={loading}>{loading ? <><Loader2 size={16} className="animate-spin" />{t('处理中...', 'Processing...')}</> : <>{view === 'login' ? t('登录', 'Sign in') : view === 'register' ? t('注册', 'Sign up') : t('发送占位提示', 'Send placeholder notice')}<ArrowRight size={16} /></>}</button>
+            <button type="submit" className="auth-btn auth-btn-main" disabled={loading || tempLoading}>{loading ? <><Loader2 size={16} className="animate-spin" />{t('处理中...', 'Processing...')}</> : <>{view === 'login' ? t('登录', 'Sign in') : view === 'register' ? t('注册', 'Sign up') : t('发送占位提示', 'Send placeholder notice')}<ArrowRight size={16} /></>}</button>
 
             {view === 'login' && (
               <>
                 <div className="auth-divider"><span>{t('或使用以下方式进入', 'Or continue with')}</span></div>
-                <button type="button" className="auth-btn auth-btn-ghost" onClick={handleWechatLogin} disabled={loading || wechatLoading || googleLoading}><QrCode size={18} />{t('使用微信扫码登录', 'Continue with WeChat QR')}</button>
-                <button type="button" className="auth-btn auth-btn-google" onClick={() => void handleGoogleLogin()} disabled={loading || googleLoading || wechatLoading}>{googleLoading ? <><Loader2 size={16} className="animate-spin" />{t('跳转中...', 'Redirecting...')}</> : <>{t('使用 Google 登录', 'Continue with Google')}</>}</button>
+                <button type="button" className="auth-btn auth-btn-ghost" onClick={handleWechatLogin} disabled={loading || tempLoading || wechatLoading || googleLoading}><QrCode size={18} />{t('使用微信扫码登录', 'Continue with WeChat QR')}</button>
+                <button type="button" className="auth-btn auth-btn-google" onClick={() => void handleGoogleLogin()} disabled={loading || tempLoading || googleLoading || wechatLoading}>{googleLoading ? <><Loader2 size={16} className="animate-spin" />{t('跳转中...', 'Redirecting...')}</> : <>{t('使用 Google 登录', 'Continue with Google')}</>}</button>
                 <div className="auth-aux-actions">
-                  <button type="button" className="auth-btn auth-btn-ghost auth-btn-compact" onClick={() => void handleTempUserEntry()} disabled={loading || googleLoading || wechatLoading}>{loading ? <><Loader2 size={15} className="animate-spin" />{t('\u6b63\u5728\u51c6\u5907', 'Preparing')}</> : t('\u4e34\u65f6\u7528\u6237\uff08\u4ec5\u672c\u5730\uff09', 'Temporary local access')}</button>
-                  <button type="button" className="auth-btn auth-btn-ghost auth-btn-compact" onClick={handleAdminEntry} disabled={loading || googleLoading || wechatLoading}>{t('管理员登录', 'Admin sign-in')}</button>
+                  <button type="button" className="auth-btn auth-btn-ghost auth-btn-compact" onClick={() => void handleTempUserEntry()} disabled={loading || tempLoading || googleLoading || wechatLoading}>{tempLoading ? <><Loader2 size={15} className="animate-spin" />{t('\u6b63\u5728\u51c6\u5907', 'Preparing')}</> : t('\u4e34\u65f6\u7528\u6237\uff08\u4ec5\u672c\u5730\uff09', 'Temporary local access')}</button>
+                  <button type="button" className="auth-btn auth-btn-ghost auth-btn-compact" onClick={handleAdminEntry} disabled={loading || tempLoading || googleLoading || wechatLoading}>{t('管理员登录', 'Admin sign-in')}</button>
                 </div>
               </>
             )}

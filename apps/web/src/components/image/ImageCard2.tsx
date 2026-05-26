@@ -1303,10 +1303,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         transitionProperty: 'transform, box-shadow, border-color',
                     }}
                 >
-                    <div
-                        className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-transparent hover:bg-[var(--accent-coral)] rounded-full z-50 cursor-crosshair"
-                        onMouseUp={() => onConnectEnd?.(image.id)}
-                    />
+                    {/* 🚀 移除 Connection Point，用户点击卡片不需要也不想触发连线与草稿功能 */}
 
                     <div
                         className="w-full p-1"
@@ -1430,11 +1427,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         transitionProperty: 'transform, box-shadow, border-color'
                     }}
                 >
-                    {/* Connection Point */}
-                    <div
-                        className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-transparent hover:bg-[var(--accent-coral)] rounded-full z-50 cursor-crosshair"
-                        onMouseUp={() => onConnectEnd?.(image.id)}
-                    />
+                    {/* 🚀 移除 Connection Point，用户点击卡片不需要也不想触发连线与草稿功能 */}
 
                     {/* 外层内边距容器 - 统一四周一缝隙 (p-1 = 4px) */}
                     <div className="w-full p-1 flex flex-col">

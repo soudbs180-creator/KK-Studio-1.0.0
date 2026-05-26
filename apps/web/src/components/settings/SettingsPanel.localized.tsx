@@ -236,42 +236,45 @@ const SettingsMobileShell: React.FC<{
 
   return (
     <div className="settings-shell-mobile" onClick={(event) => event.stopPropagation()}>
-      <div className="settings-shell-mobile__topbar">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <button
-            type="button"
-            onClick={handleLeadingAction}
-            className="apple-icon-button h-11 w-11 shrink-0 rounded-2xl"
-            aria-label={
-              isApiManagementEditorRoute
-                ? pick('返回 API 管理', 'Back to API management')
-                : activeView === 'dashboard' ? pick('关闭设置', 'Close settings') : pick('返回设置总览', 'Back to settings overview')
-            }
-          >
-            {activeView === 'dashboard' && !isApiManagementEditorRoute ? <X size={18} /> : <ArrowLeft size={18} />}
-          </button>
+      {/* 压缩顶栏整体高度，使用 padding 和 minHeight 自适应撑开，使用 align-items: center 实现垂向居中，完美兼容 safe-area-inset-top */}
+      <div 
+        className="settings-shell-mobile__topbar"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)', paddingBottom: '8px', paddingLeft: '16px', paddingRight: '16px', minHeight: '48px', alignItems: 'center', display: 'flex', justifyContent: 'space-between' }}
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          {/* 总览页且非 API 编辑状态下，左侧不渲染任何返回/关闭按钮；子设置页左侧渲染 ArrowLeft */}
+          {activeView === 'dashboard' && !isApiManagementEditorRoute ? null : (
+            <button
+              type="button"
+              onClick={handleLeadingAction}
+              className="apple-icon-button h-8 w-8 shrink-0 rounded-xl flex items-center justify-center"
+              aria-label={
+                isApiManagementEditorRoute
+                  ? pick('返回 API 管理', 'Back to API management')
+                  : pick('返回设置总览', 'Back to settings overview')
+              }
+            >
+              <ArrowLeft size={16} />
+            </button>
+          )}
 
-          <div className="settings-shell-mobile__title-wrap">
-            <div className="settings-shell-kicker">{pick('当前入口', 'Current entry')}</div>
-            <div className="settings-shell-mobile__title">{activeTitle}</div>
-            <div className="settings-shell-mobile__description">
-              {activeNavItem.description}
-            </div>
+          <div className="settings-shell-mobile__title-wrap" style={{ marginTop: 0 }}>
+            <div className="settings-shell-kicker" style={{ fontSize: '8px', lineHeight: '1' }}>{pick('当前入口', 'Current entry')}</div>
+            <div className="settings-shell-mobile__title" style={{ fontSize: '14px', lineHeight: '1.2', fontWeight: 600 }}>{activeTitle}</div>
           </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
           <SettingsLanguageToggle compact />
-          {activeView !== 'dashboard' || isApiManagementEditorRoute ? (
-            <button
-              type="button"
-              onClick={onClose}
-              className="apple-icon-button h-11 w-11 shrink-0 rounded-2xl"
-              aria-label={pick('关闭设置', 'Close settings')}
-            >
-              <X size={18} />
-            </button>
-          ) : null}
+          {/* 右侧始终保留 X 关闭按钮，提供整齐划一的视觉规范 */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="apple-icon-button h-8 w-8 shrink-0 rounded-xl flex items-center justify-center"
+            aria-label={pick('关闭设置', 'Close settings')}
+          >
+            <X size={16} />
+          </button>
         </div>
       </div>
 

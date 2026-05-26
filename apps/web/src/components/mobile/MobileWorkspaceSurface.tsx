@@ -173,13 +173,15 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             aria-label="关闭更多菜单"
           />
 
-          {/* 更多操作底部滑出式抽屉面板，整体重构为精美的半透明磨砂玻璃质感 */}
+          {/* 更多操作底部滑出式抽屉面板，强行指定为极具质感的暗色磨砂玻璃背景 rgba(20, 20, 22, 0.90) */}
           <div
             className="relative rounded-t-[30px] border px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 text-[var(--text-primary)]"
             style={{
-              background: 'var(--mobile-glass-bg)',
-              borderColor: 'var(--mobile-glass-border)',
-              boxShadow: 'var(--mobile-glass-shadow)'
+              background: 'rgba(20, 20, 22, 0.90)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              borderColor: 'rgba(255, 255, 255, 0.08)',
+              boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.5)'
             }}
           >
             <div className="mb-4 flex items-start justify-between gap-3">
@@ -261,15 +263,17 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             ) : null}
 
             <div className="grid grid-cols-2 gap-2.5">
-              <button type="button" onClick={() => runFromMoreSheet(onOpenSearch)} className={moreSheetActionClass}>
-                <Search size={17} className="mb-2.5" />
-                <div className="text-sm font-semibold">搜索</div>
-                <div className="mt-1 text-xs text-white/55">查找历史提示词和结果</div>
-              </button>
+              {/* 搜索与历史合并 */}
               <button type="button" onClick={() => runFromMoreSheet(onOpenHistory)} className={moreSheetActionClass}>
                 <Clock3 size={17} className="mb-2.5" />
-                <div className="text-sm font-semibold">历史</div>
-                <div className="mt-1 text-xs text-white/55">查看最近生成内容</div>
+                <div className="text-sm font-semibold">历史与搜索</div>
+                <div className="mt-1 text-xs text-white/55">查找历史提示词和结果</div>
+              </button>
+              {/* 电商生图独立入口 */}
+              <button type="button" onClick={() => runFromMoreSheet(() => onScreenChange('ecommerce'))} className={moreSheetActionClass}>
+                <FolderOpen size={17} className="mb-2.5 text-[var(--accent-color)]" />
+                <div className="text-sm font-semibold">电商生图</div>
+                <div className="mt-1 text-xs text-white/55">电商专用生图和任务管理</div>
               </button>
               <button type="button" onClick={() => runFromMoreSheet(onOpenChat)} className={moreSheetActionClass}>
                 <MessageSquare size={17} className="mb-2.5" />

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { type GeneratedImage, GenerationMode, type PartialRedrawRequest } from '../../types';
-import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy, Sparkles } from 'lucide-react';
 import { PartialRedrawModal } from './PartialRedrawModal';
 import { notify } from '../../services/system/notificationService';
 import { getImage, getStrictOriginalImage } from '../../services/storage/imageStorage';
@@ -21,6 +21,7 @@ interface GlobalLightboxProps {
     onDownloadPptComposite?: (imageId: string) => void;
     redrawCompleteUrl?: string | null;
     onRedrawAnimationDone?: () => void;
+    onUseAsSource?: (image: GeneratedImage) => void; // 🚀 新增继续创作回调
 }
 
 /**
@@ -30,7 +31,7 @@ interface GlobalLightboxProps {
  * @param initialIndex Initially active item index.
  * @param onClose Close handler.
  */
-export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialIndex, onClose, onEditText, onEditPptDeck, onPartialRedraw, onDownloadPptComposite }) => {
+export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialIndex, onClose, onEditText, onEditPptDeck, onPartialRedraw, onDownloadPptComposite, onUseAsSource }) => {
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -933,6 +934,22 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                           <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-1 border-l border-[var(--border-light)]" title="重置"><RotateCcw size={16} /></button>
                       </div>
   
+                      {/* Continue generation / Use as source action */}
+                      {onUseAsSource && !isVideo && !isAudio && (
+                          <button
+                              onClick={(e) => {
+                                  e.stopPropagation();
+                                  onUseAsSource(image);
+                                  onClose(); // 将此图片设为参考图后，立即关闭大图灯箱
+                              }}
+                              className={`${actionButtonClass} hover:border-[var(--accent-coral)] hover:bg-[var(--accent-coral)]/80`}
+                              title="将此图设为参考图继续创作"
+                          >
+                              <Sparkles size={16} />
+                              继续创作
+                          </button>
+                      )}
+
                       {/* Partial redraw actions for images only */}
                       {onPartialRedraw && !isVideo && !isAudio && displaySrc && (
                           <button

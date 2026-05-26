@@ -2602,57 +2602,31 @@ const AppContent: React.FC<AppContentProps> = () => {
   const handleImageClick = useCallback((imageId: string) => {
     // 🎯 Shift=切换（向后兼容），无修饰键=替换
     const sourceImage = imageNodesById.get(imageId);
-    // Keep the parent prompt group focused so the subcard frame stays visible after click.
+    // 保持父 Prompt 组聚焦，使子卡片框在点击后保持可见
     setFocusedGroupId(sourceImage?.parentPromptId || null);
     selectNodes([imageId], (window.event as any)?.shiftKey ? 'toggle' : 'replace');
 
-    // Set this image as source for continuing conversation
-    setActiveSourceImage(imageId);
-    resetEcommerceSourceSelectionState();
-    // Clear prompt and existing references to start fresh continue-conversation
-    setConfig(prev => ({ ...prev, prompt: '', referenceImages: [] }));
-
-    // Create the follow-up draft node immediately
-    // Remove the existing draft first, if any
-    if (draftNodeId) {
-      deletePromptNode(draftNodeId);
-    }
-
-    // Compute the follow-up draft position below the parent group
-    if (sourceImage) {
-      const parentPrompt = sourceImage.parentPromptId
-        ? (promptNodesById.get(sourceImage.parentPromptId) ?? null)
-        : null;
-      const draftPos = resolveFollowUpDraftPosition({
-        sourceImage,
-        parentPrompt,
-        imageNodes: activeCanvas?.imageNodes || [],
-      });
-
-      const newId = Date.now().toString();
-      addPromptNode({
-        id: newId,
-        prompt: '',  // Empty prompt; wait for user input
-        position: draftPos,
-        aspectRatio: config.aspectRatio,
-        imageSize: config.imageSize,
-        model: normalizeModelId(config.model),
-        modelLabel: resolveModelDisplayName(config.model, getModelMetadata(config.model)?.name || config.model),
-        childImageIds: [],
-        referenceImages: [],  // The source image will be attached automatically in handleGenerate
-        timestamp: Date.now(),
-        sourceImageId: imageId,
-        isDraft: true,
-        mode: config.mode,
-        tags: []
-      });
-      setDraftNodeId(newId);
-    }
-  }, [selectNodes, setConfig, draftNodeId, deletePromptNode, activeCanvas, addPromptNode, config, imageNodesById, promptNodesById, resetEcommerceSourceSelectionState]);
+    // 🚀 点击卡片时不再在画布自动生成 Draft 框和拉连线，相关交互已转移至灯箱
+  }, [imageNodesById, selectNodes]);
 
   const handleMobileUseImageAsSource = useCallback((imageId: string) => {
     handleImageClick(imageId);
   }, [handleImageClick]);
+
+  // 🚀 [新添加] 电脑端在灯箱内“继续创作”的回调，将当前图片设为参考图继续创作，实现交互闭环
+  const handleDesktopUseImageAsSource = useCallback((image: GeneratedImage) => {
+    const refImg = {
+      id: image.id,
+      storageId: image.storageId,
+      data: image.url,
+      mimeType: image.mimeType || 'image/png'
+    };
+    setConfig(prev => ({
+      ...prev,
+      referenceImages: [refImg]
+    }));
+    notify.success('参考图已设置', '已将当前图像设为参考图继续创作');
+  }, [setConfig]);
   const {
     resolveEcommercePartialRedrawContext,
     finalizeEcommercePartialRedrawResult,
@@ -4377,6 +4351,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       onEditText: handleEditPptTextFromLightbox,
       onDownloadPptComposite: handleDownloadPptComposite,
       onPartialRedraw: handlePartialRedrawRequest,
+      onUseAsSource: handleDesktopUseImageAsSource, // 🚀 绑定继续创作回调
     },
     pptStackPreview: {
       state: pptStackPreview,
