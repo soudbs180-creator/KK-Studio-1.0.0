@@ -25,7 +25,7 @@
     "release:hosted:check": "node scripts/release/diagnose-hosted-release.mjs",
     "release:hosted": "node scripts/release/release-hosted.mjs",
     "release:hosted:preview": "node scripts/release/release-hosted.mjs --preview",
-    "build": "vite build --configLoader native --config apps/web/vite.config.ts",
+    "build": "npm run build -w packages/api-client && vite build --configLoader native --config apps/web/vite.config.ts",
     "organize:local": "node scripts/maintenance/organize-local-files.mjs",
     "package:portable": "npm run build && node scripts/release/create-portable-release.mjs",
     "package:portable:with-payment-env": "npm run build && node scripts/release/create-portable-release.mjs --include-payment-env",

@@ -621,6 +621,7 @@ export default defineConfig(({ mode }) => {
             dedupe: ['react', 'react-dom'],
             alias: {
                 '@': path.resolve(__dirname, 'src'),
+                '@nano-banana/api-client': path.resolve(__dirname, '../../packages/api-client/src/index.ts'),
             }
         },
         optimizeDeps: {

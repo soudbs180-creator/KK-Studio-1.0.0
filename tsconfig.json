@@ -24,6 +24,9 @@
     "paths": {
       "@/*": [
         "apps/web/src/*"
+      ],
+      "@nano-banana/api-client": [
+        "packages/api-client/src/index.ts"
       ]
     }
   },
