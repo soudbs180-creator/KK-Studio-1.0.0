@@ -82,11 +82,81 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
   }
 
   return (
-    <>
+    <div
+      className="w-full flex items-center gap-3 rounded-2xl border p-2.5 transition-all duration-300 select-none relative"
+      style={{
+        background: 'var(--frost-card-framework-bg)',
+        borderColor: 'var(--frost-card-framework-border)',
+        boxShadow: 'var(--frost-card-framework-shadow)',
+        backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+        WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+      }}
+    >
+      {/* 简体中文：头像按钮区域 (高度与右侧资产齐平) */}
+      <div className="relative flex-shrink-0">
+        <button
+          data-testid="desktop-user-menu-trigger"
+          onClick={(event) => {
+            event.stopPropagation();
+            setShowUserMenu((prev) => !prev);
+          }}
+          className="relative flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 transition-all active:scale-95"
+          style={{
+            background: 'var(--frost-card-sub-bg)',
+            borderColor: 'var(--frost-card-sub-border)',
+            boxShadow: 'var(--frost-card-sub-shadow)',
+          }}
+        >
+          {avatarUrl ? (
+            <img src={avatarUrl} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-tr from-[var(--clay-brand-pink)] via-[var(--clay-brand-coral)] to-[var(--clay-brand-peach)] text-sm font-bold text-white">
+              {user?.email?.[0].toUpperCase() || 'K'}
+            </div>
+          )}
+        </button>
+
+        {/* 简体中文：服务/API 状态指示灯 */}
+        <div
+          className={`absolute -right-0.5 -top-0.5 z-10 h-3.5 w-3.5 rounded-full border-2 shadow-lg ${apiStatus === 'success' ? 'bg-green-500' : apiStatus === 'error' ? 'bg-red-500' : 'bg-zinc-500'}`}
+          style={{ borderColor: 'var(--bg-canvas)' }}
+        />
+      </div>
+
+      {/* 简体中文：右侧资产展示 & 充值模块 (高度与左侧头像一致，均为 40px 水平居中对齐) */}
       {billingUiEnabled && (
-        <div className="absolute top-4 left-4 z-[100] flex items-center gap-2">
+        <div className="flex-1 flex items-center justify-between gap-1.5 h-10">
+          <div className="flex flex-col items-start leading-none justify-center">
+            <div className="flex items-center gap-0.5 select-none">
+              <span className="text-[16px] font-mono font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                {remainingBalanceDisplay}
+              </span>
+              <span className="text-[10px] font-bold text-[var(--accent-coral)]">积分</span>
+            </div>
+          </div>
+
+          <button
+            onClick={onRecharge}
+            className="inline-flex items-center justify-center rounded-xl px-4 py-1.5 text-xs font-black leading-none text-white transition-all active:scale-95 hover:brightness-110"
+            style={{
+              background: 'linear-gradient(135deg, var(--accent-coral) 0%, #ff5240 100%)',
+              boxShadow: '0 4px 12px rgba(255, 107, 90, 0.35)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              height: '32px',
+            }}
+          >
+            充值
+          </button>
+        </div>
+      )}
+
+      {/* 简体中文：用户下拉菜单弹出容器 - 改为 left-0 并向下平移，完美配合左侧等宽面板 */}
+      {showUserMenu ? (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
           <div
-            className="group flex items-center gap-3 rounded-full border px-4 py-2 transition-all hover:border-[var(--frost-card-framework-border)]"
+            onClick={(e) => e.stopPropagation()}
+            className="absolute left-0 top-[72px] z-50 w-64 origin-top-left animate-in rounded-xl border p-2 duration-100 fade-in zoom-in-95"
             style={{
               background: 'var(--frost-card-framework-bg)',
               borderColor: 'var(--frost-card-framework-border)',
@@ -95,165 +165,58 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
               WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
             }}
           >
-            <div className="flex items-center gap-1.5">
-              <Sparkles size={18} fill="currentColor" className="text-[var(--accent-coral)]" />
-              <div className="flex items-center select-none gap-1">
-                <span className="min-w-[20px] text-[18px] font-mono font-bold leading-none drop-shadow-sm" style={{ color: 'var(--text-primary)' }}>
-                  {remainingBalanceDisplay}
-                </span>
-                <span className="text-[14px] font-bold leading-none text-[var(--accent-coral)]">积分</span>
-              </div>
-            </div>
-            <div className="h-6 w-px" style={{ backgroundColor: 'var(--floating-shell-border)' }} />
-            <button
-              onClick={onRecharge}
-              className="inline-flex items-center justify-center rounded-lg px-3 py-1 text-[11px] font-bold leading-none text-white transition-all active:scale-95"
-              style={{
-                background: 'var(--accent-coral)',
-                boxShadow: '0 8px 18px rgb(255 107 90 / 0.18)',
-              }}
-            >
-              充值
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div
-        id="header-user-menu"
-        className="absolute top-4 z-[100] hidden items-center gap-3 transition-all duration-300 md:flex"
-        style={{ right: rightOffset }}
-      >
-        <div className="relative group">
-          <button
-            data-testid="desktop-user-menu-trigger"
-            onClick={() => setShowUserMenu((prev) => !prev)}
-            className="relative flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 transition-all active:scale-95"
-            style={{
-              background: 'var(--frost-card-sub-bg)',
-              borderColor: 'var(--frost-card-sub-border)',
-              boxShadow: 'var(--frost-card-sub-shadow)',
-            }}
-          >
-            {avatarUrl ? (
-              <img src={avatarUrl} className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-gradient-to-tr from-[var(--clay-brand-pink)] via-[var(--clay-brand-coral)] to-[var(--clay-brand-peach)] text-sm font-bold text-white">
-                {user?.email?.[0].toUpperCase() || 'K'}
-              </div>
-            )}
-          </button>
-
-          <div
-            className={`absolute -right-0.5 -top-0.5 z-10 h-3.5 w-3.5 rounded-full border-2 shadow-lg ${apiStatus === 'success' ? 'bg-green-500' : apiStatus === 'error' ? 'bg-red-500' : 'bg-zinc-500'}`}
-            style={{ borderColor: 'var(--bg-canvas)' }}
-          />
-
-          {showUserMenu ? (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
-              <div
-                className="absolute right-0 top-12 z-50 w-64 origin-top-right animate-in rounded-xl border p-2 duration-100 fade-in zoom-in-95"
-                style={{
-                  background: 'var(--frost-card-framework-bg)',
-                  borderColor: 'var(--frost-card-framework-border)',
-                  boxShadow: 'var(--frost-card-framework-shadow)',
-                  backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
-                  WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+            <div className="space-y-1">
+              <DesktopMenuActionButton
+                icon={<User size={14} />}
+                label="个人中心"
+                accentColor="var(--clay-brand-coral)"
+                onClick={() => {
+                  onOpenProfile('main');
+                  setShowUserMenu(false);
                 }}
-              >
-                <div
-                  className="group mb-2 cursor-pointer rounded-lg border-b px-3 py-3 transition-colors"
-                  style={{ borderColor: 'var(--border-light)' }}
-                  onMouseEnter={(event) => { event.currentTarget.style.backgroundColor = 'var(--toolbar-hover)'; }}
-                  onMouseLeave={(event) => { event.currentTarget.style.backgroundColor = 'transparent'; }}
+              />
+              <DesktopMenuActionButton
+                icon={<LayoutDashboard size={14} />}
+                label="管理设置"
+                accentColor="var(--clay-brand-lavender)"
+                testId="desktop-user-menu-settings"
+                onClick={() => {
+                  onOpenSettings();
+                  setShowUserMenu(false);
+                }}
+              />
+
+              {adminLevel > 0 && (
+                <DesktopMenuActionButton
+                  icon={<LayoutDashboard size={14} />}
+                  label="管理后台"
+                  accentColor="var(--clay-brand-coral)"
                   onClick={() => {
-                    onOpenProfile('main');
+                    window.location.href = "/admin";
                     setShowUserMenu(false);
                   }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[var(--accent-coral)] font-bold text-white">
-                      {avatarUrl ? (
-                        <img src={avatarUrl} className="h-full w-full object-cover" />
-                      ) : user?.email?.[0].toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        {user?.user_metadata?.full_name || '用户'}
-                      </div>
-                      <div className="truncate text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                        {user?.email}
-                      </div>
-                    </div>
-                  </div>
+                />
+              )}
+
+              <div className="my-1 h-px" style={{ backgroundColor: 'var(--border-light)' }} />
+
+              <button
+                onClick={() => {
+                  void onSignOut();
+                  setShowUserMenu(false);
+                }}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-red-400 transition-colors hover:bg-red-500/10 outline-none"
+              >
+                <div className="rounded-lg bg-red-500/10 p-1.5">
+                  <LogOut size={14} />
                 </div>
-
-                <div className="space-y-1">
-                  <DesktopMenuActionButton
-                    icon={<User size={14} />}
-                    label="个人中心"
-                    accentColor="var(--clay-brand-coral)"
-                    onClick={() => {
-                      onOpenProfile('main');
-                      setShowUserMenu(false);
-                    }}
-                  />
-                  <DesktopMenuActionButton
-                    icon={<Zap size={14} />}
-                    label="账号管理"
-                    accentColor="var(--accent-yellow)"
-                    onClick={() => {
-                      onOpenProfile('billing');
-                      setShowUserMenu(false);
-                    }}
-                  />
-                  <DesktopMenuActionButton
-                    icon={<LayoutDashboard size={14} />}
-                    label="设置"
-                    accentColor="var(--clay-brand-lavender)"
-                    testId="desktop-user-menu-settings"
-                    onClick={() => {
-                      onOpenSettings();
-                      setShowUserMenu(false);
-                    }}
-                  />
-
-                  {adminLevel > 0 && (
-                    <DesktopMenuActionButton
-                      icon={<LayoutDashboard size={14} />}
-                      label="管理后台"
-                      accentColor="var(--clay-brand-coral)"
-                      onClick={() => {
-                        window.location.href = "/admin";
-                        setShowUserMenu(false);
-                      }}
-                    />
-                  )}
-
-                  <div className="my-1 h-px" style={{ backgroundColor: 'var(--border-light)' }} />
-
-                  <button
-                    onClick={() => {
-                      void onSignOut();
-                      setShowUserMenu(false);
-                    }}
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-red-400 transition-colors hover:bg-red-500/10"
-                  >
-                    <div className="rounded-lg bg-red-500/10 p-1.5">
-                      <LogOut size={14} />
-                    </div>
-                    退出登录
-                  </button>
-                </div>
-              </div>
-            </>
-          ) : null}
-        </div>
-      </div>
-
-
-    </>
+                退出登录
+              </button>
+            </div>
+          </div>
+        </>
+      ) : null}
+    </div>
   );
 };
 

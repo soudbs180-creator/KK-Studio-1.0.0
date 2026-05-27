@@ -30,8 +30,9 @@ type CurrentViewLatencyItem = {
 export const InfoCell: React.FC<{ label: string; value: string; helper?: string }> = ({ label, value, helper }) => (
   <div className="rounded-[18px] border p-3" style={SETTINGS_OVERLAY_STYLE}>
     <div className="text-[11px] font-medium tracking-[0.12em] text-[var(--text-tertiary)]">{label}</div>
-    <div className="mt-2 text-[15px] font-semibold text-[var(--text-primary)]">{value}</div>
-    {helper ? <div className="mt-1 text-[12px] text-[var(--text-secondary)]">{helper}</div> : null}
+    {/* 简体中文注释：为了解决重点数字太小没有突出的体验问题，将字号从 text-[15px] font-semibold 增大到 text-[20px] font-bold，并加上 tabular-nums 防止数字变动时发生排版抖动 */}
+    <div className="mt-2 text-[20px] font-bold text-[var(--text-primary)] [font-variant-numeric:tabular-nums]">{value}</div>
+    {helper ? <div className="mt-1.5 text-[12px] text-[var(--text-secondary)]">{helper}</div> : null}
   </div>
 );
 

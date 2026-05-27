@@ -15,7 +15,7 @@ import {
   getStorageUsage,
 } from '../../../services/storage/imageStorage';
 import { notify } from '../../../services/system/notificationService';
-import { SettingsActionButton, SettingsBadge, SettingsViewShell } from '../SettingsScaffold';
+import { SettingsActionButton, SettingsBadge, SettingsCardGridContainer, SettingsViewShell } from '../SettingsScaffold';
 import { ProgressBar, SettingSelect } from '../ui/index';
 
 const formatSavedSpace = (savedBytes: number) => `${(savedBytes / (1024 * 1024)).toFixed(2)} MB`;
@@ -283,294 +283,254 @@ export const StorageSettingsView: React.FC = () => {
 
   return (
     <SettingsViewShell>
-      <div className="settings-reference-stack">
-        <div className="settings-reference-page-header">
-          <div className="settings-reference-page-header__lead">
-            <div className="settings-reference-page-header__eyebrow">Advanced Settings</div>
-            <h2>Storage Management</h2>
-            <p>
-              A darker, flatter storage console that follows the reference system pages. Storage targets,
-              cache pressure, and project maintenance now live in the same visual language as the dashboard
-              and provider cards.
+      <SettingsCardGridContainer>
+        {/* Metric Card 1: Local Permission (1A) */}
+        <div className="dashboard-grid-card">
+          
+          <div className="flex flex-col justify-between h-full w-full">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[9px] font-bold uppercase tracking-wider">Permission</span>
+              <HardDrive size={13} />
+            </div>
+            <div className="text-sm font-bold text-white mt-1.5">{supportsLocal ? 'Supported' : 'Unavailable'}</div>
+            <div className="text-[9px] text-slate-400 mt-1 truncate">Local folder read/write capability.</div>
+          </div>
+        </div>
+
+        {/* Metric Card 2: Active Project (1A) */}
+        <div className="dashboard-grid-card">
+          
+          <div className="flex flex-col justify-between h-full w-full">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[9px] font-bold uppercase tracking-wider">Active Project</span>
+              <FolderOpen size={13} />
+            </div>
+            <div className="text-sm font-bold text-white mt-1.5 truncate">{activeCanvas?.name || 'None'}</div>
+            <div className="text-[9px] text-slate-400 mt-1 truncate">Canvas currently in use.</div>
+          </div>
+        </div>
+
+        {/* Metric Card 3: Footprint (1A) */}
+        <div className="dashboard-grid-card">
+          
+          <div className="flex flex-col justify-between h-full w-full">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[9px] font-bold uppercase tracking-wider">Footprint</span>
+              <Activity size={13} />
+            </div>
+            <div className="text-sm font-bold text-white mt-1.5">{usageMB.toFixed(2)} MB</div>
+            <div className="text-[9px] text-slate-400 mt-1 truncate">Total storage consumed locally.</div>
+          </div>
+        </div>
+
+        {/* Metric Card 4: Projects (1A) */}
+        <div className="dashboard-grid-card">
+          
+          <div className="flex flex-col justify-between h-full w-full">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[9px] font-bold uppercase tracking-wider">Projects</span>
+              <Layers3 size={13} />
+            </div>
+            <div className="text-sm font-bold text-white mt-1.5">{state.canvases.length} total</div>
+            <div className="text-[9px] text-slate-400 mt-1 truncate">Total canvases stored.</div>
+          </div>
+        </div>
+
+        {/* Card 5: Persistence Modes (2A * 2row) */}
+        <div 
+          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row p-4 flex flex-col justify-between"
+          style={{ cursor: 'default' }}
+        >
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Persistence
+              </div>
+              <SettingsBadge tone={mode === 'local' ? 'emerald' : mode === 'browser' ? 'indigo' : 'amber'}>
+                {getModeLabel(mode)}
+              </SettingsBadge>
+            </div>
+            <h3 className="text-sm font-bold text-white mt-2">Active Target</h3>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Browser cache for sessions, local folders for workspace persistence.
             </p>
-          </div>
-          <div className="settings-reference-actions">
-            <SettingsBadge tone={mode === 'local' ? 'emerald' : mode === 'browser' ? 'indigo' : 'amber'}>
-              {getModeLabel(mode)}
-            </SettingsBadge>
-            <SettingsActionButton icon={RefreshCw} loading={refreshing} onClick={() => void refresh()}>
-              Refresh
-            </SettingsActionButton>
-          </div>
-        </div>
 
-        <div className="settings-reference-grid-3">
-          <StorageMetricCard
-            label="Primary Target"
-            value={getModeLabel(mode)}
-            helper={
-              mode === 'local'
-                ? 'Assets are being persisted into a granted local folder.'
-                : mode === 'browser'
-                  ? 'Assets remain inside the browser storage layer.'
-                  : 'Pick a persistent target to stabilise cache operations.'
-            }
-            badge={<SettingsBadge tone={mode ? 'emerald' : 'amber'}>{mode ? 'Configured' : 'Pending'}</SettingsBadge>}
-          />
-          <StorageMetricCard
-            label="Cache Footprint"
-            value={`${usageMB.toFixed(2)} MB`}
-            helper={`${imageCount} images currently tracked in the cache layer.`}
-            badge={<SettingsBadge tone={usageMB >= 512 ? 'amber' : 'indigo'}>{usageMB >= 512 ? 'Watch usage' : 'Healthy'}</SettingsBadge>}
-          />
-          <StorageMetricCard
-            label="Workspace Projects"
-            value={activeCanvas?.name || 'No active project'}
-            helper={`${state.canvases.length} canvases can be managed from this workspace.`}
-            badge={<SettingsBadge tone="neutral">{state.canvases.length} total</SettingsBadge>}
-          />
-        </div>
-
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
-          <section className="settings-reference-card">
-            <div className="settings-reference-card__header">
-              <div>
-                <div className="settings-reference-card__eyebrow">Storage Strategy</div>
-                <div className="settings-reference-card__title">Persistence Modes</div>
-                <div className="settings-reference-card__meta">
-                  Switch modes directly from dedicated action tiles. Each action now does exactly one
-                  storage task so it is easier to understand what will change.
+            <div className="mt-3.5 space-y-2">
+              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold text-white">Local Folder Mode</div>
+                  <div className="text-[9px] text-slate-400 truncate mt-0.5">{supportsLocal ? (isConnectedToLocal ? 'Status: Connected' : 'Ready to connect') : 'Not supported'}</div>
                 </div>
+                <button
+                  type="button"
+                  disabled={!supportsLocal || mode === 'local'}
+                  onClick={() => void switchToLocal()}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-1 px-3 text-[10px] font-bold transition active:scale-95 disabled:opacity-40 cursor-pointer"
+                >
+                  Switch
+                </button>
               </div>
-              <HardDrive size={18} className="text-[var(--text-primary)]" />
-            </div>
 
-            <div className="mt-5 settings-reference-grid-2">
-              <StorageModeTile
-                title="Local Folder"
-                description="Best for durable archiving, cross-browser reuse, and long-running workspaces."
-                helper={
-                  supportsLocal
-                    ? isConnectedToLocal
-                      ? 'Browser permission is already granted for the local folder.'
-                      : 'Browser supports local-folder permission but a folder still needs to be granted.'
-                    : 'This browser does not expose the local folder API.'
-                }
-                active={mode === 'local'}
-                action={
-                  <SettingsActionButton
-                    icon={FolderOpen}
-                    tone="primary"
-                    loading={switchingMode === 'local'}
-                    onClick={() => void switchToLocal()}
-                  >
-                    Use Local Folder
-                  </SettingsActionButton>
-                }
-              />
-              <StorageModeTile
-                title="Browser Cache"
-                description="Fastest option for quick experiments and lightweight local sessions."
-                helper="No folder permission is required, but the data remains inside the browser environment."
-                active={mode === 'browser'}
-                action={
-                  <SettingsActionButton
-                    loading={switchingMode === 'browser'}
-                    onClick={() => void switchToBrowser()}
-                  >
-                    Use Browser Cache
-                  </SettingsActionButton>
-                }
-              />
-            </div>
-
-            <div className="mt-5 rounded-[22px] border border-[var(--settings-border-subtle)] bg-[var(--settings-surface-overlay)] p-4">
-              <div className="text-[11px] font-semibold tracking-[0.18em] uppercase text-[var(--text-tertiary)]">
-                Last Action
+              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold text-white">Browser Cache Mode</div>
+                  <div className="text-[9px] text-slate-400 truncate mt-0.5">No permission required</div>
+                </div>
+                <button
+                  type="button"
+                  disabled={mode === 'browser'}
+                  onClick={() => void switchToBrowser()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-1 px-3 text-[10px] font-bold transition active:scale-95 disabled:opacity-40 cursor-pointer"
+                >
+                  Switch
+                </button>
               </div>
-              <div className="mt-2 text-[14px] leading-6 text-[var(--text-secondary)]">{lastActionMessage}</div>
             </div>
-          </section>
+          </div>
 
-          <section className="settings-reference-card">
-            <div className="settings-reference-card__header">
-              <div>
-                <div className="settings-reference-card__eyebrow">Capacity Snapshot</div>
-                <div className="settings-reference-card__title">Usage Distribution</div>
-              </div>
-              <Layers3 size={18} className="text-[var(--text-primary)]" />
+          <div className="pt-2 border-t border-white/5 text-[10px] text-slate-400 truncate">
+            Last Action: {lastActionMessage}
+          </div>
+        </div>
+
+        {/* Card 6: Usage Distribution (2A * 2row) */}
+        <div 
+          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row p-4 flex flex-col justify-between"
+          style={{ cursor: 'default' }}
+        >
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Usage
             </div>
-
-            <div className="settings-reference-kpi__value">{usageMB.toFixed(2)} MB</div>
-            <div className="settings-reference-kpi__helper">
-              Visualised against a 1 GB operating threshold for quick pressure checks.
-            </div>
-
+            <h3 className="text-sm font-bold text-white mt-1.5">Capacity Snapshot</h3>
+            
             <div className="mt-4">
+              <div className="flex justify-between text-[11px] text-slate-400 mb-1.5">
+                <span>{refreshing ? 'Updating...' : `${imageCount} images`}</span>
+                <span>{usageMB.toFixed(2)} MB / 1 GB</span>
+              </div>
               <ProgressBar
                 progress={usageProgress}
                 tone={usageMB >= 768 ? 'rose' : usageMB >= 512 ? 'amber' : 'indigo'}
                 showLabel={false}
               />
+              <p className="text-[10px] text-slate-500 mt-2">
+                Reaching storage limit triggers automatic cleanup policies.
+              </p>
             </div>
+          </div>
 
-            <div className="settings-reference-segments">
-              <span className={`settings-reference-segment ${mode === 'browser' ? 'is-active' : ''}`.trim()} />
-              <span className={`settings-reference-segment ${mode === 'opfs' ? 'is-active' : ''}`.trim()} />
-              <span className={`settings-reference-segment ${mode === 'local' ? 'is-active' : ''}`.trim()} />
-            </div>
-
-            <div className="mt-5 settings-reference-metric-grid">
-              <div className="settings-reference-mini-metric">
-                <div className="settings-reference-mini-metric__label">Local Permission</div>
-                <div className="settings-reference-mini-metric__value">{supportsLocal ? 'Supported' : 'Unavailable'}</div>
-                <div className="settings-reference-mini-metric__helper">
-                  {supportsLocal ? 'The browser can request a local folder permission.' : 'Only browser cache is available in this environment.'}
-                </div>
-              </div>
-              <div className="settings-reference-mini-metric">
-                <div className="settings-reference-mini-metric__label">Image Records</div>
-                <div className="settings-reference-mini-metric__value">{imageCount}</div>
-                <div className="settings-reference-mini-metric__helper">
-                  Total image IDs discovered in the storage layer.
-                </div>
-              </div>
-              <div className="settings-reference-mini-metric">
-                <div className="settings-reference-mini-metric__label">Active Project</div>
-                <div className="settings-reference-mini-metric__value">{activeCanvas?.name || 'None'}</div>
-                <div className="settings-reference-mini-metric__helper">
-                  Current workspace receiving merge and cleanup actions.
-                </div>
-              </div>
-              <div className="settings-reference-mini-metric">
-                <div className="settings-reference-mini-metric__label">Project Count</div>
-                <div className="settings-reference-mini-metric__value">{state.canvases.length}</div>
-                <div className="settings-reference-mini-metric__helper">
-                  Total canvases currently available for maintenance.
-                </div>
-              </div>
-            </div>
-          </section>
+          <div className="flex justify-between items-center pt-2 border-t border-white/5">
+            <span className="text-[9px] text-slate-400">Quota policy: Auto-eviction</span>
+            <button
+              type="button"
+              disabled={refreshing}
+              onClick={() => void refresh()}
+              className="text-[10px] font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 active:scale-95 transition cursor-pointer"
+            >
+              <RefreshCw size={10} className={refreshing ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,1fr)]">
-          <section className="settings-reference-card">
-            <div className="settings-reference-card__header">
-              <div>
-                <div className="settings-reference-card__eyebrow">Cache Maintenance</div>
-                <div className="settings-reference-card__title">Cleanup Controls</div>
-                <div className="settings-reference-card__meta">
-                  Cache cleanup no longer looks like a form. Each control is now a dedicated maintenance
-                  action consistent with the reference control panels.
-                </div>
+        {/* Card 7: Cleanup Controls (2A * 2row) */}
+        <div 
+          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row p-4 flex flex-col justify-between"
+          style={{ cursor: 'default' }}
+        >
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Cleanup
+            </div>
+            <h3 className="text-sm font-bold text-white mt-1.5">Cache & Retention Policy</h3>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Safely reclaim local space without deleting final project data.
+            </p>
+
+            <div className="mt-3 bg-white/5 border border-white/5 p-2.5 rounded-xl flex items-center justify-between">
+              <div className="min-w-0 flex-1 pr-2">
+                <div className="text-[10px] font-semibold text-white">Originals Cleanup</div>
+                <div className="text-[9px] text-slate-400 mt-0.5 leading-normal truncate">Clean unneeded original draft files</div>
               </div>
-              <Trash2 size={18} className="text-[var(--text-primary)]" />
+              <button
+                type="button"
+                disabled={cleanupType === 'compress'}
+                onClick={() => void handleCleanup()}
+                className="bg-rose-600 hover:bg-rose-700 text-white rounded-lg py-1.5 px-3 text-[10px] font-bold transition active:scale-95 shrink-0 cursor-pointer"
+              >
+                Clean
+              </button>
             </div>
 
-            <div className="mt-5 space-y-4">
-              <div className="settings-reference-mini-metric">
-                <div className="settings-reference-mini-metric__label">Original Cache</div>
-                <div className="settings-reference-mini-metric__helper">
-                  Remove original image artifacts while keeping result images and project metadata intact.
-                </div>
-                <div className="mt-4">
-                  <SettingsActionButton
-                    icon={Trash2}
-                    tone="primary"
-                    loading={cleanupType === 'compress'}
-                    onClick={() => void handleCleanup()}
+            <div className="grid grid-cols-2 gap-2 mt-2.5">
+              {cleanupOptions.map((option) => (
+                <div key={option.days} className="bg-white/5 border border-white/5 p-2 rounded-lg flex flex-col justify-between h-[64px]">
+                  <div className="text-[10px] font-semibold text-white">{option.label}</div>
+                  <button
+                    type="button"
+                    disabled={cleanupType === option.days}
+                    onClick={() => void handleCleanupByAge(option.days)}
+                    className="w-full bg-white/10 hover:bg-white/15 border border-white/10 text-slate-200 rounded-lg py-1 px-1.5 text-[9px] font-bold transition active:scale-95 mt-1 cursor-pointer"
                   >
-                    Clean Original Cache
-                  </SettingsActionButton>
+                    Keep {option.days}D
+                  </button>
                 </div>
-              </div>
-
-              <div className="settings-reference-grid-3">
-                {cleanupOptions.map((option) => (
-                  <div key={option.days} className="settings-reference-mini-metric">
-                    <div className="settings-reference-mini-metric__label">{option.label}</div>
-                    <div className="settings-reference-mini-metric__helper">
-                      Remove aged image cache while preserving newer workspace assets.
-                    </div>
-                    <div className="mt-4">
-                      <SettingsActionButton
-                        loading={cleanupType === option.days}
-                        onClick={() => void handleCleanupByAge(option.days)}
-                      >
-                        Run Cleanup
-                      </SettingsActionButton>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
-          </section>
+          </div>
+        </div>
 
-          <section className="settings-reference-card">
-            <div className="settings-reference-card__header">
+        {/* Card 8: Workspace Repair Actions (2A * 2row) */}
+        <div 
+          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row p-4 flex flex-col justify-between"
+          style={{ cursor: 'default' }}
+        >
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Repair
+            </div>
+            <h3 className="text-sm font-bold text-white mt-1.5">Project Merge & Tidy</h3>
+            
+            <div className="mt-3 space-y-2.5">
               <div>
-                <div className="settings-reference-card__eyebrow">Project Maintenance</div>
-                <div className="settings-reference-card__title">Workspace Repair Actions</div>
-                <div className="settings-reference-card__meta">
-                  Merge retired canvases into the active project or clean invalid cards without leaving the
-                  storage page.
-                </div>
-              </div>
-              <Activity size={18} className="text-[var(--text-primary)]" />
-            </div>
-
-            <div className="mt-5 space-y-4">
-              <div className="settings-reference-mini-metric">
-                <div className="settings-reference-mini-metric__label">Merge Source</div>
-                <div className="mt-3">
+                <label className="text-[9px] text-slate-400 block mb-1">Source Canvas</label>
+                <div className="select-container mt-1">
                   <SettingSelect
-                    label="Project to merge into the active canvas"
+                    label=""
                     value={mergeSourceId}
                     options={
                       mergeCandidates.length > 0
                         ? mergeCandidates.map((canvas) => ({ value: canvas.id, label: canvas.name }))
-                        : [{ value: '', label: 'No other canvas available' }]
+                        : [{ value: '', label: 'No other canvas' }]
                     }
                     onChange={setMergeSourceId}
                   />
                 </div>
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <SettingsActionButton
-                    loading={projectAction === 'merge'}
-                    tone="primary"
-                    onClick={() => void handleMergeProject()}
-                  >
-                    Merge into Active Project
-                  </SettingsActionButton>
-                  <SettingsActionButton
-                    loading={projectAction === 'cleanup'}
-                    onClick={() => void handleCleanupProjectCards()}
-                  >
-                    Remove Invalid Cards
-                  </SettingsActionButton>
-                </div>
               </div>
 
-              <div className="settings-reference-grid-2">
-                <div className="settings-reference-mini-metric">
-                  <div className="settings-reference-mini-metric__label">Active Canvas</div>
-                  <div className="settings-reference-mini-metric__value">{activeCanvas?.name || 'None selected'}</div>
-                  <div className="settings-reference-mini-metric__helper">
-                    Merge and cleanup actions always target the current active canvas.
-                  </div>
-                </div>
-                <div className="settings-reference-mini-metric">
-                  <div className="settings-reference-mini-metric__label">Merge Candidates</div>
-                  <div className="settings-reference-mini-metric__value">{mergeCandidates.length}</div>
-                  <div className="settings-reference-mini-metric__helper">
-                    Other canvases available to consolidate into the active workspace.
-                  </div>
-                </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={!activeCanvas || mergeCandidates.length === 0 || !mergeSourceId}
+                  onClick={() => void handleMergeProject()}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-1.5 px-2 text-[10px] font-bold transition active:scale-95 truncate disabled:opacity-40 cursor-pointer"
+                >
+                  Merge into Active
+                </button>
+                <button
+                  type="button"
+                  disabled={projectAction === 'cleanup' || !activeCanvas}
+                  onClick={() => void handleCleanupProjectCards()}
+                  className="flex-1 bg-white/10 hover:bg-white/15 border border-white/10 text-slate-200 rounded-lg py-1.5 px-2 text-[10px] font-bold transition active:scale-95 truncate cursor-pointer"
+                >
+                  Clean Cards
+                </button>
               </div>
             </div>
-          </section>
+          </div>
         </div>
-      </div>
+      </SettingsCardGridContainer>
     </SettingsViewShell>
   );
 };

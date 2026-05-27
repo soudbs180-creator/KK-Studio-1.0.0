@@ -30,6 +30,7 @@ import {
 import {
   SettingsActionButton,
   SettingsBadge,
+  SettingsCardGridContainer,
   SettingsHero,
   SettingsSection,
   SettingsViewShell,
@@ -670,32 +671,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   return (
     <SettingsViewShell>
       <style>{`
-        .dashboard-grid-container {
-          display: grid;
-          grid-template-columns: repeat(1, minmax(0, 1fr));
-          gap: 16px;
-          padding: 16px;
-          overflow-y: auto;
-          max-height: calc(100vh - 120px);
-        }
-        @media (min-width: 768px) {
-          .dashboard-grid-container {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-        }
-        @media (min-width: 1024px) {
-          .dashboard-grid-container {
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            max-height: none;
-          }
-        }
         .dashboard-grid-card {
           position: relative;
           overflow: hidden;
-          border-radius: 22px;
+          border-radius: 18px;
           border: 1px solid var(--frost-card-framework-border, rgba(255, 255, 255, 0.08));
           background: var(--frost-card-framework-bg, rgba(22, 28, 45, 0.76));
-          padding: 20px;
+          padding: 12px 14px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -703,7 +685,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           -webkit-backdrop-filter: blur(var(--frost-card-framework-blur, 20px)) saturate(160%);
           transition: all 0.25s ease-in-out;
           cursor: pointer;
-          min-height: 150px;
           box-shadow: var(--frost-card-framework-shadow, 0 8px 32px rgba(0, 0, 0, 0.35));
         }
         .dashboard-grid-card:hover {
@@ -711,20 +692,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           border-color: var(--frost-card-sub-border, rgba(255, 255, 255, 0.16));
           background: var(--frost-card-sub-bg, rgba(27, 34, 54, 0.84));
           box-shadow: var(--frost-card-sub-shadow, 0 16px 48px rgba(0, 0, 0, 0.5));
-        }
-        .card-col-2 {
-          grid-column: span 1 / span 1;
-        }
-        .card-row-2 {
-          grid-row: span 1 / span 1;
-        }
-        @media (min-width: 1024px) {
-          .card-col-2 {
-            grid-column: span 2 / span 2;
-          }
-          .card-row-2 {
-            grid-row: span 2 / span 2;
-          }
         }
         .dashboard-card-glow {
           position: absolute;
@@ -739,91 +706,88 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         }
       `}</style>
 
-      <div className="dashboard-grid-container">
-        {/* 卡片 1: 总览 (Overview) - 电脑端占 2*2 格 */}
+      <SettingsCardGridContainer className="dashboard-grid-container">
+        {/* 卡片 1: 总览 (Overview) - 电脑端占 2*2 格 (4A) */}
         <div 
-          className="dashboard-grid-card card-col-2 card-row-2"
+          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row"
           onClick={() => onNavigate('consumption-records')}
         >
           <div className="dashboard-card-glow" style={{ background: 'var(--accent-color)' }} />
-          <div className="flex flex-col gap-3 h-full justify-between">
+          <div className="flex flex-col gap-2 h-full justify-between">
             <div>
               <div className="flex items-center gap-2 text-slate-400">
-                <LayoutDashboard size={16} />
-                <span className="text-[10px] font-bold uppercase tracking-wider">{pick('总览', 'Overview')}</span>
+                <LayoutDashboard size={14} />
+                <span className="text-[9px] font-bold uppercase tracking-wider">{pick('总览', 'Overview')}</span>
               </div>
-              <h3 className="text-lg font-bold text-white mt-2">{pick('系统消耗与状态', 'Usage & Status')}</h3>
+              <h3 className="text-sm font-bold text-white mt-1.5">{pick('系统消耗与状态', 'Usage & Status')}</h3>
               
-              <div className="grid grid-cols-2 gap-3 mt-4">
-                <div className="rounded-xl bg-white/5 p-3 border border-white/5">
-                  <div className="text-[10px] text-slate-400">{pick('积分余额', 'Credits Balance')}</div>
-                  <div className="text-base font-bold text-amber-300 mt-1">{remainingBalanceDisplay}</div>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <div className="rounded-lg bg-white/5 p-2 border border-white/5">
+                  <div className="text-[9px] text-slate-400">{pick('积分余额', 'Credits')}</div>
+                  <div className="text-sm font-bold text-amber-300 mt-0.5">{remainingBalanceDisplay}</div>
                 </div>
-                <div className="rounded-xl bg-white/5 p-3 border border-white/5">
-                  <div className="text-[10px] text-slate-400">{pick('今日消耗金额', 'Today Cost')}</div>
-                  <div className="text-base font-bold text-emerald-400 mt-1">{formatUsd(todayCostUsd)}</div>
+                <div className="rounded-lg bg-white/5 p-2 border border-white/5">
+                  <div className="text-[9px] text-slate-400">{pick('今日消耗', 'Today Cost')}</div>
+                  <div className="text-sm font-bold text-emerald-400 mt-0.5">{formatUsd(todayCostUsd)}</div>
                 </div>
-                <div className="rounded-xl bg-white/5 p-3 border border-white/5">
-                  <div className="text-[10px] text-slate-400">{pick('今日 API 词元', 'Today Tokens')}</div>
-                  <div className="text-base font-bold text-blue-400 mt-1">{formatCompactNumber(todayTokens)}</div>
+                <div className="rounded-lg bg-white/5 p-2 border border-white/5">
+                  <div className="text-[9px] text-slate-400">{pick('今日词元', 'Today Tokens')}</div>
+                  <div className="text-sm font-bold text-blue-400 mt-0.5">{formatCompactNumber(todayTokens)}</div>
                 </div>
-                <div className="rounded-xl bg-white/5 p-3 border border-white/5">
-                  <div className="text-[10px] text-slate-400">{pick('可用链路数', 'Active Routes')}</div>
-                  <div className="text-base font-bold text-indigo-400 mt-1">{channelCount}</div>
+                <div className="rounded-lg bg-white/5 p-2 border border-white/5">
+                  <div className="text-[9px] text-slate-400">{pick('可用链路', 'Routes')}</div>
+                  <div className="text-sm font-bold text-indigo-400 mt-0.5">{channelCount}</div>
                 </div>
               </div>
             </div>
             
-            <div className="mt-4 pt-3 border-t border-white/5 space-y-2 text-xs text-slate-400">
-              <div className="flex items-center gap-2">
-                <span className={`h-1.5 w-1.5 rounded-full ${hasAvailableRoute ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                <span className="truncate">{hasAvailableRoute ? pick('API 链路测试正常，状态健康', 'API routes ready') : pick('无可用 API 路由，请在工作台添加', 'API setup required')}</span>
+            <div className="pt-2 border-t border-white/5 space-y-1 text-[11px] text-slate-400">
+              <div className="flex items-center gap-1.5">
+                <span className={`h-1 w-1 rounded-full ${hasAvailableRoute ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                <span className="truncate">{hasAvailableRoute ? pick('API 链路正常，状态健康', 'API routes ready') : pick('无可用 API 路由，请在工作台添加', 'API setup required')}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className={`h-1.5 w-1.5 rounded-full ${storageMode ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+              <div className="flex items-center gap-1.5">
+                <span className={`h-1 w-1 rounded-full ${storageMode ? 'bg-emerald-400' : 'bg-amber-400'}`} />
                 <span className="truncate">{storageMode ? pick(`存储健康 (${storageModeLabel})`, `Storage OK (${storageModeLabel})`) : pick('本地存储待配置', 'Storage setup required')}</span>
-              </div>
-              <div className="text-[9px] text-slate-500 mt-1 font-medium">
-                * {pick('所有运行数据及生成的图片均托管在您的 VPS 服务器中', '* All runtime data is securely hosted on your VPS')}
               </div>
             </div>
           </div>
         </div>
 
-        {/* 卡片 2: API 工作台 (API Workspace) - 电脑端占 2 列 */}
+        {/* 卡片 2: API 工作台 (API Workspace) - 电脑端占 2*1 格 (2A) */}
         <div 
-          className="dashboard-grid-card card-col-2"
+          className="dashboard-grid-card a-card-span-2-col"
           onClick={() => onNavigate('api-management')}
         >
           <div className="dashboard-card-glow" style={{ background: '#3b82f6' }} />
-          <div className="flex flex-col gap-3 w-full justify-between h-full">
+          <div className="flex flex-col gap-2 w-full justify-between h-full">
             <div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-slate-400">
-                  <KeyRound size={16} />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">{pick('API 工作台', 'API Workspace')}</span>
+                  <KeyRound size={14} />
+                  <span className="text-[9px] font-bold uppercase tracking-wider">{pick('API 工作台', 'API Workspace')}</span>
                 </div>
                 <span className="text-[9px] bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-full px-2 py-0.5 font-semibold">
                   {officialCount} {pick('官方', 'Official')} / {activeProviderCount} {pick('在线', 'Online')}
                 </span>
               </div>
-              <h3 className="text-base font-bold text-white mt-2">{pick('多供应商与能力分配', 'API & Capability Routing')}</h3>
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                {pick('管理本地 API 密钥与第三方中转。直接替代旧版 EchoBird 核心，接入后可用于在能力分配中自由绑定官方和中转的各厂家模型。', 'Manage API keys and external proxies. Binds providers for models.')}
+              <h3 className="text-xs font-bold text-white mt-1.5">{pick('多供应商与能力分配', 'API & Capability Routing')}</h3>
+              <p className="text-[11px] text-slate-400 mt-1 leading-normal truncate">
+                {pick('管理本地 API 密钥与第三方中转。直接替代旧版 EchoBird 核心。', 'Manage API keys and external proxies.')}
               </p>
             </div>
             
-            <div className="flex gap-2 mt-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
               <button 
                 type="button" 
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-2 px-3 text-xs font-bold transition active:scale-95"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-1 px-2.5 text-[11px] font-bold transition active:scale-95"
                 onClick={() => onNavigate('api-management')}
               >
                 + {pick('添加 API', 'Add API')}
               </button>
               <button 
                 type="button" 
-                className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 rounded-xl py-2 px-3 text-xs font-bold transition active:scale-95"
+                className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 rounded-lg py-1 px-2.5 text-[11px] font-bold transition active:scale-95"
                 onClick={() => onNavigate('api-management')}
               >
                 {pick('高级设置', 'Advanced')}
@@ -832,38 +796,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
         </div>
 
-        {/* 卡片 3: 用户信息与充值 (User & Recharge) - 电脑端占 2 列 */}
+        {/* 卡片 3: 用户信息与充值 (User & Recharge) - 电脑端占 2*1 格 (2A) */}
         <div 
-          className="dashboard-grid-card card-col-2"
+          className="dashboard-grid-card a-card-span-2-col"
           onClick={() => setShowRechargeModal(true)}
         >
           <div className="dashboard-card-glow" style={{ background: '#ec4899' }} />
-          <div className="flex flex-col gap-3 w-full justify-between h-full">
+          <div className="flex flex-col gap-2 w-full justify-between h-full">
             <div>
               <div className="flex items-center gap-2 text-slate-400">
-                <Wallet size={16} />
-                <span className="text-[10px] font-bold uppercase tracking-wider">{pick('个人中心与充值', 'Account & Recharge')}</span>
+                <Wallet size={14} />
+                <span className="text-[9px] font-bold uppercase tracking-wider">{pick('个人中心与充值', 'Account & Recharge')}</span>
               </div>
               
-              <div className="flex items-center gap-3 mt-3 bg-white/5 p-3 rounded-xl border border-white/5">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--settings-avatar-bg)] text-[var(--settings-avatar-text)] font-bold text-xs">
+              <div className="flex items-center gap-2 mt-1.5 bg-white/5 p-1.5 rounded-lg border border-white/5">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--settings-avatar-bg)] text-[var(--settings-avatar-text)] font-bold text-[10px]">
                   {avatarUrl ? <img src={avatarUrl} alt={accountName} className="h-full w-full object-cover" /> : accountName.slice(0, 1).toUpperCase()}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-semibold text-white">{accountName}</span>
-                  <span className="block truncate text-[9px] text-slate-400 mt-0.5">{accountMeta}</span>
+                  <span className="block truncate text-[11px] font-semibold text-white">{accountName}</span>
+                  <span className="block truncate text-[8px] text-slate-400 mt-0.5">{accountMeta}</span>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="text-[9px] text-slate-400">{pick('积分余额', 'Credits')}</div>
-                  <div className="text-xs font-bold text-amber-300 mt-0.5">{remainingBalanceDisplay}</div>
+                  <div className="text-[8px] text-slate-400">{pick('积分余额', 'Credits')}</div>
+                  <div className="text-[11px] font-bold text-amber-300 mt-0.5">{remainingBalanceDisplay}</div>
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-2 mt-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex gap-2 mt-1" onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2.5 px-3 text-xs font-bold transition active:scale-95"
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-1 px-2.5 text-[11px] font-bold transition active:scale-95"
                 onClick={() => setShowRechargeModal(true)}
               >
                 ⚡ {pick('立即充值积分', 'Recharge Credits')}
@@ -872,68 +836,68 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
         </div>
 
-        {/* 卡片 4: 计费账本 (Billing Ledger) - 占 1 列 */}
+        {/* 卡片 4: 计费账本 (Billing Ledger) - 占 1*1 格 (1A) */}
         <div 
           className="dashboard-grid-card"
           onClick={() => onNavigate('consumption-records')}
         >
           <div className="dashboard-card-glow" style={{ background: '#f59e0b' }} />
-          <div className="flex flex-col gap-2 justify-between h-full">
+          <div className="flex flex-col gap-1.5 justify-between h-full">
             <div>
               <div className="flex items-center gap-2 text-slate-400">
-                <Coins size={15} />
-                <span className="text-[10px] font-bold uppercase tracking-wider">{pick('计费账本', 'Billing')}</span>
+                <Coins size={13} />
+                <span className="text-[9px] font-bold uppercase tracking-wider">{pick('计费账本', 'Billing')}</span>
               </div>
-              <h3 className="text-sm font-bold text-white mt-2">{pick('账户交易记录', 'Transaction History')}</h3>
+              <h3 className="text-xs font-bold text-white mt-1.5">{pick('账户交易记录', 'Transaction History')}</h3>
             </div>
-            <div className="text-[11px] text-slate-400 mt-2 truncate">
+            <div className="text-[10px] text-slate-400 mt-1 truncate">
               {latestRecharge ? pick(`最近充值：${formatDateTime(latestRecharge.created_at)}`, `Recharged: ${formatDateTime(latestRecharge.created_at)}`) : pick('本周暂无充值记录', 'No recent recharge')}
             </div>
           </div>
         </div>
 
-        {/* 卡片 5: 系统日志 (Logs) - 占 1 列 */}
+        {/* 卡片 5: 系统日志 (Logs) - 占 1*1 格 (1A) */}
         <div 
           className="dashboard-grid-card"
           onClick={() => onNavigate('system-logs')}
         >
           <div className="dashboard-card-glow" style={{ background: '#ef4444' }} />
-          <div className="flex flex-col gap-2 justify-between h-full">
+          <div className="flex flex-col gap-1.5 justify-between h-full">
             <div>
               <div className="flex items-center gap-2 text-slate-400">
-                <ScrollText size={15} />
-                <span className="text-[10px] font-bold uppercase tracking-wider">{pick('日志诊断', 'System Logs')}</span>
+                <ScrollText size={13} />
+                <span className="text-[9px] font-bold uppercase tracking-wider">{pick('日志诊断', 'System Logs')}</span>
               </div>
-              <h3 className="text-sm font-bold text-white mt-2">{pick('错误排障与告警', 'Triage & Diagnostics')}</h3>
+              <h3 className="text-xs font-bold text-white mt-1.5">{pick('错误排障与告警', 'Triage & Diagnostics')}</h3>
             </div>
-            <div className="text-[11px] text-slate-400 mt-2 truncate flex items-center gap-1.5">
+            <div className="text-[10px] text-slate-400 mt-1 truncate flex items-center gap-1.5">
               <span className={`h-1.5 w-1.5 rounded-full ${hasCriticalLogs ? 'bg-red-400 animate-pulse' : 'bg-emerald-400'}`} />
               <span className="truncate">{importantLogCount > 0 ? pick(`${importantLogCount} 条运行告警`, `${importantLogCount} alerts`) : pick('系统无异常记录', 'Logs clear')}</span>
             </div>
           </div>
         </div>
 
-        {/* 卡片 6: 存储管理 (Storage) - 电脑端占 2 列 */}
+        {/* 卡片 6: 存储管理 (Storage) - 电脑端占 2*1 格 (2A) */}
         <div 
-          className="dashboard-grid-card card-col-2"
+          className="dashboard-grid-card a-card-span-2-col"
           onClick={() => onNavigate('storage-settings')}
         >
           <div className="dashboard-card-glow" style={{ background: '#10b981' }} />
-          <div className="flex flex-col gap-3 w-full justify-between h-full">
+          <div className="flex flex-col gap-2 w-full justify-between h-full">
             <div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-slate-400">
-                  <HardDrive size={15} />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">{pick('存储容量', 'Storage Settings')}</span>
+                  <HardDrive size={13} />
+                  <span className="text-[9px] font-bold uppercase tracking-wider">{pick('存储容量', 'Storage Settings')}</span>
                 </div>
                 <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full px-2 py-0.5 font-semibold">
                   {storageModeLabel}
                 </span>
               </div>
-              <h3 className="text-sm font-bold text-white mt-2">{pick('画布资源与空间清理', 'Usage & Cache')}</h3>
+              <h3 className="text-xs font-bold text-white mt-1.5">{pick('画布资源与空间清理', 'Usage & Cache')}</h3>
               
-              <div className="mt-3">
-                <div className="flex justify-between text-[11px] text-slate-400 mb-1.5">
+              <div className="mt-2">
+                <div className="flex justify-between text-[10px] text-slate-400 mb-1">
                   <span>{storageSnapshotPending ? pick('更新中...', 'Updating...') : pick(`已存 ${storedImages} 张图`, `${storedImages} images`)}</span>
                   <span>{storageUsageMb.toFixed(1)} MB / 1 GB</span>
                 </div>
@@ -946,8 +910,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             </div>
           </div>
         </div>
-      </div>
+      </SettingsCardGridContainer>
     </SettingsViewShell>
+
   );
 };
 

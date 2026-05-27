@@ -223,7 +223,11 @@ const SettingsMobileShell: React.FC<{
   const items = getSettingsNavItems(language);
   const activeNavItem = items.find((item) => item.id === activeView) || items[0];
   const mobileBillingLabel = pickByLanguage(language, '计费', 'Billing');
-  const activeTitle = activeView === 'consumption-records' ? mobileBillingLabel : activeNavItem.label;
+  const activeTitle = activeView === 'dashboard'
+    ? pickByLanguage(language, '设置总览', 'Settings Overview')
+    : activeView === 'consumption-records'
+      ? mobileBillingLabel
+      : activeNavItem.label;
 
   const handleLeadingAction = () => {
     if (isApiManagementEditorRoute) {
@@ -260,7 +264,7 @@ const SettingsMobileShell: React.FC<{
 
           <div className="settings-shell-mobile__title-wrap" style={{ marginTop: 0 }}>
             <div className="settings-shell-kicker" style={{ fontSize: '8px', lineHeight: '1' }}>{pick('当前入口', 'Current entry')}</div>
-            <div className="settings-shell-mobile__title" style={{ fontSize: '14px', lineHeight: '1.2', fontWeight: 600 }}>{activeTitle}</div>
+            <h2 className="settings-shell-mobile__title" style={{ fontSize: '14px', lineHeight: '1.2', fontWeight: 600 }}>{activeTitle}</h2>
           </div>
         </div>
 
@@ -377,12 +381,6 @@ const SettingsRouterShell: React.FC<{
     setNavQuery('');
   }, [initialView]);
 
-  useEffect(() => {
-    if (!isMobile && activeView === 'dashboard') {
-      // 电脑端默认静默重定向到第一个核心二级设置详情页，避免重复展示大卡片，彻底转化为 Master-Detail
-      navigate('/settings/api-management', { replace: true });
-    }
-  }, [isMobile, activeView, navigate]);
 
   const handleNavigate = (view: CanonicalSettingsViewId) => {
     navigate(buildSettingsPath(view));

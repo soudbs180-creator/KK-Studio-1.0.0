@@ -3,6 +3,7 @@ import InfiniteCanvas, { type InfiniteCanvasHandle } from './components/canvas/I
 import ImageNode from './components/image/ImageCard';
 import PromptNodeComponent from './components/canvas/PromptNodeComponent';
 // KeyManagerModal removed - integrated into UserProfileModal
+import { APP_DISPLAY_VERSION } from './config/appInfo';
 import { AspectRatio, ImageSize, type GenerationConfig, type PromptNode, type GeneratedImage, GenerationMode, KnownModel, type CanvasGroup, type PartialRedrawRequest, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceFrameworkRuntimeState } from './types';
 import { CanvasGroupComponent } from './components/canvas/CanvasGroupComponent';
 import { generateImage, cancelGeneration } from './services/llm/geminiService';
@@ -44,6 +45,7 @@ import {
 } from './app/appCanvasTypes';
 import { buildSoftConnectorPath, getSoftConnectorPointAt } from './canvas/connectorGeometry';
 import AppDesktopChrome from './app/AppDesktopChrome';
+import AppZoomControl from './app/AppZoomControl';
 import AppCanvasOverlays from './app/AppCanvasOverlays';
 import { getCollapsedCanvasGroupNodeIds } from './app/collapsedCanvasGroups';
 import AppMobileWorkspace from './app/AppMobileWorkspace';
@@ -4409,23 +4411,53 @@ const AppContent: React.FC<AppContentProps> = () => {
         showConnections={true}
         mode={backgroundMode}
       />
-      <AppDesktopChrome
-        isMobile={isMobile}
-        billingUiEnabled={billingUiEnabled}
-        remainingBalanceDisplay={remainingBalanceDisplay}
-        onRecharge={() => setShowRechargeModal(true)}
-        rightOffset={desktopChromeRight}
-        user={user}
-        avatarUrl={derivedMobileUserAvatarUrl}
-        apiStatus={derivedApiStatus}
-        showUserMenu={showUserMenu}
-        setShowUserMenu={setShowUserMenu}
-        onOpenProfile={openProfileSurface}
-        onOpenSettings={() => openSettingsSurfaceTracked('dashboard')}
-        onSignOut={() => { void signOut(); }}
-        isChatOpen={isChatOpen}
-        onToggleChat={toggleChatPanel}
-      />
+      {/* 简体中文：左上角等宽悬浮控制卡片 */}
+      {!isMobile && (
+        <div className="fixed top-4 left-4 z-[100] w-52 pointer-events-auto select-none">
+          <AppDesktopChrome
+            isMobile={isMobile}
+            billingUiEnabled={billingUiEnabled}
+            remainingBalanceDisplay={remainingBalanceDisplay}
+            onRecharge={() => setShowRechargeModal(true)}
+            rightOffset="0px"
+            user={user}
+            avatarUrl={derivedMobileUserAvatarUrl}
+            apiStatus={derivedApiStatus}
+            showUserMenu={showUserMenu}
+            setShowUserMenu={setShowUserMenu}
+            onOpenProfile={openProfileSurface}
+            onOpenSettings={() => openSettingsSurfaceTracked('dashboard')}
+            onSignOut={() => { void signOut(); }}
+            isChatOpen={isChatOpen}
+            onToggleChat={toggleChatPanel}
+          />
+        </div>
+      )}
+
+      {/* 简体中文：左下角悬浮缩放卡片 - 竖直摆放，极致纤细宽度 (w-10)，不要和侧边工具栏宽度一致，版本号在其下方另外渲染为精致的独立毛玻璃卡片 */}
+      {!isMobile && (
+        <div className="fixed bottom-4 left-4 z-50 w-10 flex flex-col items-center gap-2 pointer-events-auto select-none">
+          <AppZoomControl
+            scale={canvasTransform.scale}
+            transform={canvasTransform}
+            canvasRef={canvasRef}
+          />
+          <div 
+            className="w-full py-1.5 flex items-center justify-center rounded-xl border transition-all duration-300"
+            style={{
+              background: 'var(--frost-card-framework-bg)',
+              border: '1px solid var(--frost-card-framework-border)',
+              boxShadow: 'var(--frost-card-framework-shadow)',
+              WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+              backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+            }}
+          >
+            <span className="text-[10px] text-[var(--text-secondary)] font-bold tracking-tight leading-none text-center">
+              {APP_DISPLAY_VERSION}
+            </span>
+          </div>
+        </div>
+      )}
 
       <AppCanvasOverlays
         selectionBox={selectionBox}

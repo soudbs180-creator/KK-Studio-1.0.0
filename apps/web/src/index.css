@@ -1129,7 +1129,7 @@ body.dark-mode #root::before {
 }
 
 body {
-  font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: "HarmonyOS Sans SC", "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background-color: var(--bg-color);
   color: var(--text-color);
   /* transition: all 0.3s ease;  <-- CAUSES JELLY EFFECT ON DRAG */
@@ -2146,7 +2146,7 @@ body.dark-mode .input-bar {
   border-radius: inherit;
   background: var(--prompt-bar-footer-frost-bg);
   box-shadow: var(--prompt-bar-footer-frost-shadow);
-  border-top: 1px solid var(--prompt-bar-footer-frost-border);
+  border-top: 2px solid var(--prompt-bar-footer-frost-border);
   -webkit-backdrop-filter: blur(18px) saturate(150%);
   backdrop-filter: blur(18px) saturate(150%);
   pointer-events: none;
@@ -9333,6 +9333,8 @@ body.dark-mode .settings-panel {
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* 简体中文注释：预留恒定的滚动条空间，从根本上防止滑动条出现时挤扁页面内容、将最右侧卡片边缘切掉一块的问题，并消除闪烁 */
+  scrollbar-gutter: stable;
 }
 
 .settings-shell-page--desktop {
@@ -11106,6 +11108,9 @@ body.dark-mode .storage-selection-modal {
   grid-template-columns: minmax(340px, 1.35fr) minmax(260px, 0.65fr);
   gap: 16px;
   align-items: stretch;
+  /* 简体中文注释：强制将三级密钥详情编辑器的横向最大宽度锁死在 4A 满宽尺寸（1128px），使其与二级列表卡片和 Dashboard 的右侧边界绝对对齐，拒绝无限拉宽变形 */
+  max-width: 1128px !important;
+  width: 100%;
 }
 
 .settings-panel .settings-api-action-stage {
@@ -11306,7 +11311,8 @@ body.dark-mode .storage-selection-modal {
 
 .settings-panel .settings-provider-card__metric-value {
   margin-top: 8px;
-  font-size: 16px;
+  /* 简体中文注释：为了突出显示卡片内部的指标数字，将其字号从 16px 提升至 20px */
+  font-size: 20px;
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: -0.02em;
@@ -11325,7 +11331,8 @@ body.dark-mode .storage-selection-modal {
 }
 
 .settings-panel .settings-provider-card__metric:first-child .settings-provider-card__metric-value {
-  font-size: 20px;
+  /* 简体中文注释：核心重点数字字号从 20px 提升至 26px，使其更为醒目和突出 */
+  font-size: 26px;
 }
 
 .settings-panel .settings-provider-card__metric:first-child .settings-provider-card__metric-helper {
@@ -11450,6 +11457,8 @@ body.dark-mode .storage-selection-modal {
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
+  /* 简体中文注释：强加不可挤压特性，解决在小卡片下因标题字长将右侧开关完全挤扁、导致按钮实际可点范围变0从而“按钮失效”的问题 */
+  flex-shrink: 0;
 }
 
 .settings-panel .settings-capability-card__switch {
@@ -11461,6 +11470,8 @@ body.dark-mode .storage-selection-modal {
   border-radius: 999px;
   background: var(--settings-surface-overlay);
   transition: border-color 160ms ease, background-color 160ms ease;
+  /* 简体中文注释：加 pointer 交互小手反馈，防止让用户在悬停时感觉这是一个“无效按钮” */
+  cursor: pointer;
 }
 
 .settings-panel .settings-capability-card__switch--on {
@@ -11486,8 +11497,9 @@ body.dark-mode .storage-selection-modal {
 
 .settings-panel .settings-capability-card__controls {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  /* 简体中文注释：为了消除在 auto-fit 分栏卡片（宽度仅 260px–350px 左右）内部 3 列排版带来的极度拥挤、选择框缩成一团并彻底脱离的问题，改用单列纵向布局 */
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 
 .settings-panel .settings-capability-card__controls label > div:first-child {
@@ -11605,7 +11617,6 @@ body.dark-mode .storage-selection-modal {
   border-radius: 18px;
   padding: 12px 14px;
   background: rgb(6 10 16 / 0.42);
-  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.65;
   color: var(--text-secondary);
@@ -11619,7 +11630,6 @@ body.dark-mode .storage-selection-modal {
 }
 
 .settings-panel .settings-mono {
-  font-family: var(--font-mono);
 }
 
 @keyframes kk-refresh-icon-spin {
@@ -12158,7 +12168,8 @@ body.dark-mode .settings-panel {
 
 .settings-panel .settings-shell-page--desktop .settings-dashboard-hero .settings-reference-mini-metric__value {
   margin-top: 6px;
-  font-size: 20px;
+  /* 简体中文注释：桌面端重点小指标数字字号从 20px 提到 24px */
+  font-size: 24px;
 }
 
 .settings-panel .settings-shell-page--desktop .settings-dashboard-hero .settings-reference-mini-metric__helper {
@@ -12334,7 +12345,7 @@ body.dark-mode .settings-panel {
 }
 
 .settings-panel .settings-shell-page--mobile {
-  padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 14px);
+  padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 14px);
 }
 
 .settings-panel .settings-shell-page--mobile .settings-reference-stack {
@@ -12553,7 +12564,8 @@ body.dark-mode .settings-panel {
 
 .settings-panel .settings-shell-page--mobile .settings-reference-mini-metric__value {
   margin-top: 7px;
-  font-size: 20px;
+  /* 简体中文注释：手机端重点小指标数字字号从 20px 提到 24px */
+  font-size: 24px;
   letter-spacing: 0;
 }
 
@@ -13209,7 +13221,7 @@ body {
 /* Final controlled frosted material bindings. Keep after every legacy theme block. */
 .input-bar {
   background: var(--frost-input-bg);
-  border: 1px solid var(--frost-input-border);
+  border: 2px solid var(--frost-input-border);
   box-shadow: var(--frost-input-shadow);
   -webkit-backdrop-filter: blur(var(--frost-input-blur)) saturate(1.12);
   backdrop-filter: blur(var(--frost-input-blur)) saturate(1.12);
@@ -13244,7 +13256,7 @@ body.dark-mode .input-bar {
 .settings-panel .settings-shell-desktop {
   background: var(--frost-card-framework-bg);
   background: var(--frost-card-framework-bg) !important;
-  border: 1px solid var(--settings-shell-border) !important;
+  border: 2px solid var(--settings-shell-border) !important;
   box-shadow: var(--settings-shell-shadow) !important;
   -webkit-backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(1.16);
   backdrop-filter: blur(var(--frost-card-framework-blur)) saturate(1.16);
@@ -13354,7 +13366,7 @@ body.dark-mode .input-bar {
 .settings-panel .settings-api-info-stage {
   padding: 14px 0 0;
   border: 0 !important;
-  border-top: 1px solid var(--frost-card-sub-border) !important;
+  border-top: 2px solid var(--frost-card-sub-border) !important;
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -14189,12 +14201,17 @@ body:not(.dark-mode) .settings-console-checkbox {
   color: var(--text-secondary);
   font-size: 10px;
   font-weight: 700;
-  font-family: var(--font-mono);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 body:not(.dark-mode) .settings-log-group-badge {
   background-color: rgba(0, 0, 0, 0.08);
+}
+
+/* 设置页面网格间隙统一锁定为 16px */
+.settings-panel .settings-provider-grid,
+.settings-panel .settings-capability-grid {
+  gap: 16px !important;
 }
 
 /* ==========================================
@@ -14225,5 +14242,243 @@ body:not(.dark-mode) .settings-log-group-badge {
   .settings-panel .settings-provider-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
+  .settings-panel .settings-provider-card,
+  .settings-panel .settings-capability-card {
+    width: 260px !important;
+    height: 150px !important;
+    min-width: 260px !important;
+    max-width: 260px !important;
+    min-height: 150px !important;
+    max-height: 150px !important;
+    overflow: hidden;
+  }
 }
+
+/* ==========================================================================
+   A卡片（270*130px）网格规范与跨度规则
+   ========================================================================== */
+
+.settings-card-grid-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-auto-rows: 130px;
+  gap: 16px;
+  justify-content: center;
+  width: 100%;
+  max-width: 100%;
+  /* 简体中文注释：使用 visible 确保在产生滑动条时即使发生极微小的宽度自适应偏差，最右侧卡片边缘也绝对不会被裁切掉 */
+  overflow-x: visible !important;
+}
+
+@media (min-width: 768px) {
+  .settings-card-grid-container {
+    grid-template-columns: repeat(2, 270px);
+    /* 简体中文注释：强制左侧对齐，与顶部的 Hero 标题、面包屑完全贴合在同一条 28px 左垂线上，避免当卡片较少时居中产生视觉不对齐和右侧空荡的问题 */
+    justify-content: start !important;
+  }
+}
+
+@media (min-width: 1200px) {
+  .settings-card-grid-container {
+    grid-template-columns: repeat(4, 270px);
+    /* 简体中文注释：强制左侧对齐，与顶部 Hero 标题的左边缘百分百垂直一致，确保在宽屏下绝不偏离对齐线 */
+    justify-content: start !important;
+  }
+}
+
+/* A卡片基础与多A跨度样式 */
+.a-card-1x1 {
+  width: 270px;
+  height: 130px;
+}
+
+/* 跨行和跨列必须用媒体查询限制，防止不同网格宽度下溢出 */
+@media (min-width: 768px) {
+  .a-card-span-2-col {
+    grid-column: span 2;
+  }
+  /* 在 2 列网格中，降级为跨 2 列，防止顶爆网格 */
+  .a-card-span-3-col {
+    grid-column: span 2;
+  }
+  .a-card-span-4-col {
+    grid-column: span 2;
+  }
+}
+
+@media (min-width: 1200px) {
+  .a-card-span-3-col {
+    grid-column: span 3;
+  }
+  .a-card-span-4-col {
+    grid-column: span 4;
+  }
+}
+
+.a-card-span-2-row {
+  grid-row: span 2;
+}
+.a-card-span-3-row {
+  grid-row: span 3;
+}
+.a-card-span-4-row {
+  grid-row: span 4;
+}
+
+/* 强制覆盖通道列表和卡片，使其严格适配 A卡片 大小 */
+.settings-panel .settings-provider-grid {
+  display: grid !important;
+  grid-template-columns: repeat(1, 270px) !important;
+  grid-auto-rows: 130px !important;
+  justify-content: center !important;
+  width: 100% !important;
+  overflow-x: hidden !important;
+  gap: 16px !important;
+}
+
+@media (min-width: 768px) {
+  .settings-panel .settings-provider-grid {
+    grid-template-columns: repeat(2, 270px) !important;
+  }
+}
+
+@media (min-width: 1200px) {
+  .settings-panel .settings-provider-grid {
+    grid-template-columns: repeat(4, 270px) !important;
+    justify-content: start !important;
+  }
+}
+
+/* 强制重写 ConsoleEndpointCard 内部尺寸，确保完美匹配 270*130 */
+.settings-panel .settings-provider-card {
+  width: 270px !important;
+  height: 130px !important;
+  min-width: 270px !important;
+  max-width: 270px !important;
+  min-height: 130px !important;
+  max-height: 130px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+/* 统一的 A卡片 (dashboard-grid-card) 样式定义，确保全设置页样式一致 */
+.dashboard-grid-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid var(--frost-card-framework-border, rgba(255, 255, 255, 0.08));
+  background: var(--frost-card-framework-bg, rgba(22, 28, 45, 0.76));
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  backdrop-filter: blur(var(--frost-card-framework-blur, 20px)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--frost-card-framework-blur, 20px)) saturate(160%);
+  transition: all 0.25s ease-in-out;
+  cursor: default;
+  box-shadow: var(--frost-card-framework-shadow, 0 8px 32px rgba(0, 0, 0, 0.35));
+}
+
+.dashboard-grid-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--frost-card-sub-border, rgba(255, 255, 255, 0.16));
+  background: var(--frost-card-sub-bg, rgba(27, 34, 54, 0.84));
+  box-shadow: var(--frost-card-sub-shadow, 0 16px 48px rgba(0, 0, 0, 0.5));
+}
+
+.dashboard-card-glow {
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  filter: blur(45px);
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   A卡片极其多A跨度的物理宽高精准锁定规则（带 16px 间隙公式）
+   ========================================================================== */
+@media (min-width: 768px) {
+  .dashboard-grid-card {
+    width: 270px !important;
+    height: 130px !important;
+    min-width: 270px !important;
+    max-width: 270px !important;
+    min-height: 130px !important;
+    max-height: 130px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 2列跨度大卡片宽度：2 * W_A + gap_16 = 556px */
+  .dashboard-grid-card.a-card-span-2-col {
+    width: 556px !important;
+    min-width: 556px !important;
+    max-width: 556px !important;
+  }
+
+  /* 3列与4列大卡片在中屏下自适应降级为跨2列宽度 */
+  .dashboard-grid-card.a-card-span-3-col,
+  .dashboard-grid-card.a-card-span-4-col {
+    width: 556px !important;
+    min-width: 556px !important;
+    max-width: 556px !important;
+  }
+
+  /* 2行跨度大卡片高度：2 * H_A + gap_16 = 276px */
+  .dashboard-grid-card.a-card-span-2-row {
+    height: 276px !important;
+    min-height: 276px !important;
+    max-height: 276px !important;
+  }
+
+  /* 3行跨度大卡片高度：3 * H_A + 2 * gap_16 = 422px */
+  .dashboard-grid-card.a-card-span-3-row {
+    height: 422px !important;
+    min-height: 422px !important;
+    max-height: 422px !important;
+  }
+
+  /* 4行跨度大卡片高度：4 * H_A + 3 * gap_16 = 568px */
+  .dashboard-grid-card.a-card-span-4-row {
+    height: 568px !important;
+    min-height: 568px !important;
+    max-height: 568px !important;
+  }
+}
+
+@media (min-width: 1200px) {
+  /* 电脑宽屏端：3列与4列大卡片以 16px 间隙公式展开独立宽度 */
+  .dashboard-grid-card.a-card-span-3-col {
+    width: 842px !important;
+    min-width: 842px !important;
+    max-width: 842px !important;
+  }
+
+  .dashboard-grid-card.a-card-span-4-col {
+    width: 1128px !important;
+    min-width: 1128px !important;
+    max-width: 1128px !important;
+  }
+}
+
+/* 日志检测列表 - 紧凑精细的单条日志流项样式（与全局 settings-log-entry 隔离以避免污染） */
+.settings-log-stream-entry {
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.settings-log-stream-entry--warning {
+  border-color: rgba(245, 158, 11, 0.25) !important;
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.06) 0%, transparent 100%), rgba(245, 158, 11, 0.02) !important;
+}
+
+.settings-log-stream-entry--error {
+  border-color: rgba(239, 68, 68, 0.25) !important;
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.06) 0%, transparent 100%), rgba(239, 68, 68, 0.02) !important;
+}
+
+
 

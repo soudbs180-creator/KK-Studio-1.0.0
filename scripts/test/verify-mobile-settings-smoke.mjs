@@ -569,7 +569,7 @@ try {
   await settingsEntry.click();
 
   const settingsOverviewHeading = page.getByRole('heading', { name: /设置总览|Settings Overview/i });
-  const apiEntry = page.getByRole('button', { name: /打开 API 工作台|Open API Workspace/i });
+  const apiEntry = page.getByRole('button', { name: /\+ 添加 API|\+ Add API/i });
 
   await assertVisible(settingsOverviewHeading, 'Mobile settings overview did not open by default.');
   await assertVisible(apiEntry, 'Mobile settings overview API action did not render.');

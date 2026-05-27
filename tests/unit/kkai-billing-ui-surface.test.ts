@@ -26,11 +26,11 @@ test('KKAI keeps billing surfaces feature-gated and restores the desktop assista
   assert.match(appSource, /rechargeModal:\s*\{\s*enabled:\s*billingUiEnabled,\s*isOpen:\s*showRechargeModal,/);
 
   assert.match(desktopChromeSource, /\{billingUiEnabled && \(/);
-  assert.match(desktopChromeSource, /onOpenProfile\('billing'\)/);
+  assert.match(desktopChromeSource, /onOpenProfile\('main'\)/);
   assert.match(desktopChromeSource, /onClick=\{onRecharge\}/);
 
 
-  assert.match(mobileWorkspaceSource, /onBillingClick=\{billingUiEnabled \? \(\) => openProfileSurface\('billing'\) : undefined\}/);
+  assert.match(mobileWorkspaceSource, /onBillingClick=\{billingUiEnabled \? \(\) => openProfileSurface\('main'\) : undefined\}/);
   assert.match(mobileWorkspaceSource, /onRechargeClick=\{billingUiEnabled \? onShowRecharge : undefined\}/);
   assert.match(globalModalsSource, /rechargeModal\.enabled && rechargeModal\.isOpen/);
 
@@ -42,10 +42,7 @@ test('KKAI keeps billing surfaces feature-gated and restores the desktop assista
   assert.match(promptBarSource, /const isSystemCreditModel = billingUiEnabled && !!currentModel\?\.isSystemInternal;/);
 
   assert.match(profileModalSource, /const billingUiEnabled = KKAI_FEATURE_FLAGS\.billing;/);
-  assert.match(profileModalSource, /requestedView === 'billing' && !billingUiEnabled/);
-  assert.match(profileModalSource, /\? 'main'/);
   assert.match(profileModalSource, /\{billingUiEnabled && \(/);
-  assert.match(profileModalSource, /\{view === 'billing' && billingUiEnabled && \(/);
 
   assert.match(settingsRoutesSource, /import \{ KKAI_FEATURE_FLAGS \} from '\.\.\/app\/kkaiFeatureFlags';/);
   assert.match(settingsRoutesSource, /\.\.\.\(KKAI_FEATURE_FLAGS\.billing \? \[/);

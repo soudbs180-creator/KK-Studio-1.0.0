@@ -24,7 +24,8 @@ type NotificationListener = (notifications: Notification[]) => void;
 class NotificationService {
     private notifications: Notification[] = [];
     private listeners: Set<NotificationListener> = new Set();
-    private maxNotifications = 5;
+    // 简体中文：支持电脑端在展开状态下最多显示 10 张卡片的需求
+    private maxNotifications = 10;
     private timers: Map<string, NodeJS.Timeout> = new Map();
 
     /**

@@ -20,7 +20,7 @@ test('ApiSettingsView keeps editor save buttons behind inline validation feedbac
   assert.match(source, /<SecondaryButton onClick=\{editingOfficialId \? cancelEdit : resetOfficialDraft\}>/);
   assert.match(
     source,
-    /\{officialEditorValidationMessage \? \(\s*<div className="text-\[13px\] leading-6 text-\[var\(--state-warning-text\)\]">\s*\{officialEditorValidationMessage\}/s,
+    /\{officialEditorValidationMessage \? \(\s*<div className="text-\[1[34]px\] leading-6 text-\[var\(--state-warning-text\)\]">\s*\{officialEditorValidationMessage\}/s,
   );
 
   assert.match(source, /const providerEditorValidationMessage = \(\(\) => \{/);
@@ -33,6 +33,6 @@ test('ApiSettingsView keeps editor save buttons behind inline validation feedbac
   assert.match(source, /<SecondaryButton onClick=\{editingProviderId \? cancelEdit : resetProviderDraft\}>/);
   assert.match(
     source,
-    /\{providerEditorValidationMessage \? \(\s*<div className="text-\[13px\] leading-6 text-\[var\(--state-warning-text\)\]">\s*\{providerEditorValidationMessage\}/s,
+    /\{providerEditorValidationMessage \? \(\s*<div className="text-\[1[34]px\] leading-6 text-\[var\(--state-warning-text\)\]">\s*\{providerEditorValidationMessage\}/s,
   );
 });

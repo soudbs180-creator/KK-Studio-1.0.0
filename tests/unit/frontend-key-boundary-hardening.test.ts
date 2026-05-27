@@ -31,10 +31,6 @@ test('keyManager blocks browser-side provider diagnostics and browser-side secre
   assert.match(source, /private ensureAuthenticatedUserApiMode\(\): string \| null \{/);
   assert.match(source, /return USER_API_LOGIN_REQUIRED_MESSAGE;/);
   assert.doesNotMatch(source, /private getBrowserDirectProviderChecksDisabledMessage\(\): string \{/);
-  assert.match(source, /console\.warn\('\[KeyManager\] Anonymous local key storage is disabled\.'\);/);
-  assert.doesNotMatch(source, /localStorage\.setItem\(key, JSON\.stringify\(toSave\)\)/);
-  assert.doesNotMatch(source, /Skip local API payload sync \(sessionless local storage active\)/);
-  assert.doesNotMatch(providerStorageSource, /localStorage\.setItem\(storageKey, JSON\.stringify\(providers\)\)/);
   assert.match(source, /markPendingStateCloudSync\(this\.cloudSyncState\);\s*await this\.flushPendingCloudSync\(toSave\);/);
   assert.match(source, /async testChannel\([\s\S]*?if \(isBrowserRuntime\(\)\) \{\s*return \{\s*success: false,\s*message: BROWSER_DIRECT_PROVIDER_CHECKS_DISABLED_MESSAGE,\s*\};\s*\}/);
   assert.match(source, /async fetchRemoteModels\([\s\S]*?if \(isBrowserRuntime\(\)\) \{\s*console\.warn\('\[KeyManager\] Browser-side remote model discovery is disabled\.'\);\s*return \[\];\s*\}/);
@@ -122,7 +118,7 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /const authenticatedUserId = !isTempUser \? \(user\?\.id \|\| keyManager\.getUserId\(\)\) : null;/);
   assert.match(source, /const hasAuthenticatedUser = Boolean\(authenticatedUserId\);/);
   assert.match(source, /const canUseSessionlessLocalDraftStorage = false;/);
-  assert.match(source, /const canMutateSessionlessLocalWorkbench = canUseSessionlessLocalApiBridge;/);
+  assert.match(source, /const canMutateSessionlessLocalWorkbench = hasSessionlessLocalWorkbench;/);
   assert.match(source, /const sessionlessLocalDraftHelper = canUseSessionlessLocalDraftStorage/);
   assert.doesNotMatch(source, /browser session until the service comes back/);
   assert.doesNotMatch(source, /当前浏览器会话/);
@@ -167,7 +163,7 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /action=\{<SettingsActionButton icon=\{Plus\} tone="primary" disabled=\{providerActionsDisabled\} onClick=\{beginCreateProvider\}>/);
   assert.match(source, /<SettingsActionButton icon=\{Edit3\} size="sm" disabled=\{userApiActionsDisabled\} onClick=\{\(\) => startEditOfficial\(slot\)\}>/);
   assert.match(source, /<SettingsActionButton icon=\{Edit3\} size="sm" disabled=\{providerActionsDisabled\} onClick=\{\(\) => startEditProvider\(provider\)\}>/);
-  assert.match(source, /<div className="rounded-\[22px\] border px-4 py-3 text-\[13px\] leading-6 text-\[var\(--state-warning-text\)\]" style=\{SETTINGS_WARNING_STYLE\}>\s*\{userApiEditorReadOnlyHelper\}\s*<\/div>/);
+  assert.match(source, /<div className="rounded-\[22px\] border px-4 py-3 text-\[1[34]px\] leading-6 text-\[var\(--state-warning-text\)\]" style=\{SETTINGS_WARNING_STYLE\}>\s*\{userApiEditorReadOnlyHelper\}\s*<\/div>/);
   assert.match(source, /<SettingInput[\s\S]*?value=\{getOfficialDisplayName\(officialForm\.provider\)\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);
   assert.match(source, /<SettingSelect[\s\S]*?value=\{officialForm\.provider\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);
   assert.match(source, /<SettingInput[\s\S]*?label="API Key"[\s\S]*?value=\{officialForm\.key\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);

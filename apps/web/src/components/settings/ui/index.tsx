@@ -204,11 +204,13 @@ export const SettingInput: React.FC<{
 }> = ({ label, value, onChange, onBlur, placeholder, type = 'text', helper, disabled = false }) => {
   return (
     <label className="block">
-      <div
-        className={`mb-2 break-words ${SETTINGS_LABEL_CLASSNAME}`.trim()}
-      >
-        {label}
-      </div>
+      {label && (
+        <div
+          className={`mb-2 break-words ${SETTINGS_LABEL_CLASSNAME}`.trim()}
+        >
+          {label}
+        </div>
+      )}
       <input
         type={type}
         value={value}
@@ -290,11 +292,13 @@ export const SettingSelect: React.FC<{
 }> = ({ label, value, options, onChange, helper, disabled = false }) => {
   return (
     <label className="block">
-      <div
-        className={`mb-2 break-words ${SETTINGS_LABEL_CLASSNAME}`.trim()}
-      >
-        {label}
-      </div>
+      {label && (
+        <div
+          className={`mb-2 break-words ${SETTINGS_LABEL_CLASSNAME}`.trim()}
+        >
+          {label}
+        </div>
+      )}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -325,6 +329,7 @@ export const SettingSelect: React.FC<{
 };
 
 // PrimaryButton 主要按钮
+// PrimaryButton 主要按钮
 export const PrimaryButton: React.FC<{
   children: React.ReactNode;
   onClick?: () => void;
@@ -332,12 +337,39 @@ export const PrimaryButton: React.FC<{
   disabled?: boolean;
   className?: string;
 }> = ({ children, onClick, loading, disabled = false, className = '' }) => {
+  // 简体中文注释：检测全局同步的云端只读快照/本地 API 未连通标志位
+  const isReadonlyGhost = typeof window !== 'undefined' && (window as any).__KK_SETTINGS_READONLY__ === true;
+  
+  // 如果是只读降级状态，底层不设置 disabled 原生属性，以维持 click 事件的分发和拦截
+  const shouldApplyNativeDisabled = disabled && !isReadonlyGhost;
+  const isGhostDisabled = disabled && isReadonlyGhost;
+
+  const handleInterceptClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (loading) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (isGhostDisabled) {
+      if (onClick) onClick();
+      return;
+    }
+    if (disabled) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (onClick) onClick();
+  };
+
+  const motionClass = disabled ? '' : SETTINGS_CONTROL_MOTION_CLASSNAME;
+
   return (
     <button
       type="button"
-      onClick={onClick}
-      disabled={loading || disabled}
-      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-semibold text-[var(--text-inverse)] disabled:cursor-not-allowed disabled:opacity-50 ${SETTINGS_CONTROL_MOTION_CLASSNAME} ${className}`}
+      onClick={handleInterceptClick}
+      disabled={loading || shouldApplyNativeDisabled}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-semibold text-[var(--text-inverse)] ${isGhostDisabled ? 'opacity-50 cursor-not-allowed pointer-events-auto' : 'disabled:cursor-not-allowed disabled:opacity-50'} ${motionClass} ${className}`}
       style={{
         borderColor: 'transparent',
         background: 'var(--settings-button-primary-bg)',
@@ -361,12 +393,32 @@ export const SecondaryButton: React.FC<{
   disabled?: boolean;
   className?: string;
 }> = ({ children, onClick, disabled = false, className = '' }) => {
+  // 简体中文注释：检测全局同步的云端只读快照/本地 API 未连通标志位
+  const isReadonlyGhost = typeof window !== 'undefined' && (window as any).__KK_SETTINGS_READONLY__ === true;
+  const shouldApplyNativeDisabled = disabled && !isReadonlyGhost;
+  const isGhostDisabled = disabled && isReadonlyGhost;
+
+  const handleInterceptClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (isGhostDisabled) {
+      if (onClick) onClick();
+      return;
+    }
+    if (disabled) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (onClick) onClick();
+  };
+
+  const motionClass = disabled ? '' : SETTINGS_CONTROL_MOTION_CLASSNAME;
+
   return (
     <button
       type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-medium text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50 ${SETTINGS_CONTROL_MOTION_CLASSNAME} ${className}`}
+      onClick={handleInterceptClick}
+      disabled={shouldApplyNativeDisabled}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-medium text-[var(--text-primary)] ${isGhostDisabled ? 'opacity-50 cursor-not-allowed pointer-events-auto' : 'disabled:cursor-not-allowed disabled:opacity-50'} ${motionClass} ${className}`}
       style={{
         borderColor: 'var(--settings-button-secondary-border)',
         background: 'var(--settings-button-secondary-bg)',
@@ -387,12 +439,32 @@ export const DangerButton: React.FC<{
   disabled?: boolean;
   className?: string;
 }> = ({ children, onClick, disabled = false, className = '' }) => {
+  // 简体中文注释：检测全局同步的云端只读快照/本地 API 未连通标志位
+  const isReadonlyGhost = typeof window !== 'undefined' && (window as any).__KK_SETTINGS_READONLY__ === true;
+  const shouldApplyNativeDisabled = disabled && !isReadonlyGhost;
+  const isGhostDisabled = disabled && isReadonlyGhost;
+
+  const handleInterceptClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (isGhostDisabled) {
+      if (onClick) onClick();
+      return;
+    }
+    if (disabled) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (onClick) onClick();
+  };
+
+  const motionClass = disabled ? '' : SETTINGS_CONTROL_MOTION_CLASSNAME;
+
   return (
     <button
       type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-medium text-[var(--error)] disabled:cursor-not-allowed disabled:opacity-50 ${SETTINGS_CONTROL_MOTION_CLASSNAME} ${className}`}
+      onClick={handleInterceptClick}
+      disabled={shouldApplyNativeDisabled}
+      className={`inline-flex max-w-full min-w-0 flex-nowrap items-center justify-center overflow-hidden whitespace-nowrap border px-4 py-2.5 font-medium text-[var(--error)] ${isGhostDisabled ? 'opacity-50 cursor-not-allowed pointer-events-auto' : 'disabled:cursor-not-allowed disabled:opacity-50'} ${motionClass} ${className}`}
       style={{
         borderColor: 'var(--settings-button-danger-border)',
         background: 'var(--settings-button-danger-bg)',

@@ -101,7 +101,7 @@ test('prompt bar keeps the textarea transparent while reserving the frosted foot
   assert.match(mobileFooterSource, /className="input-bar-footer prompt-bar-footer-frost flex w-full flex-nowrap items-center gap-2 overflow-x-auto overflow-y-visible px-1 pb-1 pt-0\.5 min-h-\[44px\]"/);
   assert.match(cssSource, /\.prompt-bar-footer-frost\s*\{/);
   assert.match(cssSource, /\.prompt-bar-footer-frost::before\s*\{/);
-  assert.match(cssSource, /border-top: 1px solid var\(--prompt-bar-footer-frost-border\);/);
+  assert.match(cssSource, /border-top: [12]px solid var\(--prompt-bar-footer-frost-border\);/);
   assert.doesNotMatch(cssSource, /\.prompt-bar-footer-frost\s*\{[\s\S]*border: 1px solid var\(--prompt-bar-footer-frost-border\);/);
   assert.match(cssSource, /\.input-bar-textarea\s*\{[\s\S]*background: transparent;/);
 });

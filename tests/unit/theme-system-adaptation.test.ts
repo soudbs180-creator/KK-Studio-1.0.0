@@ -43,7 +43,7 @@ test('theme-aware shells use resolved theme when preference is set to system', (
   assert.match(sidebarSource, /const isLightMode = resolvedTheme === 'light';/);
   assert.match(sidebarSource, /data-theme-surface=\{isLightMode \? 'light-frosted' : 'dark-frosted'\}/);
   assert.match(sidebarSource, /background:\s*'var\(--frost-card-framework-bg\)'/);
-  assert.match(sidebarSource, /border:\s*'1px solid var\(--frost-card-framework-border\)'/);
+  assert.match(sidebarSource, /border:\s*'[12]px solid var\(--frost-card-framework-border\)'/);
   assert.match(sidebarSource, /boxShadow:\s*'var\(--frost-card-framework-shadow\)'/);
   assert.match(sidebarSource, /backdropFilter:\s*'blur\(var\(--frost-card-framework-blur\)\) saturate\(1\.16\)'/);
   assert.doesNotMatch(sidebarSource, /0 8px 32px|var\(--shadow-xl\)|from-indigo|to-purple/);

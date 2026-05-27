@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { RuntimeAuthUser } from '../../services/auth/runtimeAuthTypes.ts';
 import {
   AlertCircle,
@@ -113,7 +113,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   initialView = 'main',
   isMobile = false,
 }) => {
-  const { isTempUser, tempUserExpiry } = useAuth();
+  const { isTempUser, tempUserExpiry, adminLevel } = useAuth();
   const { accountRole, checkingAdmin } = useAdminRole();
   const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
   const {
@@ -134,6 +134,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     : '仅管理员积分模型会消耗这里的积分，个人 API 不扣积分';
 
   const [view, setView] = useState<UserProfileView>('main');
+  const [billingSubTab, setBillingSubTab] = useState<'usage' | 'recharge'>('usage');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -204,16 +205,20 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    const requestedView: UserProfileView =
+    let requestedView: UserProfileView =
       initialView === 'billing' || initialView === 'change-password' || initialView === 'edit-profile' || initialView === 'security'
         ? initialView
         : 'main';
+
+    // 简体中文：将账号管理归并进个人中心主面板中
+    if (requestedView === 'billing') {
+      requestedView = 'main';
+    }
+
     const safeView: UserProfileView =
       requestedView === 'change-password' && !canChangePassword
         ? 'main'
-        : requestedView === 'billing' && !billingUiEnabled
-          ? 'main'
-          : requestedView;
+        : requestedView;
 
     setView(safeView);
     setMessage(null);
@@ -238,7 +243,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setDisplayName(defaultName);
     setAvatarUrl(user?.user_metadata?.avatar_url || '');
 
-    if (safeView === 'billing' && billingUiEnabled) {
+    if (safeView === 'main' && billingUiEnabled) {
       void refreshBilling({ includeTransactions: true });
     }
 
@@ -695,163 +700,302 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </div>
               )}
 
-              <div className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
-                <div className="flex items-center gap-3">
-                  <div className="h-14 w-14 overflow-hidden rounded-full bg-gradient-to-br from-[var(--clay-brand-coral)] via-[var(--clay-brand-pink)] to-[var(--clay-brand-peach)] text-white">
-                    {avatarSrc ? (
-                      <img src={avatarSrc} alt="头像" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-lg font-bold">
-                        {nickname.slice(0, 1).toUpperCase()}
+              {/* 简体中文：支持电脑双栏及手机自适应上下堆叠的精致卡片布局 */}
+              <div className={`grid grid-cols-1 ${isMobile ? 'gap-4' : 'md:grid-cols-2 gap-6'} items-start`}>
+                
+                {/* 简体中文：左侧卡片 - 个人基本资料与常用安全管理 */}
+                <div className="space-y-4">
+                  <div className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
+                    <div className="flex items-center gap-3">
+                      <div className="h-14 w-14 overflow-hidden rounded-full bg-gradient-to-br from-[var(--clay-brand-coral)] via-[var(--clay-brand-pink)] to-[var(--clay-brand-peach)] text-white">
+                        {avatarSrc ? (
+                          <img src={avatarSrc} alt="头像" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-lg font-bold">
+                            {nickname.slice(0, 1).toUpperCase()}
+                          </div>
+                        )}
                       </div>
-                    )}
+
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          {nickname}
+                        </div>
+                        <div className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                          {displayEmail}
+                        </div>
+                        {isWechatBound && (
+                          <div className="mt-1 text-[11px] text-emerald-300">
+                            已绑定微信，可使用微信头像、昵称和扫码登录
+                          </div>
+                        )}
+                        {isGoogleBound && (
+                          <div className="mt-1 text-[11px] text-[var(--clay-brand-lavender)]">
+                            已绑定 Google，可使用 Google 一键登录
+                          </div>
+                        )}
+                        <div className="mt-1 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                          用户 ID：{user?.id || '-'}
+                        </div>
+                      </div>
+
+                      <span className="rounded-full border px-2 py-1 text-[11px]" style={{ borderColor: 'var(--border-light)', color: 'var(--text-secondary)' }}>
+                        {roleLabel}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-                      {nickname}
-                    </div>
-                    <div className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                      {displayEmail}
-                    </div>
-                    {isWechatBound && (
-                      <div className="mt-1 text-[11px] text-emerald-300">
-                        已绑定微信，可使用微信头像、昵称和扫码登录
-                      </div>
-                    )}
-                    {isGoogleBound && (
-                      <div className="mt-1 text-[11px] text-[var(--clay-brand-lavender)]">
-                        已绑定 Google，可使用 Google 一键登录
-                      </div>
-                    )}
-                    <div className="mt-1 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                      用户 ID：{user?.id || '-'}
+                  <div className="space-y-2">
+                    <div className="text-xs font-bold px-1" style={{ color: 'var(--text-secondary)' }}>安全与账户设置</div>
+                    <div className="kk-user-profile-modal__action-list">
+                      <button
+                        onClick={() => setView('edit-profile')}
+                        className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm animate-in"
+                        style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
+                      >
+                        <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                          <Pencil size={15} className="shrink-0" />
+                          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">编辑个人资料</span>
+                        </span>
+                        <span style={{ color: 'var(--text-tertiary)' }}>进入</span>
+                      </button>
+
+                      <button
+                        onClick={() => void handleWechatBind()}
+                        disabled={!canBindWechat}
+                        className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                        style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
+                      >
+                        <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                          <QrCode size={15} className="shrink-0" />
+                          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{isWechatBound ? '微信已绑定' : '绑定微信'}</span>
+                        </span>
+                        <span style={{ color: 'var(--text-tertiary)' }}>{isWechatBound ? '已完成' : '进入'}</span>
+                      </button>
+
+                      <button
+                        onClick={() => void handleGoogleBind()}
+                        disabled={!canBindGoogle || loading}
+                        className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                        style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
+                      >
+                        <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                          <Globe size={15} className="shrink-0" />
+                          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{isGoogleBound ? 'Google 已绑定' : '绑定 Google'}</span>
+                        </span>
+                        <span style={{ color: 'var(--text-tertiary)' }}>{isGoogleBound ? '已完成' : '进入'}</span>
+                      </button>
+
+                      {canChangePassword && (
+                        <button
+                          onClick={() => setView('change-password')}
+                          className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm"
+                          style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
+                        >
+                          <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                            <Lock size={15} className="shrink-0" />
+                            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">修改密码</span>
+                          </span>
+                          <span style={{ color: 'var(--text-tertiary)' }}>进入</span>
+                        </button>
+                      )}
+
+                      {!canChangePassword && !isTempUser && (
+                        <div className="kk-user-profile-modal__action-note kk-user-profile-modal__notice--success text-xs">
+                          微信纯登录账号不需要单独密码，后续可直接扫码进入。
+                        </div>
+                      )}
+
+                      <button
+                        onClick={openSecurity}
+                        className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm"
+                        style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
+                      >
+                        <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                          <ShieldCheck size={15} className="shrink-0" />
+                          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">双重验证</span>
+                        </span>
+                        <span style={{ color: 'var(--text-tertiary)' }}>进入</span>
+                      </button>
+
+                      {/* 简体中文：如果当前用户是管理员，增设一个进入后台的快捷跳转按钮 */}
+                      {adminLevel > 0 && (
+                        <button
+                          onClick={() => {
+                            window.location.href = "/admin";
+                            resetAndClose();
+                          }}
+                          className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm text-[var(--accent-coral)]"
+                          style={{ borderColor: 'var(--border-light)' }}
+                        >
+                          <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                            <LayoutDashboard size={15} className="shrink-0" />
+                            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-bold">系统管理后台</span>
+                          </span>
+                          <span style={{ color: 'var(--accent-coral)' }}>进入</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          resetAndClose();
+                          onSignOut();
+                        }}
+                        className="kk-user-profile-modal__action-row kk-user-profile-modal__action-row--danger flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap text-sm"
+                      >
+                        <LogOut size={15} className="shrink-0" />
+                        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">退出登录</span>
+                      </button>
                     </div>
                   </div>
-
-                  <span className="rounded-full border px-2 py-1 text-[11px]" style={{ borderColor: 'var(--border-light)', color: 'var(--text-secondary)' }}>
-                    {roleLabel}
-                  </span>
                 </div>
-              </div>
 
-              {billingUiEnabled && (
-                <div className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                        积分
-                      </div>
-                      <div className="mt-1 text-2xl font-bold text-[var(--clay-brand-ochre)]">{remainingBalanceDisplay}</div>
-                      <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                        {remainingBalanceHint}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setShowRechargeModal(true)}
-                      className="inline-flex h-10 items-center justify-center rounded-lg bg-[var(--accent-coral)] px-4 text-sm font-medium text-white"
-                    >
-                      立即充值
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="kk-user-profile-modal__action-list">
-                <button
-                  onClick={() => setView('edit-profile')}
-                  className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm"
-                  style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
-                >
-                  <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
-                    <Pencil size={15} className="shrink-0" />
-                    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">编辑个人资料</span>
-                  </span>
-                  <span style={{ color: 'var(--text-tertiary)' }}>进入</span>
-                </button>
-
-                <button
-                  onClick={() => void handleWechatBind()}
-                  disabled={!canBindWechat}
-                  className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
-                >
-                  <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
-                    <QrCode size={15} className="shrink-0" />
-                    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{isWechatBound ? '微信已绑定' : '绑定微信'}</span>
-                  </span>
-                  <span style={{ color: 'var(--text-tertiary)' }}>{isWechatBound ? '已完成' : '进入'}</span>
-                </button>
-
-                <button
-                  onClick={() => void handleGoogleBind()}
-                  disabled={!canBindGoogle || loading}
-                  className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
-                >
-                  <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
-                    <Globe size={15} className="shrink-0" />
-                    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{isGoogleBound ? 'Google 已绑定' : '绑定 Google'}</span>
-                  </span>
-                  <span style={{ color: 'var(--text-tertiary)' }}>{isGoogleBound ? '已完成' : '进入'}</span>
-                </button>
-
-                {canChangePassword && (
-                  <button
-                    onClick={() => setView('change-password')}
-                    className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm"
-                    style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
-                  >
-                    <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
-                      <Lock size={15} className="shrink-0" />
-                      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">修改密码</span>
-                    </span>
-                    <span style={{ color: 'var(--text-tertiary)' }}>进入</span>
-                  </button>
-                )}
-
-                {!canChangePassword && !isTempUser && (
-                  <div className="kk-user-profile-modal__action-note kk-user-profile-modal__notice--success text-xs">
-                    微信纯登录账号不需要单独密码，后续可直接扫码进入。
-                  </div>
-                )}
-
-                <button
-                  onClick={openSecurity}
-                  className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm"
-                  style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
-                >
-                  <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
-                    <ShieldCheck size={15} className="shrink-0" />
-                    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">双重验证</span>
-                  </span>
-                  <span style={{ color: 'var(--text-tertiary)' }}>进入</span>
-                </button>
-
+                {/* 简体中文：右侧卡片 - 积分资产以及账单历史明细 */}
                 {billingUiEnabled && (
-                  <button
-                    onClick={openBilling}
-                    className="kk-user-profile-modal__action-row flex w-full items-center justify-between text-sm"
-                    style={{ borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}
-                  >
-                    <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
-                      <Wallet size={15} className="shrink-0" />
-                      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">账户管理</span>
-                    </span>
-                    <span style={{ color: 'var(--text-tertiary)' }}>进入</span>
-                  </button>
-                )}
+                  <div className="space-y-4">
+                    <div className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                            积分
+                          </div>
+                          <div className="mt-1 text-2xl font-bold text-[var(--clay-brand-ochre)]">{remainingBalanceDisplay}</div>
+                          <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                            {remainingBalanceHint}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setShowRechargeModal(true)}
+                          className="inline-flex h-10 items-center justify-center rounded-lg bg-[var(--accent-coral)] px-4 text-sm font-medium text-white transition-transform active:scale-95"
+                        >
+                          立即充值
+                        </button>
+                      </div>
+                    </div>
 
-                <button
-                  onClick={() => {
-                    resetAndClose();
-                    onSignOut();
-                  }}
-                  className="kk-user-profile-modal__action-row kk-user-profile-modal__action-row--danger flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap text-sm"
-                >
-                  <LogOut size={15} className="shrink-0" />
-                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">退出登录</span>
-                </button>
+                    {/* 简体中文：账单记录双 Tab 容器 */}
+                    <div className="kk-user-profile-modal__main-card rounded-xl border p-4 flex flex-col min-h-[350px]" style={{ borderColor: 'var(--frost-card-main-border)' }}>
+                      <div className="flex border-b border-white/5 mb-3">
+                        <button
+                          onClick={() => setBillingSubTab('usage')}
+                          className={`flex-1 pb-2 text-center text-xs font-bold border-b-2 transition-all ${
+                            billingSubTab === 'usage'
+                              ? 'border-[var(--accent-coral)] text-[var(--text-primary)]'
+                              : 'border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                          }`}
+                        >
+                          消费明细
+                        </button>
+                        <button
+                          onClick={() => setBillingSubTab('recharge')}
+                          className={`flex-1 pb-2 text-center text-xs font-bold border-b-2 transition-all ${
+                            billingSubTab === 'recharge'
+                              ? 'border-[var(--accent-coral)] text-[var(--text-primary)]'
+                              : 'border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                          }`}
+                        >
+                          充值记录
+                        </button>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto max-h-[320px] space-y-2 pr-1 custom-scrollbar">
+                        {billingSubTab === 'usage' ? (
+                          <>
+                            {billingLoading ? (
+                              <div className="flex h-16 items-center justify-center text-sm" style={{ color: 'var(--text-tertiary)' }}>
+                                <span className="inline-flex max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                                  <Loader2 size={16} className="shrink-0 animate-spin" />
+                                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">正在加载...</span>
+                                </span>
+                              </div>
+                            ) : usageLogs.length === 0 ? (
+                              <div className="kk-user-profile-modal__sub-card rounded-lg border border-dashed px-3 py-4 text-xs text-center" style={{ borderColor: 'var(--frost-card-sub-border)', color: 'var(--text-tertiary)' }}>
+                                暂无消费历史。
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                {usageLogs.slice(0, 50).map((record) => {
+                                  const title = record.model_name || record.model_id || record.description || '模型调用';
+                                  const amountText = record.amount >= 0 ? `+${record.amount}` : `${record.amount}`;
+
+                                  return (
+                                    <div key={record.id} className="kk-user-profile-modal__sub-card rounded-lg border p-3 animate-in fade-in-50 duration-200" style={{ borderColor: 'var(--frost-card-sub-border)' }}>
+                                      <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div className="min-w-0 flex-1">
+                                          <div className="truncate text-sm" style={{ color: 'var(--text-primary)' }}>
+                                            {title}
+                                          </div>
+                                          <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                                            时间：{formatDateTime(record.created_at)}
+                                          </div>
+                                          {record.description && (
+                                            <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                                              说明：{record.description}
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        <div className="text-right">
+                                          <span className={`kk-user-profile-modal__status inline-flex rounded-full border px-2 py-0.5 text-[11px] ${getStatusClass(record.status)}`}>
+                                            {getRechargeSubmissionStatusLabel(record.status || 'completed')}
+                                          </span>
+                                          <div className={`mt-1 text-sm font-semibold ${record.amount >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                                            {amountText}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {billingLoading ? (
+                              <div className="flex h-16 items-center justify-center text-sm" style={{ color: 'var(--text-tertiary)' }}>
+                                <span className="inline-flex max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
+                                  <Loader2 size={16} className="shrink-0 animate-spin" />
+                                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">正在加载...</span>
+                                </span>
+                              </div>
+                            ) : billingLogs.length === 0 ? (
+                              <div className="kk-user-profile-modal__sub-card rounded-lg border border-dashed px-3 py-4 text-xs text-center" style={{ borderColor: 'var(--frost-card-sub-border)', color: 'var(--text-tertiary)' }}>
+                                暂无充值历史。
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                {billingLogs.slice(0, 50).map((record) => (
+                                  <div key={record.id} className="kk-user-profile-modal__sub-card rounded-lg border p-3 animate-in fade-in-50 duration-200" style={{ borderColor: 'var(--frost-card-sub-border)' }}>
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <div>
+                                        <div className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                                          充值 {record.amount} 积分
+                                        </div>
+                                        <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                                          时间：{formatDateTime(record.created_at)}
+                                        </div>
+                                        {record.description && (
+                                          <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                                            备注：{record.description}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <span className={`kk-user-profile-modal__status inline-flex rounded-full border px-2 py-0.5 text-[11px] ${getStatusClass(record.status)}`}>
+                                        {getRechargeSubmissionStatusLabel(record.status || 'completed')}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1032,146 +1176,6 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 {loading && <Loader2 size={16} className="animate-spin" />}
                 <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">保存新密码</span>
               </button>
-            </div>
-          )}
-
-          {view === 'billing' && billingUiEnabled && (
-            <div className="space-y-4">
-              <div className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                      账户信息
-                    </div>
-                    <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                      角色：{roleLabel}
-                    </div>
-                    <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                      邮箱：{displayEmail}
-                    </div>
-                  </div>
-
-                  <div className="kk-user-profile-modal__sub-card rounded-lg border px-3 py-2" style={{ borderColor: 'var(--frost-card-sub-border)' }}>
-                    <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                      积分
-                    </div>
-                    <div className="text-xl font-bold text-[var(--clay-brand-ochre)]">{remainingBalanceDisplay}</div>
-                    {latestRecharge ? (
-                      <div className="mt-1 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                        最近充值：{formatDateTime(latestRecharge.created_at)}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setShowRechargeModal(true)}
-                  className="mt-3 inline-flex h-9 max-w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg bg-[var(--accent-coral)] px-4 text-sm text-white"
-                >
-                  <CreditCard size={14} className="shrink-0" />
-                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">充值积分</span>
-                </button>
-              </div>
-
-              <section className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
-                <div className="mb-2 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                  生成记录（含失败与退款）
-                </div>
-
-                {billingLoading ? (
-                  <div className="flex h-16 items-center justify-center text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                    <span className="inline-flex max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
-                      <Loader2 size={16} className="shrink-0 animate-spin" />
-                      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">正在加载...</span>
-                    </span>
-                  </div>
-                ) : usageLogs.length === 0 ? (
-                  <div className="kk-user-profile-modal__sub-card rounded-lg border border-dashed px-3 py-4 text-xs" style={{ borderColor: 'var(--frost-card-sub-border)', color: 'var(--text-tertiary)' }}>
-                    暂无生成记录。
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {usageLogs.slice(0, 50).map((record) => {
-                      const title = record.model_name || record.model_id || record.description || '模型调用';
-                      const amountText = record.amount >= 0 ? `+${record.amount}` : `${record.amount}`;
-
-                      return (
-                        <div key={record.id} className="kk-user-profile-modal__sub-card rounded-lg border p-3" style={{ borderColor: 'var(--frost-card-sub-border)' }}>
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate text-sm" style={{ color: 'var(--text-primary)' }}>
-                                {title}
-                              </div>
-                              <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                                时间：{formatDateTime(record.created_at)}
-                              </div>
-                              {record.description && (
-                                <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                                  说明：{record.description}
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="text-right">
-                              <span className={`kk-user-profile-modal__status inline-flex rounded-full border px-2 py-0.5 text-[11px] ${getStatusClass(record.status)}`}>
-                                {getRechargeSubmissionStatusLabel(record.status || 'completed')}
-                              </span>
-                              <div className={`mt-1 text-sm font-semibold ${record.amount >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
-                                {amountText}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-
-              <section className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
-                <div className="mb-2 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                  充值记录
-                </div>
-
-                {billingLoading ? (
-                  <div className="flex h-16 items-center justify-center text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                    <span className="inline-flex max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
-                      <Loader2 size={16} className="shrink-0 animate-spin" />
-                      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">正在加载...</span>
-                    </span>
-                  </div>
-                ) : billingLogs.length === 0 ? (
-                  <div className="kk-user-profile-modal__sub-card rounded-lg border border-dashed px-3 py-4 text-xs" style={{ borderColor: 'var(--frost-card-sub-border)', color: 'var(--text-tertiary)' }}>
-                    暂无充值记录。
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {billingLogs.slice(0, 50).map((record) => (
-                      <div key={record.id} className="kk-user-profile-modal__sub-card rounded-lg border p-3" style={{ borderColor: 'var(--frost-card-sub-border)' }}>
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <div className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                              充值 {record.amount} 积分
-                            </div>
-                            <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                              时间：{formatDateTime(record.created_at)}
-                            </div>
-                            {record.description && (
-                              <div className="mt-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                                备注：{record.description}
-                              </div>
-                            )}
-                          </div>
-
-                          <span className={`kk-user-profile-modal__status inline-flex rounded-full border px-2 py-0.5 text-[11px] ${getStatusClass(record.status)}`}>
-                            {getRechargeSubmissionStatusLabel(record.status || 'completed')}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
             </div>
           )}
 

@@ -611,26 +611,17 @@ export class KeyManager {
      * Load state from localStorage
      */
     private loadState(): KeyManagerState {
-        this.purgeAnonymousSensitiveLocalCaches();
+        if (this.userId && !this.authIsTempUser) {
+            this.purgeAnonymousSensitiveLocalCaches();
+        }
 
         try {
             const key = this.getStorageKey();
-            if (this.userId) {
-                localStorage.removeItem(key);
-                return {
-                    slots: [],
-                    currentIndex: 0,
-                    maxFailures: DEFAULT_MAX_FAILURES,
-                    rotationStrategy: 'round-robin'
-                };
-            }
-
+            const isTemp = this.authIsTempUser || !this.userId;
+            const isOffline = !this.hasHydratedCloudState;
             const stored = localStorage.getItem(key);
 
-            // If scoped key not found, DO NOT fallback to global key to prevent leakage.
-            // Only fallback if userId is null (already handled by getStorageKey).
-
-            if (stored) {
+            if (stored && (isTemp || isOffline)) {
                 const parsed = JSON.parse(stored);
                 // Migration for existing keys
                 const slots = (parsed.slots || []).map((s: any) => {
@@ -705,8 +696,17 @@ export class KeyManager {
                     rotationStrategy: parsed.rotationStrategy || this.state?.rotationStrategy || 'round-robin'
                 };
 
-                // No immediate saveState here to avoid overwriting on read
                 return state;
+            }
+
+            if (this.userId && !isTemp && !isOffline) {
+                localStorage.removeItem(key);
+                return {
+                    slots: [],
+                    currentIndex: 0,
+                    maxFailures: DEFAULT_MAX_FAILURES,
+                    rotationStrategy: 'round-robin'
+                };
             }
         } catch (e) {
             console.warn('[KeyManager] Load failed:', e);
@@ -729,22 +729,23 @@ export class KeyManager {
         const key = this.getStorageKey();
 
         try {
-            // Security update:
-            // Logged-in users sync through the local API payload bridge and skip plain-text local persistence.
-            // Local temp users also sync through the local API bridge; browser-side secret storage is disabled.
-            if (this.userId) {
-                console.log('[KeyManager] 安全模式：登录用户同步本地 API payload，跳过本地明文存储');
-                // Optional: Clear existing local storage just in case
-                localStorage.removeItem(key);
+            const isTemp = this.authIsTempUser || !this.userId;
+            const isOffline = !this.hasHydratedCloudState;
 
-                markPendingStateCloudSync(this.cloudSyncState);
-                await this.flushPendingCloudSync(toSave);
+            if (isTemp || isOffline) {
+                localStorage.setItem(key, JSON.stringify({
+                    slots: toSave.slots,
+                    rotationStrategy: toSave.rotationStrategy
+                }));
+                console.log('[KeyManager] Saved fallback slots state to LocalStorage');
             } else {
                 localStorage.removeItem(key);
-                this.purgeAnonymousSensitiveLocalCaches();
-                console.warn('[KeyManager] Anonymous local key storage is disabled.');
             }
 
+            if (this.userId) {
+                markPendingStateCloudSync(this.cloudSyncState);
+                await this.flushPendingCloudSync(toSave);
+            }
         } catch (e) {
             console.error('[KeyManager] Failed to save state:', e);
         }
@@ -3818,10 +3819,11 @@ export class KeyManager {
 
     private persistProvidersLocal(): void {
         try {
+            const allowLocal = this.authIsTempUser || !this.hasHydratedCloudState;
             this.providerStorageScope = persistProvidersLocal(
                 this.userId,
                 this.providers,
-                false,
+                allowLocal,
             );
         } catch (e) {
             console.error('[KeyManager] Failed to save providers:', e);
@@ -3830,11 +3832,12 @@ export class KeyManager {
 
     private loadProviders(force = false): void {
         try {
+            const allowLocal = this.authIsTempUser || !this.hasHydratedCloudState;
             const loaded = loadProvidersFromLocal(
                 this.userId,
                 this.providers,
                 force,
-                false,
+                allowLocal,
             );
             if (!loaded) {
                 return;

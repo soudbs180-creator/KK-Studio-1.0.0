@@ -46,7 +46,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
   const { pick } = useLocale();
 
   const items = useMemo(() => {
-    return rawItems.filter(item => item.id !== 'dashboard');
+    return rawItems;
   }, [rawItems]);
 
   // 1. API 状态统计
@@ -108,16 +108,22 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // 过滤掉 dashboard 卡片导航，因为它已融入整个 Master-Detail 的小卡片常驻结构中，无需重复显示
   const filteredNavItems = useMemo(() => {
-    return items.filter(item => item.id !== 'dashboard');
+    return items;
   }, [items]);
 
   // 匹配并渲染卡片下方的动态数据
   const renderCardStatusInfo = (itemId: SettingsDesktopSidebarViewId) => {
+    if (itemId === 'dashboard') {
+      return (
+        <div className="mt-2 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
+          {pick('工作区健康度及总览面板就绪', 'Workspace health & overview panel ready')}
+        </div>
+      );
+    }
     if (itemId === 'api-management') {
       return (
-        <div className="mt-2 text-[11px] leading-4 text-[var(--text-secondary)] font-medium">
+        <div className="mt-2 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
           {channelStats.officialCount} 个官方直连 / {channelStats.activeProviders} 个中转就绪
         </div>
       );
@@ -133,31 +139,18 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
     if (itemId === 'system-logs') {
       const isHealthy = importantLogCount === 0;
       return (
-        <div className="mt-2 text-[11px] leading-4 flex items-center gap-1.5 font-medium">
+        <div className="mt-2 text-[11px] leading-4 flex items-center gap-1.5 font-medium truncate">
           <span className={`h-2 w-2 rounded-full ${isHealthy ? 'bg-emerald-400' : 'bg-red-400 animate-pulse'}`} />
-          <span style={{ color: isHealthy ? 'var(--text-secondary)' : '#f87171' }}>
+          <span style={{ color: isHealthy ? 'var(--text-secondary)' : '#f87171' }} className="truncate">
             {isHealthy ? pick('系统运行正常', 'System healthy') : pick(`${importantLogCount} 项告警日志`, `${importantLogCount} warnings`)}
           </span>
         </div>
       );
     }
     if (itemId === 'storage-settings') {
-      const progress = Math.min(100, (storageUsageMb / 1024) * 100);
       return (
-        <div className="mt-2 space-y-1.5">
-          <div className="text-[10px] leading-3 text-[var(--text-secondary)] flex justify-between font-medium">
-            <span>{storedImages} 张图</span>
-            <span>{storageUsageMb.toFixed(1)} MB / 1 GB</span>
-          </div>
-          <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-            <div 
-              className="h-full rounded-full transition-all duration-500" 
-              style={{
-                width: `${progress}%`,
-                background: progress >= 85 ? '#ef4444' : progress >= 60 ? '#f59e0b' : '#3b82f6'
-              }}
-            />
-          </div>
+        <div className="mt-2 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
+          {storedImages} 张图 · {storageUsageMb.toFixed(1)} MB / 1 GB
         </div>
       );
     }
@@ -185,6 +178,8 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
           position: relative;
           display: flex;
           flex-direction: column;
+          justify-content: space-between;
+          height: 76px !important;
           border-radius: 18px;
           border: 1px solid var(--frost-card-framework-border, rgba(255, 255, 255, 0.08));
           background: var(--frost-card-framework-bg, rgba(22, 28, 45, 0.65));
@@ -235,24 +230,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
         }
       `}</style>
 
-      <div className="settings-shell-nav__title mb-4 px-1">
-        <div
-          className="text-[11px] font-semibold uppercase tracking-[0.22em]"
-          style={{ color: 'var(--settings-nav-text-tertiary)' }}
-        >
-          KK Studio
-        </div>
-        <h1
-          className="mt-2 text-[20px] font-semibold tracking-[-0.04em] text-[var(--settings-nav-text-primary)]"
-        >
-          {title}
-        </h1>
-        <p
-          className="mt-1 text-[11px] leading-5 text-[var(--settings-nav-text-secondary)]"
-        >
-          {description}
-        </p>
-      </div>
+
 
       <label
         className="settings-shell-nav__search mb-4 flex items-center gap-2.5 px-3 py-2 rounded-xl border"

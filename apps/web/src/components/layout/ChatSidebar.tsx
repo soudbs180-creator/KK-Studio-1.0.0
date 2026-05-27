@@ -1,6 +1,6 @@
 
 import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2 } from 'lucide-react';
+import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus } from 'lucide-react';
 import { generateImage } from '../../services/llm/geminiService';
 import { llmService } from '../../services/llm/LLMService';
 import { notify } from '../../services/system/notificationService';
@@ -708,7 +708,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         };
     }, [isMobile]);
 
-    // Auto-close logic
+    // 自动收起逻辑（5分钟全局页面无操作自动关闭）
     const [isHovering, setIsHovering] = useState(false);
     const lastActivityRef = useRef<number>(Date.now());
     const autoCloseTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
@@ -730,18 +730,50 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
     const scheduleAutoClose = useCallback(() => {
         clearAutoClose();
-        if (!isOpen || isHovering || isDragging) return;
+        if (!isOpen || isDragging) return;
+        
+        // 5分钟无任何页面活动自动收纳 (300,000 毫秒)
+        const timeoutMs = 300000;
         const elapsed = Date.now() - lastActivityRef.current;
-        const delay = Math.max(20000 - elapsed, 0);
+        const delay = Math.max(timeoutMs - elapsed, 0);
+        
         autoCloseTimerRef.current = window.setTimeout(() => {
-            if (!isHovering && isOpen) closeChat();
+            if (isOpen) closeChat();
         }, delay) as any;
-    }, [clearAutoClose, closeChat, isDragging, isHovering, isOpen]);
+    }, [clearAutoClose, closeChat, isDragging, isOpen]);
 
     const registerActivity = useCallback(() => {
         lastActivityRef.current = Date.now();
         scheduleAutoClose();
     }, [scheduleAutoClose]);
+
+    // 全局页面活动检测监听
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleActivity = () => {
+            registerActivity();
+        };
+
+        // 监听全局各类用户活动事件以进行页面活跃状态判定
+        window.addEventListener('mousemove', handleActivity);
+        window.addEventListener('mousedown', handleActivity);
+        window.addEventListener('keydown', handleActivity);
+        window.addEventListener('scroll', handleActivity, true);
+        window.addEventListener('touchstart', handleActivity);
+
+        // 首次激活时开始定时计算
+        registerActivity();
+
+        return () => {
+            window.removeEventListener('mousemove', handleActivity);
+            window.removeEventListener('mousedown', handleActivity);
+            window.removeEventListener('keydown', handleActivity);
+            window.removeEventListener('scroll', handleActivity, true);
+            window.removeEventListener('touchstart', handleActivity);
+            clearAutoClose();
+        };
+    }, [isOpen, registerActivity, clearAutoClose]);
 
     const closeModelMenu = useCallback(() => {
         modelMenuRequestRef.current += 1;
@@ -1795,7 +1827,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                     onTouchStart={(e) => e.stopPropagation()}
                     onTouchEnd={(e) => e.stopPropagation()}
                     onWheel={registerActivity}
-                    className={`fixed z-[100] flex flex-col overflow-hidden ${isMobile
+                    className={`fixed z-[9999] flex flex-col ${isMobile
                         ? 'left-0 right-0 top-0 bottom-0 border-none pb-0'
                         : 'top-0 right-0 bottom-0 border-l border-[var(--border-light)]'
                         }`}
@@ -1835,7 +1867,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                 backdropFilter: 'blur(var(--frost-card-framework-blur, 20px)) saturate(160%)',
                                 WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur, 20px)) saturate(160%)',
                             }}
-                            title="折叠 AI 助手"
+                            title="折叠 AI 助手（收起）"
                         >
                             <ChevronRight size={16} className="text-[var(--text-secondary)] transition-transform group-hover:translate-x-0.5" />
                         </button>
@@ -1869,6 +1901,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                             className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-[var(--primary)] transition-colors z-50"
                         />
                     )}
+
+                    {/* 内层包裹容器，具有 overflow-hidden 确保侧边栏所有主要内容不产生溢出，同时允许挂在最左侧边缘的关闭按钮完美伸出容器外部而不被截断 */}
+                    <div className="w-full h-full flex flex-col overflow-hidden relative">
 
                     {/* Session Header */}
                     <div
@@ -2179,15 +2214,16 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
                     {/* Bottom Area */}
                     <div
-                        className="px-4 pb-4 pt-3 shrink-0"
+                        className="px-4 pb-4 pt-2 shrink-0 flex flex-col"
                         style={isMobile ? { paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' } : undefined}
                     >
-                        {/* Input Area - Always visible */}
+                        {/* 一体化卡片输入容器 */}
                         <div
-                            className={`mb-3 px-2 rounded-xl border transition-colors ${isDropActive
-                                ? 'border-[var(--accent-coral)] bg-[var(--accent-coral)]/10'
-                                : 'border-transparent'
-                                }`}
+                            className={`flex flex-col rounded-2xl border transition-all duration-300 ${
+                                isDropActive
+                                    ? 'border-[var(--accent-coral)] bg-[var(--accent-coral)]/10 ring-2 ring-[var(--accent-coral)]/20'
+                                    : 'border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] focus-within:border-[var(--accent-coral)] focus-within:ring-2 focus-within:ring-[var(--accent-coral)]/15 focus-within:shadow-[0_0_12px_rgba(244,63,94,0.08)]'
+                            } p-3 gap-2 shadow-sm relative backdrop-blur-md`}
                             onDragEnter={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -2207,135 +2243,151 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                             }}
                             onDrop={handleDropToAttach}
                         >
-                            <textarea
-                                ref={inputRef}
-                                className="w-full border-none shadow-none text-base p-0 bg-transparent resize-none scrollbar-thin focus:outline-none text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
-                                placeholder="开启你的灵感之旅"
-                                rows={1}
-                                value={input}
-                                onChange={e => {
-                                    setInput(e.target.value);
-                                    registerActivity();
-                                    e.target.style.height = 'auto';
-                                    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-                                }}
-                                onKeyDown={e => {
-                                    if ((e.nativeEvent as KeyboardEvent).isComposing) {
-                                        return;
-                                    }
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        handleSend();
-                                    }
-                                }}
-                                onPaste={handleInputPaste}
-                                autoFocus
-                            />
-                            {isDropActive && (
-                                        <div className="mt-2 text-[11px] text-[var(--clay-brand-lavender)]">
-                                    松开鼠标即可添加图片/视频/文档作为参考
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Attachments Preview */}
-                        {attachments.length > 0 && (
-                            <div className="flex flex-nowrap gap-2 mb-3 px-2 overflow-x-auto scrollbar-thin pb-1">
-                                {attachments.map(att => (
-                                    <div key={att.id} className="relative group shrink-0">
-                                        {att.type === 'image' ? (
-                                            <img
-                                                src={att.data}
-                                                alt={att.name}
-                                                className="w-16 h-16 object-cover rounded-lg border border-[var(--frost-card-sub-border)]"
-                                            />
-                                        ) : (
-                                            <div className="w-16 h-16 rounded-lg border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] flex flex-col items-center justify-center gap-1">
-                                                {att.type === 'video' && <Film size={20} className="text-[var(--clay-brand-lavender)]" />}
-                                                {att.type === 'audio' && <Film size={20} className="text-[var(--clay-brand-mint)]" />}
-                                                {att.type === 'document' && <FileText size={20} className="text-[var(--clay-brand-lavender)]" />}
-                                                <span className="text-[8px] text-[var(--text-tertiary)] truncate max-w-14 px-1">{att.name}</span>
-                                            </div>
-                                        )}
-                                        <button
-                                            onClick={() => removeAttachment(att.id)}
-                                            className={`absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center transition-opacity ${isMobile ? 'opacity-95' : 'opacity-0 group-hover:opacity-100'}`}
-                                        >
-                                            <X size={10} />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Bottom Toolbar */}
-                        <div className={isMobile ? 'grid grid-cols-[1fr_auto] gap-2' : 'flex items-center gap-2'}>
-                            {/* Hidden File Input */}
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                multiple
-                                accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.md"
-                                onChange={handleFileSelect}
-                                className="hidden"
-                            />
-
-                            {/* Add Attachment Button */}
-                            <button
-                                onClick={() => fileInputRef.current?.click()}
-                                className={`p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-[var(--toolbar-hover)] transition-colors active:scale-95 ${isMobile ? 'col-start-1 row-start-2 justify-self-start' : ''}`}
-                                title="添加附件 (图片/视频/文档)"
-                            >
-                                <Plus size={20} className="text-[var(--text-secondary)]" />
-                            </button>
-
-                            {/* Agent Toggle Button */}
-                            <button
-                                onClick={() => {
-                                    setAgentMode(!agentMode);
-                                    registerActivity();
-                                    if (!agentMode && !currentAgent) {
-                                        // 如果开启Agent但没有激活的Agent,使用默认Agent
-                                        setCurrentAgent(agentService.getActive());
-                                    }
-                                }}
-                                className={`px-2.5 min-h-[44px] flex items-center gap-1.5 justify-center rounded-lg border transition-all active:scale-95 ${isMobile ? 'col-start-2 row-start-2 justify-self-end' : ''} ${agentMode
-                                    ? 'border-[var(--mobile-clay-active-border)] bg-[var(--frost-card-sub-bg)] text-[var(--clay-brand-lavender)] hover:bg-[var(--toolbar-hover)]'
-                                    : 'border-transparent hover:bg-[var(--toolbar-hover)] text-[var(--text-secondary)]'
-                                    }`}
-                                title={agentMode ? 'Agent 已开启：可自动路由问答/生成图/改图/文档任务' : '开启 Agent 增强模式'}
-                            >
-                                <Bot size={16} className={agentMode ? 'animate-pulse' : ''} />
-                                <span className="text-xs font-medium">Agent</span>
-                                <span className="text-[10px] opacity-80">{agentMode ? 'ON' : 'OFF'}</span>
-                            </button>
-
-                            </div>
-
-                            {/* Send Button */}
-                            {isThinking ? (
-                                <button
-                                    onClick={handleStopGeneration}
-                                    className={`min-w-[44px] min-h-[44px] rounded-full cursor-pointer flex items-center justify-center bg-red-500 text-white hover:bg-red-600 transition-transform active:scale-95 ${isMobile ? 'col-start-2 row-start-1' : ''}`}
-                                    title="停止生成"
-                                >
-                                    <Square size={14} />
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={() => {
-                                        if (input.trim() || attachments.length > 0) {
+                            {/* 1. 文本域输入行 */}
+                            <div className="w-full flex items-start">
+                                <textarea
+                                    ref={inputRef}
+                                    className="w-full border-none shadow-none text-[15px] p-0.5 bg-transparent resize-none scrollbar-thin focus:outline-none text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] leading-relaxed"
+                                    placeholder="开启你的灵感之旅..."
+                                    rows={1}
+                                    value={input}
+                                    onChange={e => {
+                                        setInput(e.target.value);
+                                        registerActivity();
+                                        e.target.style.height = 'auto';
+                                        e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
+                                    }}
+                                    onKeyDown={e => {
+                                        if ((e.nativeEvent as KeyboardEvent).isComposing) {
+                                            return;
+                                        }
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
                                             handleSend();
                                         }
                                     }}
-                                    className={`min-w-[44px] min-h-[44px] rounded-full cursor-pointer flex items-center justify-center bg-[var(--text-tertiary)] text-white hover:bg-[var(--text-secondary)] transition-transform active:scale-95 ${isMobile ? 'col-start-2 row-start-1' : ''}`}
-                                >
-                                    <ArrowUp size={18} />
-                                </button>
+                                    onPaste={handleInputPaste}
+                                    autoFocus
+                                />
+                            </div>
+
+                            {/* 2. 拖拽文件时的温馨提示 */}
+                            {isDropActive && (
+                                <div className="text-[11px] text-[var(--clay-brand-lavender)] font-medium px-0.5 animate-pulse">
+                                    松开鼠标即可添加图片/视频/文档作为参考
+                                </div>
                             )}
+
+                            {/* 3. 附件预览行 (卡片式) */}
+                            {attachments.length > 0 && (
+                                <div className="flex flex-nowrap gap-2 mt-1 px-0.5 overflow-x-auto scrollbar-none pb-1.5 pt-0.5">
+                                    {attachments.map(att => (
+                                        <div key={att.id} className="relative group shrink-0">
+                                            {att.type === 'image' ? (
+                                                <img
+                                                    src={att.data}
+                                                    alt={att.name}
+                                                    className="w-14 h-14 object-cover rounded-xl border border-[var(--frost-card-sub-border)] shadow-sm hover:scale-[1.02] transition-transform duration-200"
+                                                />
+                                            ) : (
+                                                <div className="w-14 h-14 rounded-xl border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-framework-bg)] flex flex-col items-center justify-center gap-1 shadow-sm hover:scale-[1.02] transition-transform duration-200">
+                                                    {att.type === 'video' && <Film size={18} className="text-[var(--clay-brand-lavender)]" />}
+                                                    {att.type === 'audio' && <Mic size={18} className="text-[var(--clay-brand-mint)]" />}
+                                                    {att.type === 'document' && <FileText size={18} className="text-[var(--clay-brand-lavender)]" />}
+                                                    <span className="text-[8px] text-[var(--text-tertiary)] truncate max-w-[48px] px-1 font-medium">{att.name}</span>
+                                                </div>
+                                            )}
+                                            <button
+                                                onClick={() => removeAttachment(att.id)}
+                                                className={`absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-all ${isMobile ? 'opacity-95 scale-110' : 'opacity-0 group-hover:opacity-100 scale-100 hover:scale-110'}`}
+                                            >
+                                                <X size={9} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* 4. 一体化工具栏底栏 */}
+                            <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-[var(--frost-card-sub-border)]/40">
+                                {/* 左侧：附件添加 & Agent 切换 */}
+                                <div className="flex items-center gap-2">
+                                    {/* 隐藏的 File Input */}
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        multiple
+                                        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.md"
+                                        onChange={handleFileSelect}
+                                        className="hidden"
+                                    />
+
+                                    {/* 附件添加按钮 */}
+                                    <button
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)] transition-all active:scale-90 flex items-center justify-center"
+                                        title="添加附件 (图片/视频/文档)"
+                                    >
+                                        <Plus size={18} />
+                                    </button>
+
+                                    {/* Agent 药丸切换按钮 */}
+                                    <button
+                                        onClick={() => {
+                                            setAgentMode(!agentMode);
+                                            registerActivity();
+                                            if (!agentMode && !currentAgent) {
+                                                setCurrentAgent(agentService.getActive());
+                                            }
+                                        }}
+                                        className={`px-2.5 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 active:scale-95 select-none ${
+                                            agentMode
+                                                ? 'bg-gradient-to-r from-[var(--clay-brand-coral)] to-[var(--clay-brand-pink)] text-white border-transparent shadow-[0_2px_8px_rgba(244,63,94,0.25)]'
+                                                : 'bg-[var(--toolbar-hover)] text-[var(--text-secondary)] border-[var(--frost-card-sub-border)] hover:text-[var(--text-primary)]'
+                                        }`}
+                                        title={agentMode ? 'Agent 已开启：可自动路由问答/生成图/改图/文档任务' : '开启 Agent 增强模式'}
+                                    >
+                                        <Bot size={11} className={agentMode ? 'animate-pulse' : ''} />
+                                        <span>Agent</span>
+                                        <span className={`inline-block w-1.5 h-1.5 rounded-full ${agentMode ? 'bg-white animate-ping' : 'bg-current opacity-60'}`} />
+                                    </button>
+                                </div>
+
+                                {/* 右侧：发送 / 停止按钮 */}
+                                <div>
+                                    {isThinking ? (
+                                        <button
+                                            onClick={handleStopGeneration}
+                                            className="w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br from-red-500 to-rose-600 text-white hover:brightness-110 active:scale-90 transition-all shadow-[0_2px_8px_rgba(239,68,68,0.25)]"
+                                            title="停止生成"
+                                        >
+                                            <Square size={10} fill="white" />
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => {
+                                                if (input.trim() || attachments.length > 0) {
+                                                    handleSend();
+                                                }
+                                            }}
+                                            disabled={!input.trim() && attachments.length === 0}
+                                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                                                input.trim() || attachments.length > 0
+                                                    ? 'bg-gradient-to-br from-[var(--clay-brand-coral)] to-[var(--clay-brand-pink)] text-white hover:brightness-110 active:scale-90 shadow-[0_2px_8px_rgba(244,63,94,0.25)] cursor-pointer'
+                                                    : 'bg-[var(--toolbar-hover)] text-[var(--text-tertiary)] opacity-50 cursor-not-allowed'
+                                            }`}
+                                            title="发送消息"
+                                        >
+                                            <ArrowUp size={15} strokeWidth={2.5} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
-                )}
+                    </div>
+                </div>
+            )}
             {sessionContextMenu && ReactDOM.createPortal(
                 <div
                     className="fixed z-[10020] w-40 rounded-lg border py-1"

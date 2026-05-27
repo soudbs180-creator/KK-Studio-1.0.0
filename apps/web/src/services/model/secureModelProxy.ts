@@ -181,12 +181,18 @@ const TRANSIENT_PROXY_RETRY_STATUS_CODES = new Set([502, 503, 504]);
 const MAX_TRANSIENT_PROXY_FETCH_ATTEMPTS = 2;
 const TRANSIENT_PROXY_RETRY_BASE_DELAY_MS = 250;
 
-function getLocalUserRouteApiEndpoint(): string {
-  return `${resolveKkApiModelProxyBaseUrl().replace(/\/+$/, '')}/api/v1/model-proxy/user`;
+function getLocalUserRouteApiEndpoint(useVpsFallback = false): string {
+  const baseUrl = useVpsFallback
+    ? "https://172-245-156-16.sslip.io"
+    : resolveKkApiModelProxyBaseUrl();
+  return `${baseUrl.replace(/\/+$/, '')}/api/v1/model-proxy/user`;
 }
 
-function getLocalSystemProxyEndpoint(): string {
-  return `${resolveKkApiModelProxyBaseUrl().replace(/\/+$/, '')}/api/v1/model-proxy/system`;
+function getLocalSystemProxyEndpoint(useVpsFallback = false): string {
+  const baseUrl = useVpsFallback
+    ? "https://172-245-156-16.sslip.io"
+    : resolveKkApiModelProxyBaseUrl();
+  return `${baseUrl.replace(/\/+$/, '')}/api/v1/model-proxy/system`;
 }
 
 function shouldUseLocalSystemProxy(): boolean {
@@ -773,15 +779,16 @@ async function handleInvalidJwtSessionState(feature: string): Promise<InvalidJwt
 async function invokeLocalUserRouteApiHttp(
   accessToken: string,
   body: Record<string, unknown>,
+  useVpsFallback = false,
 ): Promise<LocalUserRouteProxyHttpResult> {
-  const response = await fetchWithTransientProxyRetry(getLocalUserRouteApiEndpoint(), {
+  const response = await fetchWithTransientProxyRetry(getLocalUserRouteApiEndpoint(useVpsFallback), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify(body),
-  }, 'local-user-route-api');
+  }, useVpsFallback ? 'vps-user-route-api' : 'local-user-route-api');
 
   let payload: any = null;
   let responseBody = '';
@@ -802,15 +809,16 @@ async function invokeLocalUserRouteApiHttp(
 async function invokeLocalSystemProxyHttp(
   accessToken: string,
   body: Record<string, unknown>,
+  useVpsFallback = false,
 ): Promise<LocalSystemProxyHttpResult> {
-  const response = await fetchWithTransientProxyRetry(getLocalSystemProxyEndpoint(), {
+  const response = await fetchWithTransientProxyRetry(getLocalSystemProxyEndpoint(useVpsFallback), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify(body),
-  }, 'local-system-proxy');
+  }, useVpsFallback ? 'vps-system-proxy' : 'local-system-proxy');
 
   let payload: any = null;
   let responseBody = '';
@@ -842,22 +850,25 @@ async function invokeLocalUserRouteProxy(
 
   const session = await resolveCloudSession(feature, { routeKind: 'user-route' });
   let activeAccessToken = session.accessToken;
-  const failureLabel = 'local KK API user-route proxy';
-
   let result: LocalUserRouteProxyHttpResult;
   try {
-    result = await invokeLocalUserRouteApiHttp(activeAccessToken, body);
+    result = await invokeLocalUserRouteApiHttp(activeAccessToken, body, false);
   } catch (error: any) {
-    throw buildSecureProxyBoundaryError(
-      isRetryableProxyFetchError(error)
-        ? `${failureLabel} is temporarily unavailable. Please try again.`
-        : error?.message || `Failed to reach the ${failureLabel}.`,
-      {
-        code: LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE,
-        status: 502,
-        feature,
-      },
-    );
+    console.warn('[secureModelProxy] 本地 API 连接失败，尝试通过 VPS 兜底...', error);
+    try {
+      result = await invokeLocalUserRouteApiHttp(activeAccessToken, body, true);
+    } catch (vpsError: any) {
+      throw buildSecureProxyBoundaryError(
+        isRetryableProxyFetchError(vpsError)
+          ? `VPS user-route proxy is temporarily unavailable. Please try again.`
+          : vpsError?.message || `Failed to reach the VPS user-route proxy.`,
+        {
+          code: LOCAL_USER_ROUTE_PROXY_UNAVAILABLE_CODE,
+          status: 502,
+          feature,
+        },
+      );
+    }
   }
 
   const shouldRetryWithFreshSession = (
@@ -946,9 +957,9 @@ async function invokeLocalSystemProxy(
     });
   }
 
-  const invokeWithToken = async (accessToken: string): Promise<LocalSystemProxyHttpResult> => {
+  const invokeWithToken = async (accessToken: string, useVps = false): Promise<LocalSystemProxyHttpResult> => {
     try {
-      return await invokeLocalSystemProxyHttp(accessToken, body);
+      return await invokeLocalSystemProxyHttp(accessToken, body, useVps);
     } catch (error) {
       if (isRetryableProxyFetchError(error)) {
         throw buildSecureProxyBoundaryError('Local system proxy is temporarily unavailable. Please try again.', {
@@ -962,14 +973,26 @@ async function invokeLocalSystemProxy(
   };
 
   const session = await resolveCloudSession(feature, { routeKind: 'system' });
-  let result = await invokeWithToken(session.accessToken);
+  let isUsingVps = false;
+  let result;
+  try {
+    result = await invokeWithToken(session.accessToken, false);
+  } catch (error) {
+    console.warn('[secureModelProxy] 本地系统代理不可用，尝试使用 VPS 兜底...', error);
+    try {
+      result = await invokeWithToken(session.accessToken, true);
+      isUsingVps = true;
+    } catch (vpsError) {
+      throw error;
+    }
+  }
 
   if (result.response?.status === 401 || isInvalidJwtResponse(result.responseBody, result.payload)) {
     try {
       console.warn('[secureModelProxy] Local system proxy returned 401/Invalid JWT, forcing session refresh before retry');
       const recoveredSession = await resolveCloudSession(feature, { forceRefresh: true, routeKind: 'system' });
       if (recoveredSession.accessToken) {
-        result = await invokeWithToken(recoveredSession.accessToken);
+        result = await invokeWithToken(recoveredSession.accessToken, isUsingVps);
       }
     } catch (error) {
       console.warn('[secureModelProxy] Cloud session recovery failed after local system proxy 401:', error);

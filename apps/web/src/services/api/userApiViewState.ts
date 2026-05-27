@@ -56,10 +56,7 @@ export function resolveUserApiViewState(
   const runtimeUnavailable = input.isApiReachable === false;
   const actionsDisabled =
     !input.isAuthenticated
-    && (
-      input.sessionlessWorkbenchActionsEnabled !== true
-      || runtimeUnavailable
-    );
+    && input.sessionlessWorkbenchActionsEnabled !== true;
   const sessionlessLocalDraftMode =
     !input.isAuthenticated
     && input.hasSessionlessWorkbenchAccess === true

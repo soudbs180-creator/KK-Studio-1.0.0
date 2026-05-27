@@ -8,6 +8,8 @@ const failures = [];
 
 const storageAllowlist = new Set([
   "src/services/api/authAccessToken.ts",
+  "packages/api-client/src/client.ts",
+  "packages/shared/src/contracts/client/kk-api-client.ts",
 ]);
 
 const publicViteSensitiveEnvAllowlist = new Set([

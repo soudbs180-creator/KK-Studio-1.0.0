@@ -919,7 +919,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   const authenticatedUserId = !isTempUser ? (user?.id || keyManager.getUserId()) : null;
   const hasAuthenticatedUser = Boolean(authenticatedUserId);
   const canUseSessionlessLocalDraftStorage = false;
-  const canMutateSessionlessLocalWorkbench = canUseSessionlessLocalApiBridge;
+  const canMutateSessionlessLocalWorkbench = hasSessionlessLocalWorkbench;
   const hasWorkbenchAccess = hasAuthenticatedUser || hasSessionlessLocalWorkbench;
   const hasReadonlySnapshot = readonlyOfficialSlots.length > 0 || readonlyProviders.length > 0;
   const userApiViewState = resolveUserApiViewState({
@@ -1151,7 +1151,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       return false;
     }
 
-    if (apiHealth?.reachable === false && !shouldUseDirectUserApiRecordWrites && !canUseSessionlessLocalDraftStorage) {
+    if (apiHealth?.reachable === false && !shouldUseDirectUserApiRecordWrites && !canUseSessionlessLocalDraftStorage && !isTempUser) {
       notify.warning(pick('Local API unavailable', 'Local API unavailable'), userApiActionHelper || userApiPersistenceHelper || snapshotHydrationHelper);
       return false;
     }
@@ -1178,7 +1178,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       return false;
     }
 
-    if (apiHealth?.reachable === false && !shouldUseDirectUserApiRecordWrites && !canUseSessionlessLocalDraftStorage) {
+    if (apiHealth?.reachable === false && !shouldUseDirectUserApiRecordWrites && !canUseSessionlessLocalDraftStorage && !isTempUser) {
       notify.warning(pick('Local API unavailable', 'Local API unavailable'), providerActionHelper || userApiPersistenceHelper || snapshotHydrationHelper);
       return false;
     }

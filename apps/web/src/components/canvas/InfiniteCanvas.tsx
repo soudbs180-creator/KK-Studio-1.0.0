@@ -981,55 +981,8 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                 </div>
             </div>
 
-            {/* Zoom Slider & Version - Bottom Left */}
-            <div className="absolute bottom-4 left-4 z-50 hidden md:flex flex-col items-center gap-3 select-none">
-                {/* Zoom Slider */}
-                <div className="glass w-10 py-4 px-2 rounded-xl flex flex-col items-center gap-3">
-                    <div className="h-32 flex items-center justify-center relative w-full">
-                        <input
-                            type="range"
-                            min="10"
-                            max="300"
-                            value={Math.round(transform.scale * 100)}
-                            onChange={(e) => {
-                                const newScale = parseInt(e.target.value) / 100;
-                                const container = containerRef.current;
-                                if (!container) return;
-
-                                const rect = container.getBoundingClientRect();
-                                const centerX = rect.width / 2;
-                                const centerY = rect.height / 2;
-
-                                const scaleRatio = newScale / transform.scale;
-                                const newX = centerX - (centerX - transform.x) * scaleRatio;
-                                const newY = centerY - (centerY - transform.y) * scaleRatio;
-
-                                const newTransform = snapTransformForText({ x: newX, y: newY, scale: newScale });
-                                syncTransformRef.current = newTransform;
-                                setTransform(newTransform);
-                                activateInteractionPhase('zoom');
-                                scheduleZoomIdleSettle();
-                                emitTransformChange(newTransform);
-                            }}
-                            className="zoom-slider cursor-pointer origin-center -rotate-90"
-                            style={{ 
-                                '--zoom-slider-progress': `${zoomSliderProgress}%`,
-                                width: '128px',
-                                position: 'absolute'
-                            } as React.CSSProperties}
-                        />
-                    </div>
-                    <span className="text-[10px] text-gray-500 dark:text-zinc-400 font-semibold min-w-[3ch] text-center">
-                        {Math.round(transform.scale * 100)}%
-                    </span>
-                </div>
-
-                {/* Version Badge */}
-                <div className="glass w-10 h-10 rounded-xl flex items-center justify-center">
-                    <span className="text-[9px] text-gray-400 dark:text-zinc-500 font-semibold text-center leading-tight">{APP_DISPLAY_VERSION}</span>
-                </div>
-
-                {/* Update Notification */}
+            {/* 简体中文：画布更新通知悬浮框 - 依然保留在左下角绝对定位，向上偏移避开缩放卡片和版本号卡片 */}
+            <div className="absolute bottom-[285px] left-4 z-50 select-none">
                 <UpdateNotification />
             </div>
         </div>

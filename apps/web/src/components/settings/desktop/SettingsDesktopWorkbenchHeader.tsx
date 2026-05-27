@@ -29,17 +29,7 @@ const SettingsDesktopWorkbenchHeader: React.FC<SettingsDesktopWorkbenchHeaderPro
       }}
     >
       <div className="flex w-full items-center justify-end gap-4">
-        <div
-          className="hidden items-center gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--text-tertiary)] xl:flex"
-          aria-hidden="true"
-        >
-          <span>{pick('快捷操作', 'Quick actions')}</span>
-          <span
-            className="h-1 w-1 rounded-full"
-            style={{ background: activeView === 'system-logs' ? 'rgb(var(--settings-accent-rgb))' : 'var(--settings-border-subtle)' }}
-          />
-          <span>{pick('保持当前工作流', 'Stay in flow')}</span>
-        </div>
+
 
         <div className="settings-desktop-quick-actions ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
           <SettingsActionButton icon={RefreshCw} tone="secondary" size="sm" onClick={onRefreshCurrentView}>

@@ -140,7 +140,7 @@ const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
         setMobileScreen('home');
       }}
       onOpenProfile={() => openProfileSurface('main')}
-      onBillingClick={billingUiEnabled ? () => openProfileSurface('billing') : undefined}
+      onBillingClick={billingUiEnabled ? () => openProfileSurface('main') : undefined}
       onRechargeClick={billingUiEnabled ? onShowRecharge : undefined}
       resultEntries={resultEntries}
       activeEntryId={activeEntryId}

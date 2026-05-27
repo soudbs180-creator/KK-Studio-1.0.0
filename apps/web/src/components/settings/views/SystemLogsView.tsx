@@ -8,7 +8,7 @@ import {
   type SystemLogEntry,
 } from '../../../services/system/systemLogService';
 import { notify } from '../../../services/system/notificationService';
-import { SettingsActionButton, SettingsBadge, SettingsViewShell } from '../SettingsScaffold';
+import { SettingsActionButton, SettingsBadge, SettingsCardGridContainer, SettingsViewShell } from '../SettingsScaffold';
 import { EmptyState, SegmentedControlMulti, SettingSelect, StatusBadge } from '../ui/index';
 
 type LevelFilter = 'all' | 'error' | 'warning' | 'info';
@@ -32,9 +32,9 @@ const getLevelStatus = (level: LogLevel) => {
 };
 
 const getLevelClassName = (level: LogLevel) => {
-  if (level === LogLevel.CRITICAL || level === LogLevel.ERROR) return 'settings-log-entry settings-log-entry--error';
-  if (level === LogLevel.WARNING) return 'settings-log-entry settings-log-entry--warning';
-  return 'settings-log-entry';
+  if (level === LogLevel.CRITICAL || level === LogLevel.ERROR) return 'settings-log-stream-entry settings-log-stream-entry--error';
+  if (level === LogLevel.WARNING) return 'settings-log-stream-entry settings-log-stream-entry--warning';
+  return 'settings-log-stream-entry';
 };
 
 const parseLevelFilter = (value: string): LevelFilter => {
@@ -321,71 +321,86 @@ export const SystemLogsView: React.FC = () => {
 
   return (
     <SettingsViewShell>
-      <div className="settings-reference-stack">
-        <div className="settings-reference-page-header">
-          <div className="settings-reference-page-header__lead">
-            <div className="settings-reference-page-header__eyebrow">Advanced Settings</div>
-            <h2>System Logs</h2>
-            <p>
-              The logs page now mirrors the reference live-stream layout: a compact filter bar, a darker
-              scrolling feed, and a right-side alert summary that keeps the settings area visually
-              consistent with the rest of the control console.
-            </p>
-          </div>
-          <div className="settings-reference-actions">
-            <SettingsBadge tone={isStreamPaused ? 'neutral' : errorLogs.length > 0 ? 'amber' : 'emerald'}>
-              {isStreamPaused ? 'Stream Paused' : 'Live Stream'}
-            </SettingsBadge>
-            <SettingsActionButton icon={isStreamPaused ? Play : Pause} onClick={handleToggleStream}>
-              {isStreamPaused ? 'Resume Stream' : 'Pause Stream'}
-            </SettingsActionButton>
-            <SettingsActionButton icon={Download} tone="primary" onClick={handleDownload}>
-              Export Logs
-            </SettingsActionButton>
+      <SettingsCardGridContainer>
+        {/* Metric Card 1: Today (1A) */}
+        <div className="dashboard-grid-card">
+          
+          <div className="flex flex-col justify-between h-full w-full">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[9px] font-bold uppercase tracking-wider">Today Written</span>
+              <ScrollText size={13} />
+            </div>
+            <div className="text-sm font-bold text-white mt-1.5">{logs.length} rows</div>
+            <div className="text-[9px] text-slate-400 mt-1 truncate">Total logged events today.</div>
           </div>
         </div>
 
-        <div className="settings-reference-grid-4">
-          <LogMetricCard
-            label="Today"
-            value={`${logs.length} rows`}
-            helper="All log entries recorded during the current local day."
-            badge={<SettingsBadge tone="indigo">Total</SettingsBadge>}
-          />
-          <LogMetricCard
-            label="Visible"
-            value={`${filteredLogs.length} rows`}
-            helper={hasFilters ? 'Current filters are limiting the live stream.' : 'The stream is showing every available log row.'}
-            badge={<SettingsBadge tone={hasFilters ? 'amber' : 'neutral'}>{hasFilters ? 'Filtered' : 'All'}</SettingsBadge>}
-          />
-          <LogMetricCard
-            label="Errors"
-            value={`${errorLogs.length}`}
-            helper={errorLogs.length > 0 ? 'Critical or error entries should be triaged first.' : 'No critical or error entries are present right now.'}
-            badge={<StatusBadge status={errorLogs.length > 0 ? 'error' : 'online'} label={errorLogs.length > 0 ? 'Attention' : 'Healthy'} />}
-          />
-          <LogMetricCard
-            label="Sources"
-            value={`${sourceOptions.length}`}
-            helper={latestLog ? `Latest update ${formatLogTime(latestLog.timestamp)}` : 'No live updates have arrived yet.'}
-            badge={<SettingsBadge tone="neutral">Feeds</SettingsBadge>}
-          />
+        {/* Metric Card 2: Visible (1A) */}
+        <div className="dashboard-grid-card">
+          
+          <div className="flex flex-col justify-between h-full w-full">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[9px] font-bold uppercase tracking-wider">Visible</span>
+              <ScrollText size={13} />
+            </div>
+            <div className="text-sm font-bold text-white mt-1.5">{filteredLogs.length} rows</div>
+            <div className="text-[9px] text-slate-400 mt-1 truncate">Logs visible under filter.</div>
+          </div>
         </div>
 
-        <section className="settings-reference-card settings-reference-card--soft">
-          {/* 上方：紧凑过滤栏 */}
-          <div className="settings-reference-toolbar">
-            <div className="settings-reference-toolbar__filters">
-              <div className="min-w-[280px] max-w-full">
+        {/* Metric Card 3: Errors (1A) */}
+        <div className="dashboard-grid-card">
+          
+          <div className="flex flex-col justify-between h-full w-full">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[9px] font-bold uppercase tracking-wider">Errors</span>
+              <ShieldAlert size={13} />
+            </div>
+            <div className={`text-sm font-bold mt-1.5 ${errorLogs.length > 0 ? 'text-red-400 animate-pulse' : 'text-emerald-400'}`}>
+              {errorLogs.length}
+            </div>
+            <div className="text-[9px] text-slate-400 mt-1 truncate">Critical errors recorded.</div>
+          </div>
+        </div>
+
+        {/* Metric Card 4: Sources (1A) */}
+        <div className="dashboard-grid-card">
+          
+          <div className="flex flex-col justify-between h-full w-full">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[9px] font-bold uppercase tracking-wider">Sources</span>
+              <ScrollText size={13} />
+            </div>
+            <div className="text-sm font-bold text-white mt-1.5">{sourceOptions.length}</div>
+            <div className="text-[9px] text-slate-400 mt-1 truncate">
+              {latestLog ? `Updated: ${formatLogTime(latestLog.timestamp)}` : 'Waiting...'}
+            </div>
+          </div>
+        </div>
+
+        {/* Card 5: Scope & Stream Filter (2A*2A) */}
+        <div 
+          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row p-4 flex flex-col justify-between"
+          style={{ cursor: 'default' }}
+        >
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Filters & Control
+            </div>
+            <h3 className="text-sm font-bold text-white mt-1.5">Scope & Stream</h3>
+
+            <div className="mt-3.5 space-y-3">
+              <div className="overflow-hidden">
                 <SegmentedControlMulti
                   options={[...LEVEL_OPTIONS]}
                   value={levelFilterToLabel(levelFilter)}
                   onChange={(value) => setLevelFilter(parseLevelFilter(value))}
                 />
               </div>
-              <div className="min-w-[260px] max-w-full">
+
+              <div className="select-container mt-1">
                 <SettingSelect
-                  label="Source"
+                  label=""
                   value={sourceFilter}
                   options={[
                     { value: 'ALL', label: 'All Sources' },
@@ -395,275 +410,168 @@ export const SystemLogsView: React.FC = () => {
                 />
               </div>
             </div>
-            <div className="settings-reference-toolbar__meta">
-              {hasFilters ? (
-                <SettingsActionButton onClick={handleClearFilters}>Clear Filters</SettingsActionButton>
-              ) : (
-                <SettingsBadge tone="neutral">No filters</SettingsBadge>
-              )}
-              <StatusBadge status={isStreamPaused ? 'paused' : 'online'} label={isStreamPaused ? 'Paused' : 'Running'} />
-            </div>
           </div>
 
-          {/* 下方：磨砂高保真控制台配置选项面板 */}
-          <div className="settings-console-panel">
-            <div className="settings-console-title">Console Configuration Options</div>
-            <div className="settings-console-grid">
-              {/* 左侧列 */}
-              <div className="flex flex-col gap-2">
-                <div 
-                  className="settings-console-item"
-                  onClick={() => handleToggleOption('console_network_messages')}
-                >
-                  <input 
-                    type="checkbox" 
-                    checked={networkMessages} 
-                    onChange={() => {}} // 采用 div 的 onClick 统一处理
-                    className="settings-console-checkbox" 
-                  />
-                  <span className="settings-console-label">Show Network Messages</span>
-                </div>
-                <div 
-                  className="settings-console-item"
-                  onClick={() => handleToggleOption('console_preserve_log')}
-                >
-                  <input 
-                    type="checkbox" 
-                    checked={preserveLog} 
-                    onChange={() => {}}
-                    className="settings-console-checkbox" 
-                  />
-                  <span className="settings-console-label">Preserve Log</span>
-                </div>
-                <div 
-                  className="settings-console-item"
-                  onClick={() => handleToggleOption('console_selected_context_only')}
-                >
-                  <input 
-                    type="checkbox" 
-                    checked={selectedContextOnly} 
-                    onChange={() => {}}
-                    className="settings-console-checkbox" 
-                  />
-                  <span className="settings-console-label">Selected Context Only</span>
-                </div>
-                <div 
-                  className="settings-console-item"
-                  onClick={() => handleToggleOption('console_group_similar')}
-                >
-                  <input 
-                    type="checkbox" 
-                    checked={groupSimilar} 
-                    onChange={() => {}}
-                    className="settings-console-checkbox" 
-                  />
-                  <span className="settings-console-label">Group Similar Messages</span>
-                </div>
-                <div 
-                  className="settings-console-item"
-                  onClick={() => handleToggleOption('console_cors_errors')}
-                >
-                  <input 
-                    type="checkbox" 
-                    checked={corsErrors} 
-                    onChange={() => {}}
-                    className="settings-console-checkbox" 
-                  />
-                  <span className="settings-console-label">Filter CORS Errors</span>
-                </div>
-              </div>
-
-              {/* 右侧列 */}
-              <div className="flex flex-col gap-2">
-                <div 
-                  className="settings-console-item"
-                  onClick={() => handleToggleOption('console_log_xhr')}
-                >
-                  <input 
-                    type="checkbox" 
-                    checked={logXHR} 
-                    onChange={() => {}}
-                    className="settings-console-checkbox" 
-                  />
-                  <span className="settings-console-label">Log XMLHttpRequests</span>
-                </div>
-                <div 
-                  className="settings-console-item"
-                  onClick={() => handleToggleOption('console_eager_eval')}
-                >
-                  <input 
-                    type="checkbox" 
-                    checked={eagerEval} 
-                    onChange={() => {}}
-                    className="settings-console-checkbox" 
-                  />
-                  <span className="settings-console-label">Eager Evaluation</span>
-                </div>
-                <div 
-                  className="settings-console-item"
-                  onClick={() => handleToggleOption('console_autocomplete')}
-                >
-                  <input 
-                    type="checkbox" 
-                    checked={autocomplete} 
-                    onChange={() => {}}
-                    className="settings-console-checkbox" 
-                  />
-                  <span className="settings-console-label">Autocomplete From History</span>
-                </div>
-                <div 
-                  className="settings-console-item"
-                  onClick={() => handleToggleOption('console_evaluate_as_user')}
-                >
-                  <input 
-                    type="checkbox" 
-                    checked={evaluateAsUser} 
-                    onChange={() => {}}
-                    className="settings-console-checkbox" 
-                  />
-                  <span className="settings-console-label">Evaluate Expressions As User</span>
-                </div>
-              </div>
+          <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleToggleStream}
+                className="bg-white/10 hover:bg-white/15 border border-white/10 text-slate-200 rounded-lg py-1 px-2.5 text-[10px] font-bold transition active:scale-95 cursor-pointer"
+              >
+                {isStreamPaused ? 'Resume' : 'Pause'}
+              </button>
+              <button
+                type="button"
+                onClick={handleDownload}
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-1 px-2.5 text-[10px] font-bold transition active:scale-95 cursor-pointer"
+              >
+                Export
+              </button>
             </div>
-          </div>
-        </section>
-
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
-          <section className="settings-reference-card">
-            <div className="settings-reference-card__header">
-              <div>
-                <div className="settings-reference-card__eyebrow">Live Feed</div>
-                <div className="settings-reference-card__title">Streaming Log Rows</div>
-                <div className="settings-reference-card__meta">
-                  Each row keeps the timestamp, source, level, and raw detail block visible without looking
-                  like a generic form list.
-                </div>
-              </div>
-              <ScrollText size={18} className="text-[var(--text-primary)]" />
-            </div>
-
-            {groupedLogs.length === 0 ? (
-              <div className="mt-5">
-                <EmptyState
-                  title={logs.length === 0 ? 'No logs recorded yet' : 'No rows match the current filters'}
-                  description={
-                    logs.length === 0
-                      ? 'The system has not written any log events today.'
-                      : 'Try another filter combination or clear the current filters.'
-                  }
-                />
-              </div>
-            ) : (
-              <div className="mt-5 settings-log-stream">
-                {groupedLogs.map((log) => (
-                  <div key={log.id} className={getLevelClassName(log.level)}>
-                    <div className="settings-log-entry__meta">
-                      <StatusBadge status={getLevelStatus(log.level)} label={getLevelLabel(log.level)} />
-                      <SettingsBadge tone="neutral">{log.source}</SettingsBadge>
-                      {log.count > 1 && (
-                        <span className="settings-log-group-badge">{log.count}</span>
-                      )}
-                      <span className="text-[12px] text-[var(--text-tertiary)]">{formatLogTime(log.timestamp)}</span>
-                    </div>
-                    <div className="settings-log-entry__title">{log.message}</div>
-                    {log.details ? <div className="settings-log-entry__details">{log.details}</div> : null}
-                  </div>
-                ))}
-              </div>
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold cursor-pointer"
+              >
+                Clear
+              </button>
             )}
-          </section>
+          </div>
+        </div>
 
-          <div className="settings-reference-stack">
-            <section className="settings-reference-card">
-              <div className="settings-reference-card__header">
-                <div>
-                  <div className="settings-reference-card__eyebrow">Alert Summary</div>
-                  <div className="settings-reference-card__title">Current Signal</div>
-                  <div className="settings-reference-card__meta">
-                    A compact summary of alert pressure and the highest-priority message currently in the log
-                    stream.
-                  </div>
-                </div>
-                <ShieldAlert size={18} className="text-[var(--text-primary)]" />
+        {/* Card 6: Console Settings switches (2A*2A) */}
+        <div 
+          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row p-4 flex flex-col justify-between"
+          style={{ cursor: 'default' }}
+        >
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Console Settings
+            </div>
+            <h3 className="text-sm font-bold text-white mt-1.5">Switches</h3>
+
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-3.5 max-h-[180px] overflow-y-auto pr-1">
+              <div className="settings-console-item p-1 cursor-pointer" onClick={() => handleToggleOption('console_network_messages')}>
+                <input type="checkbox" checked={networkMessages} onChange={() => {}} className="settings-console-checkbox shrink-0 cursor-pointer" />
+                <span className="text-[11px] text-slate-300 truncate ml-1">Network</span>
               </div>
-
-              <div className="mt-5 settings-reference-list">
-                <div className="settings-reference-list-item">
-                  <div className="min-w-0 flex-1">
-                    <div className="settings-reference-list-item__title">Critical & Error</div>
-                    <div className="settings-reference-list-item__meta">
-                      Highest-priority rows that should be investigated before routine warnings.
-                    </div>
-                  </div>
-                  <div className="settings-reference-list-item__value">{errorLogs.length}</div>
-                </div>
-                <div className="settings-reference-list-item">
-                  <div className="min-w-0 flex-1">
-                    <div className="settings-reference-list-item__title">Warnings</div>
-                    <div className="settings-reference-list-item__meta">
-                      Advisory rows that might turn into incidents if they keep repeating.
-                    </div>
-                  </div>
-                  <div className="settings-reference-list-item__value">{warningLogs.length}</div>
-                </div>
-                <div className="settings-reference-list-item">
-                  <div className="min-w-0 flex-1">
-                    <div className="settings-reference-list-item__title">Priority Source</div>
-                    <div className="settings-reference-list-item__meta">
-                      The source attached to the latest critical or error event.
-                    </div>
-                  </div>
-                  <div className="settings-reference-list-item__value">{latestCritical?.source || 'None'}</div>
-                </div>
+              <div className="settings-console-item p-1 cursor-pointer" onClick={() => handleToggleOption('console_preserve_log')}>
+                <input type="checkbox" checked={preserveLog} onChange={() => {}} className="settings-console-checkbox shrink-0 cursor-pointer" />
+                <span className="text-[11px] text-slate-300 truncate ml-1">Preserve</span>
               </div>
-            </section>
+              <div className="settings-console-item p-1 cursor-pointer" onClick={() => handleToggleOption('console_selected_context_only')}>
+                <input type="checkbox" checked={selectedContextOnly} onChange={() => {}} className="settings-console-checkbox shrink-0 cursor-pointer" />
+                <span className="text-[11px] text-slate-300 truncate ml-1">Context</span>
+              </div>
+              <div className="settings-console-item p-1 cursor-pointer" onClick={() => handleToggleOption('console_group_similar')}>
+                <input type="checkbox" checked={groupSimilar} onChange={() => {}} className="settings-console-checkbox shrink-0 cursor-pointer" />
+                <span className="text-[11px] text-slate-300 truncate ml-1">Group</span>
+              </div>
+              <div className="settings-console-item p-1 cursor-pointer" onClick={() => handleToggleOption('console_cors_errors')}>
+                <input type="checkbox" checked={corsErrors} onChange={() => {}} className="settings-console-checkbox shrink-0 cursor-pointer" />
+                <span className="text-[11px] text-slate-300 truncate ml-1">CORS</span>
+              </div>
+              <div className="settings-console-item p-1 cursor-pointer" onClick={() => handleToggleOption('console_log_xhr')}>
+                <input type="checkbox" checked={logXHR} onChange={() => {}} className="settings-console-checkbox shrink-0 cursor-pointer" />
+                <span className="text-[11px] text-slate-300 truncate ml-1">XHR</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
-            <section className="settings-reference-card settings-reference-card--soft">
-              <div className="settings-reference-card__header">
-                <div>
-                  <div className="settings-reference-card__eyebrow">Latest Alert</div>
-                  <div className="settings-reference-card__title">
-                    {latestCritical ? getLevelLabel(latestCritical.level) : 'No critical event'}
-                  </div>
-                  <div className="settings-reference-card__meta">
-                    {latestCritical
-                      ? `${formatLogTime(latestCritical.timestamp)} · ${latestCritical.source}`
-                      : 'The live stream has no critical or error rows right now.'}
-                  </div>
+        {/* Card 7: Alert & Action (4x2 格，共 8A) */}
+        <div 
+          className="dashboard-grid-card a-card-span-4-col a-card-span-2-row p-4 flex flex-col justify-between"
+          style={{ cursor: 'default' }}
+        >
+          <div className="flex-1 flex flex-col md:flex-row gap-4 min-h-0 w-full">
+            {/* Left: Alert status and latest critical error log */}
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="flex items-center justify-between">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Alert & Action
                 </div>
                 <StatusBadge
                   status={latestCritical ? getLevelStatus(latestCritical.level) : 'online'}
                   label={latestCritical ? 'Investigate' : 'Stable'}
                 />
               </div>
-              <div className="mt-4 text-[14px] leading-6 text-[var(--text-secondary)]">
-                {latestCritical?.message || 'Warnings and informational rows can be reviewed from the stream without urgent intervention.'}
+              
+              <div className="mt-3 text-[11px] leading-relaxed text-slate-300 flex-1 overflow-y-auto break-words bg-white/5 border border-white/5 rounded-lg p-2.5">
+                {latestCritical ? (
+                  <>
+                    <div className="text-red-400 font-bold">[{getLevelLabel(latestCritical.level)}] {latestCritical.source}</div>
+                    <div className="mt-0.5">{latestCritical.message}</div>
+                  </>
+                ) : (
+                  <div className="text-slate-500 italic">No error logs currently present.</div>
+                )}
               </div>
-            </section>
+            </div>
 
-            {logs.length > 0 ? (
-              <section className="settings-reference-card settings-reference-danger">
-                <div className="settings-reference-card__header">
-                  <div>
-                    <div className="settings-reference-card__eyebrow">Danger Zone</div>
-                    <div className="settings-reference-card__title">Clear Today&apos;s Log Cache</div>
-                    <div className="settings-reference-card__meta">
-                      This removes all cached log rows for the current day, not just the currently visible
-                      filtered result.
-                    </div>
-                  </div>
-                  <Trash2 size={18} className="text-[var(--state-danger-text)]" />
+            {/* Right: Notes and clear action button */}
+            <div className="w-full md:w-[160px] shrink-0 flex flex-col justify-between border-t md:border-t-0 md:border-l border-white/5 pt-3 md:pt-0 md:pl-4">
+              <div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Maintenance
                 </div>
-                <div className="mt-4">
-                  <SettingsActionButton icon={Trash2} tone="danger" onClick={handleClearLogs}>
-                    Clear Log Cache
-                  </SettingsActionButton>
-                </div>
-              </section>
-            ) : null}
+                <p className="text-[9px] text-slate-400 mt-1 leading-normal">
+                  Manually clear today's cache stored in browser memory.
+                </p>
+              </div>
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={handleClearLogs}
+                  className="w-full bg-rose-600 hover:bg-rose-700 text-white rounded-lg py-2 px-2.5 text-[10px] font-bold transition active:scale-95 cursor-pointer text-center"
+                >
+                  Clear Log Cache
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+
+        {/* Card 8: Streaming Log list (4A*4A) */}
+        <div 
+          className="dashboard-grid-card a-card-span-4-col a-card-span-4-row p-4 flex flex-col justify-between"
+          style={{ cursor: 'default' }}
+        >
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+              Streaming Logs
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-1 space-y-2 max-h-[440px] settings-log-stream text-[11px]">
+              {groupedLogs.length === 0 ? (
+                <div className="h-full flex items-center justify-center py-10">
+                  <EmptyState
+                    title={logs.length === 0 ? 'No logs recorded yet' : 'No rows match'}
+                    description="No log rows were found matching the filter."
+                  />
+                </div>
+              ) : (
+                groupedLogs.map((log) => (
+                  <div key={log.id} className={`${getLevelClassName(log.level)} p-2 rounded-lg bg-white/5 border border-white/5 flex flex-col gap-1`}>
+                    <div className="flex items-center gap-1.5 text-[10px]">
+                      <StatusBadge status={getLevelStatus(log.level)} label={getLevelLabel(log.level)} />
+                      <SettingsBadge tone="neutral" className="py-0.5 px-1.5 text-[9px]">{log.source}</SettingsBadge>
+                      {log.count > 1 && (
+                        <span className="bg-white/10 text-white rounded-full px-1.5 text-[9px] font-bold">{log.count}x</span>
+                      )}
+                      <span className="text-slate-500 ml-auto">{formatLogTime(log.timestamp)}</span>
+                    </div>
+                    <div className="text-white font-semibold mt-0.5">{log.message}</div>
+                    {log.details && <div className="text-slate-400 text-[10px] whitespace-pre-wrap truncate leading-normal">{log.details}</div>}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </SettingsCardGridContainer>
     </SettingsViewShell>
   );
 };

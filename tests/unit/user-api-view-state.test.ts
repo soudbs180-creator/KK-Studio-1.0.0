@@ -135,7 +135,7 @@ test("sessionless local workbench reports local runtime outages instead of sign-
   assert.equal(viewState.providerActionsDisabled, true);
 });
 
-test("sessionless local workbench stays locked when the local API is unavailable", () => {
+test("sessionless local workbench stays editable when the local API is unavailable but sessionless actions are enabled", () => {
   const viewState = resolveUserApiViewState({
     hasReadonlySnapshot: false,
     hasSessionlessWorkbenchAccess: true,
@@ -148,8 +148,8 @@ test("sessionless local workbench stays locked when the local API is unavailable
   });
 
   assert.equal(viewState.stage, "local-api-unavailable");
-  assert.equal(viewState.userApiActionsDisabled, true);
-  assert.equal(viewState.providerActionsDisabled, true);
-  assert.equal(viewState.userApiEditorDisabled, true);
-  assert.equal(viewState.providerEditorReadOnly, true);
+  assert.equal(viewState.userApiActionsDisabled, false);
+  assert.equal(viewState.providerActionsDisabled, false);
+  assert.equal(viewState.userApiEditorDisabled, false);
+  assert.equal(viewState.providerEditorReadOnly, false);
 });

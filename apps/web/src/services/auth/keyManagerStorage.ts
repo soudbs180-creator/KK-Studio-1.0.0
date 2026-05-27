@@ -13,7 +13,7 @@ export function isBrowserRuntime(): boolean {
 }
 
 export function shouldAllowSessionlessLocalUserApiStorage(): boolean {
-    return isBrowserRuntime() && shouldUseLegacyWebApiFallback();
+    return isBrowserRuntime();
 }
 
 export function createBrowserDirectProviderChecksDisabledError(): Error {
