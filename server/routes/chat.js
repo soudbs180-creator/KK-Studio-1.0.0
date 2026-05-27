@@ -17,6 +17,8 @@ const ChatMessageSchema = z.object({
 
 const ChatRequestSchema = z.object({
   messages: z.array(ChatMessageSchema).min(1).max(40),
+  creditSettlement: z.enum(['server', 'client']).optional(),
+  executionLane: z.enum(['local-user-api', 'cloud-credit-model']).optional(),
 });
 
 function resolveRequestId(req) {
@@ -34,6 +36,12 @@ router.post('/chat', async (req, res) => {
   const parsed = ChatRequestSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Invalid chat messages.' });
+  }
+
+  if (parsed.data.executionLane === 'local-user-api') {
+    return res.status(409).json({
+      error: 'User-owned API requests must use the local user API route. No credits were charged.',
+    });
   }
 
   const pool = getPool();

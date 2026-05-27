@@ -28,6 +28,8 @@ export interface GenerateImagePayload {
   prompt: string;
   referenceImageBase64?: string;
   aspectRatio?: '1:1' | '16:9' | '9:16';
+  creditSettlement?: 'server' | 'client';
+  executionLane?: 'local-user-api' | 'cloud-credit-model';
 }
 
 export interface GenerateImageResponse {
@@ -42,6 +44,8 @@ export interface ChatMessage {
 
 export interface ChatPayload {
   messages: ChatMessage[];
+  creditSettlement?: 'server' | 'client';
+  executionLane?: 'local-user-api' | 'cloud-credit-model';
 }
 
 export interface ChatResponse {
