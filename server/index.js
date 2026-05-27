@@ -30,6 +30,7 @@ const webhookRouter = require('./routes/webhook');
 const generateImageRouter = require('./routes/generate-image');
 const adminRouter = require('./routes/admin');
 const userRouter = require('./routes/user');
+const chatRouter = require('./routes/chat');
 
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://kkai.plus',
@@ -87,6 +88,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/webhook', webhookRouter);
 app.use('/api', userRouter);
 app.use('/api', adminRouter);
+app.use('/api', chatRouter);
 app.use('/api', generateImageRouter);
 
 app.use((err, _req, res, _next) => {

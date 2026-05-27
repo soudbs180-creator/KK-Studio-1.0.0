@@ -13,6 +13,14 @@ const getBaseURL = (): string => {
   return (process.env.EXPO_PUBLIC_API_BASE_URL) || '/api';
 };
 
+function createClientRequestId(): string {
+  const runtimeCrypto = globalThis.crypto;
+  if (runtimeCrypto && typeof runtimeCrypto.randomUUID === 'function') {
+    return runtimeCrypto.randomUUID();
+  }
+  return `web-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+}
+
 export const apiClient = axios.create({
   baseURL: getBaseURL(),
   timeout: 30000,
@@ -40,7 +48,7 @@ apiClient.interceptors.request.use(
 
     // 附加客户端 Request ID 以追踪限流与辅助排查
     if (!config.headers['X-Client-Request-Id']) {
-      config.headers['X-Client-Request-Id'] = `web-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+      config.headers['X-Client-Request-Id'] = createClientRequestId();
     }
     return config;
   },
