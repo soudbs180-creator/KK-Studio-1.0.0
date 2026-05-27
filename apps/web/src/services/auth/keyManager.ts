@@ -82,6 +82,7 @@ import {
     type OpenAICompatModelDiscoveryMetadata,
     extractGeminiCompatModelIds,
 } from './keyManagerRemoteModelDiscovery';
+import { registerCapabilityRouteKeyManager } from '../api/capabilityRouteAssignments';
 export {
     DEFAULT_GOOGLE_MODELS,
     DEFAULT_OPENAI_MODELS,
@@ -3868,6 +3869,7 @@ export class KeyManager {
 
 // Singleton instance
 export const keyManager = new KeyManager();
+registerCapabilityRouteKeyManager(keyManager);
 adminModelService.registerModelRefreshHandler(() => {
     keyManager.clearGlobalModelListCache();
     keyManager.forceNotify();

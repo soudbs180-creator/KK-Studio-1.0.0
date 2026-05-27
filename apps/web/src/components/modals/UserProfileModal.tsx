@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   CreditCard,
   Globe,
+  LayoutDashboard,
   Loader2,
   Lock,
   LogOut,

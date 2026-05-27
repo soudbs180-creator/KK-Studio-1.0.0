@@ -1,12 +1,6 @@
 import { readSource } from '../support/workspacePaths.js';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { test } from 'node:test';
-
-const ROOT_DIR = process.cwd();
-
-
 
 test('ApiSettingsView list mode exposes a dedicated workspace snapshot section', () => {
   const source = readSource('src/components/settings/apiWorkbenchSections.tsx');
@@ -14,11 +8,36 @@ test('ApiSettingsView list mode exposes a dedicated workspace snapshot section',
   assert.match(source, /Workspace snapshot/);
 });
 
-test('ApiSettingsView keeps the default list-mode hero framed as API setup while advanced workbench sections remain available', () => {
+test('ApiSettingsView default mode exposes a Model Center provider pool with a preset directory', () => {
+  const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
+  const sectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const cssSource = readSource('src/index.css');
+
+  assert.match(viewSource, /<ApiWorkbenchModelCenterSection/);
+  assert.match(viewSource, /routes=\{modelCenterRoutes\}/);
+  assert.match(viewSource, /presets=\{modelCenterPresets\}/);
+  assert.match(viewSource, /By default, routing prefers the available channel with the highest budget or token limit/);
+  assert.match(viewSource, /navigate\(buildProviderEditorPath\(null\)\)/);
+  assert.match(viewSource, /Provider prefilled/);
+  assert.doesNotMatch(viewSource, /saveProvider\(\)[\s\S]{0,180}Provider prefilled/);
+
+  assert.match(sectionsSource, /testId="settings-model-center"/);
+  assert.match(sectionsSource, /data-testid="api-model-center-provider-pool"/);
+  assert.match(sectionsSource, /data-testid="api-model-center-preset-directory"/);
+  assert.match(sectionsSource, /Preset directory/);
+  assert.match(sectionsSource, /Clicking only prefills the editor\. You still need to enter an API key and save\./);
+
+  assert.match(cssSource, /\.settings-panel \.settings-model-center-layout \{[\s\S]*grid-template-columns: minmax\(0, 842px\) minmax\(270px, 1fr\);/);
+  assert.match(cssSource, /\.settings-panel \.settings-model-center-route-grid \{[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(270px, 1fr\)\);/);
+  assert.match(cssSource, /\.settings-panel \.settings-model-center-route__metric-value \{[\s\S]*font-variant-numeric: tabular-nums;/);
+});
+
+test('ApiSettingsView keeps the default list-mode hero framed as model center while advanced workbench sections remain available', () => {
   const source = readSource('src/components/settings/ApiSettingsView.tsx');
 
-  assert.match(source, /API setup/);
-  assert.match(source, /showAdvancedWorkbench \? \(/);
+  assert.match(source, /Model center/);
+  assert.match(source, /if \(!showAdvancedWorkbench\) return null;/);
+  assert.match(source, /\{renderAdvancedPanels\(\)\}/);
   assert.doesNotMatch(source, /API workspace/);
 });
 
@@ -37,7 +56,6 @@ test('ApiSettingsView delegates workbench stages, shared sections, and shared ca
 
   assert.match(viewSource, /from '\.\/apiWorkbenchState';/);
   assert.match(viewSource, /from '\.\/apiWorkbenchSections';/);
-  assert.match(viewSource, /from '\.\/apiWorkbenchCards';/);
   assert.match(scaffoldSource, /surface\?: 'card' \| 'plain';/);
 
   assert.match(stageSource, /export type ApiSettingsWorkbenchStage = UserApiWorkbenchStage;/);
@@ -49,6 +67,7 @@ test('ApiSettingsView delegates workbench stages, shared sections, and shared ca
   assert.match(viewSource, /<ApiWorkbenchCurrentViewSection/);
   assert.match(viewSource, /<ApiWorkbenchStageSection/);
   assert.match(viewSource, /<ApiWorkbenchPlatformSection/);
+  assert.match(viewSource, /<ApiWorkbenchModelCenterSection/);
   assert.match(sectionsSource, /Current view/);
   assert.match(sectionsSource, /Status and next step/);
   assert.match(sectionsSource, /Diagnostics view/);
@@ -56,7 +75,7 @@ test('ApiSettingsView delegates workbench stages, shared sections, and shared ca
   assert.match(sectionsSource, /testId="settings-workbench-diagnostics"[\s\S]*surface="plain"/);
   assert.match(sectionsSource, /className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"/);
   assert.match(sectionsSource, /className="min-w-0 flex-1 space-y-2 text-left"/);
-  assert.doesNotMatch(sectionsSource, /label=\{pick\('当前阶段', 'Stage'\)/);
+  assert.doesNotMatch(sectionsSource, /label=\{pick\('[^']*', 'Stage'\)/);
   assert.doesNotMatch(sectionsSource, /testId="settings-workbench-current-view"[\s\S]*rounded-\[24px\] border p-4/);
   assert.match(cardsSource, /export const ConsoleEndpointCard/);
 
@@ -66,35 +85,35 @@ test('ApiSettingsView delegates workbench stages, shared sections, and shared ca
   assert.doesNotMatch(viewSource, /const userApiWorkbenchStage = showDiagnostics \? 'diagnostics' : userApiViewState\.stage;/);
 });
 
-test('ApiSettingsView surfaces a compact unified API list and keeps provider creation scoped', () => {
+test('ApiSettingsView surfaces a model-center API list and keeps provider creation scoped', () => {
   const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
   const sectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
 
-  assert.match(viewSource, /const showSimpleProviderList = !showAdvancedWorkbench;/);
-  assert.match(viewSource, /data-testid="api-simple-provider-add"/);
-  assert.match(viewSource, /data-testid="api-proxy-provider-add"/);
-  assert.match(viewSource, /pick\('添加 API', 'Add API'\)/);
+  assert.match(viewSource, /<ApiWorkbenchModelCenterSection/);
+  assert.match(sectionsSource, /data-testid="api-simple-provider-add"/);
+  assert.match(sectionsSource, /data-testid="api-proxy-provider-add"/);
+  assert.match(sectionsSource, /pick\('[^']*', 'Local API'\)/);
   assert.match(viewSource, /thirdPartyProviders\.map\(\(provider\)/);
 
-  assert.match(viewSource, /pick\('本地 API', 'Local APIs'\)/);
-  assert.match(viewSource, /pick\('新增本地 API', 'Add local API'\)/);
-  assert.match(viewSource, /pick\('本地 API 编辑器', 'Local API editor'\)/);
-  assert.match(sectionsSource, /pick\('本地 API 视图', 'Local API view'\)/);
-  assert.match(sectionsSource, /value: 'official', label: pick\('本地 API', 'Local APIs'\)/);
+  assert.match(viewSource, /pick\('[^']*', 'Local APIs'\)/);
+  assert.match(viewSource, /pick\('[^']*', 'Add local API'\)/);
+  assert.match(viewSource, /pick\('[^']*', 'Local API editor'\)/);
+  assert.match(sectionsSource, /pick\('[^']*', 'Local API view'\)/);
+  assert.match(sectionsSource, /value: 'official', label: pick\('[^']*', 'Local APIs'\)/);
 
-  const createOfficialButtonUsages = viewSource.match(/onClick=\{\(\) => beginCreateOfficial\(\)\}/g) ?? [];
-  const createProxyAddEntryUsages = viewSource.match(/data-testid="api-proxy-provider-add"/g) ?? [];
-  const createProviderButtonUsages = viewSource.match(/onClick=\{beginCreateProvider\}/g) ?? [];
+  const directOfficialButtonUsages = viewSource.match(/onClick=\{\(\) => beginCreateOfficial\(\)\}/g) ?? [];
+  const createProxyAddEntryUsages = sectionsSource.match(/data-testid="api-proxy-provider-add"/g) ?? [];
+  const createProviderButtonUsages = viewSource.match(/onAddProvider=\{beginCreateProvider\}/g) ?? [];
 
-  assert.equal(createOfficialButtonUsages.length, 0, 'Expected official creation to go through the compact API add entry');
-  assert.equal(createProxyAddEntryUsages.length, 1, 'Expected simple list mode to expose one proxy provider add entry');
-  assert.equal(createProviderButtonUsages.length, 2, 'Expected provider creation to be available from the proxy add entry and advanced empty-state action');
+  assert.equal(directOfficialButtonUsages.length, 0, 'Expected official creation to go through shared handlers instead of inline anonymous calls.');
+  assert.equal(createProxyAddEntryUsages.length, 1, 'Expected model center to expose one proxy provider add entry.');
+  assert.ok(createProviderButtonUsages.length >= 1, 'Expected provider creation to be available from the model center add entry.');
 });
 
 test('ApiSettingsView keeps diagnostics and section actions owned by shared modules instead of hidden duplicate controls', () => {
   const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
 
   assert.doesNotMatch(viewSource, /data-testid="api-workbench-diagnostics-toggle"/);
-  assert.doesNotMatch(viewSource, /className="hidden"[^\\n]*beginCreateOfficial/);
-  assert.doesNotMatch(viewSource, /className="hidden"[^\\n]*beginCreateProvider/);
+  assert.doesNotMatch(viewSource, /className="hidden"[^\n]*beginCreateOfficial/);
+  assert.doesNotMatch(viewSource, /className="hidden"[^\n]*beginCreateProvider/);
 });

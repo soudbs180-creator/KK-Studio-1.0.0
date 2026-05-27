@@ -13,12 +13,16 @@ import {
 
 const ROOT_DIR = process.cwd();
 const CAPABILITY_STORAGE_KEY = 'kk_capability_route_assignments_v1';
+const CUSTOM_ROUTING_STORAGE_KEY = 'kk_custom_routing_enabled_v1';
 
 
 
-function withLocalStorageValue(value: string, run: () => void): void {
+function withLocalStorageValue(value: string, run: () => void, customRoutingEnabled = true): void {
   const originalWindow = (globalThis as typeof globalThis & { window?: any }).window;
-  const store = new Map<string, string>([[CAPABILITY_STORAGE_KEY, value]]);
+  const store = new Map<string, string>([
+    [CAPABILITY_STORAGE_KEY, value],
+    [CUSTOM_ROUTING_STORAGE_KEY, String(customRoutingEnabled)],
+  ]);
   (globalThis as typeof globalThis & { window?: any }).window = {
     localStorage: {
       getItem(key: string) {
@@ -53,6 +57,21 @@ test('generation mode key preference reads capability route assignments before f
   assert.match(appSource, /resolveEnabledCapabilityRouteAssignment\(capabilityRole\)\?\.primaryRouteId/);
   assert.match(appSource, /isCapabilityRouteAssignmentRouteDisabled\(capabilityRole, rememberedKeyId\)/);
   assert.match(appSource, /return capabilityKeyId \|\| rememberedKeyId;/);
+});
+
+test('capability routing defaults to smart automatic mode until custom routing is enabled', () => {
+  const source = readSource('apps/web/src/services/api/capabilityRouteAssignments.ts');
+  const sectionSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
+
+  assert.match(source, /const CUSTOM_ROUTING_KEY = 'kk_custom_routing_enabled_v1';/);
+  assert.match(source, /export const isCustomRoutingEnabled = \(\): boolean => \{[\s\S]*return false;/);
+  assert.match(source, /window\.localStorage\.getItem\(CUSTOM_ROUTING_KEY\) === 'true'/);
+  assert.match(source, /return getSmartAutoAssignment\(role\);/);
+  assert.match(source, /budgetScore = c\.budgetLimit;/);
+  assert.match(source, /tokenScore = c\.tokenLimit \/ 10000/);
+  assert.match(sectionSource, /开启后可以手动为每个能力模块指定供应商和模型/);
+  assert.match(sectionSource, /关闭时默认启用智能调度，自动选择已配置的预算金额最高或 Tokens 上限最高的活跃通道/);
+  assert.match(sectionSource, /disabled=\{!item\.enabled \|\| !customRoutingEnabled\}/);
 });
 
 test('enabled-only capability resolver preserves raw assignments while blocking disabled runtime routes', () => {

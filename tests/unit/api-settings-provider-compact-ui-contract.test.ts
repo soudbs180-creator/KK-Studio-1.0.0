@@ -8,35 +8,40 @@ const ROOT_DIR = process.cwd();
 
 
 
-test('provider list cards stay compact and keep only edit, refresh, and pause actions on the list surface', () => {
+test('provider list cards stay compact and keep edit, refresh, pause, and delete actions on the list surface', () => {
   const source = readSource('src/components/settings/ApiSettingsView.tsx');
-  const cardSource = readSource('src/components/settings/apiWorkbenchCards.tsx');
+  const sectionSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
 
-  assert.match(source, /title=\{provider\.name\}/);
-  assert.match(source, /title=\{pick\('第三方供应商', 'Third-party providers'\)\}[\s\S]*className="settings-provider-grid settings-provider-grid--compact"/);
-  assert.match(source, /density="compact"/);
-  assert.match(cardSource, /settings-provider-card--compact/);
-  assert.match(cardSource, /settings-provider-card__inline-actions/);
+  assert.match(source, /modelCenterRoutes[\s\S]*thirdPartyProviders\.map\(\(provider\)/);
+  assert.match(sectionSource, /settings-model-center-route/);
+  assert.match(sectionSource, /settings-model-center-route__actions/);
+  assert.match(sectionSource, /<Pause size=\{15\}/);
+  assert.match(sectionSource, /<Edit3 size=\{15\}/);
+  assert.match(sectionSource, /<RefreshCw size=\{15\}/);
+  assert.match(sectionSource, /<Trash2 size=\{15\}/);
+  assert.match(sectionSource, /onClick=\{route\.onDelete\}/);
+  assert.match(sectionSource, /aria-label=\{toggleLabel\}/);
+  assert.match(sectionSource, /aria-label=\{editLabel\}/);
+  assert.match(sectionSource, /aria-label=\{refreshLabel\}/);
+  assert.match(sectionSource, /aria-label=\{deleteLabel\}/);
+  assert.match(source, /confirmModelCenterRouteDelete/);
+  assert.match(source, /Delete \"\$\{title\}\"\? You will need to add the API key again to restore it\./);
+  assert.match(source, /void deleteOfficial\(slot\.id\)/);
+  assert.match(source, /void deleteProvider\(provider\.id\)/);
   assert.doesNotMatch(source, /<SettingsActionButton icon=\{Wand2\} size="sm"[\s\S]*provider-price:\$\{provider\.id\}/);
-  assert.match(
-    source,
-    /<SettingsActionButton icon=\{provider\.isActive \? Pause : Play\} size="sm" disabled=\{providerActionsDisabled\} onClick=\{\(\) => void toggleProvider\(provider\)\}>[\s\S]*?<SettingsActionButton icon=\{Edit3\} size="sm" disabled=\{providerActionsDisabled\} onClick=\{\(\) => startEditProvider\(provider\)\}>[\s\S]*?<SettingsActionButton icon=\{RefreshCw\} size="sm" disabled=\{routeDiagnosticsActionDisabled\} loading=\{busy === `provider-check:\$\{provider\.id\}`\} onClick=\{\(\) => void refreshProvider\(provider\)\}>/,
-    'Provider list action order should be pause/edit/refresh, with model and price sync moved into the editor.',
-  );
 });
 
-test('default local API cards use the same compact list density and hide metric details until advanced mode', () => {
+test('default local API cards use the model center list and keep advanced metric details behind advanced mode', () => {
   const source = readSource('src/components/settings/ApiSettingsView.tsx');
   const cssSource = readSource('src/index.css');
 
-  assert.match(source, /!showAdvancedWorkbench \? 'settings-provider-grid--compact' : ''/);
-  assert.match(source, /density=\{showAdvancedWorkbench \? 'normal' : 'compact'\}/);
-  assert.match(source, /subtitle=\{showAdvancedWorkbench[\s\S]*?undefined\}/);
-  assert.match(source, /metrics=\{showAdvancedWorkbench \? prioritizedMetrics : \[\]\}/);
-  assert.match(source, /progress=\{showAdvancedWorkbench \? progressData : undefined\}/);
-  assert.match(source, /error=\{showAdvancedWorkbench \? slot\.lastError : null\}/);
-  assert.match(cssSource, /\.settings-panel \.settings-api-quick-add \{/);
-  assert.match(cssSource, /\.settings-panel \.settings-api-quick-add__actions \{/);
+  assert.match(source, /modelCenterRoutes[\s\S]*officialSlots\.map\(\(slot\)/);
+  assert.match(source, /<ApiWorkbenchOverviewSection/);
+  assert.match(source, /<ApiWorkbenchRoutePoolSection/);
+  assert.match(cssSource, /\.settings-panel \.settings-model-center-route__metrics \{/);
+  assert.match(cssSource, /\.settings-panel \.settings-model-center-route__metric-value \{[\s\S]*font-variant-numeric: tabular-nums;/);
+  assert.match(cssSource, /\.settings-panel \.settings-model-center-route__actions \{[\s\S]*flex-wrap: nowrap;/);
+  assert.match(cssSource, /@media \(max-width: 720px\) \{[\s\S]*\.settings-panel \.settings-model-center-route__actions \{[\s\S]*grid-template-columns: repeat\(4, 32px\);/);
   assert.doesNotMatch(source, /min-h-\[132px\]/);
 });
 

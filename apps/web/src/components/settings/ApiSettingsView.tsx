@@ -2,8 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   ChevronDown,
-  Clock3,
-  Edit3,
   Globe,
   Key,
   Layers3,
@@ -24,6 +22,8 @@ import {
   getCapabilityRouteAssignments,
   subscribeCapabilityRouteAssignments,
   upsertCapabilityRouteAssignment,
+  isCustomRoutingEnabled,
+  setCustomRoutingEnabled,
 } from '../../services/api/capabilityRouteAssignments';
 import { kkWebApiClient, shouldUseLegacyWebApiFallback } from '../../services/api/kkApiClient';
 import {
@@ -60,7 +60,6 @@ import {
   SettingsActionButton,
   SettingsBadge,
   SettingsHero,
-  SettingsMetricCard,
   SettingsSection,
   SETTINGS_WARNING_STYLE,
   SettingsViewShell,
@@ -86,11 +85,11 @@ import {
   readApiManagementListState,
   type ApiManagementTab,
 } from './apiManagementRouteState';
-import { ConsoleEndpointCard, type ConsoleEndpointCardMetric } from './apiWorkbenchCards';
 import {
   ApiWorkbenchCapabilitySection,
   ApiWorkbenchCurrentViewSection,
   ApiWorkbenchDiagnosticsSection,
+  ApiWorkbenchModelCenterSection,
   ApiWorkbenchOcrSection,
   ApiWorkbenchOverviewSection,
   ApiWorkbenchPlatformSection,
@@ -228,15 +227,17 @@ interface ProviderPreset {
   baseUrl: string;
   format: ApiProtocolFormat;
   color: string;
+  modelId?: string;
+  kind?: 'provider' | 'relay';
 }
 
 const PROVIDER_PRESETS: ProviderPreset[] = [
-  { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', format: 'openai', color: '#0054ff' },
-  { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', format: 'openai', color: '#ff5a00' },
-  { name: 'Google AI Studio', baseUrl: 'https://generativelanguage.googleapis.com', format: 'gemini', color: '#4285f4' },
-  { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', format: 'openai', color: '#10a37f' },
-  { name: 'Anthropic Claude', baseUrl: 'https://api.anthropic.com', format: 'claude', color: '#d97706' },
-  { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', format: 'openai', color: '#7c3aed' },
+  { name: 'Google AI Studio', baseUrl: 'https://generativelanguage.googleapis.com', format: 'gemini', color: '#4285f4', modelId: 'gemini-2.5-flash' },
+  { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', format: 'openai', color: '#10a37f', modelId: 'gpt-4o' },
+  { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', format: 'openai', color: '#0054ff', modelId: 'deepseek-chat' },
+  { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', format: 'openai', color: '#ff5a00', modelId: 'Qwen/Qwen3-235B-A22B-Instruct-2507' },
+  { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', format: 'openai', color: '#7c3aed', modelId: 'openai/gpt-4o', kind: 'relay' },
+  { name: 'Anthropic Claude', baseUrl: 'https://api.anthropic.com', format: 'claude', color: '#d97706', modelId: 'claude-3-5-sonnet-latest' },
 ];
 
 const buildOfficialEditorPath = (officialId?: string | null) =>
@@ -791,7 +792,6 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdvancedWorkbench, setShowAdvancedWorkbench] = useState(false);
   const [showAdvancedDetails, setShowAdvancedDetails] = useState(false);
-  const showSimpleProviderList = !showAdvancedWorkbench;
   const [providerPricingEndpointDraft, setProviderPricingEndpointDraft] = useState('');
   const [showPricingEndpointOverride, setShowPricingEndpointOverride] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
@@ -1649,18 +1649,14 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       return;
     }
 
-    const targetId = showSimpleProviderList
-      ? (returnHighlight?.officialId || returnHighlight?.providerId)
-      : activeTab === 'official'
+    const targetId = activeTab === 'official'
         ? returnHighlight?.officialId
         : returnHighlight?.providerId;
     if (!targetId) {
       return;
     }
 
-    const registry = showSimpleProviderList
-      ? (returnHighlight?.providerId ? providerCardRegistryRef.current : officialCardRegistryRef.current)
-      : activeTab === 'official'
+    const registry = activeTab === 'official'
         ? officialCardRegistryRef.current
         : providerCardRegistryRef.current;
     const targetNode = registry.get(targetId);
@@ -1677,7 +1673,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     });
 
     return () => window.cancelAnimationFrame(frameId);
-  }, [activeEditorMode, activeTab, returnHighlight, officialSlots.length, showSimpleProviderList, thirdPartyProviders.length]);
+  }, [activeEditorMode, activeTab, returnHighlight, officialSlots.length, thirdPartyProviders.length]);
 
   const run = async (
     key: string,
@@ -2369,6 +2365,144 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     });
   };
 
+  const confirmModelCenterRouteDelete = useCallback((title: string) => {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+
+    return window.confirm(
+      pick(`确认删除“${title}”吗？删除后需要重新添加 API Key 才能恢复。`, `Delete "${title}"? You will need to add the API key again to restore it.`),
+    );
+  }, [pick]);
+
+  const modelCenterRoutes = useMemo(() => {
+    const officialItems = officialSlots.map((slot) => {
+      const status = getOfficialStatus(slot);
+      const mode = getMode(slot.budgetLimit, slot.tokenLimit);
+      const effectiveModels = resolveEffectiveProviderModels({
+        provider: slot.provider,
+        baseUrl: slot.baseUrl,
+        format: slot.format,
+        models: slot.supportedModels,
+      });
+
+      return {
+        id: slot.id,
+        kind: 'official' as const,
+        title: getOfficialDisplayName(slot.provider === 'OpenAI' ? 'OpenAI' : 'Google'),
+        subtitle: slot.provider === 'OpenAI' ? 'OpenAI Direct' : 'Gemini Direct',
+        accentColor: slot.provider === 'OpenAI' ? '#10a37f' : '#4285f4',
+        statusLabel: status.label,
+        statusVariant: status.status,
+        protocolLabel: getProtocolLabel(slot.format),
+        modelCountLabel: String(effectiveModels.length || slot.supportedModels?.length || 0),
+        budgetLabel: getLimitValueLabel(mode, mode === 'amount' ? slot.budgetLimit : slot.tokenLimit),
+        usageLabel: getOfficialUsageSummary(slot),
+        latencyLabel: formatLatency(slot.lastResponseTime ?? slot.avgResponseTime ?? null),
+        isPaused: Boolean(slot.disabled),
+        isHighlighted: returnHighlight?.officialId === slot.id,
+        cardRef: (node: HTMLElement | null) => registerOfficialCardRef(slot.id, node),
+        onSelect: () => startEditOfficial(slot),
+        onToggle: () => void toggleOfficial(slot),
+        onRefresh: () => void refreshOfficial(slot),
+        onDelete: () => {
+          const title = getOfficialDisplayName(slot.provider === 'OpenAI' ? 'OpenAI' : 'Google');
+          if (confirmModelCenterRouteDelete(title)) {
+            void deleteOfficial(slot.id);
+          }
+        },
+        toggleDisabled: userApiActionsDisabled,
+        refreshDisabled: routeDiagnosticsActionDisabled,
+        deleteDisabled: userApiActionsDisabled,
+        refreshLoading: busy === `official-check:${slot.id}`,
+      };
+    });
+
+    const providerItems = thirdPartyProviders.map((provider) => {
+      const status = getProviderStatus(provider);
+      const mode = getMode(provider.budgetLimit, provider.tokenLimit, provider.customCostMode || 'unlimited');
+      const budgetValue = mode === 'amount'
+        ? provider.customCostValue ?? provider.budgetLimit
+        : provider.customCostValue ?? provider.tokenLimit;
+      const usageValue = mode === 'tokens'
+        ? formatTokens(provider.usage?.totalTokens || 0)
+        : formatUsd(provider.usage?.totalCost || 0);
+
+      return {
+        id: provider.id,
+        kind: 'provider' as const,
+        title: provider.name,
+        subtitle: extractDomain(provider.baseUrl),
+        accentColor: provider.providerColor || DEFAULT_PROVIDER_COLOR,
+        statusLabel: status.label,
+        statusVariant: status.status,
+        protocolLabel: getProtocolLabel(provider.format),
+        modelCountLabel: String(provider.models?.length || 0),
+        budgetLabel: getLimitValueLabel(mode, budgetValue),
+        usageLabel: `${pick('累计', 'Total')} ${usageValue}`,
+        latencyLabel: formatLatency(provider.activitySummary?.lastLatencyMs ?? null),
+        isPaused: !provider.isActive,
+        isHighlighted: returnHighlight?.providerId === provider.id,
+        cardRef: (node: HTMLElement | null) => registerProviderCardRef(provider.id, node),
+        onSelect: () => startEditProvider(provider),
+        onToggle: () => void toggleProvider(provider),
+        onRefresh: () => void refreshProvider(provider),
+        onDelete: () => {
+          if (confirmModelCenterRouteDelete(provider.name)) {
+            void deleteProvider(provider.id);
+          }
+        },
+        toggleDisabled: providerActionsDisabled,
+        refreshDisabled: routeDiagnosticsActionDisabled,
+        deleteDisabled: providerActionsDisabled,
+        refreshLoading: busy === `provider-check:${provider.id}`,
+      };
+    });
+
+    return [...officialItems, ...providerItems];
+  }, [
+    busy,
+    confirmModelCenterRouteDelete,
+    getOfficialDisplayName,
+    officialSlots,
+    pick,
+    providerActionsDisabled,
+    registerOfficialCardRef,
+    registerProviderCardRef,
+    returnHighlight,
+    routeDiagnosticsActionDisabled,
+    thirdPartyProviders,
+    userApiActionsDisabled,
+  ]);
+
+  const modelCenterPresets = useMemo(() => (
+    PROVIDER_PRESETS.map((preset) => ({
+      id: preset.name,
+      title: preset.name,
+      kindLabel: preset.kind === 'relay' ? pick('中转目录', 'Relay') : pick('供应商预设', 'Provider'),
+      protocolLabel: getProtocolLabel(preset.format),
+      baseUrlLabel: extractDomain(preset.baseUrl),
+      recommendedModel: preset.modelId || pick('保存后同步', 'Sync after save'),
+      accentColor: preset.color,
+      onApply: () => {
+        setProviderForm((current) => ({
+          ...current,
+          name: preset.name,
+          baseUrl: preset.baseUrl,
+          format: preset.format,
+          color: preset.color,
+        }));
+        setEditingProviderId(null);
+        setActiveTab('third-party');
+        navigate(buildProviderEditorPath(null));
+        notify.success(
+          pick('已预填供应商', 'Provider prefilled'),
+          pick(`已载入 ${preset.name} 预设，请填写 API Key 后保存。`, `Loaded ${preset.name}. Enter an API key and save.`),
+        );
+      },
+    }))
+  ), [navigate, pick]);
+
   const stageMeta = resolveApiWorkbenchStageMeta({
     activeTab,
     pick,
@@ -2423,6 +2557,243 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     setShowDiagnostics((current) => !current);
   };
 
+  const [customRoutingEnabled, setCustomRoutingEnabledState] = useState(() => isCustomRoutingEnabled());
+
+  const handleCustomRoutingToggle = useCallback((enabled: boolean) => {
+    setCustomRoutingEnabled(enabled);
+    setCustomRoutingEnabledState(enabled);
+    setCapabilityAssignments(getCapabilityRouteAssignments());
+  }, []);
+
+  useEffect(() => {
+    return subscribeCapabilityRouteAssignments(() => {
+      setCapabilityAssignments(getCapabilityRouteAssignments());
+    });
+  }, []);
+
+  const getModelMetadata = useCallback((modelId: string) => {
+    const globalModels = keyManager.getGlobalModelList();
+    const matched = globalModels.find(m => m.id === modelId);
+    if (matched) {
+      return {
+        name: matched.name || modelId,
+        description: matched.description || '',
+      };
+    }
+    const lower = modelId.toLowerCase();
+    let desc = '';
+    if (lower.includes('gemini-2.5-flash')) {
+      desc = pick('谷歌新一代多模态旗舰级闪电模型，具备极高的响应速度与多模态理解能力。', 'Next-gen multimodal lightning model by Google with high speed and understanding.');
+    } else if (lower.includes('gemini-2.5-pro')) {
+      desc = pick('谷歌高智能旗舰模型，针对复杂推理、代码生成及多语言任务进行深度优化。', 'Highly intelligent flagship model by Google optimized for reasoning and coding.');
+    } else if (lower.includes('gpt-4o')) {
+      desc = pick('OpenAI 旗舰多模态模型，支持流畅的图文理解与极速响应。', 'OpenAI multimodal flagship model, supporting fluent understanding and fast response.');
+    } else if (lower.includes('gpt-4-turbo')) {
+      desc = pick('GPT-4 强力推理模型，适合处理超长上下文及高复杂逻辑。', 'GPT-4 strong reasoning model, suitable for long context and complex logic.');
+    } else if (lower.includes('o1-mini')) {
+      desc = pick('OpenAI 推理优化型轻量模型，在代码与数学领域速度与效果出众。', 'OpenAI reasoning-optimized light model with outstanding speed in coding and math.');
+    } else if (lower.includes('deepseek-r1')) {
+      desc = pick('深度求索新一代开源推理模型，拥有比肩最强闭源推理模型的长链思考与数学逻辑。', 'DeepSeek next-gen open-source reasoning model with competitive long-chain thinking.');
+    } else if (lower.includes('deepseek-chat')) {
+      desc = pick('深度求索通用对话模型，极高的性价比与优秀的中文创作能力。', 'DeepSeek general chat model with ultra high cost-performance and great Chinese writing.');
+    } else if (lower.includes('claude-3-5-sonnet')) {
+      desc = pick('Anthropic 旗舰模型，业界领先的代码、分析和多步骤推理工具。', 'Anthropic flagship model, industry-leading tool for coding, analysis, and multi-step reasoning.');
+    } else {
+      desc = pick('通用模型通道，支持完成绝大部分常见对话与逻辑任务。', 'General model route, capable of completing most common conversational and logical tasks.');
+    }
+    return {
+      name: modelId,
+      description: desc,
+    };
+  }, [pick]);
+
+  const renderPresetModelsCard = (
+    title: string,
+    models: string[] = [],
+    onSync: () => void,
+    syncLoading: boolean,
+  ) => {
+    return (
+      <SettingsSection
+        title={title}
+        eyebrow={pick('模型 Nexus', 'Model nexus')}
+        description={pick(
+          '此通道支持的所有可用模型。如果列表为空，请尝试重新刷新连通性或同步。',
+          'All available models supported by this route. If empty, try refreshing connectivity.'
+        )}
+        action={
+          <SettingsActionButton
+            icon={RefreshCw}
+            loading={syncLoading}
+            onClick={onSync}
+          >
+            {pick('同步模型列表', 'Sync models')}
+          </SettingsActionButton>
+        }
+      >
+        {models.length === 0 ? (
+          <div className="rounded-[18px] border p-6 text-center text-[var(--text-secondary)]" style={SETTINGS_OVERLAY_STYLE}>
+            {pick('暂无可用模型，请点击右上角同步按钮尝试获取。', 'No available models. Click sync to retrieve them.')}
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {models.map((modelId) => {
+              const meta = getModelMetadata(modelId);
+              return (
+                <div key={modelId} className="rounded-[18px] border p-3 flex flex-col justify-between" style={SETTINGS_OVERLAY_STYLE}>
+                  <div>
+                    <div className="text-[14px] font-semibold text-[var(--text-primary)] break-all font-mono">{meta.name}</div>
+                    <div className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">{meta.description}</div>
+                  </div>
+                  <div className="mt-3 flex justify-between items-center">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)] bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full border">
+                      {pick('就绪', 'Ready')}
+                    </span>
+                    <button
+                      type="button"
+                      className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer"
+                      onClick={() => {
+                        navigator.clipboard.writeText(modelId);
+                        notify.success(pick('复制成功', 'Copied'), modelId);
+                      }}
+                    >
+                      {pick('复制ID', 'Copy ID')}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </SettingsSection>
+    );
+  };
+
+  const renderAdvancedPanels = () => {
+    if (!showAdvancedWorkbench) return null;
+    return (
+      <>
+        <ApiWorkbenchOverviewSection
+          pick={pick}
+          workbenchStatusLabel={workbenchStatusLabel}
+          workbenchTone={workbenchTone}
+          userApiPersistenceWarning={userApiPersistenceWarning}
+          isHydratingRuntimeUserApis={isHydratingRuntimeUserApis}
+          snapshotHydrationHelper={snapshotHydrationHelper}
+          attentionCount={attentionCount}
+          connectedChannels={connectedChannels}
+          officialActiveCount={officialSlots.filter((slot) => !slot.disabled).length}
+          activeProviders={activeProviders}
+          budgetCount={budgetCount}
+          activeTab={activeTab}
+        />
+
+        <ApiWorkbenchStageSection
+          pick={pick}
+          showDiagnostics={showDiagnostics}
+          onToggleDiagnostics={handleToggleDiagnostics}
+          stage={userApiWorkbenchStage}
+          stageTone={stageTone}
+          stageTitle={stageTitle}
+          stageDescription={stageDescription}
+          stageInteractionLabel={stageInteractionLabel}
+          stageNextActionLabel={stageNextActionLabel}
+          stageBannerStyle={stageBannerStyle}
+          primaryActionIcon={stagePrimaryActionIcon}
+          primaryActionTone={stagePrimaryActionTone}
+          onPrimaryAction={handleStagePrimaryAction}
+          primaryActionLoading={busy === 'cloud-refresh'}
+          primaryActionTestId="api-workbench-primary-action"
+          isUsingReadonlyProfileFallback={isUsingReadonlyProfileFallback}
+          runtimeRouteCount={runtimeOfficialSlots.length + runtimeThirdPartyProviders.length}
+        />
+
+        <ApiWorkbenchRoutePoolSection
+          pick={pick}
+          items={routePoolItems}
+        />
+
+        <ApiWorkbenchCapabilitySection
+          pick={pick}
+          items={capabilityCards}
+          customRoutingEnabled={customRoutingEnabled}
+          onCustomRoutingToggle={handleCustomRoutingToggle}
+        />
+
+        <SettingsSection
+          title={pick('更多高级项', 'More advanced items')}
+          eyebrow={pick('高级分层', 'Advanced layers')}
+          description={pick(
+            '诊断、OCR 和平台入口收在这里，避免默认高级模式过于拥挤。',
+            'Diagnostics, OCR, and platform tools stay here so advanced mode remains focused.',
+          )}
+          action={(
+            <SettingsActionButton
+              icon={showAdvancedDetails ? Layers3 : ChevronDown}
+              tone={showAdvancedDetails ? 'primary' : 'secondary'}
+              onClick={() => setShowAdvancedDetails((current) => !current)}
+            >
+              {showAdvancedDetails ? pick('收起更多高级项', 'Hide more advanced items') : pick('更多高级项', 'More advanced items')}
+            </SettingsActionButton>
+          )}
+        >
+          {showAdvancedDetails ? (
+            <div className="space-y-4">
+              {showDiagnostics ? (
+                <ApiWorkbenchDiagnosticsSection
+                  pick={pick}
+                  diagnosticsActionDisabled={diagnosticsRefreshDisabled}
+                  onRefreshDiagnostics={() => void refreshApiHealth(true)}
+                  apiReachable={apiHealth?.reachable}
+                  apiErrorMessage={apiHealth?.errorMessage}
+                  persistenceWritable={Boolean(apiHealth?.persistence.userApiKeys)}
+                  isAuthenticated={hasAuthenticatedUser}
+                  hasReadonlySnapshot={hasReadonlySnapshot}
+                />
+              ) : null}
+
+              <ApiWorkbenchOcrSection
+                pick={pick}
+                enabled={ocrSettings.enabled}
+                defaultLanguage={ocrSettings.defaultLanguage}
+                keySourceLabel={ocrKeySourceLabel}
+                healthLabel={ocrHealthLabel}
+                onEnabledChange={(enabled) => setOcrSettings(updateOcrServiceSettings({ enabled }))}
+                onDefaultLanguageChange={(defaultLanguage) => setOcrSettings(updateOcrServiceSettings({ defaultLanguage }))}
+              />
+
+              <ApiWorkbenchPlatformSection
+                pick={pick}
+                onOpenPlatformAssistant={handleOpenPlatformAssistant}
+              />
+
+              <ApiWorkbenchCurrentViewSection
+                pick={pick}
+                activeTab={activeTab}
+                onChangeTab={(value) => setActiveTab(value)}
+                latencyCards={latencyCards}
+                formatLatency={formatLatency}
+              />
+
+              <SegmentedControl
+                options={[
+                  { value: 'official', label: pick('本地 API', 'Local APIs') },
+                  { value: 'third-party', label: pick('第三方供应商', 'Third-party providers') },
+                ]}
+                value={activeTab}
+                onChange={(value) => setActiveTab(value as TabType)}
+              />
+            </div>
+          ) : (
+            <div className="text-[13px] text-[var(--text-secondary)]">
+              {pick('需要时再展开诊断、OCR 和平台配置。', 'Expand this only when you need diagnostics, OCR, or platform-level controls.')}
+            </div>
+          )}
+        </SettingsSection>
+      </>
+    );
+  };
+
   if (officialRouteMissing) {
     return (
       <SettingsViewShell>
@@ -2436,7 +2807,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           icon={Shield}
           tone="amber"
           actions={
-            <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>
+            <SettingsActionButton data-testid="api-official-editor-back" icon={ArrowLeft} onClick={cancelEdit}>
               {pick('返回接口列表', 'Back to endpoints')}
             </SettingsActionButton>
           }
@@ -2473,7 +2844,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           icon={Globe}
           tone="amber"
           actions={
-            <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>
+            <SettingsActionButton data-testid="api-provider-editor-back" icon={ArrowLeft} onClick={cancelEdit}>
               {pick('返回供应商列表', 'Back to providers')}
             </SettingsActionButton>
           }
@@ -2499,140 +2870,12 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
   return (
     <SettingsViewShell>
-      {activeEditorMode === 'official' ? (
-        <SettingsHero
-          eyebrow={pick('接口编辑', 'Endpoint editor')}
-          title={editingOfficialId ? getOfficialDisplayName(officialForm.provider) : pick('新增本地 API', 'Add local API')}
-          description={
-            editingOfficialId
-              ? pick('只编辑当前这条本地 API。', 'Edit only this local API.')
-              : pick('在独立页面新增本地 API。', 'Create a local API in a focused editor.')
-          }
-          icon={Plus}
-          tone={selectedOfficialSlot ? getOfficialStatus(selectedOfficialSlot).badge : 'indigo'}
-          badge={
-            <SettingsBadge tone={editingOfficialId ? 'indigo' : 'emerald'}>
-              {editingOfficialId ? pick('编辑模式', 'Edit mode') : pick('新增模式', 'Create mode')}
-            </SettingsBadge>
-          }
-          actions={
-            <>
-              <SettingsActionButton data-testid="api-official-editor-back" icon={ArrowLeft} onClick={cancelEdit}>
-                {pick('返回接口列表', 'Back to endpoints')}
-              </SettingsActionButton>
-              {selectedOfficialSlot ? (
-                <SettingsActionButton
-                  icon={RefreshCw}
-                  disabled={routeDiagnosticsActionDisabled}
-                  loading={busy === `official-check:${selectedOfficialSlot.id}`}
-                  onClick={() => void refreshOfficial(selectedOfficialSlot)}
-                >
-                  {pick('刷新连通性', 'Refresh connectivity')}
-                </SettingsActionButton>
-              ) : null}
-            </>
-          }
-          metrics={
-            <>
-              <SettingsMetricCard
-                label={pick('当前接口', 'Current endpoint')}
-                value={getOfficialDisplayName(officialForm.provider)}
-                helper={editingOfficialId ? pick('你现在编辑的是这一条本地 API', 'You are editing this local API now') : pick('保存后会加入本地 API 列表', 'After saving it will join the local API list')}
-                icon={Key}
-                tone="indigo"
-              />
-              <SettingsMetricCard
-                label={pick('服务商', 'Provider')}
-                value={getOfficialDisplayName(officialForm.provider)}
-                helper={getOfficialProviderLabel(officialForm.provider)}
-                icon={Shield}
-                tone="indigo"
-              />
-              <SettingsMetricCard
-                label={pick('预算策略', 'Budget rule')}
-                value={getModeLabel(officialForm.mode)}
-                helper={getLimitValueLabel(officialForm.mode, positive(officialForm.value) ?? undefined)}
-                icon={Layers3}
-                tone={officialForm.mode === 'unlimited' ? 'neutral' : 'amber'}
-              />
-              <SettingsMetricCard
-                label={pick('最近检测', 'Latest check')}
-                value={selectedOfficialSlot ? formatLatency(selectedOfficialSlot.lastResponseTime ?? selectedOfficialSlot.avgResponseTime ?? null) : pick('待保存', 'Not saved yet')}
-                helper={selectedOfficialSlot ? formatDateTime(selectedOfficialSlot.lastUsed || selectedOfficialSlot.updatedAt || selectedOfficialSlot.createdAt) : pick('新增后可进行连通检测', 'Connectivity checks are available after creation')}
-                icon={Clock3}
-                tone={selectedOfficialSlot ? getOfficialStatus(selectedOfficialSlot).badge : 'neutral'}
-              />
-            </>
-          }
-        />
-      ) : null}
-
-      {activeEditorMode === 'third-party' ? (
-        <SettingsHero
-          eyebrow={pick('供应商编辑', 'Provider editor')}
-          title={editingProviderId ? providerForm.name.trim() || pick('未命名供应商', 'Unnamed provider') : pick('新增供应商', 'New provider')}
-          description={
-            editingProviderId
-              ? pick('只编辑当前这家供应商。', 'Edit only this provider.')
-              : pick('在独立页面新增供应商。', 'Create a provider in a focused editor.')
-          }
-          icon={Globe}
-          tone={selectedProvider ? getProviderStatus(selectedProvider).badge : providerForm.isActive ? 'emerald' : 'neutral'}
-          badge={
-            <SettingsBadge tone={editingProviderId ? 'indigo' : 'emerald'}>
-              {editingProviderId ? pick('编辑模式', 'Edit mode') : pick('新增模式', 'Create mode')}
-            </SettingsBadge>
-          }
-          actions={
-            <>
-              <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>
-                {pick('返回供应商列表', 'Back to providers')}
-              </SettingsActionButton>
-            </>
-          }
-          metrics={
-            <>
-              <SettingsMetricCard
-                label={pick('当前供应商', 'Current provider')}
-                value={providerForm.name.trim() || pick('未命名供应商', 'Unnamed provider')}
-                helper={editingProviderId ? pick('你现在编辑的是这一家供应商', 'You are editing this provider now') : pick('保存后会加入供应商列表', 'After saving it will join the provider list')}
-                icon={Globe}
-                tone="indigo"
-              />
-              <SettingsMetricCard
-                label={pick('基础地址', 'Base URL')}
-                value={extractDomain(providerForm.baseUrl)}
-                helper={pick('连通检测、模型拉取和价格同步都会使用这里', 'Connectivity checks, model sync, and pricing sync all use this URL')}
-                icon={Key}
-                tone="neutral"
-              />
-              <SettingsMetricCard
-                label={pick('通信协议', 'Protocol')}
-                value={getProtocolLabel(providerForm.format)}
-                helper={pick('决定请求结构、模型识别和价格同步方式', 'Determines request shape, model detection, and pricing sync behavior')}
-                icon={Layers3}
-                tone="indigo"
-              />
-              <SettingsMetricCard
-                label={pick('调度状态', 'Scheduling')}
-                value={providerForm.isActive ? pick('参与调度', 'Included in routing') : pick('暂停调度', 'Routing paused')}
-                helper={selectedProvider ? formatDateTime(selectedProvider.lastChecked || selectedProvider.updatedAt) : pick('保存后可继续做检测和价格同步', 'Checks and pricing sync are available after saving')}
-                icon={Clock3}
-                tone={providerForm.isActive ? 'emerald' : 'neutral'}
-              />
-            </>
-          }
-        />
-      ) : null}
-
-      {activeEditorMode === null ? (
-        <>
-          <SettingsHero
+      <SettingsHero
         eyebrow={pick('简约配置', 'Simple setup')}
-        title={pick('API 配置', 'API setup')}
+        title={pick('模型管理中心', 'Model center')}
         description={pick(
-          '默认只显示添加入口和已配置供应商。',
-          'The default view shows only add actions and configured provider cards.'
+          '管理官方直连或第三方供应商通道，并在此进行能力分配。',
+          'Manage official direct routes or third-party provider channels and assign capability roles.'
         )}
         icon={Key}
         tone={workbenchTone}
@@ -2667,401 +2910,181 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         }
       />
 
-      {showAdvancedWorkbench ? (
+      {activeEditorMode === null ? (
         <>
-          <ApiWorkbenchOverviewSection
+          <ApiWorkbenchModelCenterSection
             pick={pick}
-            workbenchStatusLabel={workbenchStatusLabel}
-            workbenchTone={workbenchTone}
-            userApiPersistenceWarning={userApiPersistenceWarning}
-            isHydratingRuntimeUserApis={isHydratingRuntimeUserApis}
-            snapshotHydrationHelper={snapshotHydrationHelper}
-            attentionCount={attentionCount}
-            connectedChannels={connectedChannels}
-            officialActiveCount={officialSlots.filter((slot) => !slot.disabled).length}
-            activeProviders={activeProviders}
-            budgetCount={budgetCount}
-            activeTab={activeTab}
-          />
-
-          <ApiWorkbenchStageSection
-            pick={pick}
-            showDiagnostics={showDiagnostics}
-            onToggleDiagnostics={handleToggleDiagnostics}
-            stage={userApiWorkbenchStage}
-            stageTone={stageTone}
-            stageTitle={stageTitle}
-            stageDescription={stageDescription}
-            stageInteractionLabel={stageInteractionLabel}
-            stageNextActionLabel={stageNextActionLabel}
-            stageBannerStyle={stageBannerStyle}
-            primaryActionIcon={stagePrimaryActionIcon}
-            primaryActionTone={stagePrimaryActionTone}
-            onPrimaryAction={handleStagePrimaryAction}
-            primaryActionLoading={busy === 'cloud-refresh'}
-            primaryActionTestId="api-workbench-primary-action"
-            isUsingReadonlyProfileFallback={isUsingReadonlyProfileFallback}
-            runtimeRouteCount={runtimeOfficialSlots.length + runtimeThirdPartyProviders.length}
-          />
-
-          <ApiWorkbenchRoutePoolSection
-            pick={pick}
-            items={routePoolItems}
-          />
-
-          <ApiWorkbenchCapabilitySection
-            pick={pick}
-            items={capabilityCards}
-          />
-
-          <SettingsSection
-            title={pick('更多高级项', 'More advanced items')}
-            eyebrow={pick('高级分层', 'Advanced layers')}
-            description={pick(
-              '诊断、OCR 和平台入口收在这里，避免默认高级模式过于拥挤。',
-              'Diagnostics, OCR, and platform tools stay here so advanced mode remains focused.',
+            routes={modelCenterRoutes}
+            presets={modelCenterPresets}
+            connectedSummary={connectedChannels > 0 ? pick(`${connectedChannels} 条链路`, `${connectedChannels} routes`) : pick('等待接入', 'Waiting')}
+            autoRoutingSummary={pick(
+              '默认自动优先使用预算金额或 Tokens 上限最高的可用通道。',
+              'By default, routing prefers the available channel with the highest budget or token limit.',
             )}
-            action={(
-              <SettingsActionButton
-                icon={showAdvancedDetails ? Layers3 : ChevronDown}
-                tone={showAdvancedDetails ? 'primary' : 'secondary'}
-                onClick={() => setShowAdvancedDetails((current) => !current)}
-              >
-                {showAdvancedDetails ? pick('收起更多高级项', 'Hide more advanced items') : pick('更多高级项', 'More advanced items')}
-              </SettingsActionButton>
-            )}
-          >
-            {showAdvancedDetails ? (
-              <div className="space-y-4">
-                {showDiagnostics ? (
-                  <ApiWorkbenchDiagnosticsSection
-                    pick={pick}
-                    diagnosticsActionDisabled={diagnosticsRefreshDisabled}
-                    onRefreshDiagnostics={() => void refreshApiHealth(true)}
-                    apiReachable={apiHealth?.reachable}
-                    apiErrorMessage={apiHealth?.errorMessage}
-                    persistenceWritable={Boolean(apiHealth?.persistence.userApiKeys)}
-                    isAuthenticated={hasAuthenticatedUser}
-                    hasReadonlySnapshot={hasReadonlySnapshot}
-                  />
-                ) : null}
-
-                <ApiWorkbenchOcrSection
-                  pick={pick}
-                  enabled={ocrSettings.enabled}
-                  defaultLanguage={ocrSettings.defaultLanguage}
-                  keySourceLabel={ocrKeySourceLabel}
-                  healthLabel={ocrHealthLabel}
-                  onEnabledChange={(enabled) => setOcrSettings(updateOcrServiceSettings({ enabled }))}
-                  onDefaultLanguageChange={(defaultLanguage) => setOcrSettings(updateOcrServiceSettings({ defaultLanguage }))}
-                />
-
-                <ApiWorkbenchPlatformSection
-                  pick={pick}
-                  onOpenPlatformAssistant={handleOpenPlatformAssistant}
-                />
-
-                <ApiWorkbenchCurrentViewSection
-                  pick={pick}
-                  activeTab={activeTab}
-                  onChangeTab={(value) => setActiveTab(value)}
-                  latencyCards={latencyCards}
-                  formatLatency={formatLatency}
-                />
-
-                <SegmentedControl
-                  options={[
-                    { value: 'official', label: pick('本地 API', 'Local APIs') },
-                    { value: 'third-party', label: pick('第三方供应商', 'Third-party providers') },
-                  ]}
-                  value={activeTab}
-                  onChange={(value) => setActiveTab(value as TabType)}
-                />
-              </div>
-            ) : (
-              <div className="text-[13px] text-[var(--text-secondary)]">
-                {pick('需要时再展开诊断、OCR 和平台配置。', 'Expand this only when you need diagnostics, OCR, or platform-level controls.')}
-              </div>
-            )}
-          </SettingsSection>
+            addOfficialDisabled={userApiActionsDisabled}
+            addProviderDisabled={providerActionsDisabled}
+            onAddOfficial={handleCreateOfficialAction}
+            onAddProvider={beginCreateProvider}
+          />
+          {renderAdvancedPanels()}
         </>
       ) : null}
 
-      {showSimpleProviderList || activeTab === 'official' ? (
-        <SettingsSection
-          title={showSimpleProviderList ? pick('API 供应商', 'API providers') : pick('本地 API', 'Local APIs')}
-          eyebrow={showSimpleProviderList ? pick('简约列表', 'Simple list') : pick('本地直连', 'Local direct routes')}
-          description={pick(
-            showSimpleProviderList ? '管理本地 API，并从一个入口添加官方直连或中转站。' : '管理本地直连接口。',
-            showSimpleProviderList ? 'Manage local APIs and add official routes or proxy providers from one entry.' : 'Manage your local direct routes.'
-          )}
-        >
-          <div className={showSimpleProviderList ? 'settings-api-default-layout' : 'space-y-3'}>
-            <div className={showSimpleProviderList ? 'settings-api-action-stage space-y-3' : 'space-y-3'}>
-            <div
-              data-testid="api-simple-provider-add"
-              className="settings-api-quick-add"
-              style={SETTINGS_OVERLAY_STYLE}
-            >
-              <div className="settings-api-quick-add__lead">
-                <div className="settings-api-quick-add__icon" style={SETTINGS_OVERLAY_STYLE}>
-                  <Plus size={18} />
-                </div>
-                <div className="min-w-0">
-                  <div className="settings-api-quick-add__title">
-                    {pick('添加 API', 'Add API')}
-                  </div>
-                  <div className="settings-api-quick-add__copy">
-                    {pick('官方直连使用内置地址；中转站需要供应商名称、请求地址和 API Key。', 'Official routes use built-in URLs. Proxy providers need a name, request URL, and API key.')}
-                  </div>
-                </div>
-              </div>
-              <div className="settings-api-quick-add__actions">
-                <SettingsActionButton
-                  data-testid="api-official-provider-add"
-                  icon={Shield}
-                  tone="primary"
-                  size="sm"
-                  disabled={userApiActionsDisabled}
-                  onClick={handleCreateOfficialAction}
-                >
-                  {pick('官方直连', 'Official route')}
-                </SettingsActionButton>
-                <SettingsActionButton
-                  data-testid="api-proxy-provider-add"
-                  icon={Globe}
-                  tone="secondary"
-                  size="sm"
-                  disabled={providerActionsDisabled}
-                  onClick={beginCreateProvider}
-                >
-                  {pick('中转站', 'Proxy')}
-                </SettingsActionButton>
-              </div>
+      {activeEditorMode !== null ? (
+      <div className="api-workbench-master-detail-layout flex flex-col lg:flex-row gap-6 w-full items-start mt-6" style={{ scrollbarGutter: 'stable' }}>
+        {/* 左栏：卡片形式的供应商列表 */}
+        <div className={`w-full lg:w-[320px] shrink-0 space-y-4 ${activeEditorMode !== null ? 'hidden lg:block' : 'block'}`}>
+          <div className="rounded-[24px] border p-4 space-y-3" style={SETTINGS_ELEVATED_STYLE}>
+            <div className="text-[14px] font-semibold text-[var(--text-primary)] px-1">{pick('API 供应商', 'API providers')}</div>
+            
+            {/* 添加通道的快速入口 */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className="flex items-center justify-center gap-1.5 py-2 px-3 text-xs rounded-xl border bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] transition-all cursor-pointer font-medium"
+                style={SETTINGS_OVERLAY_STYLE}
+                disabled={userApiActionsDisabled}
+                onClick={handleCreateOfficialAction}
+              >
+                <Shield size={14} />
+                <span>{pick('官方直连', 'Official')}</span>
+              </button>
+              <button
+                type="button"
+                className="flex items-center justify-center gap-1.5 py-2 px-3 text-xs rounded-xl border bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] transition-all cursor-pointer font-medium"
+                style={SETTINGS_OVERLAY_STYLE}
+                disabled={providerActionsDisabled}
+                onClick={beginCreateProvider}
+              >
+                <Globe size={14} />
+                <span>{pick('中转站', 'Proxy')}</span>
+              </button>
             </div>
 
-            {officialSlots.length > 0 || (showSimpleProviderList && thirdPartyProviders.length > 0) ? (
-            <div className={[
-              'settings-provider-grid',
-              !showAdvancedWorkbench ? 'settings-provider-grid--compact' : '',
-            ].filter(Boolean).join(' ')}>
+            {/* 列表容器，固定高度与滚动条 */}
+            <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1" style={{ scrollbarGutter: 'stable' }}>
+              {/* 官方直连通道列表 */}
               {officialSlots.map((slot) => {
-                const mode = getMode(slot.budgetLimit, slot.tokenLimit);
+                const isSelected = activeEditorMode === 'official' && routeOfficialId === slot.id;
                 const status = getOfficialStatus(slot);
-                const progress = getProgress(mode, mode === 'amount' ? slot.totalCost : slot.usedTokens || 0, slot.budgetLimit, slot.tokenLimit);
-                const usageSummary = getOfficialUsageSummary(slot);
-                const progressData = mode !== 'unlimited' ? { summary: usageSummary, percentage: progress } : undefined;
-                const effectiveOfficialModels = resolveEffectiveProviderModels({
-                  provider: slot.provider,
-                  baseUrl: slot.baseUrl || (slot.provider === 'Google' ? DEFAULT_GOOGLE_BASE_URL : DEFAULT_OPENAI_BASE_URL),
-                  format: slot.format,
-                  models: slot.supportedModels,
-                });
-
-                const prioritizedMetrics: ConsoleEndpointCardMetric[] = [
-                  {
-                    label: pick('预算策略', 'Budget rule'),
-                    value: getModeLabel(mode),
-                    helper: getLimitValueLabel(mode, mode === 'amount' ? slot.budgetLimit : slot.tokenLimit),
-                  },
-                  {
-                    label: pick('累计消耗', 'Total usage'),
-                    value: mode === 'tokens' ? formatTokens(slot.usedTokens || 0) : formatUsd(slot.totalCost),
-                    helper: usageSummary,
-                  },
-                  {
-                    label: pick('支持模型', 'Supported models'),
-                    value: `${effectiveOfficialModels.length}`,
-                    helper: effectiveOfficialModels.length > 0 ? pick('官方默认模型已内置', 'Built-in default models are ready') : pick('点击刷新后自动拉取', 'Refresh to fetch models'),
-                  },
-                  {
-                    label: pick('最近延迟', 'Latest latency'),
-                    value: formatLatency(slot.lastResponseTime ?? slot.avgResponseTime ?? null),
-                    helper: formatDateTime(slot.lastUsed || slot.updatedAt || slot.createdAt),
-                  },
-                ];
-
-                const avatar = (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border" style={SETTINGS_OVERLAY_STYLE}>
-                    <Shield size={18} className="text-[var(--text-primary)]" />
+                const isPaused = slot.disabled;
+                return (
+                  <div
+                    key={slot.id}
+                    onClick={() => startEditOfficial(slot)}
+                    className={`group relative flex items-center justify-between p-3 rounded-[18px] border transition-all cursor-pointer ${
+                      isSelected 
+                        ? 'border-indigo-500 bg-indigo-500/5 shadow-md shadow-indigo-500/5' 
+                        : 'hover:bg-[var(--bg-secondary)] border-[var(--border-primary)]'
+                    }`}
+                    style={SETTINGS_OVERLAY_STYLE}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border bg-[var(--bg-tertiary)] group-hover:scale-105 transition-transform" style={SETTINGS_OVERLAY_STYLE}>
+                        <Shield size={16} className={isPaused ? 'text-[var(--text-tertiary)]' : 'text-indigo-400'} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate">
+                          {getOfficialDisplayName(slot.provider === 'OpenAI' ? 'OpenAI' : 'Google')}
+                        </div>
+                        <div className="text-[11px] text-[var(--text-tertiary)] mt-0.5 truncate">
+                          {slot.provider === 'OpenAI' ? 'OpenAI Direct' : 'Gemini Direct'}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* 快捷启停与状态指示灯 */}
+                    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <div className={`h-2 w-2 rounded-full ${
+                        isPaused ? 'bg-[var(--text-tertiary)]' : status.status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
+                      }`} />
+                      <button
+                        type="button"
+                        className="p-1.5 rounded-lg border bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] transition-all cursor-pointer"
+                        style={SETTINGS_OVERLAY_STYLE}
+                        disabled={userApiActionsDisabled}
+                        onClick={() => void toggleOfficial(slot)}
+                        title={isPaused ? pick('启用', 'Enable') : pick('暂停', 'Pause')}
+                      >
+                        {isPaused ? <Play size={12} className="text-emerald-400" /> : <Pause size={12} className="text-amber-400" />}
+                      </button>
+                    </div>
                   </div>
                 );
-
-                return (
-                  <ConsoleEndpointCard
-                    key={slot.id}
-                    density={showAdvancedWorkbench ? 'normal' : 'compact'}
-                    cardRef={(node) => registerOfficialCardRef(slot.id, node)}
-                    title={getOfficialDisplayName(slot.provider === 'OpenAI' ? 'OpenAI' : 'Google')}
-                    subtitle={showAdvancedWorkbench
-                      ? (slot.provider === 'OpenAI' ? pick('OpenAI 官方接口', 'OpenAI official endpoint') : pick('谷歌官方接口', 'Google official endpoint'))
-                      : undefined}
-                    meta={showAdvancedWorkbench
-                      ? (
-                          isUsingReadonlyProfileFallback
-                            ? pick('只读回显：密钥已在服务端加密保存', 'Read-only view: secret is stored encrypted on the server')
-                            : pick('Key 预览：', 'Key preview:') + maskSecret(slot.key)
-                        )
-                      : undefined}
-                    avatar={avatar}
-                    status={status}
-                    metrics={showAdvancedWorkbench ? prioritizedMetrics : []}
-                    progress={showAdvancedWorkbench ? progressData : undefined}
-                    error={showAdvancedWorkbench ? slot.lastError : null}
-                    className={returnHighlight?.officialId === slot.id ? 'settings-provider-card--return-focus' : ''}
-                    actions={
-                      <>
-                        <SettingsActionButton icon={slot.disabled ? Play : Pause} size="sm" disabled={userApiActionsDisabled} onClick={() => void toggleOfficial(slot)}>
-                          {slot.disabled ? pick('启用', 'Enable') : pick('暂停', 'Pause')}
-                        </SettingsActionButton>
-                        <SettingsActionButton icon={Edit3} size="sm" disabled={userApiActionsDisabled} onClick={() => startEditOfficial(slot)}>{pick('编辑', 'Edit')}</SettingsActionButton>
-                        <SettingsActionButton icon={RefreshCw} size="sm" disabled={routeDiagnosticsActionDisabled} loading={busy === `official-check:${slot.id}`} onClick={() => void refreshOfficial(slot)}>{pick('刷新', 'Refresh')}</SettingsActionButton>
-                      </>
-                    }
-                  />
-                );
               })}
-              {showSimpleProviderList
-                ? thirdPartyProviders.map((provider) => {
-                    const status = getProviderStatus(provider);
-                    const avatar = (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl border text-[13px] font-semibold" style={{ ...SETTINGS_OVERLAY_STYLE, color: provider.providerColor || DEFAULT_PROVIDER_COLOR }}>
+
+              {/* 第三方供应商列表 */}
+              {thirdPartyProviders.map((provider) => {
+                const isSelected = activeEditorMode === 'third-party' && routeProviderId === provider.id;
+                const status = getProviderStatus(provider);
+                const isPaused = !provider.isActive;
+                const color = provider.providerColor || DEFAULT_PROVIDER_COLOR;
+                return (
+                  <div
+                    key={provider.id}
+                    onClick={() => startEditProvider(provider)}
+                    className={`group relative flex items-center justify-between p-3 rounded-[18px] border transition-all cursor-pointer ${
+                      isSelected 
+                        ? 'border-indigo-500 bg-indigo-500/5 shadow-md shadow-indigo-500/5' 
+                        : 'hover:bg-[var(--bg-secondary)] border-[var(--border-primary)]'
+                    }`}
+                    style={SETTINGS_OVERLAY_STYLE}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border bg-[var(--bg-tertiary)] text-[12px] font-bold group-hover:scale-105 transition-transform" style={{ ...SETTINGS_OVERLAY_STYLE, color }}>
                         {provider.name.charAt(0).toUpperCase()}
                       </div>
-                    );
-
-                    return (
-                      <ConsoleEndpointCard
-                        key={provider.id}
-                        density="compact"
-                        cardRef={(node) => registerProviderCardRef(provider.id, node)}
-                        title={provider.name}
-                        subtitle={undefined}
-                        meta={undefined}
-                        avatar={avatar}
-                        badges={null}
-                        status={status}
-                        metrics={[]}
-                        progress={undefined}
-                        error={null}
-                        footer={null}
-                        actions={
-                          <>
-                            <SettingsActionButton icon={provider.isActive ? Pause : Play} size="sm" disabled={providerActionsDisabled} onClick={() => void toggleProvider(provider)}>
-                              {provider.isActive ? pick('暂停', 'Pause') : pick('启用', 'Enable')}
-                            </SettingsActionButton>
-                            <SettingsActionButton icon={Edit3} size="sm" disabled={providerActionsDisabled} onClick={() => startEditProvider(provider)}>
-                              {pick('编辑', 'Edit')}
-                            </SettingsActionButton>
-                            <SettingsActionButton icon={RefreshCw} size="sm" disabled={routeDiagnosticsActionDisabled} loading={busy === `provider-check:${provider.id}`} onClick={() => void refreshProvider(provider)}>
-                              {pick('刷新', 'Refresh')}
-                            </SettingsActionButton>
-                          </>
-                        }
-                        className={[
-                          returnHighlight?.providerId === provider.id ? 'settings-provider-card--return-focus' : '',
-                          'settings-reference-card--soft',
-                        ].filter(Boolean).join(' ')}
-                      />
-                    );
-                  })
-                : null}
-            </div>
-            ) : null}
-            </div>
-            {showSimpleProviderList ? (
-              <div className="settings-api-info-stage settings-reference-card settings-reference-card--soft">
-                <div className="settings-reference-card__eyebrow">
-                  {pick('配置状态', 'Setup status')}
-                </div>
-                <div className="settings-reference-card__title">
-                  {connectedChannels > 0
-                    ? pick(`已接入 ${connectedChannels} 条链路`, `${connectedChannels} routes connected`)
-                    : pick('等待接入 API', 'Waiting for API routes')}
-                </div>
-                <div className="mt-2 text-[13px] leading-5 text-[var(--text-secondary)]">
-                  {pick(
-                    '默认页只保留添加和管理动作；诊断、路由池和 OCR 等信息在高级模式查看。',
-                    'The default view keeps add and management actions up front. Diagnostics, route pools, and OCR details live in advanced mode.',
-                  )}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </SettingsSection>
-      ) : (
-        <SettingsSection
-          title={pick('第三方供应商', 'Third-party providers')}
-          eyebrow={pick('第三方渠道', 'Third-party channels')}
-          description={pick(
-            '管理供应商、协议和价格同步。',
-            'Manage providers, protocols, and pricing sync.'
-          )}
-        >
-          {thirdPartyProviders.length === 0 ? (
-            <EmptyState
-              title={pick('当前还没有第三方供应商', 'No third-party providers yet')}
-              description={pick(
-                '先添加一个供应商。',
-                'Add a provider first.'
-              )}
-              action={<SettingsActionButton icon={Plus} tone="primary" disabled={providerActionsDisabled} onClick={beginCreateProvider}>{pick('新增供应商', 'New provider')}</SettingsActionButton>}
-            />
-          ) : (
-            <div className="settings-provider-grid settings-provider-grid--compact">
-              {thirdPartyProviders.map((provider) => {
-                const status = getProviderStatus(provider);
-                const prioritizedMetrics: ConsoleEndpointCardMetric[] = [];
-
-                const avatar = (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border text-[13px] font-semibold" style={{ ...SETTINGS_OVERLAY_STYLE, color: provider.providerColor || DEFAULT_PROVIDER_COLOR }}>
-                    {provider.name.charAt(0).toUpperCase()}
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate">
+                          {provider.name}
+                        </div>
+                        <div className="text-[11px] text-[var(--text-tertiary)] mt-0.5 truncate">
+                          {extractDomain(provider.baseUrl)}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* 快捷启停与状态指示灯 */}
+                    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <div className={`h-2 w-2 rounded-full ${
+                        isPaused ? 'bg-[var(--text-tertiary)]' : status.status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
+                      }`} />
+                      <button
+                        type="button"
+                        className="p-1.5 rounded-lg border bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] transition-all cursor-pointer"
+                        style={SETTINGS_OVERLAY_STYLE}
+                        disabled={providerActionsDisabled}
+                        onClick={() => void toggleProvider(provider)}
+                        title={isPaused ? pick('启用', 'Enable') : pick('暂停', 'Pause')}
+                      >
+                        {isPaused ? <Play size={12} className="text-emerald-400" /> : <Pause size={12} className="text-amber-400" />}
+                      </button>
+                    </div>
                   </div>
-                );
-
-                return (
-                  <ConsoleEndpointCard
-                    key={provider.id}
-                    density="compact"
-                    cardRef={(node) => registerProviderCardRef(provider.id, node)}
-                    title={provider.name}
-                    subtitle={undefined}
-                    meta={undefined}
-                    avatar={avatar}
-                    badges={null}
-                    status={status}
-                    metrics={prioritizedMetrics}
-                    progress={undefined}
-                    error={null}
-                    footer={null}
-                    actions={
-                      <>
-                        <SettingsActionButton icon={provider.isActive ? Pause : Play} size="sm" disabled={providerActionsDisabled} onClick={() => void toggleProvider(provider)}>
-                          {provider.isActive ? pick('暂停', 'Pause') : pick('启用', 'Enable')}
-                        </SettingsActionButton>
-                        <SettingsActionButton icon={Edit3} size="sm" disabled={providerActionsDisabled} onClick={() => startEditProvider(provider)}>
-                          {pick('编辑', 'Edit')}
-                        </SettingsActionButton>
-                        <SettingsActionButton icon={RefreshCw} size="sm" disabled={routeDiagnosticsActionDisabled} loading={busy === `provider-check:${provider.id}`} onClick={() => void refreshProvider(provider)}>
-                          {pick('刷新', 'Refresh')}
-                        </SettingsActionButton>
-                      </>
-                    }
-                    className={[
-                      returnHighlight?.providerId === provider.id ? 'settings-provider-card--return-focus' : '',
-                      'settings-reference-card--soft',
-                    ].filter(Boolean).join(' ')}
-                  />
                 );
               })}
             </div>
-          )}
-        </SettingsSection>
-      )}
-        </>
-      ) : null}
+          </div>
+        </div>
 
-      {showOfficialEditor ? (
+        {/* 右栏：表单编辑器、预设模型与能力路由配置 */}
+        <div className={`flex-1 min-w-0 space-y-6 ${activeEditorMode === null ? 'hidden lg:block' : 'block'}`}>
+          {activeEditorMode === null ? (
+            <>
+              <div className="rounded-[24px] border p-8 text-center" style={SETTINGS_ELEVATED_STYLE}>
+                <div className="inline-flex h-12 w-12 items-center justify-center rounded-full border mb-4 bg-[var(--bg-tertiary)]" style={SETTINGS_OVERLAY_STYLE}>
+                  <Key size={24} className="text-[var(--text-secondary)]" />
+                </div>
+                <div className="text-[16px] font-semibold text-[var(--text-primary)]">{pick('选择供应商开始配置', 'Select a provider to configure')}</div>
+                <div className="mt-2 text-[13px] text-[var(--text-secondary)] max-w-md mx-auto">
+                  {pick('在左侧列表中点击选择已有的官方直连或第三方供应商通道，或者点击“官方直连”/“中转站”以添加新通道。', 'Click a provider on the left list to edit, or click buttons to add a new channel.')}
+                </div>
+              </div>
+              {renderAdvancedPanels()}
+            </>
+          ) : null}
+            {showOfficialEditor ? (
+        <>
         <SettingsSection
           title={pick('本地 API 编辑器', 'Local API editor')}
           eyebrow={
@@ -3186,9 +3209,17 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             ) : null}
           </div>
         </SettingsSection>
+        {selectedOfficialSlot && renderPresetModelsCard(
+          pick('可用模型 Nexus', 'Available models'),
+          selectedOfficialSlot.supportedModels || [],
+          () => void refreshOfficial(selectedOfficialSlot),
+          busy === `official-check:${selectedOfficialSlot.id}`
+        )}
+        </>
       ) : null}
 
       {showProviderEditor ? (
+        <>
         <SettingsSection
           title={pick('供应商编辑器', 'Provider editor')}
           eyebrow={
@@ -3478,6 +3509,23 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             ) : null}
           </div>
         </SettingsSection>
+        {selectedProvider && renderPresetModelsCard(
+          pick('可用模型 Nexus', 'Available models'),
+          selectedProvider.models || [],
+          () => {
+            const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
+            if (matched) void refreshProvider(matched);
+          },
+          busy === `provider-check:${editingProviderId}`
+        )}
+        </>
+      ) : null}
+
+      {/* 开启高级视图时，在编辑通道底部渲染高级面板 */}
+      {activeEditorMode !== null && renderAdvancedPanels()}
+
+        </div>
+      </div>
       ) : null}
     </SettingsViewShell>
   );

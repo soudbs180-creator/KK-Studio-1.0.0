@@ -22,5 +22,5 @@ test('ApiSettingsView source does not retain mojibake literals or duplicated pro
   assert.ok(!source.includes("const UI_BUDGET_OPTIONS = ['Unlimited', 'Budget', UI_TOKEN_LIMIT_LABEL] as const;"));
   assert.ok(!source.includes("pick('\u8930\u64b3\u58a0\u93bf\u5d84\u7d94\u93c6\u509b\u6902\u93c3\u72b3\u7876\u7039\u5c7e\u579a\u9286?'"));
   assert.ok(!source.includes("pick('\u93bf\u5d84\u7d94\u6fb6\u8fab\u89e6'"));
-  assert.equal(metricsBlockMatches, 2);
+  assert.equal(metricsBlockMatches, 0);
 });

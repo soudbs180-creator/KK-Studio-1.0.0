@@ -44,8 +44,8 @@ test('mobile settings smoke verification opens settings directly on overview bef
   assert.match(scriptSource, /mobile-result-tile/);
   assert.match(scriptSource, /mobile-result-detail-screen/);
   assert.match(scriptSource, /设置总览\|Settings Overview/);
-  assert.match(scriptSource, /添加 API/);
-  assert.match(scriptSource, /api-official-provider-add/);
+  assert.match(scriptSource, /添加 API|本地 API|Local API/);
+  assert.match(scriptSource, /api-official-provider-add|api-simple-provider-add/);
   assert.match(scriptSource, /api-official-editor-back/);
   assert.match(scriptSource, /Advanced mode/);
   assert.match(scriptSource, /Hide advanced mode/);

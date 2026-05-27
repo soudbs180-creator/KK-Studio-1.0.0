@@ -109,6 +109,7 @@ test('LLMService uses the local user-route proxy first, falls back to cloud secu
 
 test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking server-side diagnostics', () => {
   const source = readSource('src/components/settings/ApiSettingsView.tsx');
+  const sectionSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
 
   assert.match(source, /const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';/);
   assert.match(source, /const isReadonlySecretPlaceholder = \(value\?: string \| null\) => String\(value \|\| ''\)\.trim\(\) === READONLY_SECRET_PLACEHOLDER;/);
@@ -157,12 +158,12 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /const routeDiagnosticsActionDisabled = diagnosticsAvailability\.routeActionsDisabled;/);
   assert.doesNotMatch(source, /const diagnosticsActionDisabled = !isAuthenticated \|\| apiHealth\?\.reachable === false;/);
   assert.doesNotMatch(source, /const headerPrimaryActionDisabled = activeTab === 'official' \? userApiActionsDisabled : providerActionsDisabled;/);
-  assert.match(source, /data-testid="api-official-provider-add"/);
+  assert.match(sectionSource, /data-testid="api-official-provider-add"/);
   assert.match(source, /onClick=\{handleCreateOfficialAction\}/);
   assert.doesNotMatch(source, /data-testid="api-official-empty-create"/);
-  assert.match(source, /action=\{<SettingsActionButton icon=\{Plus\} tone="primary" disabled=\{providerActionsDisabled\} onClick=\{beginCreateProvider\}>/);
-  assert.match(source, /<SettingsActionButton icon=\{Edit3\} size="sm" disabled=\{userApiActionsDisabled\} onClick=\{\(\) => startEditOfficial\(slot\)\}>/);
-  assert.match(source, /<SettingsActionButton icon=\{Edit3\} size="sm" disabled=\{providerActionsDisabled\} onClick=\{\(\) => startEditProvider\(provider\)\}>/);
+  assert.match(source, /onAddProvider=\{beginCreateProvider\}/);
+  assert.match(source, /onSelect: \(\) => startEditOfficial\(slot\)/);
+  assert.match(source, /onSelect: \(\) => startEditProvider\(provider\)/);
   assert.match(source, /<div className="rounded-\[22px\] border px-4 py-3 text-\[1[34]px\] leading-6 text-\[var\(--state-warning-text\)\]" style=\{SETTINGS_WARNING_STYLE\}>\s*\{userApiEditorReadOnlyHelper\}\s*<\/div>/);
   assert.match(source, /<SettingInput[\s\S]*?value=\{getOfficialDisplayName\(officialForm\.provider\)\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);
   assert.match(source, /<SettingSelect[\s\S]*?value=\{officialForm\.provider\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);

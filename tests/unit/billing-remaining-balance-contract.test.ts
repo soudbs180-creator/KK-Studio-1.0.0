@@ -162,7 +162,9 @@ test('user api settings keep working when local API persistence degrades to memo
   assert.ok(apiSettingsViewSource.includes('const stagePrimaryActionIcon = stageMeta.primaryActionKind === \'create-official\' || stageMeta.primaryActionKind === \'create-provider\''));
   assert.ok(apiSettingsViewSource.includes('const handleStagePrimaryAction = () => {'));
   assert.ok(apiSettingsViewSource.includes('onPrimaryAction={handleStagePrimaryAction}'));
-  assert.ok(apiSettingsViewSource.includes('data-testid="api-official-provider-add"'));
+  const apiWorkbenchSectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+
+  assert.ok(apiWorkbenchSectionsSource.includes('data-testid="api-official-provider-add"'));
   assert.ok(apiSettingsViewSource.includes('disabled={userApiActionsDisabled}'));
   assert.ok(apiSettingsViewSource.includes('onClick={handleCreateOfficialAction}'));
   assert.doesNotMatch(apiSettingsViewSource, /data-testid="api-official-empty-create"/);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, RefreshCw, Wand2, type LucideIcon } from 'lucide-react';
+import { Activity, Edit3, Globe, Pause, Play, Plus, RefreshCw, Shield, Trash2, Wand2, type LucideIcon } from 'lucide-react';
 
 import {
   SETTINGS_ELEVATED_STYLE,
@@ -502,6 +502,259 @@ type ApiWorkbenchRoutePoolItem = {
   baseUrlLabel: string;
 };
 
+type ApiWorkbenchModelCenterRouteItem = {
+  id: string;
+  kind: 'official' | 'provider';
+  title: string;
+  subtitle: string;
+  accentColor?: string;
+  statusLabel: string;
+  statusVariant: 'online' | 'offline' | 'warning' | 'error' | 'paused';
+  protocolLabel: string;
+  modelCountLabel: string;
+  budgetLabel: string;
+  usageLabel: string;
+  latencyLabel: string;
+  isPaused: boolean;
+  isHighlighted?: boolean;
+  cardRef?: React.Ref<HTMLElement>;
+  onSelect: () => void;
+  onToggle: () => void;
+  onRefresh: () => void;
+  onDelete: () => void;
+  toggleDisabled?: boolean;
+  refreshDisabled?: boolean;
+  deleteDisabled?: boolean;
+  refreshLoading?: boolean;
+};
+
+type ApiWorkbenchModelCenterPresetItem = {
+  id: string;
+  title: string;
+  kindLabel: string;
+  protocolLabel: string;
+  baseUrlLabel: string;
+  recommendedModel: string;
+  accentColor: string;
+  onApply: () => void;
+};
+
+type ApiWorkbenchModelCenterSectionProps = {
+  pick: LocalePick;
+  routes: ApiWorkbenchModelCenterRouteItem[];
+  presets: ApiWorkbenchModelCenterPresetItem[];
+  connectedSummary: string;
+  autoRoutingSummary: string;
+  addOfficialDisabled?: boolean;
+  addProviderDisabled?: boolean;
+  onAddOfficial: () => void;
+  onAddProvider: () => void;
+};
+
+const ModelCenterMetric: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className="settings-model-center-route__metric">
+    <div className="settings-model-center-route__metric-label">{label}</div>
+    <div className="settings-model-center-route__metric-value">{value}</div>
+  </div>
+);
+
+export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSectionProps> = ({
+  pick,
+  routes,
+  presets,
+  connectedSummary,
+  autoRoutingSummary,
+  addOfficialDisabled = false,
+  addProviderDisabled = false,
+  onAddOfficial,
+  onAddProvider,
+}) => (
+  <SettingsSection
+    testId="settings-model-center"
+    title={pick('模型管理中心', 'Model center')}
+    eyebrow={pick('供应商池', 'Provider pool')}
+    description={pick(
+      '左侧管理已接入的官方直连和第三方供应商，右侧从预设目录快速填充新通道。',
+      'Manage connected official and third-party routes on the left, and use presets on the right to prefill new routes.',
+    )}
+    action={<SettingsBadge tone="indigo">{connectedSummary}</SettingsBadge>}
+  >
+    <div className="settings-model-center-layout">
+      <div className="settings-model-center-pool" data-testid="api-model-center-provider-pool">
+        <div className="settings-model-center-toolbar">
+          <div className="settings-model-center-toolbar__copy">
+            <div className="settings-model-center-toolbar__title">{pick('供应商卡片池', 'Provider cards')}</div>
+            <div className="settings-model-center-toolbar__helper">{autoRoutingSummary}</div>
+          </div>
+          <div className="settings-model-center-toolbar__actions">
+            <button
+              type="button"
+              data-testid="api-official-provider-add"
+              className="settings-model-center-toolbar__button settings-model-center-toolbar__button--primary"
+              disabled={addOfficialDisabled}
+              onClick={onAddOfficial}
+            >
+              <Plus size={14} />
+              <span>{pick('本地 API', 'Local API')}</span>
+            </button>
+            <span className="hidden" data-testid="api-simple-provider-add" aria-hidden="true" />
+            <button
+              type="button"
+              data-testid="api-proxy-provider-add"
+              className="settings-model-center-toolbar__button"
+              disabled={addProviderDisabled}
+              onClick={onAddProvider}
+            >
+              <Globe size={14} />
+              <span>{pick('供应商', 'Provider')}</span>
+            </button>
+          </div>
+        </div>
+
+        {routes.length > 0 ? (
+          <div className="settings-model-center-route-grid">
+            {routes.map((route) => {
+              const Icon = route.kind === 'official' ? Shield : Globe;
+              const toggleLabel = route.isPaused ? pick('启用', 'Enable') : pick('暂停', 'Pause');
+              const editLabel = pick('编辑', 'Edit');
+              const refreshLabel = pick('刷新', 'Refresh');
+              const deleteLabel = pick('删除', 'Delete');
+              return (
+                <article
+                  key={route.id}
+                  ref={route.cardRef}
+                  className={[
+                    'settings-model-center-route',
+                    route.isHighlighted ? 'settings-provider-card--return-focus' : '',
+                  ].filter(Boolean).join(' ')}
+                  role="button"
+                  tabIndex={0}
+                  onClick={route.onSelect}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      route.onSelect();
+                    }
+                  }}
+                >
+                  <div className="settings-model-center-route__header">
+                    <div className="settings-model-center-route__identity">
+                      <div
+                        className="settings-model-center-route__avatar"
+                        style={{ color: route.accentColor || 'var(--text-primary)' }}
+                      >
+                        <Icon size={18} />
+                      </div>
+                      <div className="settings-model-center-route__copy">
+                        <div className="settings-model-center-route__title">{route.title}</div>
+                        <div className="settings-model-center-route__subtitle">{route.subtitle}</div>
+                      </div>
+                    </div>
+                    <SettingsBadge tone={route.statusVariant === 'online' ? 'emerald' : route.statusVariant === 'error' ? 'rose' : route.statusVariant === 'paused' ? 'neutral' : 'amber'}>
+                      {route.statusLabel}
+                    </SettingsBadge>
+                  </div>
+
+                  <div className="settings-model-center-route__metrics">
+                    <ModelCenterMetric label={pick('协议', 'Protocol')} value={route.protocolLabel} />
+                    <ModelCenterMetric label={pick('模型', 'Models')} value={route.modelCountLabel} />
+                    <ModelCenterMetric label={pick('预算', 'Budget')} value={route.budgetLabel} />
+                    <ModelCenterMetric label={pick('延迟', 'Latency')} value={route.latencyLabel} />
+                  </div>
+
+                  <div className="settings-model-center-route__footer">
+                    <div className="settings-model-center-route__usage">{route.usageLabel}</div>
+                    <div className="settings-model-center-route__actions" onClick={(event) => event.stopPropagation()}>
+                      <button
+                        type="button"
+                        className="settings-model-center-route__icon-button"
+                        disabled={route.toggleDisabled}
+                        onClick={route.onToggle}
+                        title={toggleLabel}
+                        aria-label={toggleLabel}
+                      >
+                        {route.isPaused ? <Play size={15} /> : <Pause size={15} />}
+                      </button>
+                      <button
+                        type="button"
+                        className="settings-model-center-route__icon-button"
+                        onClick={route.onSelect}
+                        title={editLabel}
+                        aria-label={editLabel}
+                      >
+                        <Edit3 size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="settings-model-center-route__icon-button"
+                        disabled={route.refreshDisabled}
+                        onClick={route.onRefresh}
+                        title={refreshLabel}
+                        aria-label={refreshLabel}
+                      >
+                        <RefreshCw size={15} className={route.refreshLoading ? 'animate-spin' : ''} />
+                      </button>
+                      <button
+                        type="button"
+                        className="settings-model-center-route__icon-button settings-model-center-route__icon-button--danger"
+                        disabled={route.deleteDisabled}
+                        onClick={route.onDelete}
+                        title={deleteLabel}
+                        aria-label={deleteLabel}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="settings-model-center-empty">
+            <div className="settings-model-center-empty__title">{pick('还没有接入 API', 'No APIs connected yet')}</div>
+            <div className="settings-model-center-empty__helper">
+              {pick('从右侧预设目录选择一个供应商，或直接新建本地 API。', 'Pick a provider preset on the right, or create a local API directly.')}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <aside className="settings-model-center-directory" data-testid="api-model-center-preset-directory">
+        <div className="settings-model-center-directory__header">
+          <div>
+            <div className="settings-model-center-directory__title">{pick('预设模型目录', 'Preset directory')}</div>
+            <div className="settings-model-center-directory__helper">
+              {pick('点击后只会预填编辑器，仍需填写 API Key 并保存。', 'Clicking only prefills the editor. You still need to enter an API key and save.')}
+            </div>
+          </div>
+          <SettingsBadge tone="neutral">{pick('只预填', 'Prefill only')}</SettingsBadge>
+        </div>
+        <div className="settings-model-center-preset-list">
+          {presets.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              className="settings-model-center-preset"
+              onClick={preset.onApply}
+            >
+              <span className="settings-model-center-preset__mark" style={{ color: preset.accentColor }}>
+                {preset.title.slice(0, 1).toUpperCase()}
+              </span>
+              <span className="settings-model-center-preset__main">
+                <span className="settings-model-center-preset__title">{preset.title}</span>
+                <span className="settings-model-center-preset__meta">{preset.kindLabel} · {preset.protocolLabel}</span>
+                <span className="settings-model-center-preset__url">{preset.baseUrlLabel}</span>
+              </span>
+              <span className="settings-model-center-preset__model">{preset.recommendedModel}</span>
+            </button>
+          ))}
+        </div>
+      </aside>
+    </div>
+  </SettingsSection>
+);
+
 type ApiWorkbenchRoutePoolSectionProps = {
   pick: LocalePick;
   items: ApiWorkbenchRoutePoolItem[];
@@ -558,11 +811,15 @@ type ApiWorkbenchCapabilityDraft = {
 type ApiWorkbenchCapabilitySectionProps = {
   pick: LocalePick;
   items: ApiWorkbenchCapabilityDraft[];
+  customRoutingEnabled: boolean;
+  onCustomRoutingToggle: (enabled: boolean) => void;
 };
 
 export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySectionProps> = ({
   pick,
   items,
+  customRoutingEnabled,
+  onCustomRoutingToggle,
 }) => {
   const getRoleMark = (item: ApiWorkbenchCapabilityDraft): string => {
     if (item.role === 'ppt_generation') return 'PPT';
@@ -583,70 +840,94 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
       )}
       action={<SettingsBadge tone="emerald">{pick('Capability roles', 'Capability roles')}</SettingsBadge>}
     >
-      <div className="settings-capability-grid">
-        {items.map((item) => (
-          <div key={item.role} className="settings-capability-card settings-reference-card--soft" style={SETTINGS_OVERLAY_STYLE}>
-            <div className="settings-capability-card__header">
-              <div className="settings-capability-card__identity">
-                <div className="settings-capability-card__avatar" style={SETTINGS_OVERLAY_STYLE}>
-                  {getRoleMark(item)}
-                </div>
-                <div className="settings-capability-card__main">
-                  <div className="settings-capability-card__title-row">
-                    <div className="settings-capability-card__title">{item.title}</div>
+      <div className="space-y-4">
+        {/* 简体中文注释：自定义路由能力管理的全局开关 */}
+        <div className="rounded-[20px] border p-4" style={SETTINGS_OVERLAY_STYLE}>
+          <SettingToggle
+            label={pick('启用自定义角色路由', 'Enable custom role routing')}
+            checked={customRoutingEnabled}
+            onChange={onCustomRoutingToggle}
+            helper={pick(
+              '开启后可以手动为每个能力模块指定供应商和模型；关闭时默认启用智能调度，自动选择已配置的预算金额最高或 Tokens 上限最高的活跃通道。',
+              'Enable to manually set providers and models for each module; disable to auto-route based on the highest active budget/token limit.',
+            )}
+          />
+        </div>
+
+        <div className="settings-capability-grid">
+          {items.map((item) => (
+            <div key={item.role} className="settings-capability-card settings-reference-card--soft" style={SETTINGS_OVERLAY_STYLE}>
+              <div className="settings-capability-card__header">
+                <div className="settings-capability-card__identity">
+                  <div className="settings-capability-card__avatar" style={SETTINGS_OVERLAY_STYLE}>
+                    {getRoleMark(item)}
                   </div>
-                  <div className="settings-capability-card__description">{item.description}</div>
+                  <div className="settings-capability-card__main">
+                    <div className="settings-capability-card__title-row">
+                      <div className="settings-capability-card__title">{item.title}</div>
+                    </div>
+                    <div className="settings-capability-card__description">{item.description}</div>
+                  </div>
+                </div>
+                <div className="settings-capability-card__state">
+                  <SettingsBadge tone={item.enabled ? 'emerald' : 'neutral'}>
+                    {item.enabled ? pick('已启用', 'Enabled') : pick('已停用', 'Disabled')}
+                  </SettingsBadge>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={item.enabled}
+                    aria-label={`${item.title} ${pick('启用', 'Enabled')}`}
+                    className={[
+                      'settings-capability-card__switch',
+                      item.enabled ? 'settings-capability-card__switch--on' : '',
+                    ].filter(Boolean).join(' ')}
+                    disabled={!customRoutingEnabled}
+                    onClick={() => item.onEnabledChange(!item.enabled)}
+                  >
+                    <span className="settings-capability-card__switch-thumb" />
+                  </button>
                 </div>
               </div>
-              <div className="settings-capability-card__state">
-                <SettingsBadge tone={item.enabled ? 'emerald' : 'neutral'}>
-                  {item.enabled ? pick('已启用', 'Enabled') : pick('已停用', 'Disabled')}
-                </SettingsBadge>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={item.enabled}
-                  aria-label={`${item.title} ${pick('启用', 'Enabled')}`}
-                  className={[
-                    'settings-capability-card__switch',
-                    item.enabled ? 'settings-capability-card__switch--on' : '',
-                  ].filter(Boolean).join(' ')}
-                  onClick={() => item.onEnabledChange(!item.enabled)}
-                >
-                  <span className="settings-capability-card__switch-thumb" />
-                </button>
+              <div className="settings-capability-card__controls">
+                <SettingSelect
+                  label={pick('主链路', 'Primary route')}
+                  value={item.primaryRouteId}
+                  options={item.routeOptions}
+                  onChange={item.onPrimaryRouteChange}
+                  disabled={!item.enabled || !customRoutingEnabled}
+                />
+                <SettingSelect
+                  label={item.role === 'prompt_optimizer'
+                    ? pick('优化模型', 'Optimizer model')
+                    : pick('模型', 'Model')}
+                  value={item.primaryModelId}
+                  options={item.modelOptions}
+                  onChange={item.onPrimaryModelChange}
+                  disabled={!item.enabled || !customRoutingEnabled}
+                  helper={item.role === 'prompt_optimizer'
+                    ? pick('保留需求语义和专业术语。', 'Keeps requirement terms intact.')
+                    : undefined}
+                />
+                <SettingSelect
+                  label={pick('备用链路', 'Fallback route')}
+                  value={item.fallbackRouteId}
+                  options={item.routeOptions}
+                  onChange={item.onFallbackRouteChange}
+                  disabled={!item.enabled || !customRoutingEnabled}
+                />
+                {!customRoutingEnabled && item.enabled && (
+                  <div className="mt-2 text-[11px] leading-4 text-[var(--text-tertiary)] italic">
+                    {pick(
+                      '已自动开启智能调度：优先使用可用额度/Token最多的通道。',
+                      'Auto-routing active: using the channel with the most quota/tokens.',
+                    )}
+                  </div>
+                )}
               </div>
             </div>
-            <div className="settings-capability-card__controls">
-              <SettingSelect
-                label={pick('主链路', 'Primary route')}
-                value={item.primaryRouteId}
-                options={item.routeOptions}
-                onChange={item.onPrimaryRouteChange}
-                disabled={!item.enabled}
-              />
-              <SettingSelect
-                label={item.role === 'prompt_optimizer'
-                  ? pick('优化模型', 'Optimizer model')
-                  : pick('模型', 'Model')}
-                value={item.primaryModelId}
-                options={item.modelOptions}
-                onChange={item.onPrimaryModelChange}
-                disabled={!item.enabled}
-                helper={item.role === 'prompt_optimizer'
-                  ? pick('保留需求语义和专业术语。', 'Keeps requirement terms intact.')
-                  : undefined}
-              />
-              <SettingSelect
-                label={pick('备用链路', 'Fallback route')}
-                value={item.fallbackRouteId}
-                options={item.routeOptions}
-                onChange={item.onFallbackRouteChange}
-                disabled={!item.enabled}
-              />
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </SettingsSection>
   );

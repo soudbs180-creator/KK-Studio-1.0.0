@@ -878,7 +878,7 @@ async function invokeLocalUserRouteProxy(
 
   if (shouldRetryWithFreshSession) {
     console.warn(
-      `[secureModelProxy] ${failureLabel} returned 401/Invalid JWT, forcing session refresh before retry`,
+      `[secureModelProxy] Local user-route proxy returned 401/Invalid JWT, forcing session refresh before retry`,
     );
     try {
       const recoveredSession = await resolveCloudSession(feature, { forceRefresh: true, routeKind: 'user-route' });
