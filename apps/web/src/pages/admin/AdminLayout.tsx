@@ -23,6 +23,13 @@ export const AdminLayout: React.FC = () => {
     }
   }, [adminLevel, loading, navigate]);
 
+  useEffect(() => {
+    if (!loading && activeTab === "staff" && adminLevel !== 1) {
+      setActiveTab("recharge");
+      navigate("/admin");
+    }
+  }, [activeTab, adminLevel, loading, navigate]);
+
   // 如果还在加载，显示等待状态
   if (loading) {
     return (
@@ -38,10 +45,6 @@ export const AdminLayout: React.FC = () => {
   }
 
   // 访问人员管理限制（普通管理员不可越权访问）
-  if (activeTab === "staff" && adminLevel !== 1) {
-    setActiveTab("recharge");
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 p-8 font-sans">
       <div className="max-w-6xl mx-auto">

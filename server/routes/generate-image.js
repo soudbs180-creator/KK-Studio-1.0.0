@@ -31,7 +31,7 @@ const GenerateRequestSchema = z.object({
  * 图像生成中转 Express 路由处理器
  * 挂载后实际对应 POST /api/generate-image 端点
  */
-router.post('/generate-image', async (req, res) => {
+async function handleGenerateImage(req, res) {
   // 1. 统一 JWT 鉴权
   const userId = verifyJWT(req.headers.authorization);
   if (!userId) {
@@ -156,6 +156,10 @@ router.post('/generate-image', async (req, res) => {
       error: isServerSettlement ? "Image generation or edit failed. Credits refunded." : "Image generation or edit failed."
     });
   }
-});
+}
+
+router.post('/generate-image', handleGenerateImage);
+router.post('/generate/image', handleGenerateImage);
+router.post('/generate/edit', handleGenerateImage);
 
 module.exports = router;
