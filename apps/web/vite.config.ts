@@ -256,6 +256,15 @@ function shouldIgnoreWatchPath(targetPath: string): boolean {
         return true;
     }
 
+    // 🚀 [关键修复] 只要是项目状态文档或本地产生的媒体数据目录，无论其在何层级（包括 src/ 或 public/ 内），均直接忽略
+    if (
+        normalized.endsWith('/project.json')
+        || normalized.includes('/docs/')
+        || segments.some((segment) => WORKSPACE_DATA_DIRS.has(segment))
+    ) {
+        return true;
+    }
+
     if (
         normalized.includes('/src/') ||
         normalized.includes('/public/') ||
@@ -270,12 +279,7 @@ function shouldIgnoreWatchPath(targetPath: string): boolean {
         return false;
     }
 
-    if (normalized.endsWith('/project.json')) {
-        return true;
-    }
-
-    return normalized.includes('/docs/')
-        || segments.some((segment) => WORKSPACE_DATA_DIRS.has(segment));
+    return true;
 }
 
 function resolveManualChunk(id: string): string | undefined {

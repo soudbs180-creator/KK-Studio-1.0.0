@@ -20,6 +20,7 @@ test('ecommerce structured task flow is wired through analysis, generation, disp
   const optimizePromptSource = readSource('src/app/optimizeGenerationPrompt.ts');
   const postBuildSyncSource = readSource('src/app/useEcommercePostBuildSyncRuntime.ts');
   const optimizerSource = readSource('src/services/llm/promptOptimizerService.ts');
+  const optimizerRulebookSource = readSource('src/services/llm/promptOptimizerRulebook.ts');
   const generationHookSource = readSource('src/hooks/useImageGeneration.ts');
 
   assert.match(typesSource, /export interface EcommerceEditableTaskState/);
@@ -63,8 +64,8 @@ test('ecommerce structured task flow is wired through analysis, generation, disp
 
   assert.match(imageCardSource, /image\.displayLabel \|\| /);
   assert.match(optimizePromptSource, /const optimized = await optimizePromptForImage\(rawPrompt,\s*\{/);
-  assert.match(optimizerSource, /ecommerceContext\?:/);
-  assert.match(optimizerSource, /Structured ecommerce context:/);
+  assert.match(optimizerRulebookSource, /ecommerceContext\?:/);
+  assert.match(optimizerRulebookSource, /Structured ecommerce context to preserve:/);
   assert.match(generationHookSource, /ecommerceDeliveryKind:/);
   assert.match(generationHookSource, /activeDeliveryKind/);
   assert.match(generationHookSource, /inheritedDeliveryKind/);

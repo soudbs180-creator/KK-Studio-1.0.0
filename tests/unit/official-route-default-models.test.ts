@@ -45,8 +45,8 @@ test("keyManager does not treat custom OpenAI-compatible proxy URLs as official 
 test("ApiSettingsView no longer tells official routes to fetch models before they are usable", () => {
   const source = readSource("src/components/settings/ApiSettingsView.tsx");
 
-  assert.match(source, /const effectiveOfficialModels = resolveEffectiveProviderModels\(/);
-  assert.match(source, /helper: effectiveOfficialModels\.length > 0\s*\? pick\('官方默认模型已内置', 'Built-in default models are ready'\)/);
+  assert.match(source, /const effectiveModels = resolveEffectiveProviderModels\(/);
+  assert.match(source, /modelCountLabel: String\(effectiveModels\.length \|\| slot\.supportedModels\?\.length \|\| 0\)/);
   assert.doesNotMatch(source, /helper: slot\.supportedModels\.length > 0 \? pick\('已自动识别模型列表', 'Auto detected models list'\) : pick\('点击刷新后自动拉取', 'Refresh to fetch models'\)/);
 });
 

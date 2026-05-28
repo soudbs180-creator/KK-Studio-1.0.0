@@ -159,7 +159,7 @@ export function useEcommerceNodeGenerationRuntime({
       optimizedPromptZh,
       promptOptimizerResult,
     } = await optimizeGenerationPrompt({
-      enabled: enablePromptOptimization && !!nextPrompt,
+      enabled: enablePromptOptimization && !!nextPrompt && renderTask?.taskState.promptAssistState?.optimized === true,
       rawPrompt: nextPrompt,
       referenceImages: latestNode.referenceImages || [],
       options: {
@@ -199,7 +199,18 @@ export function useEcommerceNodeGenerationRuntime({
       aspectRatio: nextAspectRatio,
       ecommerce: {
         ...latestNode.ecommerce,
-        editableTask: renderTask?.taskState || latestNode.ecommerce.editableTask,
+        editableTask: renderTask?.taskState
+          ? {
+              ...renderTask.taskState,
+              promptAssistState: renderTask.taskState.promptAssistState?.optimized
+                ? {
+                    ...renderTask.taskState.promptAssistState,
+                    source: promptOptimizerResult ? 'manual' : renderTask.taskState.promptAssistState.source,
+                    updatedAt: promptOptimizerResult ? Date.now() : renderTask.taskState.promptAssistState.updatedAt,
+                  }
+                : renderTask.taskState.promptAssistState,
+            }
+          : latestNode.ecommerce.editableTask,
         displayLabel: renderTask?.displayLabel || latestNode.ecommerce.displayLabel,
         currentAspectRatio: nextAspectRatio,
         activeDeliveryKind,
@@ -281,7 +292,7 @@ export function useEcommerceNodeGenerationRuntime({
       stagePatch: { mobileStage: 'generating' },
       successPatch: { mobileStage: 'generated' },
       failurePatch: { mobileStage: 'failed' },
-      promptSuffix: '将这个 A+ 画面转换成 600*450 手机端版本，排版更紧凑，保持主体、文案、风格与画面逻辑一致。',
+      promptSuffix: '请把这张 A+ 桌面版画面改成 4:3 手机端版本。产品主体、文案内容、品牌风格、色调和核心场景保持一致；只根据 4:3 比例重新压缩布局，让画面更紧凑、更适合手机浏览。不要更换产品，不要改文案，不要改变主视觉风格。继续按照 @产品主图、@风格参考 等参考图职责执行。',
     });
   }, [runEcommerceNodeGeneration]);
 

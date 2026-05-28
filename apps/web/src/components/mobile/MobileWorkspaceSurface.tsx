@@ -6,7 +6,7 @@ import { useAdminRole } from '../../hooks/useAdminRole';
 import type {
   MobileResultEntry,
   MobileSurfaceScreen,
-  PartialRedrawRequest,
+  RedrawRequest,
   ResponsiveSurface,
   ResultViewMode,
 } from '../../types';
@@ -40,7 +40,7 @@ export interface MobileWorkspaceSurfaceProps {
   onEntryOpen: (entryId: string) => void;
   onPreviewImage: (imageId: string) => void;
   onUseResultAsSource: (imageId: string) => void;
-  onPartialRedraw: (entry: MobileResultEntry, request: PartialRedrawRequest) => void;
+  onPartialRedraw: (entry: MobileResultEntry, request: RedrawRequest) => void;
   onDownloadEntry: (entry: MobileResultEntry) => void;
   onDeleteImage: (imageId: string) => void;
   onEditEcommerceTask: (entry: MobileResultEntry) => void;
@@ -49,6 +49,9 @@ export interface MobileWorkspaceSurfaceProps {
   onToggleEcommerceSelected: (entry: MobileResultEntry, selected: boolean) => void;
   composer: React.ReactNode;
   overlays?: React.ReactNode;
+  isLoading?: boolean;
+  workspaceSurface?: 'workspace' | 'library';
+  onCloseHistory?: () => void;
 }
 
 // 磨砂玻璃风格按钮样式定义，带背景和边框的半透明组合
@@ -88,6 +91,9 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   onToggleEcommerceSelected,
   composer,
   overlays,
+  isLoading = false,
+  workspaceSurface = 'workspace',
+  onCloseHistory,
 }) => {
   const { state, activeCanvas, switchCanvas, createCanvas, canCreateCanvas } = useCanvas();
   // 🚀 [移动端专属] 提取真实的用户角色，以在头部用户名右侧进行徽章渲染
@@ -137,7 +143,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   );
 
   const feed = (
-    <div className="h-full pt-1.5">
+    <div className="h-full pt-1.5 flex flex-col min-h-0">
       <MobileResultFeed
         resultEntries={resultEntries}
         activeEntryId={activeEntryId}
@@ -147,6 +153,9 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
         onViewModeChange={setResultViewMode}
         onEntryOpen={onEntryOpen}
         onUseAsSource={onUseResultAsSource}
+        isLoading={isLoading}
+        isHistoryView={workspaceSurface === 'library'}
+        onCloseHistory={onCloseHistory}
       />
     </div>
   );

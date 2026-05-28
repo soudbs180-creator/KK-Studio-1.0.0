@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
+import { Search, X, ArrowLeft } from 'lucide-react';
 
 import type { MobileResultEntry, ResponsiveSurface, ResultViewMode } from '../../types';
 import { useLocale } from '../../context/LocaleContext';
@@ -17,7 +18,38 @@ interface MobileResultFeedProps {
   onViewModeChange: (viewMode: ResultViewMode) => void;
   onEntryOpen: (entryId: string) => void;
   onUseAsSource: (imageId: string) => void;
+  isLoading?: boolean;
+  isHistoryView?: boolean;
+  onCloseHistory?: () => void;
 }
+
+// 简体中文：搜索无结果时显示的精致空状态组件
+const MobileResultSearchEmptyState: React.FC<{ query: string; onClear: () => void }> = ({ query, onClear }) => {
+  const { pick } = useLocale();
+  return (
+    <div
+      data-testid="mobile-result-search-empty-state"
+      className="flex flex-col items-center justify-center flex-1 py-16 px-6 text-center select-none"
+    >
+      <div className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 mb-4">
+        <Search size={22} />
+      </div>
+      <h3 className="text-lg font-bold tracking-wide text-white/90 mb-2">
+        {pick('未找到匹配结果', 'No matching results')}
+      </h3>
+      <p className="text-xs leading-relaxed text-white/40 max-w-xs px-2 mb-5">
+        {pick(`没有找到包含 "${query}" 的生成历史记录，请尝试精简或更换关键词。`, `No results matching "${query}". Please check your spelling or try another query.`)}
+      </p>
+      <button
+        type="button"
+        onClick={onClear}
+        className="rounded-full border border-[var(--mobile-clay-active-border)] bg-[var(--mobile-clay-active-bg)] px-5 py-2 text-xs font-semibold text-white shadow-md active:scale-95 transition-transform"
+      >
+        {pick('清除搜索词', 'Clear search')}
+      </button>
+    </div>
+  );
+};
 
 const getFallbackWidth = (surface: ResponsiveSurface): number => {
   if (surface === 'phone') {
@@ -81,6 +113,23 @@ const MobileResultDetailEmptySkeleton: React.FC = () => (
   </div>
 );
 
+const MobileResultFeedEmptyState: React.FC = () => {
+  const { pick } = useLocale();
+  return (
+    <div
+      data-testid="mobile-result-empty-state"
+      className="flex flex-col items-center justify-center flex-1 py-12 px-6 text-center select-none"
+    >
+      <h3 className="text-xl font-bold tracking-wide text-white/90 drop-shadow-sm mb-2">
+        {pick('我们从哪里开始？', 'Where should we start?')}
+      </h3>
+      <p className="text-xs leading-relaxed text-white/40 max-w-sm px-2">
+        {pick('在下方输入您的创意提示词，即刻开启 AI 灵感之旅。', 'Enter your creative prompt below to begin your AI generation journey.')}
+      </p>
+    </div>
+  );
+};
+
 const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
   resultEntries,
   activeEntryId,
@@ -90,14 +139,37 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
   onViewModeChange,
   onEntryOpen,
   onUseAsSource,
+  isLoading = false,
+  isHistoryView = false,
+  onCloseHistory,
 }) => {
   const { pick } = useLocale();
   const [measuredWidth, setMeasuredWidth] = React.useState(() => (
     typeof window !== 'undefined' ? window.innerWidth : getFallbackWidth(surface)
   ));
-  const totalResults = resultEntries.length;
+
+  // 简体中文：本地搜索过滤关键词状态
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // 简体中文：本地对历史生成记录的匹配过滤逻辑，支持提示词、渲染模型、标签等的匹配
+  const filteredEntries = useMemo(() => {
+    if (!isHistoryView || !searchQuery.trim()) {
+      return resultEntries;
+    }
+    const query = searchQuery.toLowerCase().trim();
+    return resultEntries.filter((entry) => {
+      const matchPrompt = (entry.fullPrompt && entry.fullPrompt.toLowerCase().includes(query)) ||
+                          (entry.promptSummary && entry.promptSummary.toLowerCase().includes(query)) ||
+                          (entry.prompt && entry.prompt.toLowerCase().includes(query));
+      const matchModel = entry.modelLabel && entry.modelLabel.toLowerCase().includes(query);
+      const matchTags = entry.tags && entry.tags.some(tag => tag.toLowerCase().includes(query));
+      return matchPrompt || matchModel || matchTags;
+    });
+  }, [resultEntries, searchQuery, isHistoryView]);
+
+  const totalResults = filteredEntries.length;
   const hasSelectedSource =
-    Boolean(activeSourceImage) && resultEntries.some((entry) => entry.imageId === activeSourceImage);
+    Boolean(activeSourceImage) && filteredEntries.some((entry) => entry.imageId === activeSourceImage);
   const counterLabel = totalResults === 0 ? pick('等待中', 'Waiting') : pick(`${totalResults} 个结果`, `${totalResults} results`);
   const selectedSourceLabel = pick('已选源图', 'source selected');
   const columnCount = getAdaptiveResultColumnCount({
@@ -116,11 +188,11 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
   // 将结果条目按照 index % 列数，均匀分发到对应的列数据中，实现瀑布流效果
   const columnsData = React.useMemo(() => {
     const cols = Array.from({ length: actualCols }, () => [] as MobileResultEntry[]);
-    resultEntries.forEach((entry, index) => {
+    filteredEntries.forEach((entry, index) => {
       cols[index % actualCols].push(entry);
     });
     return cols;
-  }, [resultEntries, actualCols]);
+  }, [filteredEntries, actualCols]);
 
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
@@ -152,13 +224,76 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
 
   return (
     <section className="relative flex h-full min-h-0 flex-col overflow-hidden">
+      {/* 简体中文：极致高颜值的移动端顶部搜索和历史控制栏，带半透明磨砂质感和返回面包屑 */}
+      {isHistoryView && (
+        <div 
+          className="shrink-0 px-3.5 pt-3 pb-2.5 flex flex-col gap-2.5 border-b"
+          style={{
+            background: 'linear-gradient(to bottom, rgba(20, 20, 22, 0.95) 0%, rgba(20, 20, 22, 0.85) 100%)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderColor: 'rgba(255, 255, 255, 0.08)',
+          }}
+        >
+          {/* 面包屑返回头部 */}
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={onCloseHistory}
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/8 bg-white/5 px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] transition-all active:scale-[0.97] active:bg-white/10"
+            >
+              <ArrowLeft size={13} className="text-[var(--text-tertiary)]" />
+              <span>{pick('返回工作区', 'Back to Workspace')}</span>
+            </button>
+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-tertiary)] select-none">
+              {pick('生成历史与检索', 'HISTORY & SEARCH')}
+            </div>
+          </div>
+
+          {/* 极其精致的磨砂毛玻璃搜索框 */}
+          <div 
+            className="relative flex items-center rounded-xl border transition-all duration-300 focus-within:border-[var(--mobile-clay-active-border)] focus-within:bg-white/[0.06] bg-white/[0.03] px-3.5 py-2.5"
+            style={{
+              borderColor: 'rgba(255, 255, 255, 0.08)',
+            }}
+          >
+            <Search size={16} className="text-white/40 mr-2 shrink-0" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={pick('搜索提示词、模型、标签...', 'Search prompts, models, tags...')}
+              className="flex-1 bg-transparent border-none p-0 text-sm font-medium focus:outline-none focus:ring-0 text-[var(--text-primary)]"
+              style={{
+                fontFamily: '"HarmonyOS Sans SC", "Inter", sans-serif',
+              }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="p-1 hover:bg-white/5 rounded-full text-white/50 hover:text-white"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 采用 Pinterest 自适应列布局的滚动展示区 */}
-      <div className="flex-1 overflow-y-auto overscroll-contain px-3 pr-1 pb-24">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-3 pr-1 pb-24 flex flex-col">
         {totalResults === 0 ? (
-          viewMode === 'detail' ? (
-            <MobileResultDetailEmptySkeleton />
+          searchQuery.trim() ? (
+            <MobileResultSearchEmptyState query={searchQuery} onClear={() => setSearchQuery('')} />
+          ) : isLoading ? (
+            viewMode === 'detail' ? (
+              <MobileResultDetailEmptySkeleton />
+            ) : (
+              <MobileResultStandardEmptySkeleton columnCount={actualCols} />
+            )
           ) : (
-            <MobileResultStandardEmptySkeleton columnCount={columnCount} />
+            <MobileResultFeedEmptyState />
           )
         ) : (
           <div className="relative">

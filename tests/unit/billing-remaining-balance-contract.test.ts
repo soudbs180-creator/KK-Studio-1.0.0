@@ -168,7 +168,9 @@ test('user api settings keep working when local API persistence degrades to memo
   assert.ok(apiSettingsViewSource.includes('disabled={userApiActionsDisabled}'));
   assert.ok(apiSettingsViewSource.includes('onClick={handleCreateOfficialAction}'));
   assert.doesNotMatch(apiSettingsViewSource, /data-testid="api-official-empty-create"/);
-  assert.ok(apiSettingsViewSource.includes('disabled={providerActionsDisabled} onClick={beginCreateProvider}'));
+  assert.ok(apiSettingsViewSource.includes('onAddProvider={beginCreateProvider}'));
+  assert.ok(apiWorkbenchSectionsSource.includes('disabled={addProviderDisabled}'));
+  assert.ok(apiWorkbenchSectionsSource.includes('onClick={onAddProvider}'));
   assert.ok(apiSettingsViewSource.includes('disabled={providerEditorReadOnly}'));
   assert.ok(apiSettingsViewSource.includes('await upsertUserApiSlotToCloudRecord({'));
   assert.ok(apiSettingsViewSource.includes('await removeUserApiSlotFromCloudRecord(id);'));

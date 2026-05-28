@@ -3407,9 +3407,7 @@ export class KeyManager {
         this.globalModelListCache = null; // Clear the model list cache so the picker refreshes immediately
         this.notifyListeners();
 
-        if (!provider.pricingSnapshot) {
-            this.syncProviderPricing(provider.id);
-        }
+        // 简体中文注释：价格抓取会触发外部请求，新增通道默认只保存配置，交给页面里的“高级抓取”显式触发。
 
         return provider;
     }
@@ -3478,9 +3476,7 @@ export class KeyManager {
         this.globalModelListCache = null; // Clear the model list cache so the picker refreshes immediately
         this.notifyListeners();
 
-        if ((updates.baseUrl !== undefined || updates.apiKey !== undefined || updates.format !== undefined) && !updates.pricingSnapshot) {
-            this.syncProviderPricing(id);
-        }
+        // 简体中文注释：更新地址或密钥时不再自动抓价，避免用户保存基础信息时产生隐式网络动作。
 
         return true;
     }
@@ -3681,8 +3677,7 @@ export class KeyManager {
             isActive: true
         });
 
-        // 自动拉取定价
-        this.syncProviderPricing(provider.id);
+        // 简体中文注释：预设创建同样只保存配置，价格和消耗信息由用户在高级抓取中手动获取。
 
         return provider;
     }

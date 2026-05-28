@@ -122,6 +122,7 @@ export interface MobileResultEntry {
   hasOriginal: boolean;
   timestamp: number;
   parentPromptId: string | null;
+  prompt?: string;
   promptSummary: string;
   fullPrompt: string;
   referenceImages: ReferenceImage[];
@@ -142,6 +143,7 @@ export interface MobileResultEntry {
   generationTime?: number;
   isGenerating?: boolean;
   error?: string;
+  tags?: string[];
   groupCount?: number;
   groupEntries?: MobileResultEntry[];
 }
@@ -243,6 +245,93 @@ export interface PartialRedrawRequest {
   referenceImages: ReferenceImage[];
 }
 
+export type RedrawRegionKind = 'rect' | 'stroke' | 'merged';
+export type RedrawPlanMode = 'whole-image' | 'regional-crops' | 'whole-image-marked' | 'color-blocks';
+
+export interface RedrawPoint {
+  x: number;
+  y: number;
+}
+
+export interface RedrawStroke {
+  id: string;
+  points: RedrawPoint[];
+  brushSize: number;
+  color?: string;
+}
+
+export interface RedrawRegion {
+  id: string;
+  kind: RedrawRegionKind;
+  rect: NormalizedRect;
+  stroke?: RedrawStroke;
+  color?: string;
+  label?: string;
+}
+
+export interface RedrawColorBlock {
+  id: string;
+  color: string;
+  label: string;
+  rect: NormalizedRect;
+  prompt?: string;
+}
+
+export interface RedrawCropPlan {
+  id: string;
+  regionIds: string[];
+  selectionRect: NormalizedRect;
+  generationRect: NormalizedRect;
+  pixelRect: { x: number; y: number; width: number; height: number };
+  imageSize: ImageSize;
+}
+
+export interface RedrawPlan {
+  mode: RedrawPlanMode;
+  model: ModelType;
+  aspectRatio: AspectRatio;
+  prompt: string;
+  sourceImageDimensions: { width: number; height: number };
+  regions: RedrawRegion[];
+  cropPlans: RedrawCropPlan[];
+  colorBlocks?: RedrawColorBlock[];
+  annotatedReferenceImage?: ReferenceImage;
+  strictPrompt?: string;
+}
+
+export interface RedrawRequest {
+  model: ModelType;
+  aspectRatio: AspectRatio;
+  prompt: string;
+  sourceImageDimensions: { width: number; height: number };
+  referenceImages: ReferenceImage[];
+  regions: RedrawRegion[];
+  strokes?: RedrawStroke[];
+  colorBlocks?: RedrawColorBlock[];
+  plan: RedrawPlan;
+  selectionRect?: NormalizedRect;
+  generationRect?: NormalizedRect;
+}
+
+export interface RedrawMetadata {
+  mode: RedrawPlanMode;
+  sourceImageId: string;
+  compositionBaseImageId?: string;
+  sourceImageStorageId?: string;
+  sourcePromptId?: string;
+  sourceImageDimensions: { width: number; height: number };
+  regions: RedrawRegion[];
+  cropPlans: RedrawCropPlan[];
+  targetAspectRatio: AspectRatio;
+  extraReferenceImageIds: string[];
+  colorBlocks?: RedrawColorBlock[];
+  strictPrompt?: string;
+  inheritedDisplayLabel?: string;
+  inheritedTaskState?: EcommerceEditableTaskState;
+  inheritedDeliveryKind?: EcommerceSlotDeliveryKind;
+  compositeVersion: 2;
+}
+
 export interface GeneratedImage {
   id: string;
   storageId?: string; // Content-based Hash ID for storage deduplication
@@ -297,6 +386,7 @@ export interface GeneratedImage {
   // 🎯 [New] 完整的提示词优化结果对象
   promptOptimizerResult?: PromptOptimizerResult;
   partialRedraw?: PartialRedrawMetadata;
+  redraw?: RedrawMetadata;
   ecommerceDeliveryKind?: EcommerceSlotDeliveryKind;
 
   // 🎯 [Layering] Z-index for rendering order
@@ -344,6 +434,10 @@ export interface PromptOptimizerResult {
     version: string;
     timestamp: string;
     optimization_mode?: 'auto';
+    engine?: 'local-rulebook' | 'ai-enhanced';
+    ai_status?: 'skipped' | 'enhanced' | 'failed-fallback';
+    route_id?: string;
+    route_title?: string;
     template_id?: string;
     template_title?: string;
     strategy?: 'reasoning-native' | 'structure-first';
@@ -526,6 +620,7 @@ export type EcommerceFrameworkQueueLaneType = 'local' | 'remote';
 export interface EcommerceFrameworkSchedulerConfig {
   maxLocalConcurrency: number;
   maxRemoteConcurrency: number;
+  maxConcurrentGenerations?: number;
 }
 
 export interface EcommerceFrameworkQueueItem {
@@ -541,6 +636,8 @@ export interface EcommerceFrameworkQueueItem {
   startedAt?: number;
   finishedAt?: number;
   error?: string;
+  pausedReason?: 'editing' | 'manual';
+  revision?: number;
 }
 
 export interface EcommerceFrameworkQueueCounts {
@@ -614,9 +711,31 @@ export interface EcommerceTaskAssetRoleBinding {
   label: string;
   normalizedLabel: string;
   aliasLabel?: string;
+  anchorId?: string;
+  token?: string;
+  roleLabel?: string;
   source: 'upload' | 'analysis' | 'history';
   note?: string;
   mentionTokens?: string[];
+}
+
+export interface EcommerceReferenceAnchor {
+  anchorId: string;
+  token: string;
+  roleLabel: string;
+  assetId: string;
+  label: string;
+  source: EcommerceTaskAssetRoleBinding['source'];
+  assetRole: EcommerceAssetRole;
+  previewUrl?: string;
+  note?: string;
+}
+
+export interface EcommercePromptAssistState {
+  optimized: boolean;
+  source?: 'manual' | 'regenerate-feedback' | 'local-rulebook';
+  updatedAt?: number;
+  error?: string;
 }
 
 export interface EcommerceSeriesTemplateStyleProfile {
@@ -738,6 +857,9 @@ export interface EcommerceEditableTaskState {
   layout: EcommerceLayoutTaskState;
   inherit: EcommerceInheritTaskState;
   assetRoles: EcommerceTaskAssetRoleBinding[];
+  referenceAnchors?: EcommerceReferenceAnchor[];
+  styleAnchorTokens?: string[];
+  promptAssistState?: EcommercePromptAssistState;
   consistencyChecks: string[];
   missingFields: string[];
   resolvedSparseIntent?: EcommerceSparseIntentPatch;
@@ -745,6 +867,7 @@ export interface EcommerceEditableTaskState {
   displayLabel: string;
   lastRenderPrompt?: string;
   promptOverride?: string;
+  revision?: number;
 }
 
 export interface EcommercePromptState {
@@ -820,6 +943,7 @@ export interface PromptNode {
   timestamp: number;
   sourceImageId?: string;
   partialRedraw?: PartialRedrawMetadata;
+  redraw?: RedrawMetadata;
   isGenerating?: boolean;
   parallelCount?: number; // Number of images being generated
   error?: string;

@@ -6,9 +6,11 @@ import {
   cancelEcommerceFrameworkNodeQueue,
   enqueueEcommerceFrameworkItems,
   markEcommerceFrameworkQueueItemStatus,
+  pauseEcommerceFrameworkNodeQueue,
   pauseEcommerceFrameworkRuntime,
   resolveEcommerceFrameworkDispatchPlan,
   resolveFrameworkLane,
+  resumeEcommerceFrameworkNodeQueue,
   resumeEcommerceFrameworkRuntime,
 } from '../services/ecommerce/frameworkRuntime.ts';
 import { GenerationMode, type EcommerceFrameworkQueueItem, type EcommerceGroupSheet, type PromptNode } from '../types';
@@ -65,6 +67,8 @@ export interface UseEcommerceRuntimeResult {
   handleGenerateEcommerceFramework: (node: PromptNode) => Promise<void>;
   handlePauseEcommerceFramework: (node: PromptNode) => void;
   handleResumeEcommerceFramework: (node: PromptNode) => void;
+  handlePauseEcommerceNodeQueue: (node: PromptNode, reason?: EcommerceFrameworkQueueItem['pausedReason']) => void;
+  handleResumeEcommerceNodeQueue: (node: PromptNode) => void;
   handleCancelEcommerceFrameworkNodeQueue: (node: PromptNode) => void;
   handleGenerateEcommerceGroup: (node: PromptNode, phase: 'desktop' | 'mobile') => Promise<void>;
   handleToggleEcommerceAnalysisSelection: (id: string, selected: boolean) => void;
@@ -177,7 +181,7 @@ export function useEcommerceRuntime({
     nodes: PromptNode[],
     phasePreference?: 'desktop' | 'mobile',
   ): number => {
-    const queueItems: Array<Pick<EcommerceFrameworkQueueItem, 'queueId' | 'nodeId' | 'phase' | 'laneKey' | 'laneType' | 'sourceSheet'>> = [];
+    const queueItems: Array<Pick<EcommerceFrameworkQueueItem, 'queueId' | 'nodeId' | 'phase' | 'laneKey' | 'laneType' | 'sourceSheet' | 'revision'>> = [];
 
     (nodes || []).forEach((node) => {
       const ecommerce = node.ecommerce;
@@ -208,6 +212,7 @@ export function useEcommerceRuntime({
           laneKey: lane.laneKey,
           laneType: lane.laneType,
           sourceSheet: ecommerce.sourceSheet,
+          revision: ecommerce.editableTask?.revision || 0,
         });
       });
     });
@@ -323,6 +328,31 @@ export function useEcommerceRuntime({
     pumpEcommerceFrameworkQueue(frameworkId);
   }, [pumpEcommerceFrameworkQueue, resolveEcommerceFrameworkId, updateEcommerceFrameworkRuntime]);
 
+  const handlePauseEcommerceNodeQueue = useCallback((
+    node: PromptNode,
+    reason: EcommerceFrameworkQueueItem['pausedReason'] = 'editing',
+  ): void => {
+    const frameworkId = resolveEcommerceFrameworkId(node);
+    if (!frameworkId) {
+      return;
+    }
+
+    updateEcommerceFrameworkRuntime(frameworkId, (runtime) => pauseEcommerceFrameworkNodeQueue(runtime, node.id, reason));
+  }, [resolveEcommerceFrameworkId, updateEcommerceFrameworkRuntime]);
+
+  const handleResumeEcommerceNodeQueue = useCallback((node: PromptNode): void => {
+    const frameworkId = resolveEcommerceFrameworkId(node);
+    if (!frameworkId) {
+      return;
+    }
+
+    updateEcommerceFrameworkRuntime(frameworkId, (runtime) => resumeEcommerceFrameworkNodeQueue(runtime, node.id, {
+      reason: 'editing',
+      revision: node.ecommerce?.editableTask?.revision || 0,
+    }));
+    pumpEcommerceFrameworkQueue(frameworkId);
+  }, [pumpEcommerceFrameworkQueue, resolveEcommerceFrameworkId, updateEcommerceFrameworkRuntime]);
+
   const handleCancelEcommerceFrameworkNodeQueue = useCallback((node: PromptNode): void => {
     const frameworkId = resolveEcommerceFrameworkId(node);
     if (!frameworkId) {
@@ -380,6 +410,8 @@ export function useEcommerceRuntime({
     handleGenerateEcommerceFramework,
     handlePauseEcommerceFramework,
     handleResumeEcommerceFramework,
+    handlePauseEcommerceNodeQueue,
+    handleResumeEcommerceNodeQueue,
     handleCancelEcommerceFrameworkNodeQueue,
     handleGenerateEcommerceGroup,
     handleToggleEcommerceAnalysisSelection,

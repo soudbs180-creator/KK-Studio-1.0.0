@@ -90,7 +90,7 @@ export function resolveLatestEcommerceSlotImageFromCanvas(
   const candidatePromptIds = new Set<string>([node.id]);
   if (taskId) {
     canvas.promptNodes.forEach((promptNode) => {
-      if (promptNode.partialRedraw?.inheritedTaskState?.taskId === taskId) {
+      if (promptNode.redraw?.inheritedTaskState?.taskId === taskId || promptNode.partialRedraw?.inheritedTaskState?.taskId === taskId) {
         candidatePromptIds.add(promptNode.id);
       }
     });

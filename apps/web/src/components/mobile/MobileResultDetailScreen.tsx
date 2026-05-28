@@ -13,15 +13,16 @@ import {
   X,
 } from 'lucide-react';
 
-import type { MobileResultEntry, PartialRedrawRequest } from '../../types';
+import type { GeneratedImage, MobileResultEntry, RedrawRequest } from '../../types';
 import { useLocale } from '../../context/LocaleContext';
+import { RedrawWorkspace } from '../image/RedrawWorkspace';
 
 interface MobileResultDetailScreenProps {
   entry: MobileResultEntry;
   onClose: () => void;
   onPreviewOriginal: (imageId: string) => void;
   onUseAsSource: (imageId: string) => void;
-  onPartialRedraw: (entry: MobileResultEntry, request: PartialRedrawRequest) => void;
+  onPartialRedraw: (entry: MobileResultEntry, request: RedrawRequest) => void;
   onDownload: (entry: MobileResultEntry) => void;
   onDelete: (imageId: string) => void;
   onEditEcommerceTask: (entry: MobileResultEntry) => void;
@@ -75,16 +76,6 @@ const normalizeText = (value: string | null | undefined, fallback: string): stri
   const normalized = value?.trim();
   return normalized ? normalized : fallback;
 };
-
-const noopPartialRedrawRequest = (entry: MobileResultEntry): PartialRedrawRequest => ({
-  model: entry.modelId || entry.modelLabel,
-  aspectRatio: entry.aspectRatio as PartialRedrawRequest['aspectRatio'],
-  prompt: entry.fullPrompt,
-  selectionRect: { x: 0, y: 0, width: 1, height: 1 },
-  generationRect: { x: 0, y: 0, width: 1, height: 1 },
-  sourceImageDimensions: { width: 1, height: 1 },
-  referenceImages: entry.referenceImages,
-});
 
 const ActionButton: React.FC<{
   label: string;
@@ -163,6 +154,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
   onNext,
 }) => {
   const [currentGroupImageIndex, setCurrentGroupImageIndex] = React.useState(0);
+  const [showRedrawWorkspace, setShowRedrawWorkspace] = React.useState(false);
 
   React.useEffect(() => {
     setCurrentGroupImageIndex(0);
@@ -172,6 +164,25 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
   const currentActiveEntry = hasGroup && entry.groupEntries![currentGroupImageIndex]
     ? entry.groupEntries![currentGroupImageIndex]
     : entry;
+  const redrawImageUrl = currentActiveEntry.primaryImageSource || currentActiveEntry.displaySrc;
+  const redrawImage: GeneratedImage | null = redrawImageUrl
+    ? {
+        id: currentActiveEntry.imageId,
+        storageId: currentActiveEntry.imageId,
+        url: redrawImageUrl,
+        originalUrl: currentActiveEntry.primaryImageSource || undefined,
+        prompt: currentActiveEntry.fullPrompt,
+        aspectRatio: currentActiveEntry.aspectRatio as GeneratedImage['aspectRatio'],
+        imageSize: currentActiveEntry.imageSize as GeneratedImage['imageSize'],
+        timestamp: currentActiveEntry.timestamp,
+        model: currentActiveEntry.modelId || currentActiveEntry.modelLabel,
+        modelLabel: currentActiveEntry.modelLabel,
+        canvasId: 'mobile',
+        parentPromptId: currentActiveEntry.parentPromptId || '',
+        position: { x: 0, y: 0 },
+        generationTime: currentActiveEntry.generationTime,
+      }
+    : null;
 
   const handlePrevAction = () => {
     if (currentGroupImageIndex > 0) {
@@ -258,6 +269,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
   const frameworkStatus = ecommerceContinuation?.frameworkStatus;
 
   return (
+    <>
     <section
       data-testid="mobile-result-detail-screen"
       className="fixed inset-0 z-[990] flex flex-col bg-[var(--bg-base)] text-[var(--text-primary)]"
@@ -484,13 +496,19 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
             label="继续创作"
             icon={<Sparkles size={15} />}
             tone="primary"
-            onClick={() => onUseAsSource(currentActiveEntry.imageId)}
+            onClick={() => {
+              onUseAsSource(currentActiveEntry.imageId);
+              onClose();
+            }}
           />
           <ActionButton
-            label="局部重绘"
+            label="重绘"
             icon={<Wand2 size={15} />}
             tone="primary"
-            onClick={() => onPartialRedraw(currentActiveEntry, noopPartialRedrawRequest(currentActiveEntry))}
+            disabled={!redrawImage || !redrawImageUrl}
+            onClick={() => {
+              setShowRedrawWorkspace(true);
+            }}
           />
           <ActionButton
             label="下载"
@@ -556,6 +574,21 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
         ) : null}
       </div>
     </section>
+    {showRedrawWorkspace && redrawImage && redrawImageUrl ? (
+      <RedrawWorkspace
+        image={redrawImage}
+        imageUrl={redrawImageUrl}
+        isMobile
+        defaultModel={currentActiveEntry.modelId || currentActiveEntry.modelLabel}
+        onCancel={() => setShowRedrawWorkspace(false)}
+        onSubmit={(request) => {
+          setShowRedrawWorkspace(false);
+          onPartialRedraw(currentActiveEntry, request);
+          onClose();
+        }}
+      />
+    ) : null}
+    </>
   );
 };
 

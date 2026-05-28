@@ -12,7 +12,8 @@ import {
 } from '../../types/index.ts';
 
 const DEFAULT_LOCAL_CONCURRENCY = 4;
-const DEFAULT_REMOTE_CONCURRENCY = 2;
+const DEFAULT_REMOTE_CONCURRENCY = 4;
+const DEFAULT_TOTAL_CONCURRENCY = 4;
 
 function cloneQueueItem(item: EcommerceFrameworkQueueItem): EcommerceFrameworkQueueItem {
   return { ...item };
@@ -24,6 +25,7 @@ export function createDefaultEcommerceFrameworkSchedulerConfig(
   return {
     maxLocalConcurrency: overrides.maxLocalConcurrency ?? DEFAULT_LOCAL_CONCURRENCY,
     maxRemoteConcurrency: overrides.maxRemoteConcurrency ?? DEFAULT_REMOTE_CONCURRENCY,
+    maxConcurrentGenerations: overrides.maxConcurrentGenerations ?? DEFAULT_TOTAL_CONCURRENCY,
   };
 }
 
@@ -45,7 +47,7 @@ export function createEcommerceFrameworkRuntimeState(params: {
 export function enqueueEcommerceFrameworkItems(
   runtime: EcommerceFrameworkRuntimeState,
   items: Array<
-    Pick<EcommerceFrameworkQueueItem, 'queueId' | 'nodeId' | 'phase' | 'laneKey' | 'laneType' | 'sourceSheet'>
+    Pick<EcommerceFrameworkQueueItem, 'queueId' | 'nodeId' | 'phase' | 'laneKey' | 'laneType' | 'sourceSheet' | 'revision'>
   >,
 ): EcommerceFrameworkRuntimeState {
   const existingKeys = new Set(
@@ -72,6 +74,8 @@ export function enqueueEcommerceFrameworkItems(
       sourceSheet: item.sourceSheet,
       status: runtime.paused ? 'paused' : 'queued',
       enqueuedAt: Date.now(),
+      revision: item.revision,
+      pausedReason: runtime.paused ? 'manual' : undefined,
     });
   });
 
@@ -111,7 +115,7 @@ export function pauseEcommerceFrameworkRuntime(
     paused: true,
     queue: runtime.queue.map((item) => (
       item.status === 'queued'
-        ? { ...item, status: 'paused' }
+        ? { ...item, status: 'paused', pausedReason: 'manual' }
         : cloneQueueItem(item)
     )),
     lastUpdatedAt: Date.now(),
@@ -126,9 +130,52 @@ export function resumeEcommerceFrameworkRuntime(
     paused: false,
     queue: runtime.queue.map((item) => (
       item.status === 'paused'
-        ? { ...item, status: 'queued' }
+        ? { ...item, status: 'queued', pausedReason: undefined }
         : cloneQueueItem(item)
     )),
+    lastUpdatedAt: Date.now(),
+  };
+}
+
+export function pauseEcommerceFrameworkNodeQueue(
+  runtime: EcommerceFrameworkRuntimeState,
+  nodeId: string,
+  reason: EcommerceFrameworkQueueItem['pausedReason'] = 'editing',
+): EcommerceFrameworkRuntimeState {
+  return {
+    ...runtime,
+    queue: runtime.queue.map((item) => (
+      item.nodeId === nodeId && item.status === 'queued'
+        ? { ...item, status: 'paused', pausedReason: reason }
+        : cloneQueueItem(item)
+    )),
+    lastUpdatedAt: Date.now(),
+  };
+}
+
+export function resumeEcommerceFrameworkNodeQueue(
+  runtime: EcommerceFrameworkRuntimeState,
+  nodeId: string,
+  options: { reason?: EcommerceFrameworkQueueItem['pausedReason']; revision?: number } = {},
+): EcommerceFrameworkRuntimeState {
+  return {
+    ...runtime,
+    queue: runtime.queue.map((item) => {
+      if (item.nodeId !== nodeId || item.status !== 'paused') {
+        return cloneQueueItem(item);
+      }
+
+      if (options.reason && item.pausedReason !== options.reason) {
+        return cloneQueueItem(item);
+      }
+
+      return {
+        ...item,
+        status: runtime.paused ? 'paused' : 'queued',
+        pausedReason: runtime.paused ? 'manual' : undefined,
+        revision: options.revision ?? item.revision,
+      };
+    }),
     lastUpdatedAt: Date.now(),
   };
 }
@@ -182,6 +229,8 @@ export function resolveEcommerceFrameworkDispatchPlan(
   const countsByLane = new Map<string, number>();
   let runningLocal = 0;
   let runningRemote = 0;
+  let runningTotal = 0;
+  const maxTotalConcurrency = Math.max(1, runtime.config.maxConcurrentGenerations ?? DEFAULT_TOTAL_CONCURRENCY);
 
   runtime.queue.forEach((item) => {
     if (item.status !== 'dispatching' && item.status !== 'running') {
@@ -189,6 +238,7 @@ export function resolveEcommerceFrameworkDispatchPlan(
     }
 
     countsByLane.set(item.laneKey, (countsByLane.get(item.laneKey) || 0) + 1);
+    runningTotal += 1;
     if (item.laneType === 'local') {
       runningLocal += 1;
       return;
@@ -204,10 +254,14 @@ export function resolveEcommerceFrameworkDispatchPlan(
     }
 
     if (item.laneType === 'local') {
+      if (runningTotal >= maxTotalConcurrency) {
+        continue;
+      }
       if (runningLocal >= runtime.config.maxLocalConcurrency) {
         continue;
       }
       runningLocal += 1;
+      runningTotal += 1;
       countsByLane.set(item.laneKey, (countsByLane.get(item.laneKey) || 0) + 1);
       selectedQueueIds.add(item.queueId);
       continue;
@@ -216,7 +270,8 @@ export function resolveEcommerceFrameworkDispatchPlan(
     remoteCandidates.push(item);
   }
 
-  const remoteSlots = Math.max(0, runtime.config.maxRemoteConcurrency - runningRemote);
+  const totalSlots = Math.max(0, maxTotalConcurrency - runningTotal);
+  const remoteSlots = Math.min(totalSlots, Math.max(0, runtime.config.maxRemoteConcurrency - runningRemote));
   const remainingRemoteCandidates = [...remoteCandidates];
   for (let slot = 0; slot < remoteSlots && remainingRemoteCandidates.length > 0; slot += 1) {
     let selectedIndex = 0;
@@ -407,6 +462,7 @@ export function resolveEcommerceFrameworkSummary(
   failed: number;
   pausedItems: number;
   total: number;
+  queueItems: EcommerceFrameworkQueueItem[];
 } {
   const frameworkNode = promptNodes.find((node) => node.id === frameworkId && node.ecommerce?.kind === 'framework');
   const counts = resolveEcommerceFrameworkQueueCounts(runtime);
@@ -423,6 +479,7 @@ export function resolveEcommerceFrameworkSummary(
     failed: counts.failed,
     pausedItems: counts.paused,
     total: counts.total,
+    queueItems: (runtime?.queue || []).map(cloneQueueItem),
   };
 }
 

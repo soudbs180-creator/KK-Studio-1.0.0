@@ -8,7 +8,7 @@ import type {
   EcommerceFrameworkRuntimeState,
   MobileResultEntry,
   MobileSurfaceScreen,
-  PartialRedrawRequest,
+  RedrawRequest,
   ResponsiveSurface,
 } from '../types';
 import AppPromptComposer, { type AppPromptBarProps } from './AppPromptComposer';
@@ -16,6 +16,7 @@ import AppPromptComposer, { type AppPromptBarProps } from './AppPromptComposer';
 interface AppMobileWorkspaceProps {
   isMobile: boolean;
   surface: ResponsiveSurface;
+  workspaceSurface: 'workspace' | 'library';
   mobileScreen: MobileSurfaceScreen;
   setMobileScreen: (screen: MobileSurfaceScreen) => void;
   onOpenSettings: () => void;
@@ -38,7 +39,7 @@ interface AppMobileWorkspaceProps {
   onEntryOpen: (entryId: string) => void;
   onPreviewImage: (imageId: string) => void;
   onUseResultAsSource: (imageId: string) => void;
-  onPartialRedraw: (entry: MobileResultEntry, request: PartialRedrawRequest) => void;
+  onPartialRedraw: (entry: MobileResultEntry, request: RedrawRequest) => void;
   onDownloadEntry: (entry: MobileResultEntry) => void;
   onDeleteImage: (imageId: string) => void;
   onEditEcommerceTask: (entry: MobileResultEntry) => void;
@@ -52,6 +53,7 @@ interface AppMobileWorkspaceProps {
 const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
   isMobile,
   surface,
+  workspaceSurface,
   mobileScreen,
   setMobileScreen,
   onOpenSettings,
@@ -115,6 +117,8 @@ const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
     <MobileWorkspaceSurface
       activeScreen={mobileScreen}
       surface={surface}
+      workspaceSurface={workspaceSurface}
+      onCloseHistory={() => setWorkspaceSurface('workspace')}
       onScreenChange={setMobileScreen}
       onOpenSettings={onOpenSettings}
       title="KK Studio"
@@ -124,6 +128,7 @@ const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
       balanceLoading={billingLoading}
       projectName={activeCanvas?.name || '项目'}
       projectCount={projectCount}
+      isLoading={promptBarProps.isGenerating}
       onOpenProjects={() => setMobileScreen('more-sheet')}
       onOpenSearch={() => {
         focusWorkspace();

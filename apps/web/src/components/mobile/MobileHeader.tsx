@@ -1,6 +1,6 @@
 import React from 'react';
 import { Menu, Sparkles } from 'lucide-react';
-import { formatRemainingCredits } from '../../services/billing/remainingBalance';
+import { formatRemainingCredits, normalizeRemainingCredits } from '../../services/billing/remainingBalance';
 import { resolveAvatarUrl } from '../../utils/presetAvatars';
 
 interface MobileHeaderProps {
@@ -23,7 +23,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
     onUserClick,
     onBillingClick,
     onRechargeClick,
-    balance,
+    balance: rawBalance,
     balanceLoading = false,
     title = 'KK Studio',
     userName = '\u7528\u6237',
@@ -33,6 +33,9 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
     const iconButtonClass = 'h-12 w-12 rounded-[16px] flex items-center justify-center border transition-all active:scale-95';
     const handleRechargeClick = onRechargeClick ?? onBillingClick;
     const avatarFallback = userName?.trim()?.[0]?.toUpperCase() || 'U';
+    const maxCredits = 999999;
+    const normalizedBalance = normalizeRemainingCredits(rawBalance);
+    const balance = Math.min(normalizedBalance, maxCredits);
     const balanceDisplay = balanceLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');
     const resolvedAvatarUrl = resolveAvatarUrl(userAvatarUrl);
 
@@ -69,13 +72,10 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                             )}
                         </span>
                         <span className="min-w-0 flex-1 flex flex-col justify-center">
-                            <span className="block truncate text-[8px] font-semibold uppercase tracking-[0.12em] text-[var(--text-tertiary)] leading-tight">
-                                {title}
+                            <span className="block truncate text-[12px] font-semibold text-[var(--text-primary)] leading-tight">
+                                {userName}
                             </span>
-                            <span className="mt-0.5 flex items-center gap-1 min-w-0">
-                                <span className="truncate text-[12px] font-semibold text-[var(--text-primary)] leading-tight">
-                                    {userName}
-                                </span>
+                            <span className="mt-0.5 flex items-center min-w-0">
                                 {(() => {
                                     const role = String(userRole || 'user').toLowerCase();
                                     if (role === 'admin') {
@@ -107,18 +107,20 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                         onClick={handleRechargeClick}
                         data-testid="mobile-header-credit-chip"
                         aria-label="\u67e5\u770b\u79ef\u5206"
-                        className="flex flex-col h-12 min-w-[84px] shrink-0 items-center justify-center gap-0.5 whitespace-nowrap rounded-[16px] border px-2 text-center text-[var(--text-primary)] transition-all active:scale-95 disabled:opacity-55"
+                        className="flex h-12 shrink-0 items-center gap-1.5 rounded-[16px] border px-2.5 transition-all active:scale-95 disabled:opacity-55"
                         style={{
                             background: 'var(--mobile-clay-surface-bg)',
                             borderColor: 'var(--mobile-clay-border)'
                         }}
                         disabled={!handleRechargeClick}
                     >
-                        <span className="inline-flex items-center gap-0.5 text-[8px] font-semibold uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
-                            <Sparkles size={10} className="text-amber-300 animate-pulse" />
-                            {'\u79ef\u5206'}
+                        <span className="inline-flex items-center gap-0.5 shrink-0 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-[0.08em]">
+                            <Sparkles size={9} className="text-amber-300 animate-pulse" />
+                            积分
                         </span>
-                        <span className="text-[13px] font-semibold leading-tight">{balanceDisplay}</span>
+                        <span className="text-[12px] font-bold text-[var(--text-primary)] truncate font-variant-numeric: tabular-nums whitespace-nowrap">
+                            {balanceDisplay}
+                        </span>
                     </button>
 
                     <button

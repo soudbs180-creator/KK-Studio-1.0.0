@@ -35,15 +35,15 @@ test('ecommerce partial redraw runtime owns ecommerce inheritance and finalizati
   assert.match(resultBlock, /finalizeEcommercePartialRedrawResult: \(params: FinalizeEcommercePartialRedrawResultParams\) => Promise<void>;/);
 });
 
-test('handlePartialRedrawRequest delegates ecommerce inheritance and redraw finalization to the hook', () => {
+test('handleRedrawRequest delegates ecommerce inheritance and redraw finalization to the hook', () => {
   const appSource = readSource('src/App.tsx');
-  const handlePartialRedrawIndex = appSource.indexOf('const handlePartialRedrawRequest = useCallback((image: GeneratedImage, request: PartialRedrawRequest) => {');
-  const handleMobilePartialRedrawIndex = appSource.indexOf('const handleMobileResultPartialRedraw = useCallback((entry: MobileResultEntry, request: PartialRedrawRequest) => {');
+  const handleRedrawIndex = appSource.indexOf('const handleRedrawRequest = useCallback((image: GeneratedImage, request: RedrawRequest) => {');
+  const handleMobileRedrawIndex = appSource.indexOf('const handleMobileResultRedraw = useCallback((entry: MobileResultEntry, request: RedrawRequest) => {');
 
-  assert.notEqual(handlePartialRedrawIndex, -1, 'expected App.tsx to declare handlePartialRedrawRequest');
-  assert.notEqual(handleMobilePartialRedrawIndex, -1, 'expected App.tsx to declare handleMobileResultPartialRedraw');
+  assert.notEqual(handleRedrawIndex, -1, 'expected App.tsx to declare handleRedrawRequest');
+  assert.notEqual(handleMobileRedrawIndex, -1, 'expected App.tsx to declare handleMobileResultRedraw');
 
-  const handlePartialRedrawSource = appSource.slice(handlePartialRedrawIndex, handleMobilePartialRedrawIndex);
+  const handlePartialRedrawSource = appSource.slice(handleRedrawIndex, handleMobileRedrawIndex);
 
   assert.match(handlePartialRedrawSource, /const ecommercePartialRedrawContext = resolveEcommercePartialRedrawContext\(sourceImage, parentPrompt\);/);
   assert.match(handlePartialRedrawSource, /await finalizeEcommercePartialRedrawResult\(\{/);
@@ -56,8 +56,11 @@ test('handlePartialRedrawRequest delegates ecommerce inheritance and redraw fina
 test('partial redraw runtime resolves ecommerce inheritance and finalizes ecommerce redraw ownership', () => {
   const hookSource = readSource('src/app/useEcommercePartialRedrawRuntime.ts');
 
+  assert.match(hookSource, /sourceImage\.redraw\?\.inheritedTaskState/);
   assert.match(hookSource, /sourceImage\.partialRedraw\?\.inheritedTaskState/);
+  assert.match(hookSource, /sourceImage\.redraw\?\.inheritedDisplayLabel/);
   assert.match(hookSource, /sourceImage\.partialRedraw\?\.inheritedDisplayLabel/);
+  assert.match(hookSource, /sourceImage\.redraw\?\.inheritedDeliveryKind/);
   assert.match(hookSource, /sourceImage\.partialRedraw\?\.inheritedDeliveryKind/);
   assert.match(hookSource, /parentPrompt\?\.ecommerce\?\.editableTask/);
   assert.match(hookSource, /parentPrompt\?\.ecommerce\?\.displayLabel/);

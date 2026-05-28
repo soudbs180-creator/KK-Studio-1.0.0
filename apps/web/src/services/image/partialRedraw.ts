@@ -191,6 +191,83 @@ export async function buildPartialRedrawReferenceImage(
   };
 }
 
+export async function buildRedrawReferenceImage(
+  sourceUrl: string,
+  generationRect: NormalizedRect,
+  sourceSize: PixelSize,
+  idPrefix = 'redraw-source',
+): Promise<{ id: string; data: string; mimeType: string }> {
+  const cropRect = resolvePixelRect(generationRect, sourceSize);
+  const dataUrl = await cropImageToDataUrl(sourceUrl, cropRect);
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+
+  return {
+    id: `${idPrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    data: match?.[2] || dataUrl,
+    mimeType: match?.[1] || 'image/png',
+  };
+}
+
+function applyFeatherMask(canvas: HTMLCanvasElement, featherRatio: number): void {
+  const context = ensureCanvasContext(canvas);
+  const width = canvas.width;
+  const height = canvas.height;
+  const feather = Math.max(1, Math.round(Math.min(width, height) * featherRatio));
+  if (feather <= 1) return;
+
+  const imageData = context.getImageData(0, 0, width, height);
+  const data = imageData.data;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const distanceToEdge = Math.min(x, y, width - 1 - x, height - 1 - y);
+      const alphaRatio = Math.min(1, Math.max(0, distanceToEdge / feather));
+      const alphaIndex = (y * width + x) * 4 + 3;
+      data[alphaIndex] = Math.round(data[alphaIndex] * alphaRatio);
+    }
+  }
+
+  context.putImageData(imageData, 0, 0);
+}
+
+export async function compositeRedrawCropResult(options: {
+  originalImageUrl: string;
+  generatedCropUrl: string;
+  generationRect: NormalizedRect;
+  featherRatio?: number;
+}): Promise<string> {
+  const originalImage = await loadImageElement(options.originalImageUrl);
+  const generatedCrop = await loadImageElement(options.generatedCropUrl);
+  const originalSize = {
+    width: originalImage.naturalWidth || originalImage.width,
+    height: originalImage.naturalHeight || originalImage.height,
+  };
+  const generationRect = resolvePixelRect(options.generationRect, originalSize);
+
+  const fullCanvas = document.createElement('canvas');
+  fullCanvas.width = originalSize.width;
+  fullCanvas.height = originalSize.height;
+  const fullContext = ensureCanvasContext(fullCanvas);
+  fullContext.drawImage(originalImage, 0, 0, fullCanvas.width, fullCanvas.height);
+
+  const patchCanvas = document.createElement('canvas');
+  patchCanvas.width = Math.max(1, generationRect.width);
+  patchCanvas.height = Math.max(1, generationRect.height);
+  const patchContext = ensureCanvasContext(patchCanvas);
+  patchContext.drawImage(generatedCrop, 0, 0, patchCanvas.width, patchCanvas.height);
+  applyFeatherMask(patchCanvas, options.featherRatio ?? 0.05);
+
+  fullContext.drawImage(
+    patchCanvas,
+    generationRect.x,
+    generationRect.y,
+    generationRect.width,
+    generationRect.height,
+  );
+
+  return fullCanvas.toDataURL('image/png');
+}
+
 export async function compositePartialRedrawResult(options: {
   originalImageUrl: string;
   generatedCropUrl: string;

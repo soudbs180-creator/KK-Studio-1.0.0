@@ -1824,8 +1824,17 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                         e.stopPropagation();
                     }}
                     onMouseUp={(e) => e.stopPropagation()}
-                    onTouchStart={(e) => e.stopPropagation()}
-                    onTouchEnd={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => {
+                        // 移动端全屏模式下，阻止 touch 事件冒泡会导致子组件（按钮、输入框等）无法触发点击和触摸事件，因此在移动端严禁阻止冒泡。
+                        if (!isMobile) {
+                            e.stopPropagation();
+                        }
+                    }}
+                    onTouchEnd={(e) => {
+                        if (!isMobile) {
+                            e.stopPropagation();
+                        }
+                    }}
                     onWheel={registerActivity}
                     className={`fixed z-[9999] flex flex-col ${isMobile
                         ? 'left-0 right-0 top-0 bottom-0 border-none pb-0'

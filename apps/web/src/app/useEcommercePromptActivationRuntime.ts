@@ -52,6 +52,7 @@ export function useEcommercePromptActivationRuntime({
 }: UseEcommercePromptActivationRuntimeDeps): UseEcommercePromptActivationRuntimeResult {
   const syncPromptNodeEcommerceSelection = useCallback((clickedNode: PromptNode) => {
     const ecommerceTaskState = clickedNode.ecommerce?.editableTask
+      || clickedNode.redraw?.inheritedTaskState
       || clickedNode.partialRedraw?.inheritedTaskState
       || null;
     const nextFrameworkId = clickedNode.mode === GenerationMode.ECOMMERCE

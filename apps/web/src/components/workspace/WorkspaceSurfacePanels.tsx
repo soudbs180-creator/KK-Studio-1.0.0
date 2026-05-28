@@ -44,7 +44,7 @@ export function WorkspaceSurfacePanels({
       activePanel={activePanel}
       isMobile={isMobile}
       renderChatSidebar={() => (
-        <div id="chat-sidebar-wrapper">
+        <div id="chat-sidebar-wrapper" style={{ pointerEvents: 'auto' }}>
           <ChatSidebar
             isOpen={isChatOpen}
             onToggle={toggleChatPanel}
@@ -58,17 +58,22 @@ export function WorkspaceSurfacePanels({
           />
         </div>
       )}
-      renderLibraryPanel={() => (
-        <AssetLibraryPanel
-          isOpen={workspaceSurface === 'library'}
-          isMobile={isMobile}
-          images={activeCanvas?.imageNodes || []}
-          promptCount={activeCanvas?.promptNodes.length || 0}
-          onClose={focusWorkspace}
-          onPreview={handlePreviewFromLibrary}
-          onFocusImage={handleFocusLibraryImage}
-        />
-      )}
+      renderLibraryPanel={() => {
+        if (isMobile) return null; // 简体中文注释：移动端下屏蔽桌面级遮挡，交给本地瀑布流及搜索框展示
+        return (
+          <div id="asset-library-wrapper" style={{ pointerEvents: 'auto' }}>
+            <AssetLibraryPanel
+              isOpen={workspaceSurface === 'library'}
+              isMobile={isMobile}
+              images={activeCanvas?.imageNodes || []}
+              promptCount={activeCanvas?.promptNodes.length || 0}
+              onClose={focusWorkspace}
+              onPreview={handlePreviewFromLibrary}
+              onFocusImage={handleFocusLibraryImage}
+            />
+          </div>
+        );
+      }}
     />
   );
 }

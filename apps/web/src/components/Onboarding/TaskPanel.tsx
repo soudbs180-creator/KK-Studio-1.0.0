@@ -179,7 +179,7 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
                 
                 {task.reward && (
                   <div className="task-reward">
-                    {task.reward.amount && (
+                    {!!task.reward.amount && (
                       <span className="reward-credits">+{task.reward.amount}</span>
                     )}
                     {task.reward.badge && completed && (

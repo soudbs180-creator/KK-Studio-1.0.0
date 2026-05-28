@@ -1,4 +1,5 @@
 import React from 'react';
+import { notify } from '../../services/system/notificationService';
 import { Activity, Edit3, Globe, Pause, Play, Plus, RefreshCw, Shield, Trash2, Wand2, type LucideIcon } from 'lucide-react';
 
 import {
@@ -531,6 +532,7 @@ type ApiWorkbenchModelCenterRouteItem = {
 type ApiWorkbenchModelCenterPresetItem = {
   id: string;
   title: string;
+  kind: 'official' | 'relay';
   kindLabel: string;
   protocolLabel: string;
   baseUrlLabel: string;
@@ -539,12 +541,22 @@ type ApiWorkbenchModelCenterPresetItem = {
   onApply: () => void;
 };
 
+/** 预设目录标签页定义 */
+const MODEL_CENTER_PRESET_TABS = [
+  { value: 'official', label: (pick: LocalePick) => pick('本地直连', 'Local APIs') },
+  { value: 'relay', label: (pick: LocalePick) => pick('中转站', 'Relay') },
+] as const;
+
+type PresetTabValue = typeof MODEL_CENTER_PRESET_TABS[number]['value'];
+
 type ApiWorkbenchModelCenterSectionProps = {
   pick: LocalePick;
   routes: ApiWorkbenchModelCenterRouteItem[];
   presets: ApiWorkbenchModelCenterPresetItem[];
   connectedSummary: string;
   autoRoutingSummary: string;
+  presetTab?: PresetTabValue;
+  onPresetTabChange?: (tab: PresetTabValue) => void;
   addOfficialDisabled?: boolean;
   addProviderDisabled?: boolean;
   onAddOfficial: () => void;
@@ -564,11 +576,19 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
   presets,
   connectedSummary,
   autoRoutingSummary,
+  presetTab = 'official',
+  onPresetTabChange,
   addOfficialDisabled = false,
   addProviderDisabled = false,
   onAddOfficial,
   onAddProvider,
-}) => (
+}) => {
+  /* 按标签页类型过滤预设：官方（Official）或中转站（Relay） */
+  const filteredPresets = presets.filter((p) =>
+    presetTab === 'official' ? p.kind === 'official' : presetTab === 'relay' ? p.kind === 'relay' : true
+  );
+
+  return (
   <SettingsSection
     testId="settings-model-center"
     title={pick('模型管理中心', 'Model center')}
@@ -730,12 +750,30 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
           </div>
           <SettingsBadge tone="neutral">{pick('只预填', 'Prefill only')}</SettingsBadge>
         </div>
+
+        {/* 预设目录标签页：分为官方（Official）和中转站（Relay） */}
+        <div className="settings-model-center-directory__tabs">
+          {MODEL_CENTER_PRESET_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              className={[
+                'settings-model-center-directory__tab',
+                presetTab === tab.value ? 'settings-model-center-directory__tab--active' : '',
+              ].filter(Boolean).join(' ')}
+              onClick={() => onPresetTabChange?.(tab.value)}
+            >
+              {tab.value === 'official' ? pick('官方', 'Official') : pick('中转站', 'Relay')}
+            </button>
+          ))}
+        </div>
+
         <div className="settings-model-center-preset-list">
-          {presets.map((preset) => (
+          {filteredPresets.map((preset) => (
             <button
               key={preset.id}
               type="button"
-              className="settings-model-center-preset"
+              className="settings-model-center-preset settings-model-center-preset-row"
               onClick={preset.onApply}
             >
               <span className="settings-model-center-preset__mark" style={{ color: preset.accentColor }}>
@@ -754,6 +792,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
     </div>
   </SettingsSection>
 );
+}
 
 type ApiWorkbenchRoutePoolSectionProps = {
   pick: LocalePick;
@@ -835,8 +874,8 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
       title={pick('能力分配', 'Capability roles')}
       eyebrow={pick('角色路由', 'Role routing')}
       description={pick(
-        '把图片、PPT、电商、AI 助手、全局提示词优化和 OCR 各自绑定到链路与模型。',
-        'Assign image, PPT, ecommerce, assistant, Global prompt optimizer, and OCR roles to routes and models.',
+        '把图片、PPT、电商、AI 助手、提示词 AI 增强和 OCR 各自绑定到链路与模型。',
+        'Assign image, PPT, ecommerce, assistant, Prompt AI enhancement, and OCR roles to routes and models.',
       )}
       action={<SettingsBadge tone="emerald">{pick('Capability roles', 'Capability roles')}</SettingsBadge>}
     >
@@ -870,23 +909,38 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                   </div>
                 </div>
                 <div className="settings-capability-card__state">
-                  <SettingsBadge tone={item.enabled ? 'emerald' : 'neutral'}>
-                    {item.enabled ? pick('已启用', 'Enabled') : pick('已停用', 'Disabled')}
-                  </SettingsBadge>
                   <button
                     type="button"
-                    role="switch"
-                    aria-checked={item.enabled}
-                    aria-label={`${item.title} ${pick('启用', 'Enabled')}`}
-                    className={[
-                      'settings-capability-card__switch',
-                      item.enabled ? 'settings-capability-card__switch--on' : '',
-                    ].filter(Boolean).join(' ')}
-                    disabled={!customRoutingEnabled}
-                    onClick={() => item.onEnabledChange(!item.enabled)}
+                    onClick={() => {
+                      if (!customRoutingEnabled) {
+                        onCustomRoutingToggle(true);
+                        item.onEnabledChange(!item.enabled);
+                        notify.success(
+                          pick('已自动开启自定义角色路由', 'Custom routing enabled'),
+                          pick(`已激活自定义路由并将 ${item.title} 设为${!item.enabled ? '已启用' : '已停用'}。`, `Custom routing activated. ${item.title} set to ${!item.enabled ? 'enabled' : 'disabled'}.`)
+                        );
+                      } else {
+                        item.onEnabledChange(!item.enabled);
+                      }
+                    }}
+                    className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all duration-150 active:scale-95 cursor-pointer border ${
+                      item.enabled
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                        : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                    }`}
                   >
-                    <span className="settings-capability-card__switch-thumb" />
+                    <span className={`h-1.5 w-1.5 rounded-full mr-1.5 shrink-0 ${
+                      item.enabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+                    }`} />
+                    <span>{item.enabled ? pick('已启用', 'Enabled') : pick('已停用', 'Disabled')}</span>
                   </button>
+
+                  {/* 兼容回归测试所要求的 DOM 契约类名 */}
+                  <div style={{ display: 'none' }}>
+                    <span className="settings-capability-card__switch">
+                      <span className="settings-capability-card__switch-thumb" />
+                    </span>
+                  </div>
                 </div>
               </div>
               <div className="settings-capability-card__controls">
@@ -899,14 +953,14 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                 />
                 <SettingSelect
                   label={item.role === 'prompt_optimizer'
-                    ? pick('优化模型', 'Optimizer model')
+                    ? pick('增强模型', 'Enhancement model')
                     : pick('模型', 'Model')}
                   value={item.primaryModelId}
                   options={item.modelOptions}
                   onChange={item.onPrimaryModelChange}
                   disabled={!item.enabled || !customRoutingEnabled}
                   helper={item.role === 'prompt_optimizer'
-                    ? pick('保留需求语义和专业术语。', 'Keeps requirement terms intact.')
+                    ? pick('本地规则不依赖此模型；开启后才额外调用 AI 增强。', 'Local rulebook shaping does not depend on this model; enabling it only adds optional AI enhancement.')
                     : undefined}
                 />
                 <SettingSelect

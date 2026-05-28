@@ -46,7 +46,7 @@ import { resolveProviderIdentity } from '../utils/providerDisplay';
 import { getReferenceImageLookupIds } from '../utils/referenceImageStorage';
 import { normalizeModelId } from '../utils/modelIdNormalization';
 import { resolveModelDisplayName } from '../utils/modelDisplayName';
-import { compositePartialRedrawResult } from '../services/image/partialRedraw';
+import { compositePartialRedrawResult, compositeRedrawCropResult } from '../services/image/partialRedraw';
 import {
   isSecureProxyGuestModeError,
   isSecureProxySessionReauthError,
@@ -877,7 +877,7 @@ export const useImageGeneration = (options: {
           timestamp: Date.now(),
           canvasId: activeCanvasRef.current?.id || 'default',
           parentPromptId: nodeId,
-          ecommerceDeliveryKind: latestNode.ecommerce?.activeDeliveryKind || latestNode.partialRedraw?.inheritedDeliveryKind,
+          ecommerceDeliveryKind: latestNode.ecommerce?.activeDeliveryKind || latestNode.redraw?.inheritedDeliveryKind || latestNode.partialRedraw?.inheritedDeliveryKind,
           sourceTaskId,
           sourceResultIndex,
           sourceReferenceStorageIds: (latestNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
@@ -1200,13 +1200,13 @@ export const useImageGeneration = (options: {
                 aspectRatio: resolvedAspectRatio, imageSize: resolvedImageSize,
                 timestamp: Date.now(), canvasId: activeCanvasRef.current?.id || 'default',
                 parentPromptId: node.id,
-                ecommerceDeliveryKind: latestNode.ecommerce?.activeDeliveryKind || latestNode.partialRedraw?.inheritedDeliveryKind,
+                ecommerceDeliveryKind: latestNode.ecommerce?.activeDeliveryKind || latestNode.redraw?.inheritedDeliveryKind || latestNode.partialRedraw?.inheritedDeliveryKind,
                 sourceTaskId,
                 sourceResultIndex,
                 sourceReferenceStorageIds: (latestNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
                 position: getGeneratedImagePosition(latestNode.position, resolvedAspectRatio, latestNode.mode, layoutIndex, expectedCount),
                 dimensions: `${resolvedAspectRatio} 路 ${resolvedImageSize || '1K'}`,
-                displayLabel: latestNode.partialRedraw?.inheritedDisplayLabel || latestNode.ecommerce?.displayLabel,
+                displayLabel: latestNode.redraw?.inheritedDisplayLabel || latestNode.partialRedraw?.inheritedDisplayLabel || latestNode.ecommerce?.displayLabel,
                 provider: (result as any).provider || latestNode.provider,
                 providerLabel: (result as any).providerName || latestNode.providerLabel,
                 keySlotId: (result as any).keySlotId || latestNode.keySlotId,
@@ -1740,8 +1740,9 @@ export const useImageGeneration = (options: {
           isMobile,
         });
 
-        const partialRedrawSourceImage = executionNode.partialRedraw?.sourceImageId
-          ? activeCanvasRef.current?.imageNodes.find((imageNode) => imageNode.id === executionNode.partialRedraw?.sourceImageId)
+        const redrawSourceImageId = executionNode.redraw?.compositionBaseImageId || executionNode.redraw?.sourceImageId || executionNode.partialRedraw?.sourceImageId;
+        const partialRedrawSourceImage = redrawSourceImageId
+          ? activeCanvasRef.current?.imageNodes.find((imageNode) => imageNode.id === redrawSourceImageId)
           : undefined;
 
         const results = await Promise.all(preparedItems.map(async ({ item, sourceTaskId, sourceResultIndex, apiResultUrl }, layoutIndex) => {
@@ -1760,14 +1761,23 @@ export const useImageGeneration = (options: {
 
           if (
             executionNode.mode === GenerationMode.REDRAW
-            && executionNode.partialRedraw
+            && (executionNode.redraw?.cropPlans?.[0] || executionNode.partialRedraw)
             && partialRedrawSourceImage
           ) {
-            finalUrl = await compositePartialRedrawResult({
-              originalImageUrl: partialRedrawSourceImage.originalUrl || partialRedrawSourceImage.apiResultUrl || partialRedrawSourceImage.url,
-              generatedCropUrl: item.originalUrl || item.url,
-              partialRedraw: executionNode.partialRedraw,
-            });
+            const originalImageUrl = partialRedrawSourceImage.originalUrl || partialRedrawSourceImage.apiResultUrl || partialRedrawSourceImage.url;
+            const cropPlan = executionNode.redraw?.cropPlans?.[0];
+            finalUrl = cropPlan
+              ? await compositeRedrawCropResult({
+                  originalImageUrl,
+                  generatedCropUrl: item.originalUrl || item.url,
+                  generationRect: cropPlan.generationRect,
+                  featherRatio: 0.05,
+                })
+              : await compositePartialRedrawResult({
+                  originalImageUrl,
+                  generatedCropUrl: item.originalUrl || item.url,
+                  partialRedraw: executionNode.partialRedraw!,
+                });
             finalOriginalUrl = finalUrl;
             finalApiResultUrl = undefined;
           }
@@ -1796,17 +1806,18 @@ export const useImageGeneration = (options: {
             provider: item.provider || executionNode.provider,
             providerLabel: item.providerName || executionNode.providerLabel,
             parentPromptId: promptNodeId,
-            ecommerceDeliveryKind: executionNode.ecommerce?.activeDeliveryKind || executionNode.partialRedraw?.inheritedDeliveryKind,
+            ecommerceDeliveryKind: executionNode.ecommerce?.activeDeliveryKind || executionNode.redraw?.inheritedDeliveryKind || executionNode.partialRedraw?.inheritedDeliveryKind,
             sourceTaskId,
             sourceResultIndex,
             position: layoutPosition,
             dimensions: item.dimensions ? `${item.dimensions.width}x${item.dimensions.height}` : undefined,
-            displayLabel: executionNode.partialRedraw?.inheritedDisplayLabel || executionNode.ecommerce?.displayLabel,
+            displayLabel: executionNode.redraw?.inheritedDisplayLabel || executionNode.partialRedraw?.inheritedDisplayLabel || executionNode.ecommerce?.displayLabel,
             exactDimensions: item.dimensions,
             sourceReferenceStorageIds: (executionNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
             generationTime: clampGenerationDurationMs(item.generationTime), keySlotId: item.keySlotId, mode,
             tokens: item.tokens, promptTokens: item.promptTokens, completionTokens: item.completionTokens, cost: item.cost, costSource: item.costSource,
             partialRedraw: executionNode.partialRedraw,
+            redraw: executionNode.redraw,
           };
         }));
 

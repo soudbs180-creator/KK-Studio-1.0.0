@@ -86,6 +86,9 @@ describe("payment webhook raw body handling", () => {
         post() { return this; },
         use() { return this; },
         get() { return this; },
+        put() { return this; },
+        patch() { return this; },
+        delete() { return this; },
       };
     };
 

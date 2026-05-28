@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 
 import type { EcommerceAPlusControlMode, EcommerceEditableTaskState } from '../../types';
 
@@ -184,6 +184,18 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
     }));
   };
 
+  const markPromptForAiAssist = () => {
+    updateTaskState((previous) => ({
+      ...previous,
+      promptAssistState: {
+        optimized: true,
+        source: 'manual',
+        updatedAt: Date.now(),
+        error: undefined,
+      },
+    }));
+  };
+
   const promptOverrideValue = taskState.promptOverride && taskState.promptOverride.length > 0
     ? taskState.promptOverride
     : taskState.resolvedPromptPreview;
@@ -271,6 +283,18 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
         </div>
       ) : (
         <>
+      {(taskState.referenceAnchors || []).length > 0 ? (
+        <div className="mb-3 rounded-xl border p-3" style={panelSurfaceStyle}>
+          <div className="mb-2 text-[11px] font-medium text-[var(--text-secondary)]">参考图 @ 锁定</div>
+          <div className="flex flex-wrap gap-1.5">
+            {(taskState.referenceAnchors || []).map((anchor) => (
+              <span key={anchor.anchorId} className="rounded-full border px-2 py-1 text-[10px]" style={summaryChipStyle}>
+                {anchor.token} · {anchor.roleLabel}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="grid gap-2 md:grid-cols-2">
         <label className="block">
           <div className="mb-1 text-[11px] font-medium text-[var(--text-secondary)]">主标题</div>
@@ -310,6 +334,17 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
         <label className="block md:col-span-2">
           <div className="mb-1 flex items-center justify-between gap-2 text-[11px] font-medium text-[var(--text-secondary)]">
             <span>提示词改写</span>
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]"
+              style={taskState.promptAssistState?.optimized ? infoChipStyle : summaryChipStyle}
+              onClick={markPromptForAiAssist}
+              title="下次生成时使用电商 AI 辅助优化当前任务提示词"
+            >
+              <Sparkles size={11} />
+              {taskState.promptAssistState?.optimized ? 'AI辅助已开' : '优化提示词'}
+            </button>
             {taskState.promptOverride ? (
               <button
                 type="button"
@@ -323,6 +358,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
                 恢复自动
               </button>
             ) : null}
+            </div>
           </div>
           <textarea
             value={promptOverrideValue}

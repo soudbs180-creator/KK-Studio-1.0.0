@@ -51,11 +51,14 @@ export function useEcommercePartialRedrawRuntime({
     parentPrompt: PromptNode | null | undefined,
   ): EcommercePartialRedrawContext => ({
     inheritedTaskState: parentPrompt?.ecommerce?.editableTask
+      || sourceImage.redraw?.inheritedTaskState
       || sourceImage.partialRedraw?.inheritedTaskState
       || undefined,
     inheritedDisplayLabel: parentPrompt?.ecommerce?.displayLabel
+      || sourceImage.redraw?.inheritedDisplayLabel
       || sourceImage.partialRedraw?.inheritedDisplayLabel,
     inheritedDeliveryKind: sourceImage.ecommerceDeliveryKind
+      || sourceImage.redraw?.inheritedDeliveryKind
       || sourceImage.partialRedraw?.inheritedDeliveryKind
       || parentPrompt?.ecommerce?.activeDeliveryKind,
   }), []);

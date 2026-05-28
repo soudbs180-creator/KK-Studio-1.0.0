@@ -84,3 +84,22 @@ test('mobile shell breakpoint and result grid width stay reactive across tablet 
   assert.match(feedSource, /window\.removeEventListener\('resize', syncMeasuredWidth\);/);
   assert.match(feedSource, /getFallbackWidth\(surface\)/);
 });
+
+test('mobile result feed handles isLoading state and displays customized empty state with default Chinese copy', () => {
+  const feedSource = readSource('src/components/mobile/MobileResultFeed.tsx');
+
+  // 1. 验证新增的 isLoading 参数存在于 Props 接口中
+  assert.match(feedSource, /isLoading\?: boolean;/);
+
+  // 2. 验证空状态组件 MobileResultFeedEmptyState 存在
+  assert.match(feedSource, /const MobileResultFeedEmptyState: React.FC/);
+
+  // 3. 验证默认中文 “我们从哪里开始？” 及其英文 “Where should we start?” 兜底
+  assert.match(feedSource, /pick\('我们从哪里开始？', 'Where should we start\?'\)/);
+
+  // 4. 验证在没有数据时，若 isLoading 开启则显示骨架屏，否则显示空状态
+  assert.match(feedSource, /isLoading \?/);
+  assert.match(feedSource, /<MobileResultFeedEmptyState \/>/);
+  assert.match(feedSource, /data-testid="mobile-result-empty-state"/);
+});
+

@@ -34,6 +34,8 @@ interface EcommerceCardActionsProps {
   onGenerateFramework?: (node: PromptNode) => void;
   onPauseFramework?: (node: PromptNode) => void;
   onResumeFramework?: (node: PromptNode) => void;
+  onPauseNodeQueue?: (node: PromptNode, reason?: 'editing' | 'manual') => void;
+  onResumeNodeQueue?: (node: PromptNode) => void;
   onCancelNodeQueue?: (node: PromptNode) => void;
   onConfirmDesktop: (node: PromptNode) => void;
   onGenerateMobile: (node: PromptNode) => void;
@@ -93,6 +95,8 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
   onGenerateFramework,
   onPauseFramework,
   onResumeFramework,
+  onPauseNodeQueue,
+  onResumeNodeQueue,
   onCancelNodeQueue,
   onConfirmDesktop,
   onGenerateMobile,
@@ -215,6 +219,33 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
       ) : null}
 
       {!isGroup && onCancelNodeQueue ? (
+        <>
+        {onPauseNodeQueue ? (
+          <button
+            type="button"
+            className={actionClass}
+            style={actionSurfaceStyle}
+            onClick={(event) => {
+              event.stopPropagation();
+              onPauseNodeQueue(node, 'manual');
+            }}
+          >
+            {pick('暂停排队', 'Pause queued')}
+          </button>
+        ) : null}
+        {onResumeNodeQueue ? (
+          <button
+            type="button"
+            className={actionClass}
+            style={actionSurfaceStyle}
+            onClick={(event) => {
+              event.stopPropagation();
+              onResumeNodeQueue(node);
+            }}
+          >
+            {pick('继续排队', 'Resume queued')}
+          </button>
+        ) : null}
         <button
           type="button"
           className={actionClass}
@@ -226,6 +257,7 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
         >
           {pick('取消排队', 'Cancel queued')}
         </button>
+        </>
       ) : null}
 
       {ecommerce.kind === 'main-image' ? (

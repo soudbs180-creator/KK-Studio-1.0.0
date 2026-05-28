@@ -4,6 +4,7 @@ import {
   HardDrive,
   KeyRound,
   LayoutDashboard,
+  Layers3,
   ScrollText,
 } from 'lucide-react';
 
@@ -178,6 +179,7 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     statusSummaryLabelZh: '路由状态',
     statusSummaryLabelEn: 'Route status',
   },
+
   'consumption-records': {
     eyebrow: 'Billing',
     titleZh: '计费账本',
@@ -237,6 +239,7 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     section: 'workspace',
     path: SETTINGS_PATHS['api-management'],
   },
+
   {
     id: 'consumption-records',
     labelZh: '计费账本',

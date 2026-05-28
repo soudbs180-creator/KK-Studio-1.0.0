@@ -204,10 +204,10 @@ test('API settings default view gives action modules more weight than repeated i
   const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
   const cssSource = readSource('src/index.css');
 
-  assert.match(viewSource, /settings-api-action-stage/);
-  assert.match(viewSource, /settings-api-info-stage/);
-  assert.match(cssSource, /settings-api-default-layout[\s\S]*grid-template-columns:\s*minmax\(340px, 1\.35fr\) minmax\(260px, 0\.65fr\);/);
-  assert.match(cssSource, /settings-api-action-stage[\s\S]*min-height:\s*180px;/);
-  assert.match(cssSource, /settings-api-info-stage[\s\S]*opacity:\s*0\.82;/);
-  assert.match(viewSource, /showAdvancedWorkbench \? \(/);
+  assert.match(viewSource, /<ApiWorkbenchModelCenterSection/);
+  assert.match(viewSource, /\{renderAdvancedPanels\(\)\}/);
+  assert.match(cssSource, /settings-model-center-layout[\s\S]*grid-template-columns:\s*minmax\(0, 842px\) minmax\(270px, 1fr\);/);
+  assert.match(cssSource, /settings-model-center-route-grid[\s\S]*grid-template-columns:\s*repeat\(auto-fit, minmax\(270px, 1fr\)\);/);
+  assert.match(cssSource, /settings-model-center-preset-row/);
+  assert.match(viewSource, /if \(!showAdvancedWorkbench\) return null;/);
 });

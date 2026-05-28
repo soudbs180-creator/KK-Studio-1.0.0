@@ -198,19 +198,21 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
           box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
         }
         .settings-sidebar-card.active {
-          border-color: var(--accent-color, #3b82f6) !important;
-          background: var(--frost-card-sub-bg, rgba(27, 34, 54, 0.85)) !important;
-          box-shadow: 0 8px 32px rgba(59, 130, 246, 0.15) !important;
+          /* 边框重塑：使用高雅的半透明靛蓝科技边框，勾勒出清晰的物理边界 */
+          border-color: rgba(59, 130, 246, 0.35) !important;
+          /* 采用带微弱蓝紫径向渐变的深色底色，并在左上角融入一抹 AI 科技微光 */
+          background: radial-gradient(circle at 12% 16%, rgba(59, 130, 246, 0.12) 0%, rgba(139, 92, 246, 0.04) 45%, var(--frost-card-framework-bg, rgba(14, 18, 30, 0.8)) 100%) !important;
+          /* 融合外层蓝色弥散光晕（Aura Glow）与内凹阴影，使边框外沿折射荧光，内部呈现立体按压凹陷 */
+          box-shadow: 
+            0 0 12px rgba(59, 130, 246, 0.22),
+            inset 2px 2px 5px rgba(0, 0, 0, 0.5),
+            inset -1px -1px 3px rgba(255, 255, 255, 0.03) !important;
+          /* 选中时卡片物理上产生微小的压低反馈 */
+          transform: translateY(0.5px);
         }
+        /* 移除原有左侧生硬的竖条，使凹陷毛玻璃的整体结构更纯粹连贯 */
         .settings-sidebar-card.active::before {
-          content: "";
-          position: absolute;
-          left: 0;
-          top: 25%;
-          height: 50%;
-          width: 3px;
-          background: var(--accent-color, #3b82f6);
-          border-radius: 0 4px 4px 0;
+          display: none;
         }
         .card-avatar-icon {
           display: flex;
@@ -222,11 +224,25 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
           border: 1px solid var(--frost-card-framework-border, rgba(255, 255, 255, 0.08));
           background: rgba(255, 255, 255, 0.04);
           color: var(--text-primary);
+          transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
         }
+        /* 选中状态下图标容器的凹陷融入与发光提亮 */
         .settings-sidebar-card.active .card-avatar-icon {
-          background: rgba(59, 130, 246, 0.15);
-          color: var(--accent-color, #3b82f6);
-          border-color: rgba(59, 130, 246, 0.25);
+          background: rgba(0, 0, 0, 0.25) !important;
+          border-color: rgba(255, 255, 255, 0.04) !important;
+          color: var(--accent-color, #3b82f6) !important;
+          /* 给图标注入柔和的发光微动效，使其在凹陷底盘中更为突出 */
+          filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.5));
+          transform: scale(0.96);
+        }
+        /* 选中状态下右侧箭头微移与淡化，模拟被推入的物理深度 */
+        .settings-sidebar-card .lucide-chevron-right {
+          transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .settings-sidebar-card.active .lucide-chevron-right {
+          color: var(--accent-color, #3b82f6) !important;
+          opacity: 0.7 !important;
+          transform: scale(0.9) translateX(-1px);
         }
       `}</style>
 
