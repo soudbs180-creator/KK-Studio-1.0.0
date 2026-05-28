@@ -1,7 +1,7 @@
 import React from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 
-import type { EcommerceAPlusControlMode, EcommerceEditableTaskState } from '../../types';
+import type { EcommerceAPlusControlMode, EcommerceEditableTaskState, ReferenceImage } from '../../types';
 
 export type EcommerceTaskStateUpdater =
   | EcommerceEditableTaskState
@@ -21,6 +21,7 @@ interface EcommerceTaskEditorPanelProps {
   compact?: boolean;
   collapsible?: boolean;
   defaultExpanded?: boolean;
+  referenceImages?: ReferenceImage[];
 }
 
 const inputClassName = 'w-full rounded-lg border bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--clay-brand-pink)]';
@@ -112,12 +113,21 @@ const aPlusOverrideOptions: Array<{ value: EcommerceAPlusControlMode | null; lab
   { value: '600x450', label: '600x450' },
 ];
 
+function resolveReferenceImageSrc(image?: ReferenceImage): string {
+  const data = image?.url || image?.data || '';
+  if (!data) return '';
+  return data.startsWith('data:') || data.startsWith('blob:') || data.startsWith('http')
+    ? data
+    : `data:${image?.mimeType || 'image/png'};base64,${data}`;
+}
+
 const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
   taskState,
   onTaskStateChange,
   compact = false,
   collapsible = false,
   defaultExpanded = true,
+  referenceImages = [],
 }) => {
   const [isExpanded, setIsExpanded] = React.useState(() => !collapsible || defaultExpanded);
   const rootPaddingClassName = compact ? 'p-2.5' : 'p-3';
@@ -182,6 +192,51 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
         [key]: value,
       },
     }));
+  };
+
+  const markPromptForAiAssist = () => {
+    updateTaskState((previous) => ({
+      ...previous,
+      promptAssistState: {
+        optimized: true,
+        source: 'manual',
+        updatedAt: Date.now(),
+        error: undefined,
+      },
+    }));
+  };
+
+  const updateReferenceAnchorRole = (anchorId: string, nextRoleLabel: string) => {
+    const roleLabel = nextRoleLabel.trim();
+    updateTaskState((previous) => {
+      const targetAnchor = (previous.referenceAnchors || []).find((anchor) => anchor.anchorId === anchorId);
+      if (!targetAnchor) return previous;
+
+      const resolvedRoleLabel = roleLabel || targetAnchor.roleLabel;
+      const nextAssetRoles = previous.assetRoles.map((assetRole) => {
+        const matchesAnchor = assetRole.anchorId === anchorId || assetRole.assetId === targetAnchor.assetId;
+        return matchesAnchor
+          ? {
+              ...assetRole,
+              roleLabel: resolvedRoleLabel,
+            }
+          : assetRole;
+      });
+
+      return {
+        ...previous,
+        assetRoles: nextAssetRoles,
+        imageRoleSummary: nextAssetRoles.map((assetRole) => assetRole.roleLabel || assetRole.normalizedLabel),
+        referenceAnchors: (previous.referenceAnchors || []).map((anchor) => (
+          anchor.anchorId === anchorId
+            ? {
+                ...anchor,
+                roleLabel: resolvedRoleLabel,
+              }
+            : anchor
+        )),
+      };
+    });
   };
 
   const promptOverrideValue = taskState.promptOverride && taskState.promptOverride.length > 0
@@ -271,6 +326,45 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
         </div>
       ) : (
         <>
+      {(taskState.referenceAnchors || []).length > 0 ? (
+        <div className="mb-3 rounded-xl border p-3" style={panelSurfaceStyle}>
+          <div className="mb-2 text-[11px] font-medium text-[var(--text-secondary)]">参考图 @ 锁定</div>
+          <div className="grid gap-2 md:grid-cols-2">
+            {(taskState.referenceAnchors || []).map((anchor) => {
+              const previewImage = referenceImages.find((image) => (
+                image.id === anchor.assetId || image.storageId === anchor.assetId
+              ));
+              const previewSrc = resolveReferenceImageSrc(previewImage);
+
+              return (
+                <div key={anchor.anchorId} className="flex items-center gap-2 rounded-lg border p-2" style={summaryChipStyle}>
+                  {previewSrc ? (
+                    <img
+                      src={previewSrc}
+                      alt={anchor.roleLabel}
+                      className="h-10 w-10 shrink-0 rounded-md object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border text-[10px] text-[var(--text-tertiary)]" style={subSurfaceStyle}>
+                      @
+                    </div>
+                  )}
+                  <label className="min-w-0 flex-1">
+                    <span className="block truncate text-[10px] font-semibold text-[var(--clay-brand-pink)]">{anchor.token}</span>
+                    <input
+                      type="text"
+                      value={anchor.roleLabel}
+                      onChange={(event) => updateReferenceAnchorRole(anchor.anchorId, event.target.value)}
+                      className="mt-1 w-full rounded-md border bg-transparent px-2 py-1 text-[10px] text-[var(--text-primary)] outline-none focus:border-[var(--clay-brand-pink)]"
+                      style={inputSurfaceStyle}
+                    />
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
       <div className="grid gap-2 md:grid-cols-2">
         <label className="block">
           <div className="mb-1 text-[11px] font-medium text-[var(--text-secondary)]">主标题</div>
@@ -310,6 +404,17 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
         <label className="block md:col-span-2">
           <div className="mb-1 flex items-center justify-between gap-2 text-[11px] font-medium text-[var(--text-secondary)]">
             <span>提示词改写</span>
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]"
+              style={taskState.promptAssistState?.optimized ? infoChipStyle : summaryChipStyle}
+              onClick={markPromptForAiAssist}
+              title="下次生成时使用电商 AI 辅助优化当前任务提示词"
+            >
+              <Sparkles size={11} />
+              {taskState.promptAssistState?.optimized ? 'AI辅助已开' : '优化提示词'}
+            </button>
             {taskState.promptOverride ? (
               <button
                 type="button"
@@ -323,6 +428,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
                 恢复自动
               </button>
             ) : null}
+            </div>
           </div>
           <textarea
             value={promptOverrideValue}

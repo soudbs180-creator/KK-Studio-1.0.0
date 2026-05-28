@@ -8,13 +8,16 @@ const ROOT_DIR = process.cwd();
 
 
 
-test('lightbox uses PartialRedrawModal and no longer wires the legacy inpaint contract', () => {
+test('lightbox uses the unified RedrawWorkspace and no longer wires the legacy inpaint contract', () => {
   const lightboxSource = readSource('src/components/image/GlobalLightbox.tsx');
 
-  assert.match(lightboxSource, /import \{ PartialRedrawModal \} from '\.\/PartialRedrawModal';/);
-  assert.match(lightboxSource, /onPartialRedraw\?: \(image: GeneratedImage, request: PartialRedrawRequest\) => void;/);
-  assert.match(lightboxSource, /setShowPartialRedraw\(true\)/);
-  assert.match(lightboxSource, /<PartialRedrawModal/);
+  assert.match(lightboxSource, /import \{ RedrawWorkspace \} from '\.\/RedrawWorkspace';/);
+  assert.match(lightboxSource, /onPartialRedraw\?: \(image: GeneratedImage, request: RedrawRequest\) => void;/);
+  assert.match(lightboxSource, /setRedrawWorkspaceMode\('fresh'\)/);
+  assert.match(lightboxSource, /setRedrawWorkspaceMode\('regenerate'\)/);
+  assert.match(lightboxSource, /<RedrawWorkspace/);
+  assert.match(lightboxSource, /initialRegions=\{redrawWorkspaceMode === 'regenerate'/);
   assert.doesNotMatch(lightboxSource, /InpaintModal/);
   assert.doesNotMatch(lightboxSource, /onInpaint/);
+  assert.doesNotMatch(lightboxSource, /PartialRedrawModal/);
 });

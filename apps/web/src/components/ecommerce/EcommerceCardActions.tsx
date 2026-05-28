@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { useLocale } from '../../context/LocaleContext';
-import type { EcommerceEditableTaskState, PromptNode } from '../../types';
+import type { EcommerceEditableTaskState, EcommerceFrameworkQueueItem, PromptNode } from '../../types';
 
 type EcommerceFrameworkStatus = {
   activeSheet: string;
@@ -13,6 +13,8 @@ type EcommerceFrameworkStatus = {
   failed: number;
   pausedItems: number;
   total: number;
+  queueItems?: EcommerceFrameworkQueueItem[];
+  maxConcurrentGenerations?: number;
 };
 
 interface EcommerceCardActionsProps {
@@ -30,10 +32,14 @@ interface EcommerceCardActionsProps {
   onToggleSelected: (node: PromptNode, selected: boolean) => void;
   onSetGroupSelection?: (node: PromptNode, selected: boolean) => void;
   onGenerateNode: (node: PromptNode) => void;
+  onRegenerateUnsatisfied?: (node: PromptNode) => void;
   onGenerateGroup: (node: PromptNode, phase: 'desktop' | 'mobile') => void;
   onGenerateFramework?: (node: PromptNode) => void;
   onPauseFramework?: (node: PromptNode) => void;
   onResumeFramework?: (node: PromptNode) => void;
+  onPauseNodeQueue?: (node: PromptNode, reason?: 'editing' | 'manual') => void;
+  onResumeNodeQueue?: (node: PromptNode, reason?: 'editing' | 'manual') => void;
+  onSetFrameworkConcurrency?: (node: PromptNode, maxConcurrentGenerations: 1 | 2 | 4) => void;
   onCancelNodeQueue?: (node: PromptNode) => void;
   onConfirmDesktop: (node: PromptNode) => void;
   onGenerateMobile: (node: PromptNode) => void;
@@ -79,6 +85,15 @@ const selectedActionStyle: React.CSSProperties = {
   borderColor: clayPinkBorder,
 };
 
+function resolveTaskQueueItem(
+  node: PromptNode,
+  frameworkStatus?: EcommerceFrameworkStatus | null,
+): EcommerceFrameworkQueueItem | null {
+  return (frameworkStatus?.queueItems || [])
+    .filter((item) => item.nodeId === node.id)
+    .sort((left, right) => (right.enqueuedAt || 0) - (left.enqueuedAt || 0))[0] || null;
+}
+
 const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
   node,
   taskState,
@@ -89,10 +104,14 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
   onToggleSelected,
   onSetGroupSelection,
   onGenerateNode,
+  onRegenerateUnsatisfied,
   onGenerateGroup,
   onGenerateFramework,
   onPauseFramework,
   onResumeFramework,
+  onPauseNodeQueue,
+  onResumeNodeQueue,
+  onSetFrameworkConcurrency,
   onCancelNodeQueue,
   onConfirmDesktop,
   onGenerateMobile,
@@ -111,6 +130,13 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
   const desktopReadyToConfirm = ecommerce.desktopStage === 'generated';
   const mobileReady = ecommerce.desktopStage === 'confirmed';
   const resolvedTaskState = taskState ?? ecommerce.editableTask;
+  const queueItem = resolveTaskQueueItem(node, frameworkStatus);
+  const canPauseQueuedItem = queueItem?.status === 'queued';
+  const canResumeQueuedItem = queueItem?.status === 'paused';
+  const canCancelQueuedItem = queueItem?.status === 'queued' || queueItem?.status === 'paused';
+  const hasGeneratedResult = ecommerce.stage === 'generated'
+    || ecommerce.desktopStage === 'generated'
+    || ecommerce.mobileStage === 'generated';
   const taskIsActive = Boolean(
     resolvedTaskState
       && activeTaskState
@@ -159,6 +185,27 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
           >
             {pick('开始队列', 'Start queue')}
           </button>
+          {onSetFrameworkConcurrency ? (
+            <div className="flex items-center gap-1 rounded-md border px-1 py-0.5" style={frameworkChipStyle}>
+              {([1, 2, 4] as const).map((value) => {
+                const active = (frameworkStatus?.maxConcurrentGenerations || 4) === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    className="rounded px-1.5 py-0.5 text-[10px] leading-none"
+                    style={active ? selectedActionStyle : { color: 'var(--text-tertiary)' }}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onSetFrameworkConcurrency(node, value);
+                    }}
+                  >
+                    {value}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
           <button
             type="button"
             className={actionClass}
@@ -204,17 +251,48 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
           type="button"
           className={actionClass}
           style={taskIsActive ? selectedActionStyle : actionSurfaceStyle}
-          onClick={(event) => {
-            event.stopPropagation();
-            onActivateTask?.(node);
-            onTaskStateChange(resolvedTaskState.taskId, (previous) => ({ ...previous }));
-          }}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (canPauseQueuedItem) {
+                onPauseNodeQueue?.(node, 'editing');
+              }
+              onActivateTask?.(node);
+              onTaskStateChange(resolvedTaskState.taskId, (previous) => ({ ...previous }));
+            }}
         >
           {taskIsActive ? pick('编辑中', 'Editing') : pick('编辑任务', 'Edit task')}
         </button>
       ) : null}
 
-      {!isGroup && onCancelNodeQueue ? (
+      {!isGroup && (canPauseQueuedItem || canResumeQueuedItem || canCancelQueuedItem) ? (
+        <>
+        {canPauseQueuedItem && onPauseNodeQueue ? (
+          <button
+            type="button"
+            className={actionClass}
+            style={actionSurfaceStyle}
+            onClick={(event) => {
+              event.stopPropagation();
+              onPauseNodeQueue(node, 'manual');
+            }}
+          >
+            {pick('暂停排队', 'Pause queued')}
+          </button>
+        ) : null}
+        {canResumeQueuedItem && onResumeNodeQueue ? (
+          <button
+            type="button"
+            className={actionClass}
+            style={actionSurfaceStyle}
+            onClick={(event) => {
+              event.stopPropagation();
+              onResumeNodeQueue(node);
+            }}
+          >
+            {pick('继续排队', 'Resume queued')}
+          </button>
+        ) : null}
+        {canCancelQueuedItem && onCancelNodeQueue ? (
         <button
           type="button"
           className={actionClass}
@@ -226,20 +304,37 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
         >
           {pick('取消排队', 'Cancel queued')}
         </button>
+        ) : null}
+        </>
       ) : null}
 
       {ecommerce.kind === 'main-image' ? (
-        <button
-          type="button"
-          className={actionClass}
-          style={coralActionStyle}
-          onClick={(event) => {
-            event.stopPropagation();
-            onGenerateNode(node);
-          }}
-        >
-          {pick('生成', 'Generate')}
-        </button>
+        <>
+          <button
+            type="button"
+            className={actionClass}
+            style={coralActionStyle}
+            onClick={(event) => {
+              event.stopPropagation();
+              onGenerateNode(node);
+            }}
+          >
+            {ecommerce.stage === 'failed' ? pick('失败重试', 'Retry failed') : pick('生成', 'Generate')}
+          </button>
+          {hasGeneratedResult && onRegenerateUnsatisfied ? (
+            <button
+              type="button"
+              className={actionClass}
+              style={pinkActionStyle}
+              onClick={(event) => {
+                event.stopPropagation();
+                onRegenerateUnsatisfied(node);
+              }}
+            >
+              {pick('不满意重生成', 'Regenerate')}
+            </button>
+          ) : null}
+        </>
       ) : null}
 
       {isGroup ? (
@@ -322,8 +417,23 @@ const EcommerceCardActions: React.FC<EcommerceCardActionsProps> = ({
               onGenerateNode(node);
             }}
           >
-            {isDesktopThenMobile ? pick('生成桌面版', 'Generate desktop') : pick('生成', 'Generate')}
+            {ecommerce.stage === 'failed' || ecommerce.desktopStage === 'failed'
+              ? pick('失败重试', 'Retry failed')
+              : isDesktopThenMobile ? pick('生成桌面版', 'Generate desktop') : pick('生成', 'Generate')}
           </button>
+          {hasGeneratedResult && onRegenerateUnsatisfied ? (
+            <button
+              type="button"
+              className={actionClass}
+              style={pinkActionStyle}
+              onClick={(event) => {
+                event.stopPropagation();
+                onRegenerateUnsatisfied(node);
+              }}
+            >
+              {pick('不满意重生成', 'Regenerate')}
+            </button>
+          ) : null}
           {isDesktopThenMobile ? (
             <>
               <button

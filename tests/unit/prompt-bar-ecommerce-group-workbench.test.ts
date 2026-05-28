@@ -21,6 +21,7 @@ test('PromptBar ecommerce panel keeps review controls before confirmation and le
 
   assert.match(desktopPanelSource, /activeGroupSheet/);
   assert.match(desktopPanelSource, /analysisConfirmed/);
+  assert.match(desktopPanelSource, /if \(analysisConfirmed\) \{\s*return null;\s*\}/);
   assert.match(desktopPanelSource, /onActivateTaskBySourceKey/);
   assert.match(desktopPanelSource, /onActivateGroupSheet/);
   assert.match(desktopPanelSource, /onPreviewSlotHistory/);

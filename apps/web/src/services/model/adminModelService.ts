@@ -86,6 +86,7 @@ export interface AdminProvider {
   id: string;
   providerId: string;
   name: string;
+  providerKind?: 'official' | 'relay';
   models: AdminModelConfig[];
 }
 
@@ -93,6 +94,7 @@ interface FlatModelRow {
   id?: string;
   provider_id?: string;
   provider_name?: string;
+  provider_kind?: string | null;
   request_profile_id?: string;
   route_strategy?: 'priority-failover' | 'weighted-random' | 'parallel-race' | null;
   model_id?: string;
@@ -276,6 +278,7 @@ class AdminModelService {
     grouped: Array<{
       providerId?: string | null;
       providerName?: string | null;
+      providerKind?: 'official' | 'relay' | null;
       models?: Array<{
         recordId?: string | null;
         modelId?: string | null;
@@ -300,6 +303,7 @@ class AdminModelService {
         id: model.recordId ?? undefined,
         provider_id: provider.providerId ?? undefined,
         provider_name: provider.providerName ?? undefined,
+        provider_kind: provider.providerKind ?? undefined,
         request_profile_id: undefined,
         route_strategy: undefined,
         model_id: model.modelId ?? undefined,
@@ -431,6 +435,7 @@ class AdminModelService {
                 id: providerId,
                 providerId,
                 name: (row.provider_name || providerId).trim(),
+                providerKind: (row.provider_kind as any) || 'relay',
                 models: [],
               });
             }

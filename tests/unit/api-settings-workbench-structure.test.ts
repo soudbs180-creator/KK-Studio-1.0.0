@@ -22,6 +22,14 @@ test('ApiSettingsView default mode exposes a Model Center provider pool with a p
   assert.doesNotMatch(viewSource, /saveProvider\(\)[\s\S]{0,180}Provider prefilled/);
 
   assert.match(sectionsSource, /testId="settings-model-center"/);
+  assert.doesNotMatch(sectionsSource, /data-testid="api-connection-wizard-open"/);
+  assert.doesNotMatch(sectionsSource, /Connect AI service/);
+  assert.match(sectionsSource, /data-testid="api-official-provider-add"/);
+  assert.match(sectionsSource, /data-testid="api-proxy-provider-add"/);
+  assert.match(sectionsSource, /presetTab === 'official'/);
+  assert.match(sectionsSource, /presetTab === 'relay'/);
+  assert.match(sectionsSource, /settings-model-center-preset-row/);
+  assert.doesNotMatch(sectionsSource, /settings-model-center-preset__external[\s\S]{0,120}role="button"/);
   assert.match(sectionsSource, /data-testid="api-model-center-provider-pool"/);
   assert.match(sectionsSource, /data-testid="api-model-center-preset-directory"/);
   assert.match(sectionsSource, /Preset directory/);
@@ -30,6 +38,42 @@ test('ApiSettingsView default mode exposes a Model Center provider pool with a p
   assert.match(cssSource, /\.settings-panel \.settings-model-center-layout \{[\s\S]*grid-template-columns: minmax\(0, 842px\) minmax\(270px, 1fr\);/);
   assert.match(cssSource, /\.settings-panel \.settings-model-center-route-grid \{[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(270px, 1fr\)\);/);
   assert.match(cssSource, /\.settings-panel \.settings-model-center-route__metric-value \{[\s\S]*font-variant-numeric: tabular-nums;/);
+});
+
+test('ApiSettingsView keeps provider setup flat without the removed connection wizard layer', () => {
+  const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
+  const cssSource = readSource('src/index.css');
+
+  assert.doesNotMatch(viewSource, /ApiConnectionWizard/);
+  assert.doesNotMatch(viewSource, /showConnectionWizard/);
+  assert.doesNotMatch(viewSource, /renderConnectionWizard/);
+  assert.doesNotMatch(viewSource, /createProviderFromConnectionWizard/);
+  assert.match(viewSource, /modelCenterPresetTab/);
+  assert.match(viewSource, /kind: preset\.kind === 'relay' \? 'relay' as const : 'official' as const/);
+
+  assert.doesNotMatch(cssSource, /settings-connection-wizard/);
+  assert.match(cssSource, /\.settings-panel \.settings-model-center-directory__tabs/);
+});
+
+test('Admin API config uses the same official and relay card model while exposing credit parameters', () => {
+  const source = readSource('src/pages/admin/ApiConfigPanel.tsx');
+  const cssSource = readSource('src/index.css');
+
+  assert.match(source, /ADMIN_API_PRESETS/);
+  assert.match(source, /kind: "official"/);
+  assert.match(source, /kind: "relay"/);
+  assert.match(source, /ADMIN_MODEL_QUALITY_KEYS\.map/);
+  assert.match(source, /saveAdminCreditProvider/);
+  assert.match(source, /retainApiKeyFingerprints/);
+  assert.match(source, /const qualityPricing = isTarget \? nextPricing/);
+  assert.match(source, /createDraftFromPreset/);
+  assert.match(source, /handleSaveDraftProvider/);
+  assert.match(source, /data-testid="admin-api-provider-draft"/);
+  assert.doesNotMatch(source, /admin-pricing-draft/);
+  assert.match(source, /API 供应商与模型积分/);
+  assert.match(cssSource, /\.admin-api-nexus \{/);
+  assert.match(cssSource, /\.admin-api-nexus__pricing-grid \{/);
+  assert.match(cssSource, /\.admin-api-nexus__draft \{/);
 });
 
 test('ApiSettingsView keeps the default list-mode hero framed as model center while advanced workbench sections remain available', () => {
@@ -92,13 +136,12 @@ test('ApiSettingsView surfaces a model-center API list and keeps provider creati
   assert.match(viewSource, /<ApiWorkbenchModelCenterSection/);
   assert.match(sectionsSource, /data-testid="api-simple-provider-add"/);
   assert.match(sectionsSource, /data-testid="api-proxy-provider-add"/);
-  assert.match(sectionsSource, /pick\('[^']*', 'Local API'\)/);
+  assert.match(sectionsSource, /pick\('官方', 'Official'\)/);
+  assert.match(sectionsSource, /pick\('中转站', 'Relay'\)/);
   assert.match(viewSource, /thirdPartyProviders\.map\(\(provider\)/);
 
-  assert.match(viewSource, /pick\('[^']*', 'Local APIs'\)/);
-  assert.match(viewSource, /pick\('[^']*', 'Add local API'\)/);
-  assert.match(viewSource, /pick\('[^']*', 'Local API editor'\)/);
-  assert.match(sectionsSource, /pick\('[^']*', 'Local API view'\)/);
+  assert.match(viewSource, /beginCreateOfficial/);
+  assert.match(viewSource, /buildOfficialEditorPath/);
   assert.match(sectionsSource, /value: 'official', label: pick\('[^']*', 'Local APIs'\)/);
 
   const directOfficialButtonUsages = viewSource.match(/onClick=\{\(\) => beginCreateOfficial\(\)\}/g) ?? [];

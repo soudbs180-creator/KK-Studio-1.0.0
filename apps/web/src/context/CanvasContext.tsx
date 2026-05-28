@@ -145,6 +145,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const { isStageReady } = useAppStartup();
     const [isLoading, setIsLoading] = useState(true);
     const [loadingProgress, setLoadingProgress] = useState(0);
+    // 简体中文注释：标记当前首次初始化（包含本地物理文件夹数据和 IndexedDB）是否已经完全恢复完毕
+    const [isInitRestored, setIsInitRestored] = useState(false);
     const [isShellReady, setIsShellReady] = useState(false);
     const [state, setState] = useState<CanvasState>(DEFAULT_STATE);
 
@@ -153,9 +155,42 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const stateRef = useRef(state);
     const lastUserActivityAtRef = useRef<number>(Date.now());
 
+    // 简体中文注释：防回退黄金法则，保存首次画布初始化加载是否成功完成的标志，防止重复执行 init() 造成进度回退
+    const hasLoadedSuccessRef = useRef(false);
+    // 简体中文注释：标记当前 Provider 挂载生命周期内 init 是否已经被触发执行过，防止 double render 造成并发和状态错乱
+    const isInitExecutedRef = useRef(false);
+
     useEffect(() => {
         stateRef.current = state;
     }, [state]);
+
+    // 简体中文注释：水合激活与 sessionStorage 缓存读取。
+    // 在挂载后 useEffect 中读取，确保在客户端 Mount 完毕后才改变状态，完美防范 Hydration Mismatch 引起的全页强制刷新
+    useEffect(() => {
+        if (typeof window !== 'undefined' && sessionStorage.getItem('kk_canvas_loaded') === 'true') {
+            setIsLoading(false);
+            setLoadingProgress(100);
+            hasLoadedSuccessRef.current = true;
+        }
+    }, []);
+
+    const setMonotonicLoadingProgress = useCallback((nextProgress: number, options?: { reset?: boolean }) => {
+        const normalizedProgress = Math.max(0, Math.min(100, Math.floor(Number.isFinite(nextProgress) ? nextProgress : 0)));
+        setLoadingProgress(prev => {
+            // 简体中文注释：一旦已经到了 100% 或者比新进度更大，且没有显示 reset 标记，绝不允许回退
+            if (prev >= 100 && normalizedProgress < 100 && !options?.reset) {
+                return prev;
+            }
+            if (options?.reset) {
+                // 简体中文注释：如果已经加载成功，绝不允许再把进度重置为 0
+                if (hasLoadedSuccessRef.current && normalizedProgress === 0) {
+                    return prev;
+                }
+                return normalizedProgress;
+            }
+            return Math.max(prev, normalizedProgress);
+        });
+    }, []);
 
     useEffect(() => {
         const markUserActivity = () => {
@@ -452,30 +487,63 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!isShellReady) return;
 
         const init = async () => {
-            // 简体中文注释：启动假进度条定时器以在手机端/电脑端均能平滑看到 1~100 加载过程
-            let progress = 0;
-            const progressTimer = setInterval(() => {
-                progress += Math.random() * 15 + 5;
-                if (progress >= 99) {
-                    progress = 99;
-                    clearInterval(progressTimer);
-                }
-                setLoadingProgress(Math.floor(progress));
-            }, 40);
+            // 简体中文注释：如果当前挂载周期内已经开始或运行过 init()，直接跳过，防止 double render 造成重复加载和时序冲突
+            if (isInitExecutedRef.current) {
+                return;
+            }
+            isInitExecutedRef.current = true;
+
+            const isSilent = typeof window !== 'undefined' && sessionStorage.getItem('kk_canvas_loaded') === 'true';
+
+            // 简体中文注释：启动减速缓动假进度条定时器，使首次加载在前中期顺滑步进，后期无限逼近 99.9% 且绝不卡死
+            let progress = isSilent ? 100 : 0;
+            let progressTimer: any = null;
+
+            if (!isSilent) {
+                progressTimer = setInterval(() => {
+                    let delta = 0;
+                    if (progress < 60) {
+                        // 前期（0 - 60%）：较快步进
+                        delta = Math.random() * 6 + 4;
+                    } else if (progress < 85) {
+                        // 中期（60% - 85%）：中等速度减速步进
+                        delta = Math.random() * 1.5 + 0.5;
+                    } else if (progress < 95) {
+                        // 后期（85% - 95%）：极慢步进
+                        delta = Math.random() * 0.3 + 0.1;
+                    } else if (progress < 99.8) {
+                        // 极限期（95% - 99.8%）：微幅移动，给用户提供系统依然在工作的持续动态反馈，杜绝卡在 99 零反应
+                        delta = Math.random() * 0.05 + 0.01;
+                    } else {
+                        // 99.8% 以上极微幅增长
+                        delta = 0.002;
+                    }
+                    
+                    progress = Math.min(99.9, progress + delta);
+                    setMonotonicLoadingProgress(Math.floor(progress));
+                }, 50);
+            }
 
             const smoothProgressTo100 = () => {
+                if (isSilent) {
+                    setMonotonicLoadingProgress(100);
+                    return Promise.resolve();
+                }
                 return new Promise<void>((resolve) => {
-                    clearInterval(progressTimer);
+                    if (progressTimer !== null) {
+                        clearInterval(progressTimer);
+                    }
                     let current = progress;
                     const endTimer = setInterval(() => {
-                        current += Math.random() * 25 + 15;
+                        // 简体中文注释：每次加 5~15% 的步长，让剩余部分在几十到两百毫秒内流畅地跑完至 100%
+                        current += Math.random() * 10 + 5;
                         if (current >= 100) {
                             current = 100;
-                            setLoadingProgress(100);
+                            setMonotonicLoadingProgress(100);
                             clearInterval(endTimer);
                             resolve();
                         } else {
-                            setLoadingProgress(Math.floor(current));
+                            setMonotonicLoadingProgress(Math.floor(current));
                         }
                     }, 30);
                 });
@@ -493,106 +561,112 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     });
                 }
 
-                const startupImageHydrationPromise = traceLocalPerformance('canvas-startup.preview-hydration', () => hydrateStartupPreviewImages(startupState, (pct) => setLoadingProgress(pct)));
+                const startupImageHydrationPromise = traceLocalPerformance('canvas-startup.preview-hydration', () => hydrateStartupPreviewImages(startupState, (pct) => setMonotonicLoadingProgress(pct)));
 
             try {
-                // 1. Restore Local Folder Handle (Fix for 0B issue)
-                try {
-                    const handle = await traceLocalPerformance('canvas-startup.restore-folder-handle', () => getLocalFolderHandle());
-                    if (handle) {
-                        // Verify permission before setting state (Cloud/Web requirement)
-                        // @ts-ignore
-                        const perm = await handle.queryPermission({ mode: 'readwrite' });
-                        if (perm === 'granted') {
-                            logInfo('CanvasContext', '已恢复本地文件夹', `folder: ${handle.name}`);
+                // 简体中文注释：为磁盘文件恢复与权限检查设置最大 3200ms 的超时保护，避免由于 File System 挂起导致界面无限等待 99%
+                const diskRestorePromise = (async () => {
+                    // 1. Restore Local Folder Handle (Fix for 0B issue)
+                    try {
+                        const handle = await traceLocalPerformance('canvas-startup.restore-folder-handle', () => getLocalFolderHandle());
+                        if (handle) {
+                            // Verify permission before setting state (Cloud/Web requirement)
+                            // @ts-ignore
+                            const perm = await handle.queryPermission({ mode: 'readwrite' });
+                            if (perm === 'granted') {
+                                logInfo('CanvasContext', '已恢复本地文件夹', `folder: ${handle.name}`);
 
-                            // [NEW] Load actual project data from disk to ensure sync
-                            // This overrides localStorage state with the true file state
-                            try {
-                                logInfo('CanvasContext', '开始从磁盘加载项目数据', `folder: ${handle.name}`);
-                                const projectLoadPromise = traceLocalPerformance('canvas-startup.disk-project-load', () => fileSystemService.loadProjectWithThumbs(handle));
-                                const referenceImageLoadPromise = traceLocalPerformance('canvas-startup.reference-image-load', () => fileSystemService.loadAllReferenceImages(handle));
-                                const [{ canvases, images, activeCanvasId: savedActiveCanvasId }, refUrls] = await Promise.all([
-                                    projectLoadPromise,
-                                    referenceImageLoadPromise,
-                                ]);
-                                logInfo('CanvasContext', '磁盘数据加载完成', `画布数: ${canvases.length}, 图片数: ${images.size}, 活动ID: ${savedActiveCanvasId}`);
+                                // [NEW] Load actual project data from disk to ensure sync
+                                // This overrides localStorage state with the true file state
+                                try {
+                                    logInfo('CanvasContext', '开始从磁盘加载项目数据', `folder: ${handle.name}`);
+                                    const projectLoadPromise = traceLocalPerformance('canvas-startup.disk-project-load', () => fileSystemService.loadProjectWithThumbs(handle));
+                                    const referenceImageLoadPromise = traceLocalPerformance('canvas-startup.reference-image-load', () => fileSystemService.loadAllReferenceImages(handle));
+                                    const [{ canvases, images, activeCanvasId: savedActiveCanvasId }, refUrls] = await Promise.all([
+                                        projectLoadPromise,
+                                        referenceImageLoadPromise,
+                                    ]);
+                                    logInfo('CanvasContext', '磁盘数据加载完成', `画布数: ${canvases.length}, 图片数: ${images.size}, 活动ID: ${savedActiveCanvasId}`);
 
-                                // Hydrate the cache without ever letting thumbnails overwrite the original slot.
-                                for (const [id, data] of images.entries()) {
-                                    void hydrateRecoveredMediaCacheEntry(id, data).catch((error) => {
-                                        console.warn('[CanvasContext] Cache hydration failed', id, error);
-                                    });
-                                }
+                                    // Hydrate the cache without ever letting thumbnails overwrite the original slot.
+                                    for (const [id, data] of images.entries()) {
+                                        void hydrateRecoveredMediaCacheEntry(id, data).catch((error) => {
+                                            console.warn('[CanvasContext] Cache hydration failed', id, error);
+                                        });
+                                    }
 
-                                if (canvases.length > 0) {
-                                    startTransition(() => {
-                                        setState(prev => {
-                                        // [Key fix] Merge disk project.json with the latest localStorage state.
-                                        // A hard refresh usually leaves fresher state in localStorage via beforeunload.
-                                        // project.json may lag behind due to async writes, so both sources must be merged carefully.
-                                        const mergedCanvases = mergeCanvases(prev.canvases, canvases, normalizeCanvasPromptRecovery);
-                                        const finalActiveId = resolvePreferredActiveCanvasId(
-                                            prev.activeCanvasId,
-                                            savedActiveCanvasId,
-                                            mergedCanvases
-                                        );
+                                    if (canvases.length > 0) {
+                                        startTransition(() => {
+                                            setState(prev => {
+                                            // [Key fix] Merge disk project.json with the latest localStorage state.
+                                            // A hard refresh usually leaves fresher state in localStorage via beforeunload.
+                                            // project.json may lag behind due to async writes, so both sources must be merged carefully.
+                                            const mergedCanvases = mergeCanvases(prev.canvases, canvases, normalizeCanvasPromptRecovery);
+                                            const finalActiveId = resolvePreferredActiveCanvasId(
+                                                prev.activeCanvasId,
+                                                savedActiveCanvasId,
+                                                mergedCanvases
+                                            );
 
-                                        return {
-                                            ...prev,
-                                            canvases: mergedCanvases.map(c => {
-                                                return {
-                                                    ...c,
-                                                    imageNodes: c.imageNodes.map(img => ({
-                                                        ...img,
-                                                        url: (images.get(img.storageId || img.id)?.url || images.get(img.id)?.url) || img.url || img.apiResultUrl || '',
-                                                        originalUrl: (images.get(img.storageId || img.id)?.originalUrl || images.get(img.id)?.originalUrl) || img.originalUrl || img.apiResultUrl
-                                                    })),
-                                                    promptNodes: c.promptNodes.map(pn => ({
-                                                        ...pn,
-                                                        // Restore missing reference data from refs/ when storageId is available.
-                                                        referenceImages: normalizeReferenceImagesStorage(pn.referenceImages)?.map(ref => {
-                                                            const recoveredData = !ref.data
-                                                                ? getReferenceImageLookupIds(ref)
-                                                                    .map((lookupId) => refUrls.get(lookupId))
-                                                                    .find((value): value is string => typeof value === 'string' && value.length > 0)
-                                                                : undefined;
+                                            return {
+                                                ...prev,
+                                                canvases: mergedCanvases.map(c => {
+                                                    return {
+                                                        ...c,
+                                                        imageNodes: c.imageNodes.map(img => ({
+                                                            ...img,
+                                                            url: (images.get(img.storageId || img.id)?.url || images.get(img.id)?.url) || img.url || img.apiResultUrl || '',
+                                                            originalUrl: (images.get(img.storageId || img.id)?.originalUrl || images.get(img.id)?.originalUrl) || img.originalUrl || img.apiResultUrl
+                                                        })),
+                                                        promptNodes: c.promptNodes.map(pn => ({
+                                                            ...pn,
+                                                            // Restore missing reference data from refs/ when storageId is available.
+                                                            referenceImages: normalizeReferenceImagesStorage(pn.referenceImages)?.map(ref => {
+                                                                const recoveredData = !ref.data
+                                                                    ? getReferenceImageLookupIds(ref)
+                                                                        .map((lookupId) => refUrls.get(lookupId))
+                                                                        .find((value): value is string => typeof value === 'string' && value.length > 0)
+                                                                    : undefined;
 
-                                                            return recoveredData
-                                                                ? { ...ref, data: recoveredData }
-                                                                : ref;
-                                                        }) || []
-                                                    }))
-                                                };
-                                            }),
-                                            activeCanvasId: finalActiveId,
-                                            fileSystemHandle: handle,
-                                            folderName: handle.name
-                                        };
-                                    });
-                                    });
-                                } else {
-                                    // Empty project on disk? Just connect.
+                                                                return recoveredData
+                                                                    ? { ...ref, data: recoveredData }
+                                                                    : ref;
+                                                            }) || []
+                                                        }))
+                                                    };
+                                                }),
+                                                activeCanvasId: finalActiveId,
+                                                fileSystemHandle: handle,
+                                                folderName: handle.name
+                                            };
+                                        });
+                                        });
+                                    } else {
+                                        // Empty project on disk? Just connect.
+                                        startTransition(() => {
+                                            setState(prev => ({ ...prev, fileSystemHandle: handle, folderName: handle.name }));
+                                        });
+                                    }
+                                } catch (err) {
+                                    console.error('Failed to load project from restored handle', err);
+                                    // Fallback just connect
                                     startTransition(() => {
                                         setState(prev => ({ ...prev, fileSystemHandle: handle, folderName: handle.name }));
                                     });
                                 }
-                            } catch (err) {
-                                console.error('Failed to load project from restored handle', err);
-                                // Fallback just connect
-                                startTransition(() => {
-                                    setState(prev => ({ ...prev, fileSystemHandle: handle, folderName: handle.name }));
-                                });
+                            } else {
+                                logInfo('CanvasContext', '等待本地文件夹权限', `permission: ${perm}`);
                             }
                         } else {
-                            logInfo('CanvasContext', '等待本地文件夹权限', `permission: ${perm}`);
+                            logInfo('CanvasContext', '未找到已保存的本地文件夹', 'no persisted handle found');
                         }
-                    } else {
-                        logInfo('CanvasContext', '未找到已保存的本地文件夹', 'no persisted handle found');
+                    } catch (e) {
+                        logError('CanvasContext', e, '恢复文件夹句柄失败');
                     }
-                } catch (e) {
-                    logError('CanvasContext', e, '恢复文件夹句柄失败');
-                }
+                })();
+
+                const diskTimeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 3200));
+                await Promise.race([diskRestorePromise, diskTimeoutPromise]);
 
             } catch (error) {
                 console.error('Failed to load images from IndexedDB:', error);
@@ -608,6 +682,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 await smoothProgressTo100();
                 setTimeout(() => {
                     setIsLoading(false);
+                    hasLoadedSuccessRef.current = true; // 标记首次加载已成功，防止以后重复初始化把进度重置为 0
+                    setIsInitRestored(true); // 🚀 标记项目已彻底同步恢复完毕，解锁后续磁盘/缓存文件保存动作
+                    if (typeof window !== 'undefined') {
+                        sessionStorage.setItem('kk_canvas_loaded', 'true');
+                    }
                 }, 200);
             }
             });
@@ -711,21 +790,22 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!isLoading && canLoadCloudLayout) loadCloud();
     }, [isLoading, canLoadCloudLayout]);
 
-    useCanvasCloudSync(state.canvases, isLoading, canSaveCloudLayout);
-    const isLoadingRef = useRef(isLoading);
+    const isSaveBlocked = !isInitRestored;
+    useCanvasCloudSync(state.canvases, isSaveBlocked, canSaveCloudLayout);
+    const isSaveBlockedRef = useRef(isSaveBlocked);
     // Mark operations that need an urgent flush and should bypass the 200ms debounce.
     const urgentSaveRef = useRef(false);
     useLayoutEffect(() => {
         stateRef.current = state;
-        isLoadingRef.current = isLoading;
-    }, [state, isLoading]);
+        isSaveBlockedRef.current = isSaveBlocked;
+    }, [state, isSaveBlocked]);
 
     useCanvasLocalPersistence({
         state,
-        isLoading,
+        isLoading: isSaveBlocked,
         storageKey: STORAGE_KEY,
         stateRef,
-        isLoadingRef,
+        isLoadingRef: isSaveBlockedRef,
         urgentSaveRef,
         prepareBeforeUnloadState: markInterruptedSyncPromptGenerations,
     });
@@ -2273,7 +2353,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         canvases: state.canvases,
         activeCanvasId: state.activeCanvasId,
         fileSystemHandle: state.fileSystemHandle,
-        isLoading,
+        isLoading: isSaveBlocked,
         stateRef,
         isSavingRef,
         resolveOriginalPersistSourceForDisk,

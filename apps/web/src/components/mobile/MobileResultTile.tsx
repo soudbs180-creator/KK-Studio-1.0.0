@@ -95,31 +95,32 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
   const isFailed = Boolean(entry.error || imgLoadError);
 
   return (
+    // 简体中文：保留卡片精致的 p-2（8px）包边（微边框），配合双圆角嵌套美学。由于我们彻底替换了 button 交互容器，消除了高度计算拉伸 Bug，现在即使带 padding 卡片高度也会严密契合图片宽高比，绝无上下留白。
     <article
-      className="relative min-w-0 rounded-[12px] border bg-[var(--mobile-clay-surface-bg)] transition-all duration-200 p-2 flex flex-col gap-2"
+      className="relative min-w-0 rounded-[20px] border bg-[var(--mobile-clay-surface-bg)] transition-all duration-300 p-2 flex flex-col gap-2 active:scale-[0.985]"
       style={{
         borderColor: isActive || isSource ? 'var(--mobile-clay-active-border)' : 'var(--mobile-clay-border)',
-        boxShadow: 'none', // 简体中文注释：去除卡片外部阴影以保持扁平化设计
+        boxShadow: isActive || isSource ? '0 8px 24px rgba(251, 113, 133, 0.12)' : 'none', // 简体中文注释：活动卡片呈现品牌发光微光
         // 开启 GPU 硬件加速，防止在 iOS 等移动端浏览器下溢出圆角裁剪失效导致漏直角
         transform: 'translateZ(0)',
         WebkitTransform: 'translateZ(0)',
       }}
     >
-      <button
-        type="button"
-        disabled={entry.isGenerating}
+      <div
         data-testid={`mobile-result-tile-${entry.id}`}
-        className={`group relative flex flex-col h-full min-h-0 w-full text-left rounded-[inherit] overflow-hidden ${entry.isGenerating ? 'cursor-default' : 'cursor-pointer'}`}
+        // 简体中文：重构 button 为带有交互性的 div 容器，避免部分移动端浏览器对 button 元素内部 Flexbox 和 aspect-ratio 计算的高度拉伸 Bug，并去除了不必要的 padding。
+        className={`group relative flex flex-col min-h-0 w-full text-left rounded-[inherit] overflow-hidden ${entry.isGenerating ? 'cursor-default' : 'cursor-pointer'}`}
         style={{
           transform: 'translateZ(0)',
           WebkitTransform: 'translateZ(0)',
         }}
-        onClick={() => onEntryOpen(entry.id)}
+        onClick={() => !entry.isGenerating && onEntryOpen(entry.id)}
         title={promptSummary}
       >
         {/* 核心展示区 */}
         <div
-          className="relative flex-1 min-h-0 w-full overflow-hidden bg-[var(--bg-tertiary)] rounded-[8px]"
+          // 简体中文：遵循经典设计准则，内层圆角根据外层 20px 圆角和 8px（p-2）padding 自动收缩，采用黄金法则 Ri = Ro - padding = 12px（rounded-[12px]），确保同心连续，避免内外冲突。
+          className="relative min-h-0 w-full overflow-hidden bg-[var(--bg-tertiary)] rounded-[12px]"
           style={!entry.isGenerating ? { aspectRatio: imageAspectRatio } : undefined}
         >
           {entry.isGenerating ? (
@@ -175,8 +176,6 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
             </div>
           )}
 
-          {/* 简体中文注释：已移除顶部暗色渐变过渡，还原画面亮度和纯净度 */}
-
           {/* 绝对定位浮动层：时间（无框化） / 参考图标记 */}
           {!entry.isGenerating && (
             <div className="pointer-events-none absolute left-2.5 top-2.5 flex items-center gap-1.5 z-20">
@@ -207,47 +206,68 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
 
           {/* 标准模式单行底栏 */}
           {viewMode === 'standard' && !entry.isGenerating && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 px-2.5 pb-2 pt-5">
-              <div className="flex items-center justify-between text-[10px] text-white/90">
-                <span className="font-light opacity-80">{formatTimestamp(entry.timestamp)}</span>
-                <span className="truncate mx-1 opacity-70 max-w-[50%]">{entry.modelLabel}</span>
-                <span className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 font-mono scale-90">
-                  {entry.displayLabel || entry.aspectRatio}
-                </span>
+            <>
+              {/* 简体中文：从下往上的柔和平滑暗色渐变遮罩，以确保在浅色/白色生成背景下文字的超强对比度与高阶质感 */}
+              <div 
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/95 via-black/35 to-transparent z-10 animate-fadeIn" 
+                style={{ borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px' }}
+              />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 px-2.5 pb-2 pt-5 z-20">
+                <div className="flex items-center justify-between text-[10px] text-white/95 font-medium">
+                  <span className="font-light opacity-80" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatTimestamp(entry.timestamp)}</span>
+                  <span className="truncate mx-1 opacity-70 max-w-[48%]">{entry.modelLabel}</span>
+                  <span className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 font-mono scale-90 uppercase">
+                    {entry.displayLabel || entry.aspectRatio}
+                  </span>
+                </div>
               </div>
-            </div>
+            </>
+          )}
+
+          {/* 简体中文：在非生成状态加上边缘柔焦微虚化羽化与高阶 1px 微发光内描边融入层，使图片边缘产生柔焦质感，自然融入卡片微框 */}
+          {!entry.isGenerating && (
+            <div 
+              className="pointer-events-none absolute inset-0 z-10 rounded-[inherit] shadow-[inset_0_0_8px_rgba(0,0,0,0.35)]" 
+              style={{ border: '1px solid rgba(255, 255, 255, 0.04)' }}
+            />
           )}
         </div>
 
         {/* 详细模式底栏参数区域 */}
         {viewMode === 'detail' && !entry.isGenerating && (
-          <div className="shrink-0 p-3 bg-[var(--bg-secondary)]/80 border-t border-white/5 flex flex-col gap-2 w-full">
-            <p className="line-clamp-2 text-xs leading-relaxed text-[var(--text-secondary)] font-normal">
+          // 简体中文：去除了详细模式下独立多余的背景和边框；增加了 mt-2.5（10px）外边距以拉开与图片的空气感间隙，不再局促拥挤
+          <div className="shrink-0 px-2.5 pb-2.5 flex flex-col gap-1.5 w-full mt-2.5">
+            {/* 简体中文：将提示词字号从 text-xs (12px) 提升为更清晰宜读的 text-[13px] */}
+            <p className="line-clamp-2 text-[13px] leading-relaxed text-[var(--text-secondary)] font-normal" style={{ fontFamily: '"HarmonyOS Sans SC", sans-serif' }}>
               {entry.fullPrompt || promptSummary}
             </p>
-            <div className="flex items-center justify-between text-[10px] text-[var(--text-tertiary)] border-t border-white/5 pt-1.5 mt-0.5 font-medium">
+            {/* 简体中文：将小字号由 text-[10px] 提升为大气的 text-xs (12px) 并采用 font-medium 字重， pt-2 微调为 pt-2.5，彻底告别阅读吃力 */}
+            <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)] border-t border-white/5 pt-2.5 mt-0.5 font-medium">
               <div className="flex items-center gap-1">
                 <span>耗时:</span>
-                <span className="text-[var(--text-secondary)] font-mono">
+                {/* 简体中文：字重由 font-bold 精简为 font-semibold，笔画清晰分明 */}
+                <span className="text-[var(--text-secondary)] font-semibold font-mono" style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {entry.generationTime ? `${(entry.generationTime / 1000).toFixed(1)}s` : '-'}
                 </span>
               </div>
               <div className="flex items-center gap-1">
                 <span>费用:</span>
-                <span className="text-amber-400 font-semibold font-mono">
+                {/* 简体中文::字重由 font-bold 精简为 font-semibold，金黄色费用数值可读性大幅跃升 */}
+                <span className="text-amber-400 font-semibold font-mono" style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {getCostDisplay(entry)}
                 </span>
               </div>
               <div className="flex items-center gap-1">
                 <span>比例:</span>
-                <span className="text-[var(--text-secondary)] uppercase font-mono">
+                {/* 简体中文：字重由 font-bold 精简为 font-semibold */}
+                <span className="text-[var(--text-secondary)] uppercase font-semibold font-mono">
                   {entry.displayLabel || entry.aspectRatio}
                 </span>
               </div>
             </div>
           </div>
         )}
-      </button>
+      </div>
     </article>
   );
 };

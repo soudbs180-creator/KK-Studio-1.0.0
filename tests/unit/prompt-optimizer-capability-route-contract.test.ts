@@ -8,13 +8,19 @@ const ROOT_DIR = process.cwd();
 
 
 
-test('prompt optimizer service reads the dedicated prompt_optimizer capability route before falling back to the global model list', () => {
+test('prompt optimizer service only uses explicit prompt_optimizer AI enhancement routes', () => {
   const serviceSource = readSource('src/services/llm/promptOptimizerService.ts');
   const routingSource = readSource('src/services/api/capabilityRouteAssignments.ts');
 
   assert.match(routingSource, /prompt_optimizer/);
   assert.match(serviceSource, /from '\.\.\/api\/capabilityRouteAssignments';/);
-  assert.match(serviceSource, /resolveEnabledCapabilityRouteAssignment\('prompt_optimizer'\)/);
+  assert.match(serviceSource, /isCustomRoutingEnabled/);
+  assert.match(serviceSource, /resolveCapabilityRouteAssignment\('prompt_optimizer'\)/);
+  assert.match(serviceSource, /const optimizerRoute = resolveExplicitOptimizerAiRoute\(\);/);
+  assert.match(serviceSource, /usedModelId: LOCAL_RULEBOOK_MODEL_ID/);
+  assert.match(serviceSource, /if \(!optimizerRoute\) \{\s*return localResult;\s*\}/);
+  assert.match(serviceSource, /if \(!modelId\) \{\s*return localResult;\s*\}/);
   assert.match(serviceSource, /preferredKeyId/);
   assert.match(serviceSource, /keyManager\.getGlobalModelList\(\)/);
+  assert.doesNotMatch(serviceSource, /resolveEnabledCapabilityRouteAssignment\('prompt_optimizer'\)/);
 });

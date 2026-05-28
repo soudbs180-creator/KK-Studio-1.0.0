@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { type PromptNode, AspectRatio, GenerationMode, type PromptGenerationMetadata, type EcommerceEditableTaskState } from '../../types';
+import { type PromptNode, AspectRatio, GenerationMode, type PromptGenerationMetadata, type EcommerceEditableTaskState, type EcommerceFrameworkQueueItem } from '../../types';
 import type { EcommerceGroupSlotState } from '../../services/ecommerce/groupSlotState.ts';
 import { Sparkles, Loader2, Video, Image, Music, Copy, Check, Languages, Info, Shield, CheckCircle2, AlertTriangle, Download } from 'lucide-react';
 import { getCardDimensions } from '../../utils/styleUtils';
@@ -78,9 +78,7 @@ const resolveGenerationTimerStart = (node: PromptNode): number | undefined => {
 const getOptimizerStrategySummaryZh = (
     node: Pick<PromptNode, 'promptOptimizerResult'>,
 ): string | null => {
-    const title = String(
-        (node.promptOptimizerResult?.meta as { route_title?: string } | undefined)?.route_title || '',
-    ).trim();
+    const title = String(node.promptOptimizerResult?.meta?.route_title || '').trim();
     const taskType = String(node.promptOptimizerResult?.params?.task_type || '').trim();
 
     if (title.includes('电商主图') || taskType === 'ecommerce_hero') {
@@ -101,8 +99,28 @@ const getOptimizerStrategySummaryZh = (
     return null;
 };
 
+const getPromptOptimizerEngineLabelZh = (
+    node: Pick<PromptNode, 'promptOptimizerResult'>,
+): string | null => {
+    const engine = node.promptOptimizerResult?.meta?.engine;
+    if (engine === 'ai-enhanced') return 'AI 增强';
+    if (engine === 'local-rulebook') return '本地规则';
+    return null;
+};
+
+const getPromptOptimizerAiStatusLabelZh = (
+    node: Pick<PromptNode, 'promptOptimizerResult'>,
+): string | null => {
+    const status = node.promptOptimizerResult?.meta?.ai_status;
+    if (status === 'enhanced') return 'AI 已增强';
+    if (status === 'failed-fallback') return 'AI 失败回退';
+    if (status === 'skipped') return 'AI 未启用';
+    return null;
+};
+
 const getPromptBusinessDisplayLabel = (node: PromptNode): string | null => {
     if (node.ecommerce?.displayLabel) return node.ecommerce.displayLabel;
+    if (node.redraw?.inheritedDisplayLabel) return node.redraw.inheritedDisplayLabel;
     if (node.partialRedraw?.inheritedDisplayLabel) return node.partialRedraw.inheritedDisplayLabel;
     return null;
 };
@@ -287,10 +305,14 @@ interface PromptNodeProps {
     onToggleEcommerceSelected?: (node: PromptNode, selected: boolean) => void;
     onSetEcommerceGroupSelection?: (node: PromptNode, selected: boolean) => void;
     onGenerateEcommerceNode?: (node: PromptNode) => void;
+    onRegenerateUnsatisfiedEcommerceNode?: (node: PromptNode) => void;
     onGenerateEcommerceGroup?: (node: PromptNode, phase: 'desktop' | 'mobile') => void;
     onGenerateEcommerceFramework?: (node: PromptNode) => void;
     onPauseEcommerceFramework?: (node: PromptNode) => void;
     onResumeEcommerceFramework?: (node: PromptNode) => void;
+    onPauseEcommerceNodeQueue?: (node: PromptNode, reason?: 'editing' | 'manual') => void;
+    onResumeEcommerceNodeQueue?: (node: PromptNode, reason?: 'editing' | 'manual') => void;
+    onSetEcommerceFrameworkConcurrency?: (node: PromptNode, maxConcurrentGenerations: 1 | 2 | 4) => void;
     onCancelEcommerceNodeQueue?: (node: PromptNode) => void;
     onConfirmEcommerceDesktop?: (node: PromptNode) => void;
     onRetryEcommerceModule?: (node: PromptNode) => void;
@@ -305,6 +327,8 @@ interface PromptNodeProps {
         failed: number;
         pausedItems: number;
         total: number;
+        queueItems?: EcommerceFrameworkQueueItem[];
+        maxConcurrentGenerations?: number;
     } | null;
     ecommerceSlotState?: EcommerceGroupSlotState | null;
     activeEcommerceTaskState?: EcommerceEditableTaskState | null;
@@ -550,10 +574,14 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     onToggleEcommerceSelected,
     onSetEcommerceGroupSelection,
     onGenerateEcommerceNode,
+    onRegenerateUnsatisfiedEcommerceNode,
     onGenerateEcommerceGroup,
     onGenerateEcommerceFramework,
     onPauseEcommerceFramework,
     onResumeEcommerceFramework,
+    onPauseEcommerceNodeQueue,
+    onResumeEcommerceNodeQueue,
+    onSetEcommerceFrameworkConcurrency,
     onCancelEcommerceNodeQueue,
     onConfirmEcommerceDesktop,
     onRetryEcommerceModule,
@@ -1511,9 +1539,13 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                             onTaskStateChange={onEcommerceTaskStateChange}
                             onToggleSelected={onToggleEcommerceSelected}
                             onGenerateNode={onGenerateEcommerceNode}
+                            onRegenerateUnsatisfied={onRegenerateUnsatisfiedEcommerceNode}
                             onGenerateFramework={onGenerateEcommerceFramework}
                             onPauseFramework={onPauseEcommerceFramework}
                             onResumeFramework={onResumeEcommerceFramework}
+                            onPauseNodeQueue={onPauseEcommerceNodeQueue}
+                            onResumeNodeQueue={onResumeEcommerceNodeQueue}
+                            onSetFrameworkConcurrency={onSetEcommerceFrameworkConcurrency}
                             onCancelNodeQueue={onCancelEcommerceNodeQueue}
                             onConfirmDesktop={onConfirmEcommerceDesktop}
                             onGenerateMobile={onRetryEcommerceModule}
@@ -1573,15 +1605,21 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                                 {node.promptOptimizerResult.params.aspect_ratio}
                                             </div>
                                         )}
-                                        {String(
-                                            (node.promptOptimizerResult?.meta as { route_title?: string } | undefined)?.route_title || '',
-                                        ).trim() && (
+                                        {String(node.promptOptimizerResult?.meta?.route_title || '').trim() && (
                                         <div className="px-1.5 py-0.5 rounded bg-[rgba(26,58,58,0.10)] text-[var(--clay-brand-teal)] text-[9px] font-bold border border-[rgba(26,58,58,0.20)]">
                                                 自动策略 · {
-                                                    String(
-                                                        (node.promptOptimizerResult?.meta as { route_title?: string } | undefined)?.route_title || '',
-                                                    ).trim()
+                                                    String(node.promptOptimizerResult?.meta?.route_title || '').trim()
                                                 }
+                                            </div>
+                                        )}
+                                        {getPromptOptimizerEngineLabelZh(node) && (
+                                            <div className="px-1.5 py-0.5 rounded bg-[rgba(129,140,248,0.10)] text-[var(--clay-brand-lavender)] text-[9px] font-bold border border-[rgba(129,140,248,0.20)]">
+                                                {getPromptOptimizerEngineLabelZh(node)}
+                                            </div>
+                                        )}
+                                        {getPromptOptimizerAiStatusLabelZh(node) && (
+                                            <div className="px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] text-[9px] font-bold border border-[var(--border-light)]">
+                                                {getPromptOptimizerAiStatusLabelZh(node)}
                                             </div>
                                         )}
                                         {node.promptOptimizerResult?.confidence && (
@@ -1795,10 +1833,14 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 onToggleSelected={onToggleEcommerceSelected}
                                 onSetGroupSelection={onSetEcommerceGroupSelection}
                                 onGenerateNode={onGenerateEcommerceNode}
+                                onRegenerateUnsatisfied={onRegenerateUnsatisfiedEcommerceNode}
                                 onGenerateGroup={onGenerateEcommerceGroup}
                                 onGenerateFramework={onGenerateEcommerceFramework}
                                 onPauseFramework={onPauseEcommerceFramework}
                                 onResumeFramework={onResumeEcommerceFramework}
+                                onPauseNodeQueue={onPauseEcommerceNodeQueue}
+                                onResumeNodeQueue={onResumeEcommerceNodeQueue}
+                                onSetFrameworkConcurrency={onSetEcommerceFrameworkConcurrency}
                                 onCancelNodeQueue={onCancelEcommerceNodeQueue}
                                 onConfirmDesktop={onConfirmEcommerceDesktop}
                                 onGenerateMobile={onRetryEcommerceModule}

@@ -2,7 +2,7 @@ import React from 'react';
 import { Pause, Play, RotateCw, Sparkles } from 'lucide-react';
 
 import { useLocale } from '../../context/LocaleContext';
-import type { EcommerceEditableTaskState, PromptNode } from '../../types';
+import type { EcommerceEditableTaskState, EcommerceFrameworkQueueItem, PromptNode } from '../../types';
 import EcommerceTaskEditorPanel from './EcommerceTaskEditorPanel';
 
 type EcommerceFrameworkStatus = {
@@ -15,6 +15,8 @@ type EcommerceFrameworkStatus = {
   failed: number;
   pausedItems: number;
   total: number;
+  queueItems?: EcommerceFrameworkQueueItem[];
+  maxConcurrentGenerations?: number;
 };
 
 interface EcommerceCanvasWorkbenchCardProps {
@@ -31,9 +33,13 @@ interface EcommerceCanvasWorkbenchCardProps {
   ) => void;
   onToggleSelected?: (node: PromptNode, selected: boolean) => void;
   onGenerateNode?: (node: PromptNode) => void;
+  onRegenerateUnsatisfied?: (node: PromptNode) => void;
   onGenerateFramework?: (node: PromptNode) => void;
   onPauseFramework?: (node: PromptNode) => void;
   onResumeFramework?: (node: PromptNode) => void;
+  onPauseNodeQueue?: (node: PromptNode, reason?: 'editing' | 'manual') => void;
+  onResumeNodeQueue?: (node: PromptNode, reason?: 'editing' | 'manual') => void;
+  onSetFrameworkConcurrency?: (node: PromptNode, maxConcurrentGenerations: 1 | 2 | 4) => void;
   onCancelNodeQueue?: (node: PromptNode) => void;
   onConfirmDesktop?: (node: PromptNode) => void;
   onGenerateMobile?: (node: PromptNode) => void;
@@ -92,6 +98,29 @@ function resolveTaskSummary(taskNode: PromptNode): string {
   ].filter(Boolean).join(' · ');
 }
 
+function resolveTaskQueueItem(
+  taskNode: PromptNode,
+  frameworkStatus?: EcommerceFrameworkStatus | null,
+): EcommerceFrameworkQueueItem | null {
+  return (frameworkStatus?.queueItems || [])
+    .filter((item) => item.nodeId === taskNode.id)
+    .sort((left, right) => (right.enqueuedAt || 0) - (left.enqueuedAt || 0))[0] || null;
+}
+
+function resolveTaskStageLabel(
+  taskNode: PromptNode,
+  queueItem: EcommerceFrameworkQueueItem | null,
+  pick: (zh: string, en: string) => string,
+): string {
+  if (queueItem?.status === 'queued' || queueItem?.status === 'dispatching') return pick('排队中', 'Queued');
+  if (queueItem?.status === 'paused') return pick(queueItem.pausedReason === 'editing' ? '编辑暂停' : '已暂停', queueItem.pausedReason === 'editing' ? 'Paused for edit' : 'Paused');
+  if (queueItem?.status === 'running') return pick('生成中', 'Generating');
+  if (queueItem?.status === 'failed') return pick('队列失败', 'Queue failed');
+  if (taskNode.ecommerce?.stage === 'generated' || taskNode.ecommerce?.desktopStage === 'generated' || taskNode.ecommerce?.mobileStage === 'generated') return pick('已完成', 'Done');
+  if (taskNode.ecommerce?.stage === 'failed' || taskNode.ecommerce?.desktopStage === 'failed' || taskNode.ecommerce?.mobileStage === 'failed') return pick('失败', 'Failed');
+  return pick('待生成', 'Ready');
+}
+
 const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> = ({
   node,
   taskNodes,
@@ -101,9 +130,13 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
   onTaskStateChange,
   onToggleSelected,
   onGenerateNode,
+  onRegenerateUnsatisfied,
   onGenerateFramework,
   onPauseFramework,
   onResumeFramework,
+  onPauseNodeQueue,
+  onResumeNodeQueue,
+  onSetFrameworkConcurrency,
   onCancelNodeQueue,
   onConfirmDesktop,
   onGenerateMobile,
@@ -139,6 +172,7 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
     || editableTaskNodes[0]
     || null;
   const selectedTaskState = selectedTaskNode?.ecommerce?.editableTask || null;
+  const selectedQueueItem = selectedTaskNode ? resolveTaskQueueItem(selectedTaskNode, frameworkStatus) : null;
   const selectedCount = editableTaskNodes.filter((taskNode) => taskNode.ecommerce?.selectedForGeneration !== false).length;
   const skippedCount = editableTaskNodes.length - selectedCount;
   const activeCount = (frameworkStatus?.dispatching || 0) + (frameworkStatus?.running || 0);
@@ -163,11 +197,20 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
   const handleSelectTask = (taskNode: PromptNode) => {
     setSelectedNodeId(taskNode.id);
     onActivateTask?.(taskNode);
+    const queueItem = resolveTaskQueueItem(taskNode, frameworkStatus);
+    if (queueItem?.status === 'queued' || queueItem?.status === 'dispatching') {
+      onPauseNodeQueue?.(taskNode, 'editing');
+    }
   };
 
   const handleGenerateSelected = () => {
     if (!selectedTaskNode) return;
     onGenerateNode?.(selectedTaskNode);
+  };
+
+  const handleRegenerateSelected = () => {
+    if (!selectedTaskNode) return;
+    onRegenerateUnsatisfied?.(selectedTaskNode);
   };
 
   const handleGenerateMobileForSelected = () => {
@@ -290,6 +333,32 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
           {frameworkStatus?.paused ? <Play size={13} /> : <Pause size={13} />}
           {frameworkStatus?.paused ? pick('继续', 'Resume') : pick('暂停', 'Pause')}
         </button>
+        {onSetFrameworkConcurrency ? (
+          <div className="inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[11px]" style={actionButtonStyle}>
+            <span className="text-[10px] text-[var(--text-tertiary)]">{pick('并发', 'Batch')}</span>
+            {([1, 2, 4] as const).map((value) => {
+              const active = (frameworkStatus?.maxConcurrentGenerations || 4) === value;
+              return (
+                <button
+                  key={`concurrency-${value}`}
+                  type="button"
+                  className="rounded-md px-2 py-1 text-[10px] font-semibold"
+                  style={{
+                    background: active ? 'var(--frost-card-main-bg)' : 'transparent',
+                    color: active ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                    border: active ? '1px solid var(--clay-brand-pink)' : '1px solid transparent',
+                  }}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSetFrameworkConcurrency(node, value);
+                  }}
+                >
+                  {value}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
         {selectedTaskNode ? (
           <>
             <button
@@ -304,6 +373,24 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
               <RotateCw size={13} />
               {pick('生成当前', 'Generate selected')}
             </button>
+            {onRegenerateUnsatisfied && (
+              selectedTaskNode.ecommerce?.stage === 'generated'
+              || selectedTaskNode.ecommerce?.desktopStage === 'generated'
+              || selectedTaskNode.ecommerce?.mobileStage === 'generated'
+            ) ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[11px] font-medium"
+                style={{ ...actionButtonStyle, borderColor: 'var(--clay-brand-pink)' }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleRegenerateSelected();
+                }}
+              >
+                <Sparkles size={13} />
+                {pick('不满意重生成', 'Regenerate')}
+              </button>
+            ) : null}
             {selectedTaskNode.ecommerce?.kind === 'a-plus-module' ? (
               <button
                 type="button"
@@ -319,7 +406,7 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
                   : pick('生成移动版', 'Generate mobile')}
               </button>
             ) : null}
-            {onCancelNodeQueue ? (
+            {onCancelNodeQueue && (selectedQueueItem?.status === 'queued' || selectedQueueItem?.status === 'paused') ? (
               <button
                 type="button"
                 className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[11px] font-medium"
@@ -330,6 +417,48 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
                 }}
               >
                 {pick('取消排队', 'Cancel queued')}
+              </button>
+            ) : null}
+            {selectedQueueItem?.status === 'queued' && onPauseNodeQueue ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[11px] font-medium"
+                style={actionButtonStyle}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onPauseNodeQueue(selectedTaskNode, 'manual');
+                }}
+              >
+                <Pause size={13} />
+                {pick('暂停当前', 'Pause item')}
+              </button>
+            ) : null}
+            {selectedQueueItem?.status === 'paused' && selectedQueueItem.pausedReason === 'manual' && onResumeNodeQueue ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[11px] font-medium"
+                style={{ ...actionButtonStyle, borderColor: 'var(--state-success-border)' }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onResumeNodeQueue(selectedTaskNode);
+                }}
+              >
+                <Play size={13} />
+                {pick('继续当前', 'Resume item')}
+              </button>
+            ) : null}
+            {selectedQueueItem?.status === 'paused' && selectedQueueItem.pausedReason === 'editing' && onResumeNodeQueue ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[11px] font-medium"
+                style={{ ...actionButtonStyle, borderColor: 'var(--state-success-border)' }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onResumeNodeQueue(selectedTaskNode, 'editing');
+                }}
+              >
+                <Play size={13} />
+                {pick('保存并继续排队', 'Save and resume')}
               </button>
             ) : null}
           </>
@@ -344,6 +473,8 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
           {editableTaskNodes.length > 0 ? editableTaskNodes.map((taskNode, index) => {
             const isActive = taskNode.id === selectedTaskNode?.id;
             const selected = taskNode.ecommerce?.selectedForGeneration !== false;
+            const queueItem = resolveTaskQueueItem(taskNode, frameworkStatus);
+            const stageLabel = resolveTaskStageLabel(taskNode, queueItem, pick);
             return (
               <button
                 key={taskNode.id}
@@ -365,12 +496,16 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
                     </div>
                   </div>
                   <span className="shrink-0 rounded-full border px-2 py-0.5 text-[9px]" style={panelStyle}>
-                    {selected ? pick('已选', 'In') : pick('跳过', 'Out')}
+                    {stageLabel}
                   </span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] text-[var(--text-tertiary)]">
                   <span>{taskNode.ecommerce?.sourceSheet}</span>
                   <span>{taskNode.referenceImages?.length || 0} {pick('参考图', 'refs')}</span>
+                  <span>{selected ? pick('已选', 'In') : pick('跳过', 'Out')}</span>
+                  {(taskNode.ecommerce?.editableTask?.styleAnchorTokens || []).slice(0, 2).map((token) => (
+                    <span key={`${taskNode.id}-${token}`}>{token}</span>
+                  ))}
                 </div>
               </button>
             );
@@ -429,6 +564,7 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
               <EcommerceTaskEditorPanel
                 taskState={activeTaskState?.taskId === selectedTaskState.taskId ? activeTaskState : selectedTaskState}
                 onTaskStateChange={onTaskStateChange}
+                referenceImages={selectedTaskNode.referenceImages || []}
                 compact
                 collapsible
                 defaultExpanded

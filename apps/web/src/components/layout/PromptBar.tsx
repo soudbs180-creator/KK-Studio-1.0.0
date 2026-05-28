@@ -1199,6 +1199,21 @@ const PromptBar: React.FC<PromptBarProps> = ({
         };
     }, [isMobile, isExpanded, textareaRef]);
 
+    // 🚀 [移动端专属] 当选择或更换了继续创作的源图时，自动展开输入面板
+    useEffect(() => {
+        if (isMobile && activeSourceImage) {
+            setIsExpanded(true);
+        }
+    }, [isMobile, activeSourceImage]);
+
+    // 🚀 [移动端专属] 面板收起时，重置子视图为 input 视图，确保下次展开时默认不打开模型库
+    useEffect(() => {
+        if (isMobile && !isExpanded) {
+            setMobileSubView('input');
+        }
+    }, [isMobile, isExpanded]);
+
+
     const [modelMenuLoadingState, setModelMenuLoadingState] = useState<ModelMenuLoadingState>('idle');
     const [modelSearch, setModelSearch] = useState('');
     const deferredModelSearch = useDeferredValue(modelSearch);
@@ -3480,6 +3495,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             textareaRef.current?.blur();
+                                            if (isModelListEmpty) {
+                                                onOpenSettings?.('api-management');
+                                                return;
+                                            }
                                             setMobileCategory('featured');
                                             setMobileSubView('model');
                                         }}

@@ -8,7 +8,9 @@ import {
   GenerationMode,
   ImageSize,
   type EcommerceEditableTaskState,
+  type GeneratedImage,
   type PromptNode,
+  type ReferenceImage,
 } from '../types';
 import { optimizeGenerationPrompt, summarizePromptOptimizationError } from './optimizeGenerationPrompt.ts';
 import type { ApplyEffectiveSizingToEcommerceTaskState } from './useEcommerceBuildRuntime.ts';
@@ -16,6 +18,7 @@ import type { EcommerceNodeGenerationSettings } from './useEcommerceSheetSetting
 
 export interface EcommerceNodeGenerationCanvasSnapshot {
   promptNodes: PromptNode[];
+  imageNodes?: GeneratedImage[];
 }
 
 export interface EcommerceNodeGenerationRuntimeState {
@@ -39,6 +42,7 @@ export interface EcommerceNodeGenerationOptions {
   stagePatch?: Partial<NonNullable<PromptNode['ecommerce']>>;
   successPatch?: Partial<NonNullable<PromptNode['ecommerce']>>;
   failurePatch?: Partial<NonNullable<PromptNode['ecommerce']>>;
+  promptAssistMode?: 'auto' | 'disabled' | 'regenerate-feedback';
 }
 
 export type UpdateEcommerceNodeState = (
@@ -70,9 +74,38 @@ export interface UseEcommerceNodeGenerationRuntimeResult {
     options?: EcommerceNodeGenerationOptions
   ) => Promise<void>;
   handleGenerateEcommerceNode: (node: PromptNode) => Promise<void>;
+  handleRegenerateUnsatisfiedEcommerceNode: (node: PromptNode) => Promise<void>;
   handleConfirmEcommerceDesktop: (node: PromptNode) => void;
   handleRetryEcommerceModule: (node: PromptNode) => Promise<void>;
 }
+
+function resolveLatestGeneratedFeedbackReference(
+  node: PromptNode,
+  snapshot?: EcommerceNodeGenerationCanvasSnapshot | null,
+): ReferenceImage | null {
+  const latestImageId = [...(node.childImageIds || [])].reverse()[0];
+  if (!latestImageId) return null;
+
+  const image = snapshot?.imageNodes?.find((item) => item.id === latestImageId);
+  const data = image?.originalUrl || image?.apiResultUrl || image?.url || '';
+  if (!image || !data) return null;
+
+  return {
+    id: `feedback-${image.id}`,
+    storageId: image.storageId,
+    data,
+    url: data,
+    mimeType: image.mimeType || 'image/png',
+  };
+}
+
+const regenerateFeedbackPromptSuffix = [
+  '用户对上一版生成结果不满意。',
+  '请结合上一版坏图先反推问题：可能是场景不好看、产品不够突出、版式不统一、文案层级不清晰或风格偏离参考。',
+  '在不更换产品、不改文案、不破坏系列风格的前提下，重新优化本张提示词，让画面更统一、更高级、更符合电商展示。',
+].join('\n');
+
+const aPlusMobilePromptSuffix = '请把这张 A+ 桌面版画面改成 4:3 手机端版本。产品主体、文案内容、品牌风格、色调和核心场景保持一致；只根据 4:3 比例重新压缩布局，让画面更紧凑、更适合手机浏览。不要更换产品，不要改文案，不要改变主视觉风格。继续按照 @产品主图、@风格参考 等参考图职责执行。';
 
 export function useEcommerceNodeGenerationRuntime({
   activeCanvasRef,
@@ -152,16 +185,38 @@ export function useEcommerceNodeGenerationRuntime({
       : (latestNode.ecommerce.effectiveSizePolicy || latestNode.ecommerce.sizePolicy) === 'desktop-then-mobile'
         ? 'desktop'
         : 'default';
-    let nextPrompt = [renderTask?.prompt || latestNode.originalPrompt || latestNode.prompt, options?.promptSuffix || ''].filter(Boolean).join('\n');
+    const promptAssistMode = options?.promptAssistMode || 'auto';
+    const isFailureRetry = latestNode.ecommerce.stage === 'failed'
+      || (options?.generationTarget === 'desktop' && latestNode.ecommerce.desktopStage === 'failed')
+      || (options?.generationTarget === 'mobile' && latestNode.ecommerce.mobileStage === 'failed');
+    const forceRegenerateFeedback = promptAssistMode === 'regenerate-feedback';
+    const promptAssistEnabled = enablePromptOptimization
+      && promptAssistMode !== 'disabled'
+      && !(promptAssistMode === 'auto' && isFailureRetry)
+      && (
+        forceRegenerateFeedback
+        || renderTask?.taskState.promptAssistState?.optimized === true
+      );
+    const feedbackReference = forceRegenerateFeedback
+      ? resolveLatestGeneratedFeedbackReference(latestNode, activeCanvasRef.current)
+      : null;
+    const optimizerReferenceImages = feedbackReference
+      ? [...(latestNode.referenceImages || []), feedbackReference]
+      : (latestNode.referenceImages || []);
+    let nextPrompt = [
+      renderTask?.prompt || latestNode.originalPrompt || latestNode.prompt,
+      options?.promptSuffix || '',
+      forceRegenerateFeedback && promptAssistEnabled ? regenerateFeedbackPromptSuffix : '',
+    ].filter(Boolean).join('\n');
     const {
       optimizedPrompt: optimizedNextPrompt,
       optimizedPromptEn,
       optimizedPromptZh,
       promptOptimizerResult,
     } = await optimizeGenerationPrompt({
-      enabled: enablePromptOptimization && !!nextPrompt,
+      enabled: promptAssistEnabled && !!nextPrompt,
       rawPrompt: nextPrompt,
-      referenceImages: latestNode.referenceImages || [],
+      referenceImages: optimizerReferenceImages,
       options: {
         preferredModelId: latestNode.model,
         aspectRatio: String(nextAspectRatio),
@@ -199,7 +254,22 @@ export function useEcommerceNodeGenerationRuntime({
       aspectRatio: nextAspectRatio,
       ecommerce: {
         ...latestNode.ecommerce,
-        editableTask: renderTask?.taskState || latestNode.ecommerce.editableTask,
+        editableTask: renderTask?.taskState
+          ? {
+              ...renderTask.taskState,
+              promptAssistState: promptAssistEnabled
+                ? {
+                    ...renderTask.taskState.promptAssistState,
+                    optimized: true,
+                    source: forceRegenerateFeedback
+                      ? 'regenerate-feedback'
+                      : (promptOptimizerResult ? 'manual' : renderTask.taskState.promptAssistState?.source),
+                    updatedAt: promptOptimizerResult ? Date.now() : renderTask.taskState.promptAssistState?.updatedAt,
+                    error: promptOptimizerResult ? undefined : renderTask.taskState.promptAssistState?.error,
+                  }
+                : renderTask.taskState.promptAssistState,
+            }
+          : latestNode.ecommerce.editableTask,
         displayLabel: renderTask?.displayLabel || latestNode.ecommerce.displayLabel,
         currentAspectRatio: nextAspectRatio,
         activeDeliveryKind,
@@ -242,6 +312,7 @@ export function useEcommerceNodeGenerationRuntime({
     if (node.ecommerce.kind === 'main-image') {
       await runEcommerceNodeGeneration(node, {
         generationTarget: 'sheet',
+        promptAssistMode: node.ecommerce.stage === 'failed' ? 'disabled' : undefined,
       });
       return;
     }
@@ -261,8 +332,46 @@ export function useEcommerceNodeGenerationRuntime({
         stagePatch: isDesktopThenMobile ? { desktopStage: 'generating' } : undefined,
         successPatch: isDesktopThenMobile ? { desktopStage: 'generated', mobileStage: 'locked' } : undefined,
         failurePatch: isDesktopThenMobile ? { desktopStage: 'failed' } : undefined,
+        promptAssistMode: (isDesktopThenMobile ? node.ecommerce.desktopStage === 'failed' : node.ecommerce.stage === 'failed')
+          ? 'disabled'
+          : undefined,
       });
     }
+  }, [runEcommerceNodeGeneration]);
+
+  const handleRegenerateUnsatisfiedEcommerceNode = useCallback(async (node: PromptNode) => {
+    if (!node.ecommerce) return;
+
+    if (node.ecommerce.kind === 'main-image') {
+      await runEcommerceNodeGeneration(node, {
+        generationTarget: 'sheet',
+        promptAssistMode: 'regenerate-feedback',
+      });
+      return;
+    }
+
+    if (node.ecommerce.kind !== 'a-plus-module') {
+      return;
+    }
+
+    const effectiveSizePolicy = node.ecommerce.effectiveSizePolicy || node.ecommerce.sizePolicy;
+    const isDesktopThenMobile = effectiveSizePolicy === 'desktop-then-mobile';
+    const shouldRegenerateMobile = isDesktopThenMobile && node.ecommerce.desktopStage === 'confirmed';
+
+    await runEcommerceNodeGeneration(node, {
+      generationTarget: shouldRegenerateMobile ? 'mobile' : (isDesktopThenMobile ? 'desktop' : 'sheet'),
+      stagePatch: shouldRegenerateMobile
+        ? { mobileStage: 'generating' }
+        : (isDesktopThenMobile ? { desktopStage: 'generating' } : undefined),
+      successPatch: shouldRegenerateMobile
+        ? { mobileStage: 'generated' }
+        : (isDesktopThenMobile ? { desktopStage: 'generated', mobileStage: 'locked' } : undefined),
+      failurePatch: shouldRegenerateMobile
+        ? { mobileStage: 'failed' }
+        : (isDesktopThenMobile ? { desktopStage: 'failed' } : undefined),
+      promptSuffix: shouldRegenerateMobile ? aPlusMobilePromptSuffix : undefined,
+      promptAssistMode: 'regenerate-feedback',
+    });
   }, [runEcommerceNodeGeneration]);
 
   const handleConfirmEcommerceDesktop = useCallback((node: PromptNode) => {
@@ -281,7 +390,8 @@ export function useEcommerceNodeGenerationRuntime({
       stagePatch: { mobileStage: 'generating' },
       successPatch: { mobileStage: 'generated' },
       failurePatch: { mobileStage: 'failed' },
-      promptSuffix: '将这个 A+ 画面转换成 600*450 手机端版本，排版更紧凑，保持主体、文案、风格与画面逻辑一致。',
+      promptSuffix: aPlusMobilePromptSuffix,
+      promptAssistMode: node.ecommerce.mobileStage === 'failed' ? 'disabled' : undefined,
     });
   }, [runEcommerceNodeGeneration]);
 
@@ -289,6 +399,7 @@ export function useEcommerceNodeGenerationRuntime({
     updateEcommerceNodeState,
     runEcommerceNodeGeneration,
     handleGenerateEcommerceNode,
+    handleRegenerateUnsatisfiedEcommerceNode,
     handleConfirmEcommerceDesktop,
     handleRetryEcommerceModule,
   };

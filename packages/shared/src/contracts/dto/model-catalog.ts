@@ -57,6 +57,7 @@ export interface ActiveCreditModelDto {
 export interface ActiveCreditModelProviderDto {
   providerId: string;
   providerName: string;
+  providerKind?: "official" | "relay";
   models: ActiveCreditModelDto[];
 }
 
@@ -94,6 +95,7 @@ export interface AdminCreditProviderDto {
   providerId: string;
   providerName: string;
   baseUrl: string;
+  providerKind?: "official" | "relay";
   apiKeyCount: number;
   apiKeyEntries?: AdminCreditProviderApiKeyEntryDto[];
   apiKeyPreviews?: string[];
@@ -126,6 +128,7 @@ export interface SaveAdminCreditProviderModelRequestDto {
 export interface SaveAdminCreditProviderRequestDto {
   providerName: string;
   baseUrl: string;
+  providerKind?: "official" | "relay";
   apiKeys: string[];
   retainApiKeyFingerprints?: string[];
   models: SaveAdminCreditProviderModelRequestDto[];

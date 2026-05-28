@@ -112,6 +112,10 @@ export function buildTaskStateSyncSignature(taskState?: EcommerceEditableTaskSta
     imageRoleSummary: taskState?.imageRoleSummary || [],
     assetRoles: taskState?.assetRoles || [],
     missingFields: taskState?.missingFields || [],
+    referenceAnchors: taskState?.referenceAnchors || [],
+    styleAnchorTokens: taskState?.styleAnchorTokens || [],
+    promptAssistState: taskState?.promptAssistState || null,
+    revision: taskState?.revision || 0,
     effectiveSizePolicy: taskState?.effectiveSizePolicy || '',
     effectiveSizeTier: taskState?.effectiveSizeTier || '',
     promptOverride: taskState?.promptOverride || '',
@@ -224,12 +228,12 @@ export function useEcommerceUploadReferenceRuntime({
     const productReferences = await Promise.all(
       (ecommerceState.productFiles || [])
         .slice(0, MAX_ECOMMERCE_PRODUCT_FILES)
-        .map((file, index) => createReferenceImageFromFileForRuntime(file, `product-${index + 1}`)),
+        .map((file) => createReferenceImageFromFileForRuntime(file, 'product')),
     );
     const extraReferences = await Promise.all(
       (ecommerceState.extraReferenceFiles || [])
         .slice(0, MAX_ECOMMERCE_EXTRA_REFERENCE_FILES)
-        .map((file, index) => createReferenceImageFromFileForRuntime(file, `extra-${index + 1}`)),
+        .map((file) => createReferenceImageFromFileForRuntime(file, 'extra-reference')),
     );
 
     return {
@@ -283,7 +287,7 @@ export function useEcommerceUploadReferenceRuntime({
 
     const manualReferenceBindings = await Promise.all(
       nextFiles.map(async (file, index) => {
-        const referenceImage = await createReferenceImageFromFileForRuntime(file, `item-${sourceKey}-${index + 1}`);
+        const referenceImage = await createReferenceImageFromFileForRuntime(file, `item-${sourceKey}`);
         const assetId = referenceImage.storageId || referenceImage.id;
         const label = `手动参考图${index + 1}`;
 

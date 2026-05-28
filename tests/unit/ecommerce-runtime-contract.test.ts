@@ -20,6 +20,7 @@ test('ecommerce framework scheduler actions are owned by useEcommerceRuntime', (
   assert.match(hookSource, /export interface UseEcommerceRuntimeResult \{/);
   assert.match(hookSource, /handleGenerateEcommerceFramework: \(node: PromptNode\) => Promise<void>;/);
   assert.match(hookSource, /handleGenerateEcommerceGroup: \(node: PromptNode, phase: 'desktop' \| 'mobile'\) => Promise<void>;/);
+  assert.match(hookSource, /handleSetEcommerceFrameworkConcurrency: \(node: PromptNode, maxConcurrentGenerations: 1 \| 2 \| 4\) => void;/);
   assert.match(hookSource, /handleToggleEcommerceAnalysisSelection: \(id: string, selected: boolean\) => void;/);
   assert.match(hookSource, /handleToggleEcommerceSelected: \(node: PromptNode, selected: boolean\) => void;/);
   assert.match(hookSource, /handleSetEcommerceGroupSelection: \(groupNode: PromptNode, selected: boolean\) => void;/);
@@ -31,6 +32,7 @@ test('ecommerce framework scheduler actions are owned by useEcommerceRuntime', (
   assert.match(hookSource, /enqueueEcommerceFrameworkNodes: \(/);
   assert.match(hookSource, /pumpEcommerceFrameworkQueue: \(frameworkId: string\) => void;/);
   assert.match(hookSource, /cancelEcommerceFrameworkNodeQueue/);
+  assert.match(hookSource, /updateEcommerceFrameworkConcurrency/);
   assert.match(hookSource, /resolveEcommerceFrameworkDispatchPlan/);
   assert.match(hookSource, /resolveFrameworkLane/);
 
@@ -39,7 +41,7 @@ test('ecommerce framework scheduler actions are owned by useEcommerceRuntime', (
   assert.match(appSource, /import \{ useEcommerceFrameworkRuntimeState,[\s\S]*?\} from '\.\/app\/useEcommerceFrameworkRuntimeState';/);
   assert.match(appSource, /import \{ useEcommerceSlotHistoryRuntime \} from '\.\/app\/useEcommerceSlotHistoryRuntime';/);
   assert.match(appSource, /const \{[\s\S]*?handleGenerateEcommerceNode,[\s\S]*?handleConfirmEcommerceDesktop,[\s\S]*?handleRetryEcommerceModule,[\s\S]*?\} = useEcommerceNodeGenerationRuntime\(\{/);
-  assert.match(appSource, /const \{[\s\S]*?handleGenerateEcommerceFramework,[\s\S]*?handleGenerateEcommerceGroup,[\s\S]*?handleToggleEcommerceAnalysisSelection,[\s\S]*?handleToggleEcommerceSelected,[\s\S]*?handleSetEcommerceGroupSelection,[\s\S]*?\} = useEcommerceRuntime\(\{/);
+  assert.match(appSource, /const \{[\s\S]*?handleGenerateEcommerceFramework,[\s\S]*?handleSetEcommerceFrameworkConcurrency,[\s\S]*?handleGenerateEcommerceGroup,[\s\S]*?handleToggleEcommerceAnalysisSelection,[\s\S]*?handleToggleEcommerceSelected,[\s\S]*?handleSetEcommerceGroupSelection,[\s\S]*?\} = useEcommerceRuntime\(\{/);
   assert.match(appSource, /const frameworkStateView = useEcommerceFrameworkRuntimeState\(\{/);
   assert.match(appSource, /const \{[\s\S]*?resolveEcommerceSlotState,[\s\S]*?handlePreviewEcommerceSlotHistory,[\s\S]*?handlePreviewEcommerceSlotHistoryForNode,[\s\S]*?\} = useEcommerceSlotHistoryRuntime\(\{/);
   assert.match(appSource, /frameworkStateView,/);
@@ -50,6 +52,7 @@ test('ecommerce framework scheduler actions are owned by useEcommerceRuntime', (
   assert.match(appSource, /setPreviewInitialIndex,/);
   assert.match(appSource, /handleGenerateEcommerceNode,/);
   assert.match(appSource, /handleRetryEcommerceModule,/);
+  assert.match(appSource, /onSetEcommerceFrameworkConcurrency: handleSetEcommerceFrameworkConcurrency/);
 
   assert.doesNotMatch(appSource, /const resolveEcommerceFrameworkQueuePhases = useCallback/);
   assert.doesNotMatch(appSource, /const enqueueEcommerceFrameworkNodes = useCallback/);
@@ -58,6 +61,7 @@ test('ecommerce framework scheduler actions are owned by useEcommerceRuntime', (
   assert.doesNotMatch(appSource, /const handlePauseEcommerceFramework = useCallback/);
   assert.doesNotMatch(appSource, /const handleResumeEcommerceFramework = useCallback/);
   assert.doesNotMatch(appSource, /const handleCancelEcommerceFrameworkNodeQueue = useCallback/);
+  assert.doesNotMatch(appSource, /const handleSetEcommerceFrameworkConcurrency = useCallback/);
   assert.doesNotMatch(appSource, /const handleGenerateEcommerceGroup = useCallback/);
   assert.doesNotMatch(appSource, /const handleToggleEcommerceAnalysisSelection = useCallback/);
   assert.doesNotMatch(appSource, /const handleToggleEcommerceSelected = useCallback/);

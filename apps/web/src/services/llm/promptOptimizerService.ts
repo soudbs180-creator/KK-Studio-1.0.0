@@ -1,43 +1,23 @@
-import type { PromptOptimizerResult } from '../../types';
-import type {
-    EcommerceEditableTaskState,
-    EcommerceSeriesTemplate,
-    EcommerceTaskAssetRoleBinding,
-} from '../../types';
+import type { CapabilityRouteAssignment, PromptOptimizerResult } from '../../types';
 import { keyManager } from '../auth/keyManager';
-import { resolveEnabledCapabilityRouteAssignment } from '../api/capabilityRouteAssignments';
+import {
+    isCustomRoutingEnabled,
+    resolveCapabilityRouteAssignment,
+} from '../api/capabilityRouteAssignments';
 import {
     buildAutomaticOptimizationInstruction,
     resolveAutomaticOptimizationRoute,
 } from './promptOptimizerAutoroute.ts';
+import {
+    buildPromptOptimizerLocalRulebookResult,
+    LOCAL_RULEBOOK_MODEL_ID,
+    resolvePromptOptimizationStrategy,
+    type PromptOptimizationRulebookOptions,
+    type PromptOptimizationStrategy,
+} from './promptOptimizerRulebook.ts';
 import { llmService } from './LLMService';
 
-type ReferenceImageInput = {
-    mimeType: string;
-    data: string;
-};
-
-type PromptOptimizationOptions = {
-    preferredModelId?: string;
-    aspectRatio?: string;
-    imageSize?: string;
-    mode?: string;
-    referenceImages?: ReferenceImageInput[];
-    supportsThinking?: boolean;
-    thinkingMode?: 'minimal' | 'high';
-    ecommerceContext?: {
-        taskState: EcommerceEditableTaskState;
-        seriesTemplate: EcommerceSeriesTemplate;
-        assetRoles: EcommerceTaskAssetRoleBinding[];
-        outputTarget?: {
-            label: string;
-            aspectRatio: string;
-            imageSize: string;
-        };
-    };
-};
-
-type PromptOptimizationStrategy = 'reasoning-native' | 'structure-first';
+type PromptOptimizationOptions = PromptOptimizationRulebookOptions;
 type PromptOptimizerRouteMeta = PromptOptimizerResult['meta'] & {
     route_id?: string;
     route_title?: string;
@@ -55,26 +35,14 @@ export interface PromptOptimizationResult {
     fullResult?: PromptOptimizerResult;
 }
 
-const OPTIMIZER_CACHE_KEY = 'kk_prompt_optimizer_cache_v5';
-const LEGACY_OPTIMIZER_CACHE_KEYS = ['kk_prompt_optimizer_cache_v4'];
+const OPTIMIZER_CACHE_KEY = 'kk_prompt_optimizer_cache_v6';
+const LEGACY_OPTIMIZER_CACHE_KEYS = ['kk_prompt_optimizer_cache_v5', 'kk_prompt_optimizer_cache_v4'];
 const OPTIMIZER_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const CJK_PATTERN = /[\u3400-\u9fff]/;
 
 const HUMAN_DEFAULT_TABS: PromptOptimizerResult['ui_payload']['tabs'] = [
     { id: 'raw', label_zh: '未优化', label_en: 'Raw' },
     { id: 'opt', label_zh: '已优化', label_en: 'Optimized' },
-];
-
-const DEFAULT_NEGATIVE_CONSTRAINTS = [
-    'Avoid adding extra subjects that change the original idea.',
-    'Avoid clutter, weak focal hierarchy, and muddy lighting.',
-    'Avoid broken anatomy, distorted geometry, or low-detail textures.',
-];
-
-const DEFAULT_VALIDATION_CHECKS = [
-    'Core subject is explicit and unambiguous.',
-    'Style, composition, and lighting all support the requested goal.',
-    'Prompt is compact enough to avoid unnecessary token cost.',
 ];
 
 const OPTIMIZER_SYSTEM_PROMPT = `You are a prompt optimization architect for image-generation workflows.
@@ -303,28 +271,28 @@ const detectReadableMissingInputs = (
     */
 };
 
-const getReadableFallbackOptimizedZh = (strategy: PromptOptimizationStrategy): string => (
-    strategy === 'reasoning-native'
-        ? '已按支持思考的模型优化为“目标 + 约束 + 结果导向”的精简提示词。'
-        : '已按不带思考能力的模型优化为更显式的结构化提示词。'
-);
-
 const buildOptimizerMeta = ({
     version,
     timestamp,
     route,
     strategy,
     validationStatus,
+    engine,
+    aiStatus,
 }: {
     version: string;
     timestamp: string;
     route: { strategyId: string; strategyTitle: string };
     strategy: PromptOptimizationStrategy;
     validationStatus: 'ready' | 'needs-review';
+    engine: 'local-rulebook' | 'ai-enhanced';
+    aiStatus: 'skipped' | 'enhanced' | 'failed-fallback';
 }): PromptOptimizerRouteMeta => ({
     version,
     timestamp,
     optimization_mode: 'auto',
+    engine,
+    ai_status: aiStatus,
     route_id: route.strategyId,
     route_title: route.strategyTitle,
     strategy,
@@ -354,83 +322,6 @@ const buildOptimizerMeta = ({
     return normalizeTextList(missing, 4);
 }; */
 
-const inferTaskType = (
-    input: string,
-    mode?: string,
-): PromptOptimizerResult['params']['task_type'] => {
-    const lowerInput = input.toLowerCase();
-
-    if (mode === 'ppt') return 'infographic';
-    if (/(icon|sticker|emoji|button|图标|贴纸)/i.test(lowerInput)) return 'icon_set';
-    if (/(amazon|ecommerce|hero|kv|packshot|product photo|product shot|产品|主图|商品)/i.test(lowerInput)) return 'ecommerce_hero';
-    if (/(dashboard|poster|infographic|ui|app|landing page|看板|海报|界面|版式)/i.test(lowerInput)) {
-        return /(ui|app|dashboard|界面)/i.test(lowerInput) ? 'ui' : 'infographic';
-    }
-    if (/(logo|logomark|brand mark|标志)/i.test(lowerInput)) return 'logo';
-    if (/(portrait|street|travel|outdoor|lifestyle|人物|街景|旅拍|户外)/i.test(lowerInput)) return 'lifestyle_photo';
-    return 'other';
-};
-
-const getTaskDefaults = (
-    taskType: PromptOptimizerResult['params']['task_type'],
-    mode?: string,
-) => {
-    const pptComposition = 'presentation-safe hierarchy, strong focal grouping, text-safe spacing';
-
-    switch (taskType) {
-        case 'icon_set':
-            return {
-                style: 'clean, consistent icon family with simplified geometry',
-                composition: 'centered set layout with even spacing',
-                lighting: 'soft ambient light with crisp edge definition',
-                background: 'white or transparent clean background',
-            };
-        case 'ecommerce_hero':
-            return {
-                style: 'premium commercial product visualization',
-                composition: mode === 'ppt' ? pptComposition : 'hero composition with a dominant subject and tidy staging',
-                lighting: 'controlled studio lighting with polished highlights and clean shadows',
-                background: 'minimal premium backdrop that keeps full attention on the product',
-            };
-        case 'lifestyle_photo':
-            return {
-                style: 'cinematic lifestyle photography with believable detail',
-                composition: mode === 'ppt' ? pptComposition : 'natural framing with depth and story-driven balance',
-                lighting: 'naturalistic lighting that supports the intended mood',
-                background: 'authentic real-world environment with moderate depth',
-            };
-        case 'logo':
-            return {
-                style: 'memorable brand mark with clean geometry',
-                composition: 'centered silhouette-first design optimized for clarity',
-                lighting: 'flat presentation suitable for vector-like output',
-                background: 'clean neutral background with strong contrast',
-            };
-        case 'ui':
-        case 'infographic':
-            return {
-                style: 'modern interface or editorial layout language',
-                composition: mode === 'ppt' ? pptComposition : 'grid-based layout with strong hierarchy and ample whitespace',
-                lighting: 'clean and even lighting or illustrative shading that preserves clarity',
-                background: 'controlled canvas with intentional spacing and text-safe zones',
-            };
-        default:
-            return {
-                style: 'high-quality visual direction tailored to the subject',
-                composition: mode === 'ppt' ? pptComposition : 'clear focal hierarchy with balanced negative space',
-                lighting: 'coherent lighting that supports realism and depth',
-                background: 'supportive background that does not compete with the main subject',
-            };
-    }
-};
-
-const resolveStrategy = (options?: PromptOptimizationOptions): PromptOptimizationStrategy => {
-    if (options?.supportsThinking) {
-        return 'reasoning-native';
-    }
-    return 'structure-first';
-};
-
 const buildStrategyHint = (
     strategy: PromptOptimizationStrategy,
     options?: PromptOptimizationOptions,
@@ -442,107 +333,6 @@ const buildStrategyHint = (
     }
 
     return 'Target model does not have strong native thinking. Make the prompt explicit and structured so the model can follow subject, style, composition, lighting, and constraints directly.';
-};
-
-const buildHeuristicPrompt = (
-    input: string,
-    strategy: PromptOptimizationStrategy,
-    options?: PromptOptimizationOptions,
-): string => {
-    const taskType = inferTaskType(input, options?.mode);
-    const defaults = getTaskDefaults(taskType, options?.mode);
-    const extraInstruction = truncateText(buildAutomaticOptimizationInstruction(input, {
-        mode: options?.mode,
-        aspectRatio: options?.aspectRatio,
-        referenceImageCount: options?.referenceImages?.length || 0,
-    }), 220);
-
-    if (strategy === 'reasoning-native') {
-        return truncateText([
-            input,
-            `Target outcome: ${defaults.style}.`,
-            `Composition: ${defaults.composition}.`,
-            `Lighting: ${defaults.lighting}.`,
-            `Background: ${defaults.background}.`,
-            options?.aspectRatio ? `Aspect ratio ${options.aspectRatio}.` : '',
-            extraInstruction ? `Additional constraint: ${extraInstruction}.` : '',
-        ].filter(Boolean).join(' '), 900);
-    }
-
-    return truncateText([
-        `Subject: ${input}.`,
-        `Style: ${defaults.style}.`,
-        `Composition: ${defaults.composition}.`,
-        `Lighting: ${defaults.lighting}.`,
-        `Background: ${defaults.background}.`,
-        options?.aspectRatio ? `Aspect ratio: ${options.aspectRatio}.` : '',
-        'Quality goal: clear subject separation, intentional hierarchy, and realistic detail where appropriate.',
-        extraInstruction ? `Additional instruction: ${extraInstruction}.` : '',
-    ].filter(Boolean).join(' '), 1100);
-};
-
-const buildFallbackResult = (
-    input: string,
-    strategy: PromptOptimizationStrategy,
-    options?: PromptOptimizationOptions,
-): PromptOptimizerResult => {
-    const autoroute = resolveAutomaticOptimizationRoute(input, {
-        mode: options?.mode,
-        aspectRatio: options?.aspectRatio,
-        referenceImageCount: options?.referenceImages?.length || 0,
-    });
-    const taskType = autoroute.taskType === 'other'
-        ? inferTaskType(input, options?.mode)
-        : autoroute.taskType;
-    const defaults = getTaskDefaults(taskType, options?.mode);
-    const missingInputs = detectReadableMissingInputs(input, autoroute, options?.mode);
-    const readableOptimizedZh = getReadableFallbackOptimizedZh(strategy);
-    const confidence: PromptOptimizerResult['confidence'] =
-        missingInputs.length >= 3 ? 'low' : missingInputs.length > 0 ? 'medium' : 'high';
-
-    return {
-        raw_prompt_original: input,
-        optimized_prompt_en: buildHeuristicPrompt(input, strategy, options),
-        /*
-        legacy_optimized_prompt_zh_display: strategy === 'reasoning-native'
-            ? '已按支持思考的模型优化为“目标 + 约束 + 结果导向”的精简提示词。'
-            : '已按不带思考能力的模型优化为更显式的结构化提示词。',
-        */
-        optimized_prompt_zh_display: readableOptimizedZh,
-        negative_constraints: [...DEFAULT_NEGATIVE_CONSTRAINTS],
-        assumptions: normalizeTextList([
-            `Automatic route: ${autoroute.strategyTitle}`,
-            strategy === 'reasoning-native'
-                ? 'Lean into the target model’s native reasoning instead of over-scripting it.'
-                : 'Expanded the prompt structure because the target model benefits from explicit guidance.',
-            input.trim().length < 18 ? 'Filled missing style and lighting details conservatively.' : '',
-        ], 4),
-        validation_checks: [...DEFAULT_VALIDATION_CHECKS],
-        missing_inputs: missingInputs,
-        confidence,
-        params: {
-            task_type: taskType,
-            subject: input,
-            style: defaults.style,
-            composition: defaults.composition,
-            lighting: defaults.lighting,
-            background: defaults.background,
-            materials: [],
-            color_palette: [],
-            aspect_ratio: options?.aspectRatio || '1:1',
-        },
-        ui_payload: {
-            tabs: HUMAN_DEFAULT_TABS,
-            default_tab: 'opt',
-        },
-        meta: buildOptimizerMeta({
-            version: 'prompt-optimizer-fallback-v4',
-            timestamp: new Date().toISOString(),
-            route: autoroute,
-            strategy,
-            validationStatus: missingInputs.length > 0 ? 'needs-review' : 'ready',
-        }),
-    };
 };
 
 const normalizeConfidence = (
@@ -579,6 +369,8 @@ const buildOptimizerCacheKey = (
     input: string,
     strategy: PromptOptimizationStrategy,
     options?: PromptOptimizationOptions,
+    aiModelId?: string,
+    aiRouteId?: string,
 ) => {
     const autoroute = resolveAutomaticOptimizationRoute(input, {
         mode: options?.mode,
@@ -590,6 +382,9 @@ const buildOptimizerCacheKey = (
         .join('|');
 
     return [
+        'ai-enhanced',
+        cleanText(aiModelId).toLowerCase(),
+        cleanText(aiRouteId).toLowerCase(),
         cleanText(options?.preferredModelId).toLowerCase(),
         cleanText(options?.aspectRatio).toLowerCase(),
         cleanText(options?.imageSize).toLowerCase(),
@@ -627,28 +422,70 @@ const resolveModelCandidate = (
     return sameSuffix?.id || null;
 };
 
-const pickOptimizerModel = (preferredModelId?: string): string | null => {
-    // Avoid silently consuming admin/system credits for behind-the-scenes prompt optimization.
+const decodeRouteToken = (value: string | null | undefined): string => {
+    try {
+        return decodeURIComponent(String(value || '').trim().toLowerCase());
+    } catch {
+        return String(value || '').trim().toLowerCase();
+    }
+};
+
+const extractModelRouteTarget = (modelId: string): string => {
+    const decodedSuffix = decodeRouteToken(modelId.split('@')[1]);
+    if (!decodedSuffix) return '';
+    if (decodedSuffix.startsWith('slot_key_')) return decodedSuffix.slice(5);
+    if (decodedSuffix.startsWith('slot_')) return decodedSuffix.slice(5);
+    if (decodedSuffix.startsWith('provider_')) return decodedSuffix;
+    return decodedSuffix;
+};
+
+const resolveRouteScopedModelCandidate = (
+    models: ReturnType<typeof keyManager.getGlobalModelList>,
+    routeId?: string,
+) => {
+    const normalizedRouteId = decodeRouteToken(routeId);
+    if (!normalizedRouteId) return null;
+
+    const routeCandidates = models.filter((model) => {
+        const target = extractModelRouteTarget(model.id);
+        return target === normalizedRouteId
+            || target === `provider_${normalizedRouteId}`
+            || decodeRouteToken(model.id.split('@')[1]) === normalizedRouteId;
+    });
+
+    const preferred = routeCandidates.find((model) => model.id.toLowerCase().includes('gemini-2.5-flash'));
+    return preferred?.id || routeCandidates[0]?.id || null;
+};
+
+const resolveExplicitOptimizerAiRoute = (): CapabilityRouteAssignment | undefined => {
+    if (!isCustomRoutingEnabled()) {
+        return undefined;
+    }
+
+    const assignment = resolveCapabilityRouteAssignment('prompt_optimizer');
+    if (!assignment?.enabled) {
+        return undefined;
+    }
+
+    return assignment.primaryModelId || assignment.primaryRouteId ? assignment : undefined;
+};
+
+const pickOptimizerModel = (optimizerRoute: CapabilityRouteAssignment): string | null => {
+    // 简体中文注释：AI 增强只能消费用户显式配置的聊天链路，避免后台优化偷偷走系统积分模型。
     const models = keyManager.getGlobalModelList().filter((model) => model.type === 'chat' && !model.isSystemInternal);
     if (models.length === 0) return null;
 
-    const capabilityAssignment = resolveEnabledCapabilityRouteAssignment('prompt_optimizer');
-    if (capabilityAssignment) {
-        const routedModelId = resolveModelCandidate(models, capabilityAssignment.primaryModelId);
-        if (routedModelId) {
-            return routedModelId;
-        }
+    const routedModelId = resolveModelCandidate(models, optimizerRoute.primaryModelId);
+    if (routedModelId) {
+        return routedModelId;
     }
 
-    if (preferredModelId) {
-        const preferredCandidate = resolveModelCandidate(models, preferredModelId);
-        if (preferredCandidate) {
-            return preferredCandidate;
-        }
+    const routeScopedModelId = resolveRouteScopedModelCandidate(models, optimizerRoute.primaryRouteId);
+    if (routeScopedModelId) {
+        return routeScopedModelId;
     }
 
-    const preferred = models.find((model) => model.id.toLowerCase().includes('gemini-2.5-flash'));
-    return preferred ? preferred.id : models[0].id;
+    return null;
 };
 
 const extractJsonObject = (text: string): any => {
@@ -734,8 +571,9 @@ const sanitizePromptOptimizerResult = (
     input: string,
     strategy: PromptOptimizationStrategy,
     options?: PromptOptimizationOptions,
+    fallbackResult?: PromptOptimizerResult,
 ): PromptOptimizerResult => {
-    const fallback = buildFallbackResult(input, strategy, options);
+    const fallback = fallbackResult || buildPromptOptimizerLocalRulebookResult(input, strategy, options);
     const autoroute = resolveAutomaticOptimizationRoute(input, {
         mode: options?.mode,
         aspectRatio: options?.aspectRatio,
@@ -797,6 +635,8 @@ const sanitizePromptOptimizerResult = (
             route: autoroute,
             strategy,
             validationStatus: normalizedMissingInputs.length > 0 ? 'needs-review' : 'ready',
+            engine: 'ai-enhanced',
+            aiStatus: 'enhanced',
         }),
     };
 };
@@ -808,30 +648,42 @@ export const optimizePromptForImage = async (
     const input = cleanText(rawPrompt);
     if (!input) throw new Error('Prompt is empty');
 
-    const strategy = resolveStrategy(options);
+    const strategy = resolvePromptOptimizationStrategy(options);
     const resolvedOptions: PromptOptimizationOptions = { ...options };
+    const localFallback = buildPromptOptimizerLocalRulebookResult(input, strategy, resolvedOptions);
+    const localResult: PromptOptimizationResult = {
+        optimizedEn: localFallback.optimized_prompt_en,
+        optimizedZh: localFallback.optimized_prompt_zh_display,
+        usedModelId: LOCAL_RULEBOOK_MODEL_ID,
+        fullResult: localFallback,
+    };
 
-    const cacheKey = buildOptimizerCacheKey(input, strategy, resolvedOptions);
+    const optimizerRoute = resolveExplicitOptimizerAiRoute();
+    if (!optimizerRoute) {
+        return localResult;
+    }
+
+    const modelId = pickOptimizerModel(optimizerRoute);
+    if (!modelId) {
+        return localResult;
+    }
+
+    const cacheKey = buildOptimizerCacheKey(
+        input,
+        strategy,
+        resolvedOptions,
+        modelId,
+        optimizerRoute.primaryRouteId || optimizerRoute.primaryModelId,
+    );
     const cache = readOptimizerCache();
     const cached = cache[cacheKey];
     if (cached && (Date.now() - cached.createdAt) < OPTIMIZER_CACHE_TTL_MS) {
         return cached.result;
     }
 
-    const modelId = pickOptimizerModel(resolvedOptions.preferredModelId);
-    const optimizerRoute = resolveEnabledCapabilityRouteAssignment('prompt_optimizer');
     const preferredKeyId = optimizerRoute?.primaryRouteId && keyManager.getKey(optimizerRoute.primaryRouteId)
         ? optimizerRoute.primaryRouteId
         : undefined;
-    if (!modelId) {
-        const fallback = buildFallbackResult(input, strategy, resolvedOptions);
-        return {
-            optimizedEn: fallback.optimized_prompt_en,
-            optimizedZh: fallback.optimized_prompt_zh_display,
-            usedModelId: 'fallback',
-            fullResult: fallback,
-        };
-    }
 
     try {
         const raw = await llmService.chat({
@@ -848,7 +700,7 @@ export const optimizePromptForImage = async (
         });
 
         const parsed = extractJsonObject(raw);
-        const fullResult = sanitizePromptOptimizerResult(parsed, input, strategy, resolvedOptions);
+        const fullResult = sanitizePromptOptimizerResult(parsed, input, strategy, resolvedOptions, localFallback);
         const result: PromptOptimizationResult = {
             optimizedEn: fullResult.optimized_prompt_en,
             optimizedZh: fullResult.optimized_prompt_zh_display,
@@ -861,12 +713,18 @@ export const optimizePromptForImage = async (
         writeOptimizerCache(cache);
         return result;
     } catch (error) {
-        console.warn('[Optimizer] Falling back to heuristic optimization.', summarizePromptOptimizerError(error));
-        const fallback = buildFallbackResult(input, strategy, resolvedOptions);
+        console.warn('[Optimizer] AI enhancement failed, using local rulebook result.', summarizePromptOptimizerError(error));
+        const fallback: PromptOptimizerResult = {
+            ...localFallback,
+            meta: {
+                ...localFallback.meta,
+                ai_status: 'failed-fallback',
+            },
+        };
         return {
             optimizedEn: fallback.optimized_prompt_en,
             optimizedZh: fallback.optimized_prompt_zh_display,
-            usedModelId: 'fallback',
+            usedModelId: LOCAL_RULEBOOK_MODEL_ID,
             fullResult: fallback,
         };
     }

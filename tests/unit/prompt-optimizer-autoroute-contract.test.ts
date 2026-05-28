@@ -52,3 +52,11 @@ test('ui prompts expose ui-specific missing slot hints', () => {
   assert.equal(route.taskType, 'ui');
   assert.deepEqual(route.missingInputHints, ['界面类型', '信息层级', '配色风格', '展示场景']);
 });
+
+test('expanded visual scenarios route to local rulebook archetypes', () => {
+  assert.equal(inferPromptOptimizationArchetype('修复照片并替换背景', 'image'), 'image-editing');
+  assert.equal(inferPromptOptimizationArchetype('客厅硬装设计效果图', 'image'), 'interior-space');
+  assert.equal(inferPromptOptimizationArchetype('小红书新品营销封面', 'image'), 'social-marketing');
+  assert.equal(inferPromptOptimizationArchetype('两个角色融合成超现实立体场景', 'image'), 'creative-composite');
+  assert.equal(inferPromptOptimizationArchetype('商务头像摄影', 'image'), 'portrait-photo');
+});

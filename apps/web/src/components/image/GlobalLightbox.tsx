@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
-import { type GeneratedImage, GenerationMode, type PartialRedrawRequest } from '../../types';
+import { type GeneratedImage, GenerationMode, type RedrawRequest } from '../../types';
 import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy, Sparkles } from 'lucide-react';
-import { PartialRedrawModal } from './PartialRedrawModal';
+import { RedrawWorkspace } from './RedrawWorkspace';
 import { notify } from '../../services/system/notificationService';
 import { getImage, getStrictOriginalImage } from '../../services/storage/imageStorage';
 import { writeTextToClipboard, writeImageToClipboard } from '../../utils/clipboard';
@@ -17,7 +17,7 @@ interface GlobalLightboxProps {
     onClose: () => void;
     onEditText?: (image: GeneratedImage) => void;
     onEditPptDeck?: (image: GeneratedImage) => void;
-    onPartialRedraw?: (image: GeneratedImage, request: PartialRedrawRequest) => void;
+    onPartialRedraw?: (image: GeneratedImage, request: RedrawRequest) => void;
     onDownloadPptComposite?: (imageId: string) => void;
     redrawCompleteUrl?: string | null;
     onRedrawAnimationDone?: () => void;
@@ -36,7 +36,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
-    const [showPartialRedraw, setShowPartialRedraw] = useState(false);
+    const [redrawWorkspaceMode, setRedrawWorkspaceMode] = useState<'fresh' | 'regenerate' | null>(null);
     const [showDownloadMenu, setShowDownloadMenu] = useState(false);
     const [isMobile, setIsMobile] = useState(() =>
         typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false
@@ -53,6 +53,19 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     const sourceSessionRef = useRef(0);
 
     const image = images[currentIndex];
+    const currentRedrawSourceId = image?.redraw?.sourceImageId || image?.partialRedraw?.sourceImageId;
+    const sourceImageForRegenerate = currentRedrawSourceId
+        ? images.find((item) => item.id === currentRedrawSourceId)
+        : undefined;
+    const sourceUrlForRegenerate = sourceImageForRegenerate
+        ? (sourceImageForRegenerate.originalUrl || sourceImageForRegenerate.apiResultUrl || sourceImageForRegenerate.url)
+        : null;
+    const redrawWorkspaceImage = redrawWorkspaceMode === 'regenerate' && sourceImageForRegenerate
+        ? sourceImageForRegenerate
+        : image;
+    const redrawWorkspaceImageUrl = redrawWorkspaceMode === 'regenerate' && sourceUrlForRegenerate
+        ? sourceUrlForRegenerate
+        : displaySrc;
     const clampedGenerationTime = clampGenerationDurationMs(image.generationTime);
     const isPptSubCard = image.mode === GenerationMode.PPT && Boolean(image.parentPromptId);
     const downloadMenuRef = useRef<HTMLDivElement>(null);
@@ -890,9 +903,49 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                       </div>
                   )}
               </div>
+
+              {!isMobile && images.length > 1 && (
+                  <div
+                      className="w-full shrink-0 border-t border-[var(--border-light)] bg-black/45 px-8 py-3 text-white backdrop-blur-xl"
+                      onClick={(event) => event.stopPropagation()}
+                  >
+                      <div className="mb-2 flex items-center justify-between text-xs text-white/55">
+                          <span>{image.redraw || image.partialRedraw ? '重绘结果列表' : '结果列表'}</span>
+                          <span>{currentIndex + 1} / {images.length}</span>
+                      </div>
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                          {images.map((item, index) => {
+                              const thumbSrc = item.url || item.originalUrl || item.apiResultUrl;
+                              const isCurrent = index === currentIndex;
+                              const isRedrawItem = Boolean(item.redraw || item.partialRedraw);
+                              return (
+                                  <button
+                                      key={item.id}
+                                      type="button"
+                                      onClick={() => {
+                                          setCurrentIndex(index);
+                                          setZoom(1);
+                                          setPan({ x: 0, y: 0 });
+                                      }}
+                                      className={`relative h-16 w-20 shrink-0 overflow-hidden rounded-lg border transition ${isCurrent ? 'border-white ring-2 ring-white/25' : 'border-white/15 opacity-75 hover:opacity-100'}`}
+                                      title={item.prompt || `结果 ${index + 1}`}
+                                  >
+                                      {thumbSrc ? (
+                                          <img src={thumbSrc} alt={item.prompt || `结果 ${index + 1}`} className="h-full w-full object-cover" />
+                                      ) : (
+                                          <span className="flex h-full w-full items-center justify-center bg-white/10 text-[10px]">无预览</span>
+                                      )}
+                                      <span className="absolute bottom-1 left-1 rounded bg-black/65 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                                          {isRedrawItem ? '重绘' : index + 1}
+                                      </span>
+                                  </button>
+                              );
+                          })}
+                      </div>
+                  </div>
+              )}
   
-              {/* Footer metadata panel */}
-              {/* Fixed footer below the media to avoid overlap */}
+              {/* 简体中文注释：底部信息与操作区和缩略图分层，避免遮挡主图和重绘入口。 */}
               <div
                   className={`w-full shrink-0 border-t border-[var(--border-light)] bg-[var(--bg-secondary)]/90 text-[var(--text-primary)] backdrop-blur-xl ${isMobile ? 'px-3 py-3' : 'grid min-h-[100px] grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-8'}`}
                   onClick={e => e.stopPropagation()}
@@ -950,18 +1003,31 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                           </button>
                       )}
 
-                      {/* Partial redraw actions for images only */}
+                      {/* 简体中文注释：灯箱只暴露统一的重绘入口，工作台内部再根据选区自动分流。 */}
                       {onPartialRedraw && !isVideo && !isAudio && displaySrc && (
+                           <button
+                               onClick={(e) => {
+                                   e.stopPropagation();
+                                  setRedrawWorkspaceMode('fresh');
+                               }}
+                               className={`${actionButtonClass} hover:border-purple-500 hover:bg-purple-600/80`}
+                              title="重绘"
+                           >
+                               <Pen size={16} />
+                               重绘
+                           </button>
+                       )}
+                      {onPartialRedraw && !isVideo && !isAudio && displaySrc && (image.redraw || image.partialRedraw) && (
                           <button
                               onClick={(e) => {
                                   e.stopPropagation();
-                                  setShowPartialRedraw(true);
+                                  setRedrawWorkspaceMode('regenerate');
                               }}
-                              className={`${actionButtonClass} hover:border-purple-500 hover:bg-purple-600/80`}
-                              title="局部重绘"
+                              className={`${actionButtonClass} hover:border-amber-400 hover:bg-amber-500/80`}
+                              title="复用原图、原提示词和原标记重新生成"
                           >
-                              <Pen size={16} />
-                              重绘
+                              <Sparkles size={16} />
+                              不满意重生成
                           </button>
                       )}
   
@@ -1040,16 +1106,19 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                   </div>
             </div>
 
-            {/* Partial redraw modal */}
-            {showPartialRedraw && displaySrc && (
-                <PartialRedrawModal
-                    image={image}
-                    imageUrl={displaySrc}
-                    onCancel={() => setShowPartialRedraw(false)}
+            {redrawWorkspaceMode && redrawWorkspaceImageUrl && (
+                <RedrawWorkspace
+                    image={redrawWorkspaceImage}
+                    imageUrl={redrawWorkspaceImageUrl}
+                    isMobile={isMobile}
+                    initialPrompt={redrawWorkspaceMode === 'regenerate' ? (image.redraw?.strictPrompt || image.prompt || '') : ''}
+                    initialRegions={redrawWorkspaceMode === 'regenerate' ? (image.redraw?.regions || []) : []}
+                    initialColorBlocks={redrawWorkspaceMode === 'regenerate' ? (image.redraw?.colorBlocks || []) : []}
+                    onCancel={() => setRedrawWorkspaceMode(null)}
                     onSubmit={(request) => {
-                        setShowPartialRedraw(false);
+                        setRedrawWorkspaceMode(null);
                         if (onPartialRedraw) {
-                            onPartialRedraw(image, request);
+                            onPartialRedraw(redrawWorkspaceImage, request);
                         }
                         onClose();
                     }}

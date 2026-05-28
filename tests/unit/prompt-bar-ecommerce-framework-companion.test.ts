@@ -44,4 +44,7 @@ test('ecommerce framework workbench lives on the canvas instead of PromptBar aft
   assert.match(canvasWorkbenchSource, /onActivateTask\?\.\(selectedTaskNode\);/);
   assert.match(canvasWorkbenchSource, /data-testid="ecommerce-canvas-framework-task-list"/);
   assert.match(canvasWorkbenchSource, /EcommerceTaskEditorPanel/);
+  assert.match(canvasWorkbenchSource, /onSetFrameworkConcurrency/);
+  assert.match(canvasWorkbenchSource, /\(\[1, 2, 4\] as const\)/);
+  assert.match(canvasWorkbenchSource, /不满意重生成/);
 });

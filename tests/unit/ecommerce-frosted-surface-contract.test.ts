@@ -17,6 +17,8 @@ test('ecommerce task editor uses Clay frosted shells, inputs, and accent chips i
   assert.match(source, /var\(--frost-input-bg\)/);
   assert.match(source, /var\(--clay-brand-pink\)/);
   assert.match(source, /var\(--clay-brand-peach\)/);
+  assert.match(source, /updateReferenceAnchorRole/);
+  assert.match(source, /resolveReferenceImageSrc/);
   assert.doesNotMatch(source, /rgba\(59,\s*130,\s*246|rgba\(16,\s*185,\s*129|rgba\(245,\s*158,\s*11|rgba\(15,\s*23,\s*42|rgba\(148,\s*163,\s*184/);
 });
 
@@ -29,6 +31,9 @@ test('ecommerce card actions use frosted action surfaces and Clay accent borders
   assert.match(source, /var\(--clay-brand-pink\)/);
   assert.match(source, /var\(--clay-brand-peach\)/);
   assert.match(source, /var\(--clay-brand-coral\)/);
+  assert.match(source, /resolveTaskQueueItem/);
+  assert.match(source, /不满意重生成/);
+  assert.match(source, /\(\[1, 2, 4\] as const\)/);
   assert.doesNotMatch(source, /rgba\(59,\s*130,\s*246|rgba\(16,\s*185,\s*129|rgba\(245,\s*158,\s*11|color-mix\(/);
 });
 

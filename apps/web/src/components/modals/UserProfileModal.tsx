@@ -3,6 +3,10 @@ import type { RuntimeAuthUser } from '../../services/auth/runtimeAuthTypes.ts';
 import {
   AlertCircle,
   ChevronLeft,
+  Copy,
+  Check,
+  Crown,
+  Sparkles,
   CreditCard,
   Globe,
   LayoutDashboard,
@@ -133,6 +137,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const remainingBalanceHint = latestRecharge
     ? `最近充值：${formatDateTime(latestRecharge.created_at)}`
     : '仅管理员积分模型会消耗这里的积分，个人 API 不扣积分';
+
+  const [copied, setCopied] = useState(false);
+  const handleCopyId = (id: string) => {
+    if (!id) return;
+    void navigator.clipboard.writeText(id);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const [view, setView] = useState<UserProfileView>('main');
   const [billingSubTab, setBillingSubTab] = useState<'usage' | 'recharge'>('usage');
@@ -722,9 +734,12 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                         <div className="truncate text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
                           {nickname}
                         </div>
-                        <div className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                          {displayEmail}
-                        </div>
+                        {/* 简体中文：仅在非临时账号且存在邮箱时显示，避免冗长的临时伪装邮箱展示，使卡片极其整洁 */}
+                        {!isTempUser && !isShadowWechatEmail && user?.email && (
+                          <div className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                            {displayEmail}
+                          </div>
+                        )}
                         {isWechatBound && (
                           <div className="mt-1 text-[11px] text-emerald-300">
                             已绑定微信，可使用微信头像、昵称和扫码登录
@@ -735,14 +750,48 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                             已绑定 Google，可使用 Google 一键登录
                           </div>
                         )}
-                        <div className="mt-1 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                          用户 ID：{user?.id || '-'}
+                        {/* 简体中文：精心设计了带有等宽字体、微光样式及一键复制功能的 ID 面板 */}
+                        <div className="mt-1 flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                          <span>ID:</span>
+                          <span 
+                            className="font-mono bg-white/5 border border-white/5 px-1.5 py-0.5 rounded text-[10px] select-all max-w-[120px] truncate"
+                            title={user?.id || ''}
+                            style={{ fontVariantNumeric: 'tabular-nums' }}
+                          >
+                            {user?.id ? `${user.id.slice(0, 8)}...${user.id.slice(-8)}` : '-'}
+                          </span>
+                          {user?.id && (
+                            <button
+                              onClick={() => handleCopyId(user.id)}
+                              className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors p-0.5 rounded hover:bg-white/10"
+                              title="复制用户 ID"
+                            >
+                              {copied ? <Check size={11} className="text-emerald-400 animate-in zoom-in duration-200" /> : <Copy size={11} />}
+                            </button>
+                          )}
                         </div>
                       </div>
 
-                      <span className="rounded-full border px-2 py-1 text-[11px]" style={{ borderColor: 'var(--border-light)', color: 'var(--text-secondary)' }}>
-                        {roleLabel}
-                      </span>
+                      {/* 简体中文：右侧预埋的高级订阅与权益套餐微标体系 */}
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        {adminLevel > 0 || accountRole === 'admin' ? (
+                          <div className="flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-orange-500/20 border border-amber-500/30 px-2.5 py-1 text-[11px] font-bold text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.15)] animate-pulse">
+                            <Crown size={12} className="text-amber-400 shrink-0" />
+                            <span>终极超级订阅</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]">
+                            <Sparkles size={12} className="text-blue-300 shrink-0" />
+                            <span>普通版订阅</span>
+                          </div>
+                        )}
+                        <span 
+                          className="text-[9px] text-[var(--text-tertiary)] opacity-80 cursor-pointer hover:text-[var(--accent-coral)] transition-colors"
+                          title="更多专业版、团队版订阅套餐正在设计中，敬请期待"
+                        >
+                          管理订阅 (即将上线)
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -854,20 +903,37 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 {/* 简体中文：右侧卡片 - 积分资产以及账单历史明细 */}
                 {billingUiEnabled && (
                   <div className="space-y-4">
-                    <div className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
+                    <div className="kk-user-profile-modal__main-card rounded-xl border p-4.5" style={{ borderColor: 'var(--frost-card-main-border)' }}>
+                      <div className="flex items-center justify-between gap-4">
+                        {/* 简体中文：左侧展示积分数值与单排充值渠道介绍，数字在卡片内垂直居中对齐 */}
+                        <div className="flex-1 min-w-0 flex flex-col justify-center">
                           <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                            积分
+                            可用积分
                           </div>
-                          <div className="mt-1 text-2xl font-bold text-[var(--clay-brand-ochre)]">{remainingBalanceDisplay}</div>
-                          <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                            {remainingBalanceHint}
+                          <div 
+                            className="mt-1 text-3xl font-black tracking-tight select-all animate-in fade-in slide-in-from-bottom-2 duration-300"
+                            style={{
+                              fontVariantNumeric: 'tabular-nums',
+                              background: 'linear-gradient(135deg, #FFE3A8 0%, #FFB084 100%)',
+                              WebkitBackgroundClip: 'text',
+                              WebkitTextFillColor: 'transparent',
+                              filter: 'drop-shadow(0 2px 6px rgba(255, 176, 132, 0.12))',
+                            }}
+                          >
+                            {remainingBalanceDisplay}
+                          </div>
+                          <div className="mt-1.5 text-[11px]" style={{ color: 'var(--text-tertiary)', opacity: 0.85 }}>
+                            支持微信支付、支付宝及 Stripe 渠道充值
                           </div>
                         </div>
+
+                        {/* 简体中文：右侧为操作按钮，与左侧积分在垂直方向上完美居中对齐，使用正常金色无渐变按钮，点击时自动重置关闭个人中心以防遮挡充值界面 */}
                         <button
-                          onClick={() => setShowRechargeModal(true)}
-                          className="inline-flex h-10 items-center justify-center rounded-lg bg-[var(--accent-coral)] px-4 text-sm font-medium text-white transition-transform active:scale-95"
+                          onClick={() => {
+                            setShowRechargeModal(true);
+                            resetAndClose();
+                          }}
+                          className="inline-flex h-9.5 items-center justify-center rounded-xl bg-[var(--clay-brand-ochre)] hover:brightness-105 active:brightness-95 px-5 text-xs font-bold text-white transition-all active:scale-95 shadow-[0_2px_8px_rgba(217,119,6,0.15)] shrink-0"
                         >
                           立即充值
                         </button>

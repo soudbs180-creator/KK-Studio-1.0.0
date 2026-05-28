@@ -13,9 +13,13 @@ import {
   createEcommerceFrameworkRuntimeState,
   enqueueEcommerceFrameworkItems,
   migrateLegacyEcommerceFrameworkCanvas,
+  pauseEcommerceFrameworkNodeQueue,
   pauseEcommerceFrameworkRuntime,
   resolveEcommerceFrameworkDispatchPlan,
+  resumeEcommerceFrameworkNodeQueue,
   resumeEcommerceFrameworkRuntime,
+  resolveEcommerceFrameworkSummary,
+  updateEcommerceFrameworkConcurrency,
 } from '../../apps/web/src/services/ecommerce/frameworkRuntime.ts';
 
 function createEcommerceNode(
@@ -188,7 +192,7 @@ test('framework dispatch caps remote lanes and allows local lanes to fill config
 
   const starters = resolveEcommerceFrameworkDispatchPlan(runtime).map((item) => item.nodeId);
 
-  assert.deepEqual(starters, ['local-1', 'local-2', 'local-3', 'remote-1', 'remote-2']);
+  assert.deepEqual(starters, ['local-1', 'local-2', 'local-3', 'remote-1']);
 });
 
 test('framework dispatch fairly spreads remote capacity across provider lanes', () => {
@@ -330,4 +334,143 @@ test('single-card cancel removes queued follow-up work only', () => {
     runtime.queue.map((item) => `${item.nodeId}:${item.phase}:${item.status}`),
     ['task-1:desktop:running', 'task-2:desktop:queued'],
   );
+});
+
+test('single-card edit pause only holds queued work for that card', () => {
+  const runtime = pauseEcommerceFrameworkNodeQueue({
+    frameworkId: 'fw-edit',
+    activeSheet: '主图',
+    paused: false,
+    config: {
+      maxLocalConcurrency: 4,
+      maxRemoteConcurrency: 4,
+      maxConcurrentGenerations: 4,
+    },
+    queue: [
+      {
+        queueId: 'queued-edit',
+        frameworkId: 'fw-edit',
+        nodeId: 'task-edit',
+        phase: 'sheet',
+        laneKey: 'remote:google',
+        laneType: 'remote',
+        sourceSheet: '主图',
+        status: 'queued',
+        enqueuedAt: 1,
+        revision: 1,
+      },
+      {
+        queueId: 'queued-other',
+        frameworkId: 'fw-edit',
+        nodeId: 'task-other',
+        phase: 'sheet',
+        laneKey: 'remote:google',
+        laneType: 'remote',
+        sourceSheet: '主图',
+        status: 'queued',
+        enqueuedAt: 2,
+      },
+    ],
+    lastUpdatedAt: 1,
+  }, 'task-edit', 'editing');
+
+  assert.equal(runtime.queue[0].status, 'paused');
+  assert.equal(runtime.queue[0].pausedReason, 'editing');
+  assert.equal(runtime.queue[1].status, 'queued');
+
+  const resumed = resumeEcommerceFrameworkNodeQueue(runtime, 'task-edit', {
+    reason: 'editing',
+    revision: 2,
+  });
+
+  assert.equal(resumed.queue[0].status, 'queued');
+  assert.equal(resumed.queue[0].pausedReason, undefined);
+  assert.equal(resumed.queue[0].revision, 2);
+});
+
+test('framework concurrency selector caps total, local, and remote slots together', () => {
+  const runtime = updateEcommerceFrameworkConcurrency({
+    frameworkId: 'fw-concurrency',
+    activeSheet: '主图',
+    paused: false,
+    config: {
+      maxLocalConcurrency: 4,
+      maxRemoteConcurrency: 4,
+      maxConcurrentGenerations: 4,
+    },
+    queue: [
+      {
+        queueId: 'queued-1',
+        frameworkId: 'fw-concurrency',
+        nodeId: 'task-1',
+        phase: 'sheet',
+        laneKey: 'remote:google',
+        laneType: 'remote',
+        sourceSheet: '主图',
+        status: 'queued',
+        enqueuedAt: 1,
+      },
+      {
+        queueId: 'queued-2',
+        frameworkId: 'fw-concurrency',
+        nodeId: 'task-2',
+        phase: 'sheet',
+        laneKey: 'remote:google',
+        laneType: 'remote',
+        sourceSheet: '主图',
+        status: 'queued',
+        enqueuedAt: 2,
+      },
+      {
+        queueId: 'queued-3',
+        frameworkId: 'fw-concurrency',
+        nodeId: 'task-3',
+        phase: 'sheet',
+        laneKey: 'remote:google',
+        laneType: 'remote',
+        sourceSheet: '主图',
+        status: 'queued',
+        enqueuedAt: 3,
+      },
+    ],
+    lastUpdatedAt: 1,
+  }, 2);
+
+  assert.equal(runtime.config.maxConcurrentGenerations, 2);
+  assert.equal(runtime.config.maxLocalConcurrency, 2);
+  assert.equal(runtime.config.maxRemoteConcurrency, 2);
+  assert.deepEqual(
+    resolveEcommerceFrameworkDispatchPlan(runtime).map((item) => item.nodeId),
+    ['task-1', 'task-2'],
+  );
+
+  const summary = resolveEcommerceFrameworkSummary([
+    {
+      id: 'fw-concurrency',
+      prompt: 'framework',
+      originalPrompt: 'framework',
+      position: { x: 0, y: 0 },
+      aspectRatio: AspectRatio.SQUARE,
+      imageSize: ImageSize.SIZE_1K,
+      childImageIds: [],
+      timestamp: 1,
+      model: 'gemini-3.1-flash-image-preview',
+      mode: GenerationMode.ECOMMERCE,
+      referenceImages: [],
+      ecommerce: {
+        kind: 'framework',
+        sourceSheet: '主图',
+        sourceRowKey: 'framework-root',
+        selectedForGeneration: false,
+        stage: 'ready',
+        theme: '框架',
+        displayLabel: '框架',
+        desktopStage: 'not_applicable',
+        mobileStage: 'not_applicable',
+      },
+    },
+  ], 'fw-concurrency', runtime);
+
+  assert.equal(summary.maxConcurrentGenerations, 2);
+  assert.equal(summary.queueItems.length, 3);
 });

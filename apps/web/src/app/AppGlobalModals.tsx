@@ -9,7 +9,7 @@ import type {
   Canvas,
   CanvasGroup,
   GeneratedImage,
-  PartialRedrawRequest,
+  RedrawRequest,
   PptEditablePage,
   PromptNode,
 } from '../types';
@@ -70,7 +70,7 @@ export interface AppGlobalModalsProps {
     onEditPptDeck: (image: GeneratedImage) => void;
     onEditText: (image: GeneratedImage) => void;
     onDownloadPptComposite: (imageId: string) => void;
-    onPartialRedraw: (image: GeneratedImage, request: PartialRedrawRequest) => void;
+    onPartialRedraw: (image: GeneratedImage, request: RedrawRequest) => void;
     onUseAsSource?: (image: GeneratedImage) => void; // 🚀 新增继续创作回调
   };
   pptStackPreview: {

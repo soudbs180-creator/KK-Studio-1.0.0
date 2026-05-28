@@ -21,17 +21,19 @@ test('App creates REDRAW prompt nodes and generation pipeline composites redraw 
   assert.match(globalModalsSource, /onPartialRedraw=\{lightbox\.onPartialRedraw\}/);
   assert.match(mobileWorkspaceSource, /onPartialRedraw=\{onPartialRedraw\}/);
   assert.match(appSource, /mode:\s*GenerationMode\.REDRAW/);
-  assert.match(appSource, /partialRedraw:\s*\{/);
+  assert.match(appSource, /redraw:\s*nodeRedrawMetadata/);
   assert.match(appSource, /sourceImageId:\s*sourceImage\.id/);
-  assert.match(appSource, /buildPartialRedrawReferenceImage\(/);
-  assert.match(appSource, /referenceImages:\s*\[\s*croppedSourceReference,\s*\.\.\.request\.referenceImages\s*\]/);
+  assert.match(appSource, /compositionBaseImageId:\s*cropPlan \? currentCompositeBaseImageId : undefined/);
+  assert.match(appSource, /buildRedrawReferenceImage\(/);
+  assert.match(appSource, /referenceImages:\s*\[\s*sourceReference,\s*\.\.\.extraReferenceImages,?\s*\]/);
   assert.match(appSource, /await executeGeneration\(redrawNode\);/);
   assert.match(appSource, /handleOpenPreview\(latestRedrawResultId\);/);
   assert.doesNotMatch(appSource, /maskUrl:\s*maskBase64/);
 
   assert.match(generationSource, /executionNode\.mode === GenerationMode\.REDRAW/);
-  assert.match(generationSource, /await compositePartialRedrawResult\(/);
-  assert.match(generationSource, /partialRedraw:\s*executionNode\.partialRedraw/);
+  assert.match(generationSource, /await compositeRedrawCropResult\(/);
+  assert.match(generationSource, /redraw:\s*executionNode\.redraw/);
+  assert.match(generationSource, /executionNode\.redraw\?\.compositionBaseImageId/);
 
   assert.doesNotMatch(promptBarSource, /import \{ InpaintModal \} from '\.\.\/image\/InpaintModal';/);
   assert.doesNotMatch(promptBarSource, /config\.maskUrl/);

@@ -26,7 +26,15 @@ describe('canvas startup local performance trace contract', () => {
     )
     assert.match(
       source,
-      /const startupImageHydrationPromise = traceLocalPerformance\('canvas-startup\.preview-hydration',\s*\(\)\s*=>\s*hydrateStartupPreviewImages\(startupState,\s*\(pct\)\s*=>\s*setLoadingProgress\(pct\)\)\s*\);/
+      /const startupImageHydrationPromise = traceLocalPerformance\('canvas-startup\.preview-hydration',\s*\(\)\s*=>\s*hydrateStartupPreviewImages\(startupState,\s*\(pct\)\s*=>\s*pushLoadingProgress\(pct\)\)\s*\);/
+    )
+    assert.match(
+      source,
+      /setLoadingProgress\(prev => options\?\.reset \? normalizedProgress : Math\.max\(prev, normalizedProgress\)\);/
+    )
+    assert.match(
+      source,
+      /startupLoadRunIdRef\.current !== options\.runId/
     )
     assert.match(
       source,

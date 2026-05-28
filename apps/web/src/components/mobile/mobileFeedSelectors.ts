@@ -96,7 +96,7 @@ const resolveDisplayLabel = (
     return normalizedPromptLabel;
   }
 
-  const normalizedInheritedLabel = normalizeText(imageNode.partialRedraw?.inheritedDisplayLabel);
+  const normalizedInheritedLabel = normalizeText(imageNode.redraw?.inheritedDisplayLabel || imageNode.partialRedraw?.inheritedDisplayLabel);
   return normalizedInheritedLabel || undefined;
 };
 
@@ -261,7 +261,7 @@ function resolveEcommerceContinuation(
   frameworkSummaryById: Map<string, EcommerceFrameworkSummary>,
 ): MobileEcommerceContinuation | undefined {
   const ecommerce = promptNode?.ecommerce;
-  const inheritedTaskState = imageNode.partialRedraw?.inheritedTaskState;
+  const inheritedTaskState = imageNode.redraw?.inheritedTaskState || imageNode.partialRedraw?.inheritedTaskState;
   const taskState = ecommerce?.editableTask || inheritedTaskState;
   const sourceSheet = ecommerce?.sourceSheet || taskState?.sourceSheet;
   const kind = ecommerce?.kind || taskState?.sourceKind;
@@ -279,7 +279,7 @@ function resolveEcommerceContinuation(
   const stage = resolveEcommerceStage(ecommerce);
 
   return {
-    promptNodeId: promptNode?.id || imageNode.partialRedraw?.sourcePromptId || null,
+    promptNodeId: promptNode?.id || imageNode.redraw?.sourcePromptId || imageNode.partialRedraw?.sourcePromptId || null,
     taskId: taskState?.taskId,
     sourceSheet,
     kind,
@@ -366,6 +366,7 @@ export function selectMobileFeedResults(
       hasOriginal: Boolean(imageNode.originalUrl || imageNode.apiResultUrl),
       timestamp: resolveTimestamp(imageNode, promptNode),
       parentPromptId,
+      prompt: imageNode.prompt || promptNode?.prompt || promptSummary,
       promptSummary,
       fullPrompt: normalizeText(promptNode?.originalPrompt || promptNode?.prompt || promptSummary) || promptSummary,
       referenceImages: promptNode?.referenceImages || [],
@@ -379,6 +380,7 @@ export function selectMobileFeedResults(
       mobileLayout,
       detailEntryId: imageNode.id,
       detailEntry,
+      tags: imageNode.tags || promptNode?.tags || [],
     } satisfies MobileResultEntry;
   });
 

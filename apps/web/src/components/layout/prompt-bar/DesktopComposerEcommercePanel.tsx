@@ -290,6 +290,10 @@ const DesktopComposerEcommercePanel: React.FC<DesktopComposerEcommercePanelProps
     return null;
   }
 
+  if (analysisConfirmed) {
+    return null;
+  }
+
   const resolvedGroupSlots: Record<EcommerceGroupSheet, EcommerceGroupSlotState[]> = groupSlots ?? { '主图': [], 'A+': [] };
   const workbenchMode = resolveWorkbenchMode(activeTaskState);
   const resolvedGroupSheet: EcommerceGroupSheet = activeGroupSheet

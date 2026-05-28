@@ -264,8 +264,11 @@ test('buildEcommerceRenderTask emits normalized asset roles and business display
 
   assert.equal(buildEcommerceDisplayLabel('主图', '1:1', '4K'), '主图 1:1 4K');
   assert.equal(buildEcommerceDisplayLabel('A+', '21:9', '4K'), 'A+ 21:9 4K');
-  assert.match(renderTask.prompt, /参考图1/);
-  assert.match(renderTask.prompt, /产品图/);
+  assert.match(renderTask.prompt, /系列风格锚点/);
+  assert.match(renderTask.prompt, /参考图职责表/);
+  assert.match(renderTask.prompt, /@产品主图/);
+  assert.match(renderTask.prompt, /@需求参考/);
+  assert.doesNotMatch(renderTask.prompt, /图1|图2/);
   assert.equal(renderTask.displayLabel, '主图 1:1 4K');
   assert.ok(renderTask.consistencyChecks.length > 0);
   assert.equal(renderTask.taskState.taskId, taskState.taskId);
@@ -379,7 +382,7 @@ test('buildEcommerceRenderTask keeps product-first prompt framing before backgro
   assert.match(renderTask.prompt, /背景：明亮家居背景/);
 });
 
-test('buildEcommerceRenderTask surfaces unified figure aliases for the current item materials', () => {
+test('buildEcommerceRenderTask surfaces stable @ anchors for the current item materials', () => {
   const taskState = createTaskState({
     assetRoles: [
       {
@@ -416,8 +419,57 @@ test('buildEcommerceRenderTask surfaces unified figure aliases for the current i
     imageSize: '4K',
   });
 
-  assert.match(renderTask.prompt, /参考图：图1（参考图1）/);
-  assert.match(renderTask.prompt, /参考图：图2（参考图2）/);
-  assert.match(renderTask.prompt, /产品图：图3（产品图1）/);
-  assert.match(renderTask.prompt, /优先展示：图3（产品图1）/);
+  assert.match(renderTask.prompt, /@需求参考-ref-1/);
+  assert.match(renderTask.prompt, /@需求参考-ref-2/);
+  assert.match(renderTask.prompt, /@产品主图/);
+  assert.match(renderTask.prompt, /优先展示：@产品主图/);
+  assert.doesNotMatch(renderTask.prompt, /图1|图2|图3/);
+  assert.deepEqual(
+    renderTask.taskState.referenceAnchors?.map((anchor) => anchor.token),
+    ['@需求参考-ref-1', '@需求参考-ref-2', '@产品主图'],
+  );
+});
+
+test('buildEcommerceRenderTask preserves edited anchor role labels without changing tokens', () => {
+  const taskState = createTaskState({
+    assetRoles: [
+      {
+        assetId: 'product-1',
+        role: 'product',
+        label: '产品图',
+        normalizedLabel: '产品图',
+        token: '@产品主图',
+        roleLabel: '产品主图',
+        aliasLabel: '@产品主图',
+        source: 'upload',
+      },
+      {
+        assetId: 'style-ref-1',
+        role: 'extra-reference',
+        label: '风格参考',
+        normalizedLabel: '风格参考',
+        token: '@style-ref',
+        roleLabel: 'LayoutRef',
+        aliasLabel: '@style-ref',
+        source: 'upload',
+      },
+    ],
+  });
+
+  const renderTask = buildEcommerceRenderTask({
+    taskState,
+    seriesTemplate: createSeriesTemplate(),
+    aspectRatio: '1:1',
+    imageSize: '4K',
+  });
+
+  assert.match(renderTask.prompt, /@style-ref：LayoutRef/);
+  assert.equal(
+    renderTask.taskState.referenceAnchors?.find((anchor) => anchor.assetId === 'style-ref-1')?.roleLabel,
+    'LayoutRef',
+  );
+  assert.equal(
+    renderTask.taskState.referenceAnchors?.find((anchor) => anchor.assetId === 'style-ref-1')?.token,
+    '@style-ref',
+  );
 });

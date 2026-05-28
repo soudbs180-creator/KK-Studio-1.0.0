@@ -14,7 +14,7 @@ test('import-only unused cleanup stays limited to type/import lists', () => {
   const modelRegistrySource = readSource('src/services/model/modelRegistry.ts');
   const costServiceSource = readSource('src/services/billing/costService.ts');
 
-  assert.match(lightboxSource, /type PartialRedrawRequest/);
+  assert.match(lightboxSource, /type RedrawRequest/);
   assert.doesNotMatch(lightboxSource, /type NormalizedRect/);
   assert.match(lightboxSource, /export const GlobalLightbox/);
 

@@ -21,7 +21,7 @@ test('ApiSettingsView adds route pool, capability roles, and OCR sections withou
   assert.match(sectionsSource, /export const ApiWorkbenchOcrSection/);
   assert.match(sectionsSource, /Unified route pool/);
   assert.match(sectionsSource, /Capability roles/);
-  assert.match(sectionsSource, /Global prompt optimizer/);
+  assert.match(sectionsSource, /Prompt AI enhancement/);
   assert.match(sectionsSource, /OCR service/);
 
   assert.match(viewSource, /<ApiWorkbenchRoutePoolSection/);

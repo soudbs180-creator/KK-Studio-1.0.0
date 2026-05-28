@@ -41,8 +41,7 @@ import {
   getSettingsViewMeta,
 } from '../settingsRegistry';
 import { ProgressBar, StatusBadge } from '../ui/index';
-import { useAdminRole } from '../../../hooks/useAdminRole';
-import { resolveAvatarUrl } from '../../../utils/presetAvatars';
+
 
 interface DashboardViewProps {
   onNavigate: (view: string) => void;
@@ -312,13 +311,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     () => getSettingsStatusSummaryLabel('dashboard', registryLanguage),
     [registryLanguage],
   );
-  const { authLoading, checkingAdmin, isAdmin, user } = useAdminRole();
-  const { balance, loading: billingLoading, billingLogs, usageLogs, fetchLogs, setShowRechargeModal } = useBilling();
-  const accountName = user?.email || user?.phone || pick('当前账户', 'Current account');
-  const accountMeta = !authLoading && !checkingAdmin && isAdmin
-    ? pick('管理员', 'Administrator')
-    : pick('标准账户', 'Standard account');
-  const avatarUrl = resolveAvatarUrl(user?.user_metadata?.avatar_url);
+  const { balance, loading: billingLoading, billingLogs, usageLogs, fetchLogs } = useBilling();
   const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, locale);
   const { latestRecharge, todayRechargeCount } = useMemo(
     () => selectRemainingBalanceSummary(billingLogs),
@@ -756,85 +749,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         {/* 卡片 2: API 工作台 (API Workspace) - 电脑端占 2*1 格 (2A) */}
         <div 
-          className="dashboard-grid-card a-card-span-2-col"
+          className="dashboard-grid-card a-card-span-2-col group"
           onClick={() => onNavigate('api-management')}
         >
           <div className="dashboard-card-glow" style={{ background: '#3b82f6' }} />
-          <div className="flex flex-col gap-2 w-full justify-between h-full">
-            <div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-slate-400">
-                  <KeyRound size={14} />
-                  <span className="text-[9px] font-bold uppercase tracking-wider">{pick('API 工作台', 'API Workspace')}</span>
-                </div>
-                <span className="text-[9px] bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-full px-2 py-0.5 font-semibold">
+          <div className="flex items-center gap-3 w-full h-full">
+            {/* 左侧：信息区域 */}
+            <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+              <div className="flex items-center gap-2 text-slate-400">
+                <KeyRound size={14} />
+                <span className="text-[9px] font-bold uppercase tracking-wider">{pick('API 工作台', 'API Workspace')}</span>
+                <span className="text-[9px] bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap">
                   {officialCount} {pick('官方', 'Official')} / {activeProviderCount} {pick('在线', 'Online')}
                 </span>
               </div>
-              <h3 className="text-xs font-bold text-white mt-1.5">{pick('多供应商与能力分配', 'API & Capability Routing')}</h3>
-              <p className="text-[11px] text-slate-400 mt-1 leading-normal truncate">
-                {pick('管理本地 API 密钥与第三方中转。直接替代旧版 EchoBird 核心。', 'Manage API keys and external proxies.')}
+              <h3 className="text-xs font-bold text-white">{pick('多供应商与能力分配', 'API & Capability Routing')}</h3>
+              <p className="text-[11px] text-slate-400 leading-normal truncate">
+                {pick('管理本地 API 密钥与第三方中转', 'Manage API keys and external proxies')}
               </p>
             </div>
-            
-            <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
-              <button 
-                type="button" 
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-1 px-2.5 text-[11px] font-bold transition active:scale-95"
-                onClick={() => onNavigate('api-management')}
-              >
-                + {pick('添加 API', 'Add API')}
-              </button>
-              <button 
-                type="button" 
-                className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 rounded-lg py-1 px-2.5 text-[11px] font-bold transition active:scale-95"
-                onClick={() => onNavigate('api-management')}
-              >
-                {pick('高级设置', 'Advanced')}
-              </button>
+            {/* 右侧：圆形箭头按钮引导 */}
+            <div className="shrink-0 flex items-center justify-center h-9 w-9 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-400 transition-all duration-200 group-hover:bg-blue-600/40 group-hover:scale-110">
+              <ArrowRight size={16} />
             </div>
           </div>
         </div>
 
-        {/* 卡片 3: 用户信息与充值 (User & Recharge) - 电脑端占 2*1 格 (2A) */}
-        <div 
-          className="dashboard-grid-card a-card-span-2-col"
-          onClick={() => setShowRechargeModal(true)}
-        >
-          <div className="dashboard-card-glow" style={{ background: '#ec4899' }} />
-          <div className="flex flex-col gap-2 w-full justify-between h-full">
-            <div>
-              <div className="flex items-center gap-2 text-slate-400">
-                <Wallet size={14} />
-                <span className="text-[9px] font-bold uppercase tracking-wider">{pick('个人中心与充值', 'Account & Recharge')}</span>
-              </div>
-              
-              <div className="flex items-center gap-2 mt-1.5 bg-white/5 p-1.5 rounded-lg border border-white/5">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--settings-avatar-bg)] text-[var(--settings-avatar-text)] font-bold text-[10px]">
-                  {avatarUrl ? <img src={avatarUrl} alt={accountName} className="h-full w-full object-cover" /> : accountName.slice(0, 1).toUpperCase()}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <span className="block truncate text-[11px] font-semibold text-white">{accountName}</span>
-                  <span className="block truncate text-[8px] text-slate-400 mt-0.5">{accountMeta}</span>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="text-[8px] text-slate-400">{pick('积分余额', 'Credits')}</div>
-                  <div className="text-[11px] font-bold text-amber-300 mt-0.5">{remainingBalanceDisplay}</div>
-                </div>
-              </div>
-            </div>
 
-            <div className="flex gap-2 mt-1" onClick={(e) => e.stopPropagation()}>
-              <button
-                type="button"
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-1 px-2.5 text-[11px] font-bold transition active:scale-95"
-                onClick={() => setShowRechargeModal(true)}
-              >
-                ⚡ {pick('立即充值积分', 'Recharge Credits')}
-              </button>
-            </div>
-          </div>
-        </div>
 
         {/* 卡片 4: 计费账本 (Billing Ledger) - 占 1*1 格 (1A) */}
         <div 

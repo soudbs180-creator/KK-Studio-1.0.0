@@ -4,14 +4,14 @@ import ImageNode from './components/image/ImageCard';
 import PromptNodeComponent from './components/canvas/PromptNodeComponent';
 // KeyManagerModal removed - integrated into UserProfileModal
 import { APP_DISPLAY_VERSION } from './config/appInfo';
-import { AspectRatio, ImageSize, type GenerationConfig, type PromptNode, type GeneratedImage, GenerationMode, KnownModel, type CanvasGroup, type PartialRedrawRequest, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceFrameworkRuntimeState } from './types';
+import { AspectRatio, ImageSize, type GenerationConfig, type PromptNode, type GeneratedImage, GenerationMode, KnownModel, type CanvasGroup, type RedrawRequest, type RedrawCropPlan, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceFrameworkRuntimeState } from './types';
 import { CanvasGroupComponent } from './components/canvas/CanvasGroupComponent';
 import { generateImage, cancelGeneration } from './services/llm/geminiService';
 import { getModelCredits } from './services/model/modelPricing';
 import { keyManager, getModelMetadata, normalizeModelId } from './services/auth/keyManager';
 import { adminModelService } from './services/model/adminModelService';
 import { unifiedModelService } from './services/model/unifiedModelService';
-import { buildPartialRedrawReferenceImage } from './services/image/partialRedraw';
+import { buildRedrawReferenceImage } from './services/image/partialRedraw';
 import { analyzeEcommerceRequirementFile } from './services/ecommerce/ecommerceAnalysisClient.ts';
 import type { EcommerceAnalysisResult } from './services/ecommerce/types';
 import type { EcommerceGroupSlotState } from './services/ecommerce/groupSlotState.ts';
@@ -154,10 +154,14 @@ type SharedPromptNodeActionProps = Pick<
   | 'onToggleEcommerceSelected'
   | 'onSetEcommerceGroupSelection'
   | 'onGenerateEcommerceNode'
+  | 'onRegenerateUnsatisfiedEcommerceNode'
   | 'onGenerateEcommerceGroup'
   | 'onGenerateEcommerceFramework'
   | 'onPauseEcommerceFramework'
   | 'onResumeEcommerceFramework'
+  | 'onPauseEcommerceNodeQueue'
+  | 'onResumeEcommerceNodeQueue'
+  | 'onSetEcommerceFrameworkConcurrency'
   | 'onCancelEcommerceNodeQueue'
   | 'onConfirmEcommerceDesktop'
   | 'onRetryEcommerceModule'
@@ -2426,6 +2430,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   const {
     updateEcommerceNodeState,
     handleGenerateEcommerceNode,
+    handleRegenerateUnsatisfiedEcommerceNode,
     handleConfirmEcommerceDesktop,
     handleRetryEcommerceModule,
   } = useEcommerceNodeGenerationRuntime({
@@ -2466,7 +2471,10 @@ const AppContent: React.FC<AppContentProps> = () => {
     handleGenerateEcommerceFramework,
     handlePauseEcommerceFramework,
     handleResumeEcommerceFramework,
+    handlePauseEcommerceNodeQueue,
+    handleResumeEcommerceNodeQueue,
     handleCancelEcommerceFrameworkNodeQueue,
+    handleSetEcommerceFrameworkConcurrency,
     handleGenerateEcommerceGroup,
     handleToggleEcommerceAnalysisSelection,
     handleToggleEcommerceSelected,
@@ -2548,10 +2556,14 @@ const AppContent: React.FC<AppContentProps> = () => {
     onToggleEcommerceSelected: handleToggleEcommerceSelected,
     onSetEcommerceGroupSelection: handleSetEcommerceGroupSelection,
     onGenerateEcommerceNode: handleGenerateEcommerceNode,
+    onRegenerateUnsatisfiedEcommerceNode: handleRegenerateUnsatisfiedEcommerceNode,
     onGenerateEcommerceGroup: handleGenerateEcommerceGroup,
     onGenerateEcommerceFramework: handleGenerateEcommerceFramework,
     onPauseEcommerceFramework: handlePauseEcommerceFramework,
     onResumeEcommerceFramework: handleResumeEcommerceFramework,
+    onPauseEcommerceNodeQueue: handlePauseEcommerceNodeQueue,
+    onResumeEcommerceNodeQueue: handleResumeEcommerceNodeQueue,
+    onSetEcommerceFrameworkConcurrency: handleSetEcommerceFrameworkConcurrency,
     onCancelEcommerceNodeQueue: handleCancelEcommerceFrameworkNodeQueue,
     onConfirmEcommerceDesktop: handleConfirmEcommerceDesktop,
     onRetryEcommerceModule: handleRetryEcommerceModule,
@@ -2587,10 +2599,14 @@ const AppContent: React.FC<AppContentProps> = () => {
     handleGenerateEcommerceGroup,
     handleGenerateEcommerceFramework,
     handleGenerateEcommerceNode,
+    handleRegenerateUnsatisfiedEcommerceNode,
     handleOpenPptDeckEditor,
     handlePauseEcommerceFramework,
+    handlePauseEcommerceNodeQueue,
     handlePreviewEcommerceSlotHistoryForNode,
+    handleResumeEcommerceNodeQueue,
     handleResumeEcommerceFramework,
+    handleSetEcommerceFrameworkConcurrency,
     handleRetryEcommerceModule,
     handleRetryNode,
     handleRetryPptSinglePage,
@@ -2644,22 +2660,17 @@ const AppContent: React.FC<AppContentProps> = () => {
     deletePromptNode,
   });
 
-  const handlePartialRedrawRequest = useCallback((image: GeneratedImage, request: PartialRedrawRequest) => {
+  const handlePartialRedrawRequest = useCallback((image: GeneratedImage, request: RedrawRequest) => {
     void (async () => {
       try {
-        const finalPrompt = (request.prompt || '局部重绘').trim();
+        const plan = request.plan;
+        const finalPrompt = (plan?.prompt || request.prompt || '重绘').trim();
         const canvas = activeCanvasRef.current;
         const sourceImage = canvas?.imageNodes.find((img) => img.id === image.id) || image;
         const parentPromptId = sourceImage.parentPromptId;
         const parentPrompt = canvas?.promptNodes.find((promptNode) => promptNode.id === parentPromptId);
-        const sourceImageUrl = sourceImage.originalUrl || sourceImage.apiResultUrl || sourceImage.url;
+        const rootSourceImageUrl = sourceImage.originalUrl || sourceImage.apiResultUrl || sourceImage.url;
         const ecommercePartialRedrawContext = resolveEcommercePartialRedrawContext(sourceImage, parentPrompt);
-
-        const croppedSourceReference = await buildPartialRedrawReferenceImage(
-          sourceImageUrl,
-          request.generationRect,
-          request.sourceImageDimensions,
-        );
 
         let nodePos = { x: sourceImage.position.x, y: sourceImage.position.y + 80 };
         if (parentPrompt && canvas) {
@@ -2668,57 +2679,125 @@ const AppContent: React.FC<AppContentProps> = () => {
           nodePos = { x: sourceImage.position.x, y: maxY + 80 };
         }
 
-        const promptNodeId = `${Date.now()}_redraw_prompt`;
+        const cropPlans = plan?.mode === 'regional-crops' && plan.cropPlans.length > 0 ? plan.cropPlans : [];
+        const executionCrops: Array<RedrawCropPlan | null> = cropPlans.length > 0 ? cropPlans : [null];
+        const createdNodes: PromptNode[] = [];
+        const extraReferenceImages = [
+          ...(plan?.annotatedReferenceImage ? [plan.annotatedReferenceImage] : []),
+          ...request.referenceImages,
+        ];
+        let currentCompositeBaseImageId = sourceImage.id;
+        let currentCompositeBaseImageUrl = rootSourceImageUrl;
+        let latestRedrawResultId: string | undefined;
 
-        const redrawNode: PromptNode = {
-          id: promptNodeId,
-          prompt: finalPrompt,
-          originalPrompt: finalPrompt,
-          position: nodePos,
-          aspectRatio: request.aspectRatio || sourceImage.aspectRatio || config.aspectRatio,
-          imageSize: sourceImage.imageSize || config.imageSize,
-          model: normalizeModelId(request.model || sourceImage.model || config.model),
-          modelLabel: resolveModelDisplayName(
-            request.model || sourceImage.model || config.model,
-            sourceImage.modelLabel || getModelMetadata(request.model || sourceImage.model || config.model)?.name,
-          ) || undefined,
-          provider: sourceImage.provider || undefined,
-          providerLabel: sourceImage.providerLabel || undefined,
-          childImageIds: [],
-          referenceImages: [croppedSourceReference, ...request.referenceImages],
-          timestamp: Date.now(),
-          sourceImageId: sourceImage.id,
-          isGenerating: true,
-          mode: GenerationMode.REDRAW,
-          partialRedraw: {
+        const waitForGeneratedImage = async (promptNodeId: string) => {
+          for (let attempt = 0; attempt < 10; attempt += 1) {
+            const generatedImageId = activeCanvasRef.current?.promptNodes
+              .find((promptNode) => promptNode.id === promptNodeId)
+              ?.childImageIds?.[0];
+            const generatedImage = generatedImageId
+              ? activeCanvasRef.current?.imageNodes.find((imageNode) => imageNode.id === generatedImageId)
+              : undefined;
+            if (generatedImage) return generatedImage;
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+          return undefined;
+        };
+
+        for (const [index, cropPlan] of executionCrops.entries()) {
+          const sourceReference = await buildRedrawReferenceImage(
+            currentCompositeBaseImageUrl,
+            cropPlan?.generationRect || { x: 0, y: 0, width: 1, height: 1 },
+            request.sourceImageDimensions,
+            cropPlan ? `redraw-crop-${index + 1}` : 'redraw-full',
+          );
+          const usesRedrawOnlyModel = Boolean(cropPlan) || plan?.mode === 'color-blocks' || plan?.mode === 'whole-image-marked';
+          const nodeModel = normalizeModelId(usesRedrawOnlyModel ? (plan?.model || request.model) : config.model);
+          const nodePrompt = cropPlan ? finalPrompt : [
+            parentPrompt?.prompt ? `原始提示词：${parentPrompt.prompt}` : '',
+            sourceImage.prompt ? `当前图片提示词：${sourceImage.prompt}` : '',
+            finalPrompt,
+          ].filter(Boolean).join('\n');
+          const nodeRedrawMetadata = {
+            mode: plan?.mode || (cropPlan ? 'regional-crops' : 'whole-image'),
             sourceImageId: sourceImage.id,
+            compositionBaseImageId: cropPlan ? currentCompositeBaseImageId : undefined,
             sourceImageStorageId: sourceImage.storageId,
             sourcePromptId: parentPrompt?.id,
             sourceImageDimensions: request.sourceImageDimensions,
-            selectionRect: request.selectionRect,
-            generationRect: request.generationRect,
-            targetAspectRatio: request.aspectRatio,
-            extraReferenceImageIds: request.referenceImages.map((ref) => ref.storageId || ref.id),
+            regions: request.regions,
+            cropPlans: cropPlan ? [cropPlan] : (plan?.cropPlans || []),
+            targetAspectRatio: cropPlan ? AspectRatio.SQUARE : (plan?.aspectRatio || AspectRatio.AUTO),
+            extraReferenceImageIds: extraReferenceImages.map((ref) => ref.storageId || ref.id),
+            colorBlocks: request.colorBlocks,
+            strictPrompt: plan?.strictPrompt,
             inheritedDisplayLabel: ecommercePartialRedrawContext.inheritedDisplayLabel,
             inheritedTaskState: ecommercePartialRedrawContext.inheritedTaskState,
             inheritedDeliveryKind: ecommercePartialRedrawContext.inheritedDeliveryKind,
-            compositeVersion: 1,
-          },
-          tags: [],
-        };
+            compositeVersion: 2 as const,
+          };
+          const redrawNode: PromptNode = {
+            id: `${Date.now()}_redraw_prompt_${index}`,
+            prompt: nodePrompt,
+            originalPrompt: nodePrompt,
+            position: { x: nodePos.x + index * 36, y: nodePos.y + index * 36 },
+            aspectRatio: cropPlan ? AspectRatio.SQUARE : (plan?.aspectRatio || AspectRatio.AUTO),
+            imageSize: cropPlan?.imageSize || (plan?.mode === 'whole-image' ? config.imageSize : sourceImage.imageSize || config.imageSize),
+            model: nodeModel,
+            modelLabel: resolveModelDisplayName(
+              nodeModel,
+              getModelMetadata(nodeModel)?.name || sourceImage.modelLabel,
+            ) || undefined,
+            provider: sourceImage.provider || undefined,
+            providerLabel: sourceImage.providerLabel || undefined,
+            childImageIds: [],
+            referenceImages: [
+              sourceReference,
+              ...extraReferenceImages,
+            ],
+            timestamp: Date.now(),
+            sourceImageId: sourceImage.id,
+            isGenerating: true,
+            mode: GenerationMode.REDRAW,
+            redraw: nodeRedrawMetadata,
+            tags: [],
+          };
 
-        await addPromptNode(redrawNode);
-        await executeGeneration(redrawNode);
+          await addPromptNode(redrawNode);
+          await executeGeneration(redrawNode);
+          createdNodes.push(redrawNode);
+          const generatedImage = await waitForGeneratedImage(redrawNode.id);
+          if (generatedImage) {
+            latestRedrawResultId = generatedImage.id;
+            if (cropPlan) {
+              currentCompositeBaseImageId = generatedImage.id;
+              currentCompositeBaseImageUrl = generatedImage.originalUrl || generatedImage.apiResultUrl || generatedImage.url;
+            }
+          } else if (cropPlan) {
+            throw new Error('分区重绘没有返回可合成结果');
+          }
+        }
 
-        const latestRedrawResultId = activeCanvasRef.current?.promptNodes
-          .find((promptNode) => promptNode.id === redrawNode.id)
-          ?.childImageIds?.[0];
+        const latestRedrawNode = createdNodes[createdNodes.length - 1];
+        if (latestRedrawResultId && latestRedrawNode?.redraw && plan?.mode === 'regional-crops' && plan.cropPlans.length > 1) {
+          await updateImageNode(latestRedrawResultId, {
+            redraw: {
+              ...latestRedrawNode.redraw,
+              sourceImageId: sourceImage.id,
+              compositionBaseImageId: undefined,
+              cropPlans: plan.cropPlans,
+              regions: request.regions,
+              colorBlocks: request.colorBlocks,
+              extraReferenceImageIds: extraReferenceImages.map((ref) => ref.storageId || ref.id),
+            },
+          });
+        }
 
-        if (latestRedrawResultId) {
+        if (latestRedrawResultId && latestRedrawNode) {
           await finalizeEcommercePartialRedrawResult({
             parentPrompt,
             sourceImage,
-            redrawNode,
+            redrawNode: latestRedrawNode,
             latestRedrawResultId,
             inheritedDeliveryKind: ecommercePartialRedrawContext.inheritedDeliveryKind,
           });
@@ -2734,9 +2813,9 @@ const AppContent: React.FC<AppContentProps> = () => {
         });
       }
     })();
-  }, [addPromptNode, config.aspectRatio, config.imageSize, config.model, executeGeneration, finalizeEcommercePartialRedrawResult, handleOpenPreview, resolveEcommercePartialRedrawContext]);
+  }, [addPromptNode, config.imageSize, config.model, executeGeneration, finalizeEcommercePartialRedrawResult, handleOpenPreview, resolveEcommercePartialRedrawContext, updateImageNode]);
 
-  const handleMobileResultPartialRedraw = useCallback((entry: MobileResultEntry, request: PartialRedrawRequest) => {
+  const handleMobileResultPartialRedraw = useCallback((entry: MobileResultEntry, request: RedrawRequest) => {
     const imageNode = activeCanvas?.imageNodes.find((image) => image.id === entry.imageId);
     if (!imageNode) {
       return;
@@ -4466,6 +4545,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       <AppMobileWorkspace
         isMobile={isMobile}
         surface={responsiveSurface}
+        workspaceSurface={workspaceSurface}
         mobileScreen={mobileScreen}
         setMobileScreen={setMobileScreen}
         onOpenSettings={openCurrentMobileSettingsSurface}

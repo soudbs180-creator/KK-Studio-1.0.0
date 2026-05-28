@@ -13,6 +13,7 @@ import {
 
 const DashboardView = lazy(() => import('./views/DashboardView.localized.tsx'));
 const ApiSettingsView = lazy(() => import('./ApiSettingsView'));
+
 const CostEstimation = lazy(() => import('../../pages/CostEstimation'));
 const StorageSettingsView = lazy(() => import('./views/StorageSettingsView.localized.tsx'));
 const SystemLogsView = lazy(() => import('./views/SystemLogsView.localized.tsx'));
@@ -20,6 +21,7 @@ const SystemLogsView = lazy(() => import('./views/SystemLogsView.localized.tsx')
 type SettingsWorkbenchRouteDefinition =
   | { path: ''; kind: 'dashboard'; index: true }
   | { path: 'api-management'; kind: 'api' }
+
   | { path: 'api-management/official/new'; kind: 'api' }
   | { path: 'api-management/official/:officialId'; kind: 'api' }
   | { path: 'api-management/provider/new'; kind: 'api' }
@@ -32,6 +34,7 @@ type SettingsWorkbenchRouteDefinition =
 const SETTINGS_WORKBENCH_ROUTE_DEFINITIONS: SettingsWorkbenchRouteDefinition[] = [
   { path: '', kind: 'dashboard', index: true },
   { path: 'api-management', kind: 'api' },
+
   { path: 'api-management/official/new', kind: 'api' },
   { path: 'api-management/official/:officialId', kind: 'api' },
   { path: 'api-management/provider/new', kind: 'api' },
@@ -87,6 +90,7 @@ function getRouteElement(
       );
     case 'api':
       return <ApiSettingsView key={routeRefreshKey} initialSupplier={options.initialSupplier || null} />;
+
     case 'billing':
       return KKAI_FEATURE_FLAGS.billing
         ? <CostEstimation key={routeRefreshKey} embedded />

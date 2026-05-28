@@ -71,7 +71,10 @@ export function resolveNextEcommerceTaskStatePatch(input: {
     if (taskState.taskId !== taskId && rowKey !== taskId) return;
 
     const updatedTaskState = typeof updater === 'function' ? updater(taskState) : updater;
-    nextTaskStates[rowKey] = applyEffectiveSizingToTaskState(updatedTaskState);
+    nextTaskStates[rowKey] = applyEffectiveSizingToTaskState({
+      ...updatedTaskState,
+      revision: (taskState.revision || 0) + 1,
+    });
     didUpdate = true;
   });
 
@@ -80,7 +83,10 @@ export function resolveNextEcommerceTaskStatePatch(input: {
     const updatedActiveTaskState = typeof updater === 'function'
       ? updater(previousState.activeTaskState)
       : updater;
-    nextActiveTaskState = applyEffectiveSizingToTaskState(updatedActiveTaskState);
+    nextActiveTaskState = applyEffectiveSizingToTaskState({
+      ...updatedActiveTaskState,
+      revision: (previousState.activeTaskState.revision || 0) + 1,
+    });
     didUpdate = true;
   }
 
