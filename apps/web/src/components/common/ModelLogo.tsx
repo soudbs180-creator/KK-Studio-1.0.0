@@ -197,7 +197,7 @@ const ModelLogo: React.FC<ModelLogoProps> = ({
 
     const iconUrl = iconId
         ? getLobeIconCdnUrl(iconId, {
-            cdn: 'aliyun',
+            cdn: 'jsdelivr',
             format: variant === 'mono' ? 'png' : 'svg',
             isDarkMode,
             type: variant,

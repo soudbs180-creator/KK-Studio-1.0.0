@@ -27,6 +27,10 @@ function resolveRequestId(req) {
   return uuidPattern.test(incoming) ? incoming : crypto.randomUUID();
 }
 
+const chatLimiterMap = new Map();
+const LIMIT_WINDOW_MS = 60 * 1000;
+const MAX_CHAT_LIMIT = 20;
+
 router.post('/chat', async (req, res) => {
   const userId = verifyJWT(req.headers.authorization);
   if (!userId) {
@@ -38,10 +42,30 @@ router.post('/chat', async (req, res) => {
     return res.status(400).json({ error: 'Invalid chat messages.' });
   }
 
-  if (parsed.data.executionLane === 'local-user-api') {
+  const isLocalUserApi = parsed.data.executionLane === 'local-user-api';
+  if (isLocalUserApi) {
     return res.status(409).json({
       error: 'User-owned API requests must use the local user API route. No credits were charged.',
     });
+  }
+
+  // 1. 云端积分模型限流器（只对非 local-user-api 生效）
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const limitKey = `${ip}:${userId}`;
+  const now = Date.now();
+  let clientLimit = chatLimiterMap.get(limitKey);
+
+  if (!clientLimit || now > clientLimit.resetTime) {
+    clientLimit = { count: 1, resetTime: now + LIMIT_WINDOW_MS };
+    chatLimiterMap.set(limitKey, clientLimit);
+  } else {
+    clientLimit.count += 1;
+    if (clientLimit.count > MAX_CHAT_LIMIT) {
+      const retryAfter = Math.ceil((clientLimit.resetTime - now) / 1000);
+      return res.status(429).json({
+        error: `云端模型对话请求过于频繁，请在 ${retryAfter} 秒后重试。使用自带 API Key 模式不受限制。`,
+      });
+    }
   }
 
   const pool = getPool();
@@ -80,22 +104,44 @@ router.post('/chat', async (req, res) => {
       throw new Error('OpenAI chat returned empty content.');
     }
 
+    const totalTokens = data?.usage?.total_tokens || 0;
+    // 整合逻辑：记录实际 token 消耗入库
+    if (totalTokens > 0) {
+      try {
+        await credits.recordTokenUsage(userId, totalTokens, `chat:${requestId}`);
+      } catch (tokenErr) {
+        console.error('[OpenAI Chat] Failed to record token usage:', tokenErr);
+      }
+    }
+
     res.setHeader('X-Refresh-Token', signJWT({ userId }));
     res.setHeader('X-Client-Request-Id', requestId);
     return res.json({
       role: 'assistant',
       content,
       credits: currentCredits,
+      creditsCost: requiredCredits,
+      tokens: totalTokens,
     });
   } catch (err) {
     console.error('[OpenAI Chat Error]', err);
+    let refundFailed = false;
     if (creditsDeducted) {
       try {
         await credits.refundCredits(userId, requiredCredits, operationKey, currentCredits);
       } catch (refundErr) {
+        refundFailed = true;
         console.error('[OpenAI Chat Error] refund failed, manual intervention required:', refundErr);
       }
     }
+
+    if (refundFailed) {
+      return res.status(500).json({
+        error: 'Chat failed. Credit refund failed and requires manual intervention.',
+        refundStatus: 'manual_intervention_required',
+      });
+    }
+
     return res.status(500).json({ error: 'Chat failed. Credits refunded.' });
   }
 });

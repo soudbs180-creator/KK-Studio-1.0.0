@@ -661,6 +661,8 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
           type="button"
           className={toolButtonClass(false)}
           onPointerDown={(event) => {
+            event.stopPropagation();
+            event.currentTarget.setPointerCapture(event.pointerId);
             toolbarDragRef.current = {
               pointer: { x: event.clientX, y: event.clientY },
               position: toolbarPosition,
@@ -713,7 +715,7 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
             value={localModel}
             onChange={(event) => setLocalModel(event.target.value)}
             className="h-9 rounded-full border border-white/10 bg-black/50 px-3 text-xs text-white outline-none"
-            title="局部重绘模型"
+            title="重绘模型"
           >
             {localModelOptions.map((model) => (
               <option key={model.id} value={model.id}>{model.label}</option>

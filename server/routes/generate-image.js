@@ -24,6 +24,10 @@ function rejectLocalUserApiRequest(res) {
   });
 }
 
+const imageLimiterMap = new Map();
+const LIMIT_WINDOW_MS = 60 * 1000;
+const MAX_IMAGE_LIMIT = 10;
+
 async function handleGenerateImage(req, res) {
   const userId = verifyJWT(req.headers.authorization);
   if (!userId) {
@@ -36,8 +40,28 @@ async function handleGenerateImage(req, res) {
   }
 
   const { prompt, referenceImageBase64, aspectRatio, executionLane } = parsed.data;
-  if (executionLane === 'local-user-api') {
+  const isLocalUserApi = executionLane === 'local-user-api';
+  if (isLocalUserApi) {
     return rejectLocalUserApiRequest(res);
+  }
+
+  // 1. 云端积分模型限流器（只对非 local-user-api 生效）
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const limitKey = `${ip}:${userId}`;
+  const now = Date.now();
+  let clientLimit = imageLimiterMap.get(limitKey);
+
+  if (!clientLimit || now > clientLimit.resetTime) {
+    clientLimit = { count: 1, resetTime: now + LIMIT_WINDOW_MS };
+    imageLimiterMap.set(limitKey, clientLimit);
+  } else {
+    clientLimit.count += 1;
+    if (clientLimit.count > MAX_IMAGE_LIMIT) {
+      const retryAfter = Math.ceil((clientLimit.resetTime - now) / 1000);
+      return res.status(429).json({
+        error: `云端模型生成请求过于频繁，请在 ${retryAfter} 秒后重试。使用自带 API Key 模式不受限制。`,
+      });
+    }
   }
 
   res.setHeader('X-Refresh-Token', signJWT({ userId }));
@@ -102,15 +126,25 @@ async function handleGenerateImage(req, res) {
       image: generatedBase64,
       text: generatedText,
       credits: currentCredits,
+      creditsCost: requiredCredits,
     });
   } catch (err) {
     console.error('[Gemini Image Generation Error]', err);
+    let refundFailed = false;
     if (creditsDeducted) {
       try {
         await credits.refundCredits(userId, requiredCredits, operationKey, currentCredits);
       } catch (refundErr) {
+        refundFailed = true;
         console.error('[Gemini Image Generation Error] refund failed, manual intervention required:', refundErr);
       }
+    }
+
+    if (refundFailed) {
+      return res.status(500).json({
+        error: 'Image generation or edit failed. Credit refund failed and requires manual intervention.',
+        refundStatus: 'manual_intervention_required',
+      });
     }
 
     return res.status(500).json({ error: 'Image generation or edit failed. Credits refunded.' });

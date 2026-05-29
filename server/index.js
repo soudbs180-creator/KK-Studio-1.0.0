@@ -1,28 +1,7 @@
 // server/index.js
-// 职责：后端主服务入口，集中挂载全局安全中间件和业务路由。
-
+// 简体中文注释：后端主服务入口，同时暴露可复用启动函数给 VPS 脚本调用。
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
-
-const isTestRun = process.env.NODE_ENV === 'test' || process.argv.some((arg) => arg.includes('test'));
-
-if (!isTestRun) {
-  const REQUIRED_ENV_VARS = [
-    'GEMINI_API_KEY',
-    'OPENAI_API_KEY',
-    'JWT_SECRET',
-    'PASSWORD_SALT',
-    'DATABASE_URL',
-    'STRIPE_SECRET_KEY',
-    'STRIPE_WEBHOOK_SECRET',
-  ];
-
-  for (const key of REQUIRED_ENV_VARS) {
-    if (!process.env[key]) {
-      throw new Error(`[严重] 环境变量 ${key} 未配置，服务拒绝启动`);
-    }
-  }
-}
 
 const express = require('express');
 const cors = require('cors');
@@ -36,6 +15,32 @@ const DEFAULT_ALLOWED_ORIGINS = [
   'https://kkai.plus',
   'https://www.kkai.plus',
 ];
+
+const REQUIRED_ENV_VARS = [
+  'GEMINI_API_KEY',
+  'OPENAI_API_KEY',
+  'JWT_SECRET',
+  'PASSWORD_SALT',
+  'DATABASE_URL',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+];
+
+function isTestRun() {
+  return process.env.NODE_ENV === 'test' || process.argv.some((arg) => arg.includes('test'));
+}
+
+function assertRequiredEnv(options = {}) {
+  if (options.skipConfigCheck === true || isTestRun()) {
+    return;
+  }
+
+  for (const key of REQUIRED_ENV_VARS) {
+    if (!process.env[key]) {
+      throw new Error(`[严重] 环境变量 ${key} 未配置，服务拒绝启动`);
+    }
+  }
+}
 
 function getAllowedOrigins() {
   const configuredOrigins = String(process.env.PAYMENT_ALLOWED_ORIGINS || '')
@@ -56,51 +61,78 @@ function captureRawJsonBody(req, _res, buf) {
   }
 }
 
-const app = express();
-app.disable('x-powered-by');
+function createApp() {
+  const app = express();
+  app.disable('x-powered-by');
 
-app.use((req, res, next) => {
-  if (!req.path.startsWith('/webhook/stripe')) {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-  }
-  next();
-});
-
-const allowedOrigins = new Set(getAllowedOrigins().map((origin) => origin.toLowerCase()));
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin) {
-      callback(null, true);
-      return;
+  app.use((req, res, next) => {
+    if (!req.path.startsWith('/webhook/stripe')) {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
     }
+    next();
+  });
 
-    const normalizedOrigin = String(origin).toLowerCase();
-    callback(null, allowedOrigins.has(normalizedOrigin) || isLocalDevelopmentOrigin(origin));
-  },
-  credentials: true,
-  exposedHeaders: ['X-Refresh-Token'],
-}));
+  const allowedOrigins = new Set(getAllowedOrigins().map((origin) => origin.toLowerCase()));
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
 
-app.use(express.json({ verify: captureRawJsonBody }));
-app.use(express.urlencoded({ extended: true }));
+      const normalizedOrigin = String(origin).toLowerCase();
+      callback(null, allowedOrigins.has(normalizedOrigin) || isLocalDevelopmentOrigin(origin));
+    },
+    credentials: true,
+    exposedHeaders: ['X-Refresh-Token'],
+  }));
 
-app.use('/webhook', webhookRouter);
-app.use('/api', userRouter);
-app.use('/api', adminRouter);
-app.use('/api', chatRouter);
-app.use('/api', generateImageRouter);
+  app.get('/healthz', (_req, res) => {
+    res.json({ ok: true, service: 'kk-api' });
+  });
 
-app.use((err, _req, res, _next) => {
-  console.error('[server] request failed:', err);
-  res.status(500).json({ error: 'Internal server error.' });
-});
+  app.use(express.json({ verify: captureRawJsonBody }));
+  app.use(express.urlencoded({ extended: true }));
 
-app.use((req, res) => {
-  res.status(404).json({ error: 'Endpoint not found or legacy route disabled.' });
-});
+  app.use('/webhook', webhookRouter);
+  app.use('/api', userRouter);
+  app.use('/api', adminRouter);
+  app.use('/api', chatRouter);
+  app.use('/api', generateImageRouter);
 
-const PORT = Number(process.env.PORT || 8080);
-app.listen(PORT, () => {
-  console.log(`[server] 后端主服务已启动，正在运行在端口 :${PORT}`);
-});
+  app.use((err, _req, res, _next) => {
+    console.error('[server] request failed:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  });
+
+  app.use((req, res) => {
+    res.status(404).json({ error: 'Endpoint not found or legacy route disabled.' });
+  });
+
+  return app;
+}
+
+const app = createApp();
+
+function startServer(port = Number(process.env.PORT || 8080), options = {}) {
+  assertRequiredEnv(options);
+  const runtimeApp = options.app || app;
+  return runtimeApp.listen(port, () => {
+    console.log(`[server] 后端主服务已启动，正在运行在端口 :${port}`);
+  });
+}
+
+if (require.main === module) {
+  startServer(Number(process.env.PORT || 8080));
+}
+
+module.exports = {
+  REQUIRED_ENV_VARS,
+  app,
+  assertRequiredEnv,
+  createApp,
+  getAllowedOrigins,
+  isLocalDevelopmentOrigin,
+  startServer,
+};

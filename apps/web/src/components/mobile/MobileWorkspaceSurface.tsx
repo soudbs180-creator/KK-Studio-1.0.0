@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { Check, Clock3, FolderOpen, MessageSquare, Plus, Search, Settings } from 'lucide-react';
+import { Check, Clock3, FolderOpen, MessageSquare, Plus, Search, Settings, Sun, Moon, Languages } from 'lucide-react';
 
 import { useCanvas } from '../../context/CanvasContext';
+import { useTheme } from '../../context/ThemeContext';
+import { useLocale } from '../../context/LocaleContext';
 import { useAdminRole } from '../../hooks/useAdminRole';
 import type {
   MobileResultEntry,
@@ -96,6 +98,8 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   onCloseHistory,
 }) => {
   const { state, activeCanvas, switchCanvas, createCanvas, canCreateCanvas } = useCanvas();
+  const { toggleTheme, isDarkMode } = useTheme();
+  const { toggleLanguage, isChinese } = useLocale();
   // 🚀 [移动端专属] 提取真实的用户角色，以在头部用户名右侧进行徽章渲染
   const { accountRole } = useAdminRole();
   const [showProjectList, setShowProjectList] = useState(false);
@@ -270,6 +274,73 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                 </button>
               </div>
             ) : null}
+
+            {/* 简体中文注释：手机端专属的主题与语言切换合并卡片。应用了 Clay 专有 cubic-bezier(0.16, 1, 0.3, 1) 黄金阻尼曲线与高档旋转微反馈 */}
+            <div className="mb-3 flex w-full gap-2.5">
+              {/* 左侧：主题大主图（点击切换亮/暗，下压 1px 且缩水 4% 阻尼物理回弹） */}
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="relative flex h-[76px] w-[140px] shrink-0 flex-col justify-end overflow-hidden rounded-[22px] border border-white/8 p-3 text-left active:scale-[0.96] active:translate-y-px cursor-pointer"
+                style={{
+                  background: isDarkMode
+                    ? 'linear-gradient(135deg, rgba(255, 77, 139, 0.85) 0%, rgba(184, 164, 237, 0.85) 100%)'
+                    : 'linear-gradient(135deg, rgba(255, 176, 132, 0.95) 0%, rgba(232, 185, 74, 0.95) 100%)',
+                  boxShadow: 'inset 0 0 12px rgba(255, 255, 255, 0.15)',
+                  transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background 240ms cubic-bezier(0.16, 1, 0.3, 1), border-color 240ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 240ms cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+              >
+                {/* 发光背景装饰微图 */}
+                <div className="absolute -right-3 -top-3 h-14 w-14 rounded-full bg-white/20 blur-md pointer-events-none" />
+                {/* 简体中文注释：切换主题时，Sun/Moon 图标伴随极其滑顺的 30度 物理旋转与极微小缩放偏转反馈 */}
+                <div 
+                  className="absolute right-3 top-3 text-white/90"
+                  style={{
+                    transform: isDarkMode ? 'rotate(0deg) scale(1)' : 'rotate(30deg) scale(0.95)',
+                    transition: 'transform 300ms cubic-bezier(0.16, 1, 0.3, 1), opacity 300ms cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                >
+                  {isDarkMode ? <Moon size={20} strokeWidth={2} /> : <Sun size={20} strokeWidth={2} />}
+                </div>
+                <div className="relative z-10 pointer-events-none">
+                  <div className="text-[10px] font-bold tracking-[0.16em] text-white/70 uppercase">
+                    主题偏好
+                  </div>
+                  <div className="mt-0.5 text-xs font-bold text-white whitespace-nowrap">
+                    {isDarkMode ? '中性黑灰' : '亮色奶油'}
+                  </div>
+                </div>
+              </button>
+
+              {/* 右侧：中英文切换按钮（下压 1px 且缩水 2.5% 阻尼物理回弹） */}
+              <button
+                type="button"
+                onClick={toggleLanguage}
+                className="flex flex-1 h-[76px] items-center justify-between rounded-[22px] border border-white/8 bg-white/5 px-4 text-left active:scale-[0.975] active:translate-y-px cursor-pointer"
+                style={{
+                  transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background-color 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+              >
+                <div className="min-w-0 pointer-events-none">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
+                    系统语言 / LANG
+                  </div>
+                  <div className="mt-1 truncate text-xs font-bold text-[var(--text-primary)]">
+                    {isChinese ? '中文 (简体)' : 'English (US)'}
+                  </div>
+                </div>
+                {/* 简体中文注释：中英文切换时，右侧 Languages 翻译图标小格子产生极其克制不张扬的 15度 偏转回弹与 5% 微弱收缩动效 */}
+                <div 
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 border border-white/8 text-[var(--text-secondary)]"
+                  style={{
+                    transform: isChinese ? 'rotate(0deg) scale(1)' : 'rotate(15deg) scale(0.95)',
+                    transition: 'transform 240ms cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                >
+                  <Languages size={18} strokeWidth={2} />
+                </div>
+              </button>
+            </div>
 
             <div className="grid grid-cols-2 gap-2.5">
               {/* 搜索与历史合并 */}

@@ -671,9 +671,13 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const providerBadgeStyle = useMemo(() => getProviderBadgeStyle(providerText), [providerText]);
     const footerTokenLabel = showTokenInfo ? `词元 ${displayTokens}` : '';
     const footerCostLabel = `费用 $${displayCost.toFixed(4)}`;
-    const footerSummaryTitle = isCreditModel
-        ? `${footerTimeLabel} | ${creditFooterLabel}`
-        : `${footerTimeLabel} | 词元 ${image.tokens || 0} | ${footerCostLabel}`;
+    const isEcommerce = (image.mode as string) === GenerationMode.ECOMMERCE || (image.mode as string) === 'ecommerce';
+    const ecommerceCostLabel = isCreditModel ? creditFooterLabel : footerCostLabel;
+    const footerSummaryTitle = isEcommerce
+        ? `${footerTimeLabel} | ${ecommerceCostLabel}`
+        : isCreditModel
+            ? `${footerTimeLabel} | ${creditFooterLabel}`
+            : `${footerTimeLabel} | 词元 ${image.tokens || 0} | ${footerCostLabel}`;
 
     // 🚀 根据画布缩放自动选择合适质量 - 使用队列加载优化
     useEffect(() => {

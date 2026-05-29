@@ -1,5 +1,5 @@
 export interface LobeIconCdnConfig {
-  cdn?: 'github' | 'aliyun' | 'unpkg';
+  cdn?: 'github' | 'aliyun' | 'unpkg' | 'jsdelivr';
   format?: 'svg' | 'png' | 'webp' | 'avatar';
   isDarkMode?: boolean;
   type?: 'mono' | 'color' | 'text' | 'text-cn' | 'text-color' | 'brand' | 'brand-color';
@@ -15,6 +15,10 @@ function getAliyunIconCdn(type: 'svg' | 'png' | 'webp' | 'avatar') {
 
 function getUnpkgIconCdn(type: 'svg' | 'png' | 'webp' | 'avatar') {
   return `https://unpkg.com/@lobehub/icons-static-${type}@latest`;
+}
+
+function getJsDelivrIconCdn(type: 'svg' | 'png' | 'webp' | 'avatar') {
+  return `https://cdn.jsdelivr.net/npm/@lobehub/icons-static-${type}@latest`;
 }
 
 export function getLobeIconCdnUrl(id: string, config: LobeIconCdnConfig = {}) {
@@ -35,6 +39,9 @@ export function getLobeIconCdnUrl(id: string, config: LobeIconCdnConfig = {}) {
       break;
     case 'aliyun':
       baseUrl = getAliyunIconCdn(format);
+      break;
+    case 'jsdelivr':
+      baseUrl = getJsDelivrIconCdn(format);
       break;
   }
 

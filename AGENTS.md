@@ -1,5 +1,7 @@
 # KK-Studio 项目开发规范与架构黄金法则 (AGENTS.md)
 
+AGENTS.md - AI Agent 项目总指导文件
+
 本手册为 KK-Studio 项目的核心架构与开发准则。任何新功能的开发、重构、维护，以及 AI Agent 辅助编程，均必须严格遵循本规范。
 
 ---

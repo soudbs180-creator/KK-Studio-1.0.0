@@ -123,11 +123,19 @@ export function setKkApiAccessToken(token?: string) {
   setStoredKkApiAccessToken(token);
 }
 
+function persistRefreshedKkApiAccessToken(token: string) {
+  setStoredKkApiAccessToken(token);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("kk-api-token-refreshed", { detail: { token } }));
+  }
+}
+
 export function createKkWebApiClient(): KkApiClient {
   return createKkApiClient({
     baseUrl: resolveKkApiBaseUrl(),
     getAccessToken: getPreferredKkApiAccessToken,
     refreshAccessToken: refreshPreferredKkApiAccessToken,
+    onRefreshToken: persistRefreshedKkApiAccessToken,
     getClientVersion: () => "kk-legacy-web",
     getDefaultHeaders: () => ({
       [ADMIN_SESSION_TOKEN_HEADER]: getStoredAdminSessionToken(),

@@ -781,7 +781,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           </div>
                         ) : (
                           <div className="flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]">
-                            <Sparkles size={12} className="text-blue-300 shrink-0" />
+                            <Sparkles size={12} className="text-[var(--clay-brand-lavender)] shrink-0" />
                             <span>普通版订阅</span>
                           </div>
                         )}

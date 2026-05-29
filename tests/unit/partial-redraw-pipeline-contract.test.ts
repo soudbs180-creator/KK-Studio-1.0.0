@@ -27,6 +27,9 @@ test('App creates REDRAW prompt nodes and generation pipeline composites redraw 
   assert.match(appSource, /buildRedrawReferenceImage\(/);
   assert.match(appSource, /referenceImages:\s*\[\s*sourceReference,\s*\.\.\.extraReferenceImages,?\s*\]/);
   assert.match(appSource, /await executeGeneration\(redrawNode\);/);
+  assert.match(appSource, /const generatedRedrawResultIds: string\[\] = \[\];/);
+  assert.match(appSource, /generatedRedrawResultIds\.slice\(0, -1\)\.forEach\(\(imageId\) => \{/);
+  assert.match(appSource, /createdNodes\.slice\(0, -1\)\.forEach\(\(redrawNode\) => \{/);
   assert.match(appSource, /handleOpenPreview\(latestRedrawResultId\);/);
   assert.doesNotMatch(appSource, /maskUrl:\s*maskBase64/);
 

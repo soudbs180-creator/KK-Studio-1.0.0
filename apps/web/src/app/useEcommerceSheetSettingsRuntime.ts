@@ -127,7 +127,7 @@ export function resolveEcommerceNodeGenerationSettingsForSheet(input: {
 
   if (input.generationTarget === 'mobile') {
     return {
-      aspectRatio: (node.ecommerce.mobileAspectRatio || AspectRatio.LANDSCAPE_4_3) as AspectRatio,
+      aspectRatio: AspectRatio.LANDSCAPE_4_3,
       imageSize: sheetSettings.imageSize,
     };
   }

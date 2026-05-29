@@ -55,7 +55,7 @@ test('ecommerce build runtime remains separate from upload sync and generation r
   assert.match(nodeGenerationSource, /const runEcommerceNodeGeneration = useCallback/);
 });
 
-test('ecommerce build confirmation hands off to one visible canvas framework and resets the composer input state', () => {
+test('ecommerce build confirmation hands off to one focused canvas framework and keeps analysis available for post-build sync', () => {
   const hookSource = readSource('src/app/useEcommerceBuildRuntime.ts');
   const appSource = readSource('src/App.tsx');
 
@@ -70,17 +70,14 @@ test('ecommerce build confirmation hands off to one visible canvas framework and
   assert.match(hookSource, /analysis\.projectMeta\.productName \? `产品：\$\{analysis\.projectMeta\.productName\}` : ''/);
   assert.match(hookSource, /String\(configPrompt \|\| ''\)\.trim\(\) \? `补充要求：\$\{String\(configPrompt \|\| ''\)\.trim\(\)\}` : ''/);
   assert.match(hookSource, /node\.ecommerce\.frameworkMeta\.inputSummary/);
-  assert.match(hookSource, /requirementFile: null,/);
-  assert.match(hookSource, /productFiles: \[\],/);
-  assert.match(hookSource, /extraReferenceFiles: \[\],/);
-  assert.match(hookSource, /itemReferenceFiles: \{\},/);
-  assert.match(hookSource, /analysis: null,/);
-  assert.match(hookSource, /analysisConfirmed: false,/);
-  assert.match(hookSource, /selectedItems: \{\},/);
-  assert.match(hookSource, /taskStates: \{\},/);
-  assert.match(hookSource, /groupSlots: createBuildResetGroupSlots\(\),/);
-  assert.match(hookSource, /activeFrameworkId: null,/);
-  assert.match(hookSource, /activeGroupSheet: null,/);
+  assert.match(hookSource, /analysisConfirmed: true,/);
+  assert.match(hookSource, /activeFrameworkId: frameworkNode\.id,/);
+  assert.match(hookSource, /\[frameworkNode\.id\]: initialFrameworkRuntime,/);
+  assert.match(hookSource, /prompt: '',/);
+  assert.match(hookSource, /referenceImages: \[\],/);
+  assert.doesNotMatch(hookSource, /analysis: null,/);
+  assert.doesNotMatch(hookSource, /groupSlots: createBuildResetGroupSlots\(\),/);
+  assert.doesNotMatch(hookSource, /activeFrameworkId: null,/);
 
   assert.match(appSource, /requirementFile: previousState\.requirementFile,/);
   assert.match(appSource, /productFiles: previousState\.productFiles,/);

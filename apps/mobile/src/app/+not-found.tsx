@@ -7,60 +7,15 @@ import {
   useRouter,
   useSitemap,
 } from 'expo-router';
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ErrorBoundaryWrapper } from '../../__create/SharedErrorBoundary';
-
-interface ParentSitemap {
-  expoPages?: Array<{
-    id: string;
-    name: string;
-    filePath: string;
-    cleanRoute?: string;
-  }>;
-}
 
 function NotFoundScreen() {
   const router = useRouter();
   const params = useGlobalSearchParams();
   const expoSitemap = useSitemap();
-  const [sitemap, setSitemap] = useState<SitemapType | ParentSitemap | null>(expoSitemap);
-
-  // Force full reload on Fast Refresh - staying on the not-found page after hot reload
-  // doesn't make sense since the missing page may now exist.
-  // useEffect with [] deps re-runs on Fast Refresh, but hasInitialized persists.
-  useEffect(() => {
-    if (hasInitialized && typeof window !== 'undefined' &&  process.env.EXPO_PUBLIC_CREATE_ENV === 'DEVELOPMENT') {
-      window.location.reload();
-    }
-    hasInitialized = true;
-  }, []);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
-      const handler = (event: MessageEvent) => {
-        if (event.data.type === 'sandbox:sitemap') {
-          window.removeEventListener('message', handler);
-          setSitemap(event.data.sitemap);
-        }
-      };
-
-      window.parent.postMessage(
-        {
-          type: 'sandbox:sitemap',
-        },
-        '*'
-      );
-      window.addEventListener('message', handler);
-
-      return () => {
-        window.removeEventListener('message', handler);
-      };
-    }
-  }, []);
-
-  const isExpoSitemap = sitemap === expoSitemap;
   const missingPath = params['not-found']?.[0] || '';
 
   const availableRoutes = useMemo(() => {
@@ -79,21 +34,19 @@ function NotFoundScreen() {
   const handleBack = () => {
     if (router.canGoBack()) {
       router.back();
+      return;
+    }
+
+    const hasTabsIndex = expoSitemap?.children?.some(
+      (child) =>
+        child.contextKey === './(tabs)/_layout.jsx' &&
+        child.children.some((child) => child.contextKey === './(tabs)/index.jsx')
+    );
+
+    if (hasTabsIndex) {
+      router.replace('../(tabs)/index.jsx');
     } else {
-      const hasTabsIndex = expoSitemap?.children?.some(
-        (child) =>
-          child.contextKey === './(tabs)/_layout.jsx' &&
-          child.children.some((child) => child.contextKey === './(tabs)/index.jsx')
-      );
-      if (isExpoSitemap) {
-        if (hasTabsIndex) {
-          router.replace('../(tabs)/index.jsx');
-        } else {
-          router.replace('../');
-        }
-      } else {
-        router.replace('..');
-      }
+      router.replace('../');
     }
   };
 
@@ -107,18 +60,6 @@ function NotFoundScreen() {
     }
   };
 
-  const handleCreatePage = useCallback(() => {
-    if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
-      window.parent.postMessage(
-        {
-          type: 'sandbox:web:create',
-          path: missingPath,
-          view: 'mobile',
-        },
-        '*'
-      );
-    }
-  }, [missingPath]);
   return (
     <>
       <Stack.Screen options={{ title: 'Page Not Found', headerShown: false }} />
@@ -141,95 +82,57 @@ function NotFoundScreen() {
           </View>
 
           <View style={styles.mainContent}>
-            <Text style={styles.title}>Uh-oh! This screen doesn't exist (yet).</Text>
+            <Text style={styles.title}>Uh-oh! This screen doesn't exist yet.</Text>
 
             <Text style={styles.subtitle}>
               Looks like "<Text style={styles.boldText}>/{missingPath}</Text>" isn't part of your
-              project. But no worries, you've got options!
+              project. You can jump to one of the available screens below.
             </Text>
 
-            {typeof window !== 'undefined' && window.parent && window.parent !== window && (
-              <View style={styles.createPageContainer}>
-                <View style={styles.createPageContent}>
-                  <View style={styles.createPageTextContainer}>
-                    <Text style={styles.createPageTitle}>Build it from scratch</Text>
-                    <Text style={styles.createPageDescription}>
-                      Create a new screen to live at "/{missingPath}"
-                    </Text>
-                  </View>
-                  <View style={styles.createPageButtonContainer}>
-                    <TouchableOpacity
-                      onPress={() => handleCreatePage()}
-                      style={styles.createPageButton}
-                    >
-                      <Text style={styles.createPageButtonText}>Create Screen</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            )}
+            <Text style={styles.routesLabel}>Check out all your project's routes here -&gt;</Text>
+            <View style={styles.pagesContainer}>
+              <View style={styles.pagesListContainer}>
+                <Text style={styles.pagesLabel}>MOBILE</Text>
+                {(availableRoutes as SitemapType[]).map((route: SitemapType) => {
+                  const url =
+                    typeof route.href === 'string' ? route.href : route.href?.pathname || '/';
 
-            <Text style={styles.routesLabel}>Check out all your project's routes here ↓</Text>
-            {!isExpoSitemap && sitemap ? (
-              <View style={styles.pagesContainer}>
-                <View style={styles.pagesListContainer}>
-                  <Text style={styles.pagesLabel}>MOBILE</Text>
-                  {((sitemap as ParentSitemap).expoPages || []).map((route, index: number) => (
+                  if (url === '/(tabs)' && route.children) {
+                    return route.children.map((childRoute: SitemapType) => {
+                      const childUrl =
+                        typeof childRoute.href === 'string'
+                          ? childRoute.href
+                          : childRoute.href.pathname || '/';
+                      const displayPath =
+                        childUrl === '/(tabs)'
+                          ? 'Homepage'
+                          : childUrl.replace(/^\//, '').replace(/^\(tabs\)\//, '');
+                      return (
+                        <TouchableOpacity
+                          key={childRoute.contextKey}
+                          onPress={() => handleNavigate(childUrl)}
+                          style={styles.pageButton}
+                        >
+                          <Text style={styles.routeName}>{displayPath}</Text>
+                        </TouchableOpacity>
+                      );
+                    });
+                  }
+
+                  const displayPath = url === '/' ? 'Homepage' : url.replace(/^\//, '');
+
+                  return (
                     <TouchableOpacity
-                      key={route.id}
-                      onPress={() => handleNavigate(route.cleanRoute || '')}
+                      key={route.contextKey}
+                      onPress={() => handleNavigate(url)}
                       style={styles.pageButton}
                     >
-                      <Text style={styles.routeName}>{route.name}</Text>
+                      <Text style={styles.routeName}>{displayPath}</Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
+                  );
+                })}
               </View>
-            ) : (
-              <View style={styles.pagesContainer}>
-                <View style={styles.pagesListContainer}>
-                  <Text style={styles.pagesLabel}>MOBILE</Text>
-                  {(availableRoutes as SitemapType[]).map((route: SitemapType, index: number) => {
-                    const url =
-                      typeof route.href === 'string' ? route.href : route.href?.pathname || '/';
-
-                    if (url === '/(tabs)' && route.children) {
-                      return route.children.map((childRoute: SitemapType) => {
-                        const childUrl =
-                          typeof childRoute.href === 'string'
-                            ? childRoute.href
-                            : childRoute.href.pathname || '/';
-                        const displayPath =
-                          childUrl === '/(tabs)'
-                            ? 'Homepage'
-                            : childUrl.replace(/^\//, '').replace(/^\(tabs\)\//, '');
-                        return (
-                          <TouchableOpacity
-                            key={childRoute.contextKey}
-                            onPress={() => handleNavigate(childUrl)}
-                            style={styles.pageButton}
-                          >
-                            <Text style={styles.routeName}>{displayPath}</Text>
-                          </TouchableOpacity>
-                        );
-                      });
-                    }
-
-                    const displayPath = url === '/' ? 'Homepage' : url.replace(/^\//, '');
-
-                    return (
-                      <TouchableOpacity
-                        key={route.contextKey}
-                        onPress={() => handleNavigate(url)}
-                        style={styles.pageButton}
-                      >
-                        <Text style={styles.routeName}>{displayPath}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
+            </View>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -319,52 +222,6 @@ const styles = StyleSheet.create({
     marginBottom: 80,
     textAlign: 'center',
   },
-  createPageContainer: {
-    width: '100%',
-    maxWidth: 800,
-    marginBottom: 40,
-    paddingHorizontal: 20,
-  },
-  createPageContent: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    borderRadius: 8,
-    padding: 20,
-    backgroundColor: '#fff',
-    gap: 15,
-  },
-  createPageTextContainer: {
-    gap: 10,
-  },
-  createPageTitle: {
-    fontSize: 14,
-    color: '#000',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  createPageDescription: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  createPageButtonContainer: {
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  createPageButton: {
-    backgroundColor: '#000',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-  },
-  createPageButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-
   pagesContainer: {
     width: '100%',
     alignItems: 'center',
@@ -399,49 +256,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#111',
   },
-  routePath: {
-    fontSize: 14,
-    color: '#999',
-  },
-
-  routesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    width: '100%',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    gap: 40,
-  },
-  routeCard: {
-    width: '100%',
-    maxWidth: 300,
-    minWidth: 150,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  routeButton: {
-    width: '100%',
-    aspectRatio: 1.4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    overflow: 'hidden',
-  },
-  routePreview: {
-    flex: 1,
-    backgroundColor: '#f9f9f9',
-  },
-  routeLabel: {
-    paddingTop: 12,
-    color: '#666',
-    textAlign: 'left',
-    width: '100%',
-  },
 });
-
-// Track if this module has been initialized - this flag persists across Fast Refresh
-let hasInitialized = false;
 
 export default () => {
   return (

@@ -137,6 +137,43 @@ async function adjustCreditsByAdmin(adminUserId, userId, delta, note) {
     client.release();
   }
 }
+async function recordTokenUsage(userId, tokensUsed, actionId, costUsd = 0) {
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. 查询该用户是否存在 token_accounts，如不存在则在当前事务中自动开户
+    let accountRes = await client.query(
+      'SELECT id FROM billing_token.token_accounts WHERE user_id = $1',
+      [userId]
+    );
+
+    let userAccountId;
+    if (accountRes.rows.length === 0) {
+      const insertRes = await client.query(
+        'INSERT INTO billing_token.token_accounts (user_id) VALUES ($1) RETURNING id',
+        [userId]
+      );
+      userAccountId = insertRes.rows[0].id;
+    } else {
+      userAccountId = accountRes.rows[0].id;
+    }
+
+    // 2. 插入 token_usage 记录
+    await client.query(
+      'INSERT INTO billing_token.token_usage (user_account_id, action_id, tokens_used, cost_usd) VALUES ($1, $2, $3, $4)',
+      [userAccountId, actionId, tokensUsed, costUsd]
+    );
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
 
 module.exports = {
   getOperationCost,
@@ -145,4 +182,5 @@ module.exports = {
   refundCredits,
   addCredits,
   adjustCreditsByAdmin,
+  recordTokenUsage,
 };

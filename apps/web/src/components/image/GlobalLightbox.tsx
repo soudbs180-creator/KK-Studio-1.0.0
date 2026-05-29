@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { type GeneratedImage, GenerationMode, type RedrawRequest, type ReferenceImage } from '../../types';
-import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy, Sparkles } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy, Sparkles, Trash2 } from 'lucide-react';
 import { RedrawWorkspace } from './RedrawWorkspace';
 import { notify } from '../../services/system/notificationService';
 import { getImage, getStrictOriginalImage } from '../../services/storage/imageStorage';
@@ -18,6 +18,7 @@ interface GlobalLightboxProps {
     onEditText?: (image: GeneratedImage) => void;
     onEditPptDeck?: (image: GeneratedImage) => void;
     onPartialRedraw?: (image: GeneratedImage, request: RedrawRequest) => void;
+    onDeleteImage?: (imageId: string) => void;
     onDownloadPptComposite?: (imageId: string) => void;
     redrawCompleteUrl?: string | null;
     onRedrawAnimationDone?: () => void;
@@ -31,7 +32,7 @@ interface GlobalLightboxProps {
  * @param initialIndex Initially active item index.
  * @param onClose Close handler.
  */
-export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialIndex, onClose, onEditText, onEditPptDeck, onPartialRedraw, onDownloadPptComposite, onUseAsSource }) => {
+export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialIndex, onClose, onEditText, onEditPptDeck, onPartialRedraw, onDeleteImage, onDownloadPptComposite, onUseAsSource }) => {
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -1118,6 +1119,24 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                           >
                               <Copy size={16} />
                               复制
+                          </button>
+                      )}
+                      {onDeleteImage && (
+                          <button
+                              onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteImage(image.id);
+                                  if (images.length <= 1) {
+                                      onClose();
+                                      return;
+                                  }
+                                  setCurrentIndex((index) => Math.max(0, Math.min(index, images.length - 2)));
+                              }}
+                              className={`${actionButtonClass} hover:border-red-500 hover:bg-red-600/80`}
+                              title="删除当前结果"
+                          >
+                              <Trash2 size={16} />
+                              删除
                           </button>
                       )}
   

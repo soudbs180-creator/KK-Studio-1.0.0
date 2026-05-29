@@ -166,9 +166,10 @@ export async function startLocalApiServer(options = {}) {
   }
 
   const verifyTurnstileToken = resolveLocalApiTurnstileVerifier(process.env);
-  const serverOptions = verifyTurnstileToken
-    ? { verifyTurnstileToken }
-    : undefined;
+  const serverOptions = {
+    ...(verifyTurnstileToken ? { verifyTurnstileToken } : {}),
+    skipConfigCheck,
+  };
 
   return serverModule.startApiServer(port, serverOptions);
 }

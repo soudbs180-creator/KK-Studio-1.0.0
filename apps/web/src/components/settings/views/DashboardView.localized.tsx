@@ -670,6 +670,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           border-radius: 18px;
           border: 1px solid var(--frost-card-framework-border, rgba(255, 255, 255, 0.08));
           background: var(--frost-card-framework-bg, rgba(22, 28, 45, 0.76));
+          color: inherit;
+          font: inherit;
+          text-align: left;
           padding: 12px 14px;
           display: flex;
           flex-direction: column;
@@ -748,7 +751,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         </div>
 
         {/* 卡片 2: API 工作台 (API Workspace) - 电脑端占 2*1 格 (2A) */}
-        <div 
+        <button
+          type="button"
+          aria-label={pick('+ 添加 API', '+ Add API')}
           className="dashboard-grid-card a-card-span-2-col group"
           onClick={() => onNavigate('api-management')}
         >
@@ -773,7 +778,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
               <ArrowRight size={16} />
             </div>
           </div>
-        </div>
+        </button>
 
 
 

@@ -343,6 +343,40 @@ test('buildEcommerceRenderTask prefers effective A+ size constraints over detect
   assert.match(renderTask.prompt, /single desktop\/mobile shared composition/i);
 });
 
+test('buildEcommerceRenderTask treats direct 600*450 output as a 4:3 mobile ratio family instead of a desktop conversion', () => {
+  const taskState = mergeEcommerceTaskState({
+    baseTask: createTaskState({
+      taskId: 'task-aplus-mobile-native',
+      sourceKind: 'a-plus-module',
+      sourceSheet: 'A+',
+      sourceRowKey: 'aplus-mobile-native',
+      theme: 'Mobile compact module',
+      outputTypeLabel: 'A+',
+      declaredSizeText: '600*450',
+      sizeTier: '600x450',
+      effectiveSizeTier: '600x450',
+      effectiveSizePolicy: 'sheet-native',
+      displayLabel: 'A+ 4:3 4K',
+    }),
+    seriesTemplate: createSeriesTemplate(),
+    sparseIntent: 'compact mobile A+ deliverable',
+    productName: 'Portable Air Cooler',
+  });
+
+  const renderTask = buildEcommerceRenderTask({
+    taskState,
+    seriesTemplate: createSeriesTemplate(),
+    aspectRatio: '4:3',
+    imageSize: '4K',
+  });
+
+  assert.match(renderTask.prompt, /600\*450/);
+  assert.match(renderTask.prompt, /4:3/);
+  assert.match(renderTask.prompt, /proportional multiple/i);
+  assert.doesNotMatch(renderTask.prompt, /desktop master first/i);
+  assert.doesNotMatch(renderTask.prompt, /desktop version/i);
+});
+
 test('buildEcommerceRenderTask keeps product-first prompt framing before background and style constraints', () => {
   const taskState = mergeEcommerceTaskState({
     baseTask: createTaskState({

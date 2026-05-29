@@ -35,6 +35,7 @@ test('ecommerce node generation runtime owns node state patches and single-card 
   assert.match(hookSource, /desktopStage: 'confirmed'/);
   assert.match(hookSource, /mobileStage: 'pending'/);
   assert.match(hookSource, /generationTarget: 'mobile'/);
+  assert.match(hookSource, /600\*450[\s\S]*4:3|4:3[\s\S]*600\*450/);
   assert.match(hookSource, /promptAssistMode\?: 'auto' \| 'disabled' \| 'regenerate-feedback';/);
   assert.match(hookSource, /resolveLatestGeneratedFeedbackReference/);
   assert.match(hookSource, /regenerateFeedbackPromptSuffix/);

@@ -64,6 +64,71 @@ function resolveEcommerceImageExtension(image: GeneratedImage): 'jpg' | 'png' | 
       : 'png';
 }
 
+async function normalizeImageToAPUSMobile(blob: Blob, isMobile: boolean): Promise<Blob> {
+  if (!isMobile) {
+    return blob;
+  }
+  return new Promise<Blob>((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const width = img.width;
+      const height = img.height;
+
+      // 无论比例偏差如何，只要是手机端大图导出，都必须强制归一化到 600x450 的等比例整数倍率像素上
+      // 使用 Math.round 来精准保留用户选择的 1K(k=2, 1200x900) 或 2K(k=4, 2400x1800) 级别分辨率
+      const k = Math.max(1, Math.round(Math.min(width / 600, height / 450)));
+      const targetWidth = 600 * k;
+      const targetHeight = 450 * k;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(blob);
+        return;
+      }
+
+      const sourceAspectRatio = width / height;
+      const targetAspectRatio = 4 / 3;
+      let srcX = 0;
+      let srcY = 0;
+      let srcWidth = width;
+      let srcHeight = height;
+
+      if (sourceAspectRatio > targetAspectRatio) {
+        // 源图宽度偏宽，居中裁切左右
+        srcWidth = height * targetAspectRatio;
+        srcX = (width - srcWidth) / 2;
+      } else {
+        // 源图高度偏高，居中裁切上下
+        srcHeight = width / targetAspectRatio;
+        srcY = (height - srcHeight) / 2;
+      }
+
+      ctx.drawImage(img, srcX, srcY, srcWidth, srcHeight, 0, 0, targetWidth, targetHeight);
+      canvas.toBlob(
+        (result) => {
+          if (result) {
+            resolve(result);
+          } else {
+            resolve(blob);
+          }
+        },
+        blob.type || 'image/png',
+        0.95
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(blob);
+    };
+    img.src = url;
+  });
+}
+
 async function saveEcommerceBlob(content: Blob, fileName: string): Promise<void> {
   const fileSaverModule = await import('file-saver') as unknown as FileSaverRuntimeModule;
   const saveBlob = typeof fileSaverModule === 'function'
@@ -251,7 +316,7 @@ export function useEcommerceGroupExportRuntime({
     const packageType = groupNode.ecommerce.sourceSheet === '主图' ? 'main-image-group' : 'a-plus-group';
     const packageLabel = groupNode.ecommerce.sourceSheet === '主图' ? '主图包' : 'A+包';
     const zip = new JSZip();
-    const exportables: Array<{ fileName: string; image: GeneratedImage }> = [];
+    const exportables: Array<{ fileName: string; image: GeneratedImage; isMobile: boolean }> = [];
 
     const manifest = buildEcommerceGroupExportManifest({
       packageType,
@@ -274,6 +339,9 @@ export function useEcommerceGroupExportRuntime({
           };
         }
 
+        const effectiveSizeTier = promptNode.ecommerce.effectiveSizeTier || promptNode.ecommerce.editableTask?.effectiveSizeTier || promptNode.ecommerce.editableTask?.sizeTier;
+        const isMobileSize = effectiveSizeTier === '600x450';
+
         if ((promptNode.ecommerce.effectiveSizePolicy || promptNode.ecommerce.sizePolicy) === 'desktop-then-mobile') {
           const deliverables = (['desktop', 'mobile'] as const).map((deliveryKind) => {
             const latestForDelivery = resolveLatestEcommerceSlotImage(promptNode, deliveryKind);
@@ -283,7 +351,11 @@ export function useEcommerceGroupExportRuntime({
 
             const extension = resolveEcommerceImageExtension(latestForDelivery.image);
             const fileName = `${String(index + 1).padStart(2, '0')}-${sanitizeEcommerceExportName(slotLabel, `slot-${index + 1}`)}-${deliveryKind}.${extension}`;
-            exportables.push({ fileName, image: latestForDelivery.image });
+            exportables.push({
+              fileName,
+              image: latestForDelivery.image,
+              isMobile: deliveryKind === 'mobile',
+            });
 
             return {
               deliveryKind,
@@ -319,7 +391,11 @@ export function useEcommerceGroupExportRuntime({
 
         const extension = resolveEcommerceImageExtension(latest.image);
         const fileName = `${String(index + 1).padStart(2, '0')}-${sanitizeEcommerceExportName(slotLabel, `slot-${index + 1}`)}.${extension}`;
-        exportables.push({ fileName, image: latest.image });
+        exportables.push({
+          fileName,
+          image: latest.image,
+          isMobile: isMobileSize,
+        });
 
         return {
           slotId,
@@ -343,8 +419,15 @@ export function useEcommerceGroupExportRuntime({
 
     const fallbackQualityFiles: string[] = [];
     for (const exportItem of exportables) {
-      const { blob, isOriginal } = await resolvePptImageBlob(exportItem.image);
+      let { blob, isOriginal } = await resolvePptImageBlob(exportItem.image);
       if (!isOriginal) fallbackQualityFiles.push(exportItem.fileName);
+
+      try {
+        blob = await normalizeImageToAPUSMobile(blob, exportItem.isMobile);
+      } catch (err) {
+        console.warn('[ecommerce] Crop pixel normalize failed', err);
+      }
+
       zip.file(exportItem.fileName, blob);
     }
 

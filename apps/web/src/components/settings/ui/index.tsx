@@ -264,16 +264,17 @@ export const SettingToggle: React.FC<{
           }
         }}
         disabled={disabled}
-        className={`settings-control-toggle settings-toggle-button relative h-7 w-12 shrink-0 overflow-hidden rounded-[var(--radius-control-md)] border disabled:cursor-not-allowed disabled:opacity-60 ${SETTINGS_CONTROL_MOTION_CLASSNAME}`}
+        className={`settings-control-toggle settings-toggle-button relative h-7 w-12 shrink-0 overflow-hidden rounded-[var(--radius-control-md)] border disabled:cursor-not-allowed disabled:opacity-60 transition-[background-color] duration-200 cursor-pointer ${SETTINGS_CONTROL_MOTION_CLASSNAME}`}
         style={{
-          background: checked ? 'rgb(var(--settings-accent-rgb))' : 'var(--settings-surface-overlay)',
-          borderColor: checked ? 'rgb(var(--settings-accent-rgb) / 0.35)' : 'var(--settings-border-subtle)',
+          background: checked ? 'rgb(var(--settings-accent-rgb))' : 'rgba(120, 120, 128, 0.32)',
+          boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.15)',
         }}
       >
         <span
-          className="settings-toggle-button__thumb absolute top-0.5 h-6 w-6 rounded-[var(--radius-control-sm)] bg-[var(--text-inverse)] shadow-sm transition-transform duration-[var(--motion-duration-standard)] ease-[var(--motion-ease-standard)]"
+          className="settings-toggle-button__thumb absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow-md transition-transform duration-200 ease-in-out"
           style={{
-            transform: checked ? 'translateX(20px)' : 'translateX(2px)',
+            transform: checked ? 'translateX(20px)' : 'translateX(0px)',
+            backgroundColor: '#ffffff',
           }}
         />
       </button>

@@ -1,5 +1,6 @@
 import type { Canvas, GeneratedImage, PromptNode } from '../types/index.ts';
 import { type AspectRatio } from '../types/index.ts';
+import { ECOMMERCE_FRAMEWORK_PROMPT_CARD_WIDTH } from '../utils/promptNodeCardWidth.ts';
 import { getCardDimensions } from '../utils/styleUtils.ts';
 
 export type CanvasAutoArrangePositions = Record<string, { x: number; y: number }>;
@@ -17,7 +18,6 @@ type LayoutGroup = {
 };
 
 const PROMPT_WIDTH = 320;
-const ECOMMERCE_FRAMEWORK_PROMPT_WIDTH = 920;
 const GROUPS_PER_ROW = 20;
 const SUB_COLUMNS = 20;
 const GROUP_GAP_X = 56;
@@ -34,7 +34,7 @@ const getImageDims = (aspectRatio?: string) => {
 
 const getPromptWidth = (prompt?: PromptNode): number => (
     prompt?.mode === 'ecommerce' && prompt.ecommerce?.kind === 'framework'
-        ? ECOMMERCE_FRAMEWORK_PROMPT_WIDTH
+        ? ECOMMERCE_FRAMEWORK_PROMPT_CARD_WIDTH
         : PROMPT_WIDTH
 );
 

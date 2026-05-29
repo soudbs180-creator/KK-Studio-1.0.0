@@ -314,7 +314,7 @@ function buildBusinessSizeLines(taskState: EcommerceEditableTaskState): string[]
   if (businessSizeTier === '600x450') {
     return [
       '- Business size: 600*450',
-      '- Delivery flow: the final composition is 600*450 and should stay compact and visually consistent with the desktop master logic.',
+      '本张画面为紧凑 4:3 手机端成品。产品主体、文案内容、品牌风格、色调和核心场景保持一致；请根据 4:3 比例进行紧凑的排版布局，让画面更适合手机浏览。不要更换产品，不要改文案，不要改变主视觉风格。输出必须符合 600*450 比例，可以是 600*450 或任意等比例高分辨率倍数（proportional multiple）。',
     ];
   }
 

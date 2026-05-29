@@ -2,6 +2,7 @@ import React from 'react';
 import { notify } from '../../services/system/notificationService';
 import { Activity, Edit3, Globe, Pause, Play, Plus, RefreshCw, Shield, Trash2, Wand2, type LucideIcon } from 'lucide-react';
 
+import ModelLogo from '../common/ModelLogo';
 import {
   SETTINGS_ELEVATED_STYLE,
   SETTINGS_OVERLAY_STYLE,
@@ -538,6 +539,7 @@ type ApiWorkbenchModelCenterPresetItem = {
   baseUrlLabel: string;
   recommendedModel: string;
   accentColor: string;
+  logoName?: string;
   onApply: () => void;
 };
 
@@ -777,7 +779,13 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
               onClick={preset.onApply}
             >
               <span className="settings-model-center-preset__mark" style={{ color: preset.accentColor }}>
-                {preset.title.slice(0, 1).toUpperCase()}
+                <ModelLogo
+                  modelId={preset.recommendedModel}
+                  provider={preset.logoName || preset.title}
+                  modelName={preset.title}
+                  size={24}
+                  className="settings-model-center-preset__logo"
+                />
               </span>
               <span className="settings-model-center-preset__main">
                 <span className="settings-model-center-preset__title">{preset.title}</span>
@@ -911,6 +919,8 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                 <div className="settings-capability-card__state">
                   <button
                     type="button"
+                    role="switch"
+                    aria-checked={item.enabled}
                     onClick={() => {
                       if (!customRoutingEnabled) {
                         onCustomRoutingToggle(true);

@@ -346,11 +346,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     isReady,
     isLoading,
     loadingProgress,
-    setViewportCenter, // 馃幆 瑙嗗彛涓績鍔ㄦ€佷紭鍏堢骇
-    state, // 馃幆 杩佺Щ鍔熻兘闇€瑕佽闂?canvases 鍒楄〃
-    migrateNodes, // 馃幆 杩佺Щ鑺傜偣鍒板叾浠栭」鐩?
-    createCanvas, // 馃幆 鍒涘缓鏂伴」鐩?
-    switchCanvas  // 馃幆 鍒囨崲椤圭洰
+    setViewportCenter, // 简体中文注释：迁移时保留当前视口中心，避免画布跳动。
+    state, // 简体中文注释：迁移功能需要读取完整画布列表。
+    migrateNodes, // 简体中文注释：将选中的节点迁移到其他项目。
+    createCanvas, // 简体中文注释：必要时创建新的目标项目。
+    switchCanvas  // 简体中文注释：迁移完成后切换到目标项目。
   } = useCanvas();
 
   const imageNodesById = React.useMemo(
@@ -602,6 +602,20 @@ const AppContent: React.FC<AppContentProps> = () => {
       setPreviewInitialIndex(idx >= 0 ? idx : 0);
     }
   }, [activeCanvasRef, tryOpenPptPreview]);
+
+  const handleLightboxDeleteImage = useCallback((imageId: string) => {
+    deleteImageNode(imageId);
+    setPreviewImages((images) => {
+      if (!images) return images;
+      const nextImages = images.filter((image) => image.id !== imageId);
+      if (nextImages.length === 0) {
+        setPreviewInitialIndex(0);
+        return null;
+      }
+      setPreviewInitialIndex((index) => Math.max(0, Math.min(index, nextImages.length - 1)));
+      return nextImages;
+    });
+  }, [deleteImageNode]);
 
   // Reactively track KeyManager state
   const [keyStats, setKeyStats] = useState(() => keyManager.getStats());
@@ -1797,6 +1811,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   });
   const { handleEcommerceSubmitGuard } = useEcommerceSubmitRuntime({
     hasEcommerceAnalysis: Boolean(ecommerceState.analysis),
+    analysisConfirmed: ecommerceState.analysisConfirmed,
     handleAnalyzeEcommerceRequirement,
     handleConfirmEcommerceAnalysis,
   });
@@ -1987,7 +2002,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             id: Date.now().toString(),
             storageId,
             url: dataUrl,
-            prompt: `鎷栧叆鍥剧墖锛?{file.name}`,
+            prompt: `拖入图片：${file.name}`,
             aspectRatio: calcAspect(img.width, img.height),
             timestamp: Date.now(),
             model: 'uploaded',
@@ -2311,7 +2326,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     if (files.length === 0) return;
     if (config.referenceImages.length + files.length > 5) {
       import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning('鏃犳硶娣诲姞鍥剧墖', '鏈€澶氭敮鎸?5 寮犲弬鑰冨浘');
+        notify.warning('无法添加图片', '最多支持 5 张参考图');
       });
       files = files.slice(0, 5 - config.referenceImages.length);
     }
@@ -2503,7 +2518,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         });
 
         import('./services/system/notificationService').then(({ notify }) => {
-          notify.info('鎭㈠浠诲姟', `绯荤粺宸茶嚜鍔ㄩ噸鏂板紑濮?${interruptedNodes.length} 涓腑鏂殑浠诲姟`);
+          notify.info('恢复任务', `系统已自动重新开始 ${interruptedNodes.length} 个中断的任务`);
         });
       }
     }
@@ -2638,7 +2653,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     handleImageClick(imageId);
   }, [handleImageClick]);
 
-  // 馃殌 [鏂版坊鍔燷 鐢佃剳绔湪鐏鍐呪€滅户缁垱浣溾€濈殑鍥炶皟锛屽皢褰撳墠鍥剧墖璁句负鍙傝€冨浘缁х画鍒涗綔锛屽疄鐜颁氦浜掗棴鐜?
+  // 桌面端在灯箱内继续创作时，将当前图片设为参考图以保持创作链路连续。
   const handleDesktopUseImageAsSource = useCallback((image: GeneratedImage) => {
     const refImg = {
       id: image.id,
@@ -2668,7 +2683,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     void (async () => {
       try {
         const plan = request.plan;
-        const finalPrompt = (plan?.prompt || request.prompt || '閲嶇粯').trim();
+        const finalPrompt = (plan?.prompt || request.prompt || '重绘').trim();
         const canvas = activeCanvasRef.current;
         const sourceImage = canvas?.imageNodes.find((img) => img.id === image.id) || image;
         const parentPromptId = sourceImage.parentPromptId;
@@ -2686,6 +2701,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         const cropPlans = plan?.mode === 'regional-crops' && plan.cropPlans.length > 0 ? plan.cropPlans : [];
         const executionCrops: Array<RedrawCropPlan | null> = cropPlans.length > 0 ? cropPlans : [null];
         const createdNodes: PromptNode[] = [];
+        const generatedRedrawResultIds: string[] = [];
         const extraReferenceImages = [
           ...(plan?.annotatedReferenceImage ? [plan.annotatedReferenceImage] : []),
           ...request.referenceImages,
@@ -2718,8 +2734,8 @@ const AppContent: React.FC<AppContentProps> = () => {
           const usesRedrawOnlyModel = Boolean(cropPlan) || plan?.mode === 'color-blocks' || plan?.mode === 'whole-image-marked';
           const nodeModel = normalizeModelId(usesRedrawOnlyModel ? (plan?.model || request.model) : config.model);
           const nodePrompt = cropPlan ? finalPrompt : [
-            parentPrompt?.prompt ? `鍘熷鎻愮ず璇嶏細${parentPrompt.prompt}` : '',
-            sourceImage.prompt ? `褰撳墠鍥剧墖鎻愮ず璇嶏細${sourceImage.prompt}` : '',
+            parentPrompt?.prompt ? `原始提示词：${parentPrompt.prompt}` : '',
+            sourceImage.prompt ? `当前图片提示词：${sourceImage.prompt}` : '',
             finalPrompt,
           ].filter(Boolean).join('\n');
           const nodeRedrawMetadata = {
@@ -2773,6 +2789,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           const generatedImage = await waitForGeneratedImage(redrawNode.id);
           if (generatedImage) {
             latestRedrawResultId = generatedImage.id;
+            generatedRedrawResultIds.push(generatedImage.id);
             if (cropPlan) {
               currentCompositeBaseImageId = generatedImage.id;
               currentCompositeBaseImageUrl = generatedImage.originalUrl || generatedImage.apiResultUrl || generatedImage.url;
@@ -2797,6 +2814,15 @@ const AppContent: React.FC<AppContentProps> = () => {
           });
         }
 
+        if (plan?.mode === 'regional-crops' && createdNodes.length > 1) {
+          generatedRedrawResultIds.slice(0, -1).forEach((imageId) => {
+            deleteImageNode(imageId);
+          });
+          createdNodes.slice(0, -1).forEach((redrawNode) => {
+            deletePromptNode(redrawNode.id);
+          });
+        }
+
         if (latestRedrawResultId && latestRedrawNode) {
           await finalizeEcommercePartialRedrawResult({
             parentPrompt,
@@ -2817,7 +2843,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         });
       }
     })();
-  }, [addPromptNode, config.imageSize, config.model, executeGeneration, finalizeEcommercePartialRedrawResult, handleOpenPreview, resolveEcommercePartialRedrawContext, updateImageNode]);
+  }, [addPromptNode, config.imageSize, config.model, deleteImageNode, deletePromptNode, executeGeneration, finalizeEcommercePartialRedrawResult, handleOpenPreview, resolveEcommercePartialRedrawContext, updateImageNode]);
 
   const handleMobileResultRedraw = useCallback((entry: MobileResultEntry, request: RedrawRequest) => {
     const imageNode = activeCanvas?.imageNodes.find((image) => image.id === entry.imageId);
@@ -4441,7 +4467,8 @@ const AppContent: React.FC<AppContentProps> = () => {
       onEditText: handleEditPptTextFromLightbox,
       onDownloadPptComposite: handleDownloadPptComposite,
       onPartialRedraw: handleRedrawRequest,
-      onUseAsSource: handleDesktopUseImageAsSource, // 馃殌 缁戝畾缁х画鍒涗綔鍥炶皟
+      onDeleteImage: handleLightboxDeleteImage,
+      onUseAsSource: handleDesktopUseImageAsSource,
     },
     pptStackPreview: {
       state: pptStackPreview,
@@ -4980,7 +5007,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           <div className="w-[320px] rounded-2xl border border-white/10 bg-[#121214]/90 p-6 shadow-2xl backdrop-blur-xl">
             {/* 绠€浣撲腑鏂囨敞閲婏細鏍囬鏂囧瓧 */}
             <div className="mb-4 text-sm font-medium text-white/95 text-left">
-              姝ｅ湪鍔犺浇鐢诲竷
+              正在加载画布
             </div>
             <div className="flex items-center gap-3">
               {/* 绠€浣撲腑鏂囨敞閲婏細娣¤摑鑹茶繘搴︽潯杞ㄩ亾 */}

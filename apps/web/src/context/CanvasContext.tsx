@@ -159,6 +159,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const hasLoadedSuccessRef = useRef(false);
     // 简体中文注释：标记当前 Provider 挂载生命周期内 init 是否已经被触发执行过，防止 double render 造成并发和状态错乱
     const isInitExecutedRef = useRef(false);
+    const startupLoadRunIdRef = useRef(0);
 
     useEffect(() => {
         stateRef.current = state;
@@ -174,22 +175,12 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
     }, []);
 
-    const setMonotonicLoadingProgress = useCallback((nextProgress: number, options?: { reset?: boolean }) => {
+    const pushLoadingProgress = useCallback((nextProgress: number, options?: { reset?: boolean; runId?: number }) => {
+        if (options?.runId !== undefined && startupLoadRunIdRef.current !== options.runId) {
+            return;
+        }
         const normalizedProgress = Math.max(0, Math.min(100, Math.floor(Number.isFinite(nextProgress) ? nextProgress : 0)));
-        setLoadingProgress(prev => {
-            // 简体中文注释：一旦已经到了 100% 或者比新进度更大，且没有显示 reset 标记，绝不允许回退
-            if (prev >= 100 && normalizedProgress < 100 && !options?.reset) {
-                return prev;
-            }
-            if (options?.reset) {
-                // 简体中文注释：如果已经加载成功，绝不允许再把进度重置为 0
-                if (hasLoadedSuccessRef.current && normalizedProgress === 0) {
-                    return prev;
-                }
-                return normalizedProgress;
-            }
-            return Math.max(prev, normalizedProgress);
-        });
+        setLoadingProgress(prev => options?.reset ? normalizedProgress : Math.max(prev, normalizedProgress));
     }, []);
 
     useEffect(() => {
@@ -520,13 +511,13 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     }
                     
                     progress = Math.min(99.9, progress + delta);
-                    setMonotonicLoadingProgress(Math.floor(progress));
+                    pushLoadingProgress(Math.floor(progress));
                 }, 50);
             }
 
             const smoothProgressTo100 = () => {
                 if (isSilent) {
-                    setMonotonicLoadingProgress(100);
+                    pushLoadingProgress(100);
                     return Promise.resolve();
                 }
                 return new Promise<void>((resolve) => {
@@ -539,11 +530,11 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         current += Math.random() * 10 + 5;
                         if (current >= 100) {
                             current = 100;
-                            setMonotonicLoadingProgress(100);
+                            pushLoadingProgress(100);
                             clearInterval(endTimer);
                             resolve();
                         } else {
-                            setMonotonicLoadingProgress(Math.floor(current));
+                            pushLoadingProgress(Math.floor(current));
                         }
                     }, 30);
                 });
@@ -561,7 +552,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     });
                 }
 
-                const startupImageHydrationPromise = traceLocalPerformance('canvas-startup.preview-hydration', () => hydrateStartupPreviewImages(startupState, (pct) => setMonotonicLoadingProgress(pct)));
+                const startupImageHydrationPromise = traceLocalPerformance('canvas-startup.preview-hydration', () => hydrateStartupPreviewImages(startupState, (pct) => pushLoadingProgress(pct)));
 
             try {
                 // 简体中文注释：为磁盘文件恢复与权限检查设置最大 3200ms 的超时保护，避免由于 File System 挂起导致界面无限等待 99%
@@ -791,7 +782,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, [isLoading, canLoadCloudLayout]);
 
     const isSaveBlocked = !isInitRestored;
-    useCanvasCloudSync(state.canvases, isSaveBlocked, canSaveCloudLayout);
+    useCanvasCloudSync(state.canvases, isLoading, canSaveCloudLayout);
     const isSaveBlockedRef = useRef(isSaveBlocked);
     // Mark operations that need an urgent flush and should bypass the 200ms debounce.
     const urgentSaveRef = useRef(false);

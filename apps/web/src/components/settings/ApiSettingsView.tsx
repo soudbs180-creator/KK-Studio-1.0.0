@@ -44,6 +44,7 @@ import {
 import { resolveUserApiViewState } from '../../services/api/userApiViewState';
 import { useAuth } from '../../context/AuthContext';
 import { useLocale } from '../../context/LocaleContext';
+import { useTheme } from '../../context/ThemeContext';
 import keyManager, {
   type KeySlot,
   type ThirdPartyProvider,
@@ -853,6 +854,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdvancedWorkbench, setShowAdvancedWorkbench] = useState(false);
+  const { isDarkMode } = useTheme();
   const [modelCenterPresetTab, setModelCenterPresetTab] = useState<'official' | 'relay'>('official');
   const dummyPresetKind = useCallback((preset: ProviderPreset) => {
     return {
@@ -2839,28 +2841,51 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     <SettingsViewShell>
       {activeEditorMode === null ? (
         <>
-          {/* 工作台顶部居中高级/标准模式切换胶囊 */}
-          <div className="flex justify-center mb-6 mt-1.5 w-full">
-            <div className="flex rounded-full border border-white/10 bg-white/5 p-0.5 text-xs font-semibold text-slate-300 shadow-lg">
+          {/* 工作台顶部居中高级/标准模式切换胶囊，应用亮暗色彩彻底隔离与细腻阻尼点击反馈 */}
+          <div className="flex justify-center mb-6 mt-1.5 w-full animate-fadeIn">
+            <div 
+              className={`flex rounded-full border p-0.5 text-xs font-semibold shadow-sm transition-[background-color,border-color] duration-300 ${
+                isDarkMode 
+                  ? 'border-white/10 bg-white/5 text-slate-300' 
+                  : 'border-[var(--settings-border-subtle)] bg-[var(--settings-surface-overlay)] text-[var(--text-secondary)]'
+              }`}
+            >
+              {/* 标准模式按钮 */}
               <button
                 type="button"
                 onClick={() => setShowAdvancedWorkbench(false)}
-                className={`rounded-full px-4 py-1.5 transition-all duration-150 cursor-pointer border-none ${
+                className={`rounded-full px-4 py-1.5 cursor-pointer border-none font-bold active:scale-[0.965] ${
                   !showAdvancedWorkbench
-                    ? 'bg-blue-600 text-white font-bold shadow-sm'
-                    : 'bg-transparent text-slate-400 hover:text-white'
+                    ? isDarkMode
+                      ? 'bg-[#fffaf0] text-[#0a0a0a] shadow-sm font-extrabold'
+                      : 'bg-[var(--clay-ink)] text-white shadow-sm font-extrabold'
+                    : isDarkMode
+                      ? 'bg-transparent text-slate-400 hover:text-white'
+                      : 'bg-transparent text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
                 }`}
+                style={{
+                  transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background-color 240ms cubic-bezier(0.16, 1, 0.3, 1), color 240ms cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
               >
                 {pick('标准模式', 'Standard Mode')}
               </button>
+
+              {/* 高级模式按钮 */}
               <button
                 type="button"
                 onClick={() => setShowAdvancedWorkbench(true)}
-                className={`rounded-full px-4 py-1.5 transition-all duration-150 cursor-pointer border-none ${
+                className={`rounded-full px-4 py-1.5 cursor-pointer border-none font-bold active:scale-[0.965] ${
                   showAdvancedWorkbench
-                    ? 'bg-blue-600 text-white font-bold shadow-sm'
-                    : 'bg-transparent text-slate-400 hover:text-white'
+                    ? isDarkMode
+                      ? 'bg-[#fffaf0] text-[#0a0a0a] shadow-sm font-extrabold'
+                      : 'bg-[var(--clay-ink)] text-white shadow-sm font-extrabold'
+                    : isDarkMode
+                      ? 'bg-transparent text-slate-400 hover:text-white'
+                      : 'bg-transparent text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
                 }`}
+                style={{
+                  transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background-color 240ms cubic-bezier(0.16, 1, 0.3, 1), color 240ms cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
               >
                 {pick('高级模式', 'Advanced Mode')}
               </button>
@@ -2869,16 +2894,6 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
           {showAdvancedWorkbench ? (
             <>
-              {/* 高级模式下的顶部动作栏（仅保留刷新数据，移除收起高级模式，由上方居中胶囊控制） */}
-              <div className="settings-model-center-top-actions justify-end mb-4 hidden w-full">
-                <SettingsActionButton
-                  icon={RefreshCw}
-                  loading={busy === 'cloud-refresh'}
-                  onClick={() => void run('cloud-refresh', () => refreshCloudData())}
-                >
-                  {pick('刷新数据', 'Refresh data')}
-                </SettingsActionButton>
-              </div>
               <ApiAdvancedSettingsView embedded={true} />
             </>
           ) : (

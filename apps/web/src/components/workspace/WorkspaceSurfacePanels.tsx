@@ -58,9 +58,8 @@ export function WorkspaceSurfacePanels({
           />
         </div>
       )}
-      renderLibraryPanel={() => {
-        if (isMobile) return null; // 简体中文注释：移动端下屏蔽桌面级遮挡，交给本地瀑布流及搜索框展示
-        return (
+      renderLibraryPanel={() => (
+        isMobile ? null : (
           <div id="asset-library-wrapper" style={{ pointerEvents: 'auto' }}>
             <AssetLibraryPanel
               isOpen={workspaceSurface === 'library'}
@@ -72,8 +71,8 @@ export function WorkspaceSurfacePanels({
               onFocusImage={handleFocusLibraryImage}
             />
           </div>
-        );
-      }}
+        )
+      )}
     />
   );
 }

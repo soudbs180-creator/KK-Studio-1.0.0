@@ -609,19 +609,10 @@ export function useEcommerceBuildRuntime({
 
       bringNodesToFront(createdNodeIds);
       setEcommerceBuildRuntimeState((previousState) => ({
-        requirementFile: null,
-        productFiles: [],
-        extraReferenceFiles: [],
-        itemReferenceFiles: {},
-        analysis: null,
-        analysisConfirmed: false,
-        selectedItems: {},
-        taskStates: {},
-        groupSlots: createBuildResetGroupSlots(),
+        analysisConfirmed: true,
         activeTaskNodeId: null,
         activeTaskState: null,
-        activeFrameworkId: null,
-        activeGroupSheet: null,
+        activeFrameworkId: frameworkNode.id,
         frameworkRuntime: {
           ...previousState.frameworkRuntime,
           [frameworkNode.id]: initialFrameworkRuntime,

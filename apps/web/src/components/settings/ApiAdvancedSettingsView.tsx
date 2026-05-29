@@ -35,7 +35,7 @@ import { notify } from '../../services/system/notificationService';
 import {
   SETTINGS_ELEVATED_STYLE,
   SETTINGS_INFO_STYLE,
-  SETTINGS_OVERLAY_STYLE,
+  SETTINGS_WARNING_STYLE,
   SettingsActionButton,
   SettingsBadge,
   SettingsHero,
@@ -49,6 +49,7 @@ import {
 } from '../../services/document/ocrServiceSettings';
 import {
   ApiWorkbenchCapabilitySection,
+  ApiWorkbenchCurrentViewSection,
   ApiWorkbenchDiagnosticsSection,
   ApiWorkbenchOcrSection,
   ApiWorkbenchOverviewSection,
@@ -393,8 +394,92 @@ const ApiAdvancedSettingsView: React.FC<{ embedded?: boolean }> = ({ embedded = 
     });
   }, [allChannelConfigs, pick]);
 
+  const refreshDiagnostics = () => {
+    void run('health-refresh', () => refreshApiHealth(true));
+  };
+
   const content = (
     <>
+      <ApiWorkbenchOverviewSection
+        pick={pick}
+        workbenchStatusLabel={workbenchStatusLabel}
+        workbenchTone={workbenchTone}
+        userApiPersistenceWarning={userApiPersistenceWarning || null}
+        isHydratingRuntimeUserApis={apiServerState.isHydratingRuntimeUserApis}
+        snapshotHydrationHelper=""
+        attentionCount={providers.filter((provider) => provider.status === 'error' || !provider.isActive).length}
+        connectedChannels={connectedChannels}
+        officialActiveCount={slots.filter((slot) => !slot.disabled).length}
+        activeProviders={activeProviders}
+        budgetCount={0}
+        activeTab="official"
+      />
+
+      <ApiWorkbenchStageSection
+        pick={pick}
+        showDiagnostics={showDiagnostics}
+        onToggleDiagnostics={handleToggleDiagnostics}
+        stage={apiServerState.stage}
+        stageTone={stageMeta.tone}
+        stageTitle={stageMeta.title}
+        stageDescription={stageMeta.description}
+        stageInteractionLabel={stageMeta.interactionLabel}
+        stageNextActionLabel={stageMeta.nextActionLabel}
+        stageBannerStyle={
+          stageMeta.bannerTone === 'info'
+            ? SETTINGS_INFO_STYLE
+            : stageMeta.bannerTone === 'warning'
+              ? SETTINGS_WARNING_STYLE
+              : SETTINGS_ELEVATED_STYLE
+        }
+        primaryActionIcon={RefreshCw}
+        primaryActionTone="secondary"
+        onPrimaryAction={refreshDiagnostics}
+        primaryActionLoading={busy === 'health-refresh'}
+        primaryActionTestId="api-advanced-health-refresh"
+        isUsingReadonlyProfileFallback={apiServerState.shouldUseReadonlySnapshotForDisplay}
+        runtimeRouteCount={connectedChannels}
+      />
+
+      {showDiagnostics ? (
+        <div className="flex justify-end">
+          <SettingsActionButton icon={X} size="sm" onClick={handleToggleDiagnostics}>
+            {pick('隐藏更多高级选项', 'Hide more advanced items')}
+          </SettingsActionButton>
+        </div>
+      ) : null}
+
+      {showDiagnostics ? (
+        <ApiWorkbenchDiagnosticsSection
+          pick={pick}
+          diagnosticsActionDisabled={diagnosticsRefreshDisabled}
+          onRefreshDiagnostics={refreshDiagnostics}
+          apiReachable={apiHealth?.reachable}
+          apiErrorMessage={apiHealth?.errorMessage}
+          persistenceWritable={Boolean(apiHealth && isKkaiUserApiStorageReady(apiHealth))}
+          isAuthenticated={hasAuthenticatedUser}
+          hasReadonlySnapshot={hasReadonlySnapshot}
+        />
+      ) : null}
+
+      <ApiWorkbenchCurrentViewSection
+        pick={pick}
+        activeTab="official"
+        onChangeTab={() => undefined}
+        latencyCards={[]}
+        formatLatency={(value) => (typeof value === 'number' ? `${Math.round(value)}ms` : '--')}
+      />
+
+      <ApiWorkbenchPlatformSection
+        pick={pick}
+        onOpenPlatformAssistant={() => notify.info(
+          pick('平台入口待接入', 'Platform entry pending'),
+          pick('平台辅助 AI 尚未接入。', 'Platform Assistant AI is not wired yet.'),
+        )}
+      />
+
+      <ApiWorkbenchRoutePoolSection pick={pick} items={routePoolItems} />
+
       <ApiWorkbenchCapabilitySection
         pick={pick}
         items={capabilityCards}

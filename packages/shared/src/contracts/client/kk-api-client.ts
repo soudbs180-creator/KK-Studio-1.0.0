@@ -106,6 +106,7 @@ export interface ApiClientConfig {
   fetchImpl?: typeof fetch;
   getAccessToken?: () => string | undefined | Promise<string | undefined>;
   refreshAccessToken?: () => string | undefined | Promise<string | undefined>;
+  onRefreshToken?: (token: string) => void | Promise<void>;
   getClientVersion?: () => string | undefined;
   getDefaultHeaders?: () => Record<string, string | undefined>;
 }
@@ -588,13 +589,8 @@ async function requestJson<TResponse>(
     if (response.ok) {
       // 中文注释：滑动过期会话续期，拦截X-Refresh-Token响应头并覆盖存储
       const refreshToken = response.headers.get("x-refresh-token") || response.headers.get("X-Refresh-Token");
-      if (refreshToken && typeof window !== "undefined") {
-        const storageKey = "kk.api.access_token";
-        window.sessionStorage?.setItem(storageKey, refreshToken);
-        if (window.localStorage?.getItem(storageKey)) {
-          window.localStorage.setItem(storageKey, refreshToken);
-        }
-        window.dispatchEvent(new CustomEvent("kk-api-token-refreshed", { detail: { token: refreshToken } }));
+      if (refreshToken) {
+        await config.onRefreshToken?.(refreshToken);
       }
 
       return {

@@ -6,6 +6,7 @@ export interface EcommerceSubmitGuardState {
 
 export interface UseEcommerceSubmitRuntimeDeps {
   hasEcommerceAnalysis: boolean;
+  analysisConfirmed: boolean;
   handleAnalyzeEcommerceRequirement: () => Promise<void>;
   handleConfirmEcommerceAnalysis: () => Promise<void>;
 }
@@ -16,6 +17,7 @@ export interface UseEcommerceSubmitRuntimeResult {
 
 export function useEcommerceSubmitRuntime({
   hasEcommerceAnalysis,
+  analysisConfirmed,
   handleAnalyzeEcommerceRequirement,
   handleConfirmEcommerceAnalysis,
 }: UseEcommerceSubmitRuntimeDeps): UseEcommerceSubmitRuntimeResult {
@@ -29,9 +31,13 @@ export function useEcommerceSubmitRuntime({
       return true;
     }
 
+    if (analysisConfirmed) {
+      return true;
+    }
+
     await handleConfirmEcommerceAnalysis();
     return true;
-  }, [handleAnalyzeEcommerceRequirement, handleConfirmEcommerceAnalysis, hasEcommerceAnalysis]);
+  }, [analysisConfirmed, handleAnalyzeEcommerceRequirement, handleConfirmEcommerceAnalysis, hasEcommerceAnalysis]);
 
   return {
     handleEcommerceSubmitGuard,

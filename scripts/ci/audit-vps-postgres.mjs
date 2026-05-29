@@ -8,7 +8,6 @@ const repoRoot = path.join(__dirname, "..", "..");
 
 export const POSTGRES_BOOTSTRAP_SQL_FILES = Object.freeze([
   "scripts/postgres/bootstrap-kk-vps.sql",
-  "apps/api/sql/bootstrap-self-hosted-postgres.sql",
 ]);
 
 export const REQUIRED_RUNTIME_TABLES = Object.freeze([
@@ -114,6 +113,13 @@ export function evaluatePostgresBootstrapSql(sql) {
   }));
 }
 
+export function getPostgresBootstrapSqlFileChecks(rootDir = repoRoot) {
+  return POSTGRES_BOOTSTRAP_SQL_FILES.map((relativePath) => ({
+    relativePath,
+    exists: fs.existsSync(path.join(rootDir, relativePath)),
+  }));
+}
+
 export function evaluatePostgresBootstrapSqlFiles(rootDir = repoRoot) {
   const combinedSql = POSTGRES_BOOTSTRAP_SQL_FILES
     .map((relativePath) => {
@@ -132,6 +138,7 @@ function logCheck(label, ok, detail = "") {
 
 export async function runAudit(options = {}) {
   const rootDir = options.repoRoot || repoRoot;
+  const fileChecks = getPostgresBootstrapSqlFileChecks(rootDir);
   const evaluation = evaluatePostgresBootstrapSqlFiles(rootDir);
   const missing = evaluation.filter((result) => !result.exists);
 
@@ -139,8 +146,8 @@ export async function runAudit(options = {}) {
   console.log("VPS PostgreSQL Runtime Audit");
   console.log("========================================");
   console.log("Bootstrap SQL files:");
-  for (const relativePath of POSTGRES_BOOTSTRAP_SQL_FILES) {
-    logCheck(`file:${relativePath}`, fs.existsSync(path.join(rootDir, relativePath)));
+  for (const check of fileChecks) {
+    logCheck(`file:${check.relativePath}`, check.exists);
   }
 
   console.log("");
@@ -157,10 +164,11 @@ export async function runAudit(options = {}) {
   }
 
   console.log("");
+  const missingFiles = fileChecks.filter((check) => !check.exists);
   const columnFailures = evaluation.filter((result) => result.missingColumns.length > 0);
-  if (missing.length > 0 || columnFailures.length > 0) {
+  if (missingFiles.length > 0 || missing.length > 0 || columnFailures.length > 0) {
     console.log(
-      `Audit finished with ${missing.length} missing runtime table(s) and ${columnFailures.length} column contract failure(s).`,
+      `Audit finished with ${missingFiles.length} missing bootstrap SQL file(s), ${missing.length} missing runtime table(s), and ${columnFailures.length} column contract failure(s).`,
     );
     process.exitCode = 1;
   } else {

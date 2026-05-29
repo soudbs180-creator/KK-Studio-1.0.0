@@ -21,9 +21,10 @@ const getCostDisplay = (entry: MobileResultEntry) => {
         entry.fullPrompt?.length || 0,
         entry.referenceImages?.length || 0
       );
-      return `$${cost.toFixed(4)}`;
+      const equivalentCredits = Math.max(1, Math.round(cost * 100)); // 1 积分 = $0.01 折算
+      return `${equivalentCredits} 积分`;
     } catch (e) {
-      return '$0.0000';
+      return '0 积分';
     }
   } else {
     return entry.creditCost ? `${entry.creditCost} 积分` : '0 积分';

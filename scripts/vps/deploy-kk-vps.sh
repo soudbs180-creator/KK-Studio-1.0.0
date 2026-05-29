@@ -54,6 +54,10 @@ build_static_sites() {
   run_npm_script_with_optional_env "npm run build" "${WEB_ENV_FILE}"
   install -d -m 0755 "${APP_SITE_ROOT}"
   rsync -a --delete "${CURRENT_DIR}/apps/web/dist/" "${APP_SITE_ROOT}/"
+
+  run_npm_script_with_optional_env "npm run admin:build" "${ADMIN_ENV_FILE}"
+  install -d -m 0755 "${ADMIN_SITE_ROOT}"
+  rsync -a --delete "${CURRENT_DIR}/apps/admin/dist/" "${ADMIN_SITE_ROOT}/"
 }
 
 harden_env_permissions() {
