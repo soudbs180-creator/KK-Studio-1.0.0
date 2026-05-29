@@ -281,18 +281,18 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
       const currentY = e.touches[0].clientY;
       const deltaY = currentY - startY;
 
-      // 顶部超界下拉：进行紧实型阻尼位移，最大偏移限制在屏幕高度的 40%
+      // 顶部超界下拉：进行紧实型阻尼位移，最大偏移限制在屏幕高度的 35%
       if (startScrollTop <= 0 && deltaY > 0) {
         if (e.cancelable) e.preventDefault();
-        const limit = window.innerHeight * 0.4;
+        const limit = window.innerHeight * 0.35;
         const offset = (deltaY * limit) / (deltaY + limit);
         content.style.transform = `translateY(${offset}px)`;
       }
-      // 底部超界上拉：进行大余量阻尼位移，最大偏移限制在屏幕高度 of 60%（允许轻松拉过屏幕一半）
+      // 底部超界上拉：进行大余量阻尼位移，最大偏移限制在屏幕高度 of 50%（允许轻松拉过屏幕一半）
       else if (startScrollTop >= maxScrollTop - 1 && deltaY < 0) {
         if (e.cancelable) e.preventDefault();
         const pullDistance = -deltaY;
-        const limit = window.innerHeight * 0.6;
+        const limit = window.innerHeight * 0.5;
         const offset = (pullDistance * limit) / (pullDistance + limit);
         content.style.transform = `translateY(${-offset}px)`;
       }
@@ -300,8 +300,8 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
 
     const handleTouchEnd = () => {
       active = false;
-      // 触手松开，以极富弹性质感的缓动曲线过渡复位
-      content.style.transition = 'transform 0.45s cubic-bezier(0.25, 0.8, 0.25, 1)';
+      // 触手松开，以更具动量弹性质感的缓动曲线物理回弹复位
+      content.style.transition = 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1)';
       content.style.transform = 'translateY(0px)';
     };
 
@@ -398,6 +398,9 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
       <div 
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto overscroll-contain px-3 pr-1 pb-24 flex flex-col"
+        style={{
+          paddingTop: 'var(--mobile-content-top-inset, 76px)',
+        }}
       >
         <div 
           ref={contentWrapperRef} 
