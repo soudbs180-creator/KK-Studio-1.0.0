@@ -243,34 +243,51 @@ const SettingsMobileShell: React.FC<{
       {/* 压缩顶栏整体高度，使用 padding 和 minHeight 自适应撑开，使用 align-items: center 实现垂向居中，完美兼容 safe-area-inset-top */}
       <div 
         className="settings-shell-mobile__topbar"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)', paddingBottom: '8px', paddingLeft: '16px', paddingRight: '16px', minHeight: '48px', alignItems: 'center', display: 'flex', justifyContent: 'space-between' }}
+        style={{
+          position: 'relative',
+          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)',
+          paddingBottom: '8px',
+          minHeight: '48px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          {/* 总览页且非 API 编辑状态下，左侧不渲染任何返回/关闭按钮；子设置页左侧渲染 ArrowLeft */}
-          {activeView === 'dashboard' && !isApiManagementEditorRoute ? null : (
-            <button
-              type="button"
-              onClick={handleLeadingAction}
-              className="apple-icon-button h-8 w-8 shrink-0 rounded-xl flex items-center justify-center"
-              aria-label={
-                isApiManagementEditorRoute
-                  ? pick('返回 API 管理', 'Back to API management')
-                  : pick('返回设置总览', 'Back to settings overview')
-              }
-            >
-              <ArrowLeft size={16} />
-            </button>
-          )}
-
-          <div className="settings-shell-mobile__title-wrap" style={{ marginTop: 0 }}>
-            <div className="settings-shell-kicker" style={{ fontSize: '8px', lineHeight: '1' }}>{pick('当前入口', 'Current entry')}</div>
-            <h2 className="settings-shell-mobile__title" style={{ fontSize: '14px', lineHeight: '1.2', fontWeight: 600 }}>{activeTitle}</h2>
-          </div>
+        {/* 左侧始终显示返回/后退按钮 */}
+        <div style={{ position: 'absolute', left: '16px', display: 'flex', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={handleLeadingAction}
+            className="apple-icon-button h-8 w-8 shrink-0 rounded-xl flex items-center justify-center"
+            aria-label={
+              isApiManagementEditorRoute
+                ? pick('返回 API 管理', 'Back to API management')
+                : pick('返回设置总览', 'Back to settings overview')
+            }
+          >
+            <ArrowLeft size={16} />
+          </button>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <SettingsLanguageToggle compact />
-          {/* 右侧始终保留 X 关闭按钮，提供整齐划一的视觉规范 */}
+        {/* 中间居中文案 */}
+        <div 
+          className="settings-shell-mobile__title-wrap" 
+          style={{ 
+            marginTop: 0, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            textAlign: 'center',
+            paddingLeft: '48px',
+            paddingRight: '48px'
+          }}
+        >
+          <div className="settings-shell-kicker" style={{ fontSize: '8px', lineHeight: '1' }}>{pick('当前入口', 'Current entry')}</div>
+          <h2 className="settings-shell-mobile__title" style={{ fontSize: '14px', lineHeight: '1.2', fontWeight: 600 }}>{activeTitle}</h2>
+        </div>
+
+        {/* 右侧始终保留 X 关闭按钮，提供整齐划一的视觉规范 */}
+        <div style={{ position: 'absolute', right: '16px', display: 'flex', alignItems: 'center' }}>
           <button
             type="button"
             onClick={onClose}

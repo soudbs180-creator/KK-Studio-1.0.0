@@ -1,13 +1,11 @@
 {
   "appName": "KK Studio",
-  "version": "1.4.9",
-  "displayVersion": "v1.4.9",
-  "releaseDate": "2026-05-26",
+  "version": "1.5.0",
+  "displayVersion": "v1.5.0",
+  "releaseDate": "2026-05-29",
   "releaseNotes": [
-    "Desktop canvas now includes a snap-to-grid toggle for more precise prompt, image, workflow, and grouped-card positioning.",
-    "Manual canvas groups can now collapse into compact cards and expand back without rendering hidden members or connectors.",
-    "Hosted/VPS release guardrails, package metadata, workspace packages, and portable version manifests are aligned to version 1.4.9.",
-    "The 1.4.9 hosted release now uses the verified kkai.plus same-origin API with an HTTPS VPS upstream while the permanent api.kkai.plus DNS record awaits Cloudflare access."
+    "Refactored mobile settings topbar navigation layout, simplified language switching, and optimized back and close button alignment.",
+    "Hosted/VPS release guardrails, package metadata, workspace packages, and portable version manifests are aligned to version 1.5.0."
   ],
   "versionTargets": {
     "releaseManifest": "config/release-manifest.json",

@@ -25,7 +25,7 @@ KK Studio 是一款面向图像、视频、音频以及演示文稿（Presentati
 - `packages/shared/`：平台无关的共享核心业务包（纯 TS 编写）。
 - `packages/api-client/`：统一封装的 HTTP API 客户端。
 - `packages/ui/`：跨平台兼容的基础 UI 组件库。
-- `server/`：VPS Backend 主服务（Express.js），处理支付 Webhook 及 API 转发。
+- `server/`：VPS 后端主服务（Express.js），处理支付 Webhook 及 API 转发。
 - `migrations/`：PostgreSQL schema 数据库迁移目录。
 
 ## 🚀 本地快速开发
@@ -48,3 +48,17 @@ KK Studio 是一款面向图像、视频、音频以及演示文稿（Presentati
    ```bash
    npm run dev:start
    ```
+
+## 📋 版本治理与持续集成
+
+项目配置了严格的版本一致性检测。在提交流程或部署前，请确保运行以下命令通过门禁检查：
+```bash
+# 检测各子包及发布清单的版本号是否与 config/release-manifest.json 保持一致
+npm run governance:check
+
+# 静态类型检查
+npm run typecheck
+
+# 生产环境打包验证
+npm run build
+```

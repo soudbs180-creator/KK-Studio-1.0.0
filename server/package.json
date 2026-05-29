@@ -1,6 +1,6 @@
 {
   "name": "kk-server",
-  "version": "1.4.9",
+  "version": "1.5.0",
   "description": "KK Studio backend service",
   "main": "index.js",
   "scripts": {
