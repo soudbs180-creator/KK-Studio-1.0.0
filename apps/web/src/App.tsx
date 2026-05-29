@@ -269,8 +269,9 @@ import { cleanupCompletedTasksOlderThan } from './services/persistence/taskPersi
 import { traceLocalPerformance } from './services/system/localPerformanceTrace';
 import { cleanupLogsOlderThan } from './services/system/systemLogService';
 import { ensureMobileRetentionPreference, getMobileRetentionPreference, MOBILE_RETENTION_PREFERENCE_KEY } from './services/storage/mobileRetentionPreference';
-const SettingsPageRoot = React.lazy(() => import('./app/SettingsPageRoot'));
-const AdminLayout = React.lazy(() => import('./pages/admin/AdminLayout.tsx').then(m => ({ default: m.AdminLayout })));
+import { lazyWithRetry, lazyNamedWithRetry } from './utils/lazyWithRetry';
+const SettingsPageRoot = lazyWithRetry(() => import('./app/SettingsPageRoot'));
+const AdminLayout = lazyNamedWithRetry(() => import('./pages/admin/AdminLayout.tsx'), 'AdminLayout');
 import { WorkspaceShell } from './components/workspace';
 import {
   createWorkflowNodeRendererRegistry,

@@ -26,6 +26,7 @@ import { startWechatLogin } from '../../services/auth/wechatAuth.ts';
 import { pickByResolvedLanguage, type ResolvedLanguage } from '../../utils/localeText';
 import { readRuntimeEnv } from '../../utils/runtimeEnv';
 import { safeOpenLink } from '../../utils/browserUtils';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { getTurnstileDisabledMessage, getTurnstileMissingSiteKeyMessage, mapAuthErrorMessage } from './authLocalization';
 import { TurnstileWidget, canUseTurnstile, ensureTurnstileScript, useTurnstile, type TurnstileStatus } from './TurnstileWidget';
 import WechatQrModal from './WechatQrModal';
@@ -43,7 +44,7 @@ type IdleSchedulerWindow = Window & typeof globalThis & {
 
 const MAX_RETRY = 3;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const DeferredAuthShaderBackground = lazy(() => import('@/components/ui/animated-shader-background'));
+const DeferredAuthShaderBackground = lazyWithRetry(() => import('@/components/ui/animated-shader-background'));
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
