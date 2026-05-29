@@ -1,6 +1,7 @@
-import React, { Suspense, lazy, useCallback } from 'react';
+import React, { Suspense, useCallback } from 'react';
+import { lazyWithRetry } from '../utils/lazyWithRetry';
 
-const SettingsPanel = lazy(() => import('../components/settings/SettingsPanel'));
+const SettingsPanel = lazyWithRetry(() => import('../components/settings/SettingsPanel'));
 import { shouldUseHistoryBackForSettingsClose } from './settingsPageClose';
 
 const SettingsPageRoot: React.FC = () => {

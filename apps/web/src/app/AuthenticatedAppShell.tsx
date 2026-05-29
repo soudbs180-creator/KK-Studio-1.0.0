@@ -1,4 +1,5 @@
-import React, { Suspense, lazy, useLayoutEffect, useState } from 'react';
+import React, { Suspense, useLayoutEffect, useState } from 'react';
+import { lazyWithRetry } from '../utils/lazyWithRetry';
 
 import LoginScreen from '../components/auth/LoginScreen';
 import AdminRechargeFloatingPanel from '../components/admin/AdminRechargeFloatingPanel';
@@ -9,7 +10,7 @@ import { useAppStartup } from '../context/AppStartupContext';
 import { shouldShowLoginForAuthGate } from './authGate';
 import { pickByDocumentLanguage } from '../utils/localeText';
 
-const CostEstimation = lazy(() => import('../pages/CostEstimation'));
+const CostEstimation = lazyWithRetry(() => import('../pages/CostEstimation'));
 const PROMPT_BAR_CONTAINER_ID = 'prompt-bar-container';
 const PROMPT_BAR_TEXTAREA_SELECTOR = 'textarea.input-bar-textarea, textarea';
 

@@ -1,4 +1,5 @@
-import React, { lazy } from 'react';
+import React from 'react';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { Navigate, Route, type RouteObject, useNavigate } from 'react-router-dom';
 
 import type { Supplier } from '../../services/billing/supplierService';
@@ -11,12 +12,12 @@ import {
   type SettingsViewId,
 } from './settingsRegistry';
 
-const DashboardView = lazy(() => import('./views/DashboardView.localized.tsx'));
-const ApiSettingsView = lazy(() => import('./ApiSettingsView'));
+const DashboardView = lazyWithRetry(() => import('./views/DashboardView.localized.tsx'));
+const ApiSettingsView = lazyWithRetry(() => import('./ApiSettingsView'));
 
-const CostEstimation = lazy(() => import('../../pages/CostEstimation'));
-const StorageSettingsView = lazy(() => import('./views/StorageSettingsView.localized.tsx'));
-const SystemLogsView = lazy(() => import('./views/SystemLogsView.localized.tsx'));
+const CostEstimation = lazyWithRetry(() => import('../../pages/CostEstimation'));
+const StorageSettingsView = lazyWithRetry(() => import('./views/StorageSettingsView.localized.tsx'));
+const SystemLogsView = lazyWithRetry(() => import('./views/SystemLogsView.localized.tsx'));
 
 type SettingsWorkbenchRouteDefinition =
   | { path: ''; kind: 'dashboard'; index: true }

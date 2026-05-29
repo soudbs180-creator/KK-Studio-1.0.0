@@ -1,4 +1,5 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
+import { lazyWithRetry, lazyNamedWithRetry } from '../utils/lazyWithRetry';
 import { GlobalLightbox } from '../components/image/GlobalLightbox';
 import PptStackPreviewModal from '../components/image/PptStackPreviewModal';
 import type { SettingsPanelProps } from '../components/settings/SettingsPanel';
@@ -14,18 +15,15 @@ import type {
   PromptNode,
 } from '../types';
 
-const UserProfileModal = lazy(() => import('../components/modals/UserProfileModal'));
-const SettingsPanel = lazy(() => import('../components/settings/SettingsPanel'));
-const SearchPalette = lazy(() => import('../components/layout/SearchPalette'));
-const TagInputModal = lazy(() => import('../components/modals/TagInputModal'));
-const TutorialOverlay = lazy(() => import('../components/common/TutorialOverlay'));
-const StorageSelectionModal = lazy(() => import('../components/modals/StorageSelectionModal'));
-const MigrateModal = lazy(async () => {
-  const module = await import('../components/modals/MigrateModal');
-  return { default: module.MigrateModal };
-});
-const PptDeckEditorModal = lazy(() => import('../components/image/PptDeckEditorModal'));
-const RechargeModal = lazy(() => import('../components/modals/RechargeModal'));
+const UserProfileModal = lazyWithRetry(() => import('../components/modals/UserProfileModal'));
+const SettingsPanel = lazyWithRetry(() => import('../components/settings/SettingsPanel'));
+const SearchPalette = lazyWithRetry(() => import('../components/layout/SearchPalette'));
+const TagInputModal = lazyWithRetry(() => import('../components/modals/TagInputModal'));
+const TutorialOverlay = lazyWithRetry(() => import('../components/common/TutorialOverlay'));
+const StorageSelectionModal = lazyWithRetry(() => import('../components/modals/StorageSelectionModal'));
+const MigrateModal = lazyNamedWithRetry(() => import('../components/modals/MigrateModal'), 'MigrateModal');
+const PptDeckEditorModal = lazyWithRetry(() => import('../components/image/PptDeckEditorModal'));
+const RechargeModal = lazyWithRetry(() => import('../components/modals/RechargeModal'));
 
 type PptDeckEditorState = { nodeId: string; initialIndex: number } | null;
 type PptStackPreviewState = { images: GeneratedImage[]; initialIndex: number } | null;
