@@ -16,6 +16,7 @@ import {
   normalizeLanguage,
   pickByResolvedLanguage,
 } from './utils/localeText';
+import { isChunkLoadError, handleChunkLoadError } from './utils/lazyWithRetry';
 
 type FatalError = {
   message: string;
@@ -265,6 +266,10 @@ function renderFatalScreen(error: unknown) {
 window.addEventListener('error', (event) => {
   console.error('[Global Error]', event.message, event.error);
   if (!hasMountedApp) {
+    const isChunkError = isChunkLoadError(event.error || event.message);
+    if (isChunkError && handleChunkLoadError()) {
+      return;
+    }
     renderFatalScreen(event.error || event.message);
   }
 });
@@ -272,6 +277,10 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => {
   console.error('[Unhandled Rejection]', event.reason);
   if (!hasMountedApp) {
+    const isChunkError = isChunkLoadError(event.reason);
+    if (isChunkError && handleChunkLoadError()) {
+      return;
+    }
     renderFatalScreen(event.reason);
   }
 });
@@ -292,6 +301,26 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 
   render() {
     if (this.state.hasError) {
+      const isChunkError = isChunkLoadError(this.state.error);
+      if (isChunkError && handleChunkLoadError()) {
+        const language = getStoredStartupLanguage();
+        return (
+          <div
+            style={{
+              minHeight: '100vh',
+              background: '#0b0b0c',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: 'Inter, system-ui, sans-serif',
+            }}
+          >
+            <div style={{ color: '#fffaf0', fontSize: '15px' }}>
+              {pickByResolvedLanguage(language, '正在更新应用资源，请稍候...', 'Updating application resources, please wait...')}
+            </div>
+          </div>
+        );
+      }
       return <FatalScreen error={normalizeError(this.state.error)} />;
     }
 
@@ -302,6 +331,11 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 function bootstrap() {
   try {
     hasMountedApp = true;
+
+    // 成功加载并挂载应用，清除自愈刷新标志
+    try {
+      sessionStorage.removeItem('kk-auto-reload-chunk-fail');
+    } catch {}
 
     root.render(
       <ErrorBoundary>
