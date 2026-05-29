@@ -269,8 +269,8 @@ import { cleanupCompletedTasksOlderThan } from './services/persistence/taskPersi
 import { traceLocalPerformance } from './services/system/localPerformanceTrace';
 import { cleanupLogsOlderThan } from './services/system/systemLogService';
 import { ensureMobileRetentionPreference, getMobileRetentionPreference, MOBILE_RETENTION_PREFERENCE_KEY } from './services/storage/mobileRetentionPreference';
-import SettingsPageRoot from './app/SettingsPageRoot';
-import { AdminLayout } from './pages/admin/AdminLayout.tsx';
+const SettingsPageRoot = React.lazy(() => import('./app/SettingsPageRoot'));
+const AdminLayout = React.lazy(() => import('./pages/admin/AdminLayout.tsx').then(m => ({ default: m.AdminLayout })));
 import { WorkspaceShell } from './components/workspace';
 import {
   createWorkflowNodeRendererRegistry,
@@ -5055,9 +5055,17 @@ const App: React.FC = () => {
               showStartupBanner={rootMode === 'workspace'}
               AppContentComponent={
                 rootMode === 'admin'
-                  ? AdminLayout
+                  ? (props: any) => (
+                      <React.Suspense fallback={<div className="fixed inset-0 z-[10005] flex items-center justify-center bg-slate-950 text-white"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>}>
+                        <AdminLayout {...props} />
+                      </React.Suspense>
+                    )
                   : rootMode === 'settings'
-                    ? SettingsPageRoot
+                    ? (props: any) => (
+                        <React.Suspense fallback={<div className="fixed inset-0 z-[10005] flex items-center justify-center bg-slate-950 text-white"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>}>
+                          <SettingsPageRoot {...props} />
+                        </React.Suspense>
+                      )
                     : AppContent
               }
             />
