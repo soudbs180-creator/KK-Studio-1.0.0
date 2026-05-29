@@ -894,9 +894,44 @@ body.auth-screen-active.auth-screen-active--light #root {
 }
 
 @media (max-width: 767px) {
+  .auth-page {
+    overflow-y: auto !important; /* 允许在小屏/软键盘弹起时进行外层大容器顺滑滚动，防止被硬性截断 */
+  }
+
+  .auth-side-form {
+    min-height: 100vh;
+    padding: 32px 18px 88px; /* 底部间隙增大到 88px，为贴底的版本号留出足够的呼吸空间，使其上下左右都有间隙 */
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .auth-panel {
+    width: 100%;
+    max-width: 410px;
+    margin: auto 0;
+    padding: 22px 18px; /* 略微收缩手机端 padding 以防止占满屏幕，展现四周均等的轻盈间隙 */
+    border-radius: 22px;
+    max-height: none; /* 彻底清除内部滚动条，由外层大容器统一托管滚动，保证移动端的极致连贯滑动体验 */
+    overflow: visible;
+  }
+
+  .auth-form {
+    gap: 11px; /* 略微收缩控件行距，保持卡片物理尺寸精简秀气 */
+  }
+
   .auth-version-badge {
-    right: 16px;
-    bottom: 14px;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 24px;
+    right: auto;
+    background: rgba(8, 14, 26, 0.72);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    z-index: 5;
   }
 }
 
