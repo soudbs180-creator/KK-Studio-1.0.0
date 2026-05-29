@@ -28,10 +28,11 @@ export function safeOpenLink(url: string | undefined | null, preferNewTab = true
   const isWeChat = /micromessenger/i.test(ua);
   const isWeibo = /weibo/i.test(ua);
   const isQQ = /qq\//i.test(ua);
+  const isQuark = /quark/i.test(ua); // 简体中文注释：识别移动端 Quark (夸克) 浏览器
 
-  // 3. 针对内置 WebView（微信/微博/QQ等）或者不强制要求新标签的移动端，采用 location.href 进行直接跳转
-  // 这既是唯一能在微信内成功打开外部链接的方法，也是移动端加载速度最快的模式
-  if (isWeChat || isWeibo || isQQ || (isMobile && !preferNewTab)) {
+  // 3. 针对内置 WebView（微信/微博/QQ等）或者夸克浏览器，或不强制要求新标签的移动端，采用 location.href 进行直接跳转
+  // 在移动端夸克等拦截策略极度严格的浏览器中，location.href 是最稳妥、100% 不会被判定为广告弹窗的极致加速方案
+  if (isWeChat || isWeibo || isQQ || isQuark || (isMobile && !preferNewTab)) {
     window.location.href = targetUrl;
     return;
   }
