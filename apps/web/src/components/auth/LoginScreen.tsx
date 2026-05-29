@@ -31,6 +31,7 @@ import { getTurnstileDisabledMessage, getTurnstileMissingSiteKeyMessage, mapAuth
 import { TurnstileWidget, canUseTurnstile, ensureTurnstileScript, useTurnstile, type TurnstileStatus } from './TurnstileWidget';
 import WechatQrModal from './WechatQrModal';
 import './LoginScreen.css';
+import AnimatedShaderBackground from '../ui/animated-shader-background';
 
 type AuthView = 'login' | 'register' | 'forgot-password';
 type FieldName = 'email' | 'password' | 'confirmPassword';
@@ -44,7 +45,6 @@ type IdleSchedulerWindow = Window & typeof globalThis & {
 
 const MAX_RETRY = 3;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const DeferredAuthShaderBackground = lazyWithRetry(() => import('@/components/ui/animated-shader-background'));
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -418,7 +418,7 @@ const LoginScreen: React.FC = () => {
         onOpenInNewPage={() => wechatAuthorizationUrl && safeOpenLink(wechatAuthorizationUrl)}
       />
 
-      <div className="auth-shader-background" aria-hidden>{showShaderBackground ? <Suspense fallback={null}><DeferredAuthShaderBackground className="auth-shader-canvas" /></Suspense> : null}</div>
+      <div className="auth-shader-background" aria-hidden>{showShaderBackground ? <AnimatedShaderBackground className="auth-shader-canvas" /> : null}</div>
       <div className="auth-background" aria-hidden><div className="auth-gradient auth-gradient-a" /><div className="auth-gradient auth-gradient-b" /><div className="auth-grid" /><div className="auth-star-layer">{stars.map((star) => <span key={star.id} className="auth-star-point" style={{ '--star-top': star.top, '--star-left': star.left, '--star-delay': star.delay, '--star-duration': star.duration, '--star-size': star.size, '--star-opacity': star.opacity } as React.CSSProperties} />)}</div></div>
       <section className="auth-side-visual" aria-hidden><div className="auth-brand"><div className="auth-brand-icon"><Sparkles size={30} /></div><h1>{t('KK 创作平台', 'KK Creative Platform')}</h1><p>{t('下一代智能创作工作台', 'Next-generation creative workspace')}</p></div><p className="auth-side-note">{hostedRuntime ? t('当前版本使用 VPS 登录与 PostgreSQL 会话持久化。', 'This build now uses VPS-backed sign-in and PostgreSQL session persistence.') : t('本地运行时优先保留工作区状态，后端认证接口就绪后再同步账号。', 'The local runtime keeps your workspace state first. Account sync will be added once the backend auth routes are ready.')}</p></section>
 
