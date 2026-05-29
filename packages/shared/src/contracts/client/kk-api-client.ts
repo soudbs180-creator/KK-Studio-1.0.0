@@ -402,10 +402,18 @@ function normalizeHeaders(
 }
 
 function shouldIncludeBrowserCredentials(path: string): boolean {
-  return path === "api/v1/auth/login"
-    || path === "api/v1/auth/session"
-    || path === "api/v1/auth/refresh"
-    || path === "api/v1/auth/logout";
+  return path.startsWith("api/v1/auth/");
+}
+
+async function persistRefreshHeader(
+  config: ApiClientConfig,
+  response: Response,
+): Promise<void> {
+  // 中文注释：标准 envelope 响应也可能携带滑动续期头，必须在任何成功分支返回前统一落盘。
+  const refreshToken = response.headers.get("x-refresh-token") || response.headers.get("X-Refresh-Token");
+  if (refreshToken) {
+    await config.onRefreshToken?.(refreshToken);
+  }
 }
 
 async function parseResponseBody(response: Response): Promise<unknown> {
@@ -567,6 +575,10 @@ async function requestJson<TResponse>(
       }
     }
 
+    if (response.ok) {
+      await persistRefreshHeader(config, response);
+    }
+
     if (isEnvelope<TResponse>(payload)) {
       return payload;
     }
@@ -587,12 +599,6 @@ async function requestJson<TResponse>(
     }
 
     if (response.ok) {
-      // 中文注释：滑动过期会话续期，拦截X-Refresh-Token响应头并覆盖存储
-      const refreshToken = response.headers.get("x-refresh-token") || response.headers.get("X-Refresh-Token");
-      if (refreshToken) {
-        await config.onRefreshToken?.(refreshToken);
-      }
-
       return {
         success: true,
         data: payload as TResponse,

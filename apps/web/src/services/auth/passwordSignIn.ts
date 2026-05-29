@@ -1,5 +1,5 @@
 import { kkWebApiClient } from "../api/kkApiClient.ts";
-import { setStoredKkApiAccessToken } from "../api/authAccessToken.ts";
+import { setStoredKkApiAccessToken, setStoredKkApiRefreshToken } from "../api/authAccessToken.ts";
 import { emitAuthSessionChange } from "./authSessionEvents.ts";
 import { updateRuntimeAuthStateFromProfile } from "./runtimeAuthState.ts";
 
@@ -40,6 +40,7 @@ export async function signInWithPasswordWithFallback(
   }
 
   setStoredKkApiAccessToken(response.data.accessToken);
+  setStoredKkApiRefreshToken(response.data.refreshToken);
   if (response.data.profile) {
     updateRuntimeAuthStateFromProfile(response.data.profile);
   }

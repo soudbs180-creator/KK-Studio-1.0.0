@@ -52,7 +52,28 @@ function getAllowedOrigins() {
 }
 
 function isLocalDevelopmentOrigin(origin) {
-  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(String(origin || ''));
+  const normalizedOrigin = String(origin || '').trim();
+  if (!normalizedOrigin) {
+    return false;
+  }
+
+  try {
+    const url = new URL(normalizedOrigin);
+    const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    const isLoopback = hostname === 'localhost' || hostname === '::1' || hostname.startsWith('127.');
+    const isPrivateNetwork =
+      /^10\./.test(hostname)
+      || /^192\.168\./.test(hostname)
+      || /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+      || /^100\.(6[4-9]|[7-9]\d|1[0-1]\d|12[0-7])\./.test(hostname)
+      || /^169\.254\./.test(hostname);
+
+    // 简体中文注释：手机浏览器调试常从局域网 IP 访问桌面开发机，只在非生产环境放行私网 Origin。
+    return (url.protocol === 'http:' || url.protocol === 'https:')
+      && (isLoopback || (process.env.NODE_ENV !== 'production' && isPrivateNetwork));
+  } catch {
+    return false;
+  }
 }
 
 function captureRawJsonBody(req, _res, buf) {

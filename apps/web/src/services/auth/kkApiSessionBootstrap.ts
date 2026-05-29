@@ -5,7 +5,10 @@ import {
   type LogoutResponseDto,
 } from "../../../../../packages/shared/src/index.ts";
 import {
+  clearStoredKkApiAuthTokens,
+  getStoredKkApiRefreshToken,
   setStoredKkApiAccessToken,
+  setStoredKkApiRefreshToken,
 } from "../api/authAccessToken.ts";
 import { resolveKkApiBaseUrl } from "../api/kkApiBaseUrl.ts";
 import { emitAuthSessionChange } from "./authSessionEvents.ts";
@@ -22,6 +25,9 @@ const cookieSessionClient = createKkApiClient({
 
 export function applyHostedSessionToRuntime(session: AuthSessionDto): RuntimeAuthState {
   setStoredKkApiAccessToken(session.accessToken);
+  if (session.refreshToken) {
+    setStoredKkApiRefreshToken(session.refreshToken);
+  }
   const nextState = updateRuntimeAuthStateFromProfile(session.profile);
   emitAuthSessionChange({
     hasSession: true,
@@ -34,7 +40,7 @@ export function applyHostedSessionToRuntime(session: AuthSessionDto): RuntimeAut
 }
 
 export function clearHostedSessionRuntime(): RuntimeAuthState {
-  setStoredKkApiAccessToken(undefined);
+  clearStoredKkApiAuthTokens();
   const nextState = clearPersistedRuntimeAuthState();
   emitAuthSessionChange({
     hasSession: false,
@@ -61,7 +67,9 @@ export async function restoreHostedSessionFromServer(): Promise<AuthSessionDto |
 }
 
 export async function refreshHostedSessionFromServer(): Promise<ApiResponse<AuthSessionDto>> {
-  return cookieSessionClient.refreshSession({});
+  return cookieSessionClient.refreshSession({
+    refreshToken: getStoredKkApiRefreshToken(),
+  });
 }
 
 export async function logoutHostedSessionFromServer(): Promise<ApiResponse<LogoutResponseDto>> {

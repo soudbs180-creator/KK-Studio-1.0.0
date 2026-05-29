@@ -1,7 +1,11 @@
 import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
 
 import { clearStoredAdminSession } from "../services/api/adminSession";
-import { getStoredKkApiAccessToken, setStoredKkApiAccessToken } from "../services/api/authAccessToken";
+import {
+  clearStoredKkApiAuthTokens,
+  getStoredKkApiAccessToken,
+  refreshPreferredKkApiAccessToken,
+} from "../services/api/authAccessToken";
 import { isHostedRuntime, kkWebApiClient, shouldUseLegacyWebApiFallback } from "../services/api/kkApiClient";
 import {
   emitAuthSessionChange,
@@ -113,7 +117,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setAdminLevel(res.adminLevel);
           }
         })
-        .catch((err) => {
+        .catch(async (err) => {
+          const refreshedToken = await refreshPreferredKkApiAccessToken().catch(() => undefined);
+          if (refreshedToken && refreshedToken !== sessionAccessToken) {
+            try {
+              const res = await getUserMe(refreshedToken);
+              if (res && typeof res.adminLevel === "number") {
+                setAdminLevel(res.adminLevel);
+                return;
+              }
+            } catch {
+              // 简体中文注释：管理员等级只影响入口展示，续期后仍失败时回落为普通用户避免误放权。
+            }
+          }
+
           console.error("[AuthContext] Fetch adminLevel failed:", err);
           setAdminLevel(0);
         });
@@ -260,6 +277,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (isSessionRecoveryAuthErrorCode(response.error?.code)) {
+          const refreshedToken = await refreshPreferredKkApiAccessToken().catch(() => undefined);
+          if (refreshedToken && refreshedToken !== accessToken) {
+            await restoreSessionFromStoredToken(refreshedToken);
+            return;
+          }
+
           clearHostedSession();
           return;
         }
@@ -327,7 +350,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAuthActionLoading(true);
 
         try {
-          setStoredKkApiAccessToken(undefined);
+          clearStoredKkApiAuthTokens();
           clearStoredAdminSession();
           setSessionRecoveryBlockedBySignOut(false);
           setSessionRecoveryWarning(null);

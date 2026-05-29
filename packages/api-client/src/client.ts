@@ -1,17 +1,132 @@
 // packages/api-client/src/client.ts
-// 职责：创建统一的 axios 实例，自动处理鉴权 token 和错误响应
+// 职责：创建统一的 axios 实例，并在浏览器端安全处理 JWT 注入与滑动续期。
 
 import axios from 'axios';
 
-// 声明全局变量以避免 import.meta 编译错误 (部分旧版 Webpack/CRA 的兼容处理)
+const accessTokenStorageKey = 'kk.api.access_token';
+const browserCookieMaxAgeSeconds = 180 * 24 * 60 * 60;
+
+let inMemoryAccessToken: string | undefined;
+
 const getBaseURL = (): string => {
-  // 中文注释：在浏览器环境下，优先从环境变量读取 VITE_PUBLIC_API_BASE_URL，若无则使用默认的 /api 路径转发给 Netlify
   if (typeof window !== 'undefined') {
     return (import.meta.env?.VITE_PUBLIC_API_BASE_URL as string) ?? '/api';
   }
-  // 中文注释：在移动端或Node环境，读取 EXPO_PUBLIC_API_BASE_URL
+
   return (process.env.EXPO_PUBLIC_API_BASE_URL) || '/api';
 };
+
+function getBrowserStorage(kind: 'localStorage' | 'sessionStorage'): Storage | undefined {
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+
+  try {
+    return window[kind];
+  } catch {
+    return undefined;
+  }
+}
+
+function readStorageItem(storage: Storage | undefined, key: string): string | undefined {
+  try {
+    return storage?.getItem(key) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeStorageItem(storage: Storage | undefined, key: string, value: string): void {
+  try {
+    storage?.setItem(key, value);
+  } catch {
+    // 简体中文注释：移动端隐私模式可能禁止写入 storage，继续依赖 cookie 与内存兜底。
+  }
+}
+
+function removeStorageItem(storage: Storage | undefined, key: string): void {
+  try {
+    storage?.removeItem(key);
+  } catch {
+    // 简体中文注释：退出或失效清理失败不能反向打断请求错误处理。
+  }
+}
+
+function readCookieItem(key: string): string | undefined {
+  if (typeof document === 'undefined' || typeof document.cookie !== 'string') {
+    return undefined;
+  }
+
+  const encodedKey = encodeURIComponent(key);
+  const pair = document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${encodedKey}=`));
+
+  if (!pair) {
+    return undefined;
+  }
+
+  try {
+    return decodeURIComponent(pair.slice(encodedKey.length + 1)) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeCookieItem(key: string, value: string): void {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  try {
+    const secureSuffix = typeof window !== 'undefined' && window.location?.protocol === 'https:'
+      ? '; Secure'
+      : '';
+    document.cookie = `${encodeURIComponent(key)}=${encodeURIComponent(value)}; Max-Age=${browserCookieMaxAgeSeconds}; Path=/; SameSite=Lax${secureSuffix}`;
+  } catch {
+    // 简体中文注释：部分 WebView 会禁用 cookie 写入，当前页面仍可使用内存 token。
+  }
+}
+
+function removeCookieItem(key: string): void {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  try {
+    const secureSuffix = typeof window !== 'undefined' && window.location?.protocol === 'https:'
+      ? '; Secure'
+      : '';
+    document.cookie = `${encodeURIComponent(key)}=; Max-Age=0; Path=/; SameSite=Lax${secureSuffix}`;
+  } catch {
+    // 简体中文注释：清理 cookie 是尽力行为，避免在异常浏览器里造成二次错误。
+  }
+}
+
+function persistBrowserAccessToken(token: string): string {
+  inMemoryAccessToken = token;
+  writeStorageItem(getBrowserStorage('sessionStorage'), accessTokenStorageKey, token);
+  writeStorageItem(getBrowserStorage('localStorage'), accessTokenStorageKey, token);
+  writeCookieItem(accessTokenStorageKey, token);
+  return token;
+}
+
+function readBrowserAccessToken(): string | undefined {
+  const token = readStorageItem(getBrowserStorage('sessionStorage'), accessTokenStorageKey)
+    || readStorageItem(getBrowserStorage('localStorage'), accessTokenStorageKey)
+    || readCookieItem(accessTokenStorageKey)
+    || inMemoryAccessToken;
+
+  return token ? persistBrowserAccessToken(token) : undefined;
+}
+
+function clearBrowserAccessToken(): void {
+  inMemoryAccessToken = undefined;
+  removeStorageItem(getBrowserStorage('sessionStorage'), accessTokenStorageKey);
+  removeStorageItem(getBrowserStorage('localStorage'), accessTokenStorageKey);
+  removeCookieItem(accessTokenStorageKey);
+}
 
 function createClientRequestId(): string {
   const runtimeCrypto = globalThis.crypto;
@@ -25,48 +140,35 @@ export const apiClient = axios.create({
   baseURL: getBaseURL(),
   timeout: 30000,
   headers: {
-    // 请求头明确声明 UTF-8，防止中文乱码
     'Content-Type': 'application/json; charset=utf-8',
-    'Accept': 'application/json; charset=utf-8',
+    Accept: 'application/json; charset=utf-8',
   },
 });
 
-// 请求拦截器：每次请求自动附加 JWT token
 apiClient.interceptors.request.use(
   (config) => {
-    if (typeof window !== 'undefined') {
-      // 桌面端从 sessionStorage 或 localStorage 获取 token
-      const token = window.sessionStorage?.getItem('kk.api.access_token') || 
-                    window.localStorage?.getItem('kk.api.access_token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    } else {
-      // 移动端由前端代码显式通过设置 API Client 全局配置或使用 SecureStore
-      // 这里可以支持通过全局变量或局部覆盖来读取，稍后在移动端重构中补齐
+    const token = readBrowserAccessToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // 附加客户端 Request ID 以追踪限流与辅助排查
     if (!config.headers['X-Client-Request-Id']) {
       config.headers['X-Client-Request-Id'] = createClientRequestId();
     }
+
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
-// 响应拦截器：统一处理常见错误
 apiClient.interceptors.response.use(
   (response) => {
-    // 中文注释：滑动过期会话续期，拦截X-Refresh-Token响应头并覆盖本地Token存储
     const refreshToken = response.headers?.['x-refresh-token'] || response.headers?.['X-Refresh-Token'];
-    if (refreshToken && typeof window !== 'undefined') {
-      const storageKey = 'kk.api.access_token';
-      window.sessionStorage?.setItem(storageKey, refreshToken);
-      if (window.localStorage?.getItem(storageKey)) {
-        window.localStorage.setItem(storageKey, refreshToken);
+    if (refreshToken && typeof refreshToken === 'string') {
+      persistBrowserAccessToken(refreshToken);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kk-api-token-refreshed', { detail: { token: refreshToken } }));
       }
-      window.dispatchEvent(new CustomEvent('kk-api-token-refreshed', { detail: { token: refreshToken } }));
     }
     return response;
   },
@@ -75,11 +177,8 @@ apiClient.interceptors.response.use(
       const { status, data } = error.response;
       if (status === 401) {
         console.error('[api-client] 授权过期或未登录，正在触发重定向...');
+        clearBrowserAccessToken();
         if (typeof window !== 'undefined') {
-          // 清除本地过期 token
-          window.sessionStorage?.removeItem('kk.api.access_token');
-          window.localStorage?.removeItem('kk.api.access_token');
-          // 广播授权过期事件，通知前端 UI 跳转登录页
           window.dispatchEvent(new CustomEvent('kk-api-unauthorized'));
         }
       } else if (status === 429) {
@@ -89,5 +188,5 @@ apiClient.interceptors.response.use(
       }
     }
     return Promise.reject(error);
-  }
+  },
 );

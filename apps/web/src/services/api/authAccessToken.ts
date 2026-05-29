@@ -10,38 +10,13 @@ import {
 } from "../auth/kkApiSessionBootstrap.ts";
 
 const accessTokenStorageKey = "kk.api.access_token";
+const refreshTokenStorageKey = "kk.api.refresh_token";
+const browserCookieMaxAgeSeconds = 180 * 24 * 60 * 60;
+
 let inMemoryCompatibilityAccessToken: string | undefined;
+let inMemoryCompatibilityRefreshToken: string | undefined;
 let stopAccessTokenSessionSync: (() => void) | null = null;
 let hostedRefreshPromise: Promise<string | undefined> | null = null;
-
-function normalizeHostname(value: unknown): string | undefined {
-  const normalized = typeof value === "string" ? value.trim().toLowerCase().replace(/^\[|\]$/g, "") : "";
-  return normalized || undefined;
-}
-
-function isLoopbackHostname(hostname: string | undefined): boolean {
-  const normalized = normalizeHostname(hostname);
-  return normalized === "localhost"
-    || normalized === "::1"
-    || Boolean(normalized && normalized.startsWith("127."));
-}
-
-function isPrivateNetworkHostname(hostname: string | undefined): boolean {
-  const normalized = normalizeHostname(hostname);
-  return Boolean(
-    normalized
-    && (
-      /^10\./.test(normalized)
-      || /^192\.168\./.test(normalized)
-      || /^172\.(1[6-9]|2\d|3[0-1])\./.test(normalized)
-    )
-  );
-}
-
-function shouldPersistAccessTokenDurably(): boolean {
-  // 简体中文：为保证用户在任何域名/公网 IP 下刷新或重新打开页面均不需要重新登录，一律在 localStorage 中持久化 Access Token
-  return true;
-}
 
 function getSessionStorage(): Storage | undefined {
   if (typeof window === "undefined") {
@@ -67,80 +42,145 @@ function getLocalStorage(): Storage | undefined {
   }
 }
 
-function migrateLegacyLocalStorageToken(): string | undefined {
-  const sessionStorage = getSessionStorage();
-  const localStorage = getLocalStorage();
-  const legacyToken = localStorage?.getItem(accessTokenStorageKey) || undefined;
+function readStorageItem(storage: Storage | undefined, key: string): string | undefined {
+  try {
+    return storage?.getItem(key) || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
-  if (!legacyToken) {
+function writeStorageItem(storage: Storage | undefined, key: string, value: string): void {
+  try {
+    storage?.setItem(key, value);
+  } catch {
+    // 简体中文注释：部分移动浏览器在隐私模式下会暴露 storage 对象但禁止写入，失败时交给 cookie 与内存兜底。
+  }
+}
+
+function removeStorageItem(storage: Storage | undefined, key: string): void {
+  try {
+    storage?.removeItem(key);
+  } catch {
+    // 简体中文注释：清理动作不应因为某个浏览器禁用 storage 而阻断退出登录。
+  }
+}
+
+function readCookieItem(key: string): string | undefined {
+  if (typeof document === "undefined" || typeof document.cookie !== "string") {
     return undefined;
   }
 
-  localStorage?.removeItem(accessTokenStorageKey);
-  sessionStorage?.setItem(accessTokenStorageKey, legacyToken);
-  inMemoryCompatibilityAccessToken = legacyToken;
-  return legacyToken;
-}
+  const encodedKey = encodeURIComponent(key);
+  const pair = document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${encodedKey}=`));
 
-function syncDurableTokenIntoSession(token: string | undefined): string | undefined {
-  if (!token) {
+  if (!pair) {
     return undefined;
   }
 
-  const sessionStorage = getSessionStorage();
-  if (sessionStorage?.getItem(accessTokenStorageKey) !== token) {
-    sessionStorage?.setItem(accessTokenStorageKey, token);
+  try {
+    return decodeURIComponent(pair.slice(encodedKey.length + 1)) || undefined;
+  } catch {
+    return undefined;
   }
-  inMemoryCompatibilityAccessToken = token;
-  return token;
 }
 
-export function getStoredKkApiAccessToken(): string | undefined {
-  const sessionStorage = getSessionStorage();
-  const localStorage = getLocalStorage();
-
-  if (shouldPersistAccessTokenDurably()) {
-    const durableToken = localStorage?.getItem(accessTokenStorageKey)
-      || sessionStorage?.getItem(accessTokenStorageKey)
-      || undefined;
-    if (durableToken) {
-      localStorage?.setItem(accessTokenStorageKey, durableToken);
-      return syncDurableTokenIntoSession(durableToken);
-    }
-  } else {
-    const sessionToken = sessionStorage?.getItem(accessTokenStorageKey) || undefined;
-    if (sessionToken) {
-      inMemoryCompatibilityAccessToken = sessionToken;
-      return sessionToken;
-    }
-
-    const migratedToken = migrateLegacyLocalStorageToken();
-    if (migratedToken) {
-      return migratedToken;
-    }
+function writeCookieItem(key: string, value: string): void {
+  if (typeof document === "undefined") {
+    return;
   }
 
-  return inMemoryCompatibilityAccessToken;
+  try {
+    const secureSuffix = typeof window !== "undefined" && window.location?.protocol === "https:"
+      ? "; Secure"
+      : "";
+    document.cookie = `${encodeURIComponent(key)}=${encodeURIComponent(value)}; Max-Age=${browserCookieMaxAgeSeconds}; Path=/; SameSite=Lax${secureSuffix}`;
+  } catch {
+    // 简体中文注释：旧版 WebView 可能禁止写 cookie，仍保留内存快照供当前页面继续使用。
+  }
 }
 
-export function setStoredKkApiAccessToken(token?: string) {
-  const sessionStorage = getSessionStorage();
-  const localStorage = getLocalStorage();
+function removeCookieItem(key: string): void {
+  if (typeof document === "undefined") {
+    return;
+  }
 
-  if (!token) {
-    inMemoryCompatibilityAccessToken = undefined;
-    sessionStorage?.removeItem(accessTokenStorageKey);
-    localStorage?.removeItem(accessTokenStorageKey);
+  try {
+    const secureSuffix = typeof window !== "undefined" && window.location?.protocol === "https:"
+      ? "; Secure"
+      : "";
+    document.cookie = `${encodeURIComponent(key)}=; Max-Age=0; Path=/; SameSite=Lax${secureSuffix}`;
+  } catch {
+    // 简体中文注释：退出登录时尽力清理 cookie，失败也不能影响前端状态回落。
+  }
+}
+
+function readMemoryToken(key: string): string | undefined {
+  return key === refreshTokenStorageKey
+    ? inMemoryCompatibilityRefreshToken
+    : inMemoryCompatibilityAccessToken;
+}
+
+function writeMemoryToken(key: string, token?: string): void {
+  if (key === refreshTokenStorageKey) {
+    inMemoryCompatibilityRefreshToken = token;
     return;
   }
 
   inMemoryCompatibilityAccessToken = token;
-  sessionStorage?.setItem(accessTokenStorageKey, token);
-  if (shouldPersistAccessTokenDurably()) {
-    localStorage?.setItem(accessTokenStorageKey, token);
-  } else {
-    localStorage?.removeItem(accessTokenStorageKey);
+}
+
+function syncTokenToAllBrowserStores(key: string, token: string): string {
+  writeMemoryToken(key, token);
+  writeStorageItem(getSessionStorage(), key, token);
+  writeStorageItem(getLocalStorage(), key, token);
+  writeCookieItem(key, token);
+  return token;
+}
+
+function readStoredBrowserToken(key: string): string | undefined {
+  const token = readStorageItem(getSessionStorage(), key)
+    || readStorageItem(getLocalStorage(), key)
+    || readCookieItem(key)
+    || readMemoryToken(key);
+
+  return token ? syncTokenToAllBrowserStores(key, token) : undefined;
+}
+
+function setStoredBrowserToken(key: string, token?: string): void {
+  if (!token) {
+    writeMemoryToken(key, undefined);
+    removeStorageItem(getSessionStorage(), key);
+    removeStorageItem(getLocalStorage(), key);
+    removeCookieItem(key);
+    return;
   }
+
+  syncTokenToAllBrowserStores(key, token);
+}
+
+export function getStoredKkApiAccessToken(): string | undefined {
+  return readStoredBrowserToken(accessTokenStorageKey);
+}
+
+export function setStoredKkApiAccessToken(token?: string): void {
+  setStoredBrowserToken(accessTokenStorageKey, token);
+}
+
+export function getStoredKkApiRefreshToken(): string | undefined {
+  return readStoredBrowserToken(refreshTokenStorageKey);
+}
+
+export function setStoredKkApiRefreshToken(token?: string): void {
+  setStoredBrowserToken(refreshTokenStorageKey, token);
+}
+
+export function clearStoredKkApiAuthTokens(): void {
+  setStoredKkApiAccessToken(undefined);
+  setStoredKkApiRefreshToken(undefined);
 }
 
 function syncFromLatestAuthSessionChange(): string | undefined {
@@ -150,8 +190,12 @@ function syncFromLatestAuthSessionChange(): string | undefined {
   }
 
   if (!latestSessionChange.hasSession || latestSessionChange.isTempUser) {
-    setStoredKkApiAccessToken(undefined);
+    clearStoredKkApiAuthTokens();
     return undefined;
+  }
+
+  if (latestSessionChange.refreshToken) {
+    setStoredKkApiRefreshToken(latestSessionChange.refreshToken);
   }
 
   if (latestSessionChange.accessToken) {
@@ -229,19 +273,25 @@ export function startKkApiAccessTokenSessionSync(): () => void {
     return stopAccessTokenSessionSync;
   }
 
-  // 中文注释：监听底层的Token滑动刷新派发事件并覆盖内存与缓存Token，实现前端全状态同步
   const handleTokenRefreshed = (event: Event) => {
     const detail = (event as CustomEvent)?.detail;
     if (detail?.token) {
       setStoredKkApiAccessToken(detail.token);
+    }
+    if (detail?.refreshToken) {
+      setStoredKkApiRefreshToken(detail.refreshToken);
     }
   };
   window.addEventListener("kk-api-token-refreshed", handleTokenRefreshed);
 
   const unsubscribe = subscribeAuthSessionChange((detail) => {
     if (!detail.hasSession || detail.isTempUser) {
-      setStoredKkApiAccessToken(undefined);
+      clearStoredKkApiAuthTokens();
       return;
+    }
+
+    if (detail.refreshToken) {
+      setStoredKkApiRefreshToken(detail.refreshToken);
     }
 
     if (detail.accessToken) {

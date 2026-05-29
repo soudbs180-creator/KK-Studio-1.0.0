@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 
-import { setStoredKkApiAccessToken } from '@/services/api/authAccessToken';
+import { setStoredKkApiAccessToken, setStoredKkApiRefreshToken } from '@/services/api/authAccessToken';
 import { kkWebApiClient } from '@/services/api/kkApiClient';
 import { emitAuthSessionChange } from '@/services/auth/authSessionEvents';
 import { restoreHostedSessionFromServer } from '@/services/auth/kkApiSessionBootstrap.ts';
@@ -34,6 +34,7 @@ async function hydrateRuntimeProfileFromHash(hashParams: URLSearchParams): Promi
   }
 
   setStoredKkApiAccessToken(accessToken);
+  setStoredKkApiRefreshToken(refreshToken);
   const response = await kkWebApiClient.getProfile({ accessToken });
   if (!response.success) {
     return false;

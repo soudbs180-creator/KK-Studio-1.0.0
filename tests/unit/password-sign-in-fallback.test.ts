@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 
-import { getStoredKkApiAccessToken, setStoredKkApiAccessToken } from '../../apps/web/src/services/api/authAccessToken.ts';
+import {
+  getStoredKkApiAccessToken,
+  getStoredKkApiRefreshToken,
+  setStoredKkApiAccessToken,
+  setStoredKkApiRefreshToken,
+} from '../../apps/web/src/services/api/authAccessToken.ts';
 import { kkWebApiClient } from '../../apps/web/src/services/api/kkApiClient.ts';
 import {
   signInWithPasswordWithFallback,
@@ -17,6 +22,7 @@ describe('password sign-in fallback', () => {
     globalThis.fetch = originalFetch;
     kkWebApiClient.login = originalLogin;
     setStoredKkApiAccessToken(undefined);
+    setStoredKkApiRefreshToken(undefined);
     persistRuntimeAuthState(createDefaultRuntimeAuthState());
   });
 
@@ -24,6 +30,7 @@ describe('password sign-in fallback', () => {
     globalThis.fetch = originalFetch;
     kkWebApiClient.login = originalLogin;
     setStoredKkApiAccessToken(undefined);
+    setStoredKkApiRefreshToken(undefined);
     persistRuntimeAuthState(originalRuntimeState);
   });
 
@@ -56,6 +63,7 @@ describe('password sign-in fallback', () => {
       success: true,
       data: {
         accessToken: 'access-token-1',
+        refreshToken: 'refresh-token-1',
         expiresIn: 3600,
         sessionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         profile: {
@@ -84,6 +92,7 @@ describe('password sign-in fallback', () => {
     assert.equal(result.error, null);
     assert.equal(result.usedProxy, false);
     assert.equal(getStoredKkApiAccessToken(), 'access-token-1');
+    assert.equal(getStoredKkApiRefreshToken(), 'refresh-token-1');
     assert.equal(getLatestRuntimeAuthState().user.id, 'user-1');
   });
 

@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { afterEach, describe, test } from "node:test";
 
 import {
+  getStoredKkApiRefreshToken,
   getPreferredKkApiAccessToken,
   getStoredKkApiAccessToken,
+  setStoredKkApiRefreshToken,
   refreshPreferredKkApiAccessToken,
   setStoredKkApiAccessToken,
   syncStoredKkApiAccessTokenWithHostedSession,
@@ -60,6 +62,7 @@ function installBrowserStorage(origin?: string) {
 describe("auth access token compatibility storage", () => {
   afterEach(() => {
     setStoredKkApiAccessToken(undefined);
+    setStoredKkApiRefreshToken(undefined);
     emitAuthSessionChange({
       hasSession: false,
       userId: null,
@@ -71,7 +74,7 @@ describe("auth access token compatibility storage", () => {
     delete (globalThis as typeof globalThis & { window?: unknown }).window;
   });
 
-  test("legacy localStorage token is migrated into session storage and cleared locally", () => {
+  test("stored localStorage token is mirrored into session storage for phone browser reload recovery", () => {
     const { sessionStorage, localStorage } = installBrowserStorage();
     localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, "legacy-token");
 
@@ -79,7 +82,7 @@ describe("auth access token compatibility storage", () => {
 
     assert.equal(token, "legacy-token");
     assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "legacy-token");
-    assert.equal(localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), null);
+    assert.equal(localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "legacy-token");
   });
 
   test("preferred KK API token follows the latest runtime auth session event and refreshes compatibility storage", async () => {
@@ -98,7 +101,53 @@ describe("auth access token compatibility storage", () => {
 
     assert.equal(token, "kkapi-token");
     assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "kkapi-token");
-    assert.equal(localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), null);
+    assert.equal(localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "kkapi-token");
+  });
+
+  test("refresh token is stored durably and submitted when hosted cookie refresh needs a fallback", async () => {
+    const { sessionStorage, localStorage } = installBrowserStorage("https://app.example.com");
+    let refreshBody: { refreshToken?: string } | undefined;
+
+    globalThis.fetch = async (_input, init) => {
+      refreshBody = JSON.parse(String(init?.body || "{}"));
+      return new Response(JSON.stringify({
+        success: true,
+        data: {
+          accessToken: "fresh-access-token",
+          refreshToken: "fresh-refresh-token",
+          expiresIn: 3600,
+          sessionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          profile: {
+            id: "user-1",
+            email: "fresh@example.com",
+            nickname: "Fresh User",
+            role: "user",
+            status: "active",
+            createdAt: new Date(0).toISOString(),
+            updatedAt: new Date(0).toISOString(),
+          },
+        },
+        meta: {
+          requestId: "req-refresh-with-token",
+          timestamp: new Date().toISOString(),
+        },
+      }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+        },
+      });
+    };
+
+    setStoredKkApiRefreshToken("stored-refresh-token");
+
+    const token = await refreshPreferredKkApiAccessToken();
+
+    assert.equal(refreshBody?.refreshToken, "stored-refresh-token");
+    assert.equal(token, "fresh-access-token");
+    assert.equal(getStoredKkApiRefreshToken(), "fresh-refresh-token");
+    assert.equal(sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "fresh-access-token");
+    assert.equal(localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY), "fresh-access-token");
   });
 
   test("local runtime stores the KK API token durably so refresh recovery keeps the user signed in", () => {

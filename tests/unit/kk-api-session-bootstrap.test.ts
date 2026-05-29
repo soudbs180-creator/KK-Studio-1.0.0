@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 
-import { getStoredKkApiAccessToken, setStoredKkApiAccessToken } from "../../apps/web/src/services/api/authAccessToken.ts";
+import {
+  getStoredKkApiAccessToken,
+  setStoredKkApiAccessToken,
+  setStoredKkApiRefreshToken,
+} from "../../apps/web/src/services/api/authAccessToken.ts";
 import {
   logoutHostedSessionFromServer,
   restoreHostedSessionFromServer,
@@ -79,6 +83,7 @@ function installHostedWindow(origin = "https://app.example.com") {
 afterEach(() => {
   globalThis.fetch = originalFetch;
   setStoredKkApiAccessToken(undefined);
+  setStoredKkApiRefreshToken(undefined);
   persistRuntimeAuthState(createDefaultRuntimeAuthState());
   delete (globalThis as typeof globalThis & { window?: unknown }).window;
 });
