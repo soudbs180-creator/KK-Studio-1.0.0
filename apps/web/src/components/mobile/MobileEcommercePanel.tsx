@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useLocale } from '../../context/LocaleContext';
 import { 
   Sparkles, Upload, X, Trash2, Image as ImageIcon, Sparkle, 
   ChevronLeft, ChevronRight, AlertCircle, RefreshCw, Layers, CheckCircle2, Play 
@@ -104,9 +105,70 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
   onRemoveEcommerceProductFile,
   onRemoveEcommerceExtraReferenceFile,
 }) => {
+  const { pick } = useLocale();
   const [prompt, setPrompt] = useState(config.prompt || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInspirationOpen, setIsInspirationOpen] = useState(false);
+
+  const localizedInspirationTags = useMemo(() => [
+    {
+      emoji: '💄',
+      title: pick('美妆奢品 · 极简火山岩', 'Luxury Cosmetics · Minimalist Volcanic Rock'),
+      text: pick(
+        '高端极简美妆护肤品瓶子，稳固摆放在浅米色火山岩石上，背景是海滩清晨的日光，柔和细腻的逆光，极简深景深，商业摄影大片',
+        'High-end minimalist cosmetics skincare bottle, stably placed on light beige volcanic rock, background morning sunlight on beach, soft and delicate backlight, minimalist deep depth of field, commercial photography blockbuster'
+      )
+    },
+    {
+      emoji: '🥩',
+      title: pick('生鲜食品 · 暖阳原木', 'Fresh Food · Warm Sun Log'),
+      text: pick(
+        '精致生鲜食品摆放在浅色原木托盘上，旁边散落迷迭香和干松果，背景是晨光微风，自然呼吸感，温暖柔和，高级食品大片',
+        'Exquisite fresh food placed on a light-colored wooden tray, scattered rosemary and pine cones beside it, background morning light breeze, natural breathable atmosphere, warm and soft, premium food blockbuster'
+      )
+    },
+    {
+      emoji: '💻',
+      title: pick('3C数码 · 科技霓虹', '3C Digital · Tech Neon'),
+      text: pick(
+        '智能科技产品悬浮在暗色拉丝金属底座上，背景是深邃的科幻未来感，冰川水滴折射，蓝色科技霓虹光束，高清晰边缘高光',
+        'Smart tech product floating on a dark brushed metal base, deep sci-fi futuristic background, glacier water droplets refraction, blue tech neon light beam, high-definition edge highlights'
+      )
+    },
+    {
+      emoji: '💍',
+      title: pick('珠宝奢饰 · 质感丝绸', 'Jewelry Luxury · Textured Silk'),
+      text: pick(
+        '奢华精美珠宝首饰，静置在米白色真丝折痕缎面上，侧方Studio专业射光，边缘锋利的高光质感，微风轻微褶皱，高贵气场',
+        'Luxury exquisite jewelry, resting on cream-white silk creased satin surface, side studio professional spotlight, sharp edge highlight texture, gentle breeze light folds, noble aura'
+      )
+    },
+    {
+      emoji: '🏺',
+      title: pick('家居日用 · 百叶窗影', 'Home & Living · Shutter Shadow'),
+      text: pick(
+        '简约家居日用品摆放在雅致大理意石台面上，百叶窗斜射过来的斑驳温暖晨光投影，树影摇曳，慵懒宁静，极简北欧生活质感',
+        'Minimalist home daily necessities placed on elegant marble countertop, dappled warm morning light shadow projected from shutters, swaying tree shadows, lazy and quiet, minimalist Nordic living texture'
+      )
+    },
+    {
+      emoji: '🥤',
+      title: pick('夏日饮品 · 冰爆水花', 'Summer Drink · Ice Water Splash'),
+      text: pick(
+        '夏日清爽饮品玻璃瓶身凝结晶莹冰润水滴，半沉浸在波光粼粼的淡蓝色冰泉水波中，阳光水波折射，动态小飞溅水花，冰爽动感',
+        'Summer refreshing drink glass bottle condensed with crystal ice dew drops, semi-submerged in sparkling light blue ice spring water, sun water refraction, dynamic small splashing water splash, cool and dynamic'
+      )
+    }
+  ], [pick]);
+
+  const localizedRatioList = useMemo(() => [
+    { ratio: '1:1', title: pick('1:1 正方形, 头像', '1:1 Square, Avatar'), desc: pick('社交媒体主图、主商品卡片首选', 'First choice for social media main images and product cards'), w: 'w-5.5', h: 'h-5.5' },
+    { ratio: '2:3', title: pick('2:3 社交媒体, 自拍', '2:3 Social Media, Selfie'), desc: pick('小红书、Pinterest 竖屏引流黄金比例', 'Golden ratio for Xiaohongshu, Pinterest vertical portrait traffic'), w: 'w-4.5', h: 'h-6.5' },
+    { ratio: '3:4', title: pick('3:4 经典比例, 拍照', '3:4 Classic Ratio, Photo'), desc: pick('电商及高端服饰展示的高频高质比例', 'High-frequency and high-quality ratio for e-commerce and premium apparel'), w: 'w-5', h: 'h-6.5' },
+    { ratio: '4:3', title: pick('4:3 文章配图, 插画', '4:3 Article Image, Illustration'), desc: pick('宽屏景观、横版商品或说明配图', 'Widescreen landscapes, horizontal products or illustration images'), w: 'w-6.5', h: 'h-5' },
+    { ratio: '9:16', title: pick('9:16 手机壁纸, 人像', '9:16 Phone Wallpaper, Portrait'), desc: pick('垂直手机全屏故事或海报宣传画面', 'Vertical full screen story or poster promotion screen'), w: 'w-4', h: 'h-7' },
+    { ratio: '16:9', title: pick('16:9 桌面壁纸, 风景', '16:9 Desktop Wallpaper, Landscape'), desc: pick('电影感宽荧幕，适用于网页横幅大图', 'Cinematic widescreen, suitable for web homepage banner images'), w: 'w-7.5', h: 'h-4.5' },
+  ], [pick]);
   
   // Carousel 视图焦点卡片索引
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
@@ -161,7 +223,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
   // 灵感模板填词
   const handleSelectInspiration = (text: string, title: string) => {
     setPrompt(text);
-    notify.success('已填入灵感词', `已选择“${title}”场景风格`);
+    notify.success(pick('已填入灵感词', 'Inspiration loaded'), pick(`已选择“${title}”场景风格`, `Selected style "${title}"`));
     setIsInspirationOpen(false); // 选择后收纳
   };
 
@@ -212,7 +274,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
               updateTaskStatus(curIdx, { status: 'success', url: result.url });
               success = true;
             } else {
-              throw new Error('生图接口未返回有效 url');
+              throw new Error(pick('生图接口未返回有效 url', 'Generation interface failed to return a valid URL'));
             }
           } catch (err: any) {
             finalError = err;
@@ -227,7 +289,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
         if (!success) {
           updateTaskStatus(curIdx, { 
             status: 'error', 
-            errorMsg: finalError instanceof Error ? finalError.message : '生成失败，请重试'
+            errorMsg: finalError instanceof Error ? finalError.message : pick('生成失败，请重试', 'Generation failed, please try again')
           });
         }
       }
@@ -249,7 +311,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
     }
 
     if (ecommerceProductFiles.length === 0) {
-      notify.warning('无法发起生图', '请先上传您的产品主体图 (左侧必填)');
+      notify.warning(pick('无法发起生图', 'Cannot generate image'), pick('请先上传您的产品主体图 (左侧必填)', 'Please upload your product image first (required)'));
       return;
     }
 
@@ -265,7 +327,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
           const resultStr = reader.result as string;
           const match = resultStr.match(/^data:(.+);base64,(.+)$/);
           if (match) resolve({ mimeType: match[1], data: match[2] });
-          else reject(new Error('图片格式不兼容'));
+          else reject(new Error(pick('图片格式不兼容', 'Incompatible image format')));
         };
         reader.onerror = () => reject(reader.error);
         reader.readAsDataURL(file);
@@ -290,7 +352,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
         });
       }
     } catch (readErr: any) {
-      notify.error('参考图读取失败', readErr?.message || '请检查上传文件');
+      notify.error(pick('参考图读取失败', 'Failed to read reference image'), readErr?.message || pick('请检查上传文件', 'Please check uploaded file'));
       setIsSubmitting(false);
       setIsAnalyzingPrompt(false);
       return;
@@ -347,7 +409,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
         throw new Error('AI 返回的数据格式不符合规范');
       }
       
-      notify.success('AI 规划就绪', `成功为 ${batchCount} 张图片规划了差异化电商卖点！`);
+      notify.success(pick('AI 规划就绪', 'AI Plan Ready'), pick(`成功为 ${batchCount} 张图片规划了差异化电商卖点！`, `Successfully planned selling points for ${batchCount} images!`));
 
     } catch (aiErr) {
       console.warn('[LLM Matrix Failed] 智能分配出错，启动常规平级生图兜底', aiErr);
@@ -378,7 +440,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
     // 4. 正式启动并发队列
     try {
       await executeTasksInQueue(initialTasks, referenceImages);
-      notify.success('批量生成结束', '所有电商生图卡片已按并发调度逻辑出图完毕！');
+      notify.success(pick('批量生成结束', 'Batch Generation Finished'), pick('所有电商生图卡片已按并发调度逻辑出图完毕！', 'All e-commerce images generated successfully!'));
     } catch (err: any) {
       console.error('队列调度发生意外错误', err);
     } finally {
@@ -408,19 +470,19 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
       <div className="absolute bottom-[-180px] left-1/4 w-[320px] h-[320px] rounded-full bg-gradient-to-br from-[#FF9966]/4 to-[#FF5E62]/8 blur-[90px] pointer-events-none z-0" />
 
       {/* 顶部 Header，毛玻璃拟态，高度精准锁定 */}
-      <div className="relative flex h-14 shrink-0 items-center justify-between border-b border-white/5 bg-[#0A0A0C]/60 px-4 backdrop-blur-2xl z-10">
+      <div className="relative flex h-14 shrink-0 items-center justify-between border-b border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-shell-bg)]/80 px-4 backdrop-blur-2xl z-10">
         <div className="flex items-center gap-2">
           <div className="p-1 rounded-lg bg-rose-500/10 text-rose-400 animate-pulse">
             <Layers size={16} />
           </div>
           <span className="text-sm font-semibold tracking-wide" style={{ fontFamily: '"HarmonyOS Sans SC", sans-serif' }}>
-            AI 智能电商极速看板
+            {pick('AI 智能电商极速看板', 'AI E-commerce Board')}
           </span>
         </div>
         <button 
           type="button" 
           onClick={onClose} 
-          className="p-1.5 text-[var(--text-secondary)] hover:text-white bg-white/[0.03] hover:bg-white/[0.08] active:scale-90 rounded-full transition-all"
+          className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--mobile-clay-surface-bg)]/60 hover:bg-[var(--mobile-clay-active-bg)] active:scale-90 rounded-full transition-all"
         >
           <X size={16} />
         </button>
@@ -436,17 +498,17 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
           <div className="col-span-6 space-y-1.5">
             <div className="text-[10px] font-bold text-[var(--text-secondary)] flex items-center gap-1.5" style={{ fontFamily: '"HarmonyOS Sans SC", sans-serif' }}>
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-              核心产品主体 (必填)
+              {pick('核心产品主体 (必填)', 'Product Body (Required)')}
             </div>
             {ecommerceProductFiles.length > 0 ? (
-              <div className="relative h-[85px] rounded-xl overflow-hidden border border-white/10 bg-white/[0.02] p-1.5 flex items-center gap-2">
+              <div className="relative h-[85px] rounded-xl overflow-hidden border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/80 p-1.5 flex items-center gap-2">
                 <img 
                   src={URL.createObjectURL(ecommerceProductFiles[0])} 
                   alt="产品主体" 
-                  className="w-12 h-12 object-cover rounded-lg shrink-0 border border-white/5" 
+                  className="w-12 h-12 object-cover rounded-lg shrink-0 border border-[var(--mobile-clay-border-strong)]" 
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="text-[11px] font-semibold text-white/90 truncate">{ecommerceProductFiles[0].name}</div>
+                  <div className="text-[11px] font-semibold text-[var(--text-primary)] truncate">{ecommerceProductFiles[0].name}</div>
                   <div className="text-[9px] text-[var(--text-tertiary)] mt-0.5">{(ecommerceProductFiles[0].size / 1024).toFixed(1)} KB</div>
                 </div>
                 <button 
@@ -458,10 +520,10 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
                 </button>
               </div>
             ) : (
-              <label className="group relative flex flex-col items-center justify-center h-[85px] rounded-xl border border-dashed border-white/10 bg-white/[0.01] hover:bg-white/[0.02] hover:border-rose-500/20 transition-all duration-300 active:scale-[0.98] cursor-pointer">
+              <label className="group relative flex flex-col items-center justify-center h-[85px] rounded-xl border border-dashed border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/60 hover:bg-[var(--mobile-clay-active-bg)] hover:border-rose-500/20 transition-all duration-300 active:scale-[0.98] cursor-pointer">
                 <Upload size={18} className="text-rose-400 mb-1 group-hover:scale-105 transition-transform" />
-                <span className="text-[10px] font-bold text-white/80">上传产品</span>
-                <span className="text-[8px] text-[var(--text-tertiary)] scale-90 mt-0.5">自动抠图融合</span>
+                <span className="text-[10px] font-bold text-[var(--text-primary)]/80">{pick('上传产品', 'Upload Product')}</span>
+                <span className="text-[8px] text-[var(--text-tertiary)] scale-90 mt-0.5">{pick('自动抠图融合', 'Auto background removal')}</span>
                 <input type="file" accept="image/*" className="hidden" onChange={handleProductUpload} />
               </label>
             )}
@@ -471,10 +533,10 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
           <div className="col-span-4 space-y-1.5">
             <div className="text-[10px] font-bold text-[var(--text-secondary)] flex items-center gap-1.5" style={{ fontFamily: '"HarmonyOS Sans SC", sans-serif' }}>
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-              氛围参考 (可选)
+              {pick('氛围参考 (可选)', 'Vibe Reference (Optional)')}
             </div>
             {ecommerceExtraReferenceFiles.length > 0 ? (
-              <div className="relative h-[85px] rounded-xl overflow-hidden border border-white/10 bg-white/[0.02] p-1.5 flex flex-col justify-between">
+              <div className="relative h-[85px] rounded-xl overflow-hidden border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/80 p-1.5 flex flex-col justify-between">
                 <div className="flex items-center gap-1.5">
                   <img 
                     src={URL.createObjectURL(ecommerceExtraReferenceFiles[0])} 
@@ -490,14 +552,14 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
                   onClick={() => onRemoveEcommerceExtraReferenceFile?.(0)}
                   className="w-full py-0.5 text-[9px] font-bold text-rose-400 bg-rose-500/5 hover:bg-rose-500/10 rounded-md active:scale-95 transition-all text-center"
                 >
-                  移除参考
+                  {pick('移除参考', 'Remove')}
                 </button>
               </div>
             ) : (
-              <label className="group relative flex flex-col items-center justify-center h-[85px] rounded-xl border border-dashed border-white/10 bg-white/[0.01] hover:bg-white/[0.02] hover:border-amber-500/20 transition-all duration-300 active:scale-[0.98] cursor-pointer">
+              <label className="group relative flex flex-col items-center justify-center h-[85px] rounded-xl border border-dashed border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/60 hover:bg-[var(--mobile-clay-active-bg)] hover:border-amber-500/20 transition-all duration-300 active:scale-[0.98] cursor-pointer">
                 <ImageIcon size={18} className="text-amber-400 mb-1 group-hover:scale-105 transition-transform" />
-                <span className="text-[10px] font-bold text-white/80">上传背景</span>
-                <span className="text-[8px] text-[var(--text-tertiary)] scale-90 mt-0.5">借鉴色调打光</span>
+                <span className="text-[10px] font-bold text-[var(--text-primary)]/80">{pick('上传背景', 'Upload BG')}</span>
+                <span className="text-[8px] text-[var(--text-tertiary)] scale-90 mt-0.5">{pick('借鉴色调打光', 'Match color & lighting')}</span>
                 <input type="file" accept="image/*" className="hidden" onChange={handleReferenceUpload} />
               </label>
             )}
@@ -507,36 +569,36 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
         {/* ================= 2. 出图区 (Carousel 卡片详情滑动展示) ================= */}
         <div className="space-y-1.5">
           <div className="flex justify-between items-center px-1">
-            <span className="text-[10px] font-bold text-[var(--text-secondary)]">🌟 AI 生成出图看板 (Carousel 左右滑动查看)</span>
+            <span className="text-[10px] font-bold text-[var(--text-secondary)]">{pick('🌟 AI 生成出图看板 (Carousel 左右滑动查看)', '🌟 AI Generation Board (Swipe Carousel to view)')}</span>
             {tasks.length > 0 && (
               <span className="text-[10px] font-bold text-rose-400">
-                图 {activeCarouselIndex + 1} / {tasks.length}
+                {pick('图', 'Img')} {activeCarouselIndex + 1} / {tasks.length}
               </span>
             )}
           </div>
 
-          <div className="relative w-full h-[280px] rounded-2xl border border-white/8 bg-white/[0.015] overflow-hidden flex flex-col justify-between p-3.5 shadow-xl shadow-black/30">
+          <div className="relative w-full h-[280px] rounded-2xl border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]/60 overflow-hidden flex flex-col justify-between p-3.5 shadow-sm">
             {isAnalyzingPrompt ? (
               // AI 分析中的加载骨架
               <div className="flex-1 flex flex-col items-center justify-center space-y-4">
-                <div className="relative w-14 h-14 rounded-2xl bg-white/[0.03] flex items-center justify-center overflow-hidden">
+                <div className="relative w-14 h-14 rounded-2xl bg-[var(--mobile-clay-surface-bg)] flex items-center justify-center overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_1.5s_infinite]" />
                   <Sparkles size={24} className="text-rose-400 animate-spin" style={{ animationDuration: '4s' }} />
                 </div>
                 <div className="text-center space-y-1.5">
-                  <div className="text-xs font-bold text-white/90 animate-pulse">正在为 {batchCount} 张图片智能分配电商卖点提示词...</div>
-                  <div className="text-[9px] text-[var(--text-tertiary)] leading-relaxed max-w-[240px]">AI 正在深度解剖产品特性，自动锁定最佳的高抛光主图、生活使用以及细节展示视角。</div>
+                  <div className="text-xs font-bold text-[var(--text-primary)] animate-pulse">{pick('正在为 ' + batchCount + ' 张图片智能分配电商卖点提示词...', 'Planning e-commerce selling point prompts for ' + batchCount + ' images...')}</div>
+                  <div className="text-[9px] text-[var(--text-tertiary)] leading-relaxed max-w-[240px]">{pick('AI 正在深度解剖产品特性，自动锁定最佳的高抛光主图、生活使用以及细节展示视角。', 'AI is deeply analyzing product features to automatically lock in the best high-polish main image, life-use, and detail display angles.')}</div>
                 </div>
               </div>
             ) : tasks.length === 0 ? (
               // 初始状态
               <div className="flex-1 flex flex-col items-center justify-center space-y-3">
-                <div className="p-3.5 rounded-2xl bg-white/[0.02] text-[var(--text-tertiary)] border border-white/5 shadow-md">
+                <div className="p-3.5 rounded-2xl bg-[var(--mobile-clay-surface-bg)] text-[var(--text-tertiary)] border border-[var(--mobile-clay-border)] shadow-sm">
                   <Sparkles size={26} />
                 </div>
                 <div className="text-center space-y-1">
-                  <div className="text-xs font-bold text-white/70">电商大片待魔法酝酿</div>
-                  <div className="text-[10px] text-[var(--text-tertiary)] max-w-[200px]">配置下方的电商平台、目标市场与数量，点击右下角发送立即排队并发生成。</div>
+                  <div className="text-xs font-bold text-[var(--text-secondary)]">{pick('电商大片待魔法酝酿', 'E-commerce blockbusters in progress')}</div>
+                  <div className="text-[10px] text-[var(--text-tertiary)] max-w-[200px]">{pick('配置下方的电商平台、目标市场与数量，点击右下角发送立即排队并发生成。', 'Configure the e-commerce platform, target market, and quantity below, then click generate to start.')}</div>
                 </div>
               </div>
             ) : (
@@ -547,11 +609,11 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
                   {tasks[activeCarouselIndex].status === 'queued' && (
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <div className="text-[10px] font-bold text-amber-400/90 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
-                        排队中
+                        {pick('排队中', 'Queued')}
                       </div>
                       <div className="text-center space-y-1">
-                        <div className="text-xs text-white/80">等待调度 Worker 启动...</div>
-                        <div className="text-[9px] text-[var(--text-tertiary)]">并发度限制为 2，以最大化维持云端生成稳定性。</div>
+                        <div className="text-xs text-[var(--text-secondary)]">{pick('等待调度 Worker 启动...', 'Waiting for worker to start...')}</div>
+                        <div className="text-[9px] text-[var(--text-tertiary)]">{pick('并发度限制为 2，以最大化维持云端生成稳定性。', 'Concurrency limit is 2 to maintain cloud generation stability.')}</div>
                       </div>
                     </div>
                   )}
@@ -563,8 +625,8 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
                         <RefreshCw size={18} className="text-rose-400 animate-spin" />
                       </div>
                       <div className="text-center space-y-1">
-                        <div className="text-xs font-bold text-white/90">正在进行第 {tasks[activeCarouselIndex].attempts}/3 次尝试生成...</div>
-                        <div className="text-[9px] text-[var(--text-tertiary)]">正在多模态融合您的产品，并发渲染中。</div>
+                        <div className="text-xs font-bold text-[var(--text-primary)]">{pick('正在进行第 ' + tasks[activeCarouselIndex].attempts + '/3 次尝试生成...', 'Attempting generation (' + tasks[activeCarouselIndex].attempts + '/3)...')}</div>
+                        <div className="text-[9px] text-[var(--text-tertiary)]">{pick('正在多模态融合您的产品，并发渲染中。', 'Fusing product features and rendering in progress.')}</div>
                       </div>
                     </div>
                   )}
@@ -581,7 +643,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
                         download={`ecommerce_image_${activeCarouselIndex + 1}.png`}
                         className="absolute bottom-1 right-1 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-bold text-rose-300 hover:text-white transition-colors flex items-center gap-1 active:scale-95"
                       >
-                        下载大图
+                        {pick('下载大图', 'Download Image')}
                       </a>
                     </div>
                   )}
@@ -590,22 +652,22 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <AlertCircle size={24} className="text-rose-500" />
                       <div className="text-center space-y-1">
-                        <div className="text-xs font-bold text-rose-400">已达 3 次重试上限均失败</div>
-                        <div className="text-[9px] text-white/50 px-4 max-w-[260px] truncate">{tasks[activeCarouselIndex].errorMsg}</div>
+                        <div className="text-xs font-bold text-rose-400">{pick('已达 3 次重试上限均失败', 'Failed after 3 attempts')}</div>
+                        <div className="text-[9px] text-[var(--text-tertiary)] px-4 max-w-[260px] truncate">{tasks[activeCarouselIndex].errorMsg}</div>
                       </div>
                     </div>
                   )}
                 </div>
 
                 {/* 卡片底部描述信息 (像首页的详细卡片一样，展示商业策略) */}
-                <div className="mt-2.5 pt-2 border-t border-white/5 flex flex-col gap-1 select-none">
+                <div className="mt-2.5 pt-2 border-t border-[var(--mobile-clay-border)] flex flex-col gap-1 select-none">
                   <div className="flex justify-between items-center">
                     <span className="text-[11px] font-bold text-rose-400 flex items-center gap-1">
                       🎯 {tasks[activeCarouselIndex].angleName}
                     </span>
                     {tasks[activeCarouselIndex].status === 'success' && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 flex items-center gap-0.5">
-                        <CheckCircle2 size={8} /> 渲染成功
+                        <CheckCircle2 size={8} /> {pick('渲染成功', 'Rendered')}
                       </span>
                     )}
                   </div>
@@ -621,7 +683,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
                       type="button"
                       onClick={() => setActiveCarouselIndex(prev => Math.max(0, prev - 1))}
                       disabled={activeCarouselIndex === 0}
-                      className={`p-1.5 rounded-full bg-black/70 border border-white/10 text-white active:scale-90 pointer-events-auto transition-all ${
+                      className={`p-1.5 rounded-full bg-[var(--mobile-clay-surface-bg)] border border-[var(--mobile-clay-border-strong)] text-[var(--text-primary)] active:scale-90 pointer-events-auto transition-all ${
                         activeCarouselIndex === 0 ? 'opacity-25 cursor-not-allowed' : 'opacity-80 hover:opacity-100'
                       }`}
                     >
@@ -631,7 +693,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
                       type="button"
                       onClick={() => setActiveCarouselIndex(prev => Math.min(tasks.length - 1, prev + 1))}
                       disabled={activeCarouselIndex === tasks.length - 1}
-                      className={`p-1.5 rounded-full bg-black/70 border border-white/10 text-white active:scale-90 pointer-events-auto transition-all ${
+                      className={`p-1.5 rounded-full bg-[var(--mobile-clay-surface-bg)] border border-[var(--mobile-clay-border-strong)] text-[var(--text-primary)] active:scale-90 pointer-events-auto transition-all ${
                         activeCarouselIndex === tasks.length - 1 ? 'opacity-25 cursor-not-allowed' : 'opacity-80 hover:opacity-100'
                       }`}
                     >
@@ -649,11 +711,11 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
           <button
             type="button"
             onClick={() => setIsInspirationOpen(!isInspirationOpen)}
-            className="w-full py-2.5 px-4 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] active:scale-98 transition-all flex items-center justify-between text-xs font-semibold"
+            className="w-full py-2.5 px-4 rounded-xl bg-[var(--mobile-clay-surface-bg)]/80 border border-[var(--mobile-clay-border)] hover:bg-[var(--mobile-clay-active-bg)] text-[var(--text-primary)] active:scale-98 transition-all flex items-center justify-between text-xs font-semibold"
           >
             <div className="flex items-center gap-2">
               <Sparkle size={13} className="text-amber-400" />
-              <span>{isInspirationOpen ? '💡 收起电商灵感库' : '💡 展开一键电商灵感库'}</span>
+              <span>{isInspirationOpen ? pick('💡 收起电商灵感库', '💡 Collapse Inspiration Lib') : pick('💡 展开一键电商灵感库', '💡 Expand Inspiration Lib')}</span>
             </div>
             <div className={`text-[10px] text-[var(--text-tertiary)] transition-transform duration-300 ${
               isInspirationOpen ? 'rotate-180' : ''
@@ -663,13 +725,13 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
           </button>
 
           {isInspirationOpen && (
-            <div className="grid grid-cols-2 gap-2 pr-0.5 p-2 rounded-2xl border border-white/5 bg-white/[0.008] no-scrollbar animate-[fadeIn_0.3s_ease]">
-              {INSPIRATION_TAGS.map((tag, idx) => (
+            <div className="grid grid-cols-2 gap-2 pr-0.5 p-2 rounded-2xl border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]/40 no-scrollbar animate-[fadeIn_0.3s_ease]">
+              {localizedInspirationTags.map((tag, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => handleSelectInspiration(tag.text, tag.title)}
-                  className="flex items-center gap-2 py-2 px-2.5 rounded-xl text-[11px] font-semibold bg-white/[0.02] border border-white/5 text-[var(--text-secondary)] hover:text-white hover:bg-rose-500/5 hover:border-rose-500/20 active:scale-95 transition-all text-left truncate shadow-sm"
+                  className="flex items-center gap-2 py-2 px-2.5 rounded-xl text-[11px] font-semibold bg-[var(--mobile-clay-surface-bg)]/80 border border-[var(--mobile-clay-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--mobile-clay-active-bg)] hover:border-[var(--mobile-clay-active-border)] active:scale-95 transition-all text-left truncate shadow-sm"
                 >
                   <span className="text-sm shrink-0">{tag.emoji}</span>
                   <span className="truncate">{tag.title}</span>
@@ -680,20 +742,20 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
         </div>
 
         {/* ================= 4. 参数与尺寸配置面板 (两合一模块) ================= */}
-        <div className="space-y-3.5 shrink-0 p-3 rounded-2xl border border-white/5 bg-white/[0.008]">
+        <div className="space-y-3.5 shrink-0 p-3 rounded-2xl border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]/50">
           {/* Tab 切换控制栏 */}
-          <div className="flex p-0.5 rounded-xl bg-white/[0.02] border border-white/5">
+          <div className="flex p-0.5 rounded-xl bg-[var(--mobile-clay-surface-bg)]/85 border border-[var(--mobile-clay-border)]">
             <button
               type="button"
               onClick={() => setActiveConfigTab('ratio')}
               className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-wide transition-all ${
                 activeConfigTab === 'ratio'
                   ? 'bg-gradient-to-r from-[#FF5E62]/10 to-[#8A2387]/10 text-rose-400 border border-rose-500/20 shadow-sm'
-                  : 'text-[var(--text-secondary)] border border-transparent hover:text-white'
+                  : 'text-[var(--text-secondary)] border border-transparent hover:text-[var(--text-primary)]'
               }`}
               style={{ fontFamily: '"HarmonyOS Sans SC", sans-serif' }}
             >
-              📐 构图比例
+              {pick('📐 构图比例', '📐 Aspect Ratio')}
             </button>
             <button
               type="button"
@@ -701,18 +763,18 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
               className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-wide transition-all ${
                 activeConfigTab === 'params'
                   ? 'bg-gradient-to-r from-[#FF5E62]/10 to-[#8A2387]/10 text-rose-400 border border-rose-500/20 shadow-sm'
-                  : 'text-[var(--text-secondary)] border border-transparent hover:text-white'
+                  : 'text-[var(--text-secondary)] border border-transparent hover:text-[var(--text-primary)]'
               }`}
               style={{ fontFamily: '"HarmonyOS Sans SC", sans-serif' }}
             >
-              ⚙️ 生成参数
+              {pick('⚙️ 生成参数', '⚙️ Parameters')}
             </button>
           </div>
 
           {/* Tab 1: 构图比例 */}
           {activeConfigTab === 'ratio' && (
             <div className="grid grid-cols-2 gap-2 animate-[fadeIn_0.2s_ease]">
-              {RATIO_LIST.map((item) => {
+              {localizedRatioList.map((item) => {
                 const isActive = activeRatio === item.ratio;
                 return (
                   <button
@@ -727,7 +789,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
                   >
                     {renderRatioSkeleton(item.w, item.h, isActive)}
                     <div className="flex-1 min-w-0">
-                      <div className={`text-[10px] font-bold transition-colors truncate ${isActive ? 'text-white' : 'text-white/80'}`}>
+                      <div className={`text-[10px] font-bold transition-colors truncate ${isActive ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
                         {item.title.split(', ')[0]}
                       </div>
                       <div className="text-[8px] text-[var(--text-tertiary)] mt-0.5 truncate leading-none">
@@ -745,11 +807,11 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
             <div className="grid grid-cols-2 gap-2.5 text-xs animate-[fadeIn_0.2s_ease]">
               {/* 电商平台 */}
               <div className="flex flex-col gap-1">
-                <span className="text-[9px] text-white/45">电商平台</span>
+                <span className="text-[9px] text-[var(--text-tertiary)]">{pick('电商平台', 'Platform')}</span>
                 <select 
                   value={platform} 
                   onChange={(e) => setPlatform(e.target.value)}
-                  className="w-full bg-[#111115] border border-white/8 rounded-lg px-2 py-1 outline-none text-white/90 active:border-rose-500/30 transition-colors text-[10px]"
+                  className="w-full bg-[var(--mobile-clay-surface-bg)] border border-[var(--mobile-clay-border)] rounded-lg px-2 py-1 outline-none text-[var(--text-primary)] active:border-rose-500/30 transition-colors text-[10px]"
                 >
                   {['亚马逊', '天猫', '淘宝', 'Shopee', '拼多多'].map(p => (
                     <option key={p} value={p}>{p}</option>
@@ -759,11 +821,11 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
 
               {/* 目标市场 */}
               <div className="flex flex-col gap-1">
-                <span className="text-[9px] text-white/45">目标市场</span>
+                <span className="text-[9px] text-[var(--text-tertiary)]">{pick('目标市场', 'Target Market')}</span>
                 <select 
                   value={targetMarket} 
                   onChange={(e) => setTargetMarket(e.target.value)}
-                  className="w-full bg-[#111115] border border-white/8 rounded-lg px-2 py-1 outline-none text-white/90 active:border-rose-500/30 transition-colors text-[10px]"
+                  className="w-full bg-[var(--mobile-clay-surface-bg)] border border-[var(--mobile-clay-border)] rounded-lg px-2 py-1 outline-none text-[var(--text-primary)] active:border-rose-500/30 transition-colors text-[10px]"
                 >
                   {['欧美', '日韩', '中国大陆', '东南亚'].map(m => (
                     <option key={m} value={m}>{m}</option>
@@ -773,11 +835,11 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
 
               {/* 文案语种 */}
               <div className="flex flex-col gap-1">
-                <span className="text-[9px] text-white/45">文案语种</span>
+                <span className="text-[9px] text-[var(--text-tertiary)]">{pick('文案语种', 'Language')}</span>
                 <select 
                   value={language} 
                   onChange={(e) => setLanguage(e.target.value)}
-                  className="w-full bg-[#111115] border border-white/8 rounded-lg px-2 py-1 outline-none text-white/90 active:border-rose-500/30 transition-colors text-[10px]"
+                  className="w-full bg-[var(--mobile-clay-surface-bg)] border border-[var(--mobile-clay-border)] rounded-lg px-2 py-1 outline-none text-[var(--text-primary)] active:border-rose-500/30 transition-colors text-[10px]"
                 >
                   {['英文', '中文', '日文', '韩文'].map(l => (
                     <option key={l} value={l}>{l}</option>
@@ -787,11 +849,11 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
 
               {/* 模型选择 */}
               <div className="flex flex-col gap-1">
-                <span className="text-[9px] text-white/45">模型选择</span>
+                <span className="text-[9px] text-[var(--text-tertiary)]">{pick('模型选择', 'Model')}</span>
                 <select 
                   value={modelType} 
                   onChange={(e) => setModelType(e.target.value)}
-                  className="w-full bg-[#111115] border border-white/8 rounded-lg px-2 py-1 outline-none text-white/90 active:border-rose-500/30 transition-colors text-[10px]"
+                  className="w-full bg-[var(--mobile-clay-surface-bg)] border border-[var(--mobile-clay-border)] rounded-lg px-2 py-1 outline-none text-[var(--text-primary)] active:border-rose-500/30 transition-colors text-[10px]"
                 >
                   {['gemini-2.5-flash-image'].map(m => (
                     <option key={m} value={m}>{m}</option>
@@ -801,11 +863,11 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
 
               {/* 分辨率选择 */}
               <div className="flex flex-col gap-1">
-                <span className="text-[9px] text-white/45">分辨率选择</span>
+                <span className="text-[9px] text-[var(--text-tertiary)]">{pick('分辨率选择', 'Resolution')}</span>
                 <select 
                   value={resolution} 
                   onChange={(e) => setResolution(e.target.value)}
-                  className="w-full bg-[#111115] border border-white/8 rounded-lg px-2 py-1 outline-none text-white/90 active:border-rose-500/30 transition-colors text-[10px]"
+                  className="w-full bg-[var(--mobile-clay-surface-bg)] border border-[var(--mobile-clay-border)] rounded-lg px-2 py-1 outline-none text-[var(--text-primary)] active:border-rose-500/30 transition-colors text-[10px]"
                 >
                   {['1K', '2K', '4K'].map(r => (
                     <option key={r} value={r}>{r}</option>
@@ -815,12 +877,12 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
 
               {/* 出图张数 */}
               <div className="flex flex-col gap-1">
-                <span className="text-[9px] text-white/45">出图张数 (1-10张)</span>
-                <div className="flex items-center bg-[#111115] border border-white/8 rounded-lg h-[24px]">
+                <span className="text-[9px] text-[var(--text-tertiary)]">{pick('出图张数 (1-10张)', 'Batch Count (1-10)')}</span>
+                <div className="flex items-center bg-[var(--mobile-clay-surface-bg)] border border-[var(--mobile-clay-border)] rounded-lg h-[24px]">
                   <button 
                     type="button" 
                     onClick={() => setBatchCount(prev => Math.max(1, prev - 1))}
-                    className="px-2.5 py-0.5 text-white/60 hover:text-white active:scale-75 select-none text-[10px]"
+                    className="px-2.5 py-0.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] active:scale-75 select-none text-[10px]"
                   >
                     -
                   </button>
@@ -828,7 +890,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
                   <button 
                     type="button" 
                     onClick={() => setBatchCount(prev => Math.min(10, prev + 1))}
-                    className="px-2.5 py-0.5 text-white/60 hover:text-white active:scale-75 select-none text-[10px]"
+                    className="px-2.5 py-0.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] active:scale-75 select-none text-[10px]"
                   >
                     +
                   </button>
@@ -841,12 +903,12 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
       </div>
 
       {/* ================= 6. 粘性底端输入控制栏 (Bottom Sticky Bar) ================= */}
-      <div className="absolute bottom-0 left-0 right-0 bg-[#0A0A0C]/90 border-t border-white/5 p-3 pb-4 backdrop-blur-md flex items-end gap-2.5 z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.5)]">
+      <div className="absolute bottom-0 left-0 right-0 bg-[var(--mobile-clay-bottom-bar-bg)] border-t border-[var(--mobile-clay-border)] p-3 pb-4 backdrop-blur-md flex items-end gap-2.5 z-20 shadow-md">
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="上传主体后，简要描述产品和您想要的场景背景，AI 将生成差异化极速出图排队..."
-          className="flex-1 h-[88px] max-h-[120px] rounded-xl border border-white/10 bg-white/[0.02] px-3.5 py-2.5 text-xs outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/20 text-white placeholder-white/20 resize-none transition-all no-scrollbar"
+          placeholder={pick('上传主体后，简要描述产品和您想要的场景背景，AI 将生成差异化极速出图排队...', 'After uploading product body, briefly describe product and scenery, AI will batch queue generation...')}
+          className="flex-1 h-[88px] max-h-[120px] rounded-xl border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] px-3.5 py-2.5 text-xs outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/20 text-[var(--text-primary)] placeholder-[var(--text-muted)] resize-none transition-all no-scrollbar"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         />
         
@@ -859,7 +921,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
               ? 'bg-white/10 text-white/50 cursor-not-allowed'
               : 'bg-gradient-to-tr from-[#FF5E62] to-[#FF9966] hover:shadow-lg hover:shadow-rose-500/10 active:scale-[0.95]'
           }`}
-          title="发起智能电商生图"
+          title={pick('发起智能电商生图', 'Start AI E-commerce Gen')}
         >
           <Play 
             size={18} 

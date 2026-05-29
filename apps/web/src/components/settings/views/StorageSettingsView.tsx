@@ -75,6 +75,7 @@ export const StorageSettingsView: React.FC = () => {
     activeCanvas,
     mergeCanvasInto,
     cleanupInvalidCards,
+    clearAllData,
   } = useCanvas();
 
   const [mode, setMode] = useState<StorageMode | null>(null);
@@ -281,6 +282,55 @@ export const StorageSettingsView: React.FC = () => {
     }
   };
 
+  // 简体中文：为英文版设置页提供免确认的快捷错误卡片清理操作，响应用户“错误卡片不需要危险提醒”的要求
+  const handleQuickCleanupInvalid = async () => {
+    if (!activeCanvas) {
+      notify.warning('没有活动项目', '请先打开一个项目。');
+      return;
+    }
+
+    setProjectAction('cleanup');
+    try {
+      const result = cleanupInvalidCards(activeCanvas.id);
+      const summary =
+        result.removedPrompts === 0 && result.removedImages === 0 && result.removedGroups === 0
+          ? `No invalid cards were found in "${activeCanvas.name}".`
+          : `Removed ${result.removedPrompts} prompt cards, ${result.removedImages} image cards, and ${result.removedGroups} empty groups from "${activeCanvas.name}".`;
+      notify.success('Cleanup complete', summary);
+      setLastActionMessage(summary);
+      void refresh();
+    } catch (error) {
+      console.error('[StorageSettingsView] Quick cleanup failed:', error);
+      notify.error('Cleanup failed', 'Please try again later.');
+    } finally {
+      setProjectAction(null);
+    }
+  };
+
+  // 简体中文：为英文版彻底清除全部卡片与项目数据的操作提供处理器，强制弹出警示窗口，保证数据安全性
+  const handleClearAllData = async () => {
+    const confirmed = typeof window === 'undefined'
+      ? true
+      : window.confirm(
+          '⚠️ WARNING: Are you sure you want to permanently clear all projects, cards, and image caches? This will reset the workspace. All local IndexedDB caches will be wiped out and cannot be undone!'
+        );
+    if (!confirmed) return;
+
+    setCleanupType('compress'); // 复用 loading 状态
+    try {
+      clearAllData();
+      notify.success('All Data Cleared', 'Workspace has been fully reset.');
+      setLastActionMessage('All projects and caches have been cleared and reset.');
+      await refresh();
+    } catch (error) {
+      console.error('[StorageSettingsView] Clear all failed:', error);
+      notify.error('Clear failed', 'Please try again later.');
+    } finally {
+      setCleanupType(null);
+    }
+  };
+
+
   return (
     <SettingsViewShell>
       <SettingsCardGridContainer>
@@ -434,9 +484,9 @@ export const StorageSettingsView: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 7: Cleanup Controls (2A * 2row) */}
+        {/* Card 7: Cleanup Controls (2A * 3row) */}
         <div 
-          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row p-4 flex flex-col justify-between"
+          className="dashboard-grid-card a-card-span-2-col a-card-span-3-row p-4 flex flex-col justify-between"
           style={{ cursor: 'default' }}
         >
           <div>
@@ -445,38 +495,92 @@ export const StorageSettingsView: React.FC = () => {
             </div>
             <h3 className="text-sm font-bold text-white mt-1.5">Cache & Retention Policy</h3>
             <p className="text-[11px] text-slate-400 mt-1">
-              Safely reclaim local space without deleting final project data.
+              Safely reclaim local space or permanently clear all workspace data.
             </p>
 
-            <div className="mt-3 bg-white/5 border border-white/5 p-2.5 rounded-xl flex items-center justify-between">
-              <div className="min-w-0 flex-1 pr-2">
-                <div className="text-[10px] font-semibold text-white">Originals Cleanup</div>
-                <div className="text-[9px] text-slate-400 mt-0.5 leading-normal truncate">Clean unneeded original draft files</div>
-              </div>
-              <button
-                type="button"
-                disabled={cleanupType === 'compress'}
-                onClick={() => void handleCleanup()}
-                className="bg-rose-600 hover:bg-rose-700 text-white rounded-lg py-1.5 px-3 text-[10px] font-bold transition active:scale-95 shrink-0 cursor-pointer"
-              >
-                Clean
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 mt-2.5">
-              {cleanupOptions.map((option) => (
-                <div key={option.days} className="bg-white/5 border border-white/5 p-2 rounded-lg flex flex-col justify-between h-[64px]">
-                  <div className="text-[10px] font-semibold text-white">{option.label}</div>
-                  <button
-                    type="button"
-                    disabled={cleanupType === option.days}
-                    onClick={() => void handleCleanupByAge(option.days)}
-                    className="w-full bg-white/10 hover:bg-white/15 border border-white/10 text-slate-200 rounded-lg py-1 px-1.5 text-[9px] font-bold transition active:scale-95 mt-1 cursor-pointer"
-                  >
-                    Keep {option.days}D
-                  </button>
+            <div className="space-y-3 mt-3">
+              {/* 1. Clean Broken Cards */}
+              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+                <div className="min-w-0 flex-1 pr-2">
+                  <div className="text-[11px] font-semibold text-white flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    Clean Broken Cards
+                  </div>
+                  <div className="text-[9px] text-slate-400 mt-0.5 leading-normal">
+                    Remove broken cards, stale references and empty groups from current project
+                  </div>
                 </div>
-              ))}
+                <button
+                  type="button"
+                  onClick={handleQuickCleanupInvalid}
+                  className="bg-white/10 hover:bg-white/15 text-slate-200 border border-white/10 rounded-lg py-1 px-3 text-[10px] font-semibold transition active:scale-95 shrink-0 cursor-pointer"
+                >
+                  Clean
+                </button>
+              </div>
+
+              {/* 2. 30-Day Policy */}
+              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+                <div className="min-w-0 flex-1 pr-2">
+                  <div className="text-[11px] font-semibold text-white flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                    30-Day Policy
+                  </div>
+                  <div className="text-[9px] text-slate-400 mt-0.5 leading-normal">
+                    Keep last 30 days of image cache, logs, and task history
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={cleanupType === 30}
+                  onClick={() => void handleCleanupByAge(30)}
+                  className="bg-amber-600/80 hover:bg-amber-600 text-white rounded-lg py-1 px-3 text-[10px] font-semibold transition active:scale-95 shrink-0 cursor-pointer"
+                >
+                  Apply
+                </button>
+              </div>
+
+              {/* 3. 7-Day Policy */}
+              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+                <div className="min-w-0 flex-1 pr-2">
+                  <div className="text-[11px] font-semibold text-white flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400"></span>
+                    7-Day Policy
+                  </div>
+                  <div className="text-[9px] text-slate-400 mt-0.5 leading-normal">
+                    Keep last 7 days of resources to reclaim maximum local storage
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={cleanupType === 7}
+                  onClick={() => void handleCleanupByAge(7)}
+                  className="bg-orange-600/80 hover:bg-orange-600 text-white rounded-lg py-1 px-3 text-[10px] font-semibold transition active:scale-95 shrink-0 cursor-pointer"
+                >
+                  Apply
+                </button>
+              </div>
+
+              {/* 4. Clear All Data */}
+              <div className="flex items-center justify-between p-2 rounded-xl bg-red-500/5 border border-red-500/10 hover:bg-red-500/10 transition-colors">
+                <div className="min-w-0 flex-1 pr-2">
+                  <div className="text-[11px] font-semibold text-red-400 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                    Clear All Data
+                  </div>
+                  <div className="text-[9px] text-red-200/50 mt-0.5 leading-normal">
+                    DANGER: Permanently wipe all projects, canvases, and media cache
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={cleanupType === 'compress'}
+                  onClick={handleClearAllData}
+                  className="bg-red-600 hover:bg-red-700 text-white rounded-lg py-1 px-3 text-[10px] font-bold transition active:scale-95 shrink-0 cursor-pointer"
+                >
+                  Wipe All
+                </button>
+              </div>
             </div>
           </div>
         </div>

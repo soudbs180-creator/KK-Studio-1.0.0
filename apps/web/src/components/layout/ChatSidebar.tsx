@@ -974,7 +974,38 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
     }, [activeSession, sessionMap]);
 
     const sessionTreeRows = useMemo(() => {
-        const visibleSessions = sessions.filter(session => showArchived || !session.archived);
+        // 简体中文：支持通过 sessionSearch 对会话树进行过滤
+        // 如果关键字不为空，我们需要确保只要会话标题或消息包含关键字，那么此节点以及它的所有祖辈节点都会保持可见
+        const query = sessionSearch.toLowerCase().trim();
+        const matchesQuery = (session: ChatSessionItem) => {
+            if (!query) return true;
+            const matchTitle = (session.title || '').toLowerCase().includes(query);
+            const matchMessages = session.messages?.some(m => (m.content || '').toLowerCase().includes(query));
+            return matchTitle || matchMessages;
+        };
+
+        const visibleSet = new Set<string>();
+        if (query) {
+            sessions.forEach(session => {
+                if (matchesQuery(session)) {
+                    let curr: ChatSessionItem | null = session;
+                    while (curr) {
+                        visibleSet.add(curr.id);
+                        curr = curr.parentSessionId ? (sessionMap.get(curr.parentSessionId) || null) : null;
+                    }
+                }
+            });
+        }
+
+        const visibleSessions = sessions.filter(session => {
+            const matchArchive = showArchived || !session.archived;
+            if (!matchArchive) return false;
+            if (query) {
+                return visibleSet.has(session.id);
+            }
+            return true;
+        });
+
         const childMap = new Map<string, ChatSessionItem[]>();
         visibleSessions.forEach(session => {
             if (!session.parentSessionId) return;
@@ -996,7 +1027,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             const hasChildren = children.length > 0;
             rows.push({ session, depth, hasChildren });
 
-            const expanded = expandedNodes[session.id] ?? (depth === 0 || activePath.has(session.id));
+            // 简体中文：在搜索模式下，匹配的会话及其祖先被展示出来，如果未手动展开，我们默认在搜索状态下展开其祖辈路径，以便展现匹配项
+            const expanded = query ? true : (expandedNodes[session.id] ?? (depth === 0 || activePath.has(session.id)));
             if (!expanded) return;
 
             children.forEach(child => dfs(child, depth + 1));
@@ -1004,7 +1036,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
         roots.forEach(root => dfs(root, 0));
         return rows;
-    }, [activeBranchTrail, expandedNodes, sessionMap, sessions, showArchived]);
+    }, [activeBranchTrail, expandedNodes, sessionMap, sessions, showArchived, sessionSearch]);
 
     useEffect(() => {
         const active = sessions.find(s => s.id === activeSessionId);

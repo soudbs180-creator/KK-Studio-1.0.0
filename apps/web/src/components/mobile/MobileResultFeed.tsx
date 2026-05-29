@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, X, ArrowLeft, ArrowDown } from 'lucide-react';
+import { Search, X, ArrowLeft, ArrowDown, Copy, Download, Trash2 } from 'lucide-react';
 
 import type { MobileResultEntry, ResponsiveSurface, ResultViewMode } from '../../types';
 import { useLocale } from '../../context/LocaleContext';
@@ -8,6 +8,7 @@ import {
   getAdaptiveResultTileGridMetrics,
 } from '../../utils/responsiveSurface';
 import MobileResultTile from './MobileResultTile';
+import { notify } from '../../services/system/notificationService';
 
 interface MobileResultFeedProps {
   resultEntries: MobileResultEntry[];
@@ -21,6 +22,9 @@ interface MobileResultFeedProps {
   isLoading?: boolean;
   isHistoryView?: boolean;
   onCloseHistory?: () => void;
+  // 简体中文：支持多选删除与多选下载所需的批量操作回调
+  onDeleteImage?: (imageId: string) => void;
+  onDownloadEntry?: (entry: MobileResultEntry) => void;
 }
 
 // 简体中文：搜索无结果时显示的精致空状态组件
@@ -31,13 +35,13 @@ const MobileResultSearchEmptyState: React.FC<{ query: string; onClear: () => voi
       data-testid="mobile-result-search-empty-state"
       className="flex flex-col items-center justify-center flex-1 py-16 px-6 text-center select-none"
     >
-      <div className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 mb-4">
+      <div className="h-12 w-12 rounded-2xl bg-[var(--mobile-clay-surface-bg)] border border-[var(--mobile-clay-border)] flex items-center justify-center text-[var(--text-tertiary)] mb-4">
         <Search size={22} />
       </div>
-      <h3 className="text-lg font-bold tracking-wide text-white/90 mb-2">
+      <h3 className="text-lg font-bold tracking-wide text-[var(--text-primary)] mb-2">
         {pick('未找到匹配结果', 'No matching results')}
       </h3>
-      <p className="text-xs leading-relaxed text-white/40 max-w-xs px-2 mb-5">
+      <p className="text-xs leading-relaxed text-[var(--text-tertiary)] max-w-xs px-2 mb-5">
         {pick(`没有找到包含 "${query}" 的生成历史记录，请尝试精简或更换关键词。`, `No results matching "${query}". Please check your spelling or try another query.`)}
       </p>
       <button
@@ -78,14 +82,14 @@ const MobileResultStandardEmptySkeleton: React.FC<{ columnCount: number }> = ({ 
         {Array.from({ length: skeletonCount }, (_, index) => (
           <div
             key={index}
-            className={`relative overflow-hidden rounded-[18px] border border-white/8 bg-[var(--bg-tertiary)]/70 ${
+            className={`relative overflow-hidden rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]/80 ${
               index === 0 && columnCount >= 3 ? 'col-span-2' : ''
             }`}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/0 to-black/10" />
             <div className="absolute inset-x-2 bottom-2 space-y-1.5">
-              <div className="h-1.5 w-2/3 rounded-full bg-white/12" />
-              <div className="h-1.5 w-1/2 rounded-full bg-white/8" />
+              <div className="h-1.5 w-2/3 rounded-full bg-[var(--text-muted)]/15" />
+              <div className="h-1.5 w-1/2 rounded-full bg-[var(--text-muted)]/10" />
             </div>
           </div>
         ))}
@@ -100,12 +104,12 @@ const MobileResultDetailEmptySkeleton: React.FC = () => (
     className="min-h-0 flex-1 rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-4"
   >
     <div className="flex h-full min-h-[190px] flex-col gap-3 overflow-hidden">
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-[18px] border border-white/8 bg-[var(--bg-tertiary)]/75">
+      <div className="relative min-h-0 flex-1 overflow-hidden rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]/80">
         <div className="absolute inset-0 bg-gradient-to-br from-white/12 via-white/0 to-black/12" />
-        <div className="absolute left-3 top-3 h-6 w-20 rounded-full bg-white/10" />
+        <div className="absolute left-3 top-3 h-6 w-20 rounded-full bg-[var(--text-muted)]/12" />
       </div>
-      <div className="space-y-2 rounded-[18px] border border-white/8 bg-black/12 p-3">
-        <div className="h-2 w-3/4 rounded-full bg-white/14" />
+      <div className="space-y-2 rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-3">
+        <div className="h-2 w-3/4 rounded-full bg-[var(--text-muted)]/20" />
         <div className="h-2 w-full rounded-full bg-white/10" />
         <div className="h-2 w-2/5 rounded-full bg-white/8" />
       </div>
@@ -120,10 +124,10 @@ const MobileResultFeedEmptyState: React.FC = () => {
       data-testid="mobile-result-empty-state"
       className="flex flex-col items-center justify-center flex-1 py-12 px-6 text-center select-none"
     >
-      <h3 className="text-xl font-bold tracking-wide text-white/90 drop-shadow-sm mb-2">
+      <h3 className="text-xl font-bold tracking-wide text-[var(--text-primary)] mb-2">
         {pick('我们从哪里开始？', 'Where should we start?')}
       </h3>
-      <p className="text-xs leading-relaxed text-white/40 max-w-sm px-2">
+      <p className="text-xs leading-relaxed text-[var(--text-tertiary)] max-w-sm px-2">
         {pick('在下方输入您的创意提示词，即刻开启 AI 灵感之旅。', 'Enter your creative prompt below to begin your AI generation journey.')}
       </p>
     </div>
@@ -146,6 +150,8 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
   isLoading = false,
   isHistoryView = false,
   onCloseHistory,
+  onDeleteImage,
+  onDownloadEntry,
 }) => {
   const { pick } = useLocale();
   const [measuredWidth, setMeasuredWidth] = React.useState(() => (
@@ -155,13 +161,96 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
   // 简体中文：本地搜索过滤关键词状态
   const [searchQuery, setSearchQuery] = useState('');
 
-  // 简体中文：本地对历史生成记录的匹配过滤逻辑，支持提示词、渲染模型、标签等的匹配
+  // 简体中文：定义多选状态与选中条目的 Set 集合，以便进行批量操作
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // 简体中文：当退出多选模式时，自动清空选中状态，防止状态泄露
+  React.useEffect(() => {
+    if (!isMultiSelectMode) {
+      setSelectedIds(new Set());
+    }
+  }, [isMultiSelectMode]);
+
+  // 简体中文：批量复制选中图片提示词的处理器
+  const handleBatchCopyPrompts = () => {
+    if (selectedIds.size === 0) return;
+    const prompts = Array.from(selectedIds)
+      .map(id => {
+        const entry = resultEntries.find(e => e.id === id);
+        return entry ? (entry.fullPrompt || entry.prompt || '') : '';
+      })
+      .filter(Boolean);
+
+    if (prompts.length === 0) return;
+
+    const textToCopy = prompts.join('\n\n');
+    navigator.clipboard.writeText(textToCopy)
+      .then(() => {
+        notify.success(
+          pick('复制成功', 'Copied successfully'),
+          pick(`已复制 ${prompts.length} 个提示词到剪贴板。`, `Copied ${prompts.length} prompts to clipboard.`)
+        );
+      })
+      .catch(() => {
+        notify.error(
+          pick('复制失败', 'Copy failed'),
+          pick('当前环境不支持剪贴板写入', 'Clipboard write not supported in this environment')
+        );
+      });
+  };
+
+  // 简体中文：批量下载选中图片的处理器
+  const handleBatchDownload = () => {
+    if (selectedIds.size === 0 || !onDownloadEntry) return;
+    let count = 0;
+    selectedIds.forEach(id => {
+      const entry = resultEntries.find(e => e.id === id);
+      if (entry) {
+        onDownloadEntry(entry);
+        count++;
+      }
+    });
+    notify.success(
+      pick('下载已启动', 'Downloads started'),
+      pick(`已开始批量下载选中的 ${count} 张图片。`, `Started batch downloading ${count} selected images.`)
+    );
+  };
+
+  // 简体中文：批量从画布中删除选中图片的处理器，带二次弹窗确认
+  const handleBatchDelete = () => {
+    if (selectedIds.size === 0 || !onDeleteImage) return;
+
+    const confirmMessage = pick(
+      `确定要删除选中的 ${selectedIds.size} 张图片吗？该操作无法撤销。`,
+      `Are you sure you want to delete the ${selectedIds.size} selected images? This action cannot be undone.`
+    );
+
+    if (window.confirm(confirmMessage)) {
+      let count = 0;
+      selectedIds.forEach(id => {
+        const entry = resultEntries.find(e => e.id === id);
+        if (entry && entry.imageId) {
+          onDeleteImage(entry.imageId);
+          count++;
+        }
+      });
+      notify.success(
+        pick('删除成功', 'Deleted successfully'),
+        pick(`已成功从画布删除 ${count} 张图片。`, `Successfully deleted ${count} images from the canvas.`)
+      );
+      setSelectedIds(new Set());
+      setIsMultiSelectMode(false);
+    }
+  };
+
+  // 简体中文：本地对历史生成记录的匹配过滤逻辑，参考电脑端设计：标签匹配优先，且按最新时间戳降序重排
   const filteredEntries = useMemo(() => {
     if (!isHistoryView || !searchQuery.trim()) {
       return resultEntries;
     }
     const query = searchQuery.toLowerCase().trim();
-    return resultEntries.filter((entry) => {
+    const matching = resultEntries.filter((entry) => {
       const matchPrompt = (entry.fullPrompt && entry.fullPrompt.toLowerCase().includes(query)) ||
                           (entry.promptSummary && entry.promptSummary.toLowerCase().includes(query)) ||
                           (entry.prompt && entry.prompt.toLowerCase().includes(query));
@@ -169,6 +258,19 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
       const matchTags = entry.tags && entry.tags.some(tag => tag.toLowerCase().includes(query));
       return matchPrompt || matchModel || matchTags;
     });
+
+    // 简体中文：匹配排序算法——标签匹配优先置顶，其次按 timestamp 最新生成时间倒序
+    matching.sort((a, b) => {
+      const aTagMatch = a.tags && a.tags.some(tag => tag.toLowerCase().includes(query));
+      const bTagMatch = b.tags && b.tags.some(tag => tag.toLowerCase().includes(query));
+
+      if (aTagMatch && !bTagMatch) return -1;
+      if (!aTagMatch && bTagMatch) return 1;
+
+      return b.timestamp - a.timestamp;
+    });
+
+    return matching;
   }, [resultEntries, searchQuery, isHistoryView]);
 
   const totalResults = filteredEntries.length;
@@ -337,40 +439,52 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
 
   return (
     <section className="relative flex h-full min-h-0 flex-col overflow-hidden">
-      {/* 简体中文：极致高颜值的移动端顶部搜索和历史控制栏，带半透明磨砂质感和返回面包屑 */}
+      {/* 简体中文：极致高颜值的移动端顶部搜索和历史控制栏，带半透明磨砂质感 and 返回面包屑 */}
       {isHistoryView && (
         <div 
-          className="shrink-0 px-3.5 pt-3 pb-2.5 flex flex-col gap-2.5 border-b"
+          className="shrink-0 px-3.5 pb-2.5 flex flex-col gap-2.5 border-b"
           style={{
             background: 'linear-gradient(to bottom, rgba(20, 20, 22, 0.95) 0%, rgba(20, 20, 22, 0.85) 100%)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
             borderColor: 'rgba(255, 255, 255, 0.08)',
+            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)',
           }}
         >
-          {/* 面包屑返回头部 */}
+          {/* 面包屑返回头部与多选切换胶囊 */}
           <div className="flex items-center justify-between">
             <button
               type="button"
               onClick={onCloseHistory}
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/8 bg-white/5 px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] transition-all active:scale-[0.97] active:bg-white/10"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] transition-all active:scale-[0.97] active:bg-[var(--mobile-clay-active-bg)]"
             >
               <ArrowLeft size={13} className="text-[var(--text-tertiary)]" />
               <span>{pick('返回工作区', 'Back to Workspace')}</span>
             </button>
-            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-tertiary)] select-none">
-              {pick('生成历史与检索', 'HISTORY & SEARCH')}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsMultiSelectMode(prev => !prev)}
+                className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition-all active:scale-[0.97]"
+                style={{
+                  background: isMultiSelectMode ? 'var(--mobile-clay-active-bg)' : 'rgba(255, 255, 255, 0.05)',
+                  borderColor: isMultiSelectMode ? 'var(--mobile-clay-active-border)' : 'rgba(255, 255, 255, 0.08)',
+                  color: isMultiSelectMode ? '#fff' : 'var(--text-secondary)',
+                }}
+              >
+                {isMultiSelectMode ? pick('取消多选', 'Cancel') : pick('多选', 'Select')}
+              </button>
             </div>
           </div>
 
           {/* 极其精致的磨砂毛玻璃搜索框 */}
           <div 
-            className="relative flex items-center rounded-xl border transition-all duration-300 focus-within:border-[var(--mobile-clay-active-border)] focus-within:bg-white/[0.06] bg-white/[0.03] px-3.5 py-2.5"
+            className="relative flex items-center rounded-xl border border-[var(--mobile-clay-border)] transition-all duration-300 focus-within:border-[var(--mobile-clay-active-border)] focus-within:bg-[var(--mobile-clay-active-bg)] bg-[var(--mobile-clay-surface-bg)]/80 px-3.5 py-2.5"
             style={{
               borderColor: 'rgba(255, 255, 255, 0.08)',
             }}
           >
-            <Search size={16} className="text-white/40 mr-2 shrink-0" />
+            <Search size={16} className="text-[var(--text-tertiary)] mr-2 shrink-0" />
             <input
               type="text"
               value={searchQuery}
@@ -385,7 +499,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="p-1 hover:bg-white/5 rounded-full text-white/50 hover:text-white"
+                className="p-1 hover:bg-[var(--mobile-clay-active-bg)] rounded-full text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
               >
                 <X size={14} />
               </button>
@@ -399,7 +513,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto overscroll-contain px-3 pr-1 pb-24 flex flex-col"
         style={{
-          paddingTop: 'var(--mobile-content-top-inset, 76px)',
+          paddingTop: isHistoryView ? '12px' : 'var(--mobile-content-top-inset, 76px)',
         }}
       >
         <div 
@@ -444,6 +558,20 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                         gridMetrics={gridMetrics}
                         onEntryOpen={onEntryOpen}
                         onUseAsSource={onUseAsSource}
+                        // 简体中文：支持移动端多选状态下的点击拦截和复选框展示
+                        isMultiSelectMode={isMultiSelectMode}
+                        isSelected={selectedIds.has(entry.id)}
+                        onToggleSelect={(id) => {
+                          setSelectedIds(prev => {
+                            const next = new Set(prev);
+                            if (next.has(id)) {
+                              next.delete(id);
+                            } else {
+                              next.add(id);
+                            }
+                            return next;
+                          });
+                        }}
                       />
                     );
                   })}
@@ -459,7 +587,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
         </div>
       </div>
 
-      {/* 底部悬浮操作与模式切换控制区（带暗色渐变过渡，限制在控制栏蓝色区高度内，不遮挡内容，左右顶满） */}
+      {/* 底部悬浮操作与模式切换控制区，多选模式下切换为批量操作栏 */}
       <div className="absolute bottom-0 inset-x-0 z-20 flex items-end justify-between gap-4 px-4 pb-4 pt-4 select-none pointer-events-none">
         <div 
           className="absolute inset-0 -z-10"
@@ -467,43 +595,103 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
             background: 'linear-gradient(to top, rgba(10, 10, 12, 1) 0%, rgba(10, 10, 12, 0.98) 18%, rgba(10, 10, 12, 0.92) 36%, rgba(10, 10, 12, 0.76) 54%, rgba(10, 10, 12, 0.48) 70%, rgba(10, 10, 12, 0.24) 84%, rgba(10, 10, 12, 0.08) 93%, rgba(10, 10, 12, 0) 100%)'
           }}
         />
-        <div className="min-w-0 flex flex-col gap-0.5 pointer-events-auto">
-          <p className="text-[11px] leading-relaxed text-white/90 drop-shadow-sm font-medium">
-            {pick('点击任意结果查看完整提示词和操作。', 'Tap any result to inspect the full prompt and actions.')}
-          </p>
-          <div className="text-[9.5px] font-bold uppercase tracking-[0.06em] text-white/55 drop-shadow-sm">
-            {hasSelectedSource ? `${counterLabel} / ${selectedSourceLabel}` : counterLabel}
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2 pointer-events-auto">
-          {/* 模式切换胶囊 */}
-          <div className="flex rounded-full border border-white/12 bg-black/40 p-0.5 text-[11px] font-medium text-white/80 shadow-lg">
-            {(['standard', 'detail'] as ResultViewMode[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => onViewModeChange(mode)}
-                className={`rounded-full px-3 py-1 transition-all duration-150 ${
-                  viewMode === mode ? 'bg-white text-black font-bold shadow-sm' : 'text-white/70 active:text-white active:bg-white/5'
-                }`}
-              >
-                {mode === 'detail' ? pick('详细', 'Detail') : pick('标准', 'Standard')}
-              </button>
-            ))}
-          </div>
 
-          {/* 快速一键滚动回底部的圆形毛玻璃按钮，高度与切换胶囊完全对齐，具备弹性缩放交互动效 */}
-          <button
-            type="button"
-            onClick={() => {
-              bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-            }}
-            title={pick('回到底部', 'Scroll to Bottom')}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/12 bg-black/40 text-white/80 shadow-lg hover:text-white hover:border-white/20 active:scale-90 active:bg-white/10 transition-all duration-150"
-          >
-            <ArrowDown size={14} />
-          </button>
-        </div>
+        {isMultiSelectMode ? (
+          // 简体中文：多选模式下的精致批量操作控制栏，毛玻璃暗色效果
+          <div className="w-full flex items-center justify-between gap-3 pointer-events-auto py-1">
+            <div className="min-w-0 flex flex-col justify-center">
+              <span className="text-xs font-bold text-white tracking-wide">
+                {pick(`已选择 ${selectedIds.size} 项`, `Selected ${selectedIds.size} items`)}
+              </span>
+              <span className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-widest mt-0.5 select-none">
+                {pick('批量整理与操作', 'BATCH ACTIONS')}
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-1.5">
+              {/* 批量复制提示词 */}
+              <button
+                type="button"
+                disabled={selectedIds.size === 0}
+                onClick={handleBatchCopyPrompts}
+                className="flex items-center gap-1 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                title={pick('复制选中提示词', 'Copy selected prompts')}
+              >
+                <Copy size={13} />
+                <span>{pick('复制', 'Copy')}</span>
+              </button>
+
+              {/* 批量下载 */}
+              {onDownloadEntry && (
+                <button
+                  type="button"
+                  disabled={selectedIds.size === 0}
+                  onClick={handleBatchDownload}
+                  className="flex items-center gap-1 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                  title={pick('下载选中图片', 'Download selected images')}
+                >
+                  <Download size={13} />
+                  <span>{pick('下载', 'DL')}</span>
+                </button>
+              )}
+
+              {/* 批量删除 */}
+              {onDeleteImage && (
+                <button
+                  type="button"
+                  disabled={selectedIds.size === 0}
+                  onClick={handleBatchDelete}
+                  className="flex items-center gap-1 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-400 active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                  title={pick('删除选中图片', 'Delete selected images')}
+                >
+                  <Trash2 size={13} />
+                  <span>{pick('删除', 'Delete')}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          // 简体中文：常规模式下的切换胶囊和计数器
+          <>
+            <div className="min-w-0 flex flex-col gap-0.5 pointer-events-auto">
+              <p className="text-[11px] leading-relaxed text-[var(--text-primary)] font-medium">
+                {pick('点击任意结果查看完整提示词和操作。', 'Tap any result to inspect the full prompt and actions.')}
+              </p>
+              <div className="text-[9.5px] font-bold uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+                {hasSelectedSource ? `${counterLabel} / ${selectedSourceLabel}` : counterLabel}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2 pointer-events-auto">
+              {/* 模式切换胶囊 */}
+              <div className="flex rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-0.5 text-[11px] font-medium text-[var(--text-primary)] shadow-sm">
+                {(['standard', 'detail'] as ResultViewMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => onViewModeChange(mode)}
+                    className={`rounded-full px-3 py-1 transition-all duration-150 ${
+                      viewMode === mode ? 'bg-[var(--mobile-clay-active-bg)] border border-[var(--mobile-clay-active-border)] text-[var(--text-primary)] font-bold shadow-sm' : 'text-[var(--text-secondary)] active:text-[var(--text-primary)] active:bg-[var(--mobile-clay-muted-surface-bg)]'
+                    }`}
+                  >
+                    {mode === 'detail' ? pick('详细', 'Detail') : pick('标准', 'Standard')}
+                  </button>
+                ))}
+              </div>
+
+              {/* 快速一键滚动回底部的圆形毛玻璃按钮，高度与切换胶囊完全对齐，具备弹性缩放交互动效 */}
+              <button
+                type="button"
+                onClick={() => {
+                  bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                }}
+                title={pick('回到底部', 'Scroll to Bottom')}
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] text-[var(--text-primary)] shadow-sm hover:text-[var(--text-primary)] active:scale-90 active:bg-[var(--mobile-clay-active-bg)] transition-all duration-150"
+              >
+                <ArrowDown size={14} />
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </section>
   );

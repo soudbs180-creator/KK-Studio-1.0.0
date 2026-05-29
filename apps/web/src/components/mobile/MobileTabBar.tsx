@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Images, MessageSquare, Sparkles, User } from 'lucide-react';
 import { GenerationMode, type MobilePrimaryTab } from '../../types';
+import { useLocale } from '../../context/LocaleContext';
 
 interface MobileTabBarProps {
   currentMode: GenerationMode;
@@ -10,17 +11,6 @@ interface MobileTabBarProps {
   onInteract?: () => void;
 }
 
-const modeLabelMap: Record<GenerationMode, string> = {
-  [GenerationMode.IMAGE]: '图片',
-  [GenerationMode.VIDEO]: '视频',
-  [GenerationMode.ECOMMERCE]: '电商',
-  [GenerationMode.AUDIO]: '音频',
-  [GenerationMode.PPT]: 'PPT',
-  [GenerationMode.EDIT]: '编辑',
-  [GenerationMode.INPAINT]: '局部',
-  [GenerationMode.REDRAW]: '重绘',
-};
-
 const MobileTabBar: React.FC<MobileTabBarProps> = ({
   currentMode,
   currentTab,
@@ -28,34 +18,42 @@ const MobileTabBar: React.FC<MobileTabBarProps> = ({
   isVisible = true,
   onInteract,
 }) => {
-  const tabs: Array<{
-    key: MobilePrimaryTab;
-    label: string;
-    caption?: string;
-    icon: React.ReactNode;
-  }> = [
+  const { pick } = useLocale();
+
+  const modeLabelMap: Record<GenerationMode, string> = useMemo(() => ({
+    [GenerationMode.IMAGE]: pick('图片', 'Image'),
+    [GenerationMode.VIDEO]: pick('视频', 'Video'),
+    [GenerationMode.ECOMMERCE]: pick('电商', 'E-commerce'),
+    [GenerationMode.AUDIO]: pick('音频', 'Audio'),
+    [GenerationMode.PPT]: pick('PPT', 'PPT'),
+    [GenerationMode.EDIT]: pick('编辑', 'Edit'),
+    [GenerationMode.INPAINT]: pick('局部', 'Inpaint'),
+    [GenerationMode.REDRAW]: pick('重绘', 'Redraw'),
+  }), [pick]);
+
+  const tabs = useMemo(() => [
     {
-      key: 'create',
-      label: '创作',
+      key: 'create' as const,
+      label: pick('创作', 'Create'),
       caption: modeLabelMap[currentMode],
       icon: <Sparkles size={18} strokeWidth={2.1} />,
     },
     {
-      key: 'library',
-      label: '资源',
+      key: 'library' as const,
+      label: pick('资源', 'Library'),
       icon: <Images size={18} strokeWidth={2.1} />,
     },
     {
-      key: 'chat',
-      label: '聊天',
+      key: 'chat' as const,
+      label: pick('聊天', 'Chat'),
       icon: <MessageSquare size={18} strokeWidth={2.1} />,
     },
     {
-      key: 'me',
-      label: '我的',
+      key: 'me' as const,
+      label: pick('我的', 'Me'),
       icon: <User size={18} strokeWidth={2.1} />,
     },
-  ];
+  ], [pick, currentMode, modeLabelMap]);
 
   return (
     <div

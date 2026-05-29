@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Check } from 'lucide-react';
 
 import type { MobileResultEntry, ResultViewMode } from '../../types';
 import type { AdaptiveResultTileGridMetrics } from '../../utils/responsiveSurface';
@@ -40,6 +40,10 @@ interface MobileResultTileProps {
   gridMetrics: AdaptiveResultTileGridMetrics;
   onEntryOpen: (entryId: string) => void;
   onUseAsSource: (imageId: string) => void;
+  // 简体中文：新增支持移动端多选状态下的点击拦截和复选框展示
+  isMultiSelectMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (entryId: string) => void;
 }
 
 // 格式化时间戳，仅提取月和日，防止移动端布局过长折行，加入 try-catch 防御 RangeError
@@ -71,6 +75,9 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
   gridMetrics, // 保留契约变量
   onEntryOpen,
   onUseAsSource,
+  isMultiSelectMode = false,
+  isSelected = false,
+  onToggleSelect,
 }) => {
   const promptSummary = normalizePromptSummary(entry.promptSummary);
   const imageAspectRatio = Number.isFinite(entry.mobileLayout.aspectRatio) && entry.mobileLayout.aspectRatio > 0
@@ -96,12 +103,20 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
   const isFailed = Boolean(entry.error || imgLoadError);
 
   return (
-    // 简体中文：保留卡片精致的 p-2（8px）包边（微边框），配合双圆角嵌套美学。由于我们彻底替换了 button 交互容器，消除了高度计算拉伸 Bug，现在即使带 padding 卡片高度也会严密契合图片宽高比，绝无上下留白。
+    // 简体中文：当处于多选状态且选中时，突出呈现选中边框和投影效果
     <article
       className="relative min-w-0 rounded-[20px] border bg-[var(--mobile-clay-surface-bg)] transition-all duration-300 p-2 flex flex-col gap-2 active:scale-[0.985]"
       style={{
-        borderColor: isActive || isSource ? 'var(--mobile-clay-active-border)' : 'var(--mobile-clay-border)',
-        boxShadow: isActive || isSource ? '0 8px 24px rgba(251, 113, 133, 0.12)' : 'none', // 简体中文注释：活动卡片呈现品牌发光微光
+        borderColor: isSelected 
+          ? 'var(--mobile-clay-active-border)' 
+          : (isActive || isSource) 
+            ? 'var(--mobile-clay-active-border)' 
+            : 'var(--mobile-clay-border)',
+        boxShadow: isSelected 
+          ? '0 8px 24px rgba(251, 113, 133, 0.16)'
+          : (isActive || isSource) 
+            ? '0 8px 24px rgba(251, 113, 133, 0.12)' 
+            : 'none',
         // 开启 GPU 硬件加速，防止在 iOS 等移动端浏览器下溢出圆角裁剪失效导致漏直角
         transform: 'translateZ(0)',
         WebkitTransform: 'translateZ(0)',
@@ -109,13 +124,20 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
     >
       <div
         data-testid={`mobile-result-tile-${entry.id}`}
-        // 简体中文：重构 button 为带有交互性的 div 容器，避免部分移动端浏览器对 button 元素内部 Flexbox 和 aspect-ratio 计算的高度拉伸 Bug，并去除了不必要的 padding。
+        // 简体中文：重构 button 为带有交互性的 div 容器，在多选模式下点击时触发切换选择回调，常规模式下触发详情弹窗
         className={`group relative flex flex-col min-h-0 w-full text-left rounded-[inherit] overflow-hidden ${entry.isGenerating ? 'cursor-default' : 'cursor-pointer'}`}
         style={{
           transform: 'translateZ(0)',
           WebkitTransform: 'translateZ(0)',
         }}
-        onClick={() => !entry.isGenerating && onEntryOpen(entry.id)}
+        onClick={() => {
+          if (entry.isGenerating) return;
+          if (isMultiSelectMode) {
+            onToggleSelect?.(entry.id);
+          } else {
+            onEntryOpen(entry.id);
+          }
+        }}
         title={promptSummary}
       >
         {/* 核心展示区 */}
@@ -193,8 +215,8 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
             </div>
           )}
 
-          {/* 右上角：组图张数标记 */}
-          {!entry.isGenerating && entry.groupCount && entry.groupCount > 1 && (
+          {/* 右上角：组图张数标记 (在多选状态下隐藏以避让复选框) */}
+          {!entry.isGenerating && !isMultiSelectMode && entry.groupCount && entry.groupCount > 1 && (
             <div className="pointer-events-none absolute right-2.5 top-2.5 flex items-center z-20">
               <span className="rounded-full border border-amber-400/20 bg-amber-500/90 px-2.5 py-0.5 text-[9.5px] font-bold text-white shadow-sm flex items-center gap-1">
                 <svg className="w-2.5 h-2.5 text-white shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -202,6 +224,25 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
                 </svg>
                 {entry.groupCount}张图
               </span>
+            </div>
+          )}
+
+          {/* 绝对定位浮动层：Checkbox 多选框 (右上角显示) */}
+          {isMultiSelectMode && !entry.isGenerating && (
+            <div className="absolute right-2.5 top-2.5 z-30 flex items-center justify-center animate-fadeIn">
+              <div
+                className={`flex items-center justify-center rounded-full border transition-all duration-200 ${
+                  isSelected
+                    ? 'bg-[#fb7185] border-[#fb7185] text-white shadow-md scale-105'
+                    : 'border-white/50 bg-black/45 text-transparent active:scale-95'
+                }`}
+                style={{
+                  width: '20px',
+                  height: '20px',
+                }}
+              >
+                {isSelected && <Check size={11} strokeWidth={3.5} />}
+              </div>
             </div>
           )}
 

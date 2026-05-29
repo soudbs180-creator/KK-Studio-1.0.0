@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Check, Clock3, FolderOpen, MessageSquare, Plus, Search, Settings, Sun, Moon, Languages, PackageOpen } from 'lucide-react';
+import { Check, Clock3, FolderOpen, MessageSquare, Plus, Search, Settings, Sun, Moon, Languages, PackageOpen, Trash2 } from 'lucide-react';
 
 import { useCanvas } from '../../context/CanvasContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLocale } from '../../context/LocaleContext';
+// 简体中文：导入全局通知服务以在移动端提供操作反馈
+import { notify } from '../../services/system/notificationService';
 import { useAdminRole } from '../../hooks/useAdminRole';
 import type {
   MobileResultEntry,
@@ -58,7 +60,7 @@ export interface MobileWorkspaceSurfaceProps {
 
 // 磨砂玻璃风格按钮样式定义，带背景和边框的半透明组合
 const moreSheetActionClass =
-  'rounded-[22px] border border-white/8 bg-white/5 p-3.5 text-left text-[var(--text-primary)] transition-all active:scale-[0.985] active:bg-white/10';
+  'rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] p-3.5 text-left text-[var(--text-primary)] transition-all active:scale-[0.985] active:bg-[var(--mobile-clay-active-bg)]';
 
 const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   activeScreen,
@@ -97,9 +99,17 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   workspaceSurface = 'workspace',
   onCloseHistory,
 }) => {
-  const { state, activeCanvas, switchCanvas, createCanvas, canCreateCanvas } = useCanvas();
+  const { 
+    state, 
+    activeCanvas, 
+    switchCanvas, 
+    createCanvas, 
+    canCreateCanvas,
+    deleteCanvas,
+    cleanupInvalidCards
+  } = useCanvas();
   const { toggleTheme, isDarkMode } = useTheme();
-  const { toggleLanguage, isChinese } = useLocale();
+  const { toggleLanguage, isChinese, pick } = useLocale();
   // 🚀 [移动端专属] 提取真实的用户角色，以在头部用户名右侧进行徽章渲染
   const { accountRole } = useAdminRole();
   const [showProjectList, setShowProjectList] = useState(false);
@@ -129,7 +139,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
     openSettings();
   };
 
-  const header = (
+  const header = workspaceSurface === 'library' ? null : (
     <div className="px-3 pb-3 pt-2">
       <MobileHeader
         onMenuClick={() => onScreenChange(showMoreSheet ? 'home' : 'more-sheet')}
@@ -160,6 +170,9 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
         isLoading={isLoading}
         isHistoryView={workspaceSurface === 'library'}
         onCloseHistory={onCloseHistory}
+        // 简体中文：支持多选批量删除和批量下载的回调参数向下传递
+        onDeleteImage={onDeleteImage}
+        onDownloadEntry={onDownloadEntry}
       />
     </div>
   );
@@ -183,7 +196,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             type="button"
             className="absolute inset-0 cursor-default"
             onClick={closeMoreSheet}
-            aria-label="关闭更多菜单"
+            aria-label={pick('关闭更多菜单', 'Close Menu')}
           />
 
           {/* 更多操作底部滑出式抽屉面板，强行指定为极具质感的暗色磨砂玻璃背景 rgba(20, 20, 22, 0.90) */}
@@ -200,9 +213,9 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
-                  工作区
+                  {pick('工作区', 'Workspace')}
                 </div>
-                <h2 className="mt-1 text-lg font-semibold">更多操作</h2>
+                <h2 className="mt-1 text-lg font-semibold">{pick('更多操作', 'More Actions')}</h2>
               </div>
             </div>
 
@@ -244,7 +257,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               <button
                 type="button"
                 onClick={toggleLanguage}
-                className="relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[18px] border border-white/8 bg-white/5 px-1.5 text-center active:scale-[0.975] active:translate-y-px cursor-pointer"
+                className="relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-1.5 text-center active:scale-[0.975] active:translate-y-px cursor-pointer"
                 style={{
                   transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background-color 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
@@ -272,47 +285,83 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               <button
                 type="button"
                 onClick={() => setShowProjectList((previous) => !previous)}
-                className="flex h-[58px] min-w-0 items-center justify-between gap-2 rounded-[18px] border border-white/8 bg-white/5 px-3 text-left transition-all active:scale-[0.985] active:bg-white/10"
+                className="flex h-[58px] min-w-0 items-center justify-between gap-2 rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-3 text-left transition-all active:scale-[0.985] active:bg-[var(--mobile-clay-active-bg)]"
               >
                 <div className="flex items-center gap-2 min-w-0 text-left">
                   <FolderOpen size={17} className="shrink-0 text-[var(--accent-color)]" />
                   <div className="min-w-0 text-left">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)] leading-none">
-                      当前项目
+                      {pick('当前项目', 'Current Project')}
                     </div>
                     <div className="mt-1 truncate text-xs font-semibold text-[var(--text-primary)] leading-none">{resolvedProjectName}</div>
                   </div>
                 </div>
-                <div className="shrink-0 text-xs text-white/70 ml-auto pl-1">{showProjectList ? '收起' : '切换'}</div>
+                <div className="shrink-0 text-xs text-[var(--text-secondary)] ml-auto pl-1">{showProjectList ? pick('收起', 'Collapse') : pick('切换', 'Switch')}</div>
               </button>
             </div>
 
             {showProjectList ? (
-              <div className="mb-4 rounded-[22px] border border-white/8 bg-white/5 p-2.5">
+              <div className="mb-4 rounded-[22px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] p-2.5">
                 <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-                  项目列表
+                  {pick('项目列表', 'Projects')}
                 </div>
                 <div className="space-y-2">
                   {state.canvases.map((canvas) => {
                     const isActive = canvas.id === activeCanvas?.id;
 
                     return (
-                      <button
+                      <div
                         key={canvas.id}
-                        type="button"
-                        onClick={() => {
-                          switchCanvas(canvas.id);
-                          closeMoreSheet();
-                        }}
-                        className={`flex w-full items-center justify-between gap-3 rounded-[18px] px-3 py-3 text-left transition-all ${
+                        className={`flex w-full items-center justify-between gap-3 rounded-[18px] px-3 py-2 transition-all ${
                           isActive
                             ? 'border border-[var(--mobile-clay-active-border)] bg-[var(--mobile-clay-active-bg)] text-[var(--text-primary)]'
-                            : 'border border-white/5 bg-white/5 text-[var(--text-secondary)]'
+                            : 'border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/80 text-[var(--text-secondary)]'
                         }`}
                       >
-                        <span className="min-w-0 truncate text-sm font-medium">{canvas.name}</span>
-                        {isActive ? <Check size={16} className="shrink-0 text-[var(--accent-color)]" /> : null}
-                      </button>
+                        {/* 简体中文：项目切换触发按钮，使用 flex-1 撑满左侧区域 */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            switchCanvas(canvas.id);
+                            closeMoreSheet();
+                          }}
+                          className="flex-1 min-w-0 py-1.5 text-left cursor-pointer"
+                        >
+                          <span className="block truncate text-sm font-medium">{canvas.name}</span>
+                        </button>
+                        
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isActive ? <Check size={16} className="text-[var(--accent-color)]" /> : null}
+                          
+                          {/* 简体中文：仅在项目多于 1 个时允许删除项目，并进行确认以防误删 */}
+                          {state.canvases.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                const confirmed = window.confirm(
+                                  pick(
+                                    `确定要删除项目“${canvas.name}”吗？此操作无法撤销。`,
+                                    `Are you sure you want to delete project "${canvas.name}"? This action cannot be undone.`
+                                  )
+                                );
+                                if (confirmed) {
+                                  deleteCanvas(canvas.id);
+                                  // 简体中文：删除后弹出成功通知反馈给用户
+                                  notify.success(
+                                    pick('项目已删除', 'Project Deleted'),
+                                    pick(`项目“${canvas.name}”已从工作区移除。`, `Project "${canvas.name}" has been removed.`)
+                                  );
+                                }
+                              }}
+                              className="rounded-lg p-1.5 text-[var(--text-muted)] hover:text-red-400 active:scale-95 transition-colors cursor-pointer"
+                              aria-label={pick('删除项目', 'Delete Project')}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
@@ -326,10 +375,37 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                     closeMoreSheet();
                   }}
                   disabled={!canCreateCanvas}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[18px] border border-dashed border-white/10 bg-white/5 px-3 py-3 text-sm font-medium text-[var(--text-secondary)] disabled:opacity-45"
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[18px] border border-dashed border-[var(--mobile-clay-border-strong)] bg-[var(--mobile-clay-surface-bg)]/80 px-3 py-3 text-sm font-medium text-[var(--text-secondary)] disabled:opacity-45 cursor-pointer"
                 >
                   <Plus size={16} />
-                  {canCreateCanvas ? '新建项目' : '项目已满'}
+                  {canCreateCanvas ? pick('新建项目', 'New Project') : pick('项目已满', 'Project Full')}
+                </button>
+                
+                {/* 简体中文：增加清理错误卡片功能按钮，点击后直接执行，不需要危险确认 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const result = cleanupInvalidCards(activeCanvas?.id);
+                    if (result.removedPrompts === 0 && result.removedImages === 0 && result.removedGroups === 0) {
+                      notify.success(
+                        pick('无需清理', 'No cleanup needed'),
+                        pick('当前项目没有发现错误卡片或失效分组。', 'No invalid cards found in the current project.')
+                      );
+                    } else {
+                      notify.success(
+                        pick('清理完成', 'Cleanup complete'),
+                        pick(
+                          `已清理 ${result.removedPrompts} 张主卡、${result.removedImages} 张子卡，并移除 ${result.removedGroups} 个空分组。`,
+                          `Cleaned up ${result.removedPrompts} prompt cards, ${result.removedImages} image cards, and removed ${result.removedGroups} empty groups.`
+                        )
+                      );
+                    }
+                    closeMoreSheet();
+                  }}
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[18px] border border-dashed border-[var(--mobile-clay-border-strong)] bg-[var(--mobile-clay-surface-bg)]/80 px-3 py-3 text-sm font-medium text-[var(--text-secondary)] active:scale-[0.99] transition-transform cursor-pointer"
+                >
+                  <Trash2 size={16} />
+                  {pick('清理错误卡片', 'Clean Invalid Cards')}
                 </button>
               </div>
             ) : null}
@@ -338,19 +414,19 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               {/* 搜索与历史合并 */}
               <button type="button" onClick={() => runFromMoreSheet(onOpenHistory)} className={moreSheetActionClass}>
                 <Clock3 size={17} className="mb-2.5" />
-                <div className="text-sm font-semibold">历史与搜索</div>
-                <div className="mt-1 text-xs text-white/55">查找历史提示词和结果</div>
+                <div className="text-sm font-semibold">{pick('历史与搜索', 'History & Search')}</div>
+                <div className="mt-1 text-xs text-[var(--text-tertiary)]">{pick('查找历史提示词和结果', 'Find history prompts and results')}</div>
               </button>
               {/* 电商生图独立入口（使用 PackageOpen 呼应电脑端） */}
               <button type="button" onClick={() => runFromMoreSheet(() => onScreenChange('ecommerce'))} className={moreSheetActionClass}>
                 <PackageOpen size={17} className="mb-2.5 text-[var(--accent-color)]" />
-                <div className="text-sm font-semibold">电商生图</div>
-                <div className="mt-1 text-xs text-white/55">电商专用生图和任务管理</div>
+                <div className="text-sm font-semibold">{pick('电商生图', 'E-commerce Gen')}</div>
+                <div className="mt-1 text-xs text-[var(--text-tertiary)]">{pick('电商专用生图和任务管理', 'E-commerce image generation & tasks')}</div>
               </button>
               <button type="button" onClick={() => runFromMoreSheet(onOpenChat)} className={moreSheetActionClass}>
                 <MessageSquare size={17} className="mb-2.5" />
-                <div className="text-sm font-semibold">聊天</div>
-                <div className="mt-1 text-xs text-white/55">打开对话侧边栏</div>
+                <div className="text-sm font-semibold">{pick('聊天', 'Chat')}</div>
+                <div className="mt-1 text-xs text-[var(--text-tertiary)]">{pick('打开对话侧边栏', 'Open chat sidebar')}</div>
               </button>
               <button
                 type="button"
@@ -359,8 +435,8 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                 className={moreSheetActionClass}
               >
                 <Settings size={17} className="mb-2.5" />
-                <div className="text-sm font-semibold">设置</div>
-                <div className="mt-1 text-xs text-white/55">模型、渠道和系统选项</div>
+                <div className="text-sm font-semibold">{pick('设置', 'Settings')}</div>
+                <div className="mt-1 text-xs text-[var(--text-tertiary)]">{pick('模型、渠道和系统选项', 'Models, providers and options')}</div>
               </button>
             </div>
           </div>

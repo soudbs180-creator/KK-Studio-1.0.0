@@ -65,6 +65,7 @@ export const StorageSettingsView: React.FC = () => {
     activeCanvas,
     mergeCanvasInto,
     cleanupInvalidCards,
+    clearAllData,
   } = useCanvas();
 
   const [mode, setMode] = useState<StorageMode | null>(null);
@@ -396,6 +397,72 @@ export const StorageSettingsView: React.FC = () => {
     } finally {
       setProjectAction(null);
     }
+    };
+
+  // 简体中文：为设置页提供免确认的快捷错误卡片清理操作，响应用户“错误卡片不需要危险提醒”的要求
+  const handleQuickCleanupInvalid = async () => {
+    if (!activeCanvas) {
+      notify.warning(
+        pick('没有活动项目', 'No active project'),
+        pick('请先打开一个项目。', 'Open a project first.')
+      );
+      return;
+    }
+
+    setProjectAction('cleanup');
+    try {
+      const result = cleanupInvalidCards(activeCanvas.id);
+      const summary =
+        result.removedPrompts === 0 && result.removedImages === 0 && result.removedGroups === 0
+          ? pick(`“${activeCanvas.name}”中没有发现错误卡片。`, `No invalid cards were found in "${activeCanvas.name}".`)
+          : pick(
+              `已移除 ${result.removedPrompts} 张提示卡、${result.removedImages} 张图片卡，以及 ${result.removedGroups} 个空分组。`,
+              `Removed ${result.removedPrompts} prompt cards, ${result.removedImages} image cards, and ${result.removedGroups} empty groups from "${activeCanvas.name}".`
+            );
+      notify.success(pick('清理完成', 'Cleanup complete'), summary);
+      setLastActionMessage(summary);
+      void refresh();
+    } catch (error) {
+      console.error('[StorageSettingsView] Quick cleanup failed:', error);
+      notify.error(
+        pick('清理失败', 'Cleanup failed'),
+        pick('请稍后再试。', 'Please try again later.')
+      );
+    } finally {
+      setProjectAction(null);
+    }
+  };
+
+  // 简体中文：为高危的“彻底清除全部卡片与项目数据”操作提供处理器，强制弹出警示窗口，保证数据安全性
+  const handleClearAllData = async () => {
+    const confirmed = typeof window === 'undefined'
+      ? true
+      : window.confirm(
+          pick(
+            '⚠️ 警告：您确定要彻底清空所有的项目、卡片及图片缓存吗？此操作将重置整个工作台，所有本地 IndexedDB 缓存将被永久抹除，且无法撤销！',
+            '⚠️ WARNING: Are you sure you want to permanently clear all projects, cards, and image caches? This will reset the workspace. All local IndexedDB caches will be wiped out and cannot be undone!'
+          )
+        );
+    if (!confirmed) return;
+
+    setCleanupType('compress'); // 复用 loading 状态
+    try {
+      clearAllData();
+      notify.success(
+        pick('抹除全部成功', 'All Data Cleared'),
+        pick('工作区已完全重置。', 'Workspace has been fully reset.')
+      );
+      setLastActionMessage(pick('已抹除全部项目与缓存数据并重置。', 'All projects and caches have been cleared and reset.'));
+      await refresh();
+    } catch (error) {
+      console.error('[StorageSettingsView] Clear all failed:', error);
+      notify.error(
+        pick('清空失败', 'Clear failed'),
+        pick('请重试或稍后再试。', 'Please try again later.')
+      );
+    } finally {
+      setCleanupType(null);
+    }
   };
 
   return (
@@ -551,9 +618,9 @@ export const StorageSettingsView: React.FC = () => {
           </div>
         </div>
 
-        {/* 卡片 7: 清理控制 (2A * 2row) */}
+        {/* 卡片 7: 清理控制 (2A * 3row) */}
         <div 
-          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row p-4 flex flex-col justify-between"
+          className="dashboard-grid-card a-card-span-2-col a-card-span-3-row p-4 flex flex-col justify-between"
           style={{ cursor: 'default' }}
         >
           <div>
@@ -562,38 +629,92 @@ export const StorageSettingsView: React.FC = () => {
             </div>
             <h3 className="text-sm font-bold text-white mt-1.5">{pick('缓存清理与保留策略', 'Cache & Retention Policy')}</h3>
             <p className="text-[11px] text-slate-400 mt-1">
-              {pick('安全清理本地图片缓存，以释放空间。项目元数据和结果图保持原样。', 'Safely reclaim local space without deleting final project data.')}
+              {pick('安全清理本地缓存与历史痕迹，或彻底抹除所有工作区 data。', 'Reclaim space by cleaning cache or fully wiping all workspace data.')}
             </p>
 
-            <div className="mt-3 bg-white/5 border border-white/5 p-2.5 rounded-xl flex items-center justify-between">
-              <div className="min-w-0 flex-1 pr-2">
-                <div className="text-[10px] font-semibold text-white">{pick('原图缓存清理', 'Originals Cleanup')}</div>
-                <div className="text-[9px] text-slate-400 mt-0.5 leading-normal truncate">{pick('一键清除编辑时的原图残留', 'Clean unneeded original draft files')}</div>
-              </div>
-              <button
-                type="button"
-                disabled={cleanupType === 'compress'}
-                onClick={() => void handleCleanup()}
-                className="bg-rose-600 hover:bg-rose-700 text-white rounded-lg py-1.5 px-3 text-[10px] font-bold transition active:scale-95 shrink-0 cursor-pointer"
-              >
-                {pick('立即清理', 'Clean')}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 mt-2.5">
-              {retentionCleanupOptions.map((option) => (
-                <div key={option.days} className="bg-white/5 border border-white/5 p-2 rounded-lg flex flex-col justify-between h-[64px]">
-                  <div className="text-[10px] font-semibold text-white">{option.label}</div>
-                  <button
-                    type="button"
-                    disabled={cleanupType === option.days}
-                    onClick={() => void handleRetentionCleanup(option.days)}
-                    className="w-full bg-white/10 hover:bg-white/15 border border-white/10 text-slate-200 rounded-lg py-1 px-1.5 text-[9px] font-bold transition active:scale-95 mt-1 cursor-pointer"
-                  >
-                    {pick(`仅保留 ${option.days} 天`, `Keep ${option.days}D`)}
-                  </button>
+            <div className="space-y-3 mt-3">
+              {/* 1. 清理错误卡片 */}
+              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+                <div className="min-w-0 flex-1 pr-2">
+                  <div className="text-[11px] font-semibold text-white flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    {pick('清理全部错误卡片', 'Clean Broken Cards')}
+                  </div>
+                  <div className="text-[9px] text-slate-400 mt-0.5 leading-normal">
+                    {pick('移除当前项目中的无效卡片、失效图片及空分组', 'Clean broken cards and empty groups')}
+                  </div>
                 </div>
-              ))}
+                <button
+                  type="button"
+                  onClick={handleQuickCleanupInvalid}
+                  className="bg-white/10 hover:bg-white/15 text-slate-200 border border-white/10 rounded-lg py-1 px-3 text-[10px] font-semibold transition active:scale-95 shrink-0 cursor-pointer"
+                >
+                  {pick('立即清理', 'Clean')}
+                </button>
+              </div>
+
+              {/* 2. 仅保留 30 天数据 */}
+              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+                <div className="min-w-0 flex-1 pr-2">
+                  <div className="text-[11px] font-semibold text-white flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                    {pick('30 天保留策略', '30-Day Policy')}
+                  </div>
+                  <div className="text-[9px] text-slate-400 mt-0.5 leading-normal">
+                    {pick('仅保留 30 天内数据，清理过期缓存、日志与任务', 'Keep last 30 days of cache, logs and tasks')}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={cleanupType === 30}
+                  onClick={() => void handleRetentionCleanup(30)}
+                  className="bg-amber-600/80 hover:bg-amber-600 text-white rounded-lg py-1 px-3 text-[10px] font-semibold transition active:scale-95 shrink-0 cursor-pointer"
+                >
+                  {pick('应用策略', 'Apply')}
+                </button>
+              </div>
+
+              {/* 3. 仅保留 7 天数据 */}
+              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+                <div className="min-w-0 flex-1 pr-2">
+                  <div className="text-[11px] font-semibold text-white flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400"></span>
+                    {pick('7 天保留策略', '7-Day Policy')}
+                  </div>
+                  <div className="text-[9px] text-slate-400 mt-0.5 leading-normal">
+                    {pick('仅保留 7 天内数据，大幅释放本地存储空间', 'Keep last 7 days of cache, logs and tasks')}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={cleanupType === 7}
+                  onClick={() => void handleRetentionCleanup(7)}
+                  className="bg-orange-600/80 hover:bg-orange-600 text-white rounded-lg py-1 px-3 text-[10px] font-semibold transition active:scale-95 shrink-0 cursor-pointer"
+                >
+                  {pick('应用策略', 'Apply')}
+                </button>
+              </div>
+
+              {/* 4. 删除全部所有卡片 */}
+              <div className="flex items-center justify-between p-2 rounded-xl bg-red-500/5 border border-red-500/10 hover:bg-red-500/10 transition-colors">
+                <div className="min-w-0 flex-1 pr-2">
+                  <div className="text-[11px] font-semibold text-red-400 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                    {pick('删除全部所有卡片', 'Clear All Data')}
+                  </div>
+                  <div className="text-[9px] text-red-200/50 mt-0.5 leading-normal">
+                    {pick('高危：永久清空所有项目、卡片和图片缓存并重置', 'DANGER: Wipe all projects, cards, cache and reset')}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={cleanupType === 'compress'}
+                  onClick={handleClearAllData}
+                  className="bg-red-600 hover:bg-red-700 text-white rounded-lg py-1 px-3 text-[10px] font-bold transition active:scale-95 shrink-0 cursor-pointer"
+                >
+                  {pick('清理全部', 'Wipe All')}
+                </button>
+              </div>
             </div>
           </div>
         </div>

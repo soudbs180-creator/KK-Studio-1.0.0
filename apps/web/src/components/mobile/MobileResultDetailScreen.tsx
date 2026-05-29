@@ -88,7 +88,7 @@ const ActionButton: React.FC<{
     tone === 'danger'
       ? 'border-red-400/30 bg-red-500/10 text-red-300'
       : tone === 'primary'
-        ? 'border-white/10 bg-white/6 text-[var(--text-primary)]'
+        ? 'border-[var(--mobile-clay-active-border)] bg-[var(--mobile-clay-active-bg)] text-[var(--text-primary)]'
         : 'border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] text-[var(--text-primary)]';
 
   return (
@@ -116,6 +116,7 @@ const stageToneClassMap: Record<
 
 const resolveAssetRoleLabel = (
   assetRole: NonNullable<MobileResultEntry['ecommerceContinuation']>['assetRoles'][number],
+  pick: <T>(zh: T, en: T) => T,
 ): string => {
   const normalized = assetRole.label?.trim();
   if (normalized) {
@@ -124,17 +125,17 @@ const resolveAssetRoleLabel = (
 
   switch (assetRole.role) {
     case 'product':
-      return '产品图';
+      return pick('产品图', 'Product Image');
     case 'reference':
-      return '参考图';
+      return pick('参考图', 'Reference Image');
     case 'extra-reference':
-      return '额外参考图';
+      return pick('额外参考图', 'Extra Reference');
     case 'series-template':
-      return '系列模板';
+      return pick('系列模板', 'Series Template');
     case 'accessory':
-      return '配件图';
+      return pick('配件图', 'Accessory Image');
     default:
-      return '素材';
+      return pick('素材', 'Asset');
   }
 };
 
@@ -248,23 +249,23 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
   };
 
   const { pick } = useLocale();
-  const promptSummary = normalizeText(currentActiveEntry.promptSummary, '未命名结果');
+  const promptSummary = normalizeText(currentActiveEntry.promptSummary, pick('未命名结果', 'Unnamed Result'));
   const fullPrompt = normalizeText(currentActiveEntry.fullPrompt, promptSummary);
   const ecommerceContinuation = currentActiveEntry.ecommerceContinuation;
   const metadataItems = [
-    currentActiveEntry.displayLabel ? { label: '任务', value: currentActiveEntry.displayLabel } : null,
+    currentActiveEntry.displayLabel ? { label: pick('任务', 'Task'), value: currentActiveEntry.displayLabel } : null,
     ecommerceContinuation?.outputTypeLabel &&
     ecommerceContinuation.outputTypeLabel !== currentActiveEntry.displayLabel
-      ? { label: '模块', value: ecommerceContinuation.outputTypeLabel }
+      ? { label: pick('模块', 'Module'), value: ecommerceContinuation.outputTypeLabel }
       : null,
     ecommerceContinuation?.declaredSizeText
-      ? { label: '需求尺寸', value: ecommerceContinuation.declaredSizeText }
+      ? { label: pick('需求尺寸', 'Required Size'), value: ecommerceContinuation.declaredSizeText }
       : null,
     { label: '比例', value: String(currentActiveEntry.aspectRatio) },
     { label: '尺寸', value: String(currentActiveEntry.imageSize) },
     { label: '素材', value: currentActiveEntry.hasOriginal ? '含原图' : '仅结果图' },
   ].filter(Boolean) as Array<{ label: string; value: string }>;
-  const previewLabel = currentActiveEntry.hasOriginal ? '原图' : '无原图';
+  const previewLabel = currentActiveEntry.hasOriginal ? pick('原图', 'Source Image') : pick('无原图', 'No Source');
   const ecommerceRequirementText = normalizeText(ecommerceContinuation?.taskPrompt, fullPrompt);
   const frameworkStatus = ecommerceContinuation?.frameworkStatus;
 
@@ -277,7 +278,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
       <div className="flex items-start justify-between gap-3 px-4 pb-2 pt-[calc(env(safe-area-inset-top)+10px)]">
         <div className="min-w-0 flex-1">
           <div className="text-[10px] uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
-            结果详情 {hasGroup ? `(${currentGroupImageIndex + 1}/${entry.groupEntries!.length})` : ''}
+            {pick('结果详情', 'Result Details')} {hasGroup ? `(${currentGroupImageIndex + 1}/${entry.groupEntries!.length})` : ''}
           </div>
           <div className="mt-1 truncate text-base font-semibold leading-6">{promptSummary}</div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-secondary)]">
@@ -292,7 +293,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
             onClick={handlePrevAction}
             className={iconButtonClass}
             disabled={!canGoPrevious}
-            aria-label="查看上一张结果"
+            aria-label={pick('查看上一张结果', 'View Previous Result')}
           >
             <ChevronLeft size={17} />
           </button>
@@ -301,7 +302,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
             onClick={handleNextAction}
             className={iconButtonClass}
             disabled={!canGoNext}
-            aria-label="查看下一张结果"
+            aria-label={pick('查看下一张结果', 'View Next Result')}
           >
             <ChevronRight size={17} />
           </button>
@@ -309,7 +310,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
             type="button"
             onClick={onClose}
             className={iconButtonClass}
-            aria-label="关闭结果详情"
+            aria-label={pick('关闭结果详情', 'Close Details')}
           >
             <X size={17} />
           </button>
@@ -384,7 +385,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
               key={`${item.label}-${item.value}`}
               className="shrink-0 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/75 px-3 py-1.5 text-xs text-[var(--text-secondary)]"
             >
-              {item.label}：<span className="font-medium text-[var(--text-primary)]">{item.value}</span>
+              {item.label}{pick('：', ': ')}<span className="font-medium text-[var(--text-primary)]">{item.value}</span>
             </div>
           ))}
         </div>
@@ -403,7 +404,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
                   {ecommerceContinuation.displayLabel}
                 </div>
                 <div className="mt-1 text-xs text-[var(--text-secondary)]">
-                  {ecommerceContinuation.sourceSheet} 路 {ecommerceContinuation.outputTypeLabel}
+                  {ecommerceContinuation.sourceSheet} {pick('路', 'Lane')} {ecommerceContinuation.outputTypeLabel}
                 </div>
               </div>
               <span
@@ -482,7 +483,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
                       key={`${assetRole.assetId}-${assetRole.role}`}
                       className="rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 px-2.5 py-1 text-[11px] text-[var(--text-secondary)]"
                     >
-                      {resolveAssetRoleLabel(assetRole)}
+                      {resolveAssetRoleLabel(assetRole, pick)}
                     </span>
                   ))}
                 </div>
@@ -496,13 +497,13 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
         ) : null}
 
         <div className="mt-3 rounded-[10px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3.5">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">提示词</div>
+          <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">{pick('提示词', 'Prompt')}</div>
           <div className="mt-2 whitespace-pre-wrap text-sm leading-6">{fullPrompt}</div>
         </div>
 
         <div className="mt-3 rounded-[10px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3.5">
           <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-            参考图 ({currentActiveEntry.referenceImages.length})
+            {pick('参考图', 'Reference Images')} ({currentActiveEntry.referenceImages.length})
           </div>
           {currentActiveEntry.referenceImages.length > 0 ? (
             <div className="mt-2.5 flex gap-2.5 overflow-x-auto pb-1">
@@ -525,7 +526,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
               })}
             </div>
           ) : (
-            <div className="mt-2.5 text-sm text-[var(--text-secondary)]">本次生成没有参考图。</div>
+            <div className="mt-2.5 text-sm text-[var(--text-secondary)]">{pick('本次生成没有参考图。', 'No reference images for this generation.')}</div>
           )}
         </div>
       </div>
@@ -534,7 +535,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
         {/* 第一排平铺按钮 */}
         <div className="grid grid-cols-3 gap-2">
           <ActionButton
-            label="继续创作"
+            label={pick('继续创作', 'Continue')}
             icon={<Sparkles size={15} />}
             tone="primary"
             onClick={() => {
@@ -543,7 +544,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
             }}
           />
           <ActionButton
-            label="重绘"
+            label={pick('重绘', 'Redraw')}
             icon={<Wand2 size={15} />}
             tone="primary"
             disabled={!redrawImage || !redrawImageUrl}
@@ -552,7 +553,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
             }}
           />
           <ActionButton
-            label="下载"
+            label={pick('下载', 'Download')}
             icon={<Download size={15} />}
             onClick={() => onDownload(currentActiveEntry)}
           />
@@ -567,7 +568,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
             onClick={() => onPreviewOriginal(currentActiveEntry.imageId)}
           />
           <ActionButton
-            label="删除"
+            label={pick('删除', 'Delete')}
             icon={<Trash2 size={15} />}
             tone="danger"
             onClick={() => onDelete(currentActiveEntry.imageId)}
@@ -579,7 +580,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
           <div className="mt-2 grid grid-cols-2 gap-2">
             {ecommerceContinuation.canToggleSelection ? (
               <ActionButton
-                label={ecommerceContinuation.selectedForGeneration ? '取消确认生成' : '确认生成'}
+                label={ecommerceContinuation.selectedForGeneration ? pick('取消确认生成', 'Cancel Confirm') : pick('确认生成', 'Confirm Generation')}
                 icon={<CheckCircle2 size={15} />}
                 tone={ecommerceContinuation.selectedForGeneration ? 'default' : 'primary'}
                 onClick={() =>
@@ -589,7 +590,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
             ) : null}
             {ecommerceContinuation.canEditTask ? (
               <ActionButton
-                label="编辑任务"
+                label={pick('编辑任务', 'Edit Task')}
                 icon={<FileText size={15} />}
                 tone="primary"
                 onClick={() => onEditEcommerceTask(currentActiveEntry)}
@@ -598,13 +599,13 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
             {ecommerceContinuation.kind === 'a-plus-module' ? (
               <>
                 <ActionButton
-                  label="确认桌面版"
+                  label={pick('确认桌面版', 'Confirm Desktop')}
                   icon={<CheckCircle2 size={15} />}
                   disabled={!ecommerceContinuation.canConfirmDesktop}
                   onClick={() => onConfirmEcommerceDesktop(currentActiveEntry)}
                 />
                 <ActionButton
-                  label="生成手机版"
+                  label={pick('生成手机版', 'Generate Mobile')}
                   icon={<Sparkles size={15} />}
                   disabled={!ecommerceContinuation.canGenerateMobile}
                   onClick={() => onGenerateEcommerceMobile(currentActiveEntry)}
