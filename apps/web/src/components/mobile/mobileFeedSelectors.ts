@@ -319,7 +319,8 @@ function resolveEcommerceContinuation(
 }
 
 const compareMobileFeedResults = (left: MobileResultEntry, right: MobileResultEntry): number => {
-  const timeDelta = right.timestamp - left.timestamp;
+  // 简体中文：更改为升序排序，使较新（时间戳大）的结果排在最下方，完美契合滚动到底部对焦的体验
+  const timeDelta = left.timestamp - right.timestamp;
   if (timeDelta !== 0) {
     return timeDelta;
   }
@@ -347,42 +348,122 @@ export function selectMobileFeedResults(
       ] as const),
   );
 
-  const rawEntries = imageNodes.map((imageNode) => {
-    const parentPromptId = normalizeOptionalId(imageNode.parentPromptId);
-    const promptNode = parentPromptId ? promptNodeById.get(parentPromptId) : undefined;
-    const promptSummary = resolvePromptSummary(promptNode, imageNode);
-    const displaySrc = resolveDisplaySource(imageNode);
-    const mobileLayout = resolveMobileResultLayout(imageNode);
-    const detailEntry = {
-      imageId: imageNode.id,
-      promptId: parentPromptId,
+  // 简体中文：收集所有已有对应生成图片的 parentPromptId 集合，用于防止将已生成图片的节点误判为失败节点
+  const parentPromptIdsWithImages = new Set<string>();
+  imageNodes.forEach((img) => {
+    if (img.parentPromptId) {
+      parentPromptIdsWithImages.add(img.parentPromptId);
+    }
+  });
+
+  // 简体中文：提取所有当前正在生成中，或者已失败且尚无成功图片的 PromptNode 并在移动端作为占位卡片呈现
+  const activePromptNodes = promptNodes.filter((node) => {
+    const isGenerating = Boolean(node.isGenerating) && !parentPromptIdsWithImages.has(node.id);
+    const isFailed = Boolean(node.error) && !parentPromptIdsWithImages.has(node.id);
+
+    if (!isGenerating && !isFailed) {
+      return false;
+    }
+
+    // 排除普通的未启动的草稿节点
+    if (node.isDraft && !isGenerating) {
+      return false;
+    }
+
+    // 排除画布辅助节点
+    if (node.hiddenInCanvas) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const promptEntries = activePromptNodes.map((node) => {
+    const promptSummary = resolvePromptSummary(node, { id: node.id } as any);
+    const mobileLayout: MobileResultLayout = {
+      aspectRatio: parseAspectRatioValue(node.aspectRatio) || 1,
+      aspectCategory: 'square',
+      emphasis: 'compact',
     };
 
     return {
-      id: imageNode.id,
-      imageId: imageNode.id,
-      displaySrc,
-      displayLabel: resolveDisplayLabel(imageNode, promptNode),
-      hasOriginal: Boolean(imageNode.originalUrl || imageNode.apiResultUrl),
-      timestamp: resolveTimestamp(imageNode, promptNode),
-      parentPromptId,
-      prompt: imageNode.prompt || promptNode?.prompt || promptSummary,
+      id: node.id,
+      imageId: node.id,
+      displaySrc: null,
+      displayLabel: node.ecommerce?.displayLabel,
+      hasOriginal: false,
+      timestamp: node.timestamp || Date.now(),
+      parentPromptId: node.id,
+      prompt: node.prompt,
       promptSummary,
-      fullPrompt: normalizeText(promptNode?.originalPrompt || promptNode?.prompt || promptSummary) || promptSummary,
-      referenceImages: promptNode?.referenceImages || [],
-      modelId: imageNode.model,
-      modelLabel: resolveModelLabel(imageNode),
-      aspectRatio: imageNode.aspectRatio || 'AUTO',
-      imageSize: imageNode.imageSize || '1K',
-      actions: { ...DEFAULT_RESULT_ACTIONS },
-      primaryImageSource: displaySrc,
-      ecommerceContinuation: resolveEcommerceContinuation(imageNode, promptNode, frameworkSummaryById),
+      fullPrompt: node.originalPrompt || node.prompt || promptSummary,
+      referenceImages: node.referenceImages || [],
+      modelId: node.model,
+      modelLabel: node.modelLabel || node.id,
+      aspectRatio: node.aspectRatio || 'AUTO',
+      imageSize: node.imageSize || '1K',
+      actions: {
+        preview: false,
+        useAsSource: false,
+        partialRedraw: false,
+        download: false,
+        delete: true,
+      },
+      primaryImageSource: null,
+      ecommerceContinuation: resolveEcommerceContinuation({ id: node.id } as any, node, frameworkSummaryById),
       mobileLayout,
-      detailEntryId: imageNode.id,
-      detailEntry,
-      tags: imageNode.tags || promptNode?.tags || [],
+      detailEntryId: node.id,
+      detailEntry: {
+        imageId: node.id,
+        promptId: node.id,
+      },
+      tags: node.tags || [],
+      isGenerating: node.isGenerating,
+      error: node.error === '::INTERRUPTED::' ? '生成被中断' : node.error,
     } satisfies MobileResultEntry;
   });
+
+  const rawEntries = [
+    ...imageNodes.map((imageNode) => {
+      const parentPromptId = normalizeOptionalId(imageNode.parentPromptId);
+      const promptNode = parentPromptId ? promptNodeById.get(parentPromptId) : undefined;
+      const promptSummary = resolvePromptSummary(promptNode, imageNode);
+      const displaySrc = resolveDisplaySource(imageNode);
+      const mobileLayout = resolveMobileResultLayout(imageNode);
+      const detailEntry = {
+        imageId: imageNode.id,
+        promptId: parentPromptId,
+      };
+
+      return {
+        id: imageNode.id,
+        imageId: imageNode.id,
+        displaySrc,
+        displayLabel: resolveDisplayLabel(imageNode, promptNode),
+        hasOriginal: Boolean(imageNode.originalUrl || imageNode.apiResultUrl),
+        timestamp: resolveTimestamp(imageNode, promptNode),
+        parentPromptId,
+        prompt: imageNode.prompt || promptNode?.prompt || promptSummary,
+        promptSummary,
+        fullPrompt: normalizeText(promptNode?.originalPrompt || promptNode?.prompt || promptSummary) || promptSummary,
+        referenceImages: promptNode?.referenceImages || [],
+        modelId: imageNode.model,
+        modelLabel: resolveModelLabel(imageNode),
+        aspectRatio: imageNode.aspectRatio || 'AUTO',
+        imageSize: imageNode.imageSize || '1K',
+        actions: { ...DEFAULT_RESULT_ACTIONS },
+        primaryImageSource: displaySrc,
+        ecommerceContinuation: resolveEcommerceContinuation(imageNode, promptNode, frameworkSummaryById),
+        mobileLayout,
+        detailEntryId: imageNode.id,
+        detailEntry,
+        tags: imageNode.tags || promptNode?.tags || [],
+        isGenerating: imageNode.isGenerating,
+        error: imageNode.error,
+      } satisfies MobileResultEntry;
+    }),
+    ...promptEntries,
+  ];
 
   const groupsMap = new Map<string, MobileResultEntry[]>();
   rawEntries.forEach((entry) => {
@@ -395,6 +476,7 @@ export function selectMobileFeedResults(
 
   const aggregatedEntries: MobileResultEntry[] = [];
   groupsMap.forEach((groupItems) => {
+    // 简体中文：将组内条目按照时间戳降序排列，使得最新的那张作为代表图展示
     groupItems.sort((a, b) => b.timestamp - a.timestamp);
     const representative = { ...groupItems[0] };
     representative.groupCount = groupItems.length;
