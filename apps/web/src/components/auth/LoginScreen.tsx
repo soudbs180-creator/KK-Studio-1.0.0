@@ -25,6 +25,7 @@ import { signInWithPasswordWithFallback } from '../../services/auth/passwordSign
 import { startWechatLogin } from '../../services/auth/wechatAuth.ts';
 import { pickByResolvedLanguage, type ResolvedLanguage } from '../../utils/localeText';
 import { readRuntimeEnv } from '../../utils/runtimeEnv';
+import { safeOpenLink } from '../../utils/browserUtils';
 import { getTurnstileDisabledMessage, getTurnstileMissingSiteKeyMessage, mapAuthErrorMessage } from './authLocalization';
 import { TurnstileWidget, canUseTurnstile, ensureTurnstileScript, useTurnstile, type TurnstileStatus } from './TurnstileWidget';
 import WechatQrModal from './WechatQrModal';
@@ -413,7 +414,7 @@ const LoginScreen: React.FC = () => {
         loading={wechatLoading}
         error={wechatError}
         onClose={() => setWechatModalOpen(false)}
-        onOpenInNewPage={() => wechatAuthorizationUrl && window.open(wechatAuthorizationUrl, '_blank', 'noopener,noreferrer')}
+        onOpenInNewPage={() => wechatAuthorizationUrl && safeOpenLink(wechatAuthorizationUrl)}
       />
 
       <div className="auth-shader-background" aria-hidden>{showShaderBackground ? <Suspense fallback={null}><DeferredAuthShaderBackground className="auth-shader-canvas" /></Suspense> : null}</div>

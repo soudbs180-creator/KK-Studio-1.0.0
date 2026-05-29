@@ -44,6 +44,7 @@ import {
 import { resolveUserApiViewState } from '../../services/api/userApiViewState';
 import { useAuth } from '../../context/AuthContext';
 import { useLocale } from '../../context/LocaleContext';
+import { safeOpenLink } from '../../utils/browserUtils';
 import { useTheme } from '../../context/ThemeContext';
 import keyManager, {
   type KeySlot,
@@ -3114,7 +3115,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                       key={`${link.labelEn}:${link.url}`}
                       type="button"
                       className="settings-provider-editor-link"
-                      onClick={() => window.open(link.url, '_blank', 'noopener,noreferrer')}
+                      onClick={() => safeOpenLink(link.url)}
                     >
                       <Globe size={14} />
                       <span>{pick(link.labelZh, link.labelEn)}</span>

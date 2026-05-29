@@ -21,6 +21,7 @@ import { resolveModelDisplayName } from '../../utils/modelDisplayName';
 import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
 import { base64ToBlob, generateDownloadFilename, triggerDownload } from '../../utils/downloadUtils';
 import { snapCanvasPointToGrid } from '../../utils/canvasSnapToGrid';
+import { safeOpenLink } from '../../utils/browserUtils';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -943,7 +944,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             const fallbackUrl = image.originalUrl || image.apiResultUrl || displaySrc || image.url;
             if (fallbackUrl && fallbackUrl.startsWith('http') && err.message === 'Failed to fetch') {
                 console.warn('[ImageCard2] CORS blocked download, opening in new tab instead.');
-                window.open(fallbackUrl, '_blank');
+                safeOpenLink(fallbackUrl);
                 return;
             }
 

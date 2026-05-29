@@ -10,6 +10,7 @@ import { generateDownloadFilename, triggerDownload } from '../../utils/downloadU
 import { clampGenerationDurationMs, formatGenerationDurationSeconds } from '../../utils/timeUtils';
 import { pickByDocumentLanguage } from '../../utils/localeText';
 import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
+import { safeOpenLink } from '../../utils/browserUtils';
 
 interface GlobalLightboxProps {
     images: GeneratedImage[];
@@ -704,7 +705,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
 	            const isAudioMode = image.mode === GenerationMode.AUDIO || (image.url && (image.url.includes('.mp3') || image.url.includes('.wav')));
 	            if (isVideoMode || isAudioMode) {
 	                const fallback = image.originalUrl || image.apiResultUrl || displaySrc || image.url;
-	                if (fallback) window.open(fallback, '_blank', 'noopener,noreferrer');
+	                if (fallback) safeOpenLink(fallback);
 	                return;
 	            }
 	            notify.warning('原图不可用', '当前仅有预览图，未找到可下载的原图。');

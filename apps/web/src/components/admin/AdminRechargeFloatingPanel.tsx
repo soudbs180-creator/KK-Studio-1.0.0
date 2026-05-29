@@ -7,6 +7,7 @@ import { kkWebApiClient } from '../../services/api/kkApiClient';
 import { listAdminRechargeSubmissions } from '../../services/billing/rechargeSubmissionService';
 import { notify } from '../../services/system/notificationService';
 import { readRuntimeEnv } from '../../utils/runtimeEnv';
+import { safeOpenLink } from '../../utils/browserUtils';
 
 function formatAmount(value: number | undefined, currencyCode: string | undefined): string {
   const symbol = currencyCode === 'USD' ? '$' : '楼';
@@ -58,7 +59,7 @@ function openAdminRechargePage(submissionId?: string) {
   const suffix = submissionId
     ? `/recharge-submissions?submissionId=${encodeURIComponent(submissionId)}`
     : '/recharge-submissions';
-  window.open(`${baseUrl.replace(/\/$/, '')}${suffix}`, '_blank', 'noopener,noreferrer');
+  safeOpenLink(`${baseUrl.replace(/\/$/, '')}${suffix}`);
 }
 
 const AdminRechargeFloatingPanel: React.FC = () => {

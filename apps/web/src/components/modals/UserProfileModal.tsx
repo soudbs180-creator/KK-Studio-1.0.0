@@ -19,6 +19,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
+import { safeOpenLink } from '../../utils/browserUtils';
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
 import { useAuth } from '../../context/AuthContext';
 import { useBilling } from '../../context/BillingContext';
@@ -626,7 +627,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         onClose={closeWechatModal}
         onOpenInNewPage={() => {
           if (wechatAuthorizationUrl) {
-            window.open(wechatAuthorizationUrl, '_blank', 'noopener,noreferrer');
+            safeOpenLink(wechatAuthorizationUrl);
           }
         }}
       />

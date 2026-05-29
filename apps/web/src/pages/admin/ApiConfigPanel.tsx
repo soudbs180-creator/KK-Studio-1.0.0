@@ -18,6 +18,7 @@ import {
   type AdminModelConfig,
   type AdminProvider,
 } from "../../services/model/adminModelService.ts";
+import { safeOpenLink } from "../../utils/browserUtils";
 
 type AdminPresetKind = "official" | "relay";
 type DraftPricing = Record<AdminModelQualityKey, string>;
@@ -435,7 +436,7 @@ export const ApiConfigPanel: React.FC = () => {
                 <strong>{preset.name}</strong>
                 <small>{parseHost(preset.baseUrl)} · {preset.modelId}</small>
               </div>
-              <button type="button" onClick={() => window.open(preset.website, "_blank", "noopener,noreferrer")}>
+              <button type="button" onClick={() => safeOpenLink(preset.website)}>
                 <ExternalLink size={16} />
               </button>
             </div>
