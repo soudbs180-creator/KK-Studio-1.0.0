@@ -227,6 +227,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return true;
       }
 
+      // 简体中文：如果托管环境的 Cookie Session 恢复失败，但本地存有 AccessToken
+      // 我们不应当直接清空，而是返回 false，交给外层逻辑降级使用本地存储的 Token 进行登录恢复
+      const storedToken = getStoredKkApiAccessToken();
+      if (storedToken) {
+        console.log("[AuthContext] Hosted session restore failed, trying local token fallback...");
+        return false;
+      }
+
       if (isSessionRecoveryAuthErrorCode(response.error?.code)) {
         clearHostedSession();
         return true;
