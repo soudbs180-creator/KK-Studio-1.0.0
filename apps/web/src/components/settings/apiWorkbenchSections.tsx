@@ -528,6 +528,8 @@ type ApiWorkbenchModelCenterRouteItem = {
   refreshDisabled?: boolean;
   deleteDisabled?: boolean;
   refreshLoading?: boolean;
+  recommendedModel?: string;
+  logoName?: string;
 };
 
 type ApiWorkbenchModelCenterPresetItem = {
