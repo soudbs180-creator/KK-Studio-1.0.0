@@ -23,6 +23,7 @@ test('ecommerce node generation runtime owns node state patches and single-card 
   assert.match(hookSource, /updateEcommerceNodeState: UpdateEcommerceNodeState;/);
   assert.match(hookSource, /runEcommerceNodeGeneration: \(/);
   assert.match(hookSource, /handleGenerateEcommerceNode: \(node: PromptNode\) => Promise<void>;/);
+  assert.match(hookSource, /handleOptimizeEcommerceTaskPrompt: \(node: PromptNode\) => Promise<void>;/);
   assert.match(hookSource, /handleRegenerateUnsatisfiedEcommerceNode: \(node: PromptNode\) => Promise<void>;/);
   assert.match(hookSource, /handleConfirmEcommerceDesktop: \(node: PromptNode\) => void;/);
   assert.match(hookSource, /handleRetryEcommerceModule: \(node: PromptNode\) => Promise<void>;/);
@@ -39,19 +40,24 @@ test('ecommerce node generation runtime owns node state patches and single-card 
   assert.match(hookSource, /regenerateFeedbackPromptSuffix/);
   assert.match(hookSource, /promptAssistMode: node\.ecommerce\.stage === 'failed' \? 'disabled' : undefined/);
   assert.match(hookSource, /promptAssistMode: 'regenerate-feedback'/);
+  assert.match(hookSource, /const handleOptimizeEcommerceTaskPrompt = useCallback/);
+  assert.match(hookSource, /promptOverride: optimizedPrompt/);
+  assert.match(hookSource, /source: optimizedSource/);
 
   assert.match(appSource, /import \{[\s\S]*?useEcommerceNodeGenerationRuntime,[\s\S]*?type SetEcommerceNodeGenerationRuntimeState[\s\S]*?\} from '\.\/app\/useEcommerceNodeGenerationRuntime';/);
   assert.match(appSource, /const updateEcommerceNodeGenerationRuntimeState = useCallback<SetEcommerceNodeGenerationRuntimeState>/);
   assert.match(appSource, /useEcommerceNodeGenerationRuntime\(\{/);
   assert.match(appSource, /setEcommerceNodeGenerationRuntimeState: updateEcommerceNodeGenerationRuntimeState/);
-  assert.match(appSource, /const \{[\s\S]*?updateEcommerceNodeState,[\s\S]*?handleGenerateEcommerceNode,[\s\S]*?handleRegenerateUnsatisfiedEcommerceNode,[\s\S]*?handleConfirmEcommerceDesktop,[\s\S]*?handleRetryEcommerceModule,[\s\S]*?\} = useEcommerceNodeGenerationRuntime\(\{/);
+  assert.match(appSource, /const \{[\s\S]*?updateEcommerceNodeState,[\s\S]*?handleGenerateEcommerceNode,[\s\S]*?handleOptimizeEcommerceTaskPrompt,[\s\S]*?handleRegenerateUnsatisfiedEcommerceNode,[\s\S]*?handleConfirmEcommerceDesktop,[\s\S]*?handleRetryEcommerceModule,[\s\S]*?\} = useEcommerceNodeGenerationRuntime\(\{/);
   assert.match(appSource, /updateEcommerceNodeState,/);
   assert.match(appSource, /handleGenerateEcommerceNode,/);
+  assert.match(appSource, /onOptimizeEcommerceTaskPrompt: handleOptimizeEcommerceTaskPrompt/);
   assert.match(appSource, /onRegenerateUnsatisfiedEcommerceNode: handleRegenerateUnsatisfiedEcommerceNode/);
   assert.match(appSource, /handleRetryEcommerceModule,/);
   assert.doesNotMatch(appSource, /const updateEcommerceNodeState = useCallback/);
   assert.doesNotMatch(appSource, /const runEcommerceNodeGeneration = useCallback/);
   assert.doesNotMatch(appSource, /const syncActiveEcommerceTask = useCallback/);
+  assert.doesNotMatch(appSource, /const handleOptimizeEcommerceTaskPrompt = useCallback/);
   assert.doesNotMatch(appSource, /const handleGenerateEcommerceNode = useCallback/);
   assert.doesNotMatch(appSource, /const handleConfirmEcommerceDesktop = useCallback/);
   assert.doesNotMatch(appSource, /const handleRetryEcommerceModule = useCallback/);

@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 
+import { optimizePromptForImage } from '../../services/llm/promptOptimizerService';
 import type { EcommerceAPlusControlMode, EcommerceEditableTaskState, ReferenceImage } from '../../types';
 
 export type EcommerceTaskStateUpdater =
@@ -22,6 +23,7 @@ interface EcommerceTaskEditorPanelProps {
   collapsible?: boolean;
   defaultExpanded?: boolean;
   referenceImages?: ReferenceImage[];
+  onOptimizePrompt?: (taskState: EcommerceEditableTaskState) => Promise<void> | void;
 }
 
 const inputClassName = 'w-full rounded-lg border bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--clay-brand-pink)]';
@@ -121,6 +123,20 @@ function resolveReferenceImageSrc(image?: ReferenceImage): string {
     : `data:${image?.mimeType || 'image/png'};base64,${data}`;
 }
 
+function buildPromptOptimizerReferenceImages(referenceImages: ReferenceImage[]) {
+  return referenceImages
+    .filter((image) => image.data || image.url)
+    .map((image) => {
+      const mimeType = image.mimeType || 'image/png';
+      const data = image.data || image.url || '';
+      const match = data.match(/^data:([^;]+);base64,(.+)$/);
+      return {
+        mimeType: match?.[1] || mimeType,
+        data: match?.[2] || data,
+      };
+    });
+}
+
 const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
   taskState,
   onTaskStateChange,
@@ -128,8 +144,10 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
   collapsible = false,
   defaultExpanded = true,
   referenceImages = [],
+  onOptimizePrompt,
 }) => {
   const [isExpanded, setIsExpanded] = React.useState(() => !collapsible || defaultExpanded);
+  const [isOptimizingPrompt, setIsOptimizingPrompt] = React.useState(false);
   const rootPaddingClassName = compact ? 'p-2.5' : 'p-3';
   const textareaMinHeightClassName = compact ? 'min-h-[56px]' : 'min-h-[72px]';
   const textareaClassName = `${inputClassName} ${textareaMinHeightClassName} resize-y`;
@@ -194,16 +212,47 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
     }));
   };
 
-  const markPromptForAiAssist = () => {
-    updateTaskState((previous) => ({
-      ...previous,
-      promptAssistState: {
-        optimized: true,
-        source: 'manual',
-        updatedAt: Date.now(),
-        error: undefined,
-      },
-    }));
+  const markPromptForAiAssist = async () => {
+    setIsOptimizingPrompt(true);
+    try {
+      if (onOptimizePrompt) {
+        await onOptimizePrompt(taskState);
+        return;
+      }
+
+      const rawPrompt = taskState.promptOverride || taskState.resolvedPromptPreview || taskState.sparseUserIntent || taskState.displayLabel;
+      const optimized = await optimizePromptForImage(rawPrompt, {
+        mode: 'ecommerce',
+        aspectRatio: taskState.effectiveSizeTier || taskState.declaredSizeText || taskState.outputTypeLabel,
+        referenceImages: buildPromptOptimizerReferenceImages(referenceImages),
+      });
+      const source = optimized.usedModelId === 'local-rulebook' ? 'local-rulebook' : 'manual';
+      updateTaskState((previous) => ({
+        ...previous,
+        promptOverride: optimized.optimizedEn || rawPrompt,
+        resolvedPromptPreview: optimized.optimizedEn || rawPrompt,
+        lastRenderPrompt: optimized.optimizedEn || rawPrompt,
+        promptAssistState: {
+          optimized: true,
+          source,
+          updatedAt: Date.now(),
+          error: undefined,
+        },
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '提示词优化失败';
+      updateTaskState((previous) => ({
+        ...previous,
+        promptAssistState: {
+          ...previous.promptAssistState,
+          optimized: false,
+          updatedAt: Date.now(),
+          error: message,
+        },
+      }));
+    } finally {
+      setIsOptimizingPrompt(false);
+    }
   };
 
   const updateReferenceAnchorRole = (anchorId: string, nextRoleLabel: string) => {
@@ -410,10 +459,11 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
               className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]"
               style={taskState.promptAssistState?.optimized ? infoChipStyle : summaryChipStyle}
               onClick={markPromptForAiAssist}
-              title="下次生成时使用电商 AI 辅助优化当前任务提示词"
+              disabled={isOptimizingPrompt}
+              title="点击后优化当前任务提示词，后续生成会使用优化结果"
             >
               <Sparkles size={11} />
-              {taskState.promptAssistState?.optimized ? 'AI辅助已开' : '优化提示词'}
+              {isOptimizingPrompt ? '优化中' : taskState.promptAssistState?.optimized ? 'AI辅助已开' : '优化提示词'}
             </button>
             {taskState.promptOverride ? (
               <button

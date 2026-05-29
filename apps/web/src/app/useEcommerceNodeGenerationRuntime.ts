@@ -74,6 +74,7 @@ export interface UseEcommerceNodeGenerationRuntimeResult {
     options?: EcommerceNodeGenerationOptions
   ) => Promise<void>;
   handleGenerateEcommerceNode: (node: PromptNode) => Promise<void>;
+  handleOptimizeEcommerceTaskPrompt: (node: PromptNode) => Promise<void>;
   handleRegenerateUnsatisfiedEcommerceNode: (node: PromptNode) => Promise<void>;
   handleConfirmEcommerceDesktop: (node: PromptNode) => void;
   handleRetryEcommerceModule: (node: PromptNode) => Promise<void>;
@@ -339,6 +340,125 @@ export function useEcommerceNodeGenerationRuntime({
     }
   }, [runEcommerceNodeGeneration]);
 
+  const handleOptimizeEcommerceTaskPrompt = useCallback(async (node: PromptNode) => {
+    const latestNode = activeCanvasRef.current?.promptNodes.find((item) => item.id === node.id) || node;
+    if (!latestNode.ecommerce || !latestNode.ecommerce.editableTask || !latestNode.ecommerce.seriesTemplate) {
+      return;
+    }
+
+    const nextGenerationSettings = resolveEcommerceNodeGenerationSettings(latestNode);
+    const baseTaskState = ecommerceState.activeTaskNodeId === latestNode.id
+      ? (ecommerceState.activeTaskState || latestNode.ecommerce.editableTask)
+      : latestNode.ecommerce.editableTask;
+    const seriesTemplate = latestNode.ecommerce.seriesTemplate;
+    const mergedTaskState = applyEffectiveSizingToTaskState(mergeEcommerceTaskState({
+      baseTask: {
+        ...baseTaskState,
+        assetRoles: baseTaskState.assetRoles,
+      },
+      seriesTemplate,
+      sparseIntent: ecommerceState.activeTaskNodeId === latestNode.id
+        ? (String(configPrompt || '').trim() || baseTaskState.sparseUserIntent || '')
+        : (baseTaskState.sparseUserIntent || ''),
+      productName: latestNode.ecommerce.productImageRef?.label || latestNode.ecommerce.theme || '',
+    }));
+    const renderTask = buildEcommerceRenderTask({
+      taskState: mergedTaskState,
+      seriesTemplate,
+      aspectRatio: String(nextGenerationSettings.aspectRatio),
+      imageSize: String(nextGenerationSettings.imageSize),
+    });
+    const pendingTaskState: EcommerceEditableTaskState = {
+      ...renderTask.taskState,
+      promptAssistState: {
+        ...renderTask.taskState.promptAssistState,
+        optimized: true,
+        source: 'manual',
+        updatedAt: Date.now(),
+        error: undefined,
+      },
+    };
+
+    updateEcommerceNodeState(latestNode.id, {
+      editableTask: pendingTaskState,
+      displayLabel: renderTask.displayLabel,
+    });
+    syncActiveEcommerceTask(latestNode.id, pendingTaskState);
+
+    const {
+      optimizedPrompt,
+      optimizedPromptEn,
+      optimizedPromptZh,
+      promptOptimizerResult,
+    } = await optimizeGenerationPrompt({
+      enabled: true,
+      rawPrompt: renderTask.prompt,
+      referenceImages: latestNode.referenceImages || [],
+      options: {
+        preferredModelId: latestNode.model,
+        aspectRatio: String(nextGenerationSettings.aspectRatio),
+        imageSize: String(nextGenerationSettings.imageSize),
+        mode: GenerationMode.ECOMMERCE,
+        supportsThinking: !!getModelCapabilities(latestNode.model)?.supportsThinking,
+        thinkingMode: resolveEffectiveEcommerceThinkingMode(),
+        ecommerceContext: {
+          taskState: renderTask.taskState,
+          seriesTemplate,
+          assetRoles: renderTask.taskState.assetRoles,
+          outputTarget: {
+            label: renderTask.displayLabel,
+            aspectRatio: String(nextGenerationSettings.aspectRatio),
+            imageSize: String(nextGenerationSettings.imageSize),
+          },
+        },
+      },
+      onError: (error) => {
+        console.warn('[handleOptimizeEcommerceTaskPrompt] Prompt optimization failed, fallback to render task prompt.', summarizePromptOptimizationError(error));
+      },
+    });
+    const optimizedSource = promptOptimizerResult?.meta?.engine === 'local-rulebook'
+      ? 'local-rulebook'
+      : 'manual';
+    const optimizedTaskState: EcommerceEditableTaskState = {
+      ...renderTask.taskState,
+      promptOverride: optimizedPrompt,
+      resolvedPromptPreview: optimizedPrompt,
+      lastRenderPrompt: optimizedPrompt,
+      promptAssistState: {
+        optimized: true,
+        source: optimizedSource,
+        updatedAt: Date.now(),
+        error: undefined,
+      },
+    };
+
+    updatePromptNode({
+      ...latestNode,
+      prompt: optimizedPrompt,
+      originalPrompt: renderTask.prompt,
+      optimizedPromptEn,
+      optimizedPromptZh,
+      promptOptimizerResult,
+      ecommerce: {
+        ...latestNode.ecommerce,
+        editableTask: optimizedTaskState,
+        displayLabel: renderTask.displayLabel,
+      },
+    });
+    syncActiveEcommerceTask(latestNode.id, optimizedTaskState);
+  }, [
+    activeCanvasRef,
+    applyEffectiveSizingToTaskState,
+    configPrompt,
+    ecommerceState.activeTaskNodeId,
+    ecommerceState.activeTaskState,
+    resolveEffectiveEcommerceThinkingMode,
+    resolveEcommerceNodeGenerationSettings,
+    syncActiveEcommerceTask,
+    updateEcommerceNodeState,
+    updatePromptNode,
+  ]);
+
   const handleRegenerateUnsatisfiedEcommerceNode = useCallback(async (node: PromptNode) => {
     if (!node.ecommerce) return;
 
@@ -399,6 +519,7 @@ export function useEcommerceNodeGenerationRuntime({
     updateEcommerceNodeState,
     runEcommerceNodeGeneration,
     handleGenerateEcommerceNode,
+    handleOptimizeEcommerceTaskPrompt,
     handleRegenerateUnsatisfiedEcommerceNode,
     handleConfirmEcommerceDesktop,
     handleRetryEcommerceModule,

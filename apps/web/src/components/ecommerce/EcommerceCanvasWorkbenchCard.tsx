@@ -33,6 +33,7 @@ interface EcommerceCanvasWorkbenchCardProps {
   ) => void;
   onToggleSelected?: (node: PromptNode, selected: boolean) => void;
   onGenerateNode?: (node: PromptNode) => void;
+  onOptimizeTaskPrompt?: (node: PromptNode) => Promise<void> | void;
   onRegenerateUnsatisfied?: (node: PromptNode) => void;
   onGenerateFramework?: (node: PromptNode) => void;
   onPauseFramework?: (node: PromptNode) => void;
@@ -130,6 +131,7 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
   onTaskStateChange,
   onToggleSelected,
   onGenerateNode,
+  onOptimizeTaskPrompt,
   onRegenerateUnsatisfied,
   onGenerateFramework,
   onPauseFramework,
@@ -565,6 +567,7 @@ const EcommerceCanvasWorkbenchCard: React.FC<EcommerceCanvasWorkbenchCardProps> 
                 taskState={activeTaskState?.taskId === selectedTaskState.taskId ? activeTaskState : selectedTaskState}
                 onTaskStateChange={onTaskStateChange}
                 referenceImages={selectedTaskNode.referenceImages || []}
+                onOptimizePrompt={onOptimizeTaskPrompt ? () => onOptimizeTaskPrompt(selectedTaskNode) : undefined}
                 compact
                 collapsible
                 defaultExpanded

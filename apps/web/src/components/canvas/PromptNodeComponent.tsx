@@ -305,6 +305,7 @@ interface PromptNodeProps {
     onToggleEcommerceSelected?: (node: PromptNode, selected: boolean) => void;
     onSetEcommerceGroupSelection?: (node: PromptNode, selected: boolean) => void;
     onGenerateEcommerceNode?: (node: PromptNode) => void;
+    onOptimizeEcommerceTaskPrompt?: (node: PromptNode) => void;
     onRegenerateUnsatisfiedEcommerceNode?: (node: PromptNode) => void;
     onGenerateEcommerceGroup?: (node: PromptNode, phase: 'desktop' | 'mobile') => void;
     onGenerateEcommerceFramework?: (node: PromptNode) => void;
@@ -574,6 +575,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     onToggleEcommerceSelected,
     onSetEcommerceGroupSelection,
     onGenerateEcommerceNode,
+    onOptimizeEcommerceTaskPrompt,
     onRegenerateUnsatisfiedEcommerceNode,
     onGenerateEcommerceGroup,
     onGenerateEcommerceFramework,
@@ -1539,6 +1541,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                             onTaskStateChange={onEcommerceTaskStateChange}
                             onToggleSelected={onToggleEcommerceSelected}
                             onGenerateNode={onGenerateEcommerceNode}
+                            onOptimizeTaskPrompt={onOptimizeEcommerceTaskPrompt}
                             onRegenerateUnsatisfied={onRegenerateUnsatisfiedEcommerceNode}
                             onGenerateFramework={onGenerateEcommerceFramework}
                             onPauseFramework={onPauseEcommerceFramework}

@@ -2737,12 +2737,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 });
                 let handledEcommerceDrop = false;
 
-                if (ecommerceDropRoute.requirementFiles.length > 0 && onPickEcommerceRequirementFile) {
+                if (ecommerceDropRoute.requirementFiles.length && onPickEcommerceRequirementFile) {
                     onPickEcommerceRequirementFile(ecommerceDropRoute.requirementFiles);
                     handledEcommerceDrop = true;
                 }
 
-                if (ecommerceDropRoute.productFiles.length > 0 && onPickEcommerceProductFiles) {
+                if (ecommerceDropRoute.productFiles.length && onPickEcommerceProductFiles) {
                     onPickEcommerceProductFiles(ecommerceDropRoute.productFiles);
                     handledEcommerceDrop = true;
                 }
