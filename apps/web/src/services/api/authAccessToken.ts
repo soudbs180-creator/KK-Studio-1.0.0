@@ -39,13 +39,8 @@ function isPrivateNetworkHostname(hostname: string | undefined): boolean {
 }
 
 function shouldPersistAccessTokenDurably(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  const hostname = normalizeHostname(window.location?.hostname)
-    || normalizeHostname(window.location?.origin ? new URL(window.location.origin).hostname : undefined);
-  return isLoopbackHostname(hostname) || isPrivateNetworkHostname(hostname);
+  // 简体中文：为保证用户在任何域名/公网 IP 下刷新或重新打开页面均不需要重新登录，一律在 localStorage 中持久化 Access Token
+  return true;
 }
 
 function getSessionStorage(): Storage | undefined {
