@@ -35,15 +35,15 @@ test('ecommerce partial redraw runtime owns ecommerce inheritance and finalizati
   assert.match(resultBlock, /finalizeEcommercePartialRedrawResult: \(params: FinalizeEcommercePartialRedrawResultParams\) => Promise<void>;/);
 });
 
-test('handlePartialRedrawRequest delegates ecommerce inheritance and redraw finalization to the hook', () => {
+test('handleRedrawRequest delegates ecommerce inheritance and redraw finalization to the hook', () => {
   const appSource = readSource('src/App.tsx');
-  const handlePartialRedrawIndex = appSource.indexOf('const handlePartialRedrawRequest = useCallback((image: GeneratedImage, request: RedrawRequest) => {');
-  const handleMobilePartialRedrawIndex = appSource.indexOf('const handleMobileResultPartialRedraw = useCallback((entry: MobileResultEntry, request: RedrawRequest) => {');
+  const handleRedrawIndex = appSource.indexOf('const handleRedrawRequest = useCallback((image: GeneratedImage, request: RedrawRequest) => {');
+  const handleMobileRedrawIndex = appSource.indexOf('const handleMobileResultRedraw = useCallback((entry: MobileResultEntry, request: RedrawRequest) => {');
 
-  assert.notEqual(handlePartialRedrawIndex, -1, 'expected App.tsx to declare handlePartialRedrawRequest');
-  assert.notEqual(handleMobilePartialRedrawIndex, -1, 'expected App.tsx to declare handleMobileResultPartialRedraw');
+  assert.notEqual(handleRedrawIndex, -1, 'expected App.tsx to declare handleRedrawRequest');
+  assert.notEqual(handleMobileRedrawIndex, -1, 'expected App.tsx to declare handleMobileResultRedraw');
 
-  const handlePartialRedrawSource = appSource.slice(handlePartialRedrawIndex, handleMobilePartialRedrawIndex);
+  const handlePartialRedrawSource = appSource.slice(handleRedrawIndex, handleMobileRedrawIndex);
 
   assert.match(handlePartialRedrawSource, /const ecommercePartialRedrawContext = resolveEcommercePartialRedrawContext\(sourceImage, parentPrompt\);/);
   assert.match(handlePartialRedrawSource, /await finalizeEcommercePartialRedrawResult\(\{/);

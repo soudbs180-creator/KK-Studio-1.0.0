@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
-import { type GeneratedImage, GenerationMode, type RedrawRequest } from '../../types';
+import { type GeneratedImage, GenerationMode, type RedrawRequest, type ReferenceImage } from '../../types';
 import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy, Sparkles } from 'lucide-react';
 import { RedrawWorkspace } from './RedrawWorkspace';
 import { notify } from '../../services/system/notificationService';
@@ -37,6 +37,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
     const [redrawWorkspaceMode, setRedrawWorkspaceMode] = useState<'fresh' | 'regenerate' | null>(null);
+    const [regenerateReferenceImages, setRegenerateReferenceImages] = useState<ReferenceImage[]>([]);
     const [showDownloadMenu, setShowDownloadMenu] = useState(false);
     const [isMobile, setIsMobile] = useState(() =>
         typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false
@@ -429,6 +430,8 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     handlePrevRef.current = handlePrev;
     const handleNextRef = useRef(handleNext);
     handleNextRef.current = handleNext;
+    const imagesRef = useRef(images);
+    imagesRef.current = images;
 
     // 简体中文注释：阻止移动端页面双指缩放和背景滚动，接管大图的原生手势事件流
     useEffect(() => {
@@ -466,7 +469,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         };
     }, [isMobile]);
 
-    // 简体中文注释：移动端 Touch 事件原生绑定，支持单指跟手微缩拖拽、双 Tap 缩放以及双指捏合捏放
+    // 简体中文注释：移动端 Touch 事件原生绑定，支持单指跟手微缩拖拽、双 Tap 缩放、上下切换结果以及双指捏合捏放。
     const touchStartRef = useRef<{ x: number; y: number }[]>([]);
     const initialTouchDistanceRef = useRef(0);
     const initialTouchZoomRef = useRef(1);
@@ -559,7 +562,16 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                 const deltaY = touch.clientY - touchStartRef.current[0].y;
 
                 if (Math.abs(deltaY) > 140) {
-                    onCloseRef.current();
+                    if (imagesRef.current.length > 1) {
+                        if (deltaY > 0) {
+                            handlePrevRef.current();
+                        } else {
+                            handleNextRef.current();
+                        }
+                        setPan({ x: 0, y: 0 });
+                    } else {
+                        onCloseRef.current();
+                    }
                 } else if (Math.abs(deltaX) > 80 && Math.abs(deltaY) < 60) {
                     if (deltaX > 0) {
                         handlePrevRef.current();
@@ -592,6 +604,45 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
             container.removeEventListener('touchend', handleTouchEnd);
         };
     }, [isMobile, handleTouchStart, handleTouchMove, handleTouchEnd]);
+
+    useEffect(() => {
+        if (redrawWorkspaceMode !== 'regenerate') {
+            setRegenerateReferenceImages([]);
+            return;
+        }
+
+        const referenceIds = Array.from(new Set([
+            ...(image.redraw?.extraReferenceImageIds || []),
+            ...(image.sourceReferenceStorageIds || []),
+        ].filter((id): id is string => Boolean(id && !/^redraw-color-map-/i.test(id)))));
+
+        let cancelled = false;
+        void (async () => {
+            const hydrated = await Promise.all(referenceIds.map(async (id): Promise<ReferenceImage | null> => {
+                try {
+                    const dataUrl = await getImage(id);
+                    if (!dataUrl) return null;
+                    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+                    return {
+                        id,
+                        storageId: id,
+                        data: match?.[2] || dataUrl,
+                        mimeType: match?.[1] || 'image/png',
+                        url: dataUrl,
+                    };
+                } catch {
+                    return null;
+                }
+            }));
+            if (!cancelled) {
+                setRegenerateReferenceImages(hydrated.filter((item): item is ReferenceImage => Boolean(item)));
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [image.redraw?.extraReferenceImageIds, image.sourceReferenceStorageIds, redrawWorkspaceMode]);
 
     useEffect(() => {
         setShowDownloadMenu(false);
@@ -1114,6 +1165,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                     initialPrompt={redrawWorkspaceMode === 'regenerate' ? (image.redraw?.strictPrompt || image.prompt || '') : ''}
                     initialRegions={redrawWorkspaceMode === 'regenerate' ? (image.redraw?.regions || []) : []}
                     initialColorBlocks={redrawWorkspaceMode === 'regenerate' ? (image.redraw?.colorBlocks || []) : []}
+                    initialReferenceImages={redrawWorkspaceMode === 'regenerate' ? regenerateReferenceImages : []}
                     onCancel={() => setRedrawWorkspaceMode(null)}
                     onSubmit={(request) => {
                         setRedrawWorkspaceMode(null);

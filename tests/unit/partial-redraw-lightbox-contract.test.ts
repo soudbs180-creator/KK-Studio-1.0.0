@@ -17,7 +17,17 @@ test('lightbox uses the unified RedrawWorkspace and no longer wires the legacy i
   assert.match(lightboxSource, /setRedrawWorkspaceMode\('regenerate'\)/);
   assert.match(lightboxSource, /<RedrawWorkspace/);
   assert.match(lightboxSource, /initialRegions=\{redrawWorkspaceMode === 'regenerate'/);
+  assert.match(lightboxSource, /initialReferenceImages=\{redrawWorkspaceMode === 'regenerate' \? regenerateReferenceImages : \[\]\}/);
+  assert.match(lightboxSource, /image\.redraw\?\.extraReferenceImageIds/);
   assert.doesNotMatch(lightboxSource, /InpaintModal/);
   assert.doesNotMatch(lightboxSource, /onInpaint/);
   assert.doesNotMatch(lightboxSource, /PartialRedrawModal/);
+});
+
+test('mobile lightbox vertical swipes switch results instead of closing multi-result redraw galleries', () => {
+  const lightboxSource = readSource('src/components/image/GlobalLightbox.tsx');
+
+  assert.match(lightboxSource, /imagesRef\.current\.length > 1/);
+  assert.match(lightboxSource, /if \(deltaY > 0\) \{\s*handlePrevRef\.current\(\);/);
+  assert.match(lightboxSource, /else \{\s*handleNextRef\.current\(\);/);
 });

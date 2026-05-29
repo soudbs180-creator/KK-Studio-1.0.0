@@ -29,6 +29,7 @@ interface RedrawWorkspaceProps {
   initialPrompt?: string;
   initialRegions?: RedrawRegion[];
   initialColorBlocks?: RedrawColorBlock[];
+  initialReferenceImages?: ReferenceImage[];
   onCancel: () => void;
   onSubmit: (request: RedrawRequest) => void;
 }
@@ -191,6 +192,7 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
   initialPrompt = '',
   initialRegions = [],
   initialColorBlocks = [],
+  initialReferenceImages = [],
   onCancel,
   onSubmit,
 }) => {
@@ -219,7 +221,7 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
   const [selectedColor, setSelectedColor] = useState(STANDARD_COLORS[0]);
   const [customRgb, setCustomRgb] = useState('239,68,68');
   const [prompt, setPrompt] = useState(initialPrompt);
-  const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
+  const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>(initialReferenceImages);
   const [sourceDimensions, setSourceDimensions] = useState(() => image.exactDimensions || { width: 1024, height: 1024 });
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
@@ -516,6 +518,10 @@ export const RedrawWorkspace: React.FC<RedrawWorkspaceProps> = ({
     const rgb = match.slice(1).map((value) => Math.min(255, Math.max(0, Number(value))));
     setSelectedColor(`#${rgb.map((value) => value.toString(16).padStart(2, '0')).join('')}`);
   }, [customRgb]);
+
+  useEffect(() => {
+    setReferenceImages(initialReferenceImages);
+  }, [initialReferenceImages]);
 
   const toolButtonClass = (active: boolean) => (
     `inline-flex h-10 w-10 items-center justify-center rounded-full border transition ${active ? 'border-white/70 bg-white text-black' : 'border-white/15 bg-black/45 text-white hover:bg-white/10'}`

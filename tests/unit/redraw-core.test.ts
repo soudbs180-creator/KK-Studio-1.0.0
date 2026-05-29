@@ -125,8 +125,10 @@ test('redraw core labels same-color blocks A-Z then numbers and builds color pro
   assert.equal(labeled[25].label, '红色Z');
   assert.equal(labeled[26].label, '红色1');
 
-  const prompt = buildColorBlockInstruction(labeled, '整体保持原构图');
+  const prompt = buildColorBlockInstruction(labeled, '整体保持原构图，@红色A 改得更高级');
   assert.match(prompt, /红色A/);
+  assert.match(prompt, /@色块标签/);
+  assert.match(prompt, /@红色A/);
   assert.match(prompt, /换成金属质感/);
   assert.match(prompt, /整体保持原构图/);
 });

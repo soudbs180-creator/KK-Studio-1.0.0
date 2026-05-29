@@ -226,15 +226,21 @@ export function assignColorBlockLabels(blocks: RedrawColorBlock[]): RedrawColorB
 }
 
 export function buildColorBlockInstruction(blocks: RedrawColorBlock[], userPrompt: string): string {
-  const effectiveBlocks = assignColorBlockLabels(blocks).filter((block) => block.prompt?.trim());
+  const labeledBlocks = assignColorBlockLabels(blocks);
+  const effectiveBlocks = labeledBlocks.filter((block) => block.prompt?.trim());
   const blockLines = effectiveBlocks.map((block) => (
     `- ${block.label} (${block.color}) 区域：${block.prompt!.trim()}`
   ));
   const basePrompt = userPrompt.trim();
+  const referencedLabels = labeledBlocks
+    .map((block) => block.label)
+    .filter((label) => label && basePrompt.includes(`@${label}`));
 
   return [
     '请基于原图和带色块标注的参考图进行重绘，只修改被色块覆盖并在下方列出的区域。',
     '未列出的色块和未覆盖区域必须保持原图内容、构图、光影、材质、边缘和比例不变。',
+    '用户补充要求中的 @色块标签 指向标注图上的同名色块区域，不是需要保留在画面里的文字。',
+    referencedLabels.length > 0 ? `本次被 @ 引用的色块：${referencedLabels.map((label) => `@${label}`).join('、')}。` : '',
     blockLines.length > 0 ? blockLines.join('\n') : '- 按用户输入修改已标注色块区域。',
     basePrompt ? `用户补充要求：${basePrompt}` : '',
   ].filter(Boolean).join('\n');

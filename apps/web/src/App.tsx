@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, startTransition } from 'react';
+﻿import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, startTransition } from 'react';
 import InfiniteCanvas, { type InfiniteCanvasHandle } from './components/canvas/InfiniteCanvas';
 import ImageNode from './components/image/ImageCard';
 import PromptNodeComponent from './components/canvas/PromptNodeComponent';
@@ -154,6 +154,7 @@ type SharedPromptNodeActionProps = Pick<
   | 'onToggleEcommerceSelected'
   | 'onSetEcommerceGroupSelection'
   | 'onGenerateEcommerceNode'
+  | 'onOptimizeEcommerceTaskPrompt'
   | 'onRegenerateUnsatisfiedEcommerceNode'
   | 'onGenerateEcommerceGroup'
   | 'onGenerateEcommerceFramework'
@@ -220,7 +221,7 @@ const ConnectorDisconnectButton: React.FC<ConnectorDisconnectButtonProps> = ({ x
       className="w-6 h-6 rounded-full border border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center cursor-pointer shadow-lg scale-90 hover:scale-110 active:scale-95 transition-all"
       style={{ backgroundColor: 'var(--bg-secondary)' }}
       onClick={onClick}
-      title="断开连接"
+      title="鏂紑杩炴帴"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -345,11 +346,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     isReady,
     isLoading,
     loadingProgress,
-    setViewportCenter, // 🎯 视口中心动态优先级
-    state, // 🎯 迁移功能需要访问 canvases 列表
-    migrateNodes, // 🎯 迁移节点到其他项目
-    createCanvas, // 🎯 创建新项目
-    switchCanvas  // 🎯 切换项目
+    setViewportCenter, // 馃幆 瑙嗗彛涓績鍔ㄦ€佷紭鍏堢骇
+    state, // 馃幆 杩佺Щ鍔熻兘闇€瑕佽闂?canvases 鍒楄〃
+    migrateNodes, // 馃幆 杩佺Щ鑺傜偣鍒板叾浠栭」鐩?
+    createCanvas, // 馃幆 鍒涘缓鏂伴」鐩?
+    switchCanvas  // 馃幆 鍒囨崲椤圭洰
   } = useCanvas();
 
   const imageNodesById = React.useMemo(
@@ -505,12 +506,12 @@ const AppContent: React.FC<AppContentProps> = () => {
 
 
 
-  // [新功能] 全局灯箱状态（针对图片浏览）
+  // [鏂板姛鑳絔 鍏ㄥ眬鐏鐘舵€侊紙閽堝鍥剧墖娴忚锛?
   const [previewImages, setPreviewImages] = useState<GeneratedImage[] | null>(null);
   const [previewInitialIndex, setPreviewInitialIndex] = useState(0);
   const [pptStackPreview, setPptStackPreview] = useState<{ images: GeneratedImage[]; initialIndex: number } | null>(null);
   const [pptDeckEditor, setPptDeckEditor] = useState<{ nodeId: string; initialIndex: number } | null>(null);
-  const [showMigrateModal, setShowMigrateModal] = useState(false); // 🎯 迁移弹窗状态
+  const [showMigrateModal, setShowMigrateModal] = useState(false); // 馃幆 杩佺Щ寮圭獥鐘舵€?
   const {
     buildPptPageAlias,
     getOrderedPptNodeBundle,
@@ -589,7 +590,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         list = canvas.imageNodes.filter(n => graphImages.has(n.id))
           .sort((a, b) => a.timestamp - b.timestamp || (a.position.x - b.position.x));
       } else {
-        // 3. 兜底逻辑（单张图片）
+        // 3. 鍏滃簳閫昏緫锛堝崟寮犲浘鐗囷級
         const target = canvas.imageNodes.find(n => n.id === imageId);
         if (target) list = [target];
       }
@@ -731,13 +732,13 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
     // Skip auto-hide while the input is focused, the sidebar is hovered, or the mouse is active
     if (!isPromptFocused && !isSidebarHovered && !isMouseActive) {
-      console.log('[handleShowMobileNav] 设置 5 秒自动隐藏定时器');
+      console.log('[handleShowMobileNav] 璁剧疆 5 绉掕嚜鍔ㄩ殣钘忓畾鏃跺櫒');
       mobileNavTimerRef.current = setTimeout(() => {
-        console.log('[handleShowMobileNav] 5 秒后自动隐藏');
+        console.log('[handleShowMobileNav] 5 绉掑悗鑷姩闅愯棌');
         setIsMobileNavVisible(false);
       }, 5000);
     } else {
-      console.log('[handleShowMobileNav] 不设置定时器，当前仍有交互', { isPromptFocused, isSidebarHovered, isMouseActive });
+      console.log('[handleShowMobileNav] 跳过自动隐藏，当前仍有交互', { isPromptFocused, isSidebarHovered, isMouseActive });
     }
   }, [isPromptFocused, isSidebarHovered]);
 
@@ -772,7 +773,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   // Tag Constraints State
   const [tagLimits, setTagLimits] = useState({ maxTags: 10, maxChars: 6 });
 
-  // 🎯 New State for enhanced TagInputModal
+  // 馃幆 New State for enhanced TagInputModal
   const [allTags, setAllTags] = useState<string[]>([]);
   const [inheritedTags, setInheritedTags] = useState<string[]>([]);
   const [isSubCard, setIsSubCard] = useState(false);
@@ -791,12 +792,12 @@ const AppContent: React.FC<AppContentProps> = () => {
     const promptNode = promptNodesById.get(firstId);
     const imageNode = imageNodesById.get(firstId);
 
-    // 🎯 Collect all existing tags from canvas for suggestions
+    // 馃幆 Collect all existing tags from canvas for suggestions
     setAllTags(allCanvasTags);
 
     // Determine if editing Sub Card and find inherited tags
     if (imageNode) {
-      // 🎯 Sub Card - find parent's tags
+      // 馃幆 Sub Card - find parent's tags
       const parentPrompt = imageNode.parentPromptId ? promptNodesById.get(imageNode.parentPromptId) : null;
       setInheritedTags(parentPrompt?.tags || []);
       setIsSubCard(true);
@@ -818,7 +819,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     const firstId = taggingNodeIds[0];
     const promptNode = promptNodesById.get(firstId);
 
-    // 🎯 Deduplication Logic: If Main Card adds a tag, remove from its Sub Cards
+    // 馃幆 Deduplication Logic: If Main Card adds a tag, remove from its Sub Cards
     if (promptNode) {
       // Editing a Main Card
       const childImageIds = promptNode.childImageIds || [];
@@ -840,7 +841,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     setNodeTags(taggingNodeIds, tags);
     setIsTagModalOpen(false);
 
-    // 🎯 File System Shortcut Integration
+    // 馃幆 File System Shortcut Integration
     try {
       const { fileSystemService } = await import('./services/storage/fileSystemService');
       const handle = fileSystemService.getGlobalHandle();
@@ -1445,7 +1446,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     config.aspectRatio, config.imageSize, config.parallelCount,
     config.model, config.enableGrounding, config.enableImageSearch, config.thinkingMode, config.mode, config.pptSlides, config.pptStyleLocked,
     config.referenceImages, // Add referenceImages to dep array
-    config.prompt, config.videoResolution, config.videoDuration, config.videoAudio, config.audioDuration, config.audioLyrics, config.maskUrl, config.editMode // 全量依赖监听
+    config.prompt, config.videoResolution, config.videoDuration, config.videoAudio, config.audioDuration, config.audioLyrics, config.maskUrl, config.editMode // 鍏ㄩ噺渚濊禆鐩戝惉
   ]);
 
   // Pending generation state
@@ -1492,15 +1493,15 @@ const AppContent: React.FC<AppContentProps> = () => {
 
       if (remainingPercent < 1) {
         alertKey = 'critical';
-        title = 'API 预算严重不足';
+        title = 'API 棰勭畻涓ラ噸涓嶈冻';
         sub = '剩余预算低于 1%，请立即充值。';
       } else if (remainingPercent < 10) {
         alertKey = 'warning';
-        title = 'API 预算不足';
+        title = 'API 棰勭畻涓嶈冻';
         sub = '剩余预算低于 10%。';
       } else if (remainingPercent < 20) {
         alertKey = 'low';
-        title = 'API 预算提醒';
+        title = 'API 棰勭畻鎻愰啋';
         sub = '剩余预算低于 20%。';
       }
 
@@ -1855,7 +1856,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     // We want: targetX * scale + transformX = screenCenterX
     // So: transformX = screenCenterX - targetX * scale
 
-    // User requested "Zoom and Pan" (平移并缩放).
+    // User requested "Zoom and Pan" (骞崇Щ骞剁缉鏀?.
     const targetScale = 1; // Reset to 1:1 view for clarity
 
     const newX = screenCenterX - targetX * targetScale;
@@ -1900,7 +1901,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         )
       );
 
-      // 计算选中节点的中心位置
+      // 璁＄畻閫変腑鑺傜偣鐨勪腑蹇冧綅缃?
       const allPositions = [
         ...selectedPrompts.map(p => p.position),
         ...selectedImages.map(img => img.position),
@@ -1950,18 +1951,18 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
   }, [activeCanvas, handleNavigateToNode, selectedNodeIds]);
 
-  // 处理拖入图片并创建孤独副卡
+  // 澶勭悊鎷栧叆鍥剧墖骞跺垱寤哄鐙壇鍗?
   const handleImageDrop = useCallback(async (file: File, canvasPosition: { x: number; y: number }) => {
     if (!activeCanvas) return;
 
     try {
-      // 读取图片
+      // 璇诲彇鍥剧墖
       const reader = new FileReader();
       reader.onload = async (e: ProgressEvent<FileReader>) => {
         const dataUrl = e.target?.result as string;
         if (!dataUrl) return;
 
-        // 获取图片尺寸
+        // 鑾峰彇鍥剧墖灏哄
         const img = new Image();
         img.onload = async () => {
           const calc = await import('./utils/imageUtils');
@@ -1973,7 +1974,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             console.error("Failed to save dropped image", err)
           );
 
-          // 计算宽高比
+          // 璁＄畻瀹介珮姣?
           const calcAspect = (w: number, h: number): AspectRatio => {
             const ratio = w / h;
             if (Math.abs(ratio - 1) < 0.1) return AspectRatio.SQUARE;
@@ -1981,27 +1982,27 @@ const AppContent: React.FC<AppContentProps> = () => {
             return AspectRatio.LANDSCAPE_4_3;
           };
 
-          // 创建孤独副卡
+          // 鍒涘缓瀛ょ嫭鍓崱
           const newImage: GeneratedImage = {
             id: Date.now().toString(),
             storageId,
             url: dataUrl,
-            prompt: `拖入图片：${file.name}`,
+            prompt: `鎷栧叆鍥剧墖锛?{file.name}`,
             aspectRatio: calcAspect(img.width, img.height),
             timestamp: Date.now(),
             model: 'uploaded',
             canvasId: activeCanvas.id,
-            parentPromptId: '', // 孤独卡片无父节点
+            parentPromptId: '', // 瀛ょ嫭鍗＄墖鏃犵埗鑺傜偣
             position: canvasPosition,
-            dimensions: `${img.width}×${img.height}`,
-            orphaned: true, // 标记为孤独副卡
+            dimensions: `${img.width}脳${img.height}`,
+            orphaned: true, // 鏍囪涓哄鐙壇鍗?
             fileName: file.name,
             fileSize: file.size
           };
 
           addImageNodes([newImage]);
 
-          // 通知用户
+          // 閫氱煡鐢ㄦ埛
           import('./services/system/notificationService').then(({ notify }) => {
             notify.success('图片已添加', `${file.name} (${img.width}×${img.height})`);
           });
@@ -2310,7 +2311,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     if (files.length === 0) return;
     if (config.referenceImages.length + files.length > 5) {
       import('./services/system/notificationService').then(({ notify }) => {
-        notify.warning('无法添加图片', '最多支持 5 张参考图');
+        notify.warning('鏃犳硶娣诲姞鍥剧墖', '鏈€澶氭敮鎸?5 寮犲弬鑰冨浘');
       });
       files = files.slice(0, 5 - config.referenceImages.length);
     }
@@ -2339,8 +2340,8 @@ const AppContent: React.FC<AppContentProps> = () => {
     arrangeAllNodes();
   }, [arrangeAllNodes]);
 
-  // --- 连接管理 ---
-  // 🎯 [Strict Logic] Disconnect Parent -> Child Group becomes Normal Group
+  // --- 杩炴帴绠＄悊 ---
+  // 馃幆 [Strict Logic] Disconnect Parent -> Child Group becomes Normal Group
   const handleDisconnectPrompt = useCallback((id: string) => {
     const node = activeCanvas?.promptNodes.find(n => n.id === id);
     if (node && node.sourceImageId) {
@@ -2352,12 +2353,12 @@ const AppContent: React.FC<AppContentProps> = () => {
       }
 
       import('./services/system/notificationService').then(({ notify }) => {
-        notify.success('已断开连接', '卡组已拆分为独立卡组');
+        notify.success('宸叉柇寮€杩炴帴', '鍗＄粍宸叉媶鍒嗕负鐙珛鍗＄粍');
       });
     }
   }, [activeCanvas, updatePromptNode, draftNodeId, setActiveSourceImage]);
 
-  // 🎯 [Strict Logic] Pin Draft -> Create Lonely Main Card
+  // 馃幆 [Strict Logic] Pin Draft -> Create Lonely Main Card
   const handlePinDraft = useCallback((id: string, _mode: 'button' | 'drag') => {
     const node = activeCanvas?.promptNodes.find(n => n.id === id);
     if (!node) return;
@@ -2374,7 +2375,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     // Clear Draft ID so next typing creates new draft
     setDraftNodeId(null);
-    // 🎯 [New Requirement] Clear input box and active source
+    // 馃幆 [New Requirement] Clear input box and active source
     setConfig(prev => ({ ...prev, prompt: '', referenceImages: [] }));
     setActiveSourceImage(null);
 
@@ -2430,6 +2431,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   const {
     updateEcommerceNodeState,
     handleGenerateEcommerceNode,
+    handleOptimizeEcommerceTaskPrompt,
     handleRegenerateUnsatisfiedEcommerceNode,
     handleConfirmEcommerceDesktop,
     handleRetryEcommerceModule,
@@ -2501,7 +2503,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         });
 
         import('./services/system/notificationService').then(({ notify }) => {
-          notify.info('恢复任务', `系统已自动重新开始 ${interruptedNodes.length} 个中断的任务`);
+          notify.info('鎭㈠浠诲姟', `绯荤粺宸茶嚜鍔ㄩ噸鏂板紑濮?${interruptedNodes.length} 涓腑鏂殑浠诲姟`);
         });
       }
     }
@@ -2526,7 +2528,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         model: normalizeModelId(clickedNode.model),
         // Let the composer switch immediately, then hydrate any missing image data in the background.
         referenceImages: clickedNode.referenceImages || [],
-        mode: clickedNode.mode || GenerationMode.IMAGE, // 🎯 Sync Mode (Image/Video)
+        mode: clickedNode.mode || GenerationMode.IMAGE, // 馃幆 Sync Mode (Image/Video)
       }));
 
       syncPromptNodeEcommerceSelection(clickedNode);
@@ -2556,6 +2558,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     onToggleEcommerceSelected: handleToggleEcommerceSelected,
     onSetEcommerceGroupSelection: handleSetEcommerceGroupSelection,
     onGenerateEcommerceNode: handleGenerateEcommerceNode,
+    onOptimizeEcommerceTaskPrompt: handleOptimizeEcommerceTaskPrompt,
     onRegenerateUnsatisfiedEcommerceNode: handleRegenerateUnsatisfiedEcommerceNode,
     onGenerateEcommerceGroup: handleGenerateEcommerceGroup,
     onGenerateEcommerceFramework: handleGenerateEcommerceFramework,
@@ -2599,6 +2602,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     handleGenerateEcommerceGroup,
     handleGenerateEcommerceFramework,
     handleGenerateEcommerceNode,
+    handleOptimizeEcommerceTaskPrompt,
     handleRegenerateUnsatisfiedEcommerceNode,
     handleOpenPptDeckEditor,
     handlePauseEcommerceFramework,
@@ -2620,21 +2624,21 @@ const AppContent: React.FC<AppContentProps> = () => {
   ]);
 
   const handleImageClick = useCallback((imageId: string) => {
-    // 🎯 Shift=切换（向后兼容），无修饰键=替换
+    // 馃幆 Shift=鍒囨崲锛堝悜鍚庡吋瀹癸級锛屾棤淇グ閿?鏇挎崲
     const sourceImage = imageNodesById.get(imageId);
-    // 保持父 Prompt 组聚焦，使子卡片框在点击后保持可见
+    // 淇濇寔鐖?Prompt 缁勮仛鐒︼紝浣垮瓙鍗＄墖妗嗗湪鐐瑰嚮鍚庝繚鎸佸彲瑙?
     setFocusedGroupId(sourceImage?.parentPromptId || null);
     selectNodes([imageId], (window.event as any)?.shiftKey ? 'toggle' : 'replace');
 
     resetEcommerceSourceSelectionState();
-    // 🚀 点击卡片时不再在画布自动生成 Draft 框和拉连线，相关交互已转移至灯箱
+    // 馃殌 鐐瑰嚮鍗＄墖鏃朵笉鍐嶅湪鐢诲竷鑷姩鐢熸垚 Draft 妗嗗拰鎷夎繛绾匡紝鐩稿叧浜や簰宸茶浆绉昏嚦鐏
   }, [imageNodesById, selectNodes, resetEcommerceSourceSelectionState]);
 
   const handleMobileUseImageAsSource = useCallback((imageId: string) => {
     handleImageClick(imageId);
   }, [handleImageClick]);
 
-  // 🚀 [新添加] 电脑端在灯箱内“继续创作”的回调，将当前图片设为参考图继续创作，实现交互闭环
+  // 馃殌 [鏂版坊鍔燷 鐢佃剳绔湪鐏鍐呪€滅户缁垱浣溾€濈殑鍥炶皟锛屽皢褰撳墠鍥剧墖璁句负鍙傝€冨浘缁х画鍒涗綔锛屽疄鐜颁氦浜掗棴鐜?
   const handleDesktopUseImageAsSource = useCallback((image: GeneratedImage) => {
     const refImg = {
       id: image.id,
@@ -2660,11 +2664,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     deletePromptNode,
   });
 
-  const handlePartialRedrawRequest = useCallback((image: GeneratedImage, request: RedrawRequest) => {
+  const handleRedrawRequest = useCallback((image: GeneratedImage, request: RedrawRequest) => {
     void (async () => {
       try {
         const plan = request.plan;
-        const finalPrompt = (plan?.prompt || request.prompt || '重绘').trim();
+        const finalPrompt = (plan?.prompt || request.prompt || '閲嶇粯').trim();
         const canvas = activeCanvasRef.current;
         const sourceImage = canvas?.imageNodes.find((img) => img.id === image.id) || image;
         const parentPromptId = sourceImage.parentPromptId;
@@ -2714,8 +2718,8 @@ const AppContent: React.FC<AppContentProps> = () => {
           const usesRedrawOnlyModel = Boolean(cropPlan) || plan?.mode === 'color-blocks' || plan?.mode === 'whole-image-marked';
           const nodeModel = normalizeModelId(usesRedrawOnlyModel ? (plan?.model || request.model) : config.model);
           const nodePrompt = cropPlan ? finalPrompt : [
-            parentPrompt?.prompt ? `原始提示词：${parentPrompt.prompt}` : '',
-            sourceImage.prompt ? `当前图片提示词：${sourceImage.prompt}` : '',
+            parentPrompt?.prompt ? `鍘熷鎻愮ず璇嶏細${parentPrompt.prompt}` : '',
+            sourceImage.prompt ? `褰撳墠鍥剧墖鎻愮ず璇嶏細${sourceImage.prompt}` : '',
             finalPrompt,
           ].filter(Boolean).join('\n');
           const nodeRedrawMetadata = {
@@ -2807,7 +2811,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           setPreviewImages(null);
         }
       } catch (error: any) {
-        console.error('[partial-redraw] Failed to prepare redraw request', error);
+        console.error('[redraw] Failed to prepare redraw request', error);
         import('./services/system/notificationService').then(({ notify }) => {
           notify.error('重绘准备失败', error?.message || '请稍后重试');
         });
@@ -2815,14 +2819,14 @@ const AppContent: React.FC<AppContentProps> = () => {
     })();
   }, [addPromptNode, config.imageSize, config.model, executeGeneration, finalizeEcommercePartialRedrawResult, handleOpenPreview, resolveEcommercePartialRedrawContext, updateImageNode]);
 
-  const handleMobileResultPartialRedraw = useCallback((entry: MobileResultEntry, request: RedrawRequest) => {
+  const handleMobileResultRedraw = useCallback((entry: MobileResultEntry, request: RedrawRequest) => {
     const imageNode = activeCanvas?.imageNodes.find((image) => image.id === entry.imageId);
     if (!imageNode) {
       return;
     }
 
-    handlePartialRedrawRequest(imageNode, request);
-  }, [activeCanvas, handlePartialRedrawRequest]);
+    handleRedrawRequest(imageNode, request);
+  }, [activeCanvas, handleRedrawRequest]);
 
   const {
     handleMobileEditEcommerceTask,
@@ -2861,7 +2865,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     let hasNodes = false;
-    // 🎯 Uniform 40px padding on all sides
+    // 馃幆 Uniform 40px padding on all sides
     const PADDING = 40;
     const TOP_EXTRA = 40; // Extra for header
     const BOTTOM_EXTRA = 40;
@@ -3172,7 +3176,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     // 1. Filter Groups
     const visibleGroups = activeCanvas.groups
       .filter(g => {
-        // 🎯 [Fix] 过滤掉空的分组（没有包含任何节点）
+        // 馃幆 [Fix] 杩囨护鎺夌┖鐨勫垎缁勶紙娌℃湁鍖呭惈浠讳綍鑺傜偣锛?
         if (!g.nodeIds || g.nodeIds.length === 0) {
           return false;
         }
@@ -3254,7 +3258,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         return a.timestamp - b.timestamp;
       });
 
-    // 🎯 Cache timestamp
+    // 馃幆 Cache timestamp
     const visibleWorkflowUtilityNodes = (activeCanvas.workflow?.nodes || [])
       .filter((node): node is WorkflowUtilityCanvasNode => isWorkflowUtilityNodeKind(node.kind))
       .filter((node) => {
@@ -4436,8 +4440,8 @@ const AppContent: React.FC<AppContentProps> = () => {
       onEditPptDeck: handleOpenPptDeckEditorFromImage,
       onEditText: handleEditPptTextFromLightbox,
       onDownloadPptComposite: handleDownloadPptComposite,
-      onPartialRedraw: handlePartialRedrawRequest,
-      onUseAsSource: handleDesktopUseImageAsSource, // 🚀 绑定继续创作回调
+      onPartialRedraw: handleRedrawRequest,
+      onUseAsSource: handleDesktopUseImageAsSource, // 馃殌 缁戝畾缁х画鍒涗綔鍥炶皟
     },
     pptStackPreview: {
       state: pptStackPreview,
@@ -4490,7 +4494,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         showConnections={true}
         mode={backgroundMode}
       />
-      {/* 简体中文：左上角等宽悬浮控制卡片 */}
+      {/* 绠€浣撲腑鏂囷細宸︿笂瑙掔瓑瀹芥偓娴帶鍒跺崱鐗?*/}
       {!isMobile && (
         <div className="fixed top-4 left-4 z-[100] w-52 pointer-events-auto select-none">
           <AppDesktopChrome
@@ -4513,7 +4517,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         </div>
       )}
 
-      {/* 简体中文：左下角悬浮缩放卡片 - 竖直摆放，极致纤细宽度 (w-10)，不要和侧边工具栏宽度一致，版本号在其下方另外渲染为精致的独立毛玻璃卡片 */}
+      {/* 绠€浣撲腑鏂囷細宸︿笅瑙掓偓娴缉鏀惧崱鐗?- 绔栫洿鎽嗘斁锛屾瀬鑷寸氦缁嗗搴?(w-10)锛屼笉瑕佸拰渚ц竟宸ュ叿鏍忓搴︿竴鑷达紝鐗堟湰鍙峰湪鍏朵笅鏂瑰彟澶栨覆鏌撲负绮捐嚧鐨勭嫭绔嬫瘺鐜荤拑鍗＄墖 */}
       {!isMobile && (
         <div className="fixed bottom-4 left-4 z-50 w-10 flex flex-col items-center gap-2 pointer-events-auto select-none">
           <AppZoomControl
@@ -4568,7 +4572,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         onEntryOpen={handleMobileResultOpen}
         onPreviewImage={handleOpenPreview}
         onUseResultAsSource={handleMobileUseImageAsSource}
-        onPartialRedraw={handleMobileResultPartialRedraw}
+        onPartialRedraw={handleMobileResultRedraw}
         onDownloadEntry={handleMobileResultDownload}
         onDeleteImage={deleteImageNode}
         onEditEcommerceTask={handleMobileEditEcommerceTask}
@@ -4579,7 +4583,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         overlays={workspacePanels}
       />
 
-      {/* Main Infinite Canvas - 仅在非手机端显示 */}
+      {/* Main Infinite Canvas - 浠呭湪闈炴墜鏈虹鏄剧ず */}
       {!isMobile && (
       <div
         className="absolute inset-y-0 left-0 transition-all duration-300 ease-out"
@@ -4609,7 +4613,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         ]}
         onCanvasClick={() => {
           // [Draft Logic] Detach from draft when clicking background
-          // if (draftNodeId) setDraftNodeId(null); // 🎯 [FIX] Prevent detaching draft on background click to avoid "Lonely Main Card" orphans
+          // if (draftNodeId) setDraftNodeId(null); // 馃幆 [FIX] Prevent detaching draft on background click to avoid "Lonely Main Card" orphans
 
           // Clear input when clicking empty canvas, but NOT during generation
           // and NOT when in "continue from image" mode
@@ -4634,7 +4638,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             clearSelection();
             setFocusedGroupId(null);
             setSelectionMenuPosition(null);
-            // 🎯 [Fix] Explicitly remove draft node so preview disappears
+            // 馃幆 [Fix] Explicitly remove draft node so preview disappears
             if (draftNodeId) {
               deletePromptNode(draftNodeId);
               setDraftNodeId(null);
@@ -4658,7 +4662,7 @@ const AppContent: React.FC<AppContentProps> = () => {
               const centerX = rect.width / 2;
               const centerY = rect.height / 2;
 
-              // 计算需要的 transform，使目标卡片居中
+              // 璁＄畻闇€瑕佺殑 transform锛屼娇鐩爣鍗＄墖灞呬腑
               const newX = centerX - targetNode.position.x * canvasTransform.scale;
               const newY = centerY - targetNode.position.y * canvasTransform.scale;
 
@@ -4935,7 +4939,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         // Mock position 0,0 for component, handle centering via container
         const displayNode = { ...draftNode, position: { x: 0, y: 0 } };
 
-        // 🎯 [Sidebar Responsive Layout]
+        // 馃幆 [Sidebar Responsive Layout]
         // Calculate center for the overlay (Accurate widths from components)
         const overlayOffsets = getViewportOffsets(isSidebarOpen, isChatOpen, isMobile, chatSidebarWidth);
         const overlayLeft = overlayOffsets.left;
@@ -4974,19 +4978,19 @@ const AppContent: React.FC<AppContentProps> = () => {
       {isLoading && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="w-[320px] rounded-2xl border border-white/10 bg-[#121214]/90 p-6 shadow-2xl backdrop-blur-xl">
-            {/* 简体中文注释：标题文字 */}
+            {/* 绠€浣撲腑鏂囨敞閲婏細鏍囬鏂囧瓧 */}
             <div className="mb-4 text-sm font-medium text-white/95 text-left">
-              正在加载画布
+              姝ｅ湪鍔犺浇鐢诲竷
             </div>
             <div className="flex items-center gap-3">
-              {/* 简体中文注释：淡蓝色进度条轨道 */}
+              {/* 绠€浣撲腑鏂囨敞閲婏細娣¤摑鑹茶繘搴︽潯杞ㄩ亾 */}
               <div className="h-2 flex-1 rounded-full bg-white/10 overflow-hidden">
                 <div 
                   className="h-full rounded-full bg-sky-400 transition-all duration-300 ease-out" 
                   style={{ width: `${loadingProgress}%` }}
                 />
               </div>
-              {/* 简体中文注释：进度百分比数值 */}
+              {/* 绠€浣撲腑鏂囨敞閲婏細杩涘害鐧惧垎姣旀暟鍊?*/}
               <span className="min-w-[42px] text-right text-sm font-semibold text-sky-400">
                 {loadingProgress}%
               </span>

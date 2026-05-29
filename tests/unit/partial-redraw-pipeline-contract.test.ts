@@ -16,8 +16,8 @@ test('App creates REDRAW prompt nodes and generation pipeline composites redraw 
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
   const mobileTabBarSource = readSource('src/components/mobile/MobileTabBar.tsx');
 
-  assert.match(appSource, /onPartialRedraw:\s*handlePartialRedrawRequest,/);
-  assert.match(appSource, /onPartialRedraw=\{handleMobileResultPartialRedraw\}/);
+  assert.match(appSource, /onPartialRedraw:\s*handleRedrawRequest,/);
+  assert.match(appSource, /onPartialRedraw=\{handleMobileResultRedraw\}/);
   assert.match(globalModalsSource, /onPartialRedraw=\{lightbox\.onPartialRedraw\}/);
   assert.match(mobileWorkspaceSource, /onPartialRedraw=\{onPartialRedraw\}/);
   assert.match(appSource, /mode:\s*GenerationMode\.REDRAW/);
