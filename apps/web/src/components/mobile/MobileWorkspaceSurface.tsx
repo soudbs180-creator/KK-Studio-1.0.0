@@ -211,7 +211,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               <button
                 type="button"
                 onClick={toggleTheme}
-                className="relative flex h-[58px] min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-[18px] border border-white/8 px-2 text-center active:scale-[0.97] active:translate-y-px cursor-pointer"
+                className="relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[18px] border border-white/8 px-1.5 text-center active:scale-[0.97] active:translate-y-px cursor-pointer"
                 style={{
                   background: isDarkMode
                     ? 'linear-gradient(135deg, rgba(255, 77, 139, 0.85) 0%, rgba(184, 164, 237, 0.85) 100%)'
@@ -222,17 +222,20 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               >
                 {/* 切换主题时的微小物理偏转反馈 */}
                 <div 
-                  className="relative text-white/90"
+                  className="relative text-white/90 shrink-0"
                   style={{
                     transform: isDarkMode ? 'rotate(0deg) scale(1)' : 'rotate(30deg) scale(0.95)',
                     transition: 'transform 300ms cubic-bezier(0.16, 1, 0.3, 1), opacity 300ms cubic-bezier(0.16, 1, 0.3, 1)'
                   }}
                 >
-                  {isDarkMode ? <Moon size={20} strokeWidth={2} /> : <Sun size={20} strokeWidth={2} />}
+                  {isDarkMode ? <Moon size={18} strokeWidth={2} /> : <Sun size={18} strokeWidth={2} />}
                 </div>
-                <div className="relative z-10 pointer-events-none">
-                  <div className="text-xs font-bold text-white uppercase">
-                    主题偏好
+                <div className="relative z-10 pointer-events-none flex flex-col items-start leading-[1.1] text-left shrink-0">
+                  <div className="text-[10px] font-bold text-white uppercase tracking-wider">
+                    {isChinese ? '主题' : 'Theme'}
+                  </div>
+                  <div className="text-[10px] font-bold text-white uppercase tracking-wider">
+                    {isChinese ? '偏好' : 'Pref'}
                   </div>
                 </div>
               </button>
@@ -241,23 +244,26 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               <button
                 type="button"
                 onClick={toggleLanguage}
-                className="relative flex h-[58px] min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-[18px] border border-white/8 bg-white/5 px-2 text-center active:scale-[0.975] active:translate-y-px cursor-pointer"
+                className="relative flex h-[58px] min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[18px] border border-white/8 bg-white/5 px-1.5 text-center active:scale-[0.975] active:translate-y-px cursor-pointer"
                 style={{
                   transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background-color 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               >
                 <div 
-                  className="relative text-[var(--text-secondary)]"
+                  className="relative text-[var(--text-secondary)] shrink-0"
                   style={{
                     transform: isChinese ? 'rotate(0deg) scale(1)' : 'rotate(15deg) scale(0.95)',
                     transition: 'transform 240ms cubic-bezier(0.16, 1, 0.3, 1)'
                   }}
                 >
-                  <Languages size={20} strokeWidth={2} />
+                  <Languages size={18} strokeWidth={2} />
                 </div>
-                <div className="relative z-10 pointer-events-none">
-                  <div className="text-xs font-bold text-[var(--text-primary)] uppercase">
-                    {isChinese ? '系统语言' : 'Lang'}
+                <div className="relative z-10 pointer-events-none flex flex-col items-start leading-[1.1] text-left shrink-0">
+                  <div className="text-[10px] font-bold text-[var(--text-primary)] uppercase tracking-wider">
+                    {isChinese ? '系统' : 'Sys'}
+                  </div>
+                  <div className="text-[10px] font-bold text-[var(--text-primary)] uppercase tracking-wider">
+                    {isChinese ? '语言' : 'Lang'}
                   </div>
                 </div>
               </button>

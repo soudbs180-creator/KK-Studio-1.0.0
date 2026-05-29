@@ -11248,13 +11248,14 @@ body.dark-mode .storage-selection-modal {
   left: 20%;
   right: 20%;
   height: 1.5px;
-  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.5), rgba(168, 85, 247, 0.5), transparent);
+  background: linear-gradient(90deg, transparent, var(--route-accent, #38bdf8), transparent);
+  opacity: 0.4;
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .settings-panel .settings-model-center-route:hover {
   transform: translateY(-4px);
-  border-color: rgba(56, 189, 248, 0.25) !important;
+  border-color: var(--route-accent, #38bdf8) !important;
   box-shadow: 
     0 12px 40px 0 rgba(0, 0, 0, 0.45),
     0 0 20px 0 rgba(56, 189, 248, 0.08);
@@ -11263,7 +11264,7 @@ body.dark-mode .storage-selection-modal {
 .settings-panel .settings-model-center-route:hover::before {
   left: 0;
   right: 0;
-  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.85), rgba(168, 85, 247, 0.85), transparent);
+  opacity: 0.9;
 }
 
 .settings-panel .settings-model-center-route__header,

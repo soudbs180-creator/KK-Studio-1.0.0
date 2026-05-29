@@ -657,6 +657,9 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                       route.onSelect();
                     }
                   }}
+                  style={{
+                    '--route-accent': route.accentColor || '#38bdf8',
+                  } as React.CSSProperties}
                 >
                   <div className="settings-model-center-route__header">
                     <div className="settings-model-center-route__identity">
@@ -705,28 +708,38 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                   {/* 大指标玻璃舱（双栏布局） */}
                   <div className="settings-model-center-route__metrics-box">
                     <div className="settings-model-center-route__metric-item">
-                      <div className="settings-model-center-route__metric-icon-wrapper">
+                      <div 
+                        className="settings-model-center-route__metric-icon-wrapper"
+                        style={{
+                          color: route.accentColor || '#38bdf8',
+                          borderColor: route.accentColor ? `${route.accentColor}30` : 'rgba(56, 189, 248, 0.12)',
+                          backgroundColor: route.accentColor ? `${route.accentColor}10` : 'rgba(56, 189, 248, 0.06)'
+                        }}
+                      >
                         <Wallet size={18} />
                       </div>
                       <div className="settings-model-center-route__metric-copy">
                         <div className="settings-model-center-route__metric-title">TOTAL BALANCE</div>
                         <div className="settings-model-center-route__metric-number">{route.budgetLabel}</div>
-                        <div className="settings-model-center-route__metric-helper">{route.usageLabel}</div>
                       </div>
                     </div>
                     
                     <div className="settings-model-center-route__metric-divider" />
                     
                     <div className="settings-model-center-route__metric-item">
-                      <div className="settings-model-center-route__metric-icon-wrapper">
+                      <div 
+                        className="settings-model-center-route__metric-icon-wrapper"
+                        style={{
+                          color: route.accentColor || '#38bdf8',
+                          borderColor: route.accentColor ? `${route.accentColor}30` : 'rgba(56, 189, 248, 0.12)',
+                          backgroundColor: route.accentColor ? `${route.accentColor}10` : 'rgba(56, 189, 248, 0.06)'
+                        }}
+                      >
                         <Timer size={18} />
                       </div>
                       <div className="settings-model-center-route__metric-copy">
                         <div className="settings-model-center-route__metric-title">DELAY</div>
                         <div className="settings-model-center-route__metric-number">{route.latencyLabel}</div>
-                        <div className="settings-model-center-route__metric-helper">
-                          {pick('协议: ', 'Protocol: ')}{route.protocolLabel}
-                        </div>
                       </div>
                     </div>
                   </div>

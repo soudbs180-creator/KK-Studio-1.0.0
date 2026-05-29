@@ -3257,6 +3257,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     }}
                     onTouchStart={(e) => {
                         e.stopPropagation();
+                        // 简体中文注释：在移动端触摸展开时，必须调用 preventDefault 阻止后续 click 事件的分发，
+                        // 否则浏览器延迟触发的 click 会穿透击中新展开面板底部的“模型选择按钮”，导致面板一展开就自动进入模型库。
+                        e.preventDefault();
                         setIsExpanded(true);
                     }}
                     title={pick('展开输入栏', 'Expand input bar')}
