@@ -28,13 +28,18 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
     >
       <div
         data-slot="header"
-        className="absolute top-0 left-0 right-0 z-20 min-h-0 overflow-hidden"
-        style={{
-          paddingTop: 'env(safe-area-inset-top)',
-          background: 'linear-gradient(to bottom, #000000 0%, rgba(0, 0, 0, 0) 100%)' // 简体中文：顶部为黑色遮挡状态栏，向下过渡为100%透明以透出底部画布
-        }}
+        className="absolute top-0 left-0 right-0 z-20 min-h-0"
       >
-        {header}
+        {/* 简体中文：极致柔和的 ease-scrim 顶栏渐变底板，限制在 Header 蓝色区实际高度内，pointer-events-none 防止阻碍卡片操作 */}
+        <div 
+          className="absolute inset-0 -z-10 pointer-events-none"
+          style={{
+            background: 'linear-gradient(to bottom, rgba(10, 10, 12, 1) 0%, rgba(10, 10, 12, 0.98) 18%, rgba(10, 10, 12, 0.92) 36%, rgba(10, 10, 12, 0.76) 54%, rgba(10, 10, 12, 0.48) 70%, rgba(10, 10, 12, 0.24) 84%, rgba(10, 10, 12, 0.08) 93%, rgba(10, 10, 12, 0) 100%)'
+          }}
+        />
+        <div style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          {header}
+        </div>
       </div>
 
       <main data-slot="feed" className="flex min-h-0 flex-col overflow-hidden">

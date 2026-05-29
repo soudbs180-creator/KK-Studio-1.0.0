@@ -337,6 +337,47 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
           </div>
         </div>
 
+        {/* 简体中文注释：多张图卡组图片列表卡片。只有在卡组条目数大于 1 时才进行条件渲染，配合阻尼震动微动效与高亮光环。 */}
+        {hasGroup && entry.groupEntries && entry.groupEntries.length > 1 && (
+          <div className="mt-3 flex flex-col gap-2 rounded-[12px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
+              卡组图片 ({entry.groupEntries.length} 张图)
+            </div>
+            <div className="mt-1 flex gap-2.5 overflow-x-auto pb-1 scrollbar-none">
+              {entry.groupEntries.map((item, index) => {
+                const isSelected = index === currentGroupImageIndex;
+                return (
+                  <button
+                    key={item.imageId}
+                    type="button"
+                    onClick={() => setCurrentGroupImageIndex(index)}
+                    className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-[8px] border-2 p-0 transition-all duration-200 active:scale-95 cursor-pointer ${
+                      isSelected
+                        ? 'border-indigo-500 ring-2 ring-inset ring-indigo-500/30 opacity-100'
+                        : 'border-[var(--mobile-clay-border)] opacity-60 hover:opacity-90'
+                    }`}
+                  >
+                    {item.displaySrc ? (
+                      <img
+                        src={item.displaySrc}
+                        alt={`卡组图 ${index + 1}`}
+                        className="block h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-[var(--mobile-clay-muted-surface-bg)] text-xs text-[var(--text-secondary)]">
+                        无预览
+                      </div>
+                    )}
+                    <span className="absolute bottom-1 right-1 rounded bg-black/65 px-1 py-0.5 text-[9px] font-bold text-white leading-none">
+                      {index + 1}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
           {metadataItems.map((item) => (
             <div

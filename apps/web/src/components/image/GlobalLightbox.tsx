@@ -1030,150 +1030,304 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                       </div>
                   </div>
   
-                  <div className={isMobile ? "mt-3 flex w-full items-center justify-between h-10 gap-2" : `mt-3 flex w-full items-center gap-2 ${isMobile ? 'overflow-x-auto pb-1' : 'self-center sm:mt-0 sm:w-auto sm:flex-nowrap sm:justify-end sm:justify-self-end sm:gap-3'}`}>
-                      {/* Action controls */}
-                      <div className="flex shrink-0 items-center h-10 rounded-lg bg-[var(--bg-tertiary)] p-1 gap-0.5">
-                          <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="缩小"><ZoomOut size={16} /></button>
-                          <span className="w-12 text-center text-xs font-mono select-none">{Math.round(zoom * 100)}%</span>
-                          <button onClick={() => setZoom(z => Math.min(5, z + 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="放大"><ZoomIn size={16} /></button>
-                          <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-1 border-l border-[var(--border-light)]" title="重置"><RotateCcw size={16} /></button>
-                      </div>
-  
-                      {/* Continue generation / Use as source action */}
-                      {onUseAsSource && !isVideo && !isAudio && (
-                          <button
-                              onClick={(e) => {
-                                  e.stopPropagation();
-                                  onUseAsSource(image);
-                                  onClose(); // 将此图片设为参考图后，立即关闭大图灯箱
-                              }}
-                              className={`${actionButtonClass} hover:border-[var(--accent-coral)] hover:bg-[var(--accent-coral)]/80`}
-                              title="将此图设为参考图继续创作"
-                          >
-                              <Sparkles size={16} />
-                              继续创作
-                          </button>
-                      )}
+                  {isMobile ? (
+                      /* 简体中文注释：手机端专属的双排自适应流式排版，剥离写死的 h-10 限高，使多余操作可以优雅折行，彻底消除遮挡风险 */
+                      <div className="mt-3 flex flex-col w-full gap-3">
+                          {/* 第一排：高频缩放控制条与高频下载按钮 */}
+                          <div className="flex w-full items-center justify-between gap-2">
+                              {/* Action controls */}
+                              <div className="flex shrink-0 items-center h-10 rounded-lg bg-[var(--bg-tertiary)] p-1 gap-0.5">
+                                  <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="缩小"><ZoomOut size={16} /></button>
+                                  <span className="w-12 text-center text-xs font-mono select-none">{Math.round(zoom * 100)}%</span>
+                                  <button onClick={() => setZoom(z => Math.min(5, z + 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="放大"><ZoomIn size={16} /></button>
+                                  <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-1 border-l border-[var(--border-light)]" title="重置"><RotateCcw size={16} /></button>
+                              </div>
 
-                      {/* 简体中文注释：灯箱只暴露统一的重绘入口，工作台内部再根据选区自动分流。 */}
-                      {onPartialRedraw && !isVideo && !isAudio && displaySrc && (
-                           <button
-                               onClick={(e) => {
-                                   e.stopPropagation();
-                                  setRedrawWorkspaceMode('fresh');
-                               }}
-                               className={`${actionButtonClass} hover:border-purple-500 hover:bg-purple-600/80`}
-                              title="重绘"
-                           >
-                               <Pen size={16} />
-                               重绘
-                           </button>
-                       )}
-                      {onPartialRedraw && !isVideo && !isAudio && displaySrc && (image.redraw || image.partialRedraw) && (
-                          <button
-                              onClick={(e) => {
-                                  e.stopPropagation();
-                                  setRedrawWorkspaceMode('regenerate');
-                              }}
-                              className={`${actionButtonClass} hover:border-amber-400 hover:bg-amber-500/80`}
-                              title="复用原图、原提示词和原标记重新生成"
-                          >
-                              <Sparkles size={16} />
-                              不满意重生成
-                          </button>
-                      )}
-  
-                      {onEditPptDeck && image.mode === GenerationMode.PPT && !isVideo && !isAudio && (
-                          <button
-                              onClick={(e) => {
-                                  e.stopPropagation();
-                                  onEditPptDeck(image);
-                              }}
-                              className={`${actionButtonClass} hover:border-emerald-500 hover:bg-emerald-600/80`}
-                              title={pickByDocumentLanguage('编辑分层页面包', 'Edit layered deck')}
-                          >
-                              <Pen size={16} />
-                              {pickByDocumentLanguage('编辑页面包', 'Edit Deck')}
-                          </button>
-                      )}
-  
-                      {onEditText && image.mode === GenerationMode.PPT && !isVideo && !isAudio && (
-                          <button
-                              onClick={(e) => {
-                                  e.stopPropagation();
-                                  onEditText(image);
-                              }}
-                              className={`${actionButtonClass} hover:border-sky-500 hover:bg-sky-600/80`}
-                              title="编辑当前页文字"
-                          >
-                              <Pen size={16} />
-                              {pickByDocumentLanguage('快速改字', 'Quick Text')}
-                          </button>
-                      )}
-  
-                      {!isVideo && !isAudio && (
-                          <button
-                              onClick={handleCopyOriginal}
-                              className={`${actionButtonClass} hover:border-cyan-500 hover:bg-cyan-600/80`}
-                              title="复制原图"
-                          >
-                              <Copy size={16} />
-                              复制
-                          </button>
-                      )}
-                      {onDeleteImage && (
-                          <button
-                              onClick={(e) => {
-                                  e.stopPropagation();
-                                  onDeleteImage(image.id);
-                                  if (images.length <= 1) {
-                                      onClose();
-                                      return;
-                                  }
-                                  setCurrentIndex((index) => Math.max(0, Math.min(index, images.length - 2)));
-                              }}
-                              className={`${actionButtonClass} hover:border-red-500 hover:bg-red-600/80`}
-                              title="删除当前结果"
-                          >
-                              <Trash2 size={16} />
-                              删除
-                          </button>
-                      )}
-  
-                      <div className="relative" ref={downloadMenuRef}>
-                          <button
-                              onClick={handleDownload}
-                              className="shrink-0 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 h-10 text-sm font-medium transition-colors hover:bg-indigo-500"
-                              title={isPptSubCard && onDownloadPptComposite ? '下载选项' : '下载原图'}
-                          >
-                              <Download size={16} />
-                              下载
-                          </button>
-                          {showDownloadMenu && isPptSubCard && onDownloadPptComposite && (
-                              <div className="absolute right-0 bottom-full z-20 mb-2 w-36 rounded-xl border border-[var(--border-medium)] bg-[var(--bg-secondary)] p-1.5 shadow-2xl">
+                              <div className="relative" ref={downloadMenuRef}>
                                   <button
-                                      onClick={(e) => {
-                                          setShowDownloadMenu(false);
-                                          void handleSingleDownload(e);
-                                      }}
-                                      className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                      onClick={handleDownload}
+                                      className="shrink-0 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 h-10 text-sm font-medium transition-colors hover:bg-indigo-500 text-white"
+                                      title={isPptSubCard && onDownloadPptComposite ? '下载选项' : '下载原图'}
                                   >
-                                      <span>下载单图</span>
+                                      <Download size={16} />
+                                      下载
                                   </button>
+                                  {showDownloadMenu && isPptSubCard && onDownloadPptComposite && (
+                                      <div className="absolute right-0 bottom-full z-20 mb-2 w-36 rounded-xl border border-[var(--border-medium)] bg-[var(--bg-secondary)] p-1.5 shadow-2xl">
+                                          <button
+                                              onClick={(e) => {
+                                                  setShowDownloadMenu(false);
+                                                  void handleSingleDownload(e);
+                                              }}
+                                              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                          >
+                                              <span>下载单图</span>
+                                          </button>
+                                          <button
+                                              onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setShowDownloadMenu(false);
+                                                  onDownloadPptComposite(image.id);
+                                              }}
+                                              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                          >
+                                              <span>下载整屏</span>
+                                          </button>
+                                      </div>
+                                  )}
+                              </div>
+                          </div>
+
+                          {/* 第二排：业务操作按钮（使用 flex-wrap 弹性多排包裹自适应） */}
+                          <div className="flex flex-wrap w-full items-center gap-2">
+                              {onUseAsSource && !isVideo && !isAudio && (
                                   <button
                                       onClick={(e) => {
                                           e.stopPropagation();
-                                          setShowDownloadMenu(false);
-                                          onDownloadPptComposite(image.id);
+                                          onUseAsSource(image);
+                                          onClose();
                                       }}
-                                      className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                      className={`${actionButtonClass} hover:border-[var(--accent-coral)] hover:bg-[var(--accent-coral)]/80 flex-1 justify-center`}
+                                      title="将此图设为参考图继续创作"
                                   >
-                                      <span>下载整屏</span>
+                                      <Sparkles size={16} />
+                                      继续创作
                                   </button>
-                              </div>
-                          )}
+                              )}
+
+                              {onPartialRedraw && !isVideo && !isAudio && displaySrc && (
+                                  <button
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          setRedrawWorkspaceMode('fresh');
+                                      }}
+                                      className={`${actionButtonClass} hover:border-purple-500 hover:bg-purple-600/80 flex-1 justify-center`}
+                                      title="重绘"
+                                  >
+                                      <Pen size={16} />
+                                      重绘
+                                  </button>
+                              )}
+
+                              {onPartialRedraw && !isVideo && !isAudio && displaySrc && (image.redraw || image.partialRedraw) && (
+                                  <button
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          setRedrawWorkspaceMode('regenerate');
+                                      }}
+                                      className={`${actionButtonClass} hover:border-amber-400 hover:bg-amber-500/80 flex-1 justify-center`}
+                                      title="复用原图、原提示词和原标记重新生成"
+                                  >
+                                      <Sparkles size={16} />
+                                      不满意重生成
+                                  </button>
+                              )}
+
+                              {onEditPptDeck && image.mode === GenerationMode.PPT && !isVideo && !isAudio && (
+                                  <button
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          onEditPptDeck(image);
+                                      }}
+                                      className={`${actionButtonClass} hover:border-emerald-500 hover:bg-emerald-600/80 flex-1 justify-center`}
+                                      title={pickByDocumentLanguage('编辑分层页面包', 'Edit layered deck')}
+                                  >
+                                      <Pen size={16} />
+                                      {pickByDocumentLanguage('编辑页面包', 'Edit Deck')}
+                                  </button>
+                              )}
+
+                              {onEditText && image.mode === GenerationMode.PPT && !isVideo && !isAudio && (
+                                  <button
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          onEditText(image);
+                                      }}
+                                      className={`${actionButtonClass} hover:border-sky-500 hover:bg-sky-600/80 flex-1 justify-center`}
+                                      title="编辑当前页文字"
+                                  >
+                                      <Pen size={16} />
+                                      {pickByDocumentLanguage('快速改字', 'Quick Text')}
+                                  </button>
+                              )}
+
+                              {!isVideo && !isAudio && (
+                                  <button
+                                      onClick={handleCopyOriginal}
+                                      className={`${actionButtonClass} hover:border-cyan-500 hover:bg-cyan-600/80 flex-1 justify-center`}
+                                      title="复制原图"
+                                  >
+                                      <Copy size={16} />
+                                      复制
+                                  </button>
+                              )}
+
+                              {onDeleteImage && (
+                                  <button
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          onDeleteImage(image.id);
+                                          if (images.length <= 1) {
+                                              onClose();
+                                              return;
+                                          }
+                                          setCurrentIndex((index) => Math.max(0, Math.min(index, images.length - 2)));
+                                      }}
+                                      className={`${actionButtonClass} hover:border-red-500 hover:bg-red-600/80 flex-1 justify-center`}
+                                      title="删除当前结果"
+                                  >
+                                      <Trash2 size={16} />
+                                      删除
+                                  </button>
+                              )}
+                          </div>
                       </div>
-                  </div>
+                  ) : (
+                      <div className="mt-3 flex w-full items-center gap-2 self-center sm:mt-0 sm:w-auto sm:flex-nowrap sm:justify-end sm:justify-self-end sm:gap-3">
+                          {/* Action controls */}
+                          <div className="flex shrink-0 items-center h-10 rounded-lg bg-[var(--bg-tertiary)] p-1 gap-0.5">
+                              <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="缩小"><ZoomOut size={16} /></button>
+                              <span className="w-12 text-center text-xs font-mono select-none">{Math.round(zoom * 100)}%</span>
+                              <button onClick={() => setZoom(z => Math.min(5, z + 0.25))} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="放大"><ZoomIn size={16} /></button>
+                              <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-1 border-l border-[var(--border-light)]" title="重置"><RotateCcw size={16} /></button>
+                          </div>
+   
+                          {/* Continue generation / Use as source action */}
+                          {onUseAsSource && !isVideo && !isAudio && (
+                              <button
+                                  onClick={(e) => {
+                                      e.stopPropagation();
+                                      onUseAsSource(image);
+                                      onClose(); // 将此图片设为参考图后，立即关闭大图灯箱
+                                  }}
+                                  className={`${actionButtonClass} hover:border-[var(--accent-coral)] hover:bg-[var(--accent-coral)]/80`}
+                                  title="将此图设为参考图继续创作"
+                              >
+                                  <Sparkles size={16} />
+                                  继续创作
+                              </button>
+                          )}
+   
+                          {/* 简体中文注释：灯箱只暴露统一的重绘入口，工作台内部再根据选区自动分流。 */}
+                          {onPartialRedraw && !isVideo && !isAudio && displaySrc && (
+                               <button
+                                   onClick={(e) => {
+                                       e.stopPropagation();
+                                      setRedrawWorkspaceMode('fresh');
+                                   }}
+                                   className={`${actionButtonClass} hover:border-purple-500 hover:bg-purple-600/80`}
+                                  title="重绘"
+                               >
+                                   <Pen size={16} />
+                                   重绘
+                               </button>
+                           )}
+                          {onPartialRedraw && !isVideo && !isAudio && displaySrc && (image.redraw || image.partialRedraw) && (
+                              <button
+                                  onClick={(e) => {
+                                      e.stopPropagation();
+                                      setRedrawWorkspaceMode('regenerate');
+                                  }}
+                                  className={`${actionButtonClass} hover:border-amber-400 hover:bg-amber-500/80`}
+                                  title="复用原图、原提示词和原标记重新生成"
+                              >
+                                  <Sparkles size={16} />
+                                  不满意重生成
+                              </button>
+                          )}
+      
+                          {onEditPptDeck && image.mode === GenerationMode.PPT && !isVideo && !isAudio && (
+                              <button
+                                  onClick={(e) => {
+                                      e.stopPropagation();
+                                      onEditPptDeck(image);
+                                  }}
+                                  className={`${actionButtonClass} hover:border-emerald-500 hover:bg-emerald-600/80`}
+                                  title={pickByDocumentLanguage('编辑分层页面包', 'Edit layered deck')}
+                              >
+                                  <Pen size={16} />
+                                  {pickByDocumentLanguage('编辑页面包', 'Edit Deck')}
+                              </button>
+                          )}
+      
+                          {onEditText && image.mode === GenerationMode.PPT && !isVideo && !isAudio && (
+                              <button
+                                  onClick={(e) => {
+                                      e.stopPropagation();
+                                      onEditText(image);
+                                  }}
+                                  className={`${actionButtonClass} hover:border-sky-500 hover:bg-sky-600/80`}
+                                  title="编辑当前页文字"
+                              >
+                                  <Pen size={16} />
+                                  {pickByDocumentLanguage('快速改字', 'Quick Text')}
+                              </button>
+                          )}
+      
+                          {!isVideo && !isAudio && (
+                              <button
+                                  onClick={handleCopyOriginal}
+                                  className={`${actionButtonClass} hover:border-cyan-500 hover:bg-cyan-600/80`}
+                                  title="复制原图"
+                              >
+                                  <Copy size={16} />
+                                  复制
+                              </button>
+                          )}
+                          {onDeleteImage && (
+                              <button
+                                  onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDeleteImage(image.id);
+                                      if (images.length <= 1) {
+                                          onClose();
+                                          return;
+                                      }
+                                      setCurrentIndex((index) => Math.max(0, Math.min(index, images.length - 2)));
+                                  }}
+                                  className={`${actionButtonClass} hover:border-red-500 hover:bg-red-600/80`}
+                                  title="删除当前结果"
+                              >
+                                  <Trash2 size={16} />
+                                  删除
+                              </button>
+                          )}
+      
+                          <div className="relative" ref={downloadMenuRef}>
+                              <button
+                                  onClick={handleDownload}
+                                  className="shrink-0 flex items-center gap-2 rounded-lg bg-indigo-600 px-4 h-10 text-sm font-medium transition-colors hover:bg-indigo-500"
+                                  title={isPptSubCard && onDownloadPptComposite ? '下载选项' : '下载原图'}
+                              >
+                                  <Download size={16} />
+                                  下载
+                              </button>
+                              {showDownloadMenu && isPptSubCard && onDownloadPptComposite && (
+                                  <div className="absolute right-0 bottom-full z-20 mb-2 w-36 rounded-xl border border-[var(--border-medium)] bg-[var(--bg-secondary)] p-1.5 shadow-2xl">
+                                      <button
+                                          onClick={(e) => {
+                                              setShowDownloadMenu(false);
+                                              void handleSingleDownload(e);
+                                          }}
+                                          className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                      >
+                                          <span>下载单图</span>
+                                      </button>
+                                      <button
+                                          onClick={(e) => {
+                                              e.stopPropagation();
+                                              setShowDownloadMenu(false);
+                                              onDownloadPptComposite(image.id);
+                                          }}
+                                          className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                      >
+                                          <span>下载整屏</span>
+                                      </button>
+                                  </div>
+                              )}
+                          </div>
+                      </div>
+                  )}
             </div>
 
             {redrawWorkspaceMode && redrawWorkspaceImageUrl && (

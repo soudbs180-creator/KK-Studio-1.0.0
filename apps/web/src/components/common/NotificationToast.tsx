@@ -13,6 +13,103 @@ const NotificationToast: React.FC = () => {
     const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
     const [hasUpdate, setHasUpdate] = useState(false);
 
+    // 简体中文：灵动胶囊与滑动手势状态
+    const [isMobileBarExpanded, setIsMobileBarExpanded] = useState(false);
+    const [touchStartX, setTouchStartX] = useState(0);
+    const [touchStartY, setTouchStartY] = useState(0);
+    const [touchOffsetX, setTouchOffsetX] = useState(0);
+    const [touchOffsetY, setTouchOffsetY] = useState(0);
+    const [isSwiping, setIsSwiping] = useState(false);
+    const [swipeDirection, setSwipeDirection] = useState<'none' | 'left' | 'right' | 'up'>('none');
+    const [dismissedUpdate, setDismissedUpdate] = useState(false);
+
+    const dismissLatestNotification = (id: string) => {
+        if (id === 'system-update-card') {
+            setDismissedUpdate(true);
+        } else {
+            notificationService.dismiss(id);
+        }
+    };
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        setTouchStartX(touch.clientX);
+        setTouchStartY(touch.clientY);
+        setTouchOffsetX(0);
+        setTouchOffsetY(0);
+        setIsSwiping(true);
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!isSwiping || e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        const diffX = touch.clientX - touchStartX;
+        const diffY = touch.clientY - touchStartY;
+        
+        setTouchOffsetX(diffX);
+        if (diffY < 0) {
+            setTouchOffsetY(diffY);
+        } else {
+            setTouchOffsetY(diffY * 0.2); // 下拉阻尼
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (!isSwiping) return;
+        setIsSwiping(false);
+        
+        const sorted = [...notifications].sort((a, b) => {
+            const score = (t: string) => (t === 'error' ? 3 : t === 'warning' ? 2 : 1);
+            return score(b.type) - score(a.type) || b.timestamp - a.timestamp;
+        });
+        
+        let activeNotifications = [...sorted];
+        if (hasUpdate && !dismissedUpdate) {
+            const updateCard: Notification = {
+                id: 'system-update-card',
+                type: 'update' as any,
+                title: pick('新版本已就绪', 'New Version Ready'),
+                message: pick('系统检测到有新版本发布。点击此卡片立即热重载并应用更新！', 'System update is ready. Click this card to hot-reload and apply update!'),
+                timestamp: Infinity
+            };
+            activeNotifications = [updateCard, ...activeNotifications];
+        }
+        
+        const latest = activeNotifications[0];
+        if (!latest) return;
+
+        // 判定临界位移：左右滑动 > 60px，上滑 > 50px
+        if (touchOffsetX > 60) {
+            setSwipeDirection('right');
+            setTimeout(() => {
+                dismissLatestNotification(latest.id);
+                setSwipeDirection('none');
+                setTouchOffsetX(0);
+                setTouchOffsetY(0);
+            }, 300);
+        } else if (touchOffsetX < -60) {
+            setSwipeDirection('left');
+            setTimeout(() => {
+                dismissLatestNotification(latest.id);
+                setSwipeDirection('none');
+                setTouchOffsetX(0);
+                setTouchOffsetY(0);
+            }, 300);
+        } else if (touchOffsetY < -50) {
+            setSwipeDirection('up');
+            setTimeout(() => {
+                dismissLatestNotification(latest.id);
+                setSwipeDirection('none');
+                setTouchOffsetX(0);
+                setTouchOffsetY(0);
+            }, 300);
+        } else {
+            setTouchOffsetX(0);
+            setTouchOffsetY(0);
+        }
+    };
+
     // 简体中文：监听屏幕尺寸与系统的热更新订阅
     useEffect(() => {
         setNotifications(notificationService.getAll());
@@ -105,58 +202,58 @@ const NotificationToast: React.FC = () => {
             case 'success':
                 return {
                     ...baseStyle,
-                    borderColor: 'rgba(16, 185, 129, 0.45)',
-                    background: 'linear-gradient(135deg, rgba(6, 40, 26, 0.8) 0%, rgba(3, 20, 13, 0.9) 100%)',
-                    color: '#6ee7b7'
+                    borderColor: 'rgba(16, 185, 129, 0.25)',
+                    background: 'linear-gradient(135deg, rgba(10, 28, 20, 0.75) 0%, rgba(6, 18, 13, 0.85) 100%)',
+                    color: '#a7f3d0'
                 };
             case 'error':
                 return {
                     ...baseStyle,
-                    borderColor: 'rgba(239, 68, 68, 0.45)',
-                    background: 'linear-gradient(135deg, rgba(60, 15, 15, 0.8) 0%, rgba(40, 8, 8, 0.9) 100%)',
-                    color: '#fca5a5'
+                    borderColor: 'rgba(239, 68, 68, 0.25)',
+                    background: 'linear-gradient(135deg, rgba(30, 12, 12, 0.75) 0%, rgba(18, 8, 8, 0.85) 100%)',
+                    color: '#fecaca'
                 };
             case 'warning':
                 return {
                     ...baseStyle,
-                    borderColor: 'rgba(245, 158, 11, 0.45)',
-                    background: 'linear-gradient(135deg, rgba(55, 35, 10, 0.8) 0%, rgba(35, 20, 5, 0.9) 100%)',
-                    color: '#fde68a'
+                    borderColor: 'rgba(245, 158, 11, 0.25)',
+                    background: 'linear-gradient(135deg, rgba(28, 20, 10, 0.75) 0%, rgba(18, 12, 6, 0.85) 100%)',
+                    color: '#fef3c7'
                 };
             case 'alipay':
                 return {
                     ...baseStyle,
-                    borderColor: 'rgba(59, 130, 246, 0.45)',
-                    background: 'linear-gradient(135deg, rgba(15, 30, 60, 0.8) 0%, rgba(8, 15, 40, 0.9) 100%)',
-                    color: '#93c5fd'
+                    borderColor: 'rgba(59, 130, 246, 0.25)',
+                    background: 'linear-gradient(135deg, rgba(12, 20, 36, 0.75) 0%, rgba(8, 12, 22, 0.85) 100%)',
+                    color: '#bfdbfe'
                 };
             case 'wechat':
                 return {
                     ...baseStyle,
-                    borderColor: 'rgba(20, 184, 166, 0.45)',
-                    background: 'linear-gradient(135deg, rgba(10, 45, 40, 0.8) 0%, rgba(5, 28, 25, 0.9) 100%)',
-                    color: '#99f6e4'
+                    borderColor: 'rgba(20, 184, 166, 0.25)',
+                    background: 'linear-gradient(135deg, rgba(10, 28, 24, 0.75) 0%, rgba(6, 18, 15, 0.85) 100%)',
+                    color: '#ccfbf1'
                 };
             case 'paypal':
                 return {
                     ...baseStyle,
-                    borderColor: 'rgba(14, 165, 233, 0.45)',
-                    background: 'linear-gradient(135deg, rgba(10, 35, 55, 0.8) 0%, rgba(5, 20, 35, 0.9) 100%)',
-                    color: '#bae6fd'
+                    borderColor: 'rgba(14, 165, 233, 0.25)',
+                    background: 'linear-gradient(135deg, rgba(10, 24, 36, 0.75) 0%, rgba(6, 15, 22, 0.85) 100%)',
+                    color: '#e0f2fe'
                 };
             case 'update' as any:
                 return {
                     ...baseStyle,
-                    borderColor: 'rgba(168, 85, 247, 0.55)',
-                    background: 'linear-gradient(135deg, rgba(40, 12, 65, 0.85) 0%, rgba(65, 30, 10, 0.9) 100%)',
-                    color: '#f3e8ff'
+                    borderColor: 'rgba(168, 85, 247, 0.3)',
+                    background: 'linear-gradient(135deg, rgba(22, 16, 32, 0.75) 0%, rgba(14, 10, 20, 0.85) 100%)',
+                    color: '#e9d5ff'
                 };
             case 'info':
             default:
                 return {
                     ...baseStyle,
-                    borderColor: 'rgba(236, 72, 153, 0.45)',
-                    background: 'linear-gradient(135deg, rgba(50, 15, 35, 0.8) 0%, rgba(30, 8, 20, 0.9) 100%)',
+                    borderColor: 'rgba(236, 72, 153, 0.25)',
+                    background: 'linear-gradient(135deg, rgba(26, 12, 20, 0.75) 0%, rgba(16, 8, 12, 0.85) 100%)',
                     color: '#fbcfe8'
                 };
         }
@@ -170,7 +267,7 @@ const NotificationToast: React.FC = () => {
 
     // 简体中文：拼装包含系统热更新卡片的最终通知队列
     let finalNotifications = [...sortedNotifications];
-    if (hasUpdate) {
+    if (hasUpdate && !dismissedUpdate) {
         const updateCard: Notification = {
             id: 'system-update-card',
             type: 'paypal', // 挂载默认类型，会被强转为 update
@@ -182,54 +279,136 @@ const NotificationToast: React.FC = () => {
         finalNotifications = [updateCard, ...finalNotifications];
     }
 
+    // 简体中文：监听最新的手机端通知以重置手势与5分钟消失倒计时
+    useEffect(() => {
+        if (!isMobile || finalNotifications.length === 0) return;
+        const latest = finalNotifications[0];
+        
+        // 每次有新的最新通知，先让胶囊折叠，然后再展开，形成灵动胶囊动画
+        setIsMobileBarExpanded(false);
+        const expandTimer = setTimeout(() => {
+            setIsMobileBarExpanded(true);
+        }, 120);
+
+        // 5分钟超时自动关闭 (300,000ms)
+        const autoDismissTimer = setTimeout(() => {
+            setSwipeDirection('up'); // 自动向上滑回
+            setTimeout(() => {
+                dismissLatestNotification(latest.id);
+                setSwipeDirection('none');
+            }, 300);
+        }, 300000);
+
+        return () => {
+            clearTimeout(expandTimer);
+            clearTimeout(autoDismissTimer);
+        };
+    }, [isMobile, finalNotifications[0]?.id]);
+
     // ==========================================
     // 手机端响应式视图
     // ==========================================
     if (isMobile) {
         const latestNotification = finalNotifications[0];
+
+        let transformStyle = '';
+        let opacityStyle = 1;
+        let transitionStyle = isSwiping 
+            ? 'none' 
+            : 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+
+        if (isSwiping) {
+            transformStyle = `translate(calc(-50% + ${touchOffsetX}px), ${touchOffsetY}px)`;
+        } else {
+            if (swipeDirection === 'left') {
+                transformStyle = 'translate(-200%, 0px) scale(0.9)';
+                opacityStyle = 0;
+            } else if (swipeDirection === 'right') {
+                transformStyle = 'translate(100%, 0px) scale(0.9)';
+                opacityStyle = 0;
+            } else if (swipeDirection === 'up') {
+                transformStyle = 'translate(-50%, -150px) scale(0.8)';
+                opacityStyle = 0;
+            } else {
+                transformStyle = 'translate(-50%, 0px)';
+            }
+        }
+
+        const premiumStyles = getPremiumStyles(latestNotification?.type || 'info');
+        const mStyle: React.CSSProperties = latestNotification ? {
+            ...premiumStyles,
+            position: 'fixed',
+            top: '48px', // 位置往下移动一些 (top-12)
+            left: '50%',
+            zIndex: 99999,
+            transform: transformStyle,
+            opacity: opacityStyle,
+            transition: transitionStyle,
+            display: 'flex',
+            alignItems: 'center',
+            boxShadow: `0 8px 32px 0 rgba(0, 0, 0, 0.4), 0 0 10px 0 ${getIconColor(latestNotification.type)}10`,
+            overflow: 'hidden',
+            cursor: 'grab',
+            touchAction: 'none', // 禁用浏览器默认滑动行为
+
+            // 灵动胶囊变形相关属性
+            width: isMobileBarExpanded ? '92%' : '40px',
+            maxWidth: isMobileBarExpanded ? '340px' : '40px',
+            height: isMobileBarExpanded ? '44px' : '40px',
+            borderRadius: isMobileBarExpanded ? '9999px' : '50%',
+            padding: isMobileBarExpanded ? '0 16px' : '0',
+            justifyContent: isMobileBarExpanded ? 'space-between' : 'center',
+        } : {};
+
         return (
             <>
                 {latestNotification && (
                     <div 
+                        onTouchStart={handleTouchStart}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
                         onClick={() => {
+                            if (!isMobileBarExpanded) return;
                             if (latestNotification.id === 'system-update-card') {
                                 handleCardClick(latestNotification);
                             } else {
                                 setIsMobileDrawerOpen(true);
                             }
                         }}
-                        className="fixed top-4 left-1/2 -translate-x-1/2 z-[99999] w-[92%] max-w-[340px] pointer-events-auto flex items-center justify-between gap-3 px-4 py-2.5 rounded-full border shadow-lg active:scale-95 transition-all duration-300"
-                        style={{
-                            background: 'rgba(20, 20, 25, 0.85)',
-                            borderColor: `${getIconColor(latestNotification.type)}40`,
-                            backdropFilter: 'blur(16px)',
-                            WebkitBackdropFilter: 'blur(16px)',
-                            boxShadow: `0 8px 32px 0 rgba(0, 0, 0, 0.4), 0 0 10px 0 ${getIconColor(latestNotification.type)}15`
-                        }}
+                        style={mStyle}
+                        className="active:scale-98"
                     >
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <div className="shrink-0 relative">
+                        {isMobileBarExpanded ? (
+                            <div className="flex items-center justify-between w-full gap-3 min-w-0 transition-opacity duration-300" style={{ opacity: isMobileBarExpanded ? 1 : 0 }}>
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <div className="shrink-0 relative">
+                                        {getIcon(latestNotification.type)}
+                                        <span 
+                                            className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full animate-ping"
+                                            style={{ backgroundColor: getIconColor(latestNotification.type) }}
+                                        />
+                                    </div>
+                                    <div className="min-w-0 flex-1 flex items-baseline">
+                                        <span className="text-xs font-bold leading-none truncate text-white max-w-[80px]">
+                                            {latestNotification.title}
+                                        </span>
+                                        <span className="text-[10px] font-medium opacity-80 pl-1.5 truncate text-white/80 flex-1">
+                                            {latestNotification.message}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="shrink-0 flex items-center justify-center opacity-70">
+                                    <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-white/90 flex items-center gap-0.5 font-bold">
+                                        {latestNotification.id === 'system-update-card' ? pick('应用', 'Apply') : pick('查看', 'View')}
+                                        <ChevronRight size={10} />
+                                    </span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-center transition-opacity duration-300" style={{ opacity: !isMobileBarExpanded ? 1 : 0 }}>
                                 {getIcon(latestNotification.type)}
-                                <span 
-                                    className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full animate-ping"
-                                    style={{ backgroundColor: getIconColor(latestNotification.type) }}
-                                />
                             </div>
-                            <div className="min-w-0 flex-1 flex items-baseline">
-                                <span className="text-xs font-bold leading-none truncate text-white max-w-[80px]">
-                                    {latestNotification.title}
-                                </span>
-                                <span className="text-[10px] font-medium opacity-85 pl-1.5 truncate text-gray-300 flex-1">
-                                    {latestNotification.message}
-                                </span>
-                            </div>
-                        </div>
-                        <div className="shrink-0 flex items-center justify-center opacity-70">
-                            <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-white/90 flex items-center gap-0.5 font-bold">
-                                {latestNotification.id === 'system-update-card' ? pick('应用', 'Apply') : pick('查看', 'View')}
-                                <ChevronRight size={10} />
-                            </span>
-                        </div>
+                        )}
                     </div>
                 )}
 

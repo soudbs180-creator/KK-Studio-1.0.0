@@ -459,8 +459,14 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
         </div>
       </div>
 
-      {/* 底部悬浮操作与模式切换控制区（带暗色渐变过渡，不遮挡内容，左右顶满） */}
-      <div className="absolute bottom-0 inset-x-0 z-20 flex items-end justify-between gap-4 px-4 pb-4 pt-12 select-none pointer-events-none bg-gradient-to-t from-black/95 via-black/50 to-transparent">
+      {/* 底部悬浮操作与模式切换控制区（带暗色渐变过渡，限制在控制栏蓝色区高度内，不遮挡内容，左右顶满） */}
+      <div className="absolute bottom-0 inset-x-0 z-20 flex items-end justify-between gap-4 px-4 pb-4 pt-4 select-none pointer-events-none">
+        <div 
+          className="absolute inset-0 -z-10"
+          style={{
+            background: 'linear-gradient(to top, rgba(10, 10, 12, 1) 0%, rgba(10, 10, 12, 0.98) 18%, rgba(10, 10, 12, 0.92) 36%, rgba(10, 10, 12, 0.76) 54%, rgba(10, 10, 12, 0.48) 70%, rgba(10, 10, 12, 0.24) 84%, rgba(10, 10, 12, 0.08) 93%, rgba(10, 10, 12, 0) 100%)'
+          }}
+        />
         <div className="min-w-0 flex flex-col gap-0.5 pointer-events-auto">
           <p className="text-[11px] leading-relaxed text-white/90 drop-shadow-sm font-medium">
             {pick('点击任意结果查看完整提示词和操作。', 'Tap any result to inspect the full prompt and actions.')}
