@@ -450,8 +450,10 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                 </div>
               ))}
             </div>
+            {/* 移动端专属：底部超大安全占位块（约占 45% 屏幕高度），防止最新生成的图片被手机软键盘和输入法遮挡，提供极致舒适的输入与观赏间距 */}
+            <div className="h-[45vh] w-full pointer-events-none shrink-0" />
             {/* 用来滚动定位到底部的锚点，避免内容滚动被遮挡 */}
-            <div ref={bottomRef} className="h-1 w-full pointer-events-none" />
+            <div ref={bottomRef} className="h-1 w-full pointer-events-none shrink-0" />
           </div>
         )}
         </div>
