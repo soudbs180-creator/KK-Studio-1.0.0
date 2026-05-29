@@ -10,7 +10,7 @@ KK Studio 是一款面向图像、视频、音频以及演示文稿（Presentati
 - **商业化闭环与安全管控**：内置完整的充值、计费、积分原子扣减与退款审计（Credits Transaction）机制。管理后台具备精细的分级授权设计。
 - **出色的商业级美学设计**：遵循 Apple 级磨砂玻璃态（Glassmorphism）与自适应流式排版设计，搭配丰富的微动效，带来愉悦的使用体验。
 
-## 🛠️ 技术栈
+## 🛠️ 技术栈 (Tech Layout & Runtime)
 
 - **前端技术**：React 19.2.x, TypeScript 6.0.x, Vite 8.0.x, React Router 7.x
 - **样式方案**：Vanilla CSS 变量与现代实用类（Tailwind CSS）

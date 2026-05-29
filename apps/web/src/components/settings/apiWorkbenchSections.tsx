@@ -1,6 +1,6 @@
 import React from 'react';
 import { notify } from '../../services/system/notificationService';
-import { Activity, Edit3, Globe, Pause, Play, Plus, RefreshCw, Shield, Trash2, Wand2, type LucideIcon } from 'lucide-react';
+import { Activity, Copy, Edit3, Globe, Pause, Play, Plus, RefreshCw, Shield, Timer, Trash2, Wallet, Wand2, type LucideIcon } from 'lucide-react';
 
 import ModelLogo from '../common/ModelLogo';
 import {
@@ -636,7 +636,6 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
         {routes.length > 0 ? (
           <div className="settings-model-center-route-grid">
             {routes.map((route) => {
-              const Icon = route.kind === 'official' ? Shield : Globe;
               const toggleLabel = route.isPaused ? pick('启用', 'Enable') : pick('暂停', 'Pause');
               const editLabel = pick('编辑', 'Edit');
               const refreshLabel = pick('刷新', 'Refresh');
@@ -665,68 +664,121 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                         className="settings-model-center-route__avatar"
                         style={{ color: route.accentColor || 'var(--text-primary)' }}
                       >
-                        <Icon size={18} />
+                        <ModelLogo
+                          modelId={route.recommendedModel || ''}
+                          provider={route.logoName || route.title}
+                          modelName={route.title}
+                          size={24}
+                          className="settings-model-center-route__logo"
+                        />
                       </div>
                       <div className="settings-model-center-route__copy">
                         <div className="settings-model-center-route__title">{route.title}</div>
-                        <div className="settings-model-center-route__subtitle">{route.subtitle}</div>
+                        <div className="settings-model-center-route__id-wrapper" onClick={(e) => e.stopPropagation()}>
+                          <span className="settings-model-center-route__id-label">Vendor ID:</span>
+                          <span className="settings-model-center-route__id-value">
+                            {route.id.length > 15 ? `${route.id.slice(0, 15)}...` : route.id}
+                          </span>
+                          <button
+                            type="button"
+                            className="settings-model-center-route__copy-btn"
+                            title={pick('复制 ID', 'Copy ID')}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(route.id);
+                              notify.success(pick('复制成功', 'Copied'), route.id);
+                            }}
+                          >
+                            <Copy size={11} />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    <SettingsBadge tone={route.statusVariant === 'online' ? 'emerald' : route.statusVariant === 'error' ? 'rose' : route.statusVariant === 'paused' ? 'neutral' : 'amber'}>
-                      {route.statusLabel}
-                    </SettingsBadge>
-                  </div>
-
-                  <div className="settings-model-center-route__metrics">
-                    <ModelCenterMetric label={pick('协议', 'Protocol')} value={route.protocolLabel} />
-                    <ModelCenterMetric label={pick('模型', 'Models')} value={route.modelCountLabel} />
-                    <ModelCenterMetric label={pick('预算', 'Budget')} value={route.budgetLabel} />
-                    <ModelCenterMetric label={pick('延迟', 'Latency')} value={route.latencyLabel} />
-                  </div>
-
-                  <div className="settings-model-center-route__footer">
-                    <div className="settings-model-center-route__usage">{route.usageLabel}</div>
-                    <div className="settings-model-center-route__actions" onClick={(event) => event.stopPropagation()}>
-                      <button
-                        type="button"
-                        className="settings-model-center-route__icon-button"
-                        disabled={route.toggleDisabled}
-                        onClick={route.onToggle}
-                        title={toggleLabel}
-                        aria-label={toggleLabel}
-                      >
-                        {route.isPaused ? <Play size={15} /> : <Pause size={15} />}
-                      </button>
-                      <button
-                        type="button"
-                        className="settings-model-center-route__icon-button"
-                        onClick={route.onSelect}
-                        title={editLabel}
-                        aria-label={editLabel}
-                      >
-                        <Edit3 size={15} />
-                      </button>
-                      <button
-                        type="button"
-                        className="settings-model-center-route__icon-button"
-                        disabled={route.refreshDisabled}
-                        onClick={route.onRefresh}
-                        title={refreshLabel}
-                        aria-label={refreshLabel}
-                      >
-                        <RefreshCw size={15} className={route.refreshLoading ? 'animate-spin' : ''} />
-                      </button>
-                      <button
-                        type="button"
-                        className="settings-model-center-route__icon-button settings-model-center-route__icon-button--danger"
-                        disabled={route.deleteDisabled}
-                        onClick={route.onDelete}
-                        title={deleteLabel}
-                        aria-label={deleteLabel}
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                    
+                    {/* 呼吸灯 Badge */}
+                    <div className={`settings-model-center-route__status-badge settings-model-center-route__status-badge--${route.statusVariant}`}>
+                      <span className="settings-model-center-route__status-dot" />
+                      <span>{route.statusLabel}</span>
                     </div>
+                  </div>
+
+                  {/* 大指标玻璃舱（双栏布局） */}
+                  <div className="settings-model-center-route__metrics-box">
+                    <div className="settings-model-center-route__metric-item">
+                      <div className="settings-model-center-route__metric-icon-wrapper">
+                        <Wallet size={18} />
+                      </div>
+                      <div className="settings-model-center-route__metric-copy">
+                        <div className="settings-model-center-route__metric-title">TOTAL BALANCE</div>
+                        <div className="settings-model-center-route__metric-number">{route.budgetLabel}</div>
+                        <div className="settings-model-center-route__metric-helper">{route.usageLabel}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="settings-model-center-route__metric-divider" />
+                    
+                    <div className="settings-model-center-route__metric-item">
+                      <div className="settings-model-center-route__metric-icon-wrapper">
+                        <Timer size={18} />
+                      </div>
+                      <div className="settings-model-center-route__metric-copy">
+                        <div className="settings-model-center-route__metric-title">DELAY</div>
+                        <div className="settings-model-center-route__metric-number">{route.latencyLabel}</div>
+                        <div className="settings-model-center-route__metric-helper">
+                          {pick('协议: ', 'Protocol: ')}{route.protocolLabel}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 底部平铺动作按钮栏 */}
+                  <div className="settings-model-center-route__actions-bar" onClick={(event) => event.stopPropagation()}>
+                    <button
+                      type="button"
+                      className="settings-model-center-route__action-btn"
+                      disabled={route.toggleDisabled}
+                      onClick={route.onToggle}
+                      title={toggleLabel}
+                      aria-label={toggleLabel}
+                    >
+                      {route.isPaused ? <Play size={14} /> : <Pause size={14} />}
+                      <span>{toggleLabel}</span>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      className="settings-model-center-route__action-btn"
+                      disabled={route.refreshDisabled}
+                      onClick={route.onRefresh}
+                      title={refreshLabel}
+                      aria-label={refreshLabel}
+                    >
+                      <RefreshCw size={14} className={route.refreshLoading ? 'animate-spin' : ''} />
+                      <span>{refreshLabel}</span>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      className="settings-model-center-route__action-btn"
+                      onClick={route.onSelect}
+                      title={editLabel}
+                      aria-label={editLabel}
+                    >
+                      <Edit3 size={14} />
+                      <span>{editLabel}</span>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      className="settings-model-center-route__action-btn settings-model-center-route__action-btn--danger"
+                      disabled={route.deleteDisabled}
+                      onClick={route.onDelete}
+                      title={deleteLabel}
+                      aria-label={deleteLabel}
+                    >
+                      <Trash2 size={14} />
+                      <span>{deleteLabel}</span>
+                    </button>
                   </div>
                 </article>
               );

@@ -62,7 +62,7 @@ export function buildPromptGroupRenderLayout({
   const groupConnectorDashLength = Math.max(2.5, Math.min(8, 3.5 / groupConnectorZoom));
   const groupConnectorGapLength = Math.max(3.5, Math.min(12, 6 / groupConnectorZoom));
   const promptCardZIndex = groupStackZIndex + 20;
-  const connectorLayerZIndex = Math.max(0, groupStackZIndex - 1);
+  const connectorLayerZIndex = -10; // 简体中文：将组内连接线 zIndex 固定为 -10，确保其沉在卡片最下方，不遮挡视线
   const promptConnectorPosition = resolveLivePromptPosition(node) ?? node.position;
   const renderedPromptNode = (
     promptConnectorPosition.x === node.position.x && promptConnectorPosition.y === node.position.y

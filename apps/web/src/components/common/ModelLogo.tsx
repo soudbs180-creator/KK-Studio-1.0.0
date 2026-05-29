@@ -33,15 +33,17 @@ const NANO_BANANA_KEYWORDS = [
 ];
 
 const ICON_MATCHERS: Array<{ iconId: string; keywords: string[] }> = [
-    { iconId: 'google', keywords: ['gemini', 'imagen', 'veo', 'learnlm', 'lyria', 'nano banana', 'nanobanana', 'google'] },
-    { iconId: 'openai', keywords: ['gpt', 'chatgpt', 'dall-e', 'dalle', 'codex', 'openai', 'sora', 'o1', 'o3', 'o4'] },
-    { iconId: 'anthropic', keywords: ['claude', 'anthropic'] },
-    { iconId: 'deepseek', keywords: ['deepseek'] },
-    { iconId: 'qwen', keywords: ['qwen', 'qwq', 'qvq', 'wanx', 'tongyi', 'wan 2', 'wan2', 'wan video', 'wan image'] },
+    { iconId: 'gemini', keywords: ['gemini'] }, // 独立 Gemini 星星图标
+    { iconId: 'google', keywords: ['imagen', 'veo', 'learnlm', 'lyria', 'google', '谷歌'] },
+    { iconId: 'openai', keywords: ['gpt', 'chatgpt', 'dall-e', 'dalle', 'codex', 'openai', 'sora', 'o1', 'o3', 'o4', 'gpt-best'] },
+    { iconId: 'claude', keywords: ['claude'] }, // 独立 Claude 小手套图标
+    { iconId: 'anthropic', keywords: ['anthropic'] },
+    { iconId: 'deepseek', keywords: ['deepseek', '深度求索'] },
+    { iconId: 'qwen', keywords: ['qwen', 'qwq', 'qvq', 'wanx', 'tongyi', 'wan 2', 'wan2', 'wan video', 'wan image', '通义千问', '千问'] },
     { iconId: 'midjourney', keywords: ['midjourney', 'mj', 'niji', 'nijijourney'] },
     { iconId: 'runway', keywords: ['runway', 'runwayml', 'gen-2', 'gen-3', 'gen-4', 'gen 2', 'gen 3', 'gen 4'] },
     { iconId: 'luma', keywords: ['luma', 'dream machine', 'lumadreammachine', 'ray2', 'ray3', 'ray 2', 'ray 3'] },
-    { iconId: 'kling', keywords: ['kling'] },
+    { iconId: 'kling', keywords: ['kling', '快手可灵', '可灵'] },
     { iconId: 'pika', keywords: ['pika'] },
     { iconId: 'ideogram', keywords: ['ideogram'] },
     { iconId: 'recraft', keywords: ['recraft'] },
@@ -52,37 +54,41 @@ const ICON_MATCHERS: Array<{ iconId: string; keywords: string[] }> = [
     { iconId: 'fishaudio', keywords: ['fish audio', 'fish-audio', 'fishaudio'] },
     { iconId: 'pixverse', keywords: ['pixverse'] },
     { iconId: 'viggle', keywords: ['viggle'] },
-    { iconId: 'hailuo', keywords: ['hailuo'] },
     { iconId: 'vidu', keywords: ['vidu'] },
-    { iconId: 'bytedance', keywords: ['jimeng', 'seedream', 'seedance', 'bytedance'] },
-    { iconId: 'moonshot', keywords: ['moonshot', 'kimi'] },
-    { iconId: 'baidu', keywords: ['baidu', 'ernie', 'wenxin'] },
-    { iconId: 'zhipu', keywords: ['zhipu', 'glm', 'bigmodel', 'cogview', 'cogvideo'] },
-    { iconId: 'zeroone', keywords: ['yi-', 'yi ', '01.ai', '01 ai', 'lingyi'] },
-    { iconId: 'xiaomi', keywords: ['xiaomi', 'xiaomi mimo', 'xiaomimimo', 'mimo'] },
-    { iconId: 'aws', keywords: ['amazon nova', 'nova'] },
+    { iconId: 'bytedance', keywords: ['jimeng', 'seedream', 'seedance', 'bytedance', '字节跳动', '字节'] },
+    { iconId: 'moonshot', keywords: ['moonshot', 'kimi', '月之暗面'] },
+    { iconId: 'wenxin', keywords: ['ernie', 'wenxin', '百度文心', '文心一言', '文心'] }, // 独立文心一言彩环图标
+    { iconId: 'baidu', keywords: ['baidu', '百度'] },
+    { iconId: 'zhipu', keywords: ['zhipu', 'glm', 'bigmodel', 'cogview', 'cogvideo', '智谱'] },
+    { iconId: 'zeroone', keywords: ['yi-', 'yi ', '01.ai', '01 ai', 'lingyi', '零一万物', '零一'] },
+    { iconId: 'xiaomimimo', keywords: ['xiaomi', 'xiaomi mimo', 'xiaomimimo', 'mimo', '小米'] }, // 修正为 LobeHub 中的 xiaomimimo 品牌以解决 CDN 404
+    { iconId: 'aws', keywords: ['amazon nova', 'nova', 'aws'] },
     { iconId: 'xai', keywords: ['grok', 'xai'] },
     { iconId: 'meta', keywords: ['llama', 'meta'] },
     { iconId: 'mistral', keywords: ['mistral'] },
     { iconId: 'perplexity', keywords: ['perplexity', 'sonar'] },
     { iconId: 'cohere', keywords: ['cohere', 'command-r'] },
     { iconId: 'groq', keywords: ['groq'] },
-    { iconId: 'minimax', keywords: ['minimax', 'abab', 'hailuo'] },
-    { iconId: 'volcengine', keywords: ['volcengine', 'doubao'] },
-    { iconId: 'tencentcloud', keywords: ['tencent cloud', 'tencent', 'hunyuan'] },
-    { iconId: 'bailian', keywords: ['aliyun', 'alibaba cloud', 'bailian'] },
-    { iconId: 'siliconcloud', keywords: ['siliconflow', 'siliconcloud'] },
+    { iconId: 'minimax', keywords: ['minimax', 'abab', 'hailuo'] }, // 统一将 minimax 品牌旗下海螺映射到 minimax 图标防 404
+    { iconId: 'doubao', keywords: ['doubao', '豆包'] }, // 独立豆包品牌图标
+    { iconId: 'volcengine', keywords: ['volcengine', '火山引擎', '火山'] },
+    { iconId: 'hunyuan', keywords: ['hunyuan', '混元'] }, // 新增混元独立品牌匹配
+    { iconId: 'tencentcloud', keywords: ['tencent cloud', 'tencent', '腾讯云', '腾讯'] },
+    { iconId: 'bailian', keywords: ['aliyun', 'alibaba cloud', 'bailian', '阿里云', '阿里', '百炼'] },
+    { iconId: 'siliconcloud', keywords: ['siliconflow', 'siliconcloud', '硅基流动'] },
     { iconId: 'openrouter', keywords: ['openrouter'] },
-    { iconId: 'stepfun', keywords: ['stepfun', 'step', '阶跃'] },
-    { iconId: 'nvidia', keywords: ['nvidia', 'nemotron'] },
+    { iconId: 'stepfun', keywords: ['stepfun', 'step', '阶跃星辰', '阶跃'] },
+    { iconId: 'nvidia', keywords: ['nvidia', 'nemotron', '英伟达'] },
     { iconId: 'worldrouter', keywords: ['worldrouter', 'world router'] },
     { iconId: 'vertexai', keywords: ['vertex ai', 'vertexai'] },
-    { iconId: 'azure', keywords: ['azure openai', 'azure'] },
+    { iconId: 'azure', keywords: ['azure openai', 'azure', '微软'] },
     { iconId: 'bedrock', keywords: ['bedrock'] },
-    { iconId: 'together', keywords: ['together'] },
+    { iconId: 'togetherai', keywords: ['together', 'togetherai'] }, // 修正为 LobeHub 中的 togetherai 品牌以解决 CDN 404
     { iconId: 'fal', keywords: ['fal'] },
     { iconId: 'bfl', keywords: ['flux', 'black forest labs', 'black-forest-labs'] },
     { iconId: 'stability', keywords: ['stability', 'stable-diffusion', 'stable video', 'sv3d', 'svd'] },
+    { iconId: 'sambanova', keywords: ['sambanova'] }, // 新增 SambaNova 品牌支持
+    { iconId: 'streamlake', keywords: ['wanqing', 'streamlake', '快手', '万青'] }, // 新增 StreamLake 快手品牌支持
 ];
 
 const CUSTOM_ICON_MATCHERS: Array<{ iconUrl: string; keywords: string[] }> = [
@@ -159,19 +165,35 @@ function isNanoBananaSeries(modelId: string, provider?: string, modelName?: stri
 }
 
 function getFallbackInitials(modelId: string, provider?: string): string {
-    const source = (provider || modelId || 'AI')
-        .replace(/[@/_-]+/g, ' ')
-        .replace(/[^a-zA-Z0-9 ]/g, ' ')
-        .trim();
-
+    const source = (provider || modelId || 'AI').trim();
     if (!source) return 'AI';
 
-    const parts = source.split(/\s+/).filter(Boolean);
+    // 如果字符串中包含中文，直接提取第一个中文字符作为图标，实现最完美契合中文字符的“首字当图标”效果
+    const chineseMatch = source.match(/[\u4e00-\u9fa5]/);
+    if (chineseMatch) {
+        return chineseMatch[0];
+    }
+
+    // 否则是纯英文或数字，进行英文缩写提取
+    const cleaned = source
+        .replace(/[@/_-]+/g, ' ')
+        .replace(/[^a-zA-Z0-9 ]/g, '')
+        .trim();
+
+    if (!cleaned) return 'AI';
+
+    const parts = cleaned.split(/\s+/).filter(Boolean);
     if (parts.length >= 2) {
         return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase();
     }
 
-    return source.slice(0, 2).toUpperCase();
+    // 处理像 "OpenClaw" 这样的驼峰大写缩写
+    const caps = cleaned.replace(/[^A-Z0-9]/g, '');
+    if (caps.length >= 2) {
+        return caps.slice(0, 2);
+    }
+
+    return cleaned.slice(0, 2).toUpperCase();
 }
 
 const ModelLogo: React.FC<ModelLogoProps> = ({
@@ -234,6 +256,15 @@ const ModelLogo: React.FC<ModelLogoProps> = ({
                     width={size}
                     height={size}
                     className="object-contain"
+                    style={{
+                        // 1. 在暗色模式下，对单色 (mono) 以及本来是纯黑色的品牌图标自动反色变白，完美契合用户“暗色下优先白色”的需求
+                        // 2. 根据亮暗主题自适应应用精细的微光投影，彻底解决因颜色接近导致看不清的问题，同时营造奢华浮雕质感
+                        filter: (isDarkMode && (variant === 'mono' || ['github', 'xai', 'aws'].includes(iconId || '')))
+                            ? 'invert(1) brightness(1.6) drop-shadow(0 0 1px rgba(255,255,255,0.35))'
+                            : isDarkMode
+                                ? 'drop-shadow(0 0 1.5px rgba(255,255,255,0.25))'
+                                : 'drop-shadow(0 0 1px rgba(0,0,0,0.12))'
+                    }}
                     onError={() => {
                         if (iconUrl && variant === 'color') {
                             setVariant('mono');

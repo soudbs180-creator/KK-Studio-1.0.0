@@ -2,7 +2,7 @@
  * Settings UI Components - iOS Style Design System
  * 设置页面UI组件库 - iOS风格设计系统
  */
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   SETTINGS_CONTROL_MOTION_CLASSNAME,
   SETTINGS_INPUT_CLASSNAME,
@@ -282,7 +282,7 @@ export const SettingToggle: React.FC<{
   );
 };
 
-// SettingSelect 选择框组件
+// SettingSelect 选择框组件 (简体中文注释：重构为自定义 iOS 风格 Dropdown，支持毛玻璃、淡入微动效和点击外部自动收起，以消除原生 Select 的白色突兀外观)
 export const SettingSelect: React.FC<{
   label: string;
   value: string;
@@ -291,41 +291,82 @@ export const SettingSelect: React.FC<{
   helper?: string;
   disabled?: boolean;
 }> = ({ label, value, options, onChange, helper, disabled = false }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const selectedOption = options.find((opt) => opt.value === value);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
-    <label className="block">
+    <div className="relative block text-left" ref={containerRef}>
       {label && (
-        <div
-          className={`mb-2 break-words ${SETTINGS_LABEL_CLASSNAME}`.trim()}
-        >
+        <div className={`mb-2 break-words ${SETTINGS_LABEL_CLASSNAME}`.trim()}>
           {label}
         </div>
       )}
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+      <button
+        type="button"
         disabled={disabled}
-        className={`${SETTINGS_INPUT_CLASSNAME} px-4`.trim()}
+        onClick={() => setIsOpen(!isOpen)}
+        className={`${SETTINGS_INPUT_CLASSNAME} flex items-center justify-between px-4 cursor-pointer text-left disabled:cursor-not-allowed disabled:opacity-60`.trim()}
         style={{ boxShadow: 'var(--settings-input-shadow)' }}
       >
-        {options.map((option) => (
-          <option
-            key={option.value}
-            value={option.value}
-            style={{
-              backgroundColor: 'var(--settings-option-bg)',
-              color: 'var(--settings-option-text)',
-            }}
-          >
-            {option.label}
-          </option>
-        ))}
-      </select>
+        <span className="truncate">{selectedOption?.label || value}</span>
+        <svg
+          className={`w-4 h-4 ml-2 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div
+          className="absolute z-[100] mt-1 w-full rounded-[var(--radius-control-md)] border overflow-hidden shadow-lg backdrop-blur-md animate-fadeIn"
+          style={{
+            borderColor: 'var(--settings-border-subtle)',
+            background: 'var(--settings-surface-elevated)',
+            maxHeight: '200px',
+            overflowY: 'auto',
+          }}
+        >
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+              className="w-full px-4 py-2.5 text-left text-sm hover:bg-[var(--bg-hover)] transition-colors duration-150 border-none bg-transparent"
+              style={{
+                color: option.value === value ? 'var(--accent-blue)' : 'var(--text-primary)',
+                fontWeight: option.value === value ? 600 : 400,
+              }}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {helper && (
         <div className="mt-2 break-words text-xs leading-5 text-[var(--text-secondary)]">
           {helper}
         </div>
       )}
-    </label>
+    </div>
   );
 };
 

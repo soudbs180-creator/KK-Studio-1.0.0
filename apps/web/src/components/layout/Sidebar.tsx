@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import logo from '../../assets/logo.png';
 import { useTheme } from '../../context/ThemeContext';
 import type { RuntimeAuthUser } from '../../services/auth/runtimeAuthTypes.ts';
 import { resolveAvatarUrl } from '../../utils/presetAvatars';
@@ -84,7 +83,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <div className="sidebar-header pb-4 mb-2">
                     <div className="sidebar-logo">
                         <img 
-                            src={logo} 
+                            src="/icon.svg" 
                             alt="KK Studio" 
                             onError={(e) => {
                                 e.currentTarget.style.display = 'none';

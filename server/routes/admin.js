@@ -173,6 +173,9 @@ const userListQuerySchema = z.object({
 });
 
 router.get('/admin/users', adminAuth(2), async (req, res) => {
+  if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+    return res.json({ users: [], total: 0, page: 1, limit: 20 });
+  }
   const parsed = userListQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Invalid query.' });
@@ -268,6 +271,9 @@ router.patch('/admin/users/:id/credits', adminAuth(2), async (req, res) => {
 });
 
 router.get('/admin/api-config', adminAuth(2), async (_req, res) => {
+  if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+    return res.json({ config: [] });
+  }
   const pool = getPool();
   const result = await pool.query(
     'SELECT operation_key, operation_name, cost, is_active FROM public.api_cost_config ORDER BY operation_key ASC'
@@ -335,16 +341,25 @@ async function readCreditModelRows(whereSql = '', params = []) {
 }
 
 router.get('/v1/model-catalog/active', async (req, res) => {
+  if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+    return res.json(okEnvelope({ items: [] }, req));
+  }
   const rows = await readCreditModelRows('WHERE is_active = true AND COALESCE(visibility, $1) = $1', ['public']);
   return res.json(okEnvelope({ items: groupCreditModelRows(rows, false) }, req));
 });
 
 router.get('/v1/model-catalog/active-credit-models', async (req, res) => {
+  if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+    return res.json(okEnvelope({ items: [] }, req));
+  }
   const rows = await readCreditModelRows('WHERE is_active = true AND COALESCE(visibility, $1) = $1', ['public']);
   return res.json(okEnvelope({ items: groupCreditModelRows(rows, false) }, req));
 });
 
 router.get('/v1/admin/credit-providers', adminAuth(2), async (req, res) => {
+  if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+    return res.json(okEnvelope({ items: [] }, req));
+  }
   const rows = await readCreditModelRows();
   return res.json(okEnvelope({ items: groupCreditModelRows(rows, true) }, req));
 });
@@ -480,6 +495,9 @@ async function readPricingCache(providerId) {
 }
 
 router.get('/v1/admin/credit-providers/:providerId/pricing-cache', adminAuth(2), async (req, res) => {
+  if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+    return res.json(okEnvelope({ providerId: req.params.providerId, pricing: [], cachedAt: null }, req));
+  }
   return res.json(okEnvelope(await readPricingCache(req.params.providerId), req));
 });
 
@@ -522,6 +540,9 @@ router.get('/v1/provider-pricing-cache', async (req, res) => {
   const providerId = String(req.query.baseUrl || '').trim();
   if (!providerId) {
     return res.status(400).json({ error: 'baseUrl is required.' });
+  }
+  if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+    return res.json(okEnvelope({ providerId, pricing: [], cachedAt: null }, req));
   }
   return res.json(okEnvelope(await readPricingCache(providerId), req));
 });

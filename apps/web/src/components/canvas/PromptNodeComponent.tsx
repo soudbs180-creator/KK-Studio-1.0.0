@@ -1410,6 +1410,15 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
 
                     {/* Right: Actions */}
                     <div className="flex items-center gap-1 shrink-0 ml-2">
+                        {!node.isGenerating && renderedSuccessCount > 0 && (
+                            <div
+                                className="flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-[var(--border-light)] bg-[var(--bg-tertiary)] text-[10px] text-[var(--text-secondary)] font-medium shrink-0 select-none"
+                                title={`共生成了 ${renderedSuccessCount} 张图片`}
+                            >
+                                <Image size={10} className="opacity-70" />
+                                <span>{renderedSuccessCount}张</span>
+                            </div>
+                        )}
                         {node.mode === GenerationMode.ECOMMERCE && node.ecommerce?.kind === 'a-plus-group' && onExportEcommerceGroup && (
                             <button
                                 type="button"

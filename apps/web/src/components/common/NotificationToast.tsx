@@ -22,6 +22,8 @@ const NotificationToast: React.FC = () => {
     const [isSwiping, setIsSwiping] = useState(false);
     const [swipeDirection, setSwipeDirection] = useState<'none' | 'left' | 'right' | 'up'>('none');
     const [dismissedUpdate, setDismissedUpdate] = useState(false);
+    // 简体中文：滑动手势锁定轴向，'none' 为未锁定，'x' 为锁定横向，'y' 为锁定纵向，防止斜向滑动导致倾斜运动
+    const swipeAxisRef = React.useRef<'none' | 'x' | 'y'>('none');
 
     const dismissLatestNotification = (id: string) => {
         if (id === 'system-update-card') {
@@ -38,6 +40,7 @@ const NotificationToast: React.FC = () => {
         setTouchStartY(touch.clientY);
         setTouchOffsetX(0);
         setTouchOffsetY(0);
+        swipeAxisRef.current = 'none'; // 开始手势时重置轴向锁定状态
         setIsSwiping(true);
     };
 
@@ -47,11 +50,26 @@ const NotificationToast: React.FC = () => {
         const diffX = touch.clientX - touchStartX;
         const diffY = touch.clientY - touchStartY;
         
-        setTouchOffsetX(diffX);
-        if (diffY < 0) {
-            setTouchOffsetY(diffY);
-        } else {
-            setTouchOffsetY(diffY * 0.2); // 下拉阻尼
+        let currentAxis = swipeAxisRef.current;
+        if (currentAxis === 'none') {
+            // 滑动超过 5px 时锁定滑动轴向
+            const threshold = 5;
+            if (Math.abs(diffX) > threshold || Math.abs(diffY) > threshold) {
+                if (Math.abs(diffX) >= Math.abs(diffY)) {
+                    currentAxis = 'x';
+                } else {
+                    currentAxis = 'y';
+                }
+                swipeAxisRef.current = currentAxis;
+            }
+        }
+
+        if (currentAxis === 'x') {
+            setTouchOffsetX(diffX);
+            setTouchOffsetY(0); // 锁定横向，清空纵向偏移
+        } else if (currentAxis === 'y') {
+            setTouchOffsetX(0); // 锁定纵向，清空横向偏移
+            setTouchOffsetY(diffY); // 往下为正，往上为负。直接线性跟手移动，移除强阻尼，提供极佳的下拉打开体感。
         }
     };
 
@@ -79,31 +97,53 @@ const NotificationToast: React.FC = () => {
         const latest = activeNotifications[0];
         if (!latest) return;
 
-        // 判定临界位移：左右滑动 > 60px，上滑 > 50px
-        if (touchOffsetX > 60) {
-            setSwipeDirection('right');
-            setTimeout(() => {
-                dismissLatestNotification(latest.id);
-                setSwipeDirection('none');
+        const currentAxis = swipeAxisRef.current;
+        swipeAxisRef.current = 'none'; // 重置方向锁定
+
+        // 判定临界位移：左右滑动绝对值 > 60px，上滑 < -50px，下滑 > 50px
+        if (currentAxis === 'x') {
+            if (touchOffsetX > 60) {
+                setSwipeDirection('right');
+                setTimeout(() => {
+                    dismissLatestNotification(latest.id);
+                    setSwipeDirection('none');
+                    setTouchOffsetX(0);
+                    setTouchOffsetY(0);
+                }, 300);
+            } else if (touchOffsetX < -60) {
+                setSwipeDirection('left');
+                setTimeout(() => {
+                    dismissLatestNotification(latest.id);
+                    setSwipeDirection('none');
+                    setTouchOffsetX(0);
+                    setTouchOffsetY(0);
+                }, 300);
+            } else {
                 setTouchOffsetX(0);
                 setTouchOffsetY(0);
-            }, 300);
-        } else if (touchOffsetX < -60) {
-            setSwipeDirection('left');
-            setTimeout(() => {
-                dismissLatestNotification(latest.id);
-                setSwipeDirection('none');
+            }
+        } else if (currentAxis === 'y') {
+            if (touchOffsetY < -50) {
+                setSwipeDirection('up');
+                setTimeout(() => {
+                    dismissLatestNotification(latest.id);
+                    setSwipeDirection('none');
+                    setTouchOffsetX(0);
+                    setTouchOffsetY(0);
+                }, 300);
+            } else if (touchOffsetY > 50) {
+                // 往下是打开：复位偏移量，并触发打开逻辑
                 setTouchOffsetX(0);
                 setTouchOffsetY(0);
-            }, 300);
-        } else if (touchOffsetY < -50) {
-            setSwipeDirection('up');
-            setTimeout(() => {
-                dismissLatestNotification(latest.id);
-                setSwipeDirection('none');
+                if (latest.id === 'system-update-card') {
+                    handleCardClick(latest);
+                } else {
+                    setIsMobileDrawerOpen(true);
+                }
+            } else {
                 setTouchOffsetX(0);
                 setTouchOffsetY(0);
-            }, 300);
+            }
         } else {
             setTouchOffsetX(0);
             setTouchOffsetY(0);

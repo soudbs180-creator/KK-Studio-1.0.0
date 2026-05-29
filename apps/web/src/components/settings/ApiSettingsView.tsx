@@ -2776,7 +2776,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           icon={Shield}
           tone="amber"
           actions={
-            <SettingsActionButton data-testid="api-official-editor-back" icon={ArrowLeft} onClick={cancelEdit}>
+            <SettingsActionButton data-testid="api-official-editor-back" data-content-back-button="true" icon={ArrowLeft} onClick={cancelEdit}>
               {pick('返回接口列表', 'Back to endpoints')}
             </SettingsActionButton>
           }
@@ -2790,7 +2790,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               'Return to API Management and choose another endpoint to edit.'
             )}
             action={
-              <SettingsActionButton data-testid="api-official-editor-back" icon={ArrowLeft} onClick={cancelEdit}>
+              <SettingsActionButton data-testid="api-official-editor-back" data-content-back-button="true" icon={ArrowLeft} onClick={cancelEdit}>
                 {pick('返回接口列表', 'Back to endpoints')}
               </SettingsActionButton>
             }
@@ -2813,7 +2813,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           icon={Globe}
           tone="amber"
           actions={
-            <SettingsActionButton data-testid="api-provider-editor-back" icon={ArrowLeft} onClick={cancelEdit}>
+            <SettingsActionButton data-testid="api-provider-editor-back" data-content-back-button="true" icon={ArrowLeft} onClick={cancelEdit}>
               {pick('返回供应商列表', 'Back to providers')}
             </SettingsActionButton>
           }
@@ -2827,7 +2827,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               'Return to API Management and choose another provider to edit.'
             )}
             action={
-              <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>
+              <SettingsActionButton data-testid="api-provider-editor-back" data-content-back-button="true" icon={ArrowLeft} onClick={cancelEdit}>
                 {pick('返回供应商列表', 'Back to providers')}
               </SettingsActionButton>
             }
@@ -2842,7 +2842,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       {activeEditorMode === null ? (
         <>
           {/* 工作台顶部居中高级/标准模式切换胶囊，应用亮暗色彩彻底隔离与细腻阻尼点击反馈 */}
-          <div className="flex justify-center mb-6 mt-1.5 w-full animate-fadeIn">
+          <div className="flex justify-center mb-2 sm:mb-4 mt-8 sm:mt-4 w-full animate-fadeIn">
             <div 
               className={`flex rounded-full border p-0.5 text-xs font-semibold shadow-sm transition-[background-color,border-color] duration-300 ${
                 isDarkMode 
@@ -2854,6 +2854,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               <button
                 type="button"
                 onClick={() => setShowAdvancedWorkbench(false)}
+                aria-label={showAdvancedWorkbench ? 'Hide advanced mode' : undefined}
                 className={`rounded-full px-4 py-1.5 cursor-pointer border-none font-bold active:scale-[0.965] ${
                   !showAdvancedWorkbench
                     ? isDarkMode
@@ -2874,6 +2875,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               <button
                 type="button"
                 onClick={() => setShowAdvancedWorkbench(true)}
+                aria-label={!showAdvancedWorkbench ? 'Advanced mode' : undefined}
                 className={`rounded-full px-4 py-1.5 cursor-pointer border-none font-bold active:scale-[0.965] ${
                   showAdvancedWorkbench
                     ? isDarkMode
@@ -2920,7 +2922,12 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       {activeEditorMode !== null ? (
         <div className="settings-model-center-editor-page">
           <div className="settings-model-center-editor-page__bar">
-            <SettingsActionButton icon={ArrowLeft} onClick={cancelEdit}>
+            <SettingsActionButton
+              data-testid={activeEditorMode === 'official' ? 'api-official-editor-back' : 'api-provider-editor-back'}
+              data-content-back-button="true"
+              icon={ArrowLeft}
+              onClick={cancelEdit}
+            >
               {pick('返回模型中心', 'Back to model center')}
             </SettingsActionButton>
             <SettingsBadge tone="neutral">

@@ -276,8 +276,9 @@ body.auth-screen-active.auth-screen-active--light #root {
 .auth-input-wrap input:-webkit-autofill:active {
   -webkit-text-fill-color: var(--input-autofill-text) !important;
   caret-color: var(--input-autofill-text);
-  box-shadow: 0 0 0 1000px var(--input-autofill-bg) inset !important;
-  transition: background-color 9999s ease-out, color 9999s ease-out;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  transition: background-color 5000000s ease-in-out 0s, color 5000000s ease-in-out 0s;
 }
 
 .auth-field-help {

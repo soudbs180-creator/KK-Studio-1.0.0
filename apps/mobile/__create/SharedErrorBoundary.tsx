@@ -183,10 +183,13 @@ function InternalErrorBoundary({
       }
       postCountRef.current += 1;
       lastPostTimeRef.current = Date.now();
-      window.parent.postMessage(
-        { type: 'sandbox:error:detected', error: serialized },
-        '*'
-      );
+      // 平台守卫：仅在 Web 环境（iframe 沙箱）中向父窗口上报错误
+      if (typeof window !== 'undefined') {
+        window.parent.postMessage(
+          { type: 'sandbox:error:detected', error: serialized },
+          '*'
+        );
+      }
     };
 
     if (timeSinceLastPost < THROTTLE_MS) {
@@ -199,6 +202,8 @@ function InternalErrorBoundary({
 
   function isInIframe() {
     try {
+      // 平台守卫：原生 RN 环境无 window 对象，直接返回 false
+      if (typeof window === 'undefined') return false;
       return window.parent !== window;
     } catch {
       return true;

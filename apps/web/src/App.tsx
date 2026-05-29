@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, startTransition } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, startTransition } from 'react';
 import InfiniteCanvas, { type InfiniteCanvasHandle } from './components/canvas/InfiniteCanvas';
 import ImageNode from './components/image/ImageCard';
 import PromptNodeComponent from './components/canvas/PromptNodeComponent';
@@ -4204,7 +4204,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     setCanvasInteractionPhase(state.interactionPhase);
   }, []);
 
-  const CONNECTOR_LAYER_Z_INDEX = 0;
+  const CONNECTOR_LAYER_Z_INDEX = -10;
   const simplifiedConnectorMode = canvasPerformanceProfile.cardDetailLevel === 'thumbnail-shell'
     || (canvasPerformanceProfile.projectSize === 'huge' && canvasPerformanceProfile.isInteracting);
   const showConnectorHitAreas = !simplifiedConnectorMode;
@@ -4523,7 +4523,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       />
       {/* 绠€浣撲腑鏂囷細宸︿笂瑙掔瓑瀹芥偓娴帶鍒跺崱鐗?*/}
       {!isMobile && (
-        <div className="fixed top-4 left-4 z-[100] w-52 pointer-events-auto select-none">
+        <div className="desktop-left-chrome fixed top-4 left-4 z-[100] w-52 pointer-events-auto select-none">
           <AppDesktopChrome
             isMobile={isMobile}
             billingUiEnabled={billingUiEnabled}
@@ -4546,7 +4546,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
       {/* 绠€浣撲腑鏂囷細宸︿笅瑙掓偓娴缉鏀惧崱鐗?- 绔栫洿鎽嗘斁锛屾瀬鑷寸氦缁嗗搴?(w-10)锛屼笉瑕佸拰渚ц竟宸ュ叿鏍忓搴︿竴鑷达紝鐗堟湰鍙峰湪鍏朵笅鏂瑰彟澶栨覆鏌撲负绮捐嚧鐨勭嫭绔嬫瘺鐜荤拑鍗＄墖 */}
       {!isMobile && (
-        <div className="fixed bottom-4 left-4 z-50 w-10 flex flex-col items-center gap-2 pointer-events-auto select-none">
+        <div className="desktop-zoom-rail fixed bottom-4 left-4 z-50 w-10 flex flex-col items-center gap-2 pointer-events-auto select-none">
           <AppZoomControl
             scale={canvasTransform.scale}
             transform={canvasTransform}
@@ -4757,6 +4757,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
             /* Follow-up connector colors mirror the active generation mode. */
             const isRedrawMode = pn.mode === GenerationMode.REDRAW || pn.mode === GenerationMode.INPAINT;
+            if (!isRedrawMode) return null; // 简体中文：追问功能已删除，不再显示非重绘模式下的黄色虚线连线
             const baseColor = isRedrawMode ? '#22c55e' : '#eab308';
             const hoverClass = isRedrawMode ? 'group-hover:stroke-green-400' : 'group-hover:stroke-yellow-400';
 
@@ -4830,6 +4831,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
             /* Pending connection colors follow the active generation mode. */
             const isRedrawMode = config.mode === GenerationMode.REDRAW || config.mode === GenerationMode.INPAINT;
+            if (!isRedrawMode) return null; // 简体中文：追问功能已删除，不再显示非重绘模式下的黄色虚线连线
             const baseColor = isRedrawMode ? '#22c55e' : '#eab308';
             const hoverClass = isRedrawMode ? 'group-hover:stroke-green-400' : 'group-hover:stroke-yellow-400';
 

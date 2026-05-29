@@ -793,7 +793,7 @@ if (-not $vitePid) {
     Assert-PortAvailable -Port 3000
     $vitePid = Start-DetachedNodeProcess `
         -NodeExe $nodeExe `
-        -NodeArguments @($viteCli, '--configLoader', 'native') `
+        -NodeArguments @($viteCli, '--configLoader', 'native', '--config', 'apps/web/vite.config.ts') `
         -WorkingDirectory $projectRoot `
         -PidFile $vitePidFile `
         -StdOutLog $viteOutLog `

@@ -17,8 +17,14 @@ type LayoutGroup = {
     layoutHeight?: number;
 };
 
+// 🎯 [New] 扩展 LayoutGroup，包含唯一 ID、分类轨道和时间戳
+type EnhancedLayoutGroup = LayoutGroup & {
+    id: string;
+    category: 'standard' | 'error' | 'ecommerce' | 'ppt' | 'automation';
+    timestamp: number;
+};
+
 const PROMPT_WIDTH = 320;
-const GROUPS_PER_ROW = 20;
 const SUB_COLUMNS = 20;
 const GROUP_GAP_X = 56;
 const GROUP_GAP_Y = 120;
@@ -38,63 +44,66 @@ const getPromptWidth = (prompt?: PromptNode): number => (
         : PROMPT_WIDTH
 );
 
-const getEcommerceFrameworkSortKey = (group: LayoutGroup): {
-    frameworkId: string;
-    rank: number;
-} | null => {
-    const ecommerce = group.prompt?.ecommerce;
-    if (!group.prompt || !ecommerce) {
-        return null;
-    }
-
-    if (ecommerce.kind === 'framework') {
-        return { frameworkId: group.prompt.id, rank: 2 };
-    }
-
-    if (!ecommerce.frameworkId) {
-        return null;
-    }
-
-    const sheetRank = ecommerce.sourceSheet === 'A+' ? 1 : 0;
-    return { frameworkId: ecommerce.frameworkId, rank: sheetRank };
+const getGroupTimestamp = (group: LayoutGroup): number => {
+    return group.prompt?.timestamp || group.images[0]?.timestamp || 0;
 };
 
-const compareRootLayoutGroups = (
-    a: LayoutGroup,
-    b: LayoutGroup,
-    rootOrder: Map<LayoutGroup, number>,
-    frameworkFirstOrder: Map<string, number>,
-): number => {
-    const leftOrder = rootOrder.get(a) ?? 0;
-    const rightOrder = rootOrder.get(b) ?? 0;
-    const leftKey = getEcommerceFrameworkSortKey(a);
-    const rightKey = getEcommerceFrameworkSortKey(b);
-    const leftBucketOrder = leftKey ? (frameworkFirstOrder.get(leftKey.frameworkId) ?? leftOrder) : leftOrder;
-    const rightBucketOrder = rightKey ? (frameworkFirstOrder.get(rightKey.frameworkId) ?? rightOrder) : rightOrder;
-    const bucketDiff = leftBucketOrder - rightBucketOrder;
+type SubtreePlacement = {
+    dx: number;
+    dy: number;
+    group: EnhancedLayoutGroup;
+};
 
-    if (bucketDiff !== 0) {
-        return bucketDiff;
+type SubtreeLayoutResult = {
+    width: number;
+    height: number;
+    placements: SubtreePlacement[];
+};
+
+// 🎯 [New] 电商项目子网格相对布局算法
+// Framework 作为主卡居左，其他的子卡组在右侧以 2 列网格紧凑平铺，组成高内聚方形模块
+const layoutEcommerceProject = (
+    fwGroup: EnhancedLayoutGroup,
+    subGroups: EnhancedLayoutGroup[]
+): SubtreeLayoutResult => {
+    const placements: SubtreePlacement[] = [];
+    placements.push({ dx: 0, dy: 0, group: fwGroup });
+
+    if (subGroups.length === 0) {
+        return { width: fwGroup.width, height: fwGroup.height, placements };
     }
 
-    if (leftKey && rightKey) {
-        const frameworkDiff = leftKey.frameworkId.localeCompare(rightKey.frameworkId);
-        if (frameworkDiff !== 0) {
-            return frameworkDiff;
-        }
+    const cols = 2;
+    const xStart = fwGroup.width + GROUP_GAP_X;
+    
+    // 计算子卡片的最大物理尺寸
+    const maxSubWidth = Math.max(...subGroups.map(g => g.width));
+    const maxSubHeight = Math.max(...subGroups.map(g => g.height));
 
-        const rankDiff = leftKey.rank - rightKey.rank;
-        if (rankDiff !== 0) {
-            return rankDiff;
-        }
-    }
+    subGroups.forEach((sub, index) => {
+        const col = index % cols;
+        const row = Math.floor(index / cols);
+        const dx = xStart + col * (maxSubWidth + GROUP_GAP_X);
+        const dy = row * (maxSubHeight + GROUP_GAP_Y);
+        placements.push({ dx, dy, group: sub });
+    });
 
-    return leftOrder - rightOrder;
+    const subRows = Math.ceil(subGroups.length / cols);
+    const subGridWidth = cols * maxSubWidth + (cols - 1) * GROUP_GAP_X;
+    const subGridHeight = subRows * maxSubHeight + (subRows - 1) * GROUP_GAP_Y;
+
+    const width = xStart + subGridWidth;
+    const height = Math.max(fwGroup.height, subGridHeight);
+
+    return { width, height, placements };
 };
 
 export function resolveCanvasAutoArrangePositions(canvas: Canvas): CanvasAutoArrangePositions {
     const errorPrompts = canvas.promptNodes.filter(prompt => prompt.error);
     const errorPromptIds = new Set(errorPrompts.map(prompt => prompt.id));
+
+    // 过滤掉所有属于 PPT 的 Prompt 节点
+    const pptPromptIds = new Set(canvas.promptNodes.filter(prompt => prompt.mode === 'ppt').map(prompt => prompt.id));
 
     const normalPrompts = canvas.promptNodes.filter(prompt =>
         !errorPromptIds.has(prompt.id) &&
@@ -111,17 +120,18 @@ export function resolveCanvasAutoArrangePositions(canvas: Canvas): CanvasAutoArr
         !canvas.promptNodes.some(prompt => prompt.id === image.parentPromptId)
     );
 
-    const layoutGroups: LayoutGroup[] = [];
+    const layoutGroups: EnhancedLayoutGroup[] = [];
     const promptById = new Map(canvas.promptNodes.map(prompt => [prompt.id, prompt]));
-    const imageById = new Map(canvas.imageNodes.map(image => [image.id, image]));
 
+    // 1. 提取所有正常卡组
     normalPrompts.forEach(prompt => {
-        const childImages = canvas.imageNodes.filter(image => image.parentPromptId === prompt.id);
+        const isPpt = prompt.mode === 'ppt';
+        // 🚀 [UI Optimization] PPT 卡片不要链式平铺其子图片，子图片在整理中排除
+        const childImages = isPpt
+            ? []
+            : canvas.imageNodes.filter(image => image.parentPromptId === prompt.id);
+            
         const promptHeight = prompt.height || 200;
-        const sourceImage = prompt.sourceImageId ? imageById.get(prompt.sourceImageId) : undefined;
-        const sourcePromptId = sourceImage?.parentPromptId && promptById.has(sourceImage.parentPromptId)
-            ? sourceImage.parentPromptId
-            : undefined;
 
         let maxSubWidth = 0;
         let maxSubHeight = 0;
@@ -143,111 +153,113 @@ export function resolveCanvasAutoArrangePositions(canvas: Canvas): CanvasAutoArr
         const groupWidth = Math.max(getPromptWidth(prompt), subBlockWidth);
         const groupHeight = promptHeight + (childImages.length > 0 ? PROMPT_TO_SUB_GAP + subBlockHeight : 0);
 
+        let category: EnhancedLayoutGroup['category'] = 'standard';
+        if (prompt.mode === 'ecommerce') {
+            category = 'ecommerce';
+        } else if (prompt.mode === 'ppt') {
+            category = 'ppt';
+        } else if ((prompt.mode as string) === 'automation' || prompt.tags?.includes('automation')) {
+            category = 'automation';
+        }
+
         layoutGroups.push({
+            id: prompt.id,
+            category,
             type: 'normal',
             prompt,
             images: childImages,
             width: groupWidth,
             height: groupHeight,
-            sourcePromptId,
+            timestamp: getGroupTimestamp({ type: 'normal', prompt, images: childImages, width: groupWidth, height: groupHeight })
         });
     });
 
+    // 2. 提取所有孤立 Prompt
     orphanPrompts.forEach(prompt => {
-        const sourceImage = prompt.sourceImageId ? imageById.get(prompt.sourceImageId) : undefined;
-        const sourcePromptId = sourceImage?.parentPromptId && promptById.has(sourceImage.parentPromptId)
-            ? sourceImage.parentPromptId
-            : undefined;
+        let category: EnhancedLayoutGroup['category'] = 'standard';
+        if (prompt.mode === 'ecommerce') {
+            category = 'ecommerce';
+        } else if (prompt.mode === 'ppt') {
+            category = 'ppt';
+        } else if ((prompt.mode as string) === 'automation' || prompt.tags?.includes('automation')) {
+            category = 'automation';
+        }
+
         layoutGroups.push({
+            id: prompt.id,
+            category,
             type: 'orphan-prompt',
             prompt,
             images: [],
             width: getPromptWidth(prompt),
             height: prompt.height || 200,
-            sourcePromptId,
+            timestamp: getGroupTimestamp({ type: 'orphan-prompt', prompt, images: [], width: getPromptWidth(prompt), height: prompt.height || 200 })
         });
     });
 
+    // 3. 提取所有孤立图片
     orphanImages.forEach(image => {
+        // 如果该孤立图片属于已过滤 PPT 子图，直接忽略以去除链式呈现
+        if (image.parentPromptId && pptPromptIds.has(image.parentPromptId)) {
+            return;
+        }
         const dims = getImageDims(image.aspectRatio);
         layoutGroups.push({
+            id: image.id,
+            category: 'standard',
             type: 'orphan-image',
             images: [image],
             width: dims.w,
             height: dims.h,
+            timestamp: getGroupTimestamp({ type: 'orphan-image', images: [image], width: dims.w, height: dims.h })
         });
     });
 
-    const followUpGroups = layoutGroups.filter(group => !!group.sourcePromptId && group.prompt);
-    const rootLayoutGroups = layoutGroups.filter(group => !group.sourcePromptId);
-    const rootOrder = new Map(rootLayoutGroups.map((group, index) => [group, index] as const));
-    const frameworkFirstOrder = new Map<string, number>();
-    rootLayoutGroups.forEach((group) => {
-        const key = getEcommerceFrameworkSortKey(group);
-        if (!key) return;
-        const order = rootOrder.get(group) ?? 0;
-        const previous = frameworkFirstOrder.get(key.frameworkId);
-        if (previous === undefined || order < previous) {
-            frameworkFirstOrder.set(key.frameworkId, order);
-        }
-    });
-    rootLayoutGroups.sort((a, b) => compareRootLayoutGroups(a, b, rootOrder, frameworkFirstOrder));
-    const followUpChildrenMap = new Map<string, LayoutGroup[]>();
-    followUpGroups.forEach(group => {
-        const sourcePromptId = group.sourcePromptId!;
-        const existing = followUpChildrenMap.get(sourcePromptId) || [];
-        existing.push(group);
-        followUpChildrenMap.set(sourcePromptId, existing);
-    });
-    followUpChildrenMap.forEach(groups => {
-        groups.sort((a, b) => (a.prompt?.timestamp || 0) - (b.prompt?.timestamp || 0));
-    });
+    // 4. 提取所有错误卡组
+    errorPrompts.forEach(prompt => {
+        const isPpt = prompt.mode === 'ppt';
+        // 错误 PPT 卡片同样不平铺子图片
+        const childImages = isPpt
+            ? []
+            : canvas.imageNodes.filter(image => image.parentPromptId === prompt.id);
+        const promptHeight = prompt.height || 200;
+        let groupWidth = PROMPT_WIDTH;
+        let groupHeight = promptHeight;
 
-    const computeLayoutHeight = (group: LayoutGroup, stack = new Set<string>()): number => {
-        const promptId = group.prompt?.id;
-        if (!promptId || stack.has(promptId)) return group.height;
-        const nextStack = new Set(stack);
-        nextStack.add(promptId);
-        const children = followUpChildrenMap.get(promptId) || [];
-        return children.length === 0
-            ? group.height
-            : Math.max(group.height, ...children.map(child => computeLayoutHeight(child, nextStack)));
-    };
-
-    rootLayoutGroups.forEach(group => {
-        group.layoutHeight = computeLayoutHeight(group);
-    });
-
-    const rows: Array<{
-        groups: LayoutGroup[];
-        maxPromptHeight: number;
-        maxTotalHeight: number;
-        startX: number;
-    }> = [];
-    let currentRow: typeof rows[0] = { groups: [], maxPromptHeight: 0, maxTotalHeight: 0, startX: START_X };
-
-    rootLayoutGroups.forEach(group => {
-        if (currentRow.groups.length >= GROUPS_PER_ROW) {
-            rows.push(currentRow);
-            currentRow = { groups: [], maxPromptHeight: 0, maxTotalHeight: 0, startX: START_X };
+        if (childImages.length > 0) {
+            let maxSubWidth = 0;
+            let maxSubHeight = 0;
+            childImages.forEach(image => {
+                const dims = getImageDims(image.aspectRatio);
+                maxSubWidth = Math.max(maxSubWidth, dims.w);
+                maxSubHeight = Math.max(maxSubHeight, dims.h);
+            });
+            const actualColumns = Math.min(SUB_COLUMNS, childImages.length);
+            const rows = Math.ceil(childImages.length / SUB_COLUMNS);
+            const subBlockWidth = actualColumns * maxSubWidth + (actualColumns - 1) * SUB_IMAGE_GAP;
+            const subBlockHeight = rows > 0
+                ? rows * maxSubHeight + (rows - 1) * SUB_IMAGE_GAP
+                : 0;
+            groupWidth = Math.max(PROMPT_WIDTH, subBlockWidth);
+            groupHeight = promptHeight + PROMPT_TO_SUB_GAP + subBlockHeight;
         }
 
-        currentRow.groups.push(group);
-        const promptHeight = group.prompt?.height || 200;
-        currentRow.maxPromptHeight = Math.max(currentRow.maxPromptHeight, promptHeight);
-        currentRow.maxTotalHeight = Math.max(currentRow.maxTotalHeight, group.layoutHeight || group.height);
+        layoutGroups.push({
+            id: prompt.id,
+            category: 'error',
+            type: 'normal',
+            prompt,
+            images: childImages,
+            width: groupWidth,
+            height: groupHeight,
+            timestamp: getGroupTimestamp({ type: 'normal', prompt, images: childImages, width: groupWidth, height: groupHeight })
+        });
     });
-
-    if (currentRow.groups.length > 0) {
-        rows.push(currentRow);
-    }
 
     const positions: CanvasAutoArrangePositions = {};
-    const placedBounds = new Map<string, { left: number; top: number; right: number; bottom: number; width: number; height: number }>();
-    const followUpRightEdge = new Map<string, number>();
-    let currentY = START_Y;
 
-    const placeGroup = (group: LayoutGroup, left: number, top: number) => {
+    // 核心卡组内部坐标分配器 (底部定位原点)
+    const placeGroupInternal = (group: EnhancedLayoutGroup, left: number, top: number) => {
         const groupCenterX = left + group.width / 2;
         const promptHeight = group.prompt?.height || 200;
         const subCardsStartY = top + promptHeight + PROMPT_TO_SUB_GAP;
@@ -291,142 +303,126 @@ export function resolveCanvasAutoArrangePositions(canvas: Canvas): CanvasAutoArr
                 y: subCardsStartY + dims.h,
             };
         }
-
-        if (group.prompt?.id) {
-            placedBounds.set(group.prompt.id, {
-                left,
-                top,
-                right: left + group.width,
-                bottom: top + group.height,
-                width: group.width,
-                height: group.height,
-            });
-        }
     };
 
-    rows.forEach(row => {
-        let rowX = START_X;
+    const placeSubtree = (layout: SubtreeLayoutResult, left: number, top: number) => {
+        layout.placements.forEach(p => {
+            placeGroupInternal(p.group, left + p.dx, top + p.dy);
+        });
+    };
 
-        row.groups.forEach(group => {
-            placeGroup(group, rowX, currentY);
-            rowX += group.width + GROUP_GAP_X;
+    // 通用独立卡片宫格平铺函数 (升序排序保证旧的在左上，新的在右下)
+    const placeIndependentGroupsGrid = (
+        groups: EnhancedLayoutGroup[],
+        columnsPerRow: number,
+        startX: number,
+        startY: number
+    ): number => {
+        groups.sort((a, b) => a.timestamp - b.timestamp);
+
+        let currentY = startY;
+        let index = 0;
+        while (index < groups.length) {
+            const rowGroups = groups.slice(index, index + columnsPerRow);
+            let rowX = startX;
+            let rowMaxHeight = 0;
+
+            rowGroups.forEach(group => {
+                placeGroupInternal(group, rowX, currentY);
+                rowX += group.width + GROUP_GAP_X;
+                rowMaxHeight = Math.max(rowMaxHeight, group.height);
+            });
+
+            currentY += rowMaxHeight + GROUP_GAP_Y;
+            index += columnsPerRow;
+        }
+        return currentY;
+    };
+
+    // 电商项目平铺排版函数 (3 列方形大项目平铺)
+    const placeEcommerceGroupsGrid = (
+        fwGroups: EnhancedLayoutGroup[],
+        subGroups: EnhancedLayoutGroup[],
+        columnsPerRow: number,
+        startX: number,
+        startY: number
+    ): number => {
+        fwGroups.sort((a, b) => a.timestamp - b.timestamp);
+
+        const projectLayouts: SubtreeLayoutResult[] = fwGroups.map(fw => {
+            const fwId = fw.prompt?.id || '';
+            const projectSubs = subGroups.filter(sub => sub.prompt?.ecommerce?.frameworkId === fwId);
+            projectSubs.sort((a, b) => a.timestamp - b.timestamp);
+            return layoutEcommerceProject(fw, projectSubs);
         });
 
-        currentY += row.maxTotalHeight + GROUP_GAP_Y;
-    });
+        // 兼容没有 Framework 的孤立电商卡片
+        const placedSubIds = new Set<string>();
+        fwGroups.forEach(fw => {
+            const fwId = fw.prompt?.id || '';
+            subGroups.filter(sub => sub.prompt?.ecommerce?.frameworkId === fwId).forEach(s => placedSubIds.add(s.id));
+        });
+        const orphanEcommerceGroups = subGroups.filter(s => !placedSubIds.has(s.id));
+        orphanEcommerceGroups.sort((a, b) => a.timestamp - b.timestamp);
+        orphanEcommerceGroups.forEach(orphan => {
+            projectLayouts.push(layoutEcommerceProject(orphan, []));
+        });
 
-    const pendingFollowUps = [...followUpGroups];
-    let guard = 0;
+        let currentY = startY;
+        let index = 0;
+        while (index < projectLayouts.length) {
+            const rowLayouts = projectLayouts.slice(index, index + columnsPerRow);
+            let rowX = startX;
+            let rowMaxHeight = 0;
 
-    while (pendingFollowUps.length > 0 && guard < 1000) {
-        guard += 1;
-        let placedInLoop = 0;
-
-        for (let index = 0; index < pendingFollowUps.length; index += 1) {
-            const group = pendingFollowUps[index];
-            const sourcePromptId = group.sourcePromptId;
-
-            if (!sourcePromptId) {
-                continue;
-            }
-
-            const anchorBounds = placedBounds.get(sourcePromptId);
-            if (!anchorBounds) {
-                continue;
-            }
-
-            const left = followUpRightEdge.get(sourcePromptId) ?? (anchorBounds.right + GROUP_GAP_X);
-            placeGroup(group, left, anchorBounds.top);
-
-            if (group.prompt?.id) {
-                const placed = placedBounds.get(group.prompt.id);
-                if (placed) {
-                    followUpRightEdge.set(sourcePromptId, placed.right + GROUP_GAP_X);
-                }
-            }
-
-            pendingFollowUps.splice(index, 1);
-            index -= 1;
-            placedInLoop += 1;
-        }
-
-        if (placedInLoop === 0) {
-            pendingFollowUps.forEach(group => {
-                placeGroup(group, START_X, currentY);
-                currentY += (group.layoutHeight || group.height) + GROUP_GAP_Y;
+            rowLayouts.forEach(layout => {
+                placeSubtree(layout, rowX, currentY);
+                rowX += layout.width + GROUP_GAP_X;
+                rowMaxHeight = Math.max(rowMaxHeight, layout.height);
             });
-            pendingFollowUps.length = 0;
+
+            currentY += rowMaxHeight + GROUP_GAP_Y;
+            index += columnsPerRow;
         }
+        return currentY;
+    };
+
+    let currentY = START_Y;
+
+    // ================== 轨道 1: 标准生成区 (18 列大网格) ==================
+    const standardGroups = layoutGroups.filter(g => g.category === 'standard');
+    if (standardGroups.length > 0) {
+        currentY = placeIndependentGroupsGrid(standardGroups, 18, START_X, currentY);
+        currentY += 120; // 轨道间隔
     }
 
-    if (errorPrompts.length > 0) {
-        let errorX = START_X;
-        let errorRowMaxHeight = 0;
-        let errorGroupsInRow = 0;
-        currentY += GROUP_GAP_Y + 50;
-        const errorGapX = 40;
+    // ================== 轨道 2: 错误与垃圾箱区 (18 列大网格) ==================
+    const errorGroups = layoutGroups.filter(g => g.category === 'error');
+    if (errorGroups.length > 0) {
+        currentY = placeIndependentGroupsGrid(errorGroups, 18, START_X, currentY);
+        currentY += 120;
+    }
 
-        errorPrompts.forEach(prompt => {
-            const promptHeight = prompt.height || 200;
-            const childImages = canvas.imageNodes.filter(image => image.parentPromptId === prompt.id);
-            let groupWidth = PROMPT_WIDTH;
-            let groupHeight = promptHeight;
+    // ================== 轨道 3: 电商项目区 (3 列项目大宫格) ==================
+    const ecommerceGroups = layoutGroups.filter(g => g.category === 'ecommerce');
+    const ecommerceFwGroups = ecommerceGroups.filter(g => g.prompt?.ecommerce?.kind === 'framework');
+    const ecommerceSubGroups = ecommerceGroups.filter(g => g.prompt?.ecommerce?.kind !== 'framework');
+    if (ecommerceGroups.length > 0) {
+        currentY = placeEcommerceGroupsGrid(ecommerceFwGroups, ecommerceSubGroups, 3, START_X, currentY);
+        currentY += 120;
+    }
 
-            if (childImages.length > 0) {
-                let maxSubWidth = 0;
-                let maxSubHeight = 0;
-                childImages.forEach(image => {
-                    const dims = getImageDims(image.aspectRatio);
-                    maxSubWidth = Math.max(maxSubWidth, dims.w);
-                    maxSubHeight = Math.max(maxSubHeight, dims.h);
-                });
-                const actualColumns = Math.min(SUB_COLUMNS, childImages.length);
-                const rows = Math.ceil(childImages.length / SUB_COLUMNS);
-                const subBlockWidth = actualColumns * maxSubWidth + (actualColumns - 1) * SUB_IMAGE_GAP;
-                const subBlockHeight = rows * maxSubHeight + (rows - 1) * SUB_IMAGE_GAP;
-                groupWidth = Math.max(PROMPT_WIDTH, subBlockWidth);
-                groupHeight = promptHeight + PROMPT_TO_SUB_GAP + subBlockHeight;
-            }
+    // ================== 轨道 4: PPT 卡片区 (6 列网格，隐藏子图) ==================
+    const pptGroups = layoutGroups.filter(g => g.category === 'ppt');
+    if (pptGroups.length > 0) {
+        currentY = placeIndependentGroupsGrid(pptGroups, 6, START_X, currentY);
+        currentY += 120;
+    }
 
-            if (errorGroupsInRow >= GROUPS_PER_ROW) {
-                errorX = START_X;
-                currentY += errorRowMaxHeight + GROUP_GAP_Y;
-                errorRowMaxHeight = 0;
-                errorGroupsInRow = 0;
-            }
-
-            const groupCenterX = errorX + groupWidth / 2;
-            positions[prompt.id] = {
-                x: groupCenterX,
-                y: currentY + promptHeight,
-            };
-
-            if (childImages.length > 0) {
-                const promptBottom = currentY + promptHeight + PROMPT_TO_SUB_GAP;
-                const imageDims = childImages.map(image => getImageDims(image.aspectRatio));
-                const maxWidth = Math.max(...imageDims.map(dim => dim.w));
-                const maxHeight = Math.max(...imageDims.map(dim => dim.h));
-                const actualColumns = Math.min(SUB_COLUMNS, childImages.length);
-                const blockWidth = actualColumns * maxWidth + (actualColumns - 1) * SUB_IMAGE_GAP;
-                const blockStartX = groupCenterX - blockWidth / 2;
-
-                childImages.forEach((image, index) => {
-                    const col = index % SUB_COLUMNS;
-                    const row = Math.floor(index / SUB_COLUMNS);
-                    const cardCenterX = blockStartX + col * (maxWidth + SUB_IMAGE_GAP) + maxWidth / 2;
-                    const cardTopY = promptBottom + row * (maxHeight + SUB_IMAGE_GAP);
-                    const dims = imageDims[index];
-                    positions[image.id] = {
-                        x: cardCenterX,
-                        y: cardTopY + dims.h,
-                    };
-                });
-            }
-
-            errorX += groupWidth + errorGapX;
-            errorRowMaxHeight = Math.max(errorRowMaxHeight, groupHeight);
-            errorGroupsInRow += 1;
-        });
+    // ================== 轨道 5: 变体与自动化流区 (6 列网格) ==================
+    const automationGroups = layoutGroups.filter(g => g.category === 'automation');
+    if (automationGroups.length > 0) {
+        currentY = placeIndependentGroupsGrid(automationGroups, 6, START_X, currentY);
     }
 
     return positions;

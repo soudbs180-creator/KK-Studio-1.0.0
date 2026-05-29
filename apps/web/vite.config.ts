@@ -5,8 +5,10 @@ import path from 'path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, loadEnv } from 'vite';
 import type { Plugin } from 'vite';
+import react from '@vitejs/plugin-react';
 import { APP_NAME, APP_RELEASE_DATE, APP_RELEASE_NOTES } from './src/config/appInfo.ts';
 import { normalizeMultipartProxyBody } from './src/utils/devMultipartFormData.ts';
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -620,7 +622,7 @@ export default defineConfig(({ mode }) => {
                 ignored: shouldIgnoreWatchPath
             }
         },
-        plugins: [kkApiProxyPlugin(), pricingProxyPlugin(), buildVersionManifestPlugin()],
+        plugins: [react(), kkApiProxyPlugin(), pricingProxyPlugin(), buildVersionManifestPlugin()],
         resolve: {
             dedupe: ['react', 'react-dom'],
             alias: {

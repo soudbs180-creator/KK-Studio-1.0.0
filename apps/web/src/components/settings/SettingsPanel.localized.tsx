@@ -219,6 +219,7 @@ const SettingsMobileShell: React.FC<{
   initialSupplier,
   isApiManagementEditorRoute,
 }) => {
+  const location = useLocation();
   const { language, pick } = useLocale();
   const items = getSettingsNavItems(language);
   const activeNavItem = items.find((item) => item.id === activeView) || items[0];
@@ -229,6 +230,10 @@ const SettingsMobileShell: React.FC<{
       ? mobileBillingLabel
       : activeNavItem.label;
 
+  const hasContentBack = isApiManagementEditorRoute;
+  const [isContentBackScrolled, setIsContentBackScrolled] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
   const handleLeadingAction = () => {
     if (isApiManagementEditorRoute) {
       onBackToApiManagement();
@@ -237,6 +242,43 @@ const SettingsMobileShell: React.FC<{
 
     activeView === 'dashboard' ? onClose() : onNavigate('dashboard');
   };
+
+  useEffect(() => {
+    setIsContentBackScrolled(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      if (!container) return;
+      const backBtn = container.querySelector('[data-content-back-button="true"]');
+      if (backBtn) {
+        const buttonRect = backBtn.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const topbarHeight = 56;
+        const isShielded = buttonRect.bottom < (containerRect.top + topbarHeight);
+        setIsContentBackScrolled(isShielded);
+      } else {
+        setIsContentBackScrolled(container.scrollTop > 30);
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+    };
+  }, [location.pathname, hasContentBack]);
+
+  const isTitleLeft = hasContentBack && !isContentBackScrolled;
+  const titleClass = `settings-shell-mobile__title-wrap ${
+    isTitleLeft ? 'settings-shell-mobile__title-wrap--left' : 'settings-shell-mobile__title-wrap--center'
+  }`;
+  
+  const backBtnClass = `settings-shell-mobile__back-btn-container ${
+    isTitleLeft ? 'settings-shell-mobile__back-btn-container--hidden' : 'settings-shell-mobile__back-btn-container--visible'
+  }`;
 
   return (
     <div className="settings-shell-mobile" onClick={(event) => event.stopPropagation()}>
@@ -247,59 +289,52 @@ const SettingsMobileShell: React.FC<{
           position: 'relative',
           paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)',
           paddingBottom: '8px',
-          minHeight: '48px',
+          minHeight: '56px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          overflow: 'hidden'
         }}
       >
-        {/* 左侧始终显示返回/后退按钮 */}
-        <div style={{ position: 'absolute', left: '16px', display: 'flex', alignItems: 'center' }}>
+        {/* 左侧显隐过渡的返回按钮 */}
+        <div className={backBtnClass}>
           <button
             type="button"
             onClick={handleLeadingAction}
-            className="apple-icon-button h-8 w-8 shrink-0 rounded-xl flex items-center justify-center"
+            className="mobile-header-action-btn"
             aria-label={
               isApiManagementEditorRoute
                 ? pick('返回 API 管理', 'Back to API management')
                 : pick('返回设置总览', 'Back to settings overview')
             }
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={18} />
           </button>
         </div>
 
-        {/* 中间居中文案 */}
-        <div 
-          className="settings-shell-mobile__title-wrap" 
-          style={{ 
-            marginTop: 0, 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center', 
-            textAlign: 'center',
-            paddingLeft: '48px',
-            paddingRight: '48px'
-          }}
-        >
+        {/* 左对齐与居中平滑切换的标题 */}
+        <div className={titleClass}>
           <div className="settings-shell-kicker" style={{ fontSize: '8px', lineHeight: '1' }}>{pick('当前入口', 'Current entry')}</div>
           <h2 className="settings-shell-mobile__title" style={{ fontSize: '14px', lineHeight: '1.2', fontWeight: 600 }}>{activeTitle}</h2>
         </div>
 
-        {/* 右侧始终保留 X 关闭按钮，提供整齐划一的视觉规范 */}
-        <div style={{ position: 'absolute', right: '16px', display: 'flex', alignItems: 'center' }}>
+        {/* 右侧始终保留 X 关闭按钮，提供无边框大触控热区 */}
+        <div style={{ position: 'absolute', right: '16px', top: 'calc(50% + env(safe-area-inset-top, 0px) / 2)', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
           <button
             type="button"
             onClick={onClose}
-            className="apple-icon-button h-8 w-8 shrink-0 rounded-xl flex items-center justify-center"
+            className="mobile-header-action-btn"
             aria-label={pick('关闭设置', 'Close settings')}
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
       </div>
 
-      <div className="settings-shell-page settings-shell-page--mobile">
+      <div 
+        ref={scrollContainerRef}
+        className="settings-shell-page settings-shell-page--mobile"
+      >
         <Suspense fallback={<ViewFallback />}>
           <Routes>
             {renderSettingsRouteElements({
