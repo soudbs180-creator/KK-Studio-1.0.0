@@ -34,8 +34,14 @@ function useUpload() {
             "x-createxyz-host": host || "",
           };
 
+          const secureStoreOptions = {
+            keychainService: 'anything-auth',
+            keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+            requireAuthentication: false,
+          };
+
           try {
-            const authStr = await SecureStore.getItemAsync(`${projectGroupId}-jwt`);
+            const authStr = await SecureStore.getItemAsync(`${projectGroupId}-jwt`, secureStoreOptions);
             if (authStr) {
               const auth = JSON.parse(authStr);
               if (auth?.jwt) headers["authorization"] = `Bearer ${auth.jwt}`;

@@ -76,7 +76,13 @@ const fetchToWeb = async function fetchWithHeaders(...args: Params) {
     }
   }
 
-  const auth = await SecureStore.getItemAsync(authKey)
+  const secureStoreOptions = {
+    keychainService: 'anything-auth',
+    keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+    requireAuthentication: false,
+  };
+
+  const auth = await SecureStore.getItemAsync(authKey, secureStoreOptions)
     .then((auth) => {
       return auth ? JSON.parse(auth) : null;
     })

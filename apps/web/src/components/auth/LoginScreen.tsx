@@ -484,8 +484,8 @@ const LoginScreen: React.FC = () => {
             </div>
           </form>
         </div>
+        <div className="auth-version-badge" aria-label={t(`应用版本 ${APP_DISPLAY_VERSION}`, `App version ${APP_DISPLAY_VERSION}`)}>{APP_DISPLAY_VERSION}</div>
       </section>
-      <div className="auth-version-badge" aria-label={t(`应用版本 ${APP_DISPLAY_VERSION}`, `App version ${APP_DISPLAY_VERSION}`)}>{APP_DISPLAY_VERSION}</div>
     </div>
   );
 };

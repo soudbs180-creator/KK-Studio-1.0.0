@@ -900,9 +900,10 @@ body.auth-screen-active.auth-screen-active--light #root {
 
   .auth-side-form {
     min-height: 100vh;
-    padding: 32px 18px 88px; /* 底部间隙增大到 88px，为贴底的版本号留出足够的呼吸空间，使其上下左右都有间隙 */
+    padding: 32px 18px 40px; /* 简体中文：缩小底部 padding，因为版本号已改为流式排列在卡片下方 */
     box-sizing: border-box;
     display: flex;
+    flex-direction: column; /* 简体中文：改用列方向 Flex 布局，让登录卡片和版本号纵向流动排列 */
     align-items: center;
     justify-content: center;
   }
@@ -910,7 +911,7 @@ body.auth-screen-active.auth-screen-active--light #root {
   .auth-panel {
     width: 100%;
     max-width: 410px;
-    margin: auto 0;
+    margin: auto 0 0; /* 简体中文：适当分配 margin 确保垂直方向居中对齐 */
     padding: 22px 18px; /* 略微收缩手机端 padding 以防止占满屏幕，展现四周均等的轻盈间隙 */
     border-radius: 22px;
     max-height: none; /* 彻底清除内部滚动条，由外层大容器统一托管滚动，保证移动端的极致连贯滑动体验 */
@@ -922,11 +923,11 @@ body.auth-screen-active.auth-screen-active--light #root {
   }
 
   .auth-version-badge {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: 24px;
-    right: auto;
+    position: relative; /* 简体中文：改为相对定位，使其参与文档流排版在登录卡片下方，防软键盘弹起时遮挡 */
+    left: auto;
+    bottom: auto;
+    transform: none;
+    margin: 20px auto 10px; /* 简体中文：在登录卡片下方增加上下间距，并水平居中 */
     background: rgba(8, 14, 26, 0.72);
     backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.08);
