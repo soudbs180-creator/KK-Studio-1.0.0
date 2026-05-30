@@ -2,6 +2,7 @@
 // 职责：提供当前登录用户信息，前端依赖它刷新管理员等级和积分余额。
 
 const express = require('express');
+const crypto = require('crypto');
 const { getPool } = require('../lib/db');
 const { verifyJWT, signJWT } = require('../lib/jwt');
 
@@ -290,6 +291,202 @@ router.post('/v1/profile/user-apis', async (req, res) => {
     },
     meta: buildMeta(req),
   });
+});
+
+// 简体中文注释：常规登录接口，优先使用数据库校验凭据，调试环境无数据库时提供 Mock 登录
+router.post('/v1/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'AUTH_INVALID_PAYLOAD',
+        message: 'Email and password are required.'
+      },
+      meta: buildMeta(req)
+    });
+  }
+
+  const isNoDb = !process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true';
+  if (isNoDb) {
+    // 无数据库时，提供直接放行（Mock）
+    const userId = 'mock-user-id';
+    return res.json({
+      success: true,
+      data: {
+        accessToken: signJWT({ userId }),
+        refreshToken: signJWT({ userId }),
+        expiresIn: 7 * 24 * 60 * 60,
+        sessionExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        profile: {
+          id: userId,
+          email: email.trim(),
+          nickname: 'Mock User',
+          avatarUrl: '',
+          role: 'user',
+          status: 'active',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      },
+      meta: buildMeta(req)
+    });
+  }
+
+  try {
+    const pool = getPool();
+    const result = await pool.query(
+      'SELECT id, email, password_hash, COALESCE(admin_level, 0) AS admin_level, created_at FROM public.users WHERE email = $1',
+      [email.trim().toLowerCase()]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'AUTH_INVALID_CREDENTIALS',
+          message: 'Invalid login credentials.'
+        },
+        meta: buildMeta(req)
+      });
+    }
+
+    const user = result.rows[0];
+    const passwordSalt = process.env.PASSWORD_SALT || 'salt';
+    const computedHash = crypto.createHmac('sha256', passwordSalt).update(password).digest('hex');
+
+    // 比较密码
+    if (user.password_hash !== computedHash) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'AUTH_INVALID_CREDENTIALS',
+          message: 'Invalid login credentials.'
+        },
+        meta: buildMeta(req)
+      });
+    }
+
+    const accessToken = signJWT({ userId: user.id });
+    return res.json({
+      success: true,
+      data: {
+        accessToken,
+        refreshToken: signJWT({ userId: user.id }),
+        expiresIn: 7 * 24 * 60 * 60,
+        sessionExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        profile: {
+          id: user.id,
+          email: user.email,
+          nickname: user.email.split('@')[0],
+          avatarUrl: '',
+          role: user.admin_level > 0 ? 'admin' : 'user',
+          status: 'active',
+          createdAt: user.created_at,
+          updatedAt: new Date().toISOString()
+        }
+      },
+      meta: buildMeta(req)
+    });
+  } catch (err) {
+    console.error('[auth] Login failed:', err);
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Internal server error during login.'
+      },
+      meta: buildMeta(req)
+    });
+  }
+});
+
+// 简体中文注释：常规注册接口，优先注册到数据库，默认写入 0 积分，调试环境直接返回 Mock 成功
+router.post('/v1/auth/register', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'AUTH_INVALID_PAYLOAD',
+        message: 'Email and password are required.'
+      },
+      meta: buildMeta(req)
+    });
+  }
+
+  if (password.length < 8) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'AUTH_WEAK_PASSWORD',
+        message: 'Password must be at least 8 characters.'
+      },
+      meta: buildMeta(req)
+    });
+  }
+
+  const isNoDb = !process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true';
+  if (isNoDb) {
+    return res.json({
+      success: true,
+      data: {
+        userId: 'mock-user-id',
+        email: email.trim(),
+        status: 'registered'
+      },
+      meta: buildMeta(req)
+    });
+  }
+
+  try {
+    const pool = getPool();
+    const existing = await pool.query(
+      'SELECT id FROM public.users WHERE email = $1',
+      [email.trim().toLowerCase()]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'AUTH_USER_ALREADY_EXISTS',
+          message: 'User already exists.'
+        },
+        meta: buildMeta(req)
+      });
+    }
+
+    const userId = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+    const passwordSalt = process.env.PASSWORD_SALT || 'salt';
+    const passwordHash = crypto.createHmac('sha256', passwordSalt).update(password).digest('hex');
+
+    // 默认积分一律为 0，符合 AGENTS.md 安全审计要求
+    await pool.query(
+      'INSERT INTO public.users (id, email, password_hash, credits, created_at, updated_at) VALUES ($1, $2, $3, 0, NOW(), NOW())',
+      [userId, email.trim().toLowerCase(), passwordHash]
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        userId,
+        email: email.trim().toLowerCase(),
+        status: 'registered'
+      },
+      meta: buildMeta(req)
+    });
+  } catch (err) {
+    console.error('[auth] Register failed:', err);
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Internal server error during registration.'
+      },
+      meta: buildMeta(req)
+    });
+  }
 });
 
 module.exports = router;
