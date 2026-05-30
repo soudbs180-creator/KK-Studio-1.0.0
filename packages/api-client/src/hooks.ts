@@ -13,7 +13,7 @@ import {
   GenerateImagePayload,
   UpdateUserPayload,
   ChatPayload,
-} from './api';
+} from './api.js';
 
 /**
  * 1. 图像生成 / 编辑 hook

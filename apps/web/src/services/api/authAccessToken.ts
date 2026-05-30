@@ -1,4 +1,8 @@
 import {
+  persistBrowserAccessToken,
+  clearBrowserAccessToken,
+} from "@nano-banana/api-client";
+import {
   getLatestAuthSessionChange,
   subscribeAuthSessionChange,
 } from "../auth/authSessionEvents.ts";
@@ -94,10 +98,11 @@ function writeCookieItem(key: string, value: string): void {
   }
 
   try {
-    const secureSuffix = typeof window !== "undefined" && window.location?.protocol === "https:"
-      ? "; Secure"
-      : "";
-    document.cookie = `${encodeURIComponent(key)}=${encodeURIComponent(value)}; Max-Age=${browserCookieMaxAgeSeconds}; Path=/; SameSite=Lax${secureSuffix}`;
+    const isHttps = typeof window !== "undefined" && window.location?.protocol === "https:";
+    const cookieSuffix = isHttps
+      ? "; Secure; SameSite=None"
+      : "; SameSite=Lax";
+    document.cookie = `${encodeURIComponent(key)}=${encodeURIComponent(value)}; Max-Age=${browserCookieMaxAgeSeconds}; Path=/${cookieSuffix}`;
   } catch {
     // 简体中文注释：旧版 WebView 可能禁止写 cookie，仍保留内存快照供当前页面继续使用。
   }
@@ -156,10 +161,24 @@ function setStoredBrowserToken(key: string, token?: string): void {
     removeStorageItem(getSessionStorage(), key);
     removeStorageItem(getLocalStorage(), key);
     removeCookieItem(key);
+    if (key === accessTokenStorageKey) {
+      try {
+        clearBrowserAccessToken();
+      } catch {
+        // 简体中文注释：防范可能存在的跨包初始化时序问题
+      }
+    }
     return;
   }
 
   syncTokenToAllBrowserStores(key, token);
+  if (key === accessTokenStorageKey) {
+    try {
+      persistBrowserAccessToken(token);
+    } catch {
+      // 简体中文注释：防范可能存在的跨包初始化时序问题
+    }
+  }
 }
 
 export function getStoredKkApiAccessToken(): string | undefined {
@@ -284,6 +303,13 @@ export function startKkApiAccessTokenSessionSync(): () => void {
   };
   window.addEventListener("kk-api-token-refreshed", handleTokenRefreshed);
 
+  const handleUnauthorized = () => {
+    // 简体中文注释：监听自 api-client 抛出的 401 事件，通知 web 侧清理缓存并重置 hosted session 状态
+    clearStoredKkApiAuthTokens();
+    clearHostedSessionRuntime();
+  };
+  window.addEventListener("kk-api-unauthorized", handleUnauthorized);
+
   const unsubscribe = subscribeAuthSessionChange((detail) => {
     if (!detail.hasSession || detail.isTempUser) {
       clearStoredKkApiAuthTokens();
@@ -303,6 +329,7 @@ export function startKkApiAccessTokenSessionSync(): () => void {
 
   stopAccessTokenSessionSync = () => {
     window.removeEventListener("kk-api-token-refreshed", handleTokenRefreshed);
+    window.removeEventListener("kk-api-unauthorized", handleUnauthorized);
     unsubscribe();
     stopAccessTokenSessionSync = null;
   };

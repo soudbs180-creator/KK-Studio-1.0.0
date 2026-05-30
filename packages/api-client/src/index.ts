@@ -1,3 +1,3 @@
-export * from './client';
-export * from './hooks';
-export * from './api';
+export * from './client.js';
+export * from './hooks.js';
+export * from './api.js';

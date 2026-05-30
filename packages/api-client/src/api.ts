@@ -1,7 +1,7 @@
 // packages/api-client/src/api.ts
 // 职责：定义与导出全部类型化的 API 请求函数，供桌面端前端、移动端以及 hooks 调用
 
-import { apiClient } from './client';
+import { apiClient } from './client.js';
 
 // 定义相关的载荷与响应类型定义
 export interface LoginPayload {

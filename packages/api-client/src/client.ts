@@ -8,9 +8,37 @@ const browserCookieMaxAgeSeconds = 180 * 24 * 60 * 60;
 
 let inMemoryAccessToken: string | undefined;
 
+const resolveDynamicBaseURL = (configured: string): string => {
+  if (typeof window === 'undefined') {
+    return configured;
+  }
+
+  try {
+    const runtimeUrl = new URL(window.location.href);
+    const configuredUrl = new URL(configured, window.location.origin);
+    const runtimeHostname = runtimeUrl.hostname.toLowerCase();
+    const configuredHostname = configuredUrl.hostname.toLowerCase();
+
+    const isConfiguredLocal = configuredHostname === 'localhost' || configuredHostname === '127.0.0.1';
+    const isRuntimeLocal = runtimeHostname === 'localhost' || runtimeHostname === '127.0.0.1';
+
+    // 简体中文注释：若配置的 API 是本地环回（如 localhost/127.0.0.1），但当前处于非环回的局域网环境（手机调试），
+    // 自动将其替换为电脑的局域网 IP，打通手机浏览器直接连接本地 API 的能力。
+    if (isConfiguredLocal && !isRuntimeLocal) {
+      configuredUrl.hostname = runtimeUrl.hostname;
+      return configuredUrl.toString().replace(/\/$/, '');
+    }
+  } catch {
+    // 简体中文注释：忽略非标准 URL，直接回退为原始配置值
+  }
+
+  return configured;
+};
+
 const getBaseURL = (): string => {
   if (typeof window !== 'undefined') {
-    return (import.meta.env?.VITE_PUBLIC_API_BASE_URL as string) ?? '/api';
+    const configured = (import.meta.env?.VITE_PUBLIC_API_BASE_URL as string) ?? '/api';
+    return resolveDynamicBaseURL(configured);
   }
 
   return (process.env.EXPO_PUBLIC_API_BASE_URL) || '/api';
@@ -80,10 +108,11 @@ function writeCookieItem(key: string, value: string): void {
   }
 
   try {
-    const secureSuffix = typeof window !== 'undefined' && window.location?.protocol === 'https:'
-      ? '; Secure'
-      : '';
-    document.cookie = `${encodeURIComponent(key)}=${encodeURIComponent(value)}; Max-Age=${browserCookieMaxAgeSeconds}; Path=/; SameSite=Lax${secureSuffix}`;
+    const isHttps = typeof window !== 'undefined' && window.location?.protocol === 'https:';
+    const cookieSuffix = isHttps
+      ? '; Secure; SameSite=None'
+      : '; SameSite=Lax';
+    document.cookie = `${encodeURIComponent(key)}=${encodeURIComponent(value)}; Max-Age=${browserCookieMaxAgeSeconds}; Path=/${cookieSuffix}`;
   } catch {
     // 简体中文注释：部分 WebView 会禁用 cookie 写入，当前页面仍可使用内存 token。
   }
@@ -104,7 +133,7 @@ function removeCookieItem(key: string): void {
   }
 }
 
-function persistBrowserAccessToken(token: string): string {
+export function persistBrowserAccessToken(token: string): string {
   inMemoryAccessToken = token;
   writeStorageItem(getBrowserStorage('sessionStorage'), accessTokenStorageKey, token);
   writeStorageItem(getBrowserStorage('localStorage'), accessTokenStorageKey, token);
@@ -121,7 +150,7 @@ function readBrowserAccessToken(): string | undefined {
   return token ? persistBrowserAccessToken(token) : undefined;
 }
 
-function clearBrowserAccessToken(): void {
+export function clearBrowserAccessToken(): void {
   inMemoryAccessToken = undefined;
   removeStorageItem(getBrowserStorage('sessionStorage'), accessTokenStorageKey);
   removeStorageItem(getBrowserStorage('localStorage'), accessTokenStorageKey);
@@ -163,6 +192,14 @@ apiClient.interceptors.request.use(
 
 apiClient.interceptors.response.use(
   (response) => {
+    // 简体中文注释：若登录或刷新直接在返回体中携带了 token 或 accessToken，自动更新并缓存凭据到内存，免除外部手动关联的额外开销
+    if (response.data && typeof response.data === 'object') {
+      const token = response.data.token || response.data.accessToken;
+      if (token && typeof token === 'string') {
+        persistBrowserAccessToken(token);
+      }
+    }
+
     const refreshToken = response.headers?.['x-refresh-token'] || response.headers?.['X-Refresh-Token'];
     if (refreshToken && typeof refreshToken === 'string') {
       persistBrowserAccessToken(refreshToken);
@@ -176,10 +213,16 @@ apiClient.interceptors.response.use(
     if (error.response) {
       const { status, data } = error.response;
       if (status === 401) {
-        console.error('[api-client] 授权过期或未登录，正在触发重定向...');
-        clearBrowserAccessToken();
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('kk-api-unauthorized'));
+        // 简体中文注释：仅当请求真正携带了授权凭据时，401 才判断为过期并清除。匿名请求 401 不执行擦除，防止误踢用户。
+        const hasAuthHeader = Boolean(error.config?.headers?.Authorization || error.config?.headers?.authorization);
+        if (hasAuthHeader) {
+          console.error('[api-client] 授权过期或未登录，正在触发重定向...');
+          clearBrowserAccessToken();
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('kk-api-unauthorized'));
+          }
+        } else {
+          console.warn('[api-client] 匿名请求返回 401，忽略凭据擦除。');
         }
       } else if (status === 429) {
         console.warn('[api-client] 速率限制 (429): 请稍后再试。');
