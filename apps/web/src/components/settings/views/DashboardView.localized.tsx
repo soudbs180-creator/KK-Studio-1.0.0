@@ -691,14 +691,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         }
         .dashboard-card-glow {
           position: absolute;
-          top: -30px;
-          right: -30px;
+          top: 0;
+          right: 0;
           width: 100px;
           height: 100px;
           border-radius: 50%;
           filter: blur(45px);
           opacity: 0.12;
           pointer-events: none;
+          transform: translateY(-30px);
         }
       `}</style>
 

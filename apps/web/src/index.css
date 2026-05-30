@@ -15027,6 +15027,14 @@ body:not(.dark-mode) .settings-log-group-badge {
 
 @media (min-width: 1200px) {
   .settings-card-grid-container {
+    grid-template-columns: repeat(3, 270px);
+    /* 简体中文注释：中等桌面宽度下主内容区扣除侧边栏后不足 4A，先降为 3A 以避免横向滚动。 */
+    justify-content: start !important;
+  }
+}
+
+@media (min-width: 1528px) {
+  .settings-card-grid-container {
     grid-template-columns: repeat(4, 270px);
     /* 简体中文注释：强制左侧对齐，与顶部 Hero 标题的左边缘百分百垂直一致，确保在宽屏下绝不偏离对齐线 */
     justify-content: start !important;
@@ -15077,9 +15085,9 @@ body:not(.dark-mode) .settings-log-group-badge {
   display: grid !important;
   grid-template-columns: repeat(1, 270px) !important;
   grid-auto-rows: 130px !important;
-  justify-content: center !important;
+  justify-content: start !important;
   width: 100% !important;
-  overflow-x: hidden !important;
+  overflow-x: visible !important;
   gap: 16px !important;
 }
 
@@ -15136,14 +15144,15 @@ body:not(.dark-mode) .settings-log-group-badge {
 
 .dashboard-card-glow {
   position: absolute;
-  top: -30px;
-  right: -30px;
+  top: 0;
+  right: 0;
   width: 100px;
   height: 100px;
   border-radius: 50%;
   filter: blur(45px);
   opacity: 0.12;
   pointer-events: none;
+  transform: translateY(-30px);
 }
 
 /* ==========================================================================
@@ -15325,6 +15334,7 @@ body:not(.dark-mode) .settings-log-group-badge {
 }
 @media (max-width: 720px) {
   .settings-panel .settings-model-center-route__actions {
+    display: grid;
     grid-template-columns: repeat(4, 32px);
   }
 }
@@ -15342,7 +15352,8 @@ body:not(.dark-mode) .settings-log-group-badge {
 .settings-panel .settings-model-center-layout {
   width: 100% !important;
   max-width: 1128px !important;
-  grid-template-columns: minmax(0, 842px) 270px !important;
+  grid-template-columns: minmax(0, 842px) minmax(270px, 1fr);
+  grid-template-columns: minmax(0, 842px) minmax(270px, 1fr) !important;
   gap: 16px !important;
   justify-content: start !important;
   overflow-x: visible !important;
@@ -15357,8 +15368,9 @@ body:not(.dark-mode) .settings-log-group-badge {
 }
 
 .settings-panel .settings-model-center-directory {
-  width: 270px !important;
-  max-width: 270px !important;
+  width: 100% !important;
+  min-width: 270px !important;
+  max-width: 100% !important;
   overflow: hidden;
 }
 
@@ -15713,12 +15725,12 @@ body:not(.dark-mode) .settings-log-group-badge {
 @media (max-width: 1439px) {
   .settings-panel .settings-model-center-layout {
     grid-template-columns: minmax(0, 1fr) 270px !important;
-    max-width: 842px !important;
+    max-width: 1128px !important;
   }
 
   .settings-panel .settings-model-center-pool {
     width: 100% !important;
-    max-width: 556px !important;
+    max-width: 842px !important;
   }
 
   .settings-panel .settings-model-center-toolbar {

@@ -40,6 +40,14 @@ async function getUserCredits(userId) {
   return Number.parseInt(result.rows[0].credits, 10);
 }
 
+function assertPositiveCreditAmount(amount, context) {
+  const normalizedAmount = Number(amount);
+  if (!Number.isSafeInteger(normalizedAmount) || normalizedAmount <= 0) {
+    throw new Error(`${context} 的积分数量必须是正整数`);
+  }
+  return normalizedAmount;
+}
+
 async function deductCredits(userId, amount, operationKey) {
   const pool = getPool();
   const client = await pool.connect();
@@ -96,9 +104,10 @@ async function refundCredits(userId, amount, operationKey, originalBalance) {
 }
 
 async function addCredits(client, userId, amount, reason, referenceId, actorId = null) {
+  const normalizedAmount = assertPositiveCreditAmount(amount, '积分入账');
   const updateRes = await client.query(
     'UPDATE public.users SET credits = COALESCE(credits, 0) + $1, updated_at = NOW() WHERE id = $2 RETURNING credits',
-    [amount, userId]
+    [normalizedAmount, userId]
   );
 
   if (updateRes.rows.length === 0) {
@@ -106,7 +115,7 @@ async function addCredits(client, userId, amount, reason, referenceId, actorId =
   }
 
   const remaining = Number.parseInt(updateRes.rows[0].credits, 10);
-  await writeCreditLog(client, userId, amount, reason, referenceId, remaining, actorId);
+  await writeCreditLog(client, userId, normalizedAmount, reason, referenceId, remaining, actorId);
   return remaining;
 }
 

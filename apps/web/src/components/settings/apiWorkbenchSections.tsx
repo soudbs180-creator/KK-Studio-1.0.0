@@ -746,53 +746,49 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                     </div>
                   </div>
 
-                  {/* 底部平铺动作按钮栏 */}
-                  <div className="settings-model-center-route__actions-bar" onClick={(event) => event.stopPropagation()}>
+                  {/* 路由卡片宽度固定，动作区只保留图标以避免窄屏文字挤压。 */}
+                  <div className="settings-model-center-route__actions" onClick={(event) => event.stopPropagation()}>
                     <button
                       type="button"
-                      className="settings-model-center-route__action-btn"
+                      className="settings-model-center-route__icon-button"
                       disabled={route.toggleDisabled}
                       onClick={route.onToggle}
                       title={toggleLabel}
                       aria-label={toggleLabel}
                     >
-                      {route.isPaused ? <Play size={14} /> : <Pause size={14} />}
-                      <span>{toggleLabel}</span>
+                      {route.isPaused ? <Play size={15} /> : <Pause size={15} />}
                     </button>
                     
                     <button
                       type="button"
-                      className="settings-model-center-route__action-btn"
+                      className="settings-model-center-route__icon-button"
                       disabled={route.refreshDisabled}
                       onClick={route.onRefresh}
                       title={refreshLabel}
                       aria-label={refreshLabel}
                     >
-                      <RefreshCw size={14} className={route.refreshLoading ? 'animate-spin' : ''} />
-                      <span>{refreshLabel}</span>
+                      <RefreshCw size={15} className={route.refreshLoading ? 'animate-spin' : ''} />
                     </button>
                     
                     <button
                       type="button"
-                      className="settings-model-center-route__action-btn"
+                      className="settings-model-center-route__icon-button"
                       onClick={route.onSelect}
                       title={editLabel}
                       aria-label={editLabel}
                     >
-                      <Edit3 size={14} />
-                      <span>{editLabel}</span>
+                      <Edit3 size={15} />
                     </button>
                     
                     <button
                       type="button"
-                      className="settings-model-center-route__action-btn settings-model-center-route__action-btn--danger"
+                      className="settings-model-center-route__icon-button settings-model-center-route__icon-button--danger"
                       disabled={route.deleteDisabled}
                       onClick={route.onDelete}
                       title={deleteLabel}
                       aria-label={deleteLabel}
                     >
-                      <Trash2 size={14} />
-                      <span>{deleteLabel}</span>
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 </article>

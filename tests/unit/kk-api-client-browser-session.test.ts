@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { createKkApiClient } from "../../packages/shared/src/contracts/client/kk-api-client.ts";
+import { createKkApiClient } from "../../packages/shared/src/index.ts";
 
 test("KK API client sends browser credentials for every auth route used by mobile sign-in flows", async () => {
   const credentials: Array<RequestCredentials | undefined> = [];

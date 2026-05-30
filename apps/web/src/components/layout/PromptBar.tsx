@@ -4161,7 +4161,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                         const isSortingThis = activeSortProvider === group.provider;
                                                         const pinnedCount = group.models.filter(m => m.isPinned).length;
                                                         
-                                                        const handleTouchStart = (e: React.TouchEvent) => {
+                                                        const handleProviderTouchStart = (e: React.TouchEvent) => {
                                                             if (mobileDragMode) return;
                                                             if (mobileTouchTimerRef.current) {
                                                                 clearTimeout(mobileTouchTimerRef.current);
@@ -4176,7 +4176,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                             }, 3000);
                                                         };
 
-                                                        const handleTouchMove = (e: React.TouchEvent) => {
+                                                        const handleProviderTouchMove = (e: React.TouchEvent) => {
                                                             if (!mobileDragMode) {
                                                                 if (mobileTouchTimerRef.current) {
                                                                     clearTimeout(mobileTouchTimerRef.current);
@@ -4216,7 +4216,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                             }
                                                         };
 
-                                                        const handleTouchEnd = () => {
+                                                        const handleProviderTouchEnd = () => {
                                                             if (mobileTouchTimerRef.current) {
                                                                 clearTimeout(mobileTouchTimerRef.current);
                                                                 mobileTouchTimerRef.current = null;
@@ -4239,10 +4239,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                             <div
                                                                 key={group.provider}
                                                                 data-provider={group.provider}
-                                                                onTouchStart={handleTouchStart}
-                                                                onTouchEnd={handleTouchEnd}
-                                                                onTouchCancel={handleTouchEnd}
-                                                                onTouchMove={handleTouchMove}
+                                                                onTouchStart={handleProviderTouchStart}
+                                                                onTouchEnd={handleProviderTouchEnd}
+                                                                onTouchCancel={handleProviderTouchEnd}
+                                                                onTouchMove={handleProviderTouchMove}
                                                                 onClick={() => {
                                                                     if (mobileDragMode || justDraggedRef.current) {
                                                                         return;

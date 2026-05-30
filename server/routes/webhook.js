@@ -55,6 +55,11 @@ async function handleStripePaymentSettlement(sessionId) {
       return true;
     }
 
+    const parsedCredits = Number(order.credits);
+    if (!Number.isSafeInteger(parsedCredits) || parsedCredits <= 0) {
+      throw new Error(`[payment-webhook] 订单积分数量非法: stripe_session_id = ${sessionId}`);
+    }
+
     // 更新订单状态为已完成
     await client.query(
       "UPDATE public.orders SET status = 'completed', updated_at = NOW() WHERE stripe_session_id = $1 AND status = 'pending'",
@@ -62,7 +67,6 @@ async function handleStripePaymentSettlement(sessionId) {
     );
 
     // 基于 credits.js 的 addCredits 安全加分，内部涵盖了流水变动记录
-    const parsedCredits = parseInt(order.credits, 10);
     const balanceAfter = await credits.addCredits(client, order.user_id, parsedCredits, 'stripe_webhook', sessionId);
 
     await client.query('COMMIT');
