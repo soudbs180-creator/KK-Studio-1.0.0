@@ -319,6 +319,22 @@ router.get('/v1/auth/session', async (req, res) => {
   return sendAuthSession(req, res, profile);
 });
 
+router.get('/v1/auth/token', async (req, res) => {
+  const profile = await resolveAuthenticatedProfile(req, res);
+  if (!profile) {
+    return;
+  }
+
+  const accessToken = signJWT({ userId: profile.id });
+  return res.json({
+    jwt: accessToken,
+    user: {
+      id: profile.id,
+      email: profile.email,
+    },
+  });
+});
+
 router.post('/v1/auth/refresh', async (req, res) => {
   const profile = await resolveAuthenticatedProfile(req, res, req.body?.refreshToken);
   if (!profile) {
