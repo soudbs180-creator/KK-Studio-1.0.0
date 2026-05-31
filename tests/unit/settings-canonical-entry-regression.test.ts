@@ -13,12 +13,12 @@ test('production settings entry delegates to the localized router-backed workben
   const settingsPageRootSource = readSource('src/app/SettingsPageRoot.tsx');
   const settingsEntrySource = readSource('src/components/settings/SettingsPanel.tsx');
 
-  assert.match(appSource, /import SettingsPageRoot from '\.\/app\/SettingsPageRoot';/);
+  assert.match(appSource, /lazyWithRetry\(\(\) => import\('\.\/app\/SettingsPageRoot'\)\)/);
   assert.match(
     appSource,
-    /AppContentComponent=\{\s*(?:rootMode === 'admin'\s*\?\s*AdminLayout\s*:\s*)?rootMode === 'settings'\s*\?\s*SettingsPageRoot\s*:\s*AppContent\s*\}/
+    /AppContentComponent=\{\s*rootMode === 'admin'[\s\S]*?<AdminLayout[\s\S]*?rootMode === 'settings'[\s\S]*?<SettingsPageRoot[\s\S]*?: AppContent\s*\}/
   );
-  assert.match(settingsPageRootSource, /const SettingsPanel = lazy\(\(\) => import\('\.\.\/components\/settings\/SettingsPanel'\)\);/);
+  assert.match(settingsPageRootSource, /const SettingsPanel = lazyWithRetry\(\(\) => import\('\.\.\/components\/settings\/SettingsPanel'\)\);/);
   assert.match(settingsPageRootSource, /presentation="page"/);
   assert.match(settingsPageRootSource, /initialPathname=\{window\.location\.pathname\}/);
   assert.doesNotMatch(appSource, /const MobileApiSettingsView = lazy\(\(\) => import\('\.\/components\/settings\/ApiSettingsView'\)\);/);

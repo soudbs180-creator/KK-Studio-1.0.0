@@ -146,7 +146,7 @@ test('remaining balance display helper is shared across billing surfaces', () =>
   assert.ok(costEstimationSource.includes('value={remainingBalanceDisplay}'));
   assert.ok(costEstimationSource.includes('await refreshBilling();'));
 
-  assert.ok(mobileHeaderSource.includes("const balanceDisplay = balanceLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');"));
+  assert.ok(mobileHeaderSource.includes("const balanceDisplay = balanceLoading ? '...' : formatRemainingCredits(balance, language === 'zh-CN' ? 'zh-CN' : 'en-US');"));
   assert.ok(promptBarSource.includes("const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');"));
   assert.ok(chatSidebarSource.includes("const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');"));
 });

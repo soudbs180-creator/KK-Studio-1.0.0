@@ -20,5 +20,5 @@ test('ecommerce mode is wired into the mode rail and prompt bar guards', () => {
   assert.match(promptBarSource, /if \(mode === GenerationMode\.ECOMMERCE\)/);
   assert.match(promptBarSource, /config\.mode === GenerationMode\.ECOMMERCE/);
   assert.match(promptBarSource, /上传运营需求文件后，在这里补充额外的电商要求/);
-  assert.match(mobileTabBarSource, /\[GenerationMode\.ECOMMERCE\]: '电商'/);
+  assert.match(mobileTabBarSource, /\[GenerationMode\.ECOMMERCE\]:\s*(?:pick\('电商',\s*'E-commerce'\)|'电商')/);
 });

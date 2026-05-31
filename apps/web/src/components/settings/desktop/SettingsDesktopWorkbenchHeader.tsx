@@ -21,7 +21,13 @@ const SettingsDesktopWorkbenchHeader: React.FC<SettingsDesktopWorkbenchHeaderPro
   const { pick } = useLocale();
 
   return (
-    <header className="settings-shell-main__topbar px-6 py-3.5">
+    <header
+      className="settings-shell-main__topbar px-6 py-3.5 border-b"
+      style={{
+        background: 'var(--settings-shell-header-bg)',
+        borderColor: 'var(--settings-nav-glass-border)',
+      }}
+    >
       <div className="flex w-full items-center justify-end gap-4">
 
 

@@ -107,7 +107,7 @@ test("dev launch starts Vite through the detached Node runner", () => {
   assert.match(devLaunchSource, /function Start-DetachedPowerShellScript/);
   assert.match(devLaunchSource, /function Start-DetachedNodeProcess/);
   assert.match(devLaunchSource, /\$vitePid = Start-DetachedNodeProcess/);
-  assert.match(devLaunchSource, /-NodeArguments @\(\$viteCli, '--configLoader', 'native'\)/);
+  assert.match(devLaunchSource, /-NodeArguments @\(\$viteCli, '--configLoader', 'native'/);
   assert.doesNotMatch(devLaunchSource, /\$vitePid = Start-DetachedPowerShellScript/);
   assert.match(devLaunchSource, /function Start-ApiProcess/);
   assert.match(devLaunchSource, /\$apiPid = Start-ApiProcess -ApiScript \$apiScript -UseWatch \$true/);

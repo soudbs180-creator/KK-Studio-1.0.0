@@ -15,6 +15,11 @@ const ROOT_DIR = path.resolve(__dirname, '../../');
 function redirectPath(filePath) {
   if (typeof filePath !== 'string') return filePath;
   const normalized = filePath.replace(/\\/g, '/');
+
+  // 对第三方模块不做任何重定向拦截
+  if (normalized.includes('/node_modules/')) {
+    return filePath;
+  }
   
   // 检查是否指向不存在的旧 src 目录，且不包含在 apps/shared 中
   if (normalized.includes('/src/') && !normalized.includes('/apps/web/src/') && !normalized.includes('/apps/mobile/src/') && !normalized.includes('/packages/shared/src/')) {

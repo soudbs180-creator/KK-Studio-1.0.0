@@ -55,7 +55,10 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
   assert.match(appSource, /showCostEstimation=\{rootMode === 'workspace' \? showCostEstimation : false\}/);
   assert.match(appSource, /onExitCostEstimation=\{\(\) => setShowCostEstimation\(false\)\}/);
   assert.match(appSource, /showStartupBanner=\{rootMode === 'workspace'\}/);
-  assert.match(appSource, /AppContentComponent=\{\s*rootMode === 'admin'[\s\S]*\? AdminLayout[\s\S]*: rootMode === 'settings'[\s\S]*\? SettingsPageRoot[\s\S]*: AppContent\s*\}/);
+  assert.match(
+    appSource,
+    /AppContentComponent=\{\s*rootMode === 'admin'[\s\S]*?<AdminLayout[\s\S]*?rootMode === 'settings'[\s\S]*?<SettingsPageRoot[\s\S]*?: AppContent\s*\}/
+  );
   assert.doesNotMatch(appSource, /const StartupRuntimeBanner: React\.FC = \(\) => \{/);
   assert.doesNotMatch(appSource, /const AuthenticatedAppShell: React\.FC/);
   assert.doesNotMatch(appSource, /import \{ AppStartupScreen \} from '\.\/components\/common\/AppStartupScreen';/);
@@ -63,7 +66,7 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
   assert.doesNotMatch(appSource, /const CostEstimation = lazy\(\(\) => import\('\.\/pages\/CostEstimation'\)\);/);
   assert.match(authenticatedShellSource, /import NotificationToast from '\.\.\/components\/common\/NotificationToast';/);
   assert.match(authenticatedShellSource, /import \{ pickByDocumentLanguage \} from '\.\.\/utils\/localeText';/);
-  assert.match(authenticatedShellSource, /const CostEstimation = lazy\(\(\) => import\('\.\.\/pages\/CostEstimation'\)\);/);
+  assert.match(authenticatedShellSource, /const CostEstimation = (lazy|lazyWithRetry)\(\(\) => import\('\.\.\/pages\/CostEstimation'\)\);/);
   assert.match(authenticatedShellSource, /export interface AuthenticatedAppShellProps \{/);
   assert.match(authenticatedShellSource, /AppContentComponent: React\.ComponentType;/);
   assert.match(authenticatedShellSource, /showStartupBanner\?: boolean;/);

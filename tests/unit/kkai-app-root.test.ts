@@ -43,7 +43,7 @@ test('kkai app root bypasses login and callback routes and mounts a local runtim
   assert.match(appSource, /const rootMode = createAppRootMode\(\{ pathname: window\.location\.pathname \}\);/);
   assert.match(
     appSource,
-    /AppContentComponent=\{\s*(?:rootMode === 'admin'\s*\?\s*AdminLayout\s*:\s*)?rootMode === 'settings'\s*\?\s*SettingsPageRoot\s*:\s*AppContent\s*\}/
+    /AppContentComponent=\{\s*rootMode === 'admin'[\s\S]*?<AdminLayout[\s\S]*?rootMode === 'settings'[\s\S]*?<SettingsPageRoot[\s\S]*?: AppContent\s*\}/
   );
   assert.doesNotMatch(appSource, /if \(createAppRootMode\(\{ pathname: window\.location\.pathname \}\) !== 'workspace'\) \{/);
   assert.match(appSource, /<BillingProvider>\s*<CanvasProvider>/);

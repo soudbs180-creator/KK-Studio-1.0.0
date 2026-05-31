@@ -68,6 +68,13 @@ test('password login cookie fallback restores mobile browser sessions through th
     }
   });
 
+  // 简体中文注释：清理服务器模块及其依赖的缓存，防止被之前测试的 module._load 劫持及缓存污染
+  for (const key of Object.keys(require.cache)) {
+    if (key.includes('/server/') || key.includes('\\server\\') || key.includes('express')) {
+      delete require.cache[key];
+    }
+  }
+
   const { createApp } = require('../../server/index.js') as typeof import('../../server/index.js');
   const server = createApp().listen(0);
   t.after(() => server.close());

@@ -38,11 +38,16 @@ test('App creates REDRAW prompt nodes and generation pipeline composites redraw 
   assert.match(generationSource, /redraw:\s*executionNode\.redraw/);
   assert.match(generationSource, /executionNode\.redraw\?\.compositionBaseImageId/);
 
+  assert.match(generationSource, /executionNode\.mode === GenerationMode\.REDRAW/);
+  assert.match(generationSource, /await compositeRedrawCropResult\(/);
+  assert.match(generationSource, /redraw:\s*executionNode\.redraw/);
+  assert.match(generationSource, /executionNode\.redraw\?\.compositionBaseImageId/);
+
   assert.doesNotMatch(promptBarSource, /import \{ InpaintModal \} from '\.\.\/image\/InpaintModal';/);
   assert.doesNotMatch(promptBarSource, /config\.maskUrl/);
   assert.doesNotMatch(promptBarSource, /editMode:\s*'inpaint'/);
   assert.doesNotMatch(promptBarSource, /inpaintImage/);
 
-  assert.match(mobileTabBarSource, /\[GenerationMode\.REDRAW\]: '重绘'/);
+  assert.match(mobileTabBarSource, /\[GenerationMode\.REDRAW\]:\s*(?:pick\('重绘',\s*'Redraw'\)|'重绘')/);
   assert.match(appSource, /pn\.mode === GenerationMode\.REDRAW \|\| pn\.mode === GenerationMode\.INPAINT/);
 });

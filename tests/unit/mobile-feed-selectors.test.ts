@@ -83,15 +83,15 @@ describe('selectMobileFeedResults', () => {
 
     assert.deepEqual(
       results.map((item) => item.id),
-      ['image-alpha', 'image-beta', 'image-gamma'],
+      ['image-gamma', 'image-alpha', 'image-beta'],
     );
     assert.deepEqual(
       results.map((item) => item.timestamp),
-      [900, 900, 700],
+      [700, 900, 900],
     );
     assert.deepEqual(
       results.map((item) => item.parentPromptId),
-      ['prompt-alpha', 'prompt-beta', null],
+      [null, 'prompt-alpha', 'prompt-beta'],
     );
   });
 

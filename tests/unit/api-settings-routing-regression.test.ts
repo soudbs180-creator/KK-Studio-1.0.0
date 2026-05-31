@@ -18,7 +18,7 @@ test('ApiSettingsView keeps editor visibility route-driven and returns through A
   assert.match(source, /const showProviderEditor = activeEditorMode === 'third-party';/);
   assert.match(source, /navigate\(API_MANAGEMENT_HOME_PATH,\s*\{\s*state:\s*buildApiManagementListState\(/);
   assert.doesNotMatch(source, /headerPrimaryActionDisabled/);
-  assert.match(source, /<SettingsActionButton\s+icon=\{RefreshCw\}\s+loading=\{busy === 'cloud-refresh'\}/);
+  assert.match(source, /<SettingsActionButton\s+icon=\{RefreshCw\}\s+loading=\{syncLoading\}/);
 
   const createOfficialButtonUsages = source.match(/onClick=\{\(\) => beginCreateOfficial\(\)\}/g) ?? [];
   const createOfficialAddEntryUsages = sectionSource.match(/data-testid="api-official-provider-add"/g) ?? [];

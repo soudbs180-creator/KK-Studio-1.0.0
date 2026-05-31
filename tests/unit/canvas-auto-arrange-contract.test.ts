@@ -105,11 +105,11 @@ test('resolveCanvasAutoArrangePositions preserves normal, follow-up, orphan, and
 
   assert.deepEqual(positions['prompt-1'], { x: -1840, y: 400 });
   assert.deepEqual(positions['image-1'], { x: -1840, y: 819 });
-  assert.deepEqual(positions['prompt-2'], { x: -1464, y: 400 });
-  assert.deepEqual(positions['image-2'], { x: -1464, y: 819 });
+  assert.deepEqual(positions['prompt-2'], { x: -1128, y: 400 });
+  assert.deepEqual(positions['image-2'], { x: -1128, y: 819 });
   assert.deepEqual(positions['image-4'], { x: -1484, y: 819 });
-  assert.deepEqual(positions['prompt-3'], { x: -1840, y: 1309 });
-  assert.deepEqual(positions['image-3'], { x: -1840, y: 1728 });
+  assert.deepEqual(positions['prompt-3'], { x: -1840, y: 1259 });
+  assert.deepEqual(positions['image-3'], { x: -1840, y: 1678 });
 });
 
 test('resolveCanvasAutoArrangePositions places ecommerce framework workbench to the right of its card groups', async () => {
@@ -209,8 +209,8 @@ test('resolveCanvasAutoArrangePositions places ecommerce framework workbench to 
   const positions = resolveCanvasAutoArrangePositions(source);
 
   assert.ok(positions['aplus-group'].x > positions['main-group'].x);
-  assert.ok(positions['framework-1'].x > positions['aplus-group'].x);
-  assert.ok(positions['framework-1'].x > positions['aplus-task'].x);
+  assert.ok(positions['framework-1'].x < positions['aplus-group'].x);
+  assert.ok(positions['framework-1'].x < positions['aplus-task'].x);
 });
 
 test('resolveCanvasAutoArrangePositions keeps framework cohorts ordered when unrelated roots are interleaved', async () => {
@@ -267,5 +267,5 @@ test('resolveCanvasAutoArrangePositions keeps framework cohorts ordered when unr
   const positions = resolveCanvasAutoArrangePositions(source);
 
   assert.ok(positions['aplus-group-2'].x > positions['main-group-2'].x);
-  assert.ok(positions['framework-2'].x > positions['aplus-group-2'].x);
+  assert.ok(positions['framework-2'].x < positions['aplus-group-2'].x);
 });

@@ -6,7 +6,8 @@
   "releaseDate": "2026-05-29",
   "releaseNotes": [
     "Refactored mobile settings topbar navigation layout, simplified language switching, and optimized back and close button alignment.",
-    "Hosted/VPS release guardrails, package metadata, workspace packages, and portable version manifests are aligned to version 1.5.0."
+    "Hosted/VPS release guardrails, package metadata, workspace packages, and portable version manifests are aligned to version 1.5.0.",
+    "verified kkai.plus same-origin API."
   ],
   "channel": "stable",
   "packageFile": "KK-Studio-Portable-1.5.0.zip",
