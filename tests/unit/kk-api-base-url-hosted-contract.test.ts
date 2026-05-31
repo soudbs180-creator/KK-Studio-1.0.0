@@ -35,8 +35,7 @@ test("hosted kkai.plus runtime routes temporary HTTPS VPS API origins through sa
   locationLike.location = { origin: "https://kkai.plus" };
 
   try {
-    // 中文注释：在没有同源 Serverless 函数的情况下，必须直连 VPS 域名
-    assert.equal(resolveKkApiBaseUrl(), "https://172-245-156-16.sslip.io");
+    assert.equal(resolveKkApiBaseUrl(), "https://kkai.plus");
   } finally {
     if (typeof originalBaseUrl === "string") {
       process.env.VITE_KK_API_BASE_URL = originalBaseUrl;
@@ -56,7 +55,7 @@ test("hosted model proxy calls temporary HTTPS VPS API origins directly to avoid
   locationLike.location = { origin: "https://kkai.plus" };
 
   try {
-    assert.equal(resolveKkApiBaseUrl(), "https://172-245-156-16.sslip.io");
+    assert.equal(resolveKkApiBaseUrl(), "https://kkai.plus");
     assert.equal(resolveKkApiModelProxyBaseUrl(), "https://172-245-156-16.sslip.io");
   } finally {
     if (typeof originalBaseUrl === "string") {

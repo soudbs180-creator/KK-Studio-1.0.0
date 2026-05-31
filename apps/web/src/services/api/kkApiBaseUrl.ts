@@ -193,6 +193,9 @@ export function resolveKkApiBaseUrl(): string {
     if (shouldPreferRuntimeOriginForHostedHttpApi(configuredBaseUrl, runtimeOrigin)) {
       return runtimeOrigin!;
     }
+    if (shouldPreferRuntimeOriginForHostedTemporaryVpsApi(configuredBaseUrl, runtimeOrigin)) {
+      return runtimeOrigin!;
+    }
     return configuredBaseUrl;
   }
 
