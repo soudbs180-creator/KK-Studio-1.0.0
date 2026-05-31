@@ -24,6 +24,14 @@ function rejectLocalUserApiRequest(res) {
   });
 }
 
+function sendInsufficientCredits(res, currentCredits, requiredCredits) {
+  return res.status(402).json({
+    error: 'Insufficient credits.',
+    credits: Math.max(0, Number(currentCredits) || 0),
+    creditsCost: requiredCredits,
+  });
+}
+
 const imageLimiterMap = new Map();
 const LIMIT_WINDOW_MS = 60 * 1000;
 const MAX_IMAGE_LIMIT = 10;
@@ -75,6 +83,14 @@ async function handleGenerateImage(req, res) {
 
   try {
     requiredCredits = await credits.getOperationCost(pool, operationKey);
+    const availableCredits = await credits.getUserCredits(userId);
+    if (availableCredits < 0) {
+      return res.status(401).json({ error: 'User not found.' });
+    }
+    if (availableCredits < requiredCredits) {
+      return sendInsufficientCredits(res, availableCredits, requiredCredits);
+    }
+
     currentCredits = await credits.deductCredits(userId, requiredCredits, operationKey);
     creditsDeducted = true;
 
@@ -130,6 +146,10 @@ async function handleGenerateImage(req, res) {
     });
   } catch (err) {
     console.error('[Gemini Image Generation Error]', err);
+    if (!creditsDeducted && credits.isInsufficientCreditsError(err)) {
+      return sendInsufficientCredits(res, currentCredits, requiredCredits);
+    }
+
     let refundFailed = false;
     if (creditsDeducted) {
       try {
@@ -147,7 +167,11 @@ async function handleGenerateImage(req, res) {
       });
     }
 
-    return res.status(500).json({ error: 'Image generation or edit failed. Credits refunded.' });
+    return res.status(500).json({
+      error: creditsDeducted
+        ? 'Image generation or edit failed. Credits refunded.'
+        : 'Image generation or edit failed. No credits were charged.',
+    });
   }
 }
 

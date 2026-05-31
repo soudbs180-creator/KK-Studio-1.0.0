@@ -3,6 +3,19 @@
 
 const { getPool } = require('./db');
 
+const INSUFFICIENT_CREDITS_CODE = 'INSUFFICIENT_CREDITS';
+
+function createInsufficientCreditsError(message = '积分不足，原子扣减失败') {
+  const error = new Error(message);
+  error.code = INSUFFICIENT_CREDITS_CODE;
+  error.statusCode = 402;
+  return error;
+}
+
+function isInsufficientCreditsError(error) {
+  return Boolean(error) && error.code === INSUFFICIENT_CREDITS_CODE;
+}
+
 async function getOperationCost(clientOrPool, operationKey) {
   const result = await clientOrPool.query(
     'SELECT cost FROM public.api_cost_config WHERE operation_key = $1 AND is_active = true',
@@ -60,7 +73,7 @@ async function deductCredits(userId, amount, operationKey) {
     );
 
     if (updateRes.rows.length === 0) {
-      throw new Error('积分不足，原子扣减失败');
+      throw createInsufficientCreditsError();
     }
 
     const remaining = Number.parseInt(updateRes.rows[0].credits, 10);
@@ -185,6 +198,7 @@ async function recordTokenUsage(userId, tokensUsed, actionId, costUsd = 0) {
 }
 
 module.exports = {
+  INSUFFICIENT_CREDITS_CODE,
   getOperationCost,
   getUserCredits,
   deductCredits,
@@ -192,4 +206,5 @@ module.exports = {
   addCredits,
   adjustCreditsByAdmin,
   recordTokenUsage,
+  isInsufficientCreditsError,
 };

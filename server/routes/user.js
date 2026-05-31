@@ -8,6 +8,23 @@ const { verifyJWT, signJWT } = require('../lib/jwt');
 
 const router = express.Router();
 
+function getRequiredPasswordSalt() {
+  if (!process.env.PASSWORD_SALT) {
+    throw new Error('[严重] PASSWORD_SALT 未配置，拒绝处理密码凭据');
+  }
+  return process.env.PASSWORD_SALT;
+}
+
+function hashPassword(password) {
+  return crypto.createHmac('sha256', getRequiredPasswordSalt()).update(password).digest('hex');
+}
+
+function timingSafeEqualHex(left, right) {
+  const leftBuffer = Buffer.from(String(left || ''), 'hex');
+  const rightBuffer = Buffer.from(String(right || ''), 'hex');
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
 router.get('/user/me', async (req, res) => {
   const userId = verifyJWT(req.headers.authorization);
   if (!userId) {
@@ -352,11 +369,10 @@ router.post('/v1/auth/login', async (req, res) => {
     }
 
     const user = result.rows[0];
-    const passwordSalt = process.env.PASSWORD_SALT || 'salt';
-    const computedHash = crypto.createHmac('sha256', passwordSalt).update(password).digest('hex');
+    const computedHash = hashPassword(password);
 
-    // 比较密码
-    if (user.password_hash !== computedHash) {
+    // 密码哈希必须使用时序安全比较，避免登录接口暴露可测量的差异。
+    if (!timingSafeEqualHex(user.password_hash, computedHash)) {
       return res.status(401).json({
         success: false,
         error: {
@@ -458,8 +474,7 @@ router.post('/v1/auth/register', async (req, res) => {
     }
 
     const userId = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
-    const passwordSalt = process.env.PASSWORD_SALT || 'salt';
-    const passwordHash = crypto.createHmac('sha256', passwordSalt).update(password).digest('hex');
+    const passwordHash = hashPassword(password);
 
     // 默认积分一律为 0，符合 AGENTS.md 安全审计要求
     await pool.query(

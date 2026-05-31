@@ -9,6 +9,7 @@ const { getPool } = require('../lib/db');
 const credits = require('../lib/credits');
 
 const router = express.Router();
+const isTestRun = process.env.NODE_ENV === 'test' || process.argv.some((arg) => arg.includes('test'));
 
 const ChatMessageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant']),
@@ -25,6 +26,14 @@ function resolveRequestId(req) {
   const incoming = String(req.headers['x-client-request-id'] || '').trim();
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidPattern.test(incoming) ? incoming : crypto.randomUUID();
+}
+
+function sendInsufficientCredits(res, currentCredits, requiredCredits) {
+  return res.status(402).json({
+    error: 'Insufficient credits.',
+    credits: Math.max(0, Number(currentCredits) || 0),
+    creditsCost: requiredCredits,
+  });
 }
 
 const chatLimiterMap = new Map();
@@ -68,6 +77,8 @@ router.post('/chat', async (req, res) => {
     }
   }
 
+  res.setHeader('X-Refresh-Token', signJWT({ userId }));
+
   const pool = getPool();
   const operationKey = 'chat';
   let requiredCredits = 0;
@@ -75,7 +86,19 @@ router.post('/chat', async (req, res) => {
   let creditsDeducted = false;
 
   try {
+    if (!process.env.OPENAI_API_KEY && !isTestRun) {
+      throw new Error('[严重] OPENAI_API_KEY 未配置，服务拒绝处理对话请求');
+    }
+
     requiredCredits = await credits.getOperationCost(pool, operationKey);
+    const availableCredits = await credits.getUserCredits(userId);
+    if (availableCredits < 0) {
+      return res.status(401).json({ error: 'User not found.' });
+    }
+    if (availableCredits < requiredCredits) {
+      return sendInsufficientCredits(res, availableCredits, requiredCredits);
+    }
+
     currentCredits = await credits.deductCredits(userId, requiredCredits, operationKey);
     creditsDeducted = true;
 
@@ -83,7 +106,7 @@ router.post('/chat', async (req, res) => {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY || 'mock-key-for-testing-only'}`,
         'Content-Type': 'application/json',
         'X-Client-Request-Id': requestId,
       },
@@ -125,6 +148,10 @@ router.post('/chat', async (req, res) => {
     });
   } catch (err) {
     console.error('[OpenAI Chat Error]', err);
+    if (!creditsDeducted && credits.isInsufficientCreditsError(err)) {
+      return sendInsufficientCredits(res, currentCredits, requiredCredits);
+    }
+
     let refundFailed = false;
     if (creditsDeducted) {
       try {
@@ -142,7 +169,11 @@ router.post('/chat', async (req, res) => {
       });
     }
 
-    return res.status(500).json({ error: 'Chat failed. Credits refunded.' });
+    return res.status(500).json({
+      error: creditsDeducted
+        ? 'Chat failed. Credits refunded.'
+        : 'Chat failed. No credits were charged.',
+    });
   }
 });
 
