@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { clearStoredAdminSession } from "../services/api/adminSession";
 import {
@@ -47,11 +47,26 @@ interface AuthContextType {
 }
 
 const DEFAULT_AUTH_CONTEXT = createKkaiRuntimeAuthSnapshot();
+const SESSION_RECOVERY_TIMEOUT_MS = 8000;
 
 const AuthContext = createContext<AuthContextType>({
   ...DEFAULT_AUTH_CONTEXT,
   adminLevel: 0,
 });
+
+function createSessionRecoveryAbortScope(): { signal?: AbortSignal; dispose: () => void } {
+  if (typeof window === "undefined" || typeof AbortController === "undefined") {
+    return { dispose: () => undefined };
+  }
+
+  // 简体中文注释：部分移动端浏览器会让弱网 fetch 长时间悬挂，登录恢复必须按时让出首屏。
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), SESSION_RECOVERY_TIMEOUT_MS);
+  return {
+    signal: controller.signal,
+    dispose: () => window.clearTimeout(timer),
+  };
+}
 
 function createSession(user: RuntimeAuthUser | null, accessToken?: string): RuntimeAuthSession | null {
   const normalizedAccessToken = String(accessToken || "").trim();
@@ -87,6 +102,18 @@ function resolveInitialRuntimeState(): RuntimeAuthState {
   return persistedState;
 }
 
+function shouldRecoverSessionOnMount(runtimeState: RuntimeAuthState): boolean {
+  return !runtimeState.user && !runtimeState.isTempUser && Boolean(getStoredKkApiAccessToken());
+}
+
+function createInitialAuthState() {
+  const runtimeState = resolveInitialRuntimeState();
+  return {
+    runtimeState,
+    sessionRecoveryLoading: shouldRecoverSessionOnMount(runtimeState),
+  };
+}
+
 export const useAuth = () => useContext(AuthContext);
 
 function isSessionRecoveryAuthErrorCode(code: unknown): boolean {
@@ -98,9 +125,14 @@ function isSessionRecoveryAuthErrorCode(code: unknown): boolean {
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [runtimeState, setRuntimeState] = useState<RuntimeAuthState>(() => resolveInitialRuntimeState());
+  const initialAuthStateRef = useRef<ReturnType<typeof createInitialAuthState> | null>(null);
+  if (!initialAuthStateRef.current) {
+    initialAuthStateRef.current = createInitialAuthState();
+  }
+
+  const [runtimeState, setRuntimeState] = useState<RuntimeAuthState>(() => initialAuthStateRef.current!.runtimeState);
   const [authActionLoading, setAuthActionLoading] = useState(false);
-  const [sessionRecoveryLoading, setSessionRecoveryLoading] = useState(false);
+  const [sessionRecoveryLoading, setSessionRecoveryLoading] = useState(() => initialAuthStateRef.current!.sessionRecoveryLoading);
   const [sessionRecoveryBlockedBySignOut, setSessionRecoveryBlockedBySignOut] = useState(false);
   const [sessionRecoveryWarning, setSessionRecoveryWarning] = useState<string | null>(null);
   const [adminLevel, setAdminLevel] = useState<number>(0);
@@ -230,7 +262,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const tryRestoreHostedSession = async (): Promise<boolean> => {
-      const response = await fetchHostedSessionFromServer();
+      const abortScope = createSessionRecoveryAbortScope();
+      const response = await fetchHostedSessionFromServer({ signal: abortScope.signal }).finally(abortScope.dispose);
       if (disposed) {
         return true;
       }
@@ -257,12 +290,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return true;
       }
 
-      return false;
+      setSessionRecoveryWarning(retryableWarning);
+      setSessionRecoveryLoading(false);
+      scheduleRetry();
+      return true;
     };
 
     const restoreSessionFromStoredToken = async (accessToken: string) => {
       try {
-        const response = await kkWebApiClient.getProfile({ accessToken });
+        const abortScope = createSessionRecoveryAbortScope();
+        const response = await kkWebApiClient.getProfile({ accessToken, signal: abortScope.signal }).finally(abortScope.dispose);
         if (disposed) {
           return;
         }
@@ -288,6 +325,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         setSessionRecoveryWarning(retryableWarning);
+        setSessionRecoveryLoading(false);
         scheduleRetry();
       } catch {
         if (disposed) {
@@ -295,23 +333,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         setSessionRecoveryWarning(retryableWarning);
+        setSessionRecoveryLoading(false);
         scheduleRetry();
       }
     };
 
     const recoverRuntimeSession = async () => {
       setSessionRecoveryLoading(true);
-      const storedToken = getStoredKkApiAccessToken();
-      if (!hostedRuntime && !storedToken) {
-        clearHostedSession();
-        return;
-      }
+      let storedToken = getStoredKkApiAccessToken();
 
-      if (hostedRuntime || !storedToken) {
+      if (hostedRuntime) {
         const restoredHostedSession = await tryRestoreHostedSession();
         if (restoredHostedSession || disposed) {
           return;
         }
+        storedToken = getStoredKkApiAccessToken() || storedToken;
       }
 
       if (!storedToken) {

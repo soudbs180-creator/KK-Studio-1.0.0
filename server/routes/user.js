@@ -7,6 +7,9 @@ const { getPool } = require('../lib/db');
 const { verifyJWT, signJWT } = require('../lib/jwt');
 
 const router = express.Router();
+const ACCESS_TOKEN_COOKIE_NAME = 'kk.api.access_token';
+const REFRESH_TOKEN_COOKIE_NAME = 'kk.api.refresh_token';
+const AUTH_COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 
 function getRequiredPasswordSalt() {
   if (!process.env.PASSWORD_SALT) {
@@ -25,8 +28,136 @@ function timingSafeEqualHex(left, right) {
   return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
 }
 
+function readCookieValue(req, name) {
+  const rawCookie = String(req.headers.cookie || '');
+  if (!rawCookie) {
+    return '';
+  }
+
+  const encodedName = encodeURIComponent(name);
+  const pair = rawCookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${encodedName}=`) || part.startsWith(`${name}=`));
+  if (!pair) {
+    return '';
+  }
+
+  const rawValue = pair.slice(pair.indexOf('=') + 1);
+  try {
+    return decodeURIComponent(rawValue);
+  } catch {
+    return rawValue;
+  }
+}
+
+function verifyRequestJwt(req, tokenOverride = '') {
+  const directUserId = verifyJWT(req.headers.authorization);
+  if (directUserId) {
+    return directUserId;
+  }
+
+  const explicitToken = String(tokenOverride || '').trim();
+  if (explicitToken) {
+    const explicitUserId = verifyJWT(`Bearer ${explicitToken}`);
+    if (explicitUserId) {
+      return explicitUserId;
+    }
+  }
+
+  const cookieToken = readCookieValue(req, ACCESS_TOKEN_COOKIE_NAME) || readCookieValue(req, REFRESH_TOKEN_COOKIE_NAME);
+  return cookieToken ? verifyJWT(`Bearer ${cookieToken}`) : null;
+}
+
+function buildProfileFromUserRow(user) {
+  const email = String(user.email || '').trim();
+  const timestamp = user.updated_at || user.created_at || new Date().toISOString();
+  return {
+    id: user.id,
+    email,
+    nickname: email.split('@')[0] || 'KK User',
+    avatarUrl: '',
+    role: Number(user.admin_level || 0) > 0 ? 'admin' : 'user',
+    status: 'active',
+    createdAt: user.created_at || timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+function buildLocalProfile(userId, email = 'local-user@example.com') {
+  const now = new Date().toISOString();
+  return {
+    id: userId || 'local-user',
+    email,
+    nickname: email.split('@')[0] || 'Local User',
+    avatarUrl: '',
+    role: 'admin',
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+async function loadProfileForUserId(userId) {
+  if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
+    return buildLocalProfile(userId);
+  }
+
+  const pool = getPool();
+  const result = await pool.query(
+    'SELECT id, email, created_at, updated_at, COALESCE(admin_level, 0) AS admin_level FROM public.users WHERE id = $1',
+    [userId]
+  );
+
+  return result.rows.length > 0 ? buildProfileFromUserRow(result.rows[0]) : null;
+}
+
+function buildAuthSession(profile) {
+  const accessToken = signJWT({ userId: profile.id });
+  return {
+    accessToken,
+    refreshToken: signJWT({ userId: profile.id }),
+    expiresIn: 7 * 24 * 60 * 60,
+    sessionExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    profile,
+  };
+}
+
+function isHttpsRequest(req) {
+  const forwardedProto = String(req.headers['x-forwarded-proto'] || '').toLowerCase();
+  return req.secure || forwardedProto.split(',').map((part) => part.trim()).includes('https');
+}
+
+function buildAuthCookie(req, name, value, maxAgeSeconds) {
+  const sameSiteSuffix = isHttpsRequest(req) ? 'SameSite=None; Secure' : 'SameSite=Lax';
+  const encodedName = encodeURIComponent(name);
+  const encodedValue = encodeURIComponent(value || '');
+  return `${encodedName}=${encodedValue}; Max-Age=${maxAgeSeconds}; Path=/; HttpOnly; ${sameSiteSuffix}`;
+}
+
+function setAuthSessionCookies(req, res, session) {
+  res.setHeader('Set-Cookie', [
+    buildAuthCookie(req, ACCESS_TOKEN_COOKIE_NAME, session.accessToken, AUTH_COOKIE_MAX_AGE_SECONDS),
+    buildAuthCookie(req, REFRESH_TOKEN_COOKIE_NAME, session.refreshToken, AUTH_COOKIE_MAX_AGE_SECONDS),
+  ]);
+  res.setHeader('X-Refresh-Token', session.accessToken);
+}
+
+function clearAuthSessionCookies(req, res) {
+  res.setHeader('Set-Cookie', [
+    buildAuthCookie(req, ACCESS_TOKEN_COOKIE_NAME, '', 0),
+    buildAuthCookie(req, REFRESH_TOKEN_COOKIE_NAME, '', 0),
+  ]);
+}
+
+function sendAuthSession(req, res, profile) {
+  const session = buildAuthSession(profile);
+  setAuthSessionCookies(req, res, session);
+  return res.json(okEnvelope(session, req));
+}
+
 router.get('/user/me', async (req, res) => {
-  const userId = verifyJWT(req.headers.authorization);
+  const userId = verifyRequestJwt(req);
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
@@ -107,7 +238,7 @@ function hasLegacyProfilePayload(data) {
 }
 
 function resolveProfileUserId(req) {
-  const verifiedUserId = verifyJWT(req.headers.authorization);
+  const verifiedUserId = verifyRequestJwt(req);
   if (verifiedUserId) {
     return {
       userId: verifiedUserId,
@@ -133,6 +264,74 @@ function buildMeta(req) {
     timestamp: new Date().toISOString(),
   };
 }
+
+function okEnvelope(data, req) {
+  return {
+    success: true,
+    data,
+    meta: buildMeta(req),
+  };
+}
+
+function authErrorEnvelope(req, code, message) {
+  return {
+    success: false,
+    error: {
+      code,
+      message,
+    },
+    meta: buildMeta(req),
+  };
+}
+
+async function resolveAuthenticatedProfile(req, res, tokenOverride = '') {
+  const userId = verifyRequestJwt(req, tokenOverride);
+  if (!userId) {
+    res.status(401).json(authErrorEnvelope(req, 'AUTH_REQUIRED', 'Authentication is required.'));
+    return null;
+  }
+
+  const profile = await loadProfileForUserId(userId);
+  if (!profile) {
+    res.status(401).json(authErrorEnvelope(req, 'AUTH_USER_NOT_FOUND', 'User not found.'));
+    return null;
+  }
+
+  res.setHeader('X-Refresh-Token', signJWT({ userId }));
+  return profile;
+}
+
+router.get('/v1/profile', async (req, res) => {
+  const profile = await resolveAuthenticatedProfile(req, res);
+  if (!profile) {
+    return;
+  }
+
+  return res.json(okEnvelope(profile, req));
+});
+
+router.get('/v1/auth/session', async (req, res) => {
+  const profile = await resolveAuthenticatedProfile(req, res);
+  if (!profile) {
+    return;
+  }
+
+  return sendAuthSession(req, res, profile);
+});
+
+router.post('/v1/auth/refresh', async (req, res) => {
+  const profile = await resolveAuthenticatedProfile(req, res, req.body?.refreshToken);
+  if (!profile) {
+    return;
+  }
+
+  return sendAuthSession(req, res, profile);
+});
+
+router.post('/v1/auth/logout', async (req, res) => {
+  clearAuthSessionCookies(req, res);
+  return res.json(okEnvelope({ loggedOut: true }, req));
+});
 
 function requireProfileAuth(req, res, next) {
   const authState = resolveProfileUserId(req);
@@ -326,35 +525,31 @@ router.post('/v1/auth/login', async (req, res) => {
 
   const isNoDb = !process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true';
   if (isNoDb) {
-    // 无数据库时，提供直接放行（Mock）
     const userId = 'mock-user-id';
+    const session = buildAuthSession({
+      id: userId,
+      email: String(email).trim() || 'mock-user@example.com',
+      nickname: 'Mock User',
+      avatarUrl: '',
+      role: 'user',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    setAuthSessionCookies(req, res, session);
     return res.json({
       success: true,
-      data: {
-        accessToken: signJWT({ userId }),
-        refreshToken: signJWT({ userId }),
-        expiresIn: 7 * 24 * 60 * 60,
-        sessionExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        profile: {
-          id: userId,
-          email: email.trim(),
-          nickname: 'Mock User',
-          avatarUrl: '',
-          role: 'user',
-          status: 'active',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      },
+      data: session,
       meta: buildMeta(req)
     });
   }
 
   try {
+    const normalizedEmail = String(email).trim().toLowerCase();
     const pool = getPool();
     const result = await pool.query(
       'SELECT id, email, password_hash, COALESCE(admin_level, 0) AS admin_level, created_at FROM public.users WHERE email = $1',
-      [email.trim().toLowerCase()]
+      [normalizedEmail]
     );
 
     if (result.rows.length === 0) {
@@ -371,7 +566,7 @@ router.post('/v1/auth/login', async (req, res) => {
     const user = result.rows[0];
     const computedHash = hashPassword(password);
 
-    // 密码哈希必须使用时序安全比较，避免登录接口暴露可测量的差异。
+    // 简体中文注释：密码哈希必须使用时序安全比较，避免登录接口暴露可测量的差异。
     if (!timingSafeEqualHex(user.password_hash, computedHash)) {
       return res.status(401).json({
         success: false,
@@ -383,25 +578,20 @@ router.post('/v1/auth/login', async (req, res) => {
       });
     }
 
-    const accessToken = signJWT({ userId: user.id });
+    const session = buildAuthSession({
+      id: user.id,
+      email: user.email,
+      nickname: user.email.split('@')[0],
+      avatarUrl: '',
+      role: user.admin_level > 0 ? 'admin' : 'user',
+      status: 'active',
+      createdAt: user.created_at,
+      updatedAt: new Date().toISOString()
+    });
+    setAuthSessionCookies(req, res, session);
     return res.json({
       success: true,
-      data: {
-        accessToken,
-        refreshToken: signJWT({ userId: user.id }),
-        expiresIn: 7 * 24 * 60 * 60,
-        sessionExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        profile: {
-          id: user.id,
-          email: user.email,
-          nickname: user.email.split('@')[0],
-          avatarUrl: '',
-          role: user.admin_level > 0 ? 'admin' : 'user',
-          status: 'active',
-          createdAt: user.created_at,
-          updatedAt: new Date().toISOString()
-        }
-      },
+      data: session,
       meta: buildMeta(req)
     });
   } catch (err) {

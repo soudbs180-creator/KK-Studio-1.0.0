@@ -52,8 +52,8 @@ export function clearHostedSessionRuntime(): RuntimeAuthState {
   return nextState;
 }
 
-export async function fetchHostedSessionFromServer(): Promise<ApiResponse<AuthSessionDto>> {
-  return cookieSessionClient.getSession();
+export async function fetchHostedSessionFromServer(options?: { signal?: AbortSignal }): Promise<ApiResponse<AuthSessionDto>> {
+  return cookieSessionClient.getSession(options);
 }
 
 export async function restoreHostedSessionFromServer(): Promise<AuthSessionDto | undefined> {

@@ -53,10 +53,17 @@ test('AuthContext attempts to rehydrate a stored KK API session before falling b
   const source = readSource('src/context/AuthContext.tsx');
 
   assert.match(source, /import \{ isHostedRuntime, kkWebApiClient, shouldUseLegacyWebApiFallback \} from ["']\.\.\/services\/api\/kkApiClient["'];/);
+  assert.match(source, /function shouldRecoverSessionOnMount\(runtimeState: RuntimeAuthState\): boolean/);
+  assert.match(source, /sessionRecoveryLoading: shouldRecoverSessionOnMount\(runtimeState\)/);
   assert.match(source, /const \[sessionRecoveryWarning, setSessionRecoveryWarning\] = useState<string \| null>\(null\);/);
-  assert.match(source, /kkWebApiClient\.getProfile\(\{ accessToken \}\)/);
+  assert.match(source, /kkWebApiClient\.getProfile\(\{ accessToken, signal: abortScope\.signal \}\)/);
   assert.match(source, /const retryableWarning = "Checking your sign-in status\. Please try again in a moment\.";/);
+  assert.match(source, /const SESSION_RECOVERY_TIMEOUT_MS = 8000;/);
   assert.match(source, /setSessionRecoveryWarning\(retryableWarning\)/);
+  assert.match(
+    source,
+    /setSessionRecoveryWarning\(retryableWarning\);\s*setSessionRecoveryLoading\(false\);\s*scheduleRetry\(\);/,
+  );
 });
 
 test('AuthContext does not poll hosted cookie recovery forever for signed-out local runtimes', () => {
@@ -64,20 +71,20 @@ test('AuthContext does not poll hosted cookie recovery forever for signed-out lo
 
   assert.match(
     source,
-    /if \(!hostedRuntime && !storedToken\) \{\s*clearHostedSession\(\);\s*return;\s*\}/,
+    /if \(hostedRuntime\) \{[\s\S]*const restoredHostedSession = await tryRestoreHostedSession\(\);[\s\S]*storedToken = getStoredKkApiAccessToken\(\) \|\| storedToken;[\s\S]*\}\s*if \(!storedToken\) \{\s*clearHostedSession\(\);\s*return;\s*\}/,
   );
 });
 
-test('AuthContext does not leave hosted signed-out visitors on the startup screen after cookie recovery fails', () => {
+test('AuthContext retries hosted cookie recovery failures without pinning the startup screen', () => {
   const source = readSource('src/context/AuthContext.tsx');
 
   assert.match(
     source,
-    /if \(!storedToken\) \{\s*clearHostedSession\(\);\s*return;\s*\}/,
+    /fetchHostedSessionFromServer\(\{ signal: abortScope\.signal \}\)\.finally\(abortScope\.dispose\)/,
   );
-  assert.doesNotMatch(
+  assert.match(
     source,
-    /if \(!storedToken\) \{\s*setSessionRecoveryWarning\(retryableWarning\);\s*scheduleRetry\(\);\s*return;\s*\}/,
+    /setSessionRecoveryWarning\(retryableWarning\);\s*setSessionRecoveryLoading\(false\);\s*scheduleRetry\(\);\s*return true;/,
   );
 });
 
