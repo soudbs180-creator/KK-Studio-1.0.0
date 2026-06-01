@@ -43,6 +43,21 @@ const DB_NAME = 'kk_studio_db';
 const DB_VERSION = 1;
 const IMAGES_STORE = 'images';
 
+// 简体中文注释：解析带质量后缀的存储ID，拆分核心ID与质量类型
+function parseQualityId(id: string): { baseId: string; quality: string } {
+    if (id.endsWith('_micro')) {
+        return { baseId: id.substring(0, id.length - 6), quality: 'micro' };
+    }
+    if (id.endsWith('_thumb')) {
+        return { baseId: id.substring(0, id.length - 6), quality: 'thumb' };
+    }
+    if (id.endsWith('_preview')) {
+        return { baseId: id.substring(0, id.length - 8), quality: 'preview' };
+    }
+    return { baseId: id, quality: 'original' };
+}
+
+
 // ========== 内存缓存层 ==========
 class ImageMemoryCache {
     private cache: Map<string, string> = new Map();
@@ -409,6 +424,23 @@ export async function saveImage(id: string, dataURL: string): Promise<void> {
         }
 
         console.debug(`[ImageStorage] Saved ${id} to IndexedDB`);
+
+        // 🚀 [OPFS Backup] 如果是 OPFS 模式，且支持 OPFS，同时往 OPFS 写入备份
+        try {
+            const { getStorageMode } = await import('./storagePreference');
+            const selectedMode = await getStorageMode();
+            if (selectedMode === 'opfs') {
+                const { isOPFSAvailable, saveToOPFS } = await import('./opfsService');
+                if (isOPFSAvailable() && saveObject.blob) {
+                    const { baseId, quality } = parseQualityId(id);
+                    const opfsType = (quality === 'micro' || quality === 'thumb') ? 'thumbnail' : 'image';
+                    await saveToOPFS(saveObject.blob, baseId, opfsType);
+                    console.log(`[ImageStorage] OPFS backup successful for ${id} (type: ${opfsType})`);
+                }
+            }
+        } catch (opfsBackupErr) {
+            console.warn(`[ImageStorage] OPFS backup failed for ${id}:`, opfsBackupErr);
+        }
     } catch (error) {
         console.error('[ImageStorage] Failed to save image:', error);
         memoryCache.set(id, dataURL);
@@ -460,6 +492,40 @@ export async function getImage(id: string): Promise<string | null> {
                 } catch (error) {
                     console.warn(`[ImageStorage] Failed local recovery for ${id}:`, error);
                 }
+            }
+
+            // 🚀 [OPFS Recovery] 手机端浏览器 OPFS 恢复兜底
+            try {
+                const { isOPFSAvailable, getOPFSBlobUrl } = await import('./opfsService');
+                if (isOPFSAvailable()) {
+                    const { baseId, quality } = parseQualityId(id);
+                    const opfsType = (quality === 'micro' || quality === 'thumb') ? 'thumbnail' : 'image';
+                    const blobURL = await getOPFSBlobUrl(baseId, opfsType);
+                    if (blobURL) {
+                        memoryCache.set(id, blobURL);
+
+                        // 异步静默写入 IndexedDB 缓存
+                        fetch(blobURL)
+                            .then(res => res.blob())
+                            .then(blob => {
+                                const saveObject: StoredImageRecord = {
+                                    id,
+                                    timestamp: Date.now(),
+                                    blob
+                                };
+                                openDB().then(db => {
+                                    const tx = db.transaction(IMAGES_STORE, 'readwrite');
+                                    tx.objectStore(IMAGES_STORE).put(saveObject);
+                                }).catch(() => {});
+                            })
+                            .catch(() => {});
+
+                        console.log(`[ImageStorage] Recovered ${id} from OPFS (quality: ${quality})`);
+                        return blobURL;
+                    }
+                }
+            } catch (opfsErr) {
+                console.warn(`[ImageStorage] Failed OPFS recovery for ${id}:`, opfsErr);
             }
 
             return null;
@@ -991,6 +1057,21 @@ export async function saveOriginalImage(id: string, dataURL: string, isVideo: bo
             }
 
             console.log(`[ImageStorage] 🔒 Original image saved successfully to IDB (attempt ${i + 1}/${MAX_RETRIES})`);
+
+            // 🚀 [OPFS Backup] 如果是 OPFS 模式，且支持 OPFS，同时往 OPFS 写入原图备份
+            try {
+                const { getStorageMode } = await import('./storagePreference');
+                const selectedMode = await getStorageMode();
+                if (selectedMode === 'opfs') {
+                    const { isOPFSAvailable, saveToOPFS } = await import('./opfsService');
+                    if (isOPFSAvailable() && saveObject.blob) {
+                        await saveToOPFS(saveObject.blob, id, isVideo ? 'video' : 'image');
+                        console.log(`[ImageStorage] 🔒 OPFS original backup successful for ${id}`);
+                    }
+                }
+            } catch (opfsBackupErr) {
+                console.warn(`[ImageStorage] 🔒 OPFS original backup failed for ${id}:`, opfsBackupErr);
+            }
             return; // 成功，退出
         } catch (error) {
             console.warn(`[ImageStorage] 🔒 Save retry ${i + 1}/${MAX_RETRIES}:`, error);
@@ -1055,6 +1136,40 @@ export async function getOriginalImage(id: string): Promise<string | null> {
                 } catch (e) {
                     console.warn(`[ImageStorage] Failed to load from local disk fallback: ${id}`, e);
                 }
+            }
+
+            // 🚀 [OPFS Recovery] 手机端浏览器 OPFS 恢复兜底 (原图)
+            try {
+                const { isOPFSAvailable, getOPFSBlobUrl } = await import('./opfsService');
+                if (isOPFSAvailable()) {
+                    const blobURL = await getOPFSBlobUrl(id, 'image');
+                    if (blobURL) {
+                        memoryCache.set(id, blobURL);
+
+                        // 异步静默写入 IndexedDB
+                        fetch(blobURL)
+                            .then(res => res.blob())
+                            .then(blob => {
+                                const saveObject: StoredImageRecord = {
+                                    id,
+                                    quality: 'original',
+                                    timestamp: Date.now(),
+                                    protected: true,
+                                    blob
+                                };
+                                openDB().then(db => {
+                                    const tx = db.transaction(IMAGES_STORE, 'readwrite');
+                                    tx.objectStore(IMAGES_STORE).put(saveObject);
+                                }).catch(() => {});
+                            })
+                            .catch(() => {});
+
+                        console.log(`[ImageStorage] 🔒 Recovered original ${id} from OPFS fallback`);
+                        return blobURL;
+                    }
+                }
+            } catch (e) {
+                console.warn(`[ImageStorage] Failed OPFS original recovery for ${id}:`, e);
             }
 
             return null;
@@ -1133,6 +1248,36 @@ export async function getStrictOriginalImage(id: string): Promise<string | null>
             } catch {
                 // noop
             }
+        }
+
+        // 🚀 [OPFS Recovery] 手机端浏览器 OPFS 恢复兜底 (原图)
+        try {
+            const { isOPFSAvailable, getOPFSBlobUrl } = await import('./opfsService');
+            if (isOPFSAvailable()) {
+                const blobURL = await getOPFSBlobUrl(id, 'image');
+                if (blobURL) {
+                    memoryCache.set(id, blobURL);
+                    fetch(blobURL)
+                        .then(res => res.blob())
+                        .then(blob => {
+                            const saveObject: StoredImageRecord = {
+                                id,
+                                quality: 'original',
+                                timestamp: Date.now(),
+                                protected: true,
+                                blob
+                            };
+                            openDB().then(db => {
+                                const tx = db.transaction(IMAGES_STORE, 'readwrite');
+                                tx.objectStore(IMAGES_STORE).put(saveObject);
+                            }).catch(() => {});
+                        })
+                        .catch(() => {});
+                    return blobURL;
+                }
+            }
+        } catch {
+            // noop
         }
     } catch {
         // noop

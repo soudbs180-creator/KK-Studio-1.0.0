@@ -1238,6 +1238,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             console.log(`[CanvasContext] Saved ORIGINAL for ${storageId} to IndexedDB cache`);
                         } else {
                             console.debug(`[CanvasContext] Skip ORIGINAL IDB save for transient blob ${storageId}`);
+                            if (previewSource) {
+                                await saveOriginalImage(storageId, previewSource);
+                                console.log(`[CanvasContext] Saved ORIGINAL from preview source for ${storageId} to IndexedDB cache`);
+                            }
                         }
 
                         // [Optimization] Generate thumbnails in a Web Worker to avoid blocking the main thread.
