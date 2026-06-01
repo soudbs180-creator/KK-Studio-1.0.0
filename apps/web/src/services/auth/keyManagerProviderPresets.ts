@@ -134,7 +134,7 @@ export const PROVIDER_PRESETS: Record<string, KeyManagerProviderPreset> = {
     },
     'wuyinkeji-google-omni': {
         name: '速创 api',
-        baseUrl: 'https://api.wuyinkeji.com/api/async/',
+        baseUrl: 'https://api.wuyinkeji.com/api/async/image_nanoBanana2',
         models: ['video_google_omni', 'image_nanoBanana2', 'video_wan2.6', 'video_vidu', 'video_omni'],
         format: 'openai',
         icon: '速'
