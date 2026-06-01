@@ -1444,10 +1444,101 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
     }
 
+    private async chatWuyinCustom(options: ChatOptions, keySlot: KeySlot): Promise<string> {
+        const lastMessage = [...options.messages].reverse().find((m) => m.role === 'user');
+        const userInput = lastMessage ? lastMessage.content : '';
+        const modelId = options.modelId || 'gemini-3-pro';
+
+        const url = 'https://api.wuyinkeji.com/api/chat/index';
+        const params = new URLSearchParams();
+        params.append('content', userInput);
+        params.append('model', modelId);
+        params.append('stream', 'false');
+
+        const headers: Record<string, string> = {
+            'Authorization': String(keySlot.key || '').trim(),
+            'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
+        };
+
+        const requestBodyPreview = params.toString();
+        const requestPath = '/api/chat/index';
+
+        const response = await this.fetchWithTimeout(url, {
+            method: 'POST',
+            headers,
+            body: params.toString(),
+            signal: options.signal
+        }, this.getTimeoutMs(keySlot, 120000), 1);
+
+        const raw = await response.text().catch(() => '');
+        if (!response.ok) {
+            const status = response.status;
+            let errorMessage = `HTTP ${status}`;
+            if (status === 404 || raw.toLowerCase().includes('<!doctype html>') || raw.toLowerCase().includes('<html>')) {
+                errorMessage = '请求地址错误 (HTTP 404 / HTML)';
+            } else if (status === 401 || status === 403) {
+                errorMessage = 'Authorization 密钥错误或权限不足';
+            } else if (status === 400 || status === 422) {
+                errorMessage = 'content 或 model 参数缺失或格式错误';
+            } else {
+                errorMessage = raw.slice(0, 500) || `请求失败 (${status})`;
+            }
+
+            keyManager.reportCallResult(keySlot.id, false, errorMessage);
+            throw buildOpenAICompatibleHttpError({
+                message: errorMessage,
+                status: response.status,
+                requestPath,
+                requestBody: requestBodyPreview,
+                responseBody: raw.slice(0, 1600),
+                provider: keySlot.provider,
+            });
+        }
+
+        let payload: any = {};
+        try {
+            payload = raw ? JSON.parse(raw) : {};
+        } catch {
+            throw buildOpenAICompatibleHttpError({
+                message: '速创 API 响应非 JSON 格式',
+                requestPath,
+                requestBody: requestBodyPreview,
+                responseBody: raw.slice(0, 1600),
+                provider: keySlot.provider,
+            });
+        }
+
+        // 提取模型回复内容
+        let textPreview = '';
+        if (typeof payload === 'string') {
+            textPreview = payload;
+        } else if (payload && typeof payload === 'object') {
+            textPreview = payload.content || payload.text || payload.message || 
+                          payload.data?.content || payload.data?.text || 
+                          payload.data?.message || '';
+            if (!textPreview) {
+                textPreview = JSON.stringify(payload);
+            }
+        }
+
+        keyManager.reportCallResult(keySlot.id, true);
+        return textPreview;
+    }
+
+    private async chatStreamWuyinCustom(options: ChatOptions, keySlot: KeySlot): Promise<void> {
+        const content = await this.chatWuyinCustom(options, keySlot);
+        if (content && options.onStream) {
+            options.onStream(content);
+        }
+    }
+
     private async chatWithCompatibleResponses(options: ChatOptions, keySlot: KeySlot): Promise<string> {
+        const runtime = this.resolveChannelRuntime(keySlot.baseUrl || '', keySlot, options.modelId);
+        if (runtime.strategyId === 'wuyinkeji') {
+            return this.chatWuyinCustom(options, keySlot);
+        }
         this.assertOpenAICompatibleRuntimeBaseUrl(keySlot, 'chat');
         const baseUrl = this.buildOpenAICompatibleBaseUrl(keySlot.baseUrl);
-        const runtime = this.resolveChannelRuntime(keySlot.baseUrl || '', keySlot, options.modelId);
         const chatTarget = this.buildOpenAICompatRequestTarget(buildOpenAIEndpoint(baseUrl, '/chat/completions'), keySlot, {
             includeJsonContentType: true,
             includeAccept: false,
@@ -1521,9 +1612,12 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
     }
 
     private async chatStreamWithCompatibleResponses(options: ChatOptions, keySlot: KeySlot): Promise<void> {
+        const runtime = this.resolveChannelRuntime(keySlot.baseUrl || '', keySlot, options.modelId);
+        if (runtime.strategyId === 'wuyinkeji') {
+            return this.chatStreamWuyinCustom(options, keySlot);
+        }
         this.assertOpenAICompatibleRuntimeBaseUrl(keySlot, 'chat');
         const baseUrl = this.buildOpenAICompatibleBaseUrl(keySlot.baseUrl);
-        const runtime = this.resolveChannelRuntime(keySlot.baseUrl || '', keySlot, options.modelId);
         const chatTarget = this.buildOpenAICompatRequestTarget(buildOpenAIEndpoint(baseUrl, '/chat/completions'), keySlot, {
             includeJsonContentType: true,
             includeAccept: false,

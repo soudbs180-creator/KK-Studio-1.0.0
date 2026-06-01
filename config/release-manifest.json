@@ -1,7 +1,7 @@
 {
   "appName": "KK Studio",
-  "version": "1.5.1",
-  "displayVersion": "v1.5.1",
+  "version": "1.5.2",
+  "displayVersion": "v1.5.2",
   "releaseDate": "2026-06-01",
   "releaseNotes": [
     "Adapted sidebar and provider logos to light/dark themes, optimizing dark mode visual hierarchy.",

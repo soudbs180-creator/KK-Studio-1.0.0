@@ -1,7 +1,7 @@
 {
   "appName": "KK Studio",
-  "version": "1.5.1",
-  "displayVersion": "v1.5.1",
+  "version": "1.5.2",
+  "displayVersion": "v1.5.2",
   "buildTime": "2026-06-01T11:00:00.000Z",
   "releaseDate": "2026-06-01",
   "releaseNotes": [
@@ -12,8 +12,8 @@
     "verified kkai.plus same-origin API workaround."
   ],
   "channel": "stable",
-  "packageFile": "KK-Studio-Portable-1.5.1.zip",
-  "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.5.1/KK-Studio-Portable-1.5.1.zip",
+  "packageFile": "KK-Studio-Portable-1.5.2.zip",
+  "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.5.2/KK-Studio-Portable-1.5.2.zip",
   "sha256": "9bce82c7a9bb2a74d0f14648b6093050352c116b3bcc50f43b6c2c15bb777316",
   "size": 52917247
 }

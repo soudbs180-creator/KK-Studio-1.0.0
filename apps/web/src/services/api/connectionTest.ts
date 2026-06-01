@@ -319,6 +319,97 @@ async function runClaudeMessagesTest(cleanBase: string, config: ConnectionConfig
   });
 }
 
+async function runWuyinCustomChatTest(
+  cleanBase: string,
+  config: ConnectionConfig
+): Promise<TestResult> {
+  const startTime = Date.now();
+  const resolved = resolveConfig(config);
+  const modelId = getModelId(resolved);
+
+  try {
+    const url = 'https://api.wuyinkeji.com/api/chat/index';
+    const params = new URLSearchParams();
+    params.append('content', 'Test connection');
+    params.append('model', modelId || 'gemini-3-pro');
+    params.append('stream', 'false');
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': String(resolved.apiKey || '').trim(),
+        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
+      },
+      body: params.toString(),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    const elapsed = Date.now() - startTime;
+    const responseText = await response.text().catch(() => '');
+
+    if (!response.ok) {
+      const status = response.status;
+      let errMsg = `HTTP ${status}`;
+      if (status === 404 || responseText.toLowerCase().includes('<!doctype html>') || responseText.toLowerCase().includes('<html>')) {
+        errMsg = '请求地址错误 (HTTP 404 / HTML)';
+      } else if (status === 401 || status === 403) {
+        errMsg = 'Authorization 密钥错误或权限不足';
+      } else if (status === 400 || status === 422) {
+        errMsg = 'content 或 model 参数缺失或格式错误';
+      } else {
+        errMsg = responseText.slice(0, 500) || `请求失败 (${status})`;
+      }
+      return {
+        success: false,
+        message: `测试连接失败: ${errMsg}`,
+        details: { status, text: responseText.slice(0, 200) },
+        responseTime: elapsed,
+      };
+    }
+
+    let result: any = {};
+    try {
+      result = responseText ? JSON.parse(responseText) : {};
+    } catch {
+      return {
+        success: false,
+        message: '速创 API 响应非 JSON 格式',
+        details: { text: responseText.slice(0, 200) },
+        responseTime: elapsed,
+      };
+    }
+
+    let textPreview = '';
+    if (typeof result === 'string') {
+      textPreview = result;
+    } else if (result && typeof result === 'object') {
+      textPreview = result.content || result.text || result.message || 
+                    result.data?.content || result.data?.text || 
+                    result.data?.message || '';
+      if (!textPreview) {
+        textPreview = JSON.stringify(result);
+      }
+    }
+
+    return {
+      success: true,
+      message: '速创 API 连接成功',
+      details: {
+        model: modelId,
+        responseFormat: 'wuyin-custom-chat',
+        responsePreview: String(textPreview).slice(0, 100)
+      },
+      responseTime: elapsed,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      message: `连接失败: ${error?.message || 'Unknown error'}`,
+      responseTime: Date.now() - startTime,
+    };
+  }
+}
+
 /**
  * Tests the active protocol path without creating billed image/video jobs.
  */
@@ -330,6 +421,10 @@ export async function testCherryConnection(config: ConnectionConfig): Promise<Te
     const cleanBase = getCleanBaseUrl(resolved.baseUrl);
     const modelId = getModelId(resolved);
     const runtime = resolveConnectionRuntime(resolved, cleanBase);
+
+    if (runtime.strategyId === 'wuyinkeji' && !isVideoModel(modelId)) {
+      return runWuyinCustomChatTest(cleanBase, resolved);
+    }
     const nativeGemini = runtime.protocolFamily === 'gemini-native';
     const nativeClaude = runtime.protocolFamily === 'claude-native';
     const documentedModels = getDocumentedStaticModelsForProvider(runtime.strategyId);

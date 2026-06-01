@@ -132,6 +132,8 @@ function createApp() {
   });
   app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
+  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
   app.use('/webhook', webhookRouter);
   app.use('/api', userRouter);
   app.use('/api', adminRouter);

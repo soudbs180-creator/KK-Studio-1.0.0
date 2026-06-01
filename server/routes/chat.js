@@ -10,9 +10,9 @@ const { z } = require('zod');
 const { verifyJWT, signJWT } = require('../lib/jwt');
 const { getPool } = require('../lib/db');
 const credits = require('../lib/credits');
+const BackendDispatcher = require('../lib/dispatcher'); // 引入统一派发器
 
 const router = express.Router();
-const isTestRun = process.env.NODE_ENV === 'test' || process.argv.some((arg) => arg.includes('test'));
 
 const ChatMessageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant']),
@@ -21,6 +21,7 @@ const ChatMessageSchema = z.object({
 
 const ChatRequestSchema = z.object({
   messages: z.array(ChatMessageSchema).min(1).max(40),
+  model: z.string().optional(), // 支持模型选择传递
   creditSettlement: z.enum(['server', 'client']).optional(),
   executionLane: z.enum(['local-user-api', 'cloud-credit-model']).optional(),
 });
@@ -82,100 +83,30 @@ router.post('/chat', async (req, res) => {
 
   res.setHeader('X-Refresh-Token', signJWT({ userId }));
 
-  const pool = getPool();
-  const operationKey = 'chat';
-  let requiredCredits = 0;
-  let currentCredits = 0;
-  let creditsDeducted = false;
-
   try {
-    if (!process.env.OPENAI_API_KEY && !isTestRun) {
-      throw new Error('[严重] OPENAI_API_KEY 未配置，服务拒绝处理对话请求');
-    }
-
-    requiredCredits = await credits.getOperationCost(pool, operationKey);
-    const availableCredits = await credits.getUserCredits(userId);
-    if (availableCredits < 0) {
-      return res.status(401).json({ error: 'User not found.' });
-    }
-    if (availableCredits < requiredCredits) {
-      return sendInsufficientCredits(res, availableCredits, requiredCredits);
-    }
-
-    currentCredits = await credits.deductCredits(userId, requiredCredits, operationKey);
-    creditsDeducted = true;
-
     const requestId = resolveRequestId(req);
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY || 'mock-key-for-testing-only'}`,
-        'Content-Type': 'application/json',
-        'X-Client-Request-Id': requestId,
-      },
-      body: JSON.stringify({
-        model: process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini',
-        messages: parsed.data.messages,
-      }),
-    });
+    
+    // 2. 组装 Unified Internal Request payload
+    const unifiedPayload = {
+      task_type: 'chat',
+      model: parsed.data.model || process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini',
+      messages: parsed.data.messages,
+      temperature: 0.7
+    };
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenAI chat failed: ${response.status} ${errorText.slice(0, 300)}`);
-    }
-
-    const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content;
-    if (typeof content !== 'string' || content.length === 0) {
-      throw new Error('OpenAI chat returned empty content.');
-    }
-
-    const totalTokens = data?.usage?.total_tokens || 0;
-    // 整合逻辑：记录实际 token 消耗入库
-    if (totalTokens > 0) {
-      try {
-        await credits.recordTokenUsage(userId, totalTokens, `chat:${requestId}`);
-      } catch (tokenErr) {
-        console.error('[OpenAI Chat] Failed to record token usage:', tokenErr);
-      }
-    }
+    // 3. 彻底委托给统一派发器执行
+    const result = await BackendDispatcher.dispatch(userId, unifiedPayload);
 
     res.setHeader('X-Refresh-Token', signJWT({ userId }));
     res.setHeader('X-Client-Request-Id', requestId);
-    return res.json({
-      role: 'assistant',
-      content,
-      credits: currentCredits,
-      creditsCost: requiredCredits,
-      tokens: totalTokens,
-    });
+    
+    return res.json(result);
   } catch (err) {
-    console.error('[OpenAI Chat Error]', err);
-    if (!creditsDeducted && credits.isInsufficientCreditsError(err)) {
-      return sendInsufficientCredits(res, currentCredits, requiredCredits);
+    if (err.statusCode === 402) {
+      return sendInsufficientCredits(res, err.credits, err.creditsCost);
     }
-
-    let refundFailed = false;
-    if (creditsDeducted) {
-      try {
-        await credits.refundCredits(userId, requiredCredits, operationKey, currentCredits);
-      } catch (refundErr) {
-        refundFailed = true;
-        console.error('[OpenAI Chat Error] refund failed, manual intervention required:', refundErr);
-      }
-    }
-
-    if (refundFailed) {
-      return res.status(500).json({
-        error: 'Chat failed. Credit refund failed and requires manual intervention.',
-        refundStatus: 'manual_intervention_required',
-      });
-    }
-
-    return res.status(500).json({
-      error: creditsDeducted
-        ? 'Chat failed. Credits refunded.'
-        : 'Chat failed. No credits were charged.',
+    return res.status(err.statusCode || 500).json({
+      error: err.message || 'Chat failed.'
     });
   }
 });

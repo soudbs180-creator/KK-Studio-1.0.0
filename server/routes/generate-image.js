@@ -4,6 +4,8 @@
  * @description 平台代理 Google Gemini 图像生成与编辑路由。处理积分预扣、图像生成配置组装、安全过滤及错误发生时的退款链路。
  */
 
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const { z } = require('zod');
 const { getPool } = require('../lib/db');
@@ -131,18 +133,32 @@ async function handleGenerateImage(req, res) {
     }
 
     const generatedMimeType = imagePart.inlineData.mimeType || 'image/png';
-    const generatedBase64 = `data:${generatedMimeType};base64,${imagePart.inlineData.data}`;
     const generatedText = parts.find((part) => part.text)?.text ?? '';
     const actionType = isEditMode ? 'image_edit' : 'image_generation';
 
+    // 简体中文注释：P0级优化——自动创建静态资源uploads目录并落盘为物理文件，拒绝大 Base64 文本拖垮数据库
+    const uploadsDir = path.join(__dirname, '../uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const fileExt = generatedMimeType.split('/')[1] || 'png';
+    const filename = `kkai-gen-${userId}-${Date.now()}.${fileExt}`;
+    const filePath = path.join(uploadsDir, filename);
+
+    // 将 base64 数据直接写入物理磁盘文件
+    fs.writeFileSync(filePath, Buffer.from(imagePart.inlineData.data, 'base64'));
+    const staticImageUrl = `/uploads/${filename}`;
+
+    // 数据库仅记录轻量级的静态路径，行体积降为数十字节，极致高吞吐性能！
     await pool.query(
       'INSERT INTO public.generations (user_id, prompt, image_url, model, type) VALUES ($1, $2, $3, $4, $5)',
-      [userId, prompt, generatedBase64, 'gemini-2.5-flash-image', actionType]
+      [userId, prompt, staticImageUrl, 'gemini-2.5-flash-image', actionType]
     );
 
     return res.json({
       success: true,
-      image: generatedBase64,
+      image: staticImageUrl, // 直接返回静态路径，前端零解码开销！
       text: generatedText,
       credits: currentCredits,
       creditsCost: requiredCredits,

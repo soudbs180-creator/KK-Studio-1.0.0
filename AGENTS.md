@@ -27,6 +27,7 @@
 15. [错误处理与监控规范](#15-错误处理与监控规范)
 16. [提交信息与 PR 规范](#16-提交信息与-pr-规范)
 17. [禁止事项速查表](#17-禁止事项速查表)
+18. [多 Preset、多模型、多 Adapter 解耦路由黄金法则（Preset-Model-Adapter-Provider）](#18-多-preset多模型多-adapter-解耦路由黄金法则preset-model-adapter-provider)
 
 ---
 
@@ -53,7 +54,7 @@
 
 ### 1.2 项目当前版本
 
-- 当前稳定版本：**v1.5.1**
+- 当前稳定版本：**v1.5.2**
 - 发布渠道：`release/publish/stable/`
 - 版本标签格式：`vX.Y.Z`（遵循语义化版本 SemVer）
 
@@ -641,7 +642,7 @@ cd migrations && psql $DATABASE_URL -f NNN_xxx.sql
  * @description AI 图像生成路由。负责积分扣减、Gemini API 调用、
  *              安全过滤捕获与失败退款的完整流程。
  * @author KK-Studio Team
- * @version 1.5.1
+ * @version 1.5.2
  */
 ```
 
@@ -1020,9 +1021,109 @@ style(web): 适配侧边栏 Provider 图标亮/暗主题
 | 🟡 | UI 使用硬编码颜色（非 Token） | P2 主题失效 |
 | 🟡 | 间距不遵循 2px 倍数栅格（非偶数间距） | P3 设计不一致 |
 | 🟡 | 无 JSDoc 注释的导出函数 | P3 可维护性 |
+| 🔴 | 在 Preset（预设）配置中定义 API URL、Headers 或鉴权密钥等 HTTP 请求细节 | P0 架构越权/信息泄露 |
+| 🔴 | 绕过 Model/Adapter 注册表，在业务逻辑中硬编码发送非标 API 请求 | P0 架构越权/不可维护 |
+| 🔴 | 通过模型名称模糊匹配（如 `gemini`）在运行时推测并强行匹配 API 协议 | P1 架构错位/请求失败 |
+| 🔴 | 在用户切换模型或 Preset 之后，复用前一个 Adapter 遗存的 Request Body | P1 状态污染/接口报错 |
 
 ---
 
-> **最后更新：** 2026-06-01 | **版本：** v1.5.1
+## 18. 多 Preset、多模型、多 Adapter 解耦路由黄金法则（Preset-Model-Adapter-Provider）
+
+> **AI 极速理解契约 (System Prompt Friendly)**:
+> 本章旨在解决“官方直连”、“第三方中转”及“高度非标定制”等多元化渠道和模型预设的物理请求路由混乱痛点。所有层级职责泾渭分明，绝不混淆。
+
+### 18.1 层级责任与核心边界
+
+系统必须严格执行五层递进流转公式：
+`Preset (预设) -> Model (模型) -> Adapter (适配器) -> Provider (渠道) -> HTTP Request`
+
+#### 18.1.1 预设层 (Preset Layer)
+- **职责**: 描述 AI 智能体的任务、角色、行为特征和参数偏好。**决定“要做什么 (What to do)”**。
+- **允许字段**: `preset_id`, `preset_name`, `system_prompt`, `default_model`, `temperature`, `max_tokens`, `top_p`, `tools`, `task_type`, `output_style`, `allowed_models`, `allowed_providers`, `allowed_adapters`, `fallback_models`。
+- **🚫 严禁字段**: 任何 API 网络细节（URL、HTTP 方法、Headers、Body 模板、Content-Type、鉴权格式、错误映射、ApiKey）。
+- **硬性红线**: 严禁将 HTTP URL 等接口特征泄露至 Preset 层。Preset 中的 HTTP 通信参数一律视为高危越权配置，系统将默认抛出异常并予以拦截。
+
+#### 18.1.2 模型层 (Model Layer)
+- **职责**: 决定“使用哪一个模型实体 (Which model to use)”。声明模型基本属性、物理别名，并建立与特定 Adapter 和 Provider 的绑定关系。
+- **允许字段**: `model_id`, `display_name`, `real_model_name` (目标渠道的物理模型别名), `provider_id`, `adapter_id`, `model_type`, `capabilities`, `context_window`, `supports_stream`, `default_parameters`。
+- **🚫 严禁字段**: 任何 API 密钥、私密凭证、HTTP 请求头和复杂的请求体 payload 结构。
+- **硬性红线**: **模型名称 (Model ID) 绝对不允许决定 API 调用协议**。请求格式和通信协议必须且只能由 `adapter_id` 唯一确定。
+
+#### 18.1.3 适配器层 (Adapter Layer)
+- **职责**: 决定“如何拼装和发起请求 (How to request)”。这是系统中**唯一被授权决定和拼装物理 HTTP 细节**的层级。
+- **允许字段**: `adapter_id`, `protocol_type` (如 json, custom_urlencoded), `method`, `url_template`, `auth_scheme`, `header_template`, `body_template`、各种 mapping（如 `input_mapping`, `system_prompt_mapping`, `stream_mapping`）、`response_extractors` (内容提取 JSON 路径) 以及 `error_mapping` (网络状态码翻译)。
+
+#### 18.1.4 渠道层 (Provider Layer)
+- **职责**: 决定“使用什么服务和网络凭证 (Which service and credentials to use)”。维护底层通信 URL 和鉴权密钥引用。
+- **允许字段**: `provider_id`, `provider_name`, `base_url`, `api_key_ref` (环境变量密钥引用), `enabled`, `timeout`, `retry_policy`, `rate_limit`, `billing_status`。
+- **🚫 严禁字段**: Preset 提示词、业务级数据转换映射、响应字段提取规则。
+
+---
+
+### 18.2 统一内部请求对象（Unified Internal Request）
+
+在任何 Preset 执行前，业务上下文必须统一转换为包含完整信息的标准 JSON 数据对象。所有 Adapter 必须仅从本对象中读取参数进行转换拼装：
+
+```json
+{
+  "preset_id": "current_preset",
+  "task_type": "chat",
+  "system_prompt": "Current preset system prompt",
+  "user_input": "User input content",
+  "messages": [
+    { "role": "system", "content": "System prompt text" },
+    { "role": "user", "content": "User input text" }
+  ],
+  "model": "current_model_id",
+  "real_model_name": "provider-real-model-name",
+  "temperature": 0.7,
+  "max_tokens": 2000,
+  "stream": false,
+  "files": [],
+  "images": [],
+  "tools": [],
+  "metadata": {
+    "source_preset": "current_preset",
+    "provider_id": "provider_id",
+    "adapter_id": "adapter_id"
+  }
+}
+```
+
+---
+
+### 18.3 强制路由执行流程 (Routing Flow)
+
+所有 AI 请求必须单向且严格执行以下 14 步标准流控，严禁短路或跨层调用：
+1. 读取当前的 Preset。
+2. 提取 `preset.default_model` 并校验其在 `Model Registry` 中存在。
+3. 从模型中读取其静态绑定的 `provider_id` 与 `adapter_id`。
+4. 校验 `preset.allowed_models`、`preset.allowed_providers` 及 `preset.allowed_adapters` 白名单。
+5. 若所选模型、渠道或适配器未在 Preset 的允许范围内，**立即阻断请求**。
+6. 读取绑定的 Provider 网络端点与鉴权凭证配置。
+7. 校验 Provider 处于启用状态。
+8. 读取绑定的 Adapter 转换配置。
+9. 通过 Adapter 的 mappings 与 templates 将统一内部请求对象转换为真实的 HTTP 发送报文。
+10. 发起 HTTP 网络请求。
+11. 取得响应。
+12. 使用 `adapter.response_extractors` 依次轮询解析并提取模型最终的文本回复内容。
+13. 若 HTTP 请求不成功，通过 `adapter.error_mapping` 解析状态码以输出标准报错。
+14. 返回标准化的最终回复给用户。
+
+---
+
+### 18.4 系统标准支持的 Adapter 预设模式
+
+为降低扩充成本，系统预设并支持以下五类通信协议：
+- `openai_chat_completions`: 兼容标准 OpenAI Chat 协议（JSON body, `/v1/chat/completions` 和 Bearer 认证）。
+- `openai_responses`: 兼容标准 OpenAI Responses 协议。
+- `claude_messages`: 兼容 Anthropic Native Messages 格式（x-api-key 鉴权，system 顶层字段）。
+- `gemini_generate_content`: 兼容 Google 原生多模态 generateContent 结构（Query key 鉴权，contents/parts 结构）。
+- `custom_form_urlencoded`: 兼容如速创 API 般需要 `x-www-form-urlencoded` 表单参数、指定 `content`/`model` 扁平参数、且强制非流式（`stream=false`）的扁平响应接口。
+
+---
+
+> **最后更新：** 2026-06-02 | **版本：** v1.5.2
 > **维护者：** KK-Studio Team
 > 本文件随项目迭代持续更新，每次重大架构变更后必须同步修订。
