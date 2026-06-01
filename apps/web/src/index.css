@@ -16651,5 +16651,65 @@ body:not(.dark-mode) .settings-model-center-route__btn-action--danger span {
   margin-top: 6px !important;
 }
 
+/* 🚀 强制模型库组件在所有平台和渲染阶段都拉起高保真磨砂效果 */
+.model-library-surface {
+  border: 1px solid var(--frost-card-framework-border) !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: blur(32px) saturate(1.8) !important;
+  backdrop-filter: blur(32px) saturate(1.8) !important;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* 🚀 桌面端 Portal 渲染的模型库下拉面板 — 高清磨砂效果
+   由于通过 ReactDOM.createPortal 渲染到 document.body，已完全脱离 .input-bar 的 DOM 合成层，
+   backdrop-filter 可以独立生效，无需再禁用父级的 backdrop-filter。 */
+
+/* 🚀 当模型列表打开时，暂时关闭 input-bar 的 backdrop-filter 以避开 Chrome 对嵌套 backdrop-filter 的合成层限制
+   （仅影响移动端仍使用嵌套 DOM 的场景，桌面端已改用 Portal） */
+.input-bar.has-open-dropdown {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* 🚀 个人中心模态框（UserProfileModal）重构的弹性弹出效果 */
+.kk-user-profile-modal-desktop-animate {
+  animation: modal-bounce-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.kk-user-profile-modal-mobile-animate {
+  animation: mobile-sheet-slide-up-elastic 0.42s cubic-bezier(0.175, 0.885, 0.32, 1.1) forwards;
+}
+
+@keyframes modal-bounce-in {
+  0% {
+    transform: scale(0.92) translate3d(0, 16px, 0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.015) translate3d(0, -3px, 0);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1) translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+
+@keyframes mobile-sheet-slide-up-elastic {
+  0% {
+    transform: translateY(100%);
+    opacity: 0.7;
+  }
+  85% {
+    transform: translateY(-6px);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 
 

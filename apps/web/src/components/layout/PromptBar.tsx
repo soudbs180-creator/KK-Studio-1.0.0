@@ -243,18 +243,19 @@ function isLightSeriesTextColor(textColor: string | undefined): boolean {
 // 🚀 [优化] 模型库下拉面板的毛玻璃磨砂效果
 // 提高模糊半径并进行微弱的不透明背景混合，确保在画布有复杂高对比度图像节点透过来时，依旧保持出色的文字对比度和可读性
 const modelLibrarySurfaceStyle: React.CSSProperties = {
-    background: 'color-mix(in srgb, var(--frost-card-framework-bg) 24%, transparent)',
+    background: 'color-mix(in srgb, var(--frost-card-framework-bg) 72%, transparent)',
     borderColor: 'var(--frost-card-framework-border)',
-    boxShadow: 'var(--frost-card-framework-shadow)',
-    WebkitBackdropFilter: 'blur(30px) saturate(1.8)',
-    backdropFilter: 'blur(30px) saturate(1.8)',
-    transform: 'translateZ(0)',
-    willChange: 'backdrop-filter',
+    boxShadow: 'none',
+    WebkitBackdropFilter: 'blur(32px) saturate(1.8)',
+    backdropFilter: 'blur(32px) saturate(1.8)',
 };
 
 const modelLibrarySearchSurfaceStyle: React.CSSProperties = {
-    ...modelLibrarySurfaceStyle,
-    boxShadow: 'var(--frost-card-sub-shadow)',
+    background: 'color-mix(in srgb, var(--frost-card-framework-bg) 68%, transparent)',
+    borderColor: 'var(--frost-card-framework-border)',
+    boxShadow: 'none',
+    WebkitBackdropFilter: 'blur(28px) saturate(1.6)',
+    backdropFilter: 'blur(28px) saturate(1.6)',
 };
 
 function getCreditModelFlatStyle(
@@ -3698,7 +3699,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         return (
             <div
                 id="prompt-bar-container"
-                className={`input-bar ios-mobile-prompt ${isModelMenuOpen ? 'has-open-dropdown' : ''} transition-all duration-300 !overflow-visible w-full max-w-full z-[800]`}
+                className={`input-bar ios-mobile-prompt ${(isModelMenuOpen || showOptionsPanel) ? 'has-open-dropdown' : ''} transition-all duration-300 !overflow-visible w-full max-w-full z-[800]`}
                 onClick={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
                 style={{
@@ -4542,7 +4543,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         <>
             <div
                 id="prompt-bar-container"
-                className={`input-bar ${isMobile ? 'ios-mobile-prompt' : ''} ${isModelMenuOpen ? 'has-open-dropdown' : ''} transition-all duration-300 !overflow-visible ${isMobile && mobileShellMode === 'embedded' ? 'w-full max-w-full' : 'w-[calc(100vw-32px)] max-w-[760px]'}`}
+                className={`input-bar ${isMobile ? 'ios-mobile-prompt' : ''} ${(isModelMenuOpen || showOptionsPanel) ? 'has-open-dropdown' : ''} transition-all duration-300 !overflow-visible ${isMobile && mobileShellMode === 'embedded' ? 'w-full max-w-full' : 'w-[calc(100vw-32px)] max-w-[760px]'}`}
                 onDragEnter={handleDragEnter}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -5486,13 +5487,25 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                       </div>
                                      </>
                                  )}
-                                {isModelMenuOpen && !isMobile && (
+                                {isModelMenuOpen && !isMobile && ReactDOM.createPortal(
                                     <div
                                         ref={modelDropdownRef}
-                                        className="absolute left-1/2 bottom-full mb-3 z-50 -translate-x-1/2 animate-fadeIn origin-bottom"
+                                        className="fixed z-[10000] animate-fadeIn origin-bottom"
+                                        style={(() => {
+                                            // 基于锚点元素动态计算 Portal 的 fixed 定位坐标
+                                            const anchorEl = modelMenuAnchorRef.current;
+                                            if (!anchorEl) return { top: 0, left: 0 };
+                                            const rect = anchorEl.getBoundingClientRect();
+                                            return {
+                                                left: rect.left + rect.width / 2,
+                                                top: rect.top - 12, // mb-3 ≈ 12px 间距
+                                                transform: 'translateX(-50%) translateY(-100%)',
+                                            };
+                                        })()}
                                     >
                                         {modelDropdownContent}
-                                    </div>
+                                    </div>,
+                                    document.body
                                 )}
                             </div >
 

@@ -633,7 +633,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       />
 
       <div
-        className={`fixed inset-0 z-[10002] flex justify-center bg-black/55 backdrop-blur-sm ${
+        className={`fixed inset-0 z-[10002] flex justify-center bg-black/45 ${
           isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-3 py-4'
         }`}
         onClick={resetAndClose}
@@ -641,15 +641,15 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         <div
           className={`kk-user-profile-modal w-full overflow-hidden border ${
             isMobile
-              ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none'
-              : 'max-w-[860px] rounded-2xl'
+              ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none kk-user-profile-modal-mobile-animate'
+              : 'max-w-[860px] rounded-2xl kk-user-profile-modal-desktop-animate'
           }`}
           style={{
-            background: 'var(--frost-card-framework-bg)',
+            background: 'color-mix(in srgb, var(--frost-card-framework-bg) 72%, transparent)',
             borderColor: 'var(--frost-card-framework-border)',
-            boxShadow: 'var(--frost-card-framework-shadow)',
-            backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
-            WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+            boxShadow: 'var(--frost-card-framework-shadow), 0 20px 50px rgba(0,0,0,0.3)',
+            backdropFilter: 'blur(32px) saturate(1.8)',
+            WebkitBackdropFilter: 'blur(32px) saturate(1.8)',
           }}
           onClick={(event) => event.stopPropagation()}
         >

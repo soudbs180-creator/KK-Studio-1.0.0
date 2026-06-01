@@ -18,11 +18,9 @@ interface SidebarProps {
 }
 
 const frostedSidebarSubSurfaceStyle: React.CSSProperties = {
-    background: 'var(--frost-card-sub-bg)',
+    background: 'color-mix(in srgb, var(--frost-card-sub-bg) 65%, transparent)',
     border: '1px solid var(--frost-card-sub-border)',
-    boxShadow: 'var(--frost-card-sub-shadow)',
-    WebkitBackdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
-    backdropFilter: 'blur(var(--frost-card-sub-blur)) saturate(1.08)',
+    boxShadow: 'none',
 };
 
 const Sidebar: React.FC<SidebarProps> = ({
