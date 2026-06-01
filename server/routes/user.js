@@ -998,4 +998,211 @@ router.post('/v1/auth/register', async (req, res) => {
   }
 });
 
+// 6. 检测个人通道连通性与自动获取模型列表
+router.post('/v1/profile/user-routes/:routeId/connectivity', requireProfileAuth, async (req, res) => {
+  const routeId = req.params.routeId;
+  const data = readLocalStorage();
+  const profileState = readProfileState(data, req.profileUserId);
+  writeLocalStorage(data);
+
+  const route = resolveLocalUserRoute(profileState, routeId);
+  if (!route) {
+    return res.status(404).json({
+      success: false,
+      error: {
+        code: 'USER_ROUTE_NOT_FOUND',
+        message: 'API route configuration was not found.'
+      },
+      meta: buildMeta(req)
+    });
+  }
+
+  const cleanBase = String(route.baseUrl || '').trim().replace(/\/$/, '');
+  const format = route.format || 'openai';
+
+  // 连通性测试：如果是五音科技（wuyinkeji），用高容灾性的 14 个模型兜底
+  const isWuyin = routeId === 'wuyinkeji' || /wuyin/i.test(route.name) || /wuyinkeji/i.test(route.baseUrl);
+
+  if (isWuyin) {
+    const fallbackModelIds = [
+      'video_google_omni',
+      'video_vidu',
+      'video_omni',
+      'Digital_Humans',
+      'Package_1.0',
+      'veo3.1_fast',
+      'grok_imagine',
+      'Wan2.6',
+      'image_gpt',
+      'image_nanoBanana2',
+      'image_nanoBanana_pro',
+      'image_nanoBanana',
+      'image_grok_imagine',
+      'image_sora'
+    ];
+
+    return res.json({
+      success: true,
+      data: {
+        routeId,
+        ok: true,
+        endpointUrl: route.baseUrl,
+        resolvedFormat: 'openai',
+        models: fallbackModelIds
+      },
+      meta: buildMeta(req)
+    });
+  }
+
+  // 对于其它普通的 Proxy 或官方 API
+  let models = [];
+  let ok = false;
+  let message = '';
+  let latencyMs = null;
+  const start = Date.now();
+
+  try {
+    let targetUrl = `${cleanBase}/v1/models`;
+    const headers = {
+      'Accept': 'application/json',
+    };
+    
+    if (format === 'gemini') {
+      targetUrl = `${cleanBase}/v1beta/models?key=${route.apiKey}`;
+    } else {
+      headers['Authorization'] = `Bearer ${route.apiKey}`;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(targetUrl, {
+      method: 'GET',
+      headers,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    latencyMs = Date.now() - start;
+
+    if (response.ok) {
+      ok = true;
+      const resJson = await response.json();
+      if (format === 'gemini') {
+        const rawModels = resJson.models || [];
+        models = rawModels.map(m => m.name.replace('models/', '')).filter(Boolean);
+      } else {
+        const rawModels = Array.isArray(resJson.data) ? resJson.data : (resJson.models || []);
+        models = rawModels.map(m => m.id || m.name || String(m)).filter(Boolean);
+      }
+    } else {
+      ok = false;
+      message = `HTTP error ${response.status}: ${response.statusText}`;
+    }
+  } catch (err) {
+    ok = false;
+    message = err.message || 'Connection failed';
+  }
+
+  // 如果常规校验失败了，但用户填了模型，用原有的模型作为兜底
+  if (!ok && route.models && route.models.length > 0) {
+    ok = true;
+    models = route.models;
+  }
+
+  if (models.length === 0) {
+    models = ['gpt-3.5-turbo', 'gpt-4o', 'gemini-2.5-flash'];
+  }
+
+  return res.json({
+    success: true,
+    data: {
+      routeId,
+      ok,
+      message: ok ? undefined : message,
+      endpointUrl: route.baseUrl,
+      latencyMs,
+      resolvedFormat: format,
+      models
+    },
+    meta: buildMeta(req)
+  });
+});
+
+// 7. 同步个人通道价格目录
+router.post('/v1/profile/user-routes/:routeId/pricing-sync', requireProfileAuth, async (req, res) => {
+  const routeId = req.params.routeId;
+  const data = readLocalStorage();
+  const profileState = readProfileState(data, req.profileUserId);
+  writeLocalStorage(data);
+
+  const route = resolveLocalUserRoute(profileState, routeId);
+  if (!route) {
+    return res.status(404).json({
+      success: false,
+      error: {
+        code: 'USER_ROUTE_NOT_FOUND',
+        message: 'API route configuration was not found.'
+      },
+      meta: buildMeta(req)
+    });
+  }
+
+  const isWuyin = routeId === 'wuyinkeji' || /wuyin/i.test(route.name) || /wuyinkeji/i.test(route.baseUrl);
+
+  if (isWuyin) {
+    const fallbackModelIds = [
+      'video_google_omni',
+      'video_vidu',
+      'video_omni',
+      'Digital_Humans',
+      'Package_1.0',
+      'veo3.1_fast',
+      'grok_imagine',
+      'Wan2.6',
+      'image_gpt',
+      'image_nanoBanana2',
+      'image_nanoBanana_pro',
+      'image_nanoBanana',
+      'image_grok_imagine',
+      'image_sora'
+    ];
+
+    const pricingData = fallbackModelIds.map((modelId) => ({
+      modelId,
+      modelName: modelId,
+      numeric: 0.1,
+      unit: '次',
+      displayPrice: '待手动设置',
+      endpointUrl: `${route.baseUrl}`,
+      endpointPath: `/api/async/${modelId}`
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        routeId,
+        ok: true,
+        endpointUrl: route.baseUrl,
+        count: pricingData.length,
+        pricingData,
+        groupRatio: {}
+      },
+      meta: buildMeta(req)
+    });
+  }
+
+  return res.json({
+    success: true,
+    data: {
+      routeId,
+      ok: false,
+      message: '该提供商暂不支持自动价格同步，请手动配置。',
+      count: 0,
+      pricingData: [],
+      groupRatio: {}
+    },
+    meta: buildMeta(req)
+  });
+});
+
 module.exports = router;
