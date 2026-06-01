@@ -4076,7 +4076,8 @@ export async function autoDetectAndConfigureModels(
     }
 
     if (models.length === 0 && runtime.strategyId === 'wuyinkeji' && baseUrl) {
-        const catalog = selectWuyinCatalogModels(baseUrl, await fetchWuyinPricingCatalog(baseUrl));
+        // 简体中文注释：对于五音科技，直接拉取全量模型的最新计费，不再根据 baseUrl 里的模型后缀做过滤
+        const catalog = await fetchWuyinPricingCatalog(baseUrl);
         models = catalog.map((item) => item.modelId).filter(Boolean);
     } else if (models.length === 0 && resolvedFormat === 'gemini') {
         models = await fetchGeminiCompatModels(apiKey, baseUrl);

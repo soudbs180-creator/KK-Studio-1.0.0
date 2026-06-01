@@ -618,7 +618,8 @@ export async function fetchRawPricingCatalog(
     const runtime = resolveProviderRuntime({ baseUrl: cleanUrl, format });
 
     if (runtime.strategyId === 'wuyinkeji') {
-        const pricingList = selectWuyinCatalogModels(cleanUrl, await fetchWuyinPricingCatalog(cleanUrl));
+        // 简体中文注释：直接获取五音科技下的全量定价模型，不再按 baseUrl 的后缀进行过滤限制，确保获取到全部产品后缀
+        const pricingList = await fetchWuyinPricingCatalog(cleanUrl);
         const rootUrl = runtime.host === 'api.wuyinkeji.com' ? 'https://api.wuyinkeji.com' : cleanUrl;
         return {
             endpointUrl: `${rootUrl}${WUYIN_PRICE_API_PATH}`,
