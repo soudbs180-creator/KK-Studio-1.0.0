@@ -950,8 +950,36 @@ const AppContent: React.FC<AppContentProps> = () => {
           || window.location.hostname === '::1';
 
         // 3. Storage Mode Check
-        const { getStorageMode } = await import('./services/storage/storagePreference');
-        const storageMode = await getStorageMode();
+        const { getStorageMode, isMobileDevice } = await import('./services/storage/storagePreference');
+        let storageMode = await getStorageMode();
+
+        const isMobilePhone = isMobileDevice();
+
+        if (isMobilePhone) {
+          // 手机端直接默认使用 browser 存储模式，不弹出选择弹窗，且静默将其设为 'browser'
+          if (!storageMode || storageMode !== 'browser') {
+            localStorage.setItem('kk_studio_storage_mode', 'browser');
+            storageMode = 'browser';
+          }
+
+          // 向浏览器申请持久化存储，延长数据在手机浏览器的保存寿命
+          if (navigator.storage && navigator.storage.persist) {
+            navigator.storage.persist().then(granted => {
+              if (granted) {
+                console.log('[Storage] 手机浏览器已授予持久化存储权限。');
+              } else {
+                console.log('[Storage] 手机浏览器未授予持久化存储权限（可能会受系统清理影响）。');
+              }
+            }).catch(e => {
+              console.warn('[Storage] 申请持久化存储错误:', e);
+            });
+          }
+
+          // 提醒用户生成的内容需要及时下载保持，避免不必要的丢失风险
+          import('./services/system/notificationService').then(({ notify }) => {
+            notify.warning('安全提醒', '手机端数据保存在浏览器本地，请及时下载保存生成的内容，避免数据丢失风险。', { duration: 6000 });
+          }).catch(err => console.error('[App] Failed to notify mobile storage warning:', err));
+        }
 
         // 4. Tutorial Logic
         const tutorialSeen = localStorage.getItem('kk_tutorial_seen');
