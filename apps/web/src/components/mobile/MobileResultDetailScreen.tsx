@@ -280,7 +280,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
           <div className="text-[10px] uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
             {pick('结果详情', 'Result Details')} {hasGroup ? `(${currentGroupImageIndex + 1}/${entry.groupEntries!.length})` : ''}
           </div>
-          <div className="mt-1 truncate text-base font-semibold leading-6">{promptSummary}</div>
+          <div className="mt-1 truncate text-base font-semibold leading-6 select-text">{promptSummary}</div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-secondary)]">
             <span>{formatTimestamp(currentActiveEntry.timestamp)}</span>
             <span className="text-[var(--text-tertiary)]">路</span>
@@ -334,7 +334,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
           )}
 
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-4 pt-12 text-white">
-            <div className="line-clamp-2 text-lg font-semibold leading-7">{promptSummary}</div>
+            <div className="line-clamp-2 text-lg font-semibold leading-7 select-text">{promptSummary}</div>
           </div>
         </div>
 
@@ -467,7 +467,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
               <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
                 当前需求
               </div>
-              <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--text-primary)]">
+              <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--text-primary)] select-text">
                 {ecommerceRequirementText}
               </div>
             </div>
@@ -498,7 +498,7 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
 
         <div className="mt-3 rounded-[10px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3.5">
           <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">{pick('提示词', 'Prompt')}</div>
-          <div className="mt-2 whitespace-pre-wrap text-sm leading-6">{fullPrompt}</div>
+          <div className="mt-2 whitespace-pre-wrap text-sm leading-6 select-text">{fullPrompt}</div>
         </div>
 
         <div className="mt-3 rounded-[10px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/85 p-3.5">

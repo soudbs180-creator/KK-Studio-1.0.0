@@ -499,7 +499,7 @@ const MobileChatFeed: React.FC<MobileChatFeedProps> = ({
                   </span>
                 </div>
 
-                <div className="mobile-card-main__title">{promptText}</div>
+                <div className="mobile-card-main__title select-text">{promptText}</div>
 
                 <div className="mobile-card-main__meta">
                   <span>{formatTimestamp(group.timestamp)}</span>
@@ -726,7 +726,7 @@ const MobileChatFeed: React.FC<MobileChatFeedProps> = ({
                             </button>
 
                             <div className="mobile-card-sub__body">
-                              <p className="mobile-card-sub__prompt">
+                              <p className="mobile-card-sub__prompt select-text">
                                 {truncateText(image.alias || image.prompt || group.label, 74)}
                               </p>
 

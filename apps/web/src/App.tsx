@@ -977,7 +977,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
           // 提醒用户生成的内容需要及时下载保持，避免不必要的丢失风险
           import('./services/system/notificationService').then(({ notify }) => {
-            notify.warning('安全提醒', '手机端数据保存在浏览器本地，请及时下载保存生成的内容，避免数据丢失风险。', { duration: 6000 });
+            notify.warning('安全提醒', '手机端数据保存在浏览器本地，请及时下载保存生成的内容，避免数据丢失风险。');
           }).catch(err => console.error('[App] Failed to notify mobile storage warning:', err));
         }
 
@@ -1643,8 +1643,11 @@ const AppContent: React.FC<AppContentProps> = () => {
   const [selectionMenuPosition, setSelectionMenuPosition] = useState<{ x: number; y: number } | null>(null);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    if (isMobile) {
+      return;
+    }
     e.preventDefault();
-  }, []);
+  }, [isMobile]);
 
   const {
     selectionBox,
