@@ -243,11 +243,11 @@ function isLightSeriesTextColor(textColor: string | undefined): boolean {
 // 🚀 [优化] 模型库下拉面板的毛玻璃磨砂效果
 // 提高模糊半径并进行微弱的不透明背景混合，确保在画布有复杂高对比度图像节点透过来时，依旧保持出色的文字对比度和可读性
 const modelLibrarySurfaceStyle: React.CSSProperties = {
-    background: 'color-mix(in srgb, var(--frost-card-framework-bg) 92%, var(--frost-card-framework-bg-solid))',
+    background: 'color-mix(in srgb, var(--frost-card-framework-bg) 65%, transparent)',
     borderColor: 'var(--frost-card-framework-border)',
     boxShadow: 'var(--frost-card-framework-shadow)',
-    WebkitBackdropFilter: 'blur(30px) saturate(1.22)',
-    backdropFilter: 'blur(30px) saturate(1.22)',
+    WebkitBackdropFilter: 'blur(30px) saturate(1.8)',
+    backdropFilter: 'blur(30px) saturate(1.8)',
 };
 
 const modelLibrarySearchSurfaceStyle: React.CSSProperties = {
@@ -269,9 +269,9 @@ function getCreditModelFlatStyle(
         background: emphasized
             ? `linear-gradient(135deg, color-mix(in srgb, ${start} 26%, var(--frost-card-framework-bg)) 0%, color-mix(in srgb, ${end} 22%, var(--frost-card-framework-bg)) 100%)`
             : 'var(--frost-card-sub-bg)',
-        border: `1px solid ${emphasized ? 'color-mix(in srgb, var(--accent-coral) 34%, var(--frost-card-framework-border))' : 'var(--frost-card-sub-border)'}`,
+        border: `1px solid ${emphasized ? 'color-mix(in srgb, var(--accent-coral) 55%, var(--frost-card-framework-border))' : 'var(--frost-card-sub-border)'}`,
         color: usesDarkText ? 'var(--clay-ink)' : undefined,
-        boxShadow: 'none',
+        boxShadow: emphasized ? '0 0 12px rgba(244, 63, 94, 0.2)' : 'none',
         WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
         backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
     };
@@ -846,11 +846,11 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
             className={`group w-full transition-all duration-300 mx-auto cursor-pointer
             ${isExclusive
                     ? (isMobile
-                        ? `h-10 px-3 flex items-center justify-between rounded-xl flex-shrink-0 ${textColorClass} active:scale-[0.98] ${selected ? 'ring-2 ring-[color:var(--accent-coral)]' : 'opacity-80 hover:opacity-100'}`
-                        : `h-14 px-5 flex items-center justify-between rounded-full flex-shrink-0 ${textColorClass} active:scale-[0.98] ${selected ? 'ring-2 ring-[color:var(--accent-coral)] scale-[1.02]' : 'hover:scale-[1.02] opacity-80 hover:opacity-100 grayscale-[0.15] hover:grayscale-0'}`)
+                        ? `h-10 px-3 flex items-center justify-between rounded-xl flex-shrink-0 ${textColorClass} active:scale-[0.98] ${selected ? '' : 'opacity-80 hover:opacity-100'}`
+                        : `h-14 px-5 flex items-center justify-between rounded-full flex-shrink-0 ${textColorClass} active:scale-[0.98] ${selected ? 'scale-[1.02]' : 'hover:scale-[1.02] opacity-80 hover:opacity-100 grayscale-[0.15] hover:grayscale-0'}`)
                     : (isMobile
                         ? `h-10 px-3 text-left flex items-center justify-between rounded-xl transition-all bg-transparent border-transparent`
-                        : `px-2.5 py-1.5 text-left flex flex-col gap-0.5 hover:bg-black/5 dark:hover:bg-[var(--toolbar-hover)] rounded-xl transition-all border-2 ${selected ? 'bg-[var(--frost-card-sub-bg)] ring-2 ring-[color:var(--accent-coral)] border-[color:var(--accent-coral)]' : 'border-transparent opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`)}
+                        : `px-2.5 py-1.5 text-left flex flex-col gap-0.5 hover:bg-black/5 dark:hover:bg-[var(--toolbar-hover)] rounded-xl transition-all border border-transparent ${selected ? 'bg-transparent grayscale-0' : 'opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`)}
             `}
             style={isExclusive ? (selected ? activeGradientStyle : inactiveGradientStyle) : undefined}
             onMouseEnter={(event) => {
@@ -969,9 +969,9 @@ const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
 
     return (
         <div 
-            className={`relative w-full flex items-center rounded-xl border-2 transition-all select-none
+            className={`relative w-full flex items-center rounded-xl border transition-all select-none
             ${selected 
-                ? 'bg-[var(--frost-card-sub-bg)] border-[color:var(--accent-coral)] ring-2 ring-[color:var(--accent-coral)]' 
+                ? 'bg-gradient-to-r from-[var(--accent-coral)]/8 to-[var(--accent-pink)]/4 border-[var(--accent-coral)] shadow-[0_0_12px_rgba(244,63,94,0.18)]' 
                 : 'border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] hover:opacity-100 opacity-90'}`}
         >
             {/* 模型选择主体 */}
@@ -2933,7 +2933,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     }, [processFiles]);
 
     const selectedModelMeta = useMemo(() => {
-        const currentModel = availableModels.find(m => m.id === config.model) || null;
+        const currentModel = availableModels.find(m => m.id === config.model || m.id.split('@')[0] === config.model.split('@')[0]) || null;
         const resolvedCurrentSystemDisplay = currentModel?.isSystemInternal
             ? adminModelService.getModelDisplayInfo(currentModel.id, config.imageSize)
             : null;

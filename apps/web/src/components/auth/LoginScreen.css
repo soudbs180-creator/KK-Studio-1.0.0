@@ -930,6 +930,10 @@ body.auth-screen-active.auth-screen-active--light #root {
     left: auto;
     bottom: auto;
     transform: none;
+    display: flex; /* 简体中文：改为 flex 布局以支持 width 属性 */
+    width: 100%; /* 简体中文：宽度占满父容器 */
+    max-width: 410px; /* 简体中文：与登录卡片保持相同最大宽度约束，确保左右空隙一致 */
+    box-sizing: border-box;
     margin: 0 auto !important; /* 简体中文：保持在正下方水平居中 */
     background: rgba(8, 14, 26, 0.72);
     backdrop-filter: blur(12px);

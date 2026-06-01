@@ -637,11 +637,17 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
 
         {routes.length > 0 ? (
           <div className="settings-model-center-route-grid">
-            {routes.map((route) => {
+                                    {routes.map((route) => {
               const toggleLabel = route.isPaused ? pick('启用', 'Enable') : pick('暂停', 'Pause');
               const editLabel = pick('编辑', 'Edit');
               const refreshLabel = pick('刷新', 'Refresh');
               const deleteLabel = pick('删除', 'Delete');
+
+              const isReadonlyGhost = typeof window !== 'undefined' && (window as any).__KK_SETTINGS_READONLY__ === true;
+
+              // 根据状态，设置相应的状态类名
+              const statusClass = `settings-model-center-route__status-indicator--${route.statusVariant}`;
+
               return (
                 <article
                   key={route.id}
@@ -661,14 +667,21 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                   }}
                   style={{
                     '--route-accent': route.accentColor || '#38bdf8',
+                    position: 'relative',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                   } as React.CSSProperties}
                 >
-                  <div className="settings-model-center-route__header">
-                    <div className="settings-model-center-route__identity">
-                      <div
-                        className="settings-model-center-route__avatar"
-                        style={{ color: route.accentColor || 'var(--text-primary)' }}
-                      >
+                  {/* 顶部模糊光晕线 */}
+                  <div className="settings-model-center-route__glow-line" />
+
+                  {/* Header 区 */}
+                  <header className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      {/* Logo 容器 */}
+                      <div className="settings-model-center-route__logo-container">
                         <ModelLogo
                           modelId={route.recommendedModel || ''}
                           provider={route.logoName || route.title}
@@ -677,120 +690,142 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                           className="settings-model-center-route__logo"
                         />
                       </div>
-                      <div className="settings-model-center-route__copy">
-                        <div className="settings-model-center-route__title">{route.title}</div>
-                        <div className="settings-model-center-route__id-wrapper" onClick={(e) => e.stopPropagation()}>
-                          <span className="settings-model-center-route__id-label">Vendor ID:</span>
-                          <span className="settings-model-center-route__id-value">
-                            {route.id.length > 15 ? `${route.id.slice(0, 15)}...` : route.id}
-                          </span>
+
+                      {/* 标题 & ID */}
+                      <div className="min-w-0">
+                        <h1 className="settings-model-center-route__title-text">
+                          {route.title}
+                        </h1>
+                        <div className="settings-model-center-route__id-wrapper mt-1 flex items-center gap-1.5 text-[11px] leading-none" onClick={(e) => e.stopPropagation()}>
+                          <span className="truncate max-w-[100px]">ID: {route.id}</span>
                           <button
                             type="button"
-                            className="settings-model-center-route__copy-btn"
                             title={pick('复制 ID', 'Copy ID')}
+                            className="hover:text-white transition-colors duration-150 p-0.5"
                             onClick={(e) => {
                               e.stopPropagation();
                               navigator.clipboard.writeText(route.id);
-                              notify.success(pick('复制成功', 'Copied'), route.id);
+                              notify.success(pick('复制成功', 'Copied to clipboard'));
                             }}
                           >
-                            <Copy size={11} />
+                            <Copy size={11} strokeWidth={1.8} className="settings-model-center-route__id-copy-icon" />
                           </button>
                         </div>
                       </div>
                     </div>
-                    
-                    {/* 呼吸灯 Badge */}
-                    <div className={`settings-model-center-route__status-badge settings-model-center-route__status-badge--${route.statusVariant}`}>
-                      <span className="settings-model-center-route__status-dot" />
-                      <span>{route.statusLabel}</span>
-                    </div>
-                  </div>
 
-                  {/* 大指标玻璃舱（双栏布局） */}
-                  <div className="settings-model-center-route__metrics-box">
-                    <div className="settings-model-center-route__metric-item">
-                      <div 
-                        className="settings-model-center-route__metric-icon-wrapper"
-                        style={{
-                          color: route.accentColor || '#38bdf8',
-                          borderColor: route.accentColor ? `${route.accentColor}30` : 'rgba(56, 189, 248, 0.12)',
-                          backgroundColor: route.accentColor ? `${route.accentColor}10` : 'rgba(56, 189, 248, 0.06)'
-                        }}
-                      >
-                        <Wallet size={18} />
-                      </div>
-                      <div className="settings-model-center-route__metric-copy">
-                        <div className="settings-model-center-route__metric-title">TOTAL BALANCE</div>
-                        <div className="settings-model-center-route__metric-number">{route.budgetLabel}</div>
-                      </div>
+                    {/* 状态 Badge */}
+                    <div className={`settings-model-center-route__status-indicator ${statusClass}`}>
+                      <span className="settings-model-center-route__status-dot-glow" />
+                      {route.statusLabel}
                     </div>
-                    
-                    <div className="settings-model-center-route__metric-divider" />
-                    
-                    <div className="settings-model-center-route__metric-item">
-                      <div 
-                        className="settings-model-center-route__metric-icon-wrapper"
-                        style={{
-                          color: route.accentColor || '#38bdf8',
-                          borderColor: route.accentColor ? `${route.accentColor}30` : 'rgba(56, 189, 248, 0.12)',
-                          backgroundColor: route.accentColor ? `${route.accentColor}10` : 'rgba(56, 189, 248, 0.06)'
-                        }}
-                      >
-                        <Timer size={18} />
-                      </div>
-                      <div className="settings-model-center-route__metric-copy">
-                        <div className="settings-model-center-route__metric-title">DELAY</div>
-                        <div className="settings-model-center-route__metric-number">{route.latencyLabel}</div>
-                      </div>
-                    </div>
-                  </div>
+                  </header>
 
-                  {/* 路由卡片宽度固定，动作区只保留图标以避免窄屏文字挤压。 */}
-                  <div className="settings-model-center-route__actions" onClick={(event) => event.stopPropagation()}>
+                  {/* 中间分割线 */}
+                  <div className="settings-model-center-route__section-divider" />
+
+                  {/* Metrics 舱 */}
+                  <section className="grid grid-cols-[auto_1fr_1px_auto_1fr] items-center gap-3">
+                    {/* Balance Icon */}
+                    <div className="settings-model-center-route__metric-icon-box">
+                      <Wallet size={18} strokeWidth={1.75} className="settings-model-center-route__metric-icon" />
+                    </div>
+
+                    {/* Balance Text */}
+                    <div className="min-w-0 text-left">
+                      <p className="settings-model-center-route__metric-lbl">
+                        Total Balance
+                      </p>
+                      <p className="settings-model-center-route__metric-val">
+                        {route.budgetLabel}
+                      </p>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="settings-model-center-route__metrics-divider" />
+
+                    {/* Delay Icon */}
+                    <div className="settings-model-center-route__metric-icon-box ml-1">
+                      <Timer size={18} strokeWidth={1.8} className="settings-model-center-route__metric-icon" />
+                    </div>
+
+                    {/* Delay Text */}
+                    <div className="min-w-0 text-left">
+                      <p className="settings-model-center-route__metric-lbl">
+                        Delay
+                      </p>
+                      <p className="settings-model-center-route__metric-val">
+                        {route.latencyLabel}
+                      </p>
+                    </div>
+                  </section>
+
+                  {/* 底部割线 */}
+                  <div className="settings-model-center-route__section-divider" />
+
+                  {/* 底部动作控制栏 */}
+                  <footer className="settings-model-center-route__actions grid grid-cols-4 gap-2" onClick={(e) => e.stopPropagation()}>
+                    {/* Pause Button */}
                     <button
                       type="button"
-                      className="settings-model-center-route__icon-button"
-                      disabled={route.toggleDisabled}
+                      disabled={route.toggleDisabled && !isReadonlyGhost}
                       onClick={route.onToggle}
                       title={toggleLabel}
                       aria-label={toggleLabel}
+                      className={`settings-model-center-route__btn-action ${
+                        isReadonlyGhost && route.toggleDisabled ? 'opacity-40 cursor-not-allowed pointer-events-auto' : 'disabled:opacity-40 disabled:cursor-not-allowed'
+                      }`}
                     >
-                      {route.isPaused ? <Play size={15} /> : <Pause size={15} />}
+                      <span>
+                        {route.isPaused ? <Play size={15} /> : <Pause size={15} />}
+                      </span>
                     </button>
-                    
+
+                    {/* Refresh Button */}
                     <button
                       type="button"
-                      className="settings-model-center-route__icon-button"
-                      disabled={route.refreshDisabled}
+                      disabled={route.refreshDisabled && !isReadonlyGhost}
                       onClick={route.onRefresh}
                       title={refreshLabel}
                       aria-label={refreshLabel}
+                      className={`settings-model-center-route__btn-action ${
+                        isReadonlyGhost && route.refreshDisabled ? 'opacity-40 cursor-not-allowed pointer-events-auto' : 'disabled:opacity-40 disabled:cursor-not-allowed'
+                      }`}
                     >
-                      <RefreshCw size={15} className={route.refreshLoading ? 'animate-spin' : ''} />
+                      <span>
+                        <RefreshCw size={15} className={route.refreshLoading ? 'animate-spin' : ''} />
+                      </span>
                     </button>
-                    
+
+                    {/* Edit Button */}
                     <button
                       type="button"
-                      className="settings-model-center-route__icon-button"
                       onClick={route.onSelect}
                       title={editLabel}
                       aria-label={editLabel}
+                      className="settings-model-center-route__btn-action"
                     >
-                      <Edit3 size={15} />
+                      <span>
+                        <Edit3 size={15} />
+                      </span>
                     </button>
-                    
+
+                    {/* Delete Button */}
                     <button
                       type="button"
-                      className="settings-model-center-route__icon-button settings-model-center-route__icon-button--danger"
-                      disabled={route.deleteDisabled}
+                      disabled={route.deleteDisabled && !isReadonlyGhost}
                       onClick={route.onDelete}
                       title={deleteLabel}
                       aria-label={deleteLabel}
+                      className={`settings-model-center-route__btn-action settings-model-center-route__btn-action--danger ${
+                        isReadonlyGhost && route.deleteDisabled ? 'opacity-40 cursor-not-allowed pointer-events-auto' : 'disabled:opacity-40 disabled:cursor-not-allowed'
+                      }`}
                     >
-                      <Trash2 size={15} />
+                      <span>
+                        <Trash2 size={15} />
+                      </span>
                     </button>
-                  </div>
+                  </footer>
                 </article>
               );
             })}

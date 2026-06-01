@@ -1640,36 +1640,11 @@ body.dark-mode .zoom-slider {
 
 .desktop-left-chrome,
 .desktop-zoom-rail {
-  transform-origin: left top;
-  transform: scale(var(--desktop-side-rail-scale, 1));
+  transform: none;
 }
 
-.desktop-zoom-rail {
+.desktop-zoom-control-shell {
   transform-origin: left bottom;
-}
-
-@media (max-height: 760px) {
-  .desktop-left-chrome,
-  .desktop-zoom-rail {
-    --desktop-side-rail-scale: 0.9;
-  }
-}
-
-@media (max-height: 680px) {
-  .desktop-left-chrome,
-  .desktop-zoom-rail {
-    --desktop-side-rail-scale: 0.78;
-  }
-}
-
-@media (max-height: 620px) {
-  .desktop-left-chrome {
-    --desktop-side-rail-scale: 0.7;
-  }
-
-  .desktop-zoom-rail {
-    display: none !important;
-  }
 }
 
 .glass-frost {
@@ -16049,5 +16024,578 @@ body.light-mode .settings-panel .mobile-header-action-btn:active {
   .settings-panel .settings-model-center-editor-page__bar {
     margin-top: 0px !important; /* 简体中文注释：归零移动端二级编辑器顶部的额外偏移，使其完全依赖滚动容器 of 统一 24px padding-top */
     margin-bottom: 6px !important;
+  }
+}
+
+/* -------------------------------------------------------------
+   供应商卡片及预设卡片高保真自适应色彩系统追加
+   ------------------------------------------------------------- */
+
+/* 1. 优化已启用的供应商卡片在亮色模式下的自适应表现 */
+body:not(.dark-mode) .settings-panel .settings-model-center-route {
+  background: rgba(255, 255, 255, 0.75) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.04) !important;
+}
+
+body:not(.dark-mode) .settings-panel .settings-model-center-route__metrics-box {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+body:not(.dark-mode) .settings-panel .settings-model-center-route__metric-divider {
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.08), transparent) !important;
+}
+
+body:not(.dark-mode) .settings-panel .settings-model-center-route__metric-number {
+  color: var(--text-primary) !important;
+}
+
+body:not(.dark-mode) .settings-panel .settings-model-center-route__metric-title {
+  color: rgba(0, 0, 0, 0.45) !important;
+}
+
+body:not(.dark-mode) .settings-panel .settings-model-center-route__avatar {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(240, 240, 240, 0.9) 100%) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 
+    inset 0 1.5px 3px rgba(255, 255, 255, 0.6),
+    0 2px 6px rgba(0, 0, 0, 0.05) !important;
+}
+
+body:not(.dark-mode) .settings-panel .settings-model-center-route__action-btn {
+  border-color: rgba(0, 0, 0, 0.06) !important;
+  background: rgba(0, 0, 0, 0.02) !important;
+  color: rgba(0, 0, 0, 0.65) !important;
+}
+
+body:not(.dark-mode) .settings-panel .settings-model-center-route__action-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: rgba(0, 0, 0, 0.9) !important;
+}
+
+body:not(.dark-mode) .settings-panel .settings-model-center-route__icon-button {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  background: rgba(255, 255, 255, 0.6) !important;
+  color: var(--text-primary) !important;
+}
+
+/* 2. 优化预设供应商卡片，支持品牌色混色，消除暗色下一片漆黑的问题 */
+.settings-panel .settings-model-center-preset {
+  /* 简体中文注释：使用 CSS color-mix 混色，将卡片背景和边框与其品牌色（--preset-accent）动态按比例混合，使其完美融入亮/暗色主题，带有相应品牌色的高级微光氛围 */
+  background: linear-gradient(135deg, color-mix(in srgb, var(--preset-accent, var(--settings-border-subtle)) 5%, var(--settings-section-bg)) 0%, color-mix(in srgb, var(--preset-accent, var(--settings-border-subtle)) 1%, var(--settings-section-bg)) 100%) !important;
+  border: 1px solid color-mix(in srgb, var(--preset-accent, var(--settings-border-subtle)) 12%, var(--settings-border-subtle)) !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.settings-panel .settings-model-center-preset:hover {
+  border-color: var(--preset-accent, var(--text-secondary)) !important;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--preset-accent, var(--settings-border-subtle)) 12%, var(--settings-section-bg)) 0%, color-mix(in srgb, var(--preset-accent, var(--settings-border-subtle)) 3%, var(--settings-section-bg)) 100%) !important;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--preset-accent, transparent) 4%, transparent) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* 简体中文注释：为了使左侧 Logo 圈在暗色模式下不会产生刺眼的黑色实心感，亮色下不失真，采用更平滑的背景表现 */
+.settings-panel .settings-model-center-preset__mark {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: color-mix(in srgb, var(--preset-accent, var(--settings-border-subtle)) 20%, rgba(255, 255, 255, 0.08)) !important;
+}
+
+body:not(.dark-mode) .settings-panel .settings-model-center-preset__mark {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border-color: color-mix(in srgb, var(--preset-accent, var(--settings-border-subtle)) 20%, rgba(0, 0, 0, 0.06)) !important;
+}
+
+/* 供应商卡片居中结构：顶部身份、中部指标、底部四按钮严格分层已整合至组件本身，在此停用旧的覆盖样式。 */
+
+/* 模型管理中心层级整理：主标题只保留在卡片头部，内部模块改为清晰的分区节奏 */
+.settings-panel [data-testid="settings-model-center"] > .settings-section-card {
+  padding: 22px 24px 26px !important;
+}
+
+.settings-panel [data-testid="settings-model-center"] > .settings-section-card > div:first-child {
+  padding-bottom: 18px !important;
+  border-bottom: 1px solid var(--settings-border-subtle) !important;
+}
+
+.settings-panel [data-testid="settings-model-center"] > .settings-section-card > div:nth-child(2) {
+  margin-top: 24px !important;
+}
+
+.settings-panel .settings-model-center-layout {
+  display: grid !important;
+  gap: 28px !important;
+  align-items: start !important;
+}
+
+.settings-panel .settings-model-center-toolbar {
+  align-items: end !important;
+  gap: 16px !important;
+  padding-bottom: 14px !important;
+}
+
+.settings-panel .settings-model-center-toolbar__copy {
+  display: grid !important;
+  min-width: 0 !important;
+  gap: 6px !important;
+}
+
+.settings-panel .settings-model-center-toolbar__eyebrow {
+  color: var(--text-tertiary) !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
+}
+
+.settings-panel .settings-model-center-toolbar__title {
+  color: var(--text-tertiary) !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
+}
+
+.settings-panel .settings-model-center-toolbar__helper {
+  max-width: 620px !important;
+  color: var(--text-secondary) !important;
+  font-size: 13px !important;
+  line-height: 1.65 !important;
+}
+
+.settings-panel .settings-model-center-toolbar__actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+}
+
+.settings-panel .settings-model-center-route-grid {
+  margin-top: 8px !important;
+}
+
+.settings-panel .settings-model-center-directory {
+  display: grid !important;
+  align-content: start !important;
+  gap: 18px !important;
+  padding-left: 24px !important;
+  border-left: 1px solid var(--settings-border-subtle) !important;
+}
+
+.settings-panel .settings-model-center-directory__header {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+.settings-panel .settings-model-center-directory__title {
+  color: var(--text-primary) !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  line-height: 1.35 !important;
+}
+
+.settings-panel .settings-model-center-directory__helper {
+  color: var(--text-secondary) !important;
+  font-size: 13px !important;
+  line-height: 1.65 !important;
+}
+
+.settings-panel .settings-model-center-directory__tabs {
+  margin: 0 auto !important;
+}
+
+.settings-panel .settings-model-center-preset-list {
+  margin-top: 0 !important;
+}
+
+@media (max-width: 1023px) {
+  .settings-panel .settings-model-center-layout {
+    grid-template-columns: 1fr !important;
+    gap: 34px !important;
+  }
+
+  .settings-panel .settings-model-center-pool,
+  .settings-panel .settings-model-center-directory {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .settings-panel .settings-model-center-directory {
+    padding-top: 28px !important;
+    padding-left: 0 !important;
+    border-top: 1px solid var(--settings-border-subtle) !important;
+    border-left: 0 !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .settings-panel [data-testid="settings-model-center"] > .settings-section-card {
+    padding: 18px !important;
+  }
+
+  .settings-panel .settings-model-center-toolbar {
+    align-items: start !important;
+  }
+
+  .settings-panel .settings-model-center-toolbar__actions {
+    justify-content: flex-start !important;
+  }
+}
+
+/* ----------------------------------------------------
+   API Connected Provider Card - Double Theme UI Redesign
+   ---------------------------------------------------- */
+
+/* 1. 暗色模式全局变量 */
+body.dark-mode .settings-model-center-route {
+  --route-bg: linear-gradient(145deg, rgba(37,37,37,.92) 0%, rgba(16,16,16,.97) 45%, rgba(10,10,10,.99) 100%);
+  --route-border: rgba(255, 255, 255, 0.15);
+  --route-shadow: 0 0 0 1px rgba(255,255,255,.035) inset, 0 -1px 0 rgba(255,255,255,.08) inset, 0 20px 50px rgba(0,0,0,.72);
+  --route-shadow-hover: 0 0 0 1px rgba(255,255,255,.05) inset, 0 -1px 0 rgba(255,255,255,.12) inset, 0 30px 70px rgba(0,0,0,.85);
+  --route-glow-color: rgba(255, 255, 255, 0.72);
+  
+  --logo-bg: linear-gradient(145deg, rgba(31,31,31,.95), rgba(8,8,8,.98));
+  --logo-border: rgba(255, 255, 255, 0.22);
+  --logo-shadow: 0 8px 16px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.04) inset;
+  
+  --title-color: #f5f5f5;
+  --id-color: #767676;
+  --copy-color: #8d8d8d;
+  --copy-hover-color: #ffffff;
+  
+  --indicator-border: rgba(255, 255, 255, 0.12);
+  
+  --metric-icon-bg: linear-gradient(145deg, rgba(40,40,40,.72), rgba(16,16,16,.84));
+  --metric-icon-border: rgba(255, 255, 255, 0.12);
+  --metric-icon-shadow: 0 4px 10px rgba(0,0,0,.35), 0 1px 0 rgba(255,255,255,.08) inset;
+  --metric-lbl-color: #a4a4a4;
+  --metric-val-color: #f3f3f3;
+  --metric-divider: rgba(255, 255, 255, 0.13);
+  
+  --btn-action-bg: linear-gradient(145deg, rgba(39,39,39,.74), rgba(17,17,17,.88));
+  --btn-action-border: rgba(255, 255, 255, 0.1);
+  --btn-action-shadow: 0 4px 10px rgba(0,0,0,.34), 0 1px 0 rgba(255,255,255,.04) inset;
+  --btn-action-icon: #cfcfcf;
+  
+  --btn-action-danger-bg: linear-gradient(145deg, rgba(68,23,23,.72), rgba(33,12,12,.84));
+  --btn-action-danger-border: rgba(255, 91, 91, 0.25);
+  --btn-action-danger-shadow: 0 4px 10px rgba(0,0,0,.35), 0 0 0 1px rgba(255, 91, 91, 0.04) inset;
+  
+  --divider-color: rgba(255, 255, 255, 0.11);
+}
+
+/* 2. 亮色模式全局变量 */
+body:not(.dark-mode) .settings-model-center-route {
+  --route-bg: linear-gradient(145deg, rgba(255,255,255,.94) 0%, rgba(246,246,246,.97) 45%, rgba(240,240,240,.99) 100%);
+  --route-border: rgba(0, 0, 0, 0.08);
+  --route-shadow: 0 0 0 1px rgba(255,255,255,.9) inset, 0 1px 2px rgba(0,0,0,.02) inset, 0 12px 30px rgba(0,0,0,.06);
+  --route-shadow-hover: 0 0 0 1px rgba(255,255,255,1) inset, 0 1px 2px rgba(0,0,0,.02) inset, 0 18px 40px rgba(0,0,0,.1);
+  --route-glow-color: rgba(255, 255, 255, 0.95);
+  
+  --logo-bg: linear-gradient(145deg, rgba(255,255,255,.98), rgba(243,243,246,.98));
+  --logo-border: rgba(0, 0, 0, 0.08);
+  --logo-shadow: 0 4px 10px rgba(0,0,0,.08), 0 0 0 1px rgba(255,255,255,1) inset;
+  
+  --title-color: #1f1f23;
+  --id-color: #8e8e93;
+  --copy-color: #8e8e93;
+  --copy-hover-color: #1f1f23;
+  
+  --indicator-border: rgba(0, 0, 0, 0.08);
+  
+  --metric-icon-bg: linear-gradient(145deg, rgba(245,245,247,.9), rgba(235,235,240,.95));
+  --metric-icon-border: rgba(0, 0, 0, 0.06);
+  --metric-icon-shadow: 0 2px 6px rgba(0,0,0,.03), 0 1px 0 rgba(255,255,255,.8) inset;
+  --metric-lbl-color: #8e8e93;
+  --metric-val-color: #1f1f23;
+  --metric-divider: rgba(0, 0, 0, 0.08);
+  
+  --btn-action-bg: linear-gradient(145deg, rgba(252,252,253,.95), rgba(243,243,246,.98));
+  --btn-action-border: rgba(0, 0, 0, 0.08);
+  --btn-action-shadow: 0 2px 6px rgba(0,0,0,.03), 0 1px 0 rgba(255,255,255,.8) inset;
+  --btn-action-icon: #5c5c5e;
+  
+  --btn-action-danger-bg: linear-gradient(145deg, rgba(254,242,242,.95), rgba(253,226,226,.98));
+  --btn-action-danger-border: rgba(239, 68, 68, 0.2);
+  --btn-action-danger-shadow: 0 2px 6px rgba(239, 68, 68, 0.04), 0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+  
+  --divider-color: rgba(0, 0, 0, 0.07);
+}
+
+/* 3. 状态灯双主题颜色自适应 */
+body.dark-mode .settings-model-center-route__status-indicator--online {
+  --status-color: #60ee8d;
+  --status-bg: rgba(13, 22, 15, .72);
+  --status-dot-bg: #61f18a;
+  --status-dot-glow: 0 0 8px rgba(97,241,138,.6);
+}
+body:not(.dark-mode) .settings-model-center-route__status-indicator--online {
+  --status-color: #166534;
+  --status-bg: rgba(240, 253, 244, .9);
+  --status-dot-bg: #22c55e;
+  --status-dot-glow: 0 0 8px rgba(34,197,94,.5);
+}
+
+body.dark-mode .settings-model-center-route__status-indicator--paused {
+  --status-color: #94a3b8;
+  --status-bg: rgba(30, 41, 59, .72);
+  --status-dot-bg: #94a3b8;
+  --status-dot-glow: 0 0 8px rgba(148,163,184,.6);
+}
+body:not(.dark-mode) .settings-model-center-route__status-indicator--paused {
+  --status-color: #475569;
+  --status-bg: rgba(241, 245, 249, .9);
+  --status-dot-bg: #64748b;
+  --status-dot-glow: 0 0 8px rgba(100,116,139,.5);
+}
+
+body.dark-mode .settings-model-center-route__status-indicator--error,
+body.dark-mode .settings-model-center-route__status-indicator--offline {
+  --status-color: #ff5b5b;
+  --status-bg: rgba(68, 23, 23, .72);
+  --status-dot-bg: #ff5b5b;
+  --status-dot-glow: 0 0 8px rgba(255,91,91,.6);
+}
+body:not(.dark-mode) .settings-model-center-route__status-indicator--error,
+body:not(.dark-mode) .settings-model-center-route__status-indicator--offline {
+  --status-color: #991b1b;
+  --status-bg: rgba(254, 242, 242, .9);
+  --status-dot-bg: #ef4444;
+  --status-dot-glow: 0 0 8px rgba(239,68,68,.5);
+}
+
+body.dark-mode .settings-model-center-route__status-indicator--warning {
+  --status-color: #fbbf24;
+  --status-bg: rgba(45, 35, 10, .72);
+  --status-dot-bg: #fbbf24;
+  --status-dot-glow: 0 0 8px rgba(251,191,36,.6);
+}
+body:not(.dark-mode) .settings-model-center-route__status-indicator--warning {
+  --status-color: #92400e;
+  --status-bg: rgba(255, 251, 235, .9);
+  --status-dot-bg: #f59e0b;
+  --status-dot-glow: 0 0 8px rgba(245,158,11,.5);
+}
+
+/* 4. 具体类名样式实现 */
+.settings-panel .settings-model-center-route {
+  background: var(--route-bg) !important;
+  border: 1.5px solid var(--route-border) !important;
+  border-radius: 34px !important;
+  box-shadow: var(--route-shadow) !important;
+  padding: 24px !important;
+  min-height: 215px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.settings-panel .settings-model-center-route:hover {
+  transform: translateY(-4px) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  box-shadow: var(--route-shadow-hover) !important;
+}
+
+body:not(.dark-mode) .settings-panel .settings-model-center-route:hover {
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+.settings-model-center-route__glow-line {
+  position: absolute;
+  left: 9%;
+  right: 9%;
+  top: 0;
+  height: 1px;
+  opacity: 0.8;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--route-glow-color), transparent);
+  filter: blur(0.1px);
+}
+
+.settings-model-center-route__logo-container {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--logo-bg);
+  border: 1.5px solid var(--logo-border);
+  box-shadow: var(--logo-shadow);
+}
+
+.settings-model-center-route__title-text {
+  font-size: 17px;
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--title-color) !important;
+  font-family: var(--font-family, sans-serif);
+  letter-spacing: -0.02em;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-model-center-route__id-wrapper {
+  color: var(--id-color) !important;
+}
+
+.settings-model-center-route__id-copy-icon {
+  color: var(--copy-color);
+  transition: color 150ms ease;
+}
+
+.settings-model-center-route__id-copy-icon:hover {
+  color: var(--copy-hover-color);
+}
+
+.settings-model-center-route__status-indicator {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  flex-shrink: 0;
+  background: var(--status-bg);
+  border: 1px solid var(--indicator-border);
+  color: var(--status-color);
+}
+
+.settings-model-center-route__status-dot-glow {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--status-dot-bg);
+  box-shadow: var(--status-dot-glow);
+}
+
+.settings-model-center-route__section-divider {
+  height: 1px;
+  background-color: var(--divider-color);
+  width: 100%;
+}
+
+.settings-model-center-route__metric-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--metric-icon-bg);
+  border: 1px solid var(--metric-icon-border);
+  box-shadow: var(--metric-icon-shadow);
+}
+
+.settings-model-center-route__metric-icon {
+  color: var(--text-secondary);
+}
+
+.settings-model-center-route__metric-lbl {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--metric-lbl-color) !important;
+  line-height: 1;
+}
+
+.settings-model-center-route__metric-val {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--metric-val-color) !important;
+  margin-top: 4px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-model-center-route__metrics-divider {
+  width: 1px;
+  height: 32px;
+  background-color: var(--metric-divider);
+  flex-shrink: 0;
+}
+
+.settings-model-center-route__btn-action {
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--btn-action-bg) !important;
+  border: 1px solid var(--btn-action-border) !important;
+  box-shadow: var(--btn-action-shadow) !important;
+}
+
+.settings-model-center-route__btn-action span {
+  color: var(--btn-action-icon) !important;
+  display: inline-flex;
+  align-items: center;
+}
+
+.settings-model-center-route__btn-action:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-0.5px);
+}
+
+.settings-model-center-route__btn-action:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.settings-model-center-route__btn-action--danger {
+  background: var(--btn-action-danger-bg) !important;
+  border: 1px solid var(--btn-action-danger-border) !important;
+  box-shadow: var(--btn-action-danger-shadow) !important;
+}
+
+.settings-model-center-route__btn-action--danger span {
+  color: #ff5b5b !important;
+}
+
+body:not(.dark-mode) .settings-model-center-route__btn-action--danger span {
+  color: #ef4444 !important;
+}
+
+/* 5. 移动端 (max-width: 720px) 专属紧凑美学适配 */
+@media (max-width: 720px) {
+  .settings-panel .settings-model-center-route {
+    padding: 16px !important;
+    min-height: 195px !important;
+    border-radius: 24px !important;
+  }
+  
+  .settings-model-center-route__metric-val {
+    font-size: 14px;
+  }
+  
+  .settings-model-center-route__metric-lbl {
+    font-size: 8px;
+  }
+  
+  .settings-model-center-route__metric-icon-box {
+    width: 32px;
+    height: 32px;
+  }
+
+  .settings-model-center-route__actions {
+    justify-content: center !important;
+    gap: 8px !important;
   }
 }

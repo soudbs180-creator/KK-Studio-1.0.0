@@ -749,9 +749,10 @@ const getProviderStatus = (provider: ThirdPartyProvider) => {
 };
 
 const getLimitValueLabel = (mode: CostMode, value?: number) => {
+  if (mode === 'unlimited') return '♾️';
   if (mode === 'amount' && typeof value === 'number' && value > -1) return formatUsd(value);
   if (mode === 'tokens' && typeof value === 'number' && value > -1) return formatTokens(value);
-  return '未设置';
+  return '♾️';
 };
 
 const getProgress = (mode: CostMode, usage: number, budgetLimit?: number, tokenLimit?: number) => {

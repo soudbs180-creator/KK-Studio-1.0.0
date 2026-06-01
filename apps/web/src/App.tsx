@@ -291,6 +291,16 @@ import {
 interface AppContentProps {
 }
 
+type DesktopSideRailLayout = {
+  projectManagerScale: number;
+  hideZoomControl: boolean;
+};
+
+const DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT: DesktopSideRailLayout = {
+  projectManagerScale: 1,
+  hideZoomControl: false,
+};
+
 const AppContent: React.FC<AppContentProps> = () => {
   const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
   const {
@@ -301,6 +311,8 @@ const AppContent: React.FC<AppContentProps> = () => {
   } = useAuth();
   const { advanceTo } = useAppStartup();
   const [showTutorial, setShowTutorial] = useState(false);
+  const [desktopSideRailLayout, setDesktopSideRailLayout] = useState<DesktopSideRailLayout>(DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT);
+  const desktopSideRailLayoutRef = useRef<DesktopSideRailLayout>(DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT);
   // [Draft Feature] Persistent Input Card State (Moved to top to avoid ReferenceError)
   const [draftNodeId, setDraftNodeId] = useState<string | null>(null);
   const [focusedGroupId, setFocusedGroupId] = useState<string | null>(null);
@@ -4256,6 +4268,111 @@ const AppContent: React.FC<AppContentProps> = () => {
       ? '428px'
       : '48px';
 
+  useEffect(() => {
+    desktopSideRailLayoutRef.current = desktopSideRailLayout;
+  }, [desktopSideRailLayout]);
+
+  useLayoutEffect(() => {
+    if (!isReady) {
+      return;
+    }
+
+    if (isMobile) {
+      setDesktopSideRailLayout(prev => {
+        const isDefault = prev.projectManagerScale === DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT.projectManagerScale
+          && prev.hideZoomControl === DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT.hideZoomControl;
+        if (isDefault) {
+          return prev;
+        }
+        desktopSideRailLayoutRef.current = DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT;
+        return DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT;
+      });
+      return;
+    }
+
+    let frameId: number | null = null;
+
+    const measure = () => {
+      frameId = null;
+
+      const projectManager = document.getElementById('project-manager-container');
+      const desktopChrome = document.querySelector<HTMLElement>('.desktop-left-chrome');
+      const zoomControl = document.querySelector<HTMLElement>('.desktop-zoom-control-shell')
+        ?? document.querySelector<HTMLElement>('.desktop-zoom-rail');
+
+      if (!projectManager || !desktopChrome) {
+        return;
+      }
+
+      const viewportHeight = window.innerHeight;
+      const previousScale = desktopSideRailLayoutRef.current.projectManagerScale || 1;
+      const projectManagerRect = projectManager.getBoundingClientRect();
+      const naturalProjectManagerHeight = projectManagerRect.height > 0
+        ? projectManagerRect.height / previousScale
+        : 0;
+
+      if (naturalProjectManagerHeight <= 0) {
+        return;
+      }
+
+      const topChromeBottom = desktopChrome.getBoundingClientRect().bottom;
+      const topClearance = Math.max(0, topChromeBottom + 16);
+      const topLimitedScale = (viewportHeight - topClearance * 2) / naturalProjectManagerHeight;
+      const boundedScale = Math.max(
+        0.64,
+        Math.min(1, Number.isFinite(topLimitedScale) ? topLimitedScale : 1),
+      );
+      const nextScale = Math.round(boundedScale * 1000) / 1000;
+      const projectedProjectManagerBottom = viewportHeight / 2 + (naturalProjectManagerHeight * nextScale) / 2;
+      const zoomControlRect = zoomControl?.getBoundingClientRect();
+      const hideZoomControl = Boolean(zoomControlRect && projectedProjectManagerBottom + 12 >= zoomControlRect.top);
+
+      const nextLayout: DesktopSideRailLayout = {
+        projectManagerScale: nextScale,
+        hideZoomControl,
+      };
+
+      setDesktopSideRailLayout(prev => {
+        const scaleUnchanged = Math.abs(prev.projectManagerScale - nextLayout.projectManagerScale) < 0.005;
+        if (scaleUnchanged && prev.hideZoomControl === nextLayout.hideZoomControl) {
+          return prev;
+        }
+
+        desktopSideRailLayoutRef.current = nextLayout;
+        return nextLayout;
+      });
+    };
+
+    const scheduleMeasure = () => {
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
+      frameId = requestAnimationFrame(measure);
+    };
+
+    const observedElements = [
+      document.getElementById('project-manager-container'),
+      document.querySelector<HTMLElement>('.desktop-left-chrome'),
+      document.querySelector<HTMLElement>('.desktop-zoom-control-shell')
+        ?? document.querySelector<HTMLElement>('.desktop-zoom-rail'),
+    ].filter((element): element is HTMLElement => Boolean(element));
+    const resizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(scheduleMeasure)
+      : null;
+
+    observedElements.forEach(element => resizeObserver?.observe(element));
+    window.addEventListener('resize', scheduleMeasure);
+    scheduleMeasure();
+
+    return () => {
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', scheduleMeasure);
+    };
+  }, [isMobile, isReady]);
+
   const handlePreviewFromLibrary = useCallback((imageId: string) => {
     setWorkspaceSurface('workspace');
     handleOpenPreview(imageId);
@@ -4420,6 +4537,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       onAutoArrange={handleAutoArrange}
       onToggleChat={toggleChatPanel}
       isChatOpen={isChatOpen}
+      desktopScale={desktopSideRailLayout.projectManagerScale}
       workflowTemplates={WORKFLOW_TEMPLATES}
       onApplyWorkflowTemplate={(templateId) => {
         void handleApplyWorkflowTemplate(templateId);
@@ -4548,11 +4666,21 @@ const AppContent: React.FC<AppContentProps> = () => {
       {/* 绠€浣撲腑鏂囷細宸︿笅瑙掓偓娴缉鏀惧崱鐗?- 绔栫洿鎽嗘斁锛屾瀬鑷寸氦缁嗗搴?(w-10)锛屼笉瑕佸拰渚ц竟宸ュ叿鏍忓搴︿竴鑷达紝鐗堟湰鍙峰湪鍏朵笅鏂瑰彟澶栨覆鏌撲负绮捐嚧鐨勭嫭绔嬫瘺鐜荤拑鍗＄墖 */}
       {!isMobile && (
         <div className="desktop-zoom-rail fixed bottom-4 left-4 z-50 w-10 flex flex-col items-center gap-2 pointer-events-auto select-none">
-          <AppZoomControl
-            scale={canvasTransform.scale}
-            transform={canvasTransform}
-            canvasRef={canvasRef}
-          />
+          <div
+            className="desktop-zoom-control-shell transition-all duration-300"
+            aria-hidden={desktopSideRailLayout.hideZoomControl}
+            style={{
+              opacity: desktopSideRailLayout.hideZoomControl ? 0 : 1,
+              visibility: desktopSideRailLayout.hideZoomControl ? 'hidden' : 'visible',
+              pointerEvents: desktopSideRailLayout.hideZoomControl ? 'none' : 'auto',
+            }}
+          >
+            <AppZoomControl
+              scale={canvasTransform.scale}
+              transform={canvasTransform}
+              canvasRef={canvasRef}
+            />
+          </div>
           <div 
             className="w-full py-1.5 flex items-center justify-center rounded-xl border transition-all duration-300"
             style={{

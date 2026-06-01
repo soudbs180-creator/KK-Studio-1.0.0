@@ -196,6 +196,36 @@ function getFallbackInitials(modelId: string, provider?: string): string {
     return cleaned.slice(0, 2).toUpperCase();
 }
 
+const MONO_BLACK_ICONS = [
+    'openai',
+    'github',
+    'xai',
+    'aws',
+    'cohere',
+    'perplexity',
+    'groq',
+    'togetherai',
+    'openrouter',
+    'fal',
+    'bfl',
+    'stability',
+    'sambanova',
+    'elevenlabs',
+    'runway',
+    'luma',
+    'pika',
+    'recraft',
+    'viggle',
+    'vidu',
+    'udio',
+    'suno',
+    'zeroone',
+    'stepfun',
+    'moonshot',
+    'xiaomimimo',
+    'anthropic',
+];
+
 const ModelLogo: React.FC<ModelLogoProps> = ({
     modelId,
     provider,
@@ -257,9 +287,15 @@ const ModelLogo: React.FC<ModelLogoProps> = ({
                     height={size}
                     className="object-contain"
                     style={{
-                        // 1. 在暗色模式下，对单色 (mono) 以及本来是纯黑色的品牌图标自动反色变白，完美契合用户“暗色下优先白色”的需求
-                        // 2. 根据亮暗主题自适应应用精细的微光投影，彻底解决因颜色接近导致看不清的问题，同时营造奢华浮雕质感
-                        filter: (isDarkMode && (variant === 'mono' || ['github', 'xai', 'aws'].includes(iconId || '')))
+                        // 1. 在暗色模式下，对本来是纯黑色的品牌彩色图标，或需要反色的自定义图标自动反色变白，完美契合用户“暗色下优先白色”的需求
+                        // 2. 对于单色 (mono) 图标，由于 CDN 的 dark 目录下已经是白色的 PNG 图片，不应再次 invert(1) 反色回黑色
+                        // 3. 根据亮暗主题自适应应用精细的微光投影，彻底解决因颜色接近导致看不清的问题，同时营造奢华浮雕质感
+                        filter: (isDarkMode && (
+                            // CDN 彩色图标，且本身属于纯黑色品牌
+                            (iconId && variant === 'color' && MONO_BLACK_ICONS.includes(iconId)) ||
+                            // 没有匹配到 iconId，即为自定义图标，且为 reve 等深色单色图标
+                            (!iconId && (modelId.toLowerCase().includes('reve') || provider?.toLowerCase().includes('reve') || modelName?.toLowerCase().includes('reve')))
+                        ))
                             ? 'invert(1) brightness(1.6) drop-shadow(0 0 1px rgba(255,255,255,0.35))'
                             : isDarkMode
                                 ? 'drop-shadow(0 0 1.5px rgba(255,255,255,0.25))'

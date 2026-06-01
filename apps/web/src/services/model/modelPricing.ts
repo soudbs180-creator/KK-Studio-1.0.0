@@ -536,7 +536,7 @@ export const isCreditBasedModel = (
   }
 
   const globalModels = keyManager.getGlobalModelList();
-  const matchedModel = globalModels.find((m: any) => m.id === normalizedModelId);
+  const matchedModel = globalModels.find((m: any) => m.id === normalizedModelId || m.id.split('@')[0] === normalizedModelId.split('@')[0]);
 
   return !!matchedModel?.isSystemInternal;
 };

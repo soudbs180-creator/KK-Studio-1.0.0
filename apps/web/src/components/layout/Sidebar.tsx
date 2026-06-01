@@ -85,6 +85,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                         <img 
                             src="/icon.svg" 
                             alt="KK Studio" 
+                            style={{
+                                filter: isDarkMode ? 'invert(1)' : 'none',
+                                transition: 'filter 0.3s ease'
+                            }}
                             onError={(e) => {
                                 e.currentTarget.style.display = 'none';
                             }}

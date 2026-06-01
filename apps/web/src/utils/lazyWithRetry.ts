@@ -76,8 +76,11 @@ export async function importWithRetry<T>(
       return await loader();
     } catch (error) {
       lastError = error;
-      if (attempt >= retries || !isChunkLoadError(error)) {
+      if (!isChunkLoadError(error)) {
         throw error;
+      }
+      if (attempt >= retries) {
+        break;
       }
       await wait(retryDelayMs * (attempt + 1));
     }
