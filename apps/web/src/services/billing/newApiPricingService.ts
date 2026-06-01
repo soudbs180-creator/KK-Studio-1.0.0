@@ -918,15 +918,36 @@ export async function fetchWuyinPricingCatalog(baseUrl: string): Promise<ModelPr
         ? 'https://api.wuyinkeji.com'
         : normalizeBaseUrl(baseUrl);
 
-    const response = await fetch(`${rootUrl}${WUYIN_PRICE_API_PATH}`, {
-        method: 'GET',
-        headers: {
-            'Accept': 'application/json',
-        },
-    });
+    let response: Response;
+    try {
+        response = await fetch(`${rootUrl}${WUYIN_PRICE_API_PATH}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+            },
+        });
 
-    if (!response.ok) {
-        throw new Error(`Failed to fetch Wuyin pricing catalog: HTTP ${response.status}`);
+        const contentType = response.headers.get('content-type') || '';
+        // 简体中文注释：如果 HTTP 状态码非 200，或者返回了 HTML 页面（即代理端 Nginx 返回的 404 错误页），则抛错触发跨域或官方直连回退
+        if (!response.ok || response.status === 404 || contentType.includes('text/html')) {
+            throw new Error(`Endpoint returned status ${response.status} or HTML payload`);
+        }
+    } catch (e) {
+        // 简体中文注释：当代理服务器未配置 /themes/DigitalBlue/ 路径代理导致 Nginx 404 时，自动回退直接请求官方域名接口
+        if (rootUrl !== 'https://api.wuyinkeji.com') {
+            console.log('[NewApiPricing] Wuyin proxy endpoint failed/404, falling back to official api.wuyinkeji.com...', e);
+            response = await fetch(`https://api.wuyinkeji.com${WUYIN_PRICE_API_PATH}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+            });
+            if (!response.ok) {
+                throw new Error(`Failed to fetch Wuyin pricing catalog via official site: HTTP ${response.status}`);
+            }
+        } else {
+            throw e;
+        }
     }
 
     const data = await response.json() as WuyinCatalogResponse;
