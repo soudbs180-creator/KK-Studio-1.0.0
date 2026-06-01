@@ -2,6 +2,9 @@ import { readRuntimeEnv, readRuntimeOrigin } from "../../utils/runtimeEnv.ts";
 
 const DEFAULT_HOSTED_MODEL_PROXY_API_BASE_URL = "https://172-245-156-16.sslip.io";
 
+// 内存中缓存的延迟最低 API URL
+let memoryOptimalApiBaseUrl: string | null = null;
+
 function normalizeHostname(value: unknown): string | undefined {
   const normalized = typeof value === "string"
     ? value.trim().toLowerCase().replace(/^\[|\]$/g, "")
@@ -183,12 +186,159 @@ function isDirectHostedModelProxyBaseUrl(
   }
 }
 
-export function resolveKkApiBaseUrl(): string {
+// ----------------------------------------------------
+// 🚀 新增：智能延迟竞争测速（Smart Routing）与状态指纹机制
+// ----------------------------------------------------
+
+function generateNetworkFingerprint(): string {
+  if (typeof window === "undefined" || !window.navigator) {
+    return "server-env";
+  }
+  const onLine = window.navigator.onLine ? "online" : "offline";
+  const connection = (window.navigator as any).connection;
+  const connectionType = connection ? `${connection.type || ""}_${connection.effectiveType || ""}` : "unknown-conn";
+  return `${onLine}_${connectionType}`;
+}
+
+export async function startOptimalApiBaseUrlRace(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+
   const rawEnvValue = readRuntimeEnv("VITE_KK_API_BASE_URL") || "";
   const normalizedRaw = rawEnvValue.trim().toLowerCase();
   const runtimeOrigin = readRuntimeOrigin();
 
-  // 简体中文注释：智能反代指令判定。当配置为 'proxy', 'self', 'relative', '/' 或者强制标志为 true 时，强制使用当前域名相对路径走 Vercel 反代。
+  const isForceProxy = normalizedRaw === "proxy"
+    || normalizedRaw === "self"
+    || normalizedRaw === "relative"
+    || normalizedRaw === "/"
+    || (readRuntimeEnv("VITE_FORCE_REWRITE_PROXY") || "").trim().toLowerCase() === "true";
+
+  if (isForceProxy && runtimeOrigin) {
+    memoryOptimalApiBaseUrl = runtimeOrigin;
+    return runtimeOrigin;
+  }
+
+  const configuredBaseUrl = normalizeConfiguredApiBaseUrl(rawEnvValue);
+  
+  if (!configuredBaseUrl || !runtimeOrigin || configuredBaseUrl === runtimeOrigin) {
+    memoryOptimalApiBaseUrl = runtimeOrigin || configuredBaseUrl || null;
+    return memoryOptimalApiBaseUrl;
+  }
+
+  const OPTIMAL_URL_KEY = "kk_optimal_api_base_url_v1";
+  const NETWORK_FINGERPRINT_KEY = "kk_optimal_api_network_fingerprint";
+  const LAST_RACED_KEY = "kk_optimal_api_last_raced_at";
+  const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 缓存有效保持时间：6 小时
+
+  const cachedUrl = window.localStorage.getItem(OPTIMAL_URL_KEY);
+  const cachedFingerprint = window.localStorage.getItem(NETWORK_FINGERPRINT_KEY);
+  const cachedLastRacedStr = window.localStorage.getItem(LAST_RACED_KEY);
+  
+  const currentFingerprint = generateNetworkFingerprint();
+  const now = Date.now();
+  const cacheAge = now - Number(cachedLastRacedStr || 0);
+
+  // 如果网络指纹未变且未超时，直接使用并保持缓存路线
+  if (cachedUrl && cachedFingerprint === currentFingerprint && cacheAge < CACHE_TTL_MS) {
+    memoryOptimalApiBaseUrl = cachedUrl;
+    return cachedUrl;
+  }
+
+  const testPing = async (baseUrl: string): Promise<{ url: string; latency: number }> => {
+    const probeUrl = new URL("healthz", baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
+    probeUrl.searchParams.set("smart_probe", String(Date.now()));
+    
+    const startTime = performance.now();
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 秒超时降级
+      
+      const response = await fetch(probeUrl.toString(), {
+        method: "GET",
+        headers: { accept: "application/json" },
+        signal: controller.signal,
+        cache: "no-store",
+        credentials: "omit"
+      });
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        return { url: baseUrl, latency: performance.now() - startTime };
+      }
+      return { url: baseUrl, latency: 9999 };
+    } catch {
+      return { url: baseUrl, latency: 9999 };
+    }
+  };
+
+  try {
+    const results = await Promise.all([
+      testPing(runtimeOrigin),
+      testPing(configuredBaseUrl)
+    ]);
+
+    const optimal = results.reduce((prev, curr) => (curr.latency < prev.latency ? curr : prev));
+    const optimalUrl = optimal.latency < 9999 ? optimal.url : runtimeOrigin;
+
+    window.localStorage.setItem(OPTIMAL_URL_KEY, optimalUrl);
+    window.localStorage.setItem(NETWORK_FINGERPRINT_KEY, currentFingerprint);
+    window.localStorage.setItem(LAST_RACED_KEY, String(now));
+    
+    memoryOptimalApiBaseUrl = optimalUrl;
+    console.log(`[Smart Routing] 智能网络延迟测试完毕。中转延迟: ${results[0].latency.toFixed(1)}ms | 直连延迟: ${results[1].latency.toFixed(1)}ms。最低延迟选择: ${optimalUrl}`);
+    return optimalUrl;
+  } catch (e) {
+    memoryOptimalApiBaseUrl = runtimeOrigin;
+    return runtimeOrigin;
+  }
+}
+
+// ----------------------------------------------------
+// 🚀 位置变化网络监听（online 触发重新测速匹配）
+// ----------------------------------------------------
+if (typeof window !== "undefined") {
+  const handleNetworkChange = () => {
+    console.log("[Smart Routing] 检测到网络状态或物理位置发生变化，准备擦除缓存重新匹配最低延迟...");
+    try {
+      window.localStorage.removeItem("kk_optimal_api_network_fingerprint");
+      startOptimalApiBaseUrlRace();
+    } catch {}
+  };
+
+  window.addEventListener("online", handleNetworkChange);
+  if ((window.navigator as any).connection) {
+    (window.navigator as any).connection.addEventListener("change", handleNetworkChange);
+  }
+}
+
+export function resolveKkApiBaseUrl(): string {
+  // 如果内存中已缓存了测速后的最优结果，零延迟瞬间返回
+  if (memoryOptimalApiBaseUrl) {
+    return memoryOptimalApiBaseUrl;
+  }
+
+  // 尝试从持久化缓存中读取，保证页面刷新时的低延迟体验
+  if (typeof window !== "undefined") {
+    try {
+      const cachedUrl = window.localStorage.getItem("kk_optimal_api_base_url_v1");
+      if (cachedUrl) {
+        memoryOptimalApiBaseUrl = cachedUrl;
+        return cachedUrl;
+      }
+    } catch {}
+  }
+
+  // 如果处于开机启动阶段（尚未完成测速竞争），启动后台默默异步测速，并先快速回退到安全的中转路线，绝不卡死首屏渲染
+  if (typeof window !== "undefined") {
+    setTimeout(() => {
+      startOptimalApiBaseUrlRace();
+    }, 50);
+  }
+
+  const rawEnvValue = readRuntimeEnv("VITE_KK_API_BASE_URL") || "";
+  const normalizedRaw = rawEnvValue.trim().toLowerCase();
+  const runtimeOrigin = readRuntimeOrigin();
+
   const isForceProxy = normalizedRaw === "proxy"
     || normalizedRaw === "self"
     || normalizedRaw === "relative"
@@ -221,6 +371,20 @@ export function resolveKkApiBaseUrl(): string {
 }
 
 export function resolveKkApiModelProxyBaseUrl(): string {
+  if (memoryOptimalApiBaseUrl) {
+    return memoryOptimalApiBaseUrl;
+  }
+
+  if (typeof window !== "undefined") {
+    try {
+      const cachedUrl = window.localStorage.getItem("kk_optimal_api_base_url_v1");
+      if (cachedUrl) {
+        memoryOptimalApiBaseUrl = cachedUrl;
+        return cachedUrl;
+      }
+    } catch {}
+  }
+
   const rawEnvValue = readRuntimeEnv("VITE_KK_API_BASE_URL") || "";
   const normalizedRaw = rawEnvValue.trim().toLowerCase();
   const runtimeOrigin = readRuntimeOrigin();

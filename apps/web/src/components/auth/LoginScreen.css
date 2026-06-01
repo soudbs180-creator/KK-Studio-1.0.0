@@ -931,10 +931,9 @@ body.auth-screen-active.auth-screen-active--light #root {
     bottom: auto;
     transform: none;
     display: flex; /* 简体中文：改为 flex 布局以支持 width 属性 */
-    width: 100%; /* 简体中文：宽度占满父容器 */
-    max-width: 410px; /* 简体中文：与登录卡片保持相同最大宽度约束，确保左右空隙一致 */
+    width: fit-content; /* 简体中文：自适应内容宽度，防止显示过宽的边框 */
     box-sizing: border-box;
-    margin: 0 auto !important; /* 简体中文：保持在正下方水平居中 */
+    margin: 0 auto !important; /* 简体中文：在容器下方保持完美的水平居中对齐 */
     background: rgba(8, 14, 26, 0.72);
     backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.08);
