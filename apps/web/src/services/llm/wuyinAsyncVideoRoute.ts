@@ -85,7 +85,7 @@ export function normalizeWuyinVideoBaseUrl(baseUrl: string): string {
 
         const sanitizedPath = parsed.pathname
             .replace(/\/+(doc\/\d+)?$/i, '')
-            .replace(/\/+(api\/async\/video[a-z0-9_.-]*)$/i, '')
+            .replace(/\/+(api\/async(\/[a-z0-9_.-]+)?)?$/i, '')
             .replace(/\/+$/, '');
         return `${parsed.protocol}//${parsed.host}${sanitizedPath}`;
     } catch {

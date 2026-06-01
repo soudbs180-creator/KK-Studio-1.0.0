@@ -886,7 +886,21 @@ type WuyinCatalogItem = NonNullable<NonNullable<WuyinCatalogResponse['data']>['a
 
 const WUYIN_PRICE_API_PATH = '/themes/DigitalBlue/api?action=api_list';
 
-const normalizeBaseUrl = (baseUrl: string) => baseUrl.replace(/\/$/, '');
+const cleanWuyinBaseUrl = (baseUrl: string): string => {
+    const raw = String(baseUrl || '').trim();
+    if (!raw) return 'https://api.wuyinkeji.com';
+    const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    try {
+        const parsed = new URL(withProtocol);
+        const sanitizedPath = parsed.pathname
+            .replace(/\/+(doc\/\d+)?$/i, '')
+            .replace(/\/+(api\/async(\/[a-z0-9_.-]+)?)?$/i, '')
+            .replace(/\/+$/, '');
+        return `${parsed.protocol}//${parsed.host}${sanitizedPath}`;
+    } catch {
+        return 'https://api.wuyinkeji.com';
+    }
+};
 
 const stripHtml = (value: string) => value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -916,7 +930,7 @@ export async function fetchWuyinPricingCatalog(baseUrl: string): Promise<ModelPr
     const runtime = resolveProviderRuntime({ baseUrl, format: 'openai' });
     const rootUrl = runtime.host === 'api.wuyinkeji.com'
         ? 'https://api.wuyinkeji.com'
-        : normalizeBaseUrl(baseUrl);
+        : cleanWuyinBaseUrl(baseUrl);
 
     let response: Response;
     try {
