@@ -913,7 +913,7 @@ body.auth-screen-active.auth-screen-active--light #root {
   .auth-panel {
     width: 100%;
     max-width: 410px;
-    margin: 0 0 16px 0 !important; /* 简体中文：去除原本的 margin: auto 0 0，让 flex-direction 垂直居中正常工作，并为下方的版本号留出空隙 */
+    margin: 0 auto 16px auto !important; /* 简体中文：使用 auto 左右外边距，确保卡片完美水平居中并与下方的版本号完全对齐，下边距为 16px */
     padding: 22px 18px; /* 略微收缩手机端 padding 以防止占满屏幕，展现四周均等的轻盈间隙 */
     border-radius: 22px;
     max-height: calc(100dvh - 120px) !important; /* 简体中文：限制卡片高度，留出外边距及版本号高度，确保软键盘弹起时不超出视口 */
