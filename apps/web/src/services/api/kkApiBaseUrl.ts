@@ -184,8 +184,22 @@ function isDirectHostedModelProxyBaseUrl(
 }
 
 export function resolveKkApiBaseUrl(): string {
-  const configuredBaseUrl = normalizeConfiguredApiBaseUrl(readRuntimeEnv("VITE_KK_API_BASE_URL") || "");
+  const rawEnvValue = readRuntimeEnv("VITE_KK_API_BASE_URL") || "";
+  const normalizedRaw = rawEnvValue.trim().toLowerCase();
   const runtimeOrigin = readRuntimeOrigin();
+
+  // 简体中文注释：智能反代指令判定。当配置为 'proxy', 'self', 'relative', '/' 或者强制标志为 true 时，强制使用当前域名相对路径走 Vercel 反代。
+  const isForceProxy = normalizedRaw === "proxy"
+    || normalizedRaw === "self"
+    || normalizedRaw === "relative"
+    || normalizedRaw === "/"
+    || (readRuntimeEnv("VITE_FORCE_REWRITE_PROXY") || "").trim().toLowerCase() === "true";
+
+  if (isForceProxy && runtimeOrigin) {
+    return runtimeOrigin;
+  }
+
+  const configuredBaseUrl = normalizeConfiguredApiBaseUrl(rawEnvValue);
   if (configuredBaseUrl) {
     if (shouldPreferRuntimeOriginForLocalApi(configuredBaseUrl, runtimeOrigin)) {
       return runtimeOrigin!;
@@ -207,9 +221,21 @@ export function resolveKkApiBaseUrl(): string {
 }
 
 export function resolveKkApiModelProxyBaseUrl(): string {
-  const configuredBaseUrl = normalizeConfiguredApiBaseUrl(readRuntimeEnv("VITE_KK_API_BASE_URL") || "");
+  const rawEnvValue = readRuntimeEnv("VITE_KK_API_BASE_URL") || "";
+  const normalizedRaw = rawEnvValue.trim().toLowerCase();
   const runtimeOrigin = readRuntimeOrigin();
 
+  const isForceProxy = normalizedRaw === "proxy"
+    || normalizedRaw === "self"
+    || normalizedRaw === "relative"
+    || normalizedRaw === "/"
+    || (readRuntimeEnv("VITE_FORCE_REWRITE_PROXY") || "").trim().toLowerCase() === "true";
+
+  if (isForceProxy && runtimeOrigin) {
+    return runtimeOrigin;
+  }
+
+  const configuredBaseUrl = normalizeConfiguredApiBaseUrl(rawEnvValue);
   if (configuredBaseUrl) {
     if (shouldPreferRuntimeOriginForLocalApi(configuredBaseUrl, runtimeOrigin)) {
       return runtimeOrigin!;
