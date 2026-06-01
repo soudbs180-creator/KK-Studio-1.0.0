@@ -4076,9 +4076,29 @@ export async function autoDetectAndConfigureModels(
     }
 
     if (models.length === 0 && runtime.strategyId === 'wuyinkeji' && baseUrl) {
-        // 简体中文注释：对于五音科技，直接拉取全量模型的最新计费，不再根据 baseUrl 里的模型后缀做过滤
-        const catalog = await fetchWuyinPricingCatalog(baseUrl);
-        models = catalog.map((item) => item.modelId).filter(Boolean);
+        try {
+            // 简体中文注释：对于五音科技，直接拉取全量模型的最新计费，若跨域或网络失败，则优雅降级为静态默认模型列表
+            const catalog = await fetchWuyinPricingCatalog(baseUrl);
+            models = catalog.map((item) => item.modelId).filter(Boolean);
+        } catch (err) {
+            console.warn('[KeyManager] Failed to fetch Wuyin catalog dynamically, using static fallback models:', err);
+            models = [
+                'video_google_omni',
+                'video_vidu',
+                'video_omni',
+                'Digital_Humans',
+                'Package_1.0',
+                'veo3.1_fast',
+                'grok_imagine',
+                'Wan2.6',
+                'image_gpt',
+                'image_nanoBanana2',
+                'image_nanoBanana_pro',
+                'image_nanoBanana',
+                'image_grok_imagine',
+                'image_sora'
+            ];
+        }
     } else if (models.length === 0 && resolvedFormat === 'gemini') {
         models = await fetchGeminiCompatModels(apiKey, baseUrl);
     } else if (models.length === 0 && apiType === 'google-official') {

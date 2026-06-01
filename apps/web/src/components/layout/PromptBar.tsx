@@ -1206,6 +1206,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
     // 🚀 [供应商分组模型库] 手机端与电脑端当前选中的供应商 ID (为 null 时显示供应商大组)
     const [desktopActiveProvider, setDesktopActiveProvider] = useState<string | null>(null);
     const [mobileActiveProvider, setMobileActiveProvider] = useState<string | null>(null);
+    const [hoveredDragProvider, setHoveredDragProvider] = useState<string | null>(null);
     
     // 供应商排序状态持久化
     const [providerOrder, setProviderOrder] = useState<string[]>(() => {
@@ -3500,7 +3501,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             return (
                                                 <div
                                                     key={group.provider}
-                                                    draggable
+                                                    draggable={hoveredDragProvider === group.provider}
                                                     onDragStart={(e) => handleProviderDragStart(e, index)}
                                                     onDragOver={(e: React.DragEvent<HTMLDivElement>) => handleProviderDragOver(e, index)}
                                                     onDragEnd={handleProviderDragEnd}
@@ -3513,7 +3514,11 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 >
                                                     <div className="flex items-center gap-2.5 min-w-0">
                                                         {/* 拖拽指示手柄 */}
-                                                        <div className="text-[var(--text-tertiary)] cursor-grab active:cursor-grabbing hover:text-[var(--text-secondary)] opacity-40 hover:opacity-100 pr-1 flex items-center shrink-0">
+                                                        <div 
+                                                            onMouseEnter={() => setHoveredDragProvider(group.provider)}
+                                                            onMouseLeave={() => setHoveredDragProvider(null)}
+                                                            className="text-[var(--text-tertiary)] cursor-grab active:cursor-grabbing hover:text-[var(--text-secondary)] opacity-40 hover:opacity-100 pr-1 flex items-center shrink-0"
+                                                        >
                                                             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                                                                 <circle cx="9" cy="5" r="1" />
                                                                 <circle cx="9" cy="12" r="1" />
@@ -4534,6 +4539,20 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         </div>
                     )}
                 </div>
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => {
+                        if (e.target.files) {
+                            processFiles(e.target.files);
+                        }
+                        // Allow retrying the exact same file after a failed read.
+                        e.target.value = '';
+                    }}
+                />
             </div>
         );
     }

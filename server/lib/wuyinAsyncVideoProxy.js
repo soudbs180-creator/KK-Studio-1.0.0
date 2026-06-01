@@ -119,7 +119,10 @@ function resolveWuyinVideoRequestRoute(baseUrl, modelId) {
     };
   }
 
-  throw new Error(`Wuyin provider does not know how to route video model "${modelId || ''}". Please use video_google_omni.`);
+  return {
+    endpointPath: `/api/async/${rawModelId}`,
+    endpointModelId: rawModelId,
+  };
 }
 
 function isWuyinBaseUrl(baseUrl) {

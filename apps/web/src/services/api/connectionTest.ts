@@ -32,7 +32,12 @@ import {
 import { resolveProviderRuntime } from './providerStrategy';
 import { resolveProviderProbeMatrix } from './providerProbeMatrix.ts';
 import { resolveChatSurface } from './providerSurfaceRouter.ts';
-import { fetchWuyinPricingCatalog, selectWuyinCatalogModels } from '../billing/newApiPricingService';
+import {
+  fetchWuyinPricingCatalog,
+  selectWuyinCatalogModels,
+  extractWuyinModelIdFromBaseUrl,
+  extractWuyinAsyncEndpointDetails,
+} from '../billing/newApiPricingService';
 import keyManager, { getDocumentedStaticModelsForProvider } from '../auth/keyManager';
 
 export interface TestResult {
@@ -535,10 +540,26 @@ export async function testModelsList(config: ConnectionConfig): Promise<TestResu
       documentedModels,
     });
     if (runtime.strategyId === 'wuyinkeji') {
-      const pricingCatalog = selectWuyinCatalogModels(
-        cleanBase || resolved.baseUrl,
-        await fetchWuyinPricingCatalog(cleanBase || resolved.baseUrl)
-      );
+      let pricingCatalog: any[] = [];
+      try {
+        pricingCatalog = selectWuyinCatalogModels(
+          cleanBase || resolved.baseUrl,
+          await fetchWuyinPricingCatalog(cleanBase || resolved.baseUrl)
+        );
+      } catch (err) {
+        console.warn('[ConnectionTest] Failed to fetch Wuyin pricing catalog dynamically, using fallback.', err);
+        const fallbackModelId = extractWuyinModelIdFromBaseUrl(cleanBase || resolved.baseUrl) || getModelId(resolved) || 'video_google_omni';
+        const details = extractWuyinAsyncEndpointDetails(cleanBase || resolved.baseUrl);
+        pricingCatalog = [{
+          modelId: fallbackModelId,
+          modelName: fallbackModelId,
+          numeric: 0.1,
+          unit: '张',
+          displayPrice: '待手动设置',
+          endpointUrl: `${cleanBase || resolved.baseUrl}`,
+          endpointPath: details?.endpointPath || `/api/async/${fallbackModelId}`
+        }];
+      }
 
       return {
         success: true,
