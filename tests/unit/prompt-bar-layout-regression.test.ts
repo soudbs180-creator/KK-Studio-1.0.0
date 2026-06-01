@@ -137,7 +137,7 @@ test('prompt bar centers the desktop model dropdown on the trigger instead of le
   assert.doesNotMatch(promptBarSource, /className="absolute left-0 bottom-full mb-3 z-50 animate-fadeIn origin-bottom"/);
   assert.match(
     promptBarSource,
-    /className="absolute left-1\/2 bottom-full mb-3 z-50 -translate-x-1\/2 animate-fadeIn origin-bottom"/,
+    /className="fixed z-\[10000\] animate-fadeIn origin-bottom"/,
   );
 });
 

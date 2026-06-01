@@ -34,6 +34,34 @@ const WUYIN_VIDEO_ROUTES: WuyinVideoRoute[] = [
             'omni google',
         ],
     },
+    {
+        endpointPath: '/api/async/video_vidu',
+        aliases: ['video_vidu', 'vidu'],
+    },
+    {
+        endpointPath: '/api/async/video_omni',
+        aliases: ['video_omni', 'kling omni', 'video omni'],
+    },
+    {
+        endpointPath: '/api/async/video_digital_humans',
+        aliases: ['video_digital_humans', 'digital_humans', 'digital humans'],
+    },
+    {
+        endpointPath: '/api/async/video_package',
+        aliases: ['video_package', 'package_1.0', 'package 1.0'],
+    },
+    {
+        endpointPath: '/api/async/video_veo3.1_fast',
+        aliases: ['video_veo3.1_fast', 'veo3.1_fast', 'veo 3.1 fast'],
+    },
+    {
+        endpointPath: '/api/async/video_grok_imagine',
+        aliases: ['video_grok_imagine', 'grok_imagine', 'grok imagine video'],
+    },
+    {
+        endpointPath: '/api/async/video_wan2.6',
+        aliases: ['video_wan2.6', 'wan2.6', 'wan26', 'wan video'],
+    },
 ];
 
 function asRecord(value: unknown): Record<string, unknown> | null {

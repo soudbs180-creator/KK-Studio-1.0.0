@@ -267,7 +267,7 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
   { name: 'NVIDIA', url: 'https://build.nvidia.com/models', baseUrl: 'https://integrate.api.nvidia.com/v1', format: 'openai', color: '#76b900', modelId: 'nvidia/llama-3.1-nemotron-ultra-253b-v1', logoName: 'nvidia nemotron', kind: 'official' },
   { name: 'OpenRouter', url: 'https://openrouter.ai', baseUrl: 'https://openrouter.ai/api/v1', format: 'openai', color: '#9ca3af', modelId: 'openai/gpt-4o', logoName: 'openrouter', kind: 'relay', keyLinks: [{ labelZh: '获取 API Key', labelEn: 'Get API Key', url: 'https://openrouter.ai/settings/keys' }, { labelZh: '接口文档', labelEn: 'API docs', url: 'https://openrouter.ai/docs' }] },
   { name: 'WorldRouter', url: 'https://www.worldrouter.ai', baseUrl: 'https://inference-api.worldrouter.ai/v1', format: 'openai', color: '#38bdf8', modelId: '', logoName: 'worldrouter', kind: 'relay' },
-  { name: '速创 api', url: 'https://api.wuyinkeji.com/type/all', baseUrl: 'https://api.wuyinkeji.com/api/async/detail', format: 'openai', color: '#0891b2', modelId: 'video_google_omni', logoName: '速', kind: 'relay', keyLinks: [{ labelZh: '获取 API Key', labelEn: 'Get API Key', url: 'https://api.wuyinkeji.com/user/register?cps=KCyv1E6I' }, { labelZh: '接口文档', labelEn: 'API docs', url: 'https://api.wuyinkeji.com/doc/72' }] },
+  { name: '速创 API', url: 'https://api.wuyinkeji.com/type/all', baseUrl: 'https://api.wuyinkeji.com', format: 'openai', color: '#0891b2', modelId: 'video_google_omni', logoName: '速', kind: 'relay', keyLinks: [{ labelZh: '获取 API Key', labelEn: 'Get API Key', url: 'https://api.wuyinkeji.com/user/register?cps=KCyv1E6I' }, { labelZh: '接口文档', labelEn: 'API docs', url: 'https://api.wuyinkeji.com/doc/72' }] },
   { name: 'B.ai', url: 'https://b.ai', baseUrl: 'https://api.theb.ai/v1', format: 'openai', color: '#a855f7', modelId: '', logoName: 'b.ai', kind: 'relay' },
 ];
 
@@ -283,6 +283,9 @@ const buildProviderEditorPath = (providerId?: string | null) =>
 
 const buildDefaultProviderPricingEndpoint = (baseUrl?: string) => {
   const normalized = String(baseUrl || '').trim().replace(/\/+$/, '');
+  if (/api\.wuyinkeji\.com|wuyinkeji/i.test(normalized)) {
+    return 'https://api.wuyinkeji.com/themes/DigitalBlue/api?action=api_list';
+  }
   return normalized ? `${normalized}/models` : '';
 };
 

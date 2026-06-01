@@ -208,18 +208,43 @@ export const buildProviderPricingSnapshot = (
   };
 
   for (const item of Array.isArray(pricingData) ? pricingData : []) {
-    const model = String(item?.model || item?.model_name || '').trim();
+    const model = String(
+      item?.model ||
+      item?.model_id ||
+      item?.modelId ||
+      item?.model_name ||
+      item?.modelName ||
+      item?.id ||
+      ''
+    ).trim();
     if (!model) continue;
 
-    const perRequestPrice = toNumber(item?.per_request_price ?? item?.perRequestPrice ?? item?.price_per_image ?? item?.pricePerImage);
-    const modelPrice = toNumber(item?.model_price ?? item?.modelPrice) ?? perRequestPrice;
+    const perRequestPrice = toNumber(
+      item?.per_request_price ??
+      item?.perRequestPrice ??
+      item?.price_per_image ??
+      item?.pricePerImage ??
+      item?.inputPrice ??
+      item?.input_price ??
+      item?.balance_sum
+    );
+    const modelPrice = toNumber(
+      item?.model_price ??
+      item?.modelPrice ??
+      item?.price ??
+      item?.inputPrice ??
+      item?.input_price ??
+      item?.balance_sum
+    ) ?? perRequestPrice;
     const modelRatio = toNumber(item?.model_ratio);
     const completionRatio = toNumber(item?.completion_ratio);
     const quotaType = item?.quota_type ?? item?.quotaType ?? (perRequestPrice !== undefined ? 'per_request' : undefined);
     const provider = typeof item?.provider === 'string' ? item.provider.trim() : undefined;
     const providerLabel = typeof item?.provider_label === 'string' ? item.provider_label.trim() : undefined;
     const providerLogo = typeof item?.provider_logo === 'string' ? item.provider_logo.trim() : undefined;
-    const description = typeof item?.description === 'string' ? item.description.trim() : undefined;
+    const description = typeof item?.description === 'string'
+      ? item.description.trim()
+      : (typeof item?.the === 'string' ? item.the.trim() : undefined);
     const tags = Array.isArray(item?.tags)
       ? item.tags.map((value: unknown) => String(value || '').trim()).filter(Boolean)
       : normalizeStringArray(item?.tags);
@@ -244,8 +269,12 @@ export const buildProviderPricingSnapshot = (
     const currency = typeof item?.currency === 'string' ? item.currency.trim() : undefined;
     const billingUnit = typeof item?.pay_unit === 'string'
       ? item.pay_unit.trim()
-      : (typeof item?.billing_unit === 'string' ? item.billing_unit.trim() : undefined);
-    const displayPrice = typeof item?.display_price === 'string' ? item.display_price.trim() : undefined;
+      : (typeof item?.billing_unit === 'string'
+        ? item.billing_unit.trim()
+        : (typeof item?.billingUnit === 'string' ? item.billingUnit.trim() : undefined));
+    const displayPrice = typeof item?.display_price === 'string'
+      ? item.display_price.trim()
+      : (typeof item?.displayPrice === 'string' ? item.displayPrice.trim() : undefined);
     const sizeRatio = normalizeRatioMap(item?.size_ratio);
     const groupModelRatio = normalizeRatioMap(item?.group_model_ratio);
     const groupSizeRatio = normalizeNestedRatioMap(item?.group_size_ratio);

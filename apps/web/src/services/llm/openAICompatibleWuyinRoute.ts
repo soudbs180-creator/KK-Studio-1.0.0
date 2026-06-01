@@ -23,6 +23,16 @@ export const WUYIN_DETAIL_PATH = '/api/async/detail';
 
 const WUYIN_IMAGE_ROUTES: WuyinImageRoute[] = [
     {
+        endpointPath: '/api/async/image_gpt',
+        aliases: [
+            'image_gpt',
+            'gpt-image-2',
+            'gpt image 2',
+            'gptimage2',
+            'GPT-Image-2',
+        ],
+    },
+    {
         endpointPath: '/api/async/image_nanoBanana2',
         aliases: [
             'image_nanobanana2',
@@ -70,6 +80,17 @@ const WUYIN_IMAGE_ROUTES: WuyinImageRoute[] = [
         aliases: [
             'image_sora',
             'sora',
+        ],
+    },
+    {
+        endpointPath: '/api/async/image_wan2.6',
+        aliases: [
+            'image_wan2.6',
+            'image_wan26',
+            'wan2.6',
+            'wan26',
+            'wan2.6 image',
+            'wan image',
         ],
     },
 ];
@@ -190,7 +211,7 @@ export function resolveWuyinSnapshotRoute(
             '';
         if (!endpointPath) continue;
 
-        const entryModel = readString(entry, 'model', 'model_name');
+        const entryModel = readString(entry, 'model', 'model_id', 'modelId', 'model_name', 'modelName', 'id');
         const endpointModelId = endpointPath.split('/').filter(Boolean).pop() || entryModel || rawModelId;
         const modelCandidates = [entryModel, endpointModelId].filter(Boolean);
         const matched = modelCandidates.some((candidate) => {

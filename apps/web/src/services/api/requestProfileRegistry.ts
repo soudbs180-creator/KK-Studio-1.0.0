@@ -88,7 +88,7 @@ const REQUEST_PROFILES: RequestProfile[] = [
     id: "wuyinkeji",
     displayName: "Wuyin Keji",
     docSources: ["https://api.wuyinkeji.com/doc/65", "https://api.wuyinkeji.com/doc/72"],
-    providerAliases: ["wuyin", "wuyin keji", "wuyinkeji", "wu yin"],
+    providerAliases: ["wuyin", "wuyin keji", "wuyinkeji", "wu yin", "suchuang", "su chuang"],
     docsUrlPatterns: [/^https?:\/\/api\.wuyinkeji\.com\/doc\/\d+(?:$|[?#])/i],
     hostPatterns: [/^api\.wuyinkeji\.com$/i],
     basePatterns: [/api\.wuyinkeji\.com/i, /wuyinkeji/i],

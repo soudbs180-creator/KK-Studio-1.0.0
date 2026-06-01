@@ -9,6 +9,24 @@ export interface KeyManagerProviderPreset {
     defaultApiKey?: string;
 }
 
+export const WUYIN_PRESET_MODELS = [
+    'video_google_omni',
+    'video_vidu',
+    'video_omni',
+    'video_digital_humans',
+    'video_package',
+    'video_veo3.1_fast',
+    'video_grok_imagine',
+    'video_wan2.6',
+    'image_gpt',
+    'image_nanoBanana2',
+    'image_grok_imagine',
+    'image_nanoBanana_pro',
+    'image_nanoBanana',
+    'image_wan2.6',
+    'audio_tts',
+];
+
 /**
  * Preset third-party API providers.
  */
@@ -133,9 +151,9 @@ export const PROVIDER_PRESETS: Record<string, KeyManagerProviderPreset> = {
         icon: '\u{1F96D}'
     },
     'wuyinkeji-google-omni': {
-        name: '速创 api',
-        baseUrl: 'https://api.wuyinkeji.com/api/async/detail',
-        models: ['video_google_omni', 'image_nanoBanana2', 'video_wan2.6', 'video_vidu', 'video_omni'],
+        name: '速创 API',
+        baseUrl: 'https://api.wuyinkeji.com',
+        models: WUYIN_PRESET_MODELS,
         format: 'openai',
         icon: '速'
     },

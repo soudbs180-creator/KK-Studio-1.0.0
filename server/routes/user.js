@@ -26,6 +26,103 @@ const router = express.Router();
 const ACCESS_TOKEN_COOKIE_NAME = 'kk.api.access_token';
 const REFRESH_TOKEN_COOKIE_NAME = 'kk.api.refresh_token';
 const AUTH_COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+const WUYIN_PRICE_CATALOG_URL = 'https://api.wuyinkeji.com/themes/DigitalBlue/api?action=api_list';
+const WUYIN_FALLBACK_CATALOG = [
+  { modelId: 'video_google_omni', modelName: 'google_omni', endpointPath: '/api/async/video_google_omni', inputPrice: 0.1, unit: '秒' },
+  { modelId: 'video_vidu', modelName: 'video_vidu', endpointPath: '/api/async/video_vidu', inputPrice: 1, unit: '秒' },
+  { modelId: 'video_omni', modelName: 'video_omni', endpointPath: '/api/async/video_omni', inputPrice: 1, unit: '秒' },
+  { modelId: 'video_digital_humans', modelName: 'Digital_Humans', endpointPath: '/api/async/video_digital_humans', inputPrice: 0.02, unit: '秒' },
+  { modelId: 'video_package', modelName: 'Package_1.0', endpointPath: '/api/async/video_package', inputPrice: 0.01, unit: '秒' },
+  { modelId: 'video_veo3.1_fast', modelName: 'veo3.1_fast', endpointPath: '/api/async/video_veo3.1_fast', inputPrice: 0.05, unit: '秒' },
+  { modelId: 'video_grok_imagine', modelName: 'grok_imagine', endpointPath: '/api/async/video_grok_imagine', inputPrice: 0.05, unit: '秒' },
+  { modelId: 'video_wan2.6', modelName: 'Wan2.6', endpointPath: '/api/async/video_wan2.6', inputPrice: 0.8, unit: '秒' },
+  { modelId: 'image_gpt', modelName: 'GPT-Image-2', endpointPath: '/api/async/image_gpt', inputPrice: 0.1, unit: '张' },
+  { modelId: 'image_nanoBanana2', modelName: 'NanoBanana2', endpointPath: '/api/async/image_nanoBanana2', inputPrice: 0.1, unit: '张' },
+  { modelId: 'image_grok_imagine', modelName: 'grok_imagine', endpointPath: '/api/async/image_grok_imagine', inputPrice: 0.1, unit: '张' },
+  { modelId: 'image_nanoBanana_pro', modelName: 'NanoBanana_pro', endpointPath: '/api/async/image_nanoBanana_pro', inputPrice: 0.3, unit: '张' },
+  { modelId: 'image_nanoBanana', modelName: 'NanoBanana', endpointPath: '/api/async/image_nanoBanana', inputPrice: 0.1, unit: '张' },
+  { modelId: 'image_wan2.6', modelName: 'Wan2.6', endpointPath: '/api/async/image_wan2.6', inputPrice: 0.2, unit: '张' },
+  { modelId: 'audio_tts', modelName: '语音合成', endpointPath: '/api/async/audio_tts', inputPrice: 0.0006, unit: '字符' },
+];
+
+function deriveWuyinModelIdFromEndpointPath(endpointPath) {
+  const path = String(endpointPath || '').trim().replace(/\/+$/, '');
+  const asyncMatch = path.match(/^\/api\/async\/([a-z0-9_.-]+)$/i);
+  if (asyncMatch && !/^detail$/i.test(asyncMatch[1])) return decodeURIComponent(asyncMatch[1]);
+  const match = path.match(/^\/api\/([a-z0-9_.-]+(?:\/[a-z0-9_.-]+)*)$/i);
+  if (!match) return '';
+  const parts = match[1].split('/').filter(Boolean);
+  if (parts.length >= 2 && /^submit$/i.test(parts[parts.length - 1])) {
+    return parts.slice(0, -1).join('_');
+  }
+  return parts.join('_');
+}
+
+function extractWuyinEndpointPath(url) {
+  const raw = String(url || '').trim();
+  if (!raw) return '';
+  try {
+    const parsed = new URL(/^https?:\/\//i.test(raw) ? raw : `https://api.wuyinkeji.com${raw.startsWith('/') ? raw : `/${raw}`}`);
+    return parsed.pathname.replace(/\/+$/, '');
+  } catch {
+    return '';
+  }
+}
+
+function toWuyinCatalogRow(item) {
+  const endpointPath = extractWuyinEndpointPath(item && item.url);
+  const modelId = deriveWuyinModelIdFromEndpointPath(endpointPath) || String(item && (item.name || item.id) || '').trim();
+  const unit = String(item && item.pay_unit || '').trim() || '次';
+  const inputPrice = Number(item && item.balance_sum);
+  const numeric = Number.isFinite(inputPrice) ? inputPrice : 0;
+  return {
+    modelId,
+    modelName: String(item && item.name || modelId).trim(),
+    inputPrice: numeric,
+    unit,
+    displayPrice: `${numeric}元/${unit}`,
+    endpointUrl: endpointPath ? `https://api.wuyinkeji.com${endpointPath}` : String(item && item.url || '').trim(),
+    endpointPath,
+    method: String(item && item.method || '').trim().toUpperCase() || undefined,
+    apiType: String(item && item.api_type || '').trim() || undefined,
+    tags: Array.isArray(item && item.tags) ? item.tags : undefined,
+  };
+}
+
+function isWuyinGeneratableCatalogRow(row) {
+  return /^\/api\/async\/(image|video|audio)_[a-z0-9_.-]+$/i.test(String(row && row.endpointPath || '').trim());
+}
+
+function getWuyinFallbackPricingRows() {
+  return WUYIN_FALLBACK_CATALOG.map((entry) => ({
+    modelId: entry.modelId,
+    modelName: entry.modelName,
+    inputPrice: entry.inputPrice,
+    numeric: entry.inputPrice,
+    unit: entry.unit,
+    displayPrice: `${entry.inputPrice}元/${entry.unit}`,
+    endpointUrl: `https://api.wuyinkeji.com${entry.endpointPath}`,
+    endpointPath: entry.endpointPath,
+  }));
+}
+
+async function fetchWuyinPricingRows() {
+  const response = await fetch(WUYIN_PRICE_CATALOG_URL, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': 'KK-Studio/1.0',
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Wuyin catalog returned HTTP ${response.status}`);
+  }
+  const payload = await response.json();
+  const apiList = Array.isArray(payload && payload.data && payload.data.api_list)
+    ? payload.data.api_list
+    : [];
+  return apiList.map(toWuyinCatalogRow).filter((row) => row.modelId);
+}
 
 function getRequiredPasswordSalt() {
   if (!process.env.PASSWORD_SALT) {
@@ -1020,35 +1117,28 @@ router.post('/v1/profile/user-routes/:routeId/connectivity', requireProfileAuth,
   const cleanBase = String(route.baseUrl || '').trim().replace(/\/$/, '');
   const format = route.format || 'openai';
 
-  // 连通性测试：如果是五音科技（wuyinkeji），用高容灾性的 14 个模型兜底
+  // Wuyin/Suchuang exposes its catalog through a site endpoint, not /v1/models.
   const isWuyin = routeId === 'wuyinkeji' || /wuyin/i.test(route.name) || /wuyinkeji/i.test(route.baseUrl);
 
   if (isWuyin) {
-    const fallbackModelIds = [
-      'video_google_omni',
-      'video_vidu',
-      'video_omni',
-      'Digital_Humans',
-      'Package_1.0',
-      'veo3.1_fast',
-      'grok_imagine',
-      'Wan2.6',
-      'image_gpt',
-      'image_nanoBanana2',
-      'image_nanoBanana_pro',
-      'image_nanoBanana',
-      'image_grok_imagine',
-      'image_sora'
-    ];
+    let pricingRows = [];
+    try {
+      pricingRows = await fetchWuyinPricingRows();
+    } catch (error) {
+      console.warn('[user-routes] Failed to fetch Wuyin catalog, using fallback models:', error && error.message || error);
+      pricingRows = getWuyinFallbackPricingRows();
+    }
+    const generatableRows = pricingRows.filter(isWuyinGeneratableCatalogRow);
+    const modelIds = (generatableRows.length ? generatableRows : getWuyinFallbackPricingRows()).map((row) => row.modelId);
 
     return res.json({
       success: true,
       data: {
         routeId,
         ok: true,
-        endpointUrl: route.baseUrl,
+        endpointUrl: WUYIN_PRICE_CATALOG_URL,
         resolvedFormat: 'openai',
-        models: fallbackModelIds
+        models: Array.from(new Set(modelIds))
       },
       meta: buildMeta(req)
     });
@@ -1150,39 +1240,20 @@ router.post('/v1/profile/user-routes/:routeId/pricing-sync', requireProfileAuth,
   const isWuyin = routeId === 'wuyinkeji' || /wuyin/i.test(route.name) || /wuyinkeji/i.test(route.baseUrl);
 
   if (isWuyin) {
-    const fallbackModelIds = [
-      'video_google_omni',
-      'video_vidu',
-      'video_omni',
-      'Digital_Humans',
-      'Package_1.0',
-      'veo3.1_fast',
-      'grok_imagine',
-      'Wan2.6',
-      'image_gpt',
-      'image_nanoBanana2',
-      'image_nanoBanana_pro',
-      'image_nanoBanana',
-      'image_grok_imagine',
-      'image_sora'
-    ];
-
-    const pricingData = fallbackModelIds.map((modelId) => ({
-      modelId,
-      modelName: modelId,
-      numeric: 0.1,
-      unit: '次',
-      displayPrice: '待手动设置',
-      endpointUrl: `${route.baseUrl}`,
-      endpointPath: `/api/async/${modelId}`
-    }));
+    let pricingData = [];
+    try {
+      pricingData = await fetchWuyinPricingRows();
+    } catch (error) {
+      console.warn('[user-routes] Failed to fetch Wuyin pricing catalog, using fallback pricing:', error && error.message || error);
+      pricingData = getWuyinFallbackPricingRows();
+    }
 
     return res.json({
       success: true,
       data: {
         routeId,
         ok: true,
-        endpointUrl: route.baseUrl,
+        endpointUrl: WUYIN_PRICE_CATALOG_URL,
         count: pricingData.length,
         pricingData,
         groupRatio: {}

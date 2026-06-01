@@ -3,6 +3,16 @@ const WUYIN_ASYNC_VIDEO_DETAIL_PATH = '/api/async/detail';
 const WUYIN_ASYNC_VIDEO_DEFAULT_ENDPOINT_PATH = '/api/async/video_google_omni';
 const WUYIN_ASYNC_VIDEO_DEFAULT_MODEL = 'video_google_omni';
 const LOCAL_PROXY_TASK_PREFIX = 'local_proxy:';
+const WUYIN_ASYNC_VIDEO_ROUTE_ALIASES = [
+  { endpointPath: WUYIN_ASYNC_VIDEO_DEFAULT_ENDPOINT_PATH, aliases: ['video_google_omni', 'google_omni', 'google omni', 'omni google'] },
+  { endpointPath: '/api/async/video_vidu', aliases: ['video_vidu', 'vidu'] },
+  { endpointPath: '/api/async/video_omni', aliases: ['video_omni', 'kling omni', 'video omni'] },
+  { endpointPath: '/api/async/video_digital_humans', aliases: ['video_digital_humans', 'digital_humans', 'digital humans'] },
+  { endpointPath: '/api/async/video_package', aliases: ['video_package', 'package_1.0', 'package 1.0'] },
+  { endpointPath: '/api/async/video_veo3.1_fast', aliases: ['video_veo3.1_fast', 'veo3.1_fast', 'veo 3.1 fast'] },
+  { endpointPath: '/api/async/video_grok_imagine', aliases: ['video_grok_imagine', 'grok_imagine', 'grok imagine video'] },
+  { endpointPath: '/api/async/video_wan2.6', aliases: ['video_wan2.6', 'wan2.6', 'wan26', 'wan video'] },
+];
 
 function normalizeWuyinVideoBaseUrl(baseUrl) {
   const raw = String(baseUrl || '').trim();
@@ -109,6 +119,16 @@ function resolveWuyinVideoRequestRoute(baseUrl, modelId) {
     return {
       endpointPath: `/api/async/${rawModelId}`,
       endpointModelId: rawModelId,
+    };
+  }
+
+  const matchedRoute = WUYIN_ASYNC_VIDEO_ROUTE_ALIASES.find((route) =>
+    route.aliases.some((alias) => normalizeWuyinVideoModelAlias(alias) === normalized)
+  );
+  if (matchedRoute) {
+    return {
+      endpointPath: matchedRoute.endpointPath,
+      endpointModelId: matchedRoute.endpointPath.split('/').pop() || WUYIN_ASYNC_VIDEO_DEFAULT_MODEL,
     };
   }
 

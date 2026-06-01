@@ -76,6 +76,28 @@ describe("OpenAI-compatible Wuyin route helpers", () => {
         endpointModelId: "image_nanoBanana_pro",
       },
     );
+
+    assert.deepEqual(
+      resolveWuyinRequestRoute({
+        baseUrl: "https://api.wuyinkeji.com",
+        modelId: "GPT-Image-2",
+      }),
+      {
+        endpointPath: "/api/async/image_gpt",
+        endpointModelId: "image_gpt",
+      },
+    );
+
+    assert.deepEqual(
+      resolveWuyinRequestRoute({
+        baseUrl: "https://api.wuyinkeji.com",
+        modelId: "image_wan2.6",
+      }),
+      {
+        endpointPath: "/api/async/image_wan2.6",
+        endpointModelId: "image_wan2.6",
+      },
+    );
   });
 
   test("normalizes Wuyin size, aspect ratio, reference images, and task status", () => {

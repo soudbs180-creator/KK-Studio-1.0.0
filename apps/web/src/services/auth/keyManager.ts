@@ -141,7 +141,7 @@ import {
     fetchRawPricingCatalog,
     fetchWuyinPricingCatalog,
     getCachedPricingByBaseUrl,
-    selectWuyinCatalogModels,
+    selectWuyinGeneratableCatalogModels,
 } from '../billing/newApiPricingService';
 import { applyModelPricingOverrides } from '../model/modelPricingOverrideBridge';
 import { notify } from '../system/notificationService';
@@ -4061,7 +4061,34 @@ export async function autoDetectAndConfigureModels(
         models = documentedModels;
     }
 
-    if (models.length === 0 && baseUrl && runtime.pricingSupport === 'native' && runtime.strategyId !== '12ai') {
+    if (models.length === 0 && runtime.strategyId === 'wuyinkeji' && baseUrl) {
+        try {
+            // 简体中文注释：对于五音科技，先拉取官方产品目录，再只把当前应用可直接生成的异步模型放进选择列表。
+            const catalog = await fetchWuyinPricingCatalog(baseUrl);
+            models = selectWuyinGeneratableCatalogModels(catalog).map((item) => item.modelId).filter(Boolean);
+        } catch (err) {
+            console.warn('[KeyManager] Failed to fetch Wuyin catalog dynamically, using static fallback models:', err);
+            models = [
+                'video_google_omni',
+                'video_vidu',
+                'video_omni',
+                'video_digital_humans',
+                'video_package',
+                'video_veo3.1_fast',
+                'video_grok_imagine',
+                'video_wan2.6',
+                'image_gpt',
+                'image_nanoBanana2',
+                'image_grok_imagine',
+                'image_nanoBanana_pro',
+                'image_nanoBanana',
+                'image_wan2.6',
+                'audio_tts',
+            ];
+        }
+    }
+
+    if (models.length === 0 && baseUrl && runtime.pricingSupport === 'native' && runtime.strategyId !== '12ai' && runtime.strategyId !== 'wuyinkeji') {
         try {
             const pricingCatalog = await fetchRawPricingCatalog(baseUrl, apiKey, resolvedFormat);
             const pricingModels = extractModelIdsFromPricingData(pricingCatalog?.pricingData || []);
@@ -4075,31 +4102,7 @@ export async function autoDetectAndConfigureModels(
         }
     }
 
-    if (models.length === 0 && runtime.strategyId === 'wuyinkeji' && baseUrl) {
-        try {
-            // 简体中文注释：对于五音科技，直接拉取全量模型的最新计费，若跨域或网络失败，则优雅降级为静态默认模型列表
-            const catalog = await fetchWuyinPricingCatalog(baseUrl);
-            models = catalog.map((item) => item.modelId).filter(Boolean);
-        } catch (err) {
-            console.warn('[KeyManager] Failed to fetch Wuyin catalog dynamically, using static fallback models:', err);
-            models = [
-                'video_google_omni',
-                'video_vidu',
-                'video_omni',
-                'Digital_Humans',
-                'Package_1.0',
-                'veo3.1_fast',
-                'grok_imagine',
-                'Wan2.6',
-                'image_gpt',
-                'image_nanoBanana2',
-                'image_nanoBanana_pro',
-                'image_nanoBanana',
-                'image_grok_imagine',
-                'image_sora'
-            ];
-        }
-    } else if (models.length === 0 && resolvedFormat === 'gemini') {
+    if (models.length === 0 && resolvedFormat === 'gemini') {
         models = await fetchGeminiCompatModels(apiKey, baseUrl);
     } else if (models.length === 0 && apiType === 'google-official') {
         models = await fetchGoogleModels(apiKey);

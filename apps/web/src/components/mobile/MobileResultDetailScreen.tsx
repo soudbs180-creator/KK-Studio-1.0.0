@@ -156,10 +156,16 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
 }) => {
   const [currentGroupImageIndex, setCurrentGroupImageIndex] = React.useState(0);
   const [showRedrawWorkspace, setShowRedrawWorkspace] = React.useState(false);
+  const [imgLoadError, setImgLoadError] = React.useState(false);
 
   React.useEffect(() => {
     setCurrentGroupImageIndex(0);
+    setImgLoadError(false);
   }, [entry.id]);
+
+  React.useEffect(() => {
+    setImgLoadError(false);
+  }, [currentGroupImageIndex]);
 
   const hasGroup = entry.groupEntries && entry.groupEntries.length > 0;
   const currentActiveEntry = hasGroup && entry.groupEntries![currentGroupImageIndex]
@@ -325,11 +331,44 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
         onTouchEnd={handleTouchEnd}
       >
         <div className="relative overflow-hidden rounded-[12px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]">
-          {currentActiveEntry.displaySrc ? (
-            <img src={currentActiveEntry.displaySrc} alt={promptSummary} className="h-auto w-full object-cover" />
+          {currentActiveEntry.error ? (
+            <div className="flex aspect-[3/4] flex-col items-center justify-center bg-rose-950/20 p-6 text-center select-text">
+              <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-rose-500/10 border border-rose-500/20 mb-3 animate-pulse">
+                <svg className="w-7 h-7 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
+              </div>
+              <h3 className="text-base font-semibold text-rose-200 mb-2">{pick('生成失败', 'Generation Failed')}</h3>
+              <div className="rounded-[12px] bg-rose-950/40 border border-rose-500/10 px-4 py-3 max-w-full">
+                <p className="text-xs text-rose-300 leading-relaxed text-left break-words font-mono">
+                  {currentActiveEntry.error}
+                </p>
+              </div>
+            </div>
+          ) : imgLoadError ? (
+            <div className="flex aspect-[3/4] flex-col items-center justify-center bg-amber-950/20 p-6 text-center">
+              <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/20 mb-3">
+                <svg className="w-7 h-7 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
+              </div>
+              <h3 className="text-base font-semibold text-amber-200 mb-2">{pick('图片加载失败', 'Image Load Failed')}</h3>
+              <div className="rounded-[12px] bg-amber-950/40 border border-amber-500/10 px-4 py-3 max-w-full">
+                <p className="text-xs text-amber-300 leading-relaxed">
+                  {pick('无法从服务器加载该图片预览源。', 'Unable to load the image preview source from the server.')}
+                </p>
+              </div>
+            </div>
+          ) : currentActiveEntry.displaySrc ? (
+            <img 
+              src={currentActiveEntry.displaySrc} 
+              alt={promptSummary} 
+              onError={() => setImgLoadError(true)}
+              className="h-auto w-full object-cover" 
+            />
           ) : (
             <div className="flex aspect-[3/4] items-center justify-center text-[var(--text-secondary)]">
-              暂无预览
+              {pick('暂无预览', 'No Preview')}
             </div>
           )}
 

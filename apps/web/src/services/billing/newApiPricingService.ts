@@ -5,7 +5,7 @@
  * Reference: https://docs.newapi.pro/en/docs/api/management/auth
  */
 
-import { kkWebApiClient } from '../api/kkApiClient';
+import { kkWebApiClient } from '../api/kkApiClient.ts';
 import {
     applyOpenAICompatAuthToUrl,
     buildGeminiHeaders,
@@ -16,8 +16,8 @@ import {
     getApiKeyToken,
     resolveApiProtocolFormat,
     type ApiProtocolFormat,
-} from '../api/apiConfig';
-import { resolveProviderRuntime } from '../api/providerStrategy';
+} from '../api/apiConfig.ts';
+import { resolveProviderRuntime } from '../api/providerStrategy.ts';
 
 export interface ModelPricingInfo {
     modelId: string;
@@ -32,6 +32,10 @@ export interface ModelPricingInfo {
     supportsGroups?: boolean;
     endpointUrl?: string;
     endpointPath?: string;
+    method?: string;
+    apiType?: string;
+    description?: string;
+    tags?: string[];
 }
 
 export interface NewApiProviderConfig {
@@ -75,6 +79,7 @@ export const normalizePricingBaseUrl = (baseUrl: string) => {
 };
 const WUYIN_DEFAULT_ROOT_URL = 'https://api.wuyinkeji.com';
 const WUYIN_ASYNC_ENDPOINT_RE = /^\/api\/async\/([a-z0-9_.-]+)$/i;
+const WUYIN_ENDPOINT_RE = /^\/api\/([a-z0-9_.-]+(?:\/[a-z0-9_.-]+)*)$/i;
 
 export type WuyinAsyncEndpointDetails = {
     endpointUrl: string;
@@ -364,32 +369,66 @@ const scrapePricingFromHtml = (html: string): any[] => {
     return [];
 };
 
-export function extractWuyinAsyncEndpointDetails(value: string): WuyinAsyncEndpointDetails | null {
+function normalizeWuyinEndpointUrlCandidates(value: string): string[] {
+    const raw = String(value || '').trim();
+    if (!raw) return [];
+
+    if (raw.startsWith('/')) {
+        return [`${WUYIN_DEFAULT_ROOT_URL}${raw}`];
+    }
+
+    return /^https?:\/\//i.test(raw) ? [raw] : [`https://${raw}`];
+}
+
+function deriveWuyinModelIdFromEndpointPath(endpointPath: string): string {
+    const normalizedPath = String(endpointPath || '').trim().replace(/\/+$/, '');
+    const asyncMatch = normalizedPath.match(WUYIN_ASYNC_ENDPOINT_RE);
+    if (asyncMatch) {
+        return /^detail$/i.test(asyncMatch[1])
+            ? 'async_detail'
+            : decodeURIComponent(asyncMatch[1]);
+    }
+
+    const match = normalizedPath.match(WUYIN_ENDPOINT_RE);
+    if (!match) return '';
+
+    const parts = match[1].split('/').filter(Boolean);
+    if (parts.length >= 2 && /^submit$/i.test(parts[parts.length - 1])) {
+        return parts.slice(0, -1).join('_');
+    }
+
+    return parts.join('_');
+}
+
+export function extractWuyinEndpointDetails(value: string): WuyinAsyncEndpointDetails | null {
     const raw = String(value || '').trim();
     if (!raw) return null;
 
-    const directPathMatch = raw.match(WUYIN_ASYNC_ENDPOINT_RE);
-    if (directPathMatch && !/^detail$/i.test(directPathMatch[1])) {
+    const directPathMatch = raw.match(WUYIN_ENDPOINT_RE);
+    if (directPathMatch) {
         const endpointPath = raw.replace(/\/+$/, '');
+        const modelId = deriveWuyinModelIdFromEndpointPath(endpointPath);
+        if (!modelId) return null;
         return {
             endpointUrl: `${WUYIN_DEFAULT_ROOT_URL}${endpointPath}`,
             endpointPath,
-            modelId: decodeURIComponent(directPathMatch[1]),
+            modelId,
         };
     }
 
-    const candidates = /^https?:\/\//i.test(raw) ? [raw] : [`https://${raw}`];
-    for (const candidate of candidates) {
+    for (const candidate of normalizeWuyinEndpointUrlCandidates(raw)) {
         try {
             const parsed = new URL(candidate);
             const endpointPath = parsed.pathname.replace(/\/+$/, '');
-            const match = endpointPath.match(WUYIN_ASYNC_ENDPOINT_RE);
-            if (!match || /^detail$/i.test(match[1])) continue;
+            if (!WUYIN_ENDPOINT_RE.test(endpointPath)) continue;
+
+            const modelId = deriveWuyinModelIdFromEndpointPath(endpointPath);
+            if (!modelId) continue;
 
             return {
                 endpointUrl: `${parsed.protocol}//${parsed.host}${endpointPath}`,
                 endpointPath,
-                modelId: decodeURIComponent(match[1]),
+                modelId,
             };
         } catch {
             continue;
@@ -397,6 +436,19 @@ export function extractWuyinAsyncEndpointDetails(value: string): WuyinAsyncEndpo
     }
 
     return null;
+}
+
+export function extractWuyinAsyncEndpointDetails(value: string): WuyinAsyncEndpointDetails | null {
+    const endpoint = extractWuyinEndpointDetails(value);
+    if (!endpoint) return null;
+
+    const match = endpoint.endpointPath.match(WUYIN_ASYNC_ENDPOINT_RE);
+    if (!match || /^detail$/i.test(match[1])) return null;
+
+    return {
+        ...endpoint,
+        modelId: decodeURIComponent(match[1]),
+    };
 }
 
 const createFallbackWuyinCatalogItem = (modelId: string): ModelPricingInfo => ({
@@ -438,6 +490,18 @@ export function selectWuyinCatalogModels(baseUrl: string, pricingList: ModelPric
     }
 
     return [createFallbackWuyinCatalogItem(endpointModelId)];
+}
+
+export function selectWuyinGeneratableCatalogModels(pricingList: ModelPricingInfo[]): ModelPricingInfo[] {
+    const filtered = pricingList.filter((item) => {
+        const endpointPath = String(item.endpointPath || extractWuyinEndpointDetails(item.endpointUrl || '')?.endpointPath || '').trim();
+        return /^\/api\/async\/(image|video|audio)_[a-z0-9_.-]+$/i.test(endpointPath);
+    });
+
+    return filtered.length > 0 ? filtered : pricingList.filter((item) => {
+        const modelId = String(item.modelId || '').trim();
+        return /^(image|video|audio)_/i.test(modelId);
+    });
 }
 
 export function buildPricingEndpointCandidates(baseUrl: string): string[] {
@@ -604,6 +668,10 @@ function toWuyinPricingRows(pricingList: ModelPricingInfo[]): any[] {
         display_price: item.displayPrice,
         endpoint_url: item.endpointUrl,
         endpoint_path: item.endpointPath,
+        method: item.method,
+        api_type: item.apiType,
+        description: item.description,
+        tags: item.tags,
     }));
 }
 
@@ -823,9 +891,9 @@ export async function fetchProviderModels(
             format: resolvedFormat === 'gemini' ? 'gemini' : format,
         });
         if (runtime.strategyId === 'wuyinkeji') {
-            // 简体中文注释：直接获取五音科技下的全量模型后缀，保证用户可以选择任意模型
+            // 简体中文注释：价格目录保留全量产品，模型选择列表只暴露当前应用可直接发起的异步生成端点。
             const catalog = await fetchWuyinPricingCatalog(baseUrl);
-            return catalog.map((item) => item.modelId).filter(Boolean);
+            return selectWuyinGeneratableCatalogModels(catalog).map((item) => item.modelId).filter(Boolean);
         }
         const geminiAuthMethod = runtime.authMethod as 'query' | 'header';
         const response = await fetch(
@@ -873,11 +941,23 @@ type WuyinCatalogResponse = {
             id?: string | number;
             name?: string;
             url?: string;
+            the?: string;
+            method?: string;
             price?: string;
+            balance?: string | number;
             balance_sum?: string | number;
             pay_unit?: string;
             api_type?: string | number;
+            res_type?: string;
+            qps_num?: string | number;
+            daynum?: string | number;
+            task_type?: string;
             tags?: string[];
+        }>;
+        api_type_data?: Array<{
+            id?: string | number;
+            name?: string;
+            the?: string;
         }>;
     };
 };
@@ -885,6 +965,42 @@ type WuyinCatalogResponse = {
 type WuyinCatalogItem = NonNullable<NonNullable<WuyinCatalogResponse['data']>['api_list']>[number];
 
 const WUYIN_PRICE_API_PATH = '/themes/DigitalBlue/api?action=api_list';
+
+type WuyinFallbackCatalogEntry = {
+    modelId: string;
+    modelName: string;
+    endpointPath: string;
+    apiType: string;
+    inputPrice: number;
+    billingUnit: string;
+    method?: string;
+    description?: string;
+};
+
+const WUYIN_FALLBACK_CATALOG: WuyinFallbackCatalogEntry[] = [
+    { modelId: 'video_google_omni', modelName: 'google_omni', endpointPath: '/api/async/video_google_omni', apiType: '11', inputPrice: 0.1, billingUnit: '秒', method: 'POST' },
+    { modelId: 'video_vidu', modelName: 'video_vidu', endpointPath: '/api/async/video_vidu', apiType: '11', inputPrice: 1, billingUnit: '秒', method: 'POST' },
+    { modelId: 'video_omni', modelName: 'video_omni', endpointPath: '/api/async/video_omni', apiType: '11', inputPrice: 1, billingUnit: '秒', method: 'POST' },
+    { modelId: 'image_gpt', modelName: 'GPT-Image-2', endpointPath: '/api/async/image_gpt', apiType: '2', inputPrice: 0.1, billingUnit: '张', method: 'POST' },
+    { modelId: 'audio_tts', modelName: '语音合成', endpointPath: '/api/async/audio_tts', apiType: '7', inputPrice: 0.0006, billingUnit: '字符', method: 'POST' },
+    { modelId: 'video_digital_humans', modelName: 'Digital_Humans', endpointPath: '/api/async/video_digital_humans', apiType: '11', inputPrice: 0.02, billingUnit: '秒', method: 'POST' },
+    { modelId: 'image_nanoBanana2', modelName: 'NanoBanana2', endpointPath: '/api/async/image_nanoBanana2', apiType: '2', inputPrice: 0.1, billingUnit: '张', method: 'POST' },
+    { modelId: 'image_grok_imagine', modelName: 'grok_imagine', endpointPath: '/api/async/image_grok_imagine', apiType: '2', inputPrice: 0.1, billingUnit: '张', method: 'POST' },
+    { modelId: 'image_nanoBanana_pro', modelName: 'NanoBanana_pro', endpointPath: '/api/async/image_nanoBanana_pro', apiType: '2', inputPrice: 0.3, billingUnit: '张', method: 'POST' },
+    { modelId: 'image_nanoBanana', modelName: 'NanoBanana', endpointPath: '/api/async/image_nanoBanana', apiType: '2', inputPrice: 0.1, billingUnit: '张', method: 'POST' },
+    { modelId: 'video_package', modelName: 'Package_1.0', endpointPath: '/api/async/video_package', apiType: '11', inputPrice: 0.01, billingUnit: '秒', method: 'POST' },
+    { modelId: 'video_veo3.1_fast', modelName: 'veo3.1_fast', endpointPath: '/api/async/video_veo3.1_fast', apiType: '11', inputPrice: 0.05, billingUnit: '秒', method: 'POST' },
+    { modelId: 'video_grok_imagine', modelName: 'grok_imagine', endpointPath: '/api/async/video_grok_imagine', apiType: '11', inputPrice: 0.05, billingUnit: '秒', method: 'POST' },
+    { modelId: 'sora2-new', modelName: 'sora2-new', endpointPath: '/api/sora2-new/submit', apiType: '9', inputPrice: 1.2, billingUnit: '次', method: 'POST' },
+    { modelId: 'video_wan2.6', modelName: 'Wan2.6', endpointPath: '/api/async/video_wan2.6', apiType: '11', inputPrice: 0.8, billingUnit: '秒', method: 'POST' },
+    { modelId: 'image_wan2.6', modelName: 'Wan2.6', endpointPath: '/api/async/image_wan2.6', apiType: '2', inputPrice: 0.2, billingUnit: '张', method: 'POST' },
+    { modelId: 'async_detail', modelName: '结果详情', endpointPath: '/api/async/detail', apiType: '10', inputPrice: 0, billingUnit: '次', method: 'GET' },
+    { modelId: 'chat_index', modelName: 'ChatAPI', endpointPath: '/api/chat/index', apiType: '1', inputPrice: 0, billingUnit: 'token', method: 'POST' },
+    { modelId: 'img_split', modelName: '智能拼图', endpointPath: '/api/img/split', apiType: '9', inputPrice: 0.03, billingUnit: '次', method: 'POST' },
+    { modelId: 'sora2_detail', modelName: 'sora2 new 视频生成详情', endpointPath: '/api/sora2/detail', apiType: '9', inputPrice: 0, billingUnit: '次', method: 'GET' },
+    { modelId: 'voice_composite', modelName: '语音合成（同步）', endpointPath: '/api/voice/composite', apiType: '7', inputPrice: 0.0006, billingUnit: '字符', method: 'POST' },
+    { modelId: 'voice_clone', modelName: '语音克隆（同步）', endpointPath: '/api/voice/clone', apiType: '7', inputPrice: 6, billingUnit: '次', method: 'POST' },
+];
 
 const cleanWuyinBaseUrl = (baseUrl: string): string => {
     const raw = String(baseUrl || '').trim();
@@ -894,7 +1010,7 @@ const cleanWuyinBaseUrl = (baseUrl: string): string => {
         const parsed = new URL(withProtocol);
         const sanitizedPath = parsed.pathname
             .replace(/\/+(doc\/\d+)?$/i, '')
-            .replace(/\/+(api\/async(\/[a-z0-9_.-]+)?)?$/i, '')
+            .replace(/\/+(api(?:\/[a-z0-9_.-]+)*)?$/i, '')
             .replace(/\/+$/, '');
         return `${parsed.protocol}//${parsed.host}${sanitizedPath}`;
     } catch {
@@ -926,12 +1042,112 @@ const extractWuyinDisplayPrice = (item: WuyinCatalogItem) => {
     };
 };
 
+function createWuyinCatalogItemFromFallback(entry: WuyinFallbackCatalogEntry): ModelPricingInfo {
+    return {
+        modelId: entry.modelId,
+        modelName: entry.modelName,
+        inputPrice: entry.inputPrice,
+        outputPrice: 0,
+        isPerToken: false,
+        groupRatio: 1,
+        currency: 'CNY',
+        billingUnit: entry.billingUnit || '次',
+        displayPrice: entry.inputPrice > 0 ? `${entry.inputPrice}元/${entry.billingUnit || '次'}` : `0元/${entry.billingUnit || '次'}`,
+        supportsGroups: false,
+        endpointUrl: `${WUYIN_DEFAULT_ROOT_URL}${entry.endpointPath}`,
+        endpointPath: entry.endpointPath,
+        method: entry.method,
+        apiType: entry.apiType,
+        description: entry.description,
+        tags: entry.inputPrice > 0 ? ['付费'] : ['免费'],
+    };
+}
+
+function normalizeWuyinCatalogItems(apiList: WuyinCatalogItem[], rootUrl = WUYIN_DEFAULT_ROOT_URL): ModelPricingInfo[] {
+    const seen = new Set<string>();
+    return apiList.map((item) => {
+        const { numeric, unit, displayPrice } = extractWuyinDisplayPrice(item);
+        const endpoint = extractWuyinEndpointDetails(String(item?.url || '').trim());
+        const modelId =
+            endpoint?.modelId ||
+            String(item?.name || '').trim() ||
+            String(item?.id || '').trim();
+        const endpointPath = endpoint?.endpointPath;
+        const endpointUrl = endpointPath
+            ? `${rootUrl}${endpointPath}`
+            : endpoint?.endpointUrl;
+
+        return {
+            modelId,
+            modelName: String(item?.name || modelId).trim(),
+            inputPrice: numeric,
+            outputPrice: 0,
+            isPerToken: false,
+            groupRatio: 1,
+            currency: 'CNY',
+            billingUnit: unit,
+            displayPrice,
+            supportsGroups: false,
+            endpointUrl,
+            endpointPath,
+            method: String(item?.method || '').trim().toUpperCase() || undefined,
+            apiType: String(item?.api_type || '').trim() || undefined,
+            description: String(item?.the || '').trim() || undefined,
+            tags: Array.isArray(item?.tags)
+                ? item.tags.map((tag) => String(tag || '').trim()).filter(Boolean)
+                : undefined,
+        };
+    }).filter((item) => {
+        if (!item.modelId) return false;
+        const key = `${item.modelId}:${item.endpointPath || item.endpointUrl || ''}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+async function fetchWuyinPricingCatalogViaProxy(baseUrl: string): Promise<ModelPricingInfo[] | null> {
+    if (typeof window === 'undefined') return null;
+
+    try {
+        const response = await fetch('/api/pricing-proxy', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                baseUrl,
+                provider: 'wuyinkeji',
+            }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !Array.isArray(payload?.data)) {
+            return null;
+        }
+
+        const runtime = resolveProviderRuntime({ baseUrl, format: 'openai' });
+        const rootUrl = runtime.host === 'api.wuyinkeji.com'
+            ? WUYIN_DEFAULT_ROOT_URL
+            : cleanWuyinBaseUrl(baseUrl);
+
+        return normalizeWuyinCatalogItems(payload.data as WuyinCatalogItem[], rootUrl);
+    } catch (error) {
+        console.warn('[NewApiPricing] Wuyin pricing proxy failed:', error);
+        return null;
+    }
+}
+
 export async function fetchWuyinPricingCatalog(baseUrl: string): Promise<ModelPricingInfo[]> {
     try {
         const runtime = resolveProviderRuntime({ baseUrl, format: 'openai' });
         const rootUrl = runtime.host === 'api.wuyinkeji.com'
             ? 'https://api.wuyinkeji.com'
             : cleanWuyinBaseUrl(baseUrl);
+
+        const proxied = await fetchWuyinPricingCatalogViaProxy(baseUrl);
+        if (proxied?.length) {
+            return proxied;
+        }
 
         let response: Response;
         try {
@@ -971,63 +1187,15 @@ export async function fetchWuyinPricingCatalog(baseUrl: string): Promise<ModelPr
         const apiList: WuyinCatalogItem[] = Array.isArray(data?.data?.api_list)
             ? data.data.api_list
             : [];
+        if (apiList.length === 0) {
+            throw new Error('Wuyin pricing catalog returned no api_list items.');
+        }
 
-        return apiList.map((item) => {
-            const { numeric, unit, displayPrice } = extractWuyinDisplayPrice(item);
-            const endpoint = extractWuyinAsyncEndpointDetails(String(item?.url || '').trim());
-            const modelId =
-                endpoint?.modelId ||
-                String(item?.name || '').trim() ||
-                String(item?.id || '').trim();
-
-            return {
-                modelId,
-                modelName: String(item?.name || modelId).trim(),
-                inputPrice: numeric,
-                outputPrice: 0,
-                isPerToken: false,
-                groupRatio: 1,
-                currency: 'CNY',
-                billingUnit: unit,
-                displayPrice,
-                supportsGroups: false,
-                endpointUrl: endpoint?.endpointUrl,
-                endpointPath: endpoint?.endpointPath,
-            };
-        }).filter((item) => item.modelId);
+        return normalizeWuyinCatalogItems(apiList, rootUrl);
     } catch (outerErr) {
         console.warn('[NewApiPricing] Wuyin catalog fetch completely failed, using static fallback models:', outerErr);
-        // 简体中文注释：当价格表抓取由于网络抖动、跨域或 WAF 拦截等因素失败时，自动回滚至静态 14 个核心视频与图像模型，保障页面渲染正常与多端列表拉取。
-        const fallbackModelIds = [
-            'video_google_omni',
-            'video_vidu',
-            'video_omni',
-            'Digital_Humans',
-            'Package_1.0',
-            'veo3.1_fast',
-            'grok_imagine',
-            'Wan2.6',
-            'image_gpt',
-            'image_nanoBanana2',
-            'image_nanoBanana_pro',
-            'image_nanoBanana',
-            'image_grok_imagine',
-            'image_sora'
-        ];
-        return fallbackModelIds.map((model) => ({
-            modelId: model,
-            modelName: model,
-            inputPrice: 0.1,
-            outputPrice: 0,
-            isPerToken: false,
-            groupRatio: 1,
-            currency: 'CNY',
-            billingUnit: '次',
-            displayPrice: '待手动设置',
-            supportsGroups: false,
-            endpointUrl: `https://api.wuyinkeji.com/api/async/${model}`,
-            endpointPath: `/api/async/${model}`
-        }));
+        // 简体中文注释：当价格表抓取由于网络抖动、跨域或 WAF 拦截等因素失败时，回滚到当前官方目录的静态快照。
+        return WUYIN_FALLBACK_CATALOG.map(createWuyinCatalogItemFromFallback);
     }
 }
 

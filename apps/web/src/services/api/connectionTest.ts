@@ -35,6 +35,7 @@ import { resolveChatSurface } from './providerSurfaceRouter.ts';
 import {
   fetchWuyinPricingCatalog,
   selectWuyinCatalogModels,
+  selectWuyinGeneratableCatalogModels,
   extractWuyinModelIdFromBaseUrl,
   extractWuyinAsyncEndpointDetails,
 } from '../billing/newApiPricingService';
@@ -542,31 +543,32 @@ export async function testModelsList(config: ConnectionConfig): Promise<TestResu
     if (runtime.strategyId === 'wuyinkeji') {
       let pricingCatalog: any[] = [];
       try {
-        pricingCatalog = selectWuyinCatalogModels(
+        pricingCatalog = selectWuyinGeneratableCatalogModels(selectWuyinCatalogModels(
           cleanBase || resolved.baseUrl,
           await fetchWuyinPricingCatalog(cleanBase || resolved.baseUrl)
-        );
+        ));
       } catch (err) {
         console.warn('[ConnectionTest] Failed to fetch Wuyin pricing catalog dynamically, using fallback.', err);
         const fallbackModelId = extractWuyinModelIdFromBaseUrl(cleanBase || resolved.baseUrl) || getModelId(resolved) || 'video_google_omni';
         const details = extractWuyinAsyncEndpointDetails(cleanBase || resolved.baseUrl);
         
-        // 简体中文注释：当抓取五音科技列表在前端发生跨域报错时，自动回退至本地支持的 14 个全量静态模型，保障用户可以选择任意模型
+        // 简体中文注释：当抓取五音科技列表在前端发生跨域报错时，自动回退至本地支持的异步模型快照。
         const fallbackModelIds = [
           'video_google_omni',
           'video_vidu',
           'video_omni',
-          'Digital_Humans',
-          'Package_1.0',
-          'veo3.1_fast',
-          'grok_imagine',
-          'Wan2.6',
+          'video_digital_humans',
+          'video_package',
+          'video_veo3.1_fast',
+          'video_grok_imagine',
+          'video_wan2.6',
           'image_gpt',
           'image_nanoBanana2',
+          'image_grok_imagine',
           'image_nanoBanana_pro',
           'image_nanoBanana',
-          'image_grok_imagine',
-          'image_sora'
+          'image_wan2.6',
+          'audio_tts'
         ];
         
         if (!fallbackModelIds.includes(fallbackModelId)) {
@@ -575,13 +577,14 @@ export async function testModelsList(config: ConnectionConfig): Promise<TestResu
         
         pricingCatalog = fallbackModelIds.map((model) => {
           const detail = extractWuyinAsyncEndpointDetails(model) || details;
+          const rootUrl = (cleanBase || resolved.baseUrl || 'https://api.wuyinkeji.com').replace(/\/+$/, '');
           return {
             modelId: model,
             modelName: model,
             numeric: 0.1,
             unit: '次',
             displayPrice: '待手动设置',
-            endpointUrl: detail?.endpointUrl || `${cleanBase || resolved.baseUrl}`,
+            endpointUrl: detail?.endpointUrl || `${rootUrl}/api/async/${model}`,
             endpointPath: detail?.endpointPath || `/api/async/${model}`
           };
         });

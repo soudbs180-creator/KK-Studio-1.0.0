@@ -54,6 +54,26 @@ describe("Wuyin async-video route helpers", () => {
       buildWuyinVideoDetailUrl("https://api.wuyinkeji.com/api/async/video_google_omni", "task 1"),
       "https://api.wuyinkeji.com/api/async/detail?id=task%201",
     );
+    assert.deepEqual(
+      resolveWuyinVideoRequestRoute({
+        baseUrl: "https://api.wuyinkeji.com",
+        modelId: "veo3.1_fast",
+      }),
+      {
+        endpointPath: "/api/async/video_veo3.1_fast",
+        endpointModelId: "video_veo3.1_fast",
+      },
+    );
+    assert.deepEqual(
+      resolveWuyinVideoRequestRoute({
+        baseUrl: "https://api.wuyinkeji.com",
+        modelId: "Wan2.6",
+      }),
+      {
+        endpointPath: "/api/async/video_wan2.6",
+        endpointModelId: "video_wan2.6",
+      },
+    );
   });
 
   test("builds the documented Wuyin video body from shared video options", () => {
