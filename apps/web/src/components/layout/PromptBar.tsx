@@ -243,11 +243,13 @@ function isLightSeriesTextColor(textColor: string | undefined): boolean {
 // 🚀 [优化] 模型库下拉面板的毛玻璃磨砂效果
 // 提高模糊半径并进行微弱的不透明背景混合，确保在画布有复杂高对比度图像节点透过来时，依旧保持出色的文字对比度和可读性
 const modelLibrarySurfaceStyle: React.CSSProperties = {
-    background: 'color-mix(in srgb, var(--frost-card-framework-bg) 65%, transparent)',
+    background: 'color-mix(in srgb, var(--frost-card-framework-bg) 24%, transparent)',
     borderColor: 'var(--frost-card-framework-border)',
     boxShadow: 'var(--frost-card-framework-shadow)',
     WebkitBackdropFilter: 'blur(30px) saturate(1.8)',
     backdropFilter: 'blur(30px) saturate(1.8)',
+    transform: 'translateZ(0)',
+    willChange: 'backdrop-filter',
 };
 
 const modelLibrarySearchSurfaceStyle: React.CSSProperties = {
@@ -268,10 +270,16 @@ function getCreditModelFlatStyle(
     return {
         background: emphasized
             ? `linear-gradient(135deg, color-mix(in srgb, ${start} 26%, var(--frost-card-framework-bg)) 0%, color-mix(in srgb, ${end} 22%, var(--frost-card-framework-bg)) 100%)`
-            : 'var(--frost-card-sub-bg)',
-        border: `1px solid ${emphasized ? 'color-mix(in srgb, var(--accent-coral) 55%, var(--frost-card-framework-border))' : 'var(--frost-card-sub-border)'}`,
+            : `color-mix(in srgb, ${start} 6%, var(--frost-card-sub-bg))`,
+        border: `1px solid ${
+            emphasized 
+                ? '#00d2ff' 
+                : `color-mix(in srgb, ${start} 18%, var(--frost-card-sub-border))`
+        }`,
         color: usesDarkText ? 'var(--clay-ink)' : undefined,
-        boxShadow: emphasized ? '0 0 12px rgba(244, 63, 94, 0.2)' : 'none',
+        boxShadow: emphasized 
+            ? '0 0 16px rgba(0, 210, 255, 0.25), inset 0 0 12px rgba(0, 210, 255, 0.45)' 
+            : 'none',
         WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
         backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
     };
@@ -850,7 +858,7 @@ const PromptBarModelMenuButton = React.memo(function PromptBarModelMenuButton({
                         : `h-14 px-5 flex items-center justify-between rounded-full flex-shrink-0 ${textColorClass} active:scale-[0.98] ${selected ? 'scale-[1.02]' : 'hover:scale-[1.02] opacity-80 hover:opacity-100 grayscale-[0.15] hover:grayscale-0'}`)
                     : (isMobile
                         ? `h-10 px-3 text-left flex items-center justify-between rounded-xl transition-all bg-transparent border-transparent`
-                        : `px-2.5 py-1.5 text-left flex flex-col gap-0.5 hover:bg-black/5 dark:hover:bg-[var(--toolbar-hover)] rounded-xl transition-all border border-transparent ${selected ? 'bg-transparent grayscale-0' : 'opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`)}
+                        : `px-2.5 py-1.5 text-left flex flex-col gap-0.5 rounded-xl transition-all border border-transparent ${selected ? 'bg-transparent grayscale-0' : 'opacity-80 hover:opacity-100 grayscale-[0.8] hover:grayscale-0'}`)}
             `}
             style={isExclusive ? (selected ? activeGradientStyle : inactiveGradientStyle) : undefined}
             onMouseEnter={(event) => {
@@ -948,6 +956,7 @@ interface SwipeableModelItemProps {
     onClick: () => void;
     selected?: boolean;
     isExclusive?: boolean;
+    isSystemInternal?: boolean;
 }
 
 const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
@@ -958,6 +967,7 @@ const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
     onClick,
     selected = false,
     isExclusive = false,
+    isSystemInternal = false,
 }) => {
     if (isExclusive) {
         return (
@@ -967,13 +977,34 @@ const SwipeableModelItem: React.FC<SwipeableModelItemProps> = ({
         );
     }
 
+    let itemClass = 'relative w-full flex items-center rounded-xl border transition-all select-none ';
+    let itemStyle: React.CSSProperties = {};
+
+    if (selected) {
+        itemClass += 'text-white border-transparent';
+        if (isSystemInternal) {
+            itemStyle = {
+                background: 'linear-gradient(to right, rgba(30, 58, 138, 0.25), rgba(21, 94, 117, 0.15))',
+                borderColor: '#00d2ff',
+                boxShadow: '0 0 16px rgba(0, 210, 255, 0.35), inset 0 0 12px rgba(0, 210, 255, 0.55)',
+            };
+        } else {
+            itemStyle = {
+                background: 'linear-gradient(to right, rgba(14, 116, 144, 0.2), rgba(30, 58, 138, 0.08))',
+                borderColor: '#00d2ff',
+                boxShadow: '0 0 14px rgba(0, 210, 255, 0.25), inset 0 0 10px rgba(0, 210, 255, 0.45)',
+            };
+        }
+    } else {
+        if (isSystemInternal) {
+            itemClass += 'border-amber-500/20 bg-amber-500/4 hover:border-amber-500/45 hover:bg-amber-500/8 hover:opacity-100 opacity-90';
+        } else {
+            itemClass += 'border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] hover:bg-black/5 dark:hover:bg-[var(--toolbar-hover)] hover:opacity-100 opacity-90';
+        }
+    }
+
     return (
-        <div 
-            className={`relative w-full flex items-center rounded-xl border transition-all select-none
-            ${selected 
-                ? 'bg-gradient-to-r from-[var(--accent-coral)]/8 to-[var(--accent-pink)]/4 border-[var(--accent-coral)] shadow-[0_0_12px_rgba(244,63,94,0.18)]' 
-                : 'border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] hover:opacity-100 opacity-90'}`}
-        >
+        <div className={itemClass} style={itemStyle}>
             {/* 模型选择主体 */}
             <div className="flex-1 min-w-0" onClick={onClick}>
                 {children}
@@ -3054,7 +3085,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
     // 桌面端模型按钮保持短名称，避免撑坏底部布局；移动端保留更多信息。
     const displayModelLabel = useMemo(() => {
-        return truncateModelLabel(currentModelName, isMobile ? 24 : 15);
+        return truncateModelLabel(currentModelName, isMobile ? 24 : 28);
     }, [currentModelName, isMobile, truncateModelLabel]);
     const isEmbeddedMobileComposer = isMobile && mobileShellMode === 'embedded';
 
@@ -3267,7 +3298,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         <>
             {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
                 <div
-                    className="mb-2 rounded-2xl border p-2.5  max-w-[calc(100vw-24px)]"
+                    className="model-library-surface mb-2 rounded-2xl border p-2.5  max-w-[calc(100vw-24px)]"
                     style={{ ...modelLibrarySearchSurfaceStyle, width: 'min(22rem, calc(100vw - 24px))' }}
                 >
                     <div className="relative flex items-center">
@@ -3306,7 +3337,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
 
             {/* 🚀 [重构] 拆分为外层非滚动玻璃层 + 内层滚动区域 */}
             <div
-                className="dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] origin-bottom overflow-hidden"
+                className="model-library-surface dropdown static w-[min(22rem,calc(100vw-24px))] max-w-[calc(100vw-24px)] origin-bottom overflow-hidden"
                 style={{ ...modelLibrarySurfaceStyle, borderRadius: '1rem' }}
             >
                 <div
@@ -3367,6 +3398,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     isPinned={true}
                                                     onTogglePin={handleTogglePin}
                                                     selected={config.model === model.id}
+                                                    isExclusive={model.isExclusive}
+                                                    isSystemInternal={model.isSystemInternal}
                                                     onClick={() => {
                                                         handleSelectPromptBarModel(model);
                                                     }}
@@ -3400,6 +3433,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 onTogglePin={handleTogglePin}
                                                 selected={config.model === model.id}
                                                 isExclusive={model.isExclusive}
+                                                isSystemInternal={model.isSystemInternal}
                                                 onClick={() => {
                                                     handleSelectPromptBarModel(model);
                                                 }}
@@ -3562,6 +3596,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     isPinned={true}
                                                     onTogglePin={handleTogglePin}
                                                     selected={config.model === model.id}
+                                                    isExclusive={model.isExclusive}
+                                                    isSystemInternal={model.isSystemInternal}
                                                     onClick={() => {
                                                         handleSelectPromptBarModel(model);
                                                     }}
@@ -3595,6 +3631,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 isPinned={false}
                                                 onTogglePin={handleTogglePin}
                                                 selected={config.model === model.id}
+                                                isExclusive={model.isExclusive}
+                                                isSystemInternal={model.isSystemInternal}
                                                 onClick={() => {
                                                     handleSelectPromptBarModel(model);
                                                 }}
@@ -3660,7 +3698,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         return (
             <div
                 id="prompt-bar-container"
-                className="input-bar ios-mobile-prompt transition-all duration-300 !overflow-visible w-full max-w-full z-[800]"
+                className={`input-bar ios-mobile-prompt ${isModelMenuOpen ? 'has-open-dropdown' : ''} transition-all duration-300 !overflow-visible w-full max-w-full z-[800]`}
                 onClick={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
                 style={{
@@ -4052,6 +4090,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                                 isPinned={true}
                                                                 onTogglePin={handleTogglePin}
                                                                 selected={config.model === model.id}
+                                                                isExclusive={model.isExclusive}
+                                                                isSystemInternal={model.isSystemInternal}
                                                                 onClick={() => {
                                                                     handleSelectPromptBarModel(model);
                                                                     setMobileSubView('input');
@@ -4090,6 +4130,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                             onTogglePin={handleTogglePin}
                                                             selected={config.model === model.id}
                                                             isExclusive={model.isExclusive}
+                                                            isSystemInternal={model.isSystemInternal}
                                                             onClick={() => {
                                                                 handleSelectPromptBarModel(model);
                                                                 setMobileSubView('input');
@@ -4347,6 +4388,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                                     isPinned={true}
                                                                     onTogglePin={handleTogglePin}
                                                                     selected={config.model === model.id}
+                                                                    isExclusive={model.isExclusive}
+                                                                    isSystemInternal={model.isSystemInternal}
                                                                     onClick={() => {
                                                                         handleSelectPromptBarModel(model);
                                                                         setMobileSubView('input');
@@ -4384,6 +4427,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                                 isPinned={false}
                                                                 onTogglePin={handleTogglePin}
                                                                 selected={config.model === model.id}
+                                                                isExclusive={model.isExclusive}
+                                                                isSystemInternal={model.isSystemInternal}
                                                                 onClick={() => {
                                                                     handleSelectPromptBarModel(model);
                                                                     setMobileSubView('input');
@@ -4497,7 +4542,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         <>
             <div
                 id="prompt-bar-container"
-                className={`input-bar ${isMobile ? 'ios-mobile-prompt' : ''} transition-all duration-300 !overflow-visible ${isMobile && mobileShellMode === 'embedded' ? 'w-full max-w-full' : 'w-[calc(100vw-32px)] max-w-[760px]'}`}
+                className={`input-bar ${isMobile ? 'ios-mobile-prompt' : ''} ${isModelMenuOpen ? 'has-open-dropdown' : ''} transition-all duration-300 !overflow-visible ${isMobile && mobileShellMode === 'embedded' ? 'w-full max-w-full' : 'w-[calc(100vw-32px)] max-w-[760px]'}`}
                 onDragEnter={handleDragEnter}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -5117,7 +5162,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 className={isMobile ? 'static min-w-0 flex-1' : `relative inline-flex min-w-0 flex-shrink-0`}
                             >
                                 <button
-                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-[clamp(6rem,34vw,8rem)] max-w-[36vw] flex-none justify-start' : 'w-auto max-w-[calc(15ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
+                                    className={`input-bar-model ${!isMobile ? 'prompt-bar-liquid-button' : ''} flex min-w-0 items-center flex-nowrap gap-1.5 md:gap-2 px-2 md:px-3 h-10 rounded-lg border transition-all duration-300 overflow-hidden ${isMobile ? 'w-full min-w-0 justify-start' : 'w-auto max-w-[calc(28ch+6rem)] justify-start flex-shrink-0'} ${isModelListEmpty
                                         ? 'bg-[var(--frost-input-bg)] text-[var(--text-tertiary)] cursor-not-allowed border-[color:var(--frost-card-sub-border)]'
                                         : 'text-[var(--text-secondary)] !opacity-100 hover:border-[var(--prompt-bar-shell-border-strong)]'
                                         }`}
@@ -5185,7 +5230,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     </span>
                                                 ) : null}
                                                 <span
-                                                    className={`font-bold truncate flex items-center gap-1 min-w-0 ${isMobile ? 'text-[13px]' : 'max-w-[15ch] text-sm'}`}
+                                                    className={`font-bold truncate flex items-center gap-1 min-w-0 ${isMobile ? 'text-[13px]' : 'max-w-[28ch] text-sm'}`}
                                                     style={{ color: currentModel?.isSystemInternal ? currentModelTextColor : 'var(--text-primary)' }}
                                                     title={currentModelName}
                                                 >
@@ -5274,7 +5319,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                               {/* 🔍 搜索输入框 */}
                                               {!isModelMenuBootstrapping && filteredDisplayModels.length > 1 && (
                                                   <div 
-                                                      className="mx-3 mb-2 p-2.5 border rounded-2xl" 
+                                                      className="model-library-surface mx-3 mb-2 p-2.5 border rounded-2xl" 
                                                       style={{ ...modelLibrarySearchSurfaceStyle }}
                                                       onTouchStart={(e) => e.stopPropagation()}
                                                       onTouchMove={(e) => e.stopPropagation()}
@@ -5323,7 +5368,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                               {/* 模型列表滚动区 */}
                                               <div
                                                   ref={modelListScrollRef}
-                                                  className="dropdown w-full overflow-y-auto scrollbar-none p-0 relative"
+                                                  className="model-library-surface dropdown w-full overflow-y-auto scrollbar-none p-0 relative"
                                                   style={{
                                                       ...modelLibrarySurfaceStyle,
                                                       borderRadius: '0',

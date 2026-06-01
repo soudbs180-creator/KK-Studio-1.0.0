@@ -216,7 +216,7 @@ test('mobile prompt footer stays single-row and lets controls overflow horizonta
   assert.match(cssSource, /\.input-bar-footer\[data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"\] \* \{/);
   assert.doesNotMatch(promptBarSource, /min-w-\[9rem\] max-w-none justify-start flex-shrink-0/);
   assert.doesNotMatch(promptBarSource, /isMobile \? 'w-\[clamp\(6\.75rem,38vw,8\.5rem\)\] max-w-\[42vw\] flex-none justify-start'/);
-  assert.match(promptBarSource, /isMobile \? 'w-\[clamp\(6rem,34vw,8rem\)\] max-w-\[36vw\] flex-none justify-start'/);
+  assert.match(promptBarSource, /isMobile \? 'w-full min-w-0 justify-start'/);
   assert.doesNotMatch(modePanelSource, /isEmbeddedMobileDrawer \? 'px-3 justify-between max-w-none' : 'px-2\.5 max-w-none'/);
   assert.match(modePanelSource, /isMobile \? 'min-w-0 shrink-0'/);
   assert.match(modePanelSource, /isMobile \? \(isEmbeddedMobileDrawer \? 'px-3 justify-between max-w-\[42vw\] min-w-0 overflow-hidden' : 'px-2\.5 max-w-\[40vw\] min-w-0 overflow-hidden'\)/);
