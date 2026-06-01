@@ -4084,6 +4084,13 @@ export async function autoDetectAndConfigureModels(
                 'image_nanoBanana',
                 'image_wan2.6',
                 'audio_tts',
+                'sora2-new',
+                'async_detail',
+                'chat_index',
+                'img_split',
+                'sora2_detail',
+                'voice_composite',
+                'voice_clone',
             ];
         }
     }

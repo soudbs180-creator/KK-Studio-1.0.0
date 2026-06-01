@@ -43,6 +43,13 @@ const WUYIN_FALLBACK_CATALOG = [
   { modelId: 'image_nanoBanana', modelName: 'NanoBanana', endpointPath: '/api/async/image_nanoBanana', inputPrice: 0.1, unit: '张' },
   { modelId: 'image_wan2.6', modelName: 'Wan2.6', endpointPath: '/api/async/image_wan2.6', inputPrice: 0.2, unit: '张' },
   { modelId: 'audio_tts', modelName: '语音合成', endpointPath: '/api/async/audio_tts', inputPrice: 0.0006, unit: '字符' },
+  { modelId: 'sora2-new', modelName: 'sora2-new', endpointPath: '/api/sora2-new/submit', inputPrice: 1.2, unit: '次' },
+  { modelId: 'async_detail', modelName: '结果详情', endpointPath: '/api/async/detail', inputPrice: 0, unit: '次' },
+  { modelId: 'chat_index', modelName: 'ChatAPI', endpointPath: '/api/chat/index', inputPrice: 0, unit: 'token' },
+  { modelId: 'img_split', modelName: '智能拼图', endpointPath: '/api/img/split', inputPrice: 0.03, unit: '次' },
+  { modelId: 'sora2_detail', modelName: 'sora2 new 视频生成详情', endpointPath: '/api/sora2/detail', inputPrice: 0, unit: '次' },
+  { modelId: 'voice_composite', modelName: '语音合成（同步）', endpointPath: '/api/voice/composite', inputPrice: 0.0006, unit: '字符' },
+  { modelId: 'voice_clone', modelName: '语音克隆（同步）', endpointPath: '/api/voice/clone', inputPrice: 6, unit: '次' },
 ];
 
 function deriveWuyinModelIdFromEndpointPath(endpointPath) {
