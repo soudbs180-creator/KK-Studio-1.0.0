@@ -927,71 +927,108 @@ const extractWuyinDisplayPrice = (item: WuyinCatalogItem) => {
 };
 
 export async function fetchWuyinPricingCatalog(baseUrl: string): Promise<ModelPricingInfo[]> {
-    const runtime = resolveProviderRuntime({ baseUrl, format: 'openai' });
-    const rootUrl = runtime.host === 'api.wuyinkeji.com'
-        ? 'https://api.wuyinkeji.com'
-        : cleanWuyinBaseUrl(baseUrl);
-
-    let response: Response;
     try {
-        response = await fetch(`${rootUrl}${WUYIN_PRICE_API_PATH}`, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-            },
-        });
+        const runtime = resolveProviderRuntime({ baseUrl, format: 'openai' });
+        const rootUrl = runtime.host === 'api.wuyinkeji.com'
+            ? 'https://api.wuyinkeji.com'
+            : cleanWuyinBaseUrl(baseUrl);
 
-        const contentType = response.headers.get('content-type') || '';
-        // 简体中文注释：如果 HTTP 状态码非 200，或者返回了 HTML 页面（即代理端 Nginx 返回的 404 错误页），则抛错触发跨域或官方直连回退
-        if (!response.ok || response.status === 404 || contentType.includes('text/html')) {
-            throw new Error(`Endpoint returned status ${response.status} or HTML payload`);
-        }
-    } catch (e) {
-        // 简体中文注释：当代理服务器未配置 /themes/DigitalBlue/ 路径代理导致 Nginx 404 时，自动回退直接请求官方域名接口
-        if (rootUrl !== 'https://api.wuyinkeji.com') {
-            console.log('[NewApiPricing] Wuyin proxy endpoint failed/404, falling back to official api.wuyinkeji.com...', e);
-            response = await fetch(`https://api.wuyinkeji.com${WUYIN_PRICE_API_PATH}`, {
+        let response: Response;
+        try {
+            response = await fetch(`${rootUrl}${WUYIN_PRICE_API_PATH}`, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 },
             });
-            if (!response.ok) {
-                throw new Error(`Failed to fetch Wuyin pricing catalog via official site: HTTP ${response.status}`);
+
+            const contentType = response.headers.get('content-type') || '';
+            // 简体中文注释：如果 HTTP 状态码非 200，或者返回了 HTML 页面（即代理端 Nginx 返回的 404 错误页），则抛错触发跨域或官方直连回退
+            if (!response.ok || response.status === 404 || contentType.includes('text/html')) {
+                throw new Error(`Endpoint returned status ${response.status} or HTML payload`);
             }
-        } else {
-            throw e;
+        } catch (e) {
+            // 简体中文注释：当代理服务器未配置 /themes/DigitalBlue/ 路径代理导致 Nginx 404 时，自动回退直接请求官方域名接口
+            if (rootUrl !== 'https://api.wuyinkeji.com') {
+                console.log('[NewApiPricing] Wuyin proxy endpoint failed/404, falling back to official api.wuyinkeji.com...', e);
+                response = await fetch(`https://api.wuyinkeji.com${WUYIN_PRICE_API_PATH}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    },
+                });
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch Wuyin pricing catalog via official site: HTTP ${response.status}`);
+                }
+            } else {
+                throw e;
+            }
         }
-    }
 
-    const data = await response.json() as WuyinCatalogResponse;
-    const apiList: WuyinCatalogItem[] = Array.isArray(data?.data?.api_list)
-        ? data.data.api_list
-        : [];
+        const data = await response.json() as WuyinCatalogResponse;
+        const apiList: WuyinCatalogItem[] = Array.isArray(data?.data?.api_list)
+            ? data.data.api_list
+            : [];
 
-    return apiList.map((item) => {
-        const { numeric, unit, displayPrice } = extractWuyinDisplayPrice(item);
-        const endpoint = extractWuyinAsyncEndpointDetails(String(item?.url || '').trim());
-        const modelId =
-            endpoint?.modelId ||
-            String(item?.name || '').trim() ||
-            String(item?.id || '').trim();
+        return apiList.map((item) => {
+            const { numeric, unit, displayPrice } = extractWuyinDisplayPrice(item);
+            const endpoint = extractWuyinAsyncEndpointDetails(String(item?.url || '').trim());
+            const modelId =
+                endpoint?.modelId ||
+                String(item?.name || '').trim() ||
+                String(item?.id || '').trim();
 
-        return {
-            modelId,
-            modelName: String(item?.name || modelId).trim(),
-            inputPrice: numeric,
+            return {
+                modelId,
+                modelName: String(item?.name || modelId).trim(),
+                inputPrice: numeric,
+                outputPrice: 0,
+                isPerToken: false,
+                groupRatio: 1,
+                currency: 'CNY',
+                billingUnit: unit,
+                displayPrice,
+                supportsGroups: false,
+                endpointUrl: endpoint?.endpointUrl,
+                endpointPath: endpoint?.endpointPath,
+            };
+        }).filter((item) => item.modelId);
+    } catch (outerErr) {
+        console.warn('[NewApiPricing] Wuyin catalog fetch completely failed, using static fallback models:', outerErr);
+        // 简体中文注释：当价格表抓取由于网络抖动、跨域或 WAF 拦截等因素失败时，自动回滚至静态 14 个核心视频与图像模型，保障页面渲染正常与多端列表拉取。
+        const fallbackModelIds = [
+            'video_google_omni',
+            'video_vidu',
+            'video_omni',
+            'Digital_Humans',
+            'Package_1.0',
+            'veo3.1_fast',
+            'grok_imagine',
+            'Wan2.6',
+            'image_gpt',
+            'image_nanoBanana2',
+            'image_nanoBanana_pro',
+            'image_nanoBanana',
+            'image_grok_imagine',
+            'image_sora'
+        ];
+        return fallbackModelIds.map((model) => ({
+            modelId: model,
+            modelName: model,
+            inputPrice: 0.1,
             outputPrice: 0,
             isPerToken: false,
             groupRatio: 1,
             currency: 'CNY',
-            billingUnit: unit,
-            displayPrice,
+            billingUnit: '次',
+            displayPrice: '待手动设置',
             supportsGroups: false,
-            endpointUrl: endpoint?.endpointUrl,
-            endpointPath: endpoint?.endpointPath,
-        };
-    }).filter((item) => item.modelId);
+            endpointUrl: `https://api.wuyinkeji.com/api/async/${model}`,
+            endpointPath: `/api/async/${model}`
+        }));
+    }
 }
 
 /**
