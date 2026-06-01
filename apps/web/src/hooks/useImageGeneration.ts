@@ -1288,6 +1288,7 @@ export const useImageGeneration = (options: {
           }
         } else {
           // Failed
+          const failedMessage = String((result as any).message || (result as any).error || 'Task failed on backend');
           const failedBillingState = nextPendingTaskIds.length === 0
             ? await resolveFailedBillingState(latestNode)
             : {
@@ -1300,11 +1301,11 @@ export const useImageGeneration = (options: {
             isGenerating: nextPendingTaskIds.length > 0,
             jobId: nextJobId,
             generationMetadata: nextGenerationMetadata,
-            error: nextPendingTaskIds.length === 0 ? 'Task failed on backend' : undefined,
+            error: nextPendingTaskIds.length === 0 ? failedMessage : undefined,
             ...failedBillingState,
           });
           // 轮询失败，更新数据库状态
-          void markTaskFailed(targetTaskId, 'Task failed on backend');
+          void markTaskFailed(targetTaskId, failedMessage);
         }
       } else {
         // Still pending

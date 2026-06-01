@@ -33,6 +33,18 @@ describe("request profile registry", () => {
     assert.equal(profile!.apiBaseUrlPolicy, "runtime-supplied");
   });
 
+  test("tracks Wuyin image and Google Omni async-video documentation sources", () => {
+    const profile = getRequestProfile("wuyinkeji");
+
+    assert.ok(profile);
+    assert.deepEqual(profile!.docSources, [
+      "https://api.wuyinkeji.com/doc/65",
+      "https://api.wuyinkeji.com/doc/72",
+    ]);
+    assert.equal(profile!.requestSurfaceDefaults.image, "async-image");
+    assert.equal(profile!.requestSurfaceDefaults.video, "async-video");
+  });
+
   test("falls back unknown local providers to the 12AI request profile", () => {
     const profile = resolveLocalRequestProfile({
       provider: "Custom",

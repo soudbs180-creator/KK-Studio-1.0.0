@@ -5,6 +5,22 @@ const express = require('express');
 const crypto = require('crypto');
 const { getPool } = require('../lib/db');
 const { verifyJWT, signJWT } = require('../lib/jwt');
+const {
+  buildWuyinVideoDetailUrl,
+  buildWuyinVideoRequestBody,
+  buildWuyinVideoSubmitUrl,
+  decodeLocalProxyTaskId,
+  encodeLocalProxyTaskId,
+  extractWuyinVideoMessage,
+  extractWuyinVideoStatusCode,
+  extractWuyinVideoTaskId,
+  extractWuyinVideoUrl,
+  fetchWuyinVideoJson,
+  isWuyinAsyncVideoRoute,
+  isWuyinAsyncVideoTargetUrl,
+  mapWuyinVideoStatus,
+  resolveWuyinVideoRequestRoute,
+} = require('../lib/wuyinAsyncVideoProxy');
 
 const router = express.Router();
 const ACCESS_TOKEN_COOKIE_NAME = 'kk.api.access_token';
@@ -428,6 +444,278 @@ function writeProfileState(data, userId, profileState) {
   delete data.providers;
   delete data.entries;
 }
+
+function localProxyErrorEnvelope(req, code, message) {
+  return {
+    success: false,
+    error: {
+      code,
+      message,
+    },
+    meta: buildMeta(req),
+  };
+}
+
+function sendLocalProxyError(res, req, status, code, message) {
+  return res.status(status).json(localProxyErrorEnvelope(req, code, message));
+}
+
+function normalizeLocalRouteValue(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function normalizeLocalProviderLinkValue(value) {
+  return String(value || '').trim().replace(/\/+$/, '').toLowerCase();
+}
+
+function resolveLocalRouteIdCandidate(value) {
+  const decoded = (() => {
+    try {
+      return decodeURIComponent(String(value || '').trim());
+    } catch {
+      return String(value || '').trim();
+    }
+  })();
+  const normalized = decoded.toLowerCase();
+  if (normalized.startsWith('slot_key_')) return normalized.slice(5);
+  if (normalized.startsWith('slot_')) return normalized.slice(5);
+  if (normalized.startsWith('provider_')) return normalized.slice('provider_'.length);
+  return normalized;
+}
+
+function findLocalProviderLinkedToSlot(slot, providers) {
+  const slotBaseUrl = normalizeLocalProviderLinkValue(slot && slot.baseUrl);
+  const slotKey = String(slot && slot.key || '').trim();
+  const slotName = normalizeLocalRouteValue(slot && slot.name);
+
+  const strongMatch = providers.find((provider) => {
+    const providerBaseUrl = normalizeLocalProviderLinkValue(provider && provider.baseUrl);
+    if (!providerBaseUrl || providerBaseUrl !== slotBaseUrl) return false;
+    const providerKey = String(provider && provider.apiKey || '').trim();
+    const providerName = normalizeLocalRouteValue(provider && provider.name);
+    return (slotKey && providerKey && slotKey === providerKey) || (slotName && providerName && slotName === providerName);
+  });
+  if (strongMatch) return strongMatch;
+
+  const sameBaseProviders = providers.filter((provider) => (
+    slotBaseUrl && normalizeLocalProviderLinkValue(provider && provider.baseUrl) === slotBaseUrl
+  ));
+  return sameBaseProviders.length === 1 ? sameBaseProviders[0] : null;
+}
+
+function buildLocalUserRouteFromProvider(provider) {
+  return {
+    id: String(provider.id || '').trim(),
+    name: String(provider.name || '').trim(),
+    baseUrl: String(provider.baseUrl || '').trim(),
+    apiKey: String(provider.apiKey || '').trim(),
+    models: Array.isArray(provider.models) ? provider.models : [],
+    format: String(provider.format || 'openai').trim() || 'openai',
+  };
+}
+
+function buildLocalUserRouteFromSlot(slot, providers) {
+  const linkedProvider = findLocalProviderLinkedToSlot(slot, providers);
+  return {
+    id: String(slot.id || '').trim(),
+    name: String(linkedProvider && linkedProvider.name || slot.name || '').trim(),
+    baseUrl: String(linkedProvider && linkedProvider.baseUrl || slot.baseUrl || '').trim(),
+    apiKey: String(linkedProvider && linkedProvider.apiKey || slot.key || '').trim(),
+    models: Array.isArray(linkedProvider && linkedProvider.models)
+      ? linkedProvider.models
+      : Array.isArray(slot.supportedModels)
+        ? slot.supportedModels
+        : [],
+    format: String(linkedProvider && linkedProvider.format || slot.format || 'openai').trim() || 'openai',
+  };
+}
+
+function resolveLocalUserRoute(profileState, routeId) {
+  const routeTarget = resolveLocalRouteIdCandidate(routeId);
+  const providers = Array.isArray(profileState.providers) ? profileState.providers : [];
+  const slots = Array.isArray(profileState.slots) ? profileState.slots : [];
+
+  const provider = providers.find((item) => {
+    const providerId = normalizeLocalRouteValue(item && item.id);
+    const providerName = normalizeLocalRouteValue(item && item.name);
+    return providerId === routeTarget || providerName === routeTarget;
+  });
+  if (provider) {
+    return buildLocalUserRouteFromProvider(provider);
+  }
+
+  const slot = slots.find((item) => {
+    const slotId = normalizeLocalRouteValue(item && item.id);
+    const slotName = normalizeLocalRouteValue(item && item.name);
+    return slotId === routeTarget || slotName === routeTarget;
+  });
+  if (slot) {
+    return buildLocalUserRouteFromSlot(slot, providers);
+  }
+
+  return null;
+}
+
+function findFirstWuyinVideoRoute(profileState) {
+  const providers = Array.isArray(profileState.providers) ? profileState.providers : [];
+  for (const provider of providers) {
+    const route = buildLocalUserRouteFromProvider(provider);
+    if (isWuyinAsyncVideoRoute(route, 'video_google_omni')) {
+      return route;
+    }
+  }
+
+  const slots = Array.isArray(profileState.slots) ? profileState.slots : [];
+  for (const slot of slots) {
+    const route = buildLocalUserRouteFromSlot(slot, providers);
+    if (isWuyinAsyncVideoRoute(route, 'video_google_omni')) {
+      return route;
+    }
+  }
+
+  return null;
+}
+
+async function handleWuyinGenericProxy(req, res, profileState) {
+  const targetUrl = String(req.headers['x-proxy-target-url'] || '').trim();
+  const routeId = String(req.headers['x-key-slot-id'] || '').trim();
+  if (!targetUrl) {
+    return null;
+  }
+
+  if (!isWuyinAsyncVideoTargetUrl(targetUrl)) {
+    return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'Local user-route proxy only handles Wuyin async-video generic requests.');
+  }
+
+  const route = resolveLocalUserRoute(profileState, routeId);
+  if (!route) {
+    return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
+  }
+  if (!route.apiKey) {
+    return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
+  }
+
+  const headers = {
+    Authorization: route.apiKey,
+    Accept: String(req.headers.accept || 'application/json'),
+  };
+  const init = {
+    method: req.method,
+    headers,
+  };
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    headers['Content-Type'] = String(req.headers['content-type'] || 'application/json');
+    init.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
+  }
+
+  const upstream = await fetch(targetUrl, init);
+  const responseText = await upstream.text().catch(() => '');
+  const contentType = upstream.headers.get('content-type') || 'application/json; charset=utf-8';
+  return res.status(upstream.status).type(contentType).send(responseText);
+}
+
+async function handleWuyinVideoMode(req, res, profileState) {
+  const routeId = String(req.body && req.body.routeId || '').trim();
+  const route = resolveLocalUserRoute(profileState, routeId);
+  if (!route) {
+    return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
+  }
+  if (!isWuyinAsyncVideoRoute(route, req.body && req.body.modelId)) {
+    return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'Local user-route proxy only handles Wuyin async-video routes.');
+  }
+  if (!route.apiKey) {
+    return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
+  }
+
+  const body = buildWuyinVideoRequestBody(req.body || {});
+  if (!body.prompt.trim()) {
+    return sendLocalProxyError(res, req, 400, 'INVALID_REQUEST', 'Prompt is required for Wuyin video generation.');
+  }
+
+  const wuyinRoute = resolveWuyinVideoRequestRoute(route.baseUrl, req.body && req.body.modelId);
+  const submitUrl = buildWuyinVideoSubmitUrl(route.baseUrl, wuyinRoute);
+  const payload = await fetchWuyinVideoJson(submitUrl, route.apiKey, 'POST', body);
+  const providerTaskId = extractWuyinVideoTaskId(payload);
+  const status = mapWuyinVideoStatus(extractWuyinVideoStatusCode(payload));
+  const directUrl = extractWuyinVideoUrl(payload);
+  const message = extractWuyinVideoMessage(payload);
+
+  if (!providerTaskId && !directUrl) {
+    return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', message || 'Wuyin video API returned no task id.');
+  }
+
+  return res.json(okEnvelope({
+    taskId: providerTaskId ? encodeLocalProxyTaskId(route.id || routeId, providerTaskId) : '',
+    providerTaskId,
+    status: directUrl && status === 'success' ? 'success' : status,
+    url: directUrl || '',
+    message: message || undefined,
+    endpointType: 'openai',
+    requestId: req.body && typeof req.body.requestId === 'string' ? req.body.requestId : undefined,
+    attemptId: req.body && typeof req.body.attemptId === 'string' ? req.body.attemptId : undefined,
+  }, req));
+}
+
+async function handleWuyinTaskStatusMode(req, res, profileState) {
+  const localTaskId = String(req.body && (req.body.localTaskId || req.body.taskId) || '').trim();
+  const parsed = decodeLocalProxyTaskId(localTaskId);
+  if (!parsed.providerTaskId) {
+    return sendLocalProxyError(res, req, 400, 'INVALID_REQUEST', 'localTaskId is required for Wuyin task status.');
+  }
+
+  const route = parsed.routeId
+    ? resolveLocalUserRoute(profileState, parsed.routeId)
+    : findFirstWuyinVideoRoute(profileState);
+  if (!route) {
+    return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'Wuyin API route for this local task was not found.');
+  }
+  if (!route.apiKey) {
+    return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
+  }
+
+  const detailUrl = buildWuyinVideoDetailUrl(route.baseUrl, parsed.providerTaskId);
+  const payload = await fetchWuyinVideoJson(detailUrl, route.apiKey, 'GET');
+  const status = mapWuyinVideoStatus(extractWuyinVideoStatusCode(payload));
+  const url = status === 'success' ? extractWuyinVideoUrl(payload) : '';
+  const message = extractWuyinVideoMessage(payload);
+  const effectiveStatus = status === 'success' && !url ? 'pending' : status;
+
+  return res.json(okEnvelope({
+    taskId: localTaskId,
+    providerTaskId: parsed.providerTaskId,
+    status: effectiveStatus,
+    url: url || undefined,
+    message: message || undefined,
+    error: status === 'failed' ? (message || 'Wuyin video task failed.') : undefined,
+    endpointType: 'openai',
+  }, req));
+}
+
+router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
+  const data = readLocalStorage();
+  const profileState = readProfileState(data, req.profileUserId);
+  writeLocalStorage(data);
+
+  try {
+    const genericResponse = await handleWuyinGenericProxy(req, res, profileState);
+    if (genericResponse) {
+      return genericResponse;
+    }
+
+    const mode = String(req.body && req.body.mode || '').trim();
+    if (mode === 'video') {
+      return await handleWuyinVideoMode(req, res, profileState);
+    }
+    if (mode === 'task_status') {
+      return await handleWuyinTaskStatusMode(req, res, profileState);
+    }
+
+    return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'Local user-route proxy does not handle this mode.');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error || 'Wuyin async-video proxy failed.');
+    return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', message);
+  }
+});
 
 router.use([
   '/v1/profile/key-manager',

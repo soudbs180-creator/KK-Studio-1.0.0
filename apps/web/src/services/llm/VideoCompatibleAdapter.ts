@@ -4,6 +4,19 @@ import { isLikelyDocumentationBaseUrl, resolveProviderRuntime, type ProviderStra
 import type { LLMAdapter, VideoGenerationOptions, VideoGenerationResult } from './LLMAdapter.ts';
 import { AsyncTaskPoller, PollCancelledError } from '../http/AsyncTaskPoller';
 import { forwardUserRouteGenericRequest } from '../model/secureModelProxy';
+import {
+    assertWuyinVideoSuccessEnvelope,
+    buildWuyinVideoDetailUrl,
+    buildWuyinVideoRequestBody,
+    buildWuyinVideoSubmitUrl,
+    extractWuyinVideoMessage,
+    extractWuyinVideoTaskId,
+    extractWuyinVideoUrl,
+    extractWuyinVideoStatusCode,
+    mapWuyinVideoStatus,
+    normalizeWuyinVideoBaseUrl,
+    resolveWuyinVideoRequestRoute,
+} from './wuyinAsyncVideoRoute.ts';
 
 export class VideoCompatibleAdapter implements LLMAdapter {
     id = 'video-compatible-adapter';
@@ -43,6 +56,10 @@ export class VideoCompatibleAdapter implements LLMAdapter {
             throw new Error(`当前 Base URL 看起来是文档地址 (${rawBase})，不是供应商 API 地址。请改成供应商工作台里显示的真实 Base URL。`);
         }
         const runtime = this.resolveRuntime(rawBase, keySlot, options.modelId);
+        if (runtime.videoApiStyle === 'wuyin-async-video') {
+            return this.generateVideoViaWuyinAsync(options, keySlot, rawBase);
+        }
+
         const cleanBase = this.normalizeBaseUrl(rawBase, runtime.videoApiStyle);
 
         if (runtime.videoApiStyle === 'unified-v2-generations') {
@@ -83,6 +100,10 @@ export class VideoCompatibleAdapter implements LLMAdapter {
     }
 
     private normalizeBaseUrl(baseUrl: string, style: ProviderStrategyVideoApiStyle): string {
+        if (style === 'wuyin-async-video') {
+            return normalizeWuyinVideoBaseUrl(baseUrl);
+        }
+
         let clean = String(baseUrl || 'https://api.openai.com').trim().replace(/\/+$/, '');
         clean = clean
             .replace(/\/v2\/videos\/generations(?:\/[^/?#]+)?$/i, '')
@@ -261,6 +282,7 @@ export class VideoCompatibleAdapter implements LLMAdapter {
             provider: this.provider,
             providerName: keySlot.name || this.provider,
             model: options.modelId,
+            keySlotId: keySlot.id,
         };
     }
 
@@ -327,6 +349,118 @@ export class VideoCompatibleAdapter implements LLMAdapter {
         }
 
         formData.append('image', imageSource);
+    }
+
+    private async generateVideoViaWuyinAsync(
+        options: VideoGenerationOptions,
+        keySlot: KeySlot,
+        rawBase: string,
+    ): Promise<VideoGenerationResult> {
+        const route = resolveWuyinVideoRequestRoute({
+            baseUrl: rawBase,
+            modelId: options.modelId,
+        });
+        const submitUrl = buildWuyinVideoSubmitUrl(rawBase, route);
+        const body = buildWuyinVideoRequestBody(options);
+
+        const response = await forwardUserRouteGenericRequest({
+            url: submitUrl,
+            method: 'POST',
+            keyId: keySlot.id,
+            rawBody: body,
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+            },
+            signal: options.signal,
+        });
+
+        if (!response.ok) {
+            const errText = await response.text().catch(() => '');
+            throw new Error(`Wuyin video API error ${response.status}: ${errText.slice(0, 300)}`);
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        assertWuyinVideoSuccessEnvelope(payload);
+
+        const taskId = extractWuyinVideoTaskId(payload);
+        const directUrl = extractWuyinVideoUrl(payload);
+        const status = mapWuyinVideoStatus(extractWuyinVideoStatusCode(payload));
+
+        if (taskId) {
+            options.onTaskId?.(taskId);
+        }
+
+        if (directUrl && status === 'success') {
+            return this.buildResult(options, keySlot, { url: directUrl, taskId, status: 'success' });
+        }
+
+        if (!taskId) {
+            if (directUrl) {
+                return this.buildResult(options, keySlot, { url: directUrl, status: 'success' });
+            }
+            throw new Error('Wuyin video API returned success without a task id or output URL.');
+        }
+
+        return this.pollWuyinVideoTask(taskId, rawBase, options, keySlot);
+    }
+
+    private async pollWuyinVideoTask(
+        taskId: string,
+        rawBase: string,
+        options: VideoGenerationOptions,
+        keySlot: KeySlot,
+    ): Promise<VideoGenerationResult> {
+        const maxDurationMs = 30 * 60 * 1000;
+        const startTime = Date.now();
+        let pollInterval = 3000;
+        const maxInterval = 15000;
+
+        while (Date.now() - startTime < maxDurationMs) {
+            if (options.signal?.aborted) {
+                throw new Error('Video generation was aborted.');
+            }
+
+            await this.delay(pollInterval);
+            pollInterval = Math.min(Math.round(pollInterval * 1.5), maxInterval);
+
+            const response = await forwardUserRouteGenericRequest({
+                url: buildWuyinVideoDetailUrl(rawBase, taskId),
+                method: 'GET',
+                keyId: keySlot.id,
+                headers: {
+                    Accept: 'application/json',
+                },
+                signal: options.signal,
+            });
+
+            if (!response.ok) {
+                const errText = await response.text().catch(() => '');
+                if (response.status >= 500 || response.status === 404) {
+                    continue;
+                }
+                throw new Error(`Wuyin video poll error ${response.status}: ${errText.slice(0, 200)}`);
+            }
+
+            const payload = await response.json().catch(() => ({}));
+            assertWuyinVideoSuccessEnvelope(payload);
+
+            const status = mapWuyinVideoStatus(extractWuyinVideoStatusCode(payload));
+            if (status === 'success') {
+                const videoUrl = extractWuyinVideoUrl(payload);
+                if (videoUrl) {
+                    return this.buildResult(options, keySlot, { url: videoUrl, taskId, status: 'success' });
+                }
+                throw new Error('Wuyin video task completed without a usable output URL.');
+            }
+
+            if (status === 'failed') {
+                const reason = extractWuyinVideoMessage(payload) || JSON.stringify(payload);
+                throw new Error(`Wuyin video generation failed: ${reason}`);
+            }
+        }
+
+        throw new Error('Wuyin video generation timed out after 30 minutes.');
     }
 
     private async fetchContentUrlViaProxy(

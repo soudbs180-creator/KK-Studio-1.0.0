@@ -22,7 +22,8 @@ export type ProviderStrategyImageRoutingPolicy = 'chat-first' | 'surface-first';
 export type ProviderStrategyVideoApiStyle =
     | 'openai-v1-videos'
     | 'legacy-video-generations'
-    | 'unified-v2-generations';
+    | 'unified-v2-generations'
+    | 'wuyin-async-video';
 
 export interface ProviderStrategy {
     id: string;
@@ -246,7 +247,7 @@ const PROVIDER_STRATEGIES: ProviderStrategy[] = [
         geminiAuthorizationValueFormat: 'raw',
         defaultCompatibilityMode: 'standard',
         imageProfile: 'openai-strict',
-        videoApiStyle: 'openai-v1-videos',
+        videoApiStyle: 'wuyin-async-video',
         pricingSupport: 'native',
         managementSupport: 'native',
         respectProviderOnCustomHost: true,

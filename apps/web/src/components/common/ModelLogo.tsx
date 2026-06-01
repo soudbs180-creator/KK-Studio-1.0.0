@@ -14,6 +14,7 @@ interface ModelLogoProps {
     size?: number;
     active?: boolean;
     className?: string;
+    preferProvider?: boolean;
 }
 
 type IconVariant = 'color' | 'mono';
@@ -60,7 +61,7 @@ const ICON_MATCHERS: Array<{ iconId: string; keywords: string[] }> = [
     { iconId: 'wenxin', keywords: ['ernie', 'wenxin', '百度文心', '文心一言', '文心'] }, // 独立文心一言彩环图标
     { iconId: 'baidu', keywords: ['baidu', '百度'] },
     { iconId: 'zhipu', keywords: ['zhipu', 'glm', 'bigmodel', 'cogview', 'cogvideo', '智谱'] },
-    { iconId: 'zeroone', keywords: ['yi-', 'yi ', '01.ai', '01 ai', 'lingyi', '零一万物', '零一'] },
+    { iconId: 'zeroone', keywords: ['yi', '01.ai', '01 ai', 'lingyi', '零一万物', '零一'] },
     { iconId: 'xiaomimimo', keywords: ['xiaomi', 'xiaomi mimo', 'xiaomimimo', 'mimo', '小米'] }, // 修正为 LobeHub 中的 xiaomimimo 品牌以解决 CDN 404
     { iconId: 'aws', keywords: ['amazon nova', 'nova', 'aws'] },
     { iconId: 'xai', keywords: ['grok', 'xai'] },
@@ -89,6 +90,36 @@ const ICON_MATCHERS: Array<{ iconId: string; keywords: string[] }> = [
     { iconId: 'stability', keywords: ['stability', 'stable-diffusion', 'stable video', 'sv3d', 'svd'] },
     { iconId: 'sambanova', keywords: ['sambanova'] }, // 新增 SambaNova 品牌支持
     { iconId: 'streamlake', keywords: ['wanqing', 'streamlake', '快手', '万青'] }, // 新增 StreamLake 快手品牌支持
+    // 以下为补充收录的 LobeHub 品牌
+    { iconId: 'baichuan', keywords: ['baichuan', '百川', '百川智能'] },
+    { iconId: 'sensenova', keywords: ['sensenova', 'sensechat', '商汤', '日日新'] },
+    { iconId: 'internlm', keywords: ['internlm', '书生', '浦语', '书生浦语'] },
+    { iconId: 'spark', keywords: ['spark', 'xfspark', '科大讯飞', '讯飞', '星火', 'iflytek'] },
+    { iconId: 'ollama', keywords: ['ollama'] },
+    { iconId: 'huggingface', keywords: ['huggingface', 'hugging face', 'hf'] },
+    { iconId: 'cloudflare', keywords: ['cloudflare', 'workers ai', 'workersai', 'cloudflare workers'] },
+    { iconId: 'fireworks', keywords: ['fireworks', 'fireworksai', 'fireworks ai'] },
+    { iconId: 'deepinfra', keywords: ['deepinfra', 'deep infra'] },
+    { iconId: 'replicate', keywords: ['replicate'] },
+    { iconId: 'novita', keywords: ['novita', 'novitaai', 'novita ai'] },
+    { iconId: 'jina', keywords: ['jina', 'jinaai', 'jina ai'] },
+    { iconId: 'leptonai', keywords: ['lepton', 'leptonai', 'lepton ai'] },
+    { iconId: 'anyscale', keywords: ['anyscale'] },
+    { iconId: 'lmstudio', keywords: ['lmstudio', 'lm studio'] },
+    { iconId: 'v0', keywords: ['v0'] },
+    { iconId: 'githubcopilot', keywords: ['copilot', 'githubcopilot', 'github copilot'] },
+    { iconId: 'apple', keywords: ['apple', '苹果'] },
+    { iconId: 'huawei', keywords: ['huawei', 'huaweicloud', '华为', '盘古'] },
+    { iconId: 'bilibili', keywords: ['bilibili', 'b站', '哔哩哔哩'] },
+    { iconId: 'ai360', keywords: ['360ai', '360 智脑', '360智脑', '360', 'ai360', '智脑'] },
+    { iconId: 'ai21', keywords: ['ai21', 'ai21labs', 'ai21 labs'] },
+    { iconId: 'yandex', keywords: ['yandex'] },
+    { iconId: 'upstage', keywords: ['upstage'] },
+    { iconId: 'cerebras', keywords: ['cerebras'] },
+    { iconId: 'civitai', keywords: ['civitai'] },
+    { iconId: 'lobehub', keywords: ['lobehub', 'lobe'] },
+    { iconId: 'giteeai', keywords: ['gitee', 'giteeai', 'gitee ai'] },
+    { iconId: 'modelscope', keywords: ['modelscope', '魔搭', '魔搭社区'] },
 ];
 
 const CUSTOM_ICON_MATCHERS: Array<{ iconUrl: string; keywords: string[] }> = [
@@ -104,78 +135,53 @@ function normalizeValue(value?: string): string {
         .trim()
         .toLowerCase()
         .replace(/[@/_.-]+/g, ' ')
-        .replace(/[^a-z0-9 ]+/g, ' ')
+        // 保留字母、数字、中文字符和空格，防止过滤掉中文大模型/提供商关键词
+        .replace(/[^a-z0-9\u4e00-\u9fa5 ]+/g, ' ')
         .replace(/\s+/g, ' ');
 }
 
 function matchesKeyword(candidate: string, keyword: string): boolean {
-    const normalizedKeyword = normalizeValue(keyword);
-    if (!candidate || !normalizedKeyword) return false;
+    const c = normalizeValue(candidate);
+    const k = normalizeValue(keyword);
+    if (!c || !k) return false;
 
-    if (candidate === normalizedKeyword) return true;
+    // 1. 完全一致则匹配成功
+    if (c === k) return true;
 
-    if (normalizedKeyword.length <= 2) {
-        return candidate
-            .split(' ')
-            .filter(Boolean)
-            .some((token) => token === normalizedKeyword || token.startsWith(normalizedKeyword));
+    // 2. 检测 keyword 是否包含中文
+    const hasChinese = /[\u4e00-\u9fa5]/.test(k);
+    if (hasChinese) {
+        // 对于中文关键词，直接进行子串包含性匹配（因为中文词语通常不使用空格分隔）
+        return c.includes(k);
     }
 
-    return candidate.includes(normalizedKeyword);
-}
-
-function resolveIconId(modelId: string, provider?: string, modelName?: string): string | undefined {
-    const candidates = [normalizeValue(modelId), normalizeValue(provider), normalizeValue(modelName)].filter(Boolean);
-
-    for (const candidate of candidates) {
-        const matched = ICON_MATCHERS.find(({ keywords }) =>
-            keywords.some((keyword) => matchesKeyword(candidate, keyword))
-        );
-
-        if (matched) {
-            return matched.iconId;
-        }
-    }
-
-    return undefined;
-}
-
-function resolveCustomIconUrl(modelId: string, provider?: string, modelName?: string): string | undefined {
-    const candidates = [normalizeValue(modelId), normalizeValue(provider), normalizeValue(modelName)].filter(Boolean);
-
-    for (const candidate of candidates) {
-        const matched = CUSTOM_ICON_MATCHERS.find(({ keywords }) =>
-            keywords.some((keyword) => matchesKeyword(candidate, keyword))
-        );
-
-        if (matched) {
-            return matched.iconUrl;
-        }
-    }
-
-    return undefined;
+    // 3. 对于英文/数字等无中文的关键词，为了防止类似 "raws" 误匹配成 "aws"、"egypt" 误匹配成 "gpt" 等，
+    // 我们强制要求进行精确的单词边界匹配。通过在首尾补空格实现：
+    const paddedC = ' ' + c + ' ';
+    const paddedK = ' ' + k + ' ';
+    return paddedC.includes(paddedK);
 }
 
 function isNanoBananaSeries(modelId: string, provider?: string, modelName?: string): boolean {
-    const candidates = [normalizeValue(modelId), normalizeValue(provider), normalizeValue(modelName)].filter(Boolean);
+    const candidates = [normalizeValue(modelId), provider, modelName].filter(Boolean).map(c => normalizeValue(c));
 
     return candidates.some((candidate) =>
         NANO_BANANA_KEYWORDS.some((keyword) => candidate.includes(keyword))
     );
 }
 
-function getFallbackInitials(modelId: string, provider?: string): string {
-    const source = (provider || modelId || 'AI').trim();
-    if (!source) return 'AI';
+function getFallbackInitials(source: string): string {
+    const cleanedSource = (source || '').trim();
+    if (!cleanedSource) return 'AI';
 
     // 如果字符串中包含中文，直接提取第一个中文字符作为图标，实现最完美契合中文字符的“首字当图标”效果
-    const chineseMatch = source.match(/[\u4e00-\u9fa5]/);
+    const chineseMatch = cleanedSource.match(/[\u4e00-\u9fa5]/);
     if (chineseMatch) {
         return chineseMatch[0];
     }
 
     // 否则是纯英文或数字，进行英文缩写提取
-    const cleaned = source
+    const cleaned = cleanedSource
         .replace(/[@/_-]+/g, ' ')
         .replace(/[^a-zA-Z0-9 ]/g, '')
         .trim();
@@ -224,6 +230,12 @@ const MONO_BLACK_ICONS = [
     'moonshot',
     'xiaomimimo',
     'anthropic',
+    'apple',
+    'replicate',
+    'v0',
+    'githubcopilot',
+    'ollama',
+    'lmstudio',
 ];
 
 const ModelLogo: React.FC<ModelLogoProps> = ({
@@ -233,14 +245,55 @@ const ModelLogo: React.FC<ModelLogoProps> = ({
     size = 18,
     active = true,
     className = '',
+    preferProvider = false,
 }) => {
     const { isDarkMode } = useTheme();
     const [variant, setVariant] = useState<IconVariant>('color');
     const [hasError, setHasError] = useState(false);
     const isNanoBanana = useMemo(() => isNanoBananaSeries(modelId, provider, modelName), [modelId, modelName, provider]);
-    const iconId = useMemo(() => resolveIconId(modelId, provider, modelName), [modelId, modelName, provider]);
-    const customIconUrl = useMemo(() => resolveCustomIconUrl(modelId, provider, modelName), [modelId, modelName, provider]);
-    const fallbackInitials = useMemo(() => getFallbackInitials(modelName || modelId, provider), [modelId, modelName, provider]);
+
+    // 根据 preferProvider 参数，智能分配候选匹配词及其优先级。
+    // 如果是供应商专属卡片，屏蔽 modelId，仅用 provider 和 modelName 来匹配供应商自己
+    // 如果是模型卡片，优先匹配 modelId/modelName（大模型本身所属品牌），随后才匹配 provider
+    const candidates = useMemo(() => {
+        return preferProvider
+            ? [normalizeValue(provider), normalizeValue(modelName)].filter(Boolean)
+            : [normalizeValue(modelId), normalizeValue(modelName), normalizeValue(provider)].filter(Boolean);
+    }, [modelId, provider, modelName, preferProvider]);
+
+    // 匹配 Lobe 图标库的 ID
+    const iconId = useMemo(() => {
+        for (const candidate of candidates) {
+            const matched = ICON_MATCHERS.find(({ keywords }) =>
+                keywords.some((keyword) => matchesKeyword(candidate, keyword))
+            );
+            if (matched) {
+                return matched.iconId;
+            }
+        }
+        return undefined;
+    }, [candidates]);
+
+    // 匹配自定义图片 URL
+    const customIconUrl = useMemo(() => {
+        for (const candidate of candidates) {
+            const matched = CUSTOM_ICON_MATCHERS.find(({ keywords }) =>
+                keywords.some((keyword) => matchesKeyword(candidate, keyword))
+            );
+            if (matched) {
+                return matched.iconUrl;
+            }
+        }
+        return undefined;
+    }, [candidates]);
+
+    // 获取首字退化显示的文字
+    const fallbackInitials = useMemo(() => {
+        const source = preferProvider
+            ? (provider || modelName || 'AI')
+            : (modelName || modelId || provider || 'AI');
+        return getFallbackInitials(source);
+    }, [modelId, provider, modelName, preferProvider]);
 
     useEffect(() => {
         setVariant('color');

@@ -25,6 +25,7 @@ export interface RequestProfile {
   requestSurfaceDefaults: {
     chat?: string;
     image?: string;
+    video?: string;
   };
   apiBaseUrlPolicy: "profile-fixed" | "runtime-supplied";
   fallbackProfileId?: RequestProfileId;
@@ -86,7 +87,7 @@ const REQUEST_PROFILES: RequestProfile[] = [
   {
     id: "wuyinkeji",
     displayName: "Wuyin Keji",
-    docSources: ["https://api.wuyinkeji.com/doc/65"],
+    docSources: ["https://api.wuyinkeji.com/doc/65", "https://api.wuyinkeji.com/doc/72"],
     providerAliases: ["wuyin", "wuyin keji", "wuyinkeji", "wu yin"],
     docsUrlPatterns: [/^https?:\/\/api\.wuyinkeji\.com\/doc\/\d+(?:$|[?#])/i],
     hostPatterns: [/^api\.wuyinkeji\.com$/i],
@@ -94,6 +95,7 @@ const REQUEST_PROFILES: RequestProfile[] = [
     supportedProtocolFamilies: ["openai-compatible", "gemini-native"],
     requestSurfaceDefaults: {
       image: "async-image",
+      video: "async-video",
     },
     apiBaseUrlPolicy: "runtime-supplied",
   },

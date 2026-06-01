@@ -1,5 +1,9 @@
-// server/index.js
-// 简体中文注释：后端主服务入口，同时暴露可复用启动函数给 VPS 脚本调用。
+/**
+ * @file index.js
+ * @module server
+ * @description 后端主服务入口文件，初始化 Express 应用、配置安全中间件、跨域 CORS、路由挂载及端口监听。
+ */
+
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
@@ -90,6 +94,7 @@ function createApp() {
     if (!req.path.startsWith('/webhook/stripe')) {
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     }
     next();
   });
@@ -113,8 +118,19 @@ function createApp() {
     res.json({ ok: true, service: 'kk-api' });
   });
 
-  app.use(express.json({ verify: captureRawJsonBody }));
-  app.use(express.urlencoded({ extended: true }));
+  // 简体中文注释：限制图像生成与编辑路由（含大 base64 数据）的请求体最大为 10mb
+  app.use('/api/generate-image', express.json({ limit: '10mb', verify: captureRawJsonBody }));
+  app.use('/api/generate/image', express.json({ limit: '10mb', verify: captureRawJsonBody }));
+  app.use('/api/generate/edit', express.json({ limit: '10mb', verify: captureRawJsonBody }));
+
+  // 简体中文注释：限制其它所有 API 和 Webhook 路由请求体最大为 1mb，防止内存耗尽攻击
+  app.use((req, res, next) => {
+    if (req.body !== undefined) {
+      return next();
+    }
+    express.json({ limit: '1mb', verify: captureRawJsonBody })(req, res, next);
+  });
+  app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
   app.use('/webhook', webhookRouter);
   app.use('/api', userRouter);

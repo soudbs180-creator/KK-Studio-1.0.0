@@ -1,6 +1,8 @@
-// server/lib/jwt.js
-// 职责：统一提供 JWT 令牌的签发（signJWT）与验证（verifyJWT）功能。
-// 遵守规范：时序安全比较防范时序攻击，所有注释均采用中文详细解释为什么和处理逻辑。
+/**
+ * @file jwt.js
+ * @module server/lib
+ * @description JWT 令牌签发与验证工具模块。采用时序安全比较防范时序攻击，用于处理多端 JWT 校验流程。
+ */
 
 const crypto = require('crypto');
 

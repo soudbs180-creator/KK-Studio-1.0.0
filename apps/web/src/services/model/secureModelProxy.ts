@@ -103,6 +103,8 @@ export interface SecureProxyVideoResponse extends SecureProxyBillingMetadata {
   taskId: string;
   status: 'pending' | 'success' | 'failed';
   url?: string;
+  message?: string;
+  error?: string;
   endpointType?: 'openai' | 'gemini' | 'claude';
 }
 
@@ -128,6 +130,8 @@ export interface SecureProxyAudioResponse extends SecureProxyBillingMetadata {
 export interface SecureProxyTaskStatusResponse extends SecureProxyBillingMetadata {
   status: 'pending' | 'success' | 'failed';
   url?: string;
+  message?: string;
+  error?: string;
   requestId?: string;
   attemptId?: string;
 }
@@ -1249,6 +1253,8 @@ export async function callSecureSystemProxyVideo(
     taskId: data.taskId || '',
     status: data.status || 'pending',
     url: data.url,
+    message: typeof data.message === 'string' ? data.message : undefined,
+    error: typeof data.error === 'string' ? data.error : undefined,
     ...extractSecureProxyBillingMetadata(data),
     endpointType: data.endpointType,
   };
@@ -1276,6 +1282,8 @@ export async function callLocalUserRouteProxyVideo(
     taskId: data.taskId || '',
     status: data.status || 'pending',
     url: data.url,
+    message: typeof data.message === 'string' ? data.message : undefined,
+    error: typeof data.error === 'string' ? data.error : undefined,
     ...extractSecureProxyBillingMetadata(data),
     endpointType: data.endpointType,
   };
@@ -1336,6 +1344,8 @@ export async function checkSecureSystemProxyTaskStatus(taskId: string): Promise<
   return {
     status: data.status || 'pending',
     url: data.url,
+    message: typeof data.message === 'string' ? data.message : undefined,
+    error: typeof data.error === 'string' ? data.error : undefined,
     requestId: typeof data.requestId === 'string' ? data.requestId : undefined,
     attemptId: typeof data.attemptId === 'string' ? data.attemptId : undefined,
     ...extractSecureProxyBillingMetadata(data),
@@ -1353,6 +1363,8 @@ export async function checkLocalUserRouteProxyTaskStatus(
   return {
     status: data.status || 'pending',
     url: data.url,
+    message: typeof data.message === 'string' ? data.message : undefined,
+    error: typeof data.error === 'string' ? data.error : undefined,
     requestId: typeof data.requestId === 'string' ? data.requestId : undefined,
     attemptId: typeof data.attemptId === 'string' ? data.attemptId : undefined,
     ...extractSecureProxyBillingMetadata(data),

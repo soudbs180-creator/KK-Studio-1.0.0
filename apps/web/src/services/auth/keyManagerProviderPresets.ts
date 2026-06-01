@@ -132,6 +132,13 @@ export const PROVIDER_PRESETS: Record<string, KeyManagerProviderPreset> = {
         format: 'openai',
         icon: '\u{1F96D}'
     },
+    'wuyinkeji-google-omni': {
+        name: 'Wuyin Keji Google Omni',
+        baseUrl: 'https://api.wuyinkeji.com/api/async/video_google_omni',
+        models: ['video_google_omni'],
+        format: 'openai',
+        icon: '\u{1F3A5}'
+    },
     'gpt-best': {
         name: 'GPT-Best',
         baseUrl: '',

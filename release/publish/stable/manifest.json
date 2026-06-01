@@ -1,17 +1,19 @@
 {
   "appName": "KK Studio",
-  "version": "1.5.0",
-  "displayVersion": "v1.5.0",
-  "buildTime": "2026-05-29T06:30:00.000Z",
-  "releaseDate": "2026-05-29",
+  "version": "1.5.1",
+  "displayVersion": "v1.5.1",
+  "buildTime": "2026-06-01T11:00:00.000Z",
+  "releaseDate": "2026-06-01",
   "releaseNotes": [
-    "Refactored mobile settings topbar navigation layout, simplified language switching, and optimized back and close button alignment.",
-    "Hosted/VPS release guardrails, package metadata, workspace packages, and portable version manifests are aligned to version 1.5.0.",
-    "verified kkai.plus same-origin API."
+    "Adapted sidebar and provider logos to light/dark themes, optimizing dark mode visual hierarchy.",
+    "Aligned provider card UI layout to strict AGENTS specification golden ratio constraints.",
+    "Integrated local user-route API proxying for offline editing and VPS fallback routes.",
+    "Enforced strict request body limits and security headers on the server side.",
+    "verified kkai.plus same-origin API workaround."
   ],
   "channel": "stable",
-  "packageFile": "KK-Studio-Portable-1.5.0.zip",
-  "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.5.0/KK-Studio-Portable-1.5.0.zip",
+  "packageFile": "KK-Studio-Portable-1.5.1.zip",
+  "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.5.1/KK-Studio-Portable-1.5.1.zip",
   "sha256": "9bce82c7a9bb2a74d0f14648b6093050352c116b3bcc50f43b6c2c15bb777316",
   "size": 52917247
 }

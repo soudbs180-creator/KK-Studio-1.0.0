@@ -1,12 +1,14 @@
 {
   "appName": "KK Studio",
-  "version": "1.5.0",
-  "displayVersion": "v1.5.0",
-  "releaseDate": "2026-05-29",
+  "version": "1.5.1",
+  "displayVersion": "v1.5.1",
+  "releaseDate": "2026-06-01",
   "releaseNotes": [
-    "Refactored mobile settings topbar navigation layout, simplified language switching, and optimized back and close button alignment.",
-    "Hosted/VPS release guardrails, package metadata, workspace packages, and portable version manifests are aligned to version 1.5.0.",
-    "verified kkai.plus same-origin API."
+    "Adapted sidebar and provider logos to light/dark themes, optimizing dark mode visual hierarchy.",
+    "Aligned provider card UI layout to strict AGENTS specification golden ratio constraints.",
+    "Integrated local user-route API proxying for offline editing and VPS fallback routes.",
+    "Enforced strict request body limits and security headers on the server side.",
+    "verified kkai.plus same-origin API workaround."
   ],
   "versionTargets": {
     "releaseManifest": "config/release-manifest.json",

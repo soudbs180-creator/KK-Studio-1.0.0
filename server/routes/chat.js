@@ -1,5 +1,8 @@
-// server/routes/chat.js
-// 职责：提供受积分事务保护的 OpenAI 对话接口，并对消息结构做强校验。
+/**
+ * @file chat.js
+ * @module server/routes
+ * @description 受积分事务保护的 OpenAI 对话 API 路由。提供请求格式强校验、积分扣除/退款时序控制，并可串联记录 Token 用量审计。
+ */
 
 const crypto = require('crypto');
 const express = require('express');

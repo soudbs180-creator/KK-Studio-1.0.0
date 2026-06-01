@@ -9,6 +9,7 @@ export type ProviderProtocolFamily =
   | "claude-native"
   | "openrouter-openai"
   | "wuyin-async-image"
+  | "wuyin-async-video"
   | "12ai-flow";
 
 export interface ModelCatalogItemDto {

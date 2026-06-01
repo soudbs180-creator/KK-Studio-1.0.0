@@ -16111,11 +16111,11 @@ body:not(.dark-mode) .settings-panel .settings-model-center-preset__mark {
 
 /* 模型管理中心层级整理：主标题只保留在卡片头部，内部模块改为清晰的分区节奏 */
 .settings-panel [data-testid="settings-model-center"] > .settings-section-card {
-  padding: 22px 24px 26px !important;
+  padding: 22px 0 26px !important;
 }
 
 .settings-panel [data-testid="settings-model-center"] > .settings-section-card > div:first-child {
-  padding-bottom: 18px !important;
+  padding: 0 24px 18px !important;
   border-bottom: 1px solid var(--settings-border-subtle) !important;
 }
 
@@ -16599,3 +16599,4 @@ body:not(.dark-mode) .settings-model-center-route__btn-action--danger span {
     gap: 8px !important;
   }
 }
+

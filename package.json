@@ -1,7 +1,7 @@
 {
   "name": "kk-studio",
   "private": true,
-  "version": "1.5.0",
+  "version": "1.5.1",
   "workspaces": [
     "packages/*"
   ],
@@ -12,7 +12,7 @@
   },
   "scripts": {
     "dev": "vite --configLoader native --config apps/web/vite.config.ts",
-    "dev:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/dev-launch.ps1 -Restart",
+    "dev:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/dev-launch.ps1 -Restart -AllowLocalOnlyFallback",
     "dev:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/dev-stop.ps1",
     "dev:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/dev-status.ps1",
     "dev:restart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/restart-dev.ps1",

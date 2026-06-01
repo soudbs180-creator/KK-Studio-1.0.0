@@ -1,64 +1,122 @@
-# KK Studio v1.5.0
+# KK Studio v1.5.1
 
-KK Studio 是一款面向图像、视频、音频以及演示文稿（Presentation）等工作流的下一代多模态无限画布 AI 工作台。它将提示词创作编排、多模型智能路由、用户自定义 API 密钥管理、工作区云端同步以及商业化计费/运维监控深度融为一体。
+> **下一代面向 AI 创作、无限画布与智能模型路由的多模态 AI 工作台。**
+> 
+> KK Studio 将提示词编排、多模型智能路由、用户自主密钥、多端云同步与商业化计费/审计深度融为一体，为创意工作者和开发团队提供高效、安全、极致流畅的创作体验。
 
-## 🌟 核心亮点
+---
 
-- **多模态无限画布 (Multimodal Canvas)**：提供直观的 prompt 编写、资源管理与多模态生成结果的可视化画布，支持组件吸附网络与卡片折叠，助您以搭积木的方式编排创作链路。
-- **多模型路由分发**：无缝对接官方接口与第三方中转供应商，具备角色路由与能力分配机制，帮助团队在速度、效果与成本之间取得完美平衡。
-- **混合云协同与自主密钥**：提供用户级 API 密钥管理，既支持本地零配置启动，也能通过安全隧道同步至云端，实现隐私与便捷性的统一。
-- **商业化闭环与安全管控**：内置完整的充值、计费、积分原子扣减与退款审计（Credits Transaction）机制。管理后台具备精细的分级授权设计。
-- **出色的商业级美学设计**：遵循 Apple 级磨砂玻璃态（Glassmorphism）与自适应流式排版设计，搭配丰富的微动效，带来愉悦的使用体验。
+## 🌟 核心能力与设计愿景
 
-## 🛠️ 技术栈
+### 🎨 极致的商业级设计美学 (Design Aesthetics)
+* **Glassmorphism 磨砂玻璃态**：遵循 Apple 级视觉规范，采用微透与流畅的阴影过渡，构建高级的主题层次。
+* **物理吸附画布**：支持组件网络物理吸附、卡片弹性折叠与连线，将原本散乱的 Prompt 编排过程变为直觉式的“搭积木”体验。
+* **微动效与自适应流式排版**：全面适配桌面端（Vite + React）与移动端（Expo + React Native），提供高帧率微交互。
 
-- **前端技术**：React 19.2.x, TypeScript 6.0.x, Vite 8.0.x, React Router 7.x
-- **样式方案**：Vanilla CSS 变量与现代实用类（Tailwind CSS）
-- **移动平台**：Expo (React Native) 移动端应用，提供原生的移动体验
-- **后端服务**：基于 PostgreSQL 的 VPS API 运行时，辅以 Supabase 用于 Auth 鉴权及实时数据存取
+### 🤖 智能模型路由与多供应商分发 (Model Routing)
+* **协议层屏蔽**：前端无需关注各家 API 的底层协议差异，通过统一 HTTP Layer（`packages/api-client`）实现接口的强类型对接。
+* **混合云协同与自主密钥**：支持本地零配置直连外部 Provider，或由安全加密通道同步至云端，在保护用户隐私的同时赋予极高的定制自由度。
+* **多模型热切换**：管理后台支持多 Provider 的 API 端点、模型参数和密钥的热更新与灰度分发。
 
-## 📂 项目结构
+### 🔒 商业级计费、安全与退款审计 (Credits Transaction)
+* **原子级积分扣减锁**：基于 PostgreSQL 事务，实现“预扣积分 -> 调用 AI 接口 -> 成功结算 / 失败自动退款”的闭环，彻底防范并发负分与资损漏洞。
+* **分级管理员控制台**：内置 0/1/2 级权限验证。超级管理员拥有最高的系统配置权限，而普通管理员则负责日常的充值与模型参数微调。
+* **Stripe 订阅闭环**：通过经过严格签名验签的 Webhook，打通在线订阅与自动充值链路。
 
-根据本项目严格的 AI Agent 架构黄金法则：
-- `apps/web/`：唯一的桌面端 Web 前端运行时（Vite + React）。
-- `apps/mobile/`：手机端 Expo 应用（React Native）。
-- `packages/shared/`：平台无关的共享核心业务包（纯 TS 编写）。
-- `packages/api-client/`：统一封装的 HTTP API 客户端。
-- `packages/ui/`：跨平台兼容的基础 UI 组件库。
-- `server/`：VPS 后端主服务（Express.js），处理支付 Webhook 及 API 转发。
-- `migrations/`：PostgreSQL schema 数据库迁移目录。
+---
 
-## 🚀 本地快速开发
+## 🏗️ 架构与分工 (System Architecture)
 
-1. **环境准备**：
-   确保您已安装 Node.js 22+ 及 npm 10+。
-   
-2. **复制环境变量**：
-   ```bash
-   cp .env.example .env
-   ```
-   如需覆盖前端配置，可创建 `.env.local`。
+KK Studio 采用 Monorepo 多包管理结构，各模块边界分工明确：
 
-3. **安装依赖**：
-   ```bash
-   npm install
-   ```
+```mermaid
+graph TD
+    subgraph Client Apps
+        Web["apps/web (Desktop Web via Vite & React)"]
+        Mobile["apps/mobile (iOS/Android via Expo & RN)"]
+    end
 
-4. **启动本地开发服务**：
-   ```bash
-   npm run dev:start
-   ```
+    subgraph Shared Packages
+        Shared["packages/shared (Pure TypeScript Domain & Contracts)"]
+        ApiClient["packages/api-client (HTTP Layer & Token Storage)"]
+        UI["packages/ui (Cross-platform Design Tokens & Components)"]
+    end
 
-## 📋 版本治理与持续集成
+    subgraph Backend Services
+        Server["server/ (VPS Backend Node/Express)"]
+        Db[("PostgreSQL Connection Pool")]
+    end
 
-项目配置了严格的版本一致性检测。在提交流程或部署前，请确保运行以下命令通过门禁检查：
-```bash
-# 检测各子包及发布清单的版本号是否与 config/release-manifest.json 保持一致
-npm run governance:check
-
-# 静态类型检查
-npm run typecheck
-
-# 生产环境打包验证
-npm run build
+    Web --> ApiClient
+    Mobile --> ApiClient
+    ApiClient --> Shared
+    ApiClient --> Server
+    Server --> Db
+    UI -.-> Web
+    UI -.-> Mobile
 ```
+
+### 📂 目录职责矩阵
+
+| 目录/包名 | 核心职责 | 技术栈 | 隔离规则 |
+| :--- | :--- | :--- | :--- |
+| [`apps/web/`](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/web) | 桌面端无限画布主应用 | React 19 + TypeScript + Vite | **禁止** 引入 React Native 与 Expo API |
+| [`apps/mobile/`](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/apps/mobile) | 原生移动端 App | Expo + React Native | **禁止** 直接调用浏览器特有的 DOM/BOM 接口 |
+| [`packages/shared/`](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/shared) | 业务模型定义、类型与核心契约 | 纯 TypeScript (ESM) | **禁止** 引入任何含平台特征（如 `window`, RN 标签）的代码 |
+| [`packages/api-client/`](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/api-client) | 强类型 HTTP 请求封装及多端 Session 管理 | Axios + React Query | 本地存储（localStorage / SecureStore）需通过依赖注入解耦 |
+| [`packages/ui/`](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/packages/ui) | 跨端共享设计系统与 UI Token 预设 | CSS Variables + Component Presets | 必须保持平台无副作用 |
+| [`server/`](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/server) | 后端 Express 运行时，处理 API 代理、计费、Stripe Webhook | Express.js + pg (Connection Pool) | **禁止** 引入 React 等前端 UI 库 |
+| [`migrations/`](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/migrations) | 数据库 Schema 迁移，DML/DDL 唯一来源 | 参数化 SQL 语句 | 严禁编写任何带有业务逻辑的处理代码 |
+
+---
+
+## 🛠️ 快速启动 (Quick Start)
+
+### 1. 环境准备
+确保您的本地开发环境已安装 **Node.js 22.x/24.x** 且包管理器使用 **npm 10.x/11.x** (或 Bun)。
+
+### 2. 配置环境变量
+在项目根目录复制 `.env.example`，并补全本地/生产环境的密钥配置：
+```bash
+cp .env.example .env
+```
+> [!WARNING]
+> 绝对禁止将包含真实 API 密钥或密码的 `.env` 文件提交至 Git 仓库，确保它们已被 `.gitignore` 规则完全覆盖。
+
+### 3. 安装依赖与构建共享包
+```bash
+npm install
+npm run build -w packages/api-client
+```
+
+### 4. 启动开发环境
+```bash
+# 同时启动后端 Express 服务与前端 Vite 调试服务器
+npm run dev:start
+```
+开发环境启动后：
+* Web 端入口：[http://localhost:3000](http://localhost:3000)
+* API 代理服务端口：`3001`
+* 移动端（Expo）：`cd apps/mobile && npx expo start`
+
+---
+
+## 📈 版本与构建治理 (Governance)
+
+项目部署了严格的代码质量门禁，每次提交或合并前都必须通过回归审查：
+
+```bash
+# 一键运行完整验证链（包含架构边界、版本一致性、代码安全检查、类型校验、编译及单元/集成测试）
+npm run verify:changes
+```
+
+### 📌 关键治理任务分类说明
+* **架构边界检查** (`npm run architecture:check`)：检查跨模块引入是否违规（如 Web 引入了 RN 依赖）。
+* **版本一致性校验** (`npm run governance:check`)：以 `config/release-manifest.json` 为版本唯一事实来源，强制校验所有 package.json 以及发布清单。
+* **安全审计扫描** (`npm run governance:security`)：核实是否存在敏感日志泄露或前端硬编码官方域名等安全合规风险。
+* **编码与测试回归** (`npm run test`)：跑通端到端的单元测试与集成冒烟测试。
+
+---
+
+> [!NOTE]
+> 本项目遵循严格的 [AGENTS.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/AGENTS.md) 开发范式，请在编写任何业务逻辑前仔细阅读其定义的安全边界与时序要求。

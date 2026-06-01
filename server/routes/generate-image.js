@@ -1,5 +1,8 @@
-// server/routes/generate-image.js
-// 职责：平台代理 Gemini 图像生成/编辑入口，所有成功调用都必须先扣积分，失败再退款。
+/**
+ * @file generate-image.js
+ * @module server/routes
+ * @description 平台代理 Google Gemini 图像生成与编辑路由。处理积分预扣、图像生成配置组装、安全过滤及错误发生时的退款链路。
+ */
 
 const express = require('express');
 const { z } = require('zod');

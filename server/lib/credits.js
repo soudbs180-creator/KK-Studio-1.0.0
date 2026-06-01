@@ -1,5 +1,8 @@
-// server/lib/credits.js
-// 职责：统一管理积分定价、扣减、退款、充值和审计流水，保证商业结算链路可追踪。
+/**
+ * @file credits.js
+ * @module server/lib
+ * @description 积分系统核心业务逻辑库。实现原子扣减防负数锁、退款、充值、管理员积分调整，以及 credit_logs 审计日志的记录。
+ */
 
 const { getPool } = require('./db');
 

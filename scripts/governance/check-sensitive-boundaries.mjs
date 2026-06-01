@@ -31,7 +31,7 @@ function walk(relativeDir) {
     const absolutePath = path.join(absoluteDir, entry.name);
     const relativePath = path.relative(root, absolutePath).split(path.sep).join("/");
     if (entry.isDirectory()) {
-      if (entry.name === "node_modules" || entry.name === "dist") {
+      if (entry.name === "node_modules" || entry.name === "dist" || entry.name === "build") {
         continue;
       }
       files.push(...walk(relativePath));

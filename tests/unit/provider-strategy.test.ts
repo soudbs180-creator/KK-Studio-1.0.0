@@ -32,6 +32,17 @@ describe("provider strategy", () => {
     assert.equal(runtime.managementSupport, "native");
   });
 
+  test("routes Wuyin Google Omni video endpoints through the dedicated async-video style", () => {
+    const runtime = resolveProviderRuntime({
+      baseUrl: "https://api.wuyinkeji.com/api/async/video_google_omni",
+    });
+
+    assert.equal(runtime.strategyId, "wuyinkeji");
+    assert.equal(runtime.videoApiStyle, "wuyin-async-video");
+    assert.equal(runtime.authorizationValueFormat, "raw");
+    assert.equal(runtime.headerName, "Authorization");
+  });
+
   test("prefers request profile registry aliases before provider strategy fallback patterns", () => {
     const runtime = resolveProviderRuntime({
       provider: "Wu Yin",

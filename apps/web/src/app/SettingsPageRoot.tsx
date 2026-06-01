@@ -1,7 +1,8 @@
 import React, { useCallback } from 'react';
-import SettingsPanel from '../components/settings/SettingsPanel';
-import { isChunkLoadError } from '../utils/lazyWithRetry';
+import { isChunkLoadError, lazyWithRetry } from '../utils/lazyWithRetry';
 import { shouldUseHistoryBackForSettingsClose } from './settingsPageClose';
+
+const SettingsPanel = lazyWithRetry(() => import('../components/settings/SettingsPanel'));
 
 class SettingsPageLoadBoundary extends React.Component<
   { children: React.ReactNode },

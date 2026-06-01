@@ -688,6 +688,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                           modelName={route.title}
                           size={24}
                           className="settings-model-center-route__logo"
+                          preferProvider
                         />
                       </div>
 
@@ -705,7 +706,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                             onClick={(e) => {
                               e.stopPropagation();
                               navigator.clipboard.writeText(route.id);
-                              notify.success(pick('复制成功', 'Copied to clipboard'));
+                              notify.success(pick('成功', 'Success'), pick('复制成功', 'Copied to clipboard'));
                             }}
                           >
                             <Copy size={11} strokeWidth={1.8} className="settings-model-center-route__id-copy-icon" />
@@ -883,6 +884,7 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                   modelName={preset.title}
                   size={24}
                   className="settings-model-center-preset__logo"
+                  preferProvider
                 />
               </span>
               <span className="settings-model-center-preset__main">

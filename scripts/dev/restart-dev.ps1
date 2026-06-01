@@ -10,4 +10,4 @@ if (Test-Path $viteCachePath) {
 }
 
 Write-Host "[RESTART] Restarting KK Studio dev services ..."
-powershell -ExecutionPolicy Bypass -File (Join-Path $projectRoot 'scripts/dev/dev-launch.ps1') -Restart
+powershell -ExecutionPolicy Bypass -File (Join-Path $projectRoot 'scripts/dev/dev-launch.ps1') -Restart -AllowLocalOnlyFallback
