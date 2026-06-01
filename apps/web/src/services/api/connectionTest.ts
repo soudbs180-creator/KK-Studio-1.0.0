@@ -550,15 +550,41 @@ export async function testModelsList(config: ConnectionConfig): Promise<TestResu
         console.warn('[ConnectionTest] Failed to fetch Wuyin pricing catalog dynamically, using fallback.', err);
         const fallbackModelId = extractWuyinModelIdFromBaseUrl(cleanBase || resolved.baseUrl) || getModelId(resolved) || 'video_google_omni';
         const details = extractWuyinAsyncEndpointDetails(cleanBase || resolved.baseUrl);
-        pricingCatalog = [{
-          modelId: fallbackModelId,
-          modelName: fallbackModelId,
-          numeric: 0.1,
-          unit: '张',
-          displayPrice: '待手动设置',
-          endpointUrl: `${cleanBase || resolved.baseUrl}`,
-          endpointPath: details?.endpointPath || `/api/async/${fallbackModelId}`
-        }];
+        
+        // 简体中文注释：当抓取五音科技列表在前端发生跨域报错时，自动回退至本地支持的 14 个全量静态模型，保障用户可以选择任意模型
+        const fallbackModelIds = [
+          'video_google_omni',
+          'video_vidu',
+          'video_omni',
+          'Digital_Humans',
+          'Package_1.0',
+          'veo3.1_fast',
+          'grok_imagine',
+          'Wan2.6',
+          'image_gpt',
+          'image_nanoBanana2',
+          'image_nanoBanana_pro',
+          'image_nanoBanana',
+          'image_grok_imagine',
+          'image_sora'
+        ];
+        
+        if (!fallbackModelIds.includes(fallbackModelId)) {
+          fallbackModelIds.unshift(fallbackModelId);
+        }
+        
+        pricingCatalog = fallbackModelIds.map((model) => {
+          const detail = extractWuyinAsyncEndpointDetails(model) || details;
+          return {
+            modelId: model,
+            modelName: model,
+            numeric: 0.1,
+            unit: '次',
+            displayPrice: '待手动设置',
+            endpointUrl: detail?.endpointUrl || `${cleanBase || resolved.baseUrl}`,
+            endpointPath: detail?.endpointPath || `/api/async/${model}`
+          };
+        });
       }
 
       return {

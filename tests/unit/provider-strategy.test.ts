@@ -23,7 +23,7 @@ describe("provider strategy", () => {
 
   test("recognizes Wuyin direct async endpoints as native catalog providers", () => {
     const runtime = resolveProviderRuntime({
-      baseUrl: "https://api.wuyinkeji.com/api/async/image_nanoBanana2",
+      baseUrl: "https://api.wuyinkeji.com/api/async/detail",
     });
 
     assert.equal(runtime.strategyId, "wuyinkeji");
