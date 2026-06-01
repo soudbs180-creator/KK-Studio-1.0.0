@@ -297,9 +297,12 @@ export function resolveWuyinRequestRoute(input: {
 
     const directEndpointPath = extractWuyinDirectEndpointPath(input.baseUrl);
     if (directEndpointPath) {
+        // 简体中文注释：即便用户在 baseUrl 中配置了带特定模型后缀的地址，仍需根据当前请求所选的 modelId 动态拼接出目标接口，以保证多模型切换可用
+        const rawModelId = normalizeRawModelId(input.modelId);
+        const endpointModelId = rawModelId.replace(/^\/+/, '').replace(/^api\/async\//i, '');
         return {
-            endpointPath: directEndpointPath,
-            endpointModelId: directEndpointPath.split('/').filter(Boolean).pop() || input.modelId,
+            endpointPath: `/api/async/${endpointModelId}`,
+            endpointModelId,
         };
     }
 

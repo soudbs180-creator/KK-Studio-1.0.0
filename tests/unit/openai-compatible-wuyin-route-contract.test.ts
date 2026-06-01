@@ -38,8 +38,8 @@ describe("OpenAI-compatible Wuyin route helpers", () => {
         modelId: "ignored-model",
       }),
       {
-        endpointPath: "/api/async/image_sora",
-        endpointModelId: "image_sora",
+        endpointPath: "/api/async/ignored-model",
+        endpointModelId: "ignored-model",
       },
     );
 

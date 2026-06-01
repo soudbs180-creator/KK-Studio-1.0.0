@@ -763,7 +763,8 @@ export async function fetchProviderPricing(
     try {
         const runtime = resolveProviderRuntime({ baseUrl, format: 'openai' });
         if (runtime.strategyId === 'wuyinkeji') {
-            return selectWuyinCatalogModels(baseUrl, await fetchWuyinPricingCatalog(baseUrl));
+            // 简体中文注释：对于五音科技（wuyinkeji），直接拉取全量模型的最新计费价格，不再按 baseUrl 的模型后缀做过滤限制
+            return await fetchWuyinPricingCatalog(baseUrl);
         }
 
         // NewAPI Pro pricing endpoint
@@ -821,7 +822,8 @@ export async function fetchProviderModels(
             format: resolvedFormat === 'gemini' ? 'gemini' : format,
         });
         if (runtime.strategyId === 'wuyinkeji') {
-            const catalog = selectWuyinCatalogModels(baseUrl, await fetchWuyinPricingCatalog(baseUrl));
+            // 简体中文注释：直接获取五音科技下的全量模型后缀，保证用户可以选择任意模型
+            const catalog = await fetchWuyinPricingCatalog(baseUrl);
             return catalog.map((item) => item.modelId).filter(Boolean);
         }
         const geminiAuthMethod = runtime.authMethod as 'query' | 'header';

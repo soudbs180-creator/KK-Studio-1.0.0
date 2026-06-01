@@ -43,12 +43,12 @@ describe("Wuyin async-video route helpers", () => {
       modelId: "ignored",
     });
     assert.deepEqual(route, {
-      endpointPath: "/api/async/video_google_omni",
-      endpointModelId: "video_google_omni",
+      endpointPath: "/api/async/ignored",
+      endpointModelId: "ignored",
     });
     assert.equal(
       buildWuyinVideoSubmitUrl("https://api.wuyinkeji.com/api/async/video_google_omni", route),
-      "https://api.wuyinkeji.com/api/async/video_google_omni",
+      "https://api.wuyinkeji.com/api/async/ignored",
     );
     assert.equal(
       buildWuyinVideoDetailUrl("https://api.wuyinkeji.com/api/async/video_google_omni", "task 1"),

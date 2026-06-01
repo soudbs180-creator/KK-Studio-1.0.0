@@ -136,9 +136,12 @@ export function resolveWuyinVideoRequestRoute(input: {
 
     const directEndpointPath = extractWuyinVideoEndpointPath(input.baseUrl);
     if (directEndpointPath) {
+        // 简体中文注释：即使 baseUrl 填入了带后缀的模型接口，也应该能够根据用户所选的视频模型 modelId 来重写实际请求路径
+        const rawModelId = normalizeRawModelId(input.modelId || WUYIN_ASYNC_VIDEO_DEFAULT_MODEL);
+        const endpointModelId = rawModelId.replace(/^\/+/, '').replace(/^api\/async\//i, '');
         return {
-            endpointPath: directEndpointPath,
-            endpointModelId: directEndpointPath.split('/').filter(Boolean).pop() || WUYIN_ASYNC_VIDEO_DEFAULT_MODEL,
+            endpointPath: `/api/async/${endpointModelId}`,
+            endpointModelId,
         };
     }
 
