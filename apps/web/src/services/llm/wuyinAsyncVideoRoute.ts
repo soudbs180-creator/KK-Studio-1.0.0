@@ -117,6 +117,23 @@ export function resolveWuyinVideoRequestRoute(input: {
     baseUrl: string;
     modelId?: string;
 }): WuyinVideoResolvedRoute {
+    // 简体中文注释：检查 baseUrl 是否为五音科技的通用异步端点前缀（即去掉末尾斜杠后为 /api/async）。
+    const cleanBaseUrl = normalizeWuyinVideoBaseUrl(input.baseUrl);
+    try {
+        const parsedBase = new URL(cleanBaseUrl);
+        const baseRoutePath = parsedBase.pathname.replace(/\/+$/, '');
+        if (baseRoutePath === '/api/async') {
+            const rawModelId = normalizeRawModelId(input.modelId || WUYIN_ASYNC_VIDEO_DEFAULT_MODEL);
+            const endpointModelId = rawModelId.replace(/^\/+/, '').replace(/^api\/async\//i, '');
+            return {
+                endpointPath: `/api/async/${endpointModelId}`,
+                endpointModelId,
+            };
+        }
+    } catch {
+        // 忽略 URL 解析错误并回退到默认逻辑
+    }
+
     const directEndpointPath = extractWuyinVideoEndpointPath(input.baseUrl);
     if (directEndpointPath) {
         return {

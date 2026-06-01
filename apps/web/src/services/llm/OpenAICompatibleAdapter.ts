@@ -805,6 +805,12 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const cleanBase = normalizeWuyinBaseUrl(keySlot.baseUrl || '');
         const detailUrl = new URL(`${cleanBase}${WUYIN_DETAIL_PATH}`);
         detailUrl.searchParams.set('id', taskId);
+        
+        // 简体中文注释：对于结果详情接口，请求的 URL 后面也需要拼接 &key=密钥。
+        const apiKey = String(keySlot.key || '').trim();
+        if (apiKey) {
+            detailUrl.searchParams.set('key', apiKey);
+        }
 
         const target = this.buildOpenAICompatRequestTarget(detailUrl.toString(), keySlot, {
             includeJsonContentType: true,
@@ -961,6 +967,14 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             includeJsonContentType: true,
             includeAccept: true,
         });
+
+        // 简体中文注释：对于五音科技（wuyinkeji），如果是前端直接调用的情况，在请求的 URL 后面拼接 ?key=密钥 授权参数。
+        const apiKey = String(keySlot.key || '').trim();
+        if (apiKey) {
+            const separator = target.url.includes('?') ? '&' : '?';
+            target.url = `${target.url}${separator}key=${encodeURIComponent(apiKey)}`;
+        }
+
         const payload = this.applyCustomBody(body, keySlot);
         const requestBodyPreview = buildSafeRequestBodyPreview(payload);
         const response = await this.fetchWithTimeout(target.url, {

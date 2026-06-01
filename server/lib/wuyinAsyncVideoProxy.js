@@ -58,6 +58,28 @@ function normalizeWuyinVideoModelAlias(value) {
 }
 
 function resolveWuyinVideoRequestRoute(baseUrl, modelId) {
+  // 简体中文注释：检查 baseUrl 是否为五音科技的通用异步端点前缀（即去掉末尾斜杠后为 /api/async）。
+  const cleanBaseUrl = normalizeWuyinVideoBaseUrl(baseUrl);
+  try {
+    const parsedBase = new URL(cleanBaseUrl);
+    const baseRoutePath = parsedBase.pathname.replace(/\/+$/, '');
+    if (baseRoutePath === '/api/async') {
+      const rawModelId = String(modelId || WUYIN_ASYNC_VIDEO_DEFAULT_MODEL)
+        .trim()
+        .split('@')[0]
+        .split('|')[0]
+        .replace(/^models\//i, '')
+        .replace(/^\/+/, '')
+        .replace(/^api\/async\//i, '');
+      return {
+        endpointPath: `/api/async/${rawModelId}`,
+        endpointModelId: rawModelId,
+      };
+    }
+  } catch (e) {
+    // 忽略错误并回退
+  }
+
   const directEndpointPath = extractWuyinVideoEndpointPath(baseUrl);
   if (directEndpointPath) {
     return {
@@ -303,6 +325,13 @@ function assertWuyinVideoSuccessEnvelope(payload) {
 }
 
 async function fetchWuyinVideoJson(url, apiKey, method = 'GET', body) {
+  // 简体中文注释：对于五音科技的后端代理请求，如果 apiKey 存在，则在 URL 上面额外拼接 ?key=密钥 鉴权参数。
+  let targetUrl = url;
+  if (apiKey) {
+    const separator = targetUrl.includes('?') ? '&' : '?';
+    targetUrl = `${targetUrl}${separator}key=${encodeURIComponent(apiKey)}`;
+  }
+
   const headers = {
     Authorization: apiKey,
     Accept: 'application/json',
@@ -317,7 +346,7 @@ async function fetchWuyinVideoJson(url, apiKey, method = 'GET', body) {
     init.body = JSON.stringify(body);
   }
 
-  const response = await fetch(url, init);
+  const response = await fetch(targetUrl, init);
   const responseText = await response.text().catch(() => '');
   let payload = {};
   try {
@@ -370,9 +399,10 @@ function isWuyinAsyncVideoTargetUrl(targetUrl) {
   if (!raw) return false;
   try {
     const parsed = new URL(raw);
+    // 简体中文注释：放宽匹配，兼容通用端点 /api/async 以及所有的子模块路径和详情路径。
     return /^api\.wuyinkeji\.com$/i.test(parsed.hostname)
-      && (/^\/api\/async\/video[a-z0-9_.-]*$/i.test(parsed.pathname.replace(/\/+$/, '')) || parsed.pathname.replace(/\/+$/, '') === WUYIN_ASYNC_VIDEO_DETAIL_PATH);
-  } catch {
+      && (/^\/api\/async(?:$|\/[a-z0-9_.-]+)$/i.test(parsed.pathname.replace(/\/+$/, '')) || parsed.pathname.replace(/\/+$/, '') === WUYIN_ASYNC_VIDEO_DETAIL_PATH);
+  } catch (e) {
     return false;
   }
 }

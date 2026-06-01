@@ -65,7 +65,7 @@ test('provider presets preserve documented built-in routes and defaults', async 
   assert.equal(PROVIDER_PRESETS['12ai-nanobanana'].format, 'gemini');
   assert.equal(PROVIDER_PRESETS['12ai-nanobanana'].models.includes('gemini-3.1-flash-image-preview'), true);
   assert.equal(PROVIDER_PRESETS['wuyinkeji-nanobanana2'].models[0], 'image_nanoBanana2');
-  assert.equal(PROVIDER_PRESETS['wuyinkeji-google-omni'].baseUrl, 'https://api.wuyinkeji.com/api/async/video_google_omni');
+  assert.equal(PROVIDER_PRESETS['wuyinkeji-google-omni'].baseUrl, 'https://api.wuyinkeji.com/api/async/');
   assert.equal(PROVIDER_PRESETS['wuyinkeji-google-omni'].models[0], 'video_google_omni');
   assert.equal(PROVIDER_PRESETS['wuyinkeji-google-omni'].format, 'openai');
 
