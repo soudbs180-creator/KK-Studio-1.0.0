@@ -29,8 +29,41 @@ jobs:
       - name: Install web app dependencies
         run: npm ci --prefix apps/web --legacy-peer-deps
 
-      - name: Governance, tests, and build
-        run: npm run verify:changes
+      - name: Architecture gates
+        run: npm run architecture:check
+
+      - name: Governance gates
+        run: npm run governance:check
+
+      - name: Dependency audit
+        run: npm run audit:dependencies
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: API spec check
+        run: npm run spec:check
+
+      - name: Build
+        run: npm run build
+
+      - name: Test suite
+        run: npm run test
+
+      - name: Prompt group drag smoke
+        run: npm run verify:prompt-group-drag
+
+      - name: Mobile settings smoke
+        run: npm run verify:mobile-settings-smoke
+
+      - name: Desktop settings smoke
+        run: npm run verify:desktop-settings-smoke
+
+      - name: Startup runtime banner smoke
+        run: npm run verify:startup-runtime-banner-centering
+
+      - name: Encoding check
+        run: npm run check:encoding
 
       - name: Upload web dist artifact
         uses: actions/upload-artifact@v4
