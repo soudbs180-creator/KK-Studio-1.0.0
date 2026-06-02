@@ -255,12 +255,16 @@ function readWuyinString(value, keys) {
   return '';
 }
 
-function extractWuyinVideoTaskId(payload) {
+function extractWuyinTaskId(payload) {
   const data = payload && typeof payload === 'object' ? payload.data : null;
   return String(
     readWuyinString(data, ['id', 'task_id', 'taskId']) ||
     readWuyinString(payload, ['id', 'task_id', 'taskId'])
   ).trim();
+}
+
+function extractWuyinVideoTaskId(payload) {
+  return extractWuyinTaskId(payload);
 }
 
 function extractWuyinVideoStatusCode(payload) {
@@ -274,10 +278,16 @@ function extractWuyinVideoStatusCode(payload) {
   return undefined;
 }
 
-function mapWuyinVideoStatus(statusCode) {
-  if (statusCode === 2) return 'success';
-  if (statusCode === 3) return 'failed';
+function mapWuyinStatus(statusCode) {
+  if (statusCode === 2 || String(statusCode) === '2') return 'success';
+  if (statusCode === 3 || String(statusCode) === '3') return 'failed';
+  if (statusCode === 1 || String(statusCode) === '1') return 'processing';
   return 'pending';
+}
+
+function mapWuyinVideoStatus(statusCode) {
+  const status = mapWuyinStatus(statusCode);
+  return status === 'processing' ? 'pending' : status;
 }
 
 function extractFirstWuyinString(value) {
@@ -670,11 +680,13 @@ module.exports = {
   extractWuyinVideoMessage,
   extractWuyinVideoStatusCode,
   extractWuyinVideoTaskId,
+  extractWuyinTaskId,
   extractWuyinVideoUrl,
   fetchWuyinVideoJson,
   isWuyinAsyncVideoRoute,
   isWuyinAsyncVideoTargetUrl,
   mapWuyinVideoStatus,
+  mapWuyinStatus,
   normalizeWuyinVideoBaseUrl,
   resolveWuyinImageEndpointPath,
   resolveWuyinVideoRequestRoute,

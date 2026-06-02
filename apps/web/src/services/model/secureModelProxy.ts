@@ -132,6 +132,7 @@ export interface SecureProxyAudioResponse extends SecureProxyBillingMetadata {
 export interface SecureProxyTaskStatusResponse extends SecureProxyBillingMetadata {
   status: 'pending' | 'success' | 'failed';
   url?: string;
+  urls?: string[];
   message?: string;
   error?: string;
   requestId?: string;
@@ -1370,6 +1371,7 @@ export async function checkLocalUserRouteProxyTaskStatus(
   return {
     status: data.status || 'pending',
     url: data.url,
+    urls: Array.isArray(data.urls) ? data.urls : undefined,
     message: typeof data.message === 'string' ? data.message : undefined,
     error: typeof data.error === 'string' ? data.error : undefined,
     requestId: typeof data.requestId === 'string' ? data.requestId : undefined,

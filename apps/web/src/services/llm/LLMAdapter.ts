@@ -132,6 +132,11 @@ export interface ImageGenerationResult {
     modelName?: string; // 🚀 User-friendly Model Name (e.g. 'Nano Banana Pro')
     keySlotId?: string;
     taskId?: string; // 🚀 [New] 异步任务 ID (用于持久化和恢复)
+    providerTaskId?: string;
+    submitExecTime?: number;
+    detailExecTime?: number;
+    totalExecTime?: number;
+    execTime?: number;
 
     // Metadata for debugging/display
     metadata?: {

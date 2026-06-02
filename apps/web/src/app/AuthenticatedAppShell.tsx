@@ -103,7 +103,6 @@ export const StartupRuntimeBanner: React.FC = () => {
     let rafId: number | null = null;
     let pollTimer: number | null = null;
     let resizeObserver: ResizeObserver | null = null;
-    let mutationObserver: MutationObserver | null = null;
     let observedPromptBar: HTMLElement | null = null;
     let observedAnchor: HTMLElement | null = null;
 
@@ -148,17 +147,6 @@ export const StartupRuntimeBanner: React.FC = () => {
       });
     };
 
-    mutationObserver = typeof MutationObserver !== 'undefined' && document.body
-      ? new MutationObserver(() => {
-        scheduleSync();
-      })
-      : null;
-
-    mutationObserver?.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-
     scheduleSync();
     pollTimer = window.setInterval(() => {
       scheduleSync();
@@ -173,7 +161,6 @@ export const StartupRuntimeBanner: React.FC = () => {
         window.clearInterval(pollTimer);
       }
       resizeObserver?.disconnect();
-      mutationObserver?.disconnect();
       window.removeEventListener('resize', scheduleSync);
     };
   }, [message]);

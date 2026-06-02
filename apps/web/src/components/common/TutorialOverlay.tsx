@@ -161,7 +161,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
 
         // Optimize: Use requestAnimationFrame for smoother tracking
         let rafId: number | null = null;
-        let mutationObserver: MutationObserver | null = null;
+        let targetResizeObserver: ResizeObserver | null = null;
         const onFrame = () => {
             updateRect();
             rafId = null;
@@ -173,24 +173,23 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ onComplete }) => {
         };
 
         // Delay slightly to ensure UI is rendered and stable
-        const timer = setTimeout(updateRect, 200);
+        const timer = setTimeout(() => {
+            updateRect();
+            const el = document.getElementById(step.targetId!);
+            if (el && typeof ResizeObserver !== 'undefined') {
+                targetResizeObserver = new ResizeObserver(() => {
+                    throttledUpdate();
+                });
+                targetResizeObserver.observe(el);
+            }
+        }, 200);
         window.addEventListener('resize', throttledUpdate);
         window.addEventListener('scroll', throttledUpdate, true); // Listen to capture scroll
-
-        if (typeof MutationObserver !== 'undefined' && document.body) {
-            mutationObserver = new MutationObserver(throttledUpdate);
-            mutationObserver.observe(document.body, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['id', 'class', 'style']
-            });
-        }
 
         return () => {
             clearTimeout(timer);
             if (rafId) cancelAnimationFrame(rafId);
-            mutationObserver?.disconnect();
+            targetResizeObserver?.disconnect();
             window.removeEventListener('resize', throttledUpdate);
             window.removeEventListener('scroll', throttledUpdate, true);
         };

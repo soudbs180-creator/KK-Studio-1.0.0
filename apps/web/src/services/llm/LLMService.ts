@@ -476,7 +476,13 @@ export class LLMService {
                 if (!result) {
                     throw new Error('Image routing returned no result');
                 }
-                keyManager.reportSuccess(keySlot.id);
+                if (result.status === 'success') {
+                    keyManager.reportSuccess(keySlot.id);
+                } else if (result.status === 'pending' || result.status === 'processing') {
+                    keyManager.reportCallResult?.(keySlot.id, true);
+                } else {
+                    keyManager.reportFailure(keySlot.id, 'Generation failed');
+                }
 
                 this.applyProviderIdentity(result, keySlot);
 

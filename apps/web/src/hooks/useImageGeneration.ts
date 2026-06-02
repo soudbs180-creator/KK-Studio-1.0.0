@@ -59,6 +59,39 @@ const SYNC_BRIDGE_RECOVERY_MAX_AGE_MS = 15 * 60 * 1000;
 const RETRO_RECOVERABLE_SYNC_BRIDGE_ERROR_CODES = new Set(['SYNC_REQUEST_INTERRUPTED', 'SYNC_BRIDGE_TIMEOUT']);
 const RETRO_RECOVERABLE_SYNC_BRIDGE_ERROR_TEXT_HINTS = ['::INTERRUPTED::', '页面刷新或离开时中断了同步生成请求', '同步生成恢复超时'];
 
+function extractProviderTaskIdFromLocalTaskId(taskId?: string): string {
+  const raw = String(taskId || '').trim();
+  const match = raw.match(/^local_proxy:[^:]+:(.+)$/);
+  return match?.[1] || raw;
+}
+
+function sanitizeStorageId(value: string): string {
+  return String(value || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9_.-]/g, '_');
+}
+
+function buildWuyinImageStorageId(input: {
+  providerTaskId?: string;
+  taskId?: string;
+  resultIndex?: number;
+  total?: number;
+}): string {
+  const providerTaskId = sanitizeStorageId(
+    input.providerTaskId || extractProviderTaskIdFromLocalTaskId(input.taskId)
+  );
+
+  if (!providerTaskId) {
+    return `${Date.now()}_${Math.random()}`;
+  }
+
+  if ((input.total || 1) <= 1) {
+    return providerTaskId;
+  }
+
+  return `${providerTaskId}_${input.resultIndex || 0}`;
+}
+
 type PendingSyncRequest = PromptPendingSyncRequest;
 
 type CompletedTaskSourceItem = Partial<GeneratedImage> & {
@@ -1194,8 +1227,8 @@ export const useImageGeneration = (options: {
                 || String(latestNode.providerLabel || '').includes('速创')
                 || String(latestNode.keySlotId || '').includes('@slot_key_');
 
-              const imageId = (isWuyin && sourceTaskId)
-                ? sourceTaskId
+              const imageId = isWuyin
+                ? buildWuyinImageStorageId({ taskId: sourceTaskId, resultIndex: sourceResultIndex, total: preparedItems.length })
                 : `${node.id}_recovered_${Date.now()}_${index}`;
               const layoutIndex = currentChildIds.length + index;
               const resolvedAspectRatio = (result as any).aspectRatio || latestNode.aspectRatio;
@@ -1221,6 +1254,7 @@ export const useImageGeneration = (options: {
                 ecommerceDeliveryKind: latestNode.ecommerce?.activeDeliveryKind || latestNode.redraw?.inheritedDeliveryKind || latestNode.partialRedraw?.inheritedDeliveryKind,
                 sourceTaskId,
                 sourceResultIndex,
+                providerTaskId: extractProviderTaskIdFromLocalTaskId(sourceTaskId),
                 sourceReferenceStorageIds: (latestNode.referenceImages || []).map((ref) => ref.storageId || ref.id).filter(Boolean),
                 position: getGeneratedImagePosition(latestNode.position, resolvedAspectRatio, latestNode.mode, layoutIndex, expectedCount),
                 dimensions: `${resolvedAspectRatio} 路 ${resolvedImageSize || '1K'}`,
@@ -1228,11 +1262,20 @@ export const useImageGeneration = (options: {
                 provider: (result as any).provider || latestNode.provider,
                 providerLabel: (result as any).providerName || latestNode.providerLabel,
                 keySlotId: (result as any).keySlotId || latestNode.keySlotId,
-                generationTime: clampGenerationDurationMs(
-                  typeof (result as any).execTime === 'number'
-                    ? (result as any).execTime * 1000
-                    : (result as any).generationTime
-                ),
+                generationTime: (() => {
+                  const pendingTaskMeta = (latestNode.generationMetadata as any)?.pendingTaskMeta || {};
+                  const meta = pendingTaskMeta[targetTaskId] || {};
+                  const submitExecTime = Number(meta.submitExecTime || 0);
+                  const detailExecTime = Number((result as any).detailExecTime ?? (result as any).execTime ?? 0);
+                  const totalExecTime = submitExecTime + detailExecTime;
+                  return totalExecTime > 0
+                    ? clampGenerationDurationMs(totalExecTime * 1000)
+                    : clampGenerationDurationMs(
+                        typeof (result as any).execTime === 'number'
+                          ? (result as any).execTime * 1000
+                          : (result as any).generationTime
+                      );
+                })(),
                 tokens: splitMetricAcrossItems(recoveredUsage.tokens, uniqueImageUrls.length || imageUrls.length),
                 promptTokens: splitMetricAcrossItems(recoveredUsage.promptTokens, uniqueImageUrls.length || imageUrls.length),
                 completionTokens: splitMetricAcrossItems(recoveredUsage.completionTokens, uniqueImageUrls.length || imageUrls.length),
@@ -1271,7 +1314,13 @@ export const useImageGeneration = (options: {
               lastGenerationFailCount: nextFailCount,
               lastGenerationTotalCount: expectedCount,
               generationMetadata: nextGenerationMetadata,
-              execTime: (result as any).execTime,
+              execTime: (() => {
+                const pendingTaskMeta = (latestNode.generationMetadata as any)?.pendingTaskMeta || {};
+                const meta = pendingTaskMeta[targetTaskId] || {};
+                const submitExecTime = Number(meta.submitExecTime || 0);
+                const detailExecTime = Number((result as any).detailExecTime ?? (result as any).execTime ?? 0);
+                return submitExecTime + detailExecTime || (result as any).execTime;
+              })(),
             }, finalizedCompletedTasks);
 
             urgentUpdatePromptNode(persistedPromptState);
@@ -1279,7 +1328,13 @@ export const useImageGeneration = (options: {
             const nextPromptState = {
               ...persistedPromptState,
               childImageIds: mergedChildIds,
-              execTime: (result as any).execTime,
+              execTime: (() => {
+                const pendingTaskMeta = (latestNode.generationMetadata as any)?.pendingTaskMeta || {};
+                const meta = pendingTaskMeta[targetTaskId] || {};
+                const submitExecTime = Number(meta.submitExecTime || 0);
+                const detailExecTime = Number((result as any).detailExecTime ?? (result as any).execTime ?? 0);
+                return submitExecTime + detailExecTime || (result as any).execTime;
+              })(),
             };
 
             if (recoveredImageNodes.length > 0) {
@@ -1560,6 +1615,7 @@ export const useImageGeneration = (options: {
           let resolvedDeducted: boolean | undefined = undefined;
           let resolvedLedgerId: string | undefined = undefined;
           let resolvedBalanceAfter: number | undefined = undefined;
+          let apiResult: any = null;
           
           if (isAudio) {
             const audioResult = await llmService.generateAudio({ modelId: executionNode.model, prompt: taskPrompt, audioDuration: executionNode.audioDuration, audioLyrics: executionNode.audioLyrics, preferredKeyId: executionNode.keySlotId, providerConfig: {} });
@@ -1628,6 +1684,7 @@ export const useImageGeneration = (options: {
               }
             });
             generatedBase64 = result.url;
+            apiResult = result;
             resolvedResultKeySlotId = result.keySlotId || resolvedResultKeySlotId;
             resolvedProvider = result.provider || resolvedProvider;
             resolvedProviderName = result.providerName || resolvedProviderName;
@@ -1641,64 +1698,6 @@ export const useImageGeneration = (options: {
             resolvedBalanceAfter = result.balanceAfter;
             if (typeof result.balanceAfter === 'number') {
               applyAuthoritativeBalance(result.balanceAfter);
-            }
-
-            // 简体中文注释：检测是否为速创 (Wuyin) 渠道的图片生成任务。如果是且为 pending 状态，则在 buildTask 内部阻塞进行状态查询轮询直到成功或失败，满足排队和耗时统计要求
-            const isWuyinImageRoute =
-              String(resolvedProvider || '').toLowerCase() === 'wuyin'
-              || String(resolvedProviderName || '').toLowerCase().includes('wuyin')
-              || String(resolvedProviderName || '').includes('速创')
-              || String(resolvedResultKeySlotId || '').includes('@slot_key_');
-
-            if (isWuyinImageRoute && taskIdForRecovery && (result as any).status === 'pending') {
-              let pollSuccess = false;
-              let pollError = '';
-              let pollUrls: string[] = [];
-              let pollExecTime = 0;
-
-              const startedAt = Date.now();
-              const maxDurationMs = 10 * 60 * 1000;
-              let delayMs = 2500;
-
-              while (Date.now() - startedAt < maxDurationMs) {
-                try {
-                  const checkResult = await llmService.checkTaskStatus(
-                    taskIdForRecovery,
-                    GenerationMode.IMAGE,
-                    executionNode.keySlotId ? { id: executionNode.keySlotId } as any : undefined,
-                    executionNode.model
-                  );
-
-                  if (checkResult && checkResult.status === 'success') {
-                    pollUrls = Array.isArray(checkResult.urls)
-                      ? checkResult.urls
-                      : (checkResult.url ? [checkResult.url] : []);
-                    pollExecTime = typeof checkResult.execTime === 'number' ? checkResult.execTime : 0;
-                    pollSuccess = true;
-                    break;
-                  }
-
-                  if (checkResult && checkResult.status === 'failed') {
-                    pollError = checkResult.error || checkResult.message || '速创图片生成失败';
-                    break;
-                  }
-                } catch (pollErr: any) {
-                  console.warn('Wuyin image poll error:', pollErr);
-                }
-
-                await new Promise(resolve => setTimeout(resolve, delayMs));
-                delayMs = Math.min(Math.round(delayMs * 1.4), 10000);
-              }
-
-              if (pollSuccess && pollUrls.length > 0) {
-                generatedBase64 = pollUrls[0];
-                (result as any).urls = pollUrls;
-                (result as any).url = pollUrls[0];
-                (result as any).status = 'success';
-                (result as any).execTime = pollExecTime;
-              } else {
-                throw new Error(pollError || '速创图片生成超时');
-              }
             }
 
             const resolvedUsage = resolveUsageMetrics({
@@ -1738,6 +1737,12 @@ export const useImageGeneration = (options: {
             deducted: resolvedDeducted,
             ledgerId: resolvedLedgerId,
             balanceAfter: resolvedBalanceAfter,
+            status: apiResult?.status || 'success',
+            submitExecTime: apiResult?.submitExecTime,
+            detailExecTime: apiResult?.detailExecTime,
+            totalExecTime: apiResult?.totalExecTime,
+            execTime: apiResult?.execTime,
+            providerTaskId: apiResult?.providerTaskId,
           };
         } catch (error: any) {
           return {
@@ -1770,7 +1775,21 @@ export const useImageGeneration = (options: {
         imageData.push(...(await Promise.all(tasks.map(t => t()))));
       }
       
-      const validImageData = imageData.filter(d => !('error' in d)) as any[];
+      const pendingImageData = imageData.filter(d => (
+        !('error' in d)
+        && (d?.status === 'pending' || d?.status === 'processing')
+        && typeof d?.taskId === 'string'
+        && d.taskId.trim().length > 0
+      ));
+
+      const validImageData = imageData.filter(d => (
+        !('error' in d)
+        && d?.status !== 'pending'
+        && d?.status !== 'processing'
+        && typeof d?.url === 'string'
+        && d.url.trim().length > 0
+      )) as any[];
+
       const failedImageData = imageData.filter(d => 'error' in d) as any[];
       const latestNodeAfterBatch = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId) || node;
       const pendingSyncRequestIds = new Set(
@@ -1798,6 +1817,56 @@ export const useImageGeneration = (options: {
 
         void markTaskFailed(item.taskId, item.error || 'Generation failed');
       });
+
+      if (pendingImageData.length > 0) {
+        const latestNode = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId) || executionNode;
+        const pendingTaskIds = pendingImageData.map(item => item.taskId);
+        const existingMeta = latestNode.generationMetadata || {};
+        const existingPendingMeta = (existingMeta as any).pendingTaskMeta || {};
+
+        const pendingTaskMeta = {
+          ...existingPendingMeta,
+          ...Object.fromEntries(pendingImageData.map(item => [
+            item.taskId,
+            {
+              providerTaskId: item.providerTaskId,
+              submitExecTime: Number(item.submitExecTime ?? item.execTime ?? 0),
+              model: item.effectiveModel || item.model || executionNode.model,
+              keySlotId: item.keySlotId || executionNode.keySlotId,
+              provider: item.provider || executionNode.provider,
+              providerLabel: item.providerName || executionNode.providerLabel,
+              startedAt: Date.now(),
+            }
+          ])),
+        };
+
+        updatePromptNode({
+          ...latestNode,
+          isGenerating: true,
+          jobId: pendingTaskIds[0],
+          error: undefined,
+          errorDetails: undefined,
+          lastGenerationSuccessCount: validImageData.length,
+          lastGenerationFailCount: 0,
+          lastGenerationTotalCount: actualCount,
+          generationMetadata: {
+            ...existingMeta,
+            pendingTaskIds: Array.from(new Set([
+              ...getPendingTaskIds(latestNode),
+              ...pendingTaskIds,
+            ])),
+            pendingTaskMeta,
+          },
+        });
+
+        // Proactively poll for pending tasks
+        setTimeout(() => {
+          const fresh = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId);
+          if (fresh?.isGenerating) {
+            pendingTaskIds.forEach(tid => pollTaskStatus(fresh, tid));
+          }
+        }, 5000);
+      }
       
       if (validImageData.length > 0) {
         const acceptedImageData = filterUniqueGeneratedSources(
@@ -1850,8 +1919,8 @@ export const useImageGeneration = (options: {
         const results = await Promise.all(preparedItems.map(async ({ item, sourceTaskId, sourceResultIndex, apiResultUrl }, layoutIndex) => {
           const idx = item.index;
           // 简体中文注释：如果是速创渠道且返回的任务 ID 存在，使用任务 ID 命名，以便后续丢失原图时根据该 ID 重新查询拉取
-          const uniqueId = (isWuyinRoute && sourceTaskId)
-            ? sourceTaskId
+          const uniqueId = isWuyinRoute
+            ? buildWuyinImageStorageId({ taskId: sourceTaskId, resultIndex: sourceResultIndex, total: preparedItems.length })
             : `${Date.now()}_${idx}_${Math.random()}`;
           const layoutPosition = generatedPositions[layoutIndex] || getGeneratedImagePosition(
             executionNode.position,
@@ -1914,6 +1983,7 @@ export const useImageGeneration = (options: {
             ecommerceDeliveryKind: executionNode.ecommerce?.activeDeliveryKind || executionNode.redraw?.inheritedDeliveryKind || executionNode.partialRedraw?.inheritedDeliveryKind,
             sourceTaskId,
             sourceResultIndex,
+            providerTaskId: extractProviderTaskIdFromLocalTaskId(sourceTaskId),
             position: layoutPosition,
             dimensions: item.dimensions ? `${item.dimensions.width}x${item.dimensions.height}` : undefined,
             displayLabel: executionNode.redraw?.inheritedDisplayLabel || executionNode.partialRedraw?.inheritedDisplayLabel || executionNode.ecommerce?.displayLabel,
@@ -2031,7 +2101,7 @@ export const useImageGeneration = (options: {
             void recoverSyncBridgeRequest(updatedNode.id, pendingRequest);
           });
         }
-      } else {
+      } else if (pendingImageData.length === 0) {
         const latestNode = activeCanvasRef.current?.promptNodes.find(n => n.id === promptNodeId) || node;
         const completedSyncRequestIds = imageData
           .map(item => item.requestId)

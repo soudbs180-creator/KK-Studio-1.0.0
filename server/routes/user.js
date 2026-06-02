@@ -16,11 +16,13 @@ const {
   extractWuyinVideoMessage,
   extractWuyinVideoStatusCode,
   extractWuyinVideoTaskId,
+  extractWuyinTaskId,
   extractWuyinVideoUrl,
   fetchWuyinVideoJson,
   isWuyinAsyncVideoRoute,
   isWuyinAsyncVideoTargetUrl,
   mapWuyinVideoStatus,
+  mapWuyinStatus,
   normalizeWuyinVideoBaseUrl,
   resolveWuyinImageEndpointPath,
   resolveWuyinVideoRequestRoute,
@@ -1202,7 +1204,7 @@ async function handleWuyinImageMode(req, res, profileState) {
   const submitUrl = `${normalizeWuyinVideoBaseUrl(route.baseUrl)}${endpointPath}`;
 
   const submitPayload = await fetchWuyinVideoJson(submitUrl, route.apiKey, 'POST', body);
-  const providerTaskId = extractWuyinVideoTaskId(submitPayload);
+  const providerTaskId = extractWuyinTaskId(submitPayload);
   const immediateUrls = extractWuyinOutputUrls(submitPayload);
 
   if (immediateUrls.length > 0) {
@@ -1229,9 +1231,10 @@ async function handleWuyinImageMode(req, res, profileState) {
     providerTaskId,
     status: 'pending',
     endpointType: 'wuyin-async-image',
+    submitExecTime: Number(submitPayload.exec_time || 0),
+    execTime: Number(submitPayload.exec_time || 0),
     requestId: req.body && typeof req.body.requestId === 'string' ? req.body.requestId : undefined,
     attemptId: req.body && typeof req.body.attemptId === 'string' ? req.body.attemptId : undefined,
-    execTime: typeof submitPayload.exec_time === 'number' ? submitPayload.exec_time : undefined,
   }, req));
 }
 
@@ -1297,13 +1300,18 @@ async function handleWuyinTaskStatusMode(req, res, profileState) {
 
   const detailUrl = buildWuyinVideoDetailUrl(route.baseUrl, parsed.providerTaskId);
   const payload = await fetchWuyinVideoJson(detailUrl, route.apiKey, 'GET');
-  const status = mapWuyinVideoStatus(extractWuyinVideoStatusCode(payload));
+  const status = mapWuyinStatus(extractWuyinVideoStatusCode(payload));
 
   // 简体中文注释：智能提取详情结果。对于视频和图片任务，不仅提取第一个 url，同时也通过 extractWuyinOutputUrls 提取全部 urls，确保前端在轮询图片结果时能拿到 urls 数组
   const urls = status === 'success' ? extractWuyinOutputUrls(payload) : [];
   const url = urls[0] || '';
-  const message = extractWuyinVideoMessage(payload);
-  const effectiveStatus = status === 'success' && !url ? 'pending' : status;
+  
+  const rawMessage = (payload && payload.data && (payload.data.message || payload.data.fail_reason || payload.data.msg || payload.data.error))
+    || (payload && (payload.message || payload.fail_reason || payload.msg || payload.error))
+    || '';
+  const message = typeof rawMessage === 'string' ? rawMessage.trim() : (rawMessage ? String(rawMessage) : '');
+  
+  const effectiveStatus = status === 'success' && !url ? 'processing' : status;
 
   const isImageTask = String(parsed.providerTaskId).startsWith('image_');
 
@@ -1312,11 +1320,12 @@ async function handleWuyinTaskStatusMode(req, res, profileState) {
     providerTaskId: parsed.providerTaskId,
     status: effectiveStatus,
     url: url || undefined,
-    urls: urls.length > 0 ? urls : undefined,
+    urls: urls.length > 0 ? urls : [],
     message: message || undefined,
     error: status === 'failed' ? (message || 'Wuyin task failed.') : undefined,
     endpointType: isImageTask ? 'wuyin-async-image' : 'openai',
-    execTime: typeof payload.exec_time === 'number' ? payload.exec_time : undefined,
+    detailExecTime: Number(payload.exec_time || 0),
+    execTime: Number(payload.exec_time || 0),
   }, req));
 }
 

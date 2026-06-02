@@ -510,7 +510,35 @@ export const generateImage = async (
 
   try {
     const result = await llmService.generateImage(llmOptions);
-    const resultUrl = result.urls[0];
+
+    if ((result.status === 'pending' || result.status === 'processing') && result.taskId) {
+      return {
+        url: '',
+        taskId: result.taskId,
+        providerTaskId: (result as any).providerTaskId,
+        status: result.status,
+        submitExecTime: (result as any).submitExecTime ?? (result as any).execTime,
+        detailExecTime: (result as any).detailExecTime,
+        totalExecTime: (result as any).totalExecTime,
+        effectiveModel: result.model || model,
+        imageSize: (result.imageSize as ImageSize) || imageSize || ImageSize.SIZE_1K,
+        effectiveSize: (result.imageSize as ImageSize) || imageSize || ImageSize.SIZE_1K,
+        aspectRatio,
+        provider: result.provider,
+        providerName: result.providerName,
+        modelName: result.modelName,
+        keySlotId: result.keySlotId,
+        requestPath: result.metadata?.requestPath,
+        requestBodyPreview: result.metadata?.requestBodyPreview,
+        referenceImagesUsed: normalizedReferenceImages.length,
+        referenceImagesDropped: totalDroppedReferenceImages,
+      } as any;
+    }
+
+    const resultUrl = result.urls?.[0];
+    if (!resultUrl) {
+      throw new Error('生成结果为空：供应商没有返回图片 URL');
+    }
     const resolvedResultModel = result.model || model;
     const resolvedResultImageSize = (result.imageSize as ImageSize) || imageSize || ImageSize.SIZE_1K;
     const resolvedKeySlotId = result.keySlotId || options?.preferredKeyId;
