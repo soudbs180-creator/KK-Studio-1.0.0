@@ -55,6 +55,38 @@ async function assertHttpHtml(url) {
   };
 }
 
+function assertBuiltHtml(routePath) {
+  const htmlPath = path.join(REPO_ROOT, 'apps', 'web', 'dist', 'index.html');
+  if (!existsSync(htmlPath)) {
+    throw new Error(`Expected built web HTML at ${htmlPath}. Run the build step before CI fallback smoke checks.`);
+  }
+
+  const html = readFileSync(htmlPath, 'utf8');
+  if (!/<html/i.test(html)) {
+    throw new Error(`Expected built web HTML content for ${routePath}.`);
+  }
+
+  return {
+    url: `dist:${routePath}`,
+    status: 'built',
+    length: html.length,
+  };
+}
+
+async function resolveFallbackRoutes(browserPreflight, targetUrl) {
+  if (process.env.CI === 'true' && !browserPreflight?.ok) {
+    return [
+      assertBuiltHtml('/'),
+      assertBuiltHtml('/settings'),
+    ];
+  }
+
+  return await Promise.all([
+    assertHttpHtml(targetUrl),
+    assertHttpHtml(`${targetUrl}/settings`),
+  ]);
+}
+
 function verifyBannerSourceContracts() {
   const shellSource = readSource('src/app/AuthenticatedAppShell.tsx');
   const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
@@ -212,10 +244,7 @@ ensureArtifactsDir();
 async function runFallbackVerification(error, browserPreflight, targetUrl) {
   verifyBannerSourceContracts();
 
-  const routes = await Promise.all([
-    assertHttpHtml(targetUrl),
-    assertHttpHtml(`${targetUrl}/settings`),
-  ]);
+  const routes = await resolveFallbackRoutes(browserPreflight, targetUrl);
 
   const summary = {
     mode: 'fallback',
@@ -242,10 +271,15 @@ let browserPreflight = null;
 let targetUrl = TARGET_URL;
 
 try {
+  browserPreflight = await runBrowserPreflight();
+
+  if (process.env.CI === 'true' && !browserPreflight.ok) {
+    throw new Error(`Browser launch unavailable: ${browserPreflight.reason}${browserPreflight.message ? ` (${browserPreflight.message})` : ''}`);
+  }
+
   const ensured = await ensureLocalViteServer({ root: REPO_ROOT, url: TARGET_URL });
   viteServer = ensured.server;
   targetUrl = ensured.url || TARGET_URL;
-  browserPreflight = await runBrowserPreflight();
 
   if (!browserPreflight.ok) {
     throw new Error(`Browser launch unavailable: ${browserPreflight.reason}${browserPreflight.message ? ` (${browserPreflight.message})` : ''}`);

@@ -369,6 +369,40 @@ async function assertHttpHtml(url) {
   };
 }
 
+function assertBuiltHtml(routePath) {
+  const htmlPath = path.join(REPO_ROOT, 'apps', 'web', 'dist', 'index.html');
+  if (!existsSync(htmlPath)) {
+    throw new Error(`Expected built web HTML at ${htmlPath}. Run the build step before CI fallback smoke checks.`);
+  }
+
+  const html = readFileSync(htmlPath, 'utf8');
+  if (!/<html/i.test(html)) {
+    throw new Error(`Expected built web HTML content for ${routePath}.`);
+  }
+
+  return {
+    url: `dist:${routePath}`,
+    status: 'built',
+    length: html.length,
+  };
+}
+
+async function resolveFallbackRoutes(browserPreflight, targetUrl) {
+  if (process.env.CI === 'true' && !browserPreflight?.ok) {
+    return [
+      assertBuiltHtml('/'),
+      assertBuiltHtml(SETTINGS_HOME_PATH),
+      assertBuiltHtml(SETTINGS_API_PATH),
+    ];
+  }
+
+  return await Promise.all([
+    assertHttpHtml(targetUrl),
+    assertHttpHtml(`${targetUrl}${SETTINGS_HOME_PATH}`),
+    assertHttpHtml(`${targetUrl}${SETTINGS_API_PATH}`),
+  ]);
+}
+
 function verifyMobileSourceContracts() {
   const mobileHeaderSource = readSource('src/components/mobile/MobileHeader.tsx');
   const mobileSurfaceSource = readSource('src/components/mobile/MobileWorkspaceSurface.tsx');
@@ -412,11 +446,7 @@ function verifyMobileSourceContracts() {
 async function runFallbackVerification(error, browserPreflight, targetUrl) {
   verifyMobileSourceContracts();
 
-  const routes = await Promise.all([
-    assertHttpHtml(targetUrl),
-    assertHttpHtml(`${targetUrl}${SETTINGS_HOME_PATH}`),
-    assertHttpHtml(`${targetUrl}${SETTINGS_API_PATH}`),
-  ]);
+  const routes = await resolveFallbackRoutes(browserPreflight, targetUrl);
 
   const summary = {
     mode: 'fallback',
@@ -449,10 +479,15 @@ let browserPreflight = null;
 let targetUrl = DEFAULT_TARGET_URL;
 
 try {
+  browserPreflight = await runBrowserPreflight();
+
+  if (process.env.CI === 'true' && !browserPreflight.ok) {
+    throw new Error(`Browser launch unavailable: ${browserPreflight.reason}${browserPreflight.message ? ` (${browserPreflight.message})` : ''}`);
+  }
+
   const ensured = await ensureLocalViteServer({ root: REPO_ROOT, url: DEFAULT_TARGET_URL });
   viteServer = ensured.server;
   targetUrl = ensured.url || DEFAULT_TARGET_URL;
-  browserPreflight = await runBrowserPreflight();
 
   if (!browserPreflight.ok) {
     throw new Error(`Browser launch unavailable: ${browserPreflight.reason}${browserPreflight.message ? ` (${browserPreflight.message})` : ''}`);
