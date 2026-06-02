@@ -9,12 +9,12 @@ const ROOT_DIR = process.cwd();
 
 
 test('App creates REDRAW prompt nodes and generation pipeline composites redraw outputs', () => {
-  const appSource = readSource('src/App.tsx');
-  const globalModalsSource = readSource('src/app/AppGlobalModals.tsx');
-  const mobileWorkspaceSource = readSource('src/app/AppMobileWorkspace.tsx');
-  const generationSource = readSource('src/hooks/useImageGeneration.ts');
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const mobileTabBarSource = readSource('src/components/mobile/MobileTabBar.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const globalModalsSource = readSource('apps/web/src/app/AppGlobalModals.tsx');
+  const mobileWorkspaceSource = readSource('apps/web/src/app/AppMobileWorkspace.tsx');
+  const generationSource = readSource('apps/web/src/hooks/useImageGeneration.ts');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const mobileTabBarSource = readSource('apps/web/src/components/mobile/MobileTabBar.tsx');
 
   assert.match(appSource, /onPartialRedraw:\s*handleRedrawRequest,/);
   assert.match(appSource, /onPartialRedraw=\{handleMobileResultRedraw\}/);

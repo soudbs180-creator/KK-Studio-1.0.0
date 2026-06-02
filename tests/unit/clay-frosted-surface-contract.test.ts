@@ -32,7 +32,7 @@ test('Clay manuals define the controlled frosted material override', () => {
 });
 
 test('Clay CSS exposes shared frosted tokens and neutral black-gray dark surfaces', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(cssSource, /--clay-dark-canvas:\s*#0b0b0c;/);
   assert.match(cssSource, /--clay-dark-surface:\s*#141414;/);
@@ -80,10 +80,10 @@ test('Clay CSS exposes shared frosted tokens and neutral black-gray dark surface
 });
 
 test('Core UI surfaces consume the shared frosted material tokens', () => {
-  const cssSource = readSource('src/index.css');
-  const searchPaletteSource = readSource('src/components/layout/SearchPalette.tsx');
-  const sidebarSource = readSource('src/components/layout/Sidebar.tsx');
-  const composerSource = readSource('src/app/AppPromptComposer.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
+  const searchPaletteSource = readSource('apps/web/src/components/layout/SearchPalette.tsx');
+  const sidebarSource = readSource('apps/web/src/components/layout/Sidebar.tsx');
+  const composerSource = readSource('apps/web/src/app/AppPromptComposer.tsx');
 
   assert.match(cssSource, /\.input-bar\s*\{[\s\S]*background:\s*var\(--frost-input-bg\);/);
   assert.match(cssSource, /\.input-bar\s*\{[\s\S]*border:\s*[12]px solid var\(--frost-input-border\);[\s\S]*box-shadow:\s*var\(--frost-input-shadow\);[\s\S]*backdrop-filter:\s*blur\(var\(--frost-input-blur\)\)/);
@@ -113,9 +113,9 @@ test('Core UI surfaces consume the shared frosted material tokens', () => {
 });
 
 test('Prompt bar surfaces avoid stale blue-glass shells and heavy shadows', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const mobileAdvancedDrawerSource = readSource('src/components/layout/prompt-bar/MobileEmbeddedAdvancedDrawer.tsx');
-  const cssSource = readSource('src/index.css');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const mobileAdvancedDrawerSource = readSource('apps/web/src/components/layout/prompt-bar/MobileEmbeddedAdvancedDrawer.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(promptBarSource, /var\(--frost-card-framework-bg\)/);
   assert.match(promptBarSource, /var\(--frost-card-sub-bg\)/);
@@ -146,7 +146,7 @@ test('Prompt bar surfaces avoid stale blue-glass shells and heavy shadows', () =
 });
 
 test('Image canvas cards use Clay accents and frosted canvas tokens', () => {
-  const imageCardSource = readSource('src/components/image/ImageCard2.tsx');
+  const imageCardSource = readSource('apps/web/src/components/image/ImageCard2.tsx');
 
   assert.match(imageCardSource, /var\(--frost-card-main-bg\)/);
   assert.match(imageCardSource, /var\(--frost-card-sub-bg\)/);
@@ -158,10 +158,10 @@ test('Image canvas cards use Clay accents and frosted canvas tokens', () => {
 });
 
 test('secondary framework surfaces from audit findings use frosted tokens instead of blue glass fallbacks', () => {
-  const sidebarSource = readSource('src/components/layout/Sidebar.tsx');
-  const projectManagerSource = readSource('src/components/settings/ProjectManager.tsx');
-  const pendingNodeSource = readSource('src/components/canvas/PendingNode.tsx');
-  const cssSource = readSource('src/index.css');
+  const sidebarSource = readSource('apps/web/src/components/layout/Sidebar.tsx');
+  const projectManagerSource = readSource('apps/web/src/components/settings/ProjectManager.tsx');
+  const pendingNodeSource = readSource('apps/web/src/components/canvas/PendingNode.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(sidebarSource, /frostedSidebarSubSurfaceStyle/);
   assert.doesNotMatch(sidebarSource, /backgroundColor: 'var\(--bg-tertiary\)'|backgroundColor: 'var\(--bg-secondary\)'/);
@@ -196,17 +196,17 @@ test('secondary framework surfaces from audit findings use frosted tokens instea
 });
 
 test('remaining active chrome and fallback surfaces consume Clay frosted tokens', () => {
-  const desktopChromeSource = readSource('src/app/AppDesktopChrome.tsx');
-  const chatSidebarSource = readSource('src/components/layout/ChatSidebar.tsx');
-  const ecommerceImportPanelSource = readSource('src/components/ecommerce/EcommerceImportPanel.tsx');
-  const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
-  const workflowUtilitySource = readSource('src/workflow/nodes/WorkflowUtilityCard.tsx');
-  const lazyBoundarySource = readSource('src/components/common/LazyModuleBoundary.tsx');
-  const errorBoundarySource = readSource('src/components/common/ErrorBoundary.tsx');
-  const mainSource = readSource('src/main.tsx');
-  const userProfileSource = readSource('src/components/modals/UserProfileModal.tsx');
-  const rechargeModalSource = readSource('src/components/modals/RechargeModal.tsx');
-  const cssSource = readSource('src/index.css');
+  const desktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
+  const chatSidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
+  const ecommerceImportPanelSource = readSource('apps/web/src/components/ecommerce/EcommerceImportPanel.tsx');
+  const promptNodeSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
+  const workflowUtilitySource = readSource('apps/web/src/workflow/nodes/WorkflowUtilityCard.tsx');
+  const lazyBoundarySource = readSource('apps/web/src/components/common/LazyModuleBoundary.tsx');
+  const errorBoundarySource = readSource('apps/web/src/components/common/ErrorBoundary.tsx');
+  const mainSource = readSource('apps/web/src/main.tsx');
+  const userProfileSource = readSource('apps/web/src/components/modals/UserProfileModal.tsx');
+  const rechargeModalSource = readSource('apps/web/src/components/modals/RechargeModal.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   for (const source of [
     desktopChromeSource,
@@ -252,7 +252,7 @@ test('remaining active chrome and fallback surfaces consume Clay frosted tokens'
   assert.match(userProfileSource, /kk-user-profile-modal__notice--warning/);
   assert.match(cssSource, /\.kk-user-profile-modal \[class\*="text-amber-200"\][\s\S]*color:\s*var\(--state-warning-text\) !important;/);
 
-  const tagInputSource = readSource('src/components/modals/TagInputModal.tsx');
+  const tagInputSource = readSource('apps/web/src/components/modals/TagInputModal.tsx');
   assert.match(tagInputSource, /tag-input-modal/);
   assert.match(tagInputSource, /var\(--frost-card-framework-bg\)/);
   assert.match(tagInputSource, /var\(--frost-card-sub-bg\)/);

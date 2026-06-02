@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('DashboardView.localized uses calmer settings primitives for the desktop overview shell', () => {
-  const source = readSource('src/components/settings/views/DashboardView.localized.tsx');
-  const registrySource = readSource('src/components/settings/settingsRegistry.ts');
+  const source = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
+  const registrySource = readSource('apps/web/src/components/settings/settingsRegistry.ts');
 
   assert.match(source, /from '\.\.\/settingsRegistry';/);
   assert.match(source, /SettingsViewShell/);

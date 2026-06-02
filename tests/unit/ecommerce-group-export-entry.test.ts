@@ -9,9 +9,9 @@ const ROOT_DIR = process.cwd();
 
 
 test('app wires main-image and A+ export entrypoints through the ecommerce group export runtime', () => {
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceGroupExportRuntime.ts');
-  const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceGroupExportRuntime.ts');
+  const promptNodeSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
 
   assert.match(hookSource, /buildEcommerceGroupExportManifest/);
   assert.match(appSource, /useEcommerceGroupExportRuntime/);

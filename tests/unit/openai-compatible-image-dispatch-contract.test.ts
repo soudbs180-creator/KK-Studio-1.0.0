@@ -13,8 +13,8 @@ const ROOT_DIR = process.cwd();
 
 describe("OpenAI-compatible image dispatch plan", () => {
   test("keeps surface router output separate from endpoint execution methods", () => {
-    const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
-    const helperSource = readSource("src/services/llm/openAICompatibleImageDispatch.ts");
+    const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
+    const helperSource = readSource("apps/web/src/services/llm/openAICompatibleImageDispatch.ts");
 
     assert.match(adapterSource, /resolveOpenAICompatibleImageDispatch\(\{/);
     assert.match(helperSource, /export function resolveOpenAICompatibleImageDispatch/);

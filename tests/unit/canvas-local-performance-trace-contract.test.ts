@@ -10,7 +10,7 @@ const ROOT_DIR = process.cwd()
 
 describe('canvas local performance trace contract', () => {
   test('App instruments prompt-group regroup layout recomputation', () => {
-    const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts')
+    const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts')
 
     assert.match(
       promptGroupLayoutSource,
@@ -23,7 +23,7 @@ describe('canvas local performance trace contract', () => {
   })
 
   test('App instruments connector render snapshot rebuilds', () => {
-    const hookSource = readSource('src/app/useConnectorRenderer.ts')
+    const hookSource = readSource('apps/web/src/app/useConnectorRenderer.ts')
 
     assert.match(
       hookSource,

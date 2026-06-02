@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('local api management exposes one provider add entry instead of direct presets', () => {
-  const source = readSource('src/components/settings/ApiSettingsView.tsx');
-  const sectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const sectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.match(source, /const beginCreateOfficial = \(provider: OfficialProvider = 'Google'\) =>/);
   assert.doesNotMatch(source, /const existingOfficialByProvider = useMemo\(/);

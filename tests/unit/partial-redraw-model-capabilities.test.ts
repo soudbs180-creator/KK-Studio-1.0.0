@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('model capabilities expose partial redraw helpers and strip AUTO from redraw ratios', () => {
-  const source = readSource('src/services/model/modelCapabilities.ts');
+  const source = readSource('apps/web/src/services/model/modelCapabilities.ts');
 
   assert.match(source, /export function getPartialRedrawSupportedRatios\(\s*modelId: string\s*\): AspectRatio\[\]/);
   assert.match(source, /filter\(\(ratio\) => ratio !== AspectRatio\.AUTO\)/);

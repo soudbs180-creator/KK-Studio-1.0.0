@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('prompt optimizer service only uses explicit prompt_optimizer AI enhancement routes', () => {
-  const serviceSource = readSource('src/services/llm/promptOptimizerService.ts');
-  const routingSource = readSource('src/services/api/capabilityRouteAssignments.ts');
+  const serviceSource = readSource('apps/web/src/services/llm/promptOptimizerService.ts');
+  const routingSource = readSource('apps/web/src/services/api/capabilityRouteAssignments.ts');
 
   assert.match(routingSource, /prompt_optimizer/);
   assert.match(serviceSource, /from '\.\.\/api\/capabilityRouteAssignments';/);

@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('storage and logs views are rebuilt onto the shared settings hero and section scaffold', () => {
-  const storageSource = readSource('src/components/settings/views/StorageSettingsView.localized.tsx');
-  const logsSource = readSource('src/components/settings/views/SystemLogsView.localized.tsx');
+  const storageSource = readSource('apps/web/src/components/settings/views/StorageSettingsView.localized.tsx');
+  const logsSource = readSource('apps/web/src/components/settings/views/SystemLogsView.localized.tsx');
 
   assert.match(storageSource, /SettingsHero/);
   assert.match(storageSource, /SettingsSection/);
@@ -26,7 +26,7 @@ test('storage and logs views are rebuilt onto the shared settings hero and secti
 });
 
 test('billing ledger shares the same settings hero and section rhythm as the rest of the workbench', () => {
-  const billingSource = readSource('src/pages/CostEstimation.tsx');
+  const billingSource = readSource('apps/web/src/pages/CostEstimation.tsx');
 
   assert.match(billingSource, /SettingsHero/);
   assert.match(billingSource, /SettingsSection/);
@@ -36,9 +36,9 @@ test('billing ledger shares the same settings hero and section rhythm as the res
 });
 
 test('mobile settings opens directly on overview instead of a separate overview entry screen', () => {
-  const settingsSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
-  const dashboardSource = readSource('src/components/settings/views/DashboardView.localized.tsx');
-  const registrySource = readSource('src/components/settings/settingsRegistry.ts');
+  const settingsSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
+  const registrySource = readSource('apps/web/src/components/settings/settingsRegistry.ts');
 
   assert.doesNotMatch(settingsSource, /MobileSettingsHome/);
   assert.doesNotMatch(settingsSource, /settingsMobileDetail/);
@@ -49,7 +49,7 @@ test('mobile settings opens directly on overview instead of a separate overview 
 });
 
 test('settings search copy now describes navigation filtering instead of page-content search', () => {
-  const registrySource = readSource('src/components/settings/settingsRegistry.ts');
+  const registrySource = readSource('apps/web/src/components/settings/settingsRegistry.ts');
 
   assert.match(registrySource, /emptySearchLabel: 'No navigation entries matched\.'/);
   assert.match(registrySource, /return pickByLanguage\(language, '筛选设置导航', 'Filter settings navigation'\);/);
@@ -58,7 +58,7 @@ test('settings search copy now describes navigation filtering instead of page-co
 });
 
 test('logs filter controls stay as a plain toolbar instead of a large nested card', () => {
-  const logsSource = readSource('src/components/settings/views/SystemLogsView.localized.tsx');
+  const logsSource = readSource('apps/web/src/components/settings/views/SystemLogsView.localized.tsx');
 
   assert.match(
     logsSource,
@@ -74,7 +74,7 @@ test('logs filter controls stay as a plain toolbar instead of a large nested car
 });
 
 test('dashboard overview uses card-based grid layout', () => {
-  const dashboardSource = readSource('src/components/settings/views/DashboardView.localized.tsx');
+  const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
 
   assert.match(dashboardSource, /dashboard-grid-container/);
   assert.match(dashboardSource, /dashboard-grid-card/);
@@ -84,8 +84,8 @@ test('dashboard overview uses card-based grid layout', () => {
 });
 
 test('destructive settings maintenance actions require confirmation before mutating local data', () => {
-  const storageSource = readSource('src/components/settings/views/StorageSettingsView.localized.tsx');
-  const logsSource = readSource('src/components/settings/views/SystemLogsView.localized.tsx');
+  const storageSource = readSource('apps/web/src/components/settings/views/StorageSettingsView.localized.tsx');
+  const logsSource = readSource('apps/web/src/components/settings/views/SystemLogsView.localized.tsx');
 
   assert.match(storageSource, /window\.confirm\(/);
   assert.match(storageSource, /Apply the \$\{days\}-day retention policy\?/);
@@ -95,7 +95,7 @@ test('destructive settings maintenance actions require confirmation before mutat
 });
 
 test('platform entry is clearly disabled until the real flow is wired in', () => {
-  const apiWorkbenchSectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const apiWorkbenchSectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.match(apiWorkbenchSectionsSource, /entryActionDisabled\?: boolean;/);
   assert.match(apiWorkbenchSectionsSource, /disabled=\{entryActionDisabled\}/);
@@ -104,8 +104,8 @@ test('platform entry is clearly disabled until the real flow is wired in', () =>
 });
 
 test('dedicated settings pages suppress the workspace startup banner so the shell header stays unobstructed', () => {
-  const appSource = readSource('src/App.tsx');
-  const shellSource = readSource('src/app/AuthenticatedAppShell.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const shellSource = readSource('apps/web/src/app/AuthenticatedAppShell.tsx');
 
   assert.match(appSource, /showStartupBanner=\{rootMode === 'workspace'\}/);
   assert.match(shellSource, /showStartupBanner\?: boolean;/);
@@ -115,8 +115,8 @@ test('dedicated settings pages suppress the workspace startup banner so the shel
 });
 
 test('storage workbench avoids duplicate success toasts and disables merge when no source canvas is available', () => {
-  const storageSource = readSource('src/components/settings/views/StorageSettingsView.localized.tsx');
-  const canvasSource = readSource('src/context/CanvasContext.tsx');
+  const storageSource = readSource('apps/web/src/components/settings/views/StorageSettingsView.localized.tsx');
+  const canvasSource = readSource('apps/web/src/context/CanvasContext.tsx');
 
   assert.doesNotMatch(storageSource, /notify\.success\(\s*pick\([^)]*'Switched'/);
   assert.match(
@@ -130,7 +130,7 @@ test('storage workbench avoids duplicate success toasts and disables merge when 
 });
 
 test('api workbench copy stays concise and local-first', () => {
-  const apiWorkbenchSectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const apiWorkbenchSectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.match(apiWorkbenchSectionsSource, /先看链路、状态和预算。/);
   assert.match(apiWorkbenchSectionsSource, /只看当前视图里的链路和延迟。/);

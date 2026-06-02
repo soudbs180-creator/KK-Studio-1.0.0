@@ -26,7 +26,7 @@ type CanvasWorkflowUpdatesModule = {
 
 async function loadCanvasWorkflowUpdatesModule(): Promise<CanvasWorkflowUpdatesModule> {
   const fullPath = path.join(ROOT_DIR, 'apps/web/src/context/canvasWorkflowUpdates.ts');
-  assert.equal(existsSync(fullPath), true, 'src/context/canvasWorkflowUpdates.ts must exist');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/context/canvasWorkflowUpdates.ts must exist');
   return await import('../../apps/web/src/context/canvasWorkflowUpdates.ts') as CanvasWorkflowUpdatesModule;
 }
 
@@ -69,8 +69,8 @@ function canvas(input: Partial<Canvas> & Pick<Canvas, 'id'>): Canvas {
 }
 
 test('canvas workflow update boundary lives outside CanvasContext', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const helperSource = readSource('src/context/canvasWorkflowUpdates.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const helperSource = readSource('apps/web/src/context/canvasWorkflowUpdates.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/canvas-workflow-updates-contract\.test\.ts/);

@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('credit model calls stay on the VPS system proxy path and never fall back to browser billing writes', () => {
-  const source = readSource('src/services/model/modelCaller.ts');
+  const source = readSource('apps/web/src/services/model/modelCaller.ts');
 
   assert.doesNotMatch(source, /legacyWebApiClient/);
   assert.doesNotMatch(source, /buildBillingRequestId/);

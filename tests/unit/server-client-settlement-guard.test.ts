@@ -24,7 +24,7 @@ test('platform image route rejects local user API requests before credit pricing
   assert.ok(costIndex < balanceIndex, 'pricing lookup must happen before balance preflight');
   assert.ok(balanceIndex < deductIndex, 'insufficient credits must be rejected before credit deduction');
   assert.ok(guardIndex < deductIndex, 'client settlement must be rejected before credit deduction');
-  assert.match(source, /sendInsufficientCredits\(res, availableCredits, requiredCredits\)/);
+  assert.match(source, /sendInsufficientCredits\(res, availableCredits, requiredCredits(?:, \w+)?\)/);
   assert.match(source, /No credits were charged/);
 });
 
@@ -45,6 +45,6 @@ test('platform chat route rejects local user API requests before credit pricing 
   assert.ok(guardIndex < dispatchIndex, 'client settlement must be rejected before dispatcher pricing');
   assert.ok(costIndex < balanceIndex, 'dispatcher pricing lookup must happen before balance preflight');
   assert.ok(balanceIndex < deductIndex, 'dispatcher insufficient credits must be rejected before credit deduction');
-  assert.match(source, /sendInsufficientCredits\(res, err\.credits, err\.creditsCost\)/);
+  assert.match(source, /sendInsufficientCredits\(res, err\.credits, err\.creditsCost(?:, \w+)?\)/);
   assert.match(source, /No credits were charged/);
 });

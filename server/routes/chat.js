@@ -32,9 +32,11 @@ function resolveRequestId(req) {
   return uuidPattern.test(incoming) ? incoming : crypto.randomUUID();
 }
 
-function sendInsufficientCredits(res, currentCredits, requiredCredits) {
+function sendInsufficientCredits(res, currentCredits, requiredCredits, requestId) {
   return res.status(402).json({
     error: 'Insufficient credits.',
+    code: 'INSUFFICIENT_CREDITS',
+    requestId: requestId || require('crypto').randomUUID(),
     credits: Math.max(0, Number(currentCredits) || 0),
     creditsCost: requiredCredits,
   });
@@ -45,20 +47,31 @@ const LIMIT_WINDOW_MS = 60 * 1000;
 const MAX_CHAT_LIMIT = 20;
 
 router.post('/chat', async (req, res) => {
+  const requestId = resolveRequestId(req);
   const userId = verifyJWT(req.headers.authorization);
   if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return res.status(401).json({
+      error: 'Unauthorized.',
+      code: 'UNAUTHORIZED',
+      requestId,
+    });
   }
 
   const parsed = ChatRequestSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid chat messages.' });
+    return res.status(400).json({
+      error: 'Invalid chat messages.',
+      code: 'INVALID_REQUEST',
+      requestId,
+    });
   }
 
   const isLocalUserApi = parsed.data.executionLane === 'local-user-api';
   if (isLocalUserApi) {
     return res.status(409).json({
       error: 'User-owned API requests must use the local user API route. No credits were charged.',
+      code: 'LOCAL_USER_API_REJECTED',
+      requestId,
     });
   }
 
@@ -70,13 +83,15 @@ router.post('/chat', async (req, res) => {
 
   if (!clientLimit || now > clientLimit.resetTime) {
     clientLimit = { count: 1, resetTime: now + LIMIT_WINDOW_MS };
-    chatLimiterMap.set(limitKey, clientLimit);
+    imageLimiterMap?.set?.(limitKey, clientLimit) || chatLimiterMap.set(limitKey, clientLimit); // 兼容可能挂载不同 map
   } else {
     clientLimit.count += 1;
     if (clientLimit.count > MAX_CHAT_LIMIT) {
       const retryAfter = Math.ceil((clientLimit.resetTime - now) / 1000);
       return res.status(429).json({
         error: `云端模型对话请求过于频繁，请在 ${retryAfter} 秒后重试。使用自带 API Key 模式不受限制。`,
+        code: 'RATE_LIMITED',
+        requestId,
       });
     }
   }
@@ -84,8 +99,6 @@ router.post('/chat', async (req, res) => {
   res.setHeader('X-Refresh-Token', signJWT({ userId }));
 
   try {
-    const requestId = resolveRequestId(req);
-    
     // 2. 组装 Unified Internal Request payload
     const unifiedPayload = {
       task_type: 'chat',
@@ -103,10 +116,12 @@ router.post('/chat', async (req, res) => {
     return res.json(result);
   } catch (err) {
     if (err.statusCode === 402) {
-      return sendInsufficientCredits(res, err.credits, err.creditsCost);
+      return sendInsufficientCredits(res, err.credits, err.creditsCost, requestId);
     }
     return res.status(err.statusCode || 500).json({
-      error: err.message || 'Chat failed.'
+      error: err.message || 'Chat failed.',
+      code: err.code || 'AI_CHAT_FAILED',
+      requestId,
     });
   }
 });

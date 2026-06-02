@@ -9,10 +9,10 @@ const ROOT_DIR = process.cwd();
 
 
 test('generation and result billing logic stays route-aware for user-owned keys', () => {
-  const appSource = readSource('src/App.tsx');
-  const generationRuntimeSource = readSource('src/app/useGenerationRuntime.ts');
-  const billingSource = readSource('src/utils/creditBilling.ts');
-  const pricingSource = readSource('src/services/model/modelPricing.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const generationRuntimeSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
+  const billingSource = readSource('apps/web/src/utils/creditBilling.ts');
+  const pricingSource = readSource('apps/web/src/services/model/modelPricing.ts');
 
   assert.match(
     generationRuntimeSource,

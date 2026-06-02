@@ -38,7 +38,7 @@ test('canonical design manuals define the Clay-first global UI system', () => {
 });
 
 test('global tokens use Clay light and dark palettes with bold color-block hierarchy', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(cssSource, /Clay Global UI Refit/i);
   assert.match(cssSource, /--clay-canvas:\s*#fffaf0;/);
@@ -81,7 +81,7 @@ test('global tokens use Clay light and dark palettes with bold color-block hiera
 });
 
 test('Clay theme does not animate the whole document tree during theme changes', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
   const themeTransitionStart = cssSource.indexOf('Global Theme Transition');
   const themeTransitionEnd = cssSource.indexOf('.custom-scrollbar::-webkit-scrollbar', themeTransitionStart);
   const themeTransitionBlock = cssSource.slice(themeTransitionStart, themeTransitionEnd);
@@ -97,7 +97,7 @@ test('Clay theme does not animate the whole document tree during theme changes',
 });
 
 test('dark canvas keeps neutral Clay depth instead of blue-tinted workspace chrome', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
   const darkModeBlock = cssSource.slice(
     cssSource.indexOf('body.dark-mode {', cssSource.indexOf('Clay Global UI Refit')),
     cssSource.indexOf('}', cssSource.indexOf('body.dark-mode {', cssSource.indexOf('Clay Global UI Refit'))),
@@ -115,7 +115,7 @@ test('dark canvas keeps neutral Clay depth instead of blue-tinted workspace chro
 });
 
 test('canvas card shadows follow Clay flat-card depth instead of cinematic shadows', () => {
-  const shadowSource = readSource('src/utils/canvasCardShadow.ts');
+  const shadowSource = readSource('apps/web/src/utils/canvasCardShadow.ts');
 
   assert.match(shadowSource, /Clay canvas card shadow/i);
   assert.match(shadowSource, /return 'none';/);
@@ -125,7 +125,7 @@ test('canvas card shadows follow Clay flat-card depth instead of cinematic shado
 });
 
 test('search palette uses Clay tokens without heavy shadows or inline focus mutation', () => {
-  const source = readSource('src/components/layout/SearchPalette.tsx');
+  const source = readSource('apps/web/src/components/layout/SearchPalette.tsx');
 
   assert.doesNotMatch(source, /shadow-2xl|shadow-xl|shadow-lg/);
   assert.doesNotMatch(source, /bg-indigo|text-indigo|border-indigo/);
@@ -141,7 +141,7 @@ test('search palette uses Clay tokens without heavy shadows or inline focus muta
 });
 
 test('tutorial overlay uses Clay spotlight and flat action treatment', () => {
-  const source = readSource('src/components/common/TutorialOverlay.tsx');
+  const source = readSource('apps/web/src/components/common/TutorialOverlay.tsx');
 
   assert.match(source, /DESKTOP_TUTORIAL_STEPS/);
   assert.match(source, /MOBILE_TUTORIAL_STEPS/);
@@ -154,13 +154,13 @@ test('tutorial overlay uses Clay spotlight and flat action treatment', () => {
 });
 
 test('mobile workspace shell uses Clay theme tokens instead of hard-coded dark glass', () => {
-  const mobileHeader = readSource('src/components/mobile/MobileHeader.tsx');
-  const mobileWorkspaceSurface = readSource('src/components/mobile/MobileWorkspaceSurface.tsx');
-  const mobileMoreMenu = readSource('src/components/mobile/MobileMoreMenu.tsx');
-  const mobileResultFeed = readSource('src/components/mobile/MobileResultFeed.tsx');
-  const mobileResultTile = readSource('src/components/mobile/MobileResultTile.tsx');
-  const mobileResultDetail = readSource('src/components/mobile/MobileResultDetailScreen.tsx');
-  const appPromptComposer = readSource('src/app/AppPromptComposer.tsx');
+  const mobileHeader = readSource('apps/web/src/components/mobile/MobileHeader.tsx');
+  const mobileWorkspaceSurface = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
+  const mobileMoreMenu = readSource('apps/web/src/components/mobile/MobileMoreMenu.tsx');
+  const mobileResultFeed = readSource('apps/web/src/components/mobile/MobileResultFeed.tsx');
+  const mobileResultTile = readSource('apps/web/src/components/mobile/MobileResultTile.tsx');
+  const mobileResultDetail = readSource('apps/web/src/components/mobile/MobileResultDetailScreen.tsx');
+  const appPromptComposer = readSource('apps/web/src/app/AppPromptComposer.tsx');
   const combined = [
     mobileHeader,
     mobileWorkspaceSurface,
@@ -185,8 +185,8 @@ test('mobile workspace shell uses Clay theme tokens instead of hard-coded dark g
 });
 
 test('settings controls share motion and overflow-safe Clay sizing primitives', () => {
-  const scaffoldSource = readSource('src/components/settings/SettingsScaffold.tsx');
-  const primitiveSource = readSource('src/components/settings/ui/index.tsx');
+  const scaffoldSource = readSource('apps/web/src/components/settings/SettingsScaffold.tsx');
+  const primitiveSource = readSource('apps/web/src/components/settings/ui/index.tsx');
 
   assert.match(scaffoldSource, /SETTINGS_CONTROL_MOTION_CLASSNAME/);
   assert.doesNotMatch(scaffoldSource, /transition-opacity duration-150 hover:opacity-70 active:opacity-50/);
@@ -201,8 +201,8 @@ test('settings controls share motion and overflow-safe Clay sizing primitives', 
 });
 
 test('API settings default view gives action modules more weight than repeated info modules', () => {
-  const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
-  const cssSource = readSource('src/index.css');
+  const viewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(viewSource, /<ApiWorkbenchModelCenterSection/);
   assert.match(viewSource, /\{renderAdvancedPanels\(\)\}/);

@@ -88,7 +88,7 @@ function extractCssVariable(block: string, name: string): string {
 }
 
 test('dark canvas keeps the dot grid visible instead of collapsing into pure black', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.doesNotMatch(
     cssSource,
@@ -101,7 +101,7 @@ test('dark canvas keeps the dot grid visible instead of collapsing into pure bla
 });
 
 test('canvas panning does not disable frosted card surfaces while zooming still keeps the fast-path fallback', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.doesNotMatch(
     cssSource,
@@ -114,8 +114,8 @@ test('canvas panning does not disable frosted card surfaces while zooming still 
 });
 
 test('prompt cards use the same theme surface fill as image cards in dark and light mode', () => {
-  const source = readSource('src/components/canvas/PromptNodeComponent.tsx');
-  const imageCardSource = readSource('src/components/image/ImageCard2.tsx');
+  const source = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
+  const imageCardSource = readSource('apps/web/src/components/image/ImageCard2.tsx');
 
   assert.match(
     source,
@@ -126,7 +126,7 @@ test('prompt cards use the same theme surface fill as image cards in dark and li
 });
 
 test('prompt card theme surface text tokens meet normal text contrast in light and dark themes', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
   const lightTheme = extractCssBlock(cssSource, ':root');
   const darkTheme = extractCssBlock(cssSource, 'body.dark-mode');
 
@@ -151,7 +151,7 @@ test('prompt card theme surface text tokens meet normal text contrast in light a
 });
 
 test('prompt cards avoid transform-focused will-change hints during drag so backdrop blur stays attached to the canvas', () => {
-  const source = readSource('src/components/canvas/PromptNodeComponent.tsx');
+  const source = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
 
   assert.doesNotMatch(
     source,
@@ -164,7 +164,7 @@ test('prompt cards avoid transform-focused will-change hints during drag so back
 });
 
 test('canvas groups avoid transform-only will-change hints while dragging their frosted shells', () => {
-  const source = readSource('src/components/canvas/CanvasGroupComponent.tsx');
+  const source = readSource('apps/web/src/components/canvas/CanvasGroupComponent.tsx');
 
   assert.doesNotMatch(
     source,
@@ -177,7 +177,7 @@ test('canvas groups avoid transform-only will-change hints while dragging their 
 });
 
 test('canvas groups use shared frosted shell and label material tokens', () => {
-  const source = readSource('src/components/canvas/CanvasGroupComponent.tsx');
+  const source = readSource('apps/web/src/components/canvas/CanvasGroupComponent.tsx');
 
   assert.match(
     source,

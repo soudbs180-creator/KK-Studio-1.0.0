@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 test('tutorial overlay keeps onboarding copy readable on mobile and desktop', () => {
-  const source = readSource('src/components/common/TutorialOverlay.tsx');
+  const source = readSource('apps/web/src/components/common/TutorialOverlay.tsx');
 
   assert.match(source, /TUTORIAL_MOBILE_CARD_MAX_WIDTH\s*=\s*460/);
   assert.match(source, /TUTORIAL_DESKTOP_CARD_MAX_WIDTH\s*=\s*560/);

@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('ApiSettingsView self-wraps with MemoryRouter when mounted outside router context', () => {
-  const source = readSource('src/components/settings/ApiSettingsView.tsx');
+  const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
 
   assert.match(source, /import \{ MemoryRouter, useInRouterContext, useLocation, useNavigate, useParams \} from 'react-router-dom';/);
   assert.match(source, /const ApiSettingsViewInner: React\.FC<\{ initialSupplier\?: Supplier \| null \}> = \(\{ initialSupplier = null \}\) => \{/);

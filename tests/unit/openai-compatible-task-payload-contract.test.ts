@@ -90,7 +90,7 @@ describe("OpenAI-compatible task payload helpers", () => {
   });
 
   test("adapter delegates task payload parsing to the helper module", () => {
-    const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+    const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
     const testConfigSource = readSource("tsconfig.tests.json");
 
     assert.match(adapterSource, /openAICompatibleTaskPayload/);

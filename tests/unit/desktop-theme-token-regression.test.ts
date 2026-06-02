@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('desktop theme tokens expose inverse text and error aliases for shared UI primitives', () => {
-  const cssSource = readSource('src/index.css');
-  const settingsUiSource = readSource('src/components/settings/ui/index.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
+  const settingsUiSource = readSource('apps/web/src/components/settings/ui/index.tsx');
 
   assert.match(cssSource, /--text-inverse:/);
   assert.match(cssSource, /--error:/);

@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('theme bootstrapping defaults to system preference and applies before app mount', () => {
-  const themeSource = readSource('src/context/ThemeContext.tsx');
-  const mainSource = readSource('src/main.tsx');
+  const themeSource = readSource('apps/web/src/context/ThemeContext.tsx');
+  const mainSource = readSource('apps/web/src/main.tsx');
 
   assert.match(themeSource, /const DEFAULT_THEME: Theme = 'system';/);
   assert.match(themeSource, /if \(typeof window === 'undefined'\) return 'light';/);
@@ -24,7 +24,7 @@ test('theme bootstrapping defaults to system preference and applies before app m
 });
 
 test('theme provider does not add programmatic transition classes that can flicker the UI', () => {
-  const themeSource = readSource('src/context/ThemeContext.tsx');
+  const themeSource = readSource('apps/web/src/context/ThemeContext.tsx');
 
   assert.doesNotMatch(themeSource, /theme-transitioning/);
   assert.doesNotMatch(themeSource, /startThemeTransition/);
@@ -32,11 +32,11 @@ test('theme provider does not add programmatic transition classes that can flick
 });
 
 test('theme-aware shells use resolved theme when preference is set to system', () => {
-  const sidebarSource = readSource('src/components/layout/Sidebar.tsx');
-  const projectManagerSource = readSource('src/components/settings/ProjectManager.tsx');
-  const notificationToastSource = readSource('src/components/common/NotificationToast.tsx');
-  const loginScreenSource = readSource('src/components/auth/LoginScreen.tsx');
-  const loginScreenStylesSource = readSource('src/components/auth/LoginScreen.css');
+  const sidebarSource = readSource('apps/web/src/components/layout/Sidebar.tsx');
+  const projectManagerSource = readSource('apps/web/src/components/settings/ProjectManager.tsx');
+  const notificationToastSource = readSource('apps/web/src/components/common/NotificationToast.tsx');
+  const loginScreenSource = readSource('apps/web/src/components/auth/LoginScreen.tsx');
+  const loginScreenStylesSource = readSource('apps/web/src/components/auth/LoginScreen.css');
 
   assert.match(sidebarSource, /const \{ theme, resolvedTheme, toggleTheme, setTheme \} = useTheme\(\);/);
   assert.match(sidebarSource, /const isDarkMode = resolvedTheme === 'dark';/);

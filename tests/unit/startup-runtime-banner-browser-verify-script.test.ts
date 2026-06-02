@@ -32,9 +32,9 @@ test('verify:changes pulls the startup runtime banner browser verification into 
 
 test('startup runtime banner browser verification uses stable selectors and checks center alignment after resize', () => {
   const scriptSource = readSource('scripts/test/verify-startup-runtime-banner-centering.mjs');
-  const shellSource = readSource('src/app/AuthenticatedAppShell.tsx');
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const appSource = readSource('src/App.tsx');
+  const shellSource = readSource('apps/web/src/app/AuthenticatedAppShell.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
 
   assert.match(scriptSource, /startup-runtime-banner/);
   assert.match(scriptSource, /prompt-bar-container/);

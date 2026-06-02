@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('OpenAI compatible adapter does not retain source-proven unused code', () => {
-  const source = readSource('src/services/llm/OpenAICompatibleAdapter.ts');
+  const source = readSource('apps/web/src/services/llm/OpenAICompatibleAdapter.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
   const chatMethodStart = source.indexOf('private async generateImageViaChat(');
   const chatMethodEnd = source.indexOf('private async generateImageViaChatStrict(');
@@ -39,7 +39,7 @@ test('OpenAI compatible adapter does not retain source-proven unused code', () =
 });
 
 test('OpenAI compatible adapter does not retain unreachable commented legacy delegates', () => {
-  const source = readSource('src/services/llm/OpenAICompatibleAdapter.ts');
+  const source = readSource('apps/web/src/services/llm/OpenAICompatibleAdapter.ts');
   const chatStart = source.indexOf('async chat(options: ChatOptions, keySlot: KeySlot): Promise<string>');
   const chatStreamStart = source.indexOf('async chatStream(options: ChatOptions, keySlot: KeySlot): Promise<void>');
   const generateImageStart = source.indexOf('async generateImage(options: ImageGenerationOptions, keySlot: KeySlot)');

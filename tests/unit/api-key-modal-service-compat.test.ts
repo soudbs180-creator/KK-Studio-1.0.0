@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('api key modal compat shell is removed once settings owns the canonical entrypoint directly', () => {
-  const appSource = readSource('src/App.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
   const servicePath = path.join(ROOT_DIR, 'apps/web/src/services/api/apiKeyModalService.ts');
 
   assert.equal(existsSync(servicePath), false);

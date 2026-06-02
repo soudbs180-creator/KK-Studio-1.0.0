@@ -27,7 +27,7 @@ type GenerationRuntimePublicBoundary = {
 
 describe('generation runtime extraction contract', () => {
   test('generation runtime public boundary types are semantically checked', () => {
-    const generationRuntimeSource = readSource('src/app/useGenerationRuntime.ts');
+    const generationRuntimeSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const testConfigSource = readSource('tsconfig.tests.json');
     const boundaryIsTypechecked: GenerationRuntimePublicBoundary | null = null;
 
@@ -41,7 +41,7 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('generation runtime receives model display names through deps only', () => {
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
 
     assert.doesNotMatch(
       hookSource,
@@ -53,10 +53,10 @@ describe('generation runtime extraction contract', () => {
 
   test('cancel generation ownership lives in useGenerationRuntime', () => {
     const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useGenerationRuntime.ts');
-    assert.equal(existsSync(hookPath), true, 'src/app/useGenerationRuntime.ts should exist');
+    assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useGenerationRuntime.ts should exist');
 
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
-    const appSource = readSource('src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
 
     assert.match(hookSource, /interface UseGenerationRuntimeDeps \{/);
     assert.match(hookSource, /interface UseGenerationRuntimeResult \{/);
@@ -80,8 +80,8 @@ describe('generation runtime extraction contract', () => {
 
     assert.equal(existsSync(guardPath), true);
 
-    const appSource = readSource('src/App.tsx');
-    const guardSource = readSource('src/app/useGenerationSubmitGuard.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const guardSource = readSource('apps/web/src/app/useGenerationSubmitGuard.ts');
 
     assert.match(appSource, /from '\.\/app\/useGenerationSubmitGuard';/);
     assert.match(appSource, /const \{ tryStartGenerationSubmission \} = useGenerationSubmitGuard\(\);/);
@@ -107,8 +107,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('generation billing helpers are owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
 
     assert.match(hookSource, /ensureCreditAttemptCharged: \(params: EnsureCreditAttemptChargedParams\) => Promise<EnsureCreditAttemptChargedResult>;/);
     assert.match(hookSource, /resolveFailedCreditAttempt: \(node: GenerationCreditAttemptNode\) => Promise<GenerationCreditAttemptFailurePatch>;/);
@@ -135,8 +135,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('initial generation credit settlement is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const handleGenerateSource = appSource.slice(
       appSource.indexOf('const handleGenerate = useCallback'),
       appSource.indexOf('const handleFilesDrop = useCallback'),
@@ -164,8 +164,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('initial generation draft context is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const handleGenerateSource = appSource.slice(
       appSource.indexOf('const handleGenerate = useCallback'),
       appSource.indexOf('const handleFilesDrop = useCallback'),
@@ -199,8 +199,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('initial generation billing attempt context is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const handleGenerateSource = appSource.slice(
       appSource.indexOf('const handleGenerate = useCallback'),
       appSource.indexOf('const handleFilesDrop = useCallback'),
@@ -236,8 +236,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('initial generation billing state context is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const handleGenerateSource = appSource.slice(
       appSource.indexOf('const handleGenerate = useCallback'),
       appSource.indexOf('const handleFilesDrop = useCallback'),
@@ -269,8 +269,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('initial generation submission preflight is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const handleGenerateSource = appSource.slice(
       appSource.indexOf('const handleGenerate = useCallback'),
       appSource.indexOf('const handleFilesDrop = useCallback'),
@@ -304,8 +304,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('initial generating prompt node assembly is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const handleGenerateSource = appSource.slice(
       appSource.indexOf('const handleGenerate = useCallback'),
       appSource.indexOf('const handleFilesDrop = useCallback'),
@@ -332,8 +332,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('initial generating prompt node persistence is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const handleGenerateSource = appSource.slice(
       appSource.indexOf('const handleGenerate = useCallback'),
       appSource.indexOf('const handleFilesDrop = useCallback'),
@@ -360,8 +360,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('initial prompt optimization context is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const handleGenerateSource = appSource.slice(
       appSource.indexOf('const handleGenerate = useCallback'),
       appSource.indexOf('const handleFilesDrop = useCallback'),
@@ -384,8 +384,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('initial prompt optimization and node assembly are composed by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const handleGenerateSource = appSource.slice(
       appSource.indexOf('const handleGenerate = useCallback'),
       appSource.indexOf('const handleFilesDrop = useCallback'),
@@ -425,8 +425,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('initial generation persistence and execution handoff is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const handleGenerateSource = appSource.slice(
       appSource.indexOf('const handleGenerate = useCallback'),
       appSource.indexOf('const handleFilesDrop = useCallback'),
@@ -475,8 +475,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('initial generation submission transaction is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const handleGenerateSource = appSource.slice(
       appSource.indexOf('const handleGenerate = useCallback'),
       appSource.indexOf('const handleFilesDrop = useCallback'),
@@ -522,8 +522,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('initial post-persist prompt cleanup is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const handleGenerateSource = appSource.slice(
       appSource.indexOf('const handleGenerate = useCallback'),
       appSource.indexOf('const handleFilesDrop = useCallback'),
@@ -564,8 +564,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generation failure commit is finalized by complete retry batch runtime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -601,8 +601,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('initial generation execution kickoff is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
 
     assert.match(hookSource, /executeInitialGenerationPromptNode: \(params: ExecuteInitialGenerationPromptNodeParams\) => Promise<void>;/);
     assert.match(hookSource, /const executeInitialGenerationPromptNode = useCallback\(async \(params: ExecuteInitialGenerationPromptNodeParams\)/);
@@ -625,8 +625,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('initial generation failure reporting is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const handleGenerateSource = appSource.slice(
       appSource.indexOf('const handleGenerate = useCallback'),
       appSource.indexOf('// Handle reference images'),
@@ -646,8 +646,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generation timeout guard is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -677,8 +677,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media attempt guard finalization is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -717,8 +717,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media attempt context is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -743,8 +743,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generation start commit is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -778,8 +778,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry recovery notification is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -830,8 +830,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generation request context is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -857,8 +857,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media execution preparation is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -894,8 +894,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generation success side effects are owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -915,8 +915,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media success commit is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -942,8 +942,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generation task prompt context is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -970,8 +970,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry video generation request options are owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -997,8 +997,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry video generation result normalization is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1029,8 +1029,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry image generation request options are owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1057,8 +1057,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry image generation result normalization is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1098,8 +1098,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media request execution is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1150,8 +1150,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media authoritative balance is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1174,8 +1174,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media result context is consolidated before result assembly', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1220,8 +1220,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media attempts batch is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1260,8 +1260,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media attempt result assembly is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1312,8 +1312,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media timing is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1344,8 +1344,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media persistence context is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1374,8 +1374,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media dimension detection is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1403,8 +1403,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media cloud sync scheduling is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1434,8 +1434,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media result assembly is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1467,8 +1467,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media result assembly uses the consolidated context boundary', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1500,8 +1500,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry completed prompt patch assembly is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1526,8 +1526,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media layout preparation is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1552,8 +1552,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media success commit context is prepared by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const prepareSuccessCommitContextSource = hookSource.slice(
       hookSource.indexOf('const prepareRetryGeneratedMediaSuccessCommitContext = useCallback'),
       hookSource.indexOf('const commitRetryGeneratedMediaBatchSuccess = useCallback'),
@@ -1586,8 +1586,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media batch success finalization is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1617,8 +1617,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media batch transaction is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),
@@ -1661,8 +1661,8 @@ describe('generation runtime extraction contract', () => {
   });
 
   test('retry generated media layout prompt resolution is owned by useGenerationRuntime', () => {
-    const appSource = readSource('src/App.tsx');
-    const hookSource = readSource('src/app/useGenerationRuntime.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
     const retryNodeSource = appSource.slice(
       appSource.indexOf('const handleRetryNode = useCallback'),
       appSource.indexOf(APP_RETRY_NODE_END_MARKER),

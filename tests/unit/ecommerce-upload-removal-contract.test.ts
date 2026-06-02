@@ -9,12 +9,12 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce upload removal flows from App state down to the import panel actions', () => {
-  const appSource = readSource('src/App.tsx');
-  const requirementRuntimeSource = readSource('src/app/useEcommerceRequirementAnalysisRuntime.ts');
-  const promptBarHookSource = readSource('src/app/useAppPromptBarProps.ts');
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const desktopPanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
-  const importPanelSource = readSource('src/components/ecommerce/EcommerceImportPanel.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const requirementRuntimeSource = readSource('apps/web/src/app/useEcommerceRequirementAnalysisRuntime.ts');
+  const promptBarHookSource = readSource('apps/web/src/app/useAppPromptBarProps.ts');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const desktopPanelSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
+  const importPanelSource = readSource('apps/web/src/components/ecommerce/EcommerceImportPanel.tsx');
 
   assert.match(appSource, /useEcommerceRequirementAnalysisRuntime\(\{/);
   assert.match(requirementRuntimeSource, /const handleClearEcommerceRequirementFile = useCallback\(\(\): void => \{/);

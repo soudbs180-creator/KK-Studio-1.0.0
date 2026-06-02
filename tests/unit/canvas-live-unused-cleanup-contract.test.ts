@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('InfiniteCanvas keeps public optional props without retaining unused destructures', () => {
-  const source = readSource('src/components/canvas/InfiniteCanvas.tsx');
+  const source = readSource('apps/web/src/components/canvas/InfiniteCanvas.tsx');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/canvas-live-unused-cleanup-contract\.test\.ts/);

@@ -9,10 +9,10 @@ const ROOT_DIR = process.cwd();
 
 
 test('import-only unused cleanup stays limited to type/import lists', () => {
-  const lightboxSource = readSource('src/components/image/GlobalLightbox.tsx');
-  const imageQualityHookSource = readSource('src/hooks/useImageQuality.ts');
-  const modelRegistrySource = readSource('src/services/model/modelRegistry.ts');
-  const costServiceSource = readSource('src/services/billing/costService.ts');
+  const lightboxSource = readSource('apps/web/src/components/image/GlobalLightbox.tsx');
+  const imageQualityHookSource = readSource('apps/web/src/hooks/useImageQuality.ts');
+  const modelRegistrySource = readSource('apps/web/src/services/model/modelRegistry.ts');
+  const costServiceSource = readSource('apps/web/src/services/billing/costService.ts');
 
   assert.match(lightboxSource, /type RedrawRequest/);
   assert.doesNotMatch(lightboxSource, /type NormalizedRect/);

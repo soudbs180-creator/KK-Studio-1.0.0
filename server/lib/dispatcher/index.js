@@ -117,12 +117,19 @@ class BackendDispatcher {
         currentCredits = await credits.refundCredits(userId, requiredCredits, operationKey, currentCredits);
       } catch (refundErr) {
         refundFailed = true;
-        console.error('[BackendDispatcher FATAL] 积分退款失败，需人工介入干预!', refundErr);
+        console.error('[P0 ALERT] 积分退款失败，需人工介入', {
+          userId,
+          cost: requiredCredits,
+          originalError: err.message,
+          refundError: refundErr.message,
+          timestamp: new Date().toISOString()
+        });
       }
 
       if (refundFailed) {
         const error = new Error('AI 请求发生异常且积分退费失败，请联系管理员介入。');
         error.statusCode = 500;
+        error.code = 'REFUND_FAILED';
         error.refundStatus = 'manual_intervention_required';
         throw error;
       }
@@ -130,6 +137,7 @@ class BackendDispatcher {
       // 抛出友好的错误信息，向用户说明积分已被妥善退回
       const error = new Error(`AI 请求处理失败，已安全回滚并退还 ${requiredCredits} 积分。`);
       error.statusCode = 500;
+      error.code = 'AI_CHAT_FAILED';
       throw error;
     }
   }

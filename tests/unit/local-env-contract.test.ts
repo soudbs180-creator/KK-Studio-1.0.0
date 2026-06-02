@@ -155,7 +155,7 @@ test("root frontend env files do not hydrate server-only API secrets or legacy S
 
 test("runtime env helper keeps Vite public vars on explicit import.meta.env keys", () => {
   const runtimeEnvSource = fs.readFileSync(
-    path.join(ROOT_DIR, "src", "utils", "runtimeEnv.ts"),
+    path.join(ROOT_DIR, "apps", "web", "src", "utils", "runtimeEnv.ts"),
     "utf8",
   );
 

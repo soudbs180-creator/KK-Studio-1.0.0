@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce build runtime creates both main-image and A+ group shells before child module cards', () => {
-  const buildRuntimeSource = readSource('src/app/useEcommerceBuildRuntime.ts');
+  const buildRuntimeSource = readSource('apps/web/src/app/useEcommerceBuildRuntime.ts');
 
   assert.match(buildRuntimeSource, /const buildEcommerceGroupNode = useCallback\(\(/);
   assert.match(buildRuntimeSource, /sourceSheet: '[^']+' \| 'A\+'/);

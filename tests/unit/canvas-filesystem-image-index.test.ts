@@ -7,7 +7,7 @@ import { test } from "node:test";
 
 
 test("canvas file-system persistence indexes image nodes before blob collection", () => {
-  const source = readSource("src/context/useCanvasFileSystemPersistence.ts");
+  const source = readSource("apps/web/src/context/useCanvasFileSystemPersistence.ts");
 
   assert.match(source, /const imageNodesByStorageId = new Map<string, GeneratedImage>\(\);/);
   assert.match(source, /if \(!imageNodesByStorageId\.has\(storageId\)\) \{/);

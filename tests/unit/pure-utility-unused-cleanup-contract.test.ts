@@ -28,8 +28,8 @@ function listSourceFiles(relativeDirectory: string): string[] {
 }
 
 test('pure utility modules do not retain source-proven unused locals', () => {
-  const promptGroupLayoutSource = readSource('src/app/promptGroupRenderLayout.ts');
-  const modelSortingSource = readSource('src/utils/modelSorting.ts');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/promptGroupRenderLayout.ts');
+  const modelSortingSource = readSource('apps/web/src/utils/modelSorting.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/pure-utility-unused-cleanup-contract\.test\.ts/);

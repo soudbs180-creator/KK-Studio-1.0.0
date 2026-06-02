@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('pre-confirmation ecommerce review only expands the active task editor', () => {
-  const reviewPanelSource = readSource('src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
+  const reviewPanelSource = readSource('apps/web/src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
 
   assert.match(
     reviewPanelSource,

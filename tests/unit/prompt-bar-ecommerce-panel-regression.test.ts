@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('PromptBar delegates ecommerce-specific composer UI to a dedicated panel component', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const ecommercePanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const ecommercePanelSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
 
   assert.match(promptBarSource, /import DesktopComposerEcommercePanel from '\.\/prompt-bar\/DesktopComposerEcommercePanel';/);
   assert.match(promptBarSource, /<DesktopComposerEcommercePanel/);

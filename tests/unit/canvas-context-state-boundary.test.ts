@@ -25,8 +25,8 @@ type CanvasContextStatePublicBoundary = {
 
 
 test('CanvasContext delegates state model and defaults to a focused boundary module', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const stateSource = readSource('src/context/canvasContextState.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const stateSource = readSource('apps/web/src/context/canvasContextState.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
   const boundaryIsTypechecked: CanvasContextStatePublicBoundary | null = null;
 

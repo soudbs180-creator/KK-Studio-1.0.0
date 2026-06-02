@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('CanvasContext does not retain proven unused imports or local layout writes', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/canvas-context-unused-cleanup\.test\.ts/);

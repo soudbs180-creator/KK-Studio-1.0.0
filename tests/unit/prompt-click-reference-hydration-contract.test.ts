@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('handlePromptClick switches the composer before any reference-image hydration work', () => {
-  const appSource = readSource('src/App.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
   const handlePromptClickIndex = appSource.indexOf(
     'const handlePromptClick = useCallback((clickedNode: PromptNode, isOptimizedView?: boolean) => {',
   );
@@ -37,7 +37,7 @@ test('handlePromptClick switches the composer before any reference-image hydrati
 });
 
 test('reference thumbnails render a lightweight skeleton while missing image data hydrates in the background', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
 
   assert.match(
     promptBarSource,

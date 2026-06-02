@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce analysis confirmation keeps unchecked modules as skipped slots instead of dropping them', () => {
-  const appSource = readSource('src/App.tsx');
-  const buildRuntimeSource = readSource('src/app/useEcommerceBuildRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const buildRuntimeSource = readSource('apps/web/src/app/useEcommerceBuildRuntime.ts');
 
   assert.doesNotMatch(appSource, /if \(ecommerceState\.selectedItems\[item\.itemId\] === false\) \{\s*continue;\s*\}/);
   assert.doesNotMatch(appSource, /if \(ecommerceState\.selectedItems\[item\.moduleId\] === false\) \{\s*continue;\s*\}/);

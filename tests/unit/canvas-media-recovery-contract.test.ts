@@ -11,8 +11,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('canvas media recovery boundary lives outside CanvasContext', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const helperSource = readSource('src/context/canvasMediaRecovery.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const helperSource = readSource('apps/web/src/context/canvasMediaRecovery.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/canvas-media-recovery-contract\.test\.ts/);
@@ -29,7 +29,7 @@ test('media recovery exports typed cache entries and prefers stable explicit ori
     originalUrl: 'https://cdn.example.com/original.png',
     filename: 'image.png',
   };
-  const helperSource = readSource('src/context/canvasMediaRecovery.ts');
+  const helperSource = readSource('apps/web/src/context/canvasMediaRecovery.ts');
 
   assert.equal(cacheEntry.originalUrl, 'https://cdn.example.com/original.png');
   assert.match(helperSource, /const explicitOriginal = normalizeMediaCacheSource\(image\.originalUrl\)\s*\|\|\s*normalizeMediaCacheSource\(image\.apiResultUrl\);/);
@@ -37,7 +37,7 @@ test('media recovery exports typed cache entries and prefers stable explicit ori
 });
 
 test('media recovery preserves original slots and rejects blob-only media', () => {
-  const helperSource = readSource('src/context/canvasMediaRecovery.ts');
+  const helperSource = readSource('apps/web/src/context/canvasMediaRecovery.ts');
 
   assert.match(helperSource, /Never promote a thumbnail\/display asset into the protected original slot/);
   assert.match(helperSource, /if \(isGeneratedMediaVideoLike\(image\)\) \{/);

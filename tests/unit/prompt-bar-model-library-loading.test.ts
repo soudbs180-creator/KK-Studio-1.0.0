@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('model pickers define explicit cached-refresh and bootstrap loading states', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
 
   assert.match(
     promptBarSource,
@@ -18,7 +18,7 @@ test('model pickers define explicit cached-refresh and bootstrap loading states'
 });
 
 test('model pickers keep cached lists interactive while showing a lightweight sync indicator', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
 
   assert.match(
     promptBarSource,
@@ -35,7 +35,7 @@ test('model pickers keep cached lists interactive while showing a lightweight sy
 });
 
 test('model pickers reserve three skeleton rows for empty-library bootstrap loading', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
 
   assert.match(
     promptBarSource,
@@ -48,7 +48,7 @@ test('model pickers reserve three skeleton rows for empty-library bootstrap load
 });
 
 test('prompt bar initializes available models before model-library effects run on first render', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx').replace(/\r\n/g, '\n');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx').replace(/\r\n/g, '\n');
 
   const availableModelsIndex = promptBarSource.indexOf('const availableModels = useMemo(() => {');
   const subscriptionEffectIndex = promptBarSource.indexOf('useEffect(() => {\n        refreshModelLibraryDataInBackground();');

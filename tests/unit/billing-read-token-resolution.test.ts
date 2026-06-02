@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test("billing read paths rely on shared kk api token refresh instead of a pinned session token", () => {
-  const billingContextSource = readSource("src/context/BillingContext.tsx");
+  const billingContextSource = readSource("apps/web/src/context/BillingContext.tsx");
 
   assert.match(
     billingContextSource,

@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('SystemLogsView variants do not retain source-proven unused locals', () => {
-  const desktopSource = readSource('src/components/settings/views/SystemLogsView.tsx');
-  const localizedSource = readSource('src/components/settings/views/SystemLogsView.localized.tsx');
+  const desktopSource = readSource('apps/web/src/components/settings/views/SystemLogsView.tsx');
+  const localizedSource = readSource('apps/web/src/components/settings/views/SystemLogsView.localized.tsx');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/system-logs-unused-cleanup-contract\.test\.ts/);

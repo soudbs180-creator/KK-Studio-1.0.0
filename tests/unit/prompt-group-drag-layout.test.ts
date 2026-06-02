@@ -9,9 +9,9 @@ const ROOT_DIR = process.cwd();
 
 
 test("prompt-group drag keeps child cards on their live positions", () => {
-  const appSource = readSource("src/App.tsx");
-  const promptGroupLayoutSource = readSource("src/app/usePromptGroupLayout.ts");
-  const renderLayoutSource = readSource("src/app/promptGroupRenderLayout.ts");
+  const appSource = readSource("apps/web/src/App.tsx");
+  const promptGroupLayoutSource = readSource("apps/web/src/app/usePromptGroupLayout.ts");
+  const renderLayoutSource = readSource("apps/web/src/app/promptGroupRenderLayout.ts");
 
   assert.match(promptGroupLayoutSource, /const promptGroupRegroupLayoutsById = useMemo/);
   assert.match(promptGroupLayoutSource, /regroupLayoutMap\.set\(/);
@@ -26,7 +26,7 @@ test("prompt-group drag keeps child cards on their live positions", () => {
 });
 
 test("prompt-group layout repair skips active drags and manually moved cards", () => {
-  const promptGroupLayoutSource = readSource("src/app/usePromptGroupLayout.ts");
+  const promptGroupLayoutSource = readSource("apps/web/src/app/usePromptGroupLayout.ts");
 
   assert.match(promptGroupLayoutSource, /const hasLiveDragInGroup = Boolean\(liveNodePositionByIdRef\.current\[promptNode\.id\]\)\s*\|\|\s*childImages\.some\(\(imageNode\) => Boolean\(liveNodePositionByIdRef\.current\[imageNode\.id\]\)\)/);
   assert.match(promptGroupLayoutSource, /const hasManualLayoutOverride = Boolean\(promptNode\.userMoved\)\s*\|\|\s*childImages\.some\(\(imageNode\) => Boolean\(imageNode\.userMoved\)\)/);
@@ -35,13 +35,13 @@ test("prompt-group layout repair skips active drags and manually moved cards", (
 });
 
 test("dragged image cards mark manual layout overrides in canvas state", () => {
-  const canvasMovementSource = readSource("src/context/canvasMovement.ts");
+  const canvasMovementSource = readSource("apps/web/src/context/canvasMovement.ts");
 
   assert.match(canvasMovementSource, /userMoved: selectedSet\.has\(node\.id\) \? true : node\.userMoved/);
 });
 
 test("main-card regroup is not blocked by previously moved child cards", () => {
-  const promptGroupLayoutSource = readSource("src/app/usePromptGroupLayout.ts");
+  const promptGroupLayoutSource = readSource("apps/web/src/app/usePromptGroupLayout.ts");
 
   assert.match(promptGroupLayoutSource, /const shouldAutoRegroupPromptGroup = useCallback/);
   assert.match(promptGroupLayoutSource, /sourceNodeId === promptNode\.id/);
@@ -49,13 +49,13 @@ test("main-card regroup is not blocked by previously moved child cards", () => {
 });
 
 test("child-card drag clears regroup presentation state so connectors follow live positions", () => {
-  const dragHandlerSource = readSource("src/app/usePromptGroupDragHandlers.ts");
+  const dragHandlerSource = readSource("apps/web/src/app/usePromptGroupDragHandlers.ts");
 
   assert.ok((dragHandlerSource.match(/clearPromptGroupRegroup\((node\.id|groupId)\);/g)?.length ?? 0) >= 4);
 });
 
 test("viewport position resolver is declared after the live node ref is initialized", () => {
-  const appSource = readSource("src/App.tsx");
+  const appSource = readSource("apps/web/src/App.tsx");
   const refIndex = appSource.indexOf("const liveNodePositionByIdRef = useRef");
   const resolverIndex = appSource.indexOf("const resolveViewportNodePosition =");
 

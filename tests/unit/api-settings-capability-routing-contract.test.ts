@@ -9,9 +9,9 @@ const ROOT_DIR = process.cwd();
 
 
 test('ApiSettingsView adds route pool, capability roles, and OCR sections without changing official vs proxy validation rules', () => {
-  const typesSource = readSource('src/types.ts');
-  const sectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
-  const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
+  const typesSource = readSource('apps/web/src/types.ts');
+  const sectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
+  const viewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
 
   assert.match(typesSource, /export interface CapabilityRouteAssignment/);
   assert.match(typesSource, /export interface OcrServiceSettings/);

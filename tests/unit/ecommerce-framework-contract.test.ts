@@ -9,10 +9,10 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce framework types and runtime helpers are wired as first-class surfaces', () => {
-  const typesSource = readSource('src/types.ts');
-  const appSource = readSource('src/App.tsx');
-  const frameworkRuntimeSource = readSource('src/services/ecommerce/frameworkRuntime.ts');
-  const mobileWorkspaceSource = readSource('src/app/AppMobileWorkspace.tsx');
+  const typesSource = readSource('apps/web/src/types.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const frameworkRuntimeSource = readSource('apps/web/src/services/ecommerce/frameworkRuntime.ts');
+  const mobileWorkspaceSource = readSource('apps/web/src/app/AppMobileWorkspace.tsx');
 
   assert.match(typesSource, /framework/);
   assert.match(typesSource, /frameworkId\?: string/);
@@ -39,11 +39,11 @@ test('ecommerce framework types and runtime helpers are wired as first-class sur
 });
 
 test('ecommerce framework prompt width is shared with canvas layout bounds', () => {
-  const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
-  const promptNodeCardWidthSource = readSource('src/utils/promptNodeCardWidth.ts');
-  const canvasAutoArrangeSource = readSource('src/context/canvasAutoArrange.ts');
-  const appSource = readSource('src/App.tsx');
+  const promptNodeSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
+  const promptNodeCardWidthSource = readSource('apps/web/src/utils/promptNodeCardWidth.ts');
+  const canvasAutoArrangeSource = readSource('apps/web/src/context/canvasAutoArrange.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
 
   assert.match(promptNodeCardWidthSource, /export const ECOMMERCE_FRAMEWORK_PROMPT_CARD_WIDTH = 1128;/);
   assert.match(promptNodeCardWidthSource, /export function getPromptNodeBoundsWidth/);

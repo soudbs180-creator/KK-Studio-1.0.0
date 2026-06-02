@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 function readFileSystemCompatibilityBlock(): string {
-  const source = readSource('src/services/storage/fileSystemService.ts');
+  const source = readSource('apps/web/src/services/storage/fileSystemService.ts');
   const start = source.indexOf('async createTagShortcut(');
   const end = source.indexOf('async migrateLegacyFiles(', start);
   assert.ok(start >= 0, 'createTagShortcut compatibility stub should remain');
@@ -33,7 +33,7 @@ test('file-system tag shortcut compatibility stubs stay no-op and noUnused-clean
 });
 
 test('App still calls tag shortcut compatibility stubs with the existing public signature', () => {
-  const source = readSource('src/App.tsx');
+  const source = readSource('apps/web/src/App.tsx');
 
   assert.match(source, /await fileSystemService\.createTagShortcut\(handle, tag, filename, isVideo\);/);
   assert.match(source, /await fileSystemService\.removeTagShortcut\(handle, tag, filename, isVideo\);/);

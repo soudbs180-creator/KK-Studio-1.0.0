@@ -91,11 +91,11 @@ describe("generation billing coordinator", () => {
   });
 
   test("frontend generation flows share the coordinator for attempt ids and refund handling", () => {
-    const appSource = readSource("src/App.tsx");
-    const generationRuntimeSource = readSource("src/app/useGenerationRuntime.ts");
-    const billingContextSource = readSource("src/context/BillingContext.tsx");
-    const imageGenerationSource = readSource("src/hooks/useImageGeneration.ts");
-    const typesSource = readSource("src/types.ts");
+    const appSource = readSource("apps/web/src/App.tsx");
+    const generationRuntimeSource = readSource("apps/web/src/app/useGenerationRuntime.ts");
+    const billingContextSource = readSource("apps/web/src/context/BillingContext.tsx");
+    const imageGenerationSource = readSource("apps/web/src/hooks/useImageGeneration.ts");
+    const typesSource = readSource("apps/web/src/types.ts");
 
     assert.match(typesSource, /billingAttemptId\?: string;/);
     assert.match(typesSource, /balanceAfter\?: number;/);

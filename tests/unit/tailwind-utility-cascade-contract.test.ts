@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('global reset stays in the base layer so Tailwind spacing utilities keep precedence', () => {
-  const source = readSource('src/index.css');
-  const htmlSource = readSource('index.html');
+  const source = readSource('apps/web/src/index.css');
+  const htmlSource = readSource('apps/web/index.html');
   const resetHeaderIndex = source.indexOf('Reset & Base Styles');
   const layeredResetIndex = source.indexOf('@layer base', resetHeaderIndex);
   const resetBlockEndIndex = source.indexOf('\n\nhtml,', layeredResetIndex);
@@ -27,7 +27,7 @@ test('global reset stays in the base layer so Tailwind spacing utilities keep pr
   assert.match(resetBlock, /padding: 0;/);
   assert.match(resetBlock, /\}\s*\}$/);
 
-  assert.ok(htmlInlineResetStart >= 0 && htmlInlineResetEnd > htmlInlineResetStart, 'index.html inline style should be present');
+  assert.ok(htmlInlineResetStart >= 0 && htmlInlineResetEnd > htmlInlineResetStart, 'apps/web/index.html inline style should be present');
   assert.match(htmlInlineReset, /box-sizing: border-box;/);
   assert.doesNotMatch(htmlInlineReset, /\*\s*\{[^}]*margin:\s*0\s*;/s);
   assert.doesNotMatch(htmlInlineReset, /\*\s*\{[^}]*padding:\s*0\s*;/s);

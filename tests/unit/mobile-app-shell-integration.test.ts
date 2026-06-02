@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('App delegates mobile rendering to MobileWorkspaceSurface instead of assembling mobile header/feed/composer inline', () => {
-  const appSource = readSource('src/App.tsx');
-  const appMobileWorkspaceSource = readSource('src/app/AppMobileWorkspace.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const appMobileWorkspaceSource = readSource('apps/web/src/app/AppMobileWorkspace.tsx');
 
   assert.match(appSource, /import AppMobileWorkspace from '\.\/app\/AppMobileWorkspace';/);
   assert.match(appSource, /<AppMobileWorkspace/);
@@ -22,13 +22,13 @@ test('App delegates mobile rendering to MobileWorkspaceSurface instead of assemb
 });
 
 test('mobile component barrel exports the dedicated mobile surface entry', () => {
-  const mobileIndexSource = readSource('src/components/mobile/index.ts');
+  const mobileIndexSource = readSource('apps/web/src/components/mobile/index.ts');
 
   assert.match(mobileIndexSource, /export \{ default as MobileWorkspaceSurface \} from '\.\/MobileWorkspaceSurface';/);
 });
 
 test('App prepares mobile result entries before the blocking hydration guard to keep hook order stable', () => {
-  const appMobileWorkspaceSource = readSource('src/app/AppMobileWorkspace.tsx');
+  const appMobileWorkspaceSource = readSource('apps/web/src/app/AppMobileWorkspace.tsx');
   const guardIndex = appMobileWorkspaceSource.indexOf('if (!isMobile) {');
   const mobileResultEntriesIndex = appMobileWorkspaceSource.indexOf('const resultEntries = React.useMemo<MobileResultEntry[]>(');
 

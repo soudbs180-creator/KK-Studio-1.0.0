@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test("app treats localhost and loopback IPs as the same local dev runtime", () => {
-  const appSource = readSource("src/App.tsx");
+  const appSource = readSource("apps/web/src/App.tsx");
 
   assert.match(
     appSource,

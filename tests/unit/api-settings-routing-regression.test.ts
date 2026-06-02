@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('ApiSettingsView keeps editor visibility route-driven and returns through API management state', () => {
-  const source = readSource('src/components/settings/ApiSettingsView.tsx');
-  const sectionSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const sectionSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.doesNotMatch(source, /const showInlineOfficialCreate =/);
   assert.doesNotMatch(source, /const showInlineProviderCreate =/);
@@ -32,7 +32,7 @@ test('ApiSettingsView keeps editor visibility route-driven and returns through A
 });
 
 test('ConsoleEndpointCard keeps the structured header layout for fast scanning', () => {
-  const source = readSource('src/components/settings/apiWorkbenchCards.tsx');
+  const source = readSource('apps/web/src/components/settings/apiWorkbenchCards.tsx');
 
   assert.match(source, /className="settings-provider-card__header"/);
   assert.match(source, /className="settings-provider-card__header-main"/);
@@ -40,7 +40,7 @@ test('ConsoleEndpointCard keeps the structured header layout for fast scanning',
 });
 
 test('ConsoleEndpointCard keeps the structured metrics layout for scan-friendly cards', () => {
-  const source = readSource('src/components/settings/apiWorkbenchCards.tsx');
+  const source = readSource('apps/web/src/components/settings/apiWorkbenchCards.tsx');
 
   assert.match(source, /className="settings-provider-card__metrics"/);
   assert.ok(source.includes('settings-provider-card__metric'));
@@ -49,7 +49,7 @@ test('ConsoleEndpointCard keeps the structured metrics layout for scan-friendly 
 });
 
 test('ApiSettingsView clears stale provider models when the provider connection changes or a refresh returns an empty list', () => {
-  const source = readSource('src/components/settings/ApiSettingsView.tsx');
+  const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
 
   assert.match(source, /const connectionSignatureChanged = Boolean\(/);
   assert.match(source, /models: connectionSignatureChanged \? \[\] : \(existingProvider\?\.models \|\| \[\]\),/);
@@ -58,7 +58,7 @@ test('ApiSettingsView clears stale provider models when the provider connection 
 });
 
 test('Settings mobile shell routes nested API editor back actions to the API management list', () => {
-  const source = readSource('src/components/settings/SettingsPanel.localized.tsx');
+  const source = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
 
   assert.ok(source.includes('isApiManagementEditorRoute'));
   assert.ok(source.includes('onBackToApiManagement'));
@@ -68,8 +68,8 @@ test('Settings mobile shell routes nested API editor back actions to the API man
 });
 
 test('ApiSettingsView list mode delegates calmer workbench overview copy to dedicated workbench sections', () => {
-  const source = readSource('src/components/settings/ApiSettingsView.tsx');
-  const sectionSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const sectionSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.match(source, /<ApiWorkbenchOverviewSection/);
   assert.match(source, /<ApiWorkbenchCurrentViewSection/);

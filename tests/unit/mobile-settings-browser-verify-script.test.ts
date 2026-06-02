@@ -32,12 +32,12 @@ test('verify:changes pulls the mobile settings smoke verification into the main 
 
 test('mobile settings smoke verification opens settings directly on overview before entering API workbench', () => {
   const scriptSource = readSource('scripts/test/verify-mobile-settings-smoke.mjs');
-  const mobileHeaderSource = readSource('src/components/mobile/MobileHeader.tsx');
-  const mobileSurfaceSource = readSource('src/components/mobile/MobileWorkspaceSurface.tsx');
-  const mobileTileSource = readSource('src/components/mobile/MobileResultTile.tsx');
-  const dashboardSource = readSource('src/components/settings/views/DashboardView.localized.tsx');
-  const workbenchSectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
-  const scaffoldSource = readSource('src/components/settings/SettingsScaffold.tsx');
+  const mobileHeaderSource = readSource('apps/web/src/components/mobile/MobileHeader.tsx');
+  const mobileSurfaceSource = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
+  const mobileTileSource = readSource('apps/web/src/components/mobile/MobileResultTile.tsx');
+  const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
+  const workbenchSectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
+  const scaffoldSource = readSource('apps/web/src/components/settings/SettingsScaffold.tsx');
 
   assert.match(scriptSource, /mobile-workspace-surface/);
   assert.match(scriptSource, /mobile-header-menu-button/);
@@ -79,10 +79,10 @@ test('mobile settings smoke verification opens settings directly on overview bef
 
 test('desktop settings smoke verification covers direct settings routes and the in-app settings entry with stable selectors', () => {
   const scriptSource = readSource('scripts/test/verify-desktop-settings-smoke.mjs');
-  const desktopChromeSource = readSource('src/app/AppDesktopChrome.tsx');
-  const settingsPanelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
-  const apiSettingsViewSource = readSource('src/components/settings/ApiSettingsView.tsx');
-  const workbenchSectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const desktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
+  const settingsPanelSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const apiSettingsViewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const workbenchSectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.match(scriptSource, /\/settings'/);
   assert.match(scriptSource, /\/settings\/api-management'/);

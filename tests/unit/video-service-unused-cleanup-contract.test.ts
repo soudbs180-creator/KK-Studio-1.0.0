@@ -9,9 +9,9 @@ const ROOT_DIR = process.cwd();
 
 
 test('video services do not retain compiler-proven unused locals', () => {
-  const openAiVideoSource = readSource('src/services/video/OpenAIVideoService.ts');
-  const veoVideoSource = readSource('src/services/video/VeoVideoService.ts');
-  const videoServiceSource = readSource('src/services/video/videoService.ts');
+  const openAiVideoSource = readSource('apps/web/src/services/video/OpenAIVideoService.ts');
+  const veoVideoSource = readSource('apps/web/src/services/video/VeoVideoService.ts');
+  const videoServiceSource = readSource('apps/web/src/services/video/videoService.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/video-service-unused-cleanup-contract\.test\.ts/);

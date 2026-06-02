@@ -9,10 +9,10 @@ const ROOT_DIR = process.cwd();
 
 
 test('desktop settings shell keeps a real inner scroll container and viewport-safe shell sizing', () => {
-  const shellSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
-  const sidebarSource = readSource('src/components/settings/desktop/SettingsDesktopSidebar.tsx');
-  const headerSource = readSource('src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
-  const cssSource = readSource('src/index.css');
+  const shellSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const sidebarSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx');
+  const headerSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(shellSource, /className="flex min-h-0 min-w-0 flex-1 flex-col"/);
   assert.match(sidebarSource, /width: 'var\(--settings-sidebar-width\)'/);
@@ -48,7 +48,7 @@ test('desktop settings shell keeps a real inner scroll container and viewport-sa
 });
 
 test('settings shell uses Apple page surfaces instead of the old gray control-console canvas', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(cssSource, /\.settings-panel \{[\s\S]*--settings-page-bg: #f5f5f7;/);
   assert.match(cssSource, /\.settings-panel \{[\s\S]*--settings-shell-bg: #ffffff;/);
@@ -58,7 +58,7 @@ test('settings shell uses Apple page surfaces instead of the old gray control-co
 });
 
 test('settings visual tokens use Apple blue accents and soft product-card shadows by default', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(cssSource, /\.settings-panel \{[\s\S]*--settings-accent-rgb: 0 113 227;/);
   assert.match(cssSource, /\.settings-panel \{[\s\S]*--settings-radius-unified: 20px;/);
@@ -70,8 +70,8 @@ test('settings visual tokens use Apple blue accents and soft product-card shadow
 });
 
 test('settings sidebar search keeps the input visually transparent inside the search shell', () => {
-  const sidebarSource = readSource('src/components/settings/desktop/SettingsDesktopSidebar.tsx');
-  const cssSource = readSource('src/index.css');
+  const sidebarSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(sidebarSource, /className="w-full min-w-0 bg-transparent text-sm outline-none"/);
   assert.doesNotMatch(

@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('admin model service can preload system models once startup reaches workspace_ready', () => {
-  const source = readSource('src/services/model/adminModelService.ts');
+  const source = readSource('apps/web/src/services/model/adminModelService.ts');
 
   assert.match(source, /if \(!isStartupStageReady\(this\.startupStage, 'workspace_ready'\)\) \{/);
   assert.match(source, /if \(isStartupStageReady\(stage, 'workspace_ready'\)\) \{/);
@@ -17,7 +17,7 @@ test('admin model service can preload system models once startup reaches workspa
 });
 
 test('prompt bar bootstraps the model library when system models are browseable but the list is still empty', () => {
-  const source = readSource('src/components/layout/PromptBar.tsx');
+  const source = readSource('apps/web/src/components/layout/PromptBar.tsx');
 
   assert.match(source, /if \(!canBrowseSystemCreditModels \|\| availableModels\.length > 0\) \{\s*return;\s*\}/);
   assert.match(source, /setModelMenuLoadingState\('bootstrapping_without_cache'\);/);

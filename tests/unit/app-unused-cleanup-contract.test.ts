@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('App does not retain compiler-proven unused imports and locals', () => {
-  const source = readSource('src/App.tsx');
+  const source = readSource('apps/web/src/App.tsx');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/app-unused-cleanup-contract\.test\.ts/);

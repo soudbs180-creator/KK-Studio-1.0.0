@@ -36,7 +36,7 @@ type CanvasMergeIntoModule = {
 
 async function loadCanvasMergeIntoModule(): Promise<CanvasMergeIntoModule> {
   const fullPath = path.join(ROOT_DIR, 'apps/web/src/context/canvasMergeInto.ts');
-  assert.equal(existsSync(fullPath), true, 'src/context/canvasMergeInto.ts must exist');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/context/canvasMergeInto.ts must exist');
   return await import('../../apps/web/src/context/canvasMergeInto.ts') as CanvasMergeIntoModule;
 }
 
@@ -102,8 +102,8 @@ function state(input: Partial<MergeCanvasIntoState> & Pick<MergeCanvasIntoState,
 }
 
 test('canvas merge-into boundary lives outside CanvasContext', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const helperSource = readSource('src/context/canvasMergeInto.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const helperSource = readSource('apps/web/src/context/canvasMergeInto.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/canvas-merge-into-contract\.test\.ts/);

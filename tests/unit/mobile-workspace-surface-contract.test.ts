@@ -5,7 +5,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
-const MOBILE_SURFACE_PATH = 'src/components/mobile/MobileWorkspaceSurface.tsx';
+const MOBILE_SURFACE_PATH = 'apps/web/src/components/mobile/MobileWorkspaceSurface.tsx';
 
 
 
@@ -15,9 +15,9 @@ test('mobile workspace surface exists as the dedicated mobile orchestration entr
 
 test('mobile workspace surface exposes the planned mobile screen contract', () => {
   const source = readSource(MOBILE_SURFACE_PATH);
-  const typesSource = readSource('src/types.ts');
-  const headerSource = readSource('src/components/mobile/MobileHeader.tsx');
-  const appShellSource = readSource('src/components/mobile/MobileAppShell.tsx');
+  const typesSource = readSource('apps/web/src/types.ts');
+  const headerSource = readSource('apps/web/src/components/mobile/MobileHeader.tsx');
+  const appShellSource = readSource('apps/web/src/components/mobile/MobileAppShell.tsx');
 
   assert.match(typesSource, /export type MobileSurfaceScreen = 'home' \| 'detail' \| 'more-sheet' \| 'ecommerce';/);
   assert.match(typesSource, /export type ResponsiveSurface = 'phone' \| 'tablet' \| 'desktop';/);
@@ -39,9 +39,9 @@ test('mobile workspace surface exposes the planned mobile screen contract', () =
 });
 
 test('mobile workspace delegates scrolling to a single shell-owned feed scrollport', () => {
-  const shellSource = readSource('src/components/mobile/MobileAppShell.tsx');
-  const surfaceSource = readSource('src/components/mobile/MobileWorkspaceSurface.tsx');
-  const feedSource = readSource('src/components/mobile/MobileResultFeed.tsx');
+  const shellSource = readSource('apps/web/src/components/mobile/MobileAppShell.tsx');
+  const surfaceSource = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
+  const feedSource = readSource('apps/web/src/components/mobile/MobileResultFeed.tsx');
 
   assert.match(shellSource, /className="flex-1 overflow-y-auto overscroll-contain"/);
   assert.doesNotMatch(surfaceSource, /className="min-h-0 flex-1 overflow-y-auto px-3 pb-3"/);
@@ -49,7 +49,7 @@ test('mobile workspace delegates scrolling to a single shell-owned feed scrollpo
 });
 
 test('mobile workspace keeps prompt optimization controls out of the dedicated surface contract', () => {
-  const appSource = readSource('src/App.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
   const surfaceSource = readSource(MOBILE_SURFACE_PATH);
 
   assert.doesNotMatch(surfaceSource, /promptOptimizationEnabled:\s*boolean;/);
@@ -62,8 +62,8 @@ test('mobile workspace keeps prompt optimization controls out of the dedicated s
 });
 
 test('mobile detail and chrome surfaces use Clay frosted mobile tokens', () => {
-  const detailSource = readSource('src/components/mobile/MobileResultDetailScreen.tsx');
-  const cssSource = readSource('src/index.css');
+  const detailSource = readSource('apps/web/src/components/mobile/MobileResultDetailScreen.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(detailSource, /var\(--mobile-clay-surface-bg\)/);
   assert.match(detailSource, /var\(--mobile-clay-muted-surface-bg\)/);

@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('premium settings tokens expose shared typography, radius, and motion scales for both themes', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(cssSource, /--type-display:/);
   assert.match(cssSource, /--type-title-1:/);
@@ -40,10 +40,10 @@ test('premium settings tokens expose shared typography, radius, and motion scale
 });
 
 test('shared settings primitives consume the Apple token contract instead of hard-coded panel styling', () => {
-  const scaffoldSource = readSource('src/components/settings/SettingsScaffold.tsx');
-  const uiSource = readSource('src/components/settings/ui/index.tsx');
-  const headerSource = readSource('src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
-  const sidebarSource = readSource('src/components/settings/desktop/SettingsDesktopSidebar.tsx');
+  const scaffoldSource = readSource('apps/web/src/components/settings/SettingsScaffold.tsx');
+  const uiSource = readSource('apps/web/src/components/settings/ui/index.tsx');
+  const headerSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
+  const sidebarSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx');
 
   assert.match(scaffoldSource, /var\(--radius-control-md\)/);
   assert.match(scaffoldSource, /var\(--settings-state-info-bg\)/);

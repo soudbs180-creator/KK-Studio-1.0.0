@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test("admin model catalog fetch opts out of bearer auth for the public credit-model route", () => {
-  const source = readSource("src/services/model/adminModelService.ts");
+  const source = readSource("apps/web/src/services/model/adminModelService.ts");
 
   assert.match(
     source,

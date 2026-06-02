@@ -20,10 +20,10 @@ function readInterfaceBlock(source: string, interfaceName: string): string {
 
 test('ecommerce upload reference runtime owns upload helpers and handlers', () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceUploadReferenceRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceUploadReferenceRuntime.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommerceUploadReferenceRuntime.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceUploadReferenceRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceUploadReferenceRuntime.ts');
 
   assert.match(appSource, /import \{[\s\S]*?useEcommerceUploadReferenceRuntime,[\s\S]*?type EcommerceManualReferenceBinding,[\s\S]*?type SetEcommerceUploadReferenceState[\s\S]*?\} from '\.\/app\/useEcommerceUploadReferenceRuntime';/);
   assert.doesNotMatch(appSource, /type EcommerceUploadReferenceBundle,/);
@@ -84,7 +84,7 @@ test('ecommerce upload reference runtime owns upload helpers and handlers', () =
 
 test('ecommerce upload helper functions preserve identity, signatures, and manual binding lookup', async () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceUploadReferenceRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceUploadReferenceRuntime.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommerceUploadReferenceRuntime.ts should exist');
 
   const runtime = await import('../../apps/web/src/app/useEcommerceUploadReferenceRuntime.ts');
   const productFile = new File(['abc'], 'Product Shot 01.PNG', {

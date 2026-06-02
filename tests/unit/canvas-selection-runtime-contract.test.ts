@@ -19,8 +19,8 @@ type CanvasSelectionPublicBoundary = {
 
 
 test('canvas selection reducer owns selection mode semantics outside CanvasContext', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const selectionSource = readSource('src/context/canvasSelection.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const selectionSource = readSource('apps/web/src/context/canvasSelection.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
   const boundaryIsTypechecked: CanvasSelectionPublicBoundary | null = null;
 

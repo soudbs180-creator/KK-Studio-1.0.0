@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('ApiSettingsView source does not retain mojibake literals or duplicated provider metric blocks', () => {
-  const source = readSource('src/components/settings/ApiSettingsView.tsx');
+  const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
   const metricsBlockMatches = source.split('const prioritizedMetrics: ConsoleEndpointCardMetric[] = [').length - 1;
 
   assert.match(source, /const UI_BUDGET_OPTIONS = \['不限额', '金额预算', UI_TOKEN_LIMIT_LABEL\] as const;/);

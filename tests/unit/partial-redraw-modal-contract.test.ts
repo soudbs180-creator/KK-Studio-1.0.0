@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('redraw workspace exposes cross-device tools, model routing, color blocks, and reference uploads', () => {
-  const workspaceSource = readSource('src/components/image/RedrawWorkspace.tsx');
+  const workspaceSource = readSource('apps/web/src/components/image/RedrawWorkspace.tsx');
 
   assert.match(workspaceSource, /keyManager\.getGlobalModelList\(\)/);
   assert.match(workspaceSource, /isLocalRedrawModel\(model\.id\)/);

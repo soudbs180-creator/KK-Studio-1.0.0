@@ -62,7 +62,7 @@ test('disabled billing operations resolve as safe no-ops', () => {
 });
 
 test('BillingContext wires the runtime guard into bootstrap and credit paths', () => {
-  const billingSource = readSource('src/context/BillingContext.tsx');
+  const billingSource = readSource('apps/web/src/context/BillingContext.tsx');
 
   assert.match(
     billingSource,

@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test("App shell surface state is extracted into a dedicated hook", () => {
-  const appSource = readSource("src/App.tsx");
-  const hookSource = readSource("src/hooks/useWorkspaceSurface.ts");
+  const appSource = readSource("apps/web/src/App.tsx");
+  const hookSource = readSource("apps/web/src/hooks/useWorkspaceSurface.ts");
 
   assert.match(appSource, /import \{ useWorkspaceSurface(?:, type SettingsSurfaceView)? \} from '\.\/hooks\/useWorkspaceSurface';/);
   assert.match(appSource, /import \{ isCompactResponsiveSurface, resolveResponsiveSurface \} from '\.\/utils\/responsiveSurface';/);

@@ -10,7 +10,7 @@ const ROOT_DIR = process.cwd()
 
 describe('local performance trace store contract', () => {
   test('local performance trace helper exports read, clear, and summarize APIs', () => {
-    const source = readSource('src/services/system/localPerformanceTrace.ts')
+    const source = readSource('apps/web/src/services/system/localPerformanceTrace.ts')
 
     assert.match(
       source,
@@ -27,7 +27,7 @@ describe('local performance trace store contract', () => {
   })
 
   test('global __KK_PERF__ store exposes clear and summary helpers', () => {
-    const source = readSource('src/services/system/localPerformanceTrace.ts')
+    const source = readSource('apps/web/src/services/system/localPerformanceTrace.ts')
 
     assert.match(
       source,

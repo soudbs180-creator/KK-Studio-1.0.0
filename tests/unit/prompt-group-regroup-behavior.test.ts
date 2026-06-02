@@ -47,8 +47,8 @@ test('prompt-group regroup keeps the right-most child on the right-most dock slo
 });
 
 test('usePromptGroupLayout exposes explicit hook boundary types', () => {
-  const appSource = readSource('src/App.tsx');
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
   const boundaryIsTypechecked: PromptGroupLayoutPublicBoundary | null = null;
 
   assert.equal(boundaryIsTypechecked, null);
@@ -119,7 +119,7 @@ test('prompt-group recycle keeps full-size child cards from overlapping each oth
 });
 
 test('prompt-group connector svg uses stable group bounds during regroup rendering', () => {
-  const layoutSource = readSource('src/app/promptGroupRenderLayout.ts');
+  const layoutSource = readSource('apps/web/src/app/promptGroupRenderLayout.ts');
 
   assert.match(layoutSource, /const connectorBounds = \{\s*minX: groupView\.bounds\.x,/);
   assert.match(layoutSource, /maxX: groupView\.bounds\.x \+ groupView\.bounds\.width,/);
@@ -128,7 +128,7 @@ test('prompt-group connector svg uses stable group bounds during regroup renderi
 });
 
 test('prompt-group settle phase keeps animating after drop instead of snapping to the final layout', () => {
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /if \(state\.layoutMode === 'docked' && state\.settleUntil !== null\) \{/);
   assert.match(promptGroupLayoutSource, /const settleDuration = Math\.max\(1, state\.settleUntil - state\.startedAt\);/);
@@ -140,7 +140,7 @@ test('prompt-group settle phase keeps animating after drop instead of snapping t
 });
 
 test('prompt-group and follow-up connectors opt into stable svg rendering flags', () => {
-  const appSource = readSource('src/App.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
 
   assert.match(appSource, /<svg[\s\S]*shapeRendering="geometricPrecision"/);
   assert.match(appSource, /strokeDasharray=\{groupConnectorDash\}[\s\S]*vectorEffect="non-scaling-stroke"/);
@@ -224,8 +224,8 @@ test('recycle motion can have layered speed while still converging to one final 
 });
 
 test('App locks regroup slot assignment when recycle starts', () => {
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
-  const dragHookSource = readSource('src/app/usePromptGroupDragHandlers.ts');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
+  const dragHookSource = readSource('apps/web/src/app/usePromptGroupDragHandlers.ts');
 
   assert.match(promptGroupLayoutSource, /targetSlotIndicesByChildId/);
   assert.match(promptGroupLayoutSource, /targetSlotIndices:\s*childImages\.map\(\(imageNode\) => layoutState\.targetSlotIndicesByChildId\[imageNode\.id\]/);
@@ -233,7 +233,7 @@ test('App locks regroup slot assignment when recycle starts', () => {
 });
 
 test('App does not recreate regroup presentation state on every drag frame when slot targets stay the same', () => {
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const hasSameTargetSlots = Boolean\(existing\?\.targetSlotIndicesByChildId\)/);
   assert.match(promptGroupLayoutSource, /existing\.layoutMode === 'regrouping'/);
@@ -242,8 +242,8 @@ test('App does not recreate regroup presentation state on every drag frame when 
 });
 
 test('usePromptGroupLayout owns prompt-group presentation state mutations', () => {
-  const appSource = readSource('src/App.tsx');
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const syncPromptGroupLayoutState = useCallback/);
   assert.match(promptGroupLayoutSource, /const schedulePromptGroupRegroupAnimation = useCallback/);
@@ -258,8 +258,8 @@ test('usePromptGroupLayout owns prompt-group presentation state mutations', () =
 });
 
 test('usePromptGroupLayout owns prompt-group child node maps', () => {
-  const appSource = readSource('src/App.tsx');
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const actualChildImagesByPromptId = useMemo/);
   assert.match(promptGroupLayoutSource, /const actualChildImageIdsByPromptId = useMemo/);
@@ -273,8 +273,8 @@ test('usePromptGroupLayout owns prompt-group child node maps', () => {
 });
 
 test('usePromptGroupLayout owns prompt-group live drag position helpers', () => {
-  const appSource = readSource('src/App.tsx');
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const resolvePromptGroupIdForNodeId = useCallback/);
   assert.match(promptGroupLayoutSource, /const resolveCanvasNodePositionForLiveDrag = useCallback/);
@@ -286,8 +286,8 @@ test('usePromptGroupLayout owns prompt-group live drag position helpers', () => 
 });
 
 test('usePromptGroupLayout owns live node position change handling', () => {
-  const appSource = readSource('src/App.tsx');
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const handleLiveNodePositionChange = useCallback/);
   assert.match(promptGroupLayoutSource, /delete nextDerivedNodeIdsByOwner\[nodeId\];/);
@@ -297,8 +297,8 @@ test('usePromptGroupLayout owns live node position change handling', () => {
 });
 
 test('usePromptGroupLayout owns prompt-group regroup predicate', () => {
-  const appSource = readSource('src/App.tsx');
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const shouldAutoRegroupPromptGroup = useCallback/);
   assert.match(promptGroupLayoutSource, /sourceNodeId === promptNode\.id/);
@@ -307,8 +307,8 @@ test('usePromptGroupLayout owns prompt-group regroup predicate', () => {
 });
 
 test('usePromptGroupLayout owns prompt-group drag commit persistence', () => {
-  const appSource = readSource('src/App.tsx');
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const commitPromptGroupDrag = useCallback/);
   assert.match(promptGroupLayoutSource, /void updatePromptNode\(\{/);
@@ -319,8 +319,8 @@ test('usePromptGroupLayout owns prompt-group drag commit persistence', () => {
 });
 
 test('usePromptGroupLayout owns prompt-group prompt node edit handlers', () => {
-  const appSource = readSource('src/App.tsx');
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const handlePromptGroupNodeHeightChange = useCallback/);
   assert.match(promptGroupLayoutSource, /const targetNode = currentPromptNodesById\.get\(id\) \?\? fallbackNode;/);
@@ -332,8 +332,8 @@ test('usePromptGroupLayout owns prompt-group prompt node edit handlers', () => {
 });
 
 test('usePromptGroupLayout owns prompt-group active-canvas lifecycle cleanup', () => {
-  const appSource = readSource('src/App.tsx');
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /setImageCardHeightById\(\{\}\);/);
   assert.match(promptGroupLayoutSource, /liveNodePositionByIdRef\.current = \{\};/);
@@ -346,8 +346,8 @@ test('usePromptGroupLayout owns prompt-group active-canvas lifecycle cleanup', (
 });
 
 test('usePromptGroupLayout owns prompt-group expanded selection derivation', () => {
-  const appSource = readSource('src/App.tsx');
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const expandedSelectedNodeIds = useMemo/);
   assert.match(promptGroupLayoutSource, /currentSelectedNodeIds\.flatMap/);
@@ -357,8 +357,8 @@ test('usePromptGroupLayout owns prompt-group expanded selection derivation', () 
 });
 
 test('usePromptGroupStacking owns prompt-group stacking maps', () => {
-  const appSource = readSource('src/App.tsx');
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(appSource, /usePromptGroupStacking\(\{/);
   assert.match(promptGroupLayoutSource, /export function usePromptGroupStacking/);
@@ -372,8 +372,8 @@ test('usePromptGroupStacking owns prompt-group stacking maps', () => {
 });
 
 test('usePromptGroupLayout owns prompt-group visible derived views', () => {
-  const appSource = readSource('src/App.tsx');
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const standaloneVisibleImageNodes = useMemo/);
   assert.match(promptGroupLayoutSource, /standaloneVisibleImageNodes,/);
@@ -384,8 +384,8 @@ test('usePromptGroupLayout owns prompt-group visible derived views', () => {
 });
 
 test('App removes hidden legacy prompt-group render branches', () => {
-  const appSource = readSource('src/App.tsx');
-  const connectorRendererSource = readSource('src/app/useConnectorRenderer.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const connectorRendererSource = readSource('apps/web/src/app/useConnectorRenderer.ts');
 
   assert.doesNotMatch(appSource, /const handleLegacyImageRelativeDrag = useCallback/);
   assert.doesNotMatch(appSource, /\{false && visiblePromptNodes\.map/);
@@ -401,8 +401,8 @@ test('App removes hidden legacy prompt-group render branches', () => {
 });
 
 test('usePromptGroupLayout owns prompt-group focus and height handlers', () => {
-  const appSource = readSource('src/App.tsx');
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const handleImageCardHeightChange = useCallback/);
   assert.match(promptGroupLayoutSource, /const handleFocusPromptGroup = useCallback/);
@@ -413,8 +413,8 @@ test('usePromptGroupLayout owns prompt-group focus and height handlers', () => {
 });
 
 test('usePromptGroupSelection owns prompt-group node selection wrapper', () => {
-  const appSource = readSource('src/App.tsx');
-  const promptGroupSelectionSource = readSource('src/app/usePromptGroupSelection.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const promptGroupSelectionSource = readSource('apps/web/src/app/usePromptGroupSelection.ts');
 
   assert.match(appSource, /usePromptGroupSelection\(\{/);
   assert.match(promptGroupSelectionSource, /interface UsePromptGroupSelectionDeps/);
@@ -426,7 +426,7 @@ test('usePromptGroupSelection owns prompt-group node selection wrapper', () => {
 });
 
 test('App keeps prompt-group renderer dependencies scoped to values read by the renderer', () => {
-  const appSource = readSource('src/App.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
   const rendererStart = appSource.indexOf('const renderPromptGroupWorkflowItem = useCallback(');
   const rendererEnd = appSource.indexOf('const renderPreviewWorkflowItem = useCallback(', rendererStart);
 
@@ -453,8 +453,8 @@ test('App keeps prompt-group renderer dependencies scoped to values read by the 
 });
 
 test('App snaps regrouping child render positions to dock slots while the main card is actively dragged', () => {
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
-  const layoutSource = readSource('src/app/promptGroupRenderLayout.ts');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
+  const layoutSource = readSource('apps/web/src/app/promptGroupRenderLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const renderPosition = !layout/);
   assert.match(promptGroupLayoutSource, /:\s*layout\.position;/);
@@ -463,14 +463,14 @@ test('App snaps regrouping child render positions to dock slots while the main c
 });
 
 test('App keeps child live positions owned by regroup layout during single main-card drag', () => {
-  const dragHookSource = readSource('src/app/usePromptGroupDragHandlers.ts');
+  const dragHookSource = readSource('apps/web/src/app/usePromptGroupDragHandlers.ts');
 
   assert.match(dragHookSource, /if \(shouldRegroup\) \{/);
   assert.match(dragHookSource, /applyLiveNodeDeltaToDraggedSet\(sourceNodeId, \[sourceNodeId\], delta\);/);
 });
 
 test('App upgrades live-scene sync to immediate mode while prompt-group regroup drag is active', () => {
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const hasActivePromptGroupDragPresentation = isNodeDragActive/);
   assert.match(promptGroupLayoutSource, /Object\.values\(promptGroupLayoutStateByIdRef\.current\)\.some/);
@@ -479,20 +479,20 @@ test('App upgrades live-scene sync to immediate mode while prompt-group regroup 
 });
 
 test('App freezes overlap-map recomputation while node drag is active', () => {
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /if \(isNodeDragActive\) \{\s*return currentGroupOverlapMap;/);
 });
 
 test('usePromptGroupLayout skips prompt-layout auto-repair while node drag is active', () => {
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /useEffect\(\(\) => \{\s*if \(!activeCanvas \|\| isNodeDragActive\) return;/);
 });
 
 test('usePromptGroupLayout owns prompt-layout auto-repair', () => {
-  const appSource = readSource('src/App.tsx');
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const autoRepairedPromptLayoutKeysRef = useRef<Set<string>>\(new Set\(\)\);/);
   assert.match(promptGroupLayoutSource, /buildGeneratedImageBatchPositions\(\{/);
@@ -502,13 +502,13 @@ test('usePromptGroupLayout owns prompt-layout auto-repair', () => {
 });
 
 test('App resolves live prompt/image positions from the ref-backed live scene snapshot', () => {
-  const hookSource = readSource('src/app/useConnectorRenderer.ts');
+  const hookSource = readSource('apps/web/src/app/useConnectorRenderer.ts');
 
   assert.match(hookSource, /resolveLiveSceneNodePosition\(\s*liveSceneRef\.current,/);
 });
 
 test('App reuses the last stable visible-canvas scene while node drag is active', () => {
-  const appSource = readSource('src/App.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
 
   assert.match(appSource, /const stableVisibleCanvasSceneRef = useRef/);
   assert.match(appSource, /if \(isNodeDragActive\) \{\s*return stableVisibleCanvasSceneRef\.current;/);
@@ -516,7 +516,7 @@ test('App reuses the last stable visible-canvas scene while node drag is active'
 });
 
 test('App reuses the last stable prompt-group bounds and views while node drag is active', () => {
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(promptGroupLayoutSource, /const stablePromptGroupBoundsByIdRef = useRef\(new Map<string/);
   assert.match(promptGroupLayoutSource, /if \(isNodeDragActive && stablePromptGroupBoundsByIdRef\.current\.size > 0\) \{\s*return stablePromptGroupBoundsByIdRef\.current;/);
@@ -527,7 +527,7 @@ test('App reuses the last stable prompt-group bounds and views while node drag i
 });
 
 test('App only builds prompt-group regroup layouts for groups with active presentation state', () => {
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
   const regroupMemoStart = promptGroupLayoutSource.indexOf('const promptGroupRegroupLayoutsById = useMemo(() => {');
   const regroupMemoEnd = promptGroupLayoutSource.indexOf('const syncLiveNodePositionState = useCallback(() => {');
 

@@ -9,16 +9,16 @@ const ROOT_DIR = process.cwd();
 
 
 test('KKAI keeps billing surfaces feature-gated and restores the desktop assistant trigger', () => {
-  const appSource = readSource('src/App.tsx');
-  const desktopChromeSource = readSource('src/app/AppDesktopChrome.tsx');
-  const mobileWorkspaceSource = readSource('src/app/AppMobileWorkspace.tsx');
-  const globalModalsSource = readSource('src/app/AppGlobalModals.tsx');
-  const chatSidebarSource = readSource('src/components/layout/ChatSidebar.tsx');
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const profileModalSource = readSource('src/components/modals/UserProfileModal.tsx');
-  const settingsRoutesSource = readSource('src/routes/settingsRoutes.tsx');
-  const settingsPanelSource = readSource('src/components/settings/SettingsPanel.tsx');
-  const localizedSettingsPanelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const desktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
+  const mobileWorkspaceSource = readSource('apps/web/src/app/AppMobileWorkspace.tsx');
+  const globalModalsSource = readSource('apps/web/src/app/AppGlobalModals.tsx');
+  const chatSidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const profileModalSource = readSource('apps/web/src/components/modals/UserProfileModal.tsx');
+  const settingsRoutesSource = readSource('apps/web/src/routes/settingsRoutes.tsx');
+  const settingsPanelSource = readSource('apps/web/src/components/settings/SettingsPanel.tsx');
+  const localizedSettingsPanelSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
 
   assert.match(appSource, /const billingUiEnabled = KKAI_FEATURE_FLAGS\.billing;/);
   assert.match(appSource, /<AppDesktopChrome[\s\S]*billingUiEnabled=\{billingUiEnabled\}/);
@@ -56,9 +56,9 @@ test('KKAI keeps billing surfaces feature-gated and restores the desktop assista
 });
 
 test('manual recharge UI exposes reserved dynamic channels and admin paid-order handling surface', () => {
-  const rechargeModalSource = readSource('src/components/modals/RechargeModal.tsx');
-  const floatingPanelSource = readSource('src/components/admin/AdminRechargeFloatingPanel.tsx');
-  const authenticatedShellSource = readSource('src/app/AuthenticatedAppShell.tsx');
+  const rechargeModalSource = readSource('apps/web/src/components/modals/RechargeModal.tsx');
+  const floatingPanelSource = readSource('apps/web/src/components/admin/AdminRechargeFloatingPanel.tsx');
+  const authenticatedShellSource = readSource('apps/web/src/app/AuthenticatedAppShell.tsx');
 
   assert.match(rechargeModalSource, /支付宝静态码/);
   assert.match(rechargeModalSource, /微信静态码/);

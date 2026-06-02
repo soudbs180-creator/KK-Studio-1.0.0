@@ -10,11 +10,11 @@ const ROOT_DIR = process.cwd();
 
 test('ecommerce task activation runtime owns source-key activation handlers', () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceTaskActivationRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceTaskActivationRuntime.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommerceTaskActivationRuntime.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceTaskActivationRuntime.ts');
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceTaskActivationRuntime.ts');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
 
   assert.match(hookSource, /export interface UseEcommerceTaskActivationRuntimeDeps \{/);
   assert.match(hookSource, /export interface UseEcommerceTaskActivationRuntimeResult \{/);

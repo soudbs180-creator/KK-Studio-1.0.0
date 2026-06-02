@@ -9,9 +9,9 @@ const ROOT_DIR = process.cwd();
 
 
 test('settings shell and exported routes use one shared route factory instead of duplicating route trees', () => {
-  const routeConfigSource = readSource('src/components/settings/settingsRouteConfig.tsx');
-  const panelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
-  const routesSource = readSource('src/routes/settingsRoutes.tsx');
+  const routeConfigSource = readSource('apps/web/src/components/settings/settingsRouteConfig.tsx');
+  const panelSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const routesSource = readSource('apps/web/src/routes/settingsRoutes.tsx');
 
   assert.match(routeConfigSource, /export function createSettingsRouteObjects\(/);
   assert.match(routeConfigSource, /export function renderSettingsRouteElements\(/);

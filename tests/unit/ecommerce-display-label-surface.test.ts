@@ -9,12 +9,12 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce business display labels propagate to desktop and mobile result surfaces', () => {
-  const postBuildSyncSource = readSource('src/app/useEcommercePostBuildSyncRuntime.ts');
-  const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
-  const mobileSelectorSource = readSource('src/components/mobile/mobileFeedSelectors.ts');
-  const mobileFeedSource = readSource('src/components/mobile/MobileResultFeed.tsx');
-  const mobileTileSource = readSource('src/components/mobile/MobileResultTile.tsx');
-  const mobileDetailSource = readSource('src/components/mobile/MobileResultDetailScreen.tsx');
+  const postBuildSyncSource = readSource('apps/web/src/app/useEcommercePostBuildSyncRuntime.ts');
+  const promptNodeSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
+  const mobileSelectorSource = readSource('apps/web/src/components/mobile/mobileFeedSelectors.ts');
+  const mobileFeedSource = readSource('apps/web/src/components/mobile/MobileResultFeed.tsx');
+  const mobileTileSource = readSource('apps/web/src/components/mobile/MobileResultTile.tsx');
+  const mobileDetailSource = readSource('apps/web/src/components/mobile/MobileResultDetailScreen.tsx');
 
   assert.match(postBuildSyncSource, /displayLabel:\s*renderTask\.displayLabel/);
   assert.match(promptNodeSource, /getPromptBusinessDisplayLabel/);
@@ -26,7 +26,7 @@ test('ecommerce business display labels propagate to desktop and mobile result s
 });
 
 test('ecommerce framework header exposes an editable remark name with up to five adjacent tags', () => {
-  const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
+  const promptNodeSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
   const thumbnailBranch = promptNodeSource.slice(
     promptNodeSource.indexOf("if (detailLevel === 'thumbnail-shell')"),
     promptNodeSource.indexOf('{shellReferenceImages.length > 0 &&')

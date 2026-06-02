@@ -26,7 +26,7 @@ type CanvasNodeUpdatesModule = {
 
 async function loadCanvasNodeUpdatesModule(): Promise<CanvasNodeUpdatesModule> {
   const fullPath = path.join(ROOT_DIR, 'apps/web/src/context/canvasNodeUpdates.ts');
-  assert.equal(existsSync(fullPath), true, 'src/context/canvasNodeUpdates.ts must exist');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/context/canvasNodeUpdates.ts must exist');
   return await import('../../apps/web/src/context/canvasNodeUpdates.ts') as CanvasNodeUpdatesModule;
 }
 
@@ -73,8 +73,8 @@ function canvas(input: Partial<Canvas> & Pick<Canvas, 'id'>): Canvas {
 }
 
 test('canvas node update boundary lives outside CanvasContext', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const helperSource = readSource('src/context/canvasNodeUpdates.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const helperSource = readSource('apps/web/src/context/canvasNodeUpdates.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/canvas-node-updates-contract\.test\.ts/);
@@ -107,7 +107,7 @@ test('canvas node update boundary lives outside CanvasContext', () => {
 });
 
 test('addPromptNode does not await reference image persistence before returning', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
   const promptUpdateWrapperSource = contextSource.slice(
     contextSource.indexOf('const addPromptNode = useCallback'),
     contextSource.indexOf('const urgentUpdatePromptNode = useCallback')

@@ -9,9 +9,9 @@ const ROOT_DIR = process.cwd();
 
 
 test('PromptBar ecommerce panel keeps review controls before confirmation and leaves post-build editing on canvas', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const desktopPanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
-  const canvasWorkbenchSource = readSource('src/components/ecommerce/EcommerceCanvasWorkbenchCard.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const desktopPanelSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
+  const canvasWorkbenchSource = readSource('apps/web/src/components/ecommerce/EcommerceCanvasWorkbenchCard.tsx');
 
   assert.match(promptBarSource, /ecommerceActiveGroupSheet/);
   assert.match(promptBarSource, /ecommerceAnalysisConfirmed/);

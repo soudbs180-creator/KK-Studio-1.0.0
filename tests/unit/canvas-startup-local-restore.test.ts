@@ -7,8 +7,8 @@ import { test } from "node:test";
 
 
 test("canvas startup restore runs after the initial state initializer", () => {
-  const source = readSource("src/context/CanvasContext.tsx");
-  const helperSource = readSource("src/context/canvasPersistence.ts");
+  const source = readSource("apps/web/src/context/CanvasContext.tsx");
+  const helperSource = readSource("apps/web/src/context/canvasPersistence.ts");
 
   assert.match(
     helperSource,

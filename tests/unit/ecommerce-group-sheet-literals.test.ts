@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce prompt bar and desktop workbench share the same 主图/A+ sheet literals', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const workbenchSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const workbenchSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
 
   assert.match(promptBarSource, /ecommerceActiveGroupSheet\?: (?:EcommerceGroupSheet|'主图' \| 'A\+') \| null;/);
   assert.match(promptBarSource, /onActivateEcommerceGroupSheet\?: \(sheet: (?:EcommerceGroupSheet|'主图' \| 'A\+')\) => void;/);

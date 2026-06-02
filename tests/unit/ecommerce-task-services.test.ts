@@ -213,7 +213,7 @@ test('mergeEcommerceTaskState prefers explicit user patch over task defaults and
 });
 
 test('mergeEcommerceTaskState keeps copy seed compatibility without reading the template parameter', () => {
-  const taskMergerSource = readSource('src/services/ecommerce/taskMerger.ts');
+  const taskMergerSource = readSource('apps/web/src/services/ecommerce/taskMerger.ts');
 
   assert.match(
     taskMergerSource,

@@ -10,7 +10,7 @@ const ROOT_DIR = process.cwd()
 
 describe('prompt click local performance trace contract', () => {
   test('App instruments prompt-click selection handoff with local performance traces', () => {
-    const appSource = readSource('src/App.tsx')
+    const appSource = readSource('apps/web/src/App.tsx')
 
     assert.match(
       appSource,
@@ -27,7 +27,7 @@ describe('prompt click local performance trace contract', () => {
   })
 
   test('PromptBar instruments reference thumbnail recovery from local storage', () => {
-    const promptBarSource = readSource('src/components/layout/PromptBar.tsx')
+    const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx')
 
     assert.match(
       promptBarSource,

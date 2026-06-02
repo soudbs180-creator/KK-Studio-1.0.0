@@ -38,15 +38,15 @@ describe('credit route classification', () => {
   });
 
   test('frontend generation flow persists execution-lane and credit spec markers on prompt nodes', () => {
-    const appSource = readSource('src/App.tsx');
-    const generationRuntimeSource = readSource('src/app/useGenerationRuntime.ts');
-    const resolveBillingStateSource = readSource('src/app/resolveGenerationBillingState.ts');
-    const geminiServiceSource = readSource('src/services/llm/geminiService.ts');
-    const llmAdapterSource = readSource('src/services/llm/LLMAdapter.ts');
-    const llmServiceSource = readSource('src/services/llm/LLMService.ts');
-    const secureProxySource = readSource('src/services/model/secureModelProxy.ts');
-    const typesSource = readSource('src/types.ts');
-    const adminModelServiceSource = readSource('src/services/model/adminModelService.ts');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const generationRuntimeSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
+    const resolveBillingStateSource = readSource('apps/web/src/app/resolveGenerationBillingState.ts');
+    const geminiServiceSource = readSource('apps/web/src/services/llm/geminiService.ts');
+    const llmAdapterSource = readSource('apps/web/src/services/llm/LLMAdapter.ts');
+    const llmServiceSource = readSource('apps/web/src/services/llm/LLMService.ts');
+    const secureProxySource = readSource('apps/web/src/services/model/secureModelProxy.ts');
+    const typesSource = readSource('apps/web/src/types.ts');
+    const adminModelServiceSource = readSource('apps/web/src/services/model/adminModelService.ts');
 
     assert.match(generationRuntimeSource, /import \{ resolveGenerationBillingState \} from '\.\/resolveGenerationBillingState';/);
     assert.match(generationRuntimeSource, /const generationBillingState = resolveGenerationBillingState\(/);

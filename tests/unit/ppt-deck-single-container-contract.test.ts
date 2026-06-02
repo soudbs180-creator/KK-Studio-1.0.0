@@ -9,12 +9,12 @@ const ROOT_DIR = process.cwd();
 
 
 test('PPT prompt nodes expose a deck module state and stop rendering PPT child pages as canvas sub-cards', () => {
-  const typesSource = readSource('src/types.ts');
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/usePptRuntime.ts');
-  const helperSource = readSource('src/app/pptRuntimeHelpers.ts');
-  const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
-  const deckSource = readSource('src/utils/pptDeckModules.ts');
+  const typesSource = readSource('apps/web/src/types.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/usePptRuntime.ts');
+  const helperSource = readSource('apps/web/src/app/pptRuntimeHelpers.ts');
+  const promptNodeSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
+  const deckSource = readSource('apps/web/src/utils/pptDeckModules.ts');
 
   assert.match(typesSource, /export interface PptDeckModuleState/);
   assert.match(typesSource, /export interface PptDeckPageModule/);
@@ -35,7 +35,7 @@ test('PPT prompt nodes expose a deck module state and stop rendering PPT child p
 });
 
 test('PromptBar keeps the PPT workflow framed as topic to outline to page descriptions before generation', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
 
   assert.match(promptBarSource, /主题 → 大纲 → 页面描述 → 生成前检查/);
   assert.match(promptBarSource, /Markdown \/ JSON 页纲导入/);

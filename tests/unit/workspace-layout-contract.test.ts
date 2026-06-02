@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test("workspace layout contract exposes explicit canvas fields instead of a generic record bag", () => {
-  const dtoSource = readSource(path.join("packages", "contracts", "src", "dto", "workspace-canvas.ts"));
+  const dtoSource = readSource(path.join("packages", "shared", "src", "contracts", "dto", "workspace-canvas.ts"));
 
   assert.match(dtoSource, /export interface CanvasLayoutRecordDto \{/);
   assert.match(dtoSource, /id: EntityId;/);
@@ -19,7 +19,7 @@ test("workspace layout contract exposes explicit canvas fields instead of a gene
 });
 
 test("sync service maps canvases through explicit workspace layout helpers instead of double-casting records", () => {
-  const syncServiceSource = readSource("src/services/system/syncService.ts");
+  const syncServiceSource = readSource("apps/web/src/services/system/syncService.ts");
 
   assert.match(syncServiceSource, /function toCanvasLayoutRecord\(canvas: Canvas\): CanvasLayoutRecordDto \{/);
   assert.match(syncServiceSource, /function normalizeCanvasRecord\(raw: unknown\): Canvas \| null \{/);

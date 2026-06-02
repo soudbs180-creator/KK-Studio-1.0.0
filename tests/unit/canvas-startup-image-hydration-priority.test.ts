@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('Canvas startup begins preview hydration before local folder restore work', () => {
-  const source = readSource('src/context/CanvasContext.tsx');
+  const source = readSource('apps/web/src/context/CanvasContext.tsx');
 
   const hydrationIndex = source.indexOf("'canvas-startup.preview-hydration'");
   const folderRestoreIndex = source.indexOf("'canvas-startup.restore-folder-handle'");

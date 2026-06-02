@@ -9,11 +9,11 @@ const ROOT_DIR = process.cwd();
 
 
 test('prompt nodes expose ecommerce state and the generation flow handles ecommerce as an image-like mode', () => {
-  const typesSource = readSource('src/types.ts');
-  const generationHookSource = readSource('src/hooks/useImageGeneration.ts');
-  const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
-  const appSource = readSource('src/App.tsx');
-  const groupExportRuntimeSource = readSource('src/app/useEcommerceGroupExportRuntime.ts');
+  const typesSource = readSource('apps/web/src/types.ts');
+  const generationHookSource = readSource('apps/web/src/hooks/useImageGeneration.ts');
+  const promptNodeSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const groupExportRuntimeSource = readSource('apps/web/src/app/useEcommerceGroupExportRuntime.ts');
 
   assert.match(typesSource, /ecommerce\?:\s*EcommercePromptState/);
   assert.match(typesSource, /export interface EcommercePromptState/);

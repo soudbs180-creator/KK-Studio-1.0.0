@@ -10,7 +10,7 @@ const ROOT_DIR = process.cwd();
 
 test("project docs publish one runtime truth table for current and transitional runtimes", () => {
   const projectStructureSource = readSource("docs/PROJECT_STRUCTURE.md");
-  const rootGuideSource = readSource("PROJECT_ROOT_GUIDE.md");
+  const rootGuideSource = readSource("docs/PROJECT_ROOT_GUIDE.md");
   const handoffSource = readSource("docs/development/session-handoff.md");
 
   assert.match(projectStructureSource, /## Runtime truth table/);

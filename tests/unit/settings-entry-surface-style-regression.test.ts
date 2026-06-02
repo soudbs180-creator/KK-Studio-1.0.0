@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('startup screen and storage selection modal avoid bright blue accents in the Clay settings aesthetic', () => {
-  const startupScreenSource = readSource('src/components/common/AppStartupScreen.tsx');
-  const storageModalSource = readSource('src/components/modals/StorageSelectionModal.tsx');
+  const startupScreenSource = readSource('apps/web/src/components/common/AppStartupScreen.tsx');
+  const storageModalSource = readSource('apps/web/src/components/modals/StorageSelectionModal.tsx');
 
   assert.doesNotMatch(startupScreenSource, /text-blue-400/);
   assert.match(startupScreenSource, /data-testid="app-startup-screen"/);
@@ -28,8 +28,8 @@ test('startup screen and storage selection modal avoid bright blue accents in th
 });
 
 test('storage selection modal owns its light and dark theme surface contract', () => {
-  const storageModalSource = readSource('src/components/modals/StorageSelectionModal.tsx');
-  const cssSource = readSource('src/index.css');
+  const storageModalSource = readSource('apps/web/src/components/modals/StorageSelectionModal.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(storageModalSource, /storage-selection-modal/);
   assert.match(storageModalSource, /--storage-selection-card-bg/);
@@ -57,7 +57,7 @@ test('storage selection modal owns its light and dark theme surface contract', (
 });
 
 test('startup screen owns readable light and dark theme tokens outside settings scope', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(cssSource, /\.app-startup-screen\s*\{/);
   assert.match(cssSource, /--app-startup-panel-bg:\s*var\(--frost-card-framework-bg\);/);
@@ -69,8 +69,8 @@ test('startup screen owns readable light and dark theme tokens outside settings 
 });
 
 test('startup screen renders a full-screen branded launch hall instead of a tiny prompt card', () => {
-  const startupScreenSource = readSource('src/components/common/AppStartupScreen.tsx');
-  const cssSource = readSource('src/index.css');
+  const startupScreenSource = readSource('apps/web/src/components/common/AppStartupScreen.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(startupScreenSource, /data-testid="app-startup-shell"/);
   assert.match(startupScreenSource, /data-testid="app-startup-brand-mark"/);

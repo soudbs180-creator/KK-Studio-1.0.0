@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('billing balance refresh still resolves remaining balance from canonical sources', () => {
-  const billingContextSource = readSource('src/context/BillingContext.tsx');
+  const billingContextSource = readSource('apps/web/src/context/BillingContext.tsx');
 
   assert.match(
     billingContextSource,
@@ -80,7 +80,7 @@ test('billing balance refresh still resolves remaining balance from canonical so
 });
 
 test('billing credit mutations stay on the shared web API surface', () => {
-  const billingContextSource = readSource('src/context/BillingContext.tsx');
+  const billingContextSource = readSource('apps/web/src/context/BillingContext.tsx');
 
   assert.match(billingContextSource, /const response = await kkWebApiClient\.debitCredits\(\{/);
   assert.match(billingContextSource, /transactionId: response\.data\.ledgerId,/);
@@ -90,7 +90,7 @@ test('billing credit mutations stay on the shared web API surface', () => {
 });
 
 test('manual recharge paid success path refreshes canonical billing balance and transaction logs', () => {
-  const rechargeModalSource = readSource('src/components/modals/RechargeModal.tsx');
+  const rechargeModalSource = readSource('apps/web/src/components/modals/RechargeModal.tsx');
 
   assert.match(rechargeModalSource, /const \{[\s\S]*?showRechargeModal[\s\S]*?refreshBilling[\s\S]*?\} = useBilling\(\);/);
   assert.match(
@@ -109,14 +109,14 @@ test('manual recharge paid success path refreshes canonical billing balance and 
 });
 
 test('remaining balance display helper is shared across billing surfaces', () => {
-  const helperSource = readSource('src/services/billing/remainingBalance.ts');
-  const dashboardLocalizedSource = readSource('src/components/settings/views/DashboardView.localized.tsx');
-  const dashboardSource = readSource('src/components/settings/views/DashboardView.tsx');
-  const profileModalSource = readSource('src/components/modals/UserProfileModal.tsx');
-  const costEstimationSource = readSource('src/pages/CostEstimation.tsx');
-  const mobileHeaderSource = readSource('src/components/mobile/MobileHeader.tsx');
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const chatSidebarSource = readSource('src/components/layout/ChatSidebar.tsx');
+  const helperSource = readSource('apps/web/src/services/billing/remainingBalance.ts');
+  const dashboardLocalizedSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
+  const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.tsx');
+  const profileModalSource = readSource('apps/web/src/components/modals/UserProfileModal.tsx');
+  const costEstimationSource = readSource('apps/web/src/pages/CostEstimation.tsx');
+  const mobileHeaderSource = readSource('apps/web/src/components/mobile/MobileHeader.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const chatSidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
 
   assert.match(helperSource, /export function normalizeRemainingCredits\(balance: unknown\): number \{/);
   assert.match(helperSource, /export function getRemainingCreditsFractionDigits\(balance: unknown\): number \{/);
@@ -152,9 +152,9 @@ test('remaining balance display helper is shared across billing surfaces', () =>
 });
 
 test('user api settings keep working when local API persistence degrades to memory mode', () => {
-  const apiSettingsViewSource = readSource('src/components/settings/ApiSettingsView.tsx');
-  const userApiCloudRecordStorageSource = readSource('src/services/api/userApiCloudRecordStorage.ts');
-  const userApiPayloadSource = readSource('src/services/api/userApiPayload.ts');
+  const apiSettingsViewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const userApiCloudRecordStorageSource = readSource('apps/web/src/services/api/userApiCloudRecordStorage.ts');
+  const userApiPayloadSource = readSource('apps/web/src/services/api/userApiPayload.ts');
   const shimPath = path.join(ROOT_DIR, 'apps/web/src/services/api/supabaseUserApiCloudStorage.ts');
 
   assert.ok(apiSettingsViewSource.includes('const providerActionsDisabled = userApiViewState.providerActionsDisabled;'));
@@ -162,7 +162,7 @@ test('user api settings keep working when local API persistence degrades to memo
   assert.ok(apiSettingsViewSource.includes('const stagePrimaryActionIcon = stageMeta.primaryActionKind === \'create-official\' || stageMeta.primaryActionKind === \'create-provider\''));
   assert.ok(apiSettingsViewSource.includes('const handleStagePrimaryAction = () => {'));
   assert.ok(apiSettingsViewSource.includes('onPrimaryAction={handleStagePrimaryAction}'));
-  const apiWorkbenchSectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const apiWorkbenchSectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.ok(apiWorkbenchSectionsSource.includes('data-testid="api-official-provider-add"'));
   assert.ok(apiSettingsViewSource.includes('disabled={userApiActionsDisabled}'));

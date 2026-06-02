@@ -23,7 +23,7 @@ type CanvasMovementModule = {
 
 async function loadCanvasMovementModule(): Promise<CanvasMovementModule> {
   const fullPath = path.join(ROOT_DIR, 'apps/web/src/context/canvasMovement.ts');
-  assert.equal(existsSync(fullPath), true, 'src/context/canvasMovement.ts must exist');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/context/canvasMovement.ts must exist');
   return await import('../../apps/web/src/context/canvasMovement.ts') as CanvasMovementModule;
 }
 
@@ -80,8 +80,8 @@ function canvas(input: Partial<Canvas> & Pick<Canvas, 'id'>): Canvas {
 }
 
 test('canvas movement boundary lives outside CanvasContext', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const helperSource = readSource('src/context/canvasMovement.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const helperSource = readSource('apps/web/src/context/canvasMovement.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/canvas-movement-contract\.test\.ts/);

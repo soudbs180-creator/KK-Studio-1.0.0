@@ -16,10 +16,10 @@ function readInterfaceBlock(source: string, interfaceName: string): string {
 
 test('ecommerce partial redraw runtime owns ecommerce inheritance and finalization helpers', () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommercePartialRedrawRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommercePartialRedrawRuntime.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommercePartialRedrawRuntime.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommercePartialRedrawRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommercePartialRedrawRuntime.ts');
 
   assert.match(appSource, /import \{[\s\S]*?useEcommercePartialRedrawRuntime[\s\S]*?\} from '\.\/app\/useEcommercePartialRedrawRuntime';/);
   assert.match(appSource, /const \{[\s\S]*?resolveEcommercePartialRedrawContext,[\s\S]*?finalizeEcommercePartialRedrawResult,[\s\S]*?\} = useEcommercePartialRedrawRuntime\(\{/);
@@ -36,7 +36,7 @@ test('ecommerce partial redraw runtime owns ecommerce inheritance and finalizati
 });
 
 test('handleRedrawRequest delegates ecommerce inheritance and redraw finalization to the hook', () => {
-  const appSource = readSource('src/App.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
   const handleRedrawIndex = appSource.indexOf('const handleRedrawRequest = useCallback((image: GeneratedImage, request: RedrawRequest) => {');
   const handleMobileRedrawIndex = appSource.indexOf('const handleMobileResultRedraw = useCallback((entry: MobileResultEntry, request: RedrawRequest) => {');
 
@@ -54,7 +54,7 @@ test('handleRedrawRequest delegates ecommerce inheritance and redraw finalizatio
 });
 
 test('partial redraw runtime resolves ecommerce inheritance and finalizes ecommerce redraw ownership', () => {
-  const hookSource = readSource('src/app/useEcommercePartialRedrawRuntime.ts');
+  const hookSource = readSource('apps/web/src/app/useEcommercePartialRedrawRuntime.ts');
 
   assert.match(hookSource, /sourceImage\.redraw\?\.inheritedTaskState/);
   assert.match(hookSource, /sourceImage\.partialRedraw\?\.inheritedTaskState/);

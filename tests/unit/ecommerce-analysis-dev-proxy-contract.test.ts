@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test.skip('local dev server wires the ecommerce analysis upload endpoint', () => {
-  const clientSource = readSource('src/services/ecommerce/ecommerceAnalysisClient.ts');
+  const clientSource = readSource('apps/web/src/services/ecommerce/ecommerceAnalysisClient.ts');
   const viteConfigSource = readSource('vite.config.ts');
   const apiHandlerSource = readSource('api/ecommerce-analysis.ts');
 

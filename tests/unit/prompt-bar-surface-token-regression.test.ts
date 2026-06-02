@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('PromptBar context menu and model modal use shared theme tokens instead of hard-coded dark surfaces', () => {
-  const source = readSource('src/components/layout/PromptBar.tsx');
+  const source = readSource('apps/web/src/components/layout/PromptBar.tsx');
 
   assert.doesNotMatch(source, /bg-\[#2a2a2e\]/);
   assert.doesNotMatch(source, /bg-\[#1e1e20\]/);

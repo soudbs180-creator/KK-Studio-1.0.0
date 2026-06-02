@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('settings shell supports overlay and page presentations while sharing one router shell', () => {
-  const source = readSource('src/components/settings/SettingsPanel.localized.tsx');
+  const source = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
 
   assert.match(source, /presentation\?: 'overlay' \| 'page';/);
   assert.match(source, /initialPathname\?: string;/);

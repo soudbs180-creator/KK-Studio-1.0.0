@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test("testModelsList derives GPT Best model-list requests from provider runtime auth", () => {
-  const connectionSource = readSource("src/services/api/connectionTest.ts");
-  const strategySource = readSource("src/services/api/providerStrategy.ts");
+  const connectionSource = readSource("apps/web/src/services/api/connectionTest.ts");
+  const strategySource = readSource("apps/web/src/services/api/providerStrategy.ts");
 
   assert.match(
     strategySource,
@@ -31,7 +31,7 @@ test("testModelsList derives GPT Best model-list requests from provider runtime 
 });
 
 test("GPT Best connection tests do not fall back to official API bases", () => {
-  const connectionSource = readSource("src/services/api/connectionTest.ts");
+  const connectionSource = readSource("apps/web/src/services/api/connectionTest.ts");
 
   assert.match(
     connectionSource,

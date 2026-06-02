@@ -9,12 +9,12 @@ const ROOT_DIR = process.cwd();
 
 
 test('runtime-sensitive services keep legacy fallback guarded while routing guest and workspace flows through the API layer', () => {
-  const userApiCloudRecordSource = readSource('src/services/api/userApiCloudRecordStorage.ts');
-  const userApiProfileSource = readSource('src/services/api/userApiProfileStorage.ts');
-  const keyManagerSource = readSource('src/services/auth/keyManager.ts');
-  const billingContextSource = readSource('src/context/BillingContext.tsx');
-  const syncServiceSource = readSource('src/services/system/syncService.ts');
-  const tempUserServiceSource = readSource('src/services/auth/tempUserService.ts');
+  const userApiCloudRecordSource = readSource('apps/web/src/services/api/userApiCloudRecordStorage.ts');
+  const userApiProfileSource = readSource('apps/web/src/services/api/userApiProfileStorage.ts');
+  const keyManagerSource = readSource('apps/web/src/services/auth/keyManager.ts');
+  const billingContextSource = readSource('apps/web/src/context/BillingContext.tsx');
+  const syncServiceSource = readSource('apps/web/src/services/system/syncService.ts');
+  const tempUserServiceSource = readSource('apps/web/src/services/auth/tempUserService.ts');
 
   assert.match(userApiCloudRecordSource, /shouldUseLegacyWebApiFallback/);
   assert.match(userApiCloudRecordSource, /if \(!shouldUseLegacyWebApiFallback\(\)\) \{/);
@@ -48,7 +48,7 @@ test('runtime-sensitive services keep legacy fallback guarded while routing gues
 });
 
 test('admin UI entrypoints use the shared web API client without Supabase fallback bridges', () => {
-  const adminRoleSource = readSource('src/hooks/useAdminRole.ts');
+  const adminRoleSource = readSource('apps/web/src/hooks/useAdminRole.ts');
 
   assert.match(adminRoleSource, /kkWebApiClient/);
   assert.match(adminRoleSource, /const \{ user, session, loading: authLoading, isTempUser \} = useAuth\(\);/);
@@ -60,7 +60,7 @@ test('admin UI entrypoints use the shared web API client without Supabase fallba
 });
 
 test('register form now routes through the KK API instead of browser-side Supabase auth', () => {
-  const registerFormSource = readSource('src/components/auth/RegisterForm.tsx');
+  const registerFormSource = readSource('apps/web/src/components/auth/RegisterForm.tsx');
 
   assert.match(registerFormSource, /import \{ kkWebApiClient \} from "\.\.\/\.\.\/services\/api\/kkApiClient";/);
   assert.match(registerFormSource, /await kkWebApiClient\.register\(/);
@@ -69,7 +69,7 @@ test('register form now routes through the KK API instead of browser-side Supaba
 });
 
 test('frontend runtime no longer exposes the disabled Supabase browser shim', () => {
-  const servicesIndexSource = readSource('src/services/index.ts');
+  const servicesIndexSource = readSource('apps/web/src/services/index.ts');
 
   assert.equal(existsSync(path.join(ROOT_DIR, 'apps/web/src/lib/supabase.ts')), false);
   assert.doesNotMatch(servicesIndexSource, /supabase/);

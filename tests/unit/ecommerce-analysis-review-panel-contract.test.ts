@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce analysis review panel keeps the full task editor scoped to the actively edited item', () => {
-  const source = readSource('src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
+  const source = readSource('apps/web/src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
   const scopedEditorGuardMatches =
     source.match(
       /const shouldShowTaskEditor = Boolean\(\s*taskState && isTaskActive && onTaskStateChange\s*\);/g,
@@ -23,8 +23,8 @@ test('ecommerce analysis review panel keeps the full task editor scoped to the a
 });
 
 test('ecommerce analysis review panel exposes active detail prompt, reference galleries, and per-item manual upload controls', () => {
-  const source = readSource('src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
-  const taskEditorSource = readSource('src/components/ecommerce/EcommerceTaskEditorPanel.tsx');
+  const source = readSource('apps/web/src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
+  const taskEditorSource = readSource('apps/web/src/components/ecommerce/EcommerceTaskEditorPanel.tsx');
 
   assert.match(source, /extractEcommerceManualReferenceBindings/);
   assert.match(source, /data-testid="ecommerce-review-active-detail"/);
@@ -41,7 +41,7 @@ test('ecommerce analysis review panel exposes active detail prompt, reference ga
 });
 
 test('ecommerce analysis review panel keeps global product uploads visible and disables confirm while building cards', () => {
-  const source = readSource('src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
+  const source = readSource('apps/web/src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
 
   assert.match(source, /globalProductFiles\?: File\[];/);
   assert.match(source, /globalExtraReferenceFiles\?: File\[];/);

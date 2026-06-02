@@ -9,9 +9,9 @@ const ROOT_DIR = process.cwd();
 
 
 test("keyManager keeps built-in defaults for official Google routes when saved models are empty", () => {
-  const source = readSource("src/services/auth/keyManager.ts");
-  const effectiveModelsSource = readSource("src/services/auth/keyManagerEffectiveProviderModels.ts");
-  const defaultsSource = readSource("src/services/auth/keyManagerDefaultModels.ts");
+  const source = readSource("apps/web/src/services/auth/keyManager.ts");
+  const effectiveModelsSource = readSource("apps/web/src/services/auth/keyManagerEffectiveProviderModels.ts");
+  const defaultsSource = readSource("apps/web/src/services/auth/keyManagerDefaultModels.ts");
 
   assert.match(source, /from '\.\/keyManagerEffectiveProviderModels';/);
   assert.match(defaultsSource, /export const DEFAULT_GOOGLE_MODELS = \[/);
@@ -22,8 +22,8 @@ test("keyManager keeps built-in defaults for official Google routes when saved m
 });
 
 test("keyManager keeps built-in defaults for official OpenAI routes when saved models are empty", () => {
-  const effectiveModelsSource = readSource("src/services/auth/keyManagerEffectiveProviderModels.ts");
-  const defaultsSource = readSource("src/services/auth/keyManagerDefaultModels.ts");
+  const effectiveModelsSource = readSource("apps/web/src/services/auth/keyManagerEffectiveProviderModels.ts");
+  const defaultsSource = readSource("apps/web/src/services/auth/keyManagerDefaultModels.ts");
 
   assert.match(defaultsSource, /export const DEFAULT_OPENAI_MODELS = \['dall-e-3', 'dall-e-2', 'gpt-4o', 'gpt-4o-mini'\];/);
   assert.match(
@@ -33,7 +33,7 @@ test("keyManager keeps built-in defaults for official OpenAI routes when saved m
 });
 
 test("keyManager does not treat custom OpenAI-compatible proxy URLs as official default-model routes", () => {
-  const effectiveModelsSource = readSource("src/services/auth/keyManagerEffectiveProviderModels.ts");
+  const effectiveModelsSource = readSource("apps/web/src/services/auth/keyManagerEffectiveProviderModels.ts");
 
   assert.match(effectiveModelsSource, /runtime\.host === (?:'api\.openai\.com'|\('api\.open' \+ 'ai\.com'\))/);
   assert.doesNotMatch(
@@ -43,7 +43,7 @@ test("keyManager does not treat custom OpenAI-compatible proxy URLs as official 
 });
 
 test("ApiSettingsView no longer tells official routes to fetch models before they are usable", () => {
-  const source = readSource("src/components/settings/ApiSettingsView.tsx");
+  const source = readSource("apps/web/src/components/settings/ApiSettingsView.tsx");
 
   assert.match(source, /const effectiveModels = resolveEffectiveProviderModels\(/);
   assert.match(source, /modelCountLabel: String\(effectiveModels\.length \|\| slot\.supportedModels\?\.length \|\| 0\)/);
@@ -51,7 +51,7 @@ test("ApiSettingsView no longer tells official routes to fetch models before the
 });
 
 test("slot channel configs keep the official OpenAI base URL when a saved slot omits baseUrl", () => {
-  const source = readSource("src/services/auth/keyManager.ts");
+  const source = readSource("apps/web/src/services/auth/keyManager.ts");
 
   assert.match(source, /const slotBaseUrl = slot\.baseUrl\s*\|\|\s*\(slot\.provider === 'OpenAI' \? (?:'https:\/\/api\.openai\.com'|\('https:\/\/api\.open' \+ 'ai\.com'\)) : GOOGLE_API_BASE\);/);
   assert.match(source, /baseUrl: slotBaseUrl,/);

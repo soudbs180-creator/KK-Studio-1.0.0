@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce import panel uses stable empty file arrays and avoids no-op preview state loops', () => {
-  const source = readSource('src/components/ecommerce/EcommerceImportPanel.tsx');
+  const source = readSource('apps/web/src/components/ecommerce/EcommerceImportPanel.tsx');
 
   assert.match(source, /const EMPTY_FILES: File\[\] = \[\];/);
   assert.match(source, /productFiles = EMPTY_FILES,/);

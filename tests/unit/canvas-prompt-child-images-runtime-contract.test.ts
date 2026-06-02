@@ -35,8 +35,8 @@ function imageNode(input: Partial<GeneratedImage> & Pick<GeneratedImage, 'id'>):
 }
 
 test('prompt child image resolver boundary lives outside CanvasContext', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const helperSource = readSource('src/context/canvasPromptChildImages.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const helperSource = readSource('apps/web/src/context/canvasPromptChildImages.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/canvas-prompt-child-images-runtime-contract\.test\.ts/);

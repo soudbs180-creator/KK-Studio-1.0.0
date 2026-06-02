@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('prompt optimizer service relies on autoroute helpers and neutral route naming instead of legacy template fields', () => {
-  const serviceSource = readSource('src/services/llm/promptOptimizerService.ts');
-  const rulebookSource = readSource('src/services/llm/promptOptimizerRulebook.ts');
+  const serviceSource = readSource('apps/web/src/services/llm/promptOptimizerService.ts');
+  const rulebookSource = readSource('apps/web/src/services/llm/promptOptimizerRulebook.ts');
 
   assert.doesNotMatch(serviceSource, /const DEFAULT_TABS:/);
   assert.doesNotMatch(serviceSource, /tabs: DEFAULT_TABS,/);
@@ -35,7 +35,7 @@ test('prompt optimizer service relies on autoroute helpers and neutral route nam
 });
 
 test('legacy prompt optimizer config fields and prompt library artifacts are removed from the active flow', () => {
-  const typesSource = readSource('src/types.ts');
+  const typesSource = readSource('apps/web/src/types.ts');
 
   assert.doesNotMatch(typesSource, /promptOptimizationMode\?:/);
   assert.doesNotMatch(typesSource, /promptOptimizationTemplateId\?:/);
@@ -48,7 +48,7 @@ test('legacy prompt optimizer config fields and prompt library artifacts are rem
 });
 
 test('prompt optimizer rulebook prioritizes autoroute-specific missing hints ahead of generic hints', () => {
-  const rulebookSource = readSource('src/services/llm/promptOptimizerRulebook.ts');
+  const rulebookSource = readSource('apps/web/src/services/llm/promptOptimizerRulebook.ts');
 
   assert.match(
     rulebookSource,
@@ -58,7 +58,7 @@ test('prompt optimizer rulebook prioritizes autoroute-specific missing hints ahe
 });
 
 test('app prompt optimization branch no longer checks ecommerce after the dedicated submit-guard early return', () => {
-  const appSource = readSource('src/App.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
 
   assert.match(appSource, /if \(await handleEcommerceSubmitGuard\(submitGuard\)\) \{/);
   assert.doesNotMatch(appSource, /if \(submitGuard\.isEcommerce\) \{/);
@@ -71,8 +71,8 @@ test('app prompt optimization branch no longer checks ecommerce after the dedica
 });
 
 test('prompt optimizer service keeps human-readable Chinese fallback copy', () => {
-  const serviceSource = readSource('src/services/llm/promptOptimizerService.ts');
-  const rulebookSource = readSource('src/services/llm/promptOptimizerRulebook.ts');
+  const serviceSource = readSource('apps/web/src/services/llm/promptOptimizerService.ts');
+  const rulebookSource = readSource('apps/web/src/services/llm/promptOptimizerRulebook.ts');
 
   assert.match(serviceSource, /label_zh: '未优化'/);
   assert.match(serviceSource, /label_zh: '已优化'/);
@@ -83,7 +83,7 @@ test('prompt optimizer service keeps human-readable Chinese fallback copy', () =
 });
 
 test('prompt optimizer cache does not persist raw prompt or reference image content', () => {
-  const serviceSource = readSource('src/services/llm/promptOptimizerService.ts');
+  const serviceSource = readSource('apps/web/src/services/llm/promptOptimizerService.ts');
 
   assert.match(serviceSource, /const buildOptimizerCacheFingerprint = /);
   assert.match(serviceSource, /const redactOptimizerCacheResult = /);
@@ -96,9 +96,9 @@ test('prompt optimizer cache does not persist raw prompt or reference image cont
 });
 
 test('prompt optimizer failure logging uses redacted error summaries', () => {
-  const serviceSource = readSource('src/services/llm/promptOptimizerService.ts');
-  const generationRuntimeSource = readSource('src/app/useGenerationRuntime.ts');
-  const ecommerceRuntimeSource = readSource('src/app/useEcommerceNodeGenerationRuntime.ts');
+  const serviceSource = readSource('apps/web/src/services/llm/promptOptimizerService.ts');
+  const generationRuntimeSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
+  const ecommerceRuntimeSource = readSource('apps/web/src/app/useEcommerceNodeGenerationRuntime.ts');
 
   assert.match(serviceSource, /const summarizePromptOptimizerError = /);
   assert.match(serviceSource, /console\.warn\('\[Optimizer\] AI enhancement failed, using local rulebook result\.', summarizePromptOptimizerError\(error\)\);/);
@@ -112,7 +112,7 @@ test('prompt optimizer failure logging uses redacted error summaries', () => {
 });
 
 test('prompt node optimizer display reads neutral route metadata while keeping Chinese labels', () => {
-  const componentSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
+  const componentSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
 
   assert.match(componentSource, /route_title/);
   assert.match(componentSource, /getPromptOptimizerEngineLabelZh/);

@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test("profile modal localizes backend errors and status labels before rendering", () => {
-  const source = readSource("src/components/modals/UserProfileModal.tsx");
+  const source = readSource("apps/web/src/components/modals/UserProfileModal.tsx");
 
   assert.match(source, /import \{ localizeUserFacingText \} from '\.\.\/\.\.\/utils\/localeText';/);
   assert.match(source, /localizeUserFacingText\(error\?\.\s*message\)/);
@@ -18,7 +18,7 @@ test("profile modal localizes backend errors and status labels before rendering"
 });
 
 test("recharge modal localizes surfaced submission failures", () => {
-  const source = readSource("src/components/modals/RechargeModal.tsx");
+  const source = readSource("apps/web/src/components/modals/RechargeModal.tsx");
 
   assert.match(source, /import \{ localizeUserFacingText \} from '\.\.\/\.\.\/utils\/localeText';/);
   assert.match(source, /localizeUserFacingText\(/);

@@ -23,15 +23,19 @@ const GenerateRequestSchema = z.object({
   executionLane: z.enum(['local-user-api', 'cloud-credit-model']).optional(),
 });
 
-function rejectLocalUserApiRequest(res) {
+function rejectLocalUserApiRequest(res, requestId) {
   return res.status(409).json({
     error: 'User-owned API requests must use the local user API route. No credits were charged.',
+    code: 'LOCAL_USER_API_REJECTED',
+    requestId: requestId || require('crypto').randomUUID(),
   });
 }
 
-function sendInsufficientCredits(res, currentCredits, requiredCredits) {
+function sendInsufficientCredits(res, currentCredits, requiredCredits, requestId) {
   return res.status(402).json({
     error: 'Insufficient credits.',
+    code: 'INSUFFICIENT_CREDITS',
+    requestId: requestId || require('crypto').randomUUID(),
     credits: Math.max(0, Number(currentCredits) || 0),
     creditsCost: requiredCredits,
   });
@@ -42,20 +46,29 @@ const LIMIT_WINDOW_MS = 60 * 1000;
 const MAX_IMAGE_LIMIT = 10;
 
 async function handleGenerateImage(req, res) {
+  const requestId = String(req.headers['x-client-request-id'] || req.headers['x-request-id'] || '').trim() || require('crypto').randomUUID();
   const userId = verifyJWT(req.headers.authorization);
   if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized.' });
+    return res.status(401).json({
+      error: 'Unauthorized.',
+      code: 'UNAUTHORIZED',
+      requestId,
+    });
   }
 
   const parsed = GenerateRequestSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid generation options or prompt too long.' });
+    return res.status(400).json({
+      error: 'Invalid generation options or prompt too long.',
+      code: 'INVALID_REQUEST',
+      requestId,
+    });
   }
 
   const { prompt, referenceImageBase64, aspectRatio, executionLane } = parsed.data;
   const isLocalUserApi = executionLane === 'local-user-api';
   if (isLocalUserApi) {
-    return rejectLocalUserApiRequest(res);
+    return rejectLocalUserApiRequest(res, requestId);
   }
 
   // 1. 云端积分模型限流器（只对非 local-user-api 生效）
@@ -73,6 +86,8 @@ async function handleGenerateImage(req, res) {
       const retryAfter = Math.ceil((clientLimit.resetTime - now) / 1000);
       return res.status(429).json({
         error: `云端模型生成请求过于频繁，请在 ${retryAfter} 秒后重试。使用自带 API Key 模式不受限制。`,
+        code: 'RATE_LIMITED',
+        requestId,
       });
     }
   }
@@ -90,10 +105,14 @@ async function handleGenerateImage(req, res) {
     requiredCredits = await credits.getOperationCost(pool, operationKey);
     const availableCredits = await credits.getUserCredits(userId);
     if (availableCredits < 0) {
-      return res.status(401).json({ error: 'User not found.' });
+      return res.status(401).json({
+        error: 'User not found.',
+        code: 'USER_NOT_FOUND',
+        requestId,
+      });
     }
     if (availableCredits < requiredCredits) {
-      return sendInsufficientCredits(res, availableCredits, requiredCredits);
+      return sendInsufficientCredits(res, availableCredits, requiredCredits, requestId);
     }
 
     currentCredits = await credits.deductCredits(userId, requiredCredits, operationKey);
@@ -166,7 +185,7 @@ async function handleGenerateImage(req, res) {
   } catch (err) {
     console.error('[Gemini Image Generation Error]', err);
     if (!creditsDeducted && credits.isInsufficientCreditsError(err)) {
-      return sendInsufficientCredits(res, currentCredits, requiredCredits);
+      return sendInsufficientCredits(res, currentCredits, requiredCredits, requestId);
     }
 
     let refundFailed = false;
@@ -175,14 +194,22 @@ async function handleGenerateImage(req, res) {
         await credits.refundCredits(userId, requiredCredits, operationKey, currentCredits);
       } catch (refundErr) {
         refundFailed = true;
-        console.error('[Gemini Image Generation Error] refund failed, manual intervention required:', refundErr);
+        console.error('[P0 ALERT] 积分退款失败，需人工介入', {
+          userId,
+          cost: requiredCredits,
+          originalError: err.message,
+          refundError: refundErr.message,
+          timestamp: new Date().toISOString(),
+          requestId,
+        });
       }
     }
 
     if (refundFailed) {
       return res.status(500).json({
         error: 'Image generation or edit failed. Credit refund failed and requires manual intervention.',
-        refundStatus: 'manual_intervention_required',
+        code: 'REFUND_FAILED',
+        requestId,
       });
     }
 
@@ -190,6 +217,8 @@ async function handleGenerateImage(req, res) {
       error: creditsDeducted
         ? 'Image generation or edit failed. Credits refunded.'
         : 'Image generation or edit failed. No credits were charged.',
+      code: 'AI_GENERATION_FAILED',
+      requestId,
     });
   }
 }

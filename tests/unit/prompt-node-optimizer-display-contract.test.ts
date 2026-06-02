@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('PromptNodeComponent presents optimizer output as strategy guidance instead of raw debug fields', () => {
-  const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
+  const promptNodeSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
 
   assert.match(promptNodeSource, /const getOptimizerStrategySummaryZh =/);
   assert.match(promptNodeSource, /自动策略说明/);

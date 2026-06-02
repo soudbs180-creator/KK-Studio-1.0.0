@@ -18,7 +18,7 @@ type CanvasGroupsModule = {
 
 async function loadCanvasGroupsModule(): Promise<CanvasGroupsModule> {
   const fullPath = path.join(ROOT_DIR, 'apps/web/src/context/canvasGroups.ts');
-  assert.equal(existsSync(fullPath), true, 'src/context/canvasGroups.ts must exist');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/context/canvasGroups.ts must exist');
   return await import('../../apps/web/src/context/canvasGroups.ts') as CanvasGroupsModule;
 }
 
@@ -65,8 +65,8 @@ function canvas(input: Partial<Canvas> & Pick<Canvas, 'id'>): Canvas {
 }
 
 test('canvas group management boundary lives outside CanvasContext', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const helperSource = readSource('src/context/canvasGroups.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const helperSource = readSource('apps/web/src/context/canvasGroups.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/canvas-groups-contract\.test\.ts/);

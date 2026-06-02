@@ -9,10 +9,10 @@ const ROOT_DIR = process.cwd();
 
 
 test("browser-side auth persistence helpers no longer read Supabase auth sessions directly", () => {
-  const userApiSource = readSource("src/services/api/userApiCloudRecordStorage.ts");
-  const taskPersistenceSource = readSource("src/services/persistence/taskPersistence.ts");
-  const fileSystemSource = readSource("src/services/storage/fileSystemService.ts");
-  const runtimeProfileSource = readSource("src/services/auth/runtimeSessionProfile.ts");
+  const userApiSource = readSource("apps/web/src/services/api/userApiCloudRecordStorage.ts");
+  const taskPersistenceSource = readSource("apps/web/src/services/persistence/taskPersistence.ts");
+  const fileSystemSource = readSource("apps/web/src/services/storage/fileSystemService.ts");
+  const runtimeProfileSource = readSource("apps/web/src/services/auth/runtimeSessionProfile.ts");
 
   assert.match(userApiSource, /resolveRuntimeAuthenticatedProfileContext/);
   assert.doesNotMatch(userApiSource, /supabase\.auth\./);

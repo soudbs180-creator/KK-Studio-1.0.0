@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('prompt cards surface ecommerce selection and continuation badges on the canvas', () => {
-  const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
+  const promptNodeSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
 
   assert.match(promptNodeSource, /getEcommerceSelectionBadges/);
   assert.match(promptNodeSource, /getEcommerceStageBadges/);

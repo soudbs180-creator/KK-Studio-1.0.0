@@ -7,7 +7,7 @@ import { test } from 'node:test';
 //
 
 test('bootstrap fatal screen localizes startup errors for both document languages', () => {
-  const source = readSource('src/main.tsx');
+  const source = readSource('apps/web/src/main.tsx');
 
   assert.doesNotMatch(
     source,
@@ -17,7 +17,7 @@ test('bootstrap fatal screen localizes startup errors for both document language
 });
 
 test('common error boundary localizes captured errors for both document languages', () => {
-  const source = readSource('src/components/common/ErrorBoundary.tsx');
+  const source = readSource('apps/web/src/components/common/ErrorBoundary.tsx');
 
   assert.match(
     source,

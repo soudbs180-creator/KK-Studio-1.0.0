@@ -9,9 +9,9 @@ const ROOT_DIR = process.cwd();
 
 
 test("Suxi image routing stays on dedicated surfaces instead of being swallowed by chat compatibility", () => {
-  const strategySource = readSource("src/services/api/providerStrategy.ts");
-  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
-  const helperSource = readSource("src/services/llm/openAICompatibleImageDispatch.ts");
+  const strategySource = readSource("apps/web/src/services/api/providerStrategy.ts");
+  const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
+  const helperSource = readSource("apps/web/src/services/llm/openAICompatibleImageDispatch.ts");
 
   assert.match(
     strategySource,
@@ -32,8 +32,8 @@ test("Suxi image routing stays on dedicated surfaces instead of being swallowed 
 });
 
 test("12AI image routing requires an explicit async preference instead of blanket async short-circuiting", () => {
-  const routerSource = readSource("src/services/api/providerSurfaceRouter.ts");
-  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+  const routerSource = readSource("apps/web/src/services/api/providerSurfaceRouter.ts");
+  const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
 
   assert.match(
     routerSource,
@@ -50,8 +50,8 @@ test("12AI image routing requires an explicit async preference instead of blanke
 });
 
 test("GPT Best defaults to the doc-safe native images payload instead of the local extended payload", () => {
-  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
-  const helperSource = readSource("src/services/llm/openAICompatibleImageDispatch.ts");
+  const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
+  const helperSource = readSource("apps/web/src/services/llm/openAICompatibleImageDispatch.ts");
   const gptBestDispatchStart = adapterSource.indexOf("dispatchPlan.kind === 'gpt-best-native'");
   const gptBestDispatchEnd = adapterSource.indexOf("dispatchPlan.kind === '12ai-openai-strict'");
   const gptBestDispatchBlock = adapterSource.slice(gptBestDispatchStart, gptBestDispatchEnd);
@@ -80,7 +80,7 @@ test("GPT Best defaults to the doc-safe native images payload instead of the loc
 });
 
 test("GPT Best native images payload stays aligned with the documented images surface", () => {
-  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+  const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
   const nativeBlockMatch = adapterSource.match(/private async generateImageStandard_GPT_Best_Native[\s\S]*?return this\.executeImageRequest\(url, body, keySlot, options\);/);
 
   assert.ok(nativeBlockMatch, "expected to find the GPT Best native images helper");
@@ -103,8 +103,8 @@ test("GPT Best native images payload stays aligned with the documented images su
 });
 
 test("model endpoint types flow from key metadata into image surface routing", () => {
-  const keyManagerSource = readSource("src/services/auth/keyManager.ts");
-  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+  const keyManagerSource = readSource("apps/web/src/services/auth/keyManager.ts");
+  const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
 
   assert.match(
     keyManagerSource,
@@ -150,7 +150,7 @@ test("model endpoint types flow from key metadata into image surface routing", (
 });
 
 test("third-party OpenAI-compatible image paths fail fast when Base URL is missing", () => {
-  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+  const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
 
   assert.match(
     adapterSource,
@@ -179,7 +179,7 @@ test("third-party OpenAI-compatible image paths fail fast when Base URL is missi
 });
 
 test("third-party OpenAI-compatible chat paths fail fast when Base URL is missing", () => {
-  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+  const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
 
   assert.match(
     adapterSource,
@@ -192,7 +192,7 @@ test("third-party OpenAI-compatible chat paths fail fast when Base URL is missin
 });
 
 test("image compatibility fallback disables unreachable post-throw fallback code", () => {
-  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+  const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
 
   assert.match(
     adapterSource,
@@ -213,7 +213,7 @@ test("image compatibility fallback disables unreachable post-throw fallback code
 });
 
 test("base64 image extraction preserves upstream mime types instead of forcing png", () => {
-  const payloadHelperSource = readSource("src/services/llm/openAICompatibleImagePayload.ts");
+  const payloadHelperSource = readSource("apps/web/src/services/llm/openAICompatibleImagePayload.ts");
 
   assert.match(
     payloadHelperSource,

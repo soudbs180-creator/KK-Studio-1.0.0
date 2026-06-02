@@ -16,7 +16,7 @@ type CanvasTagsModule = {
 
 async function loadCanvasTagsModule(): Promise<CanvasTagsModule> {
   const fullPath = path.join(ROOT_DIR, 'apps/web/src/context/canvasTags.ts');
-  assert.equal(existsSync(fullPath), true, 'src/context/canvasTags.ts must exist');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/context/canvasTags.ts must exist');
   return await import('../../apps/web/src/context/canvasTags.ts') as CanvasTagsModule;
 }
 
@@ -63,8 +63,8 @@ function canvas(input: Partial<Canvas> & Pick<Canvas, 'id'>): Canvas {
 }
 
 test('canvas tags boundary lives outside CanvasContext', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const helperSource = readSource('src/context/canvasTags.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const helperSource = readSource('apps/web/src/context/canvasTags.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/canvas-tags-contract\.test\.ts/);

@@ -98,7 +98,7 @@ describe("OpenAI-compatible image sizing helpers", () => {
   });
 
   test("adapter delegates sizing and count helpers to the focused module", () => {
-    const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+    const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
     const testConfigSource = readSource("tsconfig.tests.json");
 
     assert.match(adapterSource, /openAICompatibleImageSizing/);

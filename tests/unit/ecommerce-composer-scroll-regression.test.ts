@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce review and workbench panels stay viewport-bound with inner scroll regions', () => {
-  const reviewPanelSource = readSource('src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
-  const desktopWorkbenchSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
+  const reviewPanelSource = readSource('apps/web/src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
+  const desktopWorkbenchSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
 
   assert.match(reviewPanelSource, /const reviewViewportStyle: React\.CSSProperties = \{\s*maxHeight: 'min\(calc\(100vh - 220px\), 720px\)',\s*\};/);
   assert.match(reviewPanelSource, /className="mb-2 flex min-h-0 flex-col overflow-hidden rounded-xl border p-3"/);
@@ -28,7 +28,7 @@ test('ecommerce review and workbench panels stay viewport-bound with inner scrol
 });
 
 test('ecommerce review warnings render from deduped warning collections', () => {
-  const reviewPanelSource = readSource('src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
+  const reviewPanelSource = readSource('apps/web/src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
 
   assert.match(reviewPanelSource, /const dedupedAnalysisWarnings = React\.useMemo\(\(\) => Array\.from\(new Set\(analysis\.reviewWarnings\)\), \[analysis\.reviewWarnings\]\);/);
   assert.match(reviewPanelSource, /const dedupedItemWarnings = Array\.from\(new Set\(reviewItem\.warnings\)\);/);
@@ -37,7 +37,7 @@ test('ecommerce review warnings render from deduped warning collections', () => 
 });
 
 test('ecommerce task editor exposes a denser compact layout for constrained composer panels', () => {
-  const taskEditorSource = readSource('src/components/ecommerce/EcommerceTaskEditorPanel.tsx');
+  const taskEditorSource = readSource('apps/web/src/components/ecommerce/EcommerceTaskEditorPanel.tsx');
 
   assert.match(taskEditorSource, /const rootPaddingClassName = compact \? 'p-2\.5' : 'p-3';/);
   assert.match(taskEditorSource, /const textareaMinHeightClassName = compact \? 'min-h-\[56px\]' : 'min-h-\[72px\]';/);
@@ -45,7 +45,7 @@ test('ecommerce task editor exposes a denser compact layout for constrained comp
 });
 
 test('ecommerce review galleries collapse by default and expose explicit expand toggles', () => {
-  const reviewPanelSource = readSource('src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
+  const reviewPanelSource = readSource('apps/web/src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
 
   assert.match(reviewPanelSource, /const \[expandedGalleryKeys, setExpandedGalleryKeys\] = React\.useState<Record<string, boolean>>\(\{\}\);/);
   assert.match(reviewPanelSource, /const galleryStateKey = `\$\{itemKey\}:\$\{label\}`;/);
@@ -54,9 +54,9 @@ test('ecommerce review galleries collapse by default and expose explicit expand 
 });
 
 test('ecommerce task editor supports summary-first collapsed editing and the desktop workbench opts in', () => {
-  const taskEditorSource = readSource('src/components/ecommerce/EcommerceTaskEditorPanel.tsx');
-  const reviewPanelSource = readSource('src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
-  const desktopWorkbenchSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
+  const taskEditorSource = readSource('apps/web/src/components/ecommerce/EcommerceTaskEditorPanel.tsx');
+  const reviewPanelSource = readSource('apps/web/src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
+  const desktopWorkbenchSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
 
   assert.match(taskEditorSource, /collapsible\?: boolean;/);
   assert.match(taskEditorSource, /defaultExpanded\?: boolean;/);

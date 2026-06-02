@@ -22,19 +22,19 @@ type ModelNormalizationModule = {
 
 async function loadCanonicalHelpers(): Promise<ModelNormalizationModule> {
   const fullPath = path.join(ROOT_DIR, 'apps/web/src/services/auth/keyManagerModelHelpers.ts');
-  assert.equal(existsSync(fullPath), true, 'src/services/auth/keyManagerModelHelpers.ts must exist');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/services/auth/keyManagerModelHelpers.ts must exist');
   return await import('../../apps/web/src/services/auth/keyManagerModelHelpers.ts') as ModelNormalizationModule;
 }
 
 async function loadCompatibilityFacade(): Promise<ModelNormalizationModule> {
   const fullPath = path.join(ROOT_DIR, 'apps/web/src/utils/modelIdNormalization.ts');
-  assert.equal(existsSync(fullPath), true, 'src/utils/modelIdNormalization.ts must exist');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/utils/modelIdNormalization.ts must exist');
   return await import('../../apps/web/src/utils/modelIdNormalization.ts') as ModelNormalizationModule;
 }
 
 test('modelIdNormalization stays a thin compatibility facade over keyManager model helpers', () => {
-  const facadeSource = readSource('src/utils/modelIdNormalization.ts');
-  const helperSource = readSource('src/services/auth/keyManagerModelHelpers.ts');
+  const facadeSource = readSource('apps/web/src/utils/modelIdNormalization.ts');
+  const helperSource = readSource('apps/web/src/services/auth/keyManagerModelHelpers.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/model-id-normalization-parity-contract\.test\.ts/);

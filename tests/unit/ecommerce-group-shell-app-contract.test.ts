@@ -9,10 +9,10 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce analysis confirmation leaves one visible framework card while child task data stays hidden', () => {
-  const appSource = readSource('src/App.tsx');
-  const buildRuntimeSource = readSource('src/app/useEcommerceBuildRuntime.ts');
-  const runtimeSource = readSource('src/services/ecommerce/frameworkRuntime.ts');
-  const typesSource = readSource('src/types.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const buildRuntimeSource = readSource('apps/web/src/app/useEcommerceBuildRuntime.ts');
+  const runtimeSource = readSource('apps/web/src/services/ecommerce/frameworkRuntime.ts');
+  const typesSource = readSource('apps/web/src/types.ts');
 
   assert.match(appSource, /useEcommerceBuildRuntime\(\{/);
   assert.doesNotMatch(appSource, /const buildEcommerceGroupNode = useCallback/);

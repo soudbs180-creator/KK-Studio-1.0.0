@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('lightbox uses the unified RedrawWorkspace and no longer wires the legacy inpaint contract', () => {
-  const lightboxSource = readSource('src/components/image/GlobalLightbox.tsx');
+  const lightboxSource = readSource('apps/web/src/components/image/GlobalLightbox.tsx');
 
   assert.match(lightboxSource, /import \{ RedrawWorkspace \} from '\.\/RedrawWorkspace';/);
   assert.match(lightboxSource, /onPartialRedraw\?: \(image: GeneratedImage, request: RedrawRequest\) => void;/);
@@ -25,7 +25,7 @@ test('lightbox uses the unified RedrawWorkspace and no longer wires the legacy i
 });
 
 test('mobile lightbox vertical swipes switch results instead of closing multi-result redraw galleries', () => {
-  const lightboxSource = readSource('src/components/image/GlobalLightbox.tsx');
+  const lightboxSource = readSource('apps/web/src/components/image/GlobalLightbox.tsx');
 
   assert.match(lightboxSource, /imagesRef\.current\.length > 1/);
   assert.match(lightboxSource, /if \(deltaY > 0\) \{\s*handlePrevRef\.current\(\);/);

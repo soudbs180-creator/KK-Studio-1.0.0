@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('PPT runtime ordering helpers merge childImageIds with parentPromptId fallback', () => {
-  const helperSource = readSource('src/app/pptRuntimeHelpers.ts');
+  const helperSource = readSource('apps/web/src/app/pptRuntimeHelpers.ts');
 
   assert.match(helperSource, /function resolveOrderedPptImagesForPrompt\(/);
   assert.match(helperSource, /const safeImageNodes = imageNodes \|\| \[\];/);
@@ -19,7 +19,7 @@ test('PPT runtime ordering helpers merge childImageIds with parentPromptId fallb
 });
 
 test('PPT runtime helpers reject missing parent prompt and null canvas state', () => {
-  const helperSource = readSource('src/app/pptRuntimeHelpers.ts');
+  const helperSource = readSource('apps/web/src/app/pptRuntimeHelpers.ts');
 
   assert.match(helperSource, /const promptNode = canvas\.promptNodes\.find\(\(node\) => node\.id === target\.parentPromptId\);/);
   assert.match(helperSource, /if \(!promptNode \|\| promptNode\.mode !== GenerationMode\.PPT\) \{/);
@@ -27,7 +27,7 @@ test('PPT runtime helpers reject missing parent prompt and null canvas state', (
 });
 
 test('PPT runtime child image helper owns nullish image array guards', () => {
-  const helperSource = readSource('src/app/pptRuntimeHelpers.ts');
+  const helperSource = readSource('apps/web/src/app/pptRuntimeHelpers.ts');
 
   assert.match(helperSource, /promptNode: PromptNode \| undefined \| null/);
   assert.match(helperSource, /imageNodes: GeneratedImage\[\] \| undefined \| null/);

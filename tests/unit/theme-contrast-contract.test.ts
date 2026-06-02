@@ -139,7 +139,7 @@ function extractRuleProperty(source: string, selector: string, property: string)
 }
 
 test('shared app and settings theme surfaces keep normal text contrast', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
   const themeCases = [
     {
       name: 'global light',
@@ -203,7 +203,7 @@ test('shared app and settings theme surfaces keep normal text contrast', () => {
 });
 
 test('light Clay emphasis text remains readable on tinted frosted states', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
   const light = extractThemeVariables(cssSource, 'body:not(.dark-mode)');
   const settingsLight = extractThemeVariables(cssSource, '.settings-panel');
   const lightBase = '#fffaf0';
@@ -234,7 +234,7 @@ test('light Clay emphasis text remains readable on tinted frosted states', () =>
 });
 
 test('Clay theme tokens expose distinct readable light and dark surfaces', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
   const root = extractCssVariables(extractCssBlock(cssSource, ':root', 'last'));
   const light = extractThemeVariables(cssSource, 'body:not(.dark-mode)');
   const dark = extractThemeVariables(cssSource, 'body.dark-mode');
@@ -262,7 +262,7 @@ test('Clay theme tokens expose distinct readable light and dark surfaces', () =>
 });
 
 test('dark theme surface aliases stay neutral and old blue-black settings tokens do not return', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
   const dark = extractThemeVariables(cssSource, 'body.dark-mode');
   const settingsDark = extractThemeVariables(cssSource, 'body.dark-mode .settings-panel');
 
@@ -305,7 +305,7 @@ test('dark theme surface aliases stay neutral and old blue-black settings tokens
 });
 
 test('settings navigation glass keeps all sidebar text readable', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
   const themeCases = [
     {
       name: 'settings light nav',
@@ -340,7 +340,7 @@ test('settings navigation glass keeps all sidebar text readable', () => {
 });
 
 test('light auth support text and placeholders stay readable', () => {
-  const authCssSource = readSource('src/components/auth/LoginScreen.css');
+  const authCssSource = readSource('apps/web/src/components/auth/LoginScreen.css');
   const whiteSurface = '#ffffff';
 
   for (const selector of [

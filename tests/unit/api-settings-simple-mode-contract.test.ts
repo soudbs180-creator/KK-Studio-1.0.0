@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 test('ApiSettingsView defaults to a simple list mode and gates workbench sections behind advanced mode', () => {
-  const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
+  const viewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
 
   assert.match(viewSource, /const \[showAdvancedWorkbench, setShowAdvancedWorkbench\] = useState\(false\);/);
   assert.match(viewSource, /const \[showAdvancedDetails, setShowAdvancedDetails\] = useState\(false\);/);
@@ -30,8 +30,8 @@ test('ApiSettingsView defaults to a simple list mode and gates workbench section
 });
 
 test('ApiSettingsView simple mode keeps model-center add entries and a unified provider card list', () => {
-  const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
-  const sectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const viewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const sectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.match(viewSource, /<ApiWorkbenchModelCenterSection/);
   assert.match(sectionsSource, /data-testid="api-simple-provider-add"/);

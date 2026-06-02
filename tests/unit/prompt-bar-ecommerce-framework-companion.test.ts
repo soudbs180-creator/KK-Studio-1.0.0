@@ -9,11 +9,11 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce framework workbench lives on the canvas instead of PromptBar after card creation', () => {
-  const hookSource = readSource('src/app/useAppPromptBarProps.ts');
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const desktopPanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
-  const canvasNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
-  const canvasWorkbenchSource = readSource('src/components/ecommerce/EcommerceCanvasWorkbenchCard.tsx');
+  const hookSource = readSource('apps/web/src/app/useAppPromptBarProps.ts');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const desktopPanelSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
+  const canvasNodeSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
+  const canvasWorkbenchSource = readSource('apps/web/src/components/ecommerce/EcommerceCanvasWorkbenchCard.tsx');
 
   assert.match(hookSource, /const ecommerceFrameworkSummary = React\.useMemo\(\(\) => \{/);
   assert.match(hookSource, /ecommerceFrameworkSummary,/);

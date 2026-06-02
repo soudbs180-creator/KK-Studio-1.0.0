@@ -41,8 +41,8 @@ function createImage(overrides: Partial<GeneratedImage> = {}): GeneratedImage {
 
 describe('mobile home three-zone contract', () => {
   test('mobile shell uses a three-zone grid instead of sticky header/composer stacking', () => {
-    const shellSource = readSource('src/components/mobile/MobileAppShell.tsx');
-    const surfaceSource = readSource('src/components/mobile/MobileWorkspaceSurface.tsx');
+    const shellSource = readSource('apps/web/src/components/mobile/MobileAppShell.tsx');
+    const surfaceSource = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
 
     assert.match(shellSource, /gridTemplateRows:\s*'minmax\(0, 1fr\) auto'/);
     assert.match(shellSource, /className="[^"]* h-dvh max-h-dvh [^"]*"/);
@@ -93,9 +93,9 @@ describe('mobile home three-zone contract', () => {
   });
 
   test('embedded mobile composer exposes dedicated mode, input, and advanced-drawer sections', () => {
-    const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-    const drawerSource = readSource('src/components/layout/prompt-bar/MobileEmbeddedAdvancedDrawer.tsx');
-    const footerSource = readSource('src/components/layout/prompt-bar/PromptBarFooterMobile.tsx');
+    const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+    const drawerSource = readSource('apps/web/src/components/layout/prompt-bar/MobileEmbeddedAdvancedDrawer.tsx');
+    const footerSource = readSource('apps/web/src/components/layout/prompt-bar/PromptBarFooterMobile.tsx');
 
     assert.match(promptBarSource, /const isEmbeddedMobileComposer = isMobile && mobileShellMode === 'embedded';/);
     assert.match(promptBarSource, /data-mobile-composer-section="mode-strip"/);

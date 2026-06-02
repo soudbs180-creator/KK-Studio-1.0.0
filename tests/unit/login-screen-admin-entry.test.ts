@@ -16,7 +16,7 @@ test('buildAdminLoginUrl keeps the admin app external and lands on /login', () =
 });
 
 test('LoginScreen source contains a dedicated administrator redirect button', () => {
-  const source = readSource('src/components/auth/LoginScreen.tsx');
+  const source = readSource('apps/web/src/components/auth/LoginScreen.tsx');
 
   assert.match(source, /buildAdminLoginUrl/);
   assert.match(source, /readRuntimeEnv\('VITE_KK_ADMIN_URL'\)/);
@@ -24,7 +24,7 @@ test('LoginScreen source contains a dedicated administrator redirect button', ()
 });
 
 test('LoginScreen keeps manual local access beside the administrator entry', () => {
-  const source = readSource('src/components/auth/LoginScreen.tsx');
+  const source = readSource('apps/web/src/components/auth/LoginScreen.tsx');
 
   assert.match(source, /className="auth-aux-actions"/);
   assert.match(source, /handleTempUserEntry/);

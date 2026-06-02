@@ -16,10 +16,10 @@ function readInterfaceBlock(source: string, interfaceName: string): string {
 
 test('ecommerce prompt activation runtime is extracted from App before shared prompt action wiring', () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommercePromptActivationRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommercePromptActivationRuntime.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommercePromptActivationRuntime.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommercePromptActivationRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommercePromptActivationRuntime.ts');
 
   assert.match(appSource, /import \{[\s\S]*?useEcommercePromptActivationRuntime[\s\S]*?\} from '\.\/app\/useEcommercePromptActivationRuntime';/);
   assert.match(appSource, /const \{[\s\S]*?syncPromptNodeEcommerceSelection,[\s\S]*?resolvePromptNodeFrameworkStatus,[\s\S]*?\} = useEcommercePromptActivationRuntime\(\{/);
@@ -40,7 +40,7 @@ test('ecommerce prompt activation runtime is extracted from App before shared pr
 });
 
 test('handlePromptClick delegates ecommerce activation state to the dedicated runtime hook', () => {
-  const appSource = readSource('src/App.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
   const handlePromptClickIndex = appSource.indexOf(
     'const handlePromptClick = useCallback((clickedNode: PromptNode, isOptimizedView?: boolean) => {',
   );
@@ -62,7 +62,7 @@ test('handlePromptClick delegates ecommerce activation state to the dedicated ru
 });
 
 test('prompt activation runtime owns ecommerce task focus and framework summary resolution', () => {
-  const hookSource = readSource('src/app/useEcommercePromptActivationRuntime.ts');
+  const hookSource = readSource('apps/web/src/app/useEcommercePromptActivationRuntime.ts');
 
   assert.match(hookSource, /resolveEcommerceFrameworkSummary\(/);
   assert.match(hookSource, /clickedNode\.ecommerce\?\.editableTask/);

@@ -9,9 +9,9 @@ const ROOT_DIR = process.cwd();
 
 
 test('capability routing cards keep their toggles in a compact card header state area', () => {
-  const source = readSource('src/components/settings/apiWorkbenchSections.tsx');
-  const uiSource = readSource('src/components/settings/ui/index.tsx');
-  const cssSource = readSource('src/index.css');
+  const source = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
+  const uiSource = readSource('apps/web/src/components/settings/ui/index.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(source, /settings-capability-grid/);
   assert.match(source, /settings-capability-card/);

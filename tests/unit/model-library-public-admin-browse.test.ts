@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('public admin models stay browseable while execution remains login-guarded', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const chatSidebarSource = readSource('src/components/layout/ChatSidebar.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const chatSidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
 
   assert.match(promptBarSource, /const canBrowseSystemCreditModels = billingUiEnabled;/);
   assert.match(chatSidebarSource, /const canBrowseSystemCreditModels = billingUiEnabled;/);

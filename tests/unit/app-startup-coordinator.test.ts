@@ -11,12 +11,12 @@ const ROOT_DIR = process.cwd();
 
 
 test('app startup coordinator drives staged post-login bootstrapping', () => {
-  const startupSource = readSource('src/context/AppStartupContext.tsx');
-  const appSource = readSource('src/App.tsx');
-  const authenticatedShellSource = readSource('src/app/AuthenticatedAppShell.tsx');
-  const startupServiceSource = readSource('src/services/system/appStartup.ts');
-  const healthSource = readSource('src/services/api/kkApiServerHealth.ts');
-  const startupScreenSource = readSource('src/components/common/AppStartupScreen.tsx');
+  const startupSource = readSource('apps/web/src/context/AppStartupContext.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const authenticatedShellSource = readSource('apps/web/src/app/AuthenticatedAppShell.tsx');
+  const startupServiceSource = readSource('apps/web/src/services/system/appStartup.ts');
+  const healthSource = readSource('apps/web/src/services/api/kkApiServerHealth.ts');
+  const startupScreenSource = readSource('apps/web/src/components/common/AppStartupScreen.tsx');
 
   assert.match(startupServiceSource, /export const APP_STARTUP_STAGES = \[/);
   assert.match(startupServiceSource, /'session_ready'/);

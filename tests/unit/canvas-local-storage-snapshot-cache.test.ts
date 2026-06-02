@@ -7,9 +7,9 @@ import { test } from "node:test";
 
 
 test("canvas local-storage persistence caches serialized snapshots for the same state object", () => {
-  const source = readSource("src/context/CanvasContext.tsx");
-  const helperSource = readSource("src/context/canvasPersistence.ts");
-  const hookSource = readSource("src/context/useCanvasLocalPersistence.ts");
+  const source = readSource("apps/web/src/context/CanvasContext.tsx");
+  const helperSource = readSource("apps/web/src/context/canvasPersistence.ts");
+  const hookSource = readSource("apps/web/src/context/useCanvasLocalPersistence.ts");
 
   assert.match(helperSource, /const canvasStorageSnapshotCache = new WeakMap<object, CachedCanvasStorageSnapshot>\(\);/);
   assert.match(helperSource, /let lastPersistedCanvasStorageSnapshot: string \| null = null;/);

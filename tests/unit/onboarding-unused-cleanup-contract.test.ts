@@ -9,16 +9,16 @@ const ROOT_DIR = process.cwd();
 
 
 test('AchievementToast does not reintroduce stale lucide imports', () => {
-  const source = readSource('src/components/Onboarding/AchievementToast.tsx');
+  const source = readSource('apps/web/src/components/Onboarding/AchievementToast.tsx');
 
   assert.doesNotMatch(source, /import \{[^}]*\bStar\b[^}]*\} from 'lucide-react';/);
   assert.match(source, /import \{ Trophy, X, Sparkles \} from 'lucide-react';/);
 });
 
 test('Onboarding residual files do not retain compiler-proven unused locals', () => {
-  const managerSource = readSource('src/components/Onboarding/OnboardingManager.tsx');
-  const overlaySource = readSource('src/components/Onboarding/OnboardingOverlay.tsx');
-  const progressSource = readSource('src/components/Onboarding/useOnboardingProgress.ts');
+  const managerSource = readSource('apps/web/src/components/Onboarding/OnboardingManager.tsx');
+  const overlaySource = readSource('apps/web/src/components/Onboarding/OnboardingOverlay.tsx');
+  const progressSource = readSource('apps/web/src/components/Onboarding/useOnboardingProgress.ts');
 
   assert.doesNotMatch(managerSource, /\bOnboardingProgress,\s*/);
   assert.doesNotMatch(managerSource, /const \{ progress, updateProgress, completeTask, skipOnboarding \} = useOnboardingProgress\(\);/);

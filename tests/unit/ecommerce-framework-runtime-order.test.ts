@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test("App declares ecommerceState before initializing framework runtime state hook", () => {
-  const appSource = readSource("src/App.tsx");
-  const hookSource = readSource("src/app/useEcommerceFrameworkRuntimeState.ts");
+  const appSource = readSource("apps/web/src/App.tsx");
+  const hookSource = readSource("apps/web/src/app/useEcommerceFrameworkRuntimeState.ts");
 
   const stateIndex = appSource.indexOf(
     "const [ecommerceState, setEcommerceState] = useState<EcommerceRuntimeState>({",

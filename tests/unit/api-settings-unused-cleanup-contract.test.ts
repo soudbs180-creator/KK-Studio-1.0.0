@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('ApiSettingsView does not retain compiler-proven unused bindings', () => {
-  const source = readSource('src/components/settings/ApiSettingsView.tsx');
+  const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
 
   assert.doesNotMatch(source, /isKkApiUserDataPersistedInCloudFromHealth/);
   assert.match(source, /const UI_TOKEN_UNIT_LABEL = '词元';/);

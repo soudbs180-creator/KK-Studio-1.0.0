@@ -9,11 +9,11 @@ const ROOT_DIR = process.cwd();
 
 
 test('App wires ecommerce group slot runtime state into preview and canvas surfaces', () => {
-  const appSource = readSource('src/App.tsx');
-  const buildRuntimeSource = readSource('src/app/useEcommerceBuildRuntime.ts');
-  const hookSource = readSource('src/app/useEcommerceSlotHistoryRuntime.ts');
-  const exportRuntimeSource = readSource('src/app/useEcommerceGroupExportRuntime.ts');
-  const promptNodeSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const buildRuntimeSource = readSource('apps/web/src/app/useEcommerceBuildRuntime.ts');
+  const hookSource = readSource('apps/web/src/app/useEcommerceSlotHistoryRuntime.ts');
+  const exportRuntimeSource = readSource('apps/web/src/app/useEcommerceGroupExportRuntime.ts');
+  const promptNodeSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
 
   assert.match(appSource, /groupSlots/);
   assert.match(buildRuntimeSource, /buildInitialEcommerceGroupSlotState/);

@@ -16,12 +16,12 @@ type CollapsedCanvasGroupsModule = {
 
 async function loadCollapsedCanvasGroupsModule(): Promise<CollapsedCanvasGroupsModule> {
   const fullPath = path.join(ROOT_DIR, 'apps/web/src/app/collapsedCanvasGroups.ts');
-  assert.equal(existsSync(fullPath), true, 'src/app/collapsedCanvasGroups.ts must exist');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/app/collapsedCanvasGroups.ts must exist');
   return await import('../../apps/web/src/app/collapsedCanvasGroups.ts') as CollapsedCanvasGroupsModule;
 }
 
 test('CanvasGroup persists collapsed state for lightweight manual groups', () => {
-  const typesSource = readSource('src/types.ts');
+  const typesSource = readSource('apps/web/src/types.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/canvas-collapsed-groups-contract\.test\.ts/);
@@ -53,7 +53,7 @@ test('collapsed canvas group helper returns only node ids from collapsed groups'
 });
 
 test('App excludes collapsed manual group members from render queues and image prefetch scheduling', () => {
-  const source = readSource('src/App.tsx');
+  const source = readSource('apps/web/src/App.tsx');
   const viewportMemoStart = source.indexOf('const { visiblePromptNodes, visibleImageNodes, visibleWorkflowUtilityNodes, visibleGroups, nowTimestamp } = React.useMemo');
   const sharedPropsStart = source.indexOf('const getSharedImageNodeProps = useCallback');
   const imageSchedulingStart = source.indexOf('const imageLoadSchedulingById = React.useMemo');
@@ -108,7 +108,7 @@ test('App excludes collapsed manual group members from render queues and image p
 });
 
 test('CanvasGroupComponent exposes hide and compact expand controls for collapsed groups', () => {
-  const source = readSource('src/components/canvas/CanvasGroupComponent.tsx');
+  const source = readSource('apps/web/src/components/canvas/CanvasGroupComponent.tsx');
 
   assert.match(source, /import \{[^}]*Eye[^}]*EyeOff[^}]*\} from 'lucide-react';/);
   assert.match(source, /const isCollapsed = Boolean\(group\.collapsed\);/);

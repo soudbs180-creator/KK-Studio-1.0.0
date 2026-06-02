@@ -10,7 +10,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('storage adapter does not retain compiler-proven unused OPFS import or promise reject parameter', () => {
-  const adapterSource = readSource('src/services/storage/storageAdapter.ts');
+  const adapterSource = readSource('apps/web/src/services/storage/storageAdapter.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/storage-service-unused-cleanup-contract\.test\.ts/);
@@ -22,7 +22,7 @@ test('storage adapter does not retain compiler-proven unused OPFS import or prom
 });
 
 test('storage preference keeps local-folder save arity while making the unused prompt parameter explicit', () => {
-  const preferenceSource = readSource('src/services/storage/storagePreference.ts');
+  const preferenceSource = readSource('apps/web/src/services/storage/storagePreference.ts');
 
   assert.match(preferenceSource, /export async function saveOriginalToLocalFolder\(\s*imageId: string,\s*blob: Blob,\s*_prompt\?: string,\s*existingTimestamp\?: number\s*\): Promise<boolean>/);
   assert.doesNotMatch(preferenceSource, /\bprompt\?: string,/);
@@ -31,7 +31,7 @@ test('storage preference keeps local-folder save arity while making the unused p
 });
 
 test('image storage cleanupOriginals does not retain an unread database handle', () => {
-  const imageStorageSource = readSource('src/services/storage/imageStorage.ts');
+  const imageStorageSource = readSource('apps/web/src/services/storage/imageStorage.ts');
   const cleanupStart = imageStorageSource.indexOf('export async function cleanupOriginals()');
   const cleanupEnd = imageStorageSource.indexOf('export async function', cleanupStart + 1);
   const cleanupSource = imageStorageSource.slice(cleanupStart, cleanupEnd);
@@ -44,7 +44,7 @@ test('image storage cleanupOriginals does not retain an unread database handle',
 
 test('dead Gemini response cache module and prompt-content logging stay removed', () => {
   const testConfigSource = readSource('tsconfig.tests.json');
-  const canvasSource = readSource('src/context/CanvasContext.tsx');
+  const canvasSource = readSource('apps/web/src/context/CanvasContext.tsx');
   const cachePath = path.join(ROOT_DIR, 'apps/web/src/services/storage/cache.ts');
 
   assert.match(testConfigSource, /tests\/unit\/storage-service-unused-cleanup-contract\.test\.ts/);

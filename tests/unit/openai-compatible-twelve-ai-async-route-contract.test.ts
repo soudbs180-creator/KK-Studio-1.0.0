@@ -66,8 +66,8 @@ describe("OpenAI-compatible 12AI async route helpers", () => {
   });
 
   test("adapter delegates 12AI async route ownership to the helper module", () => {
-    const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
-    const helperSource = readSource("src/services/llm/openAICompatible12AIAsyncRoute.ts");
+    const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
+    const helperSource = readSource("apps/web/src/services/llm/openAICompatible12AIAsyncRoute.ts");
     const testConfigSource = readSource("tsconfig.tests.json");
 
     assert.match(adapterSource, /openAICompatible12AIAsyncRoute/);

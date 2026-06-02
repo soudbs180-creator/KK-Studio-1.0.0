@@ -16,10 +16,10 @@ function readInterfaceBlock(source: string, interfaceName: string): string {
 
 test('ecommerce source selection runtime owns image-source reset behavior', () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceSourceSelectionRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceSourceSelectionRuntime.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommerceSourceSelectionRuntime.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceSourceSelectionRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceSourceSelectionRuntime.ts');
 
   assert.match(appSource, /import \{[\s\S]*?useEcommerceSourceSelectionRuntime[\s\S]*?\} from '\.\/app\/useEcommerceSourceSelectionRuntime';/);
   assert.match(appSource, /const \{[\s\S]*?resetEcommerceSourceSelectionState,[\s\S]*?\} = useEcommerceSourceSelectionRuntime\(\{/);
@@ -33,7 +33,7 @@ test('ecommerce source selection runtime owns image-source reset behavior', () =
 });
 
 test('handleImageClick delegates ecommerce reset state to the dedicated runtime hook', () => {
-  const appSource = readSource('src/App.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
   const handleImageClickIndex = appSource.indexOf('const handleImageClick = useCallback((imageId: string) => {');
   const handleMobileUseImageAsSourceIndex = appSource.indexOf('const handleMobileUseImageAsSource = useCallback((imageId: string) => {');
 
@@ -50,7 +50,7 @@ test('handleImageClick delegates ecommerce reset state to the dedicated runtime 
 });
 
 test('source selection runtime clears ecommerce task, framework, and sheet focus', () => {
-  const hookSource = readSource('src/app/useEcommerceSourceSelectionRuntime.ts');
+  const hookSource = readSource('apps/web/src/app/useEcommerceSourceSelectionRuntime.ts');
 
   assert.match(hookSource, /setEcommerceRatioOverride\(undefined\);/);
   assert.match(hookSource, /activeTaskNodeId: null,/);

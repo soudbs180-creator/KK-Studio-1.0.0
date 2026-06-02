@@ -23,7 +23,7 @@ test('default runtime auth state starts signed out until a server session exists
 });
 
 test('AuthenticatedAppShell routes only fully signed-out users back to LoginScreen before the workspace renders', () => {
-  const source = readSource('src/app/AuthenticatedAppShell.tsx');
+  const source = readSource('apps/web/src/app/AuthenticatedAppShell.tsx');
 
   assert.match(source, /import LoginScreen from '\.\.\/components\/auth\/LoginScreen';/);
   assert.match(source, /import \{ AppStartupScreen \} from '\.\.\/components\/common\/AppStartupScreen';/);
@@ -50,7 +50,7 @@ test('fixed local runtime user can open the workspace without a KK API session t
 });
 
 test('AuthContext attempts to rehydrate a stored KK API session before falling back to signed-out runtime state', () => {
-  const source = readSource('src/context/AuthContext.tsx');
+  const source = readSource('apps/web/src/context/AuthContext.tsx');
 
   assert.match(source, /import \{ isHostedRuntime, kkWebApiClient, shouldUseLegacyWebApiFallback \} from ["']\.\.\/services\/api\/kkApiClient["'];/);
   assert.match(source, /function shouldRecoverSessionOnMount\(runtimeState: RuntimeAuthState\): boolean/);
@@ -67,7 +67,7 @@ test('AuthContext attempts to rehydrate a stored KK API session before falling b
 });
 
 test('AuthContext does not poll hosted cookie recovery forever for signed-out local runtimes', () => {
-  const source = readSource('src/context/AuthContext.tsx');
+  const source = readSource('apps/web/src/context/AuthContext.tsx');
 
   assert.match(
     source,
@@ -76,7 +76,7 @@ test('AuthContext does not poll hosted cookie recovery forever for signed-out lo
 });
 
 test('AuthContext retries hosted cookie recovery failures without pinning the startup screen', () => {
-  const source = readSource('src/context/AuthContext.tsx');
+  const source = readSource('apps/web/src/context/AuthContext.tsx');
 
   assert.match(
     source,
@@ -89,7 +89,7 @@ test('AuthContext retries hosted cookie recovery failures without pinning the st
 });
 
 test('AuthContext does not create a fixed local workspace user before the user chooses temporary local access', () => {
-  const source = readSource('src/context/AuthContext.tsx');
+  const source = readSource('apps/web/src/context/AuthContext.tsx');
 
   assert.doesNotMatch(
     source,
@@ -102,7 +102,7 @@ test('AuthContext does not create a fixed local workspace user before the user c
 });
 
 test('explicit user logout blocks hosted session recovery until a new runtime user appears', () => {
-  const source = readSource('src/context/AuthContext.tsx');
+  const source = readSource('apps/web/src/context/AuthContext.tsx');
 
   assert.match(source, /const \[sessionRecoveryBlockedBySignOut, setSessionRecoveryBlockedBySignOut\] = useState\(false\);/);
   assert.match(

@@ -40,9 +40,9 @@ function assertAppDoesNotDefine(appSource: string, name: string): void {
 }
 
 test('PPT runtime helpers and exports are owned by usePptRuntime', () => {
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/usePptRuntime.ts');
-  const helperSource = readSource('src/app/pptRuntimeHelpers.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/usePptRuntime.ts');
+  const helperSource = readSource('apps/web/src/app/pptRuntimeHelpers.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
   const boundaryIsTypechecked: PptRuntimePublicBoundary | null = null;
 

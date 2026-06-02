@@ -21,13 +21,13 @@ type GenerationBillingRuntimePublicBoundary = {
 
 
 test('frontend generation flow uses the shared billing coordinator and persists attempt ids on prompt nodes', () => {
-  const appSource = readSource('src/App.tsx');
-  const generationRuntimeSource = readSource('src/app/useGenerationRuntime.ts');
-  const retryHelperSource = readSource('src/app/prepareRetriedExecutionNode.ts');
-  const generationHookSource = readSource('src/hooks/useImageGeneration.ts');
-  const billingContextSource = readSource('src/context/BillingContext.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const generationRuntimeSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
+  const retryHelperSource = readSource('apps/web/src/app/prepareRetriedExecutionNode.ts');
+  const generationHookSource = readSource('apps/web/src/hooks/useImageGeneration.ts');
+  const billingContextSource = readSource('apps/web/src/context/BillingContext.tsx');
   const testConfigSource = readSource('tsconfig.tests.json');
-  const typesSource = readSource('src/types.ts');
+  const typesSource = readSource('apps/web/src/types.ts');
   const boundaryIsTypechecked: GenerationBillingRuntimePublicBoundary | null = null;
   const billingAttemptCallCount =
     (generationRuntimeSource.split('buildGenerationBillingAttempt(').length - 1)
@@ -58,13 +58,13 @@ test('frontend generation flow uses the shared billing coordinator and persists 
 });
 
 test('system proxy image generation preserves billing metadata through llm and billing contexts', () => {
-  const llmAdapterSource = readSource('src/services/llm/LLMAdapter.ts');
-  const llmServiceSource = readSource('src/services/llm/LLMService.ts');
-  const geminiServiceSource = readSource('src/services/llm/geminiService.ts');
-  const billingContextSource = readSource('src/context/BillingContext.tsx');
-  const generationHookSource = readSource('src/hooks/useImageGeneration.ts');
-  const generationRuntimeSource = readSource('src/app/useGenerationRuntime.ts');
-  const appSource = readSource('src/App.tsx');
+  const llmAdapterSource = readSource('apps/web/src/services/llm/LLMAdapter.ts');
+  const llmServiceSource = readSource('apps/web/src/services/llm/LLMService.ts');
+  const geminiServiceSource = readSource('apps/web/src/services/llm/geminiService.ts');
+  const billingContextSource = readSource('apps/web/src/context/BillingContext.tsx');
+  const generationHookSource = readSource('apps/web/src/hooks/useImageGeneration.ts');
+  const generationRuntimeSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
 
   assert.match(llmAdapterSource, /ledgerId\?: string;/);
   assert.match(llmAdapterSource, /balanceAfter\?: number;/);

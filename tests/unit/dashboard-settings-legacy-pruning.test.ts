@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('DashboardView.localized removes the hidden legacy overview header block after hero migration', () => {
-  const source = readSource('src/components/settings/views/DashboardView.localized.tsx');
+  const source = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
 
   assert.doesNotMatch(source, /\{false && \(/);
   assert.match(source, /SettingsViewShell/);

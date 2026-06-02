@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('useImageGeneration does not retain compiler-proven unused locals', () => {
-  const source = readSource('src/hooks/useImageGeneration.ts');
+  const source = readSource('apps/web/src/hooks/useImageGeneration.ts');
 
   assert.match(source, /import \{ saveOriginalImage, getImage, normalizePersistableMediaSource \} from '\.\.\/services\/storage\/imageStorage';/);
   assert.doesNotMatch(source, /\bsaveImage\b/);

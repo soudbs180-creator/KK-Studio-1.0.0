@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('shared settings ui primitives use a calmer desktop density scale', () => {
-  const source = readSource('src/components/settings/ui/index.tsx');
+  const source = readSource('apps/web/src/components/settings/ui/index.tsx');
 
   assert.match(source, /borderRadius: 'var\(--radius-control-md\)'/);
   assert.match(source, /fontSize: 'var\(--type-body-2\)'/);
@@ -21,8 +21,8 @@ test('shared settings ui primitives use a calmer desktop density scale', () => {
 });
 
 test('settings workbench compacts mobile surfaces instead of stacking oversized cards', () => {
-  const cssSource = readSource('src/index.css');
-  const panelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
+  const panelSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
 
   assert.match(
     cssSource,
@@ -135,7 +135,7 @@ test('settings workbench compacts mobile surfaces instead of stacking oversized 
 });
 
 test('settings workbench uses frosted glass tokens and blur layers', () => {
-  const cssSource = readSource('src/index.css');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(
     cssSource,

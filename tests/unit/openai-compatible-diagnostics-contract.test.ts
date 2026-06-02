@@ -68,7 +68,7 @@ test("OpenAI-compatible multipart diagnostics preview redacts secret fields and 
 });
 
 test("OpenAICompatibleAdapter delegates diagnostics preview ownership to the helper module", () => {
-  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+  const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
 
   assert.match(adapterSource, /buildSafeRequestBodyPreview/);
   assert.match(adapterSource, /buildSafeFormDataPreview/);
@@ -77,7 +77,7 @@ test("OpenAICompatibleAdapter delegates diagnostics preview ownership to the hel
 });
 
 test("OpenAICompatibleAdapter python snippets use redacted diagnostics previews", () => {
-  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+  const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
 
   assert.doesNotMatch(adapterSource, /payload = \$\{JSON\.stringify\(body, null, 2\)\}/);
   assert.doesNotMatch(adapterSource, /"prompt": \$\{JSON\.stringify\(options\.prompt\)\}/);

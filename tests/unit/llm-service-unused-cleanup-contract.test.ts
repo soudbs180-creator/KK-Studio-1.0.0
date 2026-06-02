@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('LLMService does not retain source-proven direct-call dead code', () => {
-  const source = readSource('src/services/llm/LLMService.ts');
+  const source = readSource('apps/web/src/services/llm/LLMService.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/llm-service-unused-cleanup-contract\.test\.ts/);
@@ -43,7 +43,7 @@ test('LLMService does not retain source-proven direct-call dead code', () => {
 });
 
 test('geminiService does not retain compiler-proven unused imports and helpers', () => {
-  const source = readSource('src/services/llm/geminiService.ts');
+  const source = readSource('apps/web/src/services/llm/geminiService.ts');
 
   assert.match(source, /import \{ AspectRatio, ImageSize, (?:type )?ModelType, (?:type )?ReferenceImage\s*\} from ['"]\.\.\/\.\.\/types['"];/);
   assert.doesNotMatch(source, /GenerationMode/);

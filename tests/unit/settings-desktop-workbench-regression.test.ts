@@ -9,10 +9,10 @@ const ROOT_DIR = process.cwd();
 
 
 test('desktop settings shell keeps navigation metadata in the sidebar and leaves page titles to the active settings view', () => {
-  const shellSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
-  const routeConfigSource = readSource('src/components/settings/settingsRouteConfig.tsx');
-  const headerSource = readSource('src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
-  const sidebarSource = readSource('src/components/settings/desktop/SettingsDesktopSidebar.tsx');
+  const shellSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const routeConfigSource = readSource('apps/web/src/components/settings/settingsRouteConfig.tsx');
+  const headerSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
+  const sidebarSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopSidebar.tsx');
 
   assert.match(shellSource, /import SettingsDesktopSidebar from '\.\/desktop\/SettingsDesktopSidebar';/);
   assert.match(shellSource, /import SettingsDesktopWorkbenchHeader from '\.\/desktop\/SettingsDesktopWorkbenchHeader';/);
@@ -63,7 +63,7 @@ test('desktop settings shell keeps navigation metadata in the sidebar and leaves
 });
 
 test('desktop workbench header stays action-only so it does not duplicate the active page hero', () => {
-  const headerSource = readSource('src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
+  const headerSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
 
   assert.doesNotMatch(headerSource, /pick\('当前面板', 'Current surface'\)/);
   assert.doesNotMatch(headerSource, /pick\('主要下一步', 'Primary next step'\)/);
@@ -77,8 +77,8 @@ test('desktop workbench header stays action-only so it does not duplicate the ac
 });
 
 test('settings workbench flattens cramped nested containers and clips rounded surfaces cleanly', () => {
-  const headerSource = readSource('src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
-  const cssSource = readSource('src/index.css');
+  const headerSource = readSource('apps/web/src/components/settings/desktop/SettingsDesktopWorkbenchHeader.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(headerSource, /settings-desktop-quick-actions/);
   assert.doesNotMatch(headerSource, /rounded-full border p-1/);

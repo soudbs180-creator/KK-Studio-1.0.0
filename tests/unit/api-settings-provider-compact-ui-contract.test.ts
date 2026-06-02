@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('provider list cards stay compact and keep edit, refresh, pause, and delete actions on the list surface', () => {
-  const source = readSource('src/components/settings/ApiSettingsView.tsx');
-  const sectionSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const sectionSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.match(source, /modelCenterRoutes[\s\S]*thirdPartyProviders\.map\(\(provider\)/);
   assert.match(sectionSource, /settings-model-center-route/);
@@ -32,8 +32,8 @@ test('provider list cards stay compact and keep edit, refresh, pause, and delete
 });
 
 test('default local API cards use the model center list and keep advanced metric details behind advanced mode', () => {
-  const source = readSource('src/components/settings/ApiSettingsView.tsx');
-  const cssSource = readSource('src/index.css');
+  const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(source, /modelCenterRoutes[\s\S]*officialSlots\.map\(\(slot\)/);
   assert.match(source, /<ApiWorkbenchOverviewSection/);
@@ -46,7 +46,7 @@ test('default local API cards use the model center list and keep advanced metric
 });
 
 test('provider editor advanced tools expose model sync, price sync, and a custom pricing endpoint fallback', () => {
-  const source = readSource('src/components/settings/ApiSettingsView.tsx');
+  const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
 
   assert.match(source, /自动获取模型/);
   assert.match(source, /自动获取价格/);
@@ -57,8 +57,8 @@ test('provider editor advanced tools expose model sync, price sync, and a custom
 });
 
 test('capability role cards use a provider-card-like compact assignment surface', () => {
-  const sectionSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
-  const cssSource = readSource('src/index.css');
+  const sectionSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(sectionSource, /settings-capability-card settings-reference-card--soft/);
   assert.match(sectionSource, /settings-capability-card__avatar/);

@@ -9,10 +9,10 @@ const ROOT_DIR = process.cwd();
 
 
 test('PromptBar keeps adaptive composer registry wiring aligned with dedicated prompt-bar modules', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const modeSwitcherSource = readSource('src/components/layout/prompt-bar/DesktopComposerModeSwitcher.tsx');
-  const modePanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerModePanel.tsx');
-  const promptToolsSource = readSource('src/components/layout/prompt-bar/DesktopComposerPromptTools.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const modeSwitcherSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerModeSwitcher.tsx');
+  const modePanelSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerModePanel.tsx');
+  const promptToolsSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerPromptTools.tsx');
 
   assert.match(promptBarSource, /PROMPT_BAR_MODE_REGISTRY/);
   assert.match(promptBarSource, /getPromptBarModeOption/);
@@ -43,7 +43,7 @@ test('PromptBar keeps adaptive composer registry wiring aligned with dedicated p
 });
 
 test('prompt bar mode registry keeps desktop top-level modes aligned with current media and ecommerce workflows', () => {
-  const registrySource = readSource('src/components/layout/prompt-bar/composerModeRegistry.ts');
+  const registrySource = readSource('apps/web/src/components/layout/prompt-bar/composerModeRegistry.ts');
 
   assert.match(registrySource, /GenerationMode\.IMAGE/);
   assert.match(registrySource, /GenerationMode\.VIDEO/);

@@ -18,7 +18,7 @@ type CanvasSnapToGridModule = {
 
 async function loadCanvasSnapToGridModule(): Promise<CanvasSnapToGridModule> {
   const fullPath = path.join(ROOT_DIR, 'apps/web/src/utils/canvasSnapToGrid.ts');
-  assert.equal(existsSync(fullPath), true, 'src/utils/canvasSnapToGrid.ts must exist');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/utils/canvasSnapToGrid.ts must exist');
   return await import('../../apps/web/src/utils/canvasSnapToGrid.ts') as CanvasSnapToGridModule;
 }
 
@@ -40,11 +40,11 @@ test('snap-to-grid helper leaves invalid coordinates untouched', async () => {
 });
 
 test('desktop canvas toolbar exposes a dedicated snap toggle wired to card drags', () => {
-  const projectManagerSource = readSource('src/components/settings/ProjectManager.tsx');
-  const promptCardSource = readSource('src/components/canvas/PromptNodeComponent.tsx');
-  const imageCardSource = readSource('src/components/image/ImageCard2.tsx');
-  const workflowCardSource = readSource('src/workflow/nodes/WorkflowUtilityCard.tsx');
-  const appSource = readSource('src/App.tsx');
+  const projectManagerSource = readSource('apps/web/src/components/settings/ProjectManager.tsx');
+  const promptCardSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
+  const imageCardSource = readSource('apps/web/src/components/image/ImageCard2.tsx');
+  const workflowCardSource = readSource('apps/web/src/workflow/nodes/WorkflowUtilityCard.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
 
   assert.match(projectManagerSource, /showSnapToGrid\?: boolean;/);
   assert.match(projectManagerSource, /onToggleSnapToGrid: \(\) => void;/);

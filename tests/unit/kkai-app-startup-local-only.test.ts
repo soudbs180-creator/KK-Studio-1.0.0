@@ -7,7 +7,7 @@ import { test } from 'node:test';
 const ROOT_DIR = process.cwd();
 
 test('AppStartupProvider skips canonical cloud warnings in KKAI local-only mode', () => {
-  const startupSource = readSource('src/context/AppStartupContext.tsx');
+  const startupSource = readSource('apps/web/src/context/AppStartupContext.tsx');
 
   assert.match(startupSource, /import \{ KKAI_FEATURE_FLAGS \} from '\.\.\/app\/kkaiFeatureFlags';/);
   assert.match(

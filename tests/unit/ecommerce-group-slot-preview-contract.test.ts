@@ -9,10 +9,10 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce group slot runtime state is wired into actionable current-version and history preview entrypoints', () => {
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceSlotHistoryRuntime.ts');
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const desktopPanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceSlotHistoryRuntime.ts');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const desktopPanelSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
 
   assert.match(hookSource, /handlePreviewEcommerceSlotHistory/);
   assert.match(appSource, /onPreviewEcommerceSlotHistory/);

@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('ApiSettingsView keeps Platform Assistant AI as one dedicated entry outside the local API editor', () => {
-  const source = readSource('src/components/settings/ApiSettingsView.tsx');
-  const sectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const sectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.match(source, /const handleOpenPlatformAssistant = useCallback/);
   assert.match(source, /notify\.info\(/);

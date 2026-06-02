@@ -26,7 +26,7 @@ type CanvasPromptImageLinksModule = {
 
 async function loadPromptImageLinksModule(): Promise<CanvasPromptImageLinksModule> {
   const fullPath = path.join(ROOT_DIR, 'apps/web/src/context/canvasPromptImageLinks.ts');
-  assert.equal(existsSync(fullPath), true, 'src/context/canvasPromptImageLinks.ts must exist');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/context/canvasPromptImageLinks.ts must exist');
   return await import('../../apps/web/src/context/canvasPromptImageLinks.ts') as CanvasPromptImageLinksModule;
 }
 
@@ -73,8 +73,8 @@ function canvas(input: Partial<Canvas> & Pick<Canvas, 'id'>): Canvas {
 }
 
 test('canvas prompt-image link boundary lives outside CanvasContext', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const helperSource = readSource('src/context/canvasPromptImageLinks.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const helperSource = readSource('apps/web/src/context/canvasPromptImageLinks.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/canvas-prompt-image-links-contract\.test\.ts/);

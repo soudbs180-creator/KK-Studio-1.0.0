@@ -9,9 +9,9 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce build keeps one framework workbench visible while child task cards stay hidden', () => {
-  const buildRuntimeSource = readSource('src/app/useEcommerceBuildRuntime.ts');
-  const appSource = readSource('src/App.tsx');
-  const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts');
+  const buildRuntimeSource = readSource('apps/web/src/app/useEcommerceBuildRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts');
 
   assert.match(
     buildRuntimeSource,
@@ -38,9 +38,9 @@ test('ecommerce build keeps one framework workbench visible while child task car
 });
 
 test('ecommerce post-build controls are localized instead of hard-coded English', () => {
-  const cardActionsSource = readSource('src/components/ecommerce/EcommerceCardActions.tsx');
-  const desktopPanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
-  const buildRuntimeSource = readSource('src/app/useEcommerceBuildRuntime.ts');
+  const cardActionsSource = readSource('apps/web/src/components/ecommerce/EcommerceCardActions.tsx');
+  const desktopPanelSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
+  const buildRuntimeSource = readSource('apps/web/src/app/useEcommerceBuildRuntime.ts');
 
   assert.match(cardActionsSource, /import \{ useLocale \} from '..\/..\/context\/LocaleContext';/);
   assert.match(cardActionsSource, /const \{ pick \} = useLocale\(\);/);

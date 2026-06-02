@@ -10,10 +10,10 @@ const ROOT_DIR = process.cwd();
 
 test('ecommerce submit runtime owns the ecommerce submit branch in handleGenerate', () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceSubmitRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceSubmitRuntime.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommerceSubmitRuntime.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceSubmitRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceSubmitRuntime.ts');
   const handleGenerateSource = appSource.slice(
     appSource.indexOf('const handleGenerate = useCallback'),
     appSource.indexOf('const handleFilesDrop = useCallback'),
@@ -38,10 +38,10 @@ test('ecommerce submit runtime owns the ecommerce submit branch in handleGenerat
 });
 
 test('ecommerce optimization contract for 1128px width, 600x450 aspect sizing and mobile resolution normalization', () => {
-  const cardWidthSource = readSource('src/utils/promptNodeCardWidth.ts');
-  const autoArrangeSource = readSource('src/context/canvasAutoArrange.ts');
-  const renderTaskBuilderSource = readSource('src/services/ecommerce/renderTaskBuilder.ts');
-  const exportRuntimeSource = readSource('src/app/useEcommerceGroupExportRuntime.ts');
+  const cardWidthSource = readSource('apps/web/src/utils/promptNodeCardWidth.ts');
+  const autoArrangeSource = readSource('apps/web/src/context/canvasAutoArrange.ts');
+  const renderTaskBuilderSource = readSource('apps/web/src/services/ecommerce/renderTaskBuilder.ts');
+  const exportRuntimeSource = readSource('apps/web/src/app/useEcommerceGroupExportRuntime.ts');
 
   // 1. 验证 1128px 共享宽度契约
   assert.match(cardWidthSource, /export const ECOMMERCE_FRAMEWORK_PROMPT_CARD_WIDTH = 1128;/);

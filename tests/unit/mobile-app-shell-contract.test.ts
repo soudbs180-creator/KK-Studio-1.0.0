@@ -5,12 +5,12 @@ import path from 'node:path';
 import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
-const MOBILE_APP_SHELL_PATH = 'src/components/mobile/MobileAppShell.tsx';
+const MOBILE_APP_SHELL_PATH = 'apps/web/src/components/mobile/MobileAppShell.tsx';
 
 
 
 test('mobile component index exports MobileAppShell', () => {
-  const indexSource = readSource('src/components/mobile/index.ts');
+  const indexSource = readSource('apps/web/src/components/mobile/index.ts');
 
   assert.match(indexSource, /export \{ default as MobileAppShell \} from '\.\/MobileAppShell';/);
 });

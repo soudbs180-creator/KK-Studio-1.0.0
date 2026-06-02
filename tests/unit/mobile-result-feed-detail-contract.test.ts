@@ -9,9 +9,9 @@ const ROOT_DIR = process.cwd();
 
 
 test('mobile result feed stays card-focused and defers full result actions to a dedicated detail screen', () => {
-  const feedSource = readSource('src/components/mobile/MobileResultFeed.tsx');
-  const tileSource = readSource('src/components/mobile/MobileResultTile.tsx');
-  const detailSource = readSource('src/components/mobile/MobileResultDetailScreen.tsx');
+  const feedSource = readSource('apps/web/src/components/mobile/MobileResultFeed.tsx');
+  const tileSource = readSource('apps/web/src/components/mobile/MobileResultTile.tsx');
+  const detailSource = readSource('apps/web/src/components/mobile/MobileResultDetailScreen.tsx');
 
   assert.doesNotMatch(feedSource, /PartialRedrawModal/);
   assert.doesNotMatch(feedSource, /activeDetailResult/);
@@ -51,8 +51,8 @@ test('mobile result feed stays card-focused and defers full result actions to a 
 });
 
 test('mobile result feed localizes chrome copy instead of hard-coding English in Chinese workspace', () => {
-  const feedSource = readSource('src/components/mobile/MobileResultFeed.tsx');
-  const detailSource = readSource('src/components/mobile/MobileResultDetailScreen.tsx');
+  const feedSource = readSource('apps/web/src/components/mobile/MobileResultFeed.tsx');
+  const detailSource = readSource('apps/web/src/components/mobile/MobileResultDetailScreen.tsx');
 
   assert.match(feedSource, /import \{ useLocale \} from '\.\.\/\.\.\/context\/LocaleContext';/);
   assert.match(feedSource, /const \{ pick \} = useLocale\(\);/);
@@ -72,9 +72,9 @@ test('mobile result feed localizes chrome copy instead of hard-coding English in
 });
 
 test('mobile shell breakpoint and result grid width stay reactive across tablet boundaries', () => {
-  const shellSource = readSource('src/components/mobile/MobileAppShell.tsx');
-  const feedSource = readSource('src/components/mobile/MobileResultFeed.tsx');
-  const responsiveSurfaceSource = readSource('src/utils/responsiveSurface.ts');
+  const shellSource = readSource('apps/web/src/components/mobile/MobileAppShell.tsx');
+  const feedSource = readSource('apps/web/src/components/mobile/MobileResultFeed.tsx');
+  const responsiveSurfaceSource = readSource('apps/web/src/utils/responsiveSurface.ts');
 
   assert.match(responsiveSurfaceSource, /export const TABLET_MAX_WIDTH = 1023;/);
   assert.match(shellSource, /className="[^"]*\blg:hidden\b/);
@@ -86,7 +86,7 @@ test('mobile shell breakpoint and result grid width stay reactive across tablet 
 });
 
 test('mobile result feed handles isLoading state and displays customized empty state with default Chinese copy', () => {
-  const feedSource = readSource('src/components/mobile/MobileResultFeed.tsx');
+  const feedSource = readSource('apps/web/src/components/mobile/MobileResultFeed.tsx');
 
   // 1. 验证新增的 isLoading 参数存在于 Props 接口中
   assert.match(feedSource, /isLoading\?: boolean;/);

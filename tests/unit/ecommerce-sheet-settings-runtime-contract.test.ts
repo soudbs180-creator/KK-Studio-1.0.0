@@ -75,10 +75,10 @@ function createAPlusPromptNode(overrides: Partial<PromptNode> = {}): PromptNode 
 
 test('ecommerce sheet settings runtime owns sheet defaults, sizing helpers, and App wiring', () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceSheetSettingsRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceSheetSettingsRuntime.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommerceSheetSettingsRuntime.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceSheetSettingsRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceSheetSettingsRuntime.ts');
 
   assert.match(hookSource, /export interface UseEcommerceSheetSettingsRuntimeDeps \{/);
   assert.match(hookSource, /export interface UseEcommerceSheetSettingsRuntimeResult \{/);

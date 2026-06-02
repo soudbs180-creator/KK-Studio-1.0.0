@@ -9,12 +9,12 @@ const ROOT_DIR = process.cwd();
 
 
 test("runtime auth UI/state surfaces use local runtime auth types instead of Supabase types", () => {
-  const runtimeStateSource = readSource("src/services/auth/runtimeAuthState.ts");
-  const authContextSource = readSource("src/context/AuthContext.tsx");
-  const runtimeContextSource = readSource("src/context/kkaiRuntimeContext.ts");
-  const tempUserSource = readSource("src/services/auth/tempUserService.ts");
-  const sidebarSource = readSource("src/components/layout/Sidebar.tsx");
-  const profileModalSource = readSource("src/components/modals/UserProfileModal.tsx");
+  const runtimeStateSource = readSource("apps/web/src/services/auth/runtimeAuthState.ts");
+  const authContextSource = readSource("apps/web/src/context/AuthContext.tsx");
+  const runtimeContextSource = readSource("apps/web/src/context/kkaiRuntimeContext.ts");
+  const tempUserSource = readSource("apps/web/src/services/auth/tempUserService.ts");
+  const sidebarSource = readSource("apps/web/src/components/layout/Sidebar.tsx");
+  const profileModalSource = readSource("apps/web/src/components/modals/UserProfileModal.tsx");
 
   assert.doesNotMatch(runtimeStateSource, /@supabase\/supabase-js/);
   assert.match(runtimeStateSource, /RuntimeAuthUser/);

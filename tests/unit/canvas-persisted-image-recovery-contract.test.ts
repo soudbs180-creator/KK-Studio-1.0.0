@@ -23,7 +23,7 @@ function loadPersistedImageRecoveryModuleForBehaviorTest(options: {
   cachedImages?: Record<string, string>;
   strictOriginals?: Record<string, string>;
 } = {}): RequiredPersistedImageRecoveryExports {
-  const source = readSource('src/context/canvasPersistedImageRecovery.ts');
+  const source = readSource('apps/web/src/context/canvasPersistedImageRecovery.ts');
   const transpiled = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,
@@ -93,8 +93,8 @@ function loadPersistedImageRecoveryModuleForBehaviorTest(options: {
 }
 
 test('persisted image recovery boundary lives outside CanvasContext', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const helperSource = readSource('src/context/canvasPersistedImageRecovery.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const helperSource = readSource('apps/web/src/context/canvasPersistedImageRecovery.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.equal(typedPersistedImageRecoveryExport, 'buildPromptRecoveryEntries');

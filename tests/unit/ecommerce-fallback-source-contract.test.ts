@@ -10,8 +10,8 @@ const ROOT_DIR = process.cwd();
 
 test.skip('ecommerce analysis accepts document fallback formats and routes them through text fallback analysis', () => {
   const routeSource = readSource('api/ecommerce-analysis.ts');
-  const importPanelSource = readSource('src/components/ecommerce/EcommerceImportPanel.tsx');
-  const fallbackSource = readSource('src/services/ecommerce/text/fallbackTextAnalysis.ts');
+  const importPanelSource = readSource('apps/web/src/components/ecommerce/EcommerceImportPanel.tsx');
+  const fallbackSource = readSource('apps/web/src/services/ecommerce/text/fallbackTextAnalysis.ts');
 
   assert.match(routeSource, /lowerName\.endsWith\('\.xlsx'\)/);
   assert.doesNotMatch(routeSource, /lowerName\.endsWith\('\.xls'\)/);

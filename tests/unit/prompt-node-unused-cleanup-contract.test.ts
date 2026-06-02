@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('PromptNodeComponent does not retain source-proven unused locals', () => {
-  const source = readSource('src/components/canvas/PromptNodeComponent.tsx');
+  const source = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/prompt-node-unused-cleanup-contract\.test\.ts/);

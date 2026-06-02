@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('image services do not retain compiler-proven unused priority and LOD locals', () => {
-  const priorityLoaderSource = readSource('src/services/image/imagePriorityLoader.ts');
-  const lodServiceSource = readSource('src/services/image/lodService.ts');
+  const priorityLoaderSource = readSource('apps/web/src/services/image/imagePriorityLoader.ts');
+  const lodServiceSource = readSource('apps/web/src/services/image/lodService.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/image-service-unused-cleanup-contract\.test\.ts/);

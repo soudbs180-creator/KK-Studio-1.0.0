@@ -7,9 +7,9 @@ import { test } from "node:test";
 
 
 test("canvas cloud sync is driven by a memoized sync signature instead of raw canvases", () => {
-  const source = readSource("src/context/CanvasContext.tsx");
-  const helperSource = readSource("src/context/canvasPersistence.ts");
-  const hookSource = readSource("src/context/useCanvasCloudSync.ts");
+  const source = readSource("apps/web/src/context/CanvasContext.tsx");
+  const helperSource = readSource("apps/web/src/context/canvasPersistence.ts");
+  const hookSource = readSource("apps/web/src/context/useCanvasCloudSync.ts");
 
   assert.match(helperSource, /export const buildCanvasCloudSyncSignature = \(canvases: Canvas\[\] = \[\]\): string =>/);
   assert.match(hookSource, /const hasCloudSyncLocalOnlyMedia = useMemo\(\s*\(\) => hasLocalOnlyCanvasMedia\(canvases\),/);

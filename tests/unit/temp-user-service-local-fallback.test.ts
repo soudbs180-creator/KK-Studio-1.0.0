@@ -69,7 +69,7 @@ class MemoryStorage implements StorageLike {
 const ROOT_DIR = process.cwd();
 const TEMP_USER_STORAGE_KEY = 'temp_user_session_v1';
 const TEMP_USER_SERVICE_PATH = path.join(ROOT_DIR, 'apps/web/src/services/auth/tempUserService.ts');
-const TEMP_USER_SERVICE_SOURCE = readSource('src/services/auth/tempUserService.ts');
+const TEMP_USER_SERVICE_SOURCE = readSource('apps/web/src/services/auth/tempUserService.ts');
 
 function loadTempUserService(options: {
   createTempUser: () => Promise<TempUserEnvelope>;

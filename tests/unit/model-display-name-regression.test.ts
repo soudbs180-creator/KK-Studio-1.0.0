@@ -58,7 +58,7 @@ describe('model display name normalization', () => {
   });
 
   test('getModelDisplayName keeps provider argument compatibility without reading it', () => {
-    const capabilitiesSource = readSource('src/services/model/modelCapabilities.ts');
+    const capabilitiesSource = readSource('apps/web/src/services/model/modelCapabilities.ts');
     const testConfigSource = readSource('tsconfig.tests.json');
 
     assert.match(testConfigSource, /tests\/unit\/model-display-name-regression\.test\.ts/);

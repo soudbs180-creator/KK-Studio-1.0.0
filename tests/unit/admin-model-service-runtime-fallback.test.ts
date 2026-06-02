@@ -9,10 +9,10 @@ const ROOT_DIR = process.cwd();
 
 
 test('admin model loading uses the shared web API client while exchange rates remain API-only', () => {
-  const clientSource = readSource('src/services/api/kkApiClient.ts');
-  const serviceSource = readSource('src/services/model/adminModelService.ts');
-  const routeUnitSource = readSource('src/services/model/adminRouteUnits.ts');
-  const exchangeRateSource = readSource('src/services/billing/creditExchangeRateService.ts');
+  const clientSource = readSource('apps/web/src/services/api/kkApiClient.ts');
+  const serviceSource = readSource('apps/web/src/services/model/adminModelService.ts');
+  const routeUnitSource = readSource('apps/web/src/services/model/adminRouteUnits.ts');
+  const exchangeRateSource = readSource('apps/web/src/services/billing/creditExchangeRateService.ts');
 
   assert.match(clientSource, /export function getLegacyWebApiFallbackState\(\): LegacyWebApiFallbackState \{/);
   assert.match(clientSource, /export function shouldUseLegacyWebApiFallback\(\): boolean \{\s*return getLegacyWebApiFallbackState\(\)\.enabled;\s*\}/);

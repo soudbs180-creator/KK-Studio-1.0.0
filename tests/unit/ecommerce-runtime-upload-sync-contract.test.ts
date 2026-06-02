@@ -9,10 +9,10 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce runtime sync rehydrates built cards when product, extra, or per-item manual reference uploads change', () => {
-  const appSource = readSource('src/App.tsx');
-  const buildRuntimeSource = readSource('src/app/useEcommerceBuildRuntime.ts');
-  const syncRuntimeSource = readSource('src/app/useEcommercePostBuildSyncRuntime.ts');
-  const uploadReferenceHookSource = readSource('src/app/useEcommerceUploadReferenceRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const buildRuntimeSource = readSource('apps/web/src/app/useEcommerceBuildRuntime.ts');
+  const syncRuntimeSource = readSource('apps/web/src/app/useEcommercePostBuildSyncRuntime.ts');
+  const uploadReferenceHookSource = readSource('apps/web/src/app/useEcommerceUploadReferenceRuntime.ts');
 
   assert.match(appSource, /useEcommerceUploadReferenceRuntime\(\{/);
   assert.match(appSource, /useEcommerceBuildRuntime\(\{/);

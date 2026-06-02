@@ -7,9 +7,9 @@ import { test } from "node:test";
 
 
 test("canvas periodic persistence effect only handles file-system saves", () => {
-  const source = readSource("src/context/CanvasContext.tsx");
-  const helperSource = readSource("src/context/canvasPersistence.ts");
-  const hookSource = readSource("src/context/useCanvasFileSystemPersistence.ts");
+  const source = readSource("apps/web/src/context/CanvasContext.tsx");
+  const helperSource = readSource("apps/web/src/context/canvasPersistence.ts");
+  const hookSource = readSource("apps/web/src/context/useCanvasFileSystemPersistence.ts");
 
   assert.match(helperSource, /export const buildCanvasFileSystemPersistenceSignature = \(\s*canvases: Canvas\[\] = \[\],\s*activeCanvasId\?: string/);
   assert.match(hookSource, /const fileSystemPersistenceSignature = useMemo\(/);

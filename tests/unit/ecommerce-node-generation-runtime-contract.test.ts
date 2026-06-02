@@ -10,11 +10,11 @@ const ROOT_DIR = process.cwd();
 
 test('ecommerce node generation runtime owns node state patches and single-card generation handlers', () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceNodeGenerationRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceNodeGenerationRuntime.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommerceNodeGenerationRuntime.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceNodeGenerationRuntime.ts');
-  const ecommerceRuntimeSource = readSource('src/app/useEcommerceRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceNodeGenerationRuntime.ts');
+  const ecommerceRuntimeSource = readSource('apps/web/src/app/useEcommerceRuntime.ts');
 
   assert.match(hookSource, /export interface EcommerceNodeGenerationRuntimeState \{/);
   assert.match(hookSource, /export type SetEcommerceNodeGenerationRuntimeState = /);

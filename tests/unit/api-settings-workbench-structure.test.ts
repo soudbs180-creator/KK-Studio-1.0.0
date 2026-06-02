@@ -3,15 +3,15 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 test('ApiSettingsView list mode exposes a dedicated workspace snapshot section', () => {
-  const source = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const source = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.match(source, /API Operations Overview/);
 });
 
 test('ApiSettingsView default mode exposes a Model Center provider pool with a preset directory', () => {
-  const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
-  const sectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
-  const cssSource = readSource('src/index.css');
+  const viewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const sectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(viewSource, /<ApiWorkbenchModelCenterSection/);
   assert.match(viewSource, /routes=\{modelCenterRoutes\}/);
@@ -41,8 +41,8 @@ test('ApiSettingsView default mode exposes a Model Center provider pool with a p
 });
 
 test('ApiSettingsView keeps provider setup flat without the removed connection wizard layer', () => {
-  const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
-  const cssSource = readSource('src/index.css');
+  const viewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.doesNotMatch(viewSource, /ApiConnectionWizard/);
   assert.doesNotMatch(viewSource, /showConnectionWizard/);
@@ -56,8 +56,8 @@ test('ApiSettingsView keeps provider setup flat without the removed connection w
 });
 
 test('Admin API config uses the same official and relay card model while exposing credit parameters', () => {
-  const source = readSource('src/pages/admin/ApiConfigPanel.tsx');
-  const cssSource = readSource('src/index.css');
+  const source = readSource('apps/web/src/pages/admin/ApiConfigPanel.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(source, /ADMIN_API_PRESETS/);
   assert.match(source, /kind: "official"/);
@@ -77,7 +77,7 @@ test('Admin API config uses the same official and relay card model while exposin
 });
 
 test('ApiSettingsView keeps the default list-mode hero framed as model center while advanced workbench sections remain available', () => {
-  const source = readSource('src/components/settings/ApiSettingsView.tsx');
+  const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
 
   assert.match(source, /Model center/);
   assert.match(source, /if \(!showAdvancedWorkbench\) return null;/);
@@ -86,17 +86,17 @@ test('ApiSettingsView keeps the default list-mode hero framed as model center wh
 });
 
 test('ApiSettingsView keeps platform capabilities as a dedicated section instead of mixing them into provider list content', () => {
-  const source = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const source = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.match(source, /Platform entry/);
 });
 
 test('ApiSettingsView delegates workbench stages, shared sections, and shared cards to focused modules', () => {
-  const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
-  const stageSource = readSource('src/components/settings/apiWorkbenchState.ts');
-  const sectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
-  const cardsSource = readSource('src/components/settings/apiWorkbenchCards.tsx');
-  const scaffoldSource = readSource('src/components/settings/SettingsScaffold.tsx');
+  const viewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const stageSource = readSource('apps/web/src/components/settings/apiWorkbenchState.ts');
+  const sectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
+  const cardsSource = readSource('apps/web/src/components/settings/apiWorkbenchCards.tsx');
+  const scaffoldSource = readSource('apps/web/src/components/settings/SettingsScaffold.tsx');
 
   assert.match(viewSource, /from '\.\/apiWorkbenchState';/);
   assert.match(viewSource, /from '\.\/apiWorkbenchSections';/);
@@ -130,8 +130,8 @@ test('ApiSettingsView delegates workbench stages, shared sections, and shared ca
 });
 
 test('ApiSettingsView surfaces a model-center API list and keeps provider creation scoped', () => {
-  const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
-  const sectionsSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const viewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const sectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.match(viewSource, /<ApiWorkbenchModelCenterSection/);
   assert.match(sectionsSource, /data-testid="api-simple-provider-add"/);
@@ -154,7 +154,7 @@ test('ApiSettingsView surfaces a model-center API list and keeps provider creati
 });
 
 test('ApiSettingsView keeps diagnostics and section actions owned by shared modules instead of hidden duplicate controls', () => {
-  const viewSource = readSource('src/components/settings/ApiSettingsView.tsx');
+  const viewSource = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
 
   assert.doesNotMatch(viewSource, /data-testid="api-workbench-diagnostics-toggle"/);
   assert.doesNotMatch(viewSource, /className="hidden"[^\n]*beginCreateOfficial/);

@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('model pickers force a refresh before redirecting from an empty library', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const chatSidebarSource = readSource('src/components/layout/ChatSidebar.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const chatSidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
 
   assert.match(
     promptBarSource,
@@ -31,8 +31,8 @@ test('model pickers force a refresh before redirecting from an empty library', (
 });
 
 test('model pickers open immediately from cache and refresh in the background', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const chatSidebarSource = readSource('src/components/layout/ChatSidebar.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const chatSidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
 
   assert.match(
     promptBarSource,

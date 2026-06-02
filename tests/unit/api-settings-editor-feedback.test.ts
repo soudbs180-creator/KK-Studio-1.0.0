@@ -5,7 +5,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 
 const ROOT_DIR = process.cwd();
-const API_SETTINGS_VIEW_PATH = 'src/components/settings/ApiSettingsView.tsx';
+const API_SETTINGS_VIEW_PATH = 'apps/web/src/components/settings/ApiSettingsView.tsx';
 
 
 

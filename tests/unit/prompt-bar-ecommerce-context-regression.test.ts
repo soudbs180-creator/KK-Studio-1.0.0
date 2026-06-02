@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('prompt bar ecommerce ratio guards follow the active task or sheet context before correcting config aspect ratio', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
 
   assert.match(
     promptBarSource,

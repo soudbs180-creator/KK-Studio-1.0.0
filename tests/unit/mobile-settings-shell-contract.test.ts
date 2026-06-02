@@ -9,10 +9,10 @@ const ROOT_DIR = process.cwd();
 
 
 test('mobile settings shell opens the overview directly inside the shared router-backed workbench', () => {
-  const appSource = readSource('src/App.tsx');
-  const settingsSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
-  const mobileSurfaceSource = readSource('src/components/mobile/MobileWorkspaceSurface.tsx');
-  const registrySource = readSource('src/components/settings/settingsRegistry.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const settingsSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const mobileSurfaceSource = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
+  const registrySource = readSource('apps/web/src/components/settings/settingsRegistry.ts');
 
   assert.doesNotMatch(settingsSource, /MobileSettingsHome/);
   assert.match(settingsSource, /activeView === 'dashboard' \? onClose\(\) : onNavigate\('dashboard'\);/);
@@ -33,7 +33,7 @@ test('mobile settings shell opens the overview directly inside the shared router
 });
 
 test('mobile settings shell treats settings root as the dashboard detail route', () => {
-  const settingsSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
+  const settingsSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
 
   assert.doesNotMatch(settingsSource, /SettingsRouterLocationState/);
   assert.doesNotMatch(settingsSource, /settingsMobileDetail/);

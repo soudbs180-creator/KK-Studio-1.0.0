@@ -7,7 +7,7 @@ import { test } from "node:test";
 
 
 test("task persistence keeps an in-memory per-user cache for repeated reads", () => {
-  const source = readSource("src/services/persistence/taskPersistence.ts");
+  const source = readSource("apps/web/src/services/persistence/taskPersistence.ts");
 
   assert.match(source, /let cachedUserTasks: \{ userId: string; tasks: PersistedTask\[\] \} \| null = null;/);
   assert.match(source, /if \(cachedUserTasks\?\.userId === userId\) \{\s*return cloneTasks\(cachedUserTasks\.tasks\);/);

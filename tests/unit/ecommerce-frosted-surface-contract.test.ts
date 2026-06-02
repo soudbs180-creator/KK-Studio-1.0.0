@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce task editor uses Clay frosted shells, inputs, and accent chips instead of stale blue literals', () => {
-  const source = readSource('src/components/ecommerce/EcommerceTaskEditorPanel.tsx');
+  const source = readSource('apps/web/src/components/ecommerce/EcommerceTaskEditorPanel.tsx');
 
   assert.match(source, /var\(--frost-card-framework-bg\)/);
   assert.match(source, /var\(--frost-card-main-bg\)/);
@@ -23,7 +23,7 @@ test('ecommerce task editor uses Clay frosted shells, inputs, and accent chips i
 });
 
 test('ecommerce card actions use frosted action surfaces and Clay accent borders for selection and queue control', () => {
-  const source = readSource('src/components/ecommerce/EcommerceCardActions.tsx');
+  const source = readSource('apps/web/src/components/ecommerce/EcommerceCardActions.tsx');
 
   assert.match(source, /var\(--frost-card-sub-bg\)/);
   assert.match(source, /var\(--frost-card-main-bg\)/);
@@ -38,7 +38,7 @@ test('ecommerce card actions use frosted action surfaces and Clay accent borders
 });
 
 test('desktop ecommerce workbench keeps framework, main, and sub surfaces tokenized with token hover states', () => {
-  const source = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
+  const source = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
 
   assert.match(source, /var\(--frost-card-framework-bg\)/);
   assert.match(source, /var\(--frost-card-main-bg\)/);
@@ -51,8 +51,8 @@ test('desktop ecommerce workbench keeps framework, main, and sub surfaces tokeni
 });
 
 test('ecommerce import and review panels use frosted tokens instead of blue-gray literal cards', () => {
-  const importSource = readSource('src/components/ecommerce/EcommerceImportPanel.tsx');
-  const reviewSource = readSource('src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
+  const importSource = readSource('apps/web/src/components/ecommerce/EcommerceImportPanel.tsx');
+  const reviewSource = readSource('apps/web/src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
 
   assert.match(importSource, /var\(--frost-card-framework-bg\)/);
   assert.match(importSource, /var\(--frost-card-sub-bg\)/);

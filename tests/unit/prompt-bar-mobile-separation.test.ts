@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('prompt bar routes embedded mobile UI through a dedicated advanced drawer component', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const drawerSource = readSource('src/components/layout/prompt-bar/MobileEmbeddedAdvancedDrawer.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const drawerSource = readSource('apps/web/src/components/layout/prompt-bar/MobileEmbeddedAdvancedDrawer.tsx');
 
   assert.match(promptBarSource, /import MobileEmbeddedAdvancedDrawer from '\.\/prompt-bar\/MobileEmbeddedAdvancedDrawer';/);
   assert.match(promptBarSource, /isEmbeddedMobileComposer \? \(/);

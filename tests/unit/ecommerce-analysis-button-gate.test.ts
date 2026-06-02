@@ -9,9 +9,9 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce analysis button unlocks once a requirement file is present', () => {
-  const appSource = readSource('src/App.tsx');
-  const requirementRuntimeSource = readSource('src/app/useEcommerceRequirementAnalysisRuntime.ts');
-  const importPanelSource = readSource('src/components/ecommerce/EcommerceImportPanel.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const requirementRuntimeSource = readSource('apps/web/src/app/useEcommerceRequirementAnalysisRuntime.ts');
+  const importPanelSource = readSource('apps/web/src/components/ecommerce/EcommerceImportPanel.tsx');
 
   assert.match(appSource, /useEcommerceRequirementAnalysisRuntime\(\{/);
   assert.match(requirementRuntimeSource, /if \(!requirementFile\) \{/);

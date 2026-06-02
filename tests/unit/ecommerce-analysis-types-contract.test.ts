@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce analysis types share the canonical size policy and the normalizer assigns policy outputs directly', () => {
-  const typesSource = readSource('src/services/ecommerce/types.ts');
-  const normalizerSource = readSource('src/services/ecommerce/normalize/ecommerceAnalysisNormalizer.ts');
+  const typesSource = readSource('apps/web/src/services/ecommerce/types.ts');
+  const normalizerSource = readSource('apps/web/src/services/ecommerce/normalize/ecommerceAnalysisNormalizer.ts');
 
   assert.match(typesSource, /EcommerceSizePolicy/);
   assert.match(typesSource, /export type EcommerceAnalysisSizePolicy = EcommerceSizePolicy;/);

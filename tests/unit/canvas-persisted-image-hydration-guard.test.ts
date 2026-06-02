@@ -7,8 +7,8 @@ import { test } from "node:test";
 
 
 test("canvas persisted-image hydration skips task-store reads when nothing needs recovery", () => {
-  const source = readSource("src/context/CanvasContext.tsx");
-  const helperSource = readSource("src/context/canvasPersistedImageRecovery.ts");
+  const source = readSource("apps/web/src/context/CanvasContext.tsx");
+  const helperSource = readSource("apps/web/src/context/canvasPersistedImageRecovery.ts");
 
   assert.match(source, /from '\.\/canvasPersistedImageRecovery';/);
   assert.match(helperSource, /export const buildPersistedImageRecoverySignature = \(canvases: Canvas\[\] = \[\]\): string =>/);

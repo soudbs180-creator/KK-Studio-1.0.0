@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('NewApiManagementService keeps balance refresh behavior without compiler-proven unused locals', () => {
-  const serviceSource = readSource('src/services/billing/newApiManagementService.ts');
+  const serviceSource = readSource('apps/web/src/services/billing/newApiManagementService.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/billing-service-unused-cleanup-contract\.test\.ts/);
@@ -26,7 +26,7 @@ test('NewApiManagementService keeps balance refresh behavior without compiler-pr
 });
 
 test('recharge submission service does not retain unused payment-channel config normalizer', () => {
-  const serviceSource = readSource('src/services/billing/rechargeSubmissionService.ts');
+  const serviceSource = readSource('apps/web/src/services/billing/rechargeSubmissionService.ts');
 
   assert.doesNotMatch(serviceSource, /function normalizeRechargePaymentChannelConfig\(/);
   assert.match(serviceSource, /function buildDefaultRechargePaymentChannelConfigs\(\): RechargePaymentChannelConfig\[\]/);

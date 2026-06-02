@@ -140,10 +140,10 @@ function createAnalysis(): EcommerceAnalysisResult {
 
 test('ecommerce task state runtime owns initial task-state sizing and App wiring', () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceTaskStateRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceTaskStateRuntime.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommerceTaskStateRuntime.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceTaskStateRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceTaskStateRuntime.ts');
 
   assert.match(hookSource, /export interface UseEcommerceTaskStateRuntimeDeps \{/);
   assert.match(hookSource, /export interface UseEcommerceTaskStateRuntimeResult \{/);

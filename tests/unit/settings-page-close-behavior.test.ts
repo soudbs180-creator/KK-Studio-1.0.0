@@ -51,7 +51,7 @@ test('settings page close falls back to workspace root for blank, cross-origin, 
 });
 
 test('SettingsPageRoot only uses history back when the tab actually has a back entry', () => {
-  const source = readSource('src/app/SettingsPageRoot.tsx');
+  const source = readSource('apps/web/src/app/SettingsPageRoot.tsx');
 
   assert.match(
     source,

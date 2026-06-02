@@ -117,7 +117,7 @@ describe('canvas live scene contract', () => {
   })
 
   test('App uses live scene state instead of connector snapshot state', () => {
-    const appSource = readSource('src/App.tsx')
+    const appSource = readSource('apps/web/src/App.tsx')
 
     assert.match(appSource, /liveSceneRef/)
     assert.match(appSource, /liveSceneState/)
@@ -130,10 +130,10 @@ describe('canvas live scene contract', () => {
   })
 
   test('App tracks prompt-group regrouping states explicitly', () => {
-    const appSource = readSource('src/App.tsx')
-    const promptGroupLayoutSource = readSource('src/app/usePromptGroupLayout.ts')
-    const liveSceneSource = readSource('src/canvas/liveScene.ts')
-    const dragHandlerSource = readSource('src/app/usePromptGroupDragHandlers.ts')
+    const appSource = readSource('apps/web/src/App.tsx')
+    const promptGroupLayoutSource = readSource('apps/web/src/app/usePromptGroupLayout.ts')
+    const liveSceneSource = readSource('apps/web/src/canvas/liveScene.ts')
+    const dragHandlerSource = readSource('apps/web/src/app/usePromptGroupDragHandlers.ts')
 
     assert.match(liveSceneSource, /export type PromptGroupLayoutMode = 'expanded' \| 'regrouping' \| 'docked'/)
     assert.match(appSource, /usePromptGroupLayout\(\{/)
@@ -151,8 +151,8 @@ describe('canvas live scene contract', () => {
   })
 
   test('card components expose drag commit callbacks for final persistence', () => {
-    const promptSource = readSource('src/components/canvas/PromptNodeComponent.tsx')
-    const imageSource = readSource('src/components/image/ImageCard2.tsx')
+    const promptSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx')
+    const imageSource = readSource('apps/web/src/components/image/ImageCard2.tsx')
 
     assert.match(promptSource, /onDragCommit\?:/)
     assert.match(promptSource, /onDragCommitRef/)
@@ -161,8 +161,8 @@ describe('canvas live scene contract', () => {
   })
 
   test('draggable card surfaces scale from the bottom-center anchor to keep drag alignment stable', () => {
-    const promptSource = readSource('src/components/canvas/PromptNodeComponent.tsx')
-    const imageSource = readSource('src/components/image/ImageCard2.tsx')
+    const promptSource = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx')
+    const imageSource = readSource('apps/web/src/components/image/ImageCard2.tsx')
 
     assert.match(promptSource, /data-canvas-surface="prompt"[\s\S]*transformOrigin:\s*'50% 100%'/)
     assert.match(imageSource, /data-canvas-surface="image"[\s\S]*transformOrigin:\s*'50% 100%'/)

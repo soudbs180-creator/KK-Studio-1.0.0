@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('PromptBar routes ecommerce drag and drop through the dedicated ecommerce file router', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
 
   assert.match(promptBarSource, /import \{ routeEcommerceDroppedFiles \} from '\.\/prompt-bar\/ecommerceDropRouting';/);
   assert.match(promptBarSource, /const ecommerceDropRoute = routeEcommerceDroppedFiles\(/);

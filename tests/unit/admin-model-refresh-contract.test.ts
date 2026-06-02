@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test("admin model service routes background refreshes through the shared policy helper", () => {
-  const serviceSource = readSource("src/services/model/adminModelService.ts");
+  const serviceSource = readSource("apps/web/src/services/model/adminModelService.ts");
 
   assert.match(
     serviceSource,

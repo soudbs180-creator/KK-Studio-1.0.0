@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('chat service does not retain compiler-proven unused API locals', () => {
-  const chatServiceSource = readSource('src/services/chat/chatService.ts');
+  const chatServiceSource = readSource('apps/web/src/services/chat/chatService.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/chat-service-unused-cleanup-contract\.test\.ts/);

@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test("service barrel stops re-exporting the legacy ai12ApiService entrypoint once routing goes through modelCaller and llm services", () => {
-  const servicesIndexSource = readSource("src/services/index.ts");
-  const modelCallerSource = readSource("src/services/model/modelCaller.ts");
+  const servicesIndexSource = readSource("apps/web/src/services/index.ts");
+  const modelCallerSource = readSource("apps/web/src/services/model/modelCaller.ts");
 
   assert.doesNotMatch(servicesIndexSource, /ai12ApiService/);
   assert.doesNotMatch(modelCallerSource, /AI12APIService/);

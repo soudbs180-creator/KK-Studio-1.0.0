@@ -106,6 +106,28 @@
         })();
     </script>
     <script type="module" src="/src/bootstrap.tsx"></script>
+    <script>
+        // 简体中文注释：首屏自愈自诊断机制。若 React 在 6 秒内未能成功挂载（表现为 .app-startup-screen 依然存在），
+        // 说明发生了强缓存导致的 js 加载或 SyntaxError 崩溃。此时自动尝试强刷一次以拉取最新资源。
+        (function () {
+            window.setTimeout(function () {
+                var startupScreen = document.querySelector('.app-startup-screen');
+                if (startupScreen && window.getComputedStyle(startupScreen).display !== 'none') {
+                    console.warn('[Startup Self-Healing] React app failed to mount within 6s. Force reloading page to clear stale cache...');
+                    var url = new URL(window.location.href);
+                    if (!url.searchParams.has('kk_force_reload')) {
+                        url.searchParams.set('kk_force_reload', '1');
+                        window.location.replace(url.toString());
+                    } else {
+                        var info = document.createElement('div');
+                        info.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,0.9);color:white;padding:10px 20px;border-radius:8px;font-size:12px;z-index:999999;box-shadow:0 4px 12px rgba(0,0,0,0.35);font-family:sans-serif;';
+                        info.innerText = '检测到应用加载异常，请尝试手动清理浏览器缓存后重试。';
+                        document.body.appendChild(info);
+                    }
+                }
+            }, 6000);
+        })();
+    </script>
 </body>
 
 </html>

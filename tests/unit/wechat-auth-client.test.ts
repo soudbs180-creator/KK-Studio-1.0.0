@@ -56,7 +56,7 @@ describe("wechat auth client helpers", () => {
   });
 
   test("routes WeChat auth through the KK API client instead of direct Supabase Edge calls", () => {
-    const serviceSource = readSource("src/services/auth/wechatAuth.ts");
+    const serviceSource = readSource("apps/web/src/services/auth/wechatAuth.ts");
 
     assert.match(serviceSource, /await kkWebApiClient\.startWechatLogin\(redirectTo\)/);
     assert.match(serviceSource, /await kkWebApiClient\.startWechatBind\(redirectTo\)/);

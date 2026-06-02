@@ -60,7 +60,7 @@ describe("OpenAI-compatible image reference helpers", () => {
   });
 
   test("adapter delegates repeated reference formatting to the focused helper", () => {
-    const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+    const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
     const testConfigSource = readSource("tsconfig.tests.json");
 
     assert.match(adapterSource, /openAICompatibleImageReferences/);

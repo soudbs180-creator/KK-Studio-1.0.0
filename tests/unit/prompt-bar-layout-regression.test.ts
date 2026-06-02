@@ -9,14 +9,14 @@ const ROOT_DIR = process.cwd();
 
 
 test('prompt bar keeps footer wrapping while allowing full desktop control labels', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const ecommercePanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
-  const topRowSource = readSource('src/components/layout/prompt-bar/PromptBarTopRow.tsx');
-  const topRowDesktopSource = readSource('src/components/layout/prompt-bar/PromptBarTopRowDesktop.tsx');
-  const footerShellSource = readSource('src/components/layout/prompt-bar/PromptBarFooter.tsx');
-  const footerSource = readSource('src/components/layout/prompt-bar/PromptBarFooterDesktop.tsx');
-  const modePanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerModePanel.tsx');
-  const cssSource = readSource('src/index.css');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const ecommercePanelSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
+  const topRowSource = readSource('apps/web/src/components/layout/prompt-bar/PromptBarTopRow.tsx');
+  const topRowDesktopSource = readSource('apps/web/src/components/layout/prompt-bar/PromptBarTopRowDesktop.tsx');
+  const footerShellSource = readSource('apps/web/src/components/layout/prompt-bar/PromptBarFooter.tsx');
+  const footerSource = readSource('apps/web/src/components/layout/prompt-bar/PromptBarFooterDesktop.tsx');
+  const modePanelSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerModePanel.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
   const desktopLiquidSources = [promptBarSource, modePanelSource, footerSource, cssSource].join('\n');
 
   assert.match(
@@ -52,8 +52,8 @@ test('prompt bar keeps footer wrapping while allowing full desktop control label
 });
 
 test('prompt bar tones down send button and mode switcher motion flourishes on desktop', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const modeSwitcherSource = readSource('src/components/layout/prompt-bar/DesktopComposerModeSwitcher.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const modeSwitcherSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerModeSwitcher.tsx');
 
   assert.doesNotMatch(promptBarSource, /const ModeSwitcherStyles =/);
   assert.doesNotMatch(promptBarSource, /<ModeSwitcherStyles \/>/);
@@ -68,7 +68,7 @@ test('prompt bar tones down send button and mode switcher motion flourishes on d
 });
 
 test('desktop mode switcher animates the active pill with transform instead of layout-driven left changes', () => {
-  const modeSwitcherSource = readSource('src/components/layout/prompt-bar/DesktopComposerModeSwitcher.tsx');
+  const modeSwitcherSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerModeSwitcher.tsx');
 
   assert.match(modeSwitcherSource, /const sliderOffset =/);
   assert.match(modeSwitcherSource, /transition-\[transform,background-color,border-color,box-shadow\]/);
@@ -78,7 +78,7 @@ test('desktop mode switcher animates the active pill with transform instead of l
 });
 
 test('mobile embedded composer keeps the upload affordance inside the input area instead of spending a dedicated row when empty', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
 
   assert.match(
     promptBarSource,
@@ -92,9 +92,9 @@ test('mobile embedded composer keeps the upload affordance inside the input area
 });
 
 test('prompt bar keeps the textarea transparent while reserving the frosted footer layer for mobile only', () => {
-  const desktopFooterSource = readSource('src/components/layout/prompt-bar/PromptBarFooterDesktop.tsx');
-  const mobileFooterSource = readSource('src/components/layout/prompt-bar/PromptBarFooterMobile.tsx');
-  const cssSource = readSource('src/index.css');
+  const desktopFooterSource = readSource('apps/web/src/components/layout/prompt-bar/PromptBarFooterDesktop.tsx');
+  const mobileFooterSource = readSource('apps/web/src/components/layout/prompt-bar/PromptBarFooterMobile.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.doesNotMatch(desktopFooterSource, /prompt-bar-footer-frost/);
   assert.match(mobileFooterSource, /data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"/);
@@ -107,11 +107,11 @@ test('prompt bar keeps the textarea transparent while reserving the frosted foot
 });
 
 test('prompt bar keeps a real frosted shell while desktop options stay inside the composer surface', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const modePanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerModePanel.tsx');
-  const imageOptionsSource = readSource('src/components/image/ImageOptionsPanel.tsx');
-  const videoOptionsSource = readSource('src/components/video/VideoOptionsPanel.tsx');
-  const cssSource = readSource('src/index.css');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const modePanelSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerModePanel.tsx');
+  const imageOptionsSource = readSource('apps/web/src/components/image/ImageOptionsPanel.tsx');
+  const videoOptionsSource = readSource('apps/web/src/components/video/VideoOptionsPanel.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(cssSource, /\.input-bar\s*\{[\s\S]*backdrop-filter: blur\(22px\) saturate\(160%\);/);
   assert.match(cssSource, /\.input-bar\s*\{[\s\S]*-webkit-backdrop-filter: blur\(22px\) saturate\(160%\);/);
@@ -132,7 +132,7 @@ test('prompt bar keeps a real frosted shell while desktop options stay inside th
 });
 
 test('prompt bar centers the desktop model dropdown on the trigger instead of left-aligning the menu shell', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
 
   assert.doesNotMatch(promptBarSource, /className="absolute left-0 bottom-full mb-3 z-50 animate-fadeIn origin-bottom"/);
   assert.match(
@@ -142,8 +142,8 @@ test('prompt bar centers the desktop model dropdown on the trigger instead of le
 });
 
 test('prompt bar normal action buttons share a flat shadow while the send button keeps model-color emphasis without heavy shadows', () => {
-  const cssSource = readSource('src/index.css');
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
 
   assert.match(cssSource, /--prompt-bar-liquid-shadow: none;/);
   assert.match(cssSource, /--prompt-bar-liquid-send-shadow: none;/);
@@ -162,9 +162,9 @@ test('prompt bar normal action buttons share a flat shadow while the send button
 });
 
 test('prompt bar model library and footer controls use frosted flat defaults with hover-only gradients and bright enabled toggles', () => {
-  const cssSource = readSource('src/index.css');
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const imageOptionsSource = readSource('src/components/image/ImageOptionsPanel.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const imageOptionsSource = readSource('apps/web/src/components/image/ImageOptionsPanel.tsx');
   const footerFrostRule = cssSource.match(/\.prompt-bar-footer-frost::before\s*\{[\s\S]*?\}/)?.[0] || '';
 
   assert.match(cssSource, /--prompt-bar-liquid-bg:\s*rgba\(/);
@@ -199,10 +199,10 @@ test('prompt bar model library and footer controls use frosted flat defaults wit
 });
 
 test('mobile prompt footer stays single-row and lets controls overflow horizontally instead of wrapping', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const modePanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerModePanel.tsx');
-  const footerSource = readSource('src/components/layout/prompt-bar/PromptBarFooterMobile.tsx');
-  const cssSource = readSource('src/index.css');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const modePanelSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerModePanel.tsx');
+  const footerSource = readSource('apps/web/src/components/layout/prompt-bar/PromptBarFooterMobile.tsx');
+  const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(footerSource, /data-mobile-action-overflow-policy="single-row-primary-secondary-drawer"/);
   assert.match(footerSource, /flex-nowrap items-center gap-2 overflow-x-auto overflow-y-visible/);
@@ -223,7 +223,7 @@ test('mobile prompt footer stays single-row and lets controls overflow horizonta
 });
 
 test('ecommerce main-image ratio choices stay in one equal three-column row', () => {
-  const imageOptionsSource = readSource('src/components/image/ImageOptionsPanel.tsx');
+  const imageOptionsSource = readSource('apps/web/src/components/image/ImageOptionsPanel.tsx');
 
   assert.match(
     imageOptionsSource,

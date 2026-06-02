@@ -10,7 +10,7 @@ const ROOT_DIR = process.cwd()
 
 describe('workspace startup shell contract', () => {
   test('AuthenticatedAppShell keeps the real workspace visible and only uses the runtime banner during startup', () => {
-    const shellSource = readSource('src/app/AuthenticatedAppShell.tsx')
+    const shellSource = readSource('apps/web/src/app/AuthenticatedAppShell.tsx')
 
     assert.doesNotMatch(shellSource, /import \{ WorkspaceStartupSkeleton \} from '\.\.\/components\/common\/WorkspaceStartupSkeleton';/)
     assert.match(shellSource, /const \{[\s\S]*isBackgroundReady,[\s\S]*\} = useAppStartup\(\);/)
@@ -21,7 +21,7 @@ describe('workspace startup shell contract', () => {
   })
 
   test('startup runtime banner stays available with a stable test id and localized stage copy', () => {
-    const shellSource = readSource('src/app/AuthenticatedAppShell.tsx')
+    const shellSource = readSource('apps/web/src/app/AuthenticatedAppShell.tsx')
 
     assert.match(shellSource, /data-testid="startup-runtime-banner"/)
     assert.match(shellSource, /localizeUserFacingText|pickByDocumentLanguage/)

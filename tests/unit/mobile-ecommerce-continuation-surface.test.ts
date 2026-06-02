@@ -144,9 +144,9 @@ describe('mobile ecommerce continuation surface', () => {
   });
 
   test('threads ecommerce continuation actions from app into the mobile detail screen', () => {
-    const appSource = readSource('src/App.tsx');
-    const surfaceSource = readSource('src/components/mobile/MobileWorkspaceSurface.tsx');
-    const detailSource = readSource('src/components/mobile/MobileResultDetailScreen.tsx');
+    const appSource = readSource('apps/web/src/App.tsx');
+    const surfaceSource = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
+    const detailSource = readSource('apps/web/src/components/mobile/MobileResultDetailScreen.tsx');
 
     assert.match(appSource, /onEditEcommerceTask=/);
     assert.match(appSource, /onConfirmEcommerceDesktop=/);
@@ -169,7 +169,7 @@ describe('mobile ecommerce continuation surface', () => {
   });
 
   test('localizes mobile framework queue chrome instead of hard-coding English labels', () => {
-    const detailSource = readSource('src/components/mobile/MobileResultDetailScreen.tsx');
+    const detailSource = readSource('apps/web/src/components/mobile/MobileResultDetailScreen.tsx');
 
     assert.match(detailSource, /import \{ useLocale \} from '\.\.\/\.\.\/context\/LocaleContext';/);
     assert.match(detailSource, /const \{ pick \} = useLocale\(\);/);

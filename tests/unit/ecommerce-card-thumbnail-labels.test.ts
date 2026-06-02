@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce prompt cards overlay per-item figure labels on reference thumbnails', () => {
-  const source = readSource('src/components/canvas/PromptNodeComponent.tsx');
+  const source = readSource('apps/web/src/components/canvas/PromptNodeComponent.tsx');
 
   assert.match(source, /const getEcommerceAssetPreviewLabel =/);
   assert.match(source, /label\?: string,/);

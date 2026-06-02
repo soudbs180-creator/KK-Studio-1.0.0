@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('ChatSidebar does not retain source-proven unused locals', () => {
-  const source = readSource('src/components/layout/ChatSidebar.tsx');
+  const source = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/chat-sidebar-unused-cleanup-contract\.test\.ts/);

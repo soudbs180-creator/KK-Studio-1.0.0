@@ -9,10 +9,10 @@ const ROOT_DIR = process.cwd();
 
 
 test('keyManager blocks browser-side provider diagnostics and browser-side secret persistence', () => {
-  const source = readSource('src/services/auth/keyManager.ts');
-  const storageSource = readSource('src/services/auth/keyManagerStorage.ts');
-  const providerStorageSource = readSource('src/services/auth/keyManagerProviders.ts');
-  const viteEnvSource = readSource('src/vite-env.d.ts');
+  const source = readSource('apps/web/src/services/auth/keyManager.ts');
+  const storageSource = readSource('apps/web/src/services/auth/keyManagerStorage.ts');
+  const providerStorageSource = readSource('apps/web/src/services/auth/keyManagerProviders.ts');
+  const viteEnvSource = readSource('apps/web/src/vite-env.d.ts');
   const securityCheckSource = readSource('scripts/governance/check-sensitive-boundaries.mjs');
 
   assert.match(storageSource, /const LEGACY_API_KEYS_STORAGE_KEY = "kk-api-keys-local";/);
@@ -54,7 +54,7 @@ test('keyManager blocks browser-side provider diagnostics and browser-side secre
 });
 
 test('LLMService uses the local user-route proxy first, falls back to cloud secure proxy, and blocks browser direct calls', () => {
-  const source = readSource('src/services/llm/LLMService.ts');
+  const source = readSource('apps/web/src/services/llm/LLMService.ts');
 
   assert.match(source, /buildSecureProxyUserRouteFromSlotId/);
   assert.match(source, /callLocalUserRouteProxyChat/);
@@ -108,8 +108,8 @@ test('LLMService uses the local user-route proxy first, falls back to cloud secu
 });
 
 test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking server-side diagnostics', () => {
-  const source = readSource('src/components/settings/ApiSettingsView.tsx');
-  const sectionSource = readSource('src/components/settings/apiWorkbenchSections.tsx');
+  const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const sectionSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.match(source, /const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';/);
   assert.match(source, /const isReadonlySecretPlaceholder = \(value\?: string \| null\) => String\(value \|\| ''\)\.trim\(\) === READONLY_SECRET_PLACEHOLDER;/);
@@ -178,7 +178,7 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
 });
 
 test('AuthContext keeps KeyManager scoped to the current KK runtime user and clears auth state on invalidation', () => {
-  const source = readSource('src/context/AuthContext.tsx');
+  const source = readSource('apps/web/src/context/AuthContext.tsx');
 
   assert.match(source, /import \{ keyManager \} from ["']\.\.\/services\/auth\/keyManager["'];/);
   assert.match(source, /useLayoutEffect/);
@@ -192,7 +192,7 @@ test('AuthContext keeps KeyManager scoped to the current KK runtime user and cle
 });
 
 test('KeyManager clears prior in-memory user state before hydrating the next account scope', () => {
-  const source = readSource('src/services/auth/keyManager.ts');
+  const source = readSource('apps/web/src/services/auth/keyManager.ts');
 
   assert.match(source, /async setUserId\(\s*userId: string \| null,\s*options\?: \{\s*sessionlessLocalUserApiStorageEnabled\?: boolean;\s*\},\s*\) \{/);
   assert.match(source, /this\.loadProviders\(true\);\s*this\.state = this\.loadState\(\);\s*this\.globalModelListCache = null;\s*this\.notifyListeners\(\);/);
@@ -203,7 +203,7 @@ test('KeyManager clears prior in-memory user state before hydrating the next acc
 });
 
 test('BillingContext clears balance and transaction state immediately when the user scope changes', () => {
-  const source = readSource('src/context/BillingContext.tsx');
+  const source = readSource('apps/web/src/context/BillingContext.tsx');
 
   assert.match(source, /const \[refreshing, setRefreshing\] = useState\(false\);/);
   assert.match(source, /const \[hydratedUserId, setHydratedUserId\] = useState<string \| null>\(null\);/);
@@ -230,7 +230,7 @@ test('BillingContext clears balance and transaction state immediately when the u
 });
 
 test('OpenAIVideoService fails closed instead of calling third-party providers from the browser', () => {
-  const source = readSource('src/services/video/OpenAIVideoService.ts');
+  const source = readSource('apps/web/src/services/video/OpenAIVideoService.ts');
 
   assert.match(source, /const BROWSER_DIRECT_VIDEO_CALLS_DISABLED_MESSAGE =/);
   assert.match(source, /throw new Error\(BROWSER_DIRECT_VIDEO_CALLS_DISABLED_MESSAGE\);/);

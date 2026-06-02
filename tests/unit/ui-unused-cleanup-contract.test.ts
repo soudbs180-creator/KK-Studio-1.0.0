@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('PromptBar does not retain source-proven unused UI code', () => {
-  const source = readSource('src/components/layout/PromptBar.tsx');
+  const source = readSource('apps/web/src/components/layout/PromptBar.tsx');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/ui-unused-cleanup-contract\.test\.ts/);
@@ -38,7 +38,7 @@ test('PromptBar does not retain source-proven unused UI code', () => {
 });
 
 test('ImageCard2 does not retain source-proven unused lightbox remnants', () => {
-  const source = readSource('src/components/image/ImageCard2.tsx');
+  const source = readSource('apps/web/src/components/image/ImageCard2.tsx');
 
   assert.doesNotMatch(source, /import ReactDOM from 'react-dom';/);
   assert.doesNotMatch(source, /import \{ AspectRatio,/);
@@ -56,8 +56,8 @@ test('ImageCard2 does not retain source-proven unused lightbox remnants', () => 
 });
 
 test('legacy DashboardView does not retain unused icon imports', () => {
-  const source = readSource('src/components/settings/views/DashboardView.tsx');
-  const localizedSource = readSource('src/components/settings/views/DashboardView.localized.tsx');
+  const source = readSource('apps/web/src/components/settings/views/DashboardView.tsx');
+  const localizedSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
 
   assert.doesNotMatch(source, /\bAlertTriangle,/);
   assert.doesNotMatch(source, /\bShieldCheck,/);

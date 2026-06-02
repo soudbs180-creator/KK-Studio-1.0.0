@@ -75,7 +75,7 @@ router.post('/ocr', async (req, res) => {
 
   try {
     // 2. 换取 Access Token
-    const accessToken = await getBaiduAccessToken(baiduApiKey, secretKey = baiduSecretKey);
+    const accessToken = await getBaiduAccessToken(baiduApiKey, baiduSecretKey);
 
     // 3. 构造百度识别请求参数
     const isPdf = String(fileName || '').toLowerCase().endsWith('.pdf');

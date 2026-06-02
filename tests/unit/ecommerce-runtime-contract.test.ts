@@ -10,11 +10,11 @@ const ROOT_DIR = process.cwd();
 
 test('ecommerce framework scheduler actions are owned by useEcommerceRuntime', () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceRuntime.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommerceRuntime.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceRuntime.ts');
-  const slotHistoryHookSource = readSource('src/app/useEcommerceSlotHistoryRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceRuntime.ts');
+  const slotHistoryHookSource = readSource('apps/web/src/app/useEcommerceSlotHistoryRuntime.ts');
 
   assert.match(hookSource, /export interface UseEcommerceRuntimeDeps(?:<[\s\S]*?>)? \{/);
   assert.match(hookSource, /export interface UseEcommerceRuntimeResult \{/);
@@ -75,7 +75,7 @@ test('ecommerce framework scheduler actions are owned by useEcommerceRuntime', (
 });
 
 test('ecommerce runtime queue warnings are localized for Chinese workspace', () => {
-  const hookSource = readSource('src/app/useEcommerceRuntime.ts');
+  const hookSource = readSource('apps/web/src/app/useEcommerceRuntime.ts');
 
   assert.match(hookSource, /import \{ pickByDocumentLanguage \} from '\.\.\/utils\/localeText';/);
   assert.doesNotMatch(hookSource, /notify\.warning\('No eligible cards'/);

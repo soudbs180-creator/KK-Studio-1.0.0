@@ -16,10 +16,10 @@ function readInterfaceBlock(source: string, interfaceName: string): string {
 
 test('ecommerce framework runtime state/view helper is extracted from App before runtime wiring', () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceFrameworkRuntimeState.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceFrameworkRuntimeState.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommerceFrameworkRuntimeState.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceFrameworkRuntimeState.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceFrameworkRuntimeState.ts');
 
   assert.match(appSource, /import \{ useEcommerceFrameworkRuntimeState,[\s\S]*?\} from '\.\/app\/useEcommerceFrameworkRuntimeState';/);
 
@@ -55,8 +55,8 @@ test('ecommerce framework runtime state/view helper is extracted from App before
 });
 
 test('useEcommerceRuntime consumes a framework state/view boundary object', () => {
-  const appSource = readSource('src/App.tsx');
-  const runtimeSource = readSource('src/app/useEcommerceRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const runtimeSource = readSource('apps/web/src/app/useEcommerceRuntime.ts');
 
   const depsBlock = readInterfaceBlock(runtimeSource, 'UseEcommerceRuntimeDeps');
   assert.match(depsBlock, /frameworkStateView: EcommerceFrameworkRuntimeStateView;/);
@@ -73,7 +73,7 @@ test('useEcommerceRuntime consumes a framework state/view boundary object', () =
 });
 
 test('framework runtime state hook preserves runtime-before-meta and sheet activation ordering', () => {
-  const hookSource = readSource('src/app/useEcommerceFrameworkRuntimeState.ts');
+  const hookSource = readSource('apps/web/src/app/useEcommerceFrameworkRuntimeState.ts');
 
   const updateRuntimeStart = hookSource.indexOf('const updateEcommerceFrameworkRuntime = useCallback');
   const syncStart = hookSource.indexOf('const syncEcommerceFrameworkView = useCallback');

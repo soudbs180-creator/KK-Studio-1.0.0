@@ -53,7 +53,7 @@ function resolvePromptChildImageIdsForTest(
 }
 
 function loadPromptRecoveryModuleForBehaviorTest(): RequiredPromptRecoveryExports {
-  const source = readSource('src/context/canvasPromptRecovery.ts');
+  const source = readSource('apps/web/src/context/canvasPromptRecovery.ts');
   const transpiled = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,
@@ -97,8 +97,8 @@ function loadPromptRecoveryModuleForBehaviorTest(): RequiredPromptRecoveryExport
 }
 
 test('prompt recovery boundary lives outside CanvasContext', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const helperSource = readSource('src/context/canvasPromptRecovery.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const helperSource = readSource('apps/web/src/context/canvasPromptRecovery.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.equal(typedPromptRecoveryExport, 'normalizeCanvasPromptRecovery');
@@ -112,7 +112,7 @@ test('prompt recovery boundary lives outside CanvasContext', () => {
 });
 
 test('completed recovered prompts clear pending generation state', () => {
-  const helperSource = readSource('src/context/canvasPromptRecovery.ts');
+  const helperSource = readSource('apps/web/src/context/canvasPromptRecovery.ts');
 
   assert.match(helperSource, /const isEffectivelyComplete = resolvedChildImageIds\.length > 0/);
   assert.match(helperSource, /const nextPendingTaskIds = isEffectivelyComplete \? \[\] : pendingTaskIds;/);
@@ -122,8 +122,8 @@ test('completed recovered prompts clear pending generation state', () => {
 });
 
 test('interrupted sync prompts are marked before risky unload persistence', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const helperSource = readSource('src/context/canvasPromptRecovery.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const helperSource = readSource('apps/web/src/context/canvasPromptRecovery.ts');
 
   assert.match(contextSource, /prepareBeforeUnloadState: markInterruptedSyncPromptGenerations/);
   assert.match(helperSource, /code: node\.errorDetails\?\.code \|\| 'SYNC_REQUEST_INTERRUPTED'/);

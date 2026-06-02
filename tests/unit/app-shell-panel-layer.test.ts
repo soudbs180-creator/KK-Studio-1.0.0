@@ -9,9 +9,9 @@ const ROOT_DIR = process.cwd();
 
 
 test("App delegates workspace panel rendering to a dedicated shell component", () => {
-  const appSource = readSource("src/App.tsx");
-  const layerSource = readSource("src/components/workspace/WorkspaceSurfacePanels.tsx");
-  const panelsSource = readSource("src/components/workspace/WorkspacePanels.tsx");
+  const appSource = readSource("apps/web/src/App.tsx");
+  const layerSource = readSource("apps/web/src/components/workspace/WorkspaceSurfacePanels.tsx");
+  const panelsSource = readSource("apps/web/src/components/workspace/WorkspacePanels.tsx");
 
   assert.match(appSource, /import \{ WorkspaceSurfacePanels \} from '\.\/components\/workspace\/WorkspaceSurfacePanels';/);
   assert.doesNotMatch(appSource, /<WorkspacePanels\s/);

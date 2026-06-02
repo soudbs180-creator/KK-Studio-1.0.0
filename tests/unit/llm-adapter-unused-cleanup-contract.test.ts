@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('small LLM adapters do not retain compiler-proven unused locals', () => {
-  const audioAdapterSource = readSource('src/services/llm/AudioCompatibleAdapter.ts');
-  const volcengineAdapterSource = readSource('src/services/llm/VolcengineAdapter.ts');
+  const audioAdapterSource = readSource('apps/web/src/services/llm/AudioCompatibleAdapter.ts');
+  const volcengineAdapterSource = readSource('apps/web/src/services/llm/VolcengineAdapter.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/llm-adapter-unused-cleanup-contract\.test\.ts/);
@@ -24,7 +24,7 @@ test('small LLM adapters do not retain compiler-proven unused locals', () => {
 });
 
 test('GoogleAdapter does not retain import-only compiler-proven unused symbols', () => {
-  const googleAdapterSource = readSource('src/services/llm/GoogleAdapter.ts');
+  const googleAdapterSource = readSource('apps/web/src/services/llm/GoogleAdapter.ts');
   const llmAdapterImport = googleAdapterSource.match(/^import \{[^;]+\} from '\.\/LLMAdapter';/m)?.[0] ?? '';
   const loggerImport = googleAdapterSource.match(/^import \{[^;]+\} from '\.\.\/system\/systemLogService';/m)?.[0] ?? '';
 

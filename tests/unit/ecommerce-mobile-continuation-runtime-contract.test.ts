@@ -10,11 +10,11 @@ const ROOT_DIR = process.cwd();
 
 test('ecommerce mobile continuation runtime owns mobile follow-up handlers', () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceMobileContinuationRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceMobileContinuationRuntime.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommerceMobileContinuationRuntime.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceMobileContinuationRuntime.ts');
-  const mobileWorkspaceSource = readSource('src/app/AppMobileWorkspace.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceMobileContinuationRuntime.ts');
+  const mobileWorkspaceSource = readSource('apps/web/src/app/AppMobileWorkspace.tsx');
 
   assert.match(hookSource, /export interface UseEcommerceMobileContinuationRuntimeDeps \{/);
   assert.match(hookSource, /export interface UseEcommerceMobileContinuationRuntimeResult \{/);

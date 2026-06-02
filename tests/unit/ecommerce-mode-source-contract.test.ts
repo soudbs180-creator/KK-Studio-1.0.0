@@ -9,10 +9,10 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce mode is wired into the shared mode entry surfaces', () => {
-  const typesSource = readSource('src/types.ts');
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const registrySource = readSource('src/components/layout/prompt-bar/composerModeRegistry.ts');
-  const mobileTabBarSource = readSource('src/components/mobile/MobileTabBar.tsx');
+  const typesSource = readSource('apps/web/src/types.ts');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const registrySource = readSource('apps/web/src/components/layout/prompt-bar/composerModeRegistry.ts');
+  const mobileTabBarSource = readSource('apps/web/src/components/mobile/MobileTabBar.tsx');
 
   assert.match(typesSource, /ECOMMERCE\s*[:=]\s*'ecommerce'/);
   assert.match(registrySource, /mode:\s*GenerationMode\.ECOMMERCE/);

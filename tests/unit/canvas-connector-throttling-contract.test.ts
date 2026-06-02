@@ -21,8 +21,8 @@ const ROOT_DIR = process.cwd()
 
 describe('canvas connector throttling contract', () => {
   test('connector renderer exposes explicit hook boundary types', () => {
-    const hookSource = readSource('src/app/useConnectorRenderer.ts')
-    const appSource = readSource('src/App.tsx')
+    const hookSource = readSource('apps/web/src/app/useConnectorRenderer.ts')
+    const appSource = readSource('apps/web/src/App.tsx')
     const boundaryIsTypechecked: ConnectorRendererPublicBoundary | null = null
 
     assert.equal(boundaryIsTypechecked, null)
@@ -35,7 +35,7 @@ describe('canvas connector throttling contract', () => {
   })
 
   test('App throttles connector snapshots from the performance profile', () => {
-    const hookSource = readSource('src/app/useConnectorRenderer.ts')
+    const hookSource = readSource('apps/web/src/app/useConnectorRenderer.ts')
 
     assert.match(
       hookSource,
@@ -49,7 +49,7 @@ describe('canvas connector throttling contract', () => {
   })
 
   test('App derives global connector render lists from the throttled snapshot ids', () => {
-    const hookSource = readSource('src/app/useConnectorRenderer.ts')
+    const hookSource = readSource('apps/web/src/app/useConnectorRenderer.ts')
 
     assert.match(
       hookSource,
@@ -66,8 +66,8 @@ describe('canvas connector throttling contract', () => {
   })
 
   test('App resolves global connector geometry from the throttled snapshot positions', () => {
-    const hookSource = readSource('src/app/useConnectorRenderer.ts')
-    const appSource = readSource('src/App.tsx')
+    const hookSource = readSource('apps/web/src/app/useConnectorRenderer.ts')
+    const appSource = readSource('apps/web/src/App.tsx')
 
     assert.match(hookSource, /const resolveConnectorRenderPosition = useCallback\(/)
     assert.match(hookSource, /connectorRenderSnapshot\.positionByNodeId\[nodeId\]/)

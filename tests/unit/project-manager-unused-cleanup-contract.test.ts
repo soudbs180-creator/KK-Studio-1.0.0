@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('ProjectManager keeps mobile prompt props declared without destructuring unused values', () => {
-  const projectManagerSource = readSource('src/components/settings/ProjectManager.tsx');
+  const projectManagerSource = readSource('apps/web/src/components/settings/ProjectManager.tsx');
   const testConfigSource = readSource('tsconfig.tests.json');
   const propsStart = projectManagerSource.indexOf('interface ProjectManagerProps');
   const componentStart = projectManagerSource.indexOf('const ProjectManager: React.FC<ProjectManagerProps> = ({');
@@ -35,7 +35,7 @@ test('ProjectManager keeps mobile prompt props declared without destructuring un
 });
 
 test('ProjectManager desktop collapse keeps the tool rail inside the viewport', () => {
-  const projectManagerSource = readSource('src/components/settings/ProjectManager.tsx');
+  const projectManagerSource = readSource('apps/web/src/components/settings/ProjectManager.tsx');
   const desktopContainerMatch = Array.from(
     projectManagerSource.matchAll(/id="project-manager-container"[\s\S]*?className=\{`([^`]+)`\}/g),
   ).find((match) => match[1].includes('fixed left-4'));

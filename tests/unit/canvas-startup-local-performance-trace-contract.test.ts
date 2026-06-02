@@ -10,7 +10,7 @@ const ROOT_DIR = process.cwd()
 
 describe('canvas startup local performance trace contract', () => {
   test('CanvasContext instruments startup restore phases with local performance traces', () => {
-    const source = readSource('src/context/CanvasContext.tsx')
+    const source = readSource('apps/web/src/context/CanvasContext.tsx')
 
     assert.match(
       source,
@@ -51,7 +51,7 @@ describe('canvas startup local performance trace contract', () => {
   })
 
   test('local performance trace helper keeps bounded local-only records', () => {
-    const source = readSource('src/services/system/localPerformanceTrace.ts')
+    const source = readSource('apps/web/src/services/system/localPerformanceTrace.ts')
 
     assert.match(source, /const GLOBAL_PERF_TRACE_KEY = '__KK_PERF__'/)
     assert.match(source, /const MAX_LOCAL_PERFORMANCE_MEASURES = 120/)

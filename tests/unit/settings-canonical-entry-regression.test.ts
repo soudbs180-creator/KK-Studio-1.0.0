@@ -9,9 +9,9 @@ const ROOT_DIR = process.cwd();
 
 
 test('production settings entry delegates to the localized router-backed workbench shell', () => {
-  const appSource = readSource('src/App.tsx');
-  const settingsPageRootSource = readSource('src/app/SettingsPageRoot.tsx');
-  const settingsEntrySource = readSource('src/components/settings/SettingsPanel.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const settingsPageRootSource = readSource('apps/web/src/app/SettingsPageRoot.tsx');
+  const settingsEntrySource = readSource('apps/web/src/components/settings/SettingsPanel.tsx');
 
   assert.match(appSource, /lazyWithRetry\(\(\) => import\('\.\/app\/SettingsPageRoot'\)\)/);
   assert.match(
@@ -35,8 +35,8 @@ test('production settings entry delegates to the localized router-backed workben
 });
 
 test('settings routing metadata is owned by a shared registry instead of duplicated across shell and route modules', () => {
-  const localizedShellSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
-  const routesSource = readSource('src/components/settings/settingsRouteConfig.tsx');
+  const localizedShellSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const routesSource = readSource('apps/web/src/components/settings/settingsRouteConfig.tsx');
 
   assert.match(localizedShellSource, /from '\.\/settingsRegistry';/);
   assert.match(routesSource, /from '\.\/settingsRegistry';/);
@@ -47,8 +47,8 @@ test('settings routing metadata is owned by a shared registry instead of duplica
 });
 
 test('settings workbench self-hosts a MemoryRouter because the app root does not mount a global router', () => {
-  const localizedShellSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
-  const mainSource = readSource('src/main.tsx');
+  const localizedShellSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const mainSource = readSource('apps/web/src/main.tsx');
 
   assert.doesNotMatch(mainSource, /<BrowserRouter/);
   assert.match(localizedShellSource, /import \{ MemoryRouter, Routes, useLocation, useNavigate \} from 'react-router-dom';/);
@@ -56,7 +56,7 @@ test('settings workbench self-hosts a MemoryRouter because the app root does not
 });
 
 test('page-mode settings navigation syncs the browser URL while overlay mode stays isolated from app routes', () => {
-  const localizedShellSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
+  const localizedShellSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
 
   assert.match(localizedShellSource, /presentation === 'page'/);
   assert.match(localizedShellSource, /window\.history\.pushState\(/);

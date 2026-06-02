@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test('App passes reusable result actions into MobileWorkspaceSurface for preview, continue-create, redraw, download, and delete', () => {
-  const appSource = readSource('src/App.tsx');
-  const appMobileWorkspaceSource = readSource('src/app/AppMobileWorkspace.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const appMobileWorkspaceSource = readSource('apps/web/src/app/AppMobileWorkspace.tsx');
 
   assert.match(appSource, /const handleMobileUseImageAsSource = useCallback/);
   assert.match(appSource, /const handleRedrawRequest = useCallback/);

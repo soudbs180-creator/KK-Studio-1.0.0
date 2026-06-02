@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('Canvas startup begins project and reference-image disk loads in parallel once folder access is restored', () => {
-  const source = readSource('src/context/CanvasContext.tsx');
+  const source = readSource('apps/web/src/context/CanvasContext.tsx');
 
   assert.match(source, /const projectLoadPromise = traceLocalPerformance\('canvas-startup\.disk-project-load', \(\) => fileSystemService\.loadProjectWithThumbs\(handle\)\);/);
   assert.match(source, /const referenceImageLoadPromise = traceLocalPerformance\('canvas-startup\.reference-image-load', \(\) => fileSystemService\.loadAllReferenceImages\(handle\)\);/);

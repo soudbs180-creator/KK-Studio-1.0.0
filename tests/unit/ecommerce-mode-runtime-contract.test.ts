@@ -10,10 +10,10 @@ const ROOT_DIR = process.cwd();
 
 test('ecommerce mode runtime owns mode guard and reset effect', () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceModeRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceModeRuntime.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommerceModeRuntime.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceModeRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceModeRuntime.ts');
 
   assert.match(hookSource, /export interface UseEcommerceModeRuntimeDeps \{/);
   assert.match(hookSource, /export interface UseEcommerceModeRuntimeResult \{/);

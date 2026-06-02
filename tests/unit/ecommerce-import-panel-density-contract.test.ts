@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce import file cards keep readable density inside the prompt bar', () => {
-  const source = readSource('src/components/ecommerce/EcommerceImportPanel.tsx');
+  const source = readSource('apps/web/src/components/ecommerce/EcommerceImportPanel.tsx');
 
   assert.match(source, /const chipClass = 'inline-flex items-center whitespace-nowrap/);
   assert.match(source, /const cardClass = 'rounded-\[16px\] border px-3 py-2\.5'/);

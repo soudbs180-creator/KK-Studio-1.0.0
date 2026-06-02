@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce canvas flow allows building skeleton cards before product uploads and keeps recognized copy out of the main composer prompt', () => {
-  const appSource = readSource('src/App.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
 
   assert.doesNotMatch(appSource, /if \(ecommerceState\.productFiles\.length === 0\) \{/);
   assert.doesNotMatch(appSource, /notify\.warning\('缺少产品图', '请先上传至少一张产品图，再确认建卡。'\);/);

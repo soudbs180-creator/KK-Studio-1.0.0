@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test('cost estimation embeds an admin-only recharge review panel on the billing ledger', () => {
-  const source = readSource('src/pages/CostEstimation.tsx');
+  const source = readSource('apps/web/src/pages/CostEstimation.tsx');
 
   assert.match(source, /import useAdminRole from '\.\.\/hooks\/useAdminRole';/);
   assert.match(source, /const \{[^}]*isAdmin,[^}]*adminSessionActive[^}]*\} = useAdminRole\(\);/);
@@ -19,7 +19,7 @@ test('cost estimation embeds an admin-only recharge review panel on the billing 
 });
 
 test('cost estimation uses billing-ledger naming and drops the old dark console wording', () => {
-  const source = readSource('src/pages/CostEstimation.tsx');
+  const source = readSource('apps/web/src/pages/CostEstimation.tsx');
 
   assert.match(source, /Billing Ledger/);
   assert.match(source, /SettingsHero/);

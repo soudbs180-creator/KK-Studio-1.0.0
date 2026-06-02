@@ -1,5 +1,5 @@
 // tests/support/workspacePaths.js
-// 职责：统一解析和映射测试中的源码文件路径，确保旧的 src/... 路径被正确重映射至 apps/web/src/... 等真实路径。
+// 职责：统一解析和映射测试中的源码文件路径，确保旧的 apps/web/src/... 路径被正确重映射至 apps/web/src/... 等真实路径。
 // 所有注释均使用中文。
 
 import fs from 'node:fs';
@@ -14,38 +14,23 @@ const ROOT_DIR = path.resolve(__dirname, '../../');
 
 /**
  * 智能解析工作区路径：
- * 如果输入的路径以 src/ 开头，则重映射到 apps/web/src/
- * 如果以 packages/contracts/ 开头，则重映射到 packages/shared/src/contracts/（并剥离中间的 src/）
+ * 如果输入的路径以 apps/web/src/ 开头，则重映射到 apps/web/src/
+ * 如果以 packages/shared/src/contracts/ 开头，则重映射到 packages/shared/src/contracts/（并剥离中间的 apps/web/src/）
  * 否则返回标准的根目录下路径
  */
 export function workspacePath(relativePath) {
   // 规范化斜杠
   let normalized = relativePath.replace(/\\/g, '/');
   
-  if (normalized === 'index.html') {
-    return path.join(ROOT_DIR, 'apps/web/index.html');
-  }
-  
-  if (normalized === 'PROJECT_ROOT_GUIDE.md') {
-    return path.join(ROOT_DIR, 'docs/PROJECT_ROOT_GUIDE.md');
-  }
-  
-  if (normalized.startsWith('src/')) {
-    return path.join(ROOT_DIR, 'apps/web', normalized);
-  }
-  
-  if (normalized.startsWith('packages/contracts/')) {
-    let subPath = normalized.substring('packages/contracts/'.length);
-    // 剥离旧 contracts 下的 src 目录
-    if (subPath.startsWith('src/')) {
-      subPath = subPath.substring('src/'.length);
-    }
-    return path.join(ROOT_DIR, 'packages/shared/src/contracts', subPath);
-  }
-
-  if (normalized.startsWith('packages/shared/src/contracts/src/')) {
-    let subPath = normalized.substring('packages/shared/src/contracts/src/'.length);
-    return path.join(ROOT_DIR, 'packages/shared/src/contracts', subPath);
+  // 安全拦截：禁止在测试用例中继续使用 Legacy 路径
+  if (
+    normalized.startsWith('src/') ||
+    normalized.startsWith('packages/contracts/') ||
+    normalized.includes('/contracts/src/') ||
+    normalized === 'index.html' ||
+    normalized === 'PROJECT_ROOT_GUIDE.md'
+  ) {
+    throw new Error(`[Security] 拦截到 Legacy 路径调用: "${relativePath}"。请直接使用规范的物理路径，如 "apps/web/src/..." 或 "packages/shared/src/contracts/..."。`);
   }
   
   return path.join(ROOT_DIR, normalized);

@@ -9,8 +9,8 @@ const ROOT_DIR = process.cwd();
 
 
 test("keyManager keeps a first-class Flow2API preset and runtime provider mapping", () => {
-  const keyManagerSource = readSource("src/services/auth/keyManager.ts");
-  const providerPresetsSource = readSource("src/services/auth/keyManagerProviderPresets.ts");
+  const keyManagerSource = readSource("apps/web/src/services/auth/keyManager.ts");
+  const providerPresetsSource = readSource("apps/web/src/services/auth/keyManagerProviderPresets.ts");
 
   assert.match(providerPresetsSource, /'flow2api':\s*\{/);
   assert.match(providerPresetsSource, /name:\s*'Flow2API'/);

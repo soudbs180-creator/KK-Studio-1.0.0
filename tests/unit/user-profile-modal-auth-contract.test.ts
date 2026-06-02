@@ -9,7 +9,7 @@ const ROOT_DIR = process.cwd();
 
 
 test("UserProfileModal routes profile and password changes through KK API instead of direct Supabase auth calls", () => {
-  const source = readSource("src/components/modals/UserProfileModal.tsx");
+  const source = readSource("apps/web/src/components/modals/UserProfileModal.tsx");
 
   assert.match(source, /kkWebApiClient\.updateProfile\(/);
   assert.match(source, /kkWebApiClient\.sendPasswordChangeCode\(/);

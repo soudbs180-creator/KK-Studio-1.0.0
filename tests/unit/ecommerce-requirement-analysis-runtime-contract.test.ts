@@ -51,10 +51,10 @@ function createAnalysis(): EcommerceAnalysisResult {
 
 test('ecommerce requirement analysis runtime owns reset, file, and analyze callbacks', () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceRequirementAnalysisRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceRequirementAnalysisRuntime.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommerceRequirementAnalysisRuntime.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceRequirementAnalysisRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceRequirementAnalysisRuntime.ts');
 
   assert.match(hookSource, /export interface UseEcommerceRequirementAnalysisRuntimeDeps \{/);
   assert.match(hookSource, /export interface UseEcommerceRequirementAnalysisRuntimeResult \{/);
@@ -79,8 +79,8 @@ test('ecommerce requirement analysis runtime owns reset, file, and analyze callb
 });
 
 test('ecommerce submit callback refreshes when analysis runtime state changes', () => {
-  const appSource = readSource('src/App.tsx');
-  const submitHookSource = readSource('src/app/useEcommerceSubmitRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const submitHookSource = readSource('apps/web/src/app/useEcommerceSubmitRuntime.ts');
   const handleGenerateSource = appSource.slice(
     appSource.indexOf('const handleGenerate = useCallback'),
     appSource.indexOf('const handleFilesDrop = useCallback'),

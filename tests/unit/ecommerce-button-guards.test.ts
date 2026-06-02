@@ -9,13 +9,13 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce workbench only shows current-version preview when a slot has a current image', () => {
-  const workbenchSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
+  const workbenchSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
 
   assert.match(workbenchSource, /currentTaskSlot\?\.currentImageId && onPreviewSlotHistory \? \(/);
 });
 
 test('ecommerce batch generation warns instead of silently no-oping when no eligible cards remain', () => {
-  const runtimeSource = readSource('src/app/useEcommerceRuntime.ts');
+  const runtimeSource = readSource('apps/web/src/app/useEcommerceRuntime.ts');
 
   assert.match(runtimeSource, /const queuedCount = enqueueEcommerceFrameworkNodes\(node\.id, targetNodes\);/);
   assert.match(runtimeSource, /if \(queuedCount === 0\) \{/);
@@ -26,7 +26,7 @@ test('ecommerce batch generation warns instead of silently no-oping when no elig
 });
 
 test('ecommerce card selection button labels describe the next action instead of the current state', () => {
-  const actionSource = readSource('src/components/ecommerce/EcommerceCardActions.tsx');
+  const actionSource = readSource('apps/web/src/components/ecommerce/EcommerceCardActions.tsx');
 
   assert.match(actionSource, /\{selected \? pick\('[^']+', 'Skip'\) : pick\('[^']+', 'Include'\)\}/);
   assert.doesNotMatch(actionSource, /\{selected \? pick\('[^']+', 'Selected'\) : pick\('[^']+', 'Skipped'\)\}/);

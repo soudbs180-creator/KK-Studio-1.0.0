@@ -41,7 +41,7 @@ type CanvasArrangeSelectionModule = {
 
 async function loadCanvasArrangeSelectionModule(): Promise<CanvasArrangeSelectionModule> {
   const fullPath = path.join(ROOT_DIR, 'apps/web/src/context/canvasArrangeSelection.ts');
-  assert.equal(existsSync(fullPath), true, 'src/context/canvasArrangeSelection.ts must exist');
+  assert.equal(existsSync(fullPath), true, 'apps/web/src/context/canvasArrangeSelection.ts must exist');
   return await import('../../apps/web/src/context/canvasArrangeSelection.ts') as CanvasArrangeSelectionModule;
 }
 
@@ -88,8 +88,8 @@ function canvas(input: Partial<Canvas> & Pick<Canvas, 'id'>): Canvas {
 }
 
 test('single prompt child arrange boundary lives outside CanvasContext', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const helperSource = readSource('src/context/canvasArrangeSelection.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const helperSource = readSource('apps/web/src/context/canvasArrangeSelection.ts');
   const testConfigSource = readSource('tsconfig.tests.json');
 
   assert.match(testConfigSource, /tests\/unit\/canvas-arrange-selection-contract\.test\.ts/);
@@ -106,8 +106,8 @@ test('single prompt child arrange boundary lives outside CanvasContext', () => {
 });
 
 test('selected root arrange boundary lives outside CanvasContext without any roots', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const helperSource = readSource('src/context/canvasArrangeSelection.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const helperSource = readSource('apps/web/src/context/canvasArrangeSelection.ts');
 
   assert.match(helperSource, /export function arrangeSelectedRootNodes/);
   assert.match(contextSource, /arrangeSelectedRootNodes\(currentCanvas, selectedIds, mode\)/);
@@ -116,8 +116,8 @@ test('selected root arrange boundary lives outside CanvasContext without any roo
 });
 
 test('selected grouped arrange boundary lives outside CanvasContext', () => {
-  const contextSource = readSource('src/context/CanvasContext.tsx');
-  const helperSource = readSource('src/context/canvasArrangeSelection.ts');
+  const contextSource = readSource('apps/web/src/context/CanvasContext.tsx');
+  const helperSource = readSource('apps/web/src/context/canvasArrangeSelection.ts');
 
   assert.match(helperSource, /export function arrangeSelectedGroupedNodes/);
   assert.match(contextSource, /arrangeSelectedGroupedNodes\(currentCanvas, selectedIds, mode\)/);

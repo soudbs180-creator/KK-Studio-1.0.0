@@ -37,19 +37,19 @@ describe('responsive surface utilities', () => {
 
   test('layout overlays reuse shared width helpers instead of hard-coded viewport checks', () => {
     const phoneSurfaceFiles = [
-      'src/components/layout/Sidebar.tsx',
-      'src/components/layout/SearchPalette.tsx',
-      'src/components/modals/TagInputModal.tsx',
-      'src/components/modals/StorageSelectionModal.tsx',
-      'src/components/modals/MigrateModal.tsx',
-      'src/components/image/PptDeckEditorModal.tsx',
-      'src/components/image/GlobalLightbox.tsx',
-      'src/components/common/TutorialOverlay.tsx',
-      'src/utils/canvasCenter.ts',
-      'src/context/CanvasContext.tsx',
+      'apps/web/src/components/layout/Sidebar.tsx',
+      'apps/web/src/components/layout/SearchPalette.tsx',
+      'apps/web/src/components/modals/TagInputModal.tsx',
+      'apps/web/src/components/modals/StorageSelectionModal.tsx',
+      'apps/web/src/components/modals/MigrateModal.tsx',
+      'apps/web/src/components/image/PptDeckEditorModal.tsx',
+      'apps/web/src/components/image/GlobalLightbox.tsx',
+      'apps/web/src/components/common/TutorialOverlay.tsx',
+      'apps/web/src/utils/canvasCenter.ts',
+      'apps/web/src/context/CanvasContext.tsx',
     ];
     const compactSurfaceFiles = [
-      'src/components/settings/SettingsPanel.localized.tsx',
+      'apps/web/src/components/settings/SettingsPanel.localized.tsx',
     ];
 
     for (const file of phoneSurfaceFiles) {
@@ -66,7 +66,7 @@ describe('responsive surface utilities', () => {
   });
 
   test('tutorial overlay keeps separate mobile and desktop onboarding flows', () => {
-    const source = readSource('src/components/common/TutorialOverlay.tsx');
+    const source = readSource('apps/web/src/components/common/TutorialOverlay.tsx');
 
     assert.match(source, /const DESKTOP_TUTORIAL_STEPS:\s*TutorialStep\[\]\s*=/);
     assert.match(source, /const MOBILE_TUTORIAL_STEPS:\s*TutorialStep\[\]\s*=/);
@@ -94,8 +94,8 @@ describe('responsive surface utilities', () => {
   });
 
   test('Clay settings shell keeps separate mobile and desktop surface tokens', () => {
-    const cssSource = readSource('src/index.css');
-    const settingsSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
+    const cssSource = readSource('apps/web/src/index.css');
+    const settingsSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
 
     assert.match(settingsSource, /settings-shell-page--desktop/);
     assert.match(settingsSource, /settings-shell-page--mobile/);
@@ -106,7 +106,7 @@ describe('responsive surface utilities', () => {
   });
 
   test('Clay search palette keeps distinct mobile sheet and desktop command surface', () => {
-    const source = readSource('src/components/layout/SearchPalette.tsx');
+    const source = readSource('apps/web/src/components/layout/SearchPalette.tsx');
 
     assert.match(source, /const DESKTOP_SEARCH_SHORTCUTS/);
     assert.match(source, /const MOBILE_SEARCH_HINTS/);

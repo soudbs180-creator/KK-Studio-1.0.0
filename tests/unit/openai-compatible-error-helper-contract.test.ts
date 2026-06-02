@@ -98,13 +98,13 @@ test("OpenAI-compatible image compatibility errors preserve original error metad
 });
 
 test("OpenAICompatibleAdapter delegates error construction to the helper module", () => {
-  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+  const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
   assert.equal(
     existsSync(path.join(ROOT_DIR, HELPER_RELATIVE_PATH)),
     true,
     "OpenAI-compatible errors should live in a focused helper module",
   );
-  const helperSource = readSource("src/services/llm/openAICompatibleErrors.ts");
+  const helperSource = readSource("apps/web/src/services/llm/openAICompatibleErrors.ts");
 
   assert.match(adapterSource, /buildOpenAICompatibleHttpError/);
   assert.match(adapterSource, /buildOpenAICompatibleImageCompatibilityModeError/);

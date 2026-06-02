@@ -30,10 +30,10 @@ test('createAppRootMode routes workspace paths to the workspace shell and /setti
 });
 
 test('kkai app root bypasses login and callback routes and mounts a local runtime auth provider', () => {
-  const mainSource = readSource('src/main.tsx');
-  const appSource = readSource('src/App.tsx');
-  const authContextSource = readSource('src/context/AuthContext.tsx');
-  const startupSource = readSource('src/context/AppStartupContext.tsx');
+  const mainSource = readSource('apps/web/src/main.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const authContextSource = readSource('apps/web/src/context/AuthContext.tsx');
+  const startupSource = readSource('apps/web/src/context/AppStartupContext.tsx');
 
   assert.match(mainSource, /<AuthProvider>[\s\S]*<App \/>[\s\S]*<\/AuthProvider>/);
   assert.doesNotMatch(appSource, /<LoginScreen \/>/);

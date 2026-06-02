@@ -9,10 +9,10 @@ const ROOT_DIR = process.cwd();
 
 
 test('settings routes and panel use Apple-style billing naming for consumption records', () => {
-  const routesSource = readSource('src/routes/settingsRoutes.tsx');
-  const settingsPanelSource = readSource('src/components/settings/SettingsPanel.localized.tsx');
-  const registrySource = readSource('src/components/settings/settingsRegistry.ts');
-  const dashboardSource = readSource('src/components/settings/views/DashboardView.localized.tsx');
+  const routesSource = readSource('apps/web/src/routes/settingsRoutes.tsx');
+  const settingsPanelSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
+  const registrySource = readSource('apps/web/src/components/settings/settingsRegistry.ts');
+  const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
 
   assert.match(routesSource, /getSettingsNavItems\('zh-CN'\)/);
   assert.match(registrySource, /labelZh:\s*'计费账本'/);
@@ -22,7 +22,7 @@ test('settings routes and panel use Apple-style billing naming for consumption r
 });
 
 test('mobile settings navigation keeps the logs entry framed as concise error triage', () => {
-  const dashboardSource = readSource('src/components/settings/views/DashboardView.localized.tsx');
+  const dashboardSource = readSource('apps/web/src/components/settings/views/DashboardView.localized.tsx');
 
   assert.match(dashboardSource, /pick\('日志诊断', 'System Logs'\)/);
   assert.match(dashboardSource, /pick\('错误排障与告警', 'Triage & Diagnostics'\)/);

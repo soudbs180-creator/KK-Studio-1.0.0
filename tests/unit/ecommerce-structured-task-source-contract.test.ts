@@ -9,19 +9,19 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce structured task flow is wired through analysis, generation, display labels, and redraw inheritance', () => {
-  const appSource = readSource('src/App.tsx');
-  const typesSource = readSource('src/types.ts');
-  const editorPanelSource = readSource('src/components/ecommerce/EcommerceTaskEditorPanel.tsx');
-  const reviewPanelSource = readSource('src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
-  const cardActionsSource = readSource('src/components/ecommerce/EcommerceCardActions.tsx');
-  const promptBarSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
-  const imageCardSource = readSource('src/components/image/ImageCard2.tsx');
-  const nodeGenerationHookSource = readSource('src/app/useEcommerceNodeGenerationRuntime.ts');
-  const optimizePromptSource = readSource('src/app/optimizeGenerationPrompt.ts');
-  const postBuildSyncSource = readSource('src/app/useEcommercePostBuildSyncRuntime.ts');
-  const optimizerSource = readSource('src/services/llm/promptOptimizerService.ts');
-  const optimizerRulebookSource = readSource('src/services/llm/promptOptimizerRulebook.ts');
-  const generationHookSource = readSource('src/hooks/useImageGeneration.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const typesSource = readSource('apps/web/src/types.ts');
+  const editorPanelSource = readSource('apps/web/src/components/ecommerce/EcommerceTaskEditorPanel.tsx');
+  const reviewPanelSource = readSource('apps/web/src/components/ecommerce/EcommerceAnalysisReviewPanel.tsx');
+  const cardActionsSource = readSource('apps/web/src/components/ecommerce/EcommerceCardActions.tsx');
+  const promptBarSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
+  const imageCardSource = readSource('apps/web/src/components/image/ImageCard2.tsx');
+  const nodeGenerationHookSource = readSource('apps/web/src/app/useEcommerceNodeGenerationRuntime.ts');
+  const optimizePromptSource = readSource('apps/web/src/app/optimizeGenerationPrompt.ts');
+  const postBuildSyncSource = readSource('apps/web/src/app/useEcommercePostBuildSyncRuntime.ts');
+  const optimizerSource = readSource('apps/web/src/services/llm/promptOptimizerService.ts');
+  const optimizerRulebookSource = readSource('apps/web/src/services/llm/promptOptimizerRulebook.ts');
+  const generationHookSource = readSource('apps/web/src/hooks/useImageGeneration.ts');
 
   assert.match(typesSource, /export interface EcommerceEditableTaskState/);
   assert.match(typesSource, /export interface EcommerceSeriesTemplate/);

@@ -10,10 +10,10 @@ const ROOT_DIR = process.cwd();
 
 test('ecommerce build runtime owns confirmation and node builders', () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommerceBuildRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommerceBuildRuntime.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommerceBuildRuntime.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceBuildRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceBuildRuntime.ts');
 
   assert.match(hookSource, /export interface UseEcommerceBuildRuntimeDeps \{/);
   assert.match(hookSource, /export interface UseEcommerceBuildRuntimeResult \{/);
@@ -40,10 +40,10 @@ test('ecommerce build runtime owns confirmation and node builders', () => {
 });
 
 test('ecommerce build runtime remains separate from upload sync and generation runtime', () => {
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommerceBuildRuntime.ts');
-  const postBuildSyncSource = readSource('src/app/useEcommercePostBuildSyncRuntime.ts');
-  const nodeGenerationSource = readSource('src/app/useEcommerceNodeGenerationRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceBuildRuntime.ts');
+  const postBuildSyncSource = readSource('apps/web/src/app/useEcommercePostBuildSyncRuntime.ts');
+  const nodeGenerationSource = readSource('apps/web/src/app/useEcommerceNodeGenerationRuntime.ts');
 
   assert.match(appSource, /useEcommercePostBuildSyncRuntime\(\{/);
   assert.match(appSource, /useEcommerceNodeGenerationRuntime\(\{/);
@@ -56,8 +56,8 @@ test('ecommerce build runtime remains separate from upload sync and generation r
 });
 
 test('ecommerce build confirmation hands off to one focused canvas framework and keeps analysis available for post-build sync', () => {
-  const hookSource = readSource('src/app/useEcommerceBuildRuntime.ts');
-  const appSource = readSource('src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommerceBuildRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
 
   assert.match(hookSource, /requirementFile: File \| null;/);
   assert.match(hookSource, /productFiles: File\[\];/);

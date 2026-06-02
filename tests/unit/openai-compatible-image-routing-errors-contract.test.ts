@@ -79,7 +79,7 @@ test("OpenAI-compatible image routing error classifiers preserve historical mess
 });
 
 test("OpenAICompatibleAdapter delegates image routing error classification to helper module", () => {
-  const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
+  const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
 
   assert.match(adapterSource, /isChatEndpointCompatibilityError/);
   assert.match(adapterSource, /isImageEndpointCompatibilityError/);

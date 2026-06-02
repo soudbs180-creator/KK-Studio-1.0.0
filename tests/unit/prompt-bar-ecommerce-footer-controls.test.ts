@@ -9,10 +9,10 @@ const ROOT_DIR = process.cwd();
 
 
 test('prompt bar ecommerce footer keeps ecommerce state inside the shared mode panel', () => {
-  const promptBarSource = readSource('src/components/layout/PromptBar.tsx');
-  const modePanelSource = readSource('src/components/layout/prompt-bar/DesktopComposerModePanel.tsx');
-  const imageOptionsPanelSource = readSource('src/components/image/ImageOptionsPanel.tsx');
-  const typesSource = readSource('src/types.ts');
+  const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
+  const modePanelSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerModePanel.tsx');
+  const imageOptionsPanelSource = readSource('apps/web/src/components/image/ImageOptionsPanel.tsx');
+  const typesSource = readSource('apps/web/src/types.ts');
 
   assert.match(modePanelSource, /summaryContent\?: React\.ReactNode;/);
   assert.match(promptBarSource, /const ecommerceOptionsSummary = config\.mode === GenerationMode\.ECOMMERCE \? \(/);
@@ -46,10 +46,10 @@ test('prompt bar ecommerce footer keeps ecommerce state inside the shared mode p
 });
 
 test('app forwards ecommerce sheet settings and the ecommerce confirm label into prompt bar surfaces', () => {
-  const appSource = readSource('src/App.tsx');
-  const appPromptComposerSource = readSource('src/app/AppPromptComposer.tsx');
-  const promptBarHookSource = readSource('src/app/useAppPromptBarProps.ts');
-  const sheetSettingsRuntimeSource = readSource('src/app/useEcommerceSheetSettingsRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const appPromptComposerSource = readSource('apps/web/src/app/AppPromptComposer.tsx');
+  const promptBarHookSource = readSource('apps/web/src/app/useAppPromptBarProps.ts');
+  const sheetSettingsRuntimeSource = readSource('apps/web/src/app/useEcommerceSheetSettingsRuntime.ts');
 
   assert.match(
     appPromptComposerSource,

@@ -129,8 +129,8 @@ describe("OpenAI-compatible Wuyin route helpers", () => {
   });
 
   test("adapter delegates Wuyin route ownership to the helper module", () => {
-    const adapterSource = readSource("src/services/llm/OpenAICompatibleAdapter.ts");
-    const helperSource = readSource("src/services/llm/openAICompatibleWuyinRoute.ts");
+    const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
+    const helperSource = readSource("apps/web/src/services/llm/openAICompatibleWuyinRoute.ts");
     const testConfigSource = readSource("tsconfig.tests.json");
 
     assert.match(adapterSource, /openAICompatibleWuyinRoute/);

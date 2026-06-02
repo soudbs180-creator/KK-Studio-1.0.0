@@ -10,10 +10,10 @@ const ROOT_DIR = process.cwd();
 
 test('ecommerce post-build sync runtime owns built-card upload and active-task effects', () => {
   const hookPath = path.join(ROOT_DIR, 'apps/web/src/app/useEcommercePostBuildSyncRuntime.ts');
-  assert.equal(existsSync(hookPath), true, 'src/app/useEcommercePostBuildSyncRuntime.ts should exist');
+  assert.equal(existsSync(hookPath), true, 'apps/web/src/app/useEcommercePostBuildSyncRuntime.ts should exist');
 
-  const appSource = readSource('src/App.tsx');
-  const hookSource = readSource('src/app/useEcommercePostBuildSyncRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const hookSource = readSource('apps/web/src/app/useEcommercePostBuildSyncRuntime.ts');
 
   assert.match(hookSource, /export interface UseEcommercePostBuildSyncRuntimeDeps \{/);
   assert.match(hookSource, /export interface UseEcommercePostBuildSyncRuntimeResult \{/);

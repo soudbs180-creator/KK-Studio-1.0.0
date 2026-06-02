@@ -9,9 +9,9 @@ const ROOT_DIR = process.cwd();
 
 
 test('ecommerce confirm flow caches shared upload references and exposes confirming state', () => {
-  const appSource = readSource('src/App.tsx');
-  const buildRuntimeSource = readSource('src/app/useEcommerceBuildRuntime.ts');
-  const promptBarSource = readSource('src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const buildRuntimeSource = readSource('apps/web/src/app/useEcommerceBuildRuntime.ts');
+  const promptBarSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
 
   assert.match(appSource, /isConfirmingAnalysis: false/);
   assert.match(appSource, /useEcommerceBuildRuntime\(\{/);
@@ -24,8 +24,8 @@ test('ecommerce confirm flow caches shared upload references and exposes confirm
 });
 
 test('ecommerce confirm flow builds one visible framework card that contains the whole requirement summary', () => {
-  const appSource = readSource('src/App.tsx');
-  const buildRuntimeSource = readSource('src/app/useEcommerceBuildRuntime.ts');
+  const appSource = readSource('apps/web/src/App.tsx');
+  const buildRuntimeSource = readSource('apps/web/src/app/useEcommerceBuildRuntime.ts');
 
   assert.match(appSource, /useEcommerceBuildRuntime\(\{/);
   assert.match(buildRuntimeSource, /const buildEcommerceFrameworkNode = useCallback\(\(\s*analysis: EcommerceAnalysisResult,/);
