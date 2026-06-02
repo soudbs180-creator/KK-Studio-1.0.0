@@ -12,6 +12,7 @@
  */
 
 import { fileSystemService } from './fileSystemService';
+import { getStorageMode } from './storagePreference';
 
 const BASE64_LIKE_PATTERN = /^[A-Za-z0-9+/=\r\n]+$/;
 
@@ -427,7 +428,6 @@ export async function saveImage(id: string, dataURL: string): Promise<void> {
 
         // 🚀 [OPFS Backup] 如果是 OPFS 模式，且支持 OPFS，同时往 OPFS 写入备份
         try {
-            const { getStorageMode } = await import('./storagePreference');
             const selectedMode = await getStorageMode();
             if (selectedMode === 'opfs') {
                 const { isOPFSAvailable, saveToOPFS } = await import('./opfsService');
@@ -1060,7 +1060,6 @@ export async function saveOriginalImage(id: string, dataURL: string, isVideo: bo
 
             // 🚀 [OPFS Backup] 如果是 OPFS 模式，且支持 OPFS，同时往 OPFS 写入原图备份
             try {
-                const { getStorageMode } = await import('./storagePreference');
                 const selectedMode = await getStorageMode();
                 if (selectedMode === 'opfs') {
                     const { isOPFSAvailable, saveToOPFS } = await import('./opfsService');

@@ -65,7 +65,7 @@ export const AppStartupScreen: React.FC<{
   return (
     <div
       data-testid="app-startup-screen"
-      className="fixed inset-0 flex flex-col items-center justify-center bg-[#09090b] text-white"
+      className="fixed inset-0 flex flex-col items-center justify-center bg-black text-white"
     >
       <div
         data-testid="app-startup-shell"

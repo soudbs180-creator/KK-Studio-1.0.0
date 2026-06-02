@@ -8,6 +8,7 @@
 import { ImageQuality, getQualityStorageId } from './imageQuality';
 import { getImage, getImageByQuality } from '../storage/imageStorage';
 import { registerBlobUrl, touchBlobUrl, releaseBlobUrl } from '../storage/memoryManager';
+import { getLocalFolderHandle } from '../storage/storagePreference';
 
 // LOD级别定义
 export enum LODLevel {
@@ -111,7 +112,6 @@ export async function getLODUrl(
                 }
 
                 // 尝试从本地磁盘加载
-                const { getLocalFolderHandle } = await import('../storage/storagePreference');
                 const handle = await getLocalFolderHandle();
                 if (handle) {
                     const { fileSystemService } = await import('../storage/fileSystemService');

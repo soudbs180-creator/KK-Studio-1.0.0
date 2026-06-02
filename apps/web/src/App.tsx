@@ -238,6 +238,7 @@ import { AppStartupProvider, useAppStartup } from './context/AppStartupContext';
 import { AuthenticatedAppShell } from './app/AuthenticatedAppShell';
 import { KKAI_FEATURE_FLAGS } from './app/kkaiFeatureFlags';
 import { createAppRootMode } from './context/kkaiRuntimeContext';
+import { getStorageMode, isMobileDevice } from './services/storage/storagePreference';
 import type { UserProfileView } from './components/modals/UserProfileModal';
 import { useAuth } from './context/AuthContext';
 import { Loader2 } from 'lucide-react';
@@ -950,7 +951,6 @@ const AppContent: React.FC<AppContentProps> = () => {
           || window.location.hostname === '::1';
 
         // 3. Storage Mode Check
-        const { getStorageMode, isMobileDevice } = await import('./services/storage/storagePreference');
         let storageMode = await getStorageMode();
 
         const isMobilePhone = isMobileDevice();
@@ -4580,7 +4580,7 @@ const AppContent: React.FC<AppContentProps> = () => {
   // Keep this after all hooks so the hook order stays stable across renders.
   if (!isReady) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'var(--bg-base)' }}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: '#000000' }}>
         <Loader2 className="animate-spin text-indigo-500" size={32} />
       </div>
     );
@@ -5264,13 +5264,13 @@ const App: React.FC = () => {
               AppContentComponent={
                 rootMode === 'admin'
                   ? (props: any) => (
-                      <React.Suspense fallback={<div className="fixed inset-0 z-[10005] flex items-center justify-center bg-slate-950 text-white"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>}>
+                      <React.Suspense fallback={<div className="fixed inset-0 z-[10005] flex items-center justify-center bg-black text-white"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>}>
                         <AdminLayout {...props} />
                       </React.Suspense>
                     )
                   : rootMode === 'settings'
                     ? (props: any) => (
-                        <React.Suspense fallback={<div className="fixed inset-0 z-[10005] flex items-center justify-center bg-slate-950 text-white"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>}>
+                        <React.Suspense fallback={<div className="fixed inset-0 z-[10005] flex items-center justify-center bg-black text-white"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>}>
                           <SettingsPageRoot {...props} />
                         </React.Suspense>
                       )
