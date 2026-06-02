@@ -19,9 +19,15 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Install web app dependencies
+        run: npm ci --prefix apps/web --legacy-peer-deps
 
       - name: Governance, tests, and build
         run: npm run verify:changes
