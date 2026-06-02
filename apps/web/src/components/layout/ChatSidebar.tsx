@@ -548,6 +548,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
     const [currentAgent, setCurrentAgent] = useState<AgentConfig | null>(() => agentService.getActive());
 
     // Subscribe to keyManager updates
+    const lastPreferredModelIdRef = useRef<string>('');
     useEffect(() => {
         const updateModels = () => {
             const models = buildAvailableChatModels(canBrowseSystemCreditModels);
@@ -555,6 +556,19 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
             if (models.length > 0) {
                 const assistantPreferredModel = resolveAssistantPreferredModel(models);
+                const assignment = resolveAssistantCapabilityRoute();
+                const preferredModelId = String(assignment?.primaryModelId || '').trim();
+
+                // 简体中文：如果最新获取到的首选模型ID与上次记录的不同，说明能力分配被修改，我们强行同步切换默认模型
+                if (preferredModelId && preferredModelId !== lastPreferredModelIdRef.current) {
+                    lastPreferredModelIdRef.current = preferredModelId;
+                    const match = models.find(m => m.id === preferredModelId);
+                    if (match) {
+                        setSelectedModel(match);
+                        return;
+                    }
+                }
+
                 const exists = models.find(m => m.id === selectedModel.id);
                 const staleDisabledCapabilityModel = isCapabilityRouteAssignmentModelDisabled('assistant', selectedModel.id);
                 if (!exists || staleDisabledCapabilityModel) {
@@ -1922,6 +1936,10 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                 const startX = e.clientX;
                                 const startWidth = sidebarWidth;
 
+                                // 简体中文：禁止拖动时文本选中并锁定全局光标样式以获得极致顺滑的 premium 拖动反馈
+                                document.body.style.userSelect = 'none';
+                                document.body.style.cursor = 'ew-resize';
+
                                 const onMouseMove = (moveEvent: MouseEvent) => {
                                     const deltaX = startX - moveEvent.clientX;
                                     const newWidth = Math.max(320, Math.min(800, startWidth + deltaX));
@@ -1932,12 +1950,18 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                     const deltaX = startX - upEvent.clientX;
                                     const newWidth = Math.max(320, Math.min(800, startWidth + deltaX));
                                     localStorage.setItem('kk_chat_width', newWidth.toString());
-                                    document.removeEventListener('mousemove', onMouseMove);
-                                    document.removeEventListener('mouseup', onMouseUp);
+                                    
+                                    // 简体中文：恢复选中和光标样式
+                                    document.body.style.userSelect = '';
+                                    document.body.style.cursor = '';
+                                    
+                                    window.removeEventListener('mousemove', onMouseMove);
+                                    window.removeEventListener('mouseup', onMouseUp);
                                 };
 
-                                document.addEventListener('mousemove', onMouseMove);
-                                document.addEventListener('mouseup', onMouseUp);
+                                // 简体中文：升级到 window 级别全局侦听，解决移出 document 丢失 mouseup 事件的致命黏滞问题
+                                window.addEventListener('mousemove', onMouseMove);
+                                window.addEventListener('mouseup', onMouseUp);
                             }}
                             className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-[var(--primary)] transition-colors z-50"
                         />

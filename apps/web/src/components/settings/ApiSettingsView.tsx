@@ -871,6 +871,13 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   const [showAdvancedDetails, setShowAdvancedDetails] = useState(false);
   const [providerPricingEndpointDraft, setProviderPricingEndpointDraft] = useState('');
   const [showPricingEndpointOverride, setShowPricingEndpointOverride] = useState(false);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 900 : false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => setIsMobile(window.innerWidth <= 900);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [apiHealth, setApiHealth] = useState<KkApiServerHealth | null>(null);
   const [returnHighlight, setReturnHighlight] = useState<{
@@ -3194,14 +3201,14 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               </div>
 
               <div className="settings-provider-fetch-grid">
-                <div className="settings-provider-fetch-item">
+                <div className={`settings-provider-fetch-item ${isMobile ? 'flex flex-col items-center text-center' : ''}`}>
                   <div className="settings-provider-fetch-item__copy">
                     <div className="settings-provider-fetch-item__title">{pick('自动获取模型', 'Fetch models')}</div>
                     <div className="settings-provider-fetch-item__helper">
                       {pick('保存后可检测连通性并回填模型；你也可以继续使用上方手动模型。', 'After saving, connectivity can be checked and models filled. Manual models above remain available.')}
                     </div>
                   </div>
-                  <div className="settings-provider-fetch-item__action">
+                  <div className={`settings-provider-fetch-item__action ${isMobile ? 'w-full flex justify-center mt-3' : ''}`}>
                     {editingProviderId ? (
                       <SettingsActionButton
                         icon={RefreshCw}
@@ -3220,7 +3227,52 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                   </div>
                 </div>
 
-                <div className="settings-provider-fetch-item settings-provider-fetch-item--stacked">
+                {(!isMobile && showPricingEndpointOverride) ? (
+                  /* 电脑端手动二级菜单状态：高度与左侧自动获取卡片一致，提供极其 premium 的微缩二级界面 */
+                  <div className="settings-provider-fetch-item settings-provider-fetch-item--stacked h-full flex flex-col justify-between animate-fadeIn">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowPricingEndpointOverride(false)}
+                          className="flex items-center gap-1 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer bg-transparent border-none p-0"
+                        >
+                          <ArrowLeft size={14} />
+                          <span>{pick('返回', 'Back')}</span>
+                        </button>
+                        <span className="text-[13px] font-bold text-[var(--text-primary)]">{pick('手动价格地址', 'Manual Price Endpoint')}</span>
+                      </div>
+                      <div className="text-[11px] text-[var(--text-secondary)] mb-3 leading-5">
+                        {pick('如果默认价格地址失败，请在下方输入自定义价格地址。', 'If default pricing fails, enter a custom endpoint below.')}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 w-full mt-auto">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          className="w-full bg-[var(--settings-surface-elevated)] border border-[var(--settings-border-subtle)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-indigo-500"
+                          value={providerPricingEndpointDraft}
+                          onChange={(e) => setProviderPricingEndpointDraft(e.target.value)}
+                          placeholder={buildDefaultProviderPricingEndpoint(providerForm.baseUrl) || 'https://api.example.com/v1/models'}
+                          disabled={providerEditorReadOnly}
+                        />
+                      </div>
+                      <PrimaryButton
+                        disabled={routeDiagnosticsActionDisabled}
+                        loading={busy === `provider-price:${editingProviderId}`}
+                        onClick={() => {
+                          const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
+                          if (matched) void syncPricing(matched, providerPricingEndpointDraft);
+                        }}
+                        className="px-3"
+                      >
+                        {pick('确认', 'Confirm')}
+                      </PrimaryButton>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={`settings-provider-fetch-item settings-provider-fetch-item--stacked ${isMobile ? 'flex flex-col items-center text-center' : ''}`}>
                   <div className="settings-provider-fetch-item__row">
                     <div className="settings-provider-fetch-item__copy">
                       <div className="settings-provider-fetch-item__title">{pick('价格与消耗', 'Pricing and usage')}</div>
@@ -3231,7 +3283,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                         )}
                       </div>
                     </div>
-                    <div className="settings-provider-fetch-item__action">
+                    {!isMobile && (
+                      <div className="settings-provider-fetch-item__action flex items-center gap-2">
                       {editingProviderId ? (
                         <SettingsActionButton
                           icon={Wand2}
@@ -3244,34 +3297,68 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                         >
                           {pick('自动获取', 'Fetch')}
                         </SettingsActionButton>
+                        <SecondaryButton onClick={() => setShowPricingEndpointOverride(true)} className="px-3">
+                          {pick('手动', 'Manual')}
+                        </SecondaryButton>
                       ) : (
                         <SettingsBadge tone="neutral">{pick('先保存', 'Save first')}</SettingsBadge>
                       )}
                     </div>
                   </div>
-                  {showPricingEndpointOverride ? (
-                    <div className="settings-provider-fetch-item__endpoint">
-                      <SettingInput
-                        label={pick('价格地址', 'Pricing endpoint URL')}
-                        value={providerPricingEndpointDraft}
-                        onChange={setProviderPricingEndpointDraft}
-                        placeholder={buildDefaultProviderPricingEndpoint(providerForm.baseUrl) || 'https://api.example.com/v1/models'}
-                        helper={pick(
-                          '如果默认价格地址失败，可以在这里输入自定义价格地址。',
-                          'If the default pricing address fails, enter a custom pricing endpoint here.'
+                    {/* 手机端：两个按钮并排居中，点击手动后在其下方展示一排的输入和确认 */}
+                    {isMobile && (
+                      <div className="w-full mt-3 flex flex-col items-center gap-3">
+                        <div className="flex flex-row justify-center items-center gap-3 w-full">
+                          {editingProviderId ? (
+                            <>
+                              <SettingsActionButton
+                                icon={Wand2}
+                                disabled={routeDiagnosticsActionDisabled}
+                                loading={busy === `provider-price:${editingProviderId}`}
+                                onClick={() => {
+                                  const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
+                                  if (matched) void syncPricing(matched, providerPricingEndpointDraft);
+                                }}
+                              >
+                                {pick('自动获取', 'Fetch')}
+                              </SettingsActionButton>
+                              <SecondaryButton onClick={() => setShowPricingEndpointOverride((curr) => !curr)} className="px-3">
+                                {showPricingEndpointOverride ? pick('收起地址', 'Hide URL') : pick('手动价格地址', 'Manual URL')}
+                              </SecondaryButton>
+                            </>
+                          ) : (
+                            <SettingsBadge tone="neutral">{pick('先保存', 'Save first')}</SettingsBadge>
+                          )}
+                        </div>
+
+                        {showPricingEndpointOverride && (
+                          <div className="flex flex-row items-center gap-2 w-full mt-1 animate-fadeIn">
+                            <div className="flex-1">
+                              <input
+                                type="text"
+                                className="w-full bg-[var(--settings-surface-elevated)] border border-[var(--settings-border-subtle)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-indigo-500"
+                                value={providerPricingEndpointDraft}
+                                onChange={(e) => setProviderPricingEndpointDraft(e.target.value)}
+                                placeholder={buildDefaultProviderPricingEndpoint(providerForm.baseUrl) || 'https://api.example.com/v1/models'}
+                                disabled={providerEditorReadOnly}
+                              />
+                            </div>
+                            <PrimaryButton
+                              disabled={routeDiagnosticsActionDisabled}
+                              loading={busy === `provider-price:${editingProviderId}`}
+                              onClick={() => {
+                                const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
+                                if (matched) void syncPricing(matched, providerPricingEndpointDraft);
+                              }}
+                              className="px-3"
+                            >
+                              {pick('确认', 'Confirm')}
+                            </PrimaryButton>
+                          </div>
                         )}
-                        disabled={providerEditorReadOnly}
-                      />
-                    </div>
-                  ) : null}
-                  <div className="settings-provider-fetch-item__footer">
-                    <SecondaryButton onClick={() => setShowPricingEndpointOverride((current) => !current)}>
-                      {showPricingEndpointOverride
-                        ? pick('收起价格地址', 'Hide pricing endpoint')
-                        : pick('手动价格地址', 'Manual pricing endpoint')}
-                    </SecondaryButton>
+                      </div>
+                    )}
                   </div>
-                </div>
               </div>
             </div>
 

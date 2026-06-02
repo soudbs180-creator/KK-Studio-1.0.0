@@ -11215,7 +11215,7 @@ body.dark-mode .storage-selection-modal {
   -webkit-backdrop-filter: blur(20px) saturate(1.25);
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: 24px !important;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35);
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
   cursor: pointer;
@@ -11240,8 +11240,8 @@ body.dark-mode .storage-selection-modal {
   transform: translateY(-4px);
   border-color: var(--route-accent, #38bdf8) !important;
   box-shadow: 
-    0 12px 40px 0 rgba(0, 0, 0, 0.45),
-    0 0 20px 0 rgba(56, 189, 248, 0.08);
+    0 8px 24px 0 rgba(0, 0, 0, 0.25),
+    0 0 16px 0 rgba(56, 189, 248, 0.06);
 }
 
 .settings-panel .settings-model-center-route:hover::before {
@@ -15335,8 +15335,7 @@ body:not(.dark-mode) .settings-log-group-badge {
 .settings-panel .settings-model-center-layout {
   width: 100% !important;
   max-width: 1128px !important;
-  grid-template-columns: minmax(0, 842px) minmax(270px, 1fr);
-  grid-template-columns: minmax(0, 842px) minmax(270px, 1fr) !important;
+  grid-template-columns: minmax(0, 556px) minmax(360px, 1fr) !important;
   gap: 16px !important;
   justify-content: start !important;
   overflow-x: visible !important;
@@ -15344,7 +15343,7 @@ body:not(.dark-mode) .settings-log-group-badge {
 
 .settings-panel .settings-model-center-pool {
   width: 100% !important;
-  max-width: 842px !important;
+  max-width: 556px !important;
   container-name: model-center-pool;
   container-type: inline-size;
   overflow-x: visible !important;

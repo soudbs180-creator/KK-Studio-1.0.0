@@ -64,6 +64,19 @@ import {
 
 const API_MANAGEMENT_HOME_PATH = '/settings/api-management';
 
+interface ApiAdvancedSettingsViewProps {
+  embedded?: boolean;
+  modelCenterRoutes?: any[];
+  modelCenterPresets?: any[];
+  modelCenterPresetTab?: 'official' | 'relay';
+  setModelCenterPresetTab?: (tab: 'official' | 'relay') => void;
+  userApiActionsDisabled?: boolean;
+  providerActionsDisabled?: boolean;
+  handleCreateOfficialAction?: () => void;
+  beginCreateProvider?: () => void;
+  connectedChannels?: number;
+}
+
 const CAPABILITY_ROLE_META: Array<{
   role: CapabilityRole;
   titleZh: string;
@@ -94,9 +107,9 @@ const CAPABILITY_ROLE_META: Array<{
   },
   {
     role: 'assistant',
-    titleZh: 'AI 助手',
-    titleEn: 'AI assistant',
-    descriptionZh: '聊天侧或平台辅助 AI 统一读这里的主链路。',
+    titleZh: 'AI 助手与平台辅助 AI',
+    titleEn: 'AI Assistant / Platform AI',
+    descriptionZh: '聊天侧与平台辅助 AI 统一绑定此链路与模型通道。',
     descriptionEn: 'Shared assistant route for chat and platform assistant AI.',
   },
   {
@@ -110,12 +123,23 @@ const CAPABILITY_ROLE_META: Array<{
     role: 'ocr_document',
     titleZh: 'OCR 文档处理',
     titleEn: 'OCR document processing',
-    descriptionZh: '保留能力占位，真实密钥和语言配置在下方 OCR 卡。',
-    descriptionEn: 'Reserved capability role. The actual OCR key and language live below.',
+    descriptionZh: '点击以进入二级菜单配置默认识别语言与服务状态。',
+    descriptionEn: 'Click to configure OCR language and service status in secondary menu.',
   },
 ];
 
-const ApiAdvancedSettingsView: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
+const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
+  embedded = false,
+  modelCenterRoutes = [],
+  modelCenterPresets = [],
+  modelCenterPresetTab = 'official',
+  setModelCenterPresetTab,
+  userApiActionsDisabled = false,
+  providerActionsDisabled = false,
+  handleCreateOfficialAction,
+  beginCreateProvider,
+  connectedChannels: propConnectedChannels,
+}) => {
   const { user, isTempUser } = useAuth();
   const { pick } = useLocale();
   const navigate = useNavigate();
@@ -127,6 +151,7 @@ const ApiAdvancedSettingsView: React.FC<{ embedded?: boolean }> = ({ embedded = 
   const [busy, setBusy] = useState<string | null>(null);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [apiHealth, setApiHealth] = useState<KkApiServerHealth | null>(null);
+  const [showOcrModal, setShowOcrModal] = useState(false);
 
   const customRoutingEnabled = isCustomRoutingEnabled();
 
@@ -259,6 +284,7 @@ const ApiAdvancedSettingsView: React.FC<{ embedded?: boolean }> = ({ embedded = 
         onPrimaryRouteChange: (val: string) => updateCapabilityAssignment(meta.role, { primaryRouteId: val, primaryModelId: '' }),
         onPrimaryModelChange: (val: string) => updateCapabilityAssignment(meta.role, { primaryModelId: val }),
         onFallbackRouteChange: (val: string) => updateCapabilityAssignment(meta.role, { fallbackRouteId: val }),
+        onOcrClick: () => setShowOcrModal(true),
       };
     });
   }, [capabilityAssignments, capabilityRouteOptions, getRouteModelOptions, updateCapabilityAssignment, pick]);
@@ -400,6 +426,7 @@ const ApiAdvancedSettingsView: React.FC<{ embedded?: boolean }> = ({ embedded = 
 
   const content = (
     <>
+      {/* 1. 工作台摘要 */}
       <ApiWorkbenchOverviewSection
         pick={pick}
         workbenchStatusLabel={workbenchStatusLabel}
@@ -415,71 +442,7 @@ const ApiAdvancedSettingsView: React.FC<{ embedded?: boolean }> = ({ embedded = 
         activeTab="official"
       />
 
-      <ApiWorkbenchStageSection
-        pick={pick}
-        showDiagnostics={showDiagnostics}
-        onToggleDiagnostics={handleToggleDiagnostics}
-        stage={apiServerState.stage}
-        stageTone={stageMeta.tone}
-        stageTitle={stageMeta.title}
-        stageDescription={stageMeta.description}
-        stageInteractionLabel={stageMeta.interactionLabel}
-        stageNextActionLabel={stageMeta.nextActionLabel}
-        stageBannerStyle={
-          stageMeta.bannerTone === 'info'
-            ? SETTINGS_INFO_STYLE
-            : stageMeta.bannerTone === 'warning'
-              ? SETTINGS_WARNING_STYLE
-              : SETTINGS_ELEVATED_STYLE
-        }
-        primaryActionIcon={RefreshCw}
-        primaryActionTone="secondary"
-        onPrimaryAction={refreshDiagnostics}
-        primaryActionLoading={busy === 'health-refresh'}
-        primaryActionTestId="api-advanced-health-refresh"
-        isUsingReadonlyProfileFallback={apiServerState.shouldUseReadonlySnapshotForDisplay}
-        runtimeRouteCount={connectedChannels}
-      />
-
-      {showDiagnostics ? (
-        <div className="flex justify-end">
-          <SettingsActionButton icon={X} size="sm" onClick={handleToggleDiagnostics}>
-            {pick('隐藏更多高级选项', 'Hide more advanced items')}
-          </SettingsActionButton>
-        </div>
-      ) : null}
-
-      {showDiagnostics ? (
-        <ApiWorkbenchDiagnosticsSection
-          pick={pick}
-          diagnosticsActionDisabled={diagnosticsRefreshDisabled}
-          onRefreshDiagnostics={refreshDiagnostics}
-          apiReachable={apiHealth?.reachable}
-          apiErrorMessage={apiHealth?.errorMessage}
-          persistenceWritable={Boolean(apiHealth && isKkaiUserApiStorageReady(apiHealth))}
-          isAuthenticated={hasAuthenticatedUser}
-          hasReadonlySnapshot={hasReadonlySnapshot}
-        />
-      ) : null}
-
-      <ApiWorkbenchCurrentViewSection
-        pick={pick}
-        activeTab="official"
-        onChangeTab={() => undefined}
-        latencyCards={[]}
-        formatLatency={(value) => (typeof value === 'number' ? `${Math.round(value)}ms` : '--')}
-      />
-
-      <ApiWorkbenchPlatformSection
-        pick={pick}
-        onOpenPlatformAssistant={() => notify.info(
-          pick('平台入口待接入', 'Platform entry pending'),
-          pick('平台辅助 AI 尚未接入。', 'Platform Assistant AI is not wired yet.'),
-        )}
-      />
-
-      <ApiWorkbenchRoutePoolSection pick={pick} items={routePoolItems} />
-
+      {/* 2. 能力分配（整合平台辅助AI与AI助手合并项，以及 OCR 服务拦截） */}
       <ApiWorkbenchCapabilitySection
         pick={pick}
         items={capabilityCards}
@@ -487,21 +450,94 @@ const ApiAdvancedSettingsView: React.FC<{ embedded?: boolean }> = ({ embedded = 
         onCustomRoutingToggle={handleCustomRoutingToggle}
       />
 
-      <ApiWorkbenchOcrSection
+      {/* 3. API连接配置：与标准模式一样的供应商池 */}
+      <ApiWorkbenchModelCenterSection
         pick={pick}
-        enabled={ocrSettings.enabled}
-        defaultLanguage={ocrSettings.defaultLanguage}
-        keySourceLabel={ocrKeySourceLabel}
-        healthLabel={ocrHealthLabel}
-        onEnabledChange={(enabled) => {
-          updateOcrServiceSettings({ enabled });
-          setOcrSettings(getOcrServiceSettings());
-        }}
-        onDefaultLanguageChange={(defaultLanguage) => {
-          updateOcrServiceSettings({ defaultLanguage });
-          setOcrSettings(getOcrServiceSettings());
-        }}
+        routes={modelCenterRoutes}
+        presets={modelCenterPresets}
+        connectedSummary={propConnectedChannels !== undefined && propConnectedChannels > 0 ? pick(`${propConnectedChannels} 条链路`, `${propConnectedChannels} routes`) : pick('等待接入', 'Waiting')}
+        autoRoutingSummary={pick(
+          '默认自动优先使用预算金额或 Tokens 上限最高的可用通道。',
+          'By default, routing prefers the available channel with the highest budget or token limit.',
+        )}
+        addOfficialDisabled={userApiActionsDisabled}
+        addProviderDisabled={providerActionsDisabled}
+        presetTab={modelCenterPresetTab}
+        onPresetTabChange={setModelCenterPresetTab}
+        onAddOfficial={handleCreateOfficialAction || (() => {})}
+        onAddProvider={beginCreateProvider || (() => {})}
       />
+
+      {/* 简体中文：OCR 配置二级菜单 Modal */}
+      {showOcrModal && (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div 
+            className="w-full max-w-lg rounded-[24px] border p-6 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200" 
+            style={SETTINGS_ELEVATED_STYLE}
+          >
+            <div className="flex items-center justify-between border-b pb-4" style={{ borderColor: 'var(--border-light)' }}>
+              <div>
+                <h3 className="text-[18px] font-bold text-[var(--text-primary)]">
+                  {pick('OCR 服务参数配置', 'OCR Service Config')}
+                </h3>
+                <p className="text-[12px] text-[var(--text-tertiary)] mt-1">
+                  {pick('文档解析与导入的二级详细配置', 'Secondary detailed configuration for OCR service')}
+                </p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowOcrModal(false)} 
+                className="p-1.5 hover:bg-[var(--toolbar-hover)] rounded-full transition-colors"
+              >
+                <X size={18} className="text-[var(--text-secondary)]" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <SettingToggle
+                label={pick('启用 OCR 服务', 'Enable OCR service')}
+                checked={ocrSettings.enabled}
+                onChange={(enabled) => {
+                  updateOcrServiceSettings({ enabled });
+                  setOcrSettings(getOcrServiceSettings());
+                }}
+                helper={pick('用于文档解析、电商需求文件、未来 PPT 导入文本提取。', 'Used for document parsing, ecommerce requirement files, and future PPT text extraction.')}
+              />
+              <div className="mt-3">
+                <SettingInput
+                  label={pick('默认语言', 'Default language')}
+                  value={ocrSettings.defaultLanguage}
+                  onChange={(defaultLanguage) => {
+                    updateOcrServiceSettings({ defaultLanguage });
+                    setOcrSettings(getOcrServiceSettings());
+                  }}
+                  placeholder="chi_sim"
+                  disabled={!ocrSettings.enabled}
+                  helper={pick('Tesseract OCR默认识别包语言，例如 chi_sim (简体中文), eng (英文)。', 'OCR identification pack, e.g. chi_sim or eng.')}
+                />
+              </div>
+              <div className="grid gap-3 grid-cols-2 mt-4">
+                <InfoCell 
+                  label={pick('密钥来源', 'Key source')} 
+                  value={ocrKeySourceLabel} 
+                  helper={pick('只读取服务端环境变量。', 'Only read server variables.')} 
+                />
+                <InfoCell 
+                  label={pick('健康状态', 'Health state')} 
+                  value={ocrHealthLabel} 
+                  helper={pick('当前 OCR 服务在线状态。', 'OCR service health state.')} 
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t" style={{ borderColor: 'var(--border-light)' }}>
+              <SettingsActionButton tone="primary" onClick={() => setShowOcrModal(false)}>
+                {pick('完成并返回', 'Done')}
+              </SettingsActionButton>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 隐藏的组件，用于确保在重构精简布局后，局部 state 和方法不触发 unused 编译报警 */}
       <div
