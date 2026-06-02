@@ -4,6 +4,7 @@
  * @description 后端主服务入口文件，初始化 Express 应用、配置安全中间件、跨域 CORS、路由挂载及端口监听。
  */
 
+const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
@@ -154,8 +155,30 @@ function createApp() {
 
 const app = createApp();
 
+/**
+ * 强校验 uploads 目录的可写性，防范生产环境 VPS 上由于权限缺失导致图片落盘失败的事故。
+ */
+function ensureUploadsDirectoryWritable() {
+  if (isTestRun()) {
+    return;
+  }
+  const uploadsDir = path.join(__dirname, 'uploads');
+  try {
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    // 简体中文注释：写入临时测试文件以确认物理磁盘具有写权限
+    const testFile = path.join(uploadsDir, `.write-test-${Date.now()}`);
+    fs.writeFileSync(testFile, 'test');
+    fs.unlinkSync(testFile);
+  } catch (err) {
+    throw new Error(`[严重] uploads 目录 '${uploadsDir}' 无法写入，请检查生产环境 VPS 的目录写权限。错误: ${err.message}`);
+  }
+}
+
 function startServer(port = Number(process.env.PORT || 8080), options = {}) {
   assertRequiredEnv(options);
+  ensureUploadsDirectoryWritable();
   const runtimeApp = options.app || app;
   return runtimeApp.listen(port, () => {
     console.log(`[server] 后端主服务已启动，正在运行在端口 :${port}`);
