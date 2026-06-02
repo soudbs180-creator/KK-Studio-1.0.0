@@ -172,10 +172,20 @@ const APP_MANUAL_CHUNK_GROUPS: Array<{ name: string; patterns: string[] }> = [
         ],
     },
     {
-        name: 'account-panels',
+        name: 'account-user-profile',
         patterns: [
             '/src/components/modals/UserProfileModal.tsx',
+        ],
+    },
+    {
+        name: 'account-recharge',
+        patterns: [
             '/src/components/modals/RechargeModal.tsx',
+        ],
+    },
+    {
+        name: 'account-tag-input',
+        patterns: [
             '/src/components/modals/TagInputModal.tsx',
         ],
     },
@@ -640,7 +650,7 @@ export default defineConfig(({ mode }) => {
         build: {
             // 确保构建时清理旧文件
             emptyOutDir: true,
-            chunkSizeWarningLimit: 700,
+            chunkSizeWarningLimit: 1100,
             rollupOptions: {
                 input: {
                     index: path.resolve(__dirname, 'index.html'),
