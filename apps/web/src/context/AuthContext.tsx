@@ -32,8 +32,6 @@ import { tempUserService } from "../services/auth/tempUserService";
 import { setTaskPersistenceStorageUserId } from "../services/persistence/taskPersistence";
 import { createKkaiRuntimeAuthSnapshot } from "./kkaiRuntimeContext";
 
-import { getUserMe } from "@nano-banana/api-client";
-
 interface AuthContextType {
   session: RuntimeAuthSession | null;
   user: RuntimeAuthUser | null;
@@ -124,6 +122,15 @@ function isSessionRecoveryAuthErrorCode(code: unknown): boolean {
     || normalizedCode === "SESSION_REAUTH_REQUIRED";
 }
 
+function resolveAdminLevelFromProfile(profile: { adminLevel?: unknown; role?: unknown } | null | undefined): number {
+  const explicitLevel = Number(profile?.adminLevel);
+  if (Number.isFinite(explicitLevel) && explicitLevel > 0) {
+    return explicitLevel;
+  }
+
+  return profile?.role === "admin" ? 2 : 0;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const initialAuthStateRef = useRef<ReturnType<typeof createInitialAuthState> | null>(null);
   if (!initialAuthStateRef.current) {
@@ -143,19 +150,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (sessionAccessToken && !runtimeState.isTempUser) {
-      getUserMe(sessionAccessToken)
+      kkWebApiClient.getProfile({ accessToken: sessionAccessToken })
         .then((res) => {
-          if (res && typeof res.adminLevel === "number") {
-            setAdminLevel(res.adminLevel);
+          if (res.success) {
+            setAdminLevel(resolveAdminLevelFromProfile(res.data));
+            return;
           }
+          throw new Error(res.error?.message || "Failed to fetch profile adminLevel.");
         })
         .catch(async (err) => {
           const refreshedToken = await refreshPreferredKkApiAccessToken().catch(() => undefined);
           if (refreshedToken && refreshedToken !== sessionAccessToken) {
             try {
-              const res = await getUserMe(refreshedToken);
-              if (res && typeof res.adminLevel === "number") {
-                setAdminLevel(res.adminLevel);
+              const res = await kkWebApiClient.getProfile({ accessToken: refreshedToken });
+              if (res.success) {
+                setAdminLevel(resolveAdminLevelFromProfile(res.data));
                 return;
               }
             } catch {

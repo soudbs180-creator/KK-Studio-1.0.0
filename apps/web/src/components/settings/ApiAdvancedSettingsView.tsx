@@ -51,12 +51,18 @@ import {
   ApiWorkbenchCapabilitySection,
   ApiWorkbenchCurrentViewSection,
   ApiWorkbenchDiagnosticsSection,
+  ApiWorkbenchModelCenterSection,
   ApiWorkbenchOcrSection,
   ApiWorkbenchOverviewSection,
   ApiWorkbenchPlatformSection,
   ApiWorkbenchRoutePoolSection,
   ApiWorkbenchStageSection,
+  InfoCell,
 } from './apiWorkbenchSections';
+import {
+  SettingInput,
+  SettingToggle,
+} from './ui/index';
 import {
   resolveApiWorkbenchDiagnosticsAvailability,
   resolveApiWorkbenchStageMeta,

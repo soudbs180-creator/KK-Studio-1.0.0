@@ -223,12 +223,14 @@ function verifyRequestJwt(req, tokenOverride = '') {
 function buildProfileFromUserRow(user) {
   const email = String(user.email || '').trim();
   const timestamp = user.updated_at || user.created_at || new Date().toISOString();
+  const adminLevel = Number(user.admin_level || 0);
   return {
     id: user.id,
     email,
     nickname: email.split('@')[0] || 'KK User',
     avatarUrl: '',
-    role: Number(user.admin_level || 0) > 0 ? 'admin' : 'user',
+    adminLevel,
+    role: adminLevel > 0 ? 'admin' : 'user',
     status: 'active',
     createdAt: user.created_at || timestamp,
     updatedAt: timestamp,
@@ -242,6 +244,7 @@ function buildLocalProfile(userId, email = 'local-user@example.com') {
     email,
     nickname: email.split('@')[0] || 'Local User',
     avatarUrl: '',
+    adminLevel: 2,
     role: 'admin',
     status: 'active',
     createdAt: now,
@@ -1032,6 +1035,7 @@ router.post('/v1/auth/login', async (req, res) => {
       email: String(email).trim() || 'mock-user@example.com',
       nickname: 'Mock User',
       avatarUrl: '',
+      adminLevel: 0,
       role: 'user',
       status: 'active',
       createdAt: new Date().toISOString(),
@@ -1084,6 +1088,7 @@ router.post('/v1/auth/login', async (req, res) => {
       email: user.email,
       nickname: user.email.split('@')[0],
       avatarUrl: '',
+      adminLevel: Number(user.admin_level || 0),
       role: user.admin_level > 0 ? 'admin' : 'user',
       status: 'active',
       createdAt: user.created_at,

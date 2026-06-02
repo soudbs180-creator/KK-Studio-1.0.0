@@ -21,6 +21,7 @@ export interface ProfileDto {
   email: string;
   nickname?: string;
   avatarUrl?: string;
+  adminLevel?: number;
   role: "user" | "admin";
   status: "active" | "suspended";
   createdAt: string;

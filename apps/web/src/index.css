@@ -15335,7 +15335,7 @@ body:not(.dark-mode) .settings-log-group-badge {
 .settings-panel .settings-model-center-layout {
   width: 100% !important;
   max-width: 1128px !important;
-  grid-template-columns: minmax(0, 556px) minmax(360px, 1fr) !important;
+  grid-template-columns: minmax(0, 842px) minmax(270px, 1fr);
   gap: 16px !important;
   justify-content: start !important;
   overflow-x: visible !important;

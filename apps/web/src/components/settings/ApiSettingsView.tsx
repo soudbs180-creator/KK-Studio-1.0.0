@@ -3286,6 +3286,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                     {!isMobile && (
                       <div className="settings-provider-fetch-item__action flex items-center gap-2">
                       {editingProviderId ? (
+                        <>
                         <SettingsActionButton
                           icon={Wand2}
                           disabled={routeDiagnosticsActionDisabled}
@@ -3300,10 +3301,12 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                         <SecondaryButton onClick={() => setShowPricingEndpointOverride(true)} className="px-3">
                           {pick('手动', 'Manual')}
                         </SecondaryButton>
+                        </>
                       ) : (
                         <SettingsBadge tone="neutral">{pick('先保存', 'Save first')}</SettingsBadge>
                       )}
                     </div>
+                    )}
                   </div>
                     {/* 手机端：两个按钮并排居中，点击手动后在其下方展示一排的输入和确认 */}
                     {isMobile && (
@@ -3359,6 +3362,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                       </div>
                     )}
                   </div>
+                )}
               </div>
             </div>
 
