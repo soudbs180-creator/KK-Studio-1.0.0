@@ -10,9 +10,6 @@ const {
   buildWuyinVideoRequestBody,
   buildWuyinVideoSubmitUrl,
   buildWuyinImageRequestBody,
-  decodeLocalProxyTaskId,
-  encodeLocalProxyTaskId,
-  extractWuyinOutputUrls,
   extractWuyinVideoMessage,
   extractWuyinVideoStatusCode,
   extractWuyinVideoTaskId,
@@ -28,35 +25,25 @@ const {
   resolveWuyinVideoRequestRoute,
 } = require('../lib/wuyinAsyncVideoProxy');
 
+const {
+  refreshWuyinCatalog,
+  getCachedWuyinCatalog,
+  WUYIN_FALLBACK_CATALOG
+} = require('../lib/wuyinCatalogCrawler');
+
+const {
+  submitWuyinTask,
+  checkWuyinTaskStatus,
+  decodeLocalProxyTaskId,
+  encodeLocalProxyTaskId,
+  extractWuyinOutputUrls
+} = require('../lib/wuyinModelExecutor');
+
 const router = express.Router();
 const ACCESS_TOKEN_COOKIE_NAME = 'kk.api.access_token';
 const REFRESH_TOKEN_COOKIE_NAME = 'kk.api.refresh_token';
 const AUTH_COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
-const WUYIN_PRICE_CATALOG_URL = 'https://api.wuyinkeji.com/themes/DigitalBlue/api?action=api_list';
-const WUYIN_FALLBACK_CATALOG = [
-  { modelId: 'video_google_omni', modelName: 'google_omni', endpointPath: '/api/async/video_google_omni', inputPrice: 0.1, unit: '秒' },
-  { modelId: 'video_vidu', modelName: 'video_vidu', endpointPath: '/api/async/video_vidu', inputPrice: 1, unit: '秒' },
-  { modelId: 'video_omni', modelName: 'video_omni', endpointPath: '/api/async/video_omni', inputPrice: 1, unit: '秒' },
-  { modelId: 'video_digital_humans', modelName: 'Digital_Humans', endpointPath: '/api/async/video_digital_humans', inputPrice: 0.02, unit: '秒' },
-  { modelId: 'video_package', modelName: 'Package_1.0', endpointPath: '/api/async/video_package', inputPrice: 0.01, unit: '秒' },
-  { modelId: 'video_veo3.1_fast', modelName: 'veo3.1_fast', endpointPath: '/api/async/video_veo3.1_fast', inputPrice: 0.05, unit: '秒' },
-  { modelId: 'video_grok_imagine', modelName: 'grok_imagine', endpointPath: '/api/async/video_grok_imagine', inputPrice: 0.05, unit: '秒' },
-  { modelId: 'video_wan2.6', modelName: 'Wan2.6', endpointPath: '/api/async/video_wan2.6', inputPrice: 0.8, unit: '秒' },
-  { modelId: 'image_gpt', modelName: 'GPT-Image-2', endpointPath: '/api/async/image_gpt', inputPrice: 0.1, unit: '张' },
-  { modelId: 'image_nanoBanana2', modelName: 'NanoBanana2', endpointPath: '/api/async/image_nanoBanana2', inputPrice: 0.1, unit: '张' },
-  { modelId: 'image_grok_imagine', modelName: 'grok_imagine', endpointPath: '/api/async/image_grok_imagine', inputPrice: 0.1, unit: '张' },
-  { modelId: 'image_nanoBanana_pro', modelName: 'NanoBanana_pro', endpointPath: '/api/async/image_nanoBanana_pro', inputPrice: 0.3, unit: '张' },
-  { modelId: 'image_nanoBanana', modelName: 'NanoBanana', endpointPath: '/api/async/image_nanoBanana', inputPrice: 0.1, unit: '张' },
-  { modelId: 'image_wan2.6', modelName: 'Wan2.6', endpointPath: '/api/async/image_wan2.6', inputPrice: 0.2, unit: '张' },
-  { modelId: 'audio_tts', modelName: '语音合成', endpointPath: '/api/async/audio_tts', inputPrice: 0.0006, unit: '字符' },
-  { modelId: 'sora2-new', modelName: 'sora2-new', endpointPath: '/api/sora2-new/submit', inputPrice: 1.2, unit: '次' },
-  { modelId: 'async_detail', modelName: '结果详情', endpointPath: '/api/async/detail', inputPrice: 0, unit: '次' },
-  { modelId: 'chat_index', modelName: 'ChatAPI', endpointPath: '/api/chat/index', inputPrice: 0, unit: 'token' },
-  { modelId: 'img_split', modelName: '智能拼图', endpointPath: '/api/img/split', inputPrice: 0.03, unit: '次' },
-  { modelId: 'sora2_detail', modelName: 'sora2 new 视频生成详情', endpointPath: '/api/sora2/detail', inputPrice: 0, unit: '次' },
-  { modelId: 'voice_composite', modelName: '语音合成（同步）', endpointPath: '/api/voice/composite', inputPrice: 0.0006, unit: '字符' },
-  { modelId: 'voice_clone', modelName: '语音克隆（同步）', endpointPath: '/api/voice/clone', inputPrice: 6, unit: '次' },
-];
+// 静态默认配置已从 crawler 库引入
 
 const WUYIN_FULL_DEFAULT_CATALOG = [
   {
@@ -1152,7 +1139,30 @@ async function pollWuyinImageResultUntilComplete({ route, routeId, providerTaskI
   throw new Error('Wuyin image generation timed out after 10 minutes.');
 }
 
-// 简体中文注释：处理速创 API 的图片模型提交，如果未直接返回图片则启动轮询
+function findCatalogItemInCachedCatalog(modelId) {
+  const catalog = getCachedWuyinCatalog();
+  const cleanId = String(modelId || '')
+    .split('@')[0]
+    .split('|')[0]
+    .replace(/^models\//i, '')
+    .replace(/^\/+/, '')
+    .replace(/^api\/async\//i, '')
+    .trim();
+  
+  let matched = catalog.find(item => item.id.toLowerCase() === cleanId.toLowerCase());
+  if (!matched) {
+    matched = catalog.find(item => item.aliases.some(alias => alias.toLowerCase() === cleanId.toLowerCase()));
+  }
+  if (!matched) {
+    matched = catalog.find(item => {
+      const lastSegment = item.endpointPath.split('/').pop() || '';
+      return lastSegment.toLowerCase() === cleanId.toLowerCase();
+    });
+  }
+  return matched || null;
+}
+
+// 简体中文注释：处理速创 API 的图片模型提交，由统一的 wuyinModelExecutor 处理参数清洗和路由执行
 async function handleWuyinImageMode(req, res, profileState) {
   const routeId = String(req.body && req.body.routeId || '').trim();
   const route = resolveLocalUserRoute(profileState, routeId);
@@ -1160,127 +1170,87 @@ async function handleWuyinImageMode(req, res, profileState) {
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
   }
-
-  if (!isWuyinAsyncVideoRoute(route, req.body && req.body.modelId)) {
-    return sendLocalProxyError(
-      res,
-      req,
-      404,
-      'USER_ROUTE_NOT_FOUND',
-      'Local user-route proxy only handles Wuyin async-image routes.'
-    );
-  }
-
   if (!route.apiKey) {
     return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
   }
 
-  const body = buildWuyinImageRequestBody(req.body || {});
-
-  if (!String(body.prompt || '').trim()) {
-    return sendLocalProxyError(res, req, 400, 'INVALID_REQUEST', 'Prompt is required for Wuyin image generation.');
+  const modelId = req.body && req.body.modelId;
+  const catalogItem = findCatalogItemInCachedCatalog(modelId);
+  if (!catalogItem) {
+    return sendLocalProxyError(res, req, 404, 'MODEL_NOT_FOUND', `Wuyin model "${modelId}" was not found in catalog.`);
   }
 
-  const baseModelId = String(req.body && req.body.modelId || '')
-    .split('@')[0]
-    .split('|')[0]
-    .replace(/^models\//i, '')
-    .replace(/^\/+/, '')
-    .replace(/^api\/async\//i, '')
-    .trim();
+  try {
+    const result = await submitWuyinTask({ catalogItem, apiKey: route.apiKey, input: req.body });
+    
+    if (result.status === 'pending') {
+      return res.json(okEnvelope({
+        urls: [],
+        taskId: result.taskId,
+        providerTaskId: result.providerTaskId,
+        status: 'pending',
+        endpointType: 'wuyin-async-image',
+        submitExecTime: result.submitExecTime,
+        execTime: result.submitExecTime,
+        requestId: req.body && req.body.requestId,
+        attemptId: req.body && req.body.attemptId,
+      }, req));
+    }
 
-  const endpointPath = resolveWuyinImageEndpointPath(baseModelId);
-
-  if (!endpointPath.startsWith('/api/async/image_')) {
-    return sendLocalProxyError(
-      res,
-      req,
-      400,
-      'INVALID_REQUEST',
-      `Wuyin image route expected /api/async/image_*, got ${endpointPath}.`
-    );
-  }
-
-  const submitUrl = `${normalizeWuyinVideoBaseUrl(route.baseUrl)}${endpointPath}`;
-
-  const submitPayload = await fetchWuyinVideoJson(submitUrl, route.apiKey, 'POST', body);
-  const providerTaskId = extractWuyinTaskId(submitPayload);
-  const immediateUrls = extractWuyinOutputUrls(submitPayload);
-
-  if (immediateUrls.length > 0) {
     return res.json(okEnvelope({
-      urls: immediateUrls,
+      urls: result.urls,
       taskId: '',
       providerTaskId: '',
       status: 'success',
       endpointType: 'wuyin-async-image',
-      requestId: req.body && typeof req.body.requestId === 'string' ? req.body.requestId : undefined,
-      attemptId: req.body && typeof req.body.attemptId === 'string' ? req.body.attemptId : undefined,
+      submitExecTime: result.submitExecTime,
+      execTime: result.submitExecTime,
+      requestId: req.body && req.body.requestId,
+      attemptId: req.body && req.body.attemptId,
     }, req));
+  } catch (err) {
+    return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', err.message);
   }
-
-  if (!providerTaskId) {
-    const message = extractWuyinVideoMessage(submitPayload) || 'Wuyin image API returned no task id.';
-    return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', message);
-  }
-
-  // 简体中文注释：不再在后端进行同步轮询，而是直接返回 pending 状态和编码后的任务 ID，让前端异步查询以彻底避免 Nginx/Cloudflare 的接口超时问题
-  return res.json(okEnvelope({
-    urls: [],
-    taskId: encodeLocalProxyTaskId(route.id || routeId, providerTaskId),
-    providerTaskId,
-    status: 'pending',
-    endpointType: 'wuyin-async-image',
-    submitExecTime: Number(submitPayload.exec_time || 0),
-    execTime: Number(submitPayload.exec_time || 0),
-    requestId: req.body && typeof req.body.requestId === 'string' ? req.body.requestId : undefined,
-    attemptId: req.body && typeof req.body.attemptId === 'string' ? req.body.attemptId : undefined,
-  }, req));
 }
 
+// 简体中文注释：处理速创 API 的视频模型提交，利用通用执行器自动分流和适配参数
 async function handleWuyinVideoMode(req, res, profileState) {
   const routeId = String(req.body && req.body.routeId || '').trim();
   const route = resolveLocalUserRoute(profileState, routeId);
+
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
-  }
-  if (!isWuyinAsyncVideoRoute(route, req.body && req.body.modelId)) {
-    return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'Local user-route proxy only handles Wuyin async-video routes.');
   }
   if (!route.apiKey) {
     return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
   }
 
-  const body = buildWuyinVideoRequestBody(req.body || {});
-  if (!body.prompt.trim()) {
-    return sendLocalProxyError(res, req, 400, 'INVALID_REQUEST', 'Prompt is required for Wuyin video generation.');
+  const modelId = req.body && req.body.modelId;
+  const catalogItem = findCatalogItemInCachedCatalog(modelId);
+  if (!catalogItem) {
+    return sendLocalProxyError(res, req, 404, 'MODEL_NOT_FOUND', `Wuyin model "${modelId}" was not found in catalog.`);
   }
 
-  const wuyinRoute = resolveWuyinVideoRequestRoute(route.baseUrl, req.body && req.body.modelId);
-  const submitUrl = buildWuyinVideoSubmitUrl(route.baseUrl, wuyinRoute);
-  const payload = await fetchWuyinVideoJson(submitUrl, route.apiKey, 'POST', body);
-  const providerTaskId = extractWuyinVideoTaskId(payload);
-  const status = mapWuyinVideoStatus(extractWuyinVideoStatusCode(payload));
-  const directUrl = extractWuyinVideoUrl(payload);
-  const message = extractWuyinVideoMessage(payload);
-
-  if (!providerTaskId && !directUrl) {
-    return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', message || 'Wuyin video API returned no task id.');
+  try {
+    const result = await submitWuyinTask({ catalogItem, apiKey: route.apiKey, input: req.body });
+    
+    return res.json(okEnvelope({
+      taskId: result.taskId || '',
+      providerTaskId: result.providerTaskId || '',
+      status: result.status,
+      url: result.urls[0] || '',
+      urls: result.urls,
+      endpointType: 'openai',
+      requestId: req.body && req.body.requestId,
+      attemptId: req.body && req.body.attemptId,
+      execTime: result.submitExecTime,
+    }, req));
+  } catch (err) {
+    return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', err.message);
   }
-
-  return res.json(okEnvelope({
-    taskId: providerTaskId ? encodeLocalProxyTaskId(route.id || routeId, providerTaskId) : '',
-    providerTaskId,
-    status: directUrl && status === 'success' ? 'success' : status,
-    url: directUrl || '',
-    message: message || undefined,
-    endpointType: 'openai',
-    requestId: req.body && typeof req.body.requestId === 'string' ? req.body.requestId : undefined,
-    attemptId: req.body && typeof req.body.attemptId === 'string' ? req.body.attemptId : undefined,
-    execTime: typeof payload.exec_time === 'number' ? payload.exec_time : undefined,
-  }, req));
 }
 
+// 简体中文注释：查询速创异步任务详情，利用通用执行器进行状态码匹配和结果 URL 深度提取
 async function handleWuyinTaskStatusMode(req, res, profileState) {
   const localTaskId = String(req.body && (req.body.localTaskId || req.body.taskId) || '').trim();
   const parsed = decodeLocalProxyTaskId(localTaskId);
@@ -1298,35 +1268,53 @@ async function handleWuyinTaskStatusMode(req, res, profileState) {
     return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
   }
 
-  const detailUrl = buildWuyinVideoDetailUrl(route.baseUrl, parsed.providerTaskId);
-  const payload = await fetchWuyinVideoJson(detailUrl, route.apiKey, 'GET');
-  const status = mapWuyinStatus(extractWuyinVideoStatusCode(payload));
-
-  // 简体中文注释：智能提取详情结果。对于视频和图片任务，不仅提取第一个 url，同时也通过 extractWuyinOutputUrls 提取全部 urls，确保前端在轮询图片结果时能拿到 urls 数组
-  const urls = status === 'success' ? extractWuyinOutputUrls(payload) : [];
-  const url = urls[0] || '';
+  const catalog = getCachedWuyinCatalog();
+  let catalogItem = null;
   
-  const rawMessage = (payload && payload.data && (payload.data.message || payload.data.fail_reason || payload.data.msg || payload.data.error))
-    || (payload && (payload.message || payload.fail_reason || payload.msg || payload.error))
-    || '';
-  const message = typeof rawMessage === 'string' ? rawMessage.trim() : (rawMessage ? String(rawMessage) : '');
-  
-  const effectiveStatus = status === 'success' && !url ? 'processing' : status;
+  if (parsed.providerTaskId.startsWith('image_')) {
+    catalogItem = catalog.find(x => x.id === 'image_nanoBanana2') || catalog[0];
+  } else if (parsed.providerTaskId.startsWith('video_')) {
+    if (parsed.providerTaskId.includes('sora')) {
+      catalogItem = catalog.find(x => x.id === 'sora2-new');
+    } else {
+      catalogItem = catalog.find(x => x.id === 'video_google_omni');
+    }
+  } else if (parsed.providerTaskId.startsWith('audio_')) {
+    catalogItem = catalog.find(x => x.id === 'audio_tts');
+  }
 
-  const isImageTask = String(parsed.providerTaskId).startsWith('image_');
+  if (!catalogItem) {
+    catalogItem = catalog.find(x => x.detailPath === '/api/async/detail') || {
+      detailPath: '/api/async/detail',
+      detailStatusMode: 'wuyin-async'
+    };
+  }
 
-  return res.json(okEnvelope({
-    taskId: localTaskId,
-    providerTaskId: parsed.providerTaskId,
-    status: effectiveStatus,
-    url: url || undefined,
-    urls: urls.length > 0 ? urls : [],
-    message: message || undefined,
-    error: status === 'failed' ? (message || 'Wuyin task failed.') : undefined,
-    endpointType: isImageTask ? 'wuyin-async-image' : 'openai',
-    detailExecTime: Number(payload.exec_time || 0),
-    execTime: Number(payload.exec_time || 0),
-  }, req));
+  try {
+    const result = await checkWuyinTaskStatus({
+      catalogItem,
+      apiKey: route.apiKey,
+      providerTaskId: parsed.providerTaskId,
+      submitExecTime: req.body.submitExecTime || 0
+    });
+
+    const isImageTask = String(parsed.providerTaskId).startsWith('image_');
+
+    return res.json(okEnvelope({
+      taskId: localTaskId,
+      providerTaskId: parsed.providerTaskId,
+      status: result.status,
+      url: result.urls[0] || undefined,
+      urls: result.urls,
+      message: result.message || undefined,
+      error: result.status === 'failed' ? (result.message || 'Wuyin task failed.') : undefined,
+      endpointType: isImageTask ? 'wuyin-async-image' : 'openai',
+      detailExecTime: result.detailExecTime,
+      execTime: result.detailExecTime,
+    }, req));
+  } catch (err) {
+    return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', err.message);
+  }
 }
 
 router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
@@ -1370,52 +1358,51 @@ router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
   }
 });
 
-let cachedWuyinPricingRows = null;
-
+// 简体中文注释：获取速创 API 模型目录，优先加载本地缓存文件，如果强制 refresh 则触发抓取
 router.get('/v1/wuyin/catalog', async (req, res) => {
   const shouldRefresh = req.query.refresh === 'true';
 
   try {
-    // 仅在强制刷新，或全局缓存为空时发起网络请求
-    if (shouldRefresh || !cachedWuyinPricingRows) {
-      const rows = await fetchWuyinPricingRows();
-      if (rows && rows.length > 0) {
-        cachedWuyinPricingRows = rows;
-      }
-    }
-
-    if (cachedWuyinPricingRows) {
-      const catalog = mergeWuyinCatalogWithRemoteRows(cachedWuyinPricingRows);
+    if (shouldRefresh) {
+      const catalog = await refreshWuyinCatalog();
       return res.json({
         success: true,
         data: catalog,
-        source: shouldRefresh ? 'remote' : 'cache'
+        source: 'remote'
       });
     }
 
-    // 缓存依然为空且网络请求未成功时，回退到本地静态默认配置
-    const catalog = mergeWuyinCatalogWithRemoteRows([]);
+    const catalog = getCachedWuyinCatalog();
+    return res.json({
+      success: true,
+      data: catalog,
+      source: 'cache'
+    });
+  } catch (error) {
+    console.warn('[wuyin-catalog] 获取速创 Catalog 发生异常，回退静态 fallback:', error.message);
+    const catalog = getCachedWuyinCatalog();
     return res.json({
       success: true,
       data: catalog,
       source: 'fallback'
     });
-  } catch (error) {
-    console.warn('[wuyin-catalog] 无法拉取速创远程价格表，使用缓存或本地静态配置:', error && error.message || error);
-    // 即使本次拉取报错，若之前成功获取过，依然使用已缓存的数据
-    if (cachedWuyinPricingRows) {
-      const catalog = mergeWuyinCatalogWithRemoteRows(cachedWuyinPricingRows);
-      return res.json({
-        success: true,
-        data: catalog,
-        source: 'cache'
-      });
-    }
-    const catalog = mergeWuyinCatalogWithRemoteRows([]);
+  }
+});
+
+// 简体中文注释：提供独立的 Catalog 自动爬取刷新 POST 接口
+router.post('/v1/wuyin/catalog/refresh', async (req, res) => {
+  try {
+    const catalog = await refreshWuyinCatalog();
     return res.json({
       success: true,
       data: catalog,
-      source: 'fallback'
+      source: 'remote'
+    });
+  } catch (error) {
+    console.error('[wuyin-catalog] 刷新 Catalog 接口执行失败:', error.message);
+    return res.status(502).json({
+      success: false,
+      error: `文档爬取刷新失败: ${error.message}`
     });
   }
 });
@@ -1783,15 +1770,14 @@ router.post('/v1/profile/user-routes/:routeId/connectivity', requireProfileAuth,
     || /wuyinkeji/i.test(route.baseUrl);
 
   if (isWuyin) {
-    let pricingRows = [];
+    let catalogItems = [];
     try {
-      pricingRows = await fetchWuyinPricingRows();
+      catalogItems = getCachedWuyinCatalog();
     } catch (error) {
       console.warn('[user-routes] Failed to fetch Wuyin catalog, using fallback models:', error && error.message || error);
-      pricingRows = getWuyinFallbackPricingRows();
+      catalogItems = WUYIN_FALLBACK_CATALOG;
     }
-    const generatableRows = pricingRows.filter(isWuyinGeneratableCatalogRow);
-    const modelIds = (generatableRows.length ? generatableRows : getWuyinFallbackPricingRows()).map((row) => row.modelId);
+    const modelIds = catalogItems.filter(item => item.enabled).map((item) => item.id);
 
     return res.json({
       success: true,
@@ -1904,10 +1890,29 @@ router.post('/v1/profile/user-routes/:routeId/pricing-sync', requireProfileAuth,
   if (isWuyin) {
     let pricingData = [];
     try {
-      pricingData = await fetchWuyinPricingRows();
+      const catalogItems = getCachedWuyinCatalog();
+      pricingData = catalogItems.map(item => ({
+        modelId: item.id,
+        modelName: item.displayName,
+        inputPrice: item.price || 0,
+        numeric: item.price || 0,
+        unit: item.priceUnit || '次',
+        displayPrice: item.priceText || `${item.price || 0}元/${item.priceUnit || '次'}`,
+        endpointUrl: item.endpointUrl,
+        endpointPath: item.endpointPath
+      }));
     } catch (error) {
       console.warn('[user-routes] Failed to fetch Wuyin pricing catalog, using fallback pricing:', error && error.message || error);
-      pricingData = getWuyinFallbackPricingRows();
+      pricingData = WUYIN_FALLBACK_CATALOG.map(item => ({
+        modelId: item.id,
+        modelName: item.displayName,
+        inputPrice: item.price || 0,
+        numeric: item.price || 0,
+        unit: item.priceUnit || '次',
+        displayPrice: item.priceText || `${item.price || 0}元/${item.priceUnit || '次'}`,
+        endpointUrl: item.endpointUrl,
+        endpointPath: item.endpointPath
+      }));
     }
 
     return res.json({

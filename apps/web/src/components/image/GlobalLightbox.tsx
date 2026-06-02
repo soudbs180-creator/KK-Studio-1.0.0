@@ -478,7 +478,24 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     const initialTouchPanRef = useRef({ x: 0, y: 0 });
     const lastTapRef = useRef(0);
 
+    // 简体中文注释：判断事件目标是否应该被排除在手势交互之外，避免干扰控制按钮或媒体控制条的点击
+    const isExcludedFromGesture = (target: EventTarget | null): boolean => {
+        if (!target || !(target instanceof Element)) return false;
+        return (
+            target.closest('.lightbox-exclude') !== null ||
+            target.closest('button') !== null ||
+            target.closest('a') !== null ||
+            target.closest('audio') !== null ||
+            target.closest('video') !== null ||
+            target.closest('input') !== null ||
+            target.closest('textarea') !== null
+        );
+    };
+
     const handleTouchStart = useCallback((e: TouchEvent) => {
+        // 简体中文注释：如果点击的是控制区域或交互按钮，则直接退出，不干扰其原生点击事件
+        if (isExcludedFromGesture(e.target)) return;
+
         if (e.touches.length === 1) {
             const touch = e.touches[0];
             touchStartRef.current = [{ x: touch.clientX, y: touch.clientY }];
@@ -552,6 +569,9 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     }, []);
 
     const handleTouchEnd = useCallback((e: TouchEvent) => {
+        // 简体中文注释：若未记录 touchStart（比如被拦截了），则不处理后续的手势结束逻辑
+        if (touchStartRef.current.length === 0) return;
+
         if (zoomRef.current < 1) {
             setZoom(1);
             setPan({ x: 0, y: 0 });
@@ -822,7 +842,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
             {/* Top bar: close button */}
             <button
                 onClick={onClose}
-                className="absolute z-50 rounded-full bg-white/10 p-2 text-white transition-opacity hover:opacity-80"
+                className="absolute z-50 rounded-full bg-white/10 p-2 text-white transition-opacity hover:opacity-80 lightbox-exclude"
                 style={isMobile
                     ? { top: 'max(12px, env(safe-area-inset-top, 0px))', right: 12 }
                     : { top: 16, right: 16 }}
@@ -1000,7 +1020,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
   
               {/* 简体中文注释：底部信息与操作区和缩略图分层，避免遮挡主图和重绘入口。 */}
               <div
-                  className={`w-full shrink-0 border-t border-[var(--border-light)] bg-[var(--bg-secondary)]/90 text-[var(--text-primary)] backdrop-blur-xl ${isMobile ? 'px-3 py-3' : 'grid min-h-[100px] grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-8'}`}
+                  className={`w-full shrink-0 border-t border-[var(--border-light)] bg-[var(--bg-secondary)]/90 text-[var(--text-primary)] backdrop-blur-xl lightbox-exclude ${isMobile ? 'px-3 py-3' : 'grid min-h-[100px] grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-8'}`}
                   onClick={e => e.stopPropagation()}
               >
                   <div className="flex min-w-0 flex-col text-left justify-center">
