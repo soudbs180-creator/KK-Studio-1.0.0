@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, LogOut, Sparkles, User, Zap } from 'lucide-react';
+import { LayoutDashboard, LogOut, Sparkles, User, Zap, Shield } from 'lucide-react';
 
 import type { UserProfileView } from '../components/modals/UserProfileModal';
 import type { RuntimeAuthUser } from '../services/auth/runtimeAuthTypes.ts';
@@ -155,6 +155,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
           <div
+            id="desktop-user-menu-panel"
             onClick={(e) => e.stopPropagation()}
             className="absolute left-0 top-[72px] z-50 w-64 origin-top-left animate-in rounded-xl border p-2 duration-100 fade-in zoom-in-95"
             style={{
@@ -188,7 +189,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
 
               {adminLevel > 0 && (
                 <DesktopMenuActionButton
-                  icon={<LayoutDashboard size={14} />}
+                  icon={<Shield size={14} />}
                   label="管理员后台"
                   accentColor="var(--clay-brand-coral)"
                   onClick={() => {

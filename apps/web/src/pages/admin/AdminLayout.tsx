@@ -3,7 +3,6 @@
 // 鉴权：需要通过 useAuth 获取 adminLevel，非管理员重定向至首页
 
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.tsx";
 import { RechargePanel } from "./RechargePanel.tsx";
 import { CreditsPanel } from "./CreditsPanel.tsx";
@@ -12,23 +11,24 @@ import { StaffPanel } from "./StaffPanel.tsx";
 
 export const AdminLayout: React.FC = () => {
   const { adminLevel, loading } = useAuth();
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"recharge" | "credits" | "apiConfig" | "staff">("recharge");
 
   // 路由权限守卫
   useEffect(() => {
     if (!loading && adminLevel === 0) {
       console.warn("[AdminLayout] 越权访问后台，已自动重定向回首页");
-      navigate("/");
+      window.history.pushState({}, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
     }
-  }, [adminLevel, loading, navigate]);
+  }, [adminLevel, loading]);
 
   useEffect(() => {
     if (!loading && activeTab === "staff" && adminLevel !== 1) {
       setActiveTab("recharge");
-      navigate("/admin");
+      window.history.pushState({}, "", "/admin");
+      window.dispatchEvent(new PopStateEvent("popstate"));
     }
-  }, [activeTab, adminLevel, loading, navigate]);
+  }, [activeTab, adminLevel, loading]);
 
   // 如果还在加载，显示等待状态
   if (loading) {

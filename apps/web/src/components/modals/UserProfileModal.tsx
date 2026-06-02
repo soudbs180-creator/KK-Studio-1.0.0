@@ -16,6 +16,7 @@ import {
   Pencil,
   QrCode,
   ShieldCheck,
+  Shield,
   Wallet,
   X,
 } from 'lucide-react';
@@ -880,7 +881,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           style={{ borderColor: 'var(--border-light)' }}
                         >
                           <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap">
-                            <LayoutDashboard size={15} className="shrink-0" />
+                            <Shield size={15} className="shrink-0" />
                             <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-bold">系统管理后台</span>
                           </span>
                           <span style={{ color: 'var(--accent-coral)' }}>进入</span>

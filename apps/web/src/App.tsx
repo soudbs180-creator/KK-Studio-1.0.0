@@ -295,11 +295,13 @@ interface AppContentProps {
 type DesktopSideRailLayout = {
   projectManagerScale: number;
   hideZoomControl: boolean;
+  projectManagerOffset: number;
 };
 
 const DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT: DesktopSideRailLayout = {
   projectManagerScale: 1,
   hideZoomControl: false,
+  projectManagerOffset: 0,
 };
 
 const AppContent: React.FC<AppContentProps> = () => {
@@ -4347,7 +4349,8 @@ const AppContent: React.FC<AppContentProps> = () => {
     if (isMobile) {
       setDesktopSideRailLayout(prev => {
         const isDefault = prev.projectManagerScale === DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT.projectManagerScale
-          && prev.hideZoomControl === DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT.hideZoomControl;
+          && prev.hideZoomControl === DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT.hideZoomControl
+          && prev.projectManagerOffset === DEFAULT_DESKTOP_SIDE_RAIL_LAYOUT.projectManagerOffset;
         if (isDefault) {
           return prev;
         }
@@ -4382,7 +4385,11 @@ const AppContent: React.FC<AppContentProps> = () => {
         return;
       }
 
-      const topChromeBottom = desktopChrome.getBoundingClientRect().bottom;
+      // 简体中文：检查是否有打开的用户菜单面板
+      const userMenu = document.getElementById('desktop-user-menu-panel');
+      const topChromeBottom = userMenu
+        ? userMenu.getBoundingClientRect().bottom
+        : desktopChrome.getBoundingClientRect().bottom;
       const topClearance = Math.max(0, topChromeBottom + 16);
       const topLimitedScale = (viewportHeight - topClearance * 2) / naturalProjectManagerHeight;
       const boundedScale = Math.max(
@@ -4390,18 +4397,26 @@ const AppContent: React.FC<AppContentProps> = () => {
         Math.min(1, Number.isFinite(topLimitedScale) ? topLimitedScale : 1),
       );
       const nextScale = Math.round(boundedScale * 1000) / 1000;
-      const projectedProjectManagerBottom = viewportHeight / 2 + (naturalProjectManagerHeight * nextScale) / 2;
+
+      // 简体中文：计算 projectManager 正常垂直居中（translateY(-50%)）时的 top 坐标
+      const naturalTop = viewportHeight / 2 - (naturalProjectManagerHeight * nextScale) / 2;
+      // 简体中文：只有当 naturalTop 小于 topClearance（即发生遮挡）时，才需要向下移动避让
+      const avoidOffset = Math.max(0, topClearance - naturalTop);
+
+      const projectedProjectManagerBottom = viewportHeight / 2 + (naturalProjectManagerHeight * nextScale) / 2 + avoidOffset;
       const zoomControlRect = zoomControl?.getBoundingClientRect();
       const hideZoomControl = Boolean(zoomControlRect && projectedProjectManagerBottom + 12 >= zoomControlRect.top);
 
       const nextLayout: DesktopSideRailLayout = {
         projectManagerScale: nextScale,
         hideZoomControl,
+        projectManagerOffset: avoidOffset,
       };
 
       setDesktopSideRailLayout(prev => {
         const scaleUnchanged = Math.abs(prev.projectManagerScale - nextLayout.projectManagerScale) < 0.005;
-        if (scaleUnchanged && prev.hideZoomControl === nextLayout.hideZoomControl) {
+        const offsetUnchanged = Math.abs(prev.projectManagerOffset - nextLayout.projectManagerOffset) < 1;
+        if (scaleUnchanged && prev.hideZoomControl === nextLayout.hideZoomControl && offsetUnchanged) {
           return prev;
         }
 
@@ -4438,7 +4453,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       resizeObserver?.disconnect();
       window.removeEventListener('resize', scheduleMeasure);
     };
-  }, [isMobile, isReady]);
+  }, [isMobile, isReady, showUserMenu]);
 
   const handlePreviewFromLibrary = useCallback((imageId: string) => {
     setWorkspaceSurface('workspace');
@@ -4605,6 +4620,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       onToggleChat={toggleChatPanel}
       isChatOpen={isChatOpen}
       desktopScale={desktopSideRailLayout.projectManagerScale}
+      desktopOffset={desktopSideRailLayout.projectManagerOffset}
       workflowTemplates={WORKFLOW_TEMPLATES}
       onApplyWorkflowTemplate={(templateId) => {
         void handleApplyWorkflowTemplate(templateId);
