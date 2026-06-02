@@ -1,4 +1,4 @@
-﻿import { type ChatOptions, type ImageGenerationOptions, type ImageGenerationResult, type VideoGenerationOptions, type VideoGenerationResult, type AudioGenerationOptions, type AudioGenerationResult} from './LLMAdapter';
+import { type ChatOptions, type ImageGenerationOptions, type ImageGenerationResult, type VideoGenerationOptions, type VideoGenerationResult, type AudioGenerationOptions, type AudioGenerationResult} from './LLMAdapter';
 import { GenerationMode } from '../../types';
 import { type KeySlot, getModelMetadata } from '../auth/keyManager';
 import { keyManager } from '../auth/keyManager';
@@ -418,6 +418,18 @@ export class LLMService {
                         });
                     } catch (error) {
                         const normalizedUserRouteError = this.normalizeUserRouteProxyError(error);
+
+                        // 简体中文注释：速创 (Wuyin) 本地代理失败时，禁止 fallback 进入通用 cloud image 兜底通道（防止 404）
+                        const isWuyinRoute =
+                            String(keySlot.provider || '').toLowerCase() === 'wuyin'
+                            || String(keySlot.name || '').toLowerCase().includes('wuyin')
+                            || String(keySlot.name || '').includes('速创')
+                            || String(keySlot.baseUrl || '').toLowerCase().includes('wuyinkeji.com');
+
+                        if (isWuyinRoute) {
+                            throw normalizedUserRouteError;
+                        }
+
                         if (!this.shouldFallbackToCloudUserRouteAfterLocalProxy(normalizedUserRouteError)) {
                             throw normalizedUserRouteError;
                         }

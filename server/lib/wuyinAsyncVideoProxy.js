@@ -454,6 +454,207 @@ function isAllowedWuyinTargetUrl(targetUrl) {
   }
 }
 
+// 简体中文注释：将速创图片模型 ID 映射到具体的 API 路径
+function resolveWuyinImageEndpointPath(modelId) {
+  const raw = String(modelId || '')
+    .trim()
+    .split('@')[0]
+    .split('|')[0]
+    .replace(/^models\//i, '')
+    .replace(/^\/+/, '')
+    .replace(/^api\/async\//i, '');
+
+  const normalized = raw.toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+  if (
+    normalized === 'imagenanobanana2'
+    || normalized === 'nanobanana2'
+    || normalized === 'nanobanana2preview'
+    || normalized === 'gemini31flashimagepreview'
+    || normalized === 'gemini31flashimage'
+  ) {
+    return '/api/async/image_nanoBanana2';
+  }
+
+  if (
+    normalized === 'imagenanobananapro'
+    || normalized === 'nanobananapro'
+    || normalized === 'gemini3proimagepreview'
+  ) {
+    return '/api/async/image_nanoBanana_pro';
+  }
+
+  if (
+    normalized === 'imagenanobanana'
+    || normalized === 'nanobanana'
+    || normalized === 'gemini25flashimage'
+  ) {
+    return '/api/async/image_nanoBanana';
+  }
+
+  if (
+    normalized === 'imagegpt'
+    || normalized === 'gptimage2'
+    || normalized === 'gptimage'
+  ) {
+    return '/api/async/image_gpt';
+  }
+
+  if (
+    normalized === 'imagegrokimagine'
+    || normalized === 'grokimagine'
+  ) {
+    return '/api/async/image_grok_imagine';
+  }
+
+  if (
+    normalized === 'imagewan26'
+    || normalized === 'wan26'
+    || normalized === 'wan'
+  ) {
+    return '/api/async/image_wan2.6';
+  }
+
+  if (/^image[a-z0-9_.-]+$/i.test(raw)) {
+    return `/api/async/${raw}`;
+  }
+
+  throw new Error(`Unknown Wuyin image model: ${modelId}`);
+}
+
+// 简体中文注释：规范化速创图片尺寸，默认返回 1K
+function normalizeWuyinImageSize(raw) {
+  const normalized = String(raw || '').trim().toUpperCase();
+
+  if (normalized.includes('4K')) return '4K';
+  if (normalized.includes('2K')) return '2K';
+
+  return '1K';
+}
+
+// 简体中文注释：规范化速创图片比例，支持速创允许的值，否则默认返回 auto
+function normalizeWuyinImageAspectRatio(raw) {
+  const value = String(raw || '').trim();
+
+  const allowed = new Set([
+    'auto',
+    '1:1',
+    '16:9',
+    '9:16',
+    '4:3',
+    '3:4',
+    '3:2',
+    '2:3',
+    '5:4',
+    '4:5',
+    '21:9'
+  ]);
+
+  return allowed.has(value) ? value : 'auto';
+}
+
+// 简体中文注释：清洗规范化参考图 URL 或 Base64 数据，限制最多 7 个
+function normalizeWuyinImageReferences(referenceImages) {
+  if (!Array.isArray(referenceImages)) return [];
+
+  return referenceImages
+    .map((item) => {
+      if (!item) return '';
+
+      if (typeof item === 'string') {
+        const raw = item.trim();
+
+        if (/^https?:\/\//i.test(raw)) return raw;
+
+        if (/^data:/i.test(raw)) {
+          const index = raw.indexOf(',');
+          return index >= 0 ? raw.slice(index + 1).replace(/\s+/g, '') : '';
+        }
+
+        return raw.replace(/\s+/g, '');
+      }
+
+      const url = String(item.url || '').trim();
+      if (/^https?:\/\//i.test(url)) return url;
+
+      const data = String(item.data || '').trim();
+      if (!data) return '';
+
+      if (/^data:/i.test(data)) {
+        const index = data.indexOf(',');
+        return index >= 0 ? data.slice(index + 1).replace(/\s+/g, '') : '';
+      }
+
+      return data.replace(/\s+/g, '');
+    })
+    .filter(Boolean)
+    .slice(0, 7);
+}
+
+// 简体中文注释：构造速创图片的请求数据体
+function buildWuyinImageRequestBody(input) {
+  const size = normalizeWuyinImageSize(input.imageSize || input.size);
+  const aspectRatio = normalizeWuyinImageAspectRatio(input.aspectRatio);
+
+  const body = {
+    prompt: String(input.prompt || ''),
+    size,
+    imageSize: size,
+    aspectRatio,
+  };
+
+  const urls = normalizeWuyinImageReferences(input.referenceImages || []);
+  if (urls.length > 0) {
+    body.urls = urls;
+  }
+
+  return body;
+}
+
+// 简体中文注释：递归深度寻找并提取速创 API 响应 payload 中所有的有效图片 URL 列表
+function extractWuyinOutputUrls(payload) {
+  const urls = [];
+  const seen = new Set();
+
+  const add = (value) => {
+    if (typeof value !== 'string') return;
+
+    const candidates = value.match(/https?:\/\/[^\s"'<>]+/g) || [];
+
+    for (const url of candidates) {
+      if (!seen.has(url)) {
+        seen.add(url);
+        urls.push(url);
+      }
+    }
+  };
+
+  const visit = (value) => {
+    if (!value) return;
+
+    if (typeof value === 'string') {
+      add(value);
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+
+    if (typeof value === 'object') {
+      for (const key in value) {
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+          visit(value[key]);
+        }
+      }
+    }
+  };
+
+  visit(payload);
+  return urls;
+}
+
 const isWuyinAsyncVideoTargetUrl = isAllowedWuyinTargetUrl;
 
 module.exports = {
@@ -462,8 +663,10 @@ module.exports = {
   buildWuyinVideoDetailUrl,
   buildWuyinVideoRequestBody,
   buildWuyinVideoSubmitUrl,
+  buildWuyinImageRequestBody,
   decodeLocalProxyTaskId,
   encodeLocalProxyTaskId,
+  extractWuyinOutputUrls,
   extractWuyinVideoMessage,
   extractWuyinVideoStatusCode,
   extractWuyinVideoTaskId,
@@ -472,5 +675,7 @@ module.exports = {
   isWuyinAsyncVideoRoute,
   isWuyinAsyncVideoTargetUrl,
   mapWuyinVideoStatus,
+  normalizeWuyinVideoBaseUrl,
+  resolveWuyinImageEndpointPath,
   resolveWuyinVideoRequestRoute,
 };

@@ -230,7 +230,21 @@ export const generateImage = async (
   }
 ): Promise<GenerateImageResult> => {
   // 🚀 优先对传入的模型 ID 进行归一化，将可能包含的废弃或未公开模型（如 Imagen 系列）自动迁移到最新的可用模型
-  model = normalizeModelId(model) as ModelType;
+  // 简体中文注释：如果是速创 (Wuyin) 图片模型，需锁定原始模型 ID，跳过 Google 原生模型归一化，防止变成 gemini-3.1-flash-image-preview 等官方 ID
+  const rawModelBeforeNormalize = model;
+  const isWuyinModel =
+    String(model || '').includes('image_nanoBanana')
+    || String(model || '').includes('image_gpt')
+    || String(model || '').includes('image_grok_imagine')
+    || String(model || '').includes('image_wan2.6')
+    || String(model || '').toLowerCase().includes('wuyin')
+    || String(model || '').includes('@slot_key_');
+
+  if (!isWuyinModel) {
+    model = normalizeModelId(model) as ModelType;
+  } else {
+    model = rawModelBeforeNormalize as ModelType;
+  }
 
   // 🚀 Parse Model Suffix (Consistency)
   const parsedSuffix = parseModelSuffix(model);

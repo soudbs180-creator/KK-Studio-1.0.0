@@ -9,8 +9,10 @@ const {
   buildWuyinVideoDetailUrl,
   buildWuyinVideoRequestBody,
   buildWuyinVideoSubmitUrl,
+  buildWuyinImageRequestBody,
   decodeLocalProxyTaskId,
   encodeLocalProxyTaskId,
+  extractWuyinOutputUrls,
   extractWuyinVideoMessage,
   extractWuyinVideoStatusCode,
   extractWuyinVideoTaskId,
@@ -19,6 +21,8 @@ const {
   isWuyinAsyncVideoRoute,
   isWuyinAsyncVideoTargetUrl,
   mapWuyinVideoStatus,
+  normalizeWuyinVideoBaseUrl,
+  resolveWuyinImageEndpointPath,
   resolveWuyinVideoRequestRoute,
 } = require('../lib/wuyinAsyncVideoProxy');
 
@@ -1104,6 +1108,130 @@ async function handleWuyinGenericProxy(req, res, profileState) {
   }
 }
 
+// 简体中文注释：在 10 分钟的时间窗口内，对速创的详情接口进行详情轮询
+async function pollWuyinImageResultUntilComplete({ route, routeId, providerTaskId, requestId, attemptId }) {
+  const startedAt = Date.now();
+  const maxDurationMs = 10 * 60 * 1000;
+  let delayMs = 2500;
+
+  while (Date.now() - startedAt < maxDurationMs) {
+    const detailUrl = buildWuyinVideoDetailUrl(route.baseUrl, providerTaskId);
+    const payload = await fetchWuyinVideoJson(detailUrl, route.apiKey, 'GET');
+
+    const status = mapWuyinVideoStatus(extractWuyinVideoStatusCode(payload));
+    const urls = extractWuyinOutputUrls(payload);
+    const message = extractWuyinVideoMessage(payload);
+
+    if (status === 'success') {
+      if (!urls.length) {
+        throw new Error('Wuyin image task succeeded but returned no image URL.');
+      }
+
+      return {
+        urls,
+        taskId: encodeLocalProxyTaskId(route.id || routeId, providerTaskId),
+        providerTaskId,
+        status: 'success',
+        endpointType: 'wuyin-async-image',
+        requestId: typeof requestId === 'string' ? requestId : undefined,
+        attemptId: typeof attemptId === 'string' ? attemptId : undefined,
+      };
+    }
+
+    if (status === 'failed') {
+      throw new Error(message || 'Wuyin image generation failed.');
+    }
+
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+    delayMs = Math.min(Math.round(delayMs * 1.4), 12000);
+  }
+
+  throw new Error('Wuyin image generation timed out after 10 minutes.');
+}
+
+// 简体中文注释：处理速创 API 的图片模型提交，如果未直接返回图片则启动轮询
+async function handleWuyinImageMode(req, res, profileState) {
+  const routeId = String(req.body && req.body.routeId || '').trim();
+  const route = resolveLocalUserRoute(profileState, routeId);
+
+  if (!route) {
+    return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
+  }
+
+  if (!isWuyinAsyncVideoRoute(route, req.body && req.body.modelId)) {
+    return sendLocalProxyError(
+      res,
+      req,
+      404,
+      'USER_ROUTE_NOT_FOUND',
+      'Local user-route proxy only handles Wuyin async-image routes.'
+    );
+  }
+
+  if (!route.apiKey) {
+    return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
+  }
+
+  const body = buildWuyinImageRequestBody(req.body || {});
+
+  if (!String(body.prompt || '').trim()) {
+    return sendLocalProxyError(res, req, 400, 'INVALID_REQUEST', 'Prompt is required for Wuyin image generation.');
+  }
+
+  const baseModelId = String(req.body && req.body.modelId || '')
+    .split('@')[0]
+    .split('|')[0]
+    .replace(/^models\//i, '')
+    .replace(/^\/+/, '')
+    .replace(/^api\/async\//i, '')
+    .trim();
+
+  const endpointPath = resolveWuyinImageEndpointPath(baseModelId);
+
+  if (!endpointPath.startsWith('/api/async/image_')) {
+    return sendLocalProxyError(
+      res,
+      req,
+      400,
+      'INVALID_REQUEST',
+      `Wuyin image route expected /api/async/image_*, got ${endpointPath}.`
+    );
+  }
+
+  const submitUrl = `${normalizeWuyinVideoBaseUrl(route.baseUrl)}${endpointPath}`;
+
+  const submitPayload = await fetchWuyinVideoJson(submitUrl, route.apiKey, 'POST', body);
+  const providerTaskId = extractWuyinVideoTaskId(submitPayload);
+  const immediateUrls = extractWuyinOutputUrls(submitPayload);
+
+  if (immediateUrls.length > 0) {
+    return res.json(okEnvelope({
+      urls: immediateUrls,
+      taskId: '',
+      providerTaskId: '',
+      status: 'success',
+      endpointType: 'wuyin-async-image',
+      requestId: req.body && typeof req.body.requestId === 'string' ? req.body.requestId : undefined,
+      attemptId: req.body && typeof req.body.attemptId === 'string' ? req.body.attemptId : undefined,
+    }, req));
+  }
+
+  if (!providerTaskId) {
+    const message = extractWuyinVideoMessage(submitPayload) || 'Wuyin image API returned no task id.';
+    return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', message);
+  }
+
+  const result = await pollWuyinImageResultUntilComplete({
+    route,
+    routeId,
+    providerTaskId,
+    requestId: req.body && req.body.requestId,
+    attemptId: req.body && req.body.attemptId,
+  });
+
+  return res.json(okEnvelope(result, req));
+}
+
 async function handleWuyinVideoMode(req, res, profileState) {
   const routeId = String(req.body && req.body.routeId || '').trim();
   const route = resolveLocalUserRoute(profileState, routeId);
@@ -1193,6 +1321,9 @@ router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
     }
 
     const mode = String(req.body && req.body.mode || '').trim();
+    if (mode === 'image') {
+      return await handleWuyinImageMode(req, res, profileState);
+    }
     if (mode === 'video') {
       return await handleWuyinVideoMode(req, res, profileState);
     }
@@ -1202,7 +1333,7 @@ router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
 
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'Local user-route proxy does not handle this mode.');
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error || 'Wuyin async-video proxy failed.');
+    const message = error instanceof Error ? error.message : String(error || 'Wuyin user-route proxy failed.');
     return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', message);
   }
 });
