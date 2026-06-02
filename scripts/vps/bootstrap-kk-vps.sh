@@ -64,13 +64,17 @@ prepare_directories() {
   install -d -m 0755 -o "${APP_USER}" -g "${APP_GROUP}" \
     "${APP_ROOT}" \
     "${APP_ROOT}/current" \
+    "${APP_ROOT}/releases" \
     "${APP_ROOT}/shared" \
     "${APP_ROOT}/shared/logs" \
     "${APP_ROOT}/shared/uploads" \
     "${APP_ROOT}/shared/tmp" \
     "${ENV_DIR}" \
     "${APP_SITE_ROOT}" \
-    "${ADMIN_SITE_ROOT}"
+    "${ADMIN_SITE_ROOT}" \
+    "/var/www/releases" \
+    "/var/www/releases/app" \
+    "/var/www/releases/admin"
 }
 
 setup_postgres() {
@@ -110,6 +114,8 @@ install_runtime_templates() {
     rm -f /etc/nginx/sites-enabled/default
     rm -f /etc/nginx/sites-enabled/kk-api.conf
     rm -f /etc/nginx/sites-enabled/kk-admin-4174.conf
+    rm -f /etc/nginx/sites-enabled/kk-vps.conf
+    rm -f /etc/nginx/sites-available/kk-vps.conf
   fi
 
   systemctl daemon-reload

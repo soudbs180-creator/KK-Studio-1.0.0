@@ -153,9 +153,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Pull Vercel Project Info
+        if: ${{ env.VERCEL_TOKEN != '' }}
+        run: npx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build Vercel Project
+        if: ${{ env.VERCEL_TOKEN != '' }}
+        run: npx vercel@latest build --prod --token="$VERCEL_TOKEN"
+
       - name: Deploy to Vercel
         if: ${{ env.VERCEL_TOKEN != '' }}
-        run: npx vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"
+        run: npx vercel@latest deploy --prebuilt --prod --yes --token="$VERCEL_TOKEN"
 
       - name: Skip Vercel deploy
         if: ${{ env.VERCEL_TOKEN == '' }}

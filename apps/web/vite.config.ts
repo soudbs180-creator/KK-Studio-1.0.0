@@ -3,6 +3,7 @@ import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import path from 'path';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'child_process';
 import { defineConfig, loadEnv } from 'vite';
 import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -342,11 +343,23 @@ function buildVersionManifestPlugin(): Plugin {
                 version?: string;
             };
 
+            let localGitSha: string | null = null;
+            try {
+                localGitSha = execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+                    .toString()
+                    .trim();
+            } catch (e) {
+                // 忽略没有 git 仓库或环境时的错误
+            }
+
             const commitSha = process.env.VERCEL_GIT_COMMIT_SHA
                 || process.env.COMMIT_REF
                 || process.env.GITHUB_SHA
                 || process.env.CF_PAGES_COMMIT_SHA
+                || localGitSha
                 || null;
+
+            const commitShortSha = commitSha ? commitSha.substring(0, 7) : null;
 
             const manifest = {
                 appName: APP_NAME,
@@ -361,6 +374,7 @@ function buildVersionManifestPlugin(): Plugin {
                     || process.env.NODE_ENV
                     || 'production',
                 commitSha,
+                commitShortSha,
             };
 
             this.emitFile({

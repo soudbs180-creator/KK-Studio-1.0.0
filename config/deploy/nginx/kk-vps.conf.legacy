@@ -1,3 +1,10 @@
+# ==============================================================================
+# [LEGACY / DEPRECATED]
+# 该配置文件已废弃，不再作为当前 kk-studio 项目的 VPS 部署网关配置使用。
+# 请勿将其软链接或复制到 /etc/nginx/sites-enabled/ 目录中。
+# 当前唯一的生效网关配置为: config/deploy/nginx/kk-vps-gateway.conf
+# ==============================================================================
+
 server {
   listen 80;
   server_name app.example.com;

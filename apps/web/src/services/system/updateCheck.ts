@@ -14,12 +14,14 @@ let initPromise: Promise<void> | null = null;
 let intervalId: number | null = null;
 
 type BuildManifest = {
+    appName?: string;
     version?: string;
     buildTime?: string;
     releaseDate?: string;
     releaseNotes?: readonly string[];
     channel?: string;
     commitSha?: string | null;
+    commitShortSha?: string | null;
     deploymentTarget?: string | null;
 };
 
@@ -91,6 +93,7 @@ function buildFingerprintFromManifest(manifest: BuildManifest): string {
         manifest.channel || '',
         manifest.deploymentTarget || '',
         manifest.commitSha || '',
+        manifest.commitShortSha || '',
     ].join('|');
 }
 
