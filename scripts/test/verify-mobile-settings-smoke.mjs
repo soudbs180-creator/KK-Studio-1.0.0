@@ -266,7 +266,8 @@ function isBrowserLaunchUnavailable(error) {
   return /spawn EPERM/i.test(message)
     || /Playwright npx cache directory not found/i.test(message)
     || /Playwright module was not found/i.test(message)
-    || /browser-executable-not-found/i.test(message);
+    || /browser-executable-not-found/i.test(message)
+    || /process-spawn-blocked/i.test(message);
 }
 
 async function resolvePlaywrightModuleUrl() {
@@ -452,6 +453,10 @@ try {
   viteServer = ensured.server;
   targetUrl = ensured.url || DEFAULT_TARGET_URL;
   browserPreflight = await runBrowserPreflight();
+
+  if (!browserPreflight.ok) {
+    throw new Error(`Browser launch unavailable: ${browserPreflight.reason}${browserPreflight.message ? ` (${browserPreflight.message})` : ''}`);
+  }
 
   const playwrightModuleUrl = await resolvePlaywrightModuleUrl();
   const { chromium } = await import(playwrightModuleUrl);
