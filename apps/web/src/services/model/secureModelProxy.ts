@@ -1504,6 +1504,7 @@ export interface ForwardUserRouteGenericRequestOptions {
   model?: string;
   messages?: any[];
   keyId?: string;
+  apiKey?: string;
   stream?: boolean;
   rawBody?: any;
   signal?: AbortSignal;
@@ -1527,6 +1528,7 @@ export async function forwardUserRouteGenericRequest(
   let targetUrl = '';
   let targetMethod = 'GET';
   let targetKeyId = '';
+  let targetApiKey = '';
   let targetBody: BodyInit | undefined;
   let targetHeaders: Record<string, string> | undefined;
   let targetSignal: AbortSignal | undefined;
@@ -1542,6 +1544,7 @@ export async function forwardUserRouteGenericRequest(
     targetUrl = optionsOrUrl.url || '';
     targetMethod = optionsOrUrl.method || 'POST';
     targetKeyId = optionsOrUrl.keyId || '';
+    targetApiKey = optionsOrUrl.apiKey || '';
     targetBody = optionsOrUrl.body || (optionsOrUrl.rawBody ? (typeof optionsOrUrl.rawBody === 'string' ? optionsOrUrl.rawBody : JSON.stringify(optionsOrUrl.rawBody)) : undefined);
     targetHeaders = optionsOrUrl.headers;
     targetSignal = optionsOrUrl.signal;
@@ -1556,6 +1559,9 @@ export async function forwardUserRouteGenericRequest(
 
   if (token) {
     proxyHeaders['Authorization'] = `Bearer ${token}`;
+  }
+  if (targetApiKey) {
+    proxyHeaders['X-Proxy-Api-Key'] = targetApiKey;
   }
 
   const proxyUrl = getLocalUserRouteApiEndpoint();

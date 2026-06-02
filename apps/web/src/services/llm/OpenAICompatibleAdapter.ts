@@ -811,6 +811,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             url: detailUrl.toString(),
             method: 'GET',
             keyId: keySlot.id,
+            apiKey: keySlot.key,
             headers: {
                 Accept: 'application/json',
             },
@@ -964,6 +965,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             url,
             method: 'POST',
             keyId: keySlot.id,
+            apiKey: keySlot.key,
             rawBody: payload,
             headers: {
                 'Content-Type': 'application/json',

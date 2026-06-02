@@ -25,6 +25,10 @@ test("Vercel proxies hosted auth and health routes to the VPS API origin", () =>
     "expected /api/v1/* to proxy to the VPS API instead of a missing local serverless function",
   );
   assert.ok(
+    rewrites.some((rewrite) => rewrite.source === "/api/v1/model-proxy/user" && rewrite.destination === "/api/user-model-proxy"),
+    "expected the Wuyin user model proxy to use the local Vercel serverless handler before the VPS catch-all",
+  );
+  assert.ok(
     rewrites.some((rewrite) => rewrite.source === "/api/auth/:path*" && rewrite.destination === `${VPS_API_ORIGIN}/api/v1/auth/:path*`),
     "expected legacy /api/auth/* paths to proxy to the VPS auth namespace",
   );
@@ -37,6 +41,11 @@ test("Vercel proxies hosted auth and health routes to the VPS API origin", () =>
     existsSync(path.join(ROOT_DIR, "api", "pricing-proxy.js")),
     true,
     "expected the Wuyin pricing proxy serverless handler to exist",
+  );
+  assert.equal(
+    existsSync(path.join(ROOT_DIR, "api", "user-model-proxy.js")),
+    true,
+    "expected the Wuyin user model proxy serverless handler to exist",
   );
   assert.equal(
     rewrites.some((rewrite) => String(rewrite.destination || "").includes("__kk_path")),
