@@ -1,6 +1,6 @@
 // 简体中文：安全拦截与过滤策略 (Safety Policy)
 
-import { AssistantAction } from '../types';
+import type { AssistantAction } from '../types.ts';
 
 export interface SafetyCheckResult {
   allowed: boolean;

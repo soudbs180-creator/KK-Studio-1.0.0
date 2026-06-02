@@ -65,7 +65,7 @@ import {
 } from './openAICompatibleTaskPayload';
 import { isChatEndpointCompatibilityError, isImageEndpointCompatibilityError } from './openAICompatibleImageRoutingErrors';
 import {
-    WUYIN_DETAIL_PATH,
+    WUYIN_ASYNC_DETAIL_PATH,
     extractWuyinStatusCode,
     extractWuyinTaskId,
     mapWuyinStatus,
@@ -74,7 +74,18 @@ import {
     normalizeWuyinImageSize,
     normalizeWuyinReferenceImage,
     resolveWuyinRequestRoute,
+    extractWuyinOutputUrls,
+    buildWuyinImageSubmitBody,
+    findWuyinCatalogItem,
 } from './openAICompatibleWuyinRoute';
+import { WUYIN_DEFAULT_BASE_URL } from './wuyinCatalog';
+
+function getWuyinCatalogFromKeySlot(keySlot: any): any[] {
+  const snapshot = keySlot.pricingSnapshot;
+  if (!snapshot) return [];
+  const rows = snapshot.rows || snapshot._rawData;
+  return Array.isArray(rows) && rows.length > 0 ? rows : [];
+}
 import {
     normalizeAceDataBaseUrl,
     normalizeAceDataReferenceImage,
@@ -804,7 +815,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         signal?: AbortSignal
     ): Promise<{ payload: any; requestPath: string }> {
         const cleanBase = normalizeWuyinBaseUrl(keySlot.baseUrl || '');
-        const detailUrl = new URL(`${cleanBase}${WUYIN_DETAIL_PATH}`);
+        const detailUrl = new URL(`${cleanBase}${WUYIN_ASYNC_DETAIL_PATH}`);
         detailUrl.searchParams.set('id', taskId);
         
         const response = await forwardUserRouteGenericRequest({
@@ -818,7 +829,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             signal,
         });
 
-        const requestPath = `${WUYIN_DETAIL_PATH}?id=${encodeURIComponent(taskId)}`;
+        const requestPath = `${WUYIN_ASYNC_DETAIL_PATH}?id=${encodeURIComponent(taskId)}`;
         const raw = await response.text().catch(() => '');
 
         if (!response.ok) {
@@ -923,7 +934,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         throw buildOpenAICompatibleHttpError({
             message: 'Wuyin image generation timed out after 10 minutes',
-            requestPath: requestMeta?.submitPath || WUYIN_DETAIL_PATH,
+            requestPath: requestMeta?.submitPath || WUYIN_ASYNC_DETAIL_PATH,
             requestBody: requestMeta?.requestBodyPreview,
             provider: keySlot.provider,
         });
@@ -933,42 +944,26 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         options: ImageGenerationOptions,
         keySlot: KeySlot
     ): Promise<ImageGenerationResult> {
-        const cleanBase = normalizeWuyinBaseUrl(keySlot.baseUrl || '');
-        const route = resolveWuyinRequestRoute({
-            baseUrl: keySlot.baseUrl || '',
-            modelId: options.modelId,
-            provider: keyManager.getProviderForKeySlot(keySlot) || null,
-        });
-        const url = route.endpointUrl || `${cleanBase}${route.endpointPath}`;
-        const requestPath = route.endpointPath;
-        const body: Record<string, any> = {
+        const item = findWuyinCatalogItem(options.modelId, getWuyinCatalogFromKeySlot(keySlot));
+        if (!item) throw new Error(`速创模型不存在：${options.modelId}`);
+        if (item.kind !== 'image') throw new Error(`当前模型不是图片模型：${item.name}`);
+
+        const url = `${WUYIN_DEFAULT_BASE_URL}${item.endpointPath}`;
+        const body = buildWuyinImageSubmitBody({
             prompt: options.prompt,
-            size: normalizeWuyinImageSize(options.imageSize),
-            aspectRatio: normalizeWuyinAspectRatio(options.aspectRatio),
-        };
+            imageSize: options.imageSize,
+            aspectRatio: options.aspectRatio,
+            referenceImages: options.referenceImages,
+        });
 
-        if (options.referenceImages?.length) {
-            const normalizedRefs = options.referenceImages.map((ref, index) =>
-                normalizeWuyinReferenceImage(ref as { data: string; mimeType: string; url?: string }, index)
-            );
-            body.urls = normalizedRefs.map((item) => item.value);
-
-            const remoteRefCount = normalizedRefs.filter((item) => item.kind === 'url').length;
-            console.log(
-                `[OpenAICompatibleAdapter] Wuyin refs prepared -> total=${normalizedRefs.length}, remote=${remoteRefCount}, base64=${normalizedRefs.length - remoteRefCount}`
-            );
-        }
-
-        const payload = this.applyCustomBody(body, keySlot);
-        const requestBodyPreview = buildSafeRequestBodyPreview(payload);
         const response = await forwardUserRouteGenericRequest({
             url,
-            method: 'POST',
+            method: item.method,
             keyId: keySlot.id,
             apiKey: keySlot.key,
-            rawBody: payload,
+            rawBody: body,
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': item.submitContentType,
                 Accept: 'application/json',
             },
             signal: options.signal,
@@ -980,8 +975,8 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             throw buildOpenAICompatibleHttpError({
                 message: `[${response.status}] ${raw.slice(0, 500) || 'Wuyin image request failed'}`,
                 status: response.status,
-                requestPath,
-                requestBody: requestBodyPreview,
+                requestPath: item.endpointPath,
+                requestBody: JSON.stringify(body),
                 responseBody: raw.slice(0, 1600),
                 provider: keySlot.provider,
             });
@@ -993,8 +988,8 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         } catch {
             throw buildOpenAICompatibleHttpError({
                 message: 'Wuyin image submit endpoint returned non-JSON payload',
-                requestPath,
-                requestBody: requestBodyPreview,
+                requestPath: item.endpointPath,
+                requestBody: JSON.stringify(body),
                 responseBody: raw.slice(0, 1600),
                 provider: keySlot.provider,
             });
@@ -1006,14 +1001,14 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             keyManager.reportCallResult(keySlot.id, false, message);
             throw buildOpenAICompatibleHttpError({
                 message,
-                requestPath,
-                requestBody: requestBodyPreview,
+                requestPath: item.endpointPath,
+                requestBody: JSON.stringify(body),
                 responseBody: raw.slice(0, 1600),
                 provider: keySlot.provider,
             });
         }
 
-        const immediateUrls = extractImageUrlsFromPayload(submitPayload);
+        const immediateUrls = extractWuyinOutputUrls(submitPayload);
         if (immediateUrls.length > 0) {
             keyManager.reportCallResult(keySlot.id, true);
             return {
@@ -1024,8 +1019,8 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 imageSize: normalizeWuyinImageSize(options.imageSize),
                 keySlotId: keySlot.id,
                 metadata: {
-                    requestPath,
-                    requestBodyPreview,
+                    requestPath: item.endpointPath,
+                    requestBodyPreview: JSON.stringify(body),
                 }
             };
         }
@@ -1034,8 +1029,8 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         if (!taskId) {
             throw buildOpenAICompatibleHttpError({
                 message: 'Wuyin submit succeeded but no task ID was returned',
-                requestPath,
-                requestBody: requestBodyPreview,
+                requestPath: item.endpointPath,
+                requestBody: JSON.stringify(body),
                 responseBody: raw.slice(0, 1600),
                 provider: keySlot.provider,
             });
@@ -1043,9 +1038,9 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         options.onTaskId?.(taskId);
         const finalResult = await this.pollWuyinImageTask(taskId, keySlot, options, {
-            submitPath: requestPath,
-            requestBodyPreview,
-            endpointModelId: route.endpointModelId,
+            submitPath: item.endpointPath,
+            requestBodyPreview: JSON.stringify(body),
+            endpointModelId: item.id,
         });
 
         if (!finalResult.model) {

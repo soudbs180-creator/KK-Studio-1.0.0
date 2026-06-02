@@ -1,6 +1,6 @@
 // 简体中文：接管动作执行器 (Action Executor)
 
-import { AssistantAction, BatchGenerationPlan } from '../types';
+import type { AssistantAction, BatchGenerationPlan } from '../types';
 import { zipOutputs } from '../../assets/zipOutputs';
 
 // 执行时所需的外部上下文环境依赖注入
@@ -141,14 +141,18 @@ export async function executeAction(
       try {
         notify.info('正在打包', '正在提取生成图像并进行压缩归档...');
         
-        // 传递给 zipOutputs 打包
-        await zipOutputs(scope, {
+        // 传递给 zipOutputs 打包并获取结果
+        const result = await zipOutputs(scope, {
           projectName: activeCanvas?.name || 'KKStudio',
           batchId: 'takeover_zip_' + Date.now(),
           imageNodes: activeCanvas?.imageNodes || []
         });
 
-        notify.success('打包下载完成', 'ZIP 压缩包及 manifest.json 已成功保存！');
+        if (result && result.failedCount > 0) {
+          notify.warning('打包完成（部分失败）', `已打包 ${result.count} 张图片，但有 ${result.failedCount} 张图片下载失败。详情已记录在 ZIP 内的 manifest.json。`);
+        } else {
+          notify.success('打包下载完成', 'ZIP 压缩包及 manifest.json 已成功保存！');
+        }
       } catch (err: any) {
         notify.error('打包下载失败', err.message || '未知错误');
       }

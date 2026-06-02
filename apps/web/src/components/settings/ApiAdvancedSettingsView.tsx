@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ChevronDown,
   Layers3,
+  Plus,
   RefreshCw,
   Shield,
   X,
@@ -385,6 +386,18 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
     userApiActionHelper: '',
   });
 
+  const stagePrimaryActionIcon = stageMeta.primaryActionKind === 'create-official' || stageMeta.primaryActionKind === 'create-provider'
+    ? Plus
+    : RefreshCw;
+  const stagePrimaryActionTone = stageMeta.primaryActionKind === 'create-official' || stageMeta.primaryActionKind === 'create-provider'
+    ? 'primary'
+    : 'secondary';
+  const stageBannerStyle = stageMeta.bannerTone === 'elevated'
+    ? SETTINGS_ELEVATED_STYLE
+    : stageMeta.bannerTone === 'info'
+      ? SETTINGS_INFO_STYLE
+      : SETTINGS_WARNING_STYLE;
+
   const routePoolItems = useMemo(() => {
     return allChannelConfigs.map((channel) => {
       const slot = keyManager.getKey(channel.id);
@@ -469,7 +482,66 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
         onCustomRoutingToggle={handleCustomRoutingToggle}
       />
 
+      {/* 3. 当前视图 */}
+      <ApiWorkbenchCurrentViewSection
+        pick={pick}
+        activeTab="official"
+        onChangeTab={() => {}}
+        latencyCards={[]}
+        formatLatency={(val) => val === null ? '--' : `${val}ms`}
+      />
 
+      {/* 4. 阶段工作流与下一步 */}
+      <ApiWorkbenchStageSection
+        pick={pick}
+        showDiagnostics={showDiagnostics}
+        onToggleDiagnostics={handleToggleDiagnostics}
+        stage={apiServerState.stage}
+        stageTone={stageMeta.tone}
+        stageTitle={stageMeta.title}
+        stageDescription={stageMeta.description}
+        stageInteractionLabel={stageMeta.interactionLabel}
+        stageNextActionLabel={stageMeta.nextActionLabel}
+        stageBannerStyle={stageBannerStyle}
+        primaryActionIcon={stagePrimaryActionIcon}
+        primaryActionTone={stagePrimaryActionTone}
+        onPrimaryAction={() => {}}
+        primaryActionLoading={false}
+        primaryActionTestId="settings-workbench-stage-action"
+        isUsingReadonlyProfileFallback={isUserApiPersistenceDegraded}
+        runtimeRouteCount={slots.length}
+      />
+
+      {/* 5. 诊断视图 */}
+      {showDiagnostics && (
+        <div className="space-y-4">
+          <div className="flex justify-end pr-4">
+            <SettingsActionButton
+              icon={X}
+              size="sm"
+              onClick={handleToggleDiagnostics}
+            >
+              {pick('收起更多高级项', 'Hide more advanced items')}
+            </SettingsActionButton>
+          </div>
+          <ApiWorkbenchDiagnosticsSection
+            pick={pick}
+            diagnosticsActionDisabled={diagnosticsRefreshDisabled}
+            onRefreshDiagnostics={refreshDiagnostics}
+            apiReachable={apiHealth?.reachable}
+            apiErrorMessage={apiHealth?.errorMessage}
+            persistenceWritable={!isUserApiPersistenceDegraded}
+            isAuthenticated={hasAuthenticatedUser}
+            hasReadonlySnapshot={hasReadonlySnapshot}
+          />
+        </div>
+      )}
+
+      {/* 6. 平台入口 */}
+      <ApiWorkbenchPlatformSection
+        pick={pick}
+        onOpenPlatformAssistant={() => {}}
+      />
 
       {/* 简体中文：OCR 配置二级菜单 Modal */}
       {showOcrModal && (

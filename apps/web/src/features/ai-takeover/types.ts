@@ -239,3 +239,19 @@ export interface SanitizedProjectContext {
     relatedNodeId?: string;
   }>;
 }
+
+export type ToolPermission =
+  | 'safe'
+  | 'confirm'
+  | 'dangerous'
+  | 'forbidden';
+
+export interface AssetCollection {
+  id: string;
+  name: string;
+  kind: 'image_folder' | 'file_folder' | 'mixed';
+  source: 'file_input' | 'directory_picker' | 'dropzone';
+  assetIds: string[];
+  createdAt: number;
+}
+

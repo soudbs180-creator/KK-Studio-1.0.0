@@ -1,6 +1,6 @@
 // 简体中文：内置提示词库预置模板
 
-import { PromptTemplate } from '../types';
+import type { PromptTemplate } from '../types';
 
 export const PROMPT_LIBRARY: PromptTemplate[] = [
   {

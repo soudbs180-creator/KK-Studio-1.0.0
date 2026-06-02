@@ -53,6 +53,7 @@ import keyManager, {
 } from '../../services/auth/keyManager';
 import { buildProviderPricingSnapshot, mergeProviderPricingSnapshot } from '../../services/auth/providerPricingSnapshot';
 import type { Supplier } from '../../services/billing/supplierService';
+import { buildWuyinOneKeyProvider, WUYIN_DEFAULT_CATALOG } from '../../services/llm/wuyinCatalog';
 import { notify } from '../../services/system/notificationService';
 import {
   SETTINGS_ELEVATED_STYLE,
@@ -856,6 +857,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   const [activeTab, setActiveTab] = useState<TabType>('official');
   const [officialForm, setOfficialForm] = useState<OfficialForm>(officialDefaults);
   const [providerForm, setProviderForm] = useState<ProviderForm>(providerDefaults);
+  const isWuyin = providerForm.name === '速创 API' || /wuyinkeji/i.test(providerForm.baseUrl);
   const [editingOfficialId, setEditingOfficialId] = useState<string | null>(null);
   const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -2035,6 +2037,103 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       return;
     }
 
+    const isWuyinPreset = providerForm.name === '速创 API' || /wuyinkeji/i.test(providerForm.baseUrl);
+    if (isWuyinPreset) {
+      const normalizedApiKey = providerForm.apiKey.trim();
+      if (!normalizedApiKey) {
+        notify.error(
+          pick('保存失败', 'Save failed'),
+          pick('请填写速创 API 密钥。', 'Please fill in the Wuyin API key.'),
+        );
+        return;
+      }
+
+      await run(`provider-save:${providerForm.id || 'new'}`, async () => {
+        let catalog = WUYIN_DEFAULT_CATALOG;
+        try {
+          const res = await fetch('/api/v1/wuyin/catalog');
+          const json = await res.json();
+          if (json && json.success && Array.isArray(json.data)) {
+            catalog = json.data;
+          }
+        } catch (e) {
+          console.warn('Failed to fetch remote wuyin catalog:', e);
+        }
+
+        const { provider: wuyinProvider, keySlot: wuyinKeySlot } = buildWuyinOneKeyProvider(normalizedApiKey, catalog);
+
+        if (shouldUseDirectUserApiRecordWrites) {
+          const existingProvider = thirdPartyProviders.find((provider) => provider.id === providerForm.id) || null;
+          await upsertUserApiProviderToCloudRecord({
+            ...wuyinProvider,
+            provider: wuyinProvider.provider as Provider,
+            format: wuyinProvider.format as ApiProtocolFormat,
+            id: wuyinProvider.id,
+            isActive: true,
+            usage: existingProvider?.usage || {
+              totalTokens: 0,
+              totalCost: 0,
+              dailyTokens: 0,
+              dailyCost: 0,
+              lastReset: Date.now(),
+            },
+            status: 'valid',
+            createdAt: existingProvider?.createdAt || Date.now(),
+            updatedAt: Date.now(),
+            budgetLimit: -1,
+            tokenLimit: -1,
+            customCostMode: 'unlimited',
+          });
+
+          await upsertUserApiSlotToCloudRecord({
+            ...wuyinKeySlot,
+            provider: wuyinKeySlot.provider as Provider,
+            format: wuyinKeySlot.format as ApiProtocolFormat,
+            id: wuyinKeySlot.id,
+            disabled: false,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          });
+          await refreshAfterCloudUserApiMutation();
+        } else {
+          // 本地模式，调用 keyManager
+          const typedProvider = {
+            ...wuyinProvider,
+            provider: wuyinProvider.provider as Provider,
+            format: wuyinProvider.format as ApiProtocolFormat,
+            isActive: true,
+          };
+          const typedKeySlot = {
+            ...wuyinKeySlot,
+            provider: wuyinKeySlot.provider as Provider,
+            format: wuyinKeySlot.format as ApiProtocolFormat,
+          };
+
+          if (keyManager.getProvider(typedProvider.id)) {
+            keyManager.updateProvider(typedProvider.id, typedProvider);
+          } else {
+            keyManager.addProvider(typedProvider);
+          }
+
+          if (keyManager.getKey(typedKeySlot.id)) {
+            keyManager.updateKey(typedKeySlot.id, typedKeySlot);
+          } else {
+            await keyManager.addKey(typedKeySlot.key, typedKeySlot);
+          }
+          await keyManager.syncToCloudNow();
+        }
+
+        notify.success(
+          providerForm.id ? pick('保存成功', 'Saved') : pick('新增成功', 'Created'),
+          providerForm.id
+            ? pick('速创 API 配置已更新。', 'Wuyin API settings have been updated.')
+            : pick('速创 API 已一键接入成功。', 'Wuyin API has been connected successfully.'),
+        );
+        cancelEdit();
+      });
+      return;
+    }
+
     const value = providerForm.mode === 'unlimited' ? null : positive(providerForm.value);
     const normalizedApiKey = providerForm.apiKey.trim();
     const nextProviderId = providerForm.id || `provider_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
@@ -3117,11 +3216,15 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                 <div className="min-w-0">
                   <div className="settings-provider-editor-card__title">{pick('基础信息', 'Basics')}</div>
                   <div className="settings-provider-editor-card__helper">
-                    {pick('名称、地址、API Key 和模型是唯一需要确认的基础项。协议会根据预设或地址自动处理。', 'Name, URL, API key, and models are the only basics to confirm. The protocol is handled automatically.')}
+                    {isWuyin
+                      ? pick('你正在接入速创 API。只需输入 API 密钥，即可自动匹配模型和路由。', 'You are connecting Wuyin API. Just enter the API Key to auto route.')
+                      : pick('名称、地址、API Key 和模型是唯一需要确认的基础项。协议会根据预设或地址自动处理。', 'Name, URL, API key, and models are the only basics to confirm. The protocol is handled automatically.')}
                   </div>
                 </div>
                 <div className="settings-provider-editor-card__actions">
-                  <SettingsBadge tone="neutral">{pick(`协议 ${getProtocolLabel(providerForm.format)}`, `Protocol ${getProtocolLabel(providerForm.format)}`)}</SettingsBadge>
+                  {!isWuyin && (
+                    <SettingsBadge tone="neutral">{pick(`协议 ${getProtocolLabel(providerForm.format)}`, `Protocol ${getProtocolLabel(providerForm.format)}`)}</SettingsBadge>
+                  )}
                   {activeProviderPresetLinks.map((link) => {
                     // 确保 URL 具有协议头
                     let targetUrl = link.url.trim();
@@ -3145,21 +3248,25 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               </div>
 
               <div className="settings-provider-editor-grid">
-                <SettingInput
-                  label={pick('名字', 'Name')}
-                  value={providerForm.name}
-                  onChange={(value) => setProviderForm((current) => ({ ...current, name: value }))}
-                  placeholder={pick('例如：Anthropic', 'For example: Anthropic')}
-                  disabled={providerEditorReadOnly}
-                />
-                <SettingInput
-                  label={pick('地址', 'URL')}
-                  value={providerForm.baseUrl}
-                  onChange={(value) => setProviderForm((current) => ({ ...current, baseUrl: value }))}
-                  onBlur={autoFixProviderFormat}
-                  placeholder="https://api.example.com/v1"
-                  disabled={providerEditorReadOnly}
-                />
+                {!isWuyin && (
+                  <>
+                    <SettingInput
+                      label={pick('名字', 'Name')}
+                      value={providerForm.name}
+                      onChange={(value) => setProviderForm((current) => ({ ...current, name: value }))}
+                      placeholder={pick('例如：Anthropic', 'For example: Anthropic')}
+                      disabled={providerEditorReadOnly}
+                    />
+                    <SettingInput
+                      label={pick('地址', 'URL')}
+                      value={providerForm.baseUrl}
+                      onChange={(value) => setProviderForm((current) => ({ ...current, baseUrl: value }))}
+                      onBlur={autoFixProviderFormat}
+                      placeholder="https://api.example.com/v1"
+                      disabled={providerEditorReadOnly}
+                    />
+                  </>
+                )}
                 <div className="settings-provider-editor-grid__wide">
                   <SettingInput
                     label="API Key"
@@ -3170,234 +3277,240 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                     disabled={providerEditorReadOnly}
                   />
                 </div>
-                <label className="settings-provider-editor-grid__wide block">
-                  <div className={`mb-2 break-words ${SETTINGS_LABEL_CLASSNAME}`.trim()}>{pick('模型', 'Models')}</div>
-                  <textarea
-                    value={providerForm.modelsText}
-                    onChange={(event) => setProviderForm((current) => ({ ...current, modelsText: event.target.value }))}
-                    placeholder={activeProviderPreset?.modelId ? pick(`留空自动获取；也可填写 ${activeProviderPreset.modelId}`, `Leave blank for auto discovery, or enter ${activeProviderPreset.modelId}`) : pick('留空自动获取；也可以一行一个模型', 'Leave blank for auto discovery, or enter one model per line')}
-                    disabled={providerEditorReadOnly}
-                    rows={3}
-                    className={`settings-provider-editor-models-textarea ${SETTINGS_INPUT_CLASSNAME}`.trim()}
-                    style={{ boxShadow: 'var(--settings-input-shadow)' }}
-                  />
-                  <div className="mt-2 break-words text-xs leading-5 text-[var(--text-secondary)]">
-                    {providerForm.modelsText.trim()
-                      ? pick('保存后将优先使用你手动输入的模型列表。', 'The manually entered model list will be used after saving.')
-                      : pick('默认不需要填写；保存后系统会使用自动候选，之后也可以点击自动获取刷新。', 'No entry is required by default. The system uses automatic candidates after saving, and you can refresh them later.')}
-                  </div>
-                </label>
+                {!isWuyin && (
+                  <label className="settings-provider-editor-grid__wide block">
+                    <div className={`mb-2 break-words ${SETTINGS_LABEL_CLASSNAME}`.trim()}>{pick('模型', 'Models')}</div>
+                    <textarea
+                      value={providerForm.modelsText}
+                      onChange={(event) => setProviderForm((current) => ({ ...current, modelsText: event.target.value }))}
+                      placeholder={activeProviderPreset?.modelId ? pick(`留空自动获取；也可填写 ${activeProviderPreset.modelId}`, `Leave blank for auto discovery, or enter ${activeProviderPreset.modelId}`) : pick('留空自动获取；也可以一行一个模型', 'Leave blank for auto discovery, or enter one model per line')}
+                      disabled={providerEditorReadOnly}
+                      rows={3}
+                      className={`settings-provider-editor-models-textarea ${SETTINGS_INPUT_CLASSNAME}`.trim()}
+                      style={{ boxShadow: 'var(--settings-input-shadow)' }}
+                    />
+                    <div className="mt-2 break-words text-xs leading-5 text-[var(--text-secondary)]">
+                      {providerForm.modelsText.trim()
+                        ? pick('保存后将优先使用你手动输入的模型列表。', 'The manually entered model list will be used after saving.')
+                        : pick('默认不需要填写；保存后系统会使用自动候选，之后也可以点击自动获取刷新。', 'No entry is required by default. The system uses automatic candidates after saving, and you can refresh them later.')}
+                    </div>
+                  </label>
+                )}
               </div>
             </div>
 
-            <div className="settings-provider-editor-card">
-              <div className="settings-provider-editor-card__header">
-                <div className="min-w-0">
-                  <div className="settings-provider-editor-card__title">{pick('高级抓取', 'Advanced fetch')}</div>
-                  <div className="settings-provider-editor-card__helper">
-                    {pick(
-                      '默认不会抓取价格或消耗信息。需要了解价格、消耗或刷新模型时，再手动点击获取。',
-                      'Pricing and usage data are not fetched by default. Click fetch only when you need pricing, usage, or refreshed models.'
-                    )}
-                  </div>
-                </div>
-                {!editingProviderId ? (
-                  <SettingsBadge tone="neutral">{pick('保存后可获取', 'Available after save')}</SettingsBadge>
-                ) : (
-                  <SettingsBadge tone="neutral">{pick('默认不抓取', 'No auto fetch')}</SettingsBadge>
-                )}
-              </div>
-
-              <div className="settings-provider-fetch-grid">
-                <div className={`settings-provider-fetch-item ${isMobile ? 'flex flex-col items-center text-center' : ''}`}>
-                  <div className="settings-provider-fetch-item__copy">
-                    <div className="settings-provider-fetch-item__title">{pick('自动获取模型', 'Fetch models')}</div>
-                    <div className="settings-provider-fetch-item__helper">
-                      {pick('保存后可检测连通性并回填模型；你也可以继续使用上方手动模型。', 'After saving, connectivity can be checked and models filled. Manual models above remain available.')}
+            {!isWuyin && (
+              <div className="settings-provider-editor-card">
+                <div className="settings-provider-editor-card__header">
+                  <div className="min-w-0">
+                    <div className="settings-provider-editor-card__title">{pick('高级抓取', 'Advanced fetch')}</div>
+                    <div className="settings-provider-editor-card__helper">
+                      {pick(
+                        '默认不会抓取价格或消耗信息。需要了解价格、消耗或刷新模型时，再手动点击获取。',
+                        'Pricing and usage data are not fetched by default. Click fetch only when you need pricing, usage, or refreshed models.'
+                      )}
                     </div>
                   </div>
-                  <div className={`settings-provider-fetch-item__action ${isMobile ? 'w-full flex justify-center mt-3' : ''}`}>
-                    {editingProviderId ? (
-                      <SettingsActionButton
-                        icon={RefreshCw}
-                        disabled={routeDiagnosticsActionDisabled}
-                        loading={busy === `provider-check:${editingProviderId}`}
-                        onClick={() => {
-                          const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
-                          if (matched) void refreshProvider(matched);
-                        }}
-                      >
-                        {pick('自动获取模型', 'Fetch models')}
-                      </SettingsActionButton>
-                    ) : (
-                      <SettingsBadge tone="neutral">{pick('先保存', 'Save first')}</SettingsBadge>
-                    )}
-                  </div>
+                  {!editingProviderId ? (
+                    <SettingsBadge tone="neutral">{pick('保存后可获取', 'Available after save')}</SettingsBadge>
+                  ) : (
+                    <SettingsBadge tone="neutral">{pick('默认不抓取', 'No auto fetch')}</SettingsBadge>
+                  )}
                 </div>
 
-                {(!isMobile && showPricingEndpointOverride) ? (
-                  /* 电脑端手动二级菜单状态：高度与左侧自动获取卡片一致，提供极其 premium 的微缩二级界面 */
-                  <div className="settings-provider-fetch-item settings-provider-fetch-item--stacked h-full flex flex-col justify-between animate-fadeIn">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowPricingEndpointOverride(false)}
-                          className="flex items-center gap-1 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer bg-transparent border-none p-0"
-                        >
-                          <ArrowLeft size={14} />
-                          <span>{pick('返回', 'Back')}</span>
-                        </button>
-                        <span className="text-[13px] font-bold text-[var(--text-primary)]">{pick('手动价格地址', 'Manual Price Endpoint')}</span>
-                      </div>
-                      <div className="text-[11px] text-[var(--text-secondary)] mb-3 leading-5">
-                        {pick('如果默认价格地址失败，请在下方输入自定义价格地址。', 'If default pricing fails, enter a custom endpoint below.')}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 w-full mt-auto">
-                      <div className="flex-1">
-                        <input
-                          type="text"
-                          className="w-full bg-[var(--settings-surface-elevated)] border border-[var(--settings-border-subtle)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-indigo-500"
-                          value={providerPricingEndpointDraft}
-                          onChange={(e) => setProviderPricingEndpointDraft(e.target.value)}
-                          placeholder={buildDefaultProviderPricingEndpoint(providerForm.baseUrl) || 'https://api.example.com/v1/models'}
-                          disabled={providerEditorReadOnly}
-                        />
-                      </div>
-                      <PrimaryButton
-                        disabled={routeDiagnosticsActionDisabled}
-                        loading={busy === `provider-price:${editingProviderId}`}
-                        onClick={() => {
-                          const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
-                          if (matched) void syncPricing(matched, providerPricingEndpointDraft);
-                        }}
-                        className="px-3"
-                      >
-                        {pick('确认', 'Confirm')}
-                      </PrimaryButton>
-                    </div>
-                  </div>
-                ) : (
-                  <div className={`settings-provider-fetch-item settings-provider-fetch-item--stacked ${isMobile ? 'flex flex-col items-center text-center' : ''}`}>
-                  <div className="settings-provider-fetch-item__row">
+                <div className="settings-provider-fetch-grid">
+                  <div className={`settings-provider-fetch-item ${isMobile ? 'flex flex-col items-center text-center' : ''}`}>
                     <div className="settings-provider-fetch-item__copy">
-                      <div className="settings-provider-fetch-item__title">{pick('价格与消耗', 'Pricing and usage')}</div>
+                      <div className="settings-provider-fetch-item__title">{pick('自动获取模型', 'Fetch models')}</div>
                       <div className="settings-provider-fetch-item__helper">
-                        {pick(
-                          '如果要了解价格或消耗，请点击自动获取；默认会按地址尝试候选端点，也可以手动输入价格地址。',
-                          'Click fetch only when you need pricing or usage. Default candidates are tried from the URL, and you can enter a manual pricing endpoint.'
-                        )}
+                        {pick('保存后可检测连通性并回填模型；你也可以继续使用上方手动模型。', 'After saving, connectivity can be checked and models filled. Manual models above remain available.')}
                       </div>
                     </div>
-                    {!isMobile && (
-                      <div className="settings-provider-fetch-item__action flex items-center gap-2">
+                    <div className={`settings-provider-fetch-item__action ${isMobile ? 'w-full flex justify-center mt-3' : ''}`}>
                       {editingProviderId ? (
-                        <>
                         <SettingsActionButton
-                          icon={Wand2}
+                          icon={RefreshCw}
+                          disabled={routeDiagnosticsActionDisabled}
+                          loading={busy === `provider-check:${editingProviderId}`}
+                          onClick={() => {
+                            const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
+                            if (matched) void refreshProvider(matched);
+                          }}
+                        >
+                          {pick('自动获取模型', 'Fetch models')}
+                        </SettingsActionButton>
+                      ) : (
+                        <SettingsBadge tone="neutral">{pick('先保存', 'Save first')}</SettingsBadge>
+                      )}
+                    </div>
+                  </div>
+
+                  {(!isMobile && showPricingEndpointOverride) ? (
+                    /* 电脑端手动二级菜单状态：高度与左侧自动获取卡片一致，提供极其 premium 的微缩二级界面 */
+                    <div className="settings-provider-fetch-item settings-provider-fetch-item--stacked h-full flex flex-col justify-between animate-fadeIn">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowPricingEndpointOverride(false)}
+                            className="flex items-center gap-1 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer bg-transparent border-none p-0"
+                          >
+                            <ArrowLeft size={14} />
+                            <span>{pick('返回', 'Back')}</span>
+                          </button>
+                          <span className="text-[13px] font-bold text-[var(--text-primary)]">{pick('手动价格地址', 'Manual Price Endpoint')}</span>
+                        </div>
+                        <div className="text-[11px] text-[var(--text-secondary)] mb-3 leading-5">
+                          {pick('如果默认价格地址失败，请在下方输入自定义价格地址。', 'If default pricing fails, enter a custom endpoint below.')}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 w-full mt-auto">
+                        <div className="flex-1">
+                          <input
+                            type="text"
+                            className="w-full bg-[var(--settings-surface-elevated)] border border-[var(--settings-border-subtle)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-indigo-500"
+                            value={providerPricingEndpointDraft}
+                            onChange={(e) => setProviderPricingEndpointDraft(e.target.value)}
+                            placeholder={buildDefaultProviderPricingEndpoint(providerForm.baseUrl) || 'https://api.example.com/v1/models'}
+                            disabled={providerEditorReadOnly}
+                          />
+                        </div>
+                        <PrimaryButton
                           disabled={routeDiagnosticsActionDisabled}
                           loading={busy === `provider-price:${editingProviderId}`}
                           onClick={() => {
                             const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
                             if (matched) void syncPricing(matched, providerPricingEndpointDraft);
                           }}
+                          className="px-3"
                         >
-                          {pick('自动获取', 'Fetch')}
-                        </SettingsActionButton>
-                        <SecondaryButton onClick={() => setShowPricingEndpointOverride(true)} className="px-3">
-                          {pick('手动', 'Manual')}
-                        </SecondaryButton>
-                        </>
-                      ) : (
-                        <SettingsBadge tone="neutral">{pick('先保存', 'Save first')}</SettingsBadge>
+                          {pick('确认', 'Confirm')}
+                        </PrimaryButton>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={`settings-provider-fetch-item settings-provider-fetch-item--stacked ${isMobile ? 'flex flex-col items-center text-center' : ''}`}>
+                    <div className="settings-provider-fetch-item__row">
+                      <div className="settings-provider-fetch-item__copy">
+                        <div className="settings-provider-fetch-item__title">{pick('价格与消耗', 'Pricing and usage')}</div>
+                        <div className="settings-provider-fetch-item__helper">
+                          {pick(
+                            '如果要了解价格或消耗，请点击自动获取；默认会按地址尝试候选端点，也可以手动输入价格地址。',
+                            'Click fetch only when you need pricing or usage. Default candidates are tried from the URL, and you can enter a manual pricing endpoint.'
+                          )}
+                        </div>
+                      </div>
+                      {!isMobile && (
+                        <div className="settings-provider-fetch-item__action flex items-center gap-2">
+                        {editingProviderId ? (
+                          <>
+                          <SettingsActionButton
+                            icon={Wand2}
+                            disabled={routeDiagnosticsActionDisabled}
+                            loading={busy === `provider-price:${editingProviderId}`}
+                            onClick={() => {
+                              const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
+                              if (matched) void syncPricing(matched, providerPricingEndpointDraft);
+                            }}
+                          >
+                            {pick('自动获取', 'Fetch')}
+                          </SettingsActionButton>
+                          <SecondaryButton onClick={() => setShowPricingEndpointOverride(true)} className="px-3">
+                            {pick('手动', 'Manual')}
+                          </SecondaryButton>
+                          </>
+                        ) : (
+                          <SettingsBadge tone="neutral">{pick('先保存', 'Save first')}</SettingsBadge>
+                        )}
+                      </div>
                       )}
                     </div>
-                    )}
-                  </div>
-                    {/* 手机端：两个按钮并排居中，点击手动后在其下方展示一排的输入和确认 */}
-                    {isMobile && (
-                      <div className="w-full mt-3 flex flex-col items-center gap-3">
-                        <div className="flex flex-row justify-center items-center gap-3 w-full">
-                          {editingProviderId ? (
-                            <>
-                              <SettingsActionButton
-                                icon={Wand2}
+                      {/* 手机端：两个按钮并排居中，点击手动后在其下方展示一排的输入和确认 */}
+                      {isMobile && (
+                        <div className="w-full mt-3 flex flex-col items-center gap-3">
+                          <div className="flex flex-row justify-center items-center gap-3 w-full">
+                            {editingProviderId ? (
+                              <>
+                                <SettingsActionButton
+                                  icon={Wand2}
+                                  disabled={routeDiagnosticsActionDisabled}
+                                  loading={busy === `provider-price:${editingProviderId}`}
+                                  onClick={() => {
+                                    const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
+                                    if (matched) void syncPricing(matched, providerPricingEndpointDraft);
+                                  }}
+                                >
+                                  {pick('自动获取', 'Fetch')}
+                                </SettingsActionButton>
+                                <SecondaryButton onClick={() => setShowPricingEndpointOverride((curr) => !curr)} className="px-3">
+                                  {showPricingEndpointOverride ? pick('收起地址', 'Hide URL') : pick('手动价格地址', 'Manual URL')}
+                                </SecondaryButton>
+                              </>
+                            ) : (
+                              <SettingsBadge tone="neutral">{pick('先保存', 'Save first')}</SettingsBadge>
+                            )}
+                          </div>
+
+                          {showPricingEndpointOverride && (
+                            <div className="flex flex-row items-center gap-2 w-full mt-1 animate-fadeIn">
+                              <div className="flex-1">
+                                <input
+                                  type="text"
+                                  className="w-full bg-[var(--settings-surface-elevated)] border border-[var(--settings-border-subtle)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-indigo-500"
+                                  value={providerPricingEndpointDraft}
+                                  onChange={(e) => setProviderPricingEndpointDraft(e.target.value)}
+                                  placeholder={buildDefaultProviderPricingEndpoint(providerForm.baseUrl) || 'https://api.example.com/v1/models'}
+                                  disabled={providerEditorReadOnly}
+                                />
+                              </div>
+                              <PrimaryButton
                                 disabled={routeDiagnosticsActionDisabled}
                                 loading={busy === `provider-price:${editingProviderId}`}
                                 onClick={() => {
                                   const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
                                   if (matched) void syncPricing(matched, providerPricingEndpointDraft);
                                 }}
+                                className="px-3"
                               >
-                                {pick('自动获取', 'Fetch')}
-                              </SettingsActionButton>
-                              <SecondaryButton onClick={() => setShowPricingEndpointOverride((curr) => !curr)} className="px-3">
-                                {showPricingEndpointOverride ? pick('收起地址', 'Hide URL') : pick('手动价格地址', 'Manual URL')}
-                              </SecondaryButton>
-                            </>
-                          ) : (
-                            <SettingsBadge tone="neutral">{pick('先保存', 'Save first')}</SettingsBadge>
+                                {pick('确认', 'Confirm')}
+                              </PrimaryButton>
+                            </div>
                           )}
                         </div>
-
-                        {showPricingEndpointOverride && (
-                          <div className="flex flex-row items-center gap-2 w-full mt-1 animate-fadeIn">
-                            <div className="flex-1">
-                              <input
-                                type="text"
-                                className="w-full bg-[var(--settings-surface-elevated)] border border-[var(--settings-border-subtle)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-indigo-500"
-                                value={providerPricingEndpointDraft}
-                                onChange={(e) => setProviderPricingEndpointDraft(e.target.value)}
-                                placeholder={buildDefaultProviderPricingEndpoint(providerForm.baseUrl) || 'https://api.example.com/v1/models'}
-                                disabled={providerEditorReadOnly}
-                              />
-                            </div>
-                            <PrimaryButton
-                              disabled={routeDiagnosticsActionDisabled}
-                              loading={busy === `provider-price:${editingProviderId}`}
-                              onClick={() => {
-                                const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
-                                if (matched) void syncPricing(matched, providerPricingEndpointDraft);
-                              }}
-                              className="px-3"
-                            >
-                              {pick('确认', 'Confirm')}
-                            </PrimaryButton>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="settings-provider-editor-card">
-              <div className="settings-provider-editor-card__header">
-                <div className="min-w-0">
-                  <div className="settings-provider-editor-card__title">{pick('预算策略', 'Budget rule')}</div>
-                  <div className="settings-provider-editor-card__helper">
-                    {pick('默认不限额；需要成本保护时再设置金额预算或词元上限。', 'Unlimited by default. Set an amount or token cap only when you need cost protection.')}
-                  </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
-              <SegmentedControlMulti options={[...UI_BUDGET_OPTIONS]} value={getModeOption(providerForm.mode)} onChange={(value) => setProviderForm((current) => ({ ...current, mode: parseModeOption(value) }))} disabled={providerEditorReadOnly} />
-              {providerForm.mode !== 'unlimited' ? (
-                <div className="mt-3">
-                  <SettingInput
-                    label={providerForm.mode === 'amount' ? pick('预算上限', 'Budget limit') : pick('词元上限', 'Token limit')}
-                    value={providerForm.value}
-                    onChange={(value) => setProviderForm((current) => ({ ...current, value }))}
-                    type="number"
-                    placeholder={providerForm.mode === 'amount' ? pick('例如：100', 'For example: 100') : pick('例如：1000000', 'For example: 1000000')}
-                    helper={providerForm.mode === 'amount' ? pick('金额预算按累计成本统计。', 'Amount budgets are tracked by cumulative cost.') : pick('词元上限按累计词元量统计。', 'Token limits are tracked by cumulative token usage.')}
-                    disabled={providerEditorReadOnly}
-                  />
+            )}
+
+            {!isWuyin && (
+              <div className="settings-provider-editor-card">
+                <div className="settings-provider-editor-card__header">
+                  <div className="min-w-0">
+                    <div className="settings-provider-editor-card__title">{pick('预算策略', 'Budget rule')}</div>
+                    <div className="settings-provider-editor-card__helper">
+                      {pick('默认不限额；需要成本保护时再设置金额预算或词元上限。', 'Unlimited by default. Set an amount or token cap only when you need cost protection.')}
+                    </div>
+                  </div>
                 </div>
-              ) : null}
-            </div>
+                <SegmentedControlMulti options={[...UI_BUDGET_OPTIONS]} value={getModeOption(providerForm.mode)} onChange={(value) => setProviderForm((current) => ({ ...current, mode: parseModeOption(value) }))} disabled={providerEditorReadOnly} />
+                {providerForm.mode !== 'unlimited' ? (
+                  <div className="mt-3">
+                    <SettingInput
+                      label={providerForm.mode === 'amount' ? pick('预算上限', 'Budget limit') : pick('词元上限', 'Token limit')}
+                      value={providerForm.value}
+                      onChange={(value) => setProviderForm((current) => ({ ...current, value }))}
+                      type="number"
+                      placeholder={providerForm.mode === 'amount' ? pick('例如：100', 'For example: 100') : pick('例如：1000000', 'For example: 1000000')}
+                      helper={providerForm.mode === 'amount' ? pick('金额预算按累计成本统计。', 'Amount budgets are tracked by cumulative cost.') : pick('词元上限按累计词元量统计。', 'Token limits are tracked by cumulative token usage.')}
+                      disabled={providerEditorReadOnly}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            )}
 
             <div className="settings-provider-editor-actions">
               <PrimaryButton disabled={providerActionsDisabled || Boolean(providerEditorValidationMessage)} onClick={() => void saveProvider()} loading={busy === `provider-save:${providerForm.id || 'new'}`}>

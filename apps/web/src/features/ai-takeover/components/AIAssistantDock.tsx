@@ -19,6 +19,19 @@ import {
   Cpu
 } from 'lucide-react';
 
+const getUploadStateText = (state: string) => {
+  switch (state) {
+    case 'linked': return '已连接';
+    case 'local_ready': return '已连接，本地可用，尚未上传';
+    case 'indexed': return '已索引';
+    case 'uploaded': return '已上传';
+    case 'used': return '正在使用';
+    case 'failed': return '失败';
+    case 'blocked_sensitive': return '敏感文件被隔离';
+    default: return state;
+  }
+};
+
 export const AIAssistantDock: React.FC = () => {
   const {
     aiTakeoverMode,
@@ -31,7 +44,7 @@ export const AIAssistantDock: React.FC = () => {
     cancelPendingPlan
   } = useAITakeover();
 
-  const { images, files, outputs, addImage, addFile, removeAsset } = useAssetStore();
+  const { images, files, outputs, addImage, addFile, removeAsset, addImageCollection } = useAssetStore();
 
   const [inputVal, setInputVal] = useState('');
   const [showResourcePanel, setShowResourcePanel] = useState(false);
@@ -64,10 +77,12 @@ export const AIAssistantDock: React.FC = () => {
   const handleDirChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
     if (fileList) {
-      Array.from(fileList).forEach(file => {
-        // webkitRelativePath 包含文件夹相对路径
-        addImage(file, file.webkitRelativePath);
-      });
+      addImageCollection(
+        Array.from(fileList).map(file => ({
+          file,
+          relativePath: file.webkitRelativePath
+        }))
+      );
     }
   };
 
@@ -123,7 +138,7 @@ export const AIAssistantDock: React.FC = () => {
   // 渲染消息内容（解析 action:// 交互按钮）
   const renderMessageText = (content: string) => {
     const regex = /\[([^\]]+)\]\((action:\/\/[^\)]+)\)/g;
-    const parts = [];
+    const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let match;
 
@@ -172,7 +187,7 @@ export const AIAssistantDock: React.FC = () => {
           </div>
           <div>
             <h3 className="text-xs font-bold text-white">KK本地接管助理</h3>
-            <p className="text-[9px] text-zinc-400">Offline Local Sandbox Engine</p>
+            <p className="text-[9px] text-purple-400 font-semibold">AI 接管：本地模式</p>
           </div>
         </div>
 
@@ -345,7 +360,7 @@ export const AIAssistantDock: React.FC = () => {
                   )}
                   <div className="truncate">
                     <p className="truncate text-zinc-200">{img.name}</p>
-                    <p className="text-[8px] text-zinc-500">{formatBytes(img.size)} • {img.uploadState}</p>
+                    <p className="text-[8px] text-zinc-500">{formatBytes(img.size)} • {getUploadStateText(img.uploadState)}</p>
                   </div>
                 </div>
                 <button
@@ -373,7 +388,7 @@ export const AIAssistantDock: React.FC = () => {
                   <div className="truncate">
                     <p className="truncate text-zinc-200">{f.name}</p>
                     <p className="text-[8px] text-zinc-500">
-                      {formatBytes(f.size)} • {f.sensitive ? '敏感文件被隔离' : f.uploadState}
+                      {formatBytes(f.size)} • {f.sensitive ? '敏感文件被隔离' : getUploadStateText(f.uploadState)}
                     </p>
                   </div>
                 </div>

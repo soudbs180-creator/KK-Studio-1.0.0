@@ -4984,7 +4984,8 @@ const AppContent: React.FC<AppContentProps> = () => {
 
           {/* 2. Image -> Prompt/Pending Connections (Follow-up Flow) */}
           {/* A. Existing Prompts */}
-          {!isCanvasTransforming && connectorRenderPromptNodes.map(pn => {
+          {connectorRenderPromptNodes.map(pn => {
+            if (isCanvasTransforming) return null;
             if (pn.isDraft) return null; // Draft/pending connection is rendered by pending-connection block below
             if (pn.error) return null; // 🚀 [FIX] 如果生成失败（存在 error），不渲染对应的连线，避免废弃连接线乱飘和视觉污染
             if (!pn.sourceImageId) return null;
@@ -5062,7 +5063,8 @@ const AppContent: React.FC<AppContentProps> = () => {
           })}
 
           {/* B. Pending Node Connection */}
-          {!isCanvasTransforming && activeSourceImage && (() => {
+          {activeSourceImage && (() => {
+            if (isCanvasTransforming) return null;
             if (collapsedCanvasGroupNodeIds.has(activeSourceImage)) return null;
             const hasDraftFollowup = !!activeCanvas?.promptNodes.some(p => p.isDraft && p.sourceImageId === activeSourceImage);
             if (hasDraftFollowup) return null;
@@ -5125,7 +5127,8 @@ const AppContent: React.FC<AppContentProps> = () => {
           })()}
 
           {/* C. Workflow Utility Connections */}
-          {!isCanvasTransforming && (activeCanvas?.workflow?.edges || []).map((edge) => {
+          {(activeCanvas?.workflow?.edges || []).map((edge) => {
+            if (isCanvasTransforming) return null;
             if (collapsedCanvasGroupNodeIds.has(edge.from) || collapsedCanvasGroupNodeIds.has(edge.to)) return null;
             const targetNode = connectorRenderWorkflowUtilityNodesById.get(edge.to);
             if (!targetNode) return null;
@@ -5288,6 +5291,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
 const App: React.FC = () => {
   const [showCostEstimation, setShowCostEstimation] = useState(false);
+  // const rootMode = createAppRootMode({ pathname: window.location.pathname });
   const [rootMode, setRootMode] = useState<'workspace' | 'settings' | 'admin'>(() => createAppRootMode({ pathname: window.location.pathname }));
 
   useEffect(() => {

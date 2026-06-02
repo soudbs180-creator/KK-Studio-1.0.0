@@ -52,6 +52,329 @@ const WUYIN_FALLBACK_CATALOG = [
   { modelId: 'voice_clone', modelName: '语音克隆（同步）', endpointPath: '/api/voice/clone', inputPrice: 6, unit: '次' },
 ];
 
+const WUYIN_FULL_DEFAULT_CATALOG = [
+  {
+    id: 'image_gpt',
+    name: 'GPT-Image-2',
+    kind: 'image',
+    endpointPath: '/api/async/image_gpt',
+    method: 'POST',
+    submitContentType: 'application/json',
+    detailPath: '/api/async/detail',
+    price: 0.1,
+    priceUnit: '张',
+    aliases: ['gpt-image-2', 'gpt image 2', 'image_gpt'],
+    enabled: true,
+  },
+  {
+    id: 'image_nanoBanana2',
+    name: 'NanoBanana2',
+    kind: 'image',
+    endpointPath: '/api/async/image_nanoBanana2',
+    method: 'POST',
+    submitContentType: 'application/json',
+    detailPath: '/api/async/detail',
+    price: 0.1,
+    priceUnit: '张',
+    aliases: ['nanobanana2', 'nano-banana-2', 'nano banana 2', 'gemini-3.1-flash-image-preview', 'gemini-3.1-flash-image', 'image_nanoBanana2'],
+    enabled: true,
+  },
+  {
+    id: 'image_grok_imagine',
+    name: 'grok_imagine',
+    kind: 'image',
+    endpointPath: '/api/async/image_grok_imagine',
+    method: 'POST',
+    submitContentType: 'application/json',
+    detailPath: '/api/async/detail',
+    price: 0.1,
+    priceUnit: '张',
+    aliases: ['grok_imagine', 'grok imagine', 'image_grok_imagine'],
+    enabled: true,
+  },
+  {
+    id: 'image_nanoBanana_pro',
+    name: 'NanoBanana_pro',
+    kind: 'image',
+    endpointPath: '/api/async/image_nanoBanana_pro',
+    method: 'POST',
+    submitContentType: 'application/json',
+    detailPath: '/api/async/detail',
+    price: 0.3,
+    priceUnit: '张',
+    aliases: ['nanobanana_pro', 'nanobanana-pro', 'nano-banana-pro', 'nano banana pro', 'gemini-3-pro-image-preview', 'image_nanoBanana_pro'],
+    enabled: true,
+  },
+  {
+    id: 'image_nanoBanana',
+    name: 'NanoBanana',
+    kind: 'image',
+    endpointPath: '/api/async/image_nanoBanana',
+    method: 'POST',
+    submitContentType: 'application/json',
+    detailPath: '/api/async/detail',
+    price: 0.1,
+    priceUnit: '张',
+    aliases: ['nanobanana', 'nano-banana', 'nano banana', 'gemini-2.5-flash-image', 'image_nanoBanana'],
+    enabled: true,
+  },
+  {
+    id: 'image_wan2.6',
+    name: 'Wan2.6',
+    kind: 'image',
+    endpointPath: '/api/async/image_wan2.6',
+    method: 'POST',
+    submitContentType: 'application/json',
+    detailPath: '/api/async/detail',
+    price: 0.2,
+    priceUnit: '张',
+    aliases: ['wan2.6', 'wan26', 'wan image', 'image_wan2.6'],
+    enabled: true,
+  },
+  {
+    id: 'video_google_omni',
+    name: 'google_omni',
+    kind: 'video',
+    endpointPath: '/api/async/video_google_omni',
+    method: 'POST',
+    submitContentType: 'application/json',
+    detailPath: '/api/async/detail',
+    price: 0.1,
+    priceUnit: '秒',
+    aliases: ['google_omni', 'google omni', 'video_google_omni'],
+    enabled: true,
+  },
+  {
+    id: 'video_vidu',
+    name: 'video_vidu',
+    kind: 'video',
+    endpointPath: '/api/async/video_vidu',
+    method: 'POST',
+    submitContentType: 'application/json',
+    detailPath: '/api/async/detail',
+    price: 1,
+    priceUnit: '秒',
+    aliases: ['vidu', 'video_vidu'],
+    enabled: true,
+  },
+  {
+    id: 'video_omni',
+    name: 'video_omni',
+    kind: 'video',
+    endpointPath: '/api/async/video_omni',
+    method: 'POST',
+    submitContentType: 'application/json',
+    detailPath: '/api/async/detail',
+    price: 1,
+    priceUnit: '秒',
+    aliases: ['video_omni', 'omni video'],
+    enabled: true,
+  },
+  {
+    id: 'video_digital_humans',
+    name: 'Digital_Humans',
+    kind: 'video',
+    endpointPath: '/api/async/video_digital_humans',
+    method: 'POST',
+    submitContentType: 'application/json',
+    detailPath: '/api/async/detail',
+    price: 0.02,
+    priceUnit: '秒',
+    aliases: ['digital_humans', 'digital humans', 'video_digital_humans'],
+    enabled: true,
+  },
+  {
+    id: 'video_package',
+    name: 'Package_1.0',
+    kind: 'video',
+    endpointPath: '/api/async/video_package',
+    method: 'POST',
+    submitContentType: 'application/json',
+    detailPath: '/api/async/detail',
+    price: 0.01,
+    priceUnit: '秒',
+    aliases: ['package_1.0', 'video_package'],
+    enabled: true,
+  },
+  {
+    id: 'video_veo3.1_fast',
+    name: 'veo3.1_fast',
+    kind: 'video',
+    endpointPath: '/api/async/video_veo3.1_fast',
+    method: 'POST',
+    submitContentType: 'application/json',
+    detailPath: '/api/async/detail',
+    price: 0.05,
+    priceUnit: '秒',
+    aliases: ['veo3.1_fast', 'veo 3.1 fast', 'video_veo3.1_fast'],
+    enabled: true,
+  },
+  {
+    id: 'video_grok_imagine',
+    name: 'grok_imagine',
+    kind: 'video',
+    endpointPath: '/api/async/video_grok_imagine',
+    method: 'POST',
+    submitContentType: 'application/json',
+    detailPath: '/api/async/detail',
+    price: 0.05,
+    priceUnit: '秒',
+    aliases: ['grok_imagine', 'grok imagine video', 'video_grok_imagine'],
+    enabled: true,
+  },
+  {
+    id: 'video_wan2.6',
+    name: 'Wan2.6',
+    kind: 'video',
+    endpointPath: '/api/async/video_wan2.6',
+    method: 'POST',
+    submitContentType: 'application/json',
+    detailPath: '/api/async/detail',
+    price: 0.8,
+    priceUnit: '秒',
+    aliases: ['wan2.6', 'wan26', 'wan video', 'video_wan2.6'],
+    enabled: true,
+  },
+  {
+    id: 'chat_index',
+    name: 'ChatAPI',
+    kind: 'chat',
+    endpointPath: '/api/chat/index',
+    method: 'POST',
+    submitContentType: 'application/x-www-form-urlencoded',
+    price: 0,
+    priceUnit: 'token',
+    aliases: ['chatapi', 'chat_index', 'api/chat/index'],
+    enabled: true,
+  },
+  {
+    id: 'audio_tts',
+    name: '语音合成',
+    kind: 'audio',
+    endpointPath: '/api/async/audio_tts',
+    method: 'POST',
+    submitContentType: 'application/json',
+    detailPath: '/api/async/detail',
+    price: 0.0006,
+    priceUnit: '字符',
+    aliases: ['audio_tts', 'tts'],
+    enabled: true,
+  },
+  {
+    id: 'voice_composite',
+    name: '语音合成（同步）',
+    kind: 'audio',
+    endpointPath: '/api/voice/composite',
+    method: 'POST',
+    submitContentType: 'application/x-www-form-urlencoded',
+    price: 0.0006,
+    priceUnit: '字符',
+    aliases: ['voice_composite', 'voice composite'],
+    enabled: true,
+  },
+  {
+    id: 'voice_clone',
+    name: '语音克隆（同步）',
+    kind: 'audio',
+    endpointPath: '/api/voice/clone',
+    method: 'POST',
+    submitContentType: 'application/x-www-form-urlencoded',
+    price: 6,
+    priceUnit: '次',
+    aliases: ['voice_clone', 'voice clone'],
+    enabled: true,
+  },
+  {
+    id: 'sora2-new',
+    name: 'sora2-new',
+    kind: 'video',
+    endpointPath: '/api/sora2-new/submit',
+    method: 'POST',
+    submitContentType: 'application/json',
+    detailPath: '/api/sora2/detail',
+    price: 1.2,
+    priceUnit: '次',
+    aliases: ['sora2-new', 'sora2'],
+    enabled: true,
+  },
+  {
+    id: 'img_split',
+    name: '智能拼图',
+    kind: 'utility',
+    endpointPath: '/api/img/split',
+    method: 'POST',
+    submitContentType: 'application/x-www-form-urlencoded',
+    price: 0.03,
+    priceUnit: '次',
+    aliases: ['img_split', 'split'],
+    enabled: false,
+  },
+];
+
+function mergeWuyinCatalogWithRemoteRows(remoteRows) {
+  const catalog = WUYIN_FULL_DEFAULT_CATALOG.map(item => ({ ...item }));
+  if (!Array.isArray(remoteRows) || remoteRows.length === 0) {
+    return catalog;
+  }
+
+  for (const row of remoteRows) {
+    const matched = catalog.find(item => {
+      if (item.endpointPath === row.endpointPath) return true;
+      if (item.id === row.modelId) return true;
+      return item.aliases.some(alias => alias.toLowerCase() === String(row.modelId || '').toLowerCase());
+    });
+
+    if (matched) {
+      matched.price = row.inputPrice;
+      matched.priceUnit = row.unit;
+      if (row.modelName) {
+        matched.name = row.modelName;
+      }
+      matched.enabled = true;
+    } else {
+      const path = String(row.endpointPath || '').toLowerCase();
+      let kind = 'utility';
+      if (path.includes('image') || path.includes('draw') || path.includes('img')) {
+        kind = 'image';
+      } else if (path.includes('video') || path.includes('sora') || path.includes('veo') || path.includes('vidu')) {
+        kind = 'video';
+      } else if (path.includes('audio') || path.includes('tts') || path.includes('voice') || path.includes('clone')) {
+        kind = 'audio';
+      } else if (path.includes('chat') || path.includes('gpt') || path.includes('grok')) {
+        kind = 'chat';
+      }
+
+      let submitContentType = 'application/json';
+      if (path.includes('chat') || path.includes('composite') || path.includes('clone') || path.includes('split')) {
+        submitContentType = 'application/x-www-form-urlencoded';
+      }
+
+      let detailPath = undefined;
+      if (path.includes('/api/async/') && !path.includes('/detail')) {
+        detailPath = '/api/async/detail';
+      } else if (path.includes('sora2-new')) {
+        detailPath = '/api/sora2/detail';
+      }
+
+      catalog.push({
+        id: row.modelId,
+        name: row.modelName || row.modelId,
+        kind,
+        endpointPath: row.endpointPath,
+        method: row.method || 'POST',
+        submitContentType,
+        detailPath,
+        price: row.inputPrice,
+        priceUnit: row.unit,
+        aliases: [row.modelId, row.modelName].filter(Boolean),
+        enabled: true,
+      });
+    }
+  }
+
+  return catalog;
+}
+
 function deriveWuyinModelIdFromEndpointPath(endpointPath) {
   const path = String(endpointPath || '').trim().replace(/\/+$/, '');
   const asyncMatch = path.match(/^\/api\/async\/([a-z0-9_.-]+)$/i);
@@ -746,23 +1069,39 @@ async function handleWuyinGenericProxy(req, res, profileState) {
     return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
   }
 
-  const headers = {
-    Authorization: route.apiKey,
-    Accept: String(req.headers.accept || 'application/json'),
-  };
-  const init = {
-    method: req.method,
-    headers,
-  };
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    headers['Content-Type'] = String(req.headers['content-type'] || 'application/json');
-    init.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
-  }
+  const apiKey = String(route.apiKey || '').trim();
 
-  const upstream = await fetch(appendWuyinApiKeyToTargetUrl(targetUrl, route.apiKey), init);
-  const responseText = await upstream.text().catch(() => '');
-  const contentType = upstream.headers.get('content-type') || 'application/json; charset=utf-8';
-  return res.status(upstream.status).type(contentType).send(responseText);
+  try {
+    const headers = {
+      Authorization: apiKey,
+      Accept: String(req.headers.accept || 'application/json'),
+    };
+    const init = {
+      method: req.method,
+      headers,
+    };
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      const contentType = String(req.headers['content-type'] || '');
+      headers['Content-Type'] = contentType || 'application/json';
+      init.body = typeof req.body === 'string'
+        ? req.body
+        : contentType.includes('application/x-www-form-urlencoded')
+          ? new URLSearchParams(req.body || {}).toString()
+          : JSON.stringify(req.body || {});
+    }
+
+    const upstream = await fetch(appendWuyinApiKeyToTargetUrl(targetUrl, apiKey), init);
+    const responseText = await upstream.text().catch(() => '');
+    const contentType = upstream.headers.get('content-type') || 'application/json; charset=utf-8';
+    const safeText = apiKey ? responseText.replaceAll(apiKey, '[REDACTED]') : responseText;
+    return res.status(upstream.status).type(contentType).send(safeText);
+  } catch (error) {
+    let errMsg = error instanceof Error ? error.message : String(error || 'Wuyin generic proxy failed.');
+    if (apiKey) {
+      errMsg = errMsg.replaceAll(apiKey, '[REDACTED]');
+    }
+    return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', errMsg);
+  }
 }
 
 async function handleWuyinVideoMode(req, res, profileState) {
@@ -865,6 +1204,26 @@ router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error || 'Wuyin async-video proxy failed.');
     return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', message);
+  }
+});
+
+router.get('/v1/wuyin/catalog', async (req, res) => {
+  try {
+    const rows = await fetchWuyinPricingRows();
+    const catalog = mergeWuyinCatalogWithRemoteRows(rows);
+    return res.json({
+      success: true,
+      data: catalog,
+      source: 'remote'
+    });
+  } catch (error) {
+    console.warn('[wuyin-catalog] Failed to fetch remote catalog, using fallback:', error && error.message || error);
+    const catalog = mergeWuyinCatalogWithRemoteRows([]);
+    return res.json({
+      success: true,
+      data: catalog,
+      source: 'fallback'
+    });
   }
 });
 

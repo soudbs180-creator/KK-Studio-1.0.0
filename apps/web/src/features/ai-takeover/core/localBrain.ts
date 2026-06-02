@@ -1,6 +1,6 @@
 // 简体中文：本地脑 (Local Brain) 模块
 
-import { AssistantPlan, SanitizedProjectContext, AssistantAction } from '../types';
+import type { AssistantPlan, SanitizedProjectContext, AssistantAction } from '../types';
 import { analyzeIntent } from './intentGate';
 import { PROJECT_KNOWLEDGE, matchLocalKnowledge } from '../prompts/projectKnowledge';
 import { PROMPT_LIBRARY } from '../prompts/promptLibrary';

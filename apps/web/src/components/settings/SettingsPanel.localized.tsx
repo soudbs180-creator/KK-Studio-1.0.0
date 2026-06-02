@@ -181,7 +181,7 @@ const SettingsDesktopShell: React.FC<{
           )}
         />
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col relative">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={{ position: 'relative' }}>
           <SettingsDesktopWorkbenchHeader
             activeView={activeView}
             onRefreshCurrentView={onRefreshCurrentView}

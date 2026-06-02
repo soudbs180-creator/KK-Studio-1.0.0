@@ -19,7 +19,8 @@ import { formatRemainingCredits } from '../../services/billing/remainingBalance'
 import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
 import { writeTextToClipboard } from '../../utils/clipboard';
 import ReactDOM from 'react-dom';
-import { AspectRatio, ImageSize, PromptNode } from '../../types';
+import { AspectRatio, ImageSize } from '../../types';
+import type { PromptNode } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useBilling } from '../../context/BillingContext';
 import { useCanvas } from '../../context/CanvasContext';
@@ -474,29 +475,37 @@ const matchLocalKnowledge = (query: string): string | null => {
 
 const resolveAssistantCapabilityRoute = () => resolveEnabledCapabilityRouteAssignment('assistant');
 
-const ChatSidebarInner: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange }) => {
-    const { aiTakeoverMode } = useAITakeover();
+interface NormalChatSidebarProps extends ChatSidebarProps {
+    selectedModel: ChatModel;
+    setSelectedModel: (m: ChatModel) => void;
+}
 
-    useEffect(() => {
-        if (aiTakeoverMode) {
-            onWidthChange?.(380);
-        } else {
-            onWidthChange?.(420);
-        }
-    }, [aiTakeoverMode, onWidthChange]);
-
-    if (aiTakeoverMode) {
-        return (
-            <div
-                className="fixed inset-y-0 right-0 z-50 flex flex-col transition-all duration-300 ease-out animate-in fade-in slide-in-from-right duration-300"
-                style={{ width: '380px', minWidth: '380px', maxWidth: '380px', pointerEvents: 'auto' }}
-            >
-                <AIAssistantDock />
-            </div>
-        );
-    }
-
+const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange, selectedModel, setSelectedModel }) => {
     const { user, isTempUser, loading: authLoading } = useAuth();
+
+    // 2. Chat State
+    const [sessions, setSessions] = useState<ChatSessionItem[]>(() => {
+        try {
+            const raw = localStorage.getItem(CHAT_SESSION_STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    return parsed;
+                }
+            }
+        } catch {
+            // ignore
+        }
+
+        return [{
+            id: `session_${Date.now()}`,
+            title: '新对话',
+            messages: [createWelcomeMessage()],
+            updatedAt: Date.now()
+        }];
+    });
+    const [activeSessionId, setActiveSessionId] = useState<string>(() => sessions[0]?.id || `session_${Date.now()}`);
+    const [messages, setMessages] = useState<Message[]>(() => sessions[0]?.messages || [createWelcomeMessage()]);
     const { balance, loading: billingLoading, setShowRechargeModal } = useBilling();
     const { activeCanvas, addPromptNode, getNextCardPosition } = useCanvas();
     const { executeGeneration } = useImageGeneration({
@@ -524,9 +533,9 @@ const ChatSidebarInner: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClos
                     setTimeout(() => {
                         el.classList.remove('highlight-glow-ring');
                     }, 3000);
-                    notify.success('已为您高亮定位对应操作区域');
+                    notify.success('已为您高亮定位对应操作区域', '');
                 } else {
-                    notify.warning('未找到对应界面元素，请先展开相应功能区');
+                    notify.warning('未找到对应界面元素，请先展开相应功能区', '');
                 }
             }, 100);
         } else if (url === 'action://open-recharge') {
@@ -554,18 +563,16 @@ const ChatSidebarInner: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClos
                     setTimeout(() => {
                         el.classList.remove('highlight-glow-ring');
                     }, 3000);
-                    notify.success('已为您打开设置并定位至 API 密钥输入框');
+                    notify.success('已为您打开设置并定位至 API 密钥输入框', '');
                 } else {
-                    notify.warning('已打开 API 管理，请手动在下方输入框填写密钥');
+                    notify.warning('已打开 API 管理，请手动在下方输入框填写密钥', '');
                 }
             }, 300);
         } else if (url === 'action://open-settings') {
             if (onOpenSettings) onOpenSettings();
         } else if (url.startsWith('action://takeover-bulk-generate')) {
-            // 解析 prompts 参数
             let prompts: string[] = [];
             try {
-                // URL 构造函数需要合法 scheme，所以我们将 action:// 替换为 http://dummy
                 const parsedUrl = new URL(url.replace('action://', 'http://dummy'));
                 const promptsParam = parsedUrl.searchParams.get('prompts') || '';
                 prompts = promptsParam.split(',').map(p => p.trim()).filter(Boolean);
@@ -574,48 +581,12 @@ const ChatSidebarInner: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClos
             }
 
             if (prompts.length === 0) {
-                notify.warning('AI接管失败', '未解析到有效的提示词');
+                notify.warning('AI 接管失败', '未解析到有效提示词');
                 return;
             }
 
-            notify.success(`AI接管：正在自动为您批量生成 ${prompts.length} 张图片`);
-
-            // 异步执行批量生成
-            (async () => {
-                try {
-                    const lastPos = getNextCardPosition();
-                    for (let i = 0; i < prompts.length; i++) {
-                        const promptText = prompts[i];
-                        // 偏移 x 坐标，使得卡片水平排列，避免重叠
-                        const pos = {
-                            x: lastPos.x + i * 420, // 400px 卡片宽度 + 20px 间距
-                            y: lastPos.y
-                        };
-
-                        const newNode: PromptNode = {
-                            id: 'takeover_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substr(2, 9),
-                            prompt: promptText,
-                            position: pos,
-                            aspectRatio: AspectRatio.SQUARE,
-                            imageSize: ImageSize.SIZE_1K,
-                            model: selectedModel.id as any,
-                            modelLabel: getModelDisplayInfo(selectedModel).displayName,
-                            provider: selectedModel.provider,
-                            childImageIds: [],
-                            timestamp: Date.now(),
-                            parallelCount: 1,
-                            isGenerating: true
-                        };
-
-                        await addPromptNode(newNode);
-                        await new Promise(resolve => setTimeout(resolve, 300));
-                        void executeGeneration(newNode);
-                    }
-                } catch (e: any) {
-                    console.error('Takeover bulk generation error:', e);
-                    notify.error('批量生成失败', e.message);
-                }
-            })();
+            sendMessage(`请为以下提示词创建图片生成计划，但先不要生成，必须等待我确认：${prompts.join('，')}`);
+            return;
         } else if (url.startsWith('action://takeover-locate')) {
             let keyword = '';
             try {
@@ -648,7 +619,7 @@ const ChatSidebarInner: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClos
                     }
                 });
                 window.dispatchEvent(locateEvent);
-                notify.success(`AI接管：已为您平滑定位到包含“${keyword}”的卡片`);
+                notify.success(`AI接管：已为您平滑定位到包含“${keyword}”的卡片`, '');
             } else {
                 notify.warning('AI接管定位', `未在当前画布上找到包含“${keyword}”的卡片`);
             }
@@ -658,7 +629,7 @@ const ChatSidebarInner: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClos
     // 简体中文：解析 action 链接，生成交互按钮
     const renderMessageContent = useCallback((content: string) => {
         const regex = /\[([^\]]+)\]\((action:\/\/[^\)]+)\)/g;
-        const parts = [];
+        const parts: React.ReactNode[] = [];
         let lastIndex = 0;
         let match;
 
@@ -674,7 +645,7 @@ const ChatSidebarInner: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClos
                 <button
                     key={match.index}
                     onClick={() => handleActionClick(actionUrl)}
-                    className="inline-flex items-center gap-1 mx-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:brightness-110 active:scale-95 transition-all shadow-[0_2px_8px_rgba(99,102,241,0.3)] select-none cursor-pointer"
+                    className="inline-flex items-center gap-1 mx-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-[#6366f1] via-[#a855f7] to-pink-500 hover:brightness-110 active:scale-95 transition-all shadow-[0_2px_8px_rgba(99,102,241,0.3)] select-none cursor-pointer"
                 >
                     ✨ {label}
                 </button>
@@ -728,7 +699,7 @@ const ChatSidebarInner: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClos
     // 1. Model State Management
     // ✨ 支持多模态模型 (image+chat) + 🚀 去重
     const [availableModels, setAvailableModels] = useState<ChatModel[]>(() => buildAvailableChatModels(canBrowseSystemCreditModels));
-    const [selectedModel, setSelectedModel] = useState<ChatModel>(() => resolveAssistantPreferredModel(availableModels));
+    // selectedModel, setSelectedModel 已由 props 传入
     const [showModelMenu, setShowModelMenu] = useState(false);
     const [modelMenuLoadingState, setModelMenuLoadingState] = useState<ModelMenuLoadingState>('idle');
     const [modelSearch, setModelSearch] = useState('');
@@ -817,7 +788,7 @@ const ChatSidebarInner: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClos
 
     // Agent State Management
     const [agentMode, setAgentMode] = useState(false);
-    const { aiTakeoverMode, setAiTakeoverMode, setSelectedModel: ctxSetSelectedModel } = useAITakeover();
+    const { aiTakeoverMode, setAiTakeoverMode, setSelectedModel: ctxSetSelectedModel, sendMessage } = useAITakeover();
     const [currentAgent, setCurrentAgent] = useState<AgentConfig | null>(() => agentService.getActive());
 
     // 简体中文：实时同步选择的生图模型给 AI 接管 Context
@@ -928,29 +899,6 @@ const ChatSidebarInner: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClos
         return true;
     }, [authLoading, balance, billingUiEnabled, canAccessSystemCreditModels, getRequiredCredits, setShowRechargeModal]);
 
-    // 2. Chat State
-    const [sessions, setSessions] = useState<ChatSessionItem[]>(() => {
-        try {
-            const raw = localStorage.getItem(CHAT_SESSION_STORAGE_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    return parsed;
-                }
-            }
-        } catch {
-            // ignore
-        }
-
-        return [{
-            id: `session_${Date.now()}`,
-            title: '新对话',
-            messages: [createWelcomeMessage()],
-            updatedAt: Date.now()
-        }];
-    });
-    const [activeSessionId, setActiveSessionId] = useState<string>(() => sessions[0]?.id || `session_${Date.now()}`);
-    const [messages, setMessages] = useState<Message[]>(() => sessions[0]?.messages || [createWelcomeMessage()]);
     const [sessionSearch, setSessionSearch] = useState('');
     const [showArchived, setShowArchived] = useState(false);
     const [importPreview, setImportPreview] = useState<SessionImportPreview | null>(null);
@@ -2605,7 +2553,7 @@ const ChatSidebarInner: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClos
                             <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''} group`}>
                                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${msg.role === 'user'
                                     ? 'bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)]'
-                                    : 'bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white'
+                                    : 'bg-gradient-to-br from-[#6366f1] via-[#a855f7] to-pink-500 text-white'
                                     }`}>
                                     {msg.role === 'user' ? (
                                         <User size={14} className="text-[var(--text-tertiary)]" />
@@ -3175,8 +3123,57 @@ const ChatSidebarInner: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClos
     );
 };
 
+const resolveAssistantPreferredModelGlobal = (models: ChatModel[]) => {
+    const selectableModels = models.filter((model) => !isCapabilityRouteAssignmentModelDisabled('assistant', model.id));
+    const assignment = resolveEnabledCapabilityRouteAssignment('assistant');
+    const preferredModelId = String(assignment?.primaryModelId || '').trim();
+    if (!preferredModelId) {
+        return selectableModels[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false } as ChatModel;
+    }
+
+    const exact = selectableModels.find((model) => model.id === preferredModelId);
+    if (exact) {
+        return exact;
+    }
+
+    const suffix = preferredModelId.split('@')[1];
+    if (suffix) {
+        const matched = selectableModels.find((model) => model.id.endsWith(`@${suffix}`));
+        if (matched) {
+            return matched;
+        }
+    }
+
+    return selectableModels[0] || { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', isCustom: false } as ChatModel;
+};
+
+const ChatSidebarInner: React.FC<ChatSidebarProps & { selectedModel: ChatModel; setSelectedModel: (m: ChatModel) => void }> = (props) => {
+    const { aiTakeoverMode } = useAITakeover();
+
+    useEffect(() => {
+        if (aiTakeoverMode) {
+            props.onWidthChange?.(380);
+        } else {
+            props.onWidthChange?.(420);
+        }
+    }, [aiTakeoverMode, props.onWidthChange]);
+
+    if (aiTakeoverMode) {
+        return (
+            <div
+                className="fixed inset-y-0 right-0 z-50 flex flex-col transition-all duration-300 ease-out animate-in fade-in slide-in-from-right duration-300"
+                style={{ width: '380px', minWidth: '380px', maxWidth: '380px', pointerEvents: 'auto' }}
+            >
+                <AIAssistantDock />
+            </div>
+        );
+    }
+
+    return <NormalChatSidebar {...props} />;
+};
+
 const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
-    const { activeCanvas, addPromptNode, updatePromptNode, getNextCardPosition } = useCanvas();
+    const { activeCanvas, addPromptNode, updatePromptNode, getNextCardPosition, selectedNodeIds } = useCanvas();
     const { executeGeneration } = useImageGeneration({
         isMobile: props.isMobile,
         getCardDimensions: (ratio, hasToolbar) => getCardDimensions(ratio, hasToolbar),
@@ -3185,10 +3182,16 @@ const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
     const { balance } = useBilling();
     const apiKeyStatus = keyManager.hasValidKeys() ? 'configured_masked' : 'missing';
 
+    const [selectedModel, setSelectedModel] = useState<ChatModel>(() => {
+        const models = buildAvailableChatModels(KKAI_FEATURE_FLAGS.billing);
+        return resolveAssistantPreferredModelGlobal(models);
+    });
+
     return (
         <AITakeoverProvider
             activeCanvas={activeCanvas}
-            selectedModel={{ id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google' }}
+            selectedModel={selectedModel}
+            selectedNodeIds={selectedNodeIds}
             addPromptNode={addPromptNode}
             updatePromptNode={updatePromptNode}
             executeGeneration={executeGeneration}
@@ -3199,7 +3202,11 @@ const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
             balance={balance}
             notify={notify}
         >
-            <ChatSidebarInner {...props} />
+            <ChatSidebarInner
+                {...props}
+                selectedModel={selectedModel}
+                setSelectedModel={setSelectedModel}
+            />
         </AITakeoverProvider>
     );
 };

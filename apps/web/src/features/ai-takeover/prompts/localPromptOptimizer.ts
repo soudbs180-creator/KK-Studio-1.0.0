@@ -1,6 +1,6 @@
 // 简体中文：本地提示词润色与模板拼接引擎
 
-import { PromptTemplate } from '../types';
+import type { PromptTemplate } from '../types';
 
 export interface OptimizedPromptResult {
   optimizedPromptEn: string;

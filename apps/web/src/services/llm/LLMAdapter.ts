@@ -220,6 +220,7 @@ export interface AudioGenerationOptions {
     };
     preferredKeyId?: string;
     signal?: AbortSignal; // 🚀 支持请求取消
+    onTaskId?: (id: string) => void; // 🚀 [New] 异步任务 ID 回调
 }
 
 export interface AudioGenerationResult {

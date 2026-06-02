@@ -1,6 +1,6 @@
 // 简体中文：意图分析门控 (Intent Gate) 模块
 
-import { AssistantIntent, IntentResult, SanitizedProjectContext } from '../types';
+import type { AssistantIntent, IntentResult, SanitizedProjectContext } from '../types.ts';
 
 const promptOnlyWords = [
   '优化提示词', '改提示词', '润色提示词', '整理提示词',

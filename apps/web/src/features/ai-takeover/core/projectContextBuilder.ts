@@ -1,6 +1,6 @@
 // 简体中文：项目上下文脱敏构建器 (Project Context Builder)
 
-import { SanitizedProjectContext, AssetContextSummary } from '../types';
+import type { SanitizedProjectContext, AssetContextSummary } from '../types';
 
 export interface ContextBuilderParams {
   currentPage: 'canvas' | 'settings' | 'agent' | 'unknown';

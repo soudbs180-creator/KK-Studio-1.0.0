@@ -1,6 +1,6 @@
 // 简体中文：动作确认层策略评估器 (Confirmation Policy)
 
-import { AssistantPlan, SanitizedProjectContext } from '../types';
+import type { AssistantPlan, SanitizedProjectContext } from '../types.ts';
 
 export interface ConfirmationDetails {
   required: boolean;

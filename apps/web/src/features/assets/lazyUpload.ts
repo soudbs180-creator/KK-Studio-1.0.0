@@ -23,14 +23,12 @@ export async function ensureFileUploaded(assetId: string): Promise<string> {
     throw new Error('本地文件句柄已失效，请重新连接');
   }
 
-  // 模拟真实网络延时与上传交互
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  const uploadedUrl = `https://storage.kkai.plus/projects/assets/takeover_${assetId}_${encodeURIComponent(asset.name)}`;
+  // 当前阶段没有真实上传服务，直接返回本地的 object URL
+  const objectUrl = URL.createObjectURL(asset.localFile);
 
   assetStore.updateFile(assetId, {
-    uploadState: 'uploaded',
-    uploadedUrl
+    uploadState: 'local_ready'
   });
 
-  return uploadedUrl;
+  return objectUrl;
 }

@@ -9,6 +9,25 @@ import {
 import { assertNoDirectCall } from '../../utils/security';
 import { forwardUserRouteGenericRequest } from '../model/secureModelProxy';
 import { AsyncTaskPoller, PollCancelledError } from '../http/AsyncTaskPoller';
+import { resolveProviderRuntime } from '../api/providerStrategy';
+import {
+    extractWuyinStatusCode,
+    extractWuyinTaskId,
+    mapWuyinStatus,
+    buildWuyinAudioSubmitBody,
+    extractWuyinOutputUrls,
+    extractWuyinFailureMessage,
+    WUYIN_ASYNC_DETAIL_PATH,
+    findWuyinCatalogItem,
+} from './openAICompatibleWuyinRoute';
+import { WUYIN_DEFAULT_BASE_URL } from './wuyinCatalog';
+
+function getWuyinCatalogFromKeySlot(keySlot: any): any[] {
+  const snapshot = keySlot.pricingSnapshot;
+  if (!snapshot) return [];
+  const rows = snapshot.rows || snapshot._rawData;
+  return Array.isArray(rows) && rows.length > 0 ? rows : [];
+}
 
 /**
  * 音频生成适配器
@@ -40,6 +59,20 @@ export class AudioCompatibleAdapter implements LLMAdapter {
     }
 
     async generateAudio(options: AudioGenerationOptions, keySlot: KeySlot): Promise<AudioGenerationResult> {
+        const runtime = resolveProviderRuntime({
+            provider: keySlot.provider === 'Custom' && keySlot.name ? keySlot.name : keySlot.provider,
+            baseUrl: keySlot.baseUrl || '',
+            format: keySlot.format,
+            authMethod: keySlot.authMethod,
+            headerName: keySlot.headerName,
+            compatibilityMode: keySlot.compatibilityMode,
+            modelId: options.modelId,
+        });
+
+        if (runtime.strategyId === 'wuyinkeji') {
+            return this.generateAudioWuyin(options, keySlot);
+        }
+
         const baseUrl = (keySlot.baseUrl || 'https://api.openai.com').replace(/\/+$/, '');
         const cleanBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
         const submitUrl = `${cleanBase}/audio/generations`;
@@ -281,5 +314,155 @@ export class AudioCompatibleAdapter implements LLMAdapter {
     private isFailureStatus(status: string): boolean {
         const s = status.toUpperCase();
         return s === 'FAILURE' || s === 'FAILED' || s === 'ERROR';
+    }
+
+    private async generateAudioWuyin(options: AudioGenerationOptions, keySlot: KeySlot): Promise<AudioGenerationResult> {
+        const item = findWuyinCatalogItem(options.modelId, getWuyinCatalogFromKeySlot(keySlot));
+        if (!item) throw new Error(`速创模型不存在：${options.modelId}`);
+        if (item.kind !== 'audio') throw new Error(`当前模型不是音频模型：${item.name}`);
+
+        const submitUrl = `${WUYIN_DEFAULT_BASE_URL}${item.endpointPath}`;
+        
+        let body: any;
+        if (item.submitContentType === 'application/x-www-form-urlencoded') {
+            const params = new URLSearchParams();
+            params.set('prompt', options.prompt);
+            if (options.voiceId) params.set('voice_id', options.voiceId);
+            if (options.speed !== undefined && options.speed !== null) params.set('speed', String(options.speed));
+            body = params.toString();
+        } else {
+            body = buildWuyinAudioSubmitBody(options);
+        }
+
+        const response = await forwardUserRouteGenericRequest({
+            url: submitUrl,
+            method: item.method,
+            keyId: keySlot.id,
+            rawBody: body,
+            headers: {
+                'Content-Type': item.submitContentType,
+                Accept: 'application/json',
+            },
+            signal: options.signal,
+        });
+
+        if (!response.ok) {
+            const errText = await response.text().catch(() => '');
+            throw new Error(`Wuyin audio API error ${response.status}: ${errText.slice(0, 300)}`);
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        const logicalCode = Number(payload?.code);
+        if (Number.isFinite(logicalCode) && logicalCode !== 200 && logicalCode !== 0) {
+            throw new Error(`Wuyin audio API error ${logicalCode}: ${extractWuyinFailureMessage(payload)}`);
+        }
+
+        const taskId = extractWuyinTaskId(payload);
+        const immediateUrls = extractWuyinOutputUrls(payload);
+        const status = mapWuyinStatus(extractWuyinStatusCode(payload));
+        
+        const metadata: any = {};
+        if (taskId) {
+            options.onTaskId?.(taskId);
+        }
+
+        if (immediateUrls.length > 0 && (status === 'success' || !item.detailPath)) {
+            return {
+                url: immediateUrls[0],
+                taskId,
+                status: 'success',
+                provider: this.provider,
+                providerName: keySlot.name || this.provider,
+                model: options.modelId,
+                metadata,
+            };
+        }
+
+        if (!taskId) {
+            if (immediateUrls.length > 0) {
+                return {
+                    url: immediateUrls[0],
+                    status: 'success',
+                    provider: this.provider,
+                    providerName: keySlot.name || this.provider,
+                    model: options.modelId,
+                    metadata,
+                };
+            }
+            throw new Error('Wuyin audio API returned success without a task id or output URL.');
+        }
+
+        return this.pollWuyinAudioTask(taskId, item.detailPath || WUYIN_ASYNC_DETAIL_PATH, options, keySlot);
+    }
+
+    private async pollWuyinAudioTask(
+        taskId: string,
+        detailPath: string,
+        options: AudioGenerationOptions,
+        keySlot: KeySlot,
+    ): Promise<AudioGenerationResult> {
+        const maxDurationMs = 10 * 60 * 1000;
+        const startTime = Date.now();
+        let pollInterval = 3000;
+        const maxInterval = 10000;
+
+        const pollUrl = `${WUYIN_DEFAULT_BASE_URL}${detailPath}?id=${encodeURIComponent(String(taskId).trim())}`;
+
+        while (Date.now() - startTime < maxDurationMs) {
+            if (options.signal?.aborted) {
+                throw new Error('Audio generation was aborted.');
+            }
+
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+            pollInterval = Math.min(Math.round(pollInterval * 1.5), maxInterval);
+
+            const response = await forwardUserRouteGenericRequest({
+                url: pollUrl,
+                method: 'GET',
+                keyId: keySlot.id,
+                headers: {
+                    Accept: 'application/json',
+                },
+                signal: options.signal,
+            });
+
+            if (!response.ok) {
+                const errText = await response.text().catch(() => '');
+                if (response.status >= 500 || response.status === 404) {
+                    continue;
+                }
+                throw new Error(`Wuyin audio poll error ${response.status}: ${errText.slice(0, 200)}`);
+            }
+
+            const payload = await response.json().catch(() => ({}));
+            const logicalCode = Number(payload?.code);
+            if (Number.isFinite(logicalCode) && logicalCode !== 200 && logicalCode !== 0) {
+                throw new Error(`Wuyin audio API error ${logicalCode}: ${extractWuyinFailureMessage(payload)}`);
+            }
+
+            const status = mapWuyinStatus(extractWuyinStatusCode(payload));
+            if (status === 'success') {
+                const audioUrls = extractWuyinOutputUrls(payload);
+                if (audioUrls.length > 0) {
+                    return {
+                        url: audioUrls[0],
+                        taskId,
+                        status: 'success',
+                        provider: this.provider,
+                        providerName: keySlot.name || this.provider,
+                        model: options.modelId,
+                        metadata: {},
+                    };
+                }
+                throw new Error('Wuyin audio task completed without a usable output URL.');
+            }
+
+            if (status === 'failed') {
+                const reason = extractWuyinFailureMessage(payload);
+                throw new Error(`Wuyin audio generation failed: ${reason}`);
+            }
+        }
+
+        throw new Error('Wuyin audio generation timed out after 10 minutes.');
     }
 }

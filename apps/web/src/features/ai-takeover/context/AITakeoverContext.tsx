@@ -1,10 +1,11 @@
 // 简体中文：AI 接管上下文控制中心 (AITakeover Context)
 
 import React, { createContext, useContext, useState, useCallback, useRef, ReactNode } from 'react';
-import { AssistantPlan, SanitizedProjectContext, AssistantAction } from '../types';
+import type { AssistantPlan, SanitizedProjectContext, AssistantAction } from '../types';
 import { LocalAssistantBrain } from '../core/localBrain';
 import { buildSanitizedProjectContext } from '../core/projectContextBuilder';
-import { executeAction, ExecutorContext } from '../core/actionExecutor';
+import { executeAction } from '../core/actionExecutor';
+import type { ExecutorContext } from '../core/actionExecutor';
 import { useAssetStore } from '../../assets/assetStore';
 
 interface Message {
@@ -37,12 +38,13 @@ interface AITakeoverProviderProps {
   children: ReactNode;
   activeCanvas: any;
   selectedModel: any;
+  selectedNodeIds: string[];
   addPromptNode: (node: any) => Promise<void> | void;
   updatePromptNode: (node: any) => Promise<void> | void;
   executeGeneration: (node: any) => Promise<void> | void;
   getNextCardPosition: () => { x: number; y: number };
   setConfig: React.Dispatch<React.SetStateAction<any>>;
-  onOpenSettings?: (view?: string) => void;
+  onOpenSettings?: (view?: any) => void;
   apiKeyStatus: 'missing' | 'configured_masked' | 'invalid' | 'unknown';
   balance: number;
   notify: any;
@@ -52,6 +54,7 @@ export function AITakeoverProvider({
   children,
   activeCanvas,
   selectedModel: initialModel,
+  selectedNodeIds,
   addPromptNode,
   updatePromptNode,
   executeGeneration,
@@ -64,6 +67,14 @@ export function AITakeoverProvider({
 }: AITakeoverProviderProps) {
   const [aiTakeoverMode, setAiTakeoverModeState] = useState(false);
   const [selectedModel, setSelectedModel] = useState(initialModel);
+
+  // 同步外部选中的模型
+  React.useEffect(() => {
+    if (initialModel) {
+      setSelectedModel(initialModel);
+    }
+  }, [initialModel]);
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -139,7 +150,7 @@ export function AITakeoverProvider({
       aiTakeoverEnabled: true,
       agentEnabled: false,
       activeCanvas,
-      selectedNodeIds: activeCanvas?.promptNodes?.map((n: any) => n.id) || [],
+      selectedNodeIds: selectedNodeIds || [],
       apiKeyStatus,
       providerCount: 1,
       selectedModel: selectedModel?.id,
@@ -165,7 +176,7 @@ export function AITakeoverProvider({
     for (const action of plan.actions) {
       await executeAction(action, ctx);
     }
-  }, [activeCanvas, selectedModel, addPromptNode, updatePromptNode, executeGeneration, addToQueue, getNextCardPosition, setConfig, onOpenSettings, apiKeyStatus, notify]);
+  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, executeGeneration, addToQueue, getNextCardPosition, setConfig, onOpenSettings, apiKeyStatus, notify]);
 
   // 发送消息
   const sendMessage = useCallback(async (text: string) => {
@@ -188,7 +199,7 @@ export function AITakeoverProvider({
       aiTakeoverEnabled: true,
       agentEnabled: false,
       activeCanvas,
-      selectedNodeIds: [],
+      selectedNodeIds: selectedNodeIds || [],
       apiKeyStatus,
       providerCount: 1,
       selectedModel: selectedModel?.id,
@@ -225,7 +236,7 @@ export function AITakeoverProvider({
     } finally {
       setIsThinking(false);
     }
-  }, [isThinking, activeCanvas, selectedModel, apiKeyStatus, executePlan, notify]);
+  }, [isThinking, activeCanvas, selectedModel, selectedNodeIds, apiKeyStatus, executePlan, notify]);
 
   // 用户点击“确认执行”
   const executePendingPlan = useCallback(async () => {

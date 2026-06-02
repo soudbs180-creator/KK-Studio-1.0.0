@@ -1,6 +1,6 @@
 // 简体中文：提示词模板匹配评分算法
 
-import { PromptTemplate } from '../types';
+import type { PromptTemplate } from '../types';
 
 export function matchPromptTemplates(
   input: string,

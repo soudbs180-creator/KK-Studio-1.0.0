@@ -425,18 +425,36 @@ function decodeLocalProxyTaskId(localTaskId) {
   };
 }
 
-function isWuyinAsyncVideoTargetUrl(targetUrl) {
+function isAllowedWuyinTargetUrl(targetUrl) {
   const raw = String(targetUrl || '').trim();
   if (!raw) return false;
+
   try {
     const parsed = new URL(raw);
-    // 简体中文注释：放宽匹配，兼容通用端点 /api/async 以及所有的子模块路径和详情路径。
-    return /^api\.wuyinkeji\.com$/i.test(parsed.hostname)
-      && (/^\/api\/async(?:$|\/[a-z0-9_.-]+)$/i.test(parsed.pathname.replace(/\/+$/, '')) || parsed.pathname.replace(/\/+$/, '') === WUYIN_ASYNC_VIDEO_DETAIL_PATH);
-  } catch (e) {
+    if (!/^api\.wuyinkeji\.com$/i.test(parsed.hostname)) return false;
+
+    const path = parsed.pathname.replace(/\/+$/, '');
+
+    return (
+      /^\/api\/async(?:$|\/[a-z0-9_.-]+)$/i.test(path)
+      || path === '/api/async/detail'
+      || path === '/api/chat/index'
+      || path === '/api/voice/composite'
+      || path === '/api/voice/clone'
+      || path === '/api/sora2-new/submit'
+      || path === '/api/sora2/detail'
+      || path === '/api/img/split'
+
+      // 旧版兼容，不作为主链路
+      || path === '/api/img/nanoBanana'
+      || path === '/api/img/drawDetail'
+    );
+  } catch {
     return false;
   }
 }
+
+const isWuyinAsyncVideoTargetUrl = isAllowedWuyinTargetUrl;
 
 module.exports = {
   WUYIN_ASYNC_VIDEO_DEFAULT_MODEL,
