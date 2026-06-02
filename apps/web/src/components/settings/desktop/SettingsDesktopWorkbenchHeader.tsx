@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, ScrollText, X } from 'lucide-react';
+import { RefreshCw, X } from 'lucide-react';
 
 import { useLocale } from '../../../context/LocaleContext';
 import { SettingsActionButton } from '../SettingsScaffold';
@@ -34,14 +34,6 @@ const SettingsDesktopWorkbenchHeader: React.FC<SettingsDesktopWorkbenchHeaderPro
         <div className="settings-desktop-quick-actions ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
           <SettingsActionButton icon={RefreshCw} tone="secondary" size="sm" onClick={onRefreshCurrentView}>
             {pick('刷新', 'Refresh')}
-          </SettingsActionButton>
-          <SettingsActionButton
-            icon={ScrollText}
-            tone={activeView === 'system-logs' ? 'primary' : 'secondary'}
-            size="sm"
-            onClick={onOpenLogs}
-          >
-            {pick('日志', 'Logs')}
           </SettingsActionButton>
           <SettingsActionButton icon={X} tone="secondary" size="sm" onClick={onClose}>
             {pick('关闭', 'Close')}

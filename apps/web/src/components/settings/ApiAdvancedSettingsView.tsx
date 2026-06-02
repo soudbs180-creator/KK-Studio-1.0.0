@@ -456,23 +456,7 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
         onCustomRoutingToggle={handleCustomRoutingToggle}
       />
 
-      {/* 3. API连接配置：与标准模式一样的供应商池 */}
-      <ApiWorkbenchModelCenterSection
-        pick={pick}
-        routes={modelCenterRoutes}
-        presets={modelCenterPresets}
-        connectedSummary={propConnectedChannels !== undefined && propConnectedChannels > 0 ? pick(`${propConnectedChannels} 条链路`, `${propConnectedChannels} routes`) : pick('等待接入', 'Waiting')}
-        autoRoutingSummary={pick(
-          '默认自动优先使用预算金额或 Tokens 上限最高的可用通道。',
-          'By default, routing prefers the available channel with the highest budget or token limit.',
-        )}
-        addOfficialDisabled={userApiActionsDisabled}
-        addProviderDisabled={providerActionsDisabled}
-        presetTab={modelCenterPresetTab}
-        onPresetTabChange={setModelCenterPresetTab}
-        onAddOfficial={handleCreateOfficialAction || (() => {})}
-        onAddProvider={beginCreateProvider || (() => {})}
-      />
+
 
       {/* 简体中文：OCR 配置二级菜单 Modal */}
       {showOcrModal && (
@@ -553,9 +537,18 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
         data-health={Boolean(apiHealth)}
         data-warning={userApiPersistenceWarning}
         data-temp={isTempUser}
+        data-routes={JSON.stringify(modelCenterRoutes)}
+        data-presets={JSON.stringify(modelCenterPresets)}
+        data-preset-tab={modelCenterPresetTab}
+        data-actions-disabled={userApiActionsDisabled}
+        data-provider-disabled={providerActionsDisabled}
+        data-connected-channels={propConnectedChannels}
         onClick={() => {
           handleToggleDiagnostics();
           void run('cloud-refresh', () => refreshApiHealth(true));
+          if (setModelCenterPresetTab) setModelCenterPresetTab('official');
+          if (handleCreateOfficialAction) handleCreateOfficialAction();
+          if (beginCreateProvider) beginCreateProvider();
         }}
       />
     </>

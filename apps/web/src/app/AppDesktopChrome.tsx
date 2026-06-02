@@ -192,7 +192,8 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
                   label="管理员后台"
                   accentColor="var(--clay-brand-coral)"
                   onClick={() => {
-                    window.location.href = "/admin";
+                    window.history.pushState({}, '', '/admin');
+                    window.dispatchEvent(new PopStateEvent('popstate'));
                     setShowUserMenu(false);
                   }}
                 />

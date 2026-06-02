@@ -60,7 +60,7 @@ export const AdminLayout: React.FC = () => {
             </p>
           </div>
           <button
-            onClick={() => navigate("/")}
+            onClick={() => { window.history.pushState({}, '', '/'); window.dispatchEvent(new PopStateEvent('popstate')); }}
             className="text-xs text-gray-600 bg-white border border-gray-300 hover:bg-gray-100 rounded-lg px-3 py-1.5 font-medium transition-colors"
           >
             返回工作区

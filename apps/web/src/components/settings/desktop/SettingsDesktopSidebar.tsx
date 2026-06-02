@@ -132,7 +132,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
       return (
         <div className="mt-2 text-[11px] leading-4 flex items-center justify-between">
           <span className="text-[var(--text-secondary)]">{pick('今日消耗', 'Today Cost')}</span>
-          <span className="font-bold text-amber-300 text-xs">{remainingBalanceDisplay}</span>
+          <span className="font-bold text-amber-600 dark:text-amber-300 text-xs">{remainingBalanceDisplay}</span>
         </div>
       );
     }
@@ -141,7 +141,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
       return (
         <div className="mt-2 text-[11px] leading-4 flex items-center gap-1.5 font-medium truncate">
           <span className={`h-2 w-2 rounded-full ${isHealthy ? 'bg-emerald-400' : 'bg-red-400 animate-pulse'}`} />
-          <span style={{ color: isHealthy ? 'var(--text-secondary)' : '#f87171' }} className="truncate">
+          <span style={{ color: isHealthy ? 'var(--text-secondary)' : 'var(--state-danger-text, #ef4444)' }} className="truncate">
             {isHealthy ? pick('系统运行正常', 'System healthy') : pick(`${importantLogCount} 项告警日志`, `${importantLogCount} warnings`)}
           </span>
         </div>
@@ -209,6 +209,15 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
             inset -1px -1px 3px rgba(255, 255, 255, 0.03) !important;
           /* 选中时卡片物理上产生微小的压低反馈 */
           transform: translateY(0.5px);
+        }
+        /* 选中状态下在亮色模式下的背景和阴影微调 */
+        body:not(.dark-mode) .settings-sidebar-card.active {
+          border-color: rgba(59, 130, 246, 0.4) !important;
+          background: radial-gradient(circle at 12% 16%, rgba(59, 130, 246, 0.12) 0%, rgba(139, 92, 246, 0.04) 45%, rgba(255, 255, 255, 0.9) 100%) !important;
+          box-shadow: 
+            0 0 10px rgba(59, 130, 246, 0.12),
+            inset 1px 1px 3px rgba(255, 255, 255, 0.9),
+            inset -1px -1px 2px rgba(0, 0, 0, 0.03) !important;
         }
         /* 移除原有左侧生硬的竖条，使凹陷毛玻璃的整体结构更纯粹连贯 */
         .settings-sidebar-card.active::before {

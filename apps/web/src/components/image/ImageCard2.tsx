@@ -1673,7 +1673,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                 )}
 
                                 {/* 🚀 全球加载遮罩 - 只有真正没有图且没有错误时才显示卡片级遮罩（在上模块内） */}
-                                {((isLoading && !displaySrc) || (!imgError && !displaySrc)) && !image.error && (
+                                {/* 🚀 交互/防抖期间，直接展示空的卡片（隐藏黑色加载遮罩和文字） */}
+                                {((isLoading && !displaySrc) || (!imgError && !displaySrc)) && !image.error && !isCanvasTransforming && (
                                     <div
                                         className="absolute inset-0 z-50 rounded-lg flex flex-col items-center justify-center bg-black/60 animate-shimmer-inward"
                                         style={{ willChange: 'opacity' }}

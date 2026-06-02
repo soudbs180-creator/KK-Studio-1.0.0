@@ -476,7 +476,7 @@ export const StorageSettingsView: React.FC = () => {
               <span className="text-[9px] font-bold uppercase tracking-wider">{pick('本地授权', 'Permission')}</span>
               <HardDrive size={13} />
             </div>
-            <div className="text-sm font-bold text-white mt-1.5">{supportsLocal ? pick('已支持', 'Supported') : pick('不可用', 'Unavailable')}</div>
+            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{supportsLocal ? pick('已支持', 'Supported') : pick('不可用', 'Unavailable')}</div>
             <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('是否允许访问本地文件夹。', 'Local folder read/write capability.')}</div>
           </div>
         </div>
@@ -489,7 +489,7 @@ export const StorageSettingsView: React.FC = () => {
               <span className="text-[9px] font-bold uppercase tracking-wider">{pick('活动项目', 'Active Project')}</span>
               <FolderOpen size={13} />
             </div>
-            <div className="text-sm font-bold text-white mt-1.5 truncate">{activeCanvas?.name || pick('未选择', 'None')}</div>
+            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5 truncate">{activeCanvas?.name || pick('未选择', 'None')}</div>
             <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('当前正在编辑的项目。', 'Canvas currently in use.')}</div>
           </div>
         </div>
@@ -502,7 +502,7 @@ export const StorageSettingsView: React.FC = () => {
               <span className="text-[9px] font-bold uppercase tracking-wider">{pick('缓存占用', 'Footprint')}</span>
               <Activity size={13} />
             </div>
-            <div className="text-sm font-bold text-white mt-1.5">{formatMb(usageMB)}</div>
+            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{formatMb(usageMB)}</div>
             <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('图片与文件缓存总计。', 'Total storage consumed locally.')}</div>
           </div>
         </div>
@@ -515,7 +515,7 @@ export const StorageSettingsView: React.FC = () => {
               <span className="text-[9px] font-bold uppercase tracking-wider">{pick('项目总数', 'Projects')}</span>
               <Layers3 size={13} />
             </div>
-            <div className="text-sm font-bold text-white mt-1.5">{state.canvases.length} 个</div>
+            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{state.canvases.length} 个</div>
             <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('当前工作区内项目总数。', 'Total canvases stored.')}</div>
           </div>
         </div>
@@ -527,23 +527,23 @@ export const StorageSettingsView: React.FC = () => {
         >
           <div>
             <div className="flex items-center justify-between">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 {pick('持久化模式', 'Persistence')}
               </div>
               <SettingsBadge tone={mode === 'local' ? 'emerald' : mode === 'browser' ? 'indigo' : 'amber'}>
                 {getModeLabel(mode)}
               </SettingsBadge>
             </div>
-            <h3 className="text-sm font-bold text-white mt-2">{pick('当前存储目标配置', 'Active Target')}</h3>
-            <p className="text-[11px] text-slate-400 mt-1">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-2">{pick('当前存储目标配置', 'Active Target')}</h3>
+            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">
               {pick('为快速体验保留浏览器缓存，为长期归档使用本地授权文件夹。', 'Browser cache for sessions, local folders for workspace persistence.')}
             </p>
 
             <div className="mt-3.5 space-y-2">
-              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5">
+              <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
                 <div className="min-w-0">
-                  <div className="text-[11px] font-semibold text-white">{pick('本地文件夹模式', 'Local Folder Mode')}</div>
-                  <div className="text-[9px] text-slate-400 truncate mt-0.5">{supportsLocal ? (isConnectedToLocal ? pick('状态：已授权连接', 'Status: Connected') : pick('支持但未授权', 'Ready to connect')) : pick('当前浏览器不支持', 'Not supported')}</div>
+                  <div className="text-[11px] font-semibold text-slate-900 dark:text-white">{pick('本地文件夹模式', 'Local Folder Mode')}</div>
+                  <div className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{supportsLocal ? (isConnectedToLocal ? pick('状态：已授权连接', 'Status: Connected') : pick('支持但未授权', 'Ready to connect')) : pick('当前浏览器不支持', 'Not supported')}</div>
                 </div>
                 <button
                   type="button"
@@ -555,10 +555,10 @@ export const StorageSettingsView: React.FC = () => {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5">
+              <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
                 <div className="min-w-0">
-                  <div className="text-[11px] font-semibold text-white">{pick('浏览器缓存模式', 'Browser Cache Mode')}</div>
-                  <div className="text-[9px] text-slate-400 truncate mt-0.5">{pick('免授权直接使用本地缓存', 'No permission required')}</div>
+                  <div className="text-[11px] font-semibold text-slate-900 dark:text-white">{pick('浏览器缓存模式', 'Browser Cache Mode')}</div>
+                  <div className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{pick('免授权直接使用本地缓存', 'No permission required')}</div>
                 </div>
                 <button
                   type="button"
@@ -572,7 +572,7 @@ export const StorageSettingsView: React.FC = () => {
             </div>
           </div>
 
-          <div className="pt-2 border-t border-white/5 text-[10px] text-slate-400 truncate">
+          <div className="pt-2 border-t border-black/5 dark:border-white/5 text-[10px] text-slate-600 dark:text-slate-400 truncate">
             {pick('最近动作', 'Last Action')}: {lastActionMessage}
           </div>
         </div>
@@ -583,13 +583,13 @@ export const StorageSettingsView: React.FC = () => {
           style={{ cursor: 'default' }}
         >
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               {pick('占用分布', 'Usage')}
             </div>
-            <h3 className="text-sm font-bold text-white mt-1.5">{pick('容量快照与分布', 'Capacity Snapshot')}</h3>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{pick('容量快照与分布', 'Capacity Snapshot')}</h3>
             
             <div className="mt-4">
-              <div className="flex justify-between text-[11px] text-slate-400 mb-1.5">
+              <div className="flex justify-between text-[11px] text-slate-600 dark:text-slate-400 mb-1.5">
                 <span>{refreshing ? pick('更新中...', 'Updating...') : pick(`已存 ${imageCount} 张图片`, `${imageCount} images`)}</span>
                 <span>{formatMb(usageMB)} / 1 GB</span>
               </div>
@@ -604,13 +604,13 @@ export const StorageSettingsView: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex justify-between items-center pt-2 border-t border-white/5">
-            <span className="text-[9px] text-slate-400">{pick('配额机制：自动淘汰', 'Quota policy: Auto-eviction')}</span>
+          <div className="flex justify-between items-center pt-2 border-t border-black/5 dark:border-white/5">
+            <span className="text-[9px] text-slate-500 dark:text-slate-400">{pick('配额机制：自动淘汰', 'Quota policy: Auto-eviction')}</span>
             <button
               type="button"
               disabled={refreshing}
               onClick={() => void refresh()}
-              className="text-[10px] font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 active:scale-95 transition cursor-pointer"
+              className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 flex items-center gap-1 active:scale-95 transition cursor-pointer"
             >
               <RefreshCw size={10} className={refreshing ? 'animate-spin' : ''} />
               {pick('立即刷新状态', 'Refresh')}
@@ -624,43 +624,43 @@ export const StorageSettingsView: React.FC = () => {
           style={{ cursor: 'default' }}
         >
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               {pick('清理控制', 'Cleanup')}
             </div>
-            <h3 className="text-sm font-bold text-white mt-1.5">{pick('缓存清理与保留策略', 'Cache & Retention Policy')}</h3>
-            <p className="text-[11px] text-slate-400 mt-1">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{pick('缓存清理与保留策略', 'Cache & Retention Policy')}</h3>
+            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">
               {pick('安全清理本地缓存与历史痕迹，或彻底抹除所有工作区 data。', 'Reclaim space by cleaning cache or fully wiping all workspace data.')}
             </p>
 
             <div className="space-y-3 mt-3">
               {/* 1. 清理错误卡片 */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+              <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
                 <div className="min-w-0 flex-1 pr-2">
-                  <div className="text-[11px] font-semibold text-white flex items-center gap-1.5">
+                  <div className="text-[11px] font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                     {pick('清理全部错误卡片', 'Clean Broken Cards')}
                   </div>
-                  <div className="text-[9px] text-slate-400 mt-0.5 leading-normal">
+                  <div className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5 leading-normal">
                     {pick('移除当前项目中的无效卡片、失效图片及空分组', 'Clean broken cards and empty groups')}
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={handleQuickCleanupInvalid}
-                  className="bg-white/10 hover:bg-white/15 text-slate-200 border border-white/10 rounded-lg py-1 px-3 text-[10px] font-semibold transition active:scale-95 shrink-0 cursor-pointer"
+                  className="bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 border border-black/5 dark:border-white/10 text-slate-600 dark:text-slate-200 rounded-lg py-1 px-3 text-[10px] font-semibold transition active:scale-95 shrink-0 cursor-pointer"
                 >
                   {pick('立即清理', 'Clean')}
                 </button>
               </div>
 
               {/* 2. 仅保留 30 天数据 */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+              <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
                 <div className="min-w-0 flex-1 pr-2">
-                  <div className="text-[11px] font-semibold text-white flex items-center gap-1.5">
+                  <div className="text-[11px] font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                     {pick('30 天保留策略', '30-Day Policy')}
                   </div>
-                  <div className="text-[9px] text-slate-400 mt-0.5 leading-normal">
+                  <div className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5 leading-normal">
                     {pick('仅保留 30 天内数据，清理过期缓存、日志与任务', 'Keep last 30 days of cache, logs and tasks')}
                   </div>
                 </div>
@@ -675,13 +675,13 @@ export const StorageSettingsView: React.FC = () => {
               </div>
 
               {/* 3. 仅保留 7 天数据 */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+              <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
                 <div className="min-w-0 flex-1 pr-2">
-                  <div className="text-[11px] font-semibold text-white flex items-center gap-1.5">
+                  <div className="text-[11px] font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-orange-400"></span>
                     {pick('7 天保留策略', '7-Day Policy')}
                   </div>
-                  <div className="text-[9px] text-slate-400 mt-0.5 leading-normal">
+                  <div className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5 leading-normal">
                     {pick('仅保留 7 天内数据，大幅释放本地存储空间', 'Keep last 7 days of cache, logs and tasks')}
                   </div>
                 </div>
@@ -725,14 +725,14 @@ export const StorageSettingsView: React.FC = () => {
           style={{ cursor: 'default' }}
         >
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               {pick('工作区动作', 'Repair')}
             </div>
-            <h3 className="text-sm font-bold text-white mt-1.5">{pick('项目合并与垃圾清理', 'Project Merge & Tidy')}</h3>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{pick('项目合并与垃圾清理', 'Project Merge & Tidy')}</h3>
             
             <div className="mt-3 space-y-2.5">
               <div>
-                <label className="text-[9px] text-slate-400 block mb-1">{pick('合并来源项目', 'Source Canvas')}</label>
+                <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-1">{pick('合并来源项目', 'Source Canvas')}</label>
                 <div className="select-container mt-1">
                   <SettingSelect
                     label=""
@@ -760,7 +760,7 @@ export const StorageSettingsView: React.FC = () => {
                   type="button"
                   disabled={projectAction === 'cleanup' || !activeCanvas}
                   onClick={() => void handleCleanupProjectCards()}
-                  className="flex-1 bg-white/10 hover:bg-white/15 border border-white/10 text-slate-200 rounded-lg py-1.5 px-2 text-[10px] font-bold transition active:scale-95 truncate cursor-pointer"
+                  className="flex-1 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 border border-black/5 dark:border-white/10 text-slate-600 dark:text-slate-200 rounded-lg py-1.5 px-2 text-[10px] font-bold transition active:scale-95 truncate cursor-pointer"
                 >
                   {pick('移除无用卡片', 'Clean Cards')}
                 </button>

@@ -356,7 +356,7 @@ export const SystemLogsView: React.FC = () => {
               <span className="text-[9px] font-bold uppercase tracking-wider">{pick('今日写入', 'Today Written')}</span>
               <ScrollText size={13} />
             </div>
-            <div className="text-sm font-bold text-white mt-1.5">{logs.length} 条</div>
+            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{logs.length} 条</div>
             <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('今日写入的日志总数。', 'Total logged events today.')}</div>
           </div>
         </div>
@@ -369,7 +369,7 @@ export const SystemLogsView: React.FC = () => {
               <span className="text-[9px] font-bold uppercase tracking-wider">{pick('可见条目', 'Visible')}</span>
               <ScrollText size={13} />
             </div>
-            <div className="text-sm font-bold text-white mt-1.5">{filteredLogs.length} 条</div>
+            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{filteredLogs.length} 条</div>
             <div className="text-[9px] text-slate-400 mt-1 truncate">{pick('当前过滤后可见日志。', 'Logs visible under filter.')}</div>
           </div>
         </div>
@@ -397,7 +397,7 @@ export const SystemLogsView: React.FC = () => {
               <span className="text-[9px] font-bold uppercase tracking-wider">{pick('活跃来源', 'Sources')}</span>
               <ScrollText size={13} />
             </div>
-            <div className="text-sm font-bold text-white mt-1.5">{sourceOptions.length}</div>
+            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{sourceOptions.length}</div>
             <div className="text-[9px] text-slate-400 mt-1 truncate">
               {latestLog ? pick(`更新于 ${formatLogTime(latestLog.timestamp)}`, `Updated: ${formatLogTime(latestLog.timestamp)}`) : pick('等待日志数据...', 'Waiting...')}
             </div>
@@ -413,7 +413,7 @@ export const SystemLogsView: React.FC = () => {
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
               {pick('过滤与流控制', 'Filters & Control')}
             </div>
-            <h3 className="text-sm font-bold text-white mt-1.5">{pick('级别及来源筛选', 'Scope & Stream')}</h3>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{pick('级别及来源筛选', 'Scope & Stream')}</h3>
 
             <div className="mt-3.5 space-y-3">
               <div className="overflow-hidden">
@@ -443,7 +443,7 @@ export const SystemLogsView: React.FC = () => {
               <button
                 type="button"
                 onClick={handleToggleStream}
-                className="bg-white/10 hover:bg-white/15 border border-white/10 text-slate-200 rounded-lg py-1 px-2.5 text-[10px] font-bold transition active:scale-95 cursor-pointer"
+                className="bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 border border-black/5 dark:border-white/10 text-slate-600 dark:text-slate-200 rounded-lg py-1 px-2.5 text-[10px] font-bold transition active:scale-95 cursor-pointer"
               >
                 {isStreamPaused ? pick('恢复流', 'Resume') : pick('暂停流', 'Pause')}
               </button>
@@ -476,7 +476,7 @@ export const SystemLogsView: React.FC = () => {
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
               {pick('控制台配置选项', 'Console Settings')}
             </div>
-            <h3 className="text-sm font-bold text-white mt-1.5">{pick('功能开关', 'Switches')}</h3>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{pick('功能开关', 'Switches')}</h3>
 
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-3.5 max-h-[180px] overflow-y-auto pr-1">
               <div className="settings-console-item p-1 cursor-pointer" onClick={() => handleToggleOption('console_network_messages')}>
@@ -525,7 +525,7 @@ export const SystemLogsView: React.FC = () => {
                 />
               </div>
               
-              <div className="mt-3 text-[11px] leading-relaxed text-slate-300 flex-1 overflow-y-auto break-words bg-white/5 border border-white/5 rounded-lg p-2.5">
+              <div className="mt-3 text-[11px] leading-relaxed text-slate-300 flex-1 overflow-y-auto break-words bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-lg p-2.5">
                 {latestCritical ? (
                   <>
                     <div className="text-red-400 font-bold">[{getLevelLabel(latestCritical.level)}] {latestCritical.source}</div>
@@ -538,7 +538,7 @@ export const SystemLogsView: React.FC = () => {
             </div>
 
             {/* 右侧：说明与操作按钮 */}
-            <div className="w-full md:w-[160px] shrink-0 flex flex-col justify-between border-t md:border-t-0 md:border-l border-white/5 pt-3 md:pt-0 md:pl-4">
+            <div className="w-full md:w-[160px] shrink-0 flex flex-col justify-between border-t md:border-t-0 md:border-l border-black/5 dark:border-white/5 pt-3 md:pt-0 md:pl-4">
               <div>
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   {pick('维护动作', 'Maintenance')}
@@ -580,16 +580,16 @@ export const SystemLogsView: React.FC = () => {
                 </div>
               ) : (
                 groupedLogs.map((log) => (
-                  <div key={log.id} className={`${getLevelClassName(log.level)} p-2 rounded-lg bg-white/5 border border-white/5 flex flex-col gap-1`}>
+                  <div key={log.id} className={`${getLevelClassName(log.level)} p-2 rounded-lg bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 flex flex-col gap-1`}>
                     <div className="flex items-center gap-1.5 text-[10px]">
                       <StatusBadge status={getLevelStatus(log.level)} label={getLevelLabel(log.level)} />
                       <SettingsBadge tone="neutral" className="py-0.5 px-1.5 text-[9px]">{log.source}</SettingsBadge>
                       {log.count > 1 && (
-                        <span className="bg-white/10 text-white rounded-full px-1.5 text-[9px] font-bold">{log.count}x</span>
+                        <span className="bg-black/10 dark:bg-white/10 text-slate-600 dark:text-slate-200 rounded-full px-1.5 text-[9px] font-bold">{log.count}x</span>
                       )}
                       <span className="text-slate-500 ml-auto">{formatLogTime(log.timestamp)}</span>
                     </div>
-                    <div className="text-white font-semibold mt-0.5">{log.message}</div>
+                    <div className="text-slate-900 dark:text-white font-semibold mt-0.5">{log.message}</div>
                     {log.details && <div className="text-slate-400 text-[10px] whitespace-pre-wrap truncate leading-normal">{log.details}</div>}
                   </div>
                 ))

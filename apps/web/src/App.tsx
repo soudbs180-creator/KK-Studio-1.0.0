@@ -1622,6 +1622,40 @@ const AppContent: React.FC<AppContentProps> = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCanvas, activeSourceImage, canvasTransform, imageNodesById, promptNodesById]);
 
+  // 🚀 Canvas high-frequency interaction and 2-second debounce load state
+  const [isInteractionDeferred, setIsInteractionDeferred] = useState(false);
+  const interactionTimerRef = useRef<number | null>(null);
+
+  // 只有在拖动/缩放画布 (isCanvasTransforming) 时才触发加载延迟！
+  // 拖动单个卡片时 (isNodeDragActive === true) 绝不变成空卡片，保留完美卡片外观以保证流畅舒适的感知！
+  // 同时，只有在卡片数 >= 80 (大型/巨型项目) 时才启用大项目延迟加载防抖机制，保障极限操作下的性能
+  const isLargeProject = ((activeCanvas?.promptNodes?.length || 0) + (activeCanvas?.imageNodes?.length || 0)) >= 80;
+  const shouldPauseLoading = isCanvasTransforming && isLargeProject;
+
+  useEffect(() => {
+    if (shouldPauseLoading) {
+      setIsInteractionDeferred(true);
+      if (interactionTimerRef.current !== null) {
+        window.clearTimeout(interactionTimerRef.current);
+        interactionTimerRef.current = null;
+      }
+    } else {
+      if (interactionTimerRef.current !== null) {
+        window.clearTimeout(interactionTimerRef.current);
+      }
+      interactionTimerRef.current = window.setTimeout(() => {
+        setIsInteractionDeferred(false);
+        interactionTimerRef.current = null;
+      }, 2000);
+    }
+
+    return () => {
+      if (interactionTimerRef.current !== null) {
+        window.clearTimeout(interactionTimerRef.current);
+      }
+    };
+  }, [shouldPauseLoading]);
+
   // [Draft Feature] Persistent Input Card State - Moved to Top
 
 
@@ -1638,6 +1672,8 @@ const AppContent: React.FC<AppContentProps> = () => {
       setDraftNodeId(null);
     }
   }, [deletePromptNode, draftNodeId, draftPromptNode]);
+
+
 
   // Right-Click Selection State
   const [selectionMenuPosition, setSelectionMenuPosition] = useState<{ x: number; y: number } | null>(null);
@@ -3375,7 +3411,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     onPreview: handleOpenPreview,
     onPreviewPptStack: handleOpenPptStackPreview,
     onDownloadPptComposite: handleDownloadPptComposite,
-    isCanvasTransforming,
+    isCanvasTransforming: isInteractionDeferred,
     isNew: (nowTimestamp || Date.now()) - (image.timestamp || 0) < 10000,
     canvasTransform,
     snapToGrid,
@@ -3388,7 +3424,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     handleImageClick,
     handleOpenPptStackPreview,
     handleOpenPreview,
-    isCanvasTransforming,
+    isInteractionDeferred,
     isMobile,
     nowTimestamp,
     snapToGrid,
@@ -4892,8 +4928,9 @@ const AppContent: React.FC<AppContentProps> = () => {
 
           {/* 2. Image -> Prompt/Pending Connections (Follow-up Flow) */}
           {/* A. Existing Prompts */}
-          {connectorRenderPromptNodes.map(pn => {
+          {!isCanvasTransforming && connectorRenderPromptNodes.map(pn => {
             if (pn.isDraft) return null; // Draft/pending connection is rendered by pending-connection block below
+            if (pn.error) return null; // 🚀 [FIX] 如果生成失败（存在 error），不渲染对应的连线，避免废弃连接线乱飘和视觉污染
             if (!pn.sourceImageId) return null;
             if (collapsedCanvasGroupNodeIds.has(pn.sourceImageId)) return null;
             const sourceNode = imageNodesById.get(pn.sourceImageId);
@@ -4969,7 +5006,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           })}
 
           {/* B. Pending Node Connection */}
-          {activeSourceImage && (() => {
+          {!isCanvasTransforming && activeSourceImage && (() => {
             if (collapsedCanvasGroupNodeIds.has(activeSourceImage)) return null;
             const hasDraftFollowup = !!activeCanvas?.promptNodes.some(p => p.isDraft && p.sourceImageId === activeSourceImage);
             if (hasDraftFollowup) return null;
@@ -5032,7 +5069,7 @@ const AppContent: React.FC<AppContentProps> = () => {
           })()}
 
           {/* C. Workflow Utility Connections */}
-          {(activeCanvas?.workflow?.edges || []).map((edge) => {
+          {!isCanvasTransforming && (activeCanvas?.workflow?.edges || []).map((edge) => {
             if (collapsedCanvasGroupNodeIds.has(edge.from) || collapsedCanvasGroupNodeIds.has(edge.to)) return null;
             const targetNode = connectorRenderWorkflowUtilityNodesById.get(edge.to);
             if (!targetNode) return null;
@@ -5195,7 +5232,17 @@ const AppContent: React.FC<AppContentProps> = () => {
 
 const App: React.FC = () => {
   const [showCostEstimation, setShowCostEstimation] = useState(false);
-  const rootMode = createAppRootMode({ pathname: window.location.pathname });
+  const [rootMode, setRootMode] = useState<'workspace' | 'settings' | 'admin'>(() => createAppRootMode({ pathname: window.location.pathname }));
+
+  useEffect(() => {
+    const handleLocationChange = () => {
+      setRootMode(createAppRootMode({ pathname: window.location.pathname }));
+    };
+    window.addEventListener('popstate', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+    };
+  }, []);
 
   // Initialize update check on mount (must be before any conditional returns per React Rules of Hooks)
   useEffect(() => {

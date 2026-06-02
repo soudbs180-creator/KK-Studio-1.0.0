@@ -716,29 +716,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                 <LayoutDashboard size={14} />
                 <span className="text-[9px] font-bold uppercase tracking-wider">{pick('总览', 'Overview')}</span>
               </div>
-              <h3 className="text-sm font-bold text-white mt-1.5">{pick('系统消耗与状态', 'Usage & Status')}</h3>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{pick('系统消耗与状态', 'Usage & Status')}</h3>
               
               <div className="grid grid-cols-2 gap-2 mt-2">
-                <div className="rounded-lg bg-white/5 p-2 border border-white/5">
-                  <div className="text-[9px] text-slate-400">{pick('积分余额', 'Credits')}</div>
-                  <div className="text-sm font-bold text-amber-300 mt-0.5">{remainingBalanceDisplay}</div>
+                <div className="rounded-lg bg-black/5 dark:bg-white/5 p-2 border border-black/5 dark:border-white/5">
+                  <div className="text-[9px] text-slate-500 dark:text-slate-400">{pick('积分余额', 'Credits')}</div>
+                  <div className="text-sm font-bold text-amber-600 dark:text-amber-300 mt-0.5">{remainingBalanceDisplay}</div>
                 </div>
-                <div className="rounded-lg bg-white/5 p-2 border border-white/5">
-                  <div className="text-[9px] text-slate-400">{pick('今日消耗', 'Today Cost')}</div>
-                  <div className="text-sm font-bold text-emerald-400 mt-0.5">{formatUsd(todayCostUsd)}</div>
+                <div className="rounded-lg bg-black/5 dark:bg-white/5 p-2 border border-black/5 dark:border-white/5">
+                  <div className="text-[9px] text-slate-500 dark:text-slate-400">{pick('今日消耗', 'Today Cost')}</div>
+                  <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">{formatUsd(todayCostUsd)}</div>
                 </div>
-                <div className="rounded-lg bg-white/5 p-2 border border-white/5">
-                  <div className="text-[9px] text-slate-400">{pick('今日词元', 'Today Tokens')}</div>
-                  <div className="text-sm font-bold text-blue-400 mt-0.5">{formatCompactNumber(todayTokens)}</div>
+                <div className="rounded-lg bg-black/5 dark:bg-white/5 p-2 border border-black/5 dark:border-white/5">
+                  <div className="text-[9px] text-slate-500 dark:text-slate-400">{pick('今日词元', 'Today Tokens')}</div>
+                  <div className="text-sm font-bold text-blue-600 dark:text-blue-400 mt-0.5">{formatCompactNumber(todayTokens)}</div>
                 </div>
-                <div className="rounded-lg bg-white/5 p-2 border border-white/5">
-                  <div className="text-[9px] text-slate-400">{pick('可用链路', 'Routes')}</div>
-                  <div className="text-sm font-bold text-indigo-400 mt-0.5">{channelCount}</div>
+                <div className="rounded-lg bg-black/5 dark:bg-white/5 p-2 border border-black/5 dark:border-white/5">
+                  <div className="text-[9px] text-slate-500 dark:text-slate-400">{pick('可用链路', 'Routes')}</div>
+                  <div className="text-sm font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">{channelCount}</div>
                 </div>
               </div>
             </div>
             
-            <div className="pt-2 border-t border-white/5 space-y-1 text-[11px] text-slate-400">
+            <div className="pt-2 border-t border-black/5 dark:border-white/5 space-y-1 text-[11px] text-slate-600 dark:text-slate-400">
               <div className="flex items-center gap-1.5">
                 <span className={`h-1 w-1 rounded-full ${hasAvailableRoute ? 'bg-emerald-400' : 'bg-amber-400'}`} />
                 <span className="truncate">{hasAvailableRoute ? pick('API 链路正常，状态健康', 'API routes ready') : pick('无可用 API 路由，请在工作台添加', 'API setup required')}</span>
@@ -762,20 +762,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           <div className="flex items-center gap-3 w-full h-full">
             {/* 左侧：信息区域 */}
             <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2 text-slate-400">
+              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                 <KeyRound size={14} />
                 <span className="text-[9px] font-bold uppercase tracking-wider">{pick('API 工作台', 'API Workspace')}</span>
-                <span className="text-[9px] bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap">
+                <span className="text-[9px] bg-blue-500/10 border border-blue-500/30 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap">
                   {officialCount} {pick('官方', 'Official')} / {activeProviderCount} {pick('在线', 'Online')}
                 </span>
               </div>
-              <h3 className="text-xs font-bold text-white">{pick('多供应商与能力分配', 'API & Capability Routing')}</h3>
-              <p className="text-[11px] text-slate-400 leading-normal truncate">
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white">{pick('多供应商与能力分配', 'API & Capability Routing')}</h3>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-normal truncate">
                 {pick('管理本地 API 密钥与第三方中转', 'Manage API keys and external proxies')}
               </p>
             </div>
             {/* 右侧：圆形箭头按钮引导 */}
-            <div className="shrink-0 flex items-center justify-center h-9 w-9 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-400 transition-all duration-200 group-hover:bg-blue-600/40 group-hover:scale-110">
+            <div className="shrink-0 flex items-center justify-center h-9 w-9 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-600 dark:text-blue-400 transition-all duration-200 group-hover:bg-blue-600/40 group-hover:scale-110">
               <ArrowRight size={16} />
             </div>
           </div>
@@ -791,13 +791,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           <div className="dashboard-card-glow" style={{ background: '#f59e0b' }} />
           <div className="flex flex-col gap-1.5 justify-between h-full">
             <div>
-              <div className="flex items-center gap-2 text-slate-400">
+              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                 <Coins size={13} />
                 <span className="text-[9px] font-bold uppercase tracking-wider">{pick('计费账本', 'Billing')}</span>
               </div>
-              <h3 className="text-xs font-bold text-white mt-1.5">{pick('账户交易记录', 'Transaction History')}</h3>
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white mt-1.5">{pick('账户交易记录', 'Transaction History')}</h3>
             </div>
-            <div className="text-[10px] text-slate-400 mt-1 truncate">
+            <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-1 truncate">
               {latestRecharge ? pick(`最近充值：${formatDateTime(latestRecharge.created_at)}`, `Recharged: ${formatDateTime(latestRecharge.created_at)}`) : pick('本周暂无充值记录', 'No recent recharge')}
             </div>
           </div>
@@ -811,13 +811,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           <div className="dashboard-card-glow" style={{ background: '#ef4444' }} />
           <div className="flex flex-col gap-1.5 justify-between h-full">
             <div>
-              <div className="flex items-center gap-2 text-slate-400">
+              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                 <ScrollText size={13} />
                 <span className="text-[9px] font-bold uppercase tracking-wider">{pick('日志诊断', 'System Logs')}</span>
               </div>
-              <h3 className="text-xs font-bold text-white mt-1.5">{pick('错误排障与告警', 'Triage & Diagnostics')}</h3>
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white mt-1.5">{pick('错误排障与告警', 'Triage & Diagnostics')}</h3>
             </div>
-            <div className="text-[10px] text-slate-400 mt-1 truncate flex items-center gap-1.5">
+            <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-1 truncate flex items-center gap-1.5">
               <span className={`h-1.5 w-1.5 rounded-full ${hasCriticalLogs ? 'bg-red-400 animate-pulse' : 'bg-emerald-400'}`} />
               <span className="truncate">{importantLogCount > 0 ? pick(`${importantLogCount} 条运行告警`, `${importantLogCount} alerts`) : pick('系统无异常记录', 'Logs clear')}</span>
             </div>
@@ -833,18 +833,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           <div className="flex flex-col gap-2 w-full justify-between h-full">
             <div>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-slate-400">
+                <div className="flex items-center gap-2 text-slate-505 dark:text-slate-400" style={{ color: 'var(--text-secondary)' }}>
                   <HardDrive size={13} />
                   <span className="text-[9px] font-bold uppercase tracking-wider">{pick('存储容量', 'Storage Settings')}</span>
                 </div>
-                <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full px-2 py-0.5 font-semibold">
+                <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/30 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-full px-2 py-0.5 font-semibold">
                   {storageModeLabel}
                 </span>
               </div>
-              <h3 className="text-xs font-bold text-white mt-1.5">{pick('画布资源与空间清理', 'Usage & Cache')}</h3>
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white mt-1.5">{pick('画布资源与空间清理', 'Usage & Cache')}</h3>
               
               <div className="mt-2">
-                <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+                <div className="flex justify-between text-[10px] text-slate-600 dark:text-slate-400 mb-1">
                   <span>{storageSnapshotPending ? pick('更新中...', 'Updating...') : pick(`已存 ${storedImages} 张图`, `${storedImages} images`)}</span>
                   <span>{storageUsageMb.toFixed(1)} MB / 1 GB</span>
                 </div>

@@ -342,7 +342,7 @@ export const StorageSettingsView: React.FC = () => {
               <span className="text-[9px] font-bold uppercase tracking-wider">Permission</span>
               <HardDrive size={13} />
             </div>
-            <div className="text-sm font-bold text-white mt-1.5">{supportsLocal ? 'Supported' : 'Unavailable'}</div>
+            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{supportsLocal ? 'Supported' : 'Unavailable'}</div>
             <div className="text-[9px] text-slate-400 mt-1 truncate">Local folder read/write capability.</div>
           </div>
         </div>
@@ -355,7 +355,7 @@ export const StorageSettingsView: React.FC = () => {
               <span className="text-[9px] font-bold uppercase tracking-wider">Active Project</span>
               <FolderOpen size={13} />
             </div>
-            <div className="text-sm font-bold text-white mt-1.5 truncate">{activeCanvas?.name || 'None'}</div>
+            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5 truncate">{activeCanvas?.name || 'None'}</div>
             <div className="text-[9px] text-slate-400 mt-1 truncate">Canvas currently in use.</div>
           </div>
         </div>
@@ -368,7 +368,7 @@ export const StorageSettingsView: React.FC = () => {
               <span className="text-[9px] font-bold uppercase tracking-wider">Footprint</span>
               <Activity size={13} />
             </div>
-            <div className="text-sm font-bold text-white mt-1.5">{usageMB.toFixed(2)} MB</div>
+            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{usageMB.toFixed(2)} MB</div>
             <div className="text-[9px] text-slate-400 mt-1 truncate">Total storage consumed locally.</div>
           </div>
         </div>
@@ -381,7 +381,7 @@ export const StorageSettingsView: React.FC = () => {
               <span className="text-[9px] font-bold uppercase tracking-wider">Projects</span>
               <Layers3 size={13} />
             </div>
-            <div className="text-sm font-bold text-white mt-1.5">{state.canvases.length} total</div>
+            <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{state.canvases.length} total</div>
             <div className="text-[9px] text-slate-400 mt-1 truncate">Total canvases stored.</div>
           </div>
         </div>
@@ -400,15 +400,15 @@ export const StorageSettingsView: React.FC = () => {
                 {getModeLabel(mode)}
               </SettingsBadge>
             </div>
-            <h3 className="text-sm font-bold text-white mt-2">Active Target</h3>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-2">Active Target</h3>
             <p className="text-[11px] text-slate-400 mt-1">
               Browser cache for sessions, local folders for workspace persistence.
             </p>
 
             <div className="mt-3.5 space-y-2">
-              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5">
+              <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
                 <div className="min-w-0">
-                  <div className="text-[11px] font-semibold text-white">Local Folder Mode</div>
+                  <div className="text-[11px] font-semibold text-slate-900 dark:text-white">Local Folder Mode</div>
                   <div className="text-[9px] text-slate-400 truncate mt-0.5">{supportsLocal ? (isConnectedToLocal ? 'Status: Connected' : 'Ready to connect') : 'Not supported'}</div>
                 </div>
                 <button
@@ -421,9 +421,9 @@ export const StorageSettingsView: React.FC = () => {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5">
+              <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
                 <div className="min-w-0">
-                  <div className="text-[11px] font-semibold text-white">Browser Cache Mode</div>
+                  <div className="text-[11px] font-semibold text-slate-900 dark:text-white">Browser Cache Mode</div>
                   <div className="text-[9px] text-slate-400 truncate mt-0.5">No permission required</div>
                 </div>
                 <button
@@ -452,7 +452,7 @@ export const StorageSettingsView: React.FC = () => {
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
               Usage
             </div>
-            <h3 className="text-sm font-bold text-white mt-1.5">Capacity Snapshot</h3>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">Capacity Snapshot</h3>
             
             <div className="mt-4">
               <div className="flex justify-between text-[11px] text-slate-400 mb-1.5">
@@ -493,16 +493,16 @@ export const StorageSettingsView: React.FC = () => {
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
               Cleanup
             </div>
-            <h3 className="text-sm font-bold text-white mt-1.5">Cache & Retention Policy</h3>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">Cache & Retention Policy</h3>
             <p className="text-[11px] text-slate-400 mt-1">
               Safely reclaim local space or permanently clear all workspace data.
             </p>
 
             <div className="space-y-3 mt-3">
               {/* 1. Clean Broken Cards */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+              <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
                 <div className="min-w-0 flex-1 pr-2">
-                  <div className="text-[11px] font-semibold text-white flex items-center gap-1.5">
+                  <div className="text-[11px] font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                     Clean Broken Cards
                   </div>
@@ -513,16 +513,16 @@ export const StorageSettingsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleQuickCleanupInvalid}
-                  className="bg-white/10 hover:bg-white/15 text-slate-200 border border-white/10 rounded-lg py-1 px-3 text-[10px] font-semibold transition active:scale-95 shrink-0 cursor-pointer"
+                  className="bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 border border-black/5 dark:border-white/10 text-slate-600 dark:text-slate-200 rounded-lg py-1 px-3 text-[10px] font-semibold transition active:scale-95 shrink-0 cursor-pointer"
                 >
                   Clean
                 </button>
               </div>
 
               {/* 2. 30-Day Policy */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+              <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
                 <div className="min-w-0 flex-1 pr-2">
-                  <div className="text-[11px] font-semibold text-white flex items-center gap-1.5">
+                  <div className="text-[11px] font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                     30-Day Policy
                   </div>
@@ -541,9 +541,9 @@ export const StorageSettingsView: React.FC = () => {
               </div>
 
               {/* 3. 7-Day Policy */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+              <div className="flex items-center justify-between p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
                 <div className="min-w-0 flex-1 pr-2">
-                  <div className="text-[11px] font-semibold text-white flex items-center gap-1.5">
+                  <div className="text-[11px] font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-orange-400"></span>
                     7-Day Policy
                   </div>
@@ -594,7 +594,7 @@ export const StorageSettingsView: React.FC = () => {
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
               Repair
             </div>
-            <h3 className="text-sm font-bold text-white mt-1.5">Project Merge & Tidy</h3>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">Project Merge & Tidy</h3>
             
             <div className="mt-3 space-y-2.5">
               <div>
@@ -626,7 +626,7 @@ export const StorageSettingsView: React.FC = () => {
                   type="button"
                   disabled={projectAction === 'cleanup' || !activeCanvas}
                   onClick={() => void handleCleanupProjectCards()}
-                  className="flex-1 bg-white/10 hover:bg-white/15 border border-white/10 text-slate-200 rounded-lg py-1.5 px-2 text-[10px] font-bold transition active:scale-95 truncate cursor-pointer"
+                  className="flex-1 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 border border-black/5 dark:border-white/10 text-slate-600 dark:text-slate-200 rounded-lg py-1.5 px-2 text-[10px] font-bold transition active:scale-95 truncate cursor-pointer"
                 >
                   Clean Cards
                 </button>
