@@ -2535,10 +2535,18 @@ const PromptBar: React.FC<PromptBarProps> = ({
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as Element;
-            if (!target.closest('.input-bar-inner')) {
-                setActiveMenu(null);
-                setShowPptOutlinePanel(false);
+            // 🚀 [修复] 排除点击模型库下拉弹窗、上下文菜单、自定义设置弹窗等 Portal 的情况，防止被误杀关闭
+            if (
+                target.closest('.input-bar-inner') ||
+                target.closest('.model-library-surface') ||
+                modelDropdownRef.current?.contains(target) ||
+                target.closest('.fixed.z-\\[10010\\]') ||
+                target.closest('.fixed.z-\\[10020\\]')
+            ) {
+                return;
             }
+            setActiveMenu(null);
+            setShowPptOutlinePanel(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => {
@@ -3502,7 +3510,14 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                 <div
                                                     key={group.provider}
                                                     onDragOver={(e: React.DragEvent<HTMLDivElement>) => handleProviderDragOver(e, index)}
-                                                    onClick={() => setDesktopActiveProvider(group.provider)}
+                                                    onClick={() => {
+                                                        // 🚀 [优化] 如果该供应商下只有一个模型，点击时直接选择该模型并关闭菜单，无需进入二级菜单
+                                                        if (group.models.length === 1) {
+                                                            handleSelectPromptBarModel(group.models[0]);
+                                                        } else {
+                                                            setDesktopActiveProvider(group.provider);
+                                                        }
+                                                    }}
                                                     className={`provider-row-container flex items-center justify-between p-3 rounded-xl border transition-all duration-200 select-none cursor-pointer
                                                         ${isDragged 
                                                             ? 'border-dashed border-[color:var(--accent-coral)] bg-[color:var(--accent-coral)]/5 opacity-50 scale-95' 
@@ -4298,7 +4313,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                                     if (mobileDragMode || justDraggedRef.current) {
                                                                         return;
                                                                     }
-                                                                    setMobileActiveProvider(group.provider);
+                                                                    // 🚀 [优化] 如果该供应商下只有一个模型，点击时直接选择该模型并关闭菜单，无需进入二级菜单
+                                                                    if (group.models.length === 1) {
+                                                                        handleSelectPromptBarModel(group.models[0]);
+                                                                    } else {
+                                                                        setMobileActiveProvider(group.provider);
+                                                                    }
                                                                 }}
                                                                 className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-200 select-none cursor-pointer
                                                                     ${isSortingThis
@@ -5513,6 +5533,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 {isModelMenuOpen && !isMobile && ReactDOM.createPortal(
                                     <div
                                         ref={modelDropdownRef}
+                                        onMouseDown={(e) => e.stopPropagation()} // 🚀 阻止 mousedown 冒泡，防止被 handleClickOutside 误杀
                                         className="fixed z-[10000] animate-fadeIn origin-bottom"
                                         style={(() => {
                                             // 基于锚点元素动态计算 Portal 的 fixed 定位坐标
@@ -5710,6 +5731,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         {/* Context Menu for Pinning */}
                                         {contextMenu && ReactDOM.createPortal(
                                             <div
+                                                onMouseDown={(e) => e.stopPropagation()} // 🚀 阻止 mousedown 冒泡，防止被 handleClickOutside 误杀
                                                 className="fixed z-[10010] w-32 rounded-[14px] border py-1 backdrop-blur-md"
                                                 style={{
                                                     top: contextMenu.y,
@@ -5755,6 +5777,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         {/* Model Settings Modal */}
                                         {modelSettingsModal && ReactDOM.createPortal(
                                             <div
+                                                onMouseDown={(e) => e.stopPropagation()} // 🚀 阻止 mousedown 冒泡，防止被 handleClickOutside 误杀
                                                 className="fixed inset-0 z-[10020] flex items-center justify-center p-4"
                                                 style={{
                                                     background: 'color-mix(in srgb, var(--bg-base) 52%, transparent)',

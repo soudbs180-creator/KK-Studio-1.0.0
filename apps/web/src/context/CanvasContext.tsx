@@ -1851,7 +1851,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const singlePromptArrange = arrangeSingleSelectedPromptChildren(currentCanvas, selectedIds, mode);
                 if (singlePromptArrange) {
                     const newCanvases = state.canvases.map(c =>
-                        c.id === state.activeCanvasId ? singlePromptArrange.canvas : c
+                        c.id === state.activeCanvasId ? { ...singlePromptArrange.canvas, lastModified: Date.now() } : c
                     );
                     setState(prev => ({
                         ...prev,
@@ -1864,7 +1864,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const selectedRootArrange = arrangeSelectedRootNodes(currentCanvas, selectedIds, mode);
                 if (selectedRootArrange) {
                     const newCanvases = state.canvases.map(c =>
-                        c.id === state.activeCanvasId ? selectedRootArrange.canvas : c
+                        c.id === state.activeCanvasId ? { ...selectedRootArrange.canvas, lastModified: Date.now() } : c
                     );
                     setState(prev => ({ ...prev, canvases: newCanvases }));
                     return;
@@ -1873,7 +1873,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const selectedGroupedArrange = arrangeSelectedGroupedNodes(currentCanvas, selectedIds, mode);
                 if (selectedGroupedArrange) {
                     const newCanvases = state.canvases.map(c =>
-                        c.id === state.activeCanvasId ? selectedGroupedArrange.canvas : c
+                        c.id === state.activeCanvasId ? { ...selectedGroupedArrange.canvas, lastModified: Date.now() } : c
                     );
                     setState(prev => ({
                         ...prev,
@@ -2383,7 +2383,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
             const newCanvases = prev.canvases.map(c =>
                 c.id === prev.activeCanvasId
-                    ? layeredCanvas
+                    ? { ...layeredCanvas, lastModified: Date.now() }
                     : c
             );
 
@@ -2409,7 +2409,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             if (movedCanvas === currentCanvas) return prev;
 
             const newCanvases = prev.canvases.map(c =>
-                c.id === prev.activeCanvasId ? movedCanvas : c
+                c.id === prev.activeCanvasId ? { ...movedCanvas, lastModified: Date.now() } : c
             );
 
             return { ...prev, canvases: newCanvases };
