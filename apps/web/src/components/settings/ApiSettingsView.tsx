@@ -3574,7 +3574,18 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
           {showAdvancedWorkbench ? (
             <>
-              <ApiAdvancedSettingsView embedded={true} />
+              <ApiAdvancedSettingsView
+                embedded={true}
+                modelCenterRoutes={modelCenterRoutes}
+                modelCenterPresets={modelCenterPresets}
+                modelCenterPresetTab={modelCenterPresetTab}
+                setModelCenterPresetTab={setModelCenterPresetTab}
+                userApiActionsDisabled={userApiActionsDisabled}
+                providerActionsDisabled={providerActionsDisabled}
+                handleCreateOfficialAction={handleCreateOfficialAction}
+                beginCreateProvider={beginCreateProvider}
+                connectedChannels={connectedChannels}
+              />
             </>
           ) : (
             <ApiWorkbenchModelCenterSection

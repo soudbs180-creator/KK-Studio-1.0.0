@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { KkModal } from '@kk/ui/web';
 import type { RuntimeAuthUser } from '../../services/auth/runtimeAuthTypes.ts';
 import {
   AlertCircle,
@@ -663,6 +664,27 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
+  const modalTitle = (
+    <div className="flex items-center gap-2">
+      {view !== 'main' && (
+        <button
+          onClick={() => setView('main')}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border hover:bg-[var(--frost-card-sub-bg)] transition-colors"
+          style={{ borderColor: 'var(--kk-color-border-subtle)', color: 'var(--text-secondary)' }}
+        >
+          <ChevronLeft size={16} />
+        </button>
+      )}
+      <span>
+        {view === 'main' && '个人中心'}
+        {view === 'edit-profile' && '编辑个人资料'}
+        {view === 'change-password' && '修改密码'}
+        {view === 'billing' && '账户管理'}
+        {view === 'security' && '双重验证'}
+      </span>
+    </div>
+  );
+
   if (!isOpen) return null;
 
   const avatarSrc = resolveAvatarUrl(avatarUrl || user?.user_metadata?.avatar_url);
@@ -691,59 +713,17 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         }}
       />
 
-      <div
-        className={`fixed inset-0 z-[10002] flex justify-center bg-black/45 ${
-          isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-3 py-4'
-        }`}
-        onClick={resetAndClose}
+      <KkModal
+        open={isOpen}
+        onCancel={resetAndClose}
+        title={modalTitle}
+        footer={null}
+        width={860}
+        destroyOnClose
+        style={{
+          background: 'color-mix(in srgb, var(--frost-card-framework-bg) 72%, transparent)',
+        }}
       >
-        <div
-          className={`kk-user-profile-modal w-full overflow-hidden border ${
-            isMobile
-              ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none kk-user-profile-modal-mobile-animate'
-              : 'max-w-[860px] rounded-2xl kk-user-profile-modal-desktop-animate'
-          }`}
-          style={{
-            background: 'color-mix(in srgb, var(--frost-card-framework-bg) 72%, transparent)',
-            borderColor: 'var(--frost-card-framework-border)',
-            boxShadow: 'var(--frost-card-framework-shadow), 0 20px 50px rgba(0,0,0,0.3)',
-            backdropFilter: 'blur(32px) saturate(1.8)',
-            WebkitBackdropFilter: 'blur(32px) saturate(1.8)',
-          }}
-          onClick={(event) => event.stopPropagation()}
-        >
-        <div
-          className={`kk-user-profile-modal__header flex items-center justify-between border-b ${isMobile ? 'mobile-sheet-header-safe px-3 py-3' : 'px-4 py-3'}`}
-          style={{ borderColor: 'var(--frost-card-framework-border)' }}
-        >
-          <div className="flex items-center gap-2">
-            {view !== 'main' && (
-              <button
-                onClick={() => setView('main')}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border"
-                style={{ borderColor: 'var(--border-light)', color: 'var(--text-secondary)' }}
-              >
-                <ChevronLeft size={18} />
-              </button>
-            )}
-            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-              {view === 'main' && '个人中心'}
-              {view === 'edit-profile' && '编辑个人资料'}
-              {view === 'change-password' && '修改密码'}
-              {view === 'billing' && '账户管理'}
-              {view === 'security' && '双重验证'}
-            </h2>
-          </div>
-
-          <button
-            onClick={resetAndClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border"
-            style={{ borderColor: 'var(--border-light)', color: 'var(--text-secondary)' }}
-          >
-            <X size={18} />
-          </button>
-        </div>
-
         <div className={`kk-user-profile-modal__body ${isMobile ? 'mobile-sheet-scroll flex-1 px-3 py-3' : 'max-h-[78vh] overflow-y-auto px-4 py-4'}`}>
           {message && (
             <div
@@ -1503,8 +1483,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             </div>
           )}
         </div>
-        </div>
-      </div>
+      </KkModal>
     </>
   );
 };

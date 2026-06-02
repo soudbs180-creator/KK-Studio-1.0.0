@@ -438,6 +438,15 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const loadedRef = useRef(false); // 🚀 标记是否已从队列加载
     // 🚀 [Critical Fix] 初始加载状态判定：如果已有有效初始图，就不应该显示大遮罩
     const [isLoading, setIsLoading] = useState(!displaySrc);
+    const [isMediaLoaded, setIsMediaLoaded] = useState(!!displaySrc);
+
+    // 当 displaySrc 变化时，重置 media 加载状态
+    useEffect(() => {
+        if (displaySrc) {
+            setIsMediaLoaded(false);
+        }
+    }, [displaySrc]);
+
     const qualityDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 🚀 质量切换防抖
     const [retryTick, setRetryTick] = useState(0); // 主动重试触发器
     const autoRetryRef = useRef(0); // 🚀 自动重试计数器（刷新后IndexedDB竞态）
@@ -1491,6 +1500,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     controls
                                                     controlsList="nodownload"
                                                     className="relative z-10 w-11/12 h-10 opacity-80 hover:opacity-100 transition-opacity"
+                                                    onLoadedData={() => setIsMediaLoaded(true)}
                                                     onError={() => {
                                                         console.warn('[ImageCard] Audio load error for', image.id);
                                                         void handleMediaLoadError();
@@ -1511,6 +1521,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     muted loop playsInline
                                                     onPlay={() => setIsPlaying(true)}
                                                     onPause={() => setIsPlaying(false)}
+                                                    onLoadedData={() => setIsMediaLoaded(true)}
                                                     onError={() => {
                                                         console.warn('[ImageCard] Video load error for', image.id);
                                                         void handleMediaLoadError();
@@ -1558,6 +1569,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     void handleMediaLoadError();
                                                 }}
                                                 onLoad={(e) => {
+                                                    setIsMediaLoaded(true);
                                                     failedSourcesRef.current.clear();
                                                     setImgError(false);
                                                     const img = e.target as HTMLImageElement;
@@ -1645,41 +1657,21 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                         // 加载状态由全局遮罩处理，这里显示空白占位
                                                         <div className="absolute inset-0 bg-transparent" />
                                                     ) : (
-                                                        <>
-                                                            <ImageOff size={22} className="mb-2.5 opacity-75" style={{ color: placeholderTextColor }} />
-                                                            <span className="text-xs font-semibold tracking-wide">
-                                                                {isMediaExpired
-                                                                    ? '本地临时图片已失效'
-                                                                    : (image.mode === GenerationMode.VIDEO ||
-                                                                        image.url?.includes('.mp4') ||
-                                                                        image.url?.startsWith('data:video') ||
-                                                                        displaySrc?.includes('.mp4') ||
-                                                                        displaySrc?.startsWith('data:video'))
-                                                                        ? '视频加载失败'
+                                                        <span className="text-xs font-semibold tracking-wide">
+                                                            {isMediaExpired
+                                                                ? '本地临时图片已失效'
+                                                                : (image.mode === GenerationMode.VIDEO ||
+                                                                    image.url?.includes('.mp4') ||
+                                                                    image.url?.startsWith('data:video') ||
+                                                                    displaySrc?.includes('.mp4') ||
+                                                                    displaySrc?.startsWith('data:video'))
+                                                                    ? '视频加载失败'
+                                                                    : (image.mode === GenerationMode.AUDIO ||
+                                                                       displaySrc?.includes('.mp3') ||
+                                                                       displaySrc?.endsWith('.wav'))
+                                                                        ? '音频加载失败'
                                                                         : '图片加载失败'}
-                                                            </span>
-                                                            <span className="text-[9px] opacity-60">
-                                                                {isMediaExpired
-                                                                    ? '(Expired Blob)'
-                                                                    : (image.mode === GenerationMode.AUDIO || displaySrc?.includes('.mp3'))
-                                                                    ? '(Audio Load Error)'
-                                                                    : (image.mode === GenerationMode.VIDEO ||
-                                                                        image.url?.includes('.mp4') ||
-                                                                        image.url?.startsWith('data:video') ||
-                                                                        displaySrc?.includes('.mp4') ||
-                                                                        displaySrc?.startsWith('data:video'))
-                                                                        ? '(Video Load Error)'
-                                                                        : '(Image Load Error)'}
-                                                            </span>
-                                                            {/* Retry Button */}
-                                                            <button
-                                                                onClick={handleRetryLoad}
-                                                                className="mt-2 text-[10px] underline hover:opacity-80"
-                                                                style={{ color: placeholderTextColor }}
-                                                            >
-                                                                点击重试
-                                                            </button>
-                                                        </>
+                                                        </span>
                                                     )}
                                                 </div>
                                             );
@@ -1689,74 +1681,38 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
                                 {image.error && !image.isGenerating && (() => {
                                     const isExpired = image.error === '本地临时图片已失效';
-                                    if (isExpired) {
-                                        return (
-                                            <div
-                                                className="absolute inset-0 z-40 rounded-lg flex flex-col items-center justify-center p-4 text-center border border-amber-500/12"
-                                                style={{
-                                                    background: 'rgba(10, 10, 10, 0.95)',
-                                                    backdropFilter: 'blur(8px)',
-                                                    boxShadow: 'inset 0 0 20px rgba(245, 158, 11, 0.15)'
-                                                }}
-                                            >
-                                                {/* 优雅黄色警告图标 */}
-                                                <div className="w-10 h-10 rounded-full bg-amber-500/8 border border-amber-500/25 flex items-center justify-center mb-2.5 shadow-sm">
-                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(245, 158, 11)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-[0_2px_8px_rgba(245,158,11,0.25)]">
-                                                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                                                        <line x1="12" y1="9" x2="12" y2="13" />
-                                                        <line x1="12" y1="17" x2="12.01" y2="17" />
-                                                    </svg>
-                                                </div>
-                                                <span className="text-xs font-semibold text-[rgb(245, 158, 11)] tracking-wider mb-1.5 uppercase opacity-95 drop-shadow-sm">
-                                                    ⚠️ 本地图片已失效
-                                                </span>
-                                                <span className="text-[11px] text-[rgba(245, 158, 11, 0.85)] leading-relaxed max-w-[90%] overflow-hidden">
-                                                    原图文件依然完整保存在本地，可通过重试恢复
-                                                </span>
-                                                <button
-                                                    onClick={handleRetryLoad}
-                                                    className="mt-3 text-[11px] px-3 py-1 rounded-full border border-amber-500/30 text-[rgb(245, 158, 11)] bg-amber-500/5 hover:bg-amber-500/15 hover:border-amber-500/50 transition-all font-medium"
-                                                >
-                                                    点击恢复
-                                                </button>
-                                            </div>
-                                        );
-                                    }
+                                    const errorText = isExpired 
+                                        ? '本地临时图片已失效' // '(Expired Blob)' 
+                                        : (image.error.toLowerCase().includes('timeout') || image.error.toLowerCase().includes('timed out') || image.error.toLowerCase().includes('超时')
+                                            ? '生成超时'
+                                            : image.error.toLowerCase().includes('cancel') || image.error.toLowerCase().includes('取消')
+                                                ? '已取消'
+                                                : '生成失败');
+                                    
+                                    const placeholderTextColor = isExpired ? 'rgb(245, 158, 11)' : 'rgb(244, 63, 94)';
+                                    const placeholderBorder = isExpired ? '1px solid rgba(245, 158, 11, 0.12)' : '1px solid rgba(239, 68, 68, 0.12)';
+                                    const placeholderGlow = isExpired ? 'inset 0 0 16px rgba(245, 158, 11, 0.15)' : 'inset 0 0 16px rgba(239, 68, 68, 0.15)';
 
                                     return (
                                         <div
-                                            className="absolute inset-0 z-40 rounded-lg flex flex-col items-center justify-center p-4 text-center border border-red-500/12"
+                                            className="absolute inset-0 z-40 rounded-lg flex items-center justify-center p-4 text-center"
                                             style={{
                                                 background: 'rgba(10, 10, 10, 0.95)',
-                                                backdropFilter: 'blur(8px)',
-                                                boxShadow: 'inset 0 0 20px rgba(239, 68, 68, 0.15)'
+                                                border: placeholderBorder,
+                                                boxShadow: placeholderGlow,
                                             }}
                                         >
-                                            {/* 优雅红色警告图标 */}
-                                            <div className="w-10 h-10 rounded-full bg-red-500/8 border border-red-500/25 flex items-center justify-center mb-2.5 shadow-sm">
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(244, 63, 94)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-[0_2px_8px_rgba(239,68,68,0.25)]">
-                                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                                                    <line x1="12" y1="9" x2="12" y2="13" />
-                                                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                                                </svg>
-                                            </div>
-                                            {/* 错误分类 */}
-                                            <span className="text-xs font-semibold text-[rgb(244, 63, 94)] tracking-wider mb-1.5 uppercase opacity-95 drop-shadow-sm">
-                                                {image.error.toLowerCase().includes('timeout') || image.error.toLowerCase().includes('timed out') || image.error.toLowerCase().includes('超时')
-                                                    ? '⏱ 生成超时'
-                                                    : image.error.toLowerCase().includes('cancel') || image.error.toLowerCase().includes('取消')
-                                                        ? '🚫 已取消'
-                                                        : '❌ 生成错误'}
-                                            </span>
-                                            {/* 优雅排版的错误信息 */}
-                                            <span className="text-[11px] text-[rgba(244, 63, 94, 0.85)] leading-relaxed max-w-[90%] overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as any }}>
-                                                {image.error.length > 120 ? image.error.slice(0, 120) + '...' : image.error}
+                                            <span 
+                                                className="text-xs font-semibold tracking-wide"
+                                                style={{ color: placeholderTextColor }}
+                                            >
+                                                {errorText}
                                             </span>
                                         </div>
                                     );
                                 })()}
 
-                                {((isLoading && !displaySrc) || (!imgError && !displaySrc)) && !image.error && !isCanvasTransforming && (
+                                {((isLoading || !isMediaLoaded) && !imgError) && !image.error && !isCanvasTransforming && (
                                     <div
                                         className={`absolute inset-0 z-50 rounded-lg flex flex-col items-center justify-center border ${
                                             isDarkMode ? 'border-white/5 animate-shimmer-inward' : 'border-black/5 animate-shimmer-inward'
