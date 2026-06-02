@@ -123,14 +123,18 @@ async function installSmokeApiRoutes(page) {
 }
 
 function readSource(relativePath) {
-  return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
+  const sourcePath = relativePath.startsWith('src/')
+    ? path.join('apps/web', relativePath)
+    : relativePath;
+  return readFileSync(path.join(REPO_ROOT, sourcePath), 'utf8');
 }
 
 function isBrowserLaunchUnavailable(error) {
   const message = String(error?.message || error || '');
   return /spawn EPERM/i.test(message)
     || /Playwright npx cache directory not found/i.test(message)
-    || /Playwright module was not found/i.test(message);
+    || /Playwright module was not found/i.test(message)
+    || /browser-executable-not-found/i.test(message);
 }
 
 async function resolvePlaywrightModuleUrl() {
@@ -267,9 +271,9 @@ function verifyDesktopSourceContracts() {
     /testId="settings-workbench-stage"/,
     /testId="settings-workbench-diagnostics"/,
     /testId="settings-workbench-platform"/,
-    /Traffic overview/,
-    /Operational health/,
-    /Quick routes/,
+    /Usage & Status/,
+    /API & Capability Routing/,
+    /testId="settings-workbench-route-pool"/,
   ];
 
   const sources = [

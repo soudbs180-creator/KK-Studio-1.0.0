@@ -104,7 +104,10 @@ function ensureArtifactsDir() {
 }
 
 function readSource(relativePath) {
-  return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
+  const sourcePath = relativePath.startsWith('src/')
+    ? path.join('apps/web', relativePath)
+    : relativePath;
+  return readFileSync(path.join(REPO_ROOT, sourcePath), 'utf8');
 }
 
 function isBrowserLaunchUnavailable(error) {
@@ -112,6 +115,7 @@ function isBrowserLaunchUnavailable(error) {
   return /spawn EPERM/i.test(message)
     || /Playwright npx cache directory not found/i.test(message)
     || /Playwright module was not found/i.test(message)
+    || /browser-executable-not-found/i.test(message)
     || /process-spawn-blocked/i.test(message);
 }
 
