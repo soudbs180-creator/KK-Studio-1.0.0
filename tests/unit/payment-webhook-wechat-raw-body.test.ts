@@ -80,6 +80,7 @@ describe("payment webhook raw body handling", () => {
       jsonOptions = options;
       return () => undefined;
     };
+    expressStub.static = () => () => undefined;
     expressStub.urlencoded = () => () => undefined;
     expressStub.Router = () => {
       return {

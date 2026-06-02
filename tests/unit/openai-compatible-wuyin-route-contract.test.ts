@@ -138,6 +138,9 @@ describe("OpenAI-compatible Wuyin route helpers", () => {
     assert.doesNotMatch(adapterSource, /private extractWuyinDirectEndpointPath/);
     assert.doesNotMatch(adapterSource, /private resolveWuyinImageEndpoint/);
     assert.doesNotMatch(adapterSource, /private normalizeWuyinReferenceImage/);
+    assert.match(adapterSource, /forwardUserRouteGenericRequest/);
+    assert.doesNotMatch(adapterSource, /detailUrl\.searchParams\.set\('key'/);
+    assert.doesNotMatch(adapterSource, /target\.url.*key=/);
     assert.doesNotMatch(helperSource, /fetchWithTimeout|executeImageRequest|keyManager/);
     assert.match(testConfigSource, /tests\/unit\/openai-compatible-wuyin-route-contract\.test\.ts/);
   });

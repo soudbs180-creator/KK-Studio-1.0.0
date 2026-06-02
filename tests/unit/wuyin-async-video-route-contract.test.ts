@@ -134,6 +134,10 @@ describe("Wuyin async-video route helpers", () => {
       true,
     );
     assert.equal(
+      serverWuyinVideoProxy.isWuyinAsyncVideoTargetUrl("https://api.wuyinkeji.com/api/async/image_nanoBanana2"),
+      true,
+    );
+    assert.equal(
       serverWuyinVideoProxy.isWuyinAsyncVideoTargetUrl("https://api.openai.com/v1/videos"),
       false,
     );
@@ -150,6 +154,7 @@ describe("Wuyin async-video route helpers", () => {
     assert.match(serverRouteSource, /router\.all\('\/v1\/model-proxy\/user'/);
     assert.match(serverRouteSource, /mode === 'video'/);
     assert.match(serverRouteSource, /mode === 'task_status'/);
+    assert.match(serverRouteSource, /appendWuyinApiKeyToTargetUrl/);
     assert.match(serverHelperSource, /Authorization: apiKey/);
     assert.match(serverHelperSource, /local_proxy:/);
   });

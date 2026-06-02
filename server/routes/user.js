@@ -100,6 +100,19 @@ function isWuyinGeneratableCatalogRow(row) {
   return /^\/api\/async\/(image|video|audio)_[a-z0-9_.-]+$/i.test(String(row && row.endpointPath || '').trim());
 }
 
+function isWuyinPricingProxyRequest(baseUrl, provider) {
+  if (/wuyin/i.test(String(provider || ''))) return true;
+  const raw = String(baseUrl || '').trim();
+  if (!raw) return false;
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const parsed = new URL(withProtocol);
+    return /^api\.wuyinkeji\.com$/i.test(parsed.hostname) || /wuyinkeji/i.test(parsed.hostname);
+  } catch {
+    return /wuyinkeji/i.test(raw);
+  }
+}
+
 function getWuyinFallbackPricingRows() {
   return WUYIN_FALLBACK_CATALOG.map((entry) => ({
     modelId: entry.modelId,
@@ -113,7 +126,21 @@ function getWuyinFallbackPricingRows() {
   }));
 }
 
-async function fetchWuyinPricingRows() {
+function getWuyinFallbackCatalogItems() {
+  return WUYIN_FALLBACK_CATALOG.map((entry, index) => ({
+    id: String(index + 1),
+    name: entry.modelName,
+    url: `https://api.wuyinkeji.com${entry.endpointPath}`,
+    method: entry.endpointPath.includes('/detail') ? 'GET' : 'POST',
+    price: `${entry.inputPrice}${entry.unit}`,
+    balance_sum: entry.inputPrice,
+    pay_unit: entry.unit,
+    api_type: '',
+    the: entry.modelName,
+  }));
+}
+
+async function fetchWuyinCatalogPayload() {
   const response = await fetch(WUYIN_PRICE_CATALOG_URL, {
     method: 'GET',
     headers: {
@@ -124,7 +151,11 @@ async function fetchWuyinPricingRows() {
   if (!response.ok) {
     throw new Error(`Wuyin catalog returned HTTP ${response.status}`);
   }
-  const payload = await response.json();
+  return await response.json();
+}
+
+async function fetchWuyinPricingRows() {
+  const payload = await fetchWuyinCatalogPayload();
   const apiList = Array.isArray(payload && payload.data && payload.data.api_list)
     ? payload.data.api_list
     : [];
@@ -660,6 +691,19 @@ function resolveLocalUserRoute(profileState, routeId) {
   return null;
 }
 
+function appendWuyinApiKeyToTargetUrl(targetUrl, apiKey) {
+  const token = String(apiKey || '').trim();
+  if (!token) return targetUrl;
+  try {
+    const parsed = new URL(targetUrl);
+    parsed.searchParams.set('key', token);
+    return parsed.toString();
+  } catch {
+    const separator = String(targetUrl || '').includes('?') ? '&' : '?';
+    return `${targetUrl}${separator}key=${encodeURIComponent(token)}`;
+  }
+}
+
 function findFirstWuyinVideoRoute(profileState) {
   const providers = Array.isArray(profileState.providers) ? profileState.providers : [];
   for (const provider of providers) {
@@ -688,7 +732,7 @@ async function handleWuyinGenericProxy(req, res, profileState) {
   }
 
   if (!isWuyinAsyncVideoTargetUrl(targetUrl)) {
-    return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'Local user-route proxy only handles Wuyin async-video generic requests.');
+    return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'Local user-route proxy only handles Wuyin async generic requests.');
   }
 
   const route = resolveLocalUserRoute(profileState, routeId);
@@ -712,7 +756,7 @@ async function handleWuyinGenericProxy(req, res, profileState) {
     init.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
   }
 
-  const upstream = await fetch(targetUrl, init);
+  const upstream = await fetch(appendWuyinApiKeyToTargetUrl(targetUrl, route.apiKey), init);
   const responseText = await upstream.text().catch(() => '');
   const contentType = upstream.headers.get('content-type') || 'application/json; charset=utf-8';
   return res.status(upstream.status).type(contentType).send(responseText);
@@ -818,6 +862,55 @@ router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error || 'Wuyin async-video proxy failed.');
     return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', message);
+  }
+});
+
+router.all('/pricing-proxy', async (req, res) => {
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed', data: [], group_ratio: {} });
+  }
+
+  const baseUrl = String(req.body && req.body.baseUrl || '');
+  const provider = String(req.body && req.body.provider || '');
+  if (!isWuyinPricingProxyRequest(baseUrl, provider)) {
+    return res.status(400).json({
+      error: 'Pricing proxy currently supports the Wuyin catalog endpoint only.',
+      data: [],
+      group_ratio: {},
+    });
+  }
+
+  try {
+    const payload = await fetchWuyinCatalogPayload();
+    const apiList = Array.isArray(payload && payload.data && payload.data.api_list)
+      ? payload.data.api_list
+      : [];
+    const apiTypeData = Array.isArray(payload && payload.data && payload.data.api_type_data)
+      ? payload.data.api_type_data
+      : [];
+
+    return res.json({
+      success: true,
+      source: 'wuyinkeji',
+      endpointUrl: WUYIN_PRICE_CATALOG_URL,
+      data: apiList,
+      api_type_data: apiTypeData,
+      group_ratio: {},
+    });
+  } catch (error) {
+    console.warn('[pricing-proxy] Failed to fetch Wuyin catalog, using fallback:', error && error.message || error);
+    return res.json({
+      success: true,
+      source: 'wuyinkeji',
+      endpointUrl: WUYIN_PRICE_CATALOG_URL,
+      data: getWuyinFallbackCatalogItems(),
+      api_type_data: [],
+      group_ratio: {},
+      fallback: true,
+    });
   }
 });
 
