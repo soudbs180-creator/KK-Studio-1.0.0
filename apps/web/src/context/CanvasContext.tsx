@@ -246,6 +246,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     imageNodes: c.imageNodes.map(img => {
                         const storedUrl = hydratedImageMap.get(img.storageId || img.id);
                         let displayUrl = img.url || '';
+                        let errorMsg = img.error;
                         if (storedUrl) {
                             if (storedUrl.startsWith('data:')) {
                                 const blob = base64ToBlob(storedUrl);
@@ -253,11 +254,17 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             } else {
                                 displayUrl = storedUrl;
                             }
+                        } else {
+                            if (displayUrl.startsWith('blob:') || (img.originalUrl && img.originalUrl.startsWith('blob:'))) {
+                                displayUrl = '';
+                                errorMsg = '本地临时图片已失效';
+                            }
                         }
                         return {
                             ...img,
                             url: displayUrl,
-                            originalUrl: img.originalUrl || img.apiResultUrl
+                            originalUrl: (displayUrl === '' && errorMsg === '本地临时图片已失效') ? '' : (img.originalUrl || img.apiResultUrl),
+                            error: errorMsg
                         };
                     }),
                     promptNodes: c.promptNodes.map(pn => ({

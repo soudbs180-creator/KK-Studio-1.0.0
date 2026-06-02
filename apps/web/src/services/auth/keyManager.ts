@@ -1782,7 +1782,12 @@ export class KeyManager {
             return effectiveSlot;
         });
 
+        const explicitRouteTarget = extractSlotRouteTarget(normalizedSuffix);
         const filteredLegacySlots = effectiveUserSlots.filter((slot) => {
+            const slotIdLower = String(slot.id || '').trim().toLowerCase();
+            if (explicitRouteTarget && slotIdLower === explicitRouteTarget) {
+                return true;
+            }
             const slotBaseUrl = normalizeProviderLinkValue(slot.baseUrl);
             const slotName = normalizeProviderLinkValue(slot.name);
             if (!slotBaseUrl || !slotName) return true;
@@ -1835,14 +1840,26 @@ export class KeyManager {
 
         if (preferredKeyId) {
             const normalizedPreferredKeyId = String(preferredKeyId).trim().toLowerCase();
-            const preferredRouteTarget = extractSlotRouteTarget(normalizedPreferredKeyId);
+            const parts = normalizedPreferredKeyId.split('@');
+            const mainPreferredId = parts[0];
+            const preferredSuffix = parts[1] || null;
+            const preferredRouteTarget = preferredSuffix
+                ? extractSlotRouteTarget(preferredSuffix)
+                : extractSlotRouteTarget(normalizedPreferredKeyId);
+
             const preferred = allSlots.find(s => {
                 const slotIdLower = String(s.id || '').trim().toLowerCase();
-                return slotIdLower === normalizedPreferredKeyId || (!!preferredRouteTarget && slotIdLower === preferredRouteTarget);
+                return (
+                    slotIdLower === normalizedPreferredKeyId ||
+                    slotIdLower === mainPreferredId ||
+                    (!!preferredRouteTarget && slotIdLower === preferredRouteTarget)
+                );
             });
-            if (preferred && isSlotHealthy(preferred) && modelSupportedBySlot(preferred)
-                && matchesRequestedRoute(preferred)) {
-                return this.prepareKeyResult(preferred);
+            if (preferred) {
+                const hasCompatIssue = !!getSlotModelCompatibilityIssue(preferred);
+                if (isSlotHealthy(preferred) && !hasCompatIssue && matchesRequestedRoute(preferred)) {
+                    return this.prepareKeyResult(preferred);
+                }
             }
             if (!suffix) {
                 console.warn(`[KeyManager] Preferred key unavailable for model=${normalizedModelId}, fallback to normal routing. preferredKeyId=${preferredKeyId}`);
@@ -1942,7 +1959,7 @@ export class KeyManager {
                 // system/builtin aliases share the same fallback behavior
 
                 console.log(
-                    `[KeyManager] Suffix='${normalizedSuffix}', routeTarget='${routeTarget || ''}', NameMatched=${nameMatchedCandidates.length}, ModelFiltered=${modelFilteredCandidates.length}, FinalCandidates=${candidates.length}` +
+                    `[KeyManager] route debug: Suffix='${normalizedSuffix}', routeTarget='${routeTarget || ''}', NameMatched=${nameMatchedCandidates.length}, ModelFiltered=${modelFilteredCandidates.length}, FinalCandidates=${candidates.length}` +
                     (candidates.length > 0
                         ? ` -> ${candidates.map(c => `${c.name}[${c.id}]@${String(c.baseUrl || '').trim() || 'no-base-url'}`).join(', ')}`
                         : '')

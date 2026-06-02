@@ -1,4 +1,4 @@
-﻿import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   type PromptNode,
   type GeneratedImage,
@@ -1434,7 +1434,10 @@ export const useImageGeneration = (options: {
         }
       }
       const resolvedKey = keyManager.getNextKey(node.model, node.keySlotId);
-      const effectiveKeySlotId = resolvedKey?.id || node.keySlotId;
+      if (!resolvedKey) {
+        throw new Error('No available key for model');
+      }
+      const effectiveKeySlotId = resolvedKey.id;
       const routeProviderDisplay = effectiveKeySlotId
         ? resolveProviderDisplay(effectiveKeySlotId)
         : resolveProviderDisplay(undefined, node.providerLabel, node.provider);
@@ -1981,9 +1984,10 @@ export const useImageGeneration = (options: {
       await updatePromptNode({
         ...latest,
         isGenerating: false,
-        lastGenerationSuccessCount: latest.lastGenerationSuccessCount ?? 0,
-        lastGenerationFailCount: Math.max(latest.lastGenerationFailCount ?? 0, actualCount),
-        lastGenerationTotalCount: latest.lastGenerationTotalCount ?? actualCount,
+        lastGenerationSuccessCount: 0,
+        lastGenerationFailCount: actualCount,
+        lastGenerationTotalCount: actualCount,
+        childImageIds: [],
         error: getDisplayableGenerationError(err),
         errorDetails: extractErrorDetails(err, node.model),
         ...failedBillingState,

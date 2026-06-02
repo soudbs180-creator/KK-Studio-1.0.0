@@ -2672,38 +2672,63 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       kind: (preset.kind || 'official') as 'official' | 'relay',
       onApply: () => {
         if (!ensureProviderActionsAllowed()) return;
-        setProviderForm((current) => ({
-          ...current,
-          name: preset.name,
-          baseUrl: preset.baseUrl,
-          format: preset.format,
-          color: preset.color,
-          apiKey: '',
-          modelsText: '',
-        }));
-        setEditingOfficialId(null);
-        setEditingProviderId(null);
-        setProviderPricingEndpointDraft(buildDefaultProviderPricingEndpoint(preset.baseUrl));
-        setShowPricingEndpointOverride(false);
-        setActiveTab('third-party');
-        navigate(buildProviderEditorPath(null), {
-          state: {
-            presetProviderDraft: {
-              name: preset.name,
-              baseUrl: preset.baseUrl,
-              format: preset.format,
-              color: preset.color,
-              modelsText: '',
-            },
-          },
-        });
-        notify.success(
-          pick('已预填模型通道', 'Provider prefilled'),
-          pick(`已载入 ${preset.name} 的名称、地址和协议；只需要填写 API Key。`, `Loaded ${preset.name} name, URL, and protocol. Enter the API key to continue.`),
+        
+        // 查找是否已经存在相同预设的供应商（根据名字或baseUrl匹配）
+        const existingProvider = thirdPartyProviders.find(
+          (p) => p.name === preset.name || p.baseUrl === preset.baseUrl
         );
+
+        if (existingProvider) {
+          // 如果已经配置过该预设，直接切换为编辑状态并加载已有数据
+          setProviderForm(toProviderForm(existingProvider));
+          setEditingOfficialId(null);
+          setEditingProviderId(existingProvider.id);
+          setProviderPricingEndpointDraft(
+            existingProvider.pricingSnapshot?.pricingEndpoint ||
+              buildDefaultProviderPricingEndpoint(existingProvider.baseUrl)
+          );
+          setShowPricingEndpointOverride(Boolean(existingProvider.pricingSnapshot?.pricingEndpoint));
+          setActiveTab('third-party');
+          navigate(buildProviderEditorPath(existingProvider.id));
+          notify.success(
+            pick('已载入已有模型通道', 'Provider loaded'),
+            pick(`已自动匹配并载入已配置的 ${preset.name} 渠道。`, `Matched and loaded the existing ${preset.name} configuration.`),
+          );
+        } else {
+          // 否则，作为新配置预填
+          setProviderForm((current) => ({
+            ...current,
+            name: preset.name,
+            baseUrl: preset.baseUrl,
+            format: preset.format,
+            color: preset.color,
+            apiKey: '',
+            modelsText: '',
+          }));
+          setEditingOfficialId(null);
+          setEditingProviderId(null);
+          setProviderPricingEndpointDraft(buildDefaultProviderPricingEndpoint(preset.baseUrl));
+          setShowPricingEndpointOverride(false);
+          setActiveTab('third-party');
+          navigate(buildProviderEditorPath(null), {
+            state: {
+              presetProviderDraft: {
+                name: preset.name,
+                baseUrl: preset.baseUrl,
+                format: preset.format,
+                color: preset.color,
+                modelsText: '',
+              },
+            },
+          });
+          notify.success(
+            pick('已预填模型通道', 'Provider prefilled'),
+            pick(`已载入 ${preset.name} 的名称、地址和协议；只需要填写 API Key。`, `Loaded ${preset.name} name, URL, and protocol. Enter the API key to continue.`),
+          );
+        }
       },
     }))
-  ), [navigate, pick, ensureProviderActionsAllowed, setProviderForm, setEditingOfficialId, setEditingProviderId, setProviderPricingEndpointDraft, setShowPricingEndpointOverride]);
+  ), [navigate, pick, ensureProviderActionsAllowed, setProviderForm, setEditingOfficialId, setEditingProviderId, setProviderPricingEndpointDraft, setShowPricingEndpointOverride, thirdPartyProviders]);
 
   const stageMeta = resolveApiWorkbenchStageMeta({
     activeTab,

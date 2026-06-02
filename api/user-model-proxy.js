@@ -45,8 +45,23 @@ function isAllowedWuyinTargetUrl(targetUrl) {
     }
 
     const pathname = parsed.pathname.replace(/\/+$/, '');
-    return pathname === '/api/async/detail'
-      || /^\/api\/async(?:$|\/[a-z0-9_.-]+)$/i.test(pathname);
+    const allowedExactPaths = [
+      '/api/async/detail',
+      '/api/chat/index',
+      '/api/voice/composite',
+      '/api/voice/clone',
+      '/api/sora2-new/submit',
+      '/api/sora2/detail',
+      '/api/img/split',
+      '/api/img/nanoBanana',
+      '/api/img/drawDetail'
+    ];
+
+    if (allowedExactPaths.includes(pathname)) {
+      return true;
+    }
+
+    return /^\/api\/async(?:$|\/[a-z0-9_.-]+)$/i.test(pathname);
   } catch {
     return false;
   }

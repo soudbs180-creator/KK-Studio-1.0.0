@@ -1608,16 +1608,26 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     <ImageOff size={24} className="mb-2 opacity-50 text-rose-400" />
                                                     <span className="text-xs text-rose-300">
                                                         {/* 统一视频判断：mode/data:video/.mp4/image.url */}
-                                                        {(image.mode === GenerationMode.VIDEO ||
-                                                            image.url?.includes('.mp4') ||
-                                                            image.url?.startsWith('data:video') ||
-                                                            displaySrc?.includes('.mp4') ||
-                                                            displaySrc?.startsWith('data:video'))
-                                                            ? '视频加载失败'
-                                                            : '图片加载失败'}
+                                                        {image.error === '本地临时图片已失效' ||
+                                                        displaySrc?.startsWith('blob:') ||
+                                                        image.url?.startsWith('blob:') ||
+                                                        image.originalUrl?.startsWith('blob:')
+                                                            ? '本地临时图片已失效'
+                                                            : (image.mode === GenerationMode.VIDEO ||
+                                                                image.url?.includes('.mp4') ||
+                                                                image.url?.startsWith('data:video') ||
+                                                                displaySrc?.includes('.mp4') ||
+                                                                displaySrc?.startsWith('data:video'))
+                                                                ? '视频加载失败'
+                                                                : '图片加载失败'}
                                                     </span>
                                                     <span className="text-[9px] opacity-60">
-                                                        {(image.mode === GenerationMode.AUDIO || displaySrc?.includes('.mp3'))
+                                                        {image.error === '本地临时图片已失效' ||
+                                                        displaySrc?.startsWith('blob:') ||
+                                                        image.url?.startsWith('blob:') ||
+                                                        image.originalUrl?.startsWith('blob:')
+                                                            ? '(Expired Blob)'
+                                                            : (image.mode === GenerationMode.AUDIO || displaySrc?.includes('.mp3'))
                                                             ? '(Audio Load Error)'
                                                             : (image.mode === GenerationMode.VIDEO ||
                                                                 image.url?.includes('.mp4') ||

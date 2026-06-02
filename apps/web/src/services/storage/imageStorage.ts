@@ -181,8 +181,8 @@ async function toBlobFromAnyUrl(dataURL: string): Promise<Blob | null> {
 
             if (!res || !res.ok) return null;
             const blob = await res.blob();
-            // 防止无效小文档/错误文档
-            return blob.size > 1024 ? blob : null;
+            // 防止无效空文档
+            return blob.size > 0 ? blob : null;
         }
 
         return null;

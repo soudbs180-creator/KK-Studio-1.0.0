@@ -3,6 +3,7 @@
  * 设置页面UI组件库 - iOS风格设计系统
  */
 import React, { useState, useRef, useEffect } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import {
   SETTINGS_CONTROL_MOTION_CLASSNAME,
   SETTINGS_INPUT_CLASSNAME,
@@ -202,6 +203,9 @@ export const SettingInput: React.FC<{
   helper?: string;
   disabled?: boolean;
 }> = ({ label, value, onChange, onBlur, placeholder, type = 'text', helper, disabled = false }) => {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === 'password';
+
   return (
     <label className="block">
       {label && (
@@ -211,16 +215,29 @@ export const SettingInput: React.FC<{
           {label}
         </div>
       )}
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
-        placeholder={placeholder}
-        disabled={disabled}
-        className={`${SETTINGS_INPUT_CLASSNAME} px-4`.trim()}
-        style={{ boxShadow: 'var(--settings-input-shadow)' }}
-      />
+      <div className="relative">
+        <input
+          type={isPassword ? (showPassword ? 'text' : 'password') : type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+          placeholder={placeholder}
+          disabled={disabled}
+          className={`${SETTINGS_INPUT_CLASSNAME} ${isPassword ? 'pl-4 pr-10' : 'px-4'}`.trim()}
+          style={{ boxShadow: 'var(--settings-input-shadow)' }}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            disabled={disabled}
+            className="absolute inset-y-0 right-0 flex items-center pr-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer bg-transparent border-none outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            title={showPassword ? '隐藏密钥' : '查看密钥'}
+          >
+            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        )}
+      </div>
       {helper && (
         <div className="mt-2 break-words text-xs leading-5 text-[var(--text-secondary)]">
           {helper}

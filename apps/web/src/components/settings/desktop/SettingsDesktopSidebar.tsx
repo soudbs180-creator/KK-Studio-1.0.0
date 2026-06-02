@@ -255,7 +255,11 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
         }
       `}</style>
 
-
+      {/* 阻止浏览器对导航搜索栏进行激进的自动填充 */}
+      <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden', opacity: 0 }} aria-hidden="true">
+        <input type="text" name="fake-username-prevent-autofill" tabIndex={-1} autoComplete="off" />
+        <input type="password" name="fake-password-prevent-autofill" tabIndex={-1} autoComplete="off" />
+      </div>
 
       <label
         className="settings-shell-nav__search mb-4 flex items-center gap-2.5 px-3 py-2 rounded-xl border"
