@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 
@@ -27,6 +27,16 @@ test("Vercel proxies hosted auth and health routes to the VPS API origin", () =>
   assert.ok(
     rewrites.some((rewrite) => rewrite.source === "/api/auth/:path*" && rewrite.destination === `${VPS_API_ORIGIN}/api/v1/auth/:path*`),
     "expected legacy /api/auth/* paths to proxy to the VPS auth namespace",
+  );
+  assert.equal(
+    rewrites.some((rewrite) => rewrite.source === "/api/pricing-proxy"),
+    false,
+    "expected /api/pricing-proxy to use the local Vercel serverless handler",
+  );
+  assert.equal(
+    existsSync(path.join(ROOT_DIR, "api", "pricing-proxy.js")),
+    true,
+    "expected the Wuyin pricing proxy serverless handler to exist",
   );
   assert.equal(
     rewrites.some((rewrite) => String(rewrite.destination || "").includes("__kk_path")),

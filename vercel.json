@@ -35,10 +35,6 @@
       "destination": "https://172-245-156-16.sslip.io/healthz"
     },
     {
-      "source": "/api/pricing-proxy",
-      "destination": "https://172-245-156-16.sslip.io/api/pricing-proxy"
-    },
-    {
       "source": "/api/v1/:path*",
       "destination": "https://172-245-156-16.sslip.io/api/v1/:path*"
     },
