@@ -44,6 +44,7 @@ interface ProjectManagerProps {
     onApplyWorkflowTemplate?: (templateId: WorkflowTemplateId) => void;
     onAddWorkflowUtilityCard?: (kind: WorkflowUtilityNodeKind) => void;
     desktopScale?: number;
+    isUserMenuOpen?: boolean;
 }
 
 const ProjectManager: React.FC<ProjectManagerProps> = ({
@@ -57,6 +58,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     showGrid = true,
     showSnapToGrid = false,
     desktopScale = 1,
+    isUserMenuOpen = false,
 }) => {
     const {
         state,
@@ -735,7 +737,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                 className={`fixed left-4 z-50 flex flex-col items-center select-none transition-all duration-300 ease-out ${isCollapsed ? 'cursor-pointer w-2.5 h-24 opacity-60 hover:opacity-100 hover:scale-y-105' : 'w-14 opacity-100'}`}
                 style={{ 
                     top: '50%',
-                    transform: `translateY(-50%) scale(${desktopScale})`,
+                    transform: `translateY(${isUserMenuOpen ? 'calc(-50% + 120px)' : '-50%'}) scale(${desktopScale})`,
                     transformOrigin: 'left center',
                 }}
             >

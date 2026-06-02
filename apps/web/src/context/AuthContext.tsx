@@ -142,7 +142,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [sessionRecoveryLoading, setSessionRecoveryLoading] = useState(() => initialAuthStateRef.current!.sessionRecoveryLoading);
   const [sessionRecoveryBlockedBySignOut, setSessionRecoveryBlockedBySignOut] = useState(false);
   const [sessionRecoveryWarning, setSessionRecoveryWarning] = useState<string | null>(null);
-  const [adminLevel, setAdminLevel] = useState<number>(0);
+  const [adminLevel, setAdminLevel] = useState<number>(() => {
+    const runtimeState = resolveInitialRuntimeState();
+    return resolveAdminLevelFromProfile(runtimeState.user);
+  });
   const hostedRuntime = useMemo(() => isHostedRuntime(), []);
   const runtimeUserId = runtimeState.user?.id || null;
   const sessionAccessToken = runtimeState.isTempUser ? undefined : getStoredKkApiAccessToken();

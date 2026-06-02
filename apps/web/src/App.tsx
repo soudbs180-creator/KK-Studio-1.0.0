@@ -4574,6 +4574,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         void handleApplyWorkflowTemplate(templateId);
       }}
       onAddWorkflowUtilityCard={handleAddWorkflowUtilityCard}
+      isUserMenuOpen={showUserMenu}
     />
   ) : null;
 

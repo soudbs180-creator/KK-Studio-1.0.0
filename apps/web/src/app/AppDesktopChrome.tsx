@@ -158,11 +158,11 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
             onClick={(e) => e.stopPropagation()}
             className="absolute left-0 top-[72px] z-50 w-64 origin-top-left animate-in rounded-xl border p-2 duration-100 fade-in zoom-in-95"
             style={{
-              background: 'var(--frost-card-framework-bg)',
+              background: 'color-mix(in srgb, var(--frost-card-framework-bg) 94%, var(--bg-canvas) 6%)',
               borderColor: 'var(--frost-card-framework-border)',
               boxShadow: 'var(--frost-card-framework-shadow)',
-              backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
-              WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(160%)',
+              backdropFilter: 'blur(24px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(24px) saturate(180%)',
             }}
           >
             <div className="space-y-1">
@@ -189,7 +189,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
               {adminLevel > 0 && (
                 <DesktopMenuActionButton
                   icon={<LayoutDashboard size={14} />}
-                  label="管理后台"
+                  label="管理员后台"
                   accentColor="var(--clay-brand-coral)"
                   onClick={() => {
                     window.location.href = "/admin";

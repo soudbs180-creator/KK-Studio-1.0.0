@@ -390,29 +390,61 @@ export function normalizeWuyinReferenceImage(
 
 export function extractWuyinTaskId(payload: unknown): string {
     const data = getObjectProperty(payload, 'data');
-    return String(
-        getObjectProperty(data, 'id') ||
-        getObjectProperty(payload, 'id') ||
-        getObjectProperty(payload, 'task_id') ||
-        getObjectProperty(payload, 'taskId') ||
-        ''
-    ).trim();
+    if (typeof data === 'string' && data.trim()) {
+        return data.trim();
+    }
+    const rootId = getObjectProperty(payload, 'id') || getObjectProperty(payload, 'task_id') || getObjectProperty(payload, 'taskId');
+    if (typeof rootId === 'string' && rootId.trim()) {
+        return rootId.trim();
+    }
+    if (typeof rootId === 'number') {
+        return String(rootId);
+    }
+    
+    const dataId = getObjectProperty(data, 'id') || getObjectProperty(data, 'task_id') || getObjectProperty(data, 'taskId');
+    if (typeof dataId === 'string' && dataId.trim()) {
+        return dataId.trim();
+    }
+    if (typeof dataId === 'number') {
+        return String(dataId);
+    }
+    
+    return '';
 }
 
-export function extractWuyinStatusCode(payload: unknown): number | undefined {
+export function extractWuyinStatusCode(payload: unknown): number | string | undefined {
     const data = getObjectProperty(payload, 'data');
     const value = getObjectProperty(data, 'status') ?? getObjectProperty(payload, 'status');
+    if (value === undefined || value === null) return undefined;
     if (typeof value === 'number' && Number.isFinite(value)) return value;
     if (typeof value === 'string' && value.trim() !== '') {
-        const parsed = Number(value);
+        const trimmed = value.trim();
+        const parsed = Number(trimmed);
         if (Number.isFinite(parsed)) return parsed;
+        return trimmed;
     }
     return undefined;
 }
 
-export function mapWuyinStatus(statusCode: number | undefined): 'pending' | 'processing' | 'success' | 'failed' {
-    if (statusCode === 2) return 'success';
-    if (statusCode === 3) return 'failed';
-    if (statusCode === 1) return 'processing';
+export function mapWuyinStatus(statusCode: number | string | undefined): 'pending' | 'processing' | 'success' | 'failed' {
+    if (statusCode === undefined || statusCode === null) return 'pending';
+    
+    if (typeof statusCode === 'number') {
+        if (statusCode === 2) return 'success';
+        if (statusCode === 3) return 'failed';
+        if (statusCode === 1) return 'processing';
+        return 'pending';
+    }
+    
+    const word = String(statusCode).trim().toLowerCase();
+    if (word === 'success' || word === 'succeeded' || word === 'done' || word === '2') {
+        return 'success';
+    }
+    if (word === 'failed' || word === 'fail' || word === 'error' || word === '3') {
+        return 'failed';
+    }
+    if (word === 'processing' || word === 'running' || word === '1') {
+        return 'processing';
+    }
     return 'pending';
 }

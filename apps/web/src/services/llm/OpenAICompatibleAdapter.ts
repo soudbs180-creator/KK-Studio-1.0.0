@@ -844,7 +844,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         const logicalCode = Number(payload?.code);
-        if (Number.isFinite(logicalCode) && logicalCode !== 200) {
+        if (Number.isFinite(logicalCode) && logicalCode !== 200 && logicalCode !== 0) {
             const message = extractProviderMessage(payload) || `Wuyin detail error code ${logicalCode}`;
             throw buildOpenAICompatibleHttpError({
                 message,
@@ -1001,7 +1001,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         }
 
         const logicalCode = Number(submitPayload?.code);
-        if (Number.isFinite(logicalCode) && logicalCode !== 200) {
+        if (Number.isFinite(logicalCode) && logicalCode !== 200 && logicalCode !== 0) {
             const message = extractProviderMessage(submitPayload) || `Wuyin submit error code ${logicalCode}`;
             keyManager.reportCallResult(keySlot.id, false, message);
             throw buildOpenAICompatibleHttpError({

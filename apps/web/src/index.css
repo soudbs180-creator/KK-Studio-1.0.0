@@ -12056,16 +12056,22 @@ body.dark-mode .storage-selection-modal {
 
 .settings-panel .settings-capability-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)) !important;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)) !important;
   gap: 16px !important;
+  align-items: start;
+  justify-content: start;
+  overflow-x: visible !important;
 }
 
 .settings-panel .settings-capability-card {
   display: flex;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   border: none;
   border-radius: 16px;
   padding: 10px;
@@ -12074,16 +12080,17 @@ body.dark-mode .storage-selection-modal {
 
 .settings-panel .settings-capability-card__header {
   display: flex;
-  align-items: center;
+  min-width: 0;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
 }
 
 .settings-panel .settings-capability-card__identity {
   display: flex;
   min-width: 0;
-  flex: 1 1 180px;
-  align-items: center;
+  flex: 1 1 0;
+  align-items: flex-start;
   gap: 10px;
 }
 
@@ -12117,7 +12124,9 @@ body.dark-mode .storage-selection-modal {
 .settings-panel .settings-capability-card__title {
   font-size: 14px;
   font-weight: 600;
+  line-height: 1.35;
   color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 
 .settings-panel .settings-capability-card__description {
@@ -12139,6 +12148,11 @@ body.dark-mode .storage-selection-modal {
   gap: 6px;
   /* 简体中文注释：强加不可挤压特性，解决在小卡片下因标题字长将右侧开关完全挤扁、导致按钮实际可点范围变0从而“按钮失效”的问题 */
   flex-shrink: 0;
+}
+
+.settings-panel .settings-capability-card__state > button {
+  max-width: 100%;
+  white-space: nowrap;
 }
 
 .settings-panel .settings-capability-card__switch {
@@ -12177,9 +12191,14 @@ body.dark-mode .storage-selection-modal {
 
 .settings-panel .settings-capability-card__controls {
   display: grid;
+  min-width: 0;
   /* 简体中文注释：为了消除在 auto-fit 分栏卡片（宽度仅 260px–350px 左右）内部 3 列排版带来的极度拥挤、选择框缩成一团并彻底脱离的问题，改用单列纵向布局 */
   grid-template-columns: 1fr;
   gap: 8px;
+}
+
+.settings-panel .settings-capability-card__controls > * {
+  min-width: 0;
 }
 
 .settings-panel .settings-capability-card__controls label > div:first-child {
@@ -14950,7 +14969,6 @@ body:not(.dark-mode) .settings-log-group-badge {
 
 /* 电脑/平板端自适应：中等屏幕一排 2 个卡片 */
 @media (min-width: 768px) and (max-width: 1023px) {
-  .settings-panel .settings-capability-grid,
   .settings-panel .settings-provider-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
@@ -14959,7 +14977,7 @@ body:not(.dark-mode) .settings-log-group-badge {
 /* 电脑端宽屏自适应：一排可以展示 3 到 4 个卡片 */
 @media (min-width: 1024px) {
   .settings-panel .settings-capability-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)) !important;
   }
   .settings-panel .settings-provider-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
@@ -14974,10 +14992,10 @@ body:not(.dark-mode) .settings-log-group-badge {
     overflow: hidden;
   }
   .settings-panel .settings-capability-card {
-    width: 260px !important;
+    width: 100% !important;
     height: auto !important;
-    min-width: 260px !important;
-    max-width: 260px !important;
+    min-width: 0 !important;
+    max-width: none !important;
     min-height: unset !important;
     max-height: none !important;
     overflow: visible !important;
@@ -16648,6 +16666,34 @@ body:not(.dark-mode) .settings-model-center-route__btn-action--danger span {
 /* 增加卡片中间指标舱（余额和延迟）标签与数值之间的微观间距，符合 2px 栅格规约 */
 .settings-panel .settings-model-center-route__metric-val {
   margin-top: 6px !important;
+}
+
+/* Model center desktop layout: provider cards span the two-slot pool; preset directory takes remaining space. */
+@media (min-width: 1024px) {
+  .settings-panel .settings-model-center-layout {
+    grid-template-columns: minmax(0, 556px) minmax(270px, 1fr) !important;
+    gap: 16px !important;
+  }
+
+  .settings-panel .settings-model-center-pool {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 556px !important;
+  }
+
+  .settings-panel .settings-model-center-route-grid {
+    width: 100% !important;
+    max-width: 100% !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-auto-rows: auto !important;
+  }
+
+  .settings-panel .settings-model-center-route {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
 }
 
 /* 🚀 强制模型库组件在所有平台和渲染阶段都拉起高保真磨砂效果 */

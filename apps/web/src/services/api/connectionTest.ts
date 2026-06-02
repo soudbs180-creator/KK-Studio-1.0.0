@@ -422,7 +422,11 @@ export async function testCherryConnection(config: ConnectionConfig): Promise<Te
     const modelId = getModelId(resolved);
     const runtime = resolveConnectionRuntime(resolved, cleanBase);
 
-    if (runtime.strategyId === 'wuyinkeji' && !isVideoModel(modelId)) {
+    if (
+      runtime.strategyId === 'wuyinkeji' &&
+      !isVideoModel(modelId) &&
+      /chat|gpt|text|claude|gemini-(?!.*image)/i.test(modelId)
+    ) {
       return runWuyinCustomChatTest(cleanBase, resolved);
     }
     const nativeGemini = runtime.protocolFamily === 'gemini-native';
