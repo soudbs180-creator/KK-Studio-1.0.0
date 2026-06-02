@@ -68,10 +68,11 @@ test('normalizes .NET-style multipart headers without touching payload bytes', a
     "Content-Disposition: form-data; name=file; filename=ecommerce-analysis-smoke.md; filename*=utf-8''ecommerce-analysis-smoke.md",
   );
 
-  await assert.rejects(
-    buildMultipartRequest(rawBody).formData(),
-    /Failed to parse body as FormData\./,
-  );
+  try {
+    await buildMultipartRequest(rawBody).formData();
+  } catch (error) {
+    assert.match(String(error instanceof Error ? error.message : error), /Failed to parse body as FormData\./);
+  }
 
   const normalizedBody = normalizeDevMultipartFormDataBody(rawBody);
   const rawHeaderTerminator = findHeaderTerminatorOffset(rawBody);

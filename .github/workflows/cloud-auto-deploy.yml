@@ -21,10 +21,14 @@ jobs:
           cache: npm
           cache-dependency-path: |
             package-lock.json
+            server/package-lock.json
             apps/web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Install server dependencies
+        run: npm ci --prefix server
 
       - name: Install web app dependencies
         run: npm ci --prefix apps/web --legacy-peer-deps
