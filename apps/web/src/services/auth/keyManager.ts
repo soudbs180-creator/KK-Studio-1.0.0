@@ -304,7 +304,7 @@ export interface ThirdPartyProvider {
     };
 
     // Runtime status
-    status: 'active' | 'error' | 'checking';
+    status: 'active' | 'error' | 'checking' | 'valid' | 'unverified';
     lastError?: string;
     lastChecked?: number;
 

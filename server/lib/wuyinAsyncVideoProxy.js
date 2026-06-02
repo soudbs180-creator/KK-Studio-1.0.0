@@ -3,6 +3,13 @@ const WUYIN_ASYNC_VIDEO_DETAIL_PATH = '/api/async/detail';
 const WUYIN_ASYNC_VIDEO_DEFAULT_ENDPOINT_PATH = '/api/async/video_google_omni';
 const WUYIN_ASYNC_VIDEO_DEFAULT_MODEL = 'video_google_omni';
 const LOCAL_PROXY_TASK_PREFIX = 'local_proxy:';
+
+let wuyinEndpoints = {};
+try {
+  wuyinEndpoints = require('./wuyinEndpoints.json');
+} catch (e) {
+  // 忽略，回退到硬编码
+}
 const WUYIN_ASYNC_VIDEO_ROUTE_ALIASES = [
   { endpointPath: WUYIN_ASYNC_VIDEO_DEFAULT_ENDPOINT_PATH, aliases: ['video_google_omni', 'google_omni', 'google omni', 'omni google'] },
   { endpointPath: '/api/async/video_vidu', aliases: ['video_vidu', 'vidu'] },
@@ -161,6 +168,7 @@ function isWuyinAsyncVideoRoute(route, modelId) {
   const routeName = String(route && route.name || '').trim();
   return isWuyinBaseUrl(route && route.baseUrl)
     || Boolean(extractWuyinVideoEndpointPath(route && route.baseUrl))
+    || (route && route.provider === 'Wuyin')
     || /wuyin/i.test(routeName);
 }
 
@@ -473,6 +481,21 @@ function resolveWuyinImageEndpointPath(modelId) {
     .replace(/^models\//i, '')
     .replace(/^\/+/, '')
     .replace(/^api\/async\//i, '');
+
+  // 1. 优先使用爬虫自动同步抓取的映射关系进行自适应匹配
+  if (wuyinEndpoints[raw]) {
+    return wuyinEndpoints[raw];
+  }
+  if (wuyinEndpoints[raw.toLowerCase()]) {
+    return wuyinEndpoints[raw.toLowerCase()];
+  }
+  const cleanRaw = raw.replace(/^image_/, '');
+  if (wuyinEndpoints[cleanRaw]) {
+    return wuyinEndpoints[cleanRaw];
+  }
+  if (wuyinEndpoints[cleanRaw.toLowerCase()]) {
+    return wuyinEndpoints[cleanRaw.toLowerCase()];
+  }
 
   const normalized = raw.toLowerCase().replace(/[^a-z0-9]+/g, '');
 

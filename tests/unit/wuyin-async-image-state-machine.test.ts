@@ -8,6 +8,8 @@ const serverWuyinProxy = require("../../server/lib/wuyinAsyncVideoProxy.js") as 
   mapWuyinStatus: (statusCode: any) => string;
   extractWuyinOutputUrls: (payload: any) => string[];
   encodeLocalProxyTaskId: (routeId: string, providerTaskId: string) => string;
+  isWuyinAsyncVideoRoute: (route: any, modelId?: string) => boolean;
+  resolveWuyinImageEndpointPath: (modelId: string) => string;
 };
 
 // 简体中文注释：模拟前端命名函数，用于测试命名的规范性
@@ -140,6 +142,22 @@ describe("Wuyin Async Image State Machine & Helper Tests", () => {
 
     assert.equal(totalExecTime, 1.868747);
     assert.equal(generationTimeMs, 1869);
+  });
+
+  test("6. isWuyinAsyncVideoRoute 能够拦截 provider === 'Wuyin' 的自定义路由", () => {
+    const mockRoute = {
+      name: "我的速创中转",
+      baseUrl: "https://my-custom-proxy.com/api",
+      provider: "Wuyin"
+    };
+
+    const isWuyin = serverWuyinProxy.isWuyinAsyncVideoRoute(mockRoute);
+    assert.equal(isWuyin, true);
+  });
+
+  test("7. resolveWuyinImageEndpointPath 能够通过爬虫生成的 wuyinEndpoints.json 成功自适应匹配", () => {
+    const path = serverWuyinProxy.resolveWuyinImageEndpointPath("NanoBanana2");
+    assert.equal(path, "/api/async/image_nanoBanana2");
   });
 
 });

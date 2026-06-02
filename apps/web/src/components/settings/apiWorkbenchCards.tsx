@@ -2,7 +2,7 @@ import React from 'react';
 
 import { ProgressBar, StatusBadge } from './ui/index';
 
-type EndpointStatusVariant = 'online' | 'offline' | 'warning' | 'error' | 'paused';
+type EndpointStatusVariant = 'online' | 'offline' | 'warning' | 'error' | 'paused' | 'unverified';
 
 export type ConsoleEndpointCardMetric = {
   label: React.ReactNode;

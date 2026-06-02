@@ -1775,7 +1775,12 @@ router.post('/v1/profile/user-routes/:routeId/connectivity', requireProfileAuth,
   const format = route.format || 'openai';
 
   // Wuyin/Suchuang exposes its catalog through a site endpoint, not /v1/models.
-  const isWuyin = routeId === 'wuyinkeji' || /wuyin/i.test(route.name) || /wuyinkeji/i.test(route.baseUrl);
+  const isWuyin = routeId === 'wuyinkeji'
+    || routeId === 'provider_wuyin'
+    || routeId === 'slot_wuyin'
+    || (route && route.provider === 'Wuyin')
+    || /wuyin/i.test(route.name)
+    || /wuyinkeji/i.test(route.baseUrl);
 
   if (isWuyin) {
     let pricingRows = [];

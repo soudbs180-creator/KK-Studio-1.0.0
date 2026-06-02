@@ -754,6 +754,9 @@ const getProviderStatus = (provider: ThirdPartyProvider) => {
   if (!provider.isActive) return { badge: 'neutral' as const, status: 'paused' as const, label: '已暂停' };
   if (provider.status === 'active') return { badge: 'emerald' as const, status: 'online' as const, label: '运行中' };
   if (provider.status === 'error') return { badge: 'rose' as const, status: 'error' as const, label: '异常' };
+  if (provider.status === 'valid') {
+    return { badge: 'blue' as const, status: 'unverified' as const, label: '已保存/等待首次调用验证' };
+  }
   return { badge: 'amber' as const, status: 'warning' as const, label: '检测中' };
 };
 

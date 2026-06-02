@@ -16908,6 +16908,19 @@ body:not(.dark-mode) .settings-model-center-route__status-indicator--warning {
   --status-dot-glow: 0 0 8px rgba(245,158,11,.5);
 }
 
+body.dark-mode .settings-model-center-route__status-indicator--unverified {
+  --status-color: #3b82f6;
+  --status-bg: rgba(30, 41, 59, .72);
+  --status-dot-bg: #3b82f6;
+  --status-dot-glow: 0 0 8px rgba(59, 130, 246, .6);
+}
+body:not(.dark-mode) .settings-model-center-route__status-indicator--unverified {
+  --status-color: #1d4ed8;
+  --status-bg: rgba(239, 246, 255, .9);
+  --status-dot-bg: #3b82f6;
+  --status-dot-glow: 0 0 8px rgba(59, 130, 246, .5);
+}
+
 /* 4. 具体类名样式实现 */
 .settings-panel .settings-model-center-route {
   background: var(--route-bg) !important;

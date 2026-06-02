@@ -25,7 +25,7 @@ export interface ProviderLinkProvider {
         dailyCost: number;
         lastReset: number;
     };
-    status: "active" | "error" | "checking";
+    status: "active" | "error" | "checking" | "valid" | "unverified";
     createdAt: number;
     updatedAt: number;
     budgetLimit?: number;
@@ -131,7 +131,7 @@ export function normalizeStoredProviders<TProvider extends ProviderLinkProvider>
                 dailyCost: Number(usage.dailyCost || 0),
                 lastReset: Number(usage.lastReset || now),
             },
-            status: raw.status === "active" || raw.status === "error" || raw.status === "checking"
+            status: raw.status === "active" || raw.status === "error" || raw.status === "checking" || raw.status === "valid" || raw.status === "unverified"
                 ? raw.status
                 : "checking",
             createdAt: Number(raw.createdAt || now),

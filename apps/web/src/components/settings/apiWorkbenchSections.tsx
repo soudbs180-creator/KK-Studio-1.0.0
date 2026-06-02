@@ -512,7 +512,7 @@ export type ApiWorkbenchModelCenterRouteItem = {
   subtitle: string;
   accentColor?: string;
   statusLabel: string;
-  statusVariant: 'online' | 'offline' | 'warning' | 'error' | 'paused';
+  statusVariant: 'online' | 'offline' | 'warning' | 'error' | 'paused' | 'unverified';
   protocolLabel: string;
   modelCountLabel: string;
   budgetLabel: string;

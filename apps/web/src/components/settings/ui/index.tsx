@@ -649,7 +649,7 @@ export const ProgressBar: React.FC<{
 
 // StatusBadge 状态徽章
 export const StatusBadge: React.FC<{
-  status: 'online' | 'offline' | 'warning' | 'error' | 'paused';
+  status: 'online' | 'offline' | 'warning' | 'error' | 'paused' | 'unverified';
   label?: string;
 }> = ({ status, label }) => {
   const statusConfig = {
@@ -658,6 +658,7 @@ export const StatusBadge: React.FC<{
     warning: { color: '#f59e0b', label: '警告' },
     error: { color: '#ef4444', label: '异常' },
     paused: { color: '#64748b', label: '已暂停' },
+    unverified: { color: '#3b82f6', label: '已保存' },
   };
 
   const config = statusConfig[status];
