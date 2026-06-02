@@ -5,7 +5,7 @@ import { test } from 'node:test';
 test('ApiSettingsView list mode exposes a dedicated workspace snapshot section', () => {
   const source = readSource('src/components/settings/apiWorkbenchSections.tsx');
 
-  assert.match(source, /Workspace snapshot/);
+  assert.match(source, /API Operations Overview/);
 });
 
 test('ApiSettingsView default mode exposes a Model Center provider pool with a preset directory', () => {

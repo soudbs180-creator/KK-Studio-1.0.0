@@ -73,6 +73,6 @@ test('ApiSettingsView list mode delegates calmer workbench overview copy to dedi
 
   assert.match(source, /<ApiWorkbenchOverviewSection/);
   assert.match(source, /<ApiWorkbenchCurrentViewSection/);
-  assert.match(sectionSource, /title=\{pick\('工作台摘要', 'Workspace snapshot'\)\}/);
+  assert.match(sectionSource, /title=\{pick\('API 运行概览', 'API Operations Overview'\)\}/);
   assert.match(sectionSource, /title=\{pick\('当前视图', 'Current view'\)\}/);
 });

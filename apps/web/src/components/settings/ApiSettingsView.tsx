@@ -1425,6 +1425,53 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     return '';
   }, [officialForm.key, officialForm.provider, pick]);
 
+  // 4. 简体中文注释：第三方供应商接口密钥格式诊断
+  const providerKeyDiagnostics = useMemo(() => {
+    const key = providerForm.apiKey.trim();
+    if (!key || isReadonlySecretPlaceholder(key)) return '';
+
+    const url = providerForm.baseUrl.trim().toLowerCase();
+    const isGoogle = providerForm.format === 'gemini' || url.includes('googleapis.com');
+    const isOpenAI = providerForm.format === 'openai' || url.includes('api.openai.com');
+    const isClaude = providerForm.format === 'claude' || url.includes('api.anthropic.com');
+
+    if (/\s/.test(providerForm.apiKey)) {
+      return pick(
+        '⚠️ 密钥中包含空格或换行，可能会导致接口认证失败，请检查。',
+        '⚠️ The key contains spaces or newlines, which may cause authentication failure. Please check.'
+      );
+    }
+
+    if (isGoogle) {
+      if (!key.startsWith('AIzaSy')) {
+        return pick(
+          '⚠️ Google AI Studio 密钥通常以 "AIzaSy" 开头，请确保您输入了正确的 API 密钥。',
+          '⚠️ Google AI Studio keys typically start with "AIzaSy". Please ensure you entered the correct API key.'
+        );
+      }
+    }
+
+    if (isOpenAI) {
+      if (!key.startsWith('sk-')) {
+        return pick(
+          '⚠️ OpenAI 官方密钥通常以 "sk-" 开头，请确保您输入了正确的 API 密钥。',
+          '⚠️ OpenAI keys typically start with "sk-". Please ensure you entered the correct API key.'
+        );
+      }
+    }
+
+    if (isClaude) {
+      if (!key.startsWith('sk-ant-')) {
+        return pick(
+          '⚠️ Anthropic Claude 密钥通常以 "sk-ant-" 开头，请确保您输入了正确的 API 密钥。',
+          '⚠️ Anthropic Claude keys typically start with "sk-ant-". Please ensure you entered the correct API key.'
+        );
+      }
+    }
+
+    return '';
+  }, [providerForm.apiKey, providerForm.format, providerForm.baseUrl, pick]);
+
   const runtimeOfficialSlots = useMemo(() => slots.filter(isOfficialSlot), [slots]);
   const runtimeThirdPartyProviders = useMemo(() => [...providers].sort((a, b) => b.updatedAt - a.updatedAt), [providers]);
   const isUserApiPersistenceDegraded = isUserApiPersistenceDegradedFromHealth(apiHealth);
@@ -3874,6 +3921,11 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                     type="password"
                     disabled={providerEditorReadOnly}
                   />
+                  {providerKeyDiagnostics ? (
+                    <div className="mt-2 rounded-[18px] border px-4 py-2.5 text-[12px] leading-5 text-[var(--state-warning-text)] bg-[var(--state-warning-bg)]/10 border-[var(--state-warning-border)] animate-fadeIn">
+                      {providerKeyDiagnostics}
+                    </div>
+                  ) : null}
                 </div>
                 {!isWuyin && (
                   <label className="settings-provider-editor-grid__wide block">

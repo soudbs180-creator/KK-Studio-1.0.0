@@ -230,10 +230,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         icon: <User size={12} className="text-amber-400 shrink-0" />
       };
     }
-    // 4. 会员用户 (待定) - 积分 >= 5000
+    // 4. 会员用户 - 积分 >= 5000
     if (balance >= 5000) {
       return {
-        label: '会员用户 (待定)',
+        label: '会员用户',
         colorClass: 'text-yellow-400',
         bgStyle: 'bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-orange-500/20 border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.25)] animate-pulse',
         icon: <Crown size={12} className="text-amber-400 shrink-0" />
@@ -758,47 +758,40 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 
                 {/* 简体中文：左侧卡片 - 个人基本资料与常用安全管理 */}
                 <div className="space-y-4">
-                  <div className="kk-user-profile-modal__main-card rounded-xl border p-4" style={{ borderColor: 'var(--frost-card-main-border)' }}>
-                    <div className="flex items-center gap-3">
-                      <div className="h-14 w-14 overflow-hidden rounded-full bg-gradient-to-br from-[var(--clay-brand-coral)] via-[var(--clay-brand-pink)] to-[var(--clay-brand-peach)] text-white">
+                  <div className="kk-user-profile-modal__main-card rounded-xl border p-4.5" style={{ borderColor: 'var(--frost-card-main-border)' }}>
+                    <div className="flex items-center gap-4">
+                      {/* 头像 */}
+                      <div className="h-16 w-16 overflow-hidden rounded-full border border-white/5 bg-gradient-to-br from-[var(--clay-brand-coral)] via-[var(--clay-brand-pink)] to-[var(--clay-brand-peach)] text-white shadow-inner shrink-0 flex items-center justify-center">
                         {avatarSrc ? (
                           <img src={avatarSrc} alt="头像" className="h-full w-full object-cover" />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center text-lg font-bold">
+                          <div className="flex h-full w-full items-center justify-center text-xl font-bold">
                             {nickname.slice(0, 1).toUpperCase()}
                           </div>
                         )}
                       </div>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-                          {nickname}
+                      {/* 个人详细信息（名字、身份徽章、ID、绑定情况） */}
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+                            {nickname}
+                          </span>
+                          <div className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${resolvedIdentity.colorClass} ${resolvedIdentity.bgStyle}`}>
+                            {resolvedIdentity.icon}
+                            <span>{resolvedIdentity.label}</span>
+                          </div>
                         </div>
-                        {/* 简体中文：仅在非临时账号且存在邮箱时显示，避免冗长的临时伪装邮箱展示，使卡片极其整洁 */}
-                        {!isTempUser && !isShadowWechatEmail && user?.email && (
-                          <div className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                            {displayEmail}
-                          </div>
-                        )}
-                        {isWechatBound && (
-                          <div className="mt-1 text-[11px] text-emerald-300">
-                            已绑定微信，可使用微信头像、昵称和扫码登录
-                          </div>
-                        )}
-                        {isGoogleBound && (
-                          <div className="mt-1 text-[11px] text-[var(--clay-brand-lavender)]">
-                            已绑定 Google，可使用 Google 一键登录
-                          </div>
-                        )}
-                        {/* 简体中文：精心设计了带有等宽字体、微光样式及一键复制功能的 ID 面板 */}
-                        <div className="mt-1 flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+
+                        {/* ID 行 */}
+                        <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-tertiary)' }}>
                           <span>ID:</span>
                           <span 
-                            className="font-mono bg-white/5 border border-white/5 px-1.5 py-0.5 rounded text-[10px] select-all max-w-[120px] truncate"
+                            className="font-mono bg-white/5 border border-white/5 px-1.5 py-0.5 rounded text-[11px] select-all max-w-[160px] truncate text-[var(--text-secondary)]"
                             title={user?.id || ''}
                             style={{ fontVariantNumeric: 'tabular-nums' }}
                           >
-                            {user?.id ? `${user.id.slice(0, 8)}...${user.id.slice(-8)}` : '-'}
+                            {user?.id ? user.id : '-'}
                           </span>
                           {user?.id && (
                             <button
@@ -806,24 +799,39 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                               className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors p-0.5 rounded hover:bg-white/10"
                               title="复制用户 ID"
                             >
-                              {copied ? <Check size={11} className="text-emerald-400 animate-in zoom-in duration-200" /> : <Copy size={11} />}
+                              {copied ? <Check size={12} className="text-emerald-400 animate-in zoom-in duration-200" /> : <Copy size={12} />}
                             </button>
                           )}
                         </div>
-                      </div>
 
-                      {/* 简体中文：右侧预埋的高级订阅与权益套餐微标体系 */}
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        <div className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${resolvedIdentity.colorClass} ${resolvedIdentity.bgStyle}`}>
-                          {resolvedIdentity.icon}
-                          <span>{resolvedIdentity.label}</span>
+                        {/* 邮箱与绑定详情 */}
+                        {!isTempUser && !isShadowWechatEmail && user?.email && (
+                          <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                            邮箱: {displayEmail}
+                          </div>
+                        )}
+                        
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                          {isWechatBound && (
+                            <div className="text-[10px] text-emerald-300 flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
+                              <span>已绑定微信</span>
+                            </div>
+                          )}
+                          {isGoogleBound && (
+                            <div className="text-[10px] text-[var(--clay-brand-lavender)] flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-[var(--clay-brand-lavender)] shrink-0" />
+                              <span>已绑定 Google</span>
+                            </div>
+                          )}
+                          
+                          <span 
+                            className="text-[10px] text-[var(--text-tertiary)] opacity-70 cursor-help hover:text-[var(--accent-coral)] transition-colors"
+                            title="更多专业版、团队版订阅套餐正在设计中，敬请期待"
+                          >
+                            管理订阅 (即将上线)
+                          </span>
                         </div>
-                        <span 
-                          className="text-[9px] text-[var(--text-tertiary)] opacity-80 cursor-pointer hover:text-[var(--accent-coral)] transition-colors"
-                          title="更多专业版、团队版订阅套餐正在设计中，敬请期待"
-                        >
-                          管理订阅 (即将上线)
-                        </span>
                       </div>
                     </div>
                   </div>

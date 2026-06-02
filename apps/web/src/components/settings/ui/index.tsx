@@ -334,7 +334,7 @@ export const SettingSelect: React.FC<{
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
-        className={`${SETTINGS_INPUT_CLASSNAME} flex items-center justify-between px-4 cursor-pointer text-left disabled:cursor-not-allowed disabled:opacity-60`.trim()}
+        className={`${SETTINGS_INPUT_CLASSNAME} flex items-center justify-between px-4 cursor-pointer text-left disabled:cursor-not-allowed disabled:opacity-60 min-w-0`.trim()}
         style={{ boxShadow: 'var(--settings-input-shadow)' }}
       >
         <span className="truncate">{selectedOption?.label || value}</span>

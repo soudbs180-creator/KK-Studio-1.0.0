@@ -130,7 +130,7 @@ export const ApiWorkbenchOverviewSection: React.FC<ApiWorkbenchOverviewSectionPr
 }) => (
   <SettingsSection
     testId="settings-workbench-overview"
-    title={pick('工作台摘要', 'Workspace snapshot')}
+    title={pick('API 运行概览', 'API Operations Overview')}
     eyebrow={pick('运行概览', 'Operations overview')}
     description={pick(
       '先看链路、状态和预算。',
@@ -1060,7 +1060,8 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                 </div>
               </div>
               <div className="settings-capability-card__controls">
-                {item.role === 'ocr_document' ? (
+                {/* 简体中文：在 PPT 辅助卡片中额外增加 OCR 配置入口按钮 */}
+                {item.role === 'ppt_generation' && (
                   <div className="w-full pt-1.5 pb-2">
                     <button
                       type="button"
@@ -1070,7 +1071,7 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                     >
                       <div className="space-y-0.5">
                         <div className="text-[12px] font-semibold text-[var(--text-primary)]">
-                          {pick('详细参数配置', 'Configure OCR Details')}
+                          {pick('OCR 服务参数配置 (PPT识别辅助)', 'OCR Config (PPT Helper)')}
                         </div>
                         <div className="text-[10px] text-[var(--text-tertiary)]">
                           {pick('配置默认识别语言与服务状态', 'Set OCR language & state')}
@@ -1079,43 +1080,38 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                       <ChevronDown size={16} className="-rotate-90 text-[var(--text-secondary)] shrink-0" />
                     </button>
                   </div>
-                ) : (
-                  <>
-                    <SettingSelect
-                      label={pick('主链路', 'Primary route')}
-                      value={item.primaryRouteId}
-                      options={item.routeOptions}
-                      onChange={item.onPrimaryRouteChange}
-                      disabled={!item.enabled || !customRoutingEnabled}
-                    />
-                    <SettingSelect
-                      label={item.role === 'prompt_optimizer'
-                        ? pick('增强模型', 'Enhancement model')
-                        : pick('模型', 'Model')}
-                      value={item.primaryModelId}
-                      options={item.modelOptions}
-                      onChange={item.onPrimaryModelChange}
-                      disabled={!item.enabled || !customRoutingEnabled}
-                      helper={item.role === 'prompt_optimizer'
-                        ? pick('本地规则不依赖此模型；开启后才额外调用 AI 增强。', 'Local rulebook shaping does not depend on this model; enabling it only adds optional AI enhancement.')
-                        : undefined}
-                    />
-                    <SettingSelect
-                      label={pick('备用链路', 'Fallback route')}
-                      value={item.fallbackRouteId}
-                      options={item.routeOptions}
-                      onChange={item.onFallbackRouteChange}
-                      disabled={!item.enabled || !customRoutingEnabled}
-                    />
-                    {!customRoutingEnabled && item.enabled && (
-                      <div className="mt-2 text-[11px] leading-4 text-[var(--text-tertiary)] italic">
-                        {pick(
-                          '已自动开启智能调度：优先使用可用额度/Token最多的通道。',
-                          'Auto-routing active: using the channel with the most quota/tokens.',
-                        )}
-                      </div>
+                )}
+
+                <SettingSelect
+                  label={pick('主链路', 'Primary route')}
+                  value={item.primaryRouteId}
+                  options={item.routeOptions}
+                  onChange={item.onPrimaryRouteChange}
+                  disabled={!item.enabled || !customRoutingEnabled}
+                />
+                <SettingSelect
+                  label={item.role === 'prompt_optimizer'
+                    ? pick('增强模型', 'Enhancement model')
+                    : pick('模型', 'Model')}
+                  value={item.primaryModelId}
+                  options={item.modelOptions}
+                  onChange={item.onPrimaryModelChange}
+                  disabled={!item.enabled || !customRoutingEnabled}
+                />
+                <SettingSelect
+                  label={pick('备用链路', 'Fallback route')}
+                  value={item.fallbackRouteId}
+                  options={item.routeOptions}
+                  onChange={item.onFallbackRouteChange}
+                  disabled={!item.enabled || !customRoutingEnabled}
+                />
+                {!customRoutingEnabled && item.enabled && (
+                  <div className="mt-2 text-[11px] leading-4 text-[var(--text-tertiary)] italic">
+                    {pick(
+                      '已自动开启智能调度：优先使用可用额度/Token最多的通道。',
+                      'Auto-routing active: using the channel with the most quota/tokens.',
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             </div>

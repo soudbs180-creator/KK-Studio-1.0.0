@@ -319,6 +319,7 @@ export function getCurrentSettingsViewId(pathname: string): CanonicalSettingsVie
 
   if (!currentPath) return 'dashboard';
   if (currentPath.startsWith('api-management')) return 'api-management';
+  if (currentPath.startsWith('user-profile')) return 'user-profile';
   if (topLevelPath && topLevelPath in LEGACY_SETTINGS_VIEW_ALIASES) {
     return coerceEnabledSettingsViewId(LEGACY_SETTINGS_VIEW_ALIASES[topLevelPath as LegacySettingsViewId]);
   }

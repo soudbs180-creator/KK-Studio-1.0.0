@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { KkModal } from '@kk/ui/web';
 import {
   AlertCircle,
   CheckCircle2,
@@ -111,7 +112,7 @@ function getSecondsLeft(expiresAt?: string | null): number {
 
 const RechargeModal: React.FC = () => {
   const { showRechargeModal, setShowRechargeModal, refreshBilling, balance } = useBilling();
-  const { user, isTempUser } = useAuth();
+  const { user, isTempUser, adminLevel } = useAuth();
   const { accountRole } = useAdminRole();
   
   const [exchangeRates, setExchangeRates] = useState<Record<SupportedRechargeCurrency, CreditExchangeRate>>(INITIAL_RATE_MAP);
@@ -125,6 +126,7 @@ const RechargeModal: React.FC = () => {
   const [creating, setCreating] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
   const [message, setMessage] = useState('');
+  const [showAccountDetails, setShowAccountDetails] = useState(false);
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   useEffect(() => {
@@ -140,7 +142,8 @@ const RechargeModal: React.FC = () => {
   const isExpired = Boolean(billSnapshot?.expiresAt && secondsLeft <= 0 && billSnapshot.status !== 'credited');
 
   const resolvedIdentity = useMemo(() => {
-    if (user && ((user as any).email === '977483863@qq.com' || (user.user_metadata as any)?.email === '977483863@qq.com' || accountRole === 'admin' && ((user as any).email === '977483863@qq.com' || (user.user_metadata as any)?.email === '977483863@qq.com'))) {
+    // 1. 高级管理员 (Level 1)
+    if (adminLevel === 1 || accountRole === 'admin' && (user?.email === '977483863@qq.com' || (user?.user_metadata as any)?.email === '977483863@qq.com')) {
       return {
         label: '高级管理员',
         colorClass: 'text-red-400',
@@ -148,15 +151,16 @@ const RechargeModal: React.FC = () => {
         icon: <ShieldAlert size={12} className="text-red-400 shrink-0" />
       };
     }
-    const dbAdminLevel = (user as any)?.admin_level ?? 0;
-    if (dbAdminLevel === 2 || accountRole === 'admin') {
+    // 2. 普通管理员 (Level 2)
+    if (adminLevel === 2) {
       return {
         label: '普通管理员',
         colorClass: 'text-emerald-400',
-        bgStyle: 'bg-emerald-500/10 border border-emerald-500/30 shadow-[0_0_12px_rgba(10,185,129,0.2)]',
-        icon: <ShieldCheck size={12} className="text-emerald-400 shrink-0" />
+        bgStyle: 'bg-emerald-500/10 border border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.2)]',
+        icon: <Award size={12} className="text-emerald-400 shrink-0" />
       };
     }
+    // 3. 临时用户
     if (isTempUser) {
       return {
         label: '临时用户',
@@ -165,6 +169,7 @@ const RechargeModal: React.FC = () => {
         icon: <UserIcon size={12} className="text-amber-400 shrink-0" />
       };
     }
+    // 4. 会员用户 - 积分 >= 5000
     if (balance >= 5000) {
       return {
         label: '会员用户',
@@ -173,21 +178,23 @@ const RechargeModal: React.FC = () => {
         icon: <Crown size={12} className="text-amber-400 shrink-0" />
       };
     }
+    // 5. 高级用户 - 积分 >= 1000
     if (balance >= 1000) {
       return {
         label: '高级用户',
-        colorClass: 'text-blue-400',
-        bgStyle: 'bg-blue-500/10 border border-blue-500/30 shadow-[0_0_12px_rgba(59,130,246,0.2)]',
-        icon: <Sparkles size={12} className="text-blue-400 shrink-0" />
+        colorClass: 'text-violet-400',
+        bgStyle: 'bg-violet-500/10 border border-violet-500/30 shadow-[0_0_12px_rgba(139,92,246,0.2)]',
+        icon: <Sparkles size={12} className="text-violet-400 shrink-0" />
       };
     }
+    // 6. 普通用户
     return {
       label: '普通用户',
       colorClass: 'text-gray-300',
       bgStyle: 'bg-white/5 border border-white/10',
       icon: <UserIcon size={12} className="text-gray-300 shrink-0" />
     };
-  }, [accountRole, user, balance, isTempUser]);
+  }, [adminLevel, accountRole, user, balance, isTempUser]);
 
   const activeTheme = useMemo(() => {
     switch (rechargeType) {
@@ -400,114 +407,115 @@ const RechargeModal: React.FC = () => {
     (isShadowWechatEmail ? '微信用户' : user?.email?.split('@')[0]) ||
     '未命名用户';
 
+  const modalTitle = (
+    <div className="flex items-center gap-3">
+      <span
+        className="h-2.5 w-2.5 rounded-full animate-pulse shrink-0"
+        style={{
+          backgroundColor: activeTheme.color,
+          boxShadow: `0 0 12px ${activeTheme.color}`,
+          transition: 'background-color 0.5s ease, box-shadow 0.5s ease',
+        }}
+      />
+      <div>
+        <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+          充值积分
+        </h2>
+      </div>
+    </div>
+  );
+
   return (
-    <div
-      className={`fixed inset-0 z-[10002] flex justify-center bg-black/45 ${
-        isMobile ? 'mobile-overlay-safe items-end px-2' : 'items-center px-3 py-4'
-      }`}
-      onClick={() => setShowRechargeModal(false)}
-      style={{ backgroundColor: 'var(--settings-backdrop)' }}
+    <KkModal
+      open={showRechargeModal}
+      onCancel={() => setShowRechargeModal(false)}
+      title={modalTitle}
+      footer={null}
+      width={860}
+      destroyOnClose
+      style={{
+        background: 'color-mix(in srgb, var(--frost-card-framework-bg) 72%, transparent)',
+      }}
     >
       <div
-        className={`kk-user-profile-modal w-full overflow-hidden border transition-all duration-300 ${
-          isMobile
-            ? 'ios-mobile-sheet mobile-sheet-viewport flex min-h-0 flex-col rounded-t-[26px] rounded-b-none kk-user-profile-modal-mobile-animate'
-            : 'max-w-[860px] rounded-2xl kk-user-profile-modal-desktop-animate'
+        className={`kk-user-profile-modal__body ${
+          isMobile ? 'mobile-sheet-scroll flex-1 px-3 py-3' : 'max-h-[78vh] overflow-y-auto px-4 py-4'
         }`}
-        style={{
-          background: 'color-mix(in srgb, var(--frost-card-framework-bg) 72%, transparent)',
-          borderColor: activeTheme.borderColor,
-          boxShadow: activeTheme.shadowStyle,
-          backdropFilter: 'blur(32px) saturate(1.8)',
-          WebkitBackdropFilter: 'blur(32px) saturate(1.8)',
-          transition: 'border-color 0.5s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
-        onClick={(event) => event.stopPropagation()}
       >
-        <div
-          className={`kk-user-profile-modal__header flex items-center justify-between border-b ${
-            isMobile ? 'mobile-sheet-header-safe px-3 py-3' : 'px-4 py-3'
-          }`}
-          style={{ borderColor: 'var(--frost-card-framework-border)' }}
-        >
-          <div className="flex items-center gap-3">
-            <span
-              className="h-2.5 w-2.5 rounded-full animate-pulse shrink-0"
-              style={{
-                backgroundColor: activeTheme.color,
-                boxShadow: `0 0 12px ${activeTheme.color}`,
-                transition: 'background-color 0.5s ease, box-shadow 0.5s ease',
-              }}
-            />
-            <div>
-              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-                充值积分
-              </h2>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setShowRechargeModal(false)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border transition hover:bg-[var(--frost-card-sub-bg)] shrink-0"
-            style={{ borderColor: 'var(--border-light)', color: 'var(--text-secondary)' }}
-            aria-label="关闭充值弹窗"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div
-          className={`kk-user-profile-modal__body ${
-            isMobile ? 'mobile-sheet-scroll flex-1 px-3 py-3' : 'max-h-[78vh] overflow-y-auto px-4 py-4'
-          }`}
-        >
-          <div className={`grid grid-cols-1 ${isMobile ? 'gap-4' : 'md:grid-cols-2 gap-6'} items-stretch`}>
+        <div className={`grid grid-cols-1 ${isMobile ? 'gap-4' : 'md:grid-cols-2 gap-6'} items-stretch`}>
             
             <div className="flex flex-col gap-4">
               
-              <div
-                className="kk-user-profile-modal__main-card rounded-xl border p-4 flex flex-col justify-between"
-                style={{
-                  borderColor: 'var(--frost-card-main-border)',
-                  background: 'color-mix(in srgb, var(--frost-card-sub-bg) 25%, transparent)',
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 overflow-hidden rounded-full bg-gradient-to-br from-[var(--clay-brand-coral)] via-[var(--clay-brand-pink)] to-[var(--clay-brand-peach)] text-white shrink-0 shadow-md">
-                    {avatarSrc ? (
-                      <img src={avatarSrc} alt="头像" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-base font-bold">
-                        {nickname.slice(0, 1).toUpperCase()}
+              {/* 账户资产折叠面板，默认收起以纯净首屏，仅在需要时点击展开 */}
+              <div className="space-y-2">
+                <div
+                  onClick={() => setShowAccountDetails(!showAccountDetails)}
+                  className="flex items-center justify-between p-3.5 rounded-xl border cursor-pointer hover:bg-white/5 transition-all select-none"
+                  style={{
+                    borderColor: 'var(--frost-card-main-border)',
+                    background: 'color-mix(in srgb, var(--frost-card-sub-bg) 15%, transparent)',
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>账户与资产信息</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-[var(--text-tertiary)]">当前余额:</span>
+                    <span className="font-bold text-amber-300 flex items-center gap-1">
+                      <Coins size={12} className="text-amber-400 shrink-0" />
+                      <span>{balance} 积分</span>
+                    </span>
+                    <ChevronLeft
+                      size={14}
+                      className="text-[var(--text-tertiary)] transition-transform duration-200"
+                      style={{
+                        transform: showAccountDetails ? 'rotate(-90deg)' : 'rotate(0deg)',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {showAccountDetails && (
+                  <div
+                    className="kk-user-profile-modal__main-card rounded-xl border p-4.5 flex flex-col gap-3 animate-in slide-in-from-top-2 duration-200"
+                    style={{
+                      borderColor: 'var(--frost-card-main-border)',
+                      background: 'color-mix(in srgb, var(--frost-card-sub-bg) 25%, transparent)',
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 overflow-hidden rounded-full bg-gradient-to-br from-[var(--clay-brand-coral)] via-[var(--clay-brand-pink)] to-[var(--clay-brand-peach)] text-white shrink-0 shadow-md">
+                        {avatarSrc ? (
+                          <img src={avatarSrc} alt="头像" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-sm font-bold">
+                            {nickname.slice(0, 1).toUpperCase()}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        {nickname}
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-semibold leading-none ${resolvedIdentity.bgStyle} ${resolvedIdentity.colorClass}`}
-                      >
-                        {resolvedIdentity.icon}
-                        {resolvedIdentity.label}
-                      </span>
-                    </div>
-                    <div className="mt-1.5 truncate text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                      邮箱: {displayEmail}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                            {nickname}
+                          </span>
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8px] font-semibold leading-none ${resolvedIdentity.bgStyle} ${resolvedIdentity.colorClass}`}
+                          >
+                            {resolvedIdentity.icon}
+                            {resolvedIdentity.label}
+                          </span>
+                        </div>
+                        <div className="mt-1 truncate text-[10px] text-[var(--text-tertiary)]">
+                          ID: {user?.id || '-'}
+                        </div>
+                        <div className="mt-0.5 truncate text-[10px] text-[var(--text-tertiary)]">
+                          邮箱: {displayEmail}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                <div className="mt-4 pt-3.5 border-t border-white/5 flex items-center justify-between text-xs">
-                  <span className="text-[var(--text-secondary)] font-medium">当前可用账户余额</span>
-                  <div className="flex items-center gap-1.5 font-bold text-amber-300">
-                    <Coins size={14} className="text-amber-400 shrink-0" />
-                    <span>{balance} 积分</span>
-                  </div>
-                </div>
+                )}
               </div>
 
               <div className="space-y-2 flex-1 flex flex-col">
@@ -876,8 +884,7 @@ const RechargeModal: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </KkModal>
   );
 };
 

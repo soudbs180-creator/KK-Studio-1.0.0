@@ -67,9 +67,10 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
     : 'inline-flex items-center gap-1 rounded-full px-3 py-2 text-sm font-medium';
 
   if (compact) {
+    // 简体中文：重塑 compact 语言切换容器，通过 flex-1 和固定高度 h-[70px]，实现与个人中心卡片的高度 100% 对齐契约
     return (
       <div
-        className="flex flex-col gap-0.5 rounded-[12px] border p-0.5 w-[36px] shrink-0 items-center"
+        className="flex flex-col gap-1 rounded-[18px] border p-1 w-[38px] h-[70px] shrink-0 items-center justify-between"
         style={{
           borderColor: 'var(--settings-nav-glass-border, rgba(255, 255, 255, 0.08))',
           background: 'var(--frost-card-framework-bg, rgba(22, 28, 45, 0.65))',
@@ -78,7 +79,7 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
       >
         <button
           type="button"
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-[10px] font-bold transition-all"
+          className="flex flex-1 w-full items-center justify-center rounded-[12px] text-[10px] font-bold transition-all"
           onClick={() => setLanguage('zh-CN')}
           style={{
             background: language === 'zh-CN' ? 'var(--settings-nav-active-bg, rgba(59, 130, 246, 0.2))' : 'transparent',
@@ -89,7 +90,7 @@ const SettingsLanguageToggle: React.FC<{ compact?: boolean }> = ({ compact = fal
         </button>
         <button
           type="button"
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-[9px] font-bold transition-all"
+          className="flex flex-1 w-full items-center justify-center rounded-[12px] text-[9px] font-bold transition-all"
           onClick={() => setLanguage('en-US')}
           style={{
             background: language === 'en-US' ? 'var(--settings-nav-active-bg, rgba(59, 130, 246, 0.2))' : 'transparent',
@@ -198,19 +199,20 @@ const SettingsDesktopShell: React.FC<{
             <div className="flex items-center gap-2 w-full">
               <div
                 data-testid="settings-account-block"
-                className={`flex flex-1 items-center gap-3 rounded-[18px] border px-3.5 py-3 text-left transition-all duration-220 cursor-pointer ${
+                className={`flex flex-1 h-[70px] items-center gap-3 rounded-[18px] border px-3.5 py-2 text-left transition-all duration-220 cursor-pointer ${
                   activeView === 'user-profile' 
                     ? '' 
                     : 'hover:border-[var(--frost-card-sub-border,rgba(255,255,255,0.14))] hover:bg-[var(--frost-card-sub-bg,rgba(27,34,54,0.3))]'
                 }`}
                 onClick={() => onNavigate('user-profile')}
                 style={{
-                  borderColor: activeView === 'user-profile' ? 'rgba(59, 130, 246, 0.35)' : 'var(--settings-nav-glass-border)',
+                  boxSizing: 'border-box',
+                  borderColor: activeView === 'user-profile' ? 'rgba(255, 255, 255, 0.45)' : 'var(--settings-nav-glass-border)',
                   background: activeView === 'user-profile' 
-                    ? 'radial-gradient(circle at 12% 16%, rgba(59, 130, 246, 0.12) 0%, rgba(139, 92, 246, 0.04) 45%, var(--frost-card-framework-bg, rgba(14, 18, 30, 0.8)) 100%)' 
+                    ? 'var(--frost-card-sub-bg, rgba(255, 255, 255, 0.05))' 
                     : 'color-mix(in srgb, var(--settings-nav-glass-bg) 74%, transparent)',
                   boxShadow: activeView === 'user-profile' 
-                    ? '0 0 12px rgba(59, 130, 246, 0.22), inset 2px 2px 5px rgba(0, 0, 0, 0.5), inset -1px -1px 3px rgba(255, 255, 255, 0.03)' 
+                    ? 'inset 0 1px 1.5px rgba(255, 255, 255, 0.08)' 
                     : 'none',
                   transform: activeView === 'user-profile' ? 'translateY(0.5px)' : 'none',
                 }}
@@ -279,7 +281,9 @@ const SettingsMobileShell: React.FC<{
     ? pickByLanguage(language, '设置总览', 'Settings Overview')
     : activeView === 'consumption-records'
       ? mobileBillingLabel
-      : activeNavItem.label;
+      : activeView === 'user-profile'
+        ? pickByLanguage(language, '个人中心', 'User Profile')
+        : activeNavItem.label;
 
   const hasContentBack = isApiManagementEditorRoute;
   const [isContentBackScrolled, setIsContentBackScrolled] = useState(false);
