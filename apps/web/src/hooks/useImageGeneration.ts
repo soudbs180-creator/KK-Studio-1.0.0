@@ -1650,7 +1650,7 @@ export const useImageGeneration = (options: {
               || String(resolvedProviderName || '').includes('速创')
               || String(resolvedResultKeySlotId || '').includes('@slot_key_');
 
-            if (isWuyinImageRoute && taskIdForRecovery && result.status === 'pending') {
+            if (isWuyinImageRoute && taskIdForRecovery && (result as any).status === 'pending') {
               let pollSuccess = false;
               let pollError = '';
               let pollUrls: string[] = [];
@@ -1692,10 +1692,10 @@ export const useImageGeneration = (options: {
 
               if (pollSuccess && pollUrls.length > 0) {
                 generatedBase64 = pollUrls[0];
-                result.urls = pollUrls;
-                result.url = pollUrls[0];
-                result.status = 'success';
-                result.execTime = pollExecTime;
+                (result as any).urls = pollUrls;
+                (result as any).url = pollUrls[0];
+                (result as any).status = 'success';
+                (result as any).execTime = pollExecTime;
               } else {
                 throw new Error(pollError || '速创图片生成超时');
               }
@@ -1760,7 +1760,7 @@ export const useImageGeneration = (options: {
         || String(executionNode.providerLabel || '').includes('速创')
         || String(executionNode.keySlotId || '').includes('@slot_key_');
 
-      const imageData = [];
+      const imageData: any[] = [];
       if (isWuyinRoute && !isVideo && !isAudio) {
         for (const task of tasks) {
           const res = await task();

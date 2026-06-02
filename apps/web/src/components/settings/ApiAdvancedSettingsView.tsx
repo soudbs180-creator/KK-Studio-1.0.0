@@ -59,6 +59,8 @@ import {
   ApiWorkbenchRoutePoolSection,
   ApiWorkbenchStageSection,
   InfoCell,
+  type ApiWorkbenchModelCenterRouteItem,
+  type ApiWorkbenchModelCenterPresetItem,
 } from './apiWorkbenchSections';
 import {
   SettingInput,
@@ -74,8 +76,8 @@ const API_MANAGEMENT_HOME_PATH = '/settings/api-management';
 
 interface ApiAdvancedSettingsViewProps {
   embedded?: boolean;
-  modelCenterRoutes?: any[];
-  modelCenterPresets?: any[];
+  modelCenterRoutes?: ApiWorkbenchModelCenterRouteItem[];
+  modelCenterPresets?: ApiWorkbenchModelCenterPresetItem[];
   modelCenterPresetTab?: 'official' | 'relay';
   setModelCenterPresetTab?: (tab: 'official' | 'relay') => void;
   userApiActionsDisabled?: boolean;
@@ -456,6 +458,28 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
     void run('health-refresh', () => refreshApiHealth(true));
   };
 
+  const handleStagePrimaryAction = useCallback(() => {
+    switch (stageMeta.primaryActionKind) {
+      case 'create-official':
+        if (!userApiActionsDisabled) handleCreateOfficialAction?.();
+        return;
+      case 'create-provider':
+        if (!providerActionsDisabled) beginCreateProvider?.();
+        return;
+      case 'refresh-readonly-snapshot':
+      case 'refresh-runtime-health':
+      default:
+        void run('health-refresh', () => refreshApiHealth(true));
+    }
+  }, [
+    stageMeta.primaryActionKind,
+    userApiActionsDisabled,
+    providerActionsDisabled,
+    handleCreateOfficialAction,
+    beginCreateProvider,
+    refreshApiHealth,
+  ]);
+
   const content = (
     <>
       {/* 1. 工作台摘要 */}
@@ -491,6 +515,25 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
         formatLatency={(val) => val === null ? '--' : `${val}ms`}
       />
 
+      <ApiWorkbenchModelCenterSection
+        pick={pick}
+        routes={modelCenterRoutes}
+        presets={modelCenterPresets}
+        connectedSummary={workbenchStatusLabel}
+        autoRoutingSummary={pick('智能自动选择可用最优链路', 'Smart auto-routing selection')}
+        presetTab={modelCenterPresetTab}
+        onPresetTabChange={setModelCenterPresetTab}
+        addOfficialDisabled={userApiActionsDisabled}
+        addProviderDisabled={providerActionsDisabled}
+        onAddOfficial={handleCreateOfficialAction || (() => {})}
+        onAddProvider={beginCreateProvider || (() => {})}
+      />
+
+      <ApiWorkbenchRoutePoolSection
+        pick={pick}
+        items={routePoolItems}
+      />
+
       {/* 4. 阶段工作流与下一步 */}
       <ApiWorkbenchStageSection
         pick={pick}
@@ -505,7 +548,7 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
         stageBannerStyle={stageBannerStyle}
         primaryActionIcon={stagePrimaryActionIcon}
         primaryActionTone={stagePrimaryActionTone}
-        onPrimaryAction={() => {}}
+        onPrimaryAction={handleStagePrimaryAction}
         primaryActionLoading={false}
         primaryActionTestId="settings-workbench-stage-action"
         isUsingReadonlyProfileFallback={isUserApiPersistenceDegraded}
@@ -663,29 +706,6 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
           </div>
         </div>
       )}
-
-      {/* 隐藏的组件，用于确保在重构精简布局后，局部 state 和方法不触发 unused 编译报警 */}
-      <div
-        style={{ display: 'none' }}
-        data-diagnostics-state={showDiagnostics}
-        data-busy={busy}
-        data-health={Boolean(apiHealth)}
-        data-warning={userApiPersistenceWarning}
-        data-temp={isTempUser}
-        data-routes={JSON.stringify(modelCenterRoutes)}
-        data-presets={JSON.stringify(modelCenterPresets)}
-        data-preset-tab={modelCenterPresetTab}
-        data-actions-disabled={userApiActionsDisabled}
-        data-provider-disabled={providerActionsDisabled}
-        data-connected-channels={propConnectedChannels}
-        onClick={() => {
-          handleToggleDiagnostics();
-          void run('cloud-refresh', () => refreshApiHealth(true));
-          if (setModelCenterPresetTab) setModelCenterPresetTab('official');
-          if (handleCreateOfficialAction) handleCreateOfficialAction();
-          if (beginCreateProvider) beginCreateProvider();
-        }}
-      />
     </>
   );
 

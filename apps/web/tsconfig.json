@@ -27,7 +27,10 @@
 		"strict": true,
 		"paths": {
 			"@/*": ["./src/*"],
-			"@nano-banana/api-client": ["../../packages/api-client/src/index.ts"]
+			"@nano-banana/api-client": ["../../packages/api-client/src/index.ts"],
+			"@kk/ui/web": ["../../packages/ui/src/web/index.ts"],
+			"@kk/ui/core": ["../../packages/ui/src/core/tokens.ts"],
+			"@kk/ui": ["../../packages/ui/src/index.ts"]
 		}
 	},
 	"exclude": [

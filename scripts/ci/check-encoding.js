@@ -93,6 +93,7 @@ const skipDirectories = new Set([
 const ignoreFiles = new Set([
   path.resolve(process.argv[1]),
   path.resolve("scripts", "ci", "fix-garbled-chars.cjs"),
+  path.resolve("scripts", "ci", "check-mojibake.mjs"),
 ]);
 const invalidUtf8Issues = [];
 const mojibakeIssues = [];

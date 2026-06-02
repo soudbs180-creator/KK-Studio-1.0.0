@@ -21,6 +21,7 @@ import {
   X,
   ShieldAlert,
   User,
+  Award,
 } from 'lucide-react';
 import { safeOpenLink } from '../../utils/browserUtils';
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
@@ -202,7 +203,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   const resolvedIdentity = useMemo(() => {
     // 1. 高级管理员 (Level 1)
-    if (adminLevel === 1 || accountRole === 'admin' && (user?.email === '977483863@qq.com' || user?.user_metadata?.email === '977483863@qq.com')) {
+    if (adminLevel === 1 || accountRole === 'admin' && (user?.email === '977483863@qq.com' || (user?.user_metadata as any)?.email === '977483863@qq.com')) {
       return {
         label: '高级管理员',
         colorClass: 'text-red-400',

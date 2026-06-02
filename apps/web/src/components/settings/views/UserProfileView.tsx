@@ -141,7 +141,7 @@ export const UserProfileView: React.FC = () => {
 
   // 3. 计算用户身份等级和徽标
   const resolvedIdentity = useMemo(() => {
-    if (adminLevel === 1 || (accountRole === 'admin' && (user?.email === '977483863@qq.com' || user?.user_metadata?.email === '977483863@qq.com'))) {
+    if (adminLevel === 1 || (accountRole === 'admin' && (user?.email === '977483863@qq.com' || (user?.user_metadata as any)?.email === '977483863@qq.com'))) {
       return {
         label: '高级管理员',
         colorClass: 'text-red-400',

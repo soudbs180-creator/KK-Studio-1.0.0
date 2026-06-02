@@ -3207,10 +3207,10 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           setEditingOfficialId(null);
           setEditingProviderId(existingProvider.id);
           setProviderPricingEndpointDraft(
-            existingProvider.pricingSnapshot?.pricingEndpoint ||
+            (existingProvider.pricingSnapshot as any)?.pricingEndpoint ||
               buildDefaultProviderPricingEndpoint(existingProvider.baseUrl)
           );
-          setShowPricingEndpointOverride(Boolean(existingProvider.pricingSnapshot?.pricingEndpoint));
+          setShowPricingEndpointOverride(Boolean((existingProvider.pricingSnapshot as any)?.pricingEndpoint));
           setActiveTab('third-party');
           navigate(buildProviderEditorPath(existingProvider.id));
           notify.success(

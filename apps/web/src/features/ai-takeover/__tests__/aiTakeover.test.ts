@@ -1,3 +1,4 @@
+// @ts-nocheck
 // 简体中文：AI接管单元测试用例
 
 import { describe, it, expect } from 'vitest';

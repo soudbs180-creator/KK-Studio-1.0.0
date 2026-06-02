@@ -628,6 +628,9 @@ export default defineConfig(({ mode }) => {
             alias: {
                 '@': path.resolve(__dirname, 'src'),
                 '@nano-banana/api-client': path.resolve(__dirname, '../../packages/api-client/src/index.ts'),
+                '@kk/ui/web': path.resolve(__dirname, '../../packages/ui/src/web/index.ts'),
+                '@kk/ui/core': path.resolve(__dirname, '../../packages/ui/src/core/tokens.ts'),
+                '@kk/ui': path.resolve(__dirname, '../../packages/ui/src/index.ts'),
             }
         },
         optimizeDeps: {

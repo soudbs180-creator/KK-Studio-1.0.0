@@ -140,7 +140,7 @@ const RechargeModal: React.FC = () => {
   const isExpired = Boolean(billSnapshot?.expiresAt && secondsLeft <= 0 && billSnapshot.status !== 'credited');
 
   const resolvedIdentity = useMemo(() => {
-    if (user && (user.email === '977483863@qq.com' || user.user_metadata?.email === '977483863@qq.com' || accountRole === 'admin' && (user.email === '977483863@qq.com' || user.user_metadata?.email === '977483863@qq.com'))) {
+    if (user && ((user as any).email === '977483863@qq.com' || (user.user_metadata as any)?.email === '977483863@qq.com' || accountRole === 'admin' && ((user as any).email === '977483863@qq.com' || (user.user_metadata as any)?.email === '977483863@qq.com'))) {
       return {
         label: '高级管理员',
         colorClass: 'text-red-400',
@@ -148,7 +148,7 @@ const RechargeModal: React.FC = () => {
         icon: <ShieldAlert size={12} className="text-red-400 shrink-0" />
       };
     }
-    const dbAdminLevel = user?.admin_level ?? 0;
+    const dbAdminLevel = (user as any)?.admin_level ?? 0;
     if (dbAdminLevel === 2 || accountRole === 'admin') {
       return {
         label: '普通管理员',
@@ -852,8 +852,8 @@ const RechargeModal: React.FC = () => {
                         disabled={markingPaid || isExpired || transferReferenceLast4.trim().length !== 4}
                         className="flex h-9 items-center justify-center gap-1.5 rounded-xl px-4 text-xs font-bold transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60 relative overflow-hidden text-white"
                         style={{
-                          background: `linear-gradient(135deg, ${glowStyles.glowColor} 0%, color-mix(in srgb, ${glowStyles.glowColor} 80%, black) 100%)`,
-                          boxShadow: `0 4px 12px ${glowStyles.glowColor}33`,
+                          background: `linear-gradient(135deg, ${activeTheme.color} 0%, color-mix(in srgb, ${activeTheme.color} 80%, black) 100%)`,
+                          boxShadow: `0 4px 12px ${activeTheme.color}33`,
                           flex: '2 2 0%',
                         }}
                       >

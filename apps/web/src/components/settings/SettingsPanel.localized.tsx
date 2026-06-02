@@ -424,12 +424,14 @@ const SettingsPageHistorySync: React.FC<{ enabled: boolean }> = ({ enabled }) =>
 
       if (currentWindowPath !== nextWindowPath) {
         window.history.replaceState(window.history.state, '', nextWindowPath);
+        window.dispatchEvent(new CustomEvent('kk-app-locationchange', { detail: { pathname: window.location.pathname } }));
       }
       return;
     }
 
     if (currentWindowPath !== nextWindowPath) {
       window.history.pushState(window.history.state, '', nextWindowPath);
+      window.dispatchEvent(new CustomEvent('kk-app-locationchange', { detail: { pathname: window.location.pathname } }));
     }
   }, [currentRouterPath, enabled]);
 

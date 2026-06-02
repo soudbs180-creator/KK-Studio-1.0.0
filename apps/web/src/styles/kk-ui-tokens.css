@@ -1,0 +1,50 @@
+/* 中文注释：建立核心变量桥梁，用于统一 antd/Lobe UI 主题与现有系统旧样式变量的渲染 */
+:root {
+  --kk-color-brand-primary: #6366f1;
+  --kk-color-brand-coral: #ff6b5a;
+  --kk-color-bg-canvas: #f8fafc;
+  --kk-color-bg-surface: rgba(255, 255, 255, 0.86);
+  --kk-color-bg-surface-solid: #ffffff;
+  --kk-color-text-primary: #0f172a;
+  --kk-color-text-secondary: #475569;
+  --kk-color-text-tertiary: #64748b;
+  --kk-color-border-subtle: rgba(15, 23, 42, 0.10);
+  --kk-radius-sm: 8px;
+  --kk-radius-md: 12px;
+  --kk-radius-lg: 16px;
+  --kk-radius-xl: 24px;
+  --kk-shadow-surface: 0 16px 40px rgba(15, 23, 42, 0.12);
+  --kk-shadow-floating: 0 24px 64px rgba(15, 23, 42, 0.20);
+  --kk-z-canvas: 1;
+  --kk-z-chrome: 100;
+  --kk-z-dropdown: 1000;
+  --kk-z-modal: 3000;
+  --kk-z-toast: 5000;
+  --kk-gradient-primary-action: linear-gradient(135deg, var(--kk-color-brand-coral), #ff5240);
+  --kk-shadow-primary-action: 0 4px 12px rgba(255, 107, 90, 0.35);
+
+  /* 桥接旧有样式变量，防存量 UI 组件显示冲突 */
+  --text-primary: var(--kk-color-text-primary);
+  --text-secondary: var(--kk-color-text-secondary);
+  --text-tertiary: var(--kk-color-text-tertiary);
+  --bg-canvas: var(--kk-color-bg-canvas);
+  --frost-card-framework-bg: var(--kk-color-bg-surface);
+  --frost-card-framework-bg-solid: var(--kk-color-bg-surface-solid);
+  --frost-card-framework-border: var(--kk-color-border-subtle);
+  --frost-card-framework-shadow: var(--kk-shadow-surface);
+  --accent-coral: var(--kk-color-brand-coral);
+}
+
+.dark,
+.dark-mode,
+[data-theme='dark'] {
+  --kk-color-bg-canvas: #050608;
+  --kk-color-bg-surface: rgba(18, 18, 22, 0.86);
+  --kk-color-bg-surface-solid: #121216;
+  --kk-color-text-primary: rgba(255, 255, 255, 0.96);
+  --kk-color-text-secondary: rgba(226, 232, 240, 0.74);
+  --kk-color-text-tertiary: rgba(148, 163, 184, 0.82);
+  --kk-color-border-subtle: rgba(255, 255, 255, 0.12);
+  --kk-shadow-surface: 0 18px 48px rgba(0, 0, 0, 0.35);
+  --kk-shadow-floating: 0 30px 80px rgba(0, 0, 0, 0.50);
+}

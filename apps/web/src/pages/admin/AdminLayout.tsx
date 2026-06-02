@@ -10,6 +10,7 @@ import { CreditsPanel } from "./CreditsPanel.tsx";
 import { ApiConfigPanel } from "./ApiConfigPanel.tsx";
 import { StaffPanel } from "./StaffPanel.tsx";
 import { Shield, HelpCircle, X, ShieldAlert, Award, ArrowLeft } from "lucide-react";
+import { navigateAppRoot } from "../../app/navigation/appRootNavigation";
 
 export const AdminLayout: React.FC = () => {
   const { adminLevel, loading } = useAuth();
@@ -20,16 +21,14 @@ export const AdminLayout: React.FC = () => {
   useEffect(() => {
     if (!loading && adminLevel === 0) {
       console.warn("[AdminLayout] 越权访问后台，已自动重定向回首页");
-      window.history.pushState({}, "", "/");
-      window.dispatchEvent(new PopStateEvent("popstate"));
+      navigateAppRoot("/");
     }
   }, [adminLevel, loading]);
 
   useEffect(() => {
     if (!loading && activeTab === "staff" && adminLevel !== 1) {
       setActiveTab("users");
-      window.history.pushState({}, "", "/admin");
-      window.dispatchEvent(new PopStateEvent("popstate"));
+      navigateAppRoot("/admin");
     }
   }, [activeTab, adminLevel, loading]);
 
@@ -82,8 +81,7 @@ export const AdminLayout: React.FC = () => {
 
           <button
             onClick={() => {
-              window.history.pushState({}, "", "/");
-              window.dispatchEvent(new PopStateEvent("popstate"));
+              navigateAppRoot("/");
             }}
             className="text-xs text-gray-300 bg-[#1E293B] border border-[#334155] hover:bg-[#334155] rounded-xl px-4 py-2 font-semibold transition-all inline-flex items-center gap-1.5 self-start sm:self-center"
           >

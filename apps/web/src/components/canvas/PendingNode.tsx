@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AspectRatio } from '../../types';
 import { getCardDimensions } from '../../utils/styleUtils';
@@ -49,15 +49,15 @@ const PendingNode: React.FC<PendingNodeProps> = ({
     const dragStartPos = useRef({ x: 0, y: 0 });
     const stackZIndex = elevateCanvasStackZIndex(40, isDragging);
 
-    // 鐢熸垚璁℃椂鍣?
+    // 生成计时器
     const [elapsedTime, setElapsedTime] = useState(0);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // 棰勮鍗?0绉掕秴鏃堕攢姣?
+    // 预览卡30秒超时销毁
     const [, setIdleTime] = useState(0);
     const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // 璁℃椂鍣ㄩ€昏緫 (鐢熸垚涓鏃?
+    // 计时器逻辑 (生成中计时)
     useEffect(() => {
         if (isGenerating) {
             setElapsedTime(0);
@@ -77,7 +77,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
         };
     }, [isGenerating]);
 
-    // 30绉掓棤鎿嶄綔鑷姩閿€姣侀瑙堝崱
+    // 30秒无操作自动销毁预览卡
     useEffect(() => {
         if (!isGenerating && prompt) {
             setIdleTime(0);
@@ -153,7 +153,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
         };
     }, [isDragging, dragOffset, position, canvasTransform.scale, onPositionChange]);
 
-    // 濡傛灉涓嶅湪鐢熸垚涓?鏄剧ず棰勮妯″紡
+    // 如果不在生成中显示预览模式
     if (!isGenerating) {
         return (
             <div
@@ -207,12 +207,12 @@ const PendingNode: React.FC<PendingNodeProps> = ({
         );
     }
 
-    // 鐢熸垚涓姸鎬?- 鏄剧ず涓诲崱鍜屽壇鍗犱綅鍗?
+    // 生成中状态 - 显示主卡和副占位卡
     const cardWidth = w;
     const cardHeight = h;
-    const gapToPlaceholders = 80; // 涓诲崱鍒板壇鍗＄殑闂磋窛
+    const gapToPlaceholders = 80; // 主卡到副卡的间距
 
-    // 2x2 瀹牸甯冨眬鍙傛暟
+    // 2x2 宫格布局参数
     const COLS = 2;
     const GAP = 16;
 
@@ -229,7 +229,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
             onMouseDown={handleMouseDown}
             onTouchStart={handleMouseDown}
         >
-            {/* 涓籔rompt鍗?*/}
+            {/* 主Prompt卡 */}
             <div
                 className="rounded-xl p-3 border min-w-[280px] max-w-[320px]"
                 style={pendingPromptSurfaceStyle}
@@ -264,24 +264,24 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                     const row = Math.floor(i / COLS);
                     const indexInRow = i - row * COLS;
 
-                    // 璁＄畻灞呬腑: 瀹為檯鍒楁暟 = min(COLS, parallelCount)
+                    // 计算居中: 实际列数 = min(COLS, parallelCount)
                     const actualCols = Math.min(COLS, parallelCount - row * COLS);
                     const totalW = actualCols * cardWidth + (actualCols - 1) * GAP;
 
-                    // 姣忎釜鍗＄墖鐨刲eft鍋忕Щ (鐩稿浜庝腑蹇冪偣)
+                    // 每个卡片的 left 偏移 (相对于中心点)
                     const offsetX = -totalW / 2 + indexInRow * (cardWidth + GAP) + cardWidth / 2;
 
-                    // 姣忎釜鍗＄墖鐨則op鍋忕Щ
+                    // 每个卡片的 top 偏移
                     const offsetY = gapToPlaceholders + row * (cardHeight + GAP);
 
-                    // 鏍煎紡鍖栬鏃?
+                    // 格式化计时
                     const mins = Math.floor(elapsedTime / 60);
                     const secs = elapsedTime % 60;
                     const timeStr = mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
 
                     return (
                         <React.Fragment key={i}>
-                            {/* 杩炴帴绾?*/}
+                            {/* 连接线 */}
                             <svg
                                 className="pointer-events-none"
                                 style={{
@@ -324,7 +324,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                     zIndex: 10
                                 }}
                             >
-                                {/* 45掳鍊炬枩鎵厜鍔ㄧ敾 + 纾ㄧ爞鏁堟灉 */}
+                                {/* 45度倾斜扫光动画 + 磨砂效果 */}
                                 <div
                                     style={{
                                         position: 'absolute',
@@ -340,9 +340,9 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                     }}
                                 />
 
-                                {/* 娴佷綋鍏夋檿鍔ㄧ敾搴曞骇 */}
+                                {/* 流体光晕动画底座 */}
                                 <div style={{ position: 'absolute', left: '50%', top: '50%', pointerEvents: 'none', zIndex: 1 }}>
-                                    {/* 澶栧眰娴佷綋 */}
+                                    {/* 外层流体 */}
                                     <div
                                         style={{
                                             position: 'absolute',
@@ -372,7 +372,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                                     />
                                 </div>
 
-                                {/* 鍐呭 */}
+                                {/* 内容 */}
                                 <div style={{
                                     position: 'relative',
                                     zIndex: 10,
@@ -421,7 +421,7 @@ const PendingNode: React.FC<PendingNodeProps> = ({
                 })}
             </div>
 
-            {/* 鍔ㄧ敾CSS */}
+            {/* 动画CSS */}
             <style>{`
                 @keyframes shimmer-move {
                     0% { background-position: 200% 200%; }

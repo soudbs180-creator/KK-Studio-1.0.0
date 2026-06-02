@@ -505,7 +505,7 @@ type ApiWorkbenchRoutePoolItem = {
   baseUrlLabel: string;
 };
 
-type ApiWorkbenchModelCenterRouteItem = {
+export type ApiWorkbenchModelCenterRouteItem = {
   id: string;
   kind: 'official' | 'provider';
   title: string;
@@ -533,7 +533,7 @@ type ApiWorkbenchModelCenterRouteItem = {
   logoName?: string;
 };
 
-type ApiWorkbenchModelCenterPresetItem = {
+export type ApiWorkbenchModelCenterPresetItem = {
   id: string;
   title: string;
   kind: 'official' | 'relay';

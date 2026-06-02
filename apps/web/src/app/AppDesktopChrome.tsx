@@ -5,6 +5,7 @@ import { LayoutDashboard, LogOut, Sparkles, User, Zap, Shield } from 'lucide-rea
 import type { UserProfileView } from '../components/modals/UserProfileModal';
 import type { RuntimeAuthUser } from '../services/auth/runtimeAuthTypes.ts';
 import { useAuth } from '../context/AuthContext.tsx';
+import { navigateAppRoot } from './navigation/appRootNavigation';
 
 interface AppDesktopChromeProps {
   isMobile: boolean;
@@ -201,8 +202,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
                     label="管理员后台"
                     accentColor="var(--clay-brand-coral)"
                     onClick={() => {
-                      window.history.pushState({}, '', '/admin');
-                      window.dispatchEvent(new PopStateEvent('popstate'));
+                      navigateAppRoot('/admin');
                       setShowUserMenu(false);
                     }}
                   />

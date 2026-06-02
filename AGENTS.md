@@ -39,18 +39,17 @@
 
 | 层级 | 技术 | 备注 |
 |------|------|------|
-| Web 前端 | Vite + React 18 + TypeScript + Tailwind CSS | `apps/web/` |
-| 移动端 | Expo Managed Workflow + React Native | `apps/mobile/` |
+| Web 前端 | Vite + React 19 + TypeScript + Tailwind + AntD/Lobe UI Bridge | `apps/web/` |
 | 后端 | Node.js + Express.js（VPS 部署） | `server/` |
 | 数据库 | PostgreSQL（连接池管理） | `migrations/` |
-| 包管理 | Bun（Web）/ npm（Server） | Monorepo 结构 |
+| 包管理 | npm (Monorepo 结构) | 根 packageManager 声明 npm |
 | 支付 | Stripe（Webhook 驱动） | `server/routes/webhook.js` |
 | AI 图像 | Google Gemini 2.5 Flash Image API | `server/routes/generate-image.js` |
 | AI 对话 | OpenAI Chat Completion API | `server/routes/chat.js` |
 | 身份认证 | JWT（自签发）+ 长效 Session（多端兼容） | `server/lib/` |
 | 共享逻辑 | `packages/shared/` | 零平台依赖纯 TS |
 | HTTP 层 | `packages/api-client/` | 双端共用，统一封装 |
-| 基础 UI | `packages/ui/` | 跨平台零副作用组件库 |
+| UI 契约 | `packages/ui/` | Token + Web Adapter；业务不得直接 import `@lobehub/ui` |
 
 ### 1.2 项目当前版本
 
@@ -113,11 +112,11 @@ nano-banana-KK-/
 
 | 模块 | 禁止引入 |
 |------|---------|
-| `apps/web/` | React Native 组件、Expo API、`react-native-*` 任何包 |
+| `apps/web/` | React Native 组件、Expo API、`react-native-*` 任何包、直接引入 `@lobehub/ui` |
 | `apps/mobile/` | `window`、`document`、DOM API、浏览器专属 BOM |
-| `packages/shared/` | 任何含平台特征的代码（包括 `window`、RN 组件） |
-| `packages/api-client/` | 平台特定存储（`localStorage`、AsyncStorage 均不可硬引入，必须通过依赖注入） |
-| `server/` | 前端框架组件、React、Vue 等 UI 库 |
+| `packages/shared/` | 任何含平台特征的代码（包括 `window`、RN 组件）、`@lobehub/ui` |
+| `packages/api-client/` | 平台特定存储（`localStorage`、AsyncStorage 均不可硬引入，必须通过依赖注入）、`@lobehub/ui` |
+| `server/` | 前端框架组件、React、Vue 等 UI 库、`@lobehub/ui` |
 | `migrations/` | 任何业务逻辑，只允许纯 SQL DDL |
 
 ---
@@ -874,6 +873,29 @@ const req: any = ...;
 | 宽屏 | 1280px+ | `xl:` 前缀，最大宽度 1128px（4A满宽），主网格展示 4 列，左右边界严丝合缝 |
 
 最大内容宽度限制为 **4A 满宽**：`max-width: 1128px !important;`。
+
+### 13.8 UI 黄金法则：Lobe UI Bridge 与设计系统契约
+
+1. `@lobehub/ui` 只能在 `packages/ui/src/web/**` 内直接引入。业务代码必须通过 `@kk/ui/web` 使用封装组件。
+2. `packages/ui/src/core/**` 只允许定义平台无关 token、类型与设计契约，禁止引入 React DOM、Lobe、AntD、window、document。
+3. `apps/web/src/**` 禁止直接写十六进制颜色、rgba、hsl、linear-gradient。新增颜色必须先进入 token。
+4. 禁止在 React 事件中直接修改 DOM style 实现 hover/active 状态；必须使用 class、data-state 或封装组件 variant。
+5. 禁止新增 `display:none` 隐藏 DOM 来绕过 TypeScript noUnused 规则。若为临时兼容，必须写 `DEPRECATED(test-compat)`，且不得绑定业务 action。
+6. 所有可点击 UI 必须有真实 handler；禁止生产代码中出现有可见文案的 `onClick={() => {}}`。
+7. 所有按钮、菜单、Modal、Drawer、Toast : Tooltip、Tabs、Select、Input 在设置页与管理后台优先使用 `@kk/ui/web`。
+8. Canvas 高频节点可暂缓 Lobe 化，但必须使用 token，不能引入新的硬编码颜色或重型 Provider。
+9. 所有新增 UI 必须同时验证 light/dark、移动端、安全区、键盘可访问性、焦点环、Esc 关闭、点击外部关闭、滚动锁定。
+10. 任何 UI 重构 PR 必须跑：`architecture:check`、`typecheck` : `build`、`test`、桌面/移动设置页 smoke test。
+
+### 13.9 App Root Navigation 路由规范
+
+1. `/` 为 workspace root。
+2. `/settings/**` 为设置页 root。
+3. `/admin/**` 为管理员 root。
+4. 不允许组件内部散落 `window.history.pushState` + synthetic `PopStateEvent`。
+5. 所有 root mode 切换与路由切换必须通过统一 helper：`navigateAppRoot(path, options)`。
+6. 如果 settings 仍以 overlay/surface 呈现，必须同步 URL 与 browser back 行为，并在更新 window.history 时派发自定义事件 `kk-app-locationchange`。
+7. 管理后台入口必须经过权限判断；前端隐藏不是权限控制，后端仍必须鉴权。
 
 ---
 
