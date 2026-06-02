@@ -47,8 +47,17 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Test suite
-        run: npm run test
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Integration tests
+        run: npm run test:integration
+
+      - name: Contract tests
+        run: npm run test:contract
+
+      - name: E2E tests
+        run: npm run test:e2e
 
       - name: Prompt group drag smoke
         run: npm run verify:prompt-group-drag
