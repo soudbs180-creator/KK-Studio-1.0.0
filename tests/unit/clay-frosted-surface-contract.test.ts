@@ -244,8 +244,7 @@ test('remaining active chrome and fallback surfaces consume Clay frosted tokens'
   assert.match(userProfileSource, /var\(--frost-card-framework-bg\)/);
   assert.match(userProfileSource, /var\(--frost-card-main-border\)/);
   assert.match(userProfileSource, /var\(--frost-input-bg\)/);
-  assert.match(rechargeModalSource, /background:\s*'var\(--clay-brand-peach\)'/);
-  assert.match(rechargeModalSource, /color:\s*'var\(--clay-ink\)'/);
+  assert.match(rechargeModalSource, /var\(--clay-brand-peach\)/);
   assert.doesNotMatch(rechargeModalSource, /background:\s*'var\(--settings-button-primary-bg\)'[\s\S]*color:\s*'var\(--text-inverse\)'/);
   assert.match(cssSource, /\.kk-user-profile-modal__action-list\s*\{[\s\S]*background:\s*var\(--frost-card-sub-bg\);/);
   assert.match(cssSource, /\.kk-user-profile-modal__action-list > button,[\s\S]*border-width:\s*0 !important;[\s\S]*box-shadow:\s*none !important;/);

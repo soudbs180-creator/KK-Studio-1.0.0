@@ -59,7 +59,6 @@ test('desktop settings shell keeps navigation metadata in the sidebar and leaves
   assert.doesNotMatch(headerSource, /pick\('主要下一步', 'Primary next step'\)/);
   assert.doesNotMatch(headerSource, /pick\('视图工具', 'View tools'\)/);
   assert.match(headerSource, /pick\('刷新', 'Refresh'\)/);
-  assert.match(headerSource, /pick\('日志', 'Logs'\)/);
   assert.match(headerSource, /pick\('关闭', 'Close'\)/);
 });
 
@@ -74,7 +73,6 @@ test('desktop workbench header stays action-only so it does not duplicate the ac
   assert.doesNotMatch(headerSource, /meta\.eyebrow/);
   assert.doesNotMatch(headerSource, /languageControl/);
   assert.match(headerSource, /pick\('刷新', 'Refresh'\)/);
-  assert.match(headerSource, /pick\('日志', 'Logs'\)/);
   assert.match(headerSource, /pick\('关闭', 'Close'\)/);
 });
 
@@ -92,7 +90,7 @@ test('settings workbench flattens cramped nested containers and clips rounded su
   );
   assert.match(
     headerSource,
-    /<div className="settings-desktop-quick-actions[^"]*">\s*<SettingsActionButton[\s\S]*<SettingsActionButton[\s\S]*<SettingsActionButton/,
+    /<div className="settings-desktop-quick-actions[^"]*">\s*<SettingsActionButton[\s\S]*<SettingsActionButton/,
   );
   assert.match(
     cssSource,

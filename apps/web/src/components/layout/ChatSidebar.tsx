@@ -2691,7 +2691,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
                             className={`flex flex-col rounded-2xl border transition-all duration-300 ${
                                 isDropActive
                                     ? 'border-[var(--accent-coral)] bg-[var(--accent-coral)]/10 ring-2 ring-[var(--accent-coral)]/20'
-                                    : 'border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] focus-within:border-[var(--accent-coral)] focus-within:ring-2 focus-within:ring-[var(--accent-coral)]/15 focus-within:shadow-[0_0_12px_rgba(244,63,94,0.08)]'
+                                    : 'border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] focus-within:border-[var(--accent-coral-glow)] focus-within:ring-1 focus-within:ring-[var(--accent-coral-ring)] focus-within:shadow-[0_0_12px_rgba(255,107,90,0.04)]'
                             } p-3 gap-2 shadow-sm relative backdrop-blur-md`}
                             onDragEnter={(e) => {
                                 e.preventDefault();
@@ -2809,16 +2809,16 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
                                                 setCurrentAgent(agentService.getActive());
                                             }
                                         }}
-                                        className={`px-2.5 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 active:scale-95 select-none ${
+                                        className={`px-2.5 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 active:scale-95 select-none group ${
                                             agentMode
                                                 ? 'bg-gradient-to-r from-[var(--clay-brand-coral)] to-[var(--clay-brand-pink)] text-white border-transparent shadow-[0_2px_8px_rgba(244,63,94,0.25)]'
-                                                : 'bg-[var(--toolbar-hover)] text-[var(--text-secondary)] border-[var(--frost-card-sub-border)] hover:text-[var(--text-primary)]'
+                                                : 'bg-black/10 dark:bg-white/[0.03] hover:bg-black/20 dark:hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-black/10 dark:border-white/[0.06] hover:border-black/15 dark:hover:border-white/[0.12] backdrop-blur-sm shadow-sm'
                                         }`}
                                         title={agentMode ? 'Agent 已开启：可自动路由问答/生成图/改图/文档任务' : '开启 Agent 增强模式'}
                                     >
-                                        <Bot size={11} className={agentMode ? 'animate-pulse' : ''} />
+                                        <Bot size={11} className={agentMode ? 'animate-pulse text-white' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors'} />
                                         <span>Agent</span>
-                                        <span className={`inline-block w-1.5 h-1.5 rounded-full ${agentMode ? 'bg-white animate-ping' : 'bg-current opacity-60'}`} />
+                                        <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300 ${agentMode ? 'bg-white animate-pulse scale-110 shadow-[0_0_4px_rgba(255,255,255,0.8)]' : 'bg-[var(--clay-brand-coral)]/40 group-hover:bg-[var(--clay-brand-coral)]/70'}`} />
                                     </button>
 
                                     {/* 简体中文：AI接管药丸切换按钮 */}
@@ -2828,16 +2828,16 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
                                             setAiTakeoverMode(!aiTakeoverMode);
                                             registerActivity();
                                         }}
-                                        className={`px-2.5 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 active:scale-95 select-none ${
+                                        className={`px-2.5 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 active:scale-95 select-none group ${
                                             aiTakeoverMode
                                                 ? 'bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 text-white border-transparent shadow-[0_2px_8px_rgba(219,39,119,0.25)]'
-                                                : 'bg-[var(--toolbar-hover)] text-[var(--text-secondary)] border-[var(--frost-card-sub-border)] hover:text-[var(--text-primary)]'
+                                                : 'bg-black/10 dark:bg-white/[0.03] hover:bg-black/20 dark:hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-black/10 dark:border-white/[0.06] hover:border-black/15 dark:hover:border-white/[0.12] backdrop-blur-sm shadow-sm'
                                         }`}
                                         title={aiTakeoverMode ? 'AI 接管已开启：自动为您批量生图、定位卡片或聚焦 API 输入框' : '开启 AI 接管'}
                                     >
-                                        <Cpu size={11} className={aiTakeoverMode ? 'animate-pulse' : ''} />
+                                        <Cpu size={11} className={aiTakeoverMode ? 'animate-pulse text-white' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors'} />
                                         <span>AI接管</span>
-                                        <span className={`inline-block w-1.5 h-1.5 rounded-full ${aiTakeoverMode ? 'bg-white animate-ping' : 'bg-current opacity-60'}`} />
+                                        <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300 ${aiTakeoverMode ? 'bg-white animate-pulse scale-110 shadow-[0_0_4px_rgba(255,255,255,0.8)]' : 'bg-purple-500/40 group-hover:bg-purple-500/70'}`} />
                                     </button>
                                 </div>
 

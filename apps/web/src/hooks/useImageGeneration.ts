@@ -1210,7 +1210,11 @@ export const useImageGeneration = (options: {
                 provider: (result as any).provider || latestNode.provider,
                 providerLabel: (result as any).providerName || latestNode.providerLabel,
                 keySlotId: (result as any).keySlotId || latestNode.keySlotId,
-                generationTime: clampGenerationDurationMs((result as any).generationTime),
+                generationTime: clampGenerationDurationMs(
+                  typeof (result as any).execTime === 'number'
+                    ? (result as any).execTime * 1000
+                    : (result as any).generationTime
+                ),
                 tokens: splitMetricAcrossItems(recoveredUsage.tokens, uniqueImageUrls.length || imageUrls.length),
                 promptTokens: splitMetricAcrossItems(recoveredUsage.promptTokens, uniqueImageUrls.length || imageUrls.length),
                 completionTokens: splitMetricAcrossItems(recoveredUsage.completionTokens, uniqueImageUrls.length || imageUrls.length),
@@ -1249,6 +1253,7 @@ export const useImageGeneration = (options: {
               lastGenerationFailCount: nextFailCount,
               lastGenerationTotalCount: expectedCount,
               generationMetadata: nextGenerationMetadata,
+              execTime: (result as any).execTime,
             }, finalizedCompletedTasks);
 
             urgentUpdatePromptNode(persistedPromptState);
@@ -1256,6 +1261,7 @@ export const useImageGeneration = (options: {
             const nextPromptState = {
               ...persistedPromptState,
               childImageIds: mergedChildIds,
+              execTime: (result as any).execTime,
             };
 
             if (recoveredImageNodes.length > 0) {
@@ -1619,6 +1625,64 @@ export const useImageGeneration = (options: {
               applyAuthoritativeBalance(result.balanceAfter);
             }
 
+            // 简体中文注释：检测是否为速创 (Wuyin) 渠道的图片生成任务。如果是且为 pending 状态，则在 buildTask 内部阻塞进行状态查询轮询直到成功或失败，满足排队和耗时统计要求
+            const isWuyinImageRoute =
+              String(resolvedProvider || '').toLowerCase() === 'wuyin'
+              || String(resolvedProviderName || '').toLowerCase().includes('wuyin')
+              || String(resolvedProviderName || '').includes('速创')
+              || String(resolvedResultKeySlotId || '').includes('@slot_key_');
+
+            if (isWuyinImageRoute && taskIdForRecovery && result.status === 'pending') {
+              let pollSuccess = false;
+              let pollError = '';
+              let pollUrls: string[] = [];
+              let pollExecTime = 0;
+
+              const startedAt = Date.now();
+              const maxDurationMs = 10 * 60 * 1000;
+              let delayMs = 2500;
+
+              while (Date.now() - startedAt < maxDurationMs) {
+                try {
+                  const checkResult = await llmService.checkTaskStatus(
+                    taskIdForRecovery,
+                    GenerationMode.IMAGE,
+                    executionNode.keySlotId ? { id: executionNode.keySlotId } as any : undefined,
+                    executionNode.model
+                  );
+
+                  if (checkResult && checkResult.status === 'success') {
+                    pollUrls = Array.isArray(checkResult.urls)
+                      ? checkResult.urls
+                      : (checkResult.url ? [checkResult.url] : []);
+                    pollExecTime = typeof checkResult.execTime === 'number' ? checkResult.execTime : 0;
+                    pollSuccess = true;
+                    break;
+                  }
+
+                  if (checkResult && checkResult.status === 'failed') {
+                    pollError = checkResult.error || checkResult.message || '速创图片生成失败';
+                    break;
+                  }
+                } catch (pollErr: any) {
+                  console.warn('Wuyin image poll error:', pollErr);
+                }
+
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                delayMs = Math.min(Math.round(delayMs * 1.4), 10000);
+              }
+
+              if (pollSuccess && pollUrls.length > 0) {
+                generatedBase64 = pollUrls[0];
+                result.urls = pollUrls;
+                result.url = pollUrls[0];
+                result.status = 'success';
+                result.execTime = pollExecTime;
+              } else {
+                throw new Error(pollError || '速创图片生成超时');
+              }
+            }
+
             const resolvedUsage = resolveUsageMetrics({
               model: resolvedModelId,
               imageSize: resolvedImageSize,
@@ -1670,7 +1734,23 @@ export const useImageGeneration = (options: {
       };
 
       const tasks = Array.from({ length: actualCount }).map((_, index) => buildTask(index));
-      const imageData = await Promise.all(tasks.map(t => t()));
+
+      // 简体中文注释：检测是否为速创 (Wuyin) 渠道的图片生成任务。如果是，则通过 for 循环依次串行执行，等待前一个生成的图片查询结果出来后再进行下一个，避免高并发冲突
+      const isWuyinRoute =
+        String(executionNode.provider || '').toLowerCase() === 'wuyin'
+        || String(executionNode.providerLabel || '').toLowerCase().includes('wuyin')
+        || String(executionNode.providerLabel || '').includes('速创')
+        || String(executionNode.keySlotId || '').includes('@slot_key_');
+
+      const imageData = [];
+      if (isWuyinRoute && !isVideo && !isAudio) {
+        for (const task of tasks) {
+          const res = await task();
+          imageData.push(res);
+        }
+      } else {
+        imageData.push(...(await Promise.all(tasks.map(t => t()))));
+      }
       
       const validImageData = imageData.filter(d => !('error' in d)) as any[];
       const failedImageData = imageData.filter(d => 'error' in d) as any[];

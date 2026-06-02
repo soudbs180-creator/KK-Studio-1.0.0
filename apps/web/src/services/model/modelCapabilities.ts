@@ -1220,6 +1220,16 @@ export const MODEL_DESCRIPTIONS: Record<string, { category: string; description:
         description: '具备深度思考能力',
         rank: 'ERNIE 5.0'
     },
+    'gemini-3.5-flash': {
+        category: 'LLM',
+        description: '最智能的 Flash 模型，在智能体和编码任务中持续提供前沿性能',
+        rank: 'Gemini 3.5 Flash'
+    },
+    'gemini-3.1-flash-lite': {
+        category: 'LLM',
+        description: '前沿级性能，可与大型模型相媲美，但成本却低得多',
+        rank: 'Gemini 3.1 Flash-Lite'
+    },
     'gemini-3-flash': {
         category: 'LLM',
         description: '具有专业级智能，但速度和价格与 Flash 相当',
@@ -1319,17 +1329,17 @@ export const MODEL_DESCRIPTIONS: Record<string, { category: string; description:
     },
     'imagen-4.0-ultra-generate-001': {
         category: '图像生成',
-        description: 'Google 的高保真图片生成模型 (Ultra)',
+        description: 'Google 旗舰高保真图像生成模型，支持极高质量的专业级艺术创作与图像生成',
         rank: 'Imagen 4 Ultra'
     },
     'imagen-4.0-generate-001': {
         category: '图像生成',
-        description: 'Google 的高保真图片生成模型 (标准)',
+        description: 'Google 官方图像生成模型标准版，提供画面稳定且细节丰富的高清图像生成体验',
         rank: 'Imagen 4 Standard'
     },
     'imagen-4.0-fast-generate-001': {
         category: '图像生成',
-        description: 'Google 的高保真图片生成模型 (快速)',
+        description: 'Google 快速图像生成模型，具备极高的响应速度与高效率出图能力',
         rank: 'Imagen 4 Fast'
     },
     'imagineart-1.5': {
@@ -1381,8 +1391,13 @@ export const MODEL_DESCRIPTIONS: Record<string, { category: string; description:
     },
     'veo-3.1-fast-generate-preview': {
         category: '视频生成',
-        description: '官方按秒计费，支持原生音效',
+        description: '官方按秒计费，支持原生视频快速生成',
         rank: 'Veo 3 Fast'
+    },
+    'veo-3.1-lite-generate-preview': {
+        category: '视频生成',
+        description: '高效、低成本、开发者优先的视频生成与编辑模型',
+        rank: 'Veo 3 Lite'
     },
     'sora-2': {
         category: '视频生成',

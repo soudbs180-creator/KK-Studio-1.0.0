@@ -12,6 +12,9 @@ import {
   Shield,
   Trash2,
   Wand2,
+  Search,
+  X,
+  Filter,
 } from 'lucide-react';
 import { MemoryRouter, useInRouterContext, useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { CapabilityRole, Provider } from '../../types';
@@ -50,6 +53,7 @@ import keyManager, {
   type KeySlot,
   type ThirdPartyProvider,
   resolveEffectiveProviderModels,
+  getModelMetadata as getGlobalModelMetadata,
 } from '../../services/auth/keyManager';
 import { buildProviderPricingSnapshot, mergeProviderPricingSnapshot } from '../../services/auth/providerPricingSnapshot';
 import type { Supplier } from '../../services/billing/supplierService';
@@ -825,6 +829,470 @@ const toProviderFormFromSupplier = (supplier: Supplier): ProviderForm => ({
   mode: getMode(supplier.budgetLimit, undefined),
   value: typeof supplier.budgetLimit === 'number' && supplier.budgetLimit > -1 ? String(supplier.budgetLimit) : '',
 });
+
+// 辅助判定模型类型
+const inferModelType = (modelId: string): 'chat' | 'reasoning' | 'image' | 'video' | 'audio' | 'other' => {
+  const lower = modelId.toLowerCase();
+  if (lower.includes('imagen') || lower.includes('-image') || lower.includes('generate-image') || lower.includes('flux') || lower.includes('midjourney') || lower.includes('stable-diffusion')) {
+    return 'image';
+  }
+  if (lower.includes('veo') || lower.includes('video') || lower.includes('sora') || lower.includes('luma') || lower.includes('runway')) {
+    return 'video';
+  }
+  if (lower.includes('audio') || lower.includes('speech') || lower.includes('tts') || lower.includes('whisper') || lower.includes('voice')) {
+    return 'audio';
+  }
+  if (lower.includes('r1') || lower.includes('o1') || lower.includes('reasoning') || lower.includes('o3-mini')) {
+    return 'reasoning';
+  }
+  return 'chat';
+};
+
+// 辅助判定模型品牌
+const inferModelBrand = (modelId: string): string => {
+  const lower = modelId.toLowerCase();
+  if (lower.includes('gemini') || lower.includes('imagen') || lower.includes('veo') || lower.includes('google')) {
+    return 'Google';
+  }
+  if (lower.includes('gpt') || lower.includes('o1') || lower.includes('o3') || lower.includes('openai')) {
+    return 'OpenAI';
+  }
+  if (lower.includes('claude') || lower.includes('anthropic')) {
+    return 'Anthropic';
+  }
+  if (lower.includes('deepseek')) {
+    return 'DeepSeek';
+  }
+  if (lower.includes('qwen')) {
+    return 'Qwen';
+  }
+  if (lower.includes('llama') || lower.includes('meta')) {
+    return 'Meta/Llama';
+  }
+  if (lower.includes('grok') || lower.includes('xai')) {
+    return 'xAI/Grok';
+  }
+  if (modelId.includes('/')) {
+    const parts = modelId.split('/');
+    if (parts[0]) {
+      return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+    }
+  }
+  return 'Other';
+};
+
+const getTypeLabel = (type: string, pick: (zh: string, en: string) => string) => {
+  switch (type) {
+    case 'chat': return pick('💬 对话模型', '💬 Chat Models');
+    case 'reasoning': return pick('🧠 推理模型', '🧠 Reasoning Models');
+    case 'image': return pick('🎨 图像模型', '🎨 Image Models');
+    case 'video': return pick('🎥 视频模型', '🎥 Video Models');
+    case 'audio': return pick('🔊 音频模型', '🔊 Audio Models');
+    default: return pick('⚙️ 其他模型', '⚙️ Other Models');
+  }
+};
+
+const getBrandLabel = (brand: string, pick: (zh: string, en: string) => string) => {
+  if (brand === 'Google') return pick('谷歌 (Google)', 'Google');
+  if (brand === 'OpenAI') return 'OpenAI';
+  if (brand === 'Anthropic') return 'Anthropic';
+  if (brand === 'DeepSeek') return pick('深度求索 (DeepSeek)', 'DeepSeek');
+  if (brand === 'Qwen') return pick('通义千问 (Qwen)', 'Qwen');
+  if (brand === 'Other') return pick('其他品牌', 'Other Brands');
+  return brand;
+};
+
+interface PresetModelsCardProps {
+  title: string;
+  models: string[];
+  onSync: () => void;
+  syncLoading: boolean;
+  isMobile: boolean;
+  isDarkMode: boolean;
+  getModelMetadata: (modelId: string) => { name: string; description: string };
+  pick: (zh: string, en: string) => string;
+  notify: any;
+  SETTINGS_OVERLAY_STYLE: any;
+}
+
+const PresetModelsCardComponent: React.FC<PresetModelsCardProps> = ({
+  title,
+  models = [],
+  onSync,
+  syncLoading,
+  isMobile,
+  isDarkMode,
+  getModelMetadata,
+  pick,
+  notify,
+  SETTINGS_OVERLAY_STYLE,
+}) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [groupBy, setGroupBy] = useState<'type' | 'brand'>('type');
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  // 1. 整理富模型数据
+  const parsedModels = useMemo(() => {
+    return models.map((modelId) => {
+      const meta = getModelMetadata(modelId);
+      const type = inferModelType(modelId);
+      const brand = inferModelBrand(modelId);
+      return {
+        id: modelId,
+        name: meta.name || modelId,
+        description: meta.description || '',
+        type,
+        brand,
+      };
+    });
+  }, [models, getModelMetadata]);
+
+  // 2. 动态提取已存在的所有类型和品牌
+  const availableTypes = useMemo(() => {
+    const types = new Set<string>();
+    parsedModels.forEach((m) => types.add(m.type));
+    return Array.from(types);
+  }, [parsedModels]);
+
+  const availableBrands = useMemo(() => {
+    const brands = new Set<string>();
+    parsedModels.forEach((m) => brands.add(m.brand));
+    return Array.from(brands);
+  }, [parsedModels]);
+
+  // 3. 过滤处理
+  const filteredModels = useMemo(() => {
+    return parsedModels.filter((m) => {
+      // 3.1 搜索框匹配
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matchesId = m.id.toLowerCase().includes(query);
+        const matchesName = m.name.toLowerCase().includes(query);
+        const matchesDesc = m.description.toLowerCase().includes(query);
+        if (!matchesId && !matchesName && !matchesDesc) {
+          return false;
+        }
+      }
+      // 3.2 类型多选匹配
+      if (selectedTypes.length > 0 && !selectedTypes.includes(m.type)) {
+        return false;
+      }
+      // 3.3 品牌多选匹配
+      if (selectedBrands.length > 0 && !selectedBrands.includes(m.brand)) {
+        return false;
+      }
+      return true;
+    });
+  }, [parsedModels, searchQuery, selectedTypes, selectedBrands]);
+
+  // 4. 对过滤后的模型进行分组
+  const groupedModels = useMemo(() => {
+    const groups: Record<string, typeof parsedModels> = {};
+    filteredModels.forEach((m) => {
+      const key = groupBy === 'type' ? m.type : m.brand;
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(m);
+    });
+    return groups;
+  }, [filteredModels, groupBy]);
+
+  const toggleGroup = (groupKey: string) => {
+    setCollapsedGroups((prev) => ({
+      ...prev,
+      [groupKey]: !prev[groupKey],
+    }));
+  };
+
+  const handleTypeClick = (type: string) => {
+    setSelectedTypes((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
+  };
+
+  const handleBrandClick = (brand: string) => {
+    setSelectedBrands((prev) =>
+      prev.includes(brand) ? prev.filter((b) => b !== brand) : [...prev, brand]
+    );
+  };
+
+  // 获取类型或品牌的名称，用来在折叠组头部展示
+  const getGroupTitle = (groupKey: string) => {
+    if (groupBy === 'type') {
+      return getTypeLabel(groupKey, pick);
+    }
+    return getBrandLabel(groupKey, pick);
+  };
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setSelectedTypes([]);
+    setSelectedBrands([]);
+  };
+
+  return (
+    <SettingsSection
+      title={title}
+      eyebrow={pick('模型列表', 'Model list')}
+      description={pick(
+        '此通道支持的所有可用模型。如果列表为空，请尝试重新刷新连通性或同步。',
+        'All available models supported by this route. If empty, try refreshing connectivity.'
+      )}
+      action={
+        <SettingsActionButton
+          icon={RefreshCw}
+          loading={syncLoading}
+          onClick={onSync}
+        >
+          {pick('同步模型列表', 'Sync models')}
+        </SettingsActionButton>
+      }
+    >
+      {models.length === 0 ? (
+        <div className="rounded-[18px] border p-6 text-center text-[var(--text-secondary)]" style={SETTINGS_OVERLAY_STYLE}>
+          {pick('暂无可用模型，请点击右上角同步按钮尝试获取。', 'No available models. Click sync to retrieve them.')}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* 工具栏：搜索与分类过滤 */}
+          <div className="rounded-[18px] border p-4 space-y-3" style={SETTINGS_OVERLAY_STYLE}>
+            {/* 1. 搜索框 */}
+            <div className="relative flex items-center">
+              <Search className="absolute left-3 w-4 h-4 text-[var(--text-tertiary)]" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={pick('搜索模型名称或ID...', 'Search model name or ID...')}
+                className="w-full bg-[var(--settings-surface-elevated)] border border-[var(--settings-border-subtle)] rounded-lg pl-9 pr-8 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-indigo-500 transition-colors"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 p-0.5 bg-transparent border-none text-[var(--text-tertiary)] hover:text-[var(--text-primary)] cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* 2. 类型过滤 */}
+            {availableTypes.length > 1 && (
+              <div className="flex flex-col gap-1.5">
+                <div className="text-[11px] font-semibold text-[var(--text-tertiary)] flex items-center gap-1">
+                  <Filter className="w-3 h-3" />
+                  {pick('按类型筛选', 'Filter by Type')}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTypes([])}
+                    className={`px-2.5 py-1 text-[11px] rounded-full border cursor-pointer select-none transition-all ${
+                      selectedTypes.length === 0
+                        ? 'bg-indigo-600 border-indigo-600 text-white font-semibold'
+                        : 'bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border-[var(--settings-border-subtle)] text-[var(--text-secondary)] font-medium'
+                    }`}
+                  >
+                    {pick('全部类型', 'All Types')}
+                  </button>
+                  {availableTypes.map((type) => {
+                    const active = selectedTypes.includes(type);
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => handleTypeClick(type)}
+                        className={`px-2.5 py-1 text-[11px] rounded-full border cursor-pointer select-none transition-all ${
+                          active
+                            ? 'bg-indigo-600 border-indigo-600 text-white font-semibold shadow-sm'
+                            : 'bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border-[var(--settings-border-subtle)] text-[var(--text-secondary)] font-medium'
+                        }`}
+                      >
+                        {getTypeLabel(type, pick)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 3. 品牌过滤 */}
+            {availableBrands.length > 1 && (
+              <div className="flex flex-col gap-1.5 border-t border-[var(--settings-border-subtle)] pt-2.5">
+                <div className="text-[11px] font-semibold text-[var(--text-tertiary)] flex items-center gap-1">
+                  <Globe className="w-3 h-3" />
+                  {pick('按品牌筛选', 'Filter by Brand')}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBrands([])}
+                    className={`px-2.5 py-1 text-[11px] rounded-full border cursor-pointer select-none transition-all ${
+                      selectedBrands.length === 0
+                        ? 'bg-indigo-600 border-indigo-600 text-white font-semibold'
+                        : 'bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border-[var(--settings-border-subtle)] text-[var(--text-secondary)] font-medium'
+                    }`}
+                  >
+                    {pick('全部品牌', 'All Brands')}
+                  </button>
+                  {availableBrands.map((brand) => {
+                    const active = selectedBrands.includes(brand);
+                    return (
+                      <button
+                        key={brand}
+                        type="button"
+                        onClick={() => handleBrandClick(brand)}
+                        className={`px-2.5 py-1 text-[11px] rounded-full border cursor-pointer select-none transition-all ${
+                          active
+                            ? 'bg-indigo-600 border-indigo-600 text-white font-semibold shadow-sm'
+                            : 'bg-[var(--bg-tertiary)] hover:bg-[var(--bg-secondary)] border-[var(--settings-border-subtle)] text-[var(--text-secondary)] font-medium'
+                        }`}
+                      >
+                        {getBrandLabel(brand, pick)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 4. 分组配置与清除 */}
+            <div className="flex items-center justify-between text-xs pt-1.5 border-t border-[var(--settings-border-subtle)]">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-[var(--text-tertiary)]">{pick('分组依据：', 'Group by:')}</span>
+                <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-0.5 border">
+                  <button
+                    type="button"
+                    onClick={() => setGroupBy('type')}
+                    className={`px-2.5 py-1 text-[11px] rounded-md cursor-pointer border-none font-semibold transition-all ${
+                      groupBy === 'type'
+                        ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] font-bold shadow-sm'
+                        : 'bg-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    {pick('类型', 'Type')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGroupBy('brand')}
+                    className={`px-2.5 py-1 text-[11px] rounded-md cursor-pointer border-none font-semibold transition-all ${
+                      groupBy === 'brand'
+                        ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] font-bold shadow-sm'
+                        : 'bg-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    {pick('品牌', 'Brand')}
+                  </button>
+                </div>
+              </div>
+
+              {(searchQuery || selectedTypes.length > 0 || selectedBrands.length > 0) && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="text-[11px] text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer bg-transparent border-none p-0 flex items-center gap-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  {pick('清空筛选', 'Clear filters')}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 5. 分组展示 */}
+          {Object.keys(groupedModels).length === 0 ? (
+            <div className="rounded-[18px] border p-6 text-center text-[var(--text-secondary)]" style={SETTINGS_OVERLAY_STYLE}>
+              {pick('未找到符合过滤条件的模型。', 'No models found matching the filters.')}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {Object.entries(groupedModels).map(([groupKey, groupModels]) => {
+                const isCollapsed = collapsedGroups[groupKey] ?? false;
+                const titleText = getGroupTitle(groupKey);
+
+                return (
+                  <div
+                    key={groupKey}
+                    className="rounded-[18px] border overflow-hidden transition-all duration-200"
+                    style={{
+                      ...SETTINGS_OVERLAY_STYLE,
+                      border: isCollapsed ? '1px solid var(--settings-border-subtle)' : '1px solid var(--settings-border-active, rgba(99, 102, 241, 0.25))',
+                    }}
+                  >
+                    {/* 折叠组 Header */}
+                    <div
+                      onClick={() => toggleGroup(groupKey)}
+                      className="flex items-center justify-between px-4 py-3 bg-[var(--bg-secondary)]/30 hover:bg-[var(--bg-secondary)]/50 cursor-pointer select-none transition-all duration-200"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-sm font-bold text-[var(--text-primary)]">{titleText}</span>
+                        <span className="text-[10px] font-semibold text-[var(--text-tertiary)] bg-[var(--bg-tertiary)] border px-2 py-0.5 rounded-full">
+                          {groupModels.length} {pick('个模型', 'models')}
+                        </span>
+                      </div>
+                      <ChevronDown
+                        size={16}
+                        className="text-[var(--text-secondary)] transition-transform duration-300"
+                        style={{
+                          transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+                        }}
+                      />
+                    </div>
+
+                    {/* 折叠组卡片列表内容 */}
+                    <div
+                      className={`transition-all duration-300 ease-in-out ${
+                        isCollapsed ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-[5000px] opacity-100 p-4 border-t border-[var(--settings-border-subtle)]'
+                      }`}
+                    >
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {groupModels.map((model) => (
+                          <div
+                            key={model.id}
+                            className="rounded-[14px] border p-3.5 flex flex-col justify-between hover:border-indigo-500/40 hover:bg-[var(--bg-tertiary)]/20 transition-all"
+                            style={{
+                              backgroundColor: 'rgba(255, 255, 255, 0.015)',
+                              borderColor: 'var(--settings-border-subtle)',
+                            }}
+                          >
+                            <div>
+                              <div className="text-[14px] font-semibold text-[var(--text-primary)] break-all font-mono tracking-tight">{model.name}</div>
+                              <div className="mt-1.5 text-[12px] leading-5 text-[var(--text-secondary)]">{model.description}</div>
+                            </div>
+                            <div className="mt-4 flex justify-between items-center">
+                              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)] bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full border flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                {pick('就绪', 'Ready')}
+                              </span>
+                              <button
+                                type="button"
+                                className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer bg-transparent border-none p-0"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(model.id);
+                                  notify.success(pick('复制成功', 'Copied'), model.id);
+                                }}
+                              >
+                                {pick('复制ID', 'Copy ID')}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </SettingsSection>
+  );
+};
 
 const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({ initialSupplier = null }) => {
   const location = useLocation();
@@ -2032,6 +2500,36 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     });
   };
 
+  const syncWuyinCatalog = async () => {
+    await run('sync-wuyin', async () => {
+      notify.info(
+        pick('正在拉取', 'Syncing'),
+        pick('正在同步最新的模型和价格表，这可能需要几秒钟，请稍候...', 'Syncing the latest models and prices, this may take a few seconds, please wait...'),
+      );
+      try {
+        const res = await fetch('/api/v1/wuyin/catalog?refresh=true');
+        const json = await res.json();
+        if (json && json.success && Array.isArray(json.data)) {
+          // 简体中文注释：保存到前端缓存中
+          const cacheKey = `wuyin_pricing_catalog_cache_https://api.wuyinkeji.com`;
+          window.localStorage.setItem(cacheKey, JSON.stringify(json.data));
+          notify.success(
+            pick('同步成功', 'Sync Succeeded'),
+            pick(`已成功爬取并缓存了 ${json.data.length} 个最新的速创模型与价格价格数据！`, `Successfully fetched and cached ${json.data.length} Wuyin models and pricing.`),
+          );
+        } else {
+          throw new Error(json?.message || 'Sync failed');
+        }
+      } catch (error) {
+        console.error('Failed to sync Wuyin catalog:', error);
+        notify.error(
+          pick('同步失败', 'Sync Failed'),
+          pick('无法连接速创 API 价格同步服务，请检查网络或稍后再试。', 'Failed to connect to Wuyin API pricing sync service. Check network and try again.'),
+        );
+      }
+    }, { skipRefresh: true });
+  };
+
   const saveProvider = async () => {
     if (!ensureProviderActionsAllowed()) {
       return;
@@ -2048,16 +2546,42 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         return;
       }
 
+      if (providerForm.mode !== 'unlimited' && !positive(providerForm.value)) {
+        notify.error(
+          pick('保存失败', 'Save failed'),
+          pick('预算或词元上限必须大于 0。', 'Budget or token limit must be greater than 0.'),
+        );
+        return;
+      }
+
+      const budgetValue = providerForm.mode === 'unlimited' ? null : positive(providerForm.value);
+      const budgetPayload = {
+        budgetLimit: providerForm.mode === 'amount' ? budgetValue ?? -1 : -1,
+        tokenLimit: providerForm.mode === 'tokens' ? budgetValue ?? -1 : -1,
+        customCostMode: providerForm.mode,
+        customCostValue: budgetValue ?? undefined,
+      };
+
       await run(`provider-save:${providerForm.id || 'new'}`, async () => {
         let catalog = WUYIN_DEFAULT_CATALOG;
         try {
-          const res = await fetch('/api/v1/wuyin/catalog');
-          const json = await res.json();
-          if (json && json.success && Array.isArray(json.data)) {
-            catalog = json.data;
+          // 简体中文注释：优先尝试从本地缓存读取之前同步的价格表，避免保存时网络请求导致卡顿
+          const cacheKey = `wuyin_pricing_catalog_cache_https://api.wuyinkeji.com`;
+          const cached = window.localStorage.getItem(cacheKey);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              catalog = parsed;
+            }
+          } else {
+            const res = await fetch('/api/v1/wuyin/catalog');
+            const json = await res.json();
+            if (json && json.success && Array.isArray(json.data)) {
+              catalog = json.data;
+            }
           }
         } catch (e) {
-          console.warn('Failed to fetch remote wuyin catalog:', e);
+          console.warn('读取本地速创价格配置失败:', e);
         }
 
         const { provider: wuyinProvider, keySlot: wuyinKeySlot } = buildWuyinOneKeyProvider(normalizedApiKey, catalog);
@@ -2080,9 +2604,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             status: 'valid',
             createdAt: existingProvider?.createdAt || Date.now(),
             updatedAt: Date.now(),
-            budgetLimit: -1,
-            tokenLimit: -1,
-            customCostMode: 'unlimited',
+            ...budgetPayload,
           });
 
           await upsertUserApiSlotToCloudRecord({
@@ -2102,6 +2624,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             provider: wuyinProvider.provider as Provider,
             format: wuyinProvider.format as ApiProtocolFormat,
             isActive: true,
+            ...budgetPayload,
           };
           const typedKeySlot = {
             ...wuyinKeySlot,
@@ -2807,6 +3330,16 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         description: matched.description || '',
       };
     }
+
+    // 优先尝试从全局 keyManager 获取元数据以确保描述文案正确
+    const globalMeta = getGlobalModelMetadata(modelId);
+    if (globalMeta) {
+      return {
+        name: globalMeta.name || modelId,
+        description: globalMeta.description || '',
+      };
+    }
+
     const lower = modelId.toLowerCase();
     let desc = '';
     if (lower.includes('gemini-2.5-flash')) {
@@ -2825,6 +3358,14 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       desc = pick('深度求索通用对话模型，极高的性价比与优秀的中文创作能力。', 'DeepSeek general chat model with ultra high cost-performance and great Chinese writing.');
     } else if (lower.includes('claude-3-5-sonnet')) {
       desc = pick('Anthropic 旗舰模型，业界领先的代码、分析和多步骤推理工具。', 'Anthropic flagship model, industry-leading tool for coding, analysis, and multi-step reasoning.');
+    } else if (lower.includes('imagen-4.0-ultra') || lower.includes('imagen-4-ultra')) {
+      desc = pick('Google 高保真图像生成模型（Ultra版），支持高质量的艺术创作与图像生成。', 'Google high-fidelity image generation model (Ultra), supporting high-quality artistic creation and image generation.');
+    } else if (lower.includes('imagen-4.0-fast') || lower.includes('imagen-4-fast')) {
+      desc = pick('Google 快速图像生成模型，具备极高的响应速度与快速出图能力。', 'Google fast image generation model with high response speed and quick output.');
+    } else if (lower.includes('imagen-4.0') || lower.includes('imagen-') || lower.includes('-image')) {
+      desc = pick('Google 官方图像生成模型，提供高质量且细腻逼真的图像生成体验。', 'Google official image generation model, providing high-quality and realistic image generation experience.');
+    } else if (lower.includes('veo-')) {
+      desc = pick('Google 官方视频生成模型，支持高质量、极富创意的电影级视频片段生成。', 'Google official video generation model, supporting high-quality, highly creative cinematic video generation.');
     } else {
       desc = pick('通用模型通道，支持完成绝大部分常见对话与逻辑任务。', 'General model route, capable of completing most common conversational and logical tasks.');
     }
@@ -3198,16 +3739,25 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             ) : null}
           </div>
         </SettingsSection>
-        {selectedOfficialSlot && renderPresetModelsCard(
-          pick('可用模型 Nexus', 'Available models'),
-          selectedOfficialSlot.supportedModels || [],
-          () => void refreshOfficial(selectedOfficialSlot),
-          busy === `official-check:${selectedOfficialSlot.id}`
+        {selectedOfficialSlot && (
+          <PresetModelsCardComponent
+            title={pick('可用模型', 'Available models')}
+            models={selectedOfficialSlot.supportedModels || []}
+            onSync={() => void refreshOfficial(selectedOfficialSlot)}
+            syncLoading={busy === `official-check:${selectedOfficialSlot.id}`}
+            isMobile={isMobile}
+            isDarkMode={isDarkMode}
+            getModelMetadata={getModelMetadata}
+            pick={pick}
+            notify={notify}
+            SETTINGS_OVERLAY_STYLE={SETTINGS_OVERLAY_STYLE}
+          />
         )}
         </>
       ) : null}
 
       {showProviderEditor ? (
+        <>
         <SettingsSection
           title={editingProviderId ? pick('编辑模型通道', 'Edit model route') : pick('添加模型通道', 'Add model route')}
           eyebrow={
@@ -3269,6 +3819,18 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                       </a>
                     );
                   })}
+                  {isWuyin && (
+                    <button
+                      type="button"
+                      onClick={syncWuyinCatalog}
+                      disabled={busy === 'sync-wuyin'}
+                      className="settings-provider-editor-link cursor-pointer border-none bg-transparent hover:text-[var(--primary)] flex items-center gap-1 text-[13px] text-[var(--text-secondary)] transition-colors"
+                      style={{ padding: 0, outline: 'none' }}
+                    >
+                      <RefreshCw size={14} className={busy === 'sync-wuyin' ? 'animate-spin' : ''} />
+                      <span>{pick('同步最新价格', 'Sync Latest Prices')}</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -3324,218 +3886,214 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               </div>
             </div>
 
-            {!isWuyin && (
-              <div className="settings-provider-editor-card">
-                <div className="settings-provider-editor-card__header">
-                  <div className="min-w-0">
-                    <div className="settings-provider-editor-card__title">{pick('高级抓取', 'Advanced fetch')}</div>
-                    <div className="settings-provider-editor-card__helper">
-                      {pick(
-                        '默认不会抓取价格或消耗信息。需要了解价格、消耗或刷新模型时，再手动点击获取。',
-                        'Pricing and usage data are not fetched by default. Click fetch only when you need pricing, usage, or refreshed models.'
-                      )}
+            <div className="settings-provider-editor-card">
+              <div className="settings-provider-editor-card__header">
+                <div className="min-w-0">
+                  <div className="settings-provider-editor-card__title">{pick('高级抓取', 'Advanced fetch')}</div>
+                  <div className="settings-provider-editor-card__helper">
+                    {pick(
+                      '默认不会抓取价格或消耗信息。需要了解价格、消耗或刷新模型时，再手动点击获取。',
+                      'Pricing and usage data are not fetched by default. Click fetch only when you need pricing, usage, or refreshed models.'
+                    )}
+                  </div>
+                </div>
+                {!editingProviderId ? (
+                  <SettingsBadge tone="neutral">{pick('保存后可获取', 'Available after save')}</SettingsBadge>
+                ) : (
+                  <SettingsBadge tone="neutral">{pick('默认不抓取', 'No auto fetch')}</SettingsBadge>
+                )}
+              </div>
+
+              <div className="settings-provider-fetch-grid">
+                <div className={`settings-provider-fetch-item ${isMobile ? 'flex flex-col items-center text-center' : ''}`}>
+                  <div className="settings-provider-fetch-item__copy">
+                    <div className="settings-provider-fetch-item__title">{pick('自动获取模型', 'Fetch models')}</div>
+                    <div className="settings-provider-fetch-item__helper">
+                      {pick('保存后可检测连通性并回填模型；你也可以继续使用上方手动模型。', 'After saving, connectivity can be checked and models filled. Manual models above remain available.')}
                     </div>
                   </div>
-                  {!editingProviderId ? (
-                    <SettingsBadge tone="neutral">{pick('保存后可获取', 'Available after save')}</SettingsBadge>
-                  ) : (
-                    <SettingsBadge tone="neutral">{pick('默认不抓取', 'No auto fetch')}</SettingsBadge>
-                  )}
+                  <div className={`settings-provider-fetch-item__action ${isMobile ? 'w-full flex justify-center mt-3' : ''}`}>
+                    {editingProviderId ? (
+                      <SettingsActionButton
+                        icon={RefreshCw}
+                        disabled={routeDiagnosticsActionDisabled}
+                        loading={busy === `provider-check:${editingProviderId}`}
+                        onClick={() => {
+                          const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
+                          if (matched) void refreshProvider(matched);
+                        }}
+                      >
+                        {pick('自动获取模型', 'Fetch models')}
+                      </SettingsActionButton>
+                    ) : (
+                      <SettingsBadge tone="neutral">{pick('先保存', 'Save first')}</SettingsBadge>
+                    )}
+                  </div>
                 </div>
 
-                <div className="settings-provider-fetch-grid">
-                  <div className={`settings-provider-fetch-item ${isMobile ? 'flex flex-col items-center text-center' : ''}`}>
-                    <div className="settings-provider-fetch-item__copy">
-                      <div className="settings-provider-fetch-item__title">{pick('自动获取模型', 'Fetch models')}</div>
-                      <div className="settings-provider-fetch-item__helper">
-                        {pick('保存后可检测连通性并回填模型；你也可以继续使用上方手动模型。', 'After saving, connectivity can be checked and models filled. Manual models above remain available.')}
+                {(!isMobile && showPricingEndpointOverride) ? (
+                  /* 电脑端手动二级菜单状态：高度与左侧自动获取卡片一致，提供极其 premium 的微缩二级界面 */
+                  <div className="settings-provider-fetch-item settings-provider-fetch-item--stacked h-full flex flex-col justify-between animate-fadeIn">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowPricingEndpointOverride(false)}
+                          className="flex items-center gap-1 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer bg-transparent border-none p-0"
+                        >
+                          <ArrowLeft size={14} />
+                          <span>{pick('返回', 'Back')}</span>
+                        </button>
+                        <span className="text-[13px] font-bold text-[var(--text-primary)]">{pick('手动价格地址', 'Manual Price Endpoint')}</span>
+                      </div>
+                      <div className="text-[11px] text-[var(--text-secondary)] mb-3 leading-5">
+                        {pick('如果默认价格地址失败，请在下方输入自定义价格地址。', 'If default pricing fails, enter a custom endpoint below.')}
                       </div>
                     </div>
-                    <div className={`settings-provider-fetch-item__action ${isMobile ? 'w-full flex justify-center mt-3' : ''}`}>
-                      {editingProviderId ? (
-                        <SettingsActionButton
-                          icon={RefreshCw}
-                          disabled={routeDiagnosticsActionDisabled}
-                          loading={busy === `provider-check:${editingProviderId}`}
-                          onClick={() => {
-                            const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
-                            if (matched) void refreshProvider(matched);
-                          }}
-                        >
-                          {pick('自动获取模型', 'Fetch models')}
-                        </SettingsActionButton>
-                      ) : (
-                        <SettingsBadge tone="neutral">{pick('先保存', 'Save first')}</SettingsBadge>
-                      )}
+
+                    <div className="flex items-center gap-2 w-full mt-auto">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          className="w-full bg-[var(--settings-surface-elevated)] border border-[var(--settings-border-subtle)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-indigo-500"
+                          value={providerPricingEndpointDraft}
+                          onChange={(e) => setProviderPricingEndpointDraft(e.target.value)}
+                          placeholder={buildDefaultProviderPricingEndpoint(providerForm.baseUrl) || 'https://api.example.com/v1/models'}
+                          disabled={providerEditorReadOnly}
+                        />
+                      </div>
+                      <PrimaryButton
+                        disabled={routeDiagnosticsActionDisabled}
+                        loading={busy === `provider-price:${editingProviderId}`}
+                        onClick={() => {
+                          const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
+                          if (matched) void syncPricing(matched, providerPricingEndpointDraft);
+                        }}
+                        className="px-3"
+                      >
+                        {pick('确认', 'Confirm')}
+                      </PrimaryButton>
                     </div>
                   </div>
-
-                  {(!isMobile && showPricingEndpointOverride) ? (
-                    /* 电脑端手动二级菜单状态：高度与左侧自动获取卡片一致，提供极其 premium 的微缩二级界面 */
-                    <div className="settings-provider-fetch-item settings-provider-fetch-item--stacked h-full flex flex-col justify-between animate-fadeIn">
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <button
-                            type="button"
-                            onClick={() => setShowPricingEndpointOverride(false)}
-                            className="flex items-center gap-1 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer bg-transparent border-none p-0"
-                          >
-                            <ArrowLeft size={14} />
-                            <span>{pick('返回', 'Back')}</span>
-                          </button>
-                          <span className="text-[13px] font-bold text-[var(--text-primary)]">{pick('手动价格地址', 'Manual Price Endpoint')}</span>
-                        </div>
-                        <div className="text-[11px] text-[var(--text-secondary)] mb-3 leading-5">
-                          {pick('如果默认价格地址失败，请在下方输入自定义价格地址。', 'If default pricing fails, enter a custom endpoint below.')}
-                        </div>
+                ) : (
+                  <div className={`settings-provider-fetch-item settings-provider-fetch-item--stacked ${isMobile ? 'flex flex-col items-center text-center' : ''}`}>
+                  <div className="settings-provider-fetch-item__row">
+                    <div className="settings-provider-fetch-item__copy">
+                      <div className="settings-provider-fetch-item__title">{pick('价格与消耗', 'Pricing and usage')}</div>
+                      <div className="settings-provider-fetch-item__helper">
+                        {pick(
+                          '如果要了解价格或消耗，请点击自动获取；默认会按地址尝试候选端点，也可以手动输入价格地址。',
+                          'Click fetch only when you need pricing or usage. Default candidates are tried from the URL, and you can enter a manual pricing endpoint.'
+                        )}
                       </div>
-
-                      <div className="flex items-center gap-2 w-full mt-auto">
-                        <div className="flex-1">
-                          <input
-                            type="text"
-                            className="w-full bg-[var(--settings-surface-elevated)] border border-[var(--settings-border-subtle)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-indigo-500"
-                            value={providerPricingEndpointDraft}
-                            onChange={(e) => setProviderPricingEndpointDraft(e.target.value)}
-                            placeholder={buildDefaultProviderPricingEndpoint(providerForm.baseUrl) || 'https://api.example.com/v1/models'}
-                            disabled={providerEditorReadOnly}
-                          />
-                        </div>
-                        <PrimaryButton
+                    </div>
+                    {!isMobile && (
+                      <div className="settings-provider-fetch-item__action flex items-center gap-2">
+                      {editingProviderId ? (
+                        <>
+                        <SettingsActionButton
+                          icon={Wand2}
                           disabled={routeDiagnosticsActionDisabled}
                           loading={busy === `provider-price:${editingProviderId}`}
                           onClick={() => {
                             const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
                             if (matched) void syncPricing(matched, providerPricingEndpointDraft);
                           }}
-                          className="px-3"
                         >
-                          {pick('确认', 'Confirm')}
-                        </PrimaryButton>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className={`settings-provider-fetch-item settings-provider-fetch-item--stacked ${isMobile ? 'flex flex-col items-center text-center' : ''}`}>
-                    <div className="settings-provider-fetch-item__row">
-                      <div className="settings-provider-fetch-item__copy">
-                        <div className="settings-provider-fetch-item__title">{pick('价格与消耗', 'Pricing and usage')}</div>
-                        <div className="settings-provider-fetch-item__helper">
-                          {pick(
-                            '如果要了解价格或消耗，请点击自动获取；默认会按地址尝试候选端点，也可以手动输入价格地址。',
-                            'Click fetch only when you need pricing or usage. Default candidates are tried from the URL, and you can enter a manual pricing endpoint.'
-                          )}
-                        </div>
-                      </div>
-                      {!isMobile && (
-                        <div className="settings-provider-fetch-item__action flex items-center gap-2">
-                        {editingProviderId ? (
-                          <>
-                          <SettingsActionButton
-                            icon={Wand2}
-                            disabled={routeDiagnosticsActionDisabled}
-                            loading={busy === `provider-price:${editingProviderId}`}
-                            onClick={() => {
-                              const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
-                              if (matched) void syncPricing(matched, providerPricingEndpointDraft);
-                            }}
-                          >
-                            {pick('自动获取', 'Fetch')}
-                          </SettingsActionButton>
-                          <SecondaryButton onClick={() => setShowPricingEndpointOverride(true)} className="px-3">
-                            {pick('手动', 'Manual')}
-                          </SecondaryButton>
-                          </>
-                        ) : (
-                          <SettingsBadge tone="neutral">{pick('先保存', 'Save first')}</SettingsBadge>
-                        )}
-                      </div>
+                          {pick('自动获取', 'Fetch')}
+                        </SettingsActionButton>
+                        <SecondaryButton onClick={() => setShowPricingEndpointOverride(true)} className="px-3">
+                          {pick('手动', 'Manual')}
+                        </SecondaryButton>
+                        </>
+                      ) : (
+                        <SettingsBadge tone="neutral">{pick('先保存', 'Save first')}</SettingsBadge>
                       )}
                     </div>
-                      {/* 手机端：两个按钮并排居中，点击手动后在其下方展示一排的输入和确认 */}
-                      {isMobile && (
-                        <div className="w-full mt-3 flex flex-col items-center gap-3">
-                          <div className="flex flex-row justify-center items-center gap-3 w-full">
-                            {editingProviderId ? (
-                              <>
-                                <SettingsActionButton
-                                  icon={Wand2}
-                                  disabled={routeDiagnosticsActionDisabled}
-                                  loading={busy === `provider-price:${editingProviderId}`}
-                                  onClick={() => {
-                                    const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
-                                    if (matched) void syncPricing(matched, providerPricingEndpointDraft);
-                                  }}
-                                >
-                                  {pick('自动获取', 'Fetch')}
-                                </SettingsActionButton>
-                                <SecondaryButton onClick={() => setShowPricingEndpointOverride((curr) => !curr)} className="px-3">
-                                  {showPricingEndpointOverride ? pick('收起地址', 'Hide URL') : pick('手动价格地址', 'Manual URL')}
-                                </SecondaryButton>
-                              </>
-                            ) : (
-                              <SettingsBadge tone="neutral">{pick('先保存', 'Save first')}</SettingsBadge>
-                            )}
-                          </div>
-
-                          {showPricingEndpointOverride && (
-                            <div className="flex flex-row items-center gap-2 w-full mt-1 animate-fadeIn">
-                              <div className="flex-1">
-                                <input
-                                  type="text"
-                                  className="w-full bg-[var(--settings-surface-elevated)] border border-[var(--settings-border-subtle)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-indigo-500"
-                                  value={providerPricingEndpointDraft}
-                                  onChange={(e) => setProviderPricingEndpointDraft(e.target.value)}
-                                  placeholder={buildDefaultProviderPricingEndpoint(providerForm.baseUrl) || 'https://api.example.com/v1/models'}
-                                  disabled={providerEditorReadOnly}
-                                />
-                              </div>
-                              <PrimaryButton
+                    )}
+                  </div>
+                    {/* 手机端：两个按钮并排居中，点击手动后在其下方展示一排的输入和确认 */}
+                    {isMobile && (
+                      <div className="w-full mt-3 flex flex-col items-center gap-3">
+                        <div className="flex flex-row justify-center items-center gap-3 w-full">
+                          {editingProviderId ? (
+                            <>
+                              <SettingsActionButton
+                                icon={Wand2}
                                 disabled={routeDiagnosticsActionDisabled}
                                 loading={busy === `provider-price:${editingProviderId}`}
                                 onClick={() => {
                                   const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
                                   if (matched) void syncPricing(matched, providerPricingEndpointDraft);
                                 }}
-                                className="px-3"
                               >
-                                {pick('确认', 'Confirm')}
-                              </PrimaryButton>
-                            </div>
+                                {pick('自动获取', 'Fetch')}
+                              </SettingsActionButton>
+                              <SecondaryButton onClick={() => setShowPricingEndpointOverride((curr) => !curr)} className="px-3">
+                                {showPricingEndpointOverride ? pick('收起地址', 'Hide URL') : pick('手动价格地址', 'Manual URL')}
+                              </SecondaryButton>
+                            </>
+                          ) : (
+                            <SettingsBadge tone="neutral">{pick('先保存', 'Save first')}</SettingsBadge>
                           )}
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
 
-            {!isWuyin && (
-              <div className="settings-provider-editor-card">
-                <div className="settings-provider-editor-card__header">
-                  <div className="min-w-0">
-                    <div className="settings-provider-editor-card__title">{pick('预算策略', 'Budget rule')}</div>
-                    <div className="settings-provider-editor-card__helper">
-                      {pick('默认不限额；需要成本保护时再设置金额预算或词元上限。', 'Unlimited by default. Set an amount or token cap only when you need cost protection.')}
-                    </div>
+                        {showPricingEndpointOverride && (
+                          <div className="flex flex-row items-center gap-2 w-full mt-1 animate-fadeIn">
+                            <div className="flex-1">
+                              <input
+                                type="text"
+                                className="w-full bg-[var(--settings-surface-elevated)] border border-[var(--settings-border-subtle)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-indigo-500"
+                                value={providerPricingEndpointDraft}
+                                onChange={(e) => setProviderPricingEndpointDraft(e.target.value)}
+                                placeholder={buildDefaultProviderPricingEndpoint(providerForm.baseUrl) || 'https://api.example.com/v1/models'}
+                                disabled={providerEditorReadOnly}
+                              />
+                            </div>
+                            <PrimaryButton
+                              disabled={routeDiagnosticsActionDisabled}
+                              loading={busy === `provider-price:${editingProviderId}`}
+                              onClick={() => {
+                                  const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
+                                  if (matched) void syncPricing(matched, providerPricingEndpointDraft);
+                              }}
+                              className="px-3"
+                            >
+                              {pick('确认', 'Confirm')}
+                            </PrimaryButton>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="settings-provider-editor-card">
+              <div className="settings-provider-editor-card__header">
+                <div className="min-w-0">
+                  <div className="settings-provider-editor-card__title">{pick('预算策略', 'Budget rule')}</div>
+                  <div className="settings-provider-editor-card__helper">
+                    {pick('默认不限额；需要成本保护时再设置金额预算或词元上限。', 'Unlimited by default. Set an amount or token cap only when you need cost protection.')}
                   </div>
                 </div>
-                <SegmentedControlMulti options={[...UI_BUDGET_OPTIONS]} value={getModeOption(providerForm.mode)} onChange={(value) => setProviderForm((current) => ({ ...current, mode: parseModeOption(value) }))} disabled={providerEditorReadOnly} />
-                {providerForm.mode !== 'unlimited' ? (
-                  <div className="mt-3">
-                    <SettingInput
-                      label={providerForm.mode === 'amount' ? pick('预算上限', 'Budget limit') : pick('词元上限', 'Token limit')}
-                      value={providerForm.value}
-                      onChange={(value) => setProviderForm((current) => ({ ...current, value }))}
-                      type="number"
-                      placeholder={providerForm.mode === 'amount' ? pick('例如：100', 'For example: 100') : pick('例如：1000000', 'For example: 1000000')}
-                      helper={providerForm.mode === 'amount' ? pick('金额预算按累计成本统计。', 'Amount budgets are tracked by cumulative cost.') : pick('词元上限按累计词元量统计。', 'Token limits are tracked by cumulative token usage.')}
-                      disabled={providerEditorReadOnly}
-                    />
-                  </div>
-                ) : null}
               </div>
-            )}
+              <SegmentedControlMulti options={[...UI_BUDGET_OPTIONS]} value={getModeOption(providerForm.mode)} onChange={(value) => setProviderForm((current) => ({ ...current, mode: parseModeOption(value) }))} disabled={providerEditorReadOnly} />
+              {providerForm.mode !== 'unlimited' ? (
+                <div className="mt-3">
+                  <SettingInput
+                    label={providerForm.mode === 'amount' ? pick('预算上限', 'Budget limit') : pick('词元上限', 'Token limit')}
+                    value={providerForm.value}
+                    onChange={(value) => setProviderForm((current) => ({ ...current, value }))}
+                    type="number"
+                    placeholder={providerForm.mode === 'amount' ? pick('例如：100', 'For example: 100') : pick('例如：1000000', 'For example: 1000000')}
+                    helper={providerForm.mode === 'amount' ? pick('金额预算按累计成本统计。', 'Amount budgets are tracked by cumulative cost.') : pick('词元上限按累计词元量统计。', 'Token limits are tracked by cumulative token usage.')}
+                    disabled={providerEditorReadOnly}
+                  />
+                </div>
+              ) : null}
+            </div>
 
             <div className="settings-provider-editor-actions">
               <PrimaryButton disabled={providerActionsDisabled || Boolean(providerEditorValidationMessage)} onClick={() => void saveProvider()} loading={busy === `provider-save:${providerForm.id || 'new'}`}>
@@ -3559,6 +4117,21 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             ) : null}
           </div>
         </SettingsSection>
+        {selectedProvider && (
+          <PresetModelsCardComponent
+            title={pick('可用模型', 'Available models')}
+            models={selectedProvider.models || []}
+            onSync={() => void refreshProvider(selectedProvider)}
+            syncLoading={busy === `provider-check:${selectedProvider.id}`}
+            isMobile={isMobile}
+            isDarkMode={isDarkMode}
+            getModelMetadata={getModelMetadata}
+            pick={pick}
+            notify={notify}
+            SETTINGS_OVERLAY_STYLE={SETTINGS_OVERLAY_STYLE}
+          />
+        )}
+        </>
       ) : null}
 
         </div>

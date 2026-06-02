@@ -1214,7 +1214,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     const highlightedBorderColor = 'color-mix(in srgb, var(--accent-coral) 46%, var(--frost-card-main-border))';
     const activeBorderColor = 'rgba(245, 158, 11, 0.72)';
     const cardBorderColor = image.error && !image.isGenerating
-        ? 'rgb(239, 68, 68)'
+        ? 'rgba(244, 63, 94, 0.45)' // 简体中文注释：使用带半透明质感的高级玫瑰珊瑚红代替刺眼的强亮红，更显细腻与高雅
         : showSelectedAccent
             ? selectedBorderColor
             : showHighlightedAccent
@@ -1223,7 +1223,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     ? activeBorderColor
                     : 'var(--border-default)';
     const imageCardAccent = image.error && !image.isGenerating
-        ? 'red'
+        ? 'coral' // 简体中文注释：阴影光晕使用更高级的珊瑚粉红调代替原有的强纯红
         : showActiveAccent
             ? 'gold'
             : (showSelectionBorder ? 'coral' : undefined);
@@ -1596,100 +1596,122 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                             />
                                         )
                                     ) : (
+                                        (() => {
+                                            const isMediaExpired = image.error === '本地临时图片已失效' ||
+                                                displaySrc?.startsWith('blob:') ||
+                                                image.url?.startsWith('blob:') ||
+                                                image.originalUrl?.startsWith('blob:');
 
-                                        <div className="w-full h-full min-h-[150px] flex flex-col items-center justify-center text-[var(--text-secondary)] p-4 text-center">
+                                            const placeholderBg = 'rgba(10, 10, 10, 0.95)';
+                                            const placeholderGlow = isMediaExpired
+                                                ? 'inset 0 0 16px rgba(245, 158, 11, 0.15)'
+                                                : 'inset 0 0 16px rgba(239, 68, 68, 0.15)';
+                                            const placeholderBorder = isMediaExpired
+                                                ? '1px solid rgba(245, 158, 11, 0.12)'
+                                                : '1px solid rgba(239, 68, 68, 0.12)';
+                                            const placeholderTextColor = isMediaExpired
+                                                ? 'rgb(245, 158, 11)'
+                                                : 'rgb(244, 63, 94)';
 
-                                            {/* 🚀 加载/恢复状态 - 居中显示 */}
-                                            {(isLoading || (!imgError && !displaySrc)) ? (
-                                                // 加载状态由全局遮罩处理，这里显示空白占位
-                                                <div className="absolute inset-0 bg-transparent" />
-                                            ) : (
-                                                <>
-                                                    <ImageOff size={24} className="mb-2 opacity-50 text-rose-400" />
-                                                    <span className="text-xs text-rose-300">
-                                                        {/* 统一视频判断：mode/data:video/.mp4/image.url */}
-                                                        {image.error === '本地临时图片已失效' ||
-                                                        displaySrc?.startsWith('blob:') ||
-                                                        image.url?.startsWith('blob:') ||
-                                                        image.originalUrl?.startsWith('blob:')
-                                                            ? '本地临时图片已失效'
-                                                            : (image.mode === GenerationMode.VIDEO ||
-                                                                image.url?.includes('.mp4') ||
-                                                                image.url?.startsWith('data:video') ||
-                                                                displaySrc?.includes('.mp4') ||
-                                                                displaySrc?.startsWith('data:video'))
-                                                                ? '视频加载失败'
-                                                                : '图片加载失败'}
-                                                    </span>
-                                                    <span className="text-[9px] opacity-60">
-                                                        {image.error === '本地临时图片已失效' ||
-                                                        displaySrc?.startsWith('blob:') ||
-                                                        image.url?.startsWith('blob:') ||
-                                                        image.originalUrl?.startsWith('blob:')
-                                                            ? '(Expired Blob)'
-                                                            : (image.mode === GenerationMode.AUDIO || displaySrc?.includes('.mp3'))
-                                                            ? '(Audio Load Error)'
-                                                            : (image.mode === GenerationMode.VIDEO ||
-                                                                image.url?.includes('.mp4') ||
-                                                                image.url?.startsWith('data:video') ||
-                                                                displaySrc?.includes('.mp4') ||
-                                                                displaySrc?.startsWith('data:video'))
-                                                                ? '(Video Load Error)'
-                                                                : '(Image Load Error)'}
-                                                    </span>
-                                                    {/* Retry Button */}
-                                                    <button
-                                                        onClick={handleRetryLoad}
-                                                        className="mt-2 text-[10px] text-[var(--accent-coral)] hover:text-[var(--accent-pink)] underline"
-                                                    >
-                                                        点击重试
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
+                                            return (
+                                                <div 
+                                                    className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center rounded-lg"
+                                                    style={{
+                                                        background: placeholderBg,
+                                                        boxShadow: placeholderGlow,
+                                                        border: placeholderBorder,
+                                                        color: placeholderTextColor
+                                                    }}
+                                                >
+                                                    {/* 🚀 加载/恢复状态 - 居中显示 */}
+                                                    {(isLoading || (!imgError && !displaySrc)) ? (
+                                                        // 加载状态由全局遮罩处理，这里显示空白占位
+                                                        <div className="absolute inset-0 bg-transparent" />
+                                                    ) : (
+                                                        <>
+                                                            <ImageOff size={22} className="mb-2.5 opacity-75" style={{ color: placeholderTextColor }} />
+                                                            <span className="text-xs font-semibold tracking-wide">
+                                                                {isMediaExpired
+                                                                    ? '本地临时图片已失效'
+                                                                    : (image.mode === GenerationMode.VIDEO ||
+                                                                        image.url?.includes('.mp4') ||
+                                                                        image.url?.startsWith('data:video') ||
+                                                                        displaySrc?.includes('.mp4') ||
+                                                                        displaySrc?.startsWith('data:video'))
+                                                                        ? '视频加载失败'
+                                                                        : '图片加载失败'}
+                                                            </span>
+                                                            <span className="text-[9px] opacity-60">
+                                                                {isMediaExpired
+                                                                    ? '(Expired Blob)'
+                                                                    : (image.mode === GenerationMode.AUDIO || displaySrc?.includes('.mp3'))
+                                                                    ? '(Audio Load Error)'
+                                                                    : (image.mode === GenerationMode.VIDEO ||
+                                                                        image.url?.includes('.mp4') ||
+                                                                        image.url?.startsWith('data:video') ||
+                                                                        displaySrc?.includes('.mp4') ||
+                                                                        displaySrc?.startsWith('data:video'))
+                                                                        ? '(Video Load Error)'
+                                                                        : '(Image Load Error)'}
+                                                            </span>
+                                                            {/* Retry Button */}
+                                                            <button
+                                                                onClick={handleRetryLoad}
+                                                                className="mt-2 text-[10px] underline hover:opacity-80"
+                                                                style={{ color: placeholderTextColor }}
+                                                            >
+                                                                点击重试
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()
                                     )}
                                 </div>{/* 关闭图片独立容器 */}
 
-                                {/* 🚀 错误状态遮罩 — 红色标志显示生成错误/超时（在上模块内） */}
                                 {image.error && !image.isGenerating && (
                                     <div
-                                        className="absolute inset-0 z-40 rounded-lg flex flex-col items-center justify-center p-4 text-center"
+                                        className="absolute inset-0 z-40 rounded-lg flex flex-col items-center justify-center p-4 text-center border border-red-500/12"
                                         style={{
-                                            background: 'linear-gradient(135deg, rgba(220,38,38,0.15) 0%, rgba(153,27,27,0.25) 100%)',
-                                            backdropFilter: 'blur(2px)'
+                                            background: 'rgba(10, 10, 10, 0.95)',
+                                            backdropFilter: 'blur(8px)',
+                                            boxShadow: 'inset 0 0 20px rgba(239, 68, 68, 0.15)'
                                         }}
                                     >
-                                        {/* 红色警告图标 */}
-                                        <div className="w-10 h-10 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center mb-2">
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgb(239,68,68)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        {/* 优雅红色警告图标 */}
+                                        <div className="w-10 h-10 rounded-full bg-red-500/8 border border-red-500/25 flex items-center justify-center mb-2.5 shadow-sm">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(244, 63, 94)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-[0_2px_8px_rgba(239,68,68,0.25)]">
                                                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                                                 <line x1="12" y1="9" x2="12" y2="13" />
                                                 <line x1="12" y1="17" x2="12.01" y2="17" />
                                             </svg>
                                         </div>
                                         {/* 错误分类 */}
-                                        <span className="text-xs font-semibold text-red-400 mb-1">
+                                        <span className="text-xs font-semibold text-[rgb(244, 63, 94)] tracking-wider mb-1.5 uppercase opacity-95 drop-shadow-sm">
                                             {image.error.toLowerCase().includes('timeout') || image.error.toLowerCase().includes('timed out') || image.error.toLowerCase().includes('超时')
                                                 ? '⏱ 生成超时'
                                                 : image.error.toLowerCase().includes('cancel') || image.error.toLowerCase().includes('取消')
                                                     ? '🚫 已取消'
                                                     : '❌ 生成错误'}
                                         </span>
-                                        {/* 截断后的错误信息 */}
-                                        <span className="text-[10px] text-red-300/70 leading-tight max-w-full overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as any }}>
+                                        {/* 优雅排版的错误信息 */}
+                                        <span className="text-[11px] text-[rgba(244, 63, 94, 0.85)] leading-relaxed max-w-[90%] overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as any }}>
                                             {image.error.length > 120 ? image.error.slice(0, 120) + '...' : image.error}
                                         </span>
                                     </div>
                                 )}
 
-                                {/* 🚀 全球加载遮罩 - 只有真正没有图且没有错误时才显示卡片级遮罩（在上模块内） */}
-                                {/* 🚀 交互/防抖期间，直接展示空的卡片（隐藏黑色加载遮罩和文字） */}
                                 {((isLoading && !displaySrc) || (!imgError && !displaySrc)) && !image.error && !isCanvasTransforming && (
                                     <div
-                                        className="absolute inset-0 z-50 rounded-lg flex flex-col items-center justify-center bg-black/60 animate-shimmer-inward"
-                                        style={{ willChange: 'opacity' }}
+                                        className="absolute inset-0 z-50 rounded-lg flex flex-col items-center justify-center border border-white/5 animate-shimmer-inward"
+                                        style={{
+                                            willChange: 'opacity',
+                                            background: 'rgba(10, 10, 10, 0.95)',
+                                            boxShadow: 'inset 0 0 16px rgba(255, 255, 255, 0.12)'
+                                        }}
                                     >
-                                        <span className="text-xs text-white/70 mb-2">
+                                        <span className="text-xs font-semibold tracking-wide text-[var(--text-primary)] opacity-85">
                                             正在加载...
                                         </span>
                                     </div>

@@ -19,6 +19,7 @@ export const MODEL_PRESETS: ModelPreset[] = [
     // ============================================
     { id: 'veo-3.1-generate-preview', label: 'Veo 3.1', provider: 'Google', type: 'video', description: 'Latest Veo video generation preview model.' },
     { id: 'veo-3.1-fast-generate-preview', label: 'Veo 3.1 Fast', provider: 'Google', type: 'video', description: 'Faster Veo 3.1 preview variant.' },
+    { id: 'veo-3.1-lite-generate-preview', label: 'Veo 3.1 Lite', provider: 'Google', type: 'video', description: 'Developer-oriented, highly efficient Veo 3.1 preview variant.' },
 
     // ============================================
     // Google audio and speech generation
@@ -67,6 +68,9 @@ export const CHAT_MODEL_PRESETS: ModelPreset[] = [
     // ============================================
     // Google Gemini chat models
     // ============================================
+    { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', provider: 'Google', type: 'chat', description: 'Most intelligent Flash model, providing state-of-the-art performance.' },
+    { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview', provider: 'Google', type: 'chat', description: 'Flagship model for complex reasoning and agentic tasks.' },
+    { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite', provider: 'Google', type: 'chat', description: 'Cost-effective, highly efficient Gemini model.' },
     { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro Preview', provider: 'Google', type: 'chat', description: 'Top-end multimodal reasoning model.' },
     { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash Preview', provider: 'Google', type: 'chat', description: 'Fast general-purpose Gemini preview model.' },
     { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'Google', type: 'chat', description: 'Low-latency Gemini 2.5 chat model.' },

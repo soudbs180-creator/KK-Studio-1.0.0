@@ -389,8 +389,8 @@ export function extractWuyinVideoUrl(payload: unknown): string {
 
 export function extractWuyinVideoMessage(payload: unknown): string {
     const data = asRecord(payload)?.data;
-    return readRecordString(data, 'message', 'error', 'msg')
-        || readRecordString(payload, 'message', 'error', 'msg')
+    return readRecordString(data, 'message', 'error', 'msg', 'error_msg', 'error_message', 'err_msg')
+        || readRecordString(payload, 'message', 'error', 'msg', 'error_msg', 'error_message', 'err_msg')
         || '';
 }
 

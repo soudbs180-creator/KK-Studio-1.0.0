@@ -1220,7 +1220,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                     </span>
                                 </div>
                                 <div className="text-[11px] text-[var(--text-tertiary)] shrink-0">
-                                    {node.aspectRatio}
+                                    {node.aspectRatio}{node.execTime ? ` · ${node.execTime.toFixed(1)}s` : ''}
                                 </div>
                             </>
                         )}

@@ -1137,7 +1137,26 @@ async function fetchWuyinPricingCatalogViaProxy(baseUrl: string): Promise<ModelP
     }
 }
 
-export async function fetchWuyinPricingCatalog(baseUrl: string): Promise<ModelPricingInfo[]> {
+export async function fetchWuyinPricingCatalog(baseUrl: string, forceRefresh: boolean = false): Promise<ModelPricingInfo[]> {
+    const cacheKey = `wuyin_pricing_catalog_cache_${cleanWuyinBaseUrl(baseUrl)}`;
+
+    // 简体中文注释：如果不强制刷新，且在浏览器环境下，优先从 localStorage 读取之前同步过的价格表缓存；
+    // 如果没有缓存，则直接读取本地静态 fallback 配置，完全不再发起网络请求，避免页面加载或连接测试卡顿。
+    if (!forceRefresh && typeof window !== 'undefined') {
+        try {
+            const cached = window.localStorage.getItem(cacheKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    return parsed;
+                }
+            }
+        } catch (e) {
+            console.warn('[NewApiPricing] 读取速创价格缓存失败:', e);
+        }
+        return WUYIN_FALLBACK_CATALOG.map(createWuyinCatalogItemFromFallback);
+    }
+
     try {
         const runtime = resolveProviderRuntime({ baseUrl, format: 'openai' });
         const rootUrl = runtime.host === 'api.wuyinkeji.com'
@@ -1146,6 +1165,13 @@ export async function fetchWuyinPricingCatalog(baseUrl: string): Promise<ModelPr
 
         const proxied = await fetchWuyinPricingCatalogViaProxy(baseUrl);
         if (proxied?.length) {
+            if (typeof window !== 'undefined') {
+                try {
+                    window.localStorage.setItem(cacheKey, JSON.stringify(proxied));
+                } catch (e) {
+                    console.warn('[NewApiPricing] 写入速创代理价格缓存失败:', e);
+                }
+            }
             return proxied;
         }
 
@@ -1191,7 +1217,15 @@ export async function fetchWuyinPricingCatalog(baseUrl: string): Promise<ModelPr
             throw new Error('Wuyin pricing catalog returned no api_list items.');
         }
 
-        return normalizeWuyinCatalogItems(apiList, rootUrl);
+        const result = normalizeWuyinCatalogItems(apiList, rootUrl);
+        if (result.length > 0 && typeof window !== 'undefined') {
+            try {
+                window.localStorage.setItem(cacheKey, JSON.stringify(result));
+            } catch (e) {
+                console.warn('[NewApiPricing] 写入速创价格缓存失败:', e);
+            }
+        }
+        return result;
     } catch (outerErr) {
         console.warn('[NewApiPricing] Wuyin catalog fetch completely failed, using static fallback models:', outerErr);
         // 简体中文注释：当价格表抓取由于网络抖动、跨域或 WAF 拦截等因素失败时，回滚到当前官方目录的静态快照。

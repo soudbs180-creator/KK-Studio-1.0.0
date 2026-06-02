@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from "react";
 import { adminGetUsers, adminSetAdminLevel } from "@nano-banana/api-client";
 import { getStoredKkApiAccessToken } from "../../services/api/authAccessToken.ts";
+import { ShieldAlert, Award, User, Search, Clock, ShieldCheck } from "lucide-react";
 
 interface UserItem {
   id: string;
@@ -65,7 +66,7 @@ export const StaffPanel: React.FC = () => {
         text: `操作成功！已将用户 ${user.email} 的身份更改为 ${levelName}。`,
       });
       // 重新加载当前页数据
-      fetchUsers();
+      void fetchUsers();
     } catch (err: any) {
       console.error("[更改管理员级别失败]", err);
       setMessage({
@@ -76,16 +77,21 @@ export const StaffPanel: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-4xl">
-      <h2 className="text-base font-semibold text-gray-900">人员权限管理 (超级管理员专属)</h2>
-      <p className="text-sm text-gray-500 mt-1">超级管理员可在此检索所有注册用户，并指定或取消普通管理员 (Level 2)。</p>
+    <div className="bg-[#111827]/80 border border-[#1F293D] rounded-2xl p-6 max-w-4xl backdrop-blur-md shadow-2xl">
+      <div className="border-b border-[#1F293D] pb-3 mb-5">
+        <h2 className="text-base font-bold text-white flex items-center gap-2">
+          <ShieldCheck className="text-red-500" size={18} />
+          人员权限管理 <span className="text-[10px] bg-red-500/10 border border-red-500/30 text-red-400 font-semibold px-2 py-0.5 rounded-full">超级管理员专属</span>
+        </h2>
+        <p className="text-xs text-gray-400 mt-1">超级管理员可在此检索所有注册用户，并指定或撤销普通管理员权限。</p>
+      </div>
 
       {message && (
         <div
-          className={`p-3 rounded-lg text-sm mt-4 ${
+          className={`p-3 rounded-xl text-xs mb-4 ${
             message.type === "success"
-              ? "bg-green-50 text-green-800 border border-green-200"
-              : "bg-red-50 text-red-800 border border-red-200"
+              ? "bg-green-500/10 text-green-400 border border-green-500/20"
+              : "bg-red-500/10 text-red-400 border border-red-500/20"
           }`}
         >
           {message.text}
@@ -93,83 +99,87 @@ export const StaffPanel: React.FC = () => {
       )}
 
       {/* 搜索框 */}
-      <form onSubmit={handleSearchSubmit} className="mt-6 flex gap-2">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="按邮箱搜索用户..."
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600 w-80"
-        />
+      <form onSubmit={handleSearchSubmit} className="mt-4 flex gap-2">
+        <div className="relative text-xs">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="输入邮箱搜索用户..."
+            className="bg-[#1F293D] text-white placeholder-gray-500 border border-[#374151] rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-blue-500 transition-colors w-72"
+          />
+          <Search className="absolute left-3 top-2.5 text-gray-500" size={14} />
+        </div>
         <button
           type="submit"
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg"
+          className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all shadow-[0_4px_12px_rgba(59,130,246,0.2)]"
         >
           搜索
         </button>
       </form>
 
       {/* 用户数据表 */}
-      <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 text-gray-700 uppercase font-semibold border-b border-gray-200">
+      <div className="mt-5 border border-[#1F293D] rounded-xl overflow-hidden bg-[#111827]">
+        <table className="w-full text-left text-xs border-collapse">
+          <thead className="bg-[#1F293D]/50 text-gray-400 font-semibold border-b border-[#1F293D]">
             <tr>
-              <th className="px-4 py-3">用户邮箱</th>
-              <th className="px-4 py-3">积分余额</th>
-              <th className="px-4 py-3">用户身份</th>
-              <th className="px-4 py-3 text-right">操作</th>
+              <th className="px-4 py-3.5">用户邮箱</th>
+              <th className="px-4 py-3.5">积分余额</th>
+              <th className="px-4 py-3.5">当前身份</th>
+              <th className="px-4 py-3.5 text-right">权限授信</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 text-gray-700">
+          <tbody className="divide-y divide-[#1F293D] text-gray-200">
             {loading && userList.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-gray-400">
-                  正在加载数据...
+                <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+                    正在加载数据...
+                  </div>
                 </td>
               </tr>
             ) : userList.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-gray-400">
+                <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
                   暂无匹配的用户
                 </td>
               </tr>
             ) : (
               userList.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{user.email}</td>
-                  <td className="px-4 py-3">
-                    <span className="bg-white border border-gray-200 rounded-full px-3 py-1 text-xs text-gray-700">
-                      {user.credits} 积分
-                    </span>
+                <tr key={user.id} className="hover:bg-[#1E293B]/40 transition-colors">
+                  <td className="px-4 py-3.5 font-medium">{user.email}</td>
+                  <td className="px-4 py-3.5 font-mono text-yellow-400 font-semibold">
+                    {user.credits.toLocaleString()} <span className="text-[10px] text-gray-400 font-normal">分</span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3.5">
                     {user.adminLevel === 1 ? (
-                      <span className="bg-white border border-gray-200 rounded-full px-3 py-1 text-xs text-gray-700 inline-flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                        超级管理员 (Level 1)
+                      <span className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-full px-2.5 py-1 text-xs inline-flex items-center gap-1.5 font-semibold">
+                        <ShieldAlert size={12} />
+                        高级管理员 (Level 1)
                       </span>
                     ) : user.adminLevel === 2 ? (
-                      <span className="bg-white border border-gray-200 rounded-full px-3 py-1 text-xs text-gray-700 inline-flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                      <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full px-2.5 py-1 text-xs inline-flex items-center gap-1.5 font-semibold">
+                        <Award size={12} />
                         普通管理员 (Level 2)
                       </span>
                     ) : (
-                      <span className="bg-white border border-gray-200 rounded-full px-3 py-1 text-xs text-gray-700 inline-flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                      <span className="bg-gray-500/10 border border-gray-500/20 text-gray-400 rounded-full px-2.5 py-1 text-xs inline-flex items-center gap-1.5">
+                        <User size={12} />
                         普通用户 (Level 0)
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3.5 text-right">
                     {user.adminLevel === 1 ? (
-                      <span className="text-xs text-gray-400">不可修改</span>
+                      <span className="text-xs text-gray-500">不可修改</span>
                     ) : (
                       <button
                         onClick={() => handleToggleAdmin(user)}
-                        className={`text-xs font-medium rounded-full px-3 py-1 ${
+                        className={`text-xs font-semibold rounded-xl px-3 py-1 transition-all ${
                           user.adminLevel === 2
-                            ? "bg-red-50 text-red-600 hover:bg-red-100"
-                            : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                            ? "bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500 hover:text-white"
+                            : "bg-blue-600/10 text-blue-400 border border-blue-500/20 hover:bg-blue-600 hover:text-white"
                         }`}
                       >
                         {user.adminLevel === 2 ? "撤销管理员" : "设为管理员"}
@@ -184,22 +194,22 @@ export const StaffPanel: React.FC = () => {
       </div>
 
       {/* 分页控制 */}
-      {total > 10 && (
-        <div className="mt-4 flex items-center justify-between">
+      {!loading && total > 10 && (
+        <div className="mt-6 flex items-center justify-between border-t border-[#1F293D] pt-4 text-xs">
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="border border-gray-300 rounded px-3 py-1 text-xs disabled:opacity-50"
+            className="bg-[#1F293D] hover:bg-[#374151] border border-[#374151] text-gray-300 disabled:opacity-30 rounded-xl px-3 py-1.5 transition-colors disabled:cursor-not-allowed"
           >
             上一页
           </button>
-          <span className="text-xs text-gray-500">
+          <span className="text-gray-400">
             第 {page} 页 / 共 {Math.ceil(total / 10)} 页
           </span>
           <button
             onClick={() => setPage((p) => (p * 10 < total ? p + 1 : p))}
             disabled={page * 10 >= total}
-            className="border border-gray-300 rounded px-3 py-1 text-xs disabled:opacity-50"
+            className="bg-[#1F293D] hover:bg-[#374151] border border-[#374151] text-gray-300 disabled:opacity-30 rounded-xl px-3 py-1.5 transition-colors disabled:cursor-not-allowed"
           >
             下一页
           </button>

@@ -1135,6 +1135,7 @@ async function pollWuyinImageResultUntilComplete({ route, routeId, providerTaskI
         endpointType: 'wuyin-async-image',
         requestId: typeof requestId === 'string' ? requestId : undefined,
         attemptId: typeof attemptId === 'string' ? attemptId : undefined,
+        execTime: typeof payload.exec_time === 'number' ? payload.exec_time : undefined,
       };
     }
 
@@ -1221,15 +1222,17 @@ async function handleWuyinImageMode(req, res, profileState) {
     return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', message);
   }
 
-  const result = await pollWuyinImageResultUntilComplete({
-    route,
-    routeId,
+  // 简体中文注释：不再在后端进行同步轮询，而是直接返回 pending 状态和编码后的任务 ID，让前端异步查询以彻底避免 Nginx/Cloudflare 的接口超时问题
+  return res.json(okEnvelope({
+    urls: [],
+    taskId: encodeLocalProxyTaskId(route.id || routeId, providerTaskId),
     providerTaskId,
-    requestId: req.body && req.body.requestId,
-    attemptId: req.body && req.body.attemptId,
-  });
-
-  return res.json(okEnvelope(result, req));
+    status: 'pending',
+    endpointType: 'wuyin-async-image',
+    requestId: req.body && typeof req.body.requestId === 'string' ? req.body.requestId : undefined,
+    attemptId: req.body && typeof req.body.attemptId === 'string' ? req.body.attemptId : undefined,
+    execTime: typeof submitPayload.exec_time === 'number' ? submitPayload.exec_time : undefined,
+  }, req));
 }
 
 async function handleWuyinVideoMode(req, res, profileState) {
@@ -1271,6 +1274,7 @@ async function handleWuyinVideoMode(req, res, profileState) {
     endpointType: 'openai',
     requestId: req.body && typeof req.body.requestId === 'string' ? req.body.requestId : undefined,
     attemptId: req.body && typeof req.body.attemptId === 'string' ? req.body.attemptId : undefined,
+    execTime: typeof payload.exec_time === 'number' ? payload.exec_time : undefined,
   }, req));
 }
 
@@ -1294,18 +1298,25 @@ async function handleWuyinTaskStatusMode(req, res, profileState) {
   const detailUrl = buildWuyinVideoDetailUrl(route.baseUrl, parsed.providerTaskId);
   const payload = await fetchWuyinVideoJson(detailUrl, route.apiKey, 'GET');
   const status = mapWuyinVideoStatus(extractWuyinVideoStatusCode(payload));
-  const url = status === 'success' ? extractWuyinVideoUrl(payload) : '';
+
+  // 简体中文注释：智能提取详情结果。对于视频和图片任务，不仅提取第一个 url，同时也通过 extractWuyinOutputUrls 提取全部 urls，确保前端在轮询图片结果时能拿到 urls 数组
+  const urls = status === 'success' ? extractWuyinOutputUrls(payload) : [];
+  const url = urls[0] || '';
   const message = extractWuyinVideoMessage(payload);
   const effectiveStatus = status === 'success' && !url ? 'pending' : status;
+
+  const isImageTask = String(parsed.providerTaskId).startsWith('image_');
 
   return res.json(okEnvelope({
     taskId: localTaskId,
     providerTaskId: parsed.providerTaskId,
     status: effectiveStatus,
     url: url || undefined,
+    urls: urls.length > 0 ? urls : undefined,
     message: message || undefined,
-    error: status === 'failed' ? (message || 'Wuyin video task failed.') : undefined,
-    endpointType: 'openai',
+    error: status === 'failed' ? (message || 'Wuyin task failed.') : undefined,
+    endpointType: isImageTask ? 'wuyin-async-image' : 'openai',
+    execTime: typeof payload.exec_time === 'number' ? payload.exec_time : undefined,
   }, req));
 }
 
@@ -1333,22 +1344,64 @@ router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
 
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'Local user-route proxy does not handle this mode.');
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error || 'Wuyin user-route proxy failed.');
+    let message = error instanceof Error ? error.message : String(error || 'Wuyin user-route proxy failed.');
+
+    // 简体中文注释：智能识别并清洗速创 API (Wuyin) 上游返回的 Nginx 404/502 巨幅 HTML 原始报错，极大地优化用户排障体验
+    const lowerMessage = message.toLowerCase();
+    if (
+      lowerMessage.includes('<html>') ||
+      lowerMessage.includes('nginx') ||
+      lowerMessage.includes('404 not found') ||
+      lowerMessage.includes('upstream error')
+    ) {
+      message = '[速创 API 上游通道不可用] 该绘图或视频模型底层通道暂时故障或维护中 (Nginx 404)。建议在“API设置”中切换至其他速创模型（如 NanoBanana_pro 或 NanoBanana）再试，或联系速创官方管理员确认该模型通道状态。';
+    }
+
     return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', message);
   }
 });
 
+let cachedWuyinPricingRows = null;
+
 router.get('/v1/wuyin/catalog', async (req, res) => {
+  const shouldRefresh = req.query.refresh === 'true';
+
   try {
-    const rows = await fetchWuyinPricingRows();
-    const catalog = mergeWuyinCatalogWithRemoteRows(rows);
+    // 仅在强制刷新，或全局缓存为空时发起网络请求
+    if (shouldRefresh || !cachedWuyinPricingRows) {
+      const rows = await fetchWuyinPricingRows();
+      if (rows && rows.length > 0) {
+        cachedWuyinPricingRows = rows;
+      }
+    }
+
+    if (cachedWuyinPricingRows) {
+      const catalog = mergeWuyinCatalogWithRemoteRows(cachedWuyinPricingRows);
+      return res.json({
+        success: true,
+        data: catalog,
+        source: shouldRefresh ? 'remote' : 'cache'
+      });
+    }
+
+    // 缓存依然为空且网络请求未成功时，回退到本地静态默认配置
+    const catalog = mergeWuyinCatalogWithRemoteRows([]);
     return res.json({
       success: true,
       data: catalog,
-      source: 'remote'
+      source: 'fallback'
     });
   } catch (error) {
-    console.warn('[wuyin-catalog] Failed to fetch remote catalog, using fallback:', error && error.message || error);
+    console.warn('[wuyin-catalog] 无法拉取速创远程价格表，使用缓存或本地静态配置:', error && error.message || error);
+    // 即使本次拉取报错，若之前成功获取过，依然使用已缓存的数据
+    if (cachedWuyinPricingRows) {
+      const catalog = mergeWuyinCatalogWithRemoteRows(cachedWuyinPricingRows);
+      return res.json({
+        success: true,
+        data: catalog,
+        source: 'cache'
+      });
+    }
     const catalog = mergeWuyinCatalogWithRemoteRows([]);
     return res.json({
       success: true,

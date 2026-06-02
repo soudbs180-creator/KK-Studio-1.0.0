@@ -19,6 +19,8 @@ import {
   Shield,
   Wallet,
   X,
+  ShieldAlert,
+  User,
 } from 'lucide-react';
 import { safeOpenLink } from '../../utils/browserUtils';
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
@@ -197,6 +199,61 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
     return '普通用户';
   }, [accountRole, checkingAdmin, user]);
+
+  const resolvedIdentity = useMemo(() => {
+    // 1. 高级管理员 (Level 1)
+    if (adminLevel === 1 || accountRole === 'admin' && (user?.email === '977483863@qq.com' || user?.user_metadata?.email === '977483863@qq.com')) {
+      return {
+        label: '高级管理员',
+        colorClass: 'text-red-400',
+        bgStyle: 'bg-red-500/10 border border-red-500/30 shadow-[0_0_12px_rgba(239,68,68,0.2)]',
+        icon: <ShieldAlert size={12} className="text-red-400 shrink-0" />
+      };
+    }
+    // 2. 普通管理员 (Level 2)
+    if (adminLevel === 2) {
+      return {
+        label: '普通管理员',
+        colorClass: 'text-emerald-400',
+        bgStyle: 'bg-emerald-500/10 border border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.2)]',
+        icon: <Award size={12} className="text-emerald-400 shrink-0" />
+      };
+    }
+    // 3. 临时用户
+    if (isTempUser) {
+      return {
+        label: '临时用户',
+        colorClass: 'text-amber-400',
+        bgStyle: 'bg-amber-500/10 border border-amber-500/20',
+        icon: <User size={12} className="text-amber-400 shrink-0" />
+      };
+    }
+    // 4. 会员用户 (待定) - 积分 >= 5000
+    if (balance >= 5000) {
+      return {
+        label: '会员用户 (待定)',
+        colorClass: 'text-yellow-400',
+        bgStyle: 'bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-orange-500/20 border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.25)] animate-pulse',
+        icon: <Crown size={12} className="text-amber-400 shrink-0" />
+      };
+    }
+    // 5. 高级用户 - 积分 >= 1000
+    if (balance >= 1000) {
+      return {
+        label: '高级用户',
+        colorClass: 'text-violet-400',
+        bgStyle: 'bg-violet-500/10 border border-violet-500/30 shadow-[0_0_12px_rgba(139,92,246,0.2)]',
+        icon: <Sparkles size={12} className="text-violet-400 shrink-0" />
+      };
+    }
+    // 6. 普通用户
+    return {
+      label: '普通用户',
+      colorClass: 'text-gray-300',
+      bgStyle: 'bg-white/5 border border-white/10',
+      icon: <User size={12} className="text-gray-300 shrink-0" />
+    };
+  }, [adminLevel, accountRole, user, balance, isTempUser]);
 
   const sessionLinkedProviders = useMemo(
     () => collectLinkedAuthProviders(user),
@@ -776,17 +833,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
                       {/* 简体中文：右侧预埋的高级订阅与权益套餐微标体系 */}
                       <div className="flex flex-col items-end gap-1 shrink-0">
-                        {adminLevel > 0 || accountRole === 'admin' ? (
-                          <div className="flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-orange-500/20 border border-amber-500/30 px-2.5 py-1 text-[11px] font-bold text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.15)] animate-pulse">
-                            <Crown size={12} className="text-amber-400 shrink-0" />
-                            <span>终极超级订阅</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]">
-                            <Sparkles size={12} className="text-[var(--clay-brand-lavender)] shrink-0" />
-                            <span>普通版订阅</span>
-                          </div>
-                        )}
+                        <div className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${resolvedIdentity.colorClass} ${resolvedIdentity.bgStyle}`}>
+                          {resolvedIdentity.icon}
+                          <span>{resolvedIdentity.label}</span>
+                        </div>
                         <span 
                           className="text-[9px] text-[var(--text-tertiary)] opacity-80 cursor-pointer hover:text-[var(--accent-coral)] transition-colors"
                           title="更多专业版、团队版订阅套餐正在设计中，敬请期待"

@@ -16,7 +16,8 @@ export type CanonicalSettingsViewId =
   | 'api-management'
   | 'consumption-records'
   | 'storage-settings'
-  | 'system-logs';
+  | 'system-logs'
+  | 'user-profile';
 
 export type LegacySettingsViewId =
   | 'admin-console'
@@ -128,6 +129,7 @@ export const SETTINGS_PATHS: Record<CanonicalSettingsViewId, string> = {
   'consumption-records': 'consumption-records',
   'storage-settings': 'storage-settings',
   'system-logs': 'system-logs',
+  'user-profile': 'user-profile',
 };
 
 export const LEGACY_SETTINGS_VIEW_ALIASES: Record<LegacySettingsViewId, CanonicalSettingsViewId> = {
@@ -216,6 +218,18 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     statusSummaryLabelZh: '日志状态',
     statusSummaryLabelEn: 'Log status',
   },
+  'user-profile': {
+    eyebrow: 'Profile',
+    titleZh: '个人中心',
+    titleEn: 'User Profile',
+    descriptionZh: '查看和管理您的账户、积分资产及充值消费历史。',
+    descriptionEn: 'View and manage your account, credits assets, recharges, and consumption histories.',
+    primaryActionLabelZh: '返回设置总览',
+    primaryActionLabelEn: 'Back to Settings Overview',
+    primaryActionTarget: 'dashboard',
+    statusSummaryLabelZh: '账户状态',
+    statusSummaryLabelEn: 'Account status',
+  },
 };
 
 export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
@@ -230,17 +244,6 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     path: SETTINGS_PATHS.dashboard,
   },
   {
-    id: 'api-management',
-    labelZh: 'API 工作台',
-    labelEn: 'API Workspace',
-    descriptionZh: '本地 API、供应商、预算。',
-    descriptionEn: 'Local APIs, providers, budgets.',
-    icon: KeyRound,
-    section: 'workspace',
-    path: SETTINGS_PATHS['api-management'],
-  },
-
-  {
     id: 'consumption-records',
     labelZh: '计费账本',
     labelEn: 'Billing',
@@ -252,14 +255,14 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     featureFlag: 'billing',
   },
   {
-    id: 'system-logs',
-    labelZh: '日志',
-    labelEn: 'Logs',
-    descriptionZh: '错误、告警、排障。',
-    descriptionEn: 'Errors, warnings, triage.',
-    icon: ScrollText,
-    section: 'system',
-    path: SETTINGS_PATHS['system-logs'],
+    id: 'api-management',
+    labelZh: 'API 工作台',
+    labelEn: 'API Workspace',
+    descriptionZh: '本地 API、供应商、预算。',
+    descriptionEn: 'Local APIs, providers, budgets.',
+    icon: KeyRound,
+    section: 'workspace',
+    path: SETTINGS_PATHS['api-management'],
   },
   {
     id: 'storage-settings',
@@ -270,6 +273,16 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     icon: HardDrive,
     section: 'system',
     path: SETTINGS_PATHS['storage-settings'],
+  },
+  {
+    id: 'system-logs',
+    labelZh: '日志',
+    labelEn: 'Logs',
+    descriptionZh: '错误、告警、排障。',
+    descriptionEn: 'Errors, warnings, triage.',
+    icon: ScrollText,
+    section: 'system',
+    path: SETTINGS_PATHS['system-logs'],
   },
 ];
 

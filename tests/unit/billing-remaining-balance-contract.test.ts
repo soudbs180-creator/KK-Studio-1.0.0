@@ -92,7 +92,7 @@ test('billing credit mutations stay on the shared web API surface', () => {
 test('manual recharge paid success path refreshes canonical billing balance and transaction logs', () => {
   const rechargeModalSource = readSource('src/components/modals/RechargeModal.tsx');
 
-  assert.match(rechargeModalSource, /const \{ showRechargeModal, setShowRechargeModal, refreshBilling \} = useBilling\(\);/);
+  assert.match(rechargeModalSource, /const \{[\s\S]*?showRechargeModal[\s\S]*?refreshBilling[\s\S]*?\} = useBilling\(\);/);
   assert.match(
     rechargeModalSource,
     /const paidResponse = await markRechargeSubmissionPaid\([\s\S]*?const nextBill(?:Snapshot)? = normalizeRechargeBillSnapshot\(\{ submission: paidResponse\.data\.submission \},[\s\S]*?setBillSnapshot\(nextBill(?:Snapshot)?\);[\s\S]*?await refreshBilling\(\{ includeTransactions: true \}\);/,

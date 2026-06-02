@@ -701,12 +701,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           pointer-events: none;
           transform: translateY(-30px);
         }
+        @media (min-width: 768px) {
+          .dashboard-left-col-span-2 {
+            grid-column: 1 / 3 !important;
+          }
+          .dashboard-left-col-1 {
+            grid-column: 1 !important;
+          }
+          .dashboard-left-col-2 {
+            grid-column: 2 !important;
+          }
+        }
       `}</style>
 
       <SettingsCardGridContainer className="dashboard-grid-container">
         {/* 卡片 1: 总览 (Overview) - 电脑端占 2*2 格 (4A) */}
         <div 
-          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row"
+          className="dashboard-grid-card a-card-span-2-col a-card-span-2-row dashboard-left-col-span-2"
           onClick={() => onNavigate('consumption-records')}
         >
           <div className="dashboard-card-glow" style={{ background: 'var(--accent-color)' }} />
@@ -755,7 +766,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         <button
           type="button"
           aria-label={pick('+ 添加 API', '+ Add API')}
-          className="dashboard-grid-card a-card-span-2-col group"
+          className="dashboard-grid-card a-card-span-2-col group dashboard-left-col-span-2"
           onClick={() => onNavigate('api-management')}
         >
           <div className="dashboard-card-glow" style={{ background: '#3b82f6' }} />
@@ -785,7 +796,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         {/* 卡片 4: 计费账本 (Billing Ledger) - 占 1*1 格 (1A) */}
         <div 
-          className="dashboard-grid-card"
+          className="dashboard-grid-card dashboard-left-col-1"
           onClick={() => onNavigate('consumption-records')}
         >
           <div className="dashboard-card-glow" style={{ background: '#f59e0b' }} />
@@ -805,7 +816,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         {/* 卡片 5: 系统日志 (Logs) - 占 1*1 格 (1A) */}
         <div 
-          className="dashboard-grid-card"
+          className="dashboard-grid-card dashboard-left-col-2"
           onClick={() => onNavigate('system-logs')}
         >
           <div className="dashboard-card-glow" style={{ background: '#ef4444' }} />
@@ -826,7 +837,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         {/* 卡片 6: 存储管理 (Storage) - 电脑端占 2*1 格 (2A) */}
         <div 
-          className="dashboard-grid-card a-card-span-2-col"
+          className="dashboard-grid-card a-card-span-2-col dashboard-left-col-span-2"
           onClick={() => onNavigate('storage-settings')}
         >
           <div className="dashboard-card-glow" style={{ background: '#10b981' }} />

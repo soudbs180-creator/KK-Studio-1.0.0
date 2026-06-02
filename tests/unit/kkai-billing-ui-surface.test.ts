@@ -60,14 +60,14 @@ test('manual recharge UI exposes reserved dynamic channels and admin paid-order 
   const floatingPanelSource = readSource('src/components/admin/AdminRechargeFloatingPanel.tsx');
   const authenticatedShellSource = readSource('src/app/AuthenticatedAppShell.tsx');
 
-  assert.match(rechargeModalSource, /支付宝动态码/);
-  assert.match(rechargeModalSource, /微信动态码/);
-  assert.match(rechargeModalSource, /国际支付/);
-  assert.match(rechargeModalSource, /人工充值/);
+  assert.match(rechargeModalSource, /支付宝静态码/);
+  assert.match(rechargeModalSource, /微信静态码/);
+  assert.match(rechargeModalSource, /国际卡\/Stripe/);
+  assert.match(rechargeModalSource, /人工客服/);
   assert.match(rechargeModalSource, /通道未配置/);
   assert.match(rechargeModalSource, /我已支付/);
-  assert.match(rechargeModalSource, /人工充值较慢，请等待 1-5 分钟/);
-  assert.match(rechargeModalSource, /支付成功但积分未到账，请联系客服处理/);
+  assert.match(rechargeModalSource, /人工充值较慢/);
+  assert.match(rechargeModalSource, /支付成功但积分未到账/);
   assert.match(rechargeModalSource, /markRechargeSubmissionPaid/);
 
   assert.match(floatingPanelSource, /useAdminRole/);

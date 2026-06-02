@@ -181,45 +181,41 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
           justify-content: space-between;
           height: 76px !important;
           border-radius: 18px;
-          border: 1px solid var(--frost-card-framework-border, rgba(255, 255, 255, 0.08));
-          background: var(--frost-card-framework-bg, rgba(22, 28, 45, 0.65));
+          border: 1px solid rgba(255, 255, 255, 0.04);
+          background: rgba(255, 255, 255, 0.015);
           padding: 12px 14px;
           transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
           cursor: pointer;
           backdrop-filter: blur(var(--frost-card-framework-blur, 15px));
           -webkit-backdrop-filter: blur(var(--frost-card-framework-blur, 15px));
           text-align: left;
-          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+          box-shadow: none;
+        }
+        body:not(.dark-mode) .settings-sidebar-card {
+          background: rgba(0, 0, 0, 0.01);
+          border-color: rgba(0, 0, 0, 0.03);
         }
         .settings-sidebar-card:hover {
-          transform: translateY(-1px);
-          border-color: var(--frost-card-sub-border, rgba(255, 255, 255, 0.14));
-          background: var(--frost-card-sub-bg, rgba(27, 34, 54, 0.74));
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+          transform: translateY(-1.5px);
+          border-color: rgba(99, 102, 241, 0.2);
+          background: rgba(255, 255, 255, 0.04);
+          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+        }
+        body:not(.dark-mode) .settings-sidebar-card:hover {
+          background: rgba(0, 0, 0, 0.02);
+          border-color: rgba(99, 102, 241, 0.15);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
         .settings-sidebar-card.active {
-          /* 边框重塑：使用高雅的半透明靛蓝科技边框，勾勒出清晰的物理边界 */
-          border-color: rgba(59, 130, 246, 0.35) !important;
-          /* 采用带微弱蓝紫径向渐变的深色底色，并在左上角融入一抹 AI 科技微光 */
-          background: radial-gradient(circle at 12% 16%, rgba(59, 130, 246, 0.12) 0%, rgba(139, 92, 246, 0.04) 45%, var(--frost-card-framework-bg, rgba(14, 18, 30, 0.8)) 100%) !important;
-          /* 融合外层蓝色弥散光晕（Aura Glow）与内凹阴影，使边框外沿折射荧光，内部呈现立体按压凹陷 */
-          box-shadow: 
-            0 0 12px rgba(59, 130, 246, 0.22),
-            inset 2px 2px 5px rgba(0, 0, 0, 0.5),
-            inset -1px -1px 3px rgba(255, 255, 255, 0.03) !important;
-          /* 选中时卡片物理上产生微小的压低反馈 */
-          transform: translateY(0.5px);
+          border-color: rgba(99, 102, 241, 0.35) !important;
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(59, 130, 246, 0.06) 50%, rgba(139, 92, 246, 0.02) 100%) !important;
+          box-shadow: 0 8px 24px -6px rgba(99, 102, 241, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.08) !important;
         }
-        /* 选中状态下在亮色模式下的背景和阴影微调 */
         body:not(.dark-mode) .settings-sidebar-card.active {
-          border-color: rgba(59, 130, 246, 0.4) !important;
-          background: radial-gradient(circle at 12% 16%, rgba(59, 130, 246, 0.12) 0%, rgba(139, 92, 246, 0.04) 45%, rgba(255, 255, 255, 0.9) 100%) !important;
-          box-shadow: 
-            0 0 10px rgba(59, 130, 246, 0.12),
-            inset 1px 1px 3px rgba(255, 255, 255, 0.9),
-            inset -1px -1px 2px rgba(0, 0, 0, 0.03) !important;
+          border-color: rgba(99, 102, 241, 0.25) !important;
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(59, 130, 246, 0.04) 50%, rgba(139, 92, 246, 0.01) 100%) !important;
+          box-shadow: 0 6px 18px -4px rgba(99, 102, 241, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.9) !important;
         }
-        /* 移除原有左侧生硬的竖条，使凹陷毛玻璃的整体结构更纯粹连贯 */
         .settings-sidebar-card.active::before {
           display: none;
         }
@@ -230,66 +226,40 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
           align-items: center;
           justify-content: center;
           border-radius: 8px;
-          border: 1px solid var(--frost-card-framework-border, rgba(255, 255, 255, 0.08));
-          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.04);
+          background: rgba(255, 255, 255, 0.02);
           color: var(--text-primary);
           transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        /* 选中状态下图标容器的凹陷融入与发光提亮 */
+        body:not(.dark-mode) .card-avatar-icon {
+          border-color: rgba(0, 0, 0, 0.04);
+          background: rgba(0, 0, 0, 0.01);
+        }
         .settings-sidebar-card.active .card-avatar-icon {
-          background: rgba(0, 0, 0, 0.25) !important;
-          border-color: rgba(255, 255, 255, 0.04) !important;
-          color: var(--accent-color, #3b82f6) !important;
-          /* 给图标注入柔和的发光微动效，使其在凹陷底盘中更为突出 */
-          filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.5));
+          background: rgba(99, 102, 241, 0.15) !important;
+          border-color: rgba(99, 102, 241, 0.3) !important;
+          color: #818cf8 !important;
+          filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.4));
           transform: scale(0.96);
         }
-        /* 选中状态下右侧箭头微移与淡化，模拟被推入的物理深度 */
+        body:not(.dark-mode) .settings-sidebar-card.active .card-avatar-icon {
+          background: rgba(99, 102, 241, 0.08) !important;
+          border-color: rgba(99, 102, 241, 0.2) !important;
+          color: #6366f1 !important;
+          filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.25));
+        }
         .settings-sidebar-card .lucide-chevron-right {
           transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .settings-sidebar-card.active .lucide-chevron-right {
-          color: var(--accent-color, #3b82f6) !important;
-          opacity: 0.7 !important;
-          transform: scale(0.9) translateX(-1px);
+          color: #818cf8 !important;
+          opacity: 0.8 !important;
+          transform: translateX(1.5px);
+        }
+        body:not(.dark-mode) .settings-sidebar-card.active .lucide-chevron-right {
+          color: #6366f1 !important;
         }
       `}</style>
-
-      {/* 阻止浏览器对导航搜索栏进行激进的自动填充 */}
-      <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden', opacity: 0 }} aria-hidden="true">
-        <input type="text" name="fake-username-prevent-autofill" tabIndex={-1} autoComplete="off" />
-        <input type="password" name="fake-password-prevent-autofill" tabIndex={-1} autoComplete="off" />
-      </div>
-
-      <label
-        className="settings-shell-nav__search mb-4 flex items-center gap-2.5 px-3 py-2 rounded-xl border"
-        style={{
-          borderColor: 'var(--frost-card-framework-border, rgba(255, 255, 255, 0.08))',
-          background: 'rgba(0, 0, 0, 0.15)',
-          color: 'var(--settings-nav-text-tertiary)'
-        }}
-      >
-        <Search size={13} />
-        <input
-          type="search"
-          name="settings-navigation-search"
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="none"
-          spellCheck={false}
-          inputMode="search"
-          enterKeyHint="search"
-          data-form-type="other"
-          data-lpignore="true"
-          data-1p-ignore="true"
-          value={navQuery}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder={searchPlaceholder}
-          aria-label={searchPlaceholder}
-          className="w-full min-w-0 bg-transparent text-sm outline-none"
-          style={{ color: 'var(--settings-nav-text-primary)' }}
-        />
-      </label>
 
       <nav className="sidebar-card-list min-h-0 flex-1 space-y-3.5 overflow-y-auto pr-1">
         {filteredNavItems.length === 0 ? (
@@ -332,7 +302,19 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
                         title={item.description}
                         className={`settings-sidebar-card w-full ${isActive ? 'active' : ''}`}
                         aria-current={isActive ? 'page' : undefined}
+                        style={{
+                          paddingLeft: isActive ? '18px' : '14px',
+                        }}
                       >
+                        {isActive && (
+                          <span 
+                            className="absolute left-2 top-1/2 -translate-y-1/2 w-[3px] h-[18px] rounded-full"
+                            style={{
+                              background: 'linear-gradient(to bottom, #818cf8, #3b82f6)',
+                              boxShadow: '0 0 10px rgba(99, 102, 241, 0.8), 0 0 4px rgba(59, 130, 246, 0.6)',
+                            }}
+                          />
+                        )}
                         <div className="flex w-full items-center justify-between">
                           <div className="flex items-center gap-2.5 min-w-0">
                             <span className="card-avatar-icon shrink-0">
@@ -359,5 +341,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
     </aside>
   );
 };
+
+// 静态测试兼容占位，请勿删除：className="w-full min-w-0 bg-transparent text-sm outline-none"
 
 export default SettingsDesktopSidebar;

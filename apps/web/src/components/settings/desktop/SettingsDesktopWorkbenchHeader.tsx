@@ -30,9 +30,6 @@ const SettingsDesktopWorkbenchHeader: React.FC<SettingsDesktopWorkbenchHeaderPro
     >
       <div className="flex w-full items-center justify-end gap-4">
         <div className="settings-desktop-quick-actions ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
-          <SettingsActionButton icon={ScrollText} tone="secondary" size="sm" onClick={onOpenLogs}>
-            {pick('日志', 'Logs')}
-          </SettingsActionButton>
           <SettingsActionButton icon={RefreshCw} tone="secondary" size="sm" onClick={onRefreshCurrentView}>
             {pick('刷新', 'Refresh')}
           </SettingsActionButton>

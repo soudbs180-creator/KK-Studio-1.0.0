@@ -54,7 +54,7 @@ test("effective provider model helper preserves official defaults and custom pro
     provider: "Google",
     models: [],
   });
-  assert.equal(officialGoogleModels[0], "gemini-3.1-pro-preview");
+  assert.equal(officialGoogleModels[0], "gemini-3.5-flash");
   assert.ok(officialGoogleModels.includes("gemini-3.1-flash-image-preview"));
   assert.ok(officialGoogleModels.includes("gemini-2.5-flash-image"));
 

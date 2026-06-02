@@ -356,7 +356,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
 
         imagesWithDistance.sort((a, b) => a.distance - b.distance);
-        generatedIdsArray = imagesWithDistance.slice(0, MAX_GENERATED_LOAD).map(item => item.id);
+        const nearestGeneratedIds = imagesWithDistance.slice(0, MAX_GENERATED_LOAD).map(item => item.id);
+        const remainingGeneratedIds = imagesWithDistance.slice(MAX_GENERATED_LOAD).map(item => item.id);
+        generatedIdsArray = nearestGeneratedIds;
 
         const generatedPreviewMap = new Map<string, string>();
         if (generatedIdsArray.length > 0) {
@@ -379,12 +381,13 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // 简体中文注释：生成图加载完成，进度推进至 45%
         onProgress?.(45);
 
-        const imageIdsArray = Array.from(referenceImageIds);
+        // 简体中文注释：将参考图与首屏之外的其它生成图合并，加入后台批次加载中，确保所有图片被成功捞起与恢复
+        const imageIdsArray = Array.from(referenceImageIds).concat(remainingGeneratedIds);
 
         if (generatedImageIds.size > MAX_GENERATED_LOAD) {
-            console.warn(`[CanvasContext] Too many generated images (${generatedImageIds.size}), loading only ${MAX_GENERATED_LOAD} nearest to center`);
+            console.log(`[CanvasContext] Too many generated images (${generatedImageIds.size}), loading ${MAX_GENERATED_LOAD} nearest to center first, and recovering the remaining ${remainingGeneratedIds.length} in background`);
         }
-        console.log(`[CanvasContext] Loading ${referenceImageIds.size} reference images + ${generatedIdsArray.length} generated images`);
+        console.log(`[CanvasContext] Loading ${referenceImageIds.size} reference images + ${generatedIdsArray.length} nearest generated images + ${remainingGeneratedIds.length} background generated images`);
 
         const imageMap = new Map<string, string>(generatedPreviewMap);
         const finalHydrationMap = new Map<string, string>();

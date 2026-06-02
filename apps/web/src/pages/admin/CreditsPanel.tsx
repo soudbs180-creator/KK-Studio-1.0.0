@@ -5,6 +5,7 @@
 import React, { useState } from "react";
 import { adminAdjustCredits, adminGetUsers } from "@nano-banana/api-client";
 import { getStoredKkApiAccessToken } from "../../services/api/authAccessToken.ts";
+import { Sliders, Mail, Edit3 } from "lucide-react";
 
 export const CreditsPanel: React.FC = () => {
   // 声明状态变量，全部使用英文命名，中文注释
@@ -75,26 +76,35 @@ export const CreditsPanel: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-lg">
-      <h2 className="text-base font-semibold text-gray-900">积分手动调整</h2>
-      <p className="text-sm text-gray-500 mt-1">管理员可在此手动扣减或加赠用户的积分，任何变动都会录入审计审计日志。</p>
+    <div className="bg-[#111827]/80 border border-[#1F293D] rounded-2xl p-6 max-w-lg backdrop-blur-md shadow-2xl">
+      <div className="border-b border-[#1F293D] pb-3 mb-5">
+        <h2 className="text-base font-bold text-white flex items-center gap-2">
+          <Sliders className="text-purple-500" size={18} />
+          积分手动调整
+        </h2>
+        <p className="text-xs text-gray-400 mt-1">管理员可在此手动扣减或加赠用户的积分，任何变动都会录入审计日志。</p>
+      </div>
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+      <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block font-semibold text-gray-300 mb-1.5">
             用户邮箱
           </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="user@example.com"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
-          />
+          <div className="relative">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="user@example.com"
+              className="w-full bg-[#1F293D] text-white placeholder-gray-500 border border-[#374151] rounded-xl pl-9 pr-4 py-2 focus:outline-none focus:border-blue-500 transition-colors"
+              required
+            />
+            <Mail className="absolute left-3 top-2.5 text-gray-500" size={14} />
+          </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block font-semibold text-gray-300 mb-1.5">
             积分变动值 (输入正数加积分，负数扣积分)
           </label>
           <input
@@ -102,12 +112,13 @@ export const CreditsPanel: React.FC = () => {
             value={delta || ""}
             onChange={(e) => setDelta(parseInt(e.target.value, 10) || 0)}
             placeholder="例如: 50 或 -50"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+            className="w-full bg-[#1F293D] text-white border border-[#374151] rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
+            required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block font-semibold text-gray-300 mb-1.5">
             调整原因备注 (必填)
           </label>
           <input
@@ -115,16 +126,17 @@ export const CreditsPanel: React.FC = () => {
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="如：排查报错人工赠送"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+            className="w-full bg-[#1F293D] text-white placeholder-gray-500 border border-[#374151] rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
+            required
           />
         </div>
 
         {message && (
           <div
-            className={`p-3 rounded-lg text-sm ${
+            className={`p-3 rounded-xl ${
               message.type === "success"
-                ? "bg-green-50 text-green-800 border border-green-200"
-                : "bg-red-50 text-red-800 border border-red-200"
+                ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                : "bg-red-500/10 text-red-400 border border-red-500/20"
             }`}
           >
             {message.text}
@@ -134,8 +146,9 @@ export const CreditsPanel: React.FC = () => {
         <button
           type="submit"
           disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors duration-150 disabled:opacity-50"
+          className="w-full bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold py-2.5 px-4 rounded-xl transition-all shadow-[0_4px_12px_rgba(168,85,247,0.2)] hover:shadow-[0_4px_20px_rgba(168,85,247,0.3)] hover:-translate-y-0.5 disabled:opacity-50 flex items-center justify-center gap-1.5"
         >
+          <Edit3 size={14} />
           {loading ? "正在处理..." : "确认调整"}
         </button>
       </form>

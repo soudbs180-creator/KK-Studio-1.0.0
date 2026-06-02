@@ -339,8 +339,8 @@ function extractWuyinVideoUrl(payload) {
 
 function extractWuyinVideoMessage(payload) {
   const data = payload && typeof payload === 'object' ? payload.data : null;
-  return readWuyinString(data, ['message', 'error', 'msg'])
-    || readWuyinString(payload, ['message', 'error', 'msg'])
+  return readWuyinString(data, ['message', 'error', 'msg', 'error_msg', 'error_message', 'err_msg'])
+    || readWuyinString(payload, ['message', 'error', 'msg', 'error_msg', 'error_message', 'err_msg'])
     || '';
 }
 

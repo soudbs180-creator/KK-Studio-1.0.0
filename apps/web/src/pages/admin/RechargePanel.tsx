@@ -5,6 +5,7 @@
 import React, { useState } from "react";
 import { adminRechargeUser, adminGetUsers } from "@nano-banana/api-client";
 import { getStoredKkApiAccessToken } from "../../services/api/authAccessToken.ts";
+import { Coins, Mail, PlusCircle } from "lucide-react";
 
 export const RechargePanel: React.FC = () => {
   // 声明状态变量，全部使用英文命名，中文注释
@@ -33,10 +34,7 @@ export const RechargePanel: React.FC = () => {
     const token = getStoredKkApiAccessToken() || "";
 
     try {
-      // 先模糊或精确查询用户（后端支持 users 接口，在此我们假设后端根据邮箱充值）
-      // 等等，后端 recharge 路由为 /api/admin/users/:id/recharge
-      // 所以我们需要先通过邮箱查询到用户的 ID。
-      // 为此，我们调用 adminGetUsers 接口，匹配出精准匹配该邮箱 of user.id。
+      // 先模糊或精确查询用户
       const userListRes = await adminGetUsers({ page: 1, limit: 1, search: email.trim() }, token);
       
       const targetUser = userListRes.users.find(
@@ -72,40 +70,50 @@ export const RechargePanel: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-lg">
-      <h2 className="text-base font-semibold text-gray-900">充值管理</h2>
-      <p className="text-sm text-gray-500 mt-1">管理员可在此向用户直接追加充值积分。</p>
+    <div className="bg-[#111827]/80 border border-[#1F293D] rounded-2xl p-6 max-w-lg backdrop-blur-md shadow-2xl">
+      <div className="border-b border-[#1F293D] pb-3 mb-5">
+        <h2 className="text-base font-bold text-white flex items-center gap-2">
+          <Coins className="text-blue-500" size={18} />
+          充值管理
+        </h2>
+        <p className="text-xs text-gray-400 mt-1">管理员可在此向特定注册邮箱追加充值积分。</p>
+      </div>
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+      <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block font-semibold text-gray-300 mb-1.5">
             用户邮箱
           </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="user@example.com"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
-          />
+          <div className="relative">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="user@example.com"
+              className="w-full bg-[#1F293D] text-white placeholder-gray-500 border border-[#374151] rounded-xl pl-9 pr-4 py-2 focus:outline-none focus:border-blue-500 transition-colors"
+              required
+            />
+            <Mail className="absolute left-3 top-2.5 text-gray-500" size={14} />
+          </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block font-semibold text-gray-300 mb-1.5">
             充值积分额度
           </label>
           <input
             type="number"
-            value={amount}
+            value={amount || ""}
             onChange={(e) => setAmount(parseInt(e.target.value, 10) || 0)}
             min="1"
             max="100000"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+            className="w-full bg-[#1F293D] text-white border border-[#374151] rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
+            required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block font-semibold text-gray-300 mb-1.5">
             充值备注 (选填)
           </label>
           <input
@@ -113,16 +121,16 @@ export const RechargePanel: React.FC = () => {
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="如：线上充值成功补发"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+            className="w-full bg-[#1F293D] text-white placeholder-gray-500 border border-[#374151] rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
           />
         </div>
 
         {message && (
           <div
-            className={`p-3 rounded-lg text-sm ${
+            className={`p-3 rounded-xl ${
               message.type === "success"
-                ? "bg-green-50 text-green-800 border border-green-200"
-                : "bg-red-50 text-red-800 border border-red-200"
+                ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                : "bg-red-500/10 text-red-400 border border-red-500/20"
             }`}
           >
             {message.text}
@@ -132,8 +140,9 @@ export const RechargePanel: React.FC = () => {
         <button
           type="submit"
           disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors duration-150 disabled:opacity-50"
+          className="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold py-2.5 px-4 rounded-xl transition-all shadow-[0_4px_12px_rgba(59,130,246,0.2)] hover:shadow-[0_4px_20px_rgba(59,130,246,0.3)] hover:-translate-y-0.5 disabled:opacity-50 flex items-center justify-center gap-1.5"
         >
+          <PlusCircle size={14} />
           {loading ? "正在处理..." : "确认充值"}
         </button>
       </form>

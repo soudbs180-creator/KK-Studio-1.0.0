@@ -319,18 +319,21 @@ const CLOUD_SYNC_POLL_INTERVAL_MS = 60 * 1000;
 const GOOGLE_HEADER_NAME = 'x-goog-api-key';
 
 const GOOGLE_CHAT_MODELS = [
-    // Gemini 2.5 series - best value
-    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', icon: '\u{1F9E0}', description: '\u6700\u5F3A\u63A8\u7406\u6A21\u578B\uFF0C\u64C5\u957F\u4EE3\u7801\u3001\u6570\u5B66\u3001STEM \u590D\u6742\u4EFB\u52A1' },
-    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', icon: '\u26A1', description: '\u901F\u5EA6\u4F18\u5148\uFF0C\u9002\u5408\u9AD8\u5E76\u53D1\u4E0E\u5FEB\u901F\u54CD\u5E94\u573A\u666F' },
-    { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash-Lite', icon: '\u{1F539}', description: '\u4F4E\u6210\u672C\u5FEB\u901F\u6A21\u578B\uFF0C\u9002\u5408\u8F7B\u91CF\u4EFB\u52A1' },
+    // Gemini 3.5 series
+    { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', icon: '⚡', description: '最智能的 Flash 模型，可在智能体和编码任务中提供前沿性能。' },
     // Gemini 3 / 3.1 series - advanced reasoning
-    { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro \u9884\u89C8', icon: '\u{1F48E}', description: '\u9002\u5408\u9700\u8981\u5E7F\u6CDB\u4E16\u754C\u77E5\u8BC6\u4E0E\u8DE8\u6A21\u6001\u9AD8\u7EA7\u63A8\u7406\u7684\u590D\u6742\u4EFB\u52A1' },
-    { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro \u9884\u89C8', icon: '\u{1F680}', description: '\u66F4\u5F3A\u63A8\u7406\u4E0E\u590D\u6742\u4EFB\u52A1\u80FD\u529B\uFF0C\u9002\u5408\u4E13\u4E1A\u5DE5\u4F5C\u6D41' },
-    { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash \u9884\u89C8', icon: '\u26A1', description: '\u65B0\u4E00\u4EE3 Flash\uFF0C\u5E73\u8861\u8D28\u91CF\u4E0E\u901F\u5EA6' },
+    { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro 预览', icon: '💎', description: '具备先进的智能、复杂的问题解决能力，以及强大的智能体和氛围编码能力。' },
+    { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash-Lite', icon: '⚡', description: '前沿级性能，可与大型模型相媲美，但成本却低得多。' },
+    { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro 预览', icon: '🚀', description: '更强推理与复杂任务能力，适合专业工作流。' },
+    { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash 预览', icon: '⚡', description: '前沿级性能，可与大型模型相媲美，但成本却低得多。' },
+    // Gemini 2.5 series - best value
+    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', icon: '🧠', description: '最强推理模型，擅长代码、数学、STEM 复杂任务。' },
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', icon: '⚡', description: '速度优先，适合高并发与快速响应场景。' },
+    { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash-Lite', icon: '🔹', description: '速度快、最具成本效益的多模态模型。' },
     // Multimodal models
-    { id: 'gemini-3.1-flash-image-preview', name: 'Nano Banana 2', icon: '\u{1F34C}', description: '\u7B2C\u4E8C\u4EE3 Nano Banana \u56FE\u50CF\u6A21\u578B\uFF0C\u53C2\u8003\u56FE\u4E0E\u9AD8\u6E05\u80FD\u529B\u66F4\u5F3A' },
-    { id: 'gemini-3-pro-image-preview', name: 'Nano Banana Pro', icon: '\u{1F34C}', description: '\u9AD8\u8D28\u91CF Nano Banana Pro \u9884\u89C8\u56FE\u50CF\u6A21\u578B' },
-    { id: 'gemini-2.5-flash-image', name: 'Nano Banana', icon: '\u{1F34C}', description: '\u7ECF\u5178 Nano Banana \u5FEB\u901F\u51FA\u56FE\u6A21\u578B' },
+    { id: 'gemini-3.1-flash-image-preview', name: 'Nano Banana 2', icon: '🍌🍌', description: '第二代 Nano Banana 图像模型，参考图与高清能力更强。' },
+    { id: 'gemini-3-pro-image-preview', name: 'Nano Banana Pro', icon: '🍌', description: '高质量 Nano Banana Pro 预览图像模型。' },
+    { id: 'gemini-2.5-flash-image', name: 'Nano Banana', icon: '🍌', description: '经典 Nano Banana 快速出图模型。' },
 ];
 
 type ModelMetadata = {
@@ -389,6 +392,7 @@ MODEL_TYPE_MAP.set('imagen-4.0-fast-generate-001', 'image');
 // Set Veo 3.1 model types
 MODEL_TYPE_MAP.set('veo-3.1-generate-preview', 'video');
 MODEL_TYPE_MAP.set('veo-3.1-fast-generate-preview', 'video');
+MODEL_TYPE_MAP.set('veo-3.1-lite-generate-preview', 'video');
 
 MODEL_PRESETS.filter(preset => preset.provider === 'Google').forEach(preset => {
     if (!GOOGLE_MODEL_METADATA.has(preset.id)) {
@@ -397,11 +401,12 @@ MODEL_PRESETS.filter(preset => preset.provider === 'Google').forEach(preset => {
 });
 
 // Add Imagen 4.0 / Veo 3.1 metadata
-GOOGLE_MODEL_METADATA.set('imagen-4.0-generate-001', { name: 'Imagen 4.0 \u6807\u51C6\u7248', icon: '\u{1F3A8}', description: 'Google \u5B98\u65B9\u56FE\u50CF\u6A21\u578B\uFF08\u6807\u51C6\u7248\uFF09' });
-GOOGLE_MODEL_METADATA.set('imagen-4.0-ultra-generate-001', { name: 'Imagen 4.0 Ultra', icon: '\u{1F48E}', description: 'Google \u7684\u9AD8\u4FDD\u771F\u56FE\u50CF\u6A21\u578B\uFF08Ultra\uFF09' });
-GOOGLE_MODEL_METADATA.set('imagen-4.0-fast-generate-001', { name: 'Imagen 4.0 \u5FEB\u901F\u7248', icon: '\u26A1', description: 'Google \u5B98\u65B9\u56FE\u50CF\u6A21\u578B\uFF08\u5FEB\u901F\u7248\uFF09' });
-GOOGLE_MODEL_METADATA.set('veo-3.1-generate-preview', { name: 'Veo 3.1', icon: '\u{1F3AC}', description: '\u6700\u65B0\u89C6\u9891\u751F\u6210\u6A21\u578B\uFF08\u9884\u89C8\u7248\uFF09' });
-GOOGLE_MODEL_METADATA.set('veo-3.1-fast-generate-preview', { name: 'Veo 3.1 Fast', icon: '\u{1F3AC}', description: 'Veo 3.1 \u5FEB\u901F\u7248' });
+GOOGLE_MODEL_METADATA.set('imagen-4.0-generate-001', { name: 'Imagen 4.0 标准版', icon: '🎨', description: 'Google 官方图像生成模型标准版，提供画面稳定且细节丰富的高清图像生成体验' });
+GOOGLE_MODEL_METADATA.set('imagen-4.0-ultra-generate-001', { name: 'Imagen 4.0 Ultra', icon: '💎', description: 'Google 旗舰高保真图像生成模型，支持极高质量的专业级艺术创作与图像生成' });
+GOOGLE_MODEL_METADATA.set('imagen-4.0-fast-generate-001', { name: 'Imagen 4.0 快速版', icon: '⚡', description: 'Google 快速图像生成模型，具备极高的响应速度与高效率出图能力' });
+GOOGLE_MODEL_METADATA.set('veo-3.1-generate-preview', { name: 'Veo 3.1', icon: '🎬', description: '前沿电影级视频生成模型，具有高级创意控件和原生同步音频' });
+GOOGLE_MODEL_METADATA.set('veo-3.1-fast-generate-preview', { name: 'Veo 3.1 Fast', icon: '⚡', description: 'Veo 3.1 视频生成快速版，提供高效、低成本的创意流媒体控制' });
+GOOGLE_MODEL_METADATA.set('veo-3.1-lite-generate-preview', { name: 'Veo 3.1 Lite', icon: '🎬', description: 'Veo 3.1 系列的高效、低成本、开发者优先的视频生成与编辑模型' });
 
 // Custom name overrides for whitelisted models
 GOOGLE_MODEL_METADATA.set('gemini-2.5-flash-image', { name: 'Nano Banana', icon: '\u{1F34C}', description: 'Gemini 2.5 Flash Image (Custom)' });

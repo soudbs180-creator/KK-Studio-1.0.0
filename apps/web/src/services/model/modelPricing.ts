@@ -130,10 +130,22 @@ const BUILTIN_PRICING: Record<string, ModelPricing> = {
   // Gemini 3 系列 (Token计费)
   // https://ai.google.dev/gemini-api/docs/pricing
   // ============================================
+  // Gemini 3.5 系列
+  'gemini-3.5-flash': {
+    inputPerMillionTokens: 1.50,
+    outputPerMillionTokens: 9.00,
+    currency: 'USD'
+  },
   // Gemini 3.1 Pro 预览版
   'gemini-3.1-pro-preview': {
     inputPerMillionTokens: 2.00,
     outputPerMillionTokens: 12.00,
+    currency: 'USD'
+  },
+  // Gemini 3.1 Flash-Lite
+  'gemini-3.1-flash-lite': {
+    inputPerMillionTokens: 0.25,
+    outputPerMillionTokens: 1.50,
     currency: 'USD'
   },
   // Gemini 3 Pro 预览版
@@ -212,6 +224,10 @@ const BUILTIN_PRICING: Record<string, ModelPricing> = {
   },
   'veo-3.1-fast-generate-preview': {
     pricePerImage: 0.15,  // 720p/1080p:$0.15/秒, 4K:$0.35/秒 (这里使用平均值)
+    currency: 'USD'
+  },
+  'veo-3.1-lite-generate-preview': {
+    pricePerImage: 0.05,  // $0.05/秒
     currency: 'USD'
   },
   // Veo 3 系列 (稳定版)

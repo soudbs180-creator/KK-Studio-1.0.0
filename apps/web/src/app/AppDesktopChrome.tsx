@@ -163,11 +163,12 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
             onClick={(e) => e.stopPropagation()}
             className="absolute left-0 top-[72px] z-50 w-64 origin-top-left animate-in rounded-xl border p-2 duration-100 fade-in zoom-in-95"
             style={{
-              background: 'color-mix(in srgb, var(--frost-card-framework-bg) 94%, var(--bg-canvas) 6%)',
+              // 简体中文：使用高不透明度 (85%) 的实色基底色与透明混合，配合强模糊，实现顶级高级磨砂玻璃（Mica/Glassmorphism）效果，彻底解决后方文字和图片透出的干扰问题
+              background: 'color-mix(in srgb, var(--frost-card-framework-bg-solid) 85%, transparent 15%)',
               borderColor: 'var(--frost-card-framework-border)',
-              boxShadow: 'var(--frost-card-framework-shadow)',
-              backdropFilter: 'blur(24px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+              boxShadow: 'var(--frost-card-framework-shadow), 0 10px 30px rgba(0, 0, 0, 0.25)',
+              backdropFilter: 'blur(20px) saturate(190%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(190%)',
             }}
           >
             <div className="space-y-1">

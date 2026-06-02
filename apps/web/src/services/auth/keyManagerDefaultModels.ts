@@ -34,8 +34,11 @@ export const AUDIO_MODEL_WHITELIST = [
 
 // Default official Google model list
 export const DEFAULT_GOOGLE_MODELS = [
+    // Gemini 3.5 series
+    'gemini-3.5-flash',
     // Gemini 3.1 series
     'gemini-3.1-pro-preview',
+    'gemini-3.1-flash-lite',
     // Gemini 3 series
     'gemini-3-pro-preview',
     'gemini-3-flash-preview',
@@ -47,7 +50,8 @@ export const DEFAULT_GOOGLE_MODELS = [
 
     // Veo 视频生成
     'veo-3.1-generate-preview',
-    'veo-3.1-fast-generate-preview'
+    'veo-3.1-fast-generate-preview',
+    'veo-3.1-lite-generate-preview'
 ];
 
 export const DEFAULT_OPENAI_MODELS = ['dall-e-3', 'dall-e-2', 'gpt-4o', 'gpt-4o-mini'];

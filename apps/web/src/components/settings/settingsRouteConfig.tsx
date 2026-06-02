@@ -18,6 +18,7 @@ const ApiSettingsView = lazyWithRetry(() => import('./ApiSettingsView'));
 const CostEstimation = lazyWithRetry(() => import('../../pages/CostEstimation'));
 const StorageSettingsView = lazyWithRetry(() => import('./views/StorageSettingsView.localized.tsx'));
 const SystemLogsView = lazyWithRetry(() => import('./views/SystemLogsView.localized.tsx'));
+const UserProfileView = lazyWithRetry(() => import('./views/UserProfileView.tsx'));
 
 type SettingsWorkbenchRouteDefinition =
   | { path: ''; kind: 'dashboard'; index: true }
@@ -30,7 +31,8 @@ type SettingsWorkbenchRouteDefinition =
   | { path: 'api-management/:supplierId'; kind: 'api' }
   | { path: 'consumption-records'; kind: 'billing' }
   | { path: 'storage-settings'; kind: 'storage' }
-  | { path: 'system-logs'; kind: 'logs' };
+  | { path: 'system-logs'; kind: 'logs' }
+  | { path: 'user-profile'; kind: 'profile' };
 
 const SETTINGS_WORKBENCH_ROUTE_DEFINITIONS: SettingsWorkbenchRouteDefinition[] = [
   { path: '', kind: 'dashboard', index: true },
@@ -44,6 +46,7 @@ const SETTINGS_WORKBENCH_ROUTE_DEFINITIONS: SettingsWorkbenchRouteDefinition[] =
   { path: 'consumption-records', kind: 'billing' },
   { path: 'storage-settings', kind: 'storage' },
   { path: 'system-logs', kind: 'logs' },
+  { path: 'user-profile', kind: 'profile' },
 ];
 
 interface SettingsRouteOptions {
@@ -100,6 +103,8 @@ function getRouteElement(
       return <StorageSettingsView key={routeRefreshKey} />;
     case 'logs':
       return <SystemLogsView key={routeRefreshKey} />;
+    case 'profile':
+      return <UserProfileView key={routeRefreshKey} />;
     default:
       return <Navigate to={(options.dashboardBasePath || '/settings')} replace />;
   }

@@ -595,6 +595,7 @@ export interface PromptCompletedTask {
   cost?: number;
   costSource?: 'snapshot' | 'explicit' | 'stored' | 'estimated' | 'none';
   tokens?: number;
+  execTime?: number;
 }
 
 export interface PromptGenerationMetadata {
@@ -968,6 +969,7 @@ export interface PromptNode {
   creditRouteUnitId?: string;
   paymentTransactionId?: string;
   balanceAfter?: number;
+  execTime?: number;
 
   mode?: GenerationMode; // New
   width?: number; // Dynamic width for layout calculation

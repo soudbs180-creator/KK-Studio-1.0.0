@@ -83,6 +83,7 @@ export interface SecureProxyImageResponse extends SecureProxyBillingMetadata {
   requestId?: string;
   attemptId?: string;
   endpointType?: 'openai' | 'gemini' | 'claude';
+  execTime?: number;
 }
 
 export interface SecureProxyVideoRequest {
@@ -106,6 +107,7 @@ export interface SecureProxyVideoResponse extends SecureProxyBillingMetadata {
   message?: string;
   error?: string;
   endpointType?: 'openai' | 'gemini' | 'claude';
+  execTime?: number;
 }
 
 export interface SecureProxyAudioRequest {
@@ -134,6 +136,7 @@ export interface SecureProxyTaskStatusResponse extends SecureProxyBillingMetadat
   error?: string;
   requestId?: string;
   attemptId?: string;
+  execTime?: number;
 }
 
 export const SECURE_PROXY_SESSION_REAUTH_CODE = 'SESSION_REAUTH_REQUIRED';
@@ -1222,6 +1225,7 @@ export async function callLocalUserRouteProxyImage(
     requestId: typeof data.requestId === 'string' ? data.requestId : undefined,
     attemptId: typeof data.attemptId === 'string' ? data.attemptId : undefined,
     endpointType: data.endpointType,
+    execTime: typeof data.execTime === 'number' ? data.execTime : undefined,
   };
 }
 
@@ -1257,6 +1261,7 @@ export async function callSecureSystemProxyVideo(
     error: typeof data.error === 'string' ? data.error : undefined,
     ...extractSecureProxyBillingMetadata(data),
     endpointType: data.endpointType,
+    execTime: typeof data.execTime === 'number' ? data.execTime : undefined,
   };
 }
 
@@ -1286,6 +1291,7 @@ export async function callLocalUserRouteProxyVideo(
     error: typeof data.error === 'string' ? data.error : undefined,
     ...extractSecureProxyBillingMetadata(data),
     endpointType: data.endpointType,
+    execTime: typeof data.execTime === 'number' ? data.execTime : undefined,
   };
 }
 
@@ -1348,6 +1354,7 @@ export async function checkSecureSystemProxyTaskStatus(taskId: string): Promise<
     error: typeof data.error === 'string' ? data.error : undefined,
     requestId: typeof data.requestId === 'string' ? data.requestId : undefined,
     attemptId: typeof data.attemptId === 'string' ? data.attemptId : undefined,
+    execTime: typeof data.execTime === 'number' ? data.execTime : undefined,
     ...extractSecureProxyBillingMetadata(data),
   };
 }
@@ -1367,6 +1374,7 @@ export async function checkLocalUserRouteProxyTaskStatus(
     error: typeof data.error === 'string' ? data.error : undefined,
     requestId: typeof data.requestId === 'string' ? data.requestId : undefined,
     attemptId: typeof data.attemptId === 'string' ? data.attemptId : undefined,
+    execTime: typeof data.execTime === 'number' ? data.execTime : undefined,
     ...extractSecureProxyBillingMetadata(data),
   };
 }
