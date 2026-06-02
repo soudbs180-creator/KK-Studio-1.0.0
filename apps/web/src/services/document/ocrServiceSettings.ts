@@ -13,6 +13,8 @@ const buildDefaultOcrServiceSettings = (): OcrServiceSettings => ({
   keySource: 'missing',
   healthState: 'unknown',
   updatedAt: Date.now(),
+  baiduApiKey: '',
+  baiduSecretKey: '',
 });
 
 const normalizeOcrServiceSettings = (
@@ -23,19 +25,26 @@ const normalizeOcrServiceSettings = (
   const defaultLanguage = typeof raw?.defaultLanguage === 'string' && raw.defaultLanguage.trim()
     ? raw.defaultLanguage.trim()
     : fallback.defaultLanguage;
-  const keySource = hasEnvironmentKey
-    ? 'environment'
-    : 'missing';
-  const healthState = hasEnvironmentKey
-    ? 'configured'
-    : 'unknown';
+
+  const provider = raw?.provider === 'baidu' ? 'baidu' : 'nutrient';
+
+  let keySource: 'environment' | 'missing' | 'user' = hasEnvironmentKey ? 'environment' : 'missing';
+  let healthState: 'configured' | 'missing_key' | 'unknown' = hasEnvironmentKey ? 'configured' : 'unknown';
+
+  if (provider === 'baidu') {
+    const hasUserKey = Boolean(raw?.baiduApiKey && raw?.baiduSecretKey);
+    keySource = hasUserKey ? 'user' : 'missing';
+    healthState = hasUserKey ? 'configured' : 'missing_key';
+  }
 
   return {
-    provider: 'nutrient',
+    provider,
     enabled: raw?.enabled !== false,
     defaultLanguage,
     keySource,
     healthState,
+    baiduApiKey: raw?.baiduApiKey || '',
+    baiduSecretKey: raw?.baiduSecretKey || '',
     updatedAt: typeof raw?.updatedAt === 'number' && Number.isFinite(raw.updatedAt)
       ? raw.updatedAt
       : Date.now(),
@@ -88,7 +97,7 @@ export const getOcrServiceSettings = (hasEnvironmentKey = false) =>
   normalizeOcrServiceSettings(readStoredOcrServiceSettings(), hasEnvironmentKey);
 
 export const updateOcrServiceSettings = (
-  patch: Partial<Pick<OcrServiceSettings, 'enabled' | 'defaultLanguage'>>,
+  patch: Partial<OcrServiceSettings>,
   hasEnvironmentKey = false,
 ) => {
   const current = getOcrServiceSettings(hasEnvironmentKey);

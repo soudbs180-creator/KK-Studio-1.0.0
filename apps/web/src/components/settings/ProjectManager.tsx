@@ -484,6 +484,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                     style={frostedProjectManagerSubSurfaceStyle}
                 >
                     <button
+                        id="btn-create-canvas"
                         onClick={(event) => {
                             event.stopPropagation();
                             handleCreateProject();

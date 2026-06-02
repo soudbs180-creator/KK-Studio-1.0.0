@@ -25,6 +25,19 @@ export interface NutrientOcrOptions extends NutrientRequestOptions {
 const DEFAULT_OCR_LANGUAGE = 'chi_sim';
 const DOCUMENT_ENDPOINT = '/api/nutrient-document';
 
+const fileToBase64 = (file: Blob | File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const result = reader.result as string;
+            const base64 = result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = (error) => reject(error);
+    });
+};
+
 const CONTENT_TYPE_TO_EXTENSION: Record<string, string> = {
     'application/pdf': 'pdf',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
@@ -127,12 +140,47 @@ class NutrientDocumentService {
         options: NutrientRequestOptions & { ocrLanguage?: string } = {},
     ) {
         const upload = createUploadFile(source, options.fileName);
+        const ocrSettings = getOcrServiceSettings();
+
+        if (ocrSettings.provider === 'baidu') {
+            if (operation !== 'extract-text') {
+                throw new Error('百度智能云 OCR 目前仅支持文本提取（extract-text）服务。若需要将 Word/PPT 转换为 PDF，请切换到 Nutrient 并配置环境变量。');
+            }
+
+            const fileBase64 = await fileToBase64(upload);
+            const response = await fetch('/api/v1/ocr', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    operation,
+                    fileBase64,
+                    fileName: upload.name,
+                    ocrLanguage: options.ocrLanguage || ocrSettings.defaultLanguage || DEFAULT_OCR_LANGUAGE,
+                    provider: 'baidu',
+                    baiduApiKey: ocrSettings.baiduApiKey,
+                    baiduSecretKey: ocrSettings.baiduSecretKey,
+                }),
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(errText || '百度云 OCR 识别文本失败');
+            }
+
+            return {
+                response,
+                contentType: 'text/plain; charset=utf-8',
+                responseFileName: upload.name.replace(/\.[^.]+$/, '') + '.txt',
+            };
+        }
+
         const formData = new FormData();
         formData.append('operation', operation);
         formData.append('file', upload, upload.name);
 
         if (operation === 'ocr-to-pdf') {
-            const ocrSettings = getOcrServiceSettings();
             formData.append('ocrLanguage', options.ocrLanguage || ocrSettings.defaultLanguage || DEFAULT_OCR_LANGUAGE);
         }
 

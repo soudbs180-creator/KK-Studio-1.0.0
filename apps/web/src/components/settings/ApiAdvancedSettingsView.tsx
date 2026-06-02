@@ -62,6 +62,7 @@ import {
 import {
   SettingInput,
   SettingToggle,
+  SettingSelect,
 } from './ui/index';
 import {
   resolveApiWorkbenchDiagnosticsAvailability,
@@ -342,17 +343,29 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
     return '';
   }, [apiHealth, isTempUser, pick]);
 
+  const ocrKeySourceLabel = useMemo(() => {
+    if (ocrSettings.provider === 'baidu') {
+      return ocrSettings.keySource === 'user'
+        ? pick('专属密钥 (Local)', 'Local BYOK')
+        : pick('缺少密钥', 'Key missing');
+    }
+    return ocrSettings.keySource === 'environment'
+      ? pick('服务端环境变量', 'Environment variable')
+      : pick('浏览器密钥', 'Browser cache');
+  }, [ocrSettings.provider, ocrSettings.keySource, pick]);
+
   const ocrHealthLabel = useMemo(() => {
+    if (ocrSettings.provider === 'baidu') {
+      return ocrSettings.healthState === 'configured'
+        ? pick('已配置', 'Configured')
+        : pick('未配置密钥', 'Key missing');
+    }
     return ocrSettings.healthState === 'configured'
       ? pick('已配置', 'Configured')
       : ocrSettings.healthState === 'missing_key'
         ? pick('未配置密钥', 'Key missing')
         : pick('未启动', 'Inactive');
-  }, [ocrSettings.healthState, pick]);
-
-  const ocrKeySourceLabel = ocrSettings.keySource === 'environment'
-    ? pick('服务端环境变量', 'Environment variable')
-    : pick('浏览器密钥', 'Browser cache');
+  }, [ocrSettings.provider, ocrSettings.healthState, pick]);
 
   const diagnosticsAvailability = resolveApiWorkbenchDiagnosticsAvailability({
     hasWorkbenchAccess: !isTempUser,
@@ -493,24 +506,74 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
                 }}
                 helper={pick('用于文档解析、电商需求文件、未来 PPT 导入文本提取。', 'Used for document parsing, ecommerce requirement files, and future PPT text extraction.')}
               />
-              <div className="mt-3">
-                <SettingInput
-                  label={pick('默认语言', 'Default language')}
-                  value={ocrSettings.defaultLanguage}
-                  onChange={(defaultLanguage) => {
-                    updateOcrServiceSettings({ defaultLanguage });
-                    setOcrSettings(getOcrServiceSettings());
-                  }}
-                  placeholder="chi_sim"
-                  disabled={!ocrSettings.enabled}
-                  helper={pick('Tesseract OCR默认识别包语言，例如 chi_sim (简体中文), eng (英文)。', 'OCR identification pack, e.g. chi_sim or eng.')}
-                />
-              </div>
+              
+              {ocrSettings.enabled && (
+                <>
+                  <div className="mt-3">
+                    <SettingSelect
+                      label={pick('OCR 提供商', 'OCR Provider')}
+                      value={ocrSettings.provider}
+                      onChange={(provider) => {
+                        updateOcrServiceSettings({ provider: provider as 'nutrient' | 'baidu' });
+                        setOcrSettings(getOcrServiceSettings());
+                      }}
+                      options={[
+                        { value: 'nutrient', label: pick('Nutrient (读取服务端环境变量)', 'Nutrient (Server Variable)') },
+                        { value: 'baidu', label: pick('百度智能云 OCR (专属 API 配置)', 'Baidu Smart Cloud OCR (BYOK)') }
+                      ]}
+                    />
+                  </div>
+
+                  {ocrSettings.provider === 'baidu' ? (
+                    <>
+                      <div className="mt-3">
+                        <SettingInput
+                          label={pick('Baidu API Key', 'Baidu API Key')}
+                          value={ocrSettings.baiduApiKey || ''}
+                          onChange={(baiduApiKey) => {
+                            updateOcrServiceSettings({ baiduApiKey });
+                            setOcrSettings(getOcrServiceSettings());
+                          }}
+                          placeholder={pick('输入百度的 API Key', 'Enter Baidu API Key')}
+                        />
+                      </div>
+                      <div className="mt-3">
+                        <SettingInput
+                          label={pick('Baidu Secret Key', 'Baidu Secret Key')}
+                          value={ocrSettings.baiduSecretKey || ''}
+                          type="password"
+                          onChange={(baiduSecretKey) => {
+                            updateOcrServiceSettings({ baiduSecretKey });
+                            setOcrSettings(getOcrServiceSettings());
+                          }}
+                          placeholder={pick('输入百度的 Secret Key', 'Enter Baidu Secret Key')}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="mt-3">
+                      <SettingInput
+                        label={pick('默认语言', 'Default language')}
+                        value={ocrSettings.defaultLanguage}
+                        onChange={(defaultLanguage) => {
+                          updateOcrServiceSettings({ defaultLanguage });
+                          setOcrSettings(getOcrServiceSettings());
+                        }}
+                        placeholder="chi_sim"
+                        helper={pick('Tesseract OCR默认识别包语言，例如 chi_sim (简体中文), eng (英文)。', 'OCR identification pack, e.g. chi_sim or eng.')}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+
               <div className="grid gap-3 grid-cols-2 mt-4">
                 <InfoCell 
                   label={pick('密钥来源', 'Key source')} 
                   value={ocrKeySourceLabel} 
-                  helper={pick('只读取服务端环境变量。', 'Only read server variables.')} 
+                  helper={ocrSettings.provider === 'baidu'
+                    ? pick('保存在浏览器本地 localStorage 中。', 'Saved in browser local storage.')
+                    : pick('只读取服务端环境变量。', 'Only read server variables.')} 
                 />
                 <InfoCell 
                   label={pick('健康状态', 'Health state')} 

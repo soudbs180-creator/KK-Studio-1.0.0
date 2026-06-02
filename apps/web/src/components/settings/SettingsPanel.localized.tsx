@@ -35,6 +35,8 @@ export interface SettingsPanelProps {
   initialSupplier?: Supplier | null;
   presentation?: 'overlay' | 'page';
   initialPathname?: string;
+  isChatOpen?: boolean;
+  chatSidebarWidth?: number;
 }
 
 const ViewFallback: React.FC = () => (
@@ -475,6 +477,8 @@ const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
   initialSupplier = null,
   presentation = 'overlay',
   initialPathname,
+  isChatOpen = false,
+  chatSidebarWidth = 420,
 }) => {
   const [isMobile, setIsMobile] = useState(() => (
     typeof window !== 'undefined' ? isCompactResponsiveWidth(window.innerWidth) : false
@@ -534,6 +538,7 @@ const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
         padding: isMobile ? 0 : 24,
         background: 'var(--settings-backdrop-bg)',
         backdropFilter: 'blur(18px)',
+        right: !isMobile && isChatOpen ? chatSidebarWidth : 0, // 简体中文：若 AI 助手开启，则在右侧主动避让（扣除）其宽度，保持同屏常驻
       }}
       onClick={onClose}
     >

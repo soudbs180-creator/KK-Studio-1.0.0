@@ -560,12 +560,14 @@ export interface CapabilityRouteAssignment {
 }
 
 export interface OcrServiceSettings {
-  provider: 'nutrient';
+  provider: 'nutrient' | 'baidu';
   enabled: boolean;
   defaultLanguage: string;
-  keySource: 'environment' | 'missing';
+  keySource: 'environment' | 'missing' | 'user';
   healthState: 'configured' | 'missing_key' | 'unknown';
   updatedAt: number;
+  baiduApiKey?: string;
+  baiduSecretKey?: string;
 }
 
 export type TaskProviderType = 'generic' | 'midjourney';

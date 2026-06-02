@@ -436,9 +436,15 @@ export const ApiConfigPanel: React.FC = () => {
                 <strong>{preset.name}</strong>
                 <small>{parseHost(preset.baseUrl)} · {preset.modelId}</small>
               </div>
-              <button type="button" onClick={() => safeOpenLink(preset.website)}>
+              <a
+                href={preset.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="admin-api-nexus__preset-row-link"
+                style={{ color: "inherit", textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+              >
                 <ExternalLink size={16} />
-              </button>
+              </a>
             </div>
           ))}
           <button type="button" className="admin-api-nexus__custom-row" onClick={handleCreateCustomDraft}>

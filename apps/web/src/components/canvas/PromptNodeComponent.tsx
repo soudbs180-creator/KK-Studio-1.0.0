@@ -1304,6 +1304,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     return (
         <div
             ref={containerRef}
+            id={`prompt-card-${node.id}`}
             className={`prompt-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none ${node.isNew && !canvasTransform && !isChatMode ? 'is-new' : ''}`}
             style={isChatMode ? {
                 opacity: 1,

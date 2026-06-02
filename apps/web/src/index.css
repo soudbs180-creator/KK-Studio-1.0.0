@@ -15638,6 +15638,7 @@ body:not(.dark-mode) .settings-log-group-badge {
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
+  text-decoration: none;
   transition: border-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
@@ -16773,6 +16774,27 @@ body:not(.dark-mode) .settings-model-center-route__btn-action--danger span {
     opacity: 1;
   }
 }
+
+/* 🚀 AI 助手指示和调试高亮闪烁样式 */
+@keyframes highlight-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.2), 0 0 0 10px rgba(244, 63, 94, 0.6);
+    border-color: var(--clay-brand-coral, #f43f5e) !important;
+    transform: scale(1.03);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(244, 63, 94, 0.4), 0 0 0 20px rgba(244, 63, 94, 0);
+    border-color: #ff6b5a !important;
+    transform: scale(1.05);
+  }
+}
+.highlight-glow-ring {
+  animation: highlight-glow 1.5s ease-in-out infinite;
+  z-index: 99999 !important;
+  position: relative !important;
+  transition: all 0.3s ease;
+}
+
 
 
 

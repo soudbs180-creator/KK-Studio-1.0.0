@@ -1,6 +1,6 @@
 
 import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus } from 'lucide-react';
+import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus, Cpu } from 'lucide-react';
 import { generateImage } from '../../services/llm/geminiService';
 import { llmService } from '../../services/llm/LLMService';
 import { notify } from '../../services/system/notificationService';
@@ -19,10 +19,14 @@ import { formatRemainingCredits } from '../../services/billing/remainingBalance'
 import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
 import { writeTextToClipboard } from '../../utils/clipboard';
 import ReactDOM from 'react-dom';
-import { AspectRatio, ImageSize } from '../../types';
+import { AspectRatio, ImageSize, PromptNode } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useBilling } from '../../context/BillingContext';
+import { useCanvas } from '../../context/CanvasContext';
+import { useImageGeneration } from '../../hooks/useImageGeneration';
+import { getCardDimensions } from '../../utils/styleUtils';
 import ModelLogo from '../common/ModelLogo';
+import { AITakeoverProvider, useAITakeover, AIAssistantDock, AITakeoverToggle } from '../../features/ai-takeover';
 
 interface ChatSidebarProps {
     isOpen: boolean;
@@ -111,6 +115,7 @@ interface Message {
     timestamp: number;
     attachments?: Attachment[]; // 附件列表
     isImageGeneration?: boolean; // 标记是否为图片生成结果
+    modelId?: string; // 生成该消息的供应商模型ID
 }
 
 interface ChatModel {
@@ -412,12 +417,279 @@ Return STRICT JSON only:
     };
 };
 
+// 简体中文：预置对项目的理解以及常见报错调试的知识库
+interface KnowledgeItem {
+    keywords: string[];
+    title: string;
+    content: string;
+}
+
+const LOCAL_KNOWLEDGE: KnowledgeItem[] = [
+    {
+        keywords: ['新建', '创建', '画布', '项目', '怎么建', '加画布', '新增项目', '新项目'],
+        title: '新建画布与项目',
+        content: '在 KK-Studio 中，您可以在左侧项目管理器中轻松新建画布项目。请点击 [高亮新建画布按钮](action://highlight-#btn-create-canvas) 来创建一块全新的无限画布。'
+    },
+    {
+        keywords: ['删除', '节点', '卡片', '清空', '删掉', '怎么删', '移除'],
+        title: '删除画布节点或卡片',
+        content: '如果您想删除画布上的任何内容：\n1. 选中要删除的提示词卡片或生成图片卡片。\n2. 点击卡片上方弹出的操作菜单中的垃圾桶图标。\n3. 您也可以直接按下键盘上的 `Delete` 或 `Backspace` 键来删除选中的节点。'
+    },
+    {
+        keywords: ['连接', '连线', '关联', '画线', '拉线', '线怎么画', '箭头'],
+        title: '节点之间的连线与关联',
+        content: '在画布上，当您从已生成图片的底部向下拖拽时，会拉出一根绿色的连线。松手后将其与新建提示词卡片相连，就可以在它们之间建立绘图上下文关联，非常适合进行重绘、局部修改等追问操作。'
+    },
+    {
+        keywords: ['放大', '缩小', '缩放', '看不清', '大小', '视野', '重置', '移动', '滚轮'],
+        title: '画布缩放与重置视图',
+        content: '1. 您可以使用鼠标滚轮在画布上进行自由缩放，或按住鼠标中键/空格键拖拽画布来移动视野。\n2. 您也可以点击左下角精致的 [高亮缩放控制面板](action://highlight-.desktop-zoom-rail) 按钮进行调整，双击缩放数值可重置为 100%。'
+    },
+    {
+        keywords: ['充值', '积分', '不够', '没积分', '余额', '买积分', '充钱'],
+        title: '关于积分与充值',
+        content: '使用系统默认提供的模型会消耗积分。由于默认注册积分为 0，您可以直接点击 [立即去充值](action://open-recharge) 或是点击 [高亮充值按钮](action://highlight-#btn-desktop-recharge) 来获取积分。'
+    },
+    {
+        keywords: ['设置', '配置', 'key', '密钥', 'api', '接ai', '连接ai', '接口', '专属key'],
+        title: '如何配置 API 密钥',
+        content: '如果您有自己的 Gemini 或 OpenAI API Key，可以将其填入本地设置中。这样，对话和生成将直接使用您的专属密钥，不再扣除系统积分！\n您可以点击 [跳转到API设置页面](action://open-settings-api) 进行配置，也可以 [高亮设置按钮](action://highlight-#btn-desktop-settings) 来打开面板。'
+    },
+    {
+        keywords: ['报错', '错误', '不工作', '失败', '断开', '调试', '故障', '限流'],
+        title: '常见错误与调试',
+        content: '报错通常由于以下几种情况引起：\n1. **积分不足**：若使用默认模型，请点击 [去充值](action://open-recharge)。\n2. **API 密钥失效**：请检查您的 API Key 是否输入正确，点击 [去设置API](action://open-settings-api)。\n3. **网络超时**：请检查您的网络连接并刷新页面重试。'
+    }
+];
+
+const matchLocalKnowledge = (query: string): string | null => {
+    const lowerQuery = (query || '').toLowerCase();
+    for (const item of LOCAL_KNOWLEDGE) {
+        if (item.keywords.some(kw => lowerQuery.includes(kw))) {
+            return `### 💡 ${item.title}\n\n${item.content}`;
+        }
+    }
+    return null;
+};
+
 const resolveAssistantCapabilityRoute = () => resolveEnabledCapabilityRouteAssignment('assistant');
 
-const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange }) => {
+const ChatSidebarInner: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange }) => {
+    const { aiTakeoverMode } = useAITakeover();
+
+    useEffect(() => {
+        if (aiTakeoverMode) {
+            onWidthChange?.(380);
+        } else {
+            onWidthChange?.(420);
+        }
+    }, [aiTakeoverMode, onWidthChange]);
+
+    if (aiTakeoverMode) {
+        return (
+            <div
+                className="fixed inset-y-0 right-0 z-50 flex flex-col transition-all duration-300 ease-out animate-in fade-in slide-in-from-right duration-300"
+                style={{ width: '380px', minWidth: '380px', maxWidth: '380px', pointerEvents: 'auto' }}
+            >
+                <AIAssistantDock />
+            </div>
+        );
+    }
+
     const { user, isTempUser, loading: authLoading } = useAuth();
     const { balance, loading: billingLoading, setShowRechargeModal } = useBilling();
+    const { activeCanvas, addPromptNode, getNextCardPosition } = useCanvas();
+    const { executeGeneration } = useImageGeneration({
+        isMobile,
+        getCardDimensions: (ratio, hasToolbar) => getCardDimensions(ratio, hasToolbar),
+        rememberPreferredKeyForMode: () => {}
+    });
     const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');
+
+    // 简体中文：跳转与高亮定位交互处理器
+    const handleActionClick = useCallback((url: string) => {
+        if (url.startsWith('action://highlight-')) {
+            const selector = url.replace('action://highlight-', '');
+            if (selector === '#btn-create-canvas') {
+                const trigger = document.querySelector('#project-manager-trigger') as HTMLElement;
+                if (trigger) {
+                    trigger.click();
+                }
+            }
+            setTimeout(() => {
+                const el = document.querySelector(selector) as HTMLElement;
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('highlight-glow-ring');
+                    setTimeout(() => {
+                        el.classList.remove('highlight-glow-ring');
+                    }, 3000);
+                    notify.success('已为您高亮定位对应操作区域');
+                } else {
+                    notify.warning('未找到对应界面元素，请先展开相应功能区');
+                }
+            }, 100);
+        } else if (url === 'action://open-recharge') {
+            setShowRechargeModal(true);
+        } else if (url === 'action://open-settings-api') {
+            if (onOpenSettings) onOpenSettings('api-management');
+            // 延迟高亮智能定位到 API Key 输入框
+            setTimeout(() => {
+                const inputs = Array.from(document.querySelectorAll('input, textarea')) as HTMLElement[];
+                const keyInput = inputs.find(el => {
+                    const placeholder = el.getAttribute('placeholder') || '';
+                    const id = el.getAttribute('id') || '';
+                    const name = el.getAttribute('name') || '';
+                    return id.toLowerCase().includes('key') || 
+                           name.toLowerCase().includes('key') || 
+                           placeholder.toLowerCase().includes('key') || 
+                           placeholder.toLowerCase().includes('密钥') ||
+                           placeholder.toLowerCase().includes('token');
+                });
+                const el = keyInput || document.querySelector('.settings-api-key-input') || document.querySelector('input[type="password"]');
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('highlight-glow-ring');
+                    el.focus();
+                    setTimeout(() => {
+                        el.classList.remove('highlight-glow-ring');
+                    }, 3000);
+                    notify.success('已为您打开设置并定位至 API 密钥输入框');
+                } else {
+                    notify.warning('已打开 API 管理，请手动在下方输入框填写密钥');
+                }
+            }, 300);
+        } else if (url === 'action://open-settings') {
+            if (onOpenSettings) onOpenSettings();
+        } else if (url.startsWith('action://takeover-bulk-generate')) {
+            // 解析 prompts 参数
+            let prompts: string[] = [];
+            try {
+                // URL 构造函数需要合法 scheme，所以我们将 action:// 替换为 http://dummy
+                const parsedUrl = new URL(url.replace('action://', 'http://dummy'));
+                const promptsParam = parsedUrl.searchParams.get('prompts') || '';
+                prompts = promptsParam.split(',').map(p => p.trim()).filter(Boolean);
+            } catch (err) {
+                console.error('Parse takeover-bulk-generate url failed:', err);
+            }
+
+            if (prompts.length === 0) {
+                notify.warning('AI接管失败', '未解析到有效的提示词');
+                return;
+            }
+
+            notify.success(`AI接管：正在自动为您批量生成 ${prompts.length} 张图片`);
+
+            // 异步执行批量生成
+            (async () => {
+                try {
+                    const lastPos = getNextCardPosition();
+                    for (let i = 0; i < prompts.length; i++) {
+                        const promptText = prompts[i];
+                        // 偏移 x 坐标，使得卡片水平排列，避免重叠
+                        const pos = {
+                            x: lastPos.x + i * 420, // 400px 卡片宽度 + 20px 间距
+                            y: lastPos.y
+                        };
+
+                        const newNode: PromptNode = {
+                            id: 'takeover_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substr(2, 9),
+                            prompt: promptText,
+                            position: pos,
+                            aspectRatio: AspectRatio.SQUARE,
+                            imageSize: ImageSize.SIZE_1K,
+                            model: selectedModel.id as any,
+                            modelLabel: getModelDisplayInfo(selectedModel).displayName,
+                            provider: selectedModel.provider,
+                            childImageIds: [],
+                            timestamp: Date.now(),
+                            parallelCount: 1,
+                            isGenerating: true
+                        };
+
+                        await addPromptNode(newNode);
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                        void executeGeneration(newNode);
+                    }
+                } catch (e: any) {
+                    console.error('Takeover bulk generation error:', e);
+                    notify.error('批量生成失败', e.message);
+                }
+            })();
+        } else if (url.startsWith('action://takeover-locate')) {
+            let keyword = '';
+            try {
+                const parsedUrl = new URL(url.replace('action://', 'http://dummy'));
+                keyword = (parsedUrl.searchParams.get('keyword') || '').trim();
+            } catch (err) {
+                console.error('Parse takeover-locate url failed:', err);
+            }
+
+            if (!keyword) {
+                notify.warning('AI接管定位失败', '未指定要查找的关键字');
+                return;
+            }
+
+            // 搜索匹配卡片
+            const nodes = activeCanvas?.promptNodes || [];
+            const matchedNode = nodes.find(n => 
+                (n.prompt || '').toLowerCase().includes(keyword.toLowerCase()) ||
+                (n.optimizedPromptEn || '').toLowerCase().includes(keyword.toLowerCase()) ||
+                (n.optimizedPromptZh || '').toLowerCase().includes(keyword.toLowerCase())
+            );
+
+            if (matchedNode) {
+                // 触发定位事件，交由 App.tsx 处理平滑平移和高亮闪烁
+                const locateEvent = new CustomEvent('canvas-center-on-node', {
+                    detail: {
+                        x: matchedNode.position.x,
+                        y: matchedNode.position.y,
+                        nodeId: matchedNode.id
+                    }
+                });
+                window.dispatchEvent(locateEvent);
+                notify.success(`AI接管：已为您平滑定位到包含“${keyword}”的卡片`);
+            } else {
+                notify.warning('AI接管定位', `未在当前画布上找到包含“${keyword}”的卡片`);
+            }
+        }
+    }, [onOpenSettings, setShowRechargeModal, addPromptNode, getNextCardPosition, selectedModel, executeGeneration, activeCanvas]);
+
+    // 简体中文：解析 action 链接，生成交互按钮
+    const renderMessageContent = useCallback((content: string) => {
+        const regex = /\[([^\]]+)\]\((action:\/\/[^\)]+)\)/g;
+        const parts = [];
+        let lastIndex = 0;
+        let match;
+
+        while ((match = regex.exec(content)) !== null) {
+            if (match.index > lastIndex) {
+                parts.push(content.substring(lastIndex, match.index));
+            }
+
+            const label = match[1];
+            const actionUrl = match[2];
+
+            parts.push(
+                <button
+                    key={match.index}
+                    onClick={() => handleActionClick(actionUrl)}
+                    className="inline-flex items-center gap-1 mx-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:brightness-110 active:scale-95 transition-all shadow-[0_2px_8px_rgba(99,102,241,0.3)] select-none cursor-pointer"
+                >
+                    ✨ {label}
+                </button>
+            );
+
+            lastIndex = regex.lastIndex;
+        }
+
+        if (lastIndex < content.length) {
+            parts.push(content.substring(lastIndex));
+        }
+
+        return parts.length > 0 ? parts : content;
+    }, [handleActionClick]);
+
     const billingUiEnabled = KKAI_FEATURE_FLAGS.billing;
     const canAccessSystemCreditModels = billingUiEnabled && !!user && !isTempUser;
     const canBrowseSystemCreditModels = billingUiEnabled;
@@ -545,7 +817,38 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
     // Agent State Management
     const [agentMode, setAgentMode] = useState(false);
+    const { aiTakeoverMode, setAiTakeoverMode, setSelectedModel: ctxSetSelectedModel } = useAITakeover();
     const [currentAgent, setCurrentAgent] = useState<AgentConfig | null>(() => agentService.getActive());
+
+    // 简体中文：实时同步选择的生图模型给 AI 接管 Context
+    useEffect(() => {
+        if (selectedModel) {
+            ctxSetSelectedModel(selectedModel);
+        }
+    }, [selectedModel, ctxSetSelectedModel]);
+
+    // 简体中文：记录已自动执行过的消息 Action，防止重复执行
+    const executedMessageIdsRef = useRef<Set<string>>(new Set());
+
+    // 简体中文：AI接管模式下的动作自动拦截并静默执行
+    useEffect(() => {
+        if (!aiTakeoverMode || !messages || messages.length === 0) return;
+        const lastMessage = messages[messages.length - 1];
+        
+        if (lastMessage.role === 'assistant' && !executedMessageIdsRef.current.has(lastMessage.id)) {
+            executedMessageIdsRef.current.add(lastMessage.id);
+            
+            const actionRegex = /action:\/\/[^\s\)\"\]]+/g;
+            const matches = lastMessage.content.match(actionRegex);
+            if (matches && matches.length > 0) {
+                matches.forEach(actionUrl => {
+                    setTimeout(() => {
+                        handleActionClick(actionUrl);
+                    }, 200);
+                });
+            }
+        }
+    }, [messages, aiTakeoverMode, handleActionClick]);
 
     // Subscribe to keyManager updates
     const lastPreferredModelIdRef = useRef<string>('');
@@ -698,6 +1001,12 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
     const dragStartRef = useRef({ x: 0, y: 0 });
     const startPosRef = useRef({ x: 0, y: 0 });
 
+    // 简体中文：侧边栏宽度拉伸调整相关状态与 Refs
+    const [isResizing, setIsResizing] = useState(false);
+    const dragStartWidthRef = useRef(420);
+    const dragStartXRef = useRef(0);
+    const resizeMaskRef = useRef<HTMLDivElement | null>(null);
+
     // [NEW] History Panel State
     const [showHistoryPanel, setShowHistoryPanel] = useState(false);
 
@@ -744,7 +1053,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
     const scheduleAutoClose = useCallback(() => {
         clearAutoClose();
-        if (!isOpen || isDragging) return;
+        if (!isOpen || isDragging || isResizing) return;
         
         // 5分钟无任何页面活动自动收纳 (300,000 毫秒)
         const timeoutMs = 300000;
@@ -754,7 +1063,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         autoCloseTimerRef.current = window.setTimeout(() => {
             if (isOpen) closeChat();
         }, delay) as any;
-    }, [clearAutoClose, closeChat, isDragging, isOpen]);
+    }, [clearAutoClose, closeChat, isDragging, isResizing, isOpen]);
 
     const registerActivity = useCallback(() => {
         lastActivityRef.current = Date.now();
@@ -1143,6 +1452,61 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         };
     }, [isDragging]);
 
+    // 简体中文：侧边栏拉伸宽度全局拖拽与释放逻辑（透明遮罩层防穿透 iframe 与 canvas）
+    useEffect(() => {
+        if (!isResizing) return;
+
+        // 创建全屏透明遮罩层，防止鼠标移入 iframe 或 canvas 时无法释放
+        const mask = document.createElement('div');
+        mask.style.position = 'fixed';
+        mask.style.top = '0';
+        mask.style.left = '0';
+        mask.style.width = '100vw';
+        mask.style.height = '100vh';
+        mask.style.zIndex = '999999';
+        mask.style.cursor = 'ew-resize';
+        mask.style.backgroundColor = 'transparent';
+        document.body.appendChild(mask);
+        resizeMaskRef.current = mask;
+
+        // 锁定全局光标和禁止拖动文本选中
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'ew-resize';
+
+        let rafId: number | null = null;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(() => {
+                const deltaX = dragStartXRef.current - e.clientX;
+                const newWidth = Math.max(320, Math.min(800, dragStartWidthRef.current + deltaX));
+                setSidebarWidth(newWidth);
+            });
+        };
+
+        const handleMouseUp = (e: MouseEvent) => {
+            const deltaX = dragStartXRef.current - e.clientX;
+            const newWidth = Math.max(320, Math.min(800, dragStartWidthRef.current + deltaX));
+            localStorage.setItem('kk_chat_width', newWidth.toString());
+            setIsResizing(false);
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+
+        return () => {
+            if (rafId) cancelAnimationFrame(rafId);
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+            if (mask.parentNode) {
+                mask.parentNode.removeChild(mask);
+            }
+            resizeMaskRef.current = null;
+            document.body.style.userSelect = '';
+            document.body.style.cursor = '';
+        };
+    }, [isResizing]);
+
     const appendFilesAsAttachments = useCallback(async (files: File[]) => {
         if (!files || files.length === 0) return;
 
@@ -1343,9 +1707,79 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
 
     const handleSend = async () => {
         if ((!input.trim() && attachments.length === 0) || isThinking) return;
-        if (!ensureModelAccess(selectedModel, '进行对话')) return;
 
         const userText = input.trim();
+        const hasKeys = keyManager.hasValidKeys();
+
+        // 简体中文：AI接管拦截逻辑 - 如果开启了AI接管模式，并且离线(无 key) 或提问了画布基础操作，我们直接在本地匹配回答，不消耗 API，也不执行 ensureModelAccess 报错阻断
+        if (aiTakeoverMode) {
+            const localAnswer = matchLocalKnowledge(userText);
+            
+            // 如果未配置本地 API 密钥，且开启了接管模式，我们将匹配结果或通用指南输出，不发出远程网络请求
+            if (!hasKeys) {
+                const finalAnswer = localAnswer || `### 🔍 未能精确匹配到您的操作提问。
+由于您当前未配置本地 API 密钥，且开启了**AI接管**，我为您准备了以下常见画布与报错指南：
+
+- 🆕 [新建画布/项目](action://highlight-#btn-create-canvas)
+- 💰 [充值积分](action://open-recharge)
+- ⚙️ [配置 API 密钥](action://open-settings-api)
+- 🔍 [定位包含“猫”的卡片](action://takeover-locate?keyword=猫)
+- 🚀 [自动生成提示词“一只可爱的猫”](action://takeover-bulk-generate?prompts=一只可爱的猫)
+
+您可以直接提问上述相关功能，或点击/让AI自动执行对应动作！`;
+
+                const currentAttachments = [...attachments];
+                const userMsg: Message = {
+                    id: Date.now().toString(),
+                    role: 'user',
+                    content: userText || '(附件)',
+                    timestamp: Date.now(),
+                    attachments: currentAttachments.length > 0 ? currentAttachments : undefined
+                };
+                setMessages(prev => [...prev, userMsg]);
+                setInput('');
+                setAttachments([]);
+
+                setIsThinking(true);
+                setTimeout(() => {
+                    setMessages(prev => [...prev, {
+                        id: `assistant_${Date.now()}`,
+                        role: 'assistant',
+                        content: finalAnswer,
+                        timestamp: Date.now()
+                    }]);
+                    setIsThinking(false);
+                }, 500);
+                return;
+            } else if (localAnswer) {
+                // 有 API Key，但如果能匹配到精确的本地画布基础操作，我们也秒回，提升响应速度并节省 API
+                const currentAttachments = [...attachments];
+                const userMsg: Message = {
+                    id: Date.now().toString(),
+                    role: 'user',
+                    content: userText || '(附件)',
+                    timestamp: Date.now(),
+                    attachments: currentAttachments.length > 0 ? currentAttachments : undefined
+                };
+                setMessages(prev => [...prev, userMsg]);
+                setInput('');
+                setAttachments([]);
+
+                setIsThinking(true);
+                setTimeout(() => {
+                    setMessages(prev => [...prev, {
+                        id: `assistant_${Date.now()}`,
+                        role: 'assistant',
+                        content: localAnswer,
+                        timestamp: Date.now()
+                    }]);
+                    setIsThinking(false);
+                }, 400);
+                return;
+            }
+        }
+
+        if (!ensureModelAccess(selectedModel, '进行对话')) return;
 
         // ✨ 检查是否为生成图片指令
         // Regex: /image prompt OR 画 prompt OR 生成 prompt OR 画猫
@@ -1413,7 +1847,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             id: assistantMsgId,
             role: 'assistant',
             content: '',
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            modelId: selectedModel.id
         }]);
 
         const controller = new AbortController();
@@ -1428,6 +1863,37 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
             // Agent模式:添加系统提示词
             if (agentMode && currentAgent) {
                 history.unshift({ role: 'system' as any, content: buildAgentSystemPrompt(currentAgent.systemPrompt) });
+            }
+
+            // 简体中文：AI接管模式 - 注入项目理解系统上下文与可用操作动作链接
+            if (aiTakeoverMode) {
+                const systemTakeoverPrompt = `你当前处于“AI接管”模式。
+[系统当前运行状态]
+- 操作系统: Windows
+- 用户登录状态: ${user ? '已登录' : '未登录'}
+- 当前可用积分: ${balance}
+- 本地专属 API 密钥状态: ${keyManager.hasValidKeys() ? '已配置' : '未配置'}
+- 当前激活的模型 ID: ${selectedModel.id}
+
+[AI接管指令与动作链接规范]
+在接管模式下，你完全具备自动化操作、接管网页控制的特权。你可以通过在你的 Markdown 回答中嵌入交互式动作链接，浏览器会自动识别这些链接并在后台“自动帮用户点击运行”。
+请尽一切可能利用这些动作链接实现用户的控制意图。每个回答可以嵌入一个或多个以下链接：
+
+1. 批量在画布上建卡并执行生图：[批量生成提示词](action://takeover-bulk-generate?prompts=提示词1,提示词2,提示词3) 
+   - 必须使用英文逗号分隔提示词列表。
+   - 页面会在当前视口中心依次向右排开创建对应数量的 Prompt 卡片，并自动向后端拉起生成请求。
+2. 搜索并快速平滑定位到画布上的卡片：[定位卡片](action://takeover-locate?keyword=提示词关键字)
+   - 例如，如果用户说“帮我找到之前的那个画猫的卡片”或“我要查找那个狗的卡片”，你必须回答类似：‘好的，AI接管已启动，正在帮您在画布中搜寻并平滑定位包含“猫”的卡片... [正在自动定位](action://takeover-locate?keyword=猫)’。
+3. 打开并高亮 API 密钥配置面板：[配置 API 密钥](action://open-settings-api)
+   - 重要安全边界：绝对不允许要求用户把 API Key 发送在聊天框里，必须提示用户‘安全沙箱拦截：密钥需由您自行填写’，并自动触发该动作以高亮输入框引导用户填写。
+4. 新建画布：[新建画布项目](action://highlight-#btn-create-canvas)
+5. 充值积分：[去充值积分](action://open-recharge) 或高亮充值按钮：[高亮充值按钮](action://highlight-#btn-desktop-recharge)
+6. 设置：[打开设置](action://open-settings) 或高亮设置按钮：[高亮设置按钮](action://highlight-#btn-desktop-settings)
+7. 缩放控制：[高亮缩放控制](action://highlight-.desktop-zoom-rail)
+8. 提示词输入框：[高亮提示词输入](action://highlight-#prompt-input-composer)
+
+请结合当前的系统状态和用户的提问进行排障与自动控制，回答须精炼、极简、富有亲和力。`;
+                history.unshift({ role: 'system' as any, content: systemTakeoverPrompt });
             }
 
             const { messageContent, inlineData } = buildMessageWithAttachments(userText, currentAttachments);
@@ -1582,7 +2048,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
         const controller = new AbortController();
         abortControllerRef.current = controller;
 
-        setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content: '' } : m)));
+        setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content: '', modelId: selectedModel.id } : m)));
 
         try {
             const responseText = await llmService.chat({
@@ -1933,35 +2399,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                         <div
                             onMouseDown={(e: React.MouseEvent) => {
                                 e.preventDefault();
-                                const startX = e.clientX;
-                                const startWidth = sidebarWidth;
-
-                                // 简体中文：禁止拖动时文本选中并锁定全局光标样式以获得极致顺滑的 premium 拖动反馈
-                                document.body.style.userSelect = 'none';
-                                document.body.style.cursor = 'ew-resize';
-
-                                const onMouseMove = (moveEvent: MouseEvent) => {
-                                    const deltaX = startX - moveEvent.clientX;
-                                    const newWidth = Math.max(320, Math.min(800, startWidth + deltaX));
-                                    setSidebarWidth(newWidth);
-                                };
-
-                                const onMouseUp = (upEvent: MouseEvent) => {
-                                    const deltaX = startX - upEvent.clientX;
-                                    const newWidth = Math.max(320, Math.min(800, startWidth + deltaX));
-                                    localStorage.setItem('kk_chat_width', newWidth.toString());
-                                    
-                                    // 简体中文：恢复选中和光标样式
-                                    document.body.style.userSelect = '';
-                                    document.body.style.cursor = '';
-                                    
-                                    window.removeEventListener('mousemove', onMouseMove);
-                                    window.removeEventListener('mouseup', onMouseUp);
-                                };
-
-                                // 简体中文：升级到 window 级别全局侦听，解决移出 document 丢失 mouseup 事件的致命黏滞问题
-                                window.addEventListener('mousemove', onMouseMove);
-                                window.addEventListener('mouseup', onMouseUp);
+                                dragStartXRef.current = e.clientX;
+                                dragStartWidthRef.current = sidebarWidth;
+                                setIsResizing(true);
                             }}
                             className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-[var(--primary)] transition-colors z-50"
                         />
@@ -2165,9 +2605,13 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                             <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''} group`}>
                                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${msg.role === 'user'
                                     ? 'bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)]'
-                                    : 'bg-gradient-to-br from-[var(--clay-brand-coral)] via-[var(--clay-brand-pink)] to-[var(--clay-brand-peach)] text-white'
+                                    : 'bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white'
                                     }`}>
-                                    {msg.role === 'user' ? <User size={14} className="text-[var(--text-tertiary)]" /> : <Bot size={16} className="animate-icon-breathe" />}
+                                    {msg.role === 'user' ? (
+                                        <User size={14} className="text-[var(--text-tertiary)]" />
+                                    ) : (
+                                        <Bot size={16} className="animate-icon-breathe" />
+                                    )}
                                 </div>
                                 <div className={`${isMobile ? 'max-w-[90%]' : 'max-w-[82%]'} flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                     {/* 消息文本 */}
@@ -2175,7 +2619,15 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                         ? 'bg-[var(--frost-card-sub-bg)] text-[var(--text-primary)] rounded-tr-md border border-[var(--frost-card-sub-border)]'
                                         : 'bg-[var(--frost-card-sub-bg)] text-[var(--text-primary)] border border-[var(--frost-card-sub-border)] rounded-tl-md'
                                         }`}>
-                                        <div className="whitespace-pre-wrap">{msg.content}</div>
+                                        {msg.role === 'assistant' && !msg.content ? (
+                                            <div className="flex items-center gap-1.5 h-5">
+                                                <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                                <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                                <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce" />
+                                            </div>
+                                        ) : (
+                                            <div className="whitespace-pre-wrap">{renderMessageContent(msg.content)}</div>
+                                        )}
                                     </div>
 
                                     {/* 附件/生成结果展示 */}
@@ -2262,10 +2714,14 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                             </div>
                         ))}
 
-                        {isThinking && (
+                        {isThinking && !(
+                            messages.length > 0 && 
+                            messages[messages.length - 1].role === 'assistant' && 
+                            !messages[messages.length - 1].content
+                        ) && (
                             <div className="flex gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--clay-brand-coral)] via-[var(--clay-brand-pink)] to-[var(--clay-brand-peach)] flex items-center justify-center shrink-0">
-                                    <Bot size={16} className="animate-pulse text-white" />
+                                <div className="w-8 h-8 rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] flex items-center justify-center shrink-0">
+                                    <ModelLogo modelId={selectedModel.id} size={18} className="animate-pulse" />
                                 </div>
                                 <div className="flex items-center gap-1.5 px-4 py-3 bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] rounded-2xl rounded-tl-md h-11">
                                     <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce [animation-delay:-0.3s]" />
@@ -2415,6 +2871,25 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                                         <Bot size={11} className={agentMode ? 'animate-pulse' : ''} />
                                         <span>Agent</span>
                                         <span className={`inline-block w-1.5 h-1.5 rounded-full ${agentMode ? 'bg-white animate-ping' : 'bg-current opacity-60'}`} />
+                                    </button>
+
+                                    {/* 简体中文：AI接管药丸切换按钮 */}
+                                    <button
+                                        id="btn-ai-takeover-toggle"
+                                        onClick={() => {
+                                            setAiTakeoverMode(!aiTakeoverMode);
+                                            registerActivity();
+                                        }}
+                                        className={`px-2.5 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 active:scale-95 select-none ${
+                                            aiTakeoverMode
+                                                ? 'bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 text-white border-transparent shadow-[0_2px_8px_rgba(219,39,119,0.25)]'
+                                                : 'bg-[var(--toolbar-hover)] text-[var(--text-secondary)] border-[var(--frost-card-sub-border)] hover:text-[var(--text-primary)]'
+                                        }`}
+                                        title={aiTakeoverMode ? 'AI 接管已开启：自动为您批量生图、定位卡片或聚焦 API 输入框' : '开启 AI 接管'}
+                                    >
+                                        <Cpu size={11} className={aiTakeoverMode ? 'animate-pulse' : ''} />
+                                        <span>AI接管</span>
+                                        <span className={`inline-block w-1.5 h-1.5 rounded-full ${aiTakeoverMode ? 'bg-white animate-ping' : 'bg-current opacity-60'}`} />
                                     </button>
                                 </div>
 
@@ -2697,6 +3172,35 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onToggle, onClose, is
                 document.body
             )}
         </>
+    );
+};
+
+const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
+    const { activeCanvas, addPromptNode, updatePromptNode, getNextCardPosition } = useCanvas();
+    const { executeGeneration } = useImageGeneration({
+        isMobile: props.isMobile,
+        getCardDimensions: (ratio, hasToolbar) => getCardDimensions(ratio, hasToolbar),
+        rememberPreferredKeyForMode: () => {}
+    });
+    const { balance } = useBilling();
+    const apiKeyStatus = keyManager.hasValidKeys() ? 'configured_masked' : 'missing';
+
+    return (
+        <AITakeoverProvider
+            activeCanvas={activeCanvas}
+            selectedModel={{ id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google' }}
+            addPromptNode={addPromptNode}
+            updatePromptNode={updatePromptNode}
+            executeGeneration={executeGeneration}
+            getNextCardPosition={getNextCardPosition}
+            setConfig={() => {}}
+            onOpenSettings={props.onOpenSettings}
+            apiKeyStatus={apiKeyStatus}
+            balance={balance}
+            notify={notify}
+        >
+            <ChatSidebarInner {...props} />
+        </AITakeoverProvider>
     );
 };
 

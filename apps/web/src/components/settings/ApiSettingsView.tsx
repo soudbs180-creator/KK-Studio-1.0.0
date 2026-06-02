@@ -3122,17 +3122,25 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                 </div>
                 <div className="settings-provider-editor-card__actions">
                   <SettingsBadge tone="neutral">{pick(`协议 ${getProtocolLabel(providerForm.format)}`, `Protocol ${getProtocolLabel(providerForm.format)}`)}</SettingsBadge>
-                  {activeProviderPresetLinks.map((link) => (
-                    <button
-                      key={`${link.labelEn}:${link.url}`}
-                      type="button"
-                      className="settings-provider-editor-link"
-                      onClick={() => safeOpenLink(link.url)}
-                    >
-                      <Globe size={14} />
-                      <span>{pick(link.labelZh, link.labelEn)}</span>
-                    </button>
-                  ))}
+                  {activeProviderPresetLinks.map((link) => {
+                    // 确保 URL 具有协议头
+                    let targetUrl = link.url.trim();
+                    if (!/^https?:\/\//i.test(targetUrl)) {
+                      targetUrl = `https://${targetUrl}`;
+                    }
+                    return (
+                      <a
+                        key={`${link.labelEn}:${link.url}`}
+                        href={targetUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="settings-provider-editor-link"
+                      >
+                        <Globe size={14} />
+                        <span>{pick(link.labelZh, link.labelEn)}</span>
+                      </a>
+                    );
+                  })}
                 </div>
               </div>
 

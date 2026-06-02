@@ -29,6 +29,7 @@ interface DesktopMenuActionButtonProps {
   accentColor: string;
   onClick: () => void;
   testId?: string;
+  id?: string;
 }
 
 const DesktopMenuActionButton: React.FC<DesktopMenuActionButtonProps> = ({
@@ -37,8 +38,10 @@ const DesktopMenuActionButton: React.FC<DesktopMenuActionButtonProps> = ({
   accentColor,
   onClick,
   testId,
+  id,
 }) => (
   <button
+    id={id}
     onClick={onClick}
     data-testid={testId}
     className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors"
@@ -136,6 +139,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
           </div>
 
           <button
+            id="btn-desktop-recharge"
             onClick={onRecharge}
             className="inline-flex items-center justify-center rounded-xl px-4 py-1.5 text-xs font-black leading-none text-white transition-all active:scale-95 hover:brightness-110"
             style={{
@@ -177,6 +181,7 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
                 }}
               />
               <DesktopMenuActionButton
+                id="btn-desktop-settings"
                 icon={<LayoutDashboard size={14} />}
                 label="管理设置"
                 accentColor="var(--clay-brand-lavender)"

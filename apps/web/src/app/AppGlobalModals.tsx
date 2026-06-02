@@ -189,6 +189,8 @@ export interface AppGlobalModalsProps {
     initialView: SettingsPanelProps['initialView'];
     initialSupplier: SettingsPanelProps['initialSupplier'];
     onClose: () => void;
+    isChatOpen?: boolean;
+    chatSidebarWidth?: number;
   };
   storageModal: {
     isOpen: boolean;
@@ -296,6 +298,8 @@ const AppGlobalModals: React.FC<AppGlobalModalsProps> = ({
           onClose={settingsPanel.onClose}
           initialView={settingsPanel.initialView}
           initialSupplier={settingsPanel.initialSupplier}
+          isChatOpen={settingsPanel.isChatOpen}
+          chatSidebarWidth={settingsPanel.chatSidebarWidth}
         />
       </SettingsPanelLoadBoundary>
     )}

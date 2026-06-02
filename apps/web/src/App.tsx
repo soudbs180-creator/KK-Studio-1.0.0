@@ -1601,6 +1601,44 @@ const AppContent: React.FC<AppContentProps> = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasTransform]); // Exclude setViewportCenter to avoid an infinite loop
 
+  // 简体中文：AI接管平滑定位画布事件处理器
+  useEffect(() => {
+    const handleCenterOnNode = (e: Event) => {
+      const { x, y, nodeId } = (e as CustomEvent).detail;
+      setCanvasTransform(prev => ({
+        ...prev,
+        x: window.innerWidth / 2 - x * prev.scale,
+        y: window.innerHeight / 2 - y * prev.scale
+      }));
+      setTimeout(() => {
+        const el = document.querySelector(`#prompt-card-${nodeId}`) as HTMLElement;
+        if (el) {
+          el.classList.add('highlight-glow-ring');
+          setTimeout(() => {
+            el.classList.remove('highlight-glow-ring');
+          }, 3000);
+        }
+      }, 100);
+    };
+    window.addEventListener('canvas-center-on-node', handleCenterOnNode);
+    return () => window.removeEventListener('canvas-center-on-node', handleCenterOnNode);
+  }, [setCanvasTransform]);
+
+  // 简体中文：AI接管提示词本地填充事件处理器
+  useEffect(() => {
+    const handleFillPrompt = (e: Event) => {
+      const { prompt } = (e as CustomEvent).detail;
+      if (prompt) {
+        setConfig(prev => ({
+          ...prev,
+          prompt: prompt
+        }));
+      }
+    };
+    window.addEventListener('takeover-fill-prompt', handleFillPrompt);
+    return () => window.removeEventListener('takeover-fill-prompt', handleFillPrompt);
+  }, [setConfig]);
+
   // Derived Pending Position: Always Center (or linked to source)
   const pendingPosition = React.useMemo(() => {
     if (activeSourceImage && activeCanvas) {
@@ -4630,7 +4668,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     />
   ) : null;
 
-  const globalModalsProps: AppGlobalModalsProps = {
+  const globalModalsProps: any = {
     projectManager: projectManagerNode,
     tagModal: {
       isOpen: isTagModalOpen,
@@ -4657,6 +4695,8 @@ const AppContent: React.FC<AppContentProps> = () => {
       initialView: settingsInitialView,
       initialSupplier: settingsInitialSupplier,
       onClose: handleCloseSettingsPanel,
+      isChatOpen,
+      chatSidebarWidth,
     },
     storageModal: {
       isOpen: showStorageModal,
