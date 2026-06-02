@@ -48,7 +48,22 @@ jobs:
         run: npm run build
 
       - name: Unit tests
-        run: npm run test:unit
+        shell: bash
+        run: |
+          set +e
+          npm run test:unit 2>&1 | tee unit-test.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            {
+              echo "### Unit test failure"
+              echo '```'
+              tail -n 160 unit-test.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            summary="$(tail -n 40 unit-test.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+            echo "::error title=Unit test failure::$summary"
+          fi
+          exit "$status"
 
       - name: Integration tests
         run: npm run test:integration
