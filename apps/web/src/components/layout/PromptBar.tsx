@@ -3501,12 +3501,9 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                             return (
                                                 <div
                                                     key={group.provider}
-                                                    draggable={hoveredDragProvider === group.provider}
-                                                    onDragStart={(e) => handleProviderDragStart(e, index)}
                                                     onDragOver={(e: React.DragEvent<HTMLDivElement>) => handleProviderDragOver(e, index)}
-                                                    onDragEnd={handleProviderDragEnd}
                                                     onClick={() => setDesktopActiveProvider(group.provider)}
-                                                    className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-200 select-none cursor-pointer
+                                                    className={`provider-row-container flex items-center justify-between p-3 rounded-xl border transition-all duration-200 select-none cursor-pointer
                                                         ${isDragged 
                                                             ? 'border-dashed border-[color:var(--accent-coral)] bg-[color:var(--accent-coral)]/5 opacity-50 scale-95' 
                                                             : 'bg-[var(--frost-card-sub-bg)] border-[var(--frost-card-sub-border)] hover:border-[var(--prompt-bar-shell-border-strong)] active:scale-[0.99] hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
@@ -3515,8 +3512,15 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                                     <div className="flex items-center gap-2.5 min-w-0">
                                                         {/* 拖拽指示手柄 */}
                                                         <div 
-                                                            onMouseEnter={() => setHoveredDragProvider(group.provider)}
-                                                            onMouseLeave={() => setHoveredDragProvider(null)}
+                                                            draggable={true}
+                                                            onDragStart={(e) => {
+                                                                const rowEl = e.currentTarget.closest('.provider-row-container') as HTMLDivElement;
+                                                                if (rowEl && e.dataTransfer.setDragImage) {
+                                                                    e.dataTransfer.setDragImage(rowEl, 20, 20);
+                                                                }
+                                                                handleProviderDragStart(e, index);
+                                                            }}
+                                                            onDragEnd={handleProviderDragEnd}
                                                             className="text-[var(--text-tertiary)] cursor-grab active:cursor-grabbing hover:text-[var(--text-secondary)] opacity-40 hover:opacity-100 pr-1 flex items-center shrink-0"
                                                         >
                                                             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
