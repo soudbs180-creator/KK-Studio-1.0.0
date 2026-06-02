@@ -72,7 +72,7 @@ test('CanvasContext: Hydration cleanup for expired blobs contract', () => {
 
   // Verify startup hydration cleans unrecovered blob urls to "本地临时图片已失效"
   assert.match(source, /errorMsg = '本地临时图片已失效';/);
-  assert.match(source, /originalUrl: \(displayUrl === '' && errorMsg === '本地临时图片已失效'\) \? '' : \(img\.originalUrl \|\| img\.apiResultUrl\)/);
+  assert.match(source, /originalUrl:[\s\S]*?'本地临时图片已失效'[\s\S]*?img\.originalUrl/);
 });
 
 test('ImageCard2: Friendly UI for expired blob images contract', () => {

@@ -254,12 +254,16 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             } else {
                                 displayUrl = storedUrl;
                             }
+                            if (errorMsg === '本地临时图片已失效') {
+                                errorMsg = undefined;
+                            }
                         } else {
                             if (displayUrl.startsWith('blob:') || (img.originalUrl && img.originalUrl.startsWith('blob:'))) {
                                 displayUrl = '';
                                 errorMsg = '本地临时图片已失效';
                             }
                         }
+                        const isExpiredUrl = displayUrl === '' && errorMsg === '本地临时图片已失效';
                         return {
                             ...img,
                             url: displayUrl,
@@ -614,11 +618,24 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                                 canvases: mergedCanvases.map(c => {
                                                     return {
                                                         ...c,
-                                                        imageNodes: c.imageNodes.map(img => ({
-                                                            ...img,
-                                                            url: (images.get(img.storageId || img.id)?.url || images.get(img.id)?.url) || img.url || img.apiResultUrl || '',
-                                                            originalUrl: (images.get(img.storageId || img.id)?.originalUrl || images.get(img.id)?.originalUrl) || img.originalUrl || img.apiResultUrl
-                                                        })),
+                                                        imageNodes: c.imageNodes.map(img => {
+                                                            const diskImage = images.get(img.storageId || img.id) || images.get(img.id);
+                                                            const recoveredUrl = diskImage?.url || img.url || img.apiResultUrl || '';
+                                                            const recoveredOriginalUrl = diskImage?.originalUrl || img.originalUrl || img.apiResultUrl;
+                                                            
+                                                            const isFreshDiskRecovery = !!diskImage;
+                                                            const hasRecovered = isFreshDiskRecovery ||
+                                                                (recoveredUrl && !recoveredUrl.startsWith('blob:')) ||
+                                                                (recoveredOriginalUrl && !recoveredOriginalUrl.startsWith('blob:'));
+                                                            const errorMsg = (hasRecovered && img.error === '本地临时图片已失效') ? undefined : img.error;
+
+                                                            return {
+                                                                ...img,
+                                                                url: recoveredUrl,
+                                                                originalUrl: recoveredOriginalUrl,
+                                                                error: errorMsg
+                                                            };
+                                                        }),
                                                         promptNodes: c.promptNodes.map(pn => ({
                                                             ...pn,
                                                             // Restore missing reference data from refs/ when storageId is available.

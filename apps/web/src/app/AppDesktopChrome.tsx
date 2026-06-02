@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { LayoutDashboard, LogOut, Sparkles, User, Zap, Shield } from 'lucide-react';
 
 import type { UserProfileView } from '../components/modals/UserProfileModal';
@@ -156,73 +157,76 @@ const AppDesktopChrome: React.FC<AppDesktopChromeProps> = ({
 
       {/* 简体中文：用户下拉菜单弹出容器 - 改为 left-0 并向下平移，完美配合左侧等宽面板 */}
       {showUserMenu ? (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
-          <div
-            id="desktop-user-menu-panel"
-            onClick={(e) => e.stopPropagation()}
-            className="absolute left-0 top-[72px] z-50 w-64 origin-top-left animate-in rounded-xl border p-2 duration-100 fade-in zoom-in-95"
-            style={{
-              // 简体中文：使用高不透明度 (85%) 的实色基底色与透明混合，配合强模糊，实现顶级高级磨砂玻璃（Mica/Glassmorphism）效果，彻底解决后方文字和图片透出的干扰问题
-              background: 'color-mix(in srgb, var(--frost-card-framework-bg-solid) 85%, transparent 15%)',
-              borderColor: 'var(--frost-card-framework-border)',
-              boxShadow: 'var(--frost-card-framework-shadow), 0 10px 30px rgba(0, 0, 0, 0.25)',
-              backdropFilter: 'blur(20px) saturate(190%)',
-              WebkitBackdropFilter: 'blur(20px) saturate(190%)',
-            }}
-          >
-            <div className="space-y-1">
-              <DesktopMenuActionButton
-                icon={<User size={14} />}
-                label="个人中心"
-                accentColor="var(--clay-brand-coral)"
-                onClick={() => {
-                  onOpenProfile('main');
-                  setShowUserMenu(false);
-                }}
-              />
-              <DesktopMenuActionButton
-                id="btn-desktop-settings"
-                icon={<LayoutDashboard size={14} />}
-                label="管理设置"
-                accentColor="var(--clay-brand-lavender)"
-                testId="desktop-user-menu-settings"
-                onClick={() => {
-                  onOpenSettings();
-                  setShowUserMenu(false);
-                }}
-              />
-
-              {adminLevel > 0 && (
+        createPortal(
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
+            <div
+              id="desktop-user-menu-panel"
+              onClick={(e) => e.stopPropagation()}
+              className="fixed left-4 top-[88px] z-50 w-64 origin-top-left animate-in rounded-xl border p-2 duration-100 fade-in zoom-in-95"
+              style={{
+                // 简体中文：使用 80% 的实色基底色与透明混合，配合强模糊，实现顶级高级磨砂玻璃（Mica/Glassmorphism）效果，彻底解决后方文字和图片透出的干扰问题
+                background: 'color-mix(in srgb, var(--frost-card-framework-bg-solid) 80%, transparent 20%)',
+                borderColor: 'var(--frost-card-framework-border)',
+                boxShadow: 'var(--frost-card-framework-shadow), 0 10px 30px rgba(0, 0, 0, 0.25)',
+                backdropFilter: 'blur(24px) saturate(190%)',
+                WebkitBackdropFilter: 'blur(24px) saturate(190%)',
+              }}
+            >
+              <div className="space-y-1">
                 <DesktopMenuActionButton
-                  icon={<Shield size={14} />}
-                  label="管理员后台"
+                  icon={<User size={14} />}
+                  label="个人中心"
                   accentColor="var(--clay-brand-coral)"
                   onClick={() => {
-                    window.history.pushState({}, '', '/admin');
-                    window.dispatchEvent(new PopStateEvent('popstate'));
+                    onOpenProfile('main');
                     setShowUserMenu(false);
                   }}
                 />
-              )}
+                <DesktopMenuActionButton
+                  id="btn-desktop-settings"
+                  icon={<LayoutDashboard size={14} />}
+                  label="管理设置"
+                  accentColor="var(--clay-brand-lavender)"
+                  testId="desktop-user-menu-settings"
+                  onClick={() => {
+                    onOpenSettings();
+                    setShowUserMenu(false);
+                  }}
+                />
 
-              <div className="my-1 h-px" style={{ backgroundColor: 'var(--border-light)' }} />
+                {adminLevel > 0 && (
+                  <DesktopMenuActionButton
+                    icon={<Shield size={14} />}
+                    label="管理员后台"
+                    accentColor="var(--clay-brand-coral)"
+                    onClick={() => {
+                      window.history.pushState({}, '', '/admin');
+                      window.dispatchEvent(new PopStateEvent('popstate'));
+                      setShowUserMenu(false);
+                    }}
+                  />
+                )}
 
-              <button
-                onClick={() => {
-                  void onSignOut();
-                  setShowUserMenu(false);
-                }}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-red-400 transition-colors hover:bg-red-500/10 outline-none"
-              >
-                <div className="rounded-lg bg-red-500/10 p-1.5">
-                  <LogOut size={14} />
-                </div>
-                退出登录
-              </button>
+                <div className="my-1 h-px" style={{ backgroundColor: 'var(--border-light)' }} />
+
+                <button
+                  onClick={() => {
+                    void onSignOut();
+                    setShowUserMenu(false);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-red-400 transition-colors hover:bg-red-500/10 outline-none"
+                >
+                  <div className="rounded-lg bg-red-500/10 p-1.5">
+                    <LogOut size={14} />
+                  </div>
+                  退出登录
+                </button>
+              </div>
             </div>
-          </div>
-        </>
+          </>,
+          document.body
+        )
       ) : null}
     </div>
   );

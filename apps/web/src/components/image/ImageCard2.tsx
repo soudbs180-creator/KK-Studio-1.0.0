@@ -22,6 +22,7 @@ import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
 import { base64ToBlob, generateDownloadFilename, triggerDownload } from '../../utils/downloadUtils';
 import { snapCanvasPointToGrid } from '../../utils/canvasSnapToGrid';
 import { safeOpenLink } from '../../utils/browserUtils';
+import { useTheme } from '../../context/ThemeContext';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -138,6 +139,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     canvasTransform, // 🚀 [New] 用于计算动画起始位置
     isChatMode = false // 🚀 [New] 垂直聊天流标识
 }) => {
+    const { isDarkMode } = useTheme();
     const detailQualityBias: ImageQualityBias = detailLevel === 'thumbnail-shell'
         ? 'micro-only'
         : detailLevel === 'compact'
@@ -423,9 +425,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 setIsLoading(false);
                 loadedRef.current = true;
                 setImgError(false); // 🚀 [Fix] 发现新 URL，强制清除旧图报错状态
+                if (image.error === '本地临时图片已失效' && onUpdate) {
+                    onUpdate(image.id, { error: undefined });
+                }
             }
         }
-    }, [image.apiResultUrl, image.url, image.originalUrl, image.id]);
+    }, [image.apiResultUrl, image.url, image.originalUrl, image.id, image.error, onUpdate]);
 
     const [currentQuality, setCurrentQuality] = useState<ImageQuality>(ImageQuality.ORIGINAL);
     const qualityLoadingRef = useRef(false); // 防止重复加载
@@ -771,6 +776,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     loadedRef.current = true;
                     setIsLoading(false); // 🚀 加载成功
                     autoRetryRef.current = 0; // 重置重试计数
+                    if (image.error === '本地临时图片已失效' && onUpdate) {
+                        onUpdate(image.id, { error: undefined });
+                    }
                 } else {
                     // 🚀 队列返回null - IndexedDB中没有，尝试多种fallback策略
                     console.debug(`[ImageCard] Queue returned null for ${image.id}, trying fallback recovery...`);
@@ -784,6 +792,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                 setDisplaySrc(sanitizeUrl(recoveredFromStorage));
                                 loadedRef.current = true;
                                 setIsLoading(false);
+                                if (image.error === '本地临时图片已失效' && onUpdate) {
+                                    onUpdate(image.id, { error: undefined });
+                                }
                                 return; // 恢复成功，退出
                             }
                         } catch (err) {
@@ -799,6 +810,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                             setDisplaySrc(sanitizeUrl(recoveredOriginal));
                             loadedRef.current = true;
                             setIsLoading(false);
+                            if (image.error === '本地临时图片已失效' && onUpdate) {
+                                onUpdate(image.id, { error: undefined });
+                            }
                             return;
                         }
                     } catch (err) {
@@ -812,6 +826,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                         setDisplaySrc(sanitizeUrl(fallbackUrl));
                         loadedRef.current = true;
                         setIsLoading(false);
+                        if (image.error === '本地临时图片已失效' && onUpdate) {
+                            onUpdate(image.id, { error: undefined });
+                        }
                     } else {
                         // 🚀 自动重试机制 — IndexedDB 可能尚未就绪（刷新后竞态条件）
                         if (autoRetryRef.current < 3) {
@@ -1670,48 +1687,94 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                     )}
                                 </div>{/* 关闭图片独立容器 */}
 
-                                {image.error && !image.isGenerating && (
-                                    <div
-                                        className="absolute inset-0 z-40 rounded-lg flex flex-col items-center justify-center p-4 text-center border border-red-500/12"
-                                        style={{
-                                            background: 'rgba(10, 10, 10, 0.95)',
-                                            backdropFilter: 'blur(8px)',
-                                            boxShadow: 'inset 0 0 20px rgba(239, 68, 68, 0.15)'
-                                        }}
-                                    >
-                                        {/* 优雅红色警告图标 */}
-                                        <div className="w-10 h-10 rounded-full bg-red-500/8 border border-red-500/25 flex items-center justify-center mb-2.5 shadow-sm">
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(244, 63, 94)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-[0_2px_8px_rgba(239,68,68,0.25)]">
-                                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                                                <line x1="12" y1="9" x2="12" y2="13" />
-                                                <line x1="12" y1="17" x2="12.01" y2="17" />
-                                            </svg>
+                                {image.error && !image.isGenerating && (() => {
+                                    const isExpired = image.error === '本地临时图片已失效';
+                                    if (isExpired) {
+                                        return (
+                                            <div
+                                                className="absolute inset-0 z-40 rounded-lg flex flex-col items-center justify-center p-4 text-center border border-amber-500/12"
+                                                style={{
+                                                    background: 'rgba(10, 10, 10, 0.95)',
+                                                    backdropFilter: 'blur(8px)',
+                                                    boxShadow: 'inset 0 0 20px rgba(245, 158, 11, 0.15)'
+                                                }}
+                                            >
+                                                {/* 优雅黄色警告图标 */}
+                                                <div className="w-10 h-10 rounded-full bg-amber-500/8 border border-amber-500/25 flex items-center justify-center mb-2.5 shadow-sm">
+                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(245, 158, 11)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-[0_2px_8px_rgba(245,158,11,0.25)]">
+                                                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                                        <line x1="12" y1="9" x2="12" y2="13" />
+                                                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                                                    </svg>
+                                                </div>
+                                                <span className="text-xs font-semibold text-[rgb(245, 158, 11)] tracking-wider mb-1.5 uppercase opacity-95 drop-shadow-sm">
+                                                    ⚠️ 本地图片已失效
+                                                </span>
+                                                <span className="text-[11px] text-[rgba(245, 158, 11, 0.85)] leading-relaxed max-w-[90%] overflow-hidden">
+                                                    原图文件依然完整保存在本地，可通过重试恢复
+                                                </span>
+                                                <button
+                                                    onClick={handleRetryLoad}
+                                                    className="mt-3 text-[11px] px-3 py-1 rounded-full border border-amber-500/30 text-[rgb(245, 158, 11)] bg-amber-500/5 hover:bg-amber-500/15 hover:border-amber-500/50 transition-all font-medium"
+                                                >
+                                                    点击恢复
+                                                </button>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div
+                                            className="absolute inset-0 z-40 rounded-lg flex flex-col items-center justify-center p-4 text-center border border-red-500/12"
+                                            style={{
+                                                background: 'rgba(10, 10, 10, 0.95)',
+                                                backdropFilter: 'blur(8px)',
+                                                boxShadow: 'inset 0 0 20px rgba(239, 68, 68, 0.15)'
+                                            }}
+                                        >
+                                            {/* 优雅红色警告图标 */}
+                                            <div className="w-10 h-10 rounded-full bg-red-500/8 border border-red-500/25 flex items-center justify-center mb-2.5 shadow-sm">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(244, 63, 94)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-[0_2px_8px_rgba(239,68,68,0.25)]">
+                                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                                    <line x1="12" y1="9" x2="12" y2="13" />
+                                                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                                                </svg>
+                                            </div>
+                                            {/* 错误分类 */}
+                                            <span className="text-xs font-semibold text-[rgb(244, 63, 94)] tracking-wider mb-1.5 uppercase opacity-95 drop-shadow-sm">
+                                                {image.error.toLowerCase().includes('timeout') || image.error.toLowerCase().includes('timed out') || image.error.toLowerCase().includes('超时')
+                                                    ? '⏱ 生成超时'
+                                                    : image.error.toLowerCase().includes('cancel') || image.error.toLowerCase().includes('取消')
+                                                        ? '🚫 已取消'
+                                                        : '❌ 生成错误'}
+                                            </span>
+                                            {/* 优雅排版的错误信息 */}
+                                            <span className="text-[11px] text-[rgba(244, 63, 94, 0.85)] leading-relaxed max-w-[90%] overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as any }}>
+                                                {image.error.length > 120 ? image.error.slice(0, 120) + '...' : image.error}
+                                            </span>
                                         </div>
-                                        {/* 错误分类 */}
-                                        <span className="text-xs font-semibold text-[rgb(244, 63, 94)] tracking-wider mb-1.5 uppercase opacity-95 drop-shadow-sm">
-                                            {image.error.toLowerCase().includes('timeout') || image.error.toLowerCase().includes('timed out') || image.error.toLowerCase().includes('超时')
-                                                ? '⏱ 生成超时'
-                                                : image.error.toLowerCase().includes('cancel') || image.error.toLowerCase().includes('取消')
-                                                    ? '🚫 已取消'
-                                                    : '❌ 生成错误'}
-                                        </span>
-                                        {/* 优雅排版的错误信息 */}
-                                        <span className="text-[11px] text-[rgba(244, 63, 94, 0.85)] leading-relaxed max-w-[90%] overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as any }}>
-                                            {image.error.length > 120 ? image.error.slice(0, 120) + '...' : image.error}
-                                        </span>
-                                    </div>
-                                )}
+                                    );
+                                })()}
 
                                 {((isLoading && !displaySrc) || (!imgError && !displaySrc)) && !image.error && !isCanvasTransforming && (
                                     <div
-                                        className="absolute inset-0 z-50 rounded-lg flex flex-col items-center justify-center border border-white/5 animate-shimmer-inward"
+                                        className={`absolute inset-0 z-50 rounded-lg flex flex-col items-center justify-center border ${
+                                            isDarkMode ? 'border-white/5 animate-shimmer-inward' : 'border-black/5 animate-shimmer-inward'
+                                        }`}
                                         style={{
                                             willChange: 'opacity',
-                                            background: 'rgba(10, 10, 10, 0.95)',
-                                            boxShadow: 'inset 0 0 16px rgba(255, 255, 255, 0.12)'
+                                            background: isDarkMode ? 'rgba(10, 10, 10, 0.95)' : 'rgba(250, 250, 250, 0.95)',
+                                            boxShadow: isDarkMode 
+                                                ? 'inset 0 0 16px rgba(255, 255, 255, 0.12)' 
+                                                : 'inset 0 0 16px rgba(0, 0, 0, 0.06)'
                                         }}
                                     >
-                                        <span className="text-xs font-semibold tracking-wide text-[var(--text-primary)] opacity-85">
+                                        <span 
+                                            className="text-xs font-semibold tracking-wide"
+                                            style={{
+                                                color: isDarkMode ? 'rgba(255, 255, 255, 0.85)' : 'rgba(17, 17, 17, 0.85)'
+                                            }}
+                                        >
                                             正在加载...
                                         </span>
                                     </div>

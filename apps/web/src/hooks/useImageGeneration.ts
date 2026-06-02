@@ -857,7 +857,16 @@ export const useImageGeneration = (options: {
         batchKey: pendingRequest.requestId,
       });
       const recoveredResults = preparedItems.map(({ item, sourceTaskId, sourceResultIndex, apiResultUrl }, index) => {
-        const imageId = `${nodeId}_sync_recovered_${Date.now()}_${pendingRequest.index}_${index}`;
+        // 简体中文注释：检查是否为速创渠道
+        const isWuyin =
+          String(latestNode.provider || '').toLowerCase() === 'wuyin'
+          || String(latestNode.providerLabel || '').toLowerCase().includes('wuyin')
+          || String(latestNode.providerLabel || '').includes('速创')
+          || String(latestNode.keySlotId || '').includes('@slot_key_');
+
+        const imageId = (isWuyin && sourceTaskId)
+          ? sourceTaskId
+          : `${nodeId}_sync_recovered_${Date.now()}_${pendingRequest.index}_${index}`;
         const layoutIndex = pendingRequest.index + index;
         return {
           id: imageId,
@@ -1178,7 +1187,16 @@ export const useImageGeneration = (options: {
 
             // Success recovery logic (similar to executeGeneration completion)
             const recoveredImageNodes = preparedItems.map(({ item, sourceTaskId, sourceResultIndex, apiResultUrl }, index: number) => {
-              const imageId = `${node.id}_recovered_${Date.now()}_${index}`;
+              // 简体中文注释：检查是否为速创渠道
+              const isWuyin =
+                String(latestNode.provider || '').toLowerCase() === 'wuyin'
+                || String(latestNode.providerLabel || '').toLowerCase().includes('wuyin')
+                || String(latestNode.providerLabel || '').includes('速创')
+                || String(latestNode.keySlotId || '').includes('@slot_key_');
+
+              const imageId = (isWuyin && sourceTaskId)
+                ? sourceTaskId
+                : `${node.id}_recovered_${Date.now()}_${index}`;
               const layoutIndex = currentChildIds.length + index;
               const resolvedAspectRatio = (result as any).aspectRatio || latestNode.aspectRatio;
               const resolvedImageSize = (result as any).imageSize || latestNode.imageSize;
@@ -1831,7 +1849,10 @@ export const useImageGeneration = (options: {
 
         const results = await Promise.all(preparedItems.map(async ({ item, sourceTaskId, sourceResultIndex, apiResultUrl }, layoutIndex) => {
           const idx = item.index;
-          const uniqueId = `${Date.now()}_${idx}_${Math.random()}`;
+          // 简体中文注释：如果是速创渠道且返回的任务 ID 存在，使用任务 ID 命名，以便后续丢失原图时根据该 ID 重新查询拉取
+          const uniqueId = (isWuyinRoute && sourceTaskId)
+            ? sourceTaskId
+            : `${Date.now()}_${idx}_${Math.random()}`;
           const layoutPosition = generatedPositions[layoutIndex] || getGeneratedImagePosition(
             executionNode.position,
             item.aspectRatio || executionNode.aspectRatio,
