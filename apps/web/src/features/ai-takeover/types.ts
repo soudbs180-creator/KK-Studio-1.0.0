@@ -49,6 +49,7 @@ export type AssistantAction =
   | { type: 'locateCard'; payload: { keyword: string } }
   | { type: 'highlightElement'; payload: { selector: string } }
   | { type: 'openSettings'; payload: { tab: string } }
+  | { type: 'locateApiCard'; payload: { idOrName: string } }
   | { type: 'zipOutputs'; payload: { scope: 'latest_batch' | 'current_batch' | 'selected_cards' | 'all_canvas_outputs' | 'asset_collection_outputs' } }
   | { type: 'explainError'; payload: { errorCode?: string; errorMessage?: string } }
   | { type: 'fillInputPrompt'; payload: { prompt: string } }

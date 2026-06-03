@@ -22,12 +22,48 @@ export const uiTools: AgentToolDefinition[] = [
         const el = document.querySelector(selector) as HTMLElement;
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.classList.add('highlight-glow-ring');
-          setTimeout(() => {
-            el.classList.remove('highlight-glow-ring');
-          }, 3000);
+          const triggerMaskHighlight = (window as any).triggerMaskHighlight;
+          if (triggerMaskHighlight) {
+            triggerMaskHighlight(el);
+          } else {
+            // 降级使用普通的闪烁高亮类
+            el.classList.add('highlight-glow-ring');
+            setTimeout(() => {
+              el.classList.remove('highlight-glow-ring');
+            }, 3000);
+          }
         }
       }, 200);
+    }
+  },
+
+  // 1.5. locateApiCard - 定位 API 供应商卡片
+  {
+    name: 'locateApiCard',
+    description: '通过 API 供应商 ID 或名称定位其卡片，并自动滚动且进行磨砂高亮显示',
+    permission: 'safe',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        idOrName: { type: 'string', description: 'API 供应商 ID 或名称（如 deepseek-1007-1 或 智谱）' }
+      },
+      required: ['idOrName']
+    },
+    handler: async (input: { idOrName: string }, ctx) => {
+      const { idOrName } = input;
+      const { notify } = ctx;
+      
+      const locateFn = (window as any).__KK_LOCATE_API_CARD__;
+      if (locateFn) {
+        const ok = locateFn(idOrName);
+        if (ok) {
+          notify.success(`已为您定位到供应商卡片: ${idOrName}`, '');
+        } else {
+          notify.warning(`未找到匹配的供应商卡片: ${idOrName}`, '');
+        }
+      } else {
+        notify.warning('API 定位功能未就绪，请先进入设置页面', '');
+      }
     }
   },
 

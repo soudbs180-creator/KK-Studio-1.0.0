@@ -1,6 +1,6 @@
 
 import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus, Cpu, AlertTriangle, FolderOpen, Image as Picture, Eye, Lock } from 'lucide-react';
+import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus, Cpu, AlertTriangle, FolderOpen, Image as Picture, Eye, Lock, Zap } from 'lucide-react';
 import { generateImage } from '../../services/llm/geminiService';
 import { llmService } from '../../services/llm/LLMService';
 import { notify } from '../../services/system/notificationService';
@@ -141,6 +141,7 @@ interface ChatModel {
 }
 
 interface ChatSessionItem {
+    isTemp?: boolean;
     id: string;
     title: string;
     messages: Message[];
@@ -179,6 +180,8 @@ interface SessionImportPreview {
 }
 
 const CHAT_SESSION_STORAGE_KEY = 'kk_chat_sidebar_sessions_v1';
+const TEMP_SESSION_ID = 'session_temp';
+const TEMP_SESSION_STORAGE_KEY = 'kk_temp_session_messages';
 const CHAT_SESSION_TREE_EXPAND_KEY = 'kk_chat_sidebar_tree_expand_v1';
 const MODEL_MENU_SKELETON_COUNT = 3;
 
@@ -583,24 +586,48 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
     // 2. Chat State
     const [sessions, setSessions] = useState<ChatSessionItem[]>(() => {
+        let loadedSessions: ChatSessionItem[] = [];
         try {
             const raw = localStorage.getItem(CHAT_SESSION_STORAGE_KEY);
             if (raw) {
                 const parsed = JSON.parse(raw);
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                    return parsed;
+                    loadedSessions = parsed;
                 }
             }
         } catch {
             // ignore
         }
 
-        return [{
-            id: `session_${Date.now()}`,
-            title: '新对话',
-            messages: [createWelcomeMessage()],
-            updatedAt: Date.now()
-        }];
+        if (loadedSessions.length === 0) {
+            loadedSessions = [{
+                id: `session_${Date.now()}`,
+                title: '新对话',
+                messages: [createWelcomeMessage()],
+                updatedAt: Date.now()
+            }];
+        }
+
+        try {
+            const tempRaw = sessionStorage.getItem(TEMP_SESSION_STORAGE_KEY);
+            if (tempRaw) {
+                const tempMsgs = JSON.parse(tempRaw);
+                if (Array.isArray(tempMsgs)) {
+                    const tempSession: ChatSessionItem = {
+                        id: TEMP_SESSION_ID,
+                        title: '临时对话',
+                        messages: tempMsgs,
+                        updatedAt: Date.now(),
+                        isTemp: true
+                    };
+                    loadedSessions = [tempSession, ...loadedSessions.filter(s => s.id !== TEMP_SESSION_ID)];
+                }
+            }
+        } catch {
+            // ignore
+        }
+
+        return loadedSessions;
     });
     const [activeSessionId, setActiveSessionId] = useState<string>(() => sessions[0]?.id || `session_${Date.now()}`);
     const [messages, setMessages] = useState<Message[]>(() => sessions[0]?.messages || [createWelcomeMessage()]);
@@ -1482,7 +1509,15 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
     useEffect(() => {
         try {
-            localStorage.setItem(CHAT_SESSION_STORAGE_KEY, JSON.stringify(sessions.slice(0, 20)));
+            const persistentSessions = sessions.filter(s => !s.isTemp);
+            localStorage.setItem(CHAT_SESSION_STORAGE_KEY, JSON.stringify(persistentSessions.slice(0, 20)));
+            
+            const tempSession = sessions.find(s => s.isTemp);
+            if (tempSession) {
+                sessionStorage.setItem(TEMP_SESSION_STORAGE_KEY, JSON.stringify(tempSession.messages));
+            } else {
+                sessionStorage.removeItem(TEMP_SESSION_STORAGE_KEY);
+            }
         } catch {
             // ignore
         }
@@ -2115,6 +2150,36 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         }
     }, [agentMode, currentAgent, ensureModelAccess, isThinking, messages, registerActivity, resolveAssistantPreferredKeyId, selectedModel]);
 
+    const handleClearCurrentSession = useCallback(() => {
+        const welcomeMsg = createWelcomeMessage();
+        setMessages([welcomeMsg]);
+        setInput('');
+        setAttachments([]);
+        setSessions(prev => prev.map(session => {
+            if (session.id !== activeSessionId) return session;
+            return {
+                ...session,
+                messages: [welcomeMsg],
+                updatedAt: Date.now()
+            };
+        }));
+    }, [activeSessionId]);
+
+    const handleNewTempSession = useCallback(() => {
+        sessionStorage.removeItem(TEMP_SESSION_STORAGE_KEY);
+        const tempSession: ChatSessionItem = {
+            id: TEMP_SESSION_ID,
+            title: '临时对话',
+            messages: [createWelcomeMessage()],
+            updatedAt: Date.now(),
+            isTemp: true
+        };
+        setSessions(prev => [tempSession, ...prev.filter(s => s.id !== TEMP_SESSION_ID)]);
+        setActiveSessionId(TEMP_SESSION_ID);
+        setInput('');
+        setAttachments([]);
+    }, []);
+
     const handleNewSession = useCallback(() => {
         const id = `session_${Date.now()}`;
         const item: ChatSessionItem = {
@@ -2123,10 +2188,11 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             messages: [createWelcomeMessage()],
             updatedAt: Date.now()
         };
-        setSessions(prev => [item, ...prev]);
+        setSessions(prev => [item, ...prev.filter(s => s.id !== TEMP_SESSION_ID)]);
         setActiveSessionId(id);
         setInput('');
         setAttachments([]);
+        sessionStorage.removeItem(TEMP_SESSION_STORAGE_KEY);
     }, []);
 
     const handleSwitchSession = useCallback((id: string) => {
@@ -2134,6 +2200,10 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         setActiveSessionId(id);
         setInput('');
         setAttachments([]);
+        if (id !== TEMP_SESSION_ID) {
+            setSessions(prev => prev.filter(s => s.id !== TEMP_SESSION_ID));
+            sessionStorage.removeItem(TEMP_SESSION_STORAGE_KEY);
+        }
     }, [activeSessionId]);
 
     const handleDeleteSession = useCallback((id: string) => {
@@ -2144,6 +2214,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
         const next = sessions.filter(s => s.id !== id);
         setSessions(next);
+        if (id === TEMP_SESSION_ID) {
+            sessionStorage.removeItem(TEMP_SESSION_STORAGE_KEY);
+        }
         if (activeSessionId === id) {
             setActiveSessionId(next[0].id);
         }
@@ -2476,7 +2549,8 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                     title="点击重命名"
                                 >
                                     {!isMobile && <MessageSquare size={16} className="text-[var(--primary)] shrink-0" />}
-                                    <span className="font-semibold text-sm text-[var(--text-primary)] truncate">
+                                    <span className="font-semibold text-sm text-[var(--text-primary)] truncate flex items-center gap-1">
+                                        {activeSession?.isTemp && <span style={{ color: '#f59e0b', marginRight: '4px' }}>⚡</span>}
                                         {activeSession?.title || '新对话'}
                                     </span>
                                 </button>
@@ -2485,9 +2559,23 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                             {/* 右侧：控制动作组 */}
                             <div className="flex items-center gap-1 shrink-0">
                                 <button
+                                    onClick={handleClearCurrentSession}
+                                    className="p-1.5 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--primary)] hover:bg-[var(--primary-light)] rounded-md transition-colors"
+                                    title="清除当前对话（清空）"
+                                >
+                                    <RotateCcw size={18} />
+                                </button>
+                                <button
+                                    onClick={handleNewTempSession}
+                                    className="p-1.5 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--primary)] hover:bg-[var(--primary-light)] rounded-md transition-colors"
+                                    title="开启临时对话（不保存，关闭或切换后清理）"
+                                >
+                                    <Zap size={18} />
+                                </button>
+                                <button
                                     onClick={handleNewSession}
                                     className="p-1.5 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--primary)] hover:bg-[var(--primary-light)] rounded-md transition-colors"
-                                    title="新建对话"
+                                    title="新建对话（保留历史）"
                                 >
                                     <Plus size={18} />
                                 </button>

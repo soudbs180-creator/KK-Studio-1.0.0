@@ -331,9 +331,10 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
 }) => {
   // 简体中文注释：这里强制忽略 surface="plain" 的入参，确保所有设置模块均渲染为精致毛玻璃 Frost Card 卡片样式。
   // 这既响应了用户“保证每个模块都是卡片的形式”的绝对指示，又保证了源码中写有 surface="plain" 处的静态测试正则匹配能够安全通过。
+  // 在删除小字（即没有 eyebrow）时，将顶部内边距 pt-4 微调为 pt-3，使标题位置自然上移。
   return (
     <section className="space-y-3 h-full flex flex-col" data-testid={testId}>
-      <div className="settings-section-card settings-reference-card settings-reference-card--elevated p-4 flex-1 flex flex-col min-h-0" style={SETTINGS_PANEL_STYLE}>
+      <div className={`settings-section-card settings-reference-card settings-reference-card--elevated ${eyebrow ? 'p-4' : 'pt-3 px-4 pb-4'} flex-1 flex flex-col min-h-0`} style={SETTINGS_PANEL_STYLE}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             {eyebrow ? (

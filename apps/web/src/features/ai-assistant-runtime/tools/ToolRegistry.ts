@@ -182,6 +182,7 @@ toolRegistryInstance.register({
 // 注册别名机制
 toolRegistryInstance.registerAlias('canvas.locateNodes', 'locateCard');
 toolRegistryInstance.registerAlias('ui.highlightElement', 'highlightElement');
+toolRegistryInstance.registerAlias('ui.locateApiCard', 'locateApiCard');
 toolRegistryInstance.registerAlias('ui.openSettings', 'openSettings');
 toolRegistryInstance.registerAlias('assets.zipOriginals', 'zipOutputs');
 toolRegistryInstance.registerAlias('generation.start', 'startGeneration');

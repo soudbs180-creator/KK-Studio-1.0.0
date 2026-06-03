@@ -93,6 +93,8 @@ const normalizeAssignment = (
     primaryRouteId: typeof raw.primaryRouteId === 'string' ? raw.primaryRouteId.trim() || undefined : undefined,
     primaryModelId: typeof raw.primaryModelId === 'string' ? raw.primaryModelId.trim() || undefined : undefined,
     fallbackRouteId: typeof raw.fallbackRouteId === 'string' ? raw.fallbackRouteId.trim() || undefined : undefined,
+    auxiliaryRouteId: typeof raw.auxiliaryRouteId === 'string' ? raw.auxiliaryRouteId.trim() || undefined : undefined,
+    auxiliaryModelId: typeof raw.auxiliaryModelId === 'string' ? raw.auxiliaryModelId.trim() || undefined : undefined,
     enabled: raw.enabled !== false,
     updatedAt: typeof raw.updatedAt === 'number' && Number.isFinite(raw.updatedAt)
       ? raw.updatedAt

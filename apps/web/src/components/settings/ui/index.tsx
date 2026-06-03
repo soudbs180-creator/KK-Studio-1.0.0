@@ -202,7 +202,8 @@ export const SettingInput: React.FC<{
   type?: 'text' | 'password' | 'number';
   helper?: string;
   disabled?: boolean;
-}> = ({ label, value, onChange, onBlur, placeholder, type = 'text', helper, disabled = false }) => {
+  autoComplete?: string;
+}> = ({ label, value, onChange, onBlur, placeholder, type = 'text', helper, disabled = false, autoComplete }) => {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === 'password';
 
@@ -223,6 +224,7 @@ export const SettingInput: React.FC<{
           onBlur={onBlur}
           placeholder={placeholder}
           disabled={disabled}
+          autoComplete={autoComplete}
           className={`${SETTINGS_INPUT_CLASSNAME} ${isPassword ? 'pl-4 pr-10' : 'px-4'}`.trim()}
           style={{ boxShadow: 'var(--settings-input-shadow)' }}
         />

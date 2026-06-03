@@ -583,6 +583,9 @@ const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
     <div
       className="settings-panel settings-page-root"
       data-testid="settings-page-root"
+      style={{
+        ['--chat-sidebar-width' as any]: !isMobile && isChatOpen ? `${chatSidebarWidth}px` : '0px',
+      }}
     >
       {shellContent}
     </div>
@@ -594,6 +597,7 @@ const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
         background: 'var(--settings-backdrop-bg)',
         backdropFilter: 'blur(18px)',
         right: !isMobile && isChatOpen ? chatSidebarWidth : 0, // 简体中文：若 AI 助手开启，则在右侧主动避让（扣除）其宽度，保持同屏常驻
+        ['--chat-sidebar-width' as any]: !isMobile && isChatOpen ? `${chatSidebarWidth}px` : '0px',
       }}
       onClick={onClose}
     >

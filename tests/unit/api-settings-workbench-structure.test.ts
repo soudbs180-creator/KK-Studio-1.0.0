@@ -35,7 +35,7 @@ test('ApiSettingsView default mode exposes a Model Center provider pool with a p
   assert.match(sectionsSource, /Preset directory/);
   assert.match(sectionsSource, /Clicking only prefills the editor\. You still need to enter an API key and save\./);
 
-  assert.match(cssSource, /\.settings-panel \.settings-model-center-layout \{[\s\S]*grid-template-columns: minmax\(0, 842px\) minmax\(270px, 1fr\);/);
+  assert.match(cssSource, /\.settings-panel \.settings-model-center-layout \{[\s\S]*grid-template-columns: minmax\(0, (?:842px|1\.8fr)\) minmax\(270px, 1fr\);/);
   assert.match(cssSource, /\.settings-panel \.settings-model-center-route-grid \{[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(270px, 1fr\)\);/);
   assert.match(cssSource, /\.settings-panel \.settings-model-center-route__metric-value \{[\s\S]*font-variant-numeric: tabular-nums;/);
 });

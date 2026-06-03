@@ -556,6 +556,8 @@ export interface CapabilityRouteAssignment {
   primaryRouteId?: string;
   primaryModelId?: string;
   fallbackRouteId?: string;
+  auxiliaryRouteId?: string;
+  auxiliaryModelId?: string;
   enabled: boolean;
   updatedAt: number;
 }

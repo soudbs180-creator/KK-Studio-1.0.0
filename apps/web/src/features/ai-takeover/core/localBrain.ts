@@ -183,14 +183,33 @@ ${optResult.optimizedPromptZh}
       }
 
       case 'search_card': {
-        const query = intentResult.extracted.cardQuery || '';
-        reply = `### 🔍 正在画布上检索包含“${query}”的卡片...
+        const query = (intentResult.extracted.cardQuery || '').trim();
+        const lowerQuery = query.toLowerCase();
+        
+        // 判断是否是 API 卡片（匹配 API ID 规则，或者包含已知渠道缩写且没有明显的画布实体指示）
+        const isApiId = /[a-z0-9]+-\d{4}-\d+/.test(lowerQuery);
+        const isKnownApiName = /(?:zhipu|deepseek|siliconflow|openai|gemini|custom|智谱|火山|百度|阿里|零一|通义|千问|腾讯|混元|秘塔|阶跃|月之暗面|kimi)/i.test(lowerQuery);
+
+        if (isApiId || isKnownApiName) {
+          reply = `### ⚙️ 正在为您查找供应商卡片“${query}”...
+已为您自动打开 API 设置面板，并对目标卡片进行磨砂挖空聚焦高亮显示。`;
+          actions.push({
+            type: 'openSettings',
+            payload: { tab: 'api-management' }
+          });
+          actions.push({
+            type: 'locateApiCard',
+            payload: { idOrName: query }
+          });
+        } else {
+          reply = `### 🔍 正在画布上检索包含“${query}”的卡片...
 如果找到了对应的卡片，我将平滑地将您的视口平移过去并加上高亮闪烁效果。`;
 
-        actions.push({
-          type: 'locateCard',
-          payload: { keyword: query }
-        });
+          actions.push({
+            type: 'locateCard',
+            payload: { keyword: query }
+          });
+        }
         break;
       }
 

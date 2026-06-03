@@ -3387,6 +3387,40 @@ export class KeyManager {
 
         return this.findLinkedProviderForSlot(slotOrId) || undefined;
     }
+    private static readonly PRESET_ID_PREFIXES: Record<string, string> = {
+        'zhipu': '1001',
+        'wanqing': '1002',
+        'sambanova': '1003',
+        'openclaw': '1004',
+        't8star': '1005',
+        'volcengine': '1006',
+        'deepseek': '1007',
+        'moonshot': '1008',
+        'siliconflow': '1009',
+        '12ai': '1010',
+        'antigravity': '1011',
+        '12ai-nanobanana': '1012',
+        'flow2api': '1013',
+        'wuyinkeji-nanobanana2': '1014',
+        'wuyinkeji-google-omni': '1015',
+        'gpt-best': '1016',
+        'custom': '2000'
+    };
+
+    private findPresetKeyForConfig(name: string, baseUrl: string): string {
+        const normalizedName = String(name || '').toLowerCase().trim();
+        const normalizedUrl = String(baseUrl || '').toLowerCase().trim();
+        
+        for (const [key, preset] of Object.entries(PROVIDER_PRESETS)) {
+            if (key === 'custom') continue;
+            const presetName = preset.name.toLowerCase().trim();
+            const presetUrl = preset.baseUrl.toLowerCase().trim();
+            if (normalizedName === presetName || (presetUrl && normalizedUrl.includes(presetUrl)) || (normalizedUrl && presetUrl.includes(normalizedUrl))) {
+                return key;
+            }
+        }
+        return 'custom';
+    }
 
     /**
      * 添加新的第三方供应商配置。
@@ -3406,11 +3440,33 @@ export class KeyManager {
             format: config.format,
             models: config.models,
         });
+
+        const presetKey = this.findPresetKeyForConfig(config.name, config.baseUrl);
+        const prefix = KeyManager.PRESET_ID_PREFIXES[presetKey] || '2000';
+        const channelName = presetKey;
+        
+        // 扫描已有 provider 的 ID，进行空缺替补计算
+        const idPattern = new RegExp(`^${channelName}-${prefix}-(\\d+)$`);
+        const activeIndexes = new Set<number>();
+        this.providers.forEach(p => {
+            const match = p.id.match(idPattern);
+            if (match) {
+                activeIndexes.add(parseInt(match[1], 10));
+            }
+        });
+        
+        let nextIndex = 1;
+        while (activeIndexes.has(nextIndex)) {
+            nextIndex++;
+        }
+        
+        const generatedId = `${channelName}-${prefix}-${nextIndex}`;
+
         const provider: ThirdPartyProvider = {
             ...config,
             models: providerModels,
             format: normalizeApiProtocolFormat(config.format, 'auto'),
-            id: `provider_${now}_${Math.random().toString(36).substr(2, 9)}`,
+            id: generatedId,
             usage: {
                 totalTokens: 0,
                 totalCost: 0,

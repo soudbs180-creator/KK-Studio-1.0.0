@@ -1982,7 +1982,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
   const updateCapabilityAssignment = useCallback((
     role: CapabilityRole,
-    patch: Partial<{ enabled: boolean; primaryRouteId: string; primaryModelId: string; fallbackRouteId: string }>,
+    patch: Partial<{ enabled: boolean; primaryRouteId: string; primaryModelId: string; fallbackRouteId: string; auxiliaryRouteId: string; auxiliaryModelId: string }>,
   ) => {
     upsertCapabilityRouteAssignment(role, patch);
     setCapabilityAssignments(getCapabilityRouteAssignments());
@@ -1999,12 +1999,17 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         primaryRouteId: assignment?.primaryRouteId || '',
         primaryModelId: assignment?.primaryModelId || '',
         fallbackRouteId: assignment?.fallbackRouteId || '',
+        auxiliaryRouteId: assignment?.auxiliaryRouteId || '',
+        auxiliaryModelId: assignment?.auxiliaryModelId || '',
         routeOptions: capabilityRouteOptions,
         modelOptions: getRouteModelOptions(assignment?.primaryRouteId || '', meta.role),
+        auxiliaryModelOptions: getRouteModelOptions(assignment?.auxiliaryRouteId || '', meta.role),
         onEnabledChange: (enabled: boolean) => updateCapabilityAssignment(meta.role, { enabled }),
         onPrimaryRouteChange: (value: string) => updateCapabilityAssignment(meta.role, { primaryRouteId: value }),
         onPrimaryModelChange: (value: string) => updateCapabilityAssignment(meta.role, { primaryModelId: value }),
         onFallbackRouteChange: (value: string) => updateCapabilityAssignment(meta.role, { fallbackRouteId: value }),
+        onAuxiliaryRouteChange: (value: string) => updateCapabilityAssignment(meta.role, { auxiliaryRouteId: value }),
+        onAuxiliaryModelChange: (value: string) => updateCapabilityAssignment(meta.role, { auxiliaryModelId: value }),
       };
     })
   ), [capabilityAssignments, capabilityRouteOptions, getRouteModelOptions, pick, updateCapabilityAssignment]);
@@ -2317,6 +2322,156 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
     return () => window.cancelAnimationFrame(frameId);
   }, [activeEditorMode, activeTab, returnHighlight, officialSlots.length, thirdPartyProviders.length]);
+  // 磨砂挖空高亮遮罩核心实现
+  const triggerMaskHighlight = (el: HTMLElement) => {
+    if (typeof document === 'undefined') return;
+
+    // 1. 动态注入闪烁动画的 keyframes
+    const styleId = 'kk-mask-highlight-style';
+    if (!document.getElementById(styleId)) {
+      const styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      styleEl.innerHTML = `
+        @keyframes kk-mask-highlight-flash {
+          0%, 100% {
+            opacity: 0.3;
+            transform: scale(1);
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+          }
+          50% {
+            opacity: 1;
+            transform: scale(1.02);
+            border-color: rgba(255, 255, 255, 1);
+            box-shadow: 0 0 25px rgba(255, 255, 255, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.5);
+          }
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
+
+    // 2. 创建半透明磨砂蒙版
+    const mask = document.createElement('div');
+    mask.style.position = 'fixed';
+    mask.style.left = '0';
+    mask.style.top = '0';
+    mask.style.width = '100vw';
+    mask.style.height = '100vh';
+    mask.style.zIndex = '199999';
+    mask.style.backdropFilter = 'blur(6px)';
+    (mask.style as any).webkitBackdropFilter = 'blur(6px)';
+    mask.style.background = 'rgba(15, 23, 42, 0.45)'; // 深色高级磨砂质感
+    mask.style.pointerEvents = 'none';
+    mask.style.transition = 'opacity 0.3s ease';
+
+    // 3. 创建白色高亮边框
+    const borderBox = document.createElement('div');
+    borderBox.style.position = 'fixed';
+    borderBox.style.zIndex = '200000';
+    borderBox.style.border = '2px solid rgba(255, 255, 255, 0.8)';
+    borderBox.style.borderRadius = '12px';
+    borderBox.style.pointerEvents = 'none';
+    borderBox.style.transition = 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
+    borderBox.style.animation = 'kk-mask-highlight-flash 1s ease-in-out 3'; // 3秒闪烁3次
+
+    // 4. 定位与镂空更新逻辑
+    const updatePosition = () => {
+      const rect = el.getBoundingClientRect();
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const l = rect.left;
+      const t = rect.top;
+      const r = rect.right;
+      const b = rect.bottom;
+
+      // 使用 evenodd 填充规则绘制回字形 polygon，挖空 rect 区域
+      mask.style.clipPath = `polygon(evenodd, 0px 0px, ${w}px 0px, ${w}px ${h}px, 0px ${h}px, 0px 0px, ${l}px ${t}px, ${l}px ${b}px, ${r}px ${b}px, ${r}px ${t}px, ${l}px ${t}px)`;
+
+      // 调整呼吸框大小和位置
+      borderBox.style.left = `${l - 4}px`;
+      borderBox.style.top = `${t - 4}px`;
+      borderBox.style.width = `${rect.width + 8}px`;
+      borderBox.style.height = `${rect.height + 8}px`;
+    };
+
+    updatePosition();
+    document.body.appendChild(mask);
+    document.body.appendChild(borderBox);
+
+    // 监听滚动与尺寸变化以实时更新高亮位置，保障高级感与准确性
+    window.addEventListener('scroll', updatePosition, { passive: true });
+    window.addEventListener('resize', updatePosition, { passive: true });
+
+    // 3 秒自动销毁
+    const destroy = () => {
+      mask.style.opacity = '0';
+      borderBox.style.opacity = '0';
+      setTimeout(() => {
+        window.removeEventListener('scroll', updatePosition);
+        window.removeEventListener('resize', updatePosition);
+        if (mask.parentNode) mask.parentNode.removeChild(mask);
+        if (borderBox.parentNode) borderBox.parentNode.removeChild(borderBox);
+      }, 300);
+    };
+
+    setTimeout(destroy, 3000);
+  };
+
+  // 将方法挂载到 window，以便 uiTools.ts 等外部调用
+  if (typeof window !== 'undefined') {
+    (window as any).triggerMaskHighlight = triggerMaskHighlight;
+  }
+
+  // 注册全局 API 卡片定位方法与磨砂挖空高亮遮罩
+  useEffect(() => {
+    (window as any).__KK_LOCATE_API_CARD__ = (cardIdOrName: string) => {
+      const cleanTarget = cardIdOrName.trim().toLowerCase();
+      
+      // 1. 尝试寻找第三方供应商匹配
+      const matchedProvider = thirdPartyProviders.find(
+        (p) => p.id.toLowerCase() === cleanTarget || p.name.toLowerCase().includes(cleanTarget)
+      );
+      
+      if (matchedProvider) {
+        setActiveTab('third-party');
+        setReturnHighlight({ providerId: matchedProvider.id });
+        
+        setTimeout(() => {
+          const node = providerCardRegistryRef.current.get(matchedProvider.id);
+          if (node) {
+            node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            triggerMaskHighlight(node);
+          }
+        }, 300);
+        return true;
+      }
+      
+      // 2. 尝试寻找官方接口匹配
+      const matchedOfficial = officialSlots.find(
+        (s) => s.id.toLowerCase() === cleanTarget || s.name.toLowerCase().includes(cleanTarget) || s.provider.toLowerCase().includes(cleanTarget)
+      );
+      
+      if (matchedOfficial) {
+        setActiveTab('official');
+        setReturnHighlight({ officialId: matchedOfficial.id });
+        
+        setTimeout(() => {
+          const node = officialCardRegistryRef.current.get(matchedOfficial.id);
+          if (node) {
+            node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            triggerMaskHighlight(node);
+          }
+        }, 300);
+        return true;
+      }
+      
+      return false;
+    };
+    
+    return () => {
+      delete (window as any).__KK_LOCATE_API_CARD__;
+    };
+  }, [thirdPartyProviders, officialSlots]);
 
   const run = async (
     key: string,
@@ -3723,12 +3878,38 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     );
   }
 
+  // 运行报告状态卡片需要的计算参数
+  const workbenchTone = isUserApiPersistenceDegraded ? 'rose' : connectedChannels > 0 ? 'emerald' : 'neutral';
+  const workbenchStatusLabel = isUserApiPersistenceDegraded
+    ? pick('本地 API 内存模式', 'Local API memory mode')
+    : connectedChannels > 0
+      ? pick(`已接入 ${connectedChannels} 条链路`, `${connectedChannels} routes connected`)
+      : pick('尚未接入链路', 'No routes connected yet');
+
   return (
     <SettingsViewShell>
       {activeEditorMode === null ? (
         <>
+          {/* API 运行概览现在是公共的最上面卡片 */}
+          <div className="w-full mb-4">
+            <ApiWorkbenchOverviewSection
+              pick={pick}
+              workbenchStatusLabel={workbenchStatusLabel}
+              workbenchTone={workbenchTone}
+              userApiPersistenceWarning={userApiPersistenceWarning || null}
+              isHydratingRuntimeUserApis={isHydratingRuntimeUserApis}
+              snapshotHydrationHelper={snapshotHydrationHelper}
+              attentionCount={thirdPartyProviders.filter((provider) => provider.status === 'error' || !provider.isActive).length}
+              connectedChannels={connectedChannels}
+              officialActiveCount={officialSlots.filter((slot) => !slot.disabled).length}
+              activeProviders={activeProviders}
+              budgetCount={0}
+              activeTab="official"
+            />
+          </div>
+
           {/* 工作台顶部居中高级/标准模式切换胶囊，应用亮暗色彩彻底隔离与细腻阻尼点击反馈 */}
-          <div className="flex justify-center mb-2 sm:mb-4 mt-8 sm:mt-4 w-full animate-fadeIn">
+          <div className="flex justify-center mb-2 sm:mb-4 mt-2 w-full animate-fadeIn">
             <div 
               className={`flex rounded-full border p-0.5 text-xs font-semibold shadow-sm transition-[background-color,border-color] duration-300 ${
                 isDarkMode 
@@ -3908,6 +4089,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               onChange={(value) => setOfficialForm((current) => ({ ...current, key: value }))}
               placeholder={pick('输入本地 API 的 API Key', 'Enter the local API key')}
               type="password"
+              autoComplete="new-password"
               helper={pick('这里只保存当前接口使用的密钥，不会 and 刷新动作混用。', 'This field only saves the key for this endpoint and does not trigger refresh behavior.')}
               disabled={userApiEditorReadOnly}
             />
@@ -4091,6 +4273,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                     onChange={(value) => setProviderForm((current) => ({ ...current, apiKey: value }))}
                     placeholder={pick('输入该品牌的 API Key', 'Enter this provider API key')}
                     type="password"
+                    autoComplete="new-password"
                     disabled={providerEditorReadOnly}
                   />
                   {providerKeyDiagnostics ? (

@@ -126,17 +126,20 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
   }
 
   // 3. 卡片检索与定位意图
-  if (/查找|定位|找到|搜下|高亮卡片|聚焦卡片|在哪/.test(lowerInput)) {
+  if (/查找|定位|找到|搜下|高亮卡片|聚焦卡片|在哪/.test(lowerInput) || /[a-z0-9]+-\d{4}-\d+/.test(lowerInput)) {
+    // 优先匹配形如 deepseek-1007-1 的供应商 ID
+    const apiIdMatch = lowerInput.match(/([a-z0-9]+-\d{4}-\d+)/);
     const cardQueryMatch = cleanInput.match(/(?:查找|定位|找到|搜下|高亮|聚焦)(?:包含)?(?:“|")?([^”\"]+)(?:”|")?的?(?:卡片|节点)?/);
+    
     return {
       intent: 'search_card',
-      confidence: 0.85,
+      confidence: apiIdMatch ? 0.95 : 0.85,
       extracted: {
-        cardQuery: cardQueryMatch ? cardQueryMatch[1] : cleanInput.replace(/[查找定位找到搜下高亮聚焦卡片节点]/g, '').trim()
+        cardQuery: apiIdMatch ? apiIdMatch[1] : (cardQueryMatch ? cardQueryMatch[1] : cleanInput.replace(/[查找定位找到搜下高亮聚焦卡片节点]/g, '').trim())
       },
       risk: 'none',
       needsConfirmation: false,
-      reason: '识别到卡片检索或视口跳转聚焦意图。'
+      reason: apiIdMatch ? '直接识别到 API 供应商 ID，准备定位供应商卡片。' : '识别到卡片检索或视口跳转聚焦意图。'
     };
   }
 

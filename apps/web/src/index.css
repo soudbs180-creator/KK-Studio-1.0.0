@@ -9127,7 +9127,7 @@ body.dark-mode .settings-panel {
   display: grid;
   grid-template-columns: var(--settings-sidebar-width) minmax(0, 1fr);
   gap: 0;
-  width: min(1480px, calc(100vw - 48px));
+  width: min(1480px, calc(100vw - var(--chat-sidebar-width, 0px) - 48px));
   height: min(calc(100dvh - 48px), 920px);
   isolation: isolate;
   border: 0;
@@ -11629,6 +11629,7 @@ body.dark-mode .storage-selection-modal {
   padding: 14px;
   background: var(--settings-section-bg);
   color: var(--text-primary);
+  box-shadow: none !important;
   cursor: pointer;
   transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
 }
@@ -11636,6 +11637,7 @@ body.dark-mode .storage-selection-modal {
 .settings-panel .settings-model-center-route:hover {
   border-color: rgb(var(--settings-accent-rgb) / 0.28);
   transform: translateY(-1px);
+  box-shadow: none !important;
 }
 
 .settings-panel .settings-model-center-route__header,
@@ -15850,7 +15852,7 @@ body:not(.dark-mode) .settings-log-group-badge {
 .settings-panel .settings-model-center-layout {
   width: 100% !important;
   max-width: 1128px !important;
-  grid-template-columns: minmax(0, 842px) minmax(270px, 1fr);
+  grid-template-columns: minmax(0, 1.8fr) minmax(270px, 1fr);
   gap: 16px !important;
   justify-content: start !important;
   overflow-x: visible !important;
@@ -15858,7 +15860,7 @@ body:not(.dark-mode) .settings-log-group-badge {
 
 .settings-panel .settings-model-center-pool {
   width: 100% !important;
-  max-width: 556px !important;
+  max-width: 100% !important;
   container-name: model-center-pool;
   container-type: inline-size;
   overflow-x: visible !important;
@@ -15873,27 +15875,25 @@ body:not(.dark-mode) .settings-log-group-badge {
 
 .settings-panel .settings-model-center-route-grid {
   display: grid !important;
-  width: 270px !important;
+  width: 100% !important;
   max-width: 100% !important;
-  grid-template-columns: 270px !important;
+  grid-template-columns: minmax(0, 1fr) !important;
   grid-auto-rows: minmax(180px, auto) !important;
   gap: 16px !important;
   justify-content: start !important;
   overflow-x: visible !important;
 }
 
-/* 卡片网格只在真实内容宽度够用时升级到 2A/3A，避免父容器 padding 把固定宽度挤到右侧目录里。 */
-@container model-center-pool (min-width: 530px) {
+/* 卡片网格只在真实内容宽度够用时升级到 2A/3A，卡片和容器自适应拉伸。 */
+@container model-center-pool (min-width: 480px) {
   .settings-panel .settings-model-center-route-grid {
-    width: 556px !important;
-    grid-template-columns: repeat(2, 270px) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
 
-@container model-center-pool (min-width: 842px) {
+@container model-center-pool (min-width: 800px) {
   .settings-panel .settings-model-center-route-grid {
-    width: 842px !important;
-    grid-template-columns: repeat(3, 270px) !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
 }
 
@@ -15910,8 +15910,8 @@ body:not(.dark-mode) .settings-log-group-badge {
 
 .settings-panel .settings-model-center-route {
   display: grid !important;
-  width: 270px !important;
-  max-width: 270px !important;
+  width: 100% !important;
+  max-width: 100% !important;
   min-height: 196px !important;
   height: auto !important;
   grid-template-rows: auto auto auto !important;

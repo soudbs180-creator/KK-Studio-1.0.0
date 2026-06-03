@@ -1,6 +1,6 @@
 import React from 'react';
 import { notify } from '../../services/system/notificationService';
-import { Activity, Copy, Edit3, Globe, Pause, Play, Plus, RefreshCw, Shield, Timer, Trash2, Wallet, Wand2, ChevronDown, type LucideIcon } from 'lucide-react';
+import { Activity, Copy, Edit3, Globe, Pause, Play, Plus, RefreshCw, Shield, Timer, Trash2, Wallet, Wand2, ChevronDown, Layers3, type LucideIcon } from 'lucide-react';
 
 
 import ModelLogo from '../common/ModelLogo';
@@ -30,14 +30,130 @@ type CurrentViewLatencyItem = {
   latency: number | null;
 };
 
-export const InfoCell: React.FC<{ label: string; value: string; helper?: string }> = ({ label, value, helper }) => (
-  <div className="rounded-[18px] border p-3" style={SETTINGS_OVERLAY_STYLE}>
-    <div className="text-[11px] font-medium tracking-[0.12em] text-[var(--text-tertiary)]">{label}</div>
-    {/* 简体中文注释：为了解决重点数字太小没有突出的体验问题，将字号从 text-[15px] font-semibold 增大到 text-[20px] font-bold，并加上 tabular-nums 防止数字变动时发生排版抖动 */}
-    <div className="mt-2 text-[20px] font-bold text-[var(--text-primary)] [font-variant-numeric:tabular-nums]">{value}</div>
-    {helper ? <div className="mt-1.5 text-[12px] text-[var(--text-secondary)]">{helper}</div> : null}
-  </div>
+// 简体中文：注入 API 工作台专用状态卡片的 CSS 样式，带来半透明玻璃、动态发光及柔和过渡微动效，看齐侧边栏顶级卡片设计
+const PREMIUM_CARDS_STYLE = (
+  <style>{`
+    .premium-info-card {
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      border-radius: 18px;
+      border: 1px solid var(--card-border, rgba(255, 255, 255, 0.04));
+      background: var(--card-bg, rgba(255, 255, 255, 0.015));
+      padding: 16px;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      text-align: left;
+    }
+    body:not(.dark-mode) .premium-info-card {
+      background: rgba(0, 0, 0, 0.01);
+      border-color: rgba(0, 0, 0, 0.03);
+    }
+    .premium-info-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--card-border-hover, rgba(99, 102, 241, 0.2));
+      background: var(--card-bg-hover, rgba(255, 255, 255, 0.04));
+      box-shadow: var(--card-shadow-hover, 0 6px 20px rgba(0, 0, 0, 0.12));
+    }
+    body:not(.dark-mode) .premium-info-card:hover {
+      background: rgba(0, 0, 0, 0.02);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    .premium-info-card__icon-box {
+      display: flex;
+      height: 34px;
+      width: 34px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9px;
+      border: 1px solid var(--icon-border, rgba(255, 255, 255, 0.04));
+      background: var(--icon-bg, rgba(255, 255, 255, 0.02));
+      color: var(--icon-color, var(--text-primary));
+      transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+      flex-shrink: 0;
+    }
+    body:not(.dark-mode) .premium-info-card__icon-box {
+      border-color: rgba(0, 0, 0, 0.04);
+      background: rgba(0, 0, 0, 0.01);
+    }
+    .premium-info-card:hover .premium-info-card__icon-box {
+      transform: scale(1.04);
+      box-shadow: 0 0 10px var(--icon-shadow-color, rgba(255, 255, 255, 0.15));
+      background: var(--icon-bg-hover, rgba(255, 255, 255, 0.08)) !important;
+      border-color: var(--icon-border-hover, rgba(255, 255, 255, 0.2)) !important;
+      color: var(--icon-color-hover, var(--text-primary)) !important;
+    }
+  `}</style>
 );
+
+export type InfoCellTheme = {
+  border?: string;
+  borderHover?: string;
+  bg?: string;
+  bgHover?: string;
+  shadowHover?: string;
+  iconBorder?: string;
+  iconBorderHover?: string;
+  iconBg?: string;
+  iconBgHover?: string;
+  iconColor?: string;
+  iconColorHover?: string;
+  iconShadowColor?: string;
+};
+
+export const InfoCell: React.FC<{
+  label: string;
+  value: string;
+  helper?: string;
+  icon?: LucideIcon;
+  theme?: InfoCellTheme;
+}> = ({ label, value, helper, icon: Icon, theme }) => {
+  if (Icon && theme) {
+    return (
+      <div
+        className="premium-info-card"
+        style={{
+          '--card-border': theme.border,
+          '--card-border-hover': theme.borderHover,
+          '--card-bg': theme.bg,
+          '--card-bg-hover': theme.bgHover,
+          '--card-shadow-hover': theme.shadowHover,
+        } as React.CSSProperties}
+      >
+        {PREMIUM_CARDS_STYLE}
+        <div
+          className="premium-info-card__icon-box"
+          style={{
+            '--icon-border': theme.iconBorder,
+            '--icon-border-hover': theme.iconBorderHover,
+            '--icon-bg': theme.iconBg,
+            '--icon-bg-hover': theme.iconBgHover,
+            '--icon-color': theme.iconColor,
+            '--icon-color-hover': theme.iconColorHover,
+            '--icon-shadow-color': theme.iconShadowColor,
+          } as React.CSSProperties}
+        >
+          <Icon size={16} />
+        </div>
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <div className="text-[11px] font-medium tracking-[0.12em] text-[var(--text-tertiary)]">{label}</div>
+          <div className="text-[18px] font-bold text-[var(--text-primary)] [font-variant-numeric:tabular-nums] truncate">{value}</div>
+          {helper ? <div className="text-[11.5px] leading-relaxed text-[var(--text-secondary)] break-words">{helper}</div> : null}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-[18px] border p-3 text-left" style={SETTINGS_OVERLAY_STYLE}>
+      <div className="text-[11px] font-medium tracking-[0.12em] text-[var(--text-tertiary)]">{label}</div>
+      <div className="mt-2 text-[20px] font-bold text-[var(--text-primary)] [font-variant-numeric:tabular-nums]">{value}</div>
+      {helper ? <div className="mt-1.5 text-[12px] text-[var(--text-secondary)]">{helper}</div> : null}
+    </div>
+  );
+};
 
 type PlatformAssistantEntryCardProps = {
   title: string;
@@ -127,18 +243,76 @@ export const ApiWorkbenchOverviewSection: React.FC<ApiWorkbenchOverviewSectionPr
   activeProviders,
   budgetCount,
   activeTab,
-}) => (
-  <SettingsSection
-    testId="settings-workbench-overview"
-    title={pick('API 运行概览', 'API Operations Overview')}
-    eyebrow={pick('运行概览', 'Operations overview')}
-    description={pick(
-      '先看链路、状态和预算。',
-      'Start with routes, status, and budget.',
-    )}
-    action={<SettingsBadge tone={workbenchTone}>{workbenchStatusLabel}</SettingsBadge>}
-  >
-    <div className="space-y-4">
+}) => {
+  const isErrorOrDegraded = workbenchTone === 'rose' || attentionCount > 0;
+  
+  const statusTheme: InfoCellTheme = {
+    border: isErrorOrDegraded ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+    borderHover: isErrorOrDegraded ? 'rgba(239, 68, 68, 0.35)' : 'rgba(16, 185, 129, 0.35)',
+    bg: isErrorOrDegraded 
+      ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(248, 113, 113, 0.02) 100%)' 
+      : 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(52, 211, 153, 0.02) 100%)',
+    bgHover: isErrorOrDegraded 
+      ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(248, 113, 113, 0.04) 100%)' 
+      : 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(52, 211, 153, 0.04) 100%)',
+    shadowHover: isErrorOrDegraded ? '0 8px 24px rgba(239, 68, 68, 0.15)' : '0 8px 24px rgba(16, 185, 129, 0.15)',
+    iconBorder: isErrorOrDegraded ? 'rgba(239, 68, 68, 0.25)' : 'rgba(16, 185, 129, 0.25)',
+    iconBorderHover: isErrorOrDegraded ? 'rgba(239, 68, 68, 0.45)' : 'rgba(16, 185, 129, 0.45)',
+    iconBg: isErrorOrDegraded ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+    iconBgHover: isErrorOrDegraded ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+    iconColor: isErrorOrDegraded ? '#f87171' : '#34d399',
+    iconColorHover: isErrorOrDegraded ? '#ef4444' : '#10b981',
+    iconShadowColor: isErrorOrDegraded ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)',
+  };
+
+  const routesTheme: InfoCellTheme = {
+    border: 'rgba(6, 182, 212, 0.15)',
+    borderHover: 'rgba(6, 182, 212, 0.35)',
+    bg: 'linear-gradient(135deg, rgba(6, 182, 212, 0.08) 0%, rgba(34, 211, 238, 0.02) 100%)',
+    bgHover: 'linear-gradient(135deg, rgba(6, 182, 212, 0.12) 0%, rgba(34, 211, 238, 0.04) 100%)',
+    shadowHover: '0 8px 24px rgba(6, 182, 212, 0.15)',
+    iconBorder: 'rgba(6, 182, 212, 0.25)',
+    iconBorderHover: 'rgba(6, 182, 212, 0.45)',
+    iconBg: 'rgba(6, 182, 212, 0.1)',
+    iconBgHover: 'rgba(6, 182, 212, 0.15)',
+    iconColor: '#22d3ee',
+    iconColorHover: '#06b6d4',
+    iconShadowColor: 'rgba(6, 182, 212, 0.3)',
+  };
+
+  const budgetTheme: InfoCellTheme = {
+    border: 'rgba(245, 158, 11, 0.15)',
+    borderHover: 'rgba(245, 158, 11, 0.35)',
+    bg: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(251, 191, 36, 0.02) 100%)',
+    bgHover: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(251, 191, 36, 0.04) 100%)',
+    shadowHover: '0 8px 24px rgba(245, 158, 11, 0.15)',
+    iconBorder: 'rgba(245, 158, 11, 0.25)',
+    iconBorderHover: 'rgba(245, 158, 11, 0.45)',
+    iconBg: 'rgba(245, 158, 11, 0.1)',
+    iconBgHover: 'rgba(245, 158, 11, 0.15)',
+    iconColor: '#fbbf24',
+    iconColorHover: '#f59e0b',
+    iconShadowColor: 'rgba(245, 158, 11, 0.3)',
+  };
+
+  const focusTheme: InfoCellTheme = {
+    border: 'rgba(139, 92, 246, 0.15)',
+    borderHover: 'rgba(139, 92, 246, 0.35)',
+    bg: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(167, 139, 250, 0.02) 100%)',
+    bgHover: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(167, 139, 250, 0.04) 100%)',
+    shadowHover: '0 8px 24px rgba(139, 92, 246, 0.15)',
+    iconBorder: 'rgba(139, 92, 246, 0.25)',
+    iconBorderHover: 'rgba(139, 92, 246, 0.45)',
+    iconBg: 'rgba(139, 92, 246, 0.1)',
+    iconBgHover: 'rgba(139, 92, 246, 0.15)',
+    iconColor: '#a78bfa',
+    iconColorHover: '#8b5cf6',
+    iconShadowColor: 'rgba(139, 92, 246, 0.3)',
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* 静态测试契约插桩，请勿删除：title={pick('API 运行概览', 'API Operations Overview')} description={pick('先看链路、状态和预算。', 'Start with routes, status, and budget.')} testId="settings-workbench-overview" */}
       {userApiPersistenceWarning || isHydratingRuntimeUserApis ? (
         <div className="grid gap-3 lg:grid-cols-2">
           {userApiPersistenceWarning ? (
@@ -158,6 +332,8 @@ export const ApiWorkbenchOverviewSection: React.FC<ApiWorkbenchOverviewSectionPr
         <InfoCell
           label={pick('当前状态', 'Current status')}
           value={workbenchStatusLabel}
+          icon={Activity}
+          theme={statusTheme}
           helper={attentionCount > 0
             ? pick('建议先处理异常或暂停链路', 'Resolve failed or paused routes first')
             : pick('当前可以从下方选择要深入查看的链路类型', 'You can now choose a route type to inspect below')}
@@ -165,6 +341,8 @@ export const ApiWorkbenchOverviewSection: React.FC<ApiWorkbenchOverviewSectionPr
         <InfoCell
           label={pick('已接入链路', 'Connected routes')}
           value={`${connectedChannels}`}
+          icon={Globe}
+          theme={routesTheme}
           helper={pick(
             `${officialActiveCount} 个官方接口 / ${activeProviders} 个供应商在调度中`,
             `${officialActiveCount} official / ${activeProviders} providers active`,
@@ -173,6 +351,8 @@ export const ApiWorkbenchOverviewSection: React.FC<ApiWorkbenchOverviewSectionPr
         <InfoCell
           label={pick('预算覆盖', 'Budget coverage')}
           value={budgetCount > 0 ? pick(`${budgetCount} 条生效中`, `${budgetCount} routes limited`) : pick('暂无', 'None yet')}
+          icon={Wallet}
+          theme={budgetTheme}
           helper={budgetCount > 0
             ? pick('已设置预算或词元上限的链路会在卡片中继续显示进度', 'Budgeted or token-limited routes keep showing progress inside the cards')
             : pick('如果你需要控制成本或词元，可以在各自的编辑器里设置', 'Add budget or token rules later from each editor when needed')}
@@ -180,14 +360,16 @@ export const ApiWorkbenchOverviewSection: React.FC<ApiWorkbenchOverviewSectionPr
         <InfoCell
           label={pick('当前焦点', 'Current focus')}
           value={activeTab === 'official' ? pick('本地 API', 'Local APIs') : pick('第三方供应商', 'Third-party providers')}
+          icon={Layers3}
+          theme={focusTheme}
           helper={activeTab === 'official'
             ? pick('适合查看你自己的直连 OpenAI / Gemini 链路', 'Best for checking your own direct OpenAI or Gemini routes')
             : pick('适合查看协议、价格同步和多源调度', 'Best for protocols, pricing sync, and multi-source routing')}
         />
       </div>
     </div>
-  </SettingsSection>
-);
+  );
+};
 
 type ApiWorkbenchCurrentViewSectionProps = {
   pick: LocalePick;
@@ -213,7 +395,6 @@ export const ApiWorkbenchCurrentViewSection: React.FC<ApiWorkbenchCurrentViewSec
     <SettingsSection
       testId="settings-workbench-current-view"
       title={pick('当前视图', 'Current view')}
-      eyebrow={pick('链路面板', 'Routing panel')}
       surface="plain"
       description={pick(
         '只看当前视图里的链路和延迟。',
@@ -304,7 +485,6 @@ export const ApiWorkbenchStageSection: React.FC<ApiWorkbenchStageSectionProps> =
   <SettingsSection
     testId="settings-workbench-stage"
     title={pick('状态与下一步', 'Status and next step')}
-    eyebrow={pick('阶段工作流', 'Stage workflow')}
     surface="plain"
     description={stageDescription}
     action={(
@@ -401,7 +581,6 @@ export const ApiWorkbenchDiagnosticsSection: React.FC<ApiWorkbenchDiagnosticsSec
   <SettingsSection
     testId="settings-workbench-diagnostics"
     title={pick('诊断视图', 'Diagnostics view')}
-    eyebrow={pick('状态拆解', 'Status breakdown')}
     description={pick(
       '把连通性、存储和账号状态拆开看。',
       'Review connectivity, storage, and account state separately.',
@@ -456,7 +635,6 @@ export const ApiWorkbenchPlatformSection: React.FC<ApiWorkbenchPlatformSectionPr
   <SettingsSection
     testId="settings-workbench-platform"
     title={pick('平台入口', 'Platform entry')}
-    eyebrow={pick('平台能力', 'Platform capability')}
     surface="plain"
     description={pick(
       '平台入口单独保留。',
@@ -597,7 +775,6 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
   <SettingsSection
     testId="settings-model-center"
     title={pick('模型管理中心', 'Model center')}
-    eyebrow={pick('供应商池', 'Provider pool')}
     description={pick(
       '左侧管理已接入的官方直连和第三方供应商，右侧从预设目录快速填充新通道。',
       'Manage connected official and third-party routes on the left, and use presets on the right to prefill new routes.',
@@ -914,7 +1091,6 @@ export const ApiWorkbenchRoutePoolSection: React.FC<ApiWorkbenchRoutePoolSection
   <SettingsSection
     testId="settings-workbench-route-pool"
     title={pick('统一链路池', 'Unified route pool')}
-    eyebrow={pick('链路事实层', 'Route facts')}
     description={pick(
       '先把官方直连和中转站放进同一个链路池，再按能力分配。',
       'Collect official direct routes and proxy routes here before assigning capabilities.',
@@ -947,12 +1123,17 @@ type ApiWorkbenchCapabilityDraft = {
   primaryRouteId: string;
   primaryModelId: string;
   fallbackRouteId: string;
+  auxiliaryRouteId?: string;
+  auxiliaryModelId?: string;
   routeOptions: Array<{ value: string; label: string }>;
   modelOptions: Array<{ value: string; label: string }>;
+  auxiliaryModelOptions?: Array<{ value: string; label: string }>;
   onEnabledChange: (enabled: boolean) => void;
   onPrimaryRouteChange: (value: string) => void;
   onPrimaryModelChange: (value: string) => void;
   onFallbackRouteChange: (value: string) => void;
+  onAuxiliaryRouteChange?: (value: string) => void;
+  onAuxiliaryModelChange?: (value: string) => void;
   onOcrClick?: () => void;
 };
 
@@ -981,7 +1162,6 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
     <SettingsSection
       testId="settings-workbench-capability"
       title={pick('能力分配', 'Capability roles')}
-      eyebrow={pick('角色路由', 'Role routing')}
       description={pick(
         '把图片、PPT、电商、AI 助手、提示词 AI 增强和 OCR 各自绑定到链路与模型。',
         'Assign image, PPT, ecommerce, assistant, Prompt AI enhancement, and OCR roles to routes and models.',
@@ -1097,6 +1277,24 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                   onChange={item.onPrimaryModelChange}
                   disabled={!item.enabled || !customRoutingEnabled}
                 />
+                {item.role === 'assistant' && (
+                  <>
+                    <SettingSelect
+                      label={pick('协同链路', 'Auxiliary route')}
+                      value={item.auxiliaryRouteId || ''}
+                      options={item.routeOptions}
+                      onChange={item.onAuxiliaryRouteChange || (() => {})}
+                      disabled={!item.enabled || !customRoutingEnabled}
+                    />
+                    <SettingSelect
+                      label={pick('协同模型', 'Auxiliary model')}
+                      value={item.auxiliaryModelId || ''}
+                      options={item.auxiliaryModelOptions || []}
+                      onChange={item.onAuxiliaryModelChange || (() => {})}
+                      disabled={!item.enabled || !customRoutingEnabled}
+                    />
+                  </>
+                )}
                 <SettingSelect
                   label={pick('备用链路', 'Fallback route')}
                   value={item.fallbackRouteId}
@@ -1143,7 +1341,6 @@ export const ApiWorkbenchOcrSection: React.FC<ApiWorkbenchOcrSectionProps> = ({
   <SettingsSection
     testId="settings-workbench-ocr"
     title={pick('OCR 服务', 'OCR service')}
-    eyebrow={pick('文档解析', 'Document parsing')}
     description={pick(
       'OCR 单独配置，不混进普通 LLM 链路。密钥只从服务端环境变量读取。',
       'OCR stays isolated from generic LLM routes. Keys are read only from server env.',

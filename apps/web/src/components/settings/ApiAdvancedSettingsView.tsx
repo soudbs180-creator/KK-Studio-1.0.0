@@ -215,7 +215,7 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
 
   const updateCapabilityAssignment = useCallback((
     role: CapabilityRole,
-    patch: Partial<{ enabled: boolean; primaryRouteId: string; primaryModelId: string; fallbackRouteId: string }>,
+    patch: Partial<{ enabled: boolean; primaryRouteId: string; primaryModelId: string; fallbackRouteId: string; auxiliaryRouteId: string; auxiliaryModelId: string }>,
   ) => {
     upsertCapabilityRouteAssignment(role, patch);
     setCapabilityAssignments(getCapabilityRouteAssignments());
@@ -274,8 +274,11 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
         primaryRouteId: assignment?.primaryRouteId || '',
         primaryModelId: assignment?.primaryModelId || '',
         fallbackRouteId: assignment?.fallbackRouteId || '',
+        auxiliaryRouteId: assignment?.auxiliaryRouteId || '',
+        auxiliaryModelId: assignment?.auxiliaryModelId || '',
         routeOptions: capabilityRouteOptions,
         modelOptions: getRouteModelOptions(assignment?.primaryRouteId || ''),
+        auxiliaryModelOptions: getRouteModelOptions(assignment?.auxiliaryRouteId || ''),
         onEnabledChange: (val: boolean) => {
           updateCapabilityAssignment(meta.role, { enabled: val });
           if (meta.role === 'assistant') {
@@ -298,6 +301,18 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
           updateCapabilityAssignment(meta.role, { fallbackRouteId: val });
           if (meta.role === 'assistant') {
             updateCapabilityAssignment('image_generation', { fallbackRouteId: val });
+          }
+        },
+        onAuxiliaryRouteChange: (val: string) => {
+          updateCapabilityAssignment(meta.role, { auxiliaryRouteId: val, auxiliaryModelId: '' });
+          if (meta.role === 'assistant') {
+            updateCapabilityAssignment('image_generation', { auxiliaryRouteId: val, auxiliaryModelId: '' });
+          }
+        },
+        onAuxiliaryModelChange: (val: string) => {
+          updateCapabilityAssignment(meta.role, { auxiliaryModelId: val });
+          if (meta.role === 'assistant') {
+            updateCapabilityAssignment('image_generation', { auxiliaryModelId: val });
           }
         },
         onOcrClick: () => setShowOcrModal(true),
@@ -488,21 +503,6 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
 
   const content = (
     <>
-      <ApiWorkbenchOverviewSection
-        pick={pick}
-        workbenchStatusLabel={workbenchStatusLabel}
-        workbenchTone={workbenchTone}
-        userApiPersistenceWarning={userApiPersistenceWarning || null}
-        isHydratingRuntimeUserApis={apiServerState.isHydratingRuntimeUserApis}
-        snapshotHydrationHelper=""
-        attentionCount={providers.filter((provider) => provider.status === 'error' || !provider.isActive).length}
-        connectedChannels={connectedChannels}
-        officialActiveCount={slots.filter((slot) => !slot.disabled).length}
-        activeProviders={activeProviders}
-        budgetCount={0}
-        activeTab="official"
-      />
-
       <ApiWorkbenchCapabilitySection
         pick={pick}
         items={capabilityCards}
@@ -621,76 +621,53 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
               {ocrSettings.enabled && (
                 <>
                   <div className="mt-3">
-                    <SettingSelect
-                      label={pick('OCR 提供商', 'OCR Provider')}
-                      value={ocrSettings.provider}
-                      onChange={(provider) => {
-                        updateOcrServiceSettings({ provider: provider as 'nutrient' | 'baidu' });
+                    <SettingInput
+                      label={pick('Baidu API Key', 'Baidu API Key')}
+                      value={ocrSettings.baiduApiKey || ''}
+                      autoComplete="new-password"
+                      onChange={(baiduApiKey) => {
+                        updateOcrServiceSettings({ provider: 'baidu', baiduApiKey });
                         setOcrSettings(getOcrServiceSettings());
                       }}
-                      options={[
-                        { value: 'nutrient', label: pick('Nutrient (读取服务端环境变量)', 'Nutrient (Server Variable)') },
-                        { value: 'baidu', label: pick('百度智能云 OCR (专属 API 配置)', 'Baidu Smart Cloud OCR (BYOK)') }
-                      ]}
+                      placeholder={pick('输入百度的 API Key', 'Enter Baidu API Key')}
                     />
                   </div>
-
-                  {ocrSettings.provider === 'baidu' ? (
-                    <>
-                      <div className="mt-3">
-                        <SettingInput
-                          label={pick('Baidu API Key', 'Baidu API Key')}
-                          value={ocrSettings.baiduApiKey || ''}
-                          onChange={(baiduApiKey) => {
-                            updateOcrServiceSettings({ baiduApiKey });
-                            setOcrSettings(getOcrServiceSettings());
-                          }}
-                          placeholder={pick('输入百度的 API Key', 'Enter Baidu API Key')}
-                        />
-                      </div>
-                      <div className="mt-3">
-                        <SettingInput
-                          label={pick('Baidu Secret Key', 'Baidu Secret Key')}
-                          value={ocrSettings.baiduSecretKey || ''}
-                          type="password"
-                          onChange={(baiduSecretKey) => {
-                            updateOcrServiceSettings({ baiduSecretKey });
-                            setOcrSettings(getOcrServiceSettings());
-                          }}
-                          placeholder={pick('输入百度的 Secret Key', 'Enter Baidu Secret Key')}
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <div className="mt-3">
-                      <SettingInput
-                        label={pick('默认语言', 'Default language')}
-                        value={ocrSettings.defaultLanguage}
-                        onChange={(defaultLanguage) => {
-                          updateOcrServiceSettings({ defaultLanguage });
-                          setOcrSettings(getOcrServiceSettings());
-                        }}
-                        placeholder="chi_sim"
-                        helper={pick('Tesseract OCR默认识别包语言，例如 chi_sim (简体中文), eng (英文)。', 'OCR identification pack, e.g. chi_sim or eng.')}
-                      />
-                    </div>
-                  )}
+                  <div className="mt-3">
+                    <SettingInput
+                      label={pick('Baidu Secret Key', 'Baidu Secret Key')}
+                      value={ocrSettings.baiduSecretKey || ''}
+                      type="password"
+                      autoComplete="new-password"
+                      onChange={(baiduSecretKey) => {
+                        updateOcrServiceSettings({ provider: 'baidu', baiduSecretKey });
+                        setOcrSettings(getOcrServiceSettings());
+                      }}
+                      placeholder={pick('输入百度的 Secret Key', 'Enter Baidu Secret Key')}
+                    />
+                  </div>
                 </>
               )}
 
-              <div className="grid gap-3 grid-cols-2 mt-4">
-                <InfoCell 
-                  label={pick('密钥来源', 'Key source')} 
-                  value={ocrKeySourceLabel} 
-                  helper={ocrSettings.provider === 'baidu'
-                    ? pick('保存在浏览器本地 localStorage 中。', 'Saved in browser local storage.')
-                    : pick('只读取服务端环境变量。', 'Only read server variables.')} 
-                />
-                <InfoCell 
-                  label={pick('健康状态', 'Health state')} 
-                  value={ocrHealthLabel} 
-                  helper={pick('当前 OCR 服务在线状态。', 'OCR service health state.')} 
-                />
+              <div className="mt-4 flex items-center justify-between p-4 rounded-2xl border" style={{ borderColor: 'var(--border-light)', background: 'var(--bg-secondary)' }}>
+                <div className="space-y-1">
+                  <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+                    {pick('服务状态', 'Service Status')}
+                  </div>
+                  <div className="text-[13px] font-semibold flex items-center gap-1.5 text-[var(--text-primary)]">
+                    <span className={`h-2 w-2 rounded-full ${ocrSettings.enabled && ocrSettings.baiduApiKey && ocrSettings.baiduSecretKey ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]' : 'bg-rose-500 shadow-[0_0_8px_#ef4444]'}`} />
+                    {ocrSettings.enabled && ocrSettings.baiduApiKey && ocrSettings.baiduSecretKey 
+                      ? pick('已启用 (已配置专属密钥)', 'Active (BYOK Configured)') 
+                      : pick('未启用 (未配置密钥)', 'Inactive (Key Missing)')}
+                  </div>
+                </div>
+                <a
+                  href="https://console.bce.baidu.com/ai/#/ai/ocr/overview/index"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-bold text-blue-500 hover:text-blue-600 transition-colors cursor-pointer select-none"
+                >
+                  {pick('获取百度 API 密钥 ↗', 'Get Baidu Key ↗')}
+                </a>
               </div>
             </div>
 

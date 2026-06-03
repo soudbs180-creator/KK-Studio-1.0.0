@@ -18,7 +18,6 @@ test('ChatSidebar does not retain source-proven unused locals', () => {
   assert.doesNotMatch(source, /\bEraser\b/);
   assert.doesNotMatch(source, /\bImageIcon\b/);
   assert.doesNotMatch(source, /\bPaperclip\b/);
-  assert.doesNotMatch(source, /\bZap\b/);
   assert.doesNotMatch(source, /\bSparkles\b/);
   assert.doesNotMatch(source, /\bviewportHeight\b/);
   assert.doesNotMatch(source, /\bfilteredSessions\b/);
