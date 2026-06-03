@@ -387,6 +387,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
                           className={`settings-sidebar-card w-full ${isActive ? 'active' : ''}`}
                           aria-current={isActive ? 'page' : undefined}
                           style={isActive ? {
+                            paddingLeft: '26px', // 激活时增加左边距，为指示灯空出位置
                             borderColor: theme.border,
                             background: theme.bg,
                             boxShadow: `${theme.shadow}, inset 0 1px 1px rgba(255, 255, 255, 0.08)`,
@@ -410,20 +411,19 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
                                 {item.label}
                               </span>
                             </div>
-                            <div className="flex items-center shrink-0">
-                              {isActive ? (
-                                <span 
-                                  className="opacity-80 animate-arrowBounce flex items-center"
-                                  style={{ color: theme.iconColor }}
-                                >
-                                  <ChevronRight size={13} />
-                                </span>
-                              ) : (
-                                <ChevronRight size={13} className="text-[var(--settings-nav-text-tertiary)] opacity-60" />
-                              )}
-                            </div>
+                            {!isActive && (
+                              <ChevronRight size={13} className="text-[var(--settings-nav-text-tertiary)] opacity-60 shrink-0" />
+                            )}
                           </div>
                           {renderCardStatusInfo(item.id)}
+                          {isActive && (
+                            <span 
+                              className="absolute right-3.5 top-[calc(50%-6.5px)] h-[13px] w-[13px] opacity-80 animate-arrowBounce flex items-center justify-center"
+                              style={{ color: theme.iconColor }}
+                            >
+                              <ChevronRight size={13} />
+                            </span>
+                          )}
                         </button>
                       </div>
                     );
