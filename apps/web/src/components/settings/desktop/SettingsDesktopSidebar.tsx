@@ -179,25 +179,24 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
   };
 
   // 匹配并渲染卡片下方的动态数据
-  const renderCardStatusInfo = (itemId: SettingsDesktopSidebarViewId, isActive: boolean) => {
-    const centerClass = isActive ? 'text-center w-full justify-center' : '';
+  const renderCardStatusInfo = (itemId: SettingsDesktopSidebarViewId) => {
     if (itemId === 'dashboard') {
       return (
-        <div className={`mt-2 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate ${centerClass}`}>
+        <div className="mt-2 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
           {pick('工作区健康度及总览面板就绪', 'Workspace health & overview panel ready')}
         </div>
       );
     }
     if (itemId === 'api-management') {
       return (
-        <div className={`mt-2 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate ${centerClass}`}>
+        <div className="mt-2 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
           {channelStats.officialCount} 个官方直连 / {channelStats.activeProviders} 个中转就绪
         </div>
       );
     }
     if (itemId === 'consumption-records') {
       return (
-        <div className={`mt-2 text-[11px] leading-4 flex items-center ${isActive ? 'justify-center gap-1.5' : 'justify-between'}`}>
+        <div className="mt-2 text-[11px] leading-4 flex items-center justify-between">
           <span className="text-[var(--text-secondary)]">{pick('今日消耗', 'Today Cost')}</span>
           <span className="font-bold text-amber-600 dark:text-amber-300 text-xs">{remainingBalanceDisplay}</span>
         </div>
@@ -206,7 +205,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
     if (itemId === 'system-logs') {
       const isHealthy = importantLogCount === 0;
       return (
-        <div className={`mt-2 text-[11px] leading-4 flex items-center gap-1.5 font-medium truncate ${isActive ? 'justify-center w-full' : ''}`}>
+        <div className="mt-2 text-[11px] leading-4 flex items-center gap-1.5 font-medium truncate">
           <span className={`h-2 w-2 rounded-full ${isHealthy ? 'bg-emerald-400' : 'bg-red-400 animate-pulse'}`} />
           <span style={{ color: isHealthy ? 'var(--text-secondary)' : 'var(--state-danger-text, #ef4444)' }} className="truncate">
             {isHealthy ? pick('系统运行正常', 'System healthy') : pick(`${importantLogCount} 项告警日志`, `${importantLogCount} warnings`)}
@@ -216,7 +215,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
     }
     if (itemId === 'storage-settings') {
       return (
-        <div className={`mt-2 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate ${centerClass}`}>
+        <div className="mt-2 text-[11px] leading-4 text-[var(--text-secondary)] font-medium truncate">
           {storedImages} 张图 · {storageUsageMb.toFixed(1)} MB / 1 GB
         </div>
       );
@@ -226,7 +225,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
 
   return (
     <aside
-      className="settings-shell-nav flex h-full min-h-0 shrink-0 flex-col border-r px-4 py-5"
+      className="settings-shell-nav flex h-full min-h-0 shrink-0 flex-col border-r pl-2 pr-2 py-5"
       style={{
         width: 'var(--settings-sidebar-width)',
         borderColor: 'var(--settings-nav-glass-border)',
@@ -235,8 +234,8 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
     >
       <style>{`
         @keyframes arrowBounce {
-          0%, 100% { transform: translate(0, -50%); opacity: 0.6; }
-          50% { transform: translate(3px, -50%); opacity: 1; }
+          0%, 100% { transform: translateX(0); opacity: 0.6; }
+          50% { transform: translateX(3px); opacity: 1; }
         }
         .animate-arrowBounce {
           animation: arrowBounce 1.4s infinite ease-in-out;
@@ -336,7 +335,7 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
         }
       `}</style>
 
-      <nav className="sidebar-card-list min-h-0 flex-1 space-y-3.5 overflow-y-auto pr-1">
+      <nav className="sidebar-card-list min-h-0 flex-1 space-y-3.5 overflow-y-auto pl-2 pr-3">
         {filteredNavItems.length === 0 ? (
           <div
             className="settings-shell-empty rounded-[18px] border px-4 py-3 text-[12px] leading-6"
@@ -371,61 +370,62 @@ const SettingsDesktopSidebar: React.FC<SettingsDesktopSidebarProps> = ({
                     const theme = getSidebarItemTheme(item.id);
 
                     return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => onNavigate(item.id)}
-                        title={item.description}
-                        className={`settings-sidebar-card w-full ${isActive ? 'active' : ''}`}
-                        aria-current={isActive ? 'page' : undefined}
-                        style={isActive ? {
-                          paddingLeft: '14px', // 简体中文：居中显示时，左侧内边距保持原样，与非激活状态一致
-                          borderColor: theme.border,
-                          background: theme.bg,
-                          boxShadow: `${theme.shadow}, inset 0 1px 1px rgba(255, 255, 255, 0.08)`,
-                        } : undefined}
-                      >
+                      <div key={item.id} className="relative w-full">
                         {isActive && (
                           <span 
-                            className="absolute left-2 top-1/2 -translate-y-1/2 w-[3.5px] h-[18px] rounded-full"
+                            className="absolute left-[8px] top-1/2 -translate-y-1/2 w-[3.5px] h-[18px] rounded-full z-10"
                             style={{
                               background: theme.glow,
                               boxShadow: theme.shadow,
                             }}
                           />
                         )}
-                        <div className={`flex w-full items-center ${isActive ? 'justify-center' : 'justify-between'}`}>
-                          <div className={`flex items-center gap-2.5 min-w-0 ${isActive ? 'justify-center w-full' : ''}`}>
-                            <span 
-                              className="card-avatar-icon shrink-0"
-                              style={isActive ? {
-                                background: theme.iconBg,
-                                borderColor: theme.iconBorder,
-                                color: theme.iconColor,
-                                filter: `drop-shadow(0 0 6px ${theme.iconColor}44)`,
-                                transform: 'scale(0.96)',
-                              } : undefined}
-                            >
-                              <Icon size={14} />
-                            </span>
-                            <span className="truncate text-xs font-semibold text-[var(--settings-nav-text-primary)]">
-                              {item.label}
-                            </span>
+                        <button
+                          type="button"
+                          onClick={() => onNavigate(item.id)}
+                          title={item.description}
+                          className={`settings-sidebar-card w-full ${isActive ? 'active' : ''}`}
+                          aria-current={isActive ? 'page' : undefined}
+                          style={isActive ? {
+                            borderColor: theme.border,
+                            background: theme.bg,
+                            boxShadow: `${theme.shadow}, inset 0 1px 1px rgba(255, 255, 255, 0.08)`,
+                          } : undefined}
+                        >
+                          <div className="flex w-full items-center justify-between">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span 
+                                className="card-avatar-icon shrink-0"
+                                style={isActive ? {
+                                  background: theme.iconBg,
+                                  borderColor: theme.iconBorder,
+                                  color: theme.iconColor,
+                                  filter: `drop-shadow(0 0 6px ${theme.iconColor}44)`,
+                                  transform: 'scale(0.96)',
+                                } : undefined}
+                              >
+                                <Icon size={14} />
+                              </span>
+                              <span className="truncate text-xs font-semibold text-[var(--settings-nav-text-primary)]">
+                                {item.label}
+                              </span>
+                            </div>
+                            <div className="flex items-center shrink-0">
+                              {isActive ? (
+                                <span 
+                                  className="opacity-80 animate-arrowBounce flex items-center"
+                                  style={{ color: theme.iconColor }}
+                                >
+                                  <ChevronRight size={13} />
+                                </span>
+                              ) : (
+                                <ChevronRight size={13} className="text-[var(--settings-nav-text-tertiary)] opacity-60" />
+                              )}
+                            </div>
                           </div>
-                          {!isActive && (
-                            <ChevronRight size={13} className="text-[var(--settings-nav-text-tertiary)] opacity-60" />
-                          )}
-                        </div>
-                        {renderCardStatusInfo(item.id, isActive)}
-                        {isActive && (
-                          <span 
-                            className="absolute right-3.5 top-1/2 -translate-y-1/2 opacity-80 animate-arrowBounce flex items-center"
-                            style={{ color: theme.iconColor }}
-                          >
-                            <ChevronRight size={13} />
-                          </span>
-                        )}
-                      </button>
+                          {renderCardStatusInfo(item.id)}
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
