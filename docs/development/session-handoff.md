@@ -73,15 +73,10 @@ npm run check:encoding
 
 ## 6. Latest Validation
 
-- Passed: `npm run governance:check`
-- Passed: `npm run check:encoding`
+- Passed: `npm run verify:changes` (全量验证顺利通过，包括架构、规范、类型、冒烟测试及字符编码检查)
+- Fixed: 修正了 `tests/unit/canvas-runtime-state-builder.test.ts` 中与 v1.5.3 升级对应的项目版本号断言测试。
 - Passed: `npm run typecheck`
-- Passed: targeted assistant tests for ToolRegistry, CanvasRuntimeState, ConfirmationPolicy, and SafetyPolicy
-- Passed: targeted selected ZIP tests in `tests/unit/zip-selected-originals.test.ts`
-- Passed: targeted DurableGenerationQueue tests in `tests/unit/durable-generation-queue.test.ts` covering idempotency, max batch size, concurrency clamp, pause/resume, and retry
-- Passed: targeted KnowledgeSync tests in `tests/unit/agent-knowledge-sync.test.ts`
-- Passed: `npm run build`
-- Not run: full `npm run verify:changes`, because this round stayed scoped and the worktree has concurrent changes from the user or another agent
+- Passed: 侧边和桌面工具栏折叠/展开测试以及所有的单元和集成测试。
 
 ## 7. Handoff Notes For Next Agent
 

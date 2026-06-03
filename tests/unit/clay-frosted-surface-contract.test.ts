@@ -17,9 +17,9 @@ function extractCssBlock(source: string, selector: string): string {
 
 test('Clay manuals define the controlled frosted material override', () => {
   const manuals = [
-    readSource('docs/DESIGN.md'),
-    readSource('docs/DESIGN.md'),
-    readSource('docs/DESIGN.md'), // 用 docs/DESIGN.md 替代已下线的 .agent/rules/skills/SKILL.md
+    readSource('docs/architecture/DESIGN.md'),
+    readSource('docs/architecture/DESIGN.md'),
+    readSource('docs/architecture/DESIGN.md'), // 用 docs/architecture/DESIGN.md 替代已下线的 .agent/rules/skills/SKILL.md
   ].join('\n');
 
   assert.match(manuals, /controlled frosted|受控磨砂/i);

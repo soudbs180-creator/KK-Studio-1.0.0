@@ -1,64 +1,116 @@
-# AGENTS.md — KK Studio v1.5.3 项目总规范与 Agent 黄金法则
+# AGENTS.md — KK Studio v1.5.3 AI / Agent 最高执行规范
+<!-- CI Tokens: AGENTS.md - AI Agent 项目总指导文件, KK Studio v1.5.3, AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md, ToolRegistry, CanvasRuntimeState -->
 
-<!-- AGENTS.md - AI Agent 项目总指导文件 -->
-
-Last updated: 2026-06-03
+Last updated: 2026-06-03  
 Project version: **KK Studio v1.5.3**
-Primary companion: [`AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md`](./AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md)
 
-> 本文件是 KK Studio v1.5.3 的最高优先级开发规约。Codex、Antigravity、Claude、Cursor、人工开发者及任何自动化 Agent 在修改项目之前必须先读取本文件。任何旧文档、旧提示词、历史计划、临时代码与本文件冲突时，以本文件和当前源码为准。
-
----
-
-## 0. 不可改错的当前项目事实
-
-1. **项目名与版本**：项目为 `KK Studio`，当前稳定版本必须写作 **v1.5.3**。版本事实以 `config/release-manifest.json` 为第一来源，`package.json` 与各 workspace package 只能作为同步投影。
-2. **仓库名**：`soudbs180-creator/nano-banana-KK-`。
-3. **技术栈**：Web 端为 Vite + React 19 + TypeScript + Tailwind + AntD / Lobe UI Bridge；主要运行目录为 `apps/web/`。后端存在 `server/` Express / VPS 运行时与相关代理路由。共享逻辑位于 `packages/shared/`、统一 API 客户端位于 `packages/api-client/`、设计系统适配位于 `packages/ui/`。
-4. **Node 与包管理器**：以根 `package.json` 的 `engines.node` 与 `packageManager` 为准，当前为 Node 24.x 与 npm 11.x。
-5. **核心产品定位**：KK Studio 是面向 AI 创作、无限画布、多模型路由、用户自主密钥、多端同步与商业化计费审计的多模态工作台。
-6. **当前 AI 助手雏形**：`apps/web/src/features/ai-takeover/` 已存在 LocalBrain、LLMBrain、IntentGate、ActionExecutor、SafetyPolicy、ConfirmationPolicy、ProjectContextBuilder 等前端接管能力。后续必须在此基础上升级，不得绕开并另起一套互相竞争的助手系统。
-7. **当前画布事实**：画布状态由 `CanvasContext` / `canvasContextState` 管理，包含 `activeCanvasId`、`selectedNodeIds`、`viewportCenter`、画布列表、历史、组、图像节点、提示词节点等。无限画布组件 `InfiniteCanvas` 已暴露实时 transform、视口矩形、缩放、复位和全览能力。
-8. **生成结果事实**：`GeneratedImage` 同时可能拥有 `url`、`originalUrl`、`apiResultUrl`、`storageId`、`mimeType`、`sourceTaskId` 等字段。下载原图必须优先解析 `originalUrl`，其次 `apiResultUrl`，再次 `url`，最后才走本地存储恢复。
-9. **当前文档事实**：仓库中存在部分历史文档口径不一致，例如旧迁移文档可能仍提到 `src/`、Netlify、1.4.x 或未来目标目录。Agent 必须以当前源码、`package.json`、`config/release-manifest.json`、测试脚本与本文件为准，并在相关工作中修正文档漂移。
-10. **根目录允许的治理文件**：`AGENTS.md`、`AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md`、`plans.md`、`implement.md`、`status.md`、`validation.md`、`README.md`、`REPO_AUDIT.md`、`OPTIMIZATION_PROMPTS.md` 可存在于根目录。历史 `OPTIMIZATION_PROMPTS.md` 只能作为参考，不得覆盖本文件与 AI 助手优化方案。
+> 本文件是 Codex、Claude、Cursor、Antigravity、自动化 Agent 与任何 AI 编程工具修改本项目之前必须读取的最高优先级规则入口。
 
 ---
 
-## 1. Agent 工作总原则
+## 0. 文档路由总表
 
-### 1.1 先读项目，后动代码
+Agent 接到任务后，先用下表判断需要读取哪些文档。不要把所有规则塞进 prompt 后凭感觉执行；必须按任务类型进入对应规则。
 
-任何 AI 编程工具接手任务时，必须按顺序读取：
+| 任务类型 | 必读文档 | 继续读取 | 输出要求 |
+|---|---|---|---|
+| 任意代码修改 | `AGENTS.md` | `package.json`、`config/release-manifest.json`、相关源码与测试 | 简短计划、最小变更、验证记录、交接说明 |
+| AI 助手 / 画布 Agent | `AGENTS.md` | `docs/ai-assistant/AI_ASSISTANT_ROADMAP.md`、`docs/ai-assistant/RUNBOOKS.md` | ToolRegistry、CanvasRuntimeState、权限、测试、知识更新 |
+| 下载选中卡片 / 打包原图 | `AGENTS.md` §8、§9 | `docs/ai-assistant/RUNBOOKS.md` 中 `download-selected-originals` | 调用工具，不模拟 UI；ZIP manifest 完整 |
+| 批量生成 / 自动整理 | `AGENTS.md` §9 | `AI_ASSISTANT_ROADMAP.md` Sprint 4、`RUNBOOKS.md` | DurableQueue、限速、幂等、确认、自动布局 |
+| 安全 / 密钥 / CORS / JWT / 计费 | `AGENTS.md` §6、§12 | `docs/governance/SECURITY_AND_BACKLOG.md` | 不泄露密钥；不绕过账务；有迁移 / 测试 / 审计 |
+| 数据库结构变更 | `AGENTS.md` §13 | `migrations/`、相关测试、`SECURITY_AND_BACKLOG.md` | 只写 migrations；幂等；验证 SQL 与业务使用 |
+| 文档、状态、验证整理 | `AGENTS.md` | `docs/governance/PROJECT_STATE_AND_VALIDATION.md` | 修正文档漂移；记录已验证 / 未验证 |
+| 编码、乱码、PowerShell | `AGENTS.md` §15 | `docs/governance/ENCODING_AND_POWERSHELL.md` | UTF-8 without BOM、LF、显式编码、检查脚本 |
 
-1. `AGENTS.md`
-2. `AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md`
-3. `package.json`
-4. `config/release-manifest.json`
-5. 与任务相关的源码目录
-6. `docs/development/session-handoff.md`、`status.md`、`implement.md`、`validation.md` 中与任务有关的部分
+---
 
-禁止凭记忆、旧提示词或猜测修改项目。
+## 1. 不可改错的当前项目事实
 
-### 1.2 冲突解决顺序
+1. 项目名：`KK Studio`。
+2. 当前稳定版本：`v1.5.3`。
+3. 版本事实第一来源：`config/release-manifest.json`。
+4. 仓库名：`soudbs180-creator/nano-banana-KK-`。
+5. Web 主运行时：`apps/web/`。
+6. Mobile：`apps/mobile/`。
+7. 共享契约：`packages/shared/`。
+8. 统一 HTTP Client：`packages/api-client/`。
+9. 设计系统适配：`packages/ui/`。
+10. 后端运行时：`server/` Express / VPS。
+11. 数据库迁移唯一合法目录：`migrations/`。
+12. AI 接管雏形：`apps/web/src/features/ai-takeover/`。
+13. 画布状态：`CanvasContext` / `canvasContextState`，包含 `activeCanvasId`、`selectedNodeIds`、`viewportCenter`、历史、画布列表、组、Prompt 节点、Image 节点。
+14. 无限画布：`InfiniteCanvas` 暴露 transform、视口矩形、缩放、复位、全览能力。
+15. `GeneratedImage` 可能包含 `url`、`originalUrl`、`apiResultUrl`、`storageId`、`mimeType`、`sourceTaskId`。
+16. 下载原图解析优先级：`originalUrl -> apiResultUrl -> url -> storageId -> failedItems`。
+17. 历史文档可能包含过期事实，例如 `src/`、Netlify、`payment-server`、`1.4.x`、`1.5.0`、`1.5.1`。遇到冲突时，以当前源码、`package.json`、`config/release-manifest.json`、测试脚本和本文件为准。
 
-当文档、源码、测试、历史记录互相冲突时，按以下优先级判断：
+---
+
+## 2. 事实优先级与冲突处理
+
+事实优先级：
 
 ```text
 当前源码和类型定义
-  > package.json / release-manifest / 构建脚本
+  > package.json / config/release-manifest.json / 构建脚本
   > 自动化测试与治理脚本
   > AGENTS.md
-  > AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md
+  > docs/ai-assistant/AI_ASSISTANT_ROADMAP.md
+  > README.md
   > docs/ 下的当前文档
-  > 历史归档、旧计划、旧提示词
+  > 历史归档、旧计划、旧审计、旧提示词
 ```
 
-若发现冲突，不要静默沿用旧口径。必须在本次变更中修正或记录到 handoff。
+冲突处理步骤：
 
-### 1.3 工具优先，不模拟用户界面
+1. 明确指出冲突文件和冲突字段。
+2. 使用高优先级事实继续执行。
+3. 小范围修正文档漂移，或记录到 `docs/development/session-handoff.md`。
+4. 不得自行编造折中事实。
+5. 高风险事项不确定时停止扩展，先交代假设与风险。
 
-AI 助手、Agent Runtime 和自动化工作流不得模拟人在输入框里逐条输入、点击、发送来完成批量任务。只要项目已有或应有直接函数、Context API、服务接口或 Tool API，就必须直接调用能力。
+高风险事项包括：密钥、积分、退款、支付、Stripe Webhook、JWT、CORS、Provider 直连、数据库迁移、生产部署、用户隐私文件。
+
+---
+
+## 3. Agent 工作协议
+
+### 3.1 开始任务
+
+每次开始任务必须执行：
+
+```text
+1. 读取 AGENTS.md
+2. 按文档路由总表读取相关细则
+3. 读取 package.json 和 config/release-manifest.json
+4. 搜索相关源码和测试
+5. 判断模块归属
+6. 输出简短计划
+7. 小步修改
+8. 运行相关验证
+9. 更新知识库 / handoff / 状态文档
+10. 给出完成范围、验证结果、未完成风险
+```
+
+### 3.2 最小变更原则
+
+Agent 只能修改与当前任务直接相关的文件。
+
+禁止：
+
+- 借小问题做大重构
+- 同时修改多个无关模块
+- 擅自更换技术栈、状态管理、构建工具、目录结构
+- 删除功能、删除测试、绕过治理脚本
+- 为通过编译而降低类型安全
+- 为通过测试而改测试适配错误行为
+- 提交临时调试代码、真实密钥、个人路径、机器相关配置
+- 用大范围格式化掩盖逻辑变更
+
+### 3.3 工具优先，不模拟 UI
+
+AI 助手、Agent Runtime 和自动化工作流不得模拟人在输入框逐条输入、点击、等待来完成批量任务。
 
 错误方式：
 
@@ -75,151 +127,261 @@ canvas.arrangeNodes(cardIds, layout)
 assets.zipOriginals(selectedImageNodeIds)
 ```
 
-### 1.4 AI 不是无限权限执行器
+只要项目已有或应有函数、Context API、服务接口或 Tool API，就必须直接调用能力。
 
-LLM 只能负责理解、规划、生成结构化动作。真正执行必须经过：
+### 3.4 LLM 权限边界
+
+LLM 只能负责：
 
 ```text
-Intent Gate -> Planner -> Tool Registry -> Permission Policy -> Executor -> Verification -> Memory / Knowledge Update
+理解意图 -> 生成计划 -> 输出结构化工具调用 -> 总结结果
 ```
 
-不得让 LLM 直接读写密钥、生产数据库、任意文件系统、付款状态、积分余额或部署环境。
+执行必须经过：
 
-### 1.5 每次改动都必须可恢复
+```text
+IntentGate -> Planner -> ToolRegistry -> PermissionPolicy -> Executor -> Verification -> Memory / Knowledge Update
+```
 
-Codex / Antigravity 可能中断。任何复杂任务必须留下可恢复信息：
+LLM 永远不得直接读写密钥、生产数据库、付款状态、积分余额、Webhook Secret、任意文件系统或部署环境。
+
+### 3.5 可恢复性
+
+复杂任务必须留下：
 
 - 已修改文件
-- 未完成步骤
 - 当前设计决策
-- 已运行测试
-- 未运行测试与原因
+- 已运行验证
+- 未运行验证及原因
+- 未完成步骤
 - 下一步最小操作
 
-优先写入 `docs/development/session-handoff.md` 或任务相关的 `docs/ai-assistant/*` 文档；根目录 `implement.md/status.md/validation.md` 只记录里程碑级事实。
+优先写入：
+
+```text
+docs/development/session-handoff.md
+docs/ai-assistant/session-memory.md
+```
+
+根目录 `implement.md`、`status.md`、`validation.md` 只记录里程碑级事实；如果迁移到 `docs/governance/`，同步更新引用。
 
 ---
 
-## 2. 当前目录职责
+## 4. 修改前归属判断
+
+| 需求 | 应修改位置 | 禁止事项 |
+|---|---|---|
+| Web 页面、桌面端交互、无限画布 | `apps/web/` | 禁止引入 RN / Expo；禁止直接写数据库 |
+| 移动端原生交互 | `apps/mobile/` | 禁止直接调用 DOM / BOM 专属 API |
+| 类型、DTO、枚举、共享契约 | `packages/shared/` | 禁止 React、DOM、RN、Node 专属 API |
+| HTTP 请求、鉴权、Session、跨端 API | `packages/api-client/` | 禁止平台存储硬编码；必须依赖注入 |
+| 设计 Token、基础组件、UI Bridge | `packages/ui/` | 禁止业务状态和模型调用逻辑 |
+| API 代理、计费、Stripe、数据库访问 | `server/` | 禁止引入前端组件；禁止弱默认密钥 |
+| 数据库结构变化 | `migrations/` | 禁止在业务代码中执行 DDL |
+| AI 接管能力 | `apps/web/src/features/ai-takeover/` 或 `apps/web/src/features/ai-assistant-runtime/` | 禁止另起平行助手 |
+| AI 知识、流程、Runbook | `docs/ai-assistant/` | 禁止只改 UI 不更新知识 |
+| 状态、验证、审计、编码 | `docs/governance/` | 禁止用历史事实覆盖当前事实 |
+
+跨层需求顺序：
+
+```text
+shared 契约 -> api-client -> server -> app 层 -> tests -> docs / handoff
+```
+
+---
+
+## 5. 目录职责与模块边界
 
 ```text
 nano-banana-KK-/
 ├── apps/
-│   ├── web/                         # 桌面 Web 主运行时，Vite + React + TypeScript
+│   ├── web/
 │   │   └── src/
 │   │       ├── app/                 # 应用级 hooks、运行态编排、响应式入口
 │   │       ├── components/          # UI 组件，含 canvas/layout/mobile/ecommerce
 │   │       ├── context/             # Canvas/Auth/Billing/Startup 等 React Context
 │   │       ├── features/
-│   │       │   ├── ai-takeover/     # 当前 AI 接管雏形，后续 AI 助手升级必须基于这里演进
+│   │       │   ├── ai-takeover/     # 当前 AI 接管雏形，必须兼容演进
 │   │       │   └── assets/          # 资源池、ZIP 输出、敏感文件扫描
 │   │       ├── hooks/               # 生成、任务恢复、UI 状态 hooks
 │   │       ├── services/            # LLM、存储、认证、账单、API、系统日志等服务
-│   │       ├── types/               # 主要业务类型，GeneratedImage/PromptNode/Canvas 等
-│   │       ├── utils/               # 画布布局、模型展示、图像恢复、PPT/电商工具
+│   │       ├── types/               # GeneratedImage / PromptNode / Canvas 等
+│   │       ├── utils/               # 布局、模型展示、图像恢复、PPT、电商工具
 │   │       └── workflow/            # 实验性工作流图能力
-│   └── mobile/                      # Expo 移动端。若工作区未完全接入，仍不得在 Web 引入 RN API
+│   └── mobile/                      # Expo 移动端
 ├── packages/
 │   ├── shared/                      # 跨端纯 TS 共享契约和领域逻辑
 │   ├── api-client/                  # 统一 HTTP 客户端
 │   └── ui/                          # 设计令牌与 UI 适配层
-├── server/                          # Express / VPS 后端与过渡代理路由
+├── server/                          # Express / VPS 后端与代理路由
 ├── migrations/                      # PostgreSQL DDL 唯一合法来源
 ├── docs/                            # 项目文档、架构记录、开发交接
 ├── scripts/                         # CI、治理、发布、测试与维护脚本
 ├── tests/                           # 单元、集成、契约、E2E 测试
 ├── config/                          # release manifest 与项目配置
-└── AGENTS.md                        # 本文件
+├── AGENTS.md                        # 本文件
+└── README.md                        # 项目入口说明
 ```
 
-### 2.1 模块边界硬规则
+硬规则：
 
-| 模块 | 必须遵守 | 禁止事项 |
-|---|---|---|
-| `apps/web/` | 只写浏览器 Web 逻辑，通过 `packages/api-client` 或服务层访问后端 | 禁止引入 React Native / Expo API；禁止直接写数据库；禁止直接读取密钥 |
-| `apps/web/src/features/ai-takeover/` | 作为现有 AI 接管能力的升级入口 | 禁止再新建一套平行 AI 助手导致状态分裂 |
-| `apps/web/src/context/` | 管理画布、认证、账单等运行态 | 禁止把高频 runtime state 全部塞进 LLM prompt；必须脱敏摘要化 |
-| `apps/web/src/services/llm/` | 模型路由、Provider 能力、用户密钥路由、系统代理 | 禁止浏览器直连受保护 Provider；禁止明文日志密钥 |
-| `packages/shared/` | 纯 TS 契约、DTO、领域规则 | 禁止 DOM、window、localStorage、React、RN、Node 专属 API |
-| `packages/api-client/` | HTTP API 边界 | 禁止平台专属存储硬编码；需要依赖注入 |
-| `packages/ui/` | UI token、基础组件、适配器 | 禁止业务状态和模型调用逻辑 |
-| `server/` | 后端路由、积分、代理、Webhook、文件落盘 | 禁止引入前端组件；禁止使用弱默认密钥 |
-| `migrations/` | 数据库结构变更 | 禁止业务逻辑；禁止非幂等破坏性 DDL |
+- `packages/shared` 必须保持平台无关。
+- `packages/api-client` 只能定义 HTTP / Session 边界，不直接绑定某平台存储。
+- `server` 是计费、退款、Stripe、Provider 代理、文件落盘的权威执行层。
+- `migrations` 是 Schema 变更唯一入口。
+- `apps/web/src/features/ai-takeover` 是现有助手兼容入口，不能绕开重建竞争系统。
 
 ---
 
-## 3. AI 助手与画布 Agent 目标架构
+## 6. 安全、密钥、积分与隐私红线
 
-KK Studio 的最终助手不是聊天机器人，而是项目级、画布级、任务级 Agent。目标链路如下：
+### 6.1 永远禁止
+
+Agent 永远不得：
+
+```text
+读取 / 记录 / 上传 / 复述 API Key
+读取 / 记录 JWT、Cookie、Password、Stripe Secret、Webhook Secret、数据库连接串
+填写用户密钥
+把用户密钥放入日志、Prompt、Knowledge、Runbook、测试快照
+绕过积分扣减
+绕过退款审计
+绕过 Stripe Webhook 验签
+直接修改生产账单或余额
+浏览器端直连受保护 Provider
+```
+
+### 6.2 LLM 上下文脱敏
+
+发送给 LLM 的内容必须脱敏、摘要、按需检索。不得把完整 base64、长随机串、用户凭证、私密文件、完整 Provider 配置塞进 prompt。
+
+### 6.3 积分与支付
+
+系统积分扣减、退款、余额、支付状态以后端权威结果为准。
+
+标准链路：
+
+```text
+预扣积分 -> 调用 AI -> 成功结算 / 失败退款 -> 写入审计
+```
+
+规则：
+
+- 文生图、图生图、对话等成本常量必须集中定义。
+- 余额扣减必须原子化，防止并发负数。
+- Stripe Webhook 必须使用原始请求体验签。
+- 失败退款不能 silent catch。
+- 积分流水应可用于客服追查。
+
+---
+
+## 7. AI 助手目标架构
+
+KK Studio 的最终助手是项目级、画布级、任务级 Agent。
+
+目标链路：
 
 ```text
 用户自然语言
-  -> CanvasRuntimeState 当前画布/选区/视口/输入框/最近事件
-  -> ProjectKnowledge 项目模块/代码/流程/规范/历史任务
-  -> IntentGate 意图识别
-  -> Planner 结构化计划
-  -> ToolRegistry 工具选择
-  -> PermissionPolicy 权限与确认
-  -> Executor 直接调用项目能力
-  -> JobQueue 批量任务/限速/重试/恢复
+  -> CanvasRuntimeState
+  -> ProjectKnowledge
+  -> IntentGate
+  -> Planner
+  -> ToolRegistry
+  -> PermissionPolicy
+  -> Executor
+  -> DurableJobQueue
   -> Canvas / Assets / Generation 更新
-  -> Memory & Knowledge Sync 自动更新知识库和 Skills
+  -> Memory / KnowledgeSync / Skills
 ```
 
-### 3.1 已有基础必须复用
+### 7.1 已有基础必须复用
 
-当前已有这些基础，不得重复造轮子：
+```text
+LocalAssistantBrain
+LLMBrain
+analyzeIntent
+executeAction
+safetyPolicy
+confirmationPolicy
+buildSanitizedProjectContext
+useAssetStore
+zipOutputs
+CanvasContext
+useTaskRecovery
+taskPersistence
+```
 
-- `LocalAssistantBrain`：本地规则脑
-- `LLMBrain`：云端大模型规划器
-- `analyzeIntent`：意图门控
-- `executeAction`：动作执行器
-- `safetyPolicy`：安全策略
-- `confirmationPolicy`：确认策略
-- `buildSanitizedProjectContext`：脱敏上下文构建器
-- `useAssetStore`：资产池
-- `zipOutputs`：ZIP 输出雏形
-- `CanvasContext`：画布增删改查、选择、排列、历史、持久化
-- `useTaskRecovery` / `taskPersistence`：生成任务恢复雏形
+升级方向：
 
-升级时必须从这些点演进为 `AgentRuntime + ToolRegistry + DurableQueue + KnowledgeSync`，而不是新增互相割裂的助手。
+```text
+ai-takeover -> AgentRuntime -> ToolRegistry -> DurableQueue -> KnowledgeSync
+```
 
-### 3.2 必须补齐的核心缺口
+### 7.2 必须补齐
 
-1. **项目知识库**：当前助手只能看到脱敏画布摘要，不能真正理解项目代码、模块、接口、流程。必须增加项目知识索引、模块地图、流转地图、规范索引。
-2. **画布运行态**：当前上下文缺少完整 viewport、transform、active tool、recent events、选区对象详情、UI 布局签名。必须补齐。
-3. **Tool Registry**：当前 action 是前端 switch-case。必须升级为可声明、可权限控制、可审计、可测试的工具注册表。
-4. **批量任务队列**：当前 AI 接管队列是前端内存数组且默认并发 3。必须支持持久化、限速、幂等、暂停、恢复、失败重试。
-5. **下载选中原图**：当前 ZIP 工具对 selected scope 和 originalUrl 优先级不完整。必须实现真实选区过滤与原图解析。
-6. **知识自更新**：每次调试、UI 位置变化、流程变化、工具新增后，必须自动或半自动写入知识库、Skills/Runbooks、handoff，保持最新。
+1. 项目知识库：模块地图、流程地图、工具索引、规范索引。
+2. 画布运行态：viewport、transform、active tool、recent events、选区对象详情、UI 布局签名。
+3. ToolRegistry：声明式、权限化、审计化、可测试。
+4. 持久批量任务队列：限速、幂等、暂停、恢复、重试。
+5. 选中卡片原图下载：真实选区过滤、Prompt 子图解析、原图优先级。
+6. 知识自更新：UI、Flow、Tool、调试结论变化后更新 docs / Skills / handoff。
+
+详细 Sprint 见 `docs/ai-assistant/AI_ASSISTANT_ROADMAP.md`。
 
 ---
 
-## 4. 画布运行态协议
+## 8. CanvasRuntimeState 协议
 
-AI 助手理解“我在画布干嘛”必须依赖结构化运行态，而不是猜测用户意图。
-
-必须建设并保持如下概念：
+AI 助手理解“我在画布干嘛”必须依赖结构化运行态。
 
 ```ts
 type CanvasRuntimeState = {
   projectVersion: '1.5.3';
+  currentPage?: 'canvas' | 'settings' | 'agent' | 'unknown';
   userId?: string;
   canvasId: string;
   canvasName?: string;
+  canvas?: {
+    id: string;
+    name: string;
+    promptCount: number;
+    imageCount: number;
+    groupCount: number;
+    lastModified?: number;
+  };
   viewport: {
     x: number;
     y: number;
     scale: number;
-    rect?: { width: number; height: number };
     center?: { x: number; y: number };
+    rect?: { width: number; height: number };
   };
   selection: {
     selectedNodeIds: string[];
     promptNodeIds: string[];
     imageNodeIds: string[];
+    childImageNodeIdsFromSelectedPrompts?: string[];
     groupIds: string[];
     count: number;
+  };
+  selectedNodes?: {
+    prompts: Array<{
+      id: string;
+      prompt: string;
+      status: 'idle' | 'queued' | 'generating' | 'failed' | 'done';
+      childImageIds: string[];
+      tags?: string[];
+    }>;
+    images: Array<{
+      id: string;
+      parentPromptId?: string;
+      urlPresent: boolean;
+      originalUrlPresent: boolean;
+      apiResultUrlPresent: boolean;
+      storageIdPresent: boolean;
+      tags?: string[];
+    }>;
   };
   promptBarInput?: {
     prompt: string;
@@ -228,6 +390,7 @@ type CanvasRuntimeState = {
   };
   activeTool?: 'select' | 'pan' | 'generate' | 'edit' | 'redraw' | 'unknown';
   recentEvents: Array<{
+    id?: string;
     type: string;
     targetIds?: string[];
     timestamp: number;
@@ -236,33 +399,23 @@ type CanvasRuntimeState = {
 };
 ```
 
-### 4.1 选区解释规则
+选区解释：
 
-- 用户说“这些卡片”“选中的卡片”“我框选的卡片”，必须解析为 `selectedNodeIds`。
-- 下载图片时，只能下载选区里的图片节点；如果选区包含 Prompt 节点，必须解析其子图像节点。
-- 用户说“刚刚生成的图”，优先使用 recentEvents 中的 generation completed/batch id，其次用 imageNodes timestamp。
-- 用户说“当前画布”，范围是 `activeCanvasId` 对应的画布，而不是所有画布。
-- 用户说“整理一下”，默认整理当前选区；没有选区时才整理当前画布。
+- “这些卡片”“选中的卡片”“我框选的卡片”“当前选区” => `selectedNodeIds`。
+- 下载图片时只下载选区内图片节点。
+- 选区包含 Prompt 节点时，解析其子图像节点。
+- 同时选中 Prompt 与子图时去重。
+- “刚刚生成的图”优先 recentEvents，其次 imageNodes timestamp。
+- “当前画布”指 `activeCanvasId` 对应画布，不是所有画布。
+- “整理一下”默认当前选区；无选区时才整理当前画布。
 
-### 4.2 视口与 UI 位置变更规则
-
-任何 UI 位置、面板布局、画布坐标系、按钮入口变化都要同步更新：
-
-- 运行态字段
-- 相关选择器或 action handler
-- 帮助文案
-- `docs/ai-assistant/ui-map.md` 或同类知识文档
-- 回归测试中的选择器
-
-不得只改 UI，不改助手知识；否则助手会继续“知道旧位置”。
+UI 位置变化时必须同步：运行态字段、selector、action handler、帮助文案、`docs/ai-assistant/ui-map.md`、回归测试。
 
 ---
 
-## 5. Tool Registry 黄金规范
+## 9. ToolRegistry 规范
 
-### 5.1 工具命名
-
-工具名必须使用命名空间：
+### 9.1 命名空间
 
 ```text
 canvas.getState
@@ -278,26 +431,29 @@ generation.createBatchJob
 generation.getJobStatus
 generation.pauseJob
 generation.resumeJob
+generation.submitComposer
 knowledge.searchProject
 knowledge.recordChange
 skills.upsertSkill
 ui.recordLayoutChange
 ```
 
-### 5.2 工具声明结构
+### 9.2 工具声明
 
 ```ts
-type AgentToolDefinition = {
+type ToolPermission = 'safe' | 'confirm' | 'dangerous' | 'forbidden';
+
+type AgentToolDefinition<Input = unknown, Output = unknown> = {
   name: string;
   description: string;
-  permission: 'safe' | 'confirm' | 'dangerous' | 'forbidden';
+  permission: ToolPermission;
   inputSchema: unknown;
   outputSchema: unknown;
-  handler: (input: unknown, ctx: AgentExecutionContext) => Promise<unknown>;
+  handler: (input: Input, ctx: AgentExecutionContext) => Promise<Output>;
 };
 ```
 
-所有工具调用都必须记录：
+### 9.3 调用日志
 
 ```ts
 type AgentToolCallLog = {
@@ -314,30 +470,33 @@ type AgentToolCallLog = {
 };
 ```
 
-### 5.3 权限规则
+日志必须脱敏，不得记录密钥、JWT、Cookie、Password、Stripe Secret、Webhook Secret、数据库连接串、完整用户隐私原文、完整 base64。
 
-| 权限 | 示例 | 是否自动执行 |
+### 9.4 权限矩阵
+
+| 权限 | 示例 | 执行规则 |
 |---|---|---|
-| `safe` | 读画布状态、定位卡片、整理非破坏性布局、下载已有文件 | 可以 |
-| `confirm` | 批量生成、上传资源、扣积分、覆盖输出、读取文件内容 | 必须确认 |
-| `dangerous` | 删除卡片、清空画布、发布、部署、批量替换 | 必须二次确认并显示影响范围 |
-| `forbidden` | 读取/填写/上传 API 密钥、记录密码、绕过积分、直接改生产账单 | 永远禁止 |
+| `safe` | 读状态、定位、非破坏性整理、下载已有文件 | 可自动执行 |
+| `confirm` | 批量生成、上传、扣积分、覆盖输出、读取文件内容 | 必须确认 |
+| `dangerous` | 删除、清空、发布、部署、批量替换 | 必须二次确认并显示影响范围 |
+| `forbidden` | 读取/填写/上传密钥、绕过积分、直接改生产账单 | 永远拦截 |
 
 ---
 
-## 6. 必须跑通的核心业务流
+## 10. 核心业务流规则
 
-### 6.1 下载选中卡片原图
+### 10.1 下载选中卡片原图
 
-用户说：
+触发表达：
 
 ```text
 下载选择的卡片
 我要打包这些图
 把我框选的卡片原图下载
+下载当前选区原图
 ```
 
-必须执行：
+执行链路：
 
 ```text
 canvas.getState
@@ -345,50 +504,42 @@ canvas.getState
   -> 解析 Prompt 子图与 Image 节点
   -> assets.resolveOriginals
   -> assets.zipOriginals
-  -> 返回下载结果 / 浏览器保存
+  -> 返回下载结果
 ```
 
-原图解析优先级：
+原图优先级：
 
 ```text
-image.originalUrl
-  -> image.apiResultUrl
-  -> image.url
-  -> image.storageId 对应 IndexedDB / OPFS / 本地文件恢复
-  -> 标记 failedItems 写入 manifest.json
+image.originalUrl -> image.apiResultUrl -> image.url -> image.storageId -> failedItems
 ```
 
-ZIP 必须包含：
+ZIP 必须包含原图文件与 `manifest.json`，manifest 至少包含：`nodeId`、`parentPromptId`、`promptSummary`、`model`、`createdAt`、`sourceKind`、失败原因。
 
-- 原图文件
-- `manifest.json`
-- 每个文件的 `nodeId`、`parentPromptId`、`prompt` 摘要、`model`、`createdAt`、失败原因
+### 10.2 批量生图并放入画布
 
-### 6.2 批量生图并整齐放入画布
-
-用户说：
+触发表达：
 
 ```text
 批量生成 30 张头像，整理成卡片组
 对这个文件夹每张图都生成一个商品主图
 ```
 
-不得循环模拟输入框。必须一次创建批量任务：
+执行链路：
 
 ```text
 IntentGate
   -> Planner 生成 BatchGenerationPlan
-  -> confirmationPolicy 确认成本/上传/数量
+  -> ConfirmationPolicy 确认成本 / 上传 / 数量
   -> generation.createBatchJob
-  -> JobQueue 按并发与速率执行
-  -> 结果保存 originalUrl/storageId
+  -> DurableJobQueue 按并发与速率执行
+  -> 保存 originalUrl / storageId
   -> canvas.createImageCards / addImageNodes
   -> canvas.arrangeNodes
-  -> group/tag 标记 batchId
+  -> group / tag 标记 batchId
   -> knowledge.recordChange
 ```
 
-默认限速策略：
+默认限制：
 
 ```text
 defaultConcurrency = 3
@@ -399,43 +550,37 @@ retryBackoffMs = 2000
 requireIdempotencyKey = true
 ```
 
-### 6.3 整理卡片
+### 10.3 整理卡片
 
-- 当前选区存在时，只整理选区。
-- 选中单个 Prompt 且有子图时，调用 `arrangeSingleSelectedPromptChildren`。
-- 选中多个组或多张卡片时，调用 `arrangeSelectedGroupedNodes` 或 `arrangeSelectedRootNodes`。
-- 整个画布整理时，调用 `resolveCanvasAutoArrangePositions`。
-- 自动化批量输出必须打 `automation` tag，进入自动化轨道，避免与用户手动创作区混在一起。
+- 有选区：只整理选区。
+- 选中单个 Prompt 且有子图：调用 `arrangeSingleSelectedPromptChildren`。
+- 选中多个组或多张卡片：调用 `arrangeSelectedGroupedNodes` 或 `arrangeSelectedRootNodes`。
+- 整个画布整理：调用 `resolveCanvasAutoArrangePositions`。
+- 自动化批量输出：打 `automation` tag，进入自动化轨道。
 
-### 6.4 帮我发送 / 帮我运行
+### 10.4 优化提示词
 
-如果用户只是要发送当前输入框，允许调用 `submitPromptComposer` 或未来的 `generation.submitComposer`。但批量任务不允许逐条发送；必须转成 Batch Job。
+“优化提示词”“润色提示词”“给我提示词”“帮我改 prompt”默认只输出文本，不生成图片。
 
-### 6.5 优化提示词
-
-“优化提示词”“润色提示词”“给我提示词”默认不生成图片。只有用户明确说“生成、出图、跑图、发送”时，才可进入生成流程。
+只有用户明确说“生成”“出图”“跑图”“发送”“执行”时，才可进入生成流程。
 
 ---
 
-## 7. 项目知识库与 Skills 自更新规范
+## 11. 知识库、Runbooks 与自更新
 
-### 7.1 不是微调优先
-
-本项目所谓“像训练出一个小模型”，第一阶段不通过不透明微调实现，而通过以下机制实现：
+第一阶段不是微调，而是工程化知识系统：
 
 ```text
-项目代码索引 + 模块地图 + 流程地图 + 画布运行态 + 工具注册表 + 长短期记忆 + Skills/Runbooks
+项目代码索引 + 模块地图 + 流程地图 + 画布运行态 + 工具注册表 + 记忆 + Skills / Runbooks
 ```
 
-只有在积累足够脱敏、高质量、可授权的任务样本后，才允许考虑微调或蒸馏。
-
-### 7.2 知识库目录建议
-
-后续必须逐步建立：
+建议目录：
 
 ```text
 docs/ai-assistant/
 ├── README.md
+├── AI_ASSISTANT_ROADMAP.md
+├── RUNBOOKS.md
 ├── module-map.md
 ├── flow-map.md
 ├── tool-registry.md
@@ -446,103 +591,117 @@ docs/ai-assistant/
 └── session-memory.md
 ```
 
-必要时新增：
+以下变化必须更新知识库或 handoff：
 
-```text
-apps/web/src/features/ai-assistant-runtime/
-├── runtime/
-├── tools/
-├── knowledge/
-├── memory/
-├── queue/
-└── __tests__/
-```
-
-### 7.3 每次变更后的知识更新
-
-任何满足以下条件的变更，都必须更新知识库：
-
-- 新增或修改 AI 助手动作
-- 新增或修改画布操作
-- 新增或修改 UI 入口、按钮、面板位置
-- 新增或修改生成流程、批量流程、下载流程
-- 新增 Provider、模型能力、限速策略
-- 修改资产存储、原图恢复、ZIP 导出
+- 新增 / 修改 AI 助手动作
+- 新增 / 修改 Tool
+- 修改画布操作、UI 入口、按钮、面板位置
+- 修改生成、批量、下载、整理流程
+- 新增 Provider 或修改模型能力
+- 修改限速策略、资产存储、原图恢复、ZIP 导出
 - 修复用户调试中发现的关键行为
 
-更新内容至少包括：
+更新内容至少包括：变更点、影响模块、新工具或新流程、旧行为是否废弃、验证方式、下一次 Agent 如何使用。
+
+---
+
+## 12. 后端、安全与计费整改入口
+
+安全与后端整改细节统一进入：
 
 ```text
-变更点
-影响模块
-新工具或新流程
-旧行为是否废弃
-验证方式
-下一次 Agent 如何使用这个信息
+docs/governance/SECURITY_AND_BACKLOG.md
 ```
 
----
+执行优先级：
 
-## 8. 安全、密钥、积分与隐私
-
-1. AI 永远不得读取、填写、上传、记录 API Key、JWT、Cookie、Password、Stripe Secret、Webhook Secret、数据库连接串。
-2. Prompt、错误信息、日志、上下文发送给 LLM 前必须脱敏。
-3. 文件上传给大模型前必须经过确认；敏感文件必须物理隔离。
-4. 系统积分扣减、退款、余额、支付状态必须以后端权威结果为准。
-5. 本地用户 API 与系统积分模型必须明确区分；禁止用“免费/无限”等文案误导用户。
-6. 浏览器端不得直连受保护 Provider；用户自有 API 也必须走项目规定的 secure proxy / local user route。
-7. 任何 destructive 操作必须确认并列出影响范围。
-8. 下载已有原图是 safe 操作，但范围不明确时必须先澄清或默认当前选区。
+1. 去除旧后端 / 旧部署残留，收口到当前 `server/` Express / VPS 事实。
+2. 移除所有硬编码密钥 fallback，缺失必需 env 时拒绝启动。
+3. CORS 使用 Origin 白名单，不使用 `Access-Control-Allow-Origin: *` 搭配 Authorization。
+4. 统一积分成本和 `server/lib/credits`。
+5. 修复 Gemini `aspectRatio` 参数位置与 `Modality` 枚举。
+6. 增加 rate limit、JWT middleware、统一 logger、信用流水测试。
+7. 数据库迁移全部走 `migrations/`。
 
 ---
 
-## 9. 数据库与迁移规范
+## 13. 数据库与迁移
 
 1. Schema 变更只能写入 `migrations/`。
-2. 迁移文件必须幂等，命名格式 `NNN_<description>.sql`。
-3. 不得在前端、脚本或普通业务路由中执行 DDL。
-4. 新增 AI 助手持久化表时，必须覆盖：
-   - agent_runs
-   - agent_tool_calls
-   - agent_memory
-   - knowledge_documents
-   - knowledge_chunks
-   - canvas_runtime_snapshots
-   - agent_skills
-5. 如果暂时用 localStorage/IndexedDB 作为过渡，必须注明它是 projection / cache，不得当作长期权威存储。
+2. 迁移必须幂等。
+3. 推荐命名格式：`NNN_<description>.sql`。
+4. 不得在前端、普通脚本或业务路由中执行 DDL。
+5. AI 助手持久化表应规划：
+
+```text
+agent_runs
+agent_tool_calls
+agent_memory
+knowledge_documents
+knowledge_chunks
+canvas_runtime_snapshots
+agent_skills
+```
+
+6. localStorage / IndexedDB 只能作为 projection / cache，不得当长期权威存储。
 
 ---
 
-## 10. UI 与设计系统规范
+## 14. UI 与设计系统
 
-1. 保持 KK Studio 既有 Glassmorphism、柔和层级、卡片质感与无限画布视觉语言。
-2. 业务代码不得直接依赖 `@lobehub/ui`，必须走 `packages/ui` 或项目现有 Bridge。
-3. 新增 AI 助手面板、确认卡、任务队列面板、知识更新提示必须支持暗色和浅色主题。
-4. 画布批量输出必须整齐排列，不得随机堆叠。
-5. 移动端不得直接使用 DOM/BOM 专属逻辑；Web 不得引入 RN/Expo。
-6. UI 位置变更必须同步更新 AI 助手的 `ui-map` 与测试选择器。
+1. 保持 Glassmorphism、柔和层级、卡片质感、无限画布视觉语言。
+2. 业务代码不得直接绕开 `packages/ui` 或项目 UI Bridge。
+3. 新增 AI 助手面板、确认卡、任务队列面板、知识更新提示必须支持暗色 / 浅色主题。
+4. 批量输出必须整齐排列，不得随机堆叠。
+5. 移动端不得直接使用 DOM / BOM 专属逻辑。
+6. Web 不得引入 RN / Expo。
+7. UI 入口或布局变化必须同步更新 `ui-map` 与测试 selector。
 
 ---
 
-## 11. 测试与验证
+## 15. 编码与乱码防护
 
-### 11.1 标准全量验证
+完整规则见：
 
-完成代码变更后优先运行：
+```text
+docs/governance/ENCODING_AND_POWERSHELL.md
+```
+
+硬规则：
+
+```text
+默认编码：UTF-8 without BOM
+默认换行：LF
+禁止：GBK / GB2312 / Big5 / ANSI / UTF-16 / UTF-8 BOM / 乱码
+例外：.bat / .cmd 可 CRLF；兼容 Windows PowerShell 5.1 且含中文的 .ps1 可 UTF-8 BOM，但必须说明原因
+```
+
+PowerShell 写文本必须显式编码：
+
+```powershell
+Set-Content -Path $Path -Value $Content -Encoding utf8NoBOM
+Add-Content -Path $Path -Value $Content -Encoding utf8NoBOM
+Export-Csv -Path $Path -InputObject $Data -NoTypeInformation -Encoding utf8NoBOM
+```
+
+禁止依赖默认重定向或默认 `Out-File` / `Set-Content` 写入持久文件。
+
+---
+
+## 16. 验证要求
+
+优先运行：
 
 ```bash
 npm run verify:changes
 ```
 
-此命令包含架构边界、治理、安全、类型检查、OpenAPI/spec、构建、测试、关键冒烟和编码检查。
-
-### 11.2 允许的分阶段验证
-
-若任务很小或环境无法跑全量，至少运行相关子集，并在 handoff 中说明未跑全量的原因：
+分阶段验证：
 
 ```bash
 npm run architecture:check
 npm run governance:check
+npm run governance:security
 npm run typecheck
 npm run test:unit
 npm run test:contract
@@ -550,88 +709,75 @@ npm run build
 npm run check:encoding
 ```
 
-### 11.3 AI 助手专项测试必须补齐
+AI 助手专项测试：
 
-后续新增 AI 助手能力时，必须增加或更新：
+```text
+tests/unit/ai-takeover-intentGate.test.ts
+tests/unit/ai-takeover-safetyPolicy.test.ts
+tests/unit/ai-takeover-confirmationPolicy.test.ts
+tests/unit/ai-assistant-tool-registry.test.ts
+tests/unit/canvas-runtime-state-builder.test.ts
+tests/unit/zip-selected-originals.test.ts
+tests/unit/durable-generation-queue.test.ts
+tests/unit/generation-batch-idempotency.test.ts
+tests/unit/agent-knowledge-sync.test.ts
+```
 
-- `tests/unit/ai-takeover-intentGate.test.ts`
-- `tests/unit/ai-takeover-safetyPolicy.test.ts`
-- `tests/unit/ai-takeover-confirmationPolicy.test.ts`
-- 新增 `tests/unit/ai-assistant-tool-registry.test.ts`
-- 新增 `tests/unit/zip-selected-originals.test.ts`
-- 新增 `tests/unit/agent-knowledge-sync.test.ts`
-- 必要时新增浏览器冒烟测试验证选区下载、批量生图、整理卡片
+未运行全量验证时，必须写明：已运行什么、未运行什么、原因、风险、下一步如何补验。
 
 ---
 
-## 12. Codex / Antigravity 连续开发协议
+## 17. 完成定义
 
-每次开始任务时：
-
-```text
-1. 读取 AGENTS.md
-2. 读取 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md
-3. 确认版本仍为 v1.5.3
-4. 搜索相关源码和测试
-5. 输出简短计划
-6. 小步修改
-7. 跑验证
-8. 更新知识库 / handoff
-9. 提交清晰 commit 或 PR 说明
-```
-
-中断恢复时：
-
-```text
-1. 查看 git diff / 最近提交
-2. 查看 docs/development/session-handoff.md
-3. 查看 status.md / implement.md / validation.md 是否有任务记录
-4. 重新运行最小相关验证
-5. 从未完成的最小下一步继续
-```
-
-禁止：
-
-- 新开大分支后长期不合并
-- 同时重构多个无关模块
-- 把测试改到“适应错误行为”
-- 删除安全检查绕过失败
-- 复制旧目录生成重复代码
-- 只改 UI 不更新 AI 知识
-
----
-
-## 13. 完成定义
-
-一个 AI 助手能力改造任务只有同时满足以下条件才算完成：
+AI 助手能力改造任务只有同时满足以下条件才算完成：
 
 1. 用户自然语言能被正确识别为 intent。
 2. Planner 输出结构化计划。
-3. Tool Registry 能直接调用项目能力。
-4. 安全策略和确认策略生效。
-5. 画布或资产状态真实更新。
-6. 批量任务可限速、可重试、可恢复。
-7. 选区、视口、UI 位置被运行态感知。
-8. 结果整齐排列或正确打包下载。
-9. 知识库和 Skills/Runbooks 更新。
-10. 测试或验证记录完成。
-11. 中断后下一次 Codex / Antigravity 可继续。
+3. ToolRegistry 能直接调用项目能力。
+4. 安全策略生效。
+5. 确认策略生效。
+6. 画布或资产状态真实更新。
+7. 批量任务可限速、可重试、可恢复。
+8. 选区、视口、UI 位置被运行态感知。
+9. 结果整齐排列或正确打包下载。
+10. 知识库和 Skills / Runbooks 更新。
+11. 测试或验证记录完成。
+12. 中断后下一次 Agent 可继续。
+
+缺任一项，不得声称完成，只能声称部分完成。
 
 ---
 
-## 14. 当前最高优先级整改顺序
+## 18. 当前最高优先级整改顺序
 
-1. 固化本文件与 `AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md` 为双入口。
+1. 固化文档体系：`README.md`、`AGENTS.md`、`docs/ai-assistant/*`、`docs/governance/*`。
 2. 建立 `docs/ai-assistant/` 知识目录。
-3. 扩展 `SanitizedProjectContext` 为完整 CanvasRuntimeState。
-4. 把 `ActionExecutor` 拆为 Tool Registry + Executor。
-5. 修复 `selected_cards` ZIP 逻辑，优先下载原图。
-6. 把 AI 接管内存队列升级为持久化 Batch Job Queue。
+3. 扩展 `SanitizedProjectContext` 为完整 `CanvasRuntimeState`。
+4. 将 `ActionExecutor` 迁移为 `ToolRegistry + Executor` 兼容层。
+5. 修复 `selected_cards` ZIP，优先下载原图。
+6. 将 AI 接管内存队列升级为持久化 Batch Job Queue。
 7. 建立知识索引与自动更新机制。
 8. 为批量生成、下载选区、整理卡片补齐测试。
-9. 清理旧文档中与 v1.5.3 冲突的版本 and 运行时描述。
-10. 再考虑更高级的模型微调或蒸馏。
+9. 清理旧文档中与 v1.5.3 冲突的版本、目录、后端和部署描述。
+10. 再考虑微调、蒸馏或专用模型训练。
 
 ---
 
-**严格结论：KK Studio v1.5.3 的 AI 助手必须从“前端接管雏形”升级为“项目知识库 + 画布运行态 + 工具调用 + 持久队列 + 自更新记忆”的工程系统。任何实现都必须遵守本文件。**
+## 19. 最终执行指令
+
+```text
+先读规则。
+再读源码。
+识别任务类型。
+进入对应文档。
+小步修改。
+直接调用能力。
+不模拟 UI。
+不绕过安全。
+不泄露密钥。
+不乱改架构。
+不提交乱码。
+跑验证。
+更新知识。
+明确交接。
+```

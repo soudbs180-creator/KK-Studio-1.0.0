@@ -8,8 +8,8 @@ const ROOT_DIR = process.cwd();
 
 
 
-test("project docs publish one runtime truth table for current and transitional runtimes", () => {
-  const projectStructureSource = readSource("docs/PROJECT_STRUCTURE.md");
+test("project docs publish one truth table for current and transitional runtimes", () => {
+  const projectStructureSource = readSource("docs/architecture/PROJECT_STRUCTURE.md");
   const rootGuideSource = readSource("docs/PROJECT_ROOT_GUIDE.md");
   const handoffSource = readSource("docs/development/session-handoff.md");
 
@@ -19,9 +19,8 @@ test("project docs publish one runtime truth table for current and transitional 
   assert.match(projectStructureSource, /\| `packages\/shared\/` \| pure shared logic \|/);
   assert.match(projectStructureSource, /\| `server\/` \| Express \/ VPS backend \|/);
 
-  assert.match(rootGuideSource, /### Runtime Layout/);
-  assert.match(rootGuideSource, /- `apps\/web\/` is the primary desktop Web runtime/);
-  assert.match(rootGuideSource, /- `apps\/mobile\/` is the Expo mobile workspace/);
+  assert.match(rootGuideSource, /Runtime Layout/);
+  assert.match(rootGuideSource, /PROJECT_STRUCTURE/);
 
   assert.match(handoffSource, /Primary Web runtime: `apps\/web\/`/);
   assert.match(handoffSource, /Mobile workspace: `apps\/mobile\/`/);

@@ -1,5 +1,14 @@
 [
   {
+    "id": "doc_ai_assistant_roadmap_md",
+    "source": "doc",
+    "path": "docs/ai-assistant/AI_ASSISTANT_ROADMAP.md",
+    "title": "AI Assistant Roadmap — KK Studio v1.5.3",
+    "summary": "Last updated: 2026-06-03",
+    "contentHash": "2134cbbe0865e8576732c2bfa0b477fc",
+    "updatedAt": "2026-06-03T07:09:12.000Z"
+  },
+  {
     "id": "doc_canvas_runtime_state_md",
     "source": "doc",
     "path": "docs/ai-assistant/canvas-runtime-state.md",
@@ -30,10 +39,19 @@
     "id": "doc_readme_md",
     "source": "doc",
     "path": "docs/ai-assistant/README.md",
-    "title": "AI 助手知识库与运行指南",
-    "summary": "本目录是 KK Studio v1.5.3 AI 助手与画布 Agent 的核心知识库。它向大模型与自动化 Agent 工具提供项目架构、核心流转流程、工具注册表和安全规范等直接索引和执行依据。",
-    "contentHash": "54777c95fb10a827741f58092fb540ae",
-    "updatedAt": "2026-06-03T10:54:13.154Z"
+    "title": "AI 助手与 Agent 运行时知识库 (docs/ai-assistant/README.md) - KK Studio v1.5.3",
+    "summary": "本目录是 KK Studio 的 **AI 助手与 Agent 运行态知识库**。当 AI 助手执行任务、解析选区、调用接口或对画布进行操作时，必须基于本目录的协议与 Runbook。",
+    "contentHash": "41ccba654d038236bbb3e15a074c3ff2",
+    "updatedAt": "2026-06-03T15:30:10.537Z"
+  },
+  {
+    "id": "doc_runbooks_md",
+    "source": "doc",
+    "path": "docs/ai-assistant/RUNBOOKS.md",
+    "title": "AI Assistant Runbooks — KK Studio v1.5.3",
+    "summary": "Last updated: 2026-06-03",
+    "contentHash": "feedfc33dd5fa975000534d1656a3a34",
+    "updatedAt": "2026-06-03T07:09:12.000Z"
   },
   {
     "id": "doc_safety_policy_md",

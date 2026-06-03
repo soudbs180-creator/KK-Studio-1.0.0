@@ -106,6 +106,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     });
     const [isDragging, setIsDragging] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isMouseOver, setIsMouseOver] = useState(false);
 
     const dragStartRef = useRef({ y: 0, startTop: 0 });
     const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -166,15 +167,21 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         setIsDragging(true);
     };
 
-    const resetInactivityTimer = useCallback(() => {
+    const handleMouseEnter = useCallback(() => {
+        setIsMouseOver(true);
+        if (isMobile) return;
         if (inactivityTimerRef.current) {
             clearTimeout(inactivityTimerRef.current);
+            inactivityTimerRef.current = null;
         }
-
         setIsCollapsed(false);
+    }, [isMobile]);
 
-        if (isMobile) {
-            return;
+    const handleMouseLeave = useCallback(() => {
+        setIsMouseOver(false);
+        if (isMobile) return;
+        if (inactivityTimerRef.current) {
+            clearTimeout(inactivityTimerRef.current);
         }
 
         const activeElement = document.activeElement;
@@ -197,24 +204,31 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
             if (!stillEditing) {
                 setIsCollapsed(true);
             }
-        }, 4000);
+        }, 60000); // 鼠标移开 1 分钟后自动收起
     }, [isMobile]);
 
     useEffect(() => {
-        resetInactivityTimer();
-        window.addEventListener('mousemove', resetInactivityTimer);
-        window.addEventListener('touchstart', resetInactivityTimer);
-        window.addEventListener('click', resetInactivityTimer);
+        // 挂载时，如果没有鼠标进入，4秒后自动收起
+        if (!isMobile) {
+            inactivityTimerRef.current = setTimeout(() => {
+                const focusedElement = document.activeElement;
+                const stillEditing =
+                    focusedElement instanceof HTMLInputElement ||
+                    focusedElement instanceof HTMLTextAreaElement ||
+                    (focusedElement as HTMLElement | null)?.isContentEditable;
+
+                if (!stillEditing) {
+                    setIsCollapsed(true);
+                }
+            }, 4000);
+        }
 
         return () => {
             if (inactivityTimerRef.current) {
                 clearTimeout(inactivityTimerRef.current);
             }
-            window.removeEventListener('mousemove', resetInactivityTimer);
-            window.removeEventListener('touchstart', resetInactivityTimer);
-            window.removeEventListener('click', resetInactivityTimer);
         };
-    }, [resetInactivityTimer]);
+    }, [isMobile]);
 
     useEffect(() => {
         if (!showDropdown) {
@@ -234,7 +248,17 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         }
         setEditingId(null);
         setEditName('');
-    }, [editName, editingId, renameCanvas]);
+
+        // 如果保存后焦点失去，且鼠标不在面板上，自动收起
+        if (!isMouseOver && !isMobile) {
+            if (inactivityTimerRef.current) {
+                clearTimeout(inactivityTimerRef.current);
+            }
+            inactivityTimerRef.current = setTimeout(() => {
+                setIsCollapsed(true);
+            }, 60000);
+        }
+    }, [editName, editingId, renameCanvas, isMouseOver, isMobile]);
 
     const startEditing = useCallback((canvas: { id: string; name: string }) => {
         setEditingId(canvas.id);
@@ -731,10 +755,11 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         <>
             <div
                 id="project-manager-container"
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
                 onClick={() => {
                     if (isCollapsed) {
                         setIsCollapsed(false);
-                        resetInactivityTimer();
                     }
                 }}
                 className={`fixed left-4 z-50 flex flex-col items-center select-none transition-all duration-300 ease-out ${isCollapsed ? 'cursor-pointer w-2.5 h-24 opacity-60 hover:opacity-100 hover:scale-y-105' : 'w-14 opacity-100'}`}
@@ -755,12 +780,15 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                     }}
                 >
                     {isCollapsed ? (
-                        /* 收起状态：显示精致的发光珊瑚色小竖线条 */
+                        /* 收起状态：显示精致的磨砂质感发光天蓝色小竖线条 */
                         <div 
-                            className="w-1 h-12 rounded-full transition-all duration-300"
+                            className="w-1.5 h-12 rounded-full transition-all duration-300"
                             style={{
-                                background: 'var(--accent-coral)',
-                                boxShadow: '0 0 8px var(--accent-coral)'
+                                background: 'rgba(96, 165, 250, 0.65)',
+                                border: '1px solid rgba(255, 255, 255, 0.25)',
+                                boxShadow: '0 0 8px rgba(96, 165, 250, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.2)',
+                                backdropFilter: 'blur(3px)',
+                                WebkitBackdropFilter: 'blur(3px)'
                             }}
                         />
                     ) : (

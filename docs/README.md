@@ -1,57 +1,47 @@
-# KK Studio v1.5.3
+# KK Studio 项目文档导航 (docs/README.md)
 
-KK Studio 是一款面向图像、视频、音频以及演示文稿（Presentation）等工作流的下一代多模态无限画布 AI 工作台。它将提示词创作编排、多模型智能路由、用户自定义 API 密钥管理、工作区云端同步以及商业化计费/运维监控深度融为一体。
+欢迎使用 **KK Studio v1.5.3** 的项目文档知识库。本目录是 KK Studio 的开发与治理护城河。
 
-## 🌟 核心亮点
+为了确保 AI 编程助手（如 Codex、Claude、Cursor、Antigravity）和人类开发人员能够以最低的信息摩擦理解项目规则，所有文档均按照职责和生命周期进行了重组，并与项目根目录下的 [README.md](../README.md) 和最高执行规范 [AGENTS.md](../AGENTS.md) 建立了强映射关系。关于具体的技术分层，请参见技术栈与运行时定义 (Tech Layout & Runtime)。
 
-- **多模态无限画布 (Multimodal Canvas)**：提供直观的 prompt 编写、资源管理与多模态生成结果的可视化画布，支持组件吸附网络与卡片折叠，助您以搭积木的方式编排创作链路。
-- **多模型路由分发**：无缝对接官方接口与第三方中转供应商，具备角色路由与能力分配机制，帮助团队在速度、效果与成本之间取得完美平衡。
-- **混合云协同与自主密钥**：提供用户级 API 密钥管理，既支持本地零配置启动，也能通过安全隧道同步至云端，实现隐私与便捷性的统一。
-- **商业化闭环与安全管控**：内置完整的充值、计费、积分原子扣减与退款审计（Credits Transaction）机制。管理后台具备精细的分级授权设计。
-- **出色的商业级美学设计**：遵循 Apple 级磨砂玻璃态（Glassmorphism）与自适应流式排版设计，搭配丰富的微动效，带来愉悦的使用体验。
+---
 
-### 🚀 v1.5.3 最新升级特性
-- **主题自适应界面**：侧边栏与模型供应商的 Logo 经过深度适配，支持在深色和浅色主题下智能切换，展现更高质感的暗黑模式对比度层次。
-- **黄金比例供应商布局**：卡片 UI 的整体布局遵循了严格的黄金比例规范，信息排列更加美观与易读。
-- **本地用户路由代理**：集成了自主路由 API 代理模块，支持离线状态下的画布编辑，并能够智能判定与平滑回退至 VPS 备用路由。
-- **安全闭环增强**：后端接入了更加严密的请求体容量限制规范，并自动注入主流安全防护请求头，杜绝越权与跨站利用隐患。
-- **移动端灯箱 UX 优化**：大幅改善移动端在生成列表遭遇失败时的提示逻辑，列表卡片仅提示常规错误，只有在用户点击放大进入灯箱时才展示详细错误原因，界面表现更加大方。
 
-## 🛠️ 技术栈 (Tech Layout & Runtime)
+## 🧭 文档路由总表
 
-- **前端技术**：React 19.2.x, TypeScript 6.0.x, Vite 8.0.x, React Router 7.x
-- **样式方案**：Vanilla CSS 变量与现代实用类（Tailwind CSS）
-- **移动平台**：Expo (React Native) 移动端应用，提供原生的移动体验
-- **后端服务**：基于 PostgreSQL 的 VPS API 运行时，辅以 Supabase 用于 Auth 鉴权及实时数据存取
+当您（或 AI 助手）需要修改或研究某个特定业务领域时，请根据下表直接定位到对应的文档和规则。**修改代码前必须先阅读对应的规范，严禁凭感觉和经验编写！**
 
-## 📂 项目结构
+| 任务类型 / 修改模块 | 必读文档 / 规则入口 | 辅助参考 / 继续阅读 | 核心要求 |
+|---|---|---|---|
+| **任意代码修改** | [AGENTS.md](../AGENTS.md) | [docs/architecture/PROJECT_STRUCTURE.md](architecture/PROJECT_STRUCTURE.md) | 最小变更、直接调用能力、运行 `npm run verify:changes` |
+| **AI 助手 / 状态 / 工具** | [AGENTS.md](../AGENTS.md) §7-§11 | [docs/ai-assistant/README.md](ai-assistant/README.md) | CanvasRuntimeState 结构对齐、注册 ToolRegistry、不模拟 UI |
+| **下载原图 / ZIP 打包** | [AGENTS.md](../AGENTS.md) §10.1 | [docs/ai-assistant/RUNBOOKS.md](ai-assistant/RUNBOOKS.md) 中 `download-selected-originals` | 优先 `originalUrl` 解析，ZIP 附带 manifest |
+| **数据库结构变更** | [AGENTS.md](../AGENTS.md) §13 | [docs/architecture/DATABASE_SCHEMA.md](architecture/DATABASE_SCHEMA.md) | 必须走 `migrations/` 目录；DDL 幂等；严禁在业务层写 DDL |
+| **系统安全 / 计费 / API 密钥** | [AGENTS.md](../AGENTS.md) §6、§12 | [docs/governance/SECURITY_AND_BACKLOG.md](governance/SECURITY_AND_BACKLOG.md) | 绝对禁止泄露明文密钥、绕过积分或 Stripe Webhook 验签 |
+| **编码格式 / 乱码防护** | [AGENTS.md](../AGENTS.md) §15 | [docs/governance/ENCODING_AND_POWERSHELL.md](governance/ENCODING_AND_POWERSHELL.md) | 默认使用 `UTF-8 without BOM`、`LF` 换行，PowerShell 显式指定编码 |
+| **系统部署 / Supabase CLI** | [docs/setup/README.md](setup/README.md) | [docs/setup/GUIDE.md](setup/GUIDE.md) | 遵循自发布 VPS 定时与权限配置 |
+| **第三方接口规格 (gpt-best)** | [docs/specs/README.md](specs/README.md) | [docs/specs/API_DOCS.md](specs/API_DOCS.md) | 适配 Images/Videos/Audio v2 接口，轮询退避算法 |
 
-根据本项目严格的 AI Agent 架构黄金法则：
-- `apps/web/`：唯一的桌面端 Web 前端运行时（Vite + React）。
-- `apps/mobile/`：手机端 Expo 应用（React Native）。
-- `packages/shared/`：平台无关的共享核心业务包（纯 TS 编写）。
-- `packages/api-client/`：统一封装的 HTTP API 客户端。
-- `packages/ui/`：跨平台兼容的基础 UI 组件库。
-- `server/`：VPS Backend 主服务（Express.js），处理支付 Webhook 及 API 转发。
-- `migrations/`：PostgreSQL schema 数据库迁移目录。
+---
 
-## 🚀 本地快速开发
+## 📂 目录职责划分
 
-1. **环境准备**：
-   确保您已安装 Node.js 24.x 及 npm 11.x；具体版本以根目录 `package.json` 的 `engines.node` 与 `packageManager` 为准。
-   
-2. **复制环境变量**：
-   ```bash
-   cp .env.example .env
-   ```
-   如需覆盖前端配置，可创建 `.env.local`。
+| 目录 | 职责范围 | 包含的核心文档 |
+|---|---|---|
+| ⚖️ [governance/](governance/README.md) | **项目治理与红线**。定义不可违背的编码、安全漏洞与版本验证规范。 | [ENCODING_AND_POWERSHELL.md](governance/ENCODING_AND_POWERSHELL.md)<br>[SECURITY_AND_BACKLOG.md](governance/SECURITY_AND_BACKLOG.md)<br>[PROJECT_STATE_AND_VALIDATION.md](governance/PROJECT_STATE_AND_VALIDATION.md) |
+| 🧠 [ai-assistant/](ai-assistant/README.md) | **AI 助手与 Agent 运行时**。提供 Canvas 运行态、工具库、指令运行及知识同步策略。 | [AI_ASSISTANT_ROADMAP.md](ai-assistant/AI_ASSISTANT_ROADMAP.md)<br>[RUNBOOKS.md](ai-assistant/RUNBOOKS.md)<br>[tool-registry.md](ai-assistant/tool-registry.md) |
+| 🏛️ [architecture/](architecture/README.md) | **架构底座与数据分层**。定义真实的项目模块所有权、数据库设计及多端 UI 架构。 | [PROJECT_STRUCTURE.md](architecture/PROJECT_STRUCTURE.md)<br>[DATABASE_SCHEMA.md](architecture/DATABASE_SCHEMA.md)<br>[DESIGN.md](architecture/DESIGN.md) |
+| 🔌 [specs/](specs/README.md) | **数据规格与 API 协议**。规范第三方提供商的 API 模型、轮询与对接参数。 | [openapi.yaml](specs/openapi.yaml)<br>[API_DOCS.md](specs/API_DOCS.md)<br>[NANO_BANANA.md](specs/NANO_BANANA.md) |
+| 🛠️ [setup/](setup/README.md) | **环境搭建与自发布部署**。系统在 VPS 和 Supabase 上运行、配置、启动的命令手册。 | [GUIDE.md](setup/GUIDE.md)<br>[SUPABASE_CLI.md](setup/SUPABASE_CLI.md) |
+| 💻 [development/](development/README.md) | **开发手册与交接模板**。指导多提供商架构设计、发布流以及 Durable 的会话交接。 | [session-handoff.md](development/session-handoff.md)<br>[multi-vendor-provider-architecture.md](development/multi-vendor-provider-architecture.md) |
+| ⚡ [superpowers/](superpowers/README.md) | **具体业务功能计划**。留作历史架构与具体超级功能逻辑实现的开发参考。 | [plans/](superpowers/plans/) 实施方案<br>[specs/](superpowers/specs/) 业务定义 |
+| 📊 [reports/](reports/README.md) | **分析与优化报告**。收集各类自动化或人工输出的性能与安全审计报告。 | [mobile-ui-optimization.md](reports/mobile-ui-optimization.md) |
+| 📦 [archive/](archive/README.md) | **归档区**。存放已经过时、与 v1.5.3 事实相冲突的历史文档，仅供追溯历史使用。 | 🚫 **警告：AI 严禁将此处文档作为当前代码开发的参考依据！** |
 
-3. **安装依赖**：
-   ```bash
-   npm install
-   ```
+---
 
-4. **启动本地开发服务**：
-   ```bash
-   npm run dev:start
-   ```
+## 🛡️ 文档一致性保证
+
+1. **去冗余化**：docs/ 目录下不再允许保留同名冗余文件，如发现重复文件，以 `governance/`、`ai-assistant/` 和 `architecture/` 为最高优先级，其余一律归档或删除。
+2. **拒绝陈旧信息**：所有与 Supabase 时代相关的旧版鉴权和积分扣减说明均已移入 `archive/`。在 v1.5.3 之后的开发中，应严格以 VPS 上的 PostgreSQL 自建 DDL (`migrations/`) 和 `server/` 代码为准。
+3. **编码防乱码**：所有在此知识库中新增或修改的 Markdown 文档，必须使用 `UTF-8 without BOM` 编码及 `LF` 换行符。

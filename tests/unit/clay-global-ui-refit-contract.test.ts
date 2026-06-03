@@ -10,11 +10,11 @@ const ROOT_DIR = process.cwd();
 
 
 test('canonical design manuals define the Clay-first global UI system', () => {
-  assert.equal(existsSync(path.join(ROOT_DIR, 'docs/DESIGN.md')), true);
+  assert.equal(existsSync(path.join(ROOT_DIR, 'docs/architecture/DESIGN.md')), true);
 
-  const rootManual = readSource('docs/DESIGN.md');
-  const docsManual = readSource('docs/DESIGN.md');
-  const agentRules = readSource('docs/DESIGN.md'); // 用 docs/DESIGN.md 替代已下线的 .agent/rules/skills/SKILL.md
+  const rootManual = readSource('docs/architecture/DESIGN.md');
+  const docsManual = readSource('docs/architecture/DESIGN.md');
+  const agentRules = readSource('docs/architecture/DESIGN.md'); // 用 docs/architecture/DESIGN.md 替代已下线的 .agent/rules/skills/SKILL.md
 
   for (const source of [rootManual, docsManual, agentRules]) {
     assert.match(source, /Clay/i);

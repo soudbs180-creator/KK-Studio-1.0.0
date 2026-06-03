@@ -1,19 +1,31 @@
-# AI 助手知识库与运行指南
+# AI 助手与 Agent 运行时知识库 (docs/ai-assistant/README.md) - KK Studio v1.5.3
 
-本目录是 KK Studio v1.5.3 AI 助手与画布 Agent 的核心知识库。它向大模型与自动化 Agent 工具提供项目架构、核心流转流程、工具注册表和安全规范等直接索引和执行依据。
+本目录是 KK Studio 的 **AI 助手与 Agent 运行态知识库**。当 AI 助手执行任务、解析选区、调用接口或对画布进行操作时，必须基于本目录的协议与 Runbook。
 
-## 知识库目录结构
+## 📁 目录文件清单
 
-- [README.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/ai-assistant/README.md) - 本说明文档
-- [module-map.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/ai-assistant/module-map.md) - 项目模块地图，维护主要功能文件的依赖关系
-- [flow-map.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/ai-assistant/flow-map.md) - 业务流转地图，描绘复杂操作的工作流
-- [tool-registry.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/ai-assistant/tool-registry.md) - Agent 可调用工具的注册说明
-- [canvas-runtime-state.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/ai-assistant/canvas-runtime-state.md) - 画布结构化运行态协议
-- [ui-map.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/ai-assistant/ui-map.md) - 界面元素与 CSS 选择器映射表
-- [skills.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/ai-assistant/skills.md) - 助手可执行的手册 (Skills / Runbooks)
-- [safety-policy.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/ai-assistant/safety-policy.md) - 安全、脱敏、成本控制及高敏操作确认规约
-- [session-memory.md](file:///c:/Users/Administrator/Downloads/KK-Studio-1.0.0/docs/ai-assistant/session-memory.md) - 长短期记忆与多轮会话规范
+1. **[AI_ASSISTANT_ROADMAP.md](AI_ASSISTANT_ROADMAP.md) —— 助手升级路线图**
+   - **职责**：画布级/任务级 Agent 的演进路线，详细记录了关于 `CanvasRuntimeState`、`ToolRegistry`、`DurableQueue` 和 `KnowledgeSync` 的 Sprint 规划。
 
-## 更新规约
+2. **[RUNBOOKS.md](RUNBOOKS.md) —— 流程操作手册**
+   - **职责**：提供高频、复杂的具体流程指令。包括：**下载选区内原图**、**批量生图**、**整理画布卡片**、**添加新工具**以及**会话中断恢复**的详细 Runbook。
+   - **适用场景**：AI 助手或开发人员被指派进行具体的批量操作和流程整合时。
 
-任何对界面布局、API 路由、工具集、或者生成与下载流程的修改，**必须**同步更新本知识库内的对应文件，保持文档与代码事实一致。
+3. **[tool-registry.md](tool-registry.md) —— 工具注册表规范**
+   - **职责**：定义 AI 助手可调用的原子工具（如 `canvas.getState`、`assets.zipOriginals`）的声明规范、权限分类（`safe` / `confirm` / `dangerous` / `forbidden`）与调用日志脱敏机制。
+   - **适用场景**：新增或修改助手所调用的接口。
+
+4. **[canvas-runtime-state.md](canvas-runtime-state.md) —— 画布运行时状态**
+   - **职责**：画布（Viewport、Selection、RecentEvents）状态的 JSON schema 定义。
+   - **适用场景**：重构画布上下文与 AI 交互时的上下文裁剪逻辑。
+
+5. **[flow-map.md](flow-map.md)** 与 **[module-map.md](module-map.md)**
+   - **职责**：系统交互流和模块依赖树的映射，帮助 Agent 进行全局定位。
+
+6. **[skills.md](skills.md)**、**[safety-policy.md](safety-policy.md)** 和 **[session-memory.md](session-memory.md)**
+   - **职责**：定义助手的安全围栏与临时上下文记忆同步方式。
+
+## 🧠 助手开发规范
+
+- **工具优先，不模拟 UI**：严禁采用模拟人在输入框填值、点击按钮来做批量生图或下载。必须直接通过 `DurableJobQueue` 或 Tool Registry 提供的 API 接口进行调用。
+- **选区感知**：下载和整理卡片时，必须优先获取并基于 `selectedNodeIds` 状态，而不是全量画布。
