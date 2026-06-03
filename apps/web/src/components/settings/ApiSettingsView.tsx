@@ -1464,9 +1464,10 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     if (!key || isReadonlySecretPlaceholder(key)) return '';
 
     const url = providerForm.baseUrl.trim().toLowerCase();
-    const isGoogle = url.includes('googleapis.com') || (activeProviderPreset && activeProviderPreset.name === 'Google Gemini');
-    const isOpenAI = url.includes('api.openai.com') || (activeProviderPreset && activeProviderPreset.name === 'OpenAI');
-    const isClaude = url.includes('api.anthropic.com') || (activeProviderPreset && activeProviderPreset.name === 'Anthropic');
+    const activePreset = findProviderPresetForDraft(providerForm.name, providerForm.baseUrl);
+    const isGoogle = url.includes('googleapis.com') || (activePreset && activePreset.name === 'Google Gemini');
+    const isOpenAI = url.includes('api.openai.com') || (activePreset && activePreset.name === 'OpenAI');
+    const isClaude = url.includes('api.anthropic.com') || (activePreset && activePreset.name === 'Anthropic');
 
     if (/\s/.test(providerForm.apiKey)) {
       return pick(
