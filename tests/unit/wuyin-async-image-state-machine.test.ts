@@ -160,4 +160,41 @@ describe("Wuyin Async Image State Machine & Helper Tests", () => {
     assert.equal(path, "/api/async/image_nanoBanana2");
   });
 
+  test("8. 任务 ID 通用提取测试 (extractWuyinProviderTaskId)", () => {
+    const extract = (serverWuyinProxy as any).extractWuyinProviderTaskId;
+    assert.equal(extract({ data: { id: 'image_abc' } }), 'image_abc');
+    assert.equal(extract({ data: { id: 'video_abc' } }), 'video_abc');
+    assert.equal(extract({ data: { id: 'audio_abc' } }), 'audio_abc');
+    assert.equal(extract({ data: { id: '114514' } }), '114514');
+    assert.equal(extract({ data: { id: 'image_9da52388-7e77-485c-98e4-2b25d739729e', count: '1' } }), 'image_9da52388-7e77-485c-98e4-2b25d739729e');
+    assert.equal(extract({ data: { task_id: 'abc-def-ghi' } }), 'abc-def-ghi');
+    assert.equal(extract({ data: { taskId: 'task_xyz' } }), 'task_xyz');
+    assert.equal(extract({ data: { taskID: 'taskID_123' } }), 'taskID_123');
+    // 外层直接有
+    assert.equal(extract({ id: '114514' }), '114514');
+  });
+
+  test("9. local_proxy 解码测试 (encode & decode)", () => {
+    const encoded = serverWuyinProxy.encodeLocalProxyTaskId('key_123', 'video_abc-def');
+    const parsed = (serverWuyinProxy as any).decodeLocalProxyTaskId(encoded);
+
+    assert.equal(parsed.routeId, 'key_123');
+    assert.equal(parsed.providerTaskId, 'video_abc-def');
+
+    // 含有特殊字符的 providerTaskId
+    const encodedSpecial = serverWuyinProxy.encodeLocalProxyTaskId('slot_1', 'abc/def/ghi');
+    const parsedSpecial = (serverWuyinProxy as any).decodeLocalProxyTaskId(encodedSpecial);
+    assert.equal(parsedSpecial.routeId, 'slot_1');
+    assert.equal(parsedSpecial.providerTaskId, 'abc/def/ghi');
+  });
+
+  test("10. 验证 endpointType 推导逻辑 (inferWuyinEndpointTypeFromProviderTaskId)", () => {
+    const infer = (serverWuyinProxy as any).inferWuyinEndpointTypeFromProviderTaskId;
+    assert.equal(infer('image_abc'), 'wuyin-async-image');
+    assert.equal(infer('video_abc'), 'wuyin-async-video');
+    assert.equal(infer('audio_abc'), 'wuyin-async-audio');
+    assert.equal(infer('114514'), 'wuyin-async');
+    assert.equal(infer('abc-def', 'custom-fallback'), 'custom-fallback');
+  });
+
 });

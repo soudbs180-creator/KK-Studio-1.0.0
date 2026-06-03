@@ -14,6 +14,7 @@ const {
   extractWuyinVideoStatusCode,
   extractWuyinVideoTaskId,
   extractWuyinTaskId,
+  extractWuyinProviderTaskId,
   extractWuyinVideoUrl,
   fetchWuyinVideoJson,
   isWuyinAsyncVideoRoute,
@@ -23,6 +24,7 @@ const {
   normalizeWuyinVideoBaseUrl,
   resolveWuyinImageEndpointPath,
   resolveWuyinVideoRequestRoute,
+  inferWuyinEndpointTypeFromProviderTaskId,
 } = require('../lib/wuyinAsyncVideoProxy');
 
 const {
@@ -1270,17 +1272,14 @@ async function handleWuyinTaskStatusMode(req, res, profileState) {
 
   const catalog = getCachedWuyinCatalog();
   let catalogItem = null;
+  const rawTaskId = String(parsed.providerTaskId || '').toLowerCase();
   
-  if (parsed.providerTaskId.startsWith('image_')) {
+  if (rawTaskId.startsWith('image_')) {
     catalogItem = catalog.find(x => x.id === 'image_nanoBanana2') || catalog[0];
-  } else if (parsed.providerTaskId.startsWith('video_')) {
-    if (parsed.providerTaskId.includes('sora')) {
-      catalogItem = catalog.find(x => x.id === 'sora2-new');
-    } else {
-      catalogItem = catalog.find(x => x.id === 'video_google_omni');
-    }
-  } else if (parsed.providerTaskId.startsWith('audio_')) {
-    catalogItem = catalog.find(x => x.id === 'audio_tts');
+  } else if (rawTaskId.startsWith('video_') || rawTaskId.startsWith('sora_') || rawTaskId.includes('sora')) {
+    catalogItem = catalog.find(x => x.id === 'video_google_omni') || catalog.find(x => x.kind === 'video');
+  } else if (rawTaskId.startsWith('audio_')) {
+    catalogItem = catalog.find(x => x.id === 'audio_tts') || catalog.find(x => x.kind === 'audio');
   }
 
   if (!catalogItem) {
@@ -1298,7 +1297,14 @@ async function handleWuyinTaskStatusMode(req, res, profileState) {
       submitExecTime: req.body.submitExecTime || 0
     });
 
-    const isImageTask = String(parsed.providerTaskId).startsWith('image_');
+    let endpointType = 'wuyin-async';
+    if (catalogItem && catalogItem.kind) {
+      if (catalogItem.kind === 'image') endpointType = 'wuyin-async-image';
+      else if (catalogItem.kind === 'video') endpointType = 'wuyin-async-video';
+      else if (catalogItem.kind === 'audio') endpointType = 'wuyin-async-audio';
+    } else {
+      endpointType = inferWuyinEndpointTypeFromProviderTaskId(parsed.providerTaskId);
+    }
 
     return res.json(okEnvelope({
       taskId: localTaskId,
@@ -1308,7 +1314,7 @@ async function handleWuyinTaskStatusMode(req, res, profileState) {
       urls: result.urls,
       message: result.message || undefined,
       error: result.status === 'failed' ? (result.message || 'Wuyin task failed.') : undefined,
-      endpointType: isImageTask ? 'wuyin-async-image' : 'openai',
+      endpointType,
       detailExecTime: result.detailExecTime,
       execTime: result.detailExecTime,
     }, req));
@@ -1770,6 +1776,35 @@ router.post('/v1/profile/user-routes/:routeId/connectivity', requireProfileAuth,
     || /wuyinkeji/i.test(route.baseUrl);
 
   if (isWuyin) {
+    const apiKey = String(route.apiKey || '').trim();
+    const baseUrl = String(route.baseUrl || '').trim();
+
+    if (!apiKey) {
+      return res.json({
+        success: true,
+        data: {
+          routeId,
+          ok: false,
+          message: 'API Key 不能为空',
+          models: []
+        },
+        meta: buildMeta(req)
+      });
+    }
+
+    if (!baseUrl || !/^https?:\/\/api\.wuyinkeji\.com/i.test(baseUrl)) {
+      return res.json({
+        success: true,
+        data: {
+          routeId,
+          ok: false,
+          message: 'Base URL 必须指向 https://api.wuyinkeji.com',
+          models: []
+        },
+        meta: buildMeta(req)
+      });
+    }
+
     let catalogItems = [];
     try {
       catalogItems = getCachedWuyinCatalog();

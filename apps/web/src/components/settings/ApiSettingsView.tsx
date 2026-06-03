@@ -752,6 +752,36 @@ const getOfficialStatus = (slot: KeySlot) => {
 
 const getProviderStatus = (provider: ThirdPartyProvider) => {
   if (!provider.isActive) return { badge: 'neutral' as const, status: 'paused' as const, label: '已暂停' };
+
+  const isWuyin = provider.name === '速创 API' || /wuyinkeji/i.test(provider.baseUrl);
+  if (isWuyin) {
+    const apiKey = String(provider.apiKey || '').trim();
+    const baseUrl = String(provider.baseUrl || '').trim();
+
+    if (!apiKey) {
+      return { badge: 'rose' as const, status: 'error' as const, label: 'API Key 不能为空' };
+    }
+    if (baseUrl && !/^https?:\/\/api\.wuyinkeji\.com/i.test(baseUrl)) {
+      return { badge: 'rose' as const, status: 'error' as const, label: 'Base URL 必须指向 https://api.wuyinkeji.com' };
+    }
+
+    if (provider.status === 'error') {
+      const errMsg = String(provider.lastError || '');
+      if (
+        errMsg.includes('Key') ||
+        errMsg.includes('key') ||
+        errMsg.includes('未找到') ||
+        errMsg.includes('读取') ||
+        errMsg.includes('API Key 不能为空') ||
+        errMsg.includes('Base URL')
+      ) {
+        return { badge: 'rose' as const, status: 'error' as const, label: `异常: ${errMsg}` };
+      }
+    }
+
+    return { badge: 'emerald' as const, status: 'online' as const, label: '速创 API 已保存 / 等待首次调用验证' };
+  }
+
   if (provider.status === 'active') return { badge: 'emerald' as const, status: 'online' as const, label: '运行中' };
   if (provider.status === 'error') return { badge: 'rose' as const, status: 'error' as const, label: '异常' };
   if (provider.status === 'valid') {

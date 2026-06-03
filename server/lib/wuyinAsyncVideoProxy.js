@@ -255,24 +255,48 @@ function buildWuyinVideoRequestBody(input) {
 
 function readWuyinString(value, keys) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+
   for (const key of keys) {
     const item = value[key];
-    if (typeof item === 'string' && item.trim()) return item.trim();
-    if (typeof item === 'number' && Number.isFinite(item)) return String(item);
+
+    if (typeof item === 'string' && item.trim()) {
+      return item.trim();
+    }
+
+    if (typeof item === 'number' && Number.isFinite(item)) {
+      return String(item);
+    }
   }
+
   return '';
 }
 
-function extractWuyinTaskId(payload) {
+function extractWuyinProviderTaskId(payload) {
   const data = payload && typeof payload === 'object' ? payload.data : null;
+
   return String(
-    readWuyinString(data, ['id', 'task_id', 'taskId']) ||
-    readWuyinString(payload, ['id', 'task_id', 'taskId'])
+    readWuyinString(data, ['id', 'task_id', 'taskId', 'taskID'])
+    || readWuyinString(payload, ['id', 'task_id', 'taskId', 'taskID'])
+    || ''
   ).trim();
 }
 
+function extractWuyinTaskId(payload) {
+  return extractWuyinProviderTaskId(payload);
+}
+
 function extractWuyinVideoTaskId(payload) {
-  return extractWuyinTaskId(payload);
+  return extractWuyinProviderTaskId(payload);
+}
+
+function inferWuyinEndpointTypeFromProviderTaskId(providerTaskId, fallback = 'wuyin-async') {
+  const raw = String(providerTaskId || '').toLowerCase();
+
+  if (raw.startsWith('image_')) return 'wuyin-async-image';
+  if (raw.startsWith('video_')) return 'wuyin-async-video';
+  if (raw.startsWith('audio_')) return 'wuyin-async-audio';
+
+  return fallback;
 }
 
 function extractWuyinVideoStatusCode(payload) {
@@ -704,6 +728,7 @@ module.exports = {
   extractWuyinVideoStatusCode,
   extractWuyinVideoTaskId,
   extractWuyinTaskId,
+  extractWuyinProviderTaskId,
   extractWuyinVideoUrl,
   fetchWuyinVideoJson,
   isWuyinAsyncVideoRoute,
@@ -713,4 +738,5 @@ module.exports = {
   normalizeWuyinVideoBaseUrl,
   resolveWuyinImageEndpointPath,
   resolveWuyinVideoRequestRoute,
+  inferWuyinEndpointTypeFromProviderTaskId,
 };

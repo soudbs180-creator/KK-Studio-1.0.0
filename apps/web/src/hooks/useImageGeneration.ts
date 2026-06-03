@@ -59,10 +59,34 @@ const SYNC_BRIDGE_RECOVERY_MAX_AGE_MS = 15 * 60 * 1000;
 const RETRO_RECOVERABLE_SYNC_BRIDGE_ERROR_CODES = new Set(['SYNC_REQUEST_INTERRUPTED', 'SYNC_BRIDGE_TIMEOUT']);
 const RETRO_RECOVERABLE_SYNC_BRIDGE_ERROR_TEXT_HINTS = ['::INTERRUPTED::', '页面刷新或离开时中断了同步生成请求', '同步生成恢复超时'];
 
-function extractProviderTaskIdFromLocalTaskId(taskId?: string): string {
+function safeDecodeURIComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function extractWuyinProviderTaskId(taskId?: string, providerTaskId?: string): string {
+  const direct = String(providerTaskId || '').trim();
+  if (direct) return direct;
+
   const raw = String(taskId || '').trim();
-  const match = raw.match(/^local_proxy:[^:]+:(.+)$/);
-  return match?.[1] || raw;
+  if (!raw) return '';
+
+  const prefix = 'local_proxy:';
+  const normalized = raw.startsWith(prefix) ? raw.slice(prefix.length) : raw;
+  const separatorIndex = normalized.indexOf(':');
+
+  if (separatorIndex >= 0) {
+    return safeDecodeURIComponent(normalized.slice(separatorIndex + 1));
+  }
+
+  return safeDecodeURIComponent(normalized);
+}
+
+function extractProviderTaskIdFromLocalTaskId(taskId?: string): string {
+  return extractWuyinProviderTaskId(taskId);
 }
 
 function sanitizeStorageId(value: string): string {
@@ -1826,18 +1850,25 @@ export const useImageGeneration = (options: {
 
         const pendingTaskMeta = {
           ...existingPendingMeta,
-          ...Object.fromEntries(pendingImageData.map(item => [
-            item.taskId,
-            {
-              providerTaskId: item.providerTaskId,
-              submitExecTime: Number(item.submitExecTime ?? item.execTime ?? 0),
-              model: item.effectiveModel || item.model || executionNode.model,
-              keySlotId: item.keySlotId || executionNode.keySlotId,
-              provider: item.provider || executionNode.provider,
-              providerLabel: item.providerName || executionNode.providerLabel,
-              startedAt: Date.now(),
-            }
-          ])),
+          ...Object.fromEntries(pendingImageData.map(item => {
+            const kind = mode === GenerationMode.VIDEO ? 'video' : (mode === GenerationMode.AUDIO ? 'audio' : 'image');
+            const endpointType = mode === GenerationMode.VIDEO ? 'wuyin-async-video' : (mode === GenerationMode.AUDIO ? 'wuyin-async-audio' : 'wuyin-async-image');
+            return [
+              item.taskId,
+              {
+                providerTaskId: item.providerTaskId || extractWuyinProviderTaskId(item.taskId),
+                submitExecTime: Number(item.submitExecTime ?? item.execTime ?? 0),
+                model: item.effectiveModel || item.model || executionNode.model,
+                keySlotId: item.keySlotId || executionNode.keySlotId,
+                provider: item.provider || executionNode.provider,
+                providerLabel: item.providerName || executionNode.providerLabel,
+                endpointType: item.endpointType || endpointType,
+                kind,
+                endpointPath: item.endpointPath || '',
+                startedAt: Date.now(),
+              }
+            ];
+          })),
         };
 
         updatePromptNode({

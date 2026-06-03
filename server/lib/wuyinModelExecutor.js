@@ -58,18 +58,23 @@ function extractWuyinOutputUrls(payload) {
 /**
  * 提取 API 返回的任务 ID
  */
-function extractProviderTaskId(payload) {
-  const data = payload && typeof payload === 'object' ? payload.data : null;
-  const target = data || payload || {};
-  const candidates = ['id', 'task_id', 'taskId', 'taskId'];
-  
-  for (const key of candidates) {
-    if (target[key] !== undefined && target[key] !== null) {
-      const val = String(target[key]).trim();
-      if (val) return val;
-    }
+function readWuyinString(value, keys) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+  for (const key of keys) {
+    const item = value[key];
+    if (typeof item === 'string' && item.trim()) return item.trim();
+    if (typeof item === 'number' && Number.isFinite(item)) return String(item);
   }
   return '';
+}
+
+function extractProviderTaskId(payload) {
+  const data = payload && typeof payload === 'object' ? payload.data : null;
+  return String(
+    readWuyinString(data, ['id', 'task_id', 'taskId', 'taskID']) ||
+    readWuyinString(payload, ['id', 'task_id', 'taskId', 'taskID']) ||
+    ''
+  ).trim();
 }
 
 /**
