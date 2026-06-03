@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAITakeover } from '../context/AITakeoverContext';
 import { useAssetStore } from '../../assets/assetStore';
 import { ensureFileUploaded } from '../../assets/lazyUpload';
+import { estimateTokens, getModelContextLimit } from '../../../utils/contextHelper';
 import { durableGenerationQueue } from '../../ai-assistant-runtime';
 import type { GenerationBatchJob } from '../../ai-assistant-runtime';
 import {
@@ -47,12 +48,34 @@ export const AIAssistantDock: React.FC = () => {
     sendMessage,
     pendingPlan,
     executePendingPlan,
-    cancelPendingPlan
+    cancelPendingPlan,
+    compressContext,
+    isCompressing,
+    selectedModel
   } = useAITakeover();
 
   const { images, files, outputs, addImage, addFile, removeAsset, addImageCollection } = useAssetStore();
 
   const [jobs, setJobs] = useState<GenerationBatchJob[]>([]);
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
+
+  const { maxTokens, label: maxTokensLabel } = React.useMemo(() => {
+    return getModelContextLimit(selectedModel?.id);
+  }, [selectedModel?.id]);
+
+  const totalTokensUsed = React.useMemo(() => {
+    let total = 0;
+    messages.forEach(msg => {
+      total += estimateTokens(msg.content);
+    });
+    return total;
+  }, [messages]);
+
+  const percentUsed = React.useMemo(() => {
+    return Math.min(100, Math.round((totalTokensUsed / maxTokens) * 100));
+  }, [totalTokensUsed, maxTokens]);
+
+  const isNearLimit = percentUsed >= 80;
 
   useEffect(() => {
     const updateJobs = () => {
@@ -194,47 +217,147 @@ export const AIAssistantDock: React.FC = () => {
     >
       
       {/* 1. Header 头部栏 */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-[#0f111a] backdrop-blur-md">
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center shadow-[0_0_12px_rgba(168,85,247,0.35)]">
-              <Cpu className="text-white w-5 h-5 animate-pulse" />
+      <div className="flex flex-col border-b border-zinc-800 bg-[#0f111a] backdrop-blur-md">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center shadow-[0_0_12px_rgba(168,85,247,0.35)]">
+                <Cpu className="text-white w-5 h-5 animate-pulse" />
+              </div>
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border border-zinc-950 rounded-full" />
             </div>
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border border-zinc-950 rounded-full" />
+            <div>
+              <h3 className="text-xs font-bold text-white">KK本地接管助理</h3>
+              <p className="text-[9px] text-purple-400 font-semibold">AI 接管：本地模式</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-xs font-bold text-white">KK本地接管助理</h3>
-            <p className="text-[9px] text-purple-400 font-semibold">AI 接管：本地模式</p>
-          </div>
+
+          <button
+            onClick={() => setAiTakeoverMode(false)}
+            className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
+            title="关闭 AI 接管"
+          >
+            <X size={16} />
+          </button>
         </div>
 
-        <button
-          onClick={() => setAiTakeoverMode(false)}
-          className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
-          title="关闭 AI 接管"
-        >
-          <X size={16} />
-        </button>
+        {/* Context Limit Indicator 栏 */}
+        <div className="px-4 pb-3 pt-1.5 border-t border-zinc-800/85 bg-zinc-950/20 flex flex-col gap-1.5 animate-in fade-in duration-300">
+          <div className="flex items-center justify-between text-[10px] text-zinc-400">
+            <span className="flex items-center gap-1.5">
+              <span>🧠 上下文额度:</span>
+              <span className="font-semibold text-zinc-200">
+                {totalTokensUsed >= 1000 ? `${(totalTokensUsed / 1000).toFixed(1)}k` : totalTokensUsed} / {maxTokensLabel} Tokens
+              </span>
+              <span className="text-purple-400">({percentUsed}%)</span>
+            </span>
+
+            <button
+              onClick={compressContext}
+              disabled={isCompressing || messages.filter(m => m.id !== 'welcome').length <= 1}
+              className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all flex items-center gap-1 cursor-pointer select-none border ${
+                isNearLimit
+                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 hover:bg-amber-500/30 animate-pulse'
+                  : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
+              } disabled:opacity-30 disabled:pointer-events-none`}
+              title={isNearLimit ? "上下文即将满，建议立即压缩以节省额度！" : "点击对历史对话进行总结和压缩"}
+            >
+              {isCompressing ? (
+                <>
+                  <Loader2 size={10} className="animate-spin" />
+                  <span>压缩中...</span>
+                </>
+              ) : (
+                <span>🗜️ 压缩</span>
+              )}
+            </button>
+          </div>
+
+          {/* 进度条 */}
+          <div className="w-full bg-zinc-900 rounded-full h-1 relative overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                percentUsed >= 80
+                  ? 'bg-gradient-to-r from-amber-500 to-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'
+                  : 'bg-gradient-to-r from-purple-500 to-pink-500'
+              }`}
+              style={{ width: `${percentUsed}%` }}
+            />
+          </div>
+
+          {isNearLimit && (
+            <div className="text-[9px] text-amber-400/90 flex items-center gap-1 mt-0.5 animate-pulse">
+              <AlertTriangle size={10} />
+              <span>用量超 80%，建议立即压缩上下文以防信息溢出。</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 2. Message Area 消息对话区 */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0 bg-[#0a0a0d]">
-        {messages.map(msg => (
-          <div
-            key={msg.id}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed shadow-sm ${
-                msg.role === 'user'
-                  ? 'bg-zinc-800 text-white rounded-br-none border border-zinc-700'
-                  : 'bg-zinc-900 text-zinc-200 rounded-bl-none border border-zinc-800/80 whitespace-pre-wrap'
-              }`}
-            >
-              {msg.role === 'assistant' ? renderMessageText(msg.content) : msg.content}
-            </div>
-          </div>
-        ))}
+        {(() => {
+          let boundaryIndex = -1;
+          for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].content.includes('上下文压缩分界线')) {
+              boundaryIndex = i;
+              break;
+            }
+          }
+
+          const items: React.ReactNode[] = [];
+
+          if (boundaryIndex !== -1) {
+            items.push(
+              <div key="takeover-archive-fold-toggle" className="flex flex-col items-center my-2 w-full animate-in fade-in duration-300">
+                <button
+                  onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition-all select-none cursor-pointer"
+                >
+                  <span>{isHistoryExpanded ? '🔼 收起已归档历史' : `🔽 展开已压缩的 ${boundaryIndex} 条历史对话`}</span>
+                </button>
+              </div>
+            );
+          }
+
+          messages.forEach((msg, idx) => {
+            if (boundaryIndex !== -1 && idx < boundaryIndex && !isHistoryExpanded) {
+              return;
+            }
+
+            const isBoundary = msg.content.includes('上下文压缩分界线');
+
+            items.push(
+              <div
+                key={msg.id}
+                className={`flex ${isBoundary ? 'w-full flex-col items-center my-3 animate-in fade-in duration-300' : (msg.role === 'user' ? 'justify-end' : 'justify-start')}`}
+              >
+                {isBoundary ? (
+                  <div className="w-full flex flex-col items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-500/5 border border-dashed border-amber-500/20 shadow-[inset_0_1px_3px_rgba(245,158,11,0.03)]">
+                    <div className="flex items-center gap-1.5 text-[10px] font-black text-amber-500/80 tracking-wider uppercase select-none">
+                      <span>🗜️ 上下文已压缩归档</span>
+                    </div>
+                    <div className="w-full text-[11px] text-zinc-400 whitespace-pre-wrap leading-relaxed text-left">
+                      {renderMessageText(msg.content.replace('--- 📌 上下文压缩分界线 (已归档历史) ---\n', ''))}
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed shadow-sm ${
+                      msg.role === 'user'
+                        ? 'bg-zinc-800 text-white rounded-br-none border border-zinc-700'
+                        : 'bg-zinc-900 text-zinc-200 rounded-bl-none border border-zinc-800/80 whitespace-pre-wrap'
+                    }`}
+                  >
+                    {msg.role === 'assistant' ? renderMessageText(msg.content) : msg.content}
+                  </div>
+                )}
+              </div>
+            );
+          });
+
+          return items;
+        })()}
         
         {isThinking && (
           <div className="flex justify-start">

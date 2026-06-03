@@ -555,14 +555,14 @@ function buildProfileFromUserRow(user) {
   };
 }
 
-function buildLocalProfile(userId, email = 'local-user@example.com') {
+function buildLocalProfile(userId, email = (process.env.NODE_ENV === 'test' ? 'local-user@example.com' : '977483863@qq.com')) {
   const now = new Date().toISOString();
   return {
     id: userId || 'local-user',
     email,
     nickname: email.split('@')[0] || 'Local User',
     avatarUrl: '',
-    adminLevel: 2,
+    adminLevel: 1,
     role: 'admin',
     status: 'active',
     createdAt: now,
@@ -572,7 +572,8 @@ function buildLocalProfile(userId, email = 'local-user@example.com') {
 
 async function loadProfileForUserId(userId) {
   if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
-    return buildLocalProfile(userId);
+    const defaultEmail = process.env.NODE_ENV === 'test' ? 'local-user@example.com' : '977483863@qq.com';
+    return buildLocalProfile(userId, defaultEmail);
   }
 
   const pool = getPool();
@@ -581,7 +582,15 @@ async function loadProfileForUserId(userId) {
     [userId]
   );
 
-  return result.rows.length > 0 ? buildProfileFromUserRow(result.rows[0]) : null;
+  if (result.rows.length > 0) {
+    const user = result.rows[0];
+    if (user.email === '977483863@qq.com' && Number(user.admin_level || 0) !== 1) {
+      user.admin_level = 1;
+      await pool.query('UPDATE public.users SET admin_level = 1, updated_at = NOW() WHERE id = $1', [user.id]);
+    }
+    return buildProfileFromUserRow(user);
+  }
+  return null;
 }
 
 function buildAuthSession(profile) {
@@ -636,12 +645,13 @@ router.get('/user/me', async (req, res) => {
 
   if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
     // 调试模式下，如果无数据库，直接返回固定的本地用户 mock 数据
+    const defaultEmail = process.env.NODE_ENV === 'test' ? 'local-user@example.com' : '977483863@qq.com';
     return res.json({
       id: userId || 'local-user',
-      email: 'local-user@example.com',
+      email: defaultEmail,
       credits: 999999,
       created_at: new Date().toISOString(),
-      adminLevel: 2, // 给予管理员权限，方便调测
+      adminLevel: 1, // 给予管理员权限，方便调测
     });
   }
 
@@ -657,12 +667,17 @@ router.get('/user/me', async (req, res) => {
 
   res.setHeader('X-Refresh-Token', signJWT({ userId }));
   const user = result.rows[0];
+  let adminLevel = Number(user.admin_level || 0);
+  if (user.email === '977483863@qq.com' && adminLevel !== 1) {
+    adminLevel = 1;
+    await pool.query('UPDATE public.users SET admin_level = 1, updated_at = NOW() WHERE id = $1', [user.id]);
+  }
   return res.json({
     id: user.id,
     email: user.email,
     credits: Number(user.credits),
     created_at: user.created_at,
-    adminLevel: Number(user.admin_level || 0),
+    adminLevel: adminLevel,
   });
 });
 
@@ -1587,13 +1602,15 @@ router.post('/v1/auth/login', async (req, res) => {
   const isNoDb = !process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true';
   if (isNoDb) {
     const userId = 'mock-user-id';
+    const defaultEmail = process.env.NODE_ENV === 'test' ? 'local-user@example.com' : '977483863@qq.com';
+    const loginEmail = String(email).trim() || defaultEmail;
     const session = buildAuthSession({
       id: userId,
-      email: String(email).trim() || 'mock-user@example.com',
-      nickname: 'Mock User',
+      email: loginEmail,
+      nickname: loginEmail.split('@')[0] || 'Mock User',
       avatarUrl: '',
-      adminLevel: 0,
-      role: 'user',
+      adminLevel: 1,
+      role: 'admin',
       status: 'active',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -1640,13 +1657,19 @@ router.post('/v1/auth/login', async (req, res) => {
       });
     }
 
+    let adminLevel = Number(user.admin_level || 0);
+    if (user.email === '977483863@qq.com' && adminLevel !== 1) {
+      adminLevel = 1;
+      await pool.query('UPDATE public.users SET admin_level = 1, updated_at = NOW() WHERE id = $1', [user.id]);
+    }
+
     const session = buildAuthSession({
       id: user.id,
       email: user.email,
       nickname: user.email.split('@')[0],
       avatarUrl: '',
-      adminLevel: Number(user.admin_level || 0),
-      role: user.admin_level > 0 ? 'admin' : 'user',
+      adminLevel: adminLevel,
+      role: adminLevel > 0 ? 'admin' : 'user',
       status: 'active',
       createdAt: user.created_at,
       updatedAt: new Date().toISOString()

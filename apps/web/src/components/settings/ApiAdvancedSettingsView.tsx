@@ -99,14 +99,14 @@ const CAPABILITY_ROLE_META: Array<{
     titleZh: 'AI助手',
     titleEn: 'AI Assistant',
     descriptionZh: '最高权重，支持覆盖所有项目并辅助平台，接管整个线路（已合并图片生成及所有其他模型通道）。',
-    descriptionEn: 'Highest priority route, managing the entire backend flow (including image generation and other models).',
+    descriptionEn: 'Highest priority route, managing the entire flow (including image generation and other models).',
   },
   {
-    role: 'ppt_generation',
-    titleZh: 'PPT生成辅助',
-    titleEn: 'PPT Generation Assistant',
-    descriptionZh: 'PPT 主题与单页重生优化，整合 OCR 文档处理以支持文字识别与修改。',
-    descriptionEn: 'PPT theme and page optimization, integrating OCR document processing for text recognition.',
+    role: 'prompt_optimizer',
+    titleZh: '全局能力补充',
+    titleEn: 'Global Capability Enhancement',
+    descriptionZh: '主要针对全局的提示词优化、提示词增强、备用后备及基础逻辑补充。',
+    descriptionEn: 'Global prompt optimization, shaping, fallback strategies and basic capabilities.',
   },
   {
     role: 'ecommerce_generation',
@@ -116,11 +116,11 @@ const CAPABILITY_ROLE_META: Array<{
     descriptionEn: 'Optimizations and skills for ecommerce scene, cards, and image generation.',
   },
   {
-    role: 'prompt_optimizer',
-    titleZh: '全局提示词优化',
-    titleEn: 'Global Prompt Optimization',
-    descriptionZh: '主要针对全局的提示词优化、提示词增强和 skills。',
-    descriptionEn: 'Global prompt optimization, shaping, and optimization skills.',
+    role: 'ppt_generation',
+    titleZh: 'PPT生成辅助',
+    titleEn: 'PPT Generation Assistant',
+    descriptionZh: 'PPT 主题与单页重生优化，整合 OCR 文档处理以支持文字识别与修改。',
+    descriptionEn: 'PPT theme and page optimization, integrating OCR document processing for text recognition.',
   },
 ];
 
@@ -215,7 +215,17 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
 
   const updateCapabilityAssignment = useCallback((
     role: CapabilityRole,
-    patch: Partial<{ enabled: boolean; primaryRouteId: string; primaryModelId: string; fallbackRouteId: string; auxiliaryRouteId: string; auxiliaryModelId: string }>,
+    patch: Partial<{
+      enabled: boolean;
+      primaryRouteId: string;
+      primaryModelId: string;
+      fallbackRouteId: string;
+      fallbackModelId: string;
+      auxiliaryRouteId: string;
+      auxiliaryModelId: string;
+      imageRouteId: string;
+      imageModelId: string;
+    }>,
   ) => {
     upsertCapabilityRouteAssignment(role, patch);
     setCapabilityAssignments(getCapabilityRouteAssignments());
@@ -274,11 +284,25 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
         primaryRouteId: assignment?.primaryRouteId || '',
         primaryModelId: assignment?.primaryModelId || '',
         fallbackRouteId: assignment?.fallbackRouteId || '',
+        fallbackModelId: assignment?.fallbackModelId || '',
         auxiliaryRouteId: assignment?.auxiliaryRouteId || '',
         auxiliaryModelId: assignment?.auxiliaryModelId || '',
+        imageRouteId: assignment?.imageRouteId || '',
+        imageModelId: assignment?.imageModelId || '',
         routeOptions: capabilityRouteOptions,
         modelOptions: getRouteModelOptions(assignment?.primaryRouteId || ''),
         auxiliaryModelOptions: getRouteModelOptions(assignment?.auxiliaryRouteId || ''),
+        fallbackModelOptions: getRouteModelOptions(assignment?.fallbackRouteId || ''),
+        imageModelOptions: meta.role === 'prompt_optimizer'
+          ? [
+              { value: '', label: pick('自动选择', 'Automatic') },
+              { value: 'nano banana 2', label: 'nano banana 2' },
+              { value: 'nano banana pro', label: 'nano banana pro' }
+            ]
+          : [
+              { value: '', label: pick('自动选择', 'Automatic') },
+              ...getRouteModelOptions(assignment?.imageRouteId || '')
+            ],
         onEnabledChange: (val: boolean) => {
           updateCapabilityAssignment(meta.role, { enabled: val });
           if (meta.role === 'assistant') {
@@ -298,9 +322,15 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
           }
         },
         onFallbackRouteChange: (val: string) => {
-          updateCapabilityAssignment(meta.role, { fallbackRouteId: val });
+          updateCapabilityAssignment(meta.role, { fallbackRouteId: val, fallbackModelId: '' });
           if (meta.role === 'assistant') {
-            updateCapabilityAssignment('image_generation', { fallbackRouteId: val });
+            updateCapabilityAssignment('image_generation', { fallbackRouteId: val, fallbackModelId: '' });
+          }
+        },
+        onFallbackModelChange: (val: string) => {
+          updateCapabilityAssignment(meta.role, { fallbackModelId: val });
+          if (meta.role === 'assistant') {
+            updateCapabilityAssignment('image_generation', { fallbackModelId: val });
           }
         },
         onAuxiliaryRouteChange: (val: string) => {
@@ -313,6 +343,18 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
           updateCapabilityAssignment(meta.role, { auxiliaryModelId: val });
           if (meta.role === 'assistant') {
             updateCapabilityAssignment('image_generation', { auxiliaryModelId: val });
+          }
+        },
+        onImageRouteChange: (val: string) => {
+          updateCapabilityAssignment(meta.role, { imageRouteId: val, imageModelId: '' });
+          if (meta.role === 'assistant') {
+            updateCapabilityAssignment('image_generation', { imageRouteId: val, imageModelId: '' });
+          }
+        },
+        onImageModelChange: (val: string) => {
+          updateCapabilityAssignment(meta.role, { imageModelId: val });
+          if (meta.role === 'assistant') {
+            updateCapabilityAssignment('image_generation', { imageModelId: val });
           }
         },
         onOcrClick: () => setShowOcrModal(true),

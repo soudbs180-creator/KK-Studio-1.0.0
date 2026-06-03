@@ -207,6 +207,12 @@ export const SettingInput: React.FC<{
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === 'password';
 
+  const resolvedAutoComplete = autoComplete || (
+    isPassword || /key|secret|password|token|name|id|名字|密钥|密匙|用户名|邮箱/i.test(label || '')
+      ? 'new-password'
+      : undefined
+  );
+
   return (
     <label className="block">
       {label && (
@@ -224,7 +230,7 @@ export const SettingInput: React.FC<{
           onBlur={onBlur}
           placeholder={placeholder}
           disabled={disabled}
-          autoComplete={autoComplete}
+          autoComplete={resolvedAutoComplete}
           className={`${SETTINGS_INPUT_CLASSNAME} ${isPassword ? 'pl-4 pr-10' : 'px-4'}`.trim()}
           style={{ boxShadow: 'var(--settings-input-shadow)' }}
         />

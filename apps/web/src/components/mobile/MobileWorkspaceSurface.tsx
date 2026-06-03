@@ -1,6 +1,32 @@
 import React, { useMemo, useState } from 'react';
 import { Check, Clock3, FolderOpen, MessageSquare, Plus, Search, Settings, Sun, Moon, Languages, PackageOpen, Trash2 } from 'lucide-react';
 
+// 简体中文：自定义扫把（Broom）图标组件，用于清理操作
+const Broom: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ size = 24, ...props }) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        {...props}
+    >
+        <path d="M4 20h16" />
+        <path d="m11 15 4.5-4.5" />
+        <path d="m13 13 4.5-4.5" />
+        <path d="M15 11 19.5 6.5" />
+        <path d="m20 4-4.5 4.5" />
+        <path d="M11 15 8 18" />
+        <path d="m8 18-2 2" />
+        <path d="M13 13 10 16" />
+        <path d="m10 16-2 2" />
+    </svg>
+);
+
 import { useCanvas } from '../../context/CanvasContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLocale } from '../../context/LocaleContext';
@@ -404,7 +430,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                   }}
                   className="mt-2 flex w-full items-center justify-center gap-2 rounded-[18px] border border-dashed border-[var(--mobile-clay-border-strong)] bg-[var(--mobile-clay-surface-bg)]/80 px-3 py-3 text-sm font-medium text-[var(--text-secondary)] active:scale-[0.99] transition-transform cursor-pointer"
                 >
-                  <Trash2 size={16} />
+                  <Broom size={16} />
                   {pick('清理错误卡片', 'Clean Invalid Cards')}
                 </button>
               </div>

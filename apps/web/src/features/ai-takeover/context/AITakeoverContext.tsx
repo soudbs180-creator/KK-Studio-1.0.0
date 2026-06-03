@@ -6,6 +6,7 @@ import { buildSanitizedProjectContext } from '../core/projectContextBuilder';
 import { useAssetStore } from '../../assets/assetStore';
 import { durableGenerationQueue } from '../../ai-assistant-runtime/queue/DurableGenerationQueue.ts';
 import { agentRuntimeInstance } from '../../ai-assistant-runtime';
+import { llmService } from '../../../services/llm/LLMService';
 
 interface Message {
   id: string;
@@ -30,6 +31,8 @@ interface AITakeoverContextType {
   selectedModel: any;
   setSelectedModel: (model: any) => void;
   currentRunId: string | null;
+  compressContext: () => Promise<void>;
+  isCompressing: boolean;
 }
 
 const AITakeoverContext = createContext<AITakeoverContextType | null>(null);
@@ -82,6 +85,60 @@ export function AITakeoverProvider({
   const [selectedModel, setSelectedModel] = useState(initialModel);
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isCompressing, setIsCompressing] = useState(false);
+
+  // 简体中文：一键压缩接管助理上下文
+  const compressContext = useCallback(async () => {
+    if (isCompressing || messages.filter(m => m.id !== 'welcome').length <= 1) return;
+    setIsCompressing(true);
+
+    try {
+      let boundaryIndex = -1;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].content.includes('上下文压缩分界线')) {
+          boundaryIndex = i;
+          break;
+        }
+      }
+      const filteredMsgs = boundaryIndex !== -1 ? messages.slice(boundaryIndex) : messages;
+
+      const history = filteredMsgs
+        .filter(m => m.id !== 'welcome')
+        .map(m => ({ role: m.role, content: m.content }));
+
+      const promptText = "请为我们之前的对话内容进行一次高度精炼的摘要总结，提炼出核心的事实、当前的任务状态和关键决策。要求言简意赅，不要有任何客套话。";
+      
+      const responseText = await llmService.chat({
+        modelId: selectedModel?.id || 'gemini-2.5-flash',
+        messages: [
+          ...history,
+          { role: 'user', content: promptText }
+        ]
+      });
+
+      if (!responseText) throw new Error("大模型未能返回摘要内容");
+
+      const summaryContent = `--- 📌 上下文压缩分界线 (已归档历史) ---\n以下是此前对话内容的摘要总结：\n\n${responseText}\n\n此前的历史已被压缩归档，后续对话将基于此摘要进行。`;
+      const boundaryMessage: Message = {
+        id: `boundary_${Date.now()}`,
+        role: 'assistant',
+        content: summaryContent,
+        timestamp: Date.now()
+      };
+
+      setMessages(prev => [...prev, boundaryMessage]);
+      if (notify) {
+        notify.success("上下文压缩成功！", "已成功通过摘要生成归档分界线，释放本地接管助理的上下文缓存。");
+      }
+    } catch (error: any) {
+      console.error("Context compression failed:", error);
+      if (notify) {
+        notify.error("上下文压缩失败", error.message || "未知错误");
+      }
+    } finally {
+      setIsCompressing(false);
+    }
+  }, [messages, selectedModel, isCompressing, notify]);
 
   // 🤖 动态开场白效果
   useEffect(() => {
@@ -403,7 +460,9 @@ export function AITakeoverProvider({
         cancelPendingPlan,
         selectedModel,
         setSelectedModel,
-        currentRunId
+        currentRunId,
+        compressContext,
+        isCompressing
       }}
     >
       {children}

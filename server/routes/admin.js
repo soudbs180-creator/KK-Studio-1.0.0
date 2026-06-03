@@ -174,7 +174,64 @@ const userListQuerySchema = z.object({
 
 router.get('/admin/users', adminAuth(2), async (req, res) => {
   if (!process.env.DATABASE_URL || process.env.KKAI_LOCAL_ONLY === 'true') {
-    return res.json({ users: [], total: 0, page: 1, limit: 20 });
+    const mockUsers = [
+      {
+        id: 'mock-user-admin',
+        email: '977483863@qq.com',
+        credits: 999999,
+        adminLevel: 1,
+        createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: 'mock-user-subadmin',
+        email: 'subadmin@kkai.plus',
+        credits: 50000,
+        adminLevel: 2,
+        createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: 'mock-user-vip',
+        email: 'vip-customer@example.com',
+        credits: 12500,
+        adminLevel: 0,
+        createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: 'mock-user-standard',
+        email: 'user-standard@example.com',
+        credits: 1800,
+        adminLevel: 0,
+        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: 'mock-user-newbie',
+        email: 'new-user@gmail.com',
+        credits: 100,
+        adminLevel: 0,
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      }
+    ];
+
+    const search = String(req.query.search || '').trim().toLowerCase();
+    const page = Math.max(1, Number(req.query.page || 1));
+    const limit = Math.max(1, Number(req.query.limit || 8));
+
+    let filtered = mockUsers;
+    if (search) {
+      filtered = mockUsers.filter(
+        u => u.email.toLowerCase().includes(search) || u.id.toLowerCase().includes(search)
+      );
+    }
+
+    const start = (page - 1) * limit;
+    const paginated = filtered.slice(start, start + limit);
+
+    return res.json({
+      users: paginated,
+      total: filtered.length,
+      page,
+      limit,
+    });
   }
   const parsed = userListQuerySchema.safeParse(req.query);
   if (!parsed.success) {

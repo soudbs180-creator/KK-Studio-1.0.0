@@ -2,6 +2,14 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { type GeneratedImage, GenerationMode, type RedrawRequest, type ReferenceImage } from '../../types';
 import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy, Sparkles, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { resolveRedrawRouteAndModel } from '../../services/api/capabilityRouteAssignments';
+
+// 简体中文：获取是否已经配置了图片生成的逻辑，根据能力路由配置是否有有效链路来判断
+const isImageConfigured = () => {
+    const { routeId, modelId } = resolveRedrawRouteAndModel();
+    return Boolean(routeId && modelId);
+};
 import { RedrawWorkspace } from './RedrawWorkspace';
 import { notify } from '../../services/system/notificationService';
 import { getImage, getStrictOriginalImage } from '../../services/storage/imageStorage';
@@ -34,6 +42,7 @@ interface GlobalLightboxProps {
  * @param onClose Close handler.
  */
 export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialIndex, onClose, onEditText, onEditPptDeck, onPartialRedraw, onDeleteImage, onDownloadPptComposite, onUseAsSource }) => {
+    const navigate = useNavigate();
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -1229,34 +1238,50 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                               </button>
                           )}
    
-                          {/* 简体中文注释：灯箱只暴露统一的重绘入口，工作台内部再根据选区自动分流。 */}
-                          {onPartialRedraw && !isVideo && !isAudio && displaySrc && (
-                               <button
-                                   onClick={(e) => {
-                                       e.stopPropagation();
-                                      setRedrawWorkspaceMode('fresh');
-                                   }}
-                                   className={`${actionButtonClass} hover:border-purple-500 hover:bg-purple-600/80`}
-                                  title="重绘"
-                               >
-                                   <Pen size={16} />
-                                   重绘
-                               </button>
-                           )}
-                          {onPartialRedraw && !isVideo && !isAudio && displaySrc && (image.redraw || image.partialRedraw) && (
-                              <button
-                                  onClick={(e) => {
-                                      e.stopPropagation();
-                                      setRedrawWorkspaceMode('regenerate');
-                                  }}
-                                  className={`${actionButtonClass} hover:border-amber-400 hover:bg-amber-500/80`}
-                                  title="复用原图、原提示词和原标记重新生成"
-                              >
-                                  <Sparkles size={16} />
-                                  不满意重生成
-                              </button>
-                          )}
-      
+                          {onPartialRedraw && !isVideo && !isAudio && displaySrc && (() => {
+                              const isImgConfigured = isImageConfigured();
+                              return (
+                                  <button
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (!isImgConfigured) {
+                                              navigate('/settings/api-management');
+                                              onClose();
+                                              notify.info('需要配置模型', '重绘功能需要先在能力分配中配置图片模型。');
+                                              return;
+                                          }
+                                          setRedrawWorkspaceMode('fresh');
+                                      }}
+                                      className={`${actionButtonClass} ${isImgConfigured ? 'hover:border-purple-500 hover:bg-purple-600/80' : 'opacity-40 hover:opacity-50 grayscale cursor-pointer'}`}
+                                      title="重绘"
+                                  >
+                                      <Pen size={16} />
+                                      重绘
+                                  </button>
+                              );
+                          })()}
+                          {onPartialRedraw && !isVideo && !isAudio && displaySrc && (image.redraw || image.partialRedraw) && (() => {
+                              const isImgConfigured = isImageConfigured();
+                              return (
+                                  <button
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (!isImgConfigured) {
+                                              navigate('/settings/api-management');
+                                              onClose();
+                                              notify.info('需要配置模型', '重绘功能需要先在能力分配中配置图片模型。');
+                                              return;
+                                          }
+                                          setRedrawWorkspaceMode('regenerate');
+                                      }}
+                                      className={`${actionButtonClass} ${isImgConfigured ? 'hover:border-amber-400 hover:bg-amber-500/80' : 'opacity-40 hover:opacity-50 grayscale cursor-pointer'}`}
+                                      title="复用原图、原提示词和原标记重新生成"
+                                  >
+                                      <Sparkles size={16} />
+                                      不满意重生成
+                                  </button>
+                              );
+                          })()}
                           {onEditPptDeck && image.mode === GenerationMode.PPT && !isVideo && !isAudio && (
                               <button
                                   onClick={(e) => {

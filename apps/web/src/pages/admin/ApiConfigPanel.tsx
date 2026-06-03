@@ -429,7 +429,7 @@ export const ApiConfigPanel: React.FC = () => {
   };
 
   return (
-    <div className="admin-api-nexus">
+    <div className="admin-api-nexus flex flex-col gap-6 w-full">
       <section className="admin-api-nexus__main">
         <div className="admin-api-nexus__header">
           <div>
@@ -534,7 +534,7 @@ export const ApiConfigPanel: React.FC = () => {
         </div>
       </section>
 
-      <aside className="admin-api-nexus__directory">
+      <aside className="admin-api-nexus__directory w-full" style={{ width: "100%" }}>
         <div className="admin-api-nexus__tabs">
           <button type="button" className={presetTab === "official" ? "is-active" : ""} onClick={() => setPresetTab("official")}>
             <Shield size={14} />

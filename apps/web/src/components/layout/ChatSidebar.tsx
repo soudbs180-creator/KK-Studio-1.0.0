@@ -1,7 +1,33 @@
 
 import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus, Cpu, AlertTriangle, FolderOpen, Image as Picture, Eye, Lock, Zap } from 'lucide-react';
+import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus, Cpu, AlertTriangle, FolderOpen, Image as Picture, Eye, Lock, Ghost } from 'lucide-react';
 import { generateImage } from '../../services/llm/geminiService';
+
+// 简体中文：自定义扫把（Broom）图标组件，弥补内置图标库版本缺失
+const Broom: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ size = 24, ...props }) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        {...props}
+    >
+        <path d="M4 20h16" />
+        <path d="m11 15 4.5-4.5" />
+        <path d="m13 13 4.5-4.5" />
+        <path d="M15 11 19.5 6.5" />
+        <path d="m20 4-4.5 4.5" />
+        <path d="M11 15 8 18" />
+        <path d="m8 18-2 2" />
+        <path d="M13 13 10 16" />
+        <path d="m10 16-2 2" />
+    </svg>
+);
 import { llmService } from '../../services/llm/LLMService';
 import { notify } from '../../services/system/notificationService';
 import { keyManager } from '../../services/auth/keyManager';
@@ -29,6 +55,7 @@ import { getCardDimensions } from '../../utils/styleUtils';
 import ModelLogo from '../common/ModelLogo';
 import { AITakeoverProvider, useAITakeover, AIAssistantDock, AITakeoverToggle } from '../../features/ai-takeover';
 import { useAssetStore } from '../../features/assets/assetStore';
+import { estimateTokens, getModelContextLimit } from '../../utils/contextHelper';
 
 interface ChatSidebarProps {
     isOpen: boolean;
@@ -631,6 +658,82 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     });
     const [activeSessionId, setActiveSessionId] = useState<string>(() => sessions[0]?.id || `session_${Date.now()}`);
     const [messages, setMessages] = useState<Message[]>(() => sessions[0]?.messages || [createWelcomeMessage()]);
+    
+    const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
+    const [isCompressing, setIsCompressing] = useState(false);
+
+    useEffect(() => {
+        setIsHistoryExpanded(false);
+    }, [activeSessionId]);
+
+    const { maxTokens, supportsCompression, label: maxTokensLabel } = useMemo(() => {
+        return getModelContextLimit(selectedModel?.id);
+    }, [selectedModel?.id]);
+
+    const totalTokensUsed = useMemo(() => {
+        let total = 0;
+        messages.forEach(msg => {
+            total += estimateTokens(msg.content);
+        });
+        return total;
+    }, [messages]);
+
+    const percentUsed = useMemo(() => {
+        return Math.min(100, Math.round((totalTokensUsed / maxTokens) * 100));
+    }, [totalTokensUsed, maxTokens]);
+
+    const isNearLimit = percentUsed >= 80;
+
+    const handleCompressContext = async () => {
+        if (isCompressing || messages.filter(m => m.id !== 'welcome').length <= 1) return;
+        setIsCompressing(true);
+        registerActivity();
+
+        try {
+            let boundaryIndex = -1;
+            for (let i = messages.length - 1; i >= 0; i--) {
+                if (messages[i].content.includes('上下文压缩分界线')) {
+                    boundaryIndex = i;
+                }
+            }
+            const filteredMsgs = boundaryIndex !== -1 ? messages.slice(boundaryIndex) : messages;
+
+            const history = filteredMsgs
+                .filter(m => m.id !== 'welcome')
+                .map(m => ({ role: m.role, content: m.content }));
+
+            const promptText = "请为我们之前的对话内容进行一次高度精炼的摘要总结，提炼出核心的事实、当前的任务状态和关键决策。要求言简意赅，不要有任何客套话。";
+            
+            const responseText = await llmService.chat({
+                modelId: selectedModel.id,
+                messages: [
+                    ...history,
+                    { role: 'user', content: promptText }
+                ],
+                preferredKeyId: resolveAssistantPreferredKeyId(),
+            });
+
+            if (!responseText) throw new Error("大模型未能返回摘要内容");
+
+            const summaryContent = `--- 📌 上下文压缩分界线 (已归档历史) ---\n以下是此前对话内容的摘要总结：\n\n${responseText}\n\n此前的历史已被压缩归档，后续对话将基于此摘要进行。`;
+            const boundaryMessage: Message = {
+                id: `boundary_${Date.now()}`,
+                role: 'assistant',
+                content: summaryContent,
+                timestamp: Date.now(),
+                modelId: selectedModel.id
+            };
+
+            setMessages(prev => [...prev, boundaryMessage]);
+            notify.success("上下文压缩成功！", "已通过大模型摘要进行上下文压缩并归档。");
+        } catch (error: any) {
+            console.error("Context compression failed:", error);
+            notify.error("上下文压缩失败", error.message || "未知错误");
+        } finally {
+            setIsCompressing(false);
+        }
+    };
+
     const { balance, loading: billingLoading, setShowRechargeModal } = useBilling();
     const { activeCanvas, addPromptNode, getNextCardPosition } = useCanvas();
     const { executeGeneration } = useImageGeneration({
@@ -1928,8 +2031,18 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         abortControllerRef.current = controller;
 
         try {
+            // 过滤分界线前的消息
+            let boundaryIndex = -1;
+            for (let i = messages.length - 1; i >= 0; i--) {
+                if (messages[i].content.includes('上下文压缩分界线')) {
+                    boundaryIndex = i;
+                    break;
+                }
+            }
+            const filteredMsgs = boundaryIndex !== -1 ? messages.slice(boundaryIndex) : messages;
+
             // 构建历史记录
-            const history = messages
+            const history = filteredMsgs
                 .filter(m => m.id !== 'welcome')
                 .map(m => ({ role: m.role, content: m.content }));
 
@@ -2106,8 +2219,16 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         const sourceAttachments = userMsg.attachments || [];
         const { messageContent, inlineData } = buildMessageWithAttachments(sourceText, sourceAttachments);
 
-        const history = messages
-            .slice(0, userIndex)
+        let boundaryIndex = -1;
+        for (let i = userIndex - 1; i >= 0; i--) {
+            if (messages[i].content.includes('上下文压缩分界线')) {
+                boundaryIndex = i;
+                break;
+            }
+        }
+        const filteredMsgs = boundaryIndex !== -1 ? messages.slice(boundaryIndex, userIndex) : messages.slice(0, userIndex);
+
+        const history = filteredMsgs
             .filter(m => m.id !== 'welcome')
             .map(m => ({ role: m.role, content: m.content }));
 
@@ -2550,7 +2671,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                 >
                                     {!isMobile && <MessageSquare size={16} className="text-[var(--primary)] shrink-0" />}
                                     <span className="font-semibold text-sm text-[var(--text-primary)] truncate flex items-center gap-1">
-                                        {activeSession?.isTemp && <span style={{ color: '#f59e0b', marginRight: '4px' }}>⚡</span>}
+                                        {activeSession?.isTemp && <Ghost size={14} className="text-amber-500 shrink-0 mr-1" style={{ display: 'inline-block', verticalAlign: 'middle' }} />}
                                         {activeSession?.title || '新对话'}
                                     </span>
                                 </button>
@@ -2563,14 +2684,14 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                     className="p-1.5 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--primary)] hover:bg-[var(--primary-light)] rounded-md transition-colors"
                                     title="清除当前对话（清空）"
                                 >
-                                    <RotateCcw size={18} />
+                                    <Broom size={18} />
                                 </button>
                                 <button
                                     onClick={handleNewTempSession}
                                     className="p-1.5 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--primary)] hover:bg-[var(--primary-light)] rounded-md transition-colors"
                                     title="开启临时对话（不保存，关闭或切换后清理）"
                                 >
-                                    <Zap size={18} />
+                                    <Ghost size={18} />
                                 </button>
                                 <button
                                     onClick={handleNewSession}
@@ -2587,6 +2708,63 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                     <Layout size={18} />
                                 </button>
                             </div>
+                        </div>
+
+                        {/* Context Limit Indicator 栏 */}
+                        <div className="px-4 pb-3 pt-1 border-t border-[var(--border-light)]/40 bg-[var(--bg-primary)]/10 flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between text-[10px] text-[var(--text-tertiary)]">
+                                <span className="flex items-center gap-1">
+                                    <span>🧠 上下文额度:</span>
+                                    <span className="font-semibold text-[var(--text-secondary)]">
+                                        {totalTokensUsed >= 1000 ? `${(totalTokensUsed / 1000).toFixed(1)}k` : totalTokensUsed} / {maxTokensLabel} Tokens
+                                    </span>
+                                    <span>({percentUsed}%)</span>
+                                </span>
+
+                                <button
+                                    onClick={handleCompressContext}
+                                    disabled={isCompressing || messages.filter(m => m.id !== 'welcome').length <= 1}
+                                    className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all flex items-center gap-1 cursor-pointer select-none border ${
+                                        isNearLimit
+                                            ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 hover:bg-amber-500/30 animate-pulse'
+                                            : 'bg-[var(--frost-card-sub-bg)] border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--primary)]'
+                                    } disabled:opacity-30 disabled:pointer-events-none`}
+                                    title={isNearLimit ? "上下文即将满，建议立即压缩以节省额度！" : "点击对历史对话进行总结和压缩"}
+                                >
+                                    {isCompressing ? (
+                                        <>
+                                            <Loader2 size={10} className="animate-spin" />
+                                            <span>正在压缩...</span>
+                                        </>
+                                    ) : (
+                                        <span>🗜️ 压缩上下文</span>
+                                    )}
+                                </button>
+                            </div>
+
+                            {/* 进度条 */}
+                            <div className="w-full bg-[var(--border-light)]/30 rounded-full h-1 relative overflow-hidden">
+                                <div
+                                    className={`h-full rounded-full transition-all duration-500 ${
+                                        percentUsed >= 80
+                                            ? 'bg-gradient-to-r from-amber-500 to-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'
+                                            : ''
+                                    }`}
+                                    style={{ 
+                                        width: `${percentUsed}%`,
+                                        background: percentUsed >= 80 
+                                            ? undefined 
+                                            : 'linear-gradient(90deg, var(--clay-brand-lavender) 0%, var(--primary) 100%)'
+                                    }}
+                                />
+                            </div>
+
+                            {isNearLimit && (
+                                <div className="text-[9px] text-amber-400/90 flex items-center gap-1 mt-0.5 animate-pulse">
+                                    <AlertTriangle size={10} />
+                                    <span>上下文用量已超 80%，AI 可能会开始遗忘，请及时压缩。</span>
+                                </div>
+                            )}
                         </div>
 
                         {/* Expandable History Panel */}
@@ -2727,118 +2905,166 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
                     {/* Messages */}
                     <div className={`flex-1 overflow-y-auto space-y-4 scrollbar-thin ${isMobile ? 'px-3 py-3' : 'px-6 py-4'}`}>
-                        {activeMessages.map((msg, idx) => (
-                            <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''} group`}>
-                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${msg.role === 'user'
-                                    ? 'bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)]'
-                                    : 'bg-gradient-to-br from-[#6366f1] via-[#a855f7] to-pink-500 text-white'
-                                    }`}>
-                                    {msg.role === 'user' ? (
-                                        <User size={14} className="text-[var(--text-tertiary)]" />
-                                    ) : (
-                                        <Bot size={16} className="animate-icon-breathe" />
-                                    )}
-                                </div>
-                                <div className={`${isMobile ? 'max-w-[90%]' : 'max-w-[82%]'} flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                    {/* 消息文本 */}
-                                    <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
-                                        ? 'bg-[var(--frost-card-sub-bg)] text-[var(--text-primary)] rounded-tr-md border border-[var(--frost-card-sub-border)]'
-                                        : 'bg-[var(--frost-card-sub-bg)] text-[var(--text-primary)] border border-[var(--frost-card-sub-border)] rounded-tl-md'
-                                        }`}>
-                                        {msg.role === 'assistant' && !msg.content ? (
-                                            <div className="flex items-center gap-1.5 h-5">
-                                                <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce [animation-delay:-0.3s]" />
-                                                <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce [animation-delay:-0.15s]" />
-                                                <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce" />
+                        {(() => {
+                            let boundaryIndex = -1;
+                            for (let i = activeMessages.length - 1; i >= 0; i--) {
+                                if (activeMessages[i].content.includes('上下文压缩分界线')) {
+                                    boundaryIndex = i;
+                                    break;
+                                }
+                            }
+
+                            const items: React.ReactNode[] = [];
+
+                            if (boundaryIndex !== -1) {
+                                items.push(
+                                    <div key="archive-fold-toggle" className="flex flex-col items-center my-3 w-full animate-in fade-in duration-300">
+                                        <button
+                                            onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--primary)] transition-all select-none cursor-pointer"
+                                        >
+                                            <span>{isHistoryExpanded ? '🔼 收起已归档历史' : `🔽 展开已压缩的 ${boundaryIndex} 条历史对话`}</span>
+                                        </button>
+                                    </div>
+                                );
+                            }
+
+                            activeMessages.forEach((msg, idx) => {
+                                if (boundaryIndex !== -1 && idx < boundaryIndex && !isHistoryExpanded) {
+                                    return;
+                                }
+
+                                const isBoundary = msg.content.includes('上下文压缩分界线');
+
+                                items.push(
+                                    <div key={msg.id} className={`flex ${isBoundary ? 'w-full flex-col items-center my-4 animate-in fade-in duration-300' : `gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''} group`}`}>
+                                        {isBoundary ? (
+                                            <div className="w-full flex flex-col items-center gap-2.5 px-4 py-3 rounded-2xl bg-amber-500/5 border border-dashed border-amber-500/30 shadow-[inset_0_1px_3px_rgba(245,158,11,0.05)]">
+                                                <div className="flex items-center gap-2 text-xs font-black text-amber-500/90 tracking-wider uppercase select-none">
+                                                    <span>🗜️ 上下文压缩分界线 (已归档历史)</span>
+                                                </div>
+                                                <div className="w-full text-xs text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed text-left">
+                                                    {renderMessageContent(msg.content.replace('--- 📌 上下文压缩分界线 (已归档历史) ---\n', ''))}
+                                                </div>
                                             </div>
                                         ) : (
-                                            <div className="whitespace-pre-wrap">{renderMessageContent(msg.content)}</div>
-                                        )}
-                                    </div>
-
-                                    {/* 附件/生成结果展示 */}
-                                    {msg.attachments && msg.attachments.length > 0 && (
-                                        <div className="flex flex-wrap gap-2 mt-1">
-                                            {msg.attachments.map(att => (
-                                                <div key={att.id} className="relative group overflow-hidden rounded-xl border border-[var(--border-light)] shadow-sm transition-transform hover:scale-[1.02]">
-                                                    {att.type === 'image' ? (
-                                                        <a href={att.data} target="_blank" rel="noopener noreferrer" className="block cursor-zoom-in">
-                                                            <img
-                                                                src={att.data}
-                                                                alt={att.name}
-                                                                className="max-w-[240px] max-h-[240px] object-cover bg-[var(--frost-card-sub-bg)]"
-                                                            />
-                                                        </a>
+                                            <>
+                                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${msg.role === 'user'
+                                                    ? 'bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)]'
+                                                    : 'bg-gradient-to-br from-[#6366f1] via-[#a855f7] to-pink-500 text-white'
+                                                    }`}>
+                                                    {msg.role === 'user' ? (
+                                                        <User size={14} className="text-[var(--text-tertiary)]" />
                                                     ) : (
-                                                        <div className="flex items-center gap-2 px-3 py-2 bg-[var(--frost-card-sub-bg)] cursor-default">
-                                                            {att.type === 'video' && <Film size={16} className="text-[var(--clay-brand-lavender)]" />}
-                                                            {att.type === 'audio' && <Mic size={16} className="text-[var(--clay-brand-mint)]" />}
-                                                                {att.type === 'document' && <FileText size={16} className="text-[var(--clay-brand-lavender)]" />}
-                                                            <span className="text-xs text-[var(--text-secondary)] truncate max-w-[150px]">{att.name}</span>
+                                                        <Bot size={16} className="animate-icon-breathe" />
+                                                    )}
+                                                </div>
+                                                <div className={`${isMobile ? 'max-w-[90%]' : 'max-w-[82%]'} flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                                    {/* 消息文本 */}
+                                                    <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
+                                                        ? 'bg-[var(--frost-card-sub-bg)] text-[var(--text-primary)] rounded-tr-md border border-[var(--frost-card-sub-border)]'
+                                                        : 'bg-[var(--frost-card-sub-bg)] text-[var(--text-primary)] border border-[var(--frost-card-sub-border)] rounded-tl-md'
+                                                        }`}>
+                                                        {msg.role === 'assistant' && !msg.content ? (
+                                                            <div className="flex items-center gap-1.5 h-5">
+                                                                <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                                                <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                                                <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce" />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="whitespace-pre-wrap">{renderMessageContent(msg.content)}</div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* 附件/生成结果展示 */}
+                                                    {msg.attachments && msg.attachments.length > 0 && (
+                                                        <div className="flex flex-wrap gap-2 mt-1">
+                                                            {msg.attachments.map(att => (
+                                                                <div key={att.id} className="relative group overflow-hidden rounded-xl border border-[var(--border-light)] shadow-sm transition-transform hover:scale-[1.02]">
+                                                                    {att.type === 'image' ? (
+                                                                        <a href={att.data} target="_blank" rel="noopener noreferrer" className="block cursor-zoom-in">
+                                                                            <img
+                                                                                src={att.data}
+                                                                                alt={att.name}
+                                                                                className="max-w-[240px] max-h-[240px] object-cover bg-[var(--frost-card-sub-bg)]"
+                                                                            />
+                                                                        </a>
+                                                                    ) : (
+                                                                        <div className="flex items-center gap-2 px-3 py-2 bg-[var(--frost-card-sub-bg)] cursor-default">
+                                                                            {att.type === 'video' && <Film size={16} className="text-[var(--clay-brand-lavender)]" />}
+                                                                            {att.type === 'audio' && <Mic size={16} className="text-[var(--clay-brand-mint)]" />}
+                                                                            {att.type === 'document' && <FileText size={16} className="text-[var(--clay-brand-lavender)]" />}
+                                                                            <span className="text-xs text-[var(--text-secondary)] truncate max-w-[150px]">{att.name}</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    {msg.id !== 'welcome' && (
+                                                        <div className={`flex items-center gap-1 text-[10px] transition-opacity ${isMobile
+                                                            ? 'opacity-85'
+                                                            : 'opacity-0 group-hover:opacity-100'
+                                                            } ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                                            {msg.role === 'user' && (
+                                                                <button
+                                                                    onClick={() => handleEditResend(msg)}
+                                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
+                                                                    title="编辑后重发"
+                                                                >
+                                                                    <Pencil size={12} />
+                                                                    {!isMobile && <span>编辑</span>}
+                                                                </button>
+                                                            )}
+                                                            {msg.role === 'assistant' && idx === lastAssistantIndex && (
+                                                                <button
+                                                                    onClick={() => handleRegenerateAssistant(msg.id)}
+                                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)] disabled:opacity-50"
+                                                                    disabled={isThinking}
+                                                                    title="重试这一轮回答"
+                                                                >
+                                                                    <RotateCcw size={12} />
+                                                                    {!isMobile && <span>重试</span>}
+                                                                </button>
+                                                            )}
+                                                            {msg.role === 'assistant' && (
+                                                                <button
+                                                                    onClick={() => handleEditFromAssistant(msg.id)}
+                                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
+                                                                    title="编辑上一条提问"
+                                                                >
+                                                                    <Pencil size={12} />
+                                                                    {!isMobile && <span>编辑提问</span>}
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={() => handleBranchFrom(idx)}
+                                                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
+                                                                title="从当前消息创建分支"
+                                                            >
+                                                                <GitBranch size={12} />
+                                                                {!isMobile && <span>分支</span>}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleCopyMessage(msg)}
+                                                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
+                                                                title="复制消息文本"
+                                                            >
+                                                                {copiedMessageId === msg.id ? <Check size={12} /> : <Copy size={12} />}
+                                                                {!isMobile && <span>{copiedMessageId === msg.id ? '已复制' : '复制'}</span>}
+                                                            </button>
                                                         </div>
                                                     )}
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                            </>
+                                        )}
+                                    </div>
+                                );
+                            });
 
-                                    {msg.id !== 'welcome' && (
-                                        <div className={`flex items-center gap-1 text-[10px] transition-opacity ${isMobile
-                                            ? 'opacity-85'
-                                            : 'opacity-0 group-hover:opacity-100'
-                                            } ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                            {msg.role === 'user' && (
-                                                <button
-                                                    onClick={() => handleEditResend(msg)}
-                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
-                                                    title="编辑后重发"
-                                                >
-                                                    <Pencil size={12} />
-                                                    {!isMobile && <span>编辑</span>}
-                                                </button>
-                                            )}
-                                            {msg.role === 'assistant' && idx === lastAssistantIndex && (
-                                                <button
-                                                    onClick={() => handleRegenerateAssistant(msg.id)}
-                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)] disabled:opacity-50"
-                                                    disabled={isThinking}
-                                                    title="重试这一轮回答"
-                                                >
-                                                    <RotateCcw size={12} />
-                                                    {!isMobile && <span>重试</span>}
-                                                </button>
-                                            )}
-                                            {msg.role === 'assistant' && (
-                                                <button
-                                                    onClick={() => handleEditFromAssistant(msg.id)}
-                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
-                                                    title="编辑上一条提问"
-                                                >
-                                                    <Pencil size={12} />
-                                                    {!isMobile && <span>编辑提问</span>}
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={() => handleBranchFrom(idx)}
-                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
-                                                title="从当前消息创建分支"
-                                            >
-                                                <GitBranch size={12} />
-                                                {!isMobile && <span>分支</span>}
-                                            </button>
-                                            <button
-                                                onClick={() => handleCopyMessage(msg)}
-                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)]"
-                                                title="复制消息文本"
-                                            >
-                                                {copiedMessageId === msg.id ? <Check size={12} /> : <Copy size={12} />}
-                                                {!isMobile && <span>{copiedMessageId === msg.id ? '已复制' : '复制'}</span>}
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
+                            return items;
+                        })()}
 
                         {activeIsThinking && (
                             aiTakeoverMode ? (

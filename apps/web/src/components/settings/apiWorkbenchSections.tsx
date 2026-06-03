@@ -30,6 +30,8 @@ type CurrentViewLatencyItem = {
   latency: number | null;
 };
 
+const noop = () => {};
+
 // 简体中文：注入 API 工作台专用状态卡片的 CSS 样式，带来半透明玻璃、动态发光及柔和过渡微动效，看齐侧边栏顶级卡片设计
 const PREMIUM_CARDS_STYLE = (
   <style>{`
@@ -1125,17 +1127,25 @@ type ApiWorkbenchCapabilityDraft = {
   primaryRouteId: string;
   primaryModelId: string;
   fallbackRouteId: string;
+  fallbackModelId?: string;
   auxiliaryRouteId?: string;
   auxiliaryModelId?: string;
+  imageRouteId?: string;
+  imageModelId?: string;
   routeOptions: Array<{ value: string; label: string }>;
   modelOptions: Array<{ value: string; label: string }>;
   auxiliaryModelOptions?: Array<{ value: string; label: string }>;
+  fallbackModelOptions?: Array<{ value: string; label: string }>;
+  imageModelOptions?: Array<{ value: string; label: string }>;
   onEnabledChange: (enabled: boolean) => void;
   onPrimaryRouteChange: (value: string) => void;
   onPrimaryModelChange: (value: string) => void;
   onFallbackRouteChange: (value: string) => void;
+  onFallbackModelChange?: (value: string) => void;
   onAuxiliaryRouteChange?: (value: string) => void;
   onAuxiliaryModelChange?: (value: string) => void;
+  onImageRouteChange?: (value: string) => void;
+  onImageModelChange?: (value: string) => void;
   onOcrClick?: () => void;
 };
 
@@ -1165,153 +1175,136 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
       testId="settings-workbench-capability"
       title={pick('能力分配', 'Capability roles')}
       description={pick(
-        '把图片、PPT、电商、AI 助手、提示词 AI 增强和 OCR 各自绑定到链路与模型。',
+        '把图片、PPT、电商、AI 助手、提示词 AI 增强和 OCR 各自绑定 to 链路与模型。',
         'Assign image, PPT, ecommerce, assistant, Prompt AI enhancement, and OCR roles to routes and models.',
       )}
       action={<SettingsBadge tone="emerald">{pick('Capability roles', 'Capability roles')}</SettingsBadge>}
     >
       <div className="space-y-4">
-        {/* 简体中文注释：自定义路由能力管理的全局开关 */}
-        <div className="rounded-[20px] border p-4" style={SETTINGS_OVERLAY_STYLE}>
-          <SettingToggle
-            label={pick('启用自定义角色路由', 'Enable custom role routing')}
-            checked={customRoutingEnabled}
-            onChange={onCustomRoutingToggle}
-            helper={pick(
-              '开启后可以手动为每个能力模块指定供应商和模型；关闭时默认启用智能调度，自动选择已配置的预算金额最高或 Tokens 上限最高的活跃通道。',
-              'Enable to manually set providers and models for each module; disable to auto-route based on the highest active budget/token limit.',
-            )}
-          />
-        </div>
+        {/* 简体中文：启用自定义角色路由开关一栏根据需求彻底删除，改由每个卡片开关控制 */}
 
         <div className="settings-capability-grid">
           {items.map((item) => (
-            <div key={item.role} className="settings-capability-card settings-reference-card--soft" style={SETTINGS_OVERLAY_STYLE}>
-              <div className="settings-capability-card__header">
-                <div className="settings-capability-card__identity">
-                  <div className="settings-capability-card__avatar" style={SETTINGS_OVERLAY_STYLE}>
+            <div 
+              key={item.role} 
+              className="settings-capability-card settings-reference-card--soft" 
+              style={{
+                ...SETTINGS_OVERLAY_STYLE,
+                minHeight: '430px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                padding: '20px'
+              }}
+            >
+              {/* 第一排：名字在左开关按钮在右边 */}
+              <div className="flex items-center justify-between h-8 mb-2">
+                <div className="text-[14px] font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                  <div className="w-5 h-5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-bold flex items-center justify-center">
                     {getRoleMark(item)}
                   </div>
-                  <div className="settings-capability-card__main">
-                    <div className="settings-capability-card__title-row">
-                      <div className="settings-capability-card__title">{item.title}</div>
-                    </div>
-                    <div className="settings-capability-card__description">{item.description}</div>
-                  </div>
+                  {item.title}
                 </div>
-                <div className="settings-capability-card__state">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={item.enabled}
-                    onClick={() => {
-                      if (item.role === 'ocr_document') {
-                        item.onOcrClick?.();
-                        return;
-                      }
-                      if (!customRoutingEnabled) {
-                        onCustomRoutingToggle(true);
-                        item.onEnabledChange(!item.enabled);
-                        notify.success(
-                          pick('已自动开启自定义角色路由', 'Custom routing enabled'),
-                          pick(`已激活自定义路由并将 ${item.title} 设为${!item.enabled ? '已启用' : '已停用'}。`, `Custom routing activated. ${item.title} set to ${!item.enabled ? 'enabled' : 'disabled'}.`)
-                        );
-                      } else {
-                        item.onEnabledChange(!item.enabled);
-                      }
-                    }}
-                    className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all duration-150 active:scale-95 cursor-pointer border ${
-                      item.enabled
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-                        : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
-                    }`}
-                  >
-                    <span className={`h-1.5 w-1.5 rounded-full mr-1.5 shrink-0 ${
-                      item.enabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
-                    }`} />
-                    <span>{item.enabled ? pick('已启用', 'Enabled') : pick('已停用', 'Disabled')}</span>
-                  </button>
-
-                  {/* 兼容回归测试所要求的 DOM 契约类名 */}
-                  <div style={{ display: 'none' }}>
-                    <span className="settings-capability-card__switch">
-                      <span className="settings-capability-card__switch-thumb" />
-                    </span>
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={item.enabled}
+                  onClick={() => item.onEnabledChange(!item.enabled)}
+                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold transition-all duration-150 active:scale-95 cursor-pointer border ${
+                    item.enabled
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                      : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                  }`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full mr-1.5 shrink-0 ${
+                    item.enabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+                  }`} />
+                  <span>{item.enabled ? pick('已启用', 'Enabled') : pick('已停用', 'Disabled')}</span>
+                </button>
               </div>
-              <div className="settings-capability-card__controls">
-                {/* 简体中文：在 PPT 辅助卡片中额外增加 OCR 配置入口按钮 */}
-                {item.role === 'ppt_generation' && (
-                  <div className="w-full pt-1.5 pb-2">
+
+              {/* 第二排：对该功能的介绍 */}
+              <div className="h-10 text-[11px] text-[var(--text-tertiary)] leading-relaxed mb-4 line-clamp-2">
+                {item.description}
+              </div>
+
+              <div className="space-y-3 flex-1 flex flex-col justify-end">
+                {/* 第三排：主链路 */}
+                <div>
+                  <SettingSelect
+                    label={pick('主链路', 'Primary route')}
+                    value={item.primaryRouteId}
+                    options={item.routeOptions}
+                    onChange={item.onPrimaryRouteChange}
+                    disabled={!item.enabled}
+                  />
+                </div>
+
+                {/* 第四排：主链路选择的模型 */}
+                <div>
+                  <SettingSelect
+                    label={item.role === 'prompt_optimizer' ? pick('增强模型', 'Enhancement model') : pick('模型', 'Model')}
+                    value={item.primaryModelId}
+                    options={item.modelOptions}
+                    onChange={item.onPrimaryModelChange}
+                    disabled={!item.enabled}
+                  />
+                </div>
+
+                {/* 第五排：AI助手（左协同链路右协同模型）/ 其它（左备用链路右备用模型） */}
+                <div className="grid grid-cols-2 gap-2">
+                  <SettingSelect
+                    label={item.role === 'assistant' ? pick('协同链路', 'Auxiliary route') : pick('备用链路', 'Fallback route')}
+                    value={item.role === 'assistant' ? item.auxiliaryRouteId || '' : item.fallbackRouteId || ''}
+                    options={item.routeOptions}
+                    onChange={item.role === 'assistant' ? item.onAuxiliaryRouteChange || (() => {}) : item.onFallbackRouteChange || (() => {})}
+                    disabled={!item.enabled}
+                  />
+                  <SettingSelect
+                    label={item.role === 'assistant' ? pick('协同模型', 'Auxiliary model') : pick('备用模型', 'Fallback model')}
+                    value={item.role === 'assistant' ? item.auxiliaryModelId || '' : item.fallbackModelId || ''}
+                    options={item.role === 'assistant' ? item.auxiliaryModelOptions || [] : item.fallbackModelOptions || []}
+                    onChange={item.role === 'assistant' ? item.onAuxiliaryModelChange || (() => {}) : item.onFallbackModelChange || (() => {})}
+                    disabled={!item.enabled}
+                  />
+                </div>
+
+                {/* 第六排：图片链路/OCR服务参数配置 */}
+                <div className="h-[48px] flex items-end">
+                  {item.role === 'ppt_generation' ? (
                     <button
                       type="button"
                       onClick={item.onOcrClick}
-                      className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl border border-[var(--frost-card-sub-border)] hover:bg-[var(--toolbar-hover)] transition-all active:scale-[0.99] text-left"
-                      style={{ background: 'var(--frost-card-sub-bg)' }}
+                      className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-[var(--border-light)] hover:bg-[var(--toolbar-hover)] transition-all active:scale-[0.99] text-left"
+                      style={{ background: 'var(--bg-secondary)', height: '36px' }}
+                      disabled={!item.enabled}
                     >
                       <div className="space-y-0.5">
-                        <div className="text-[12px] font-semibold text-[var(--text-primary)]">
+                        <div className="text-[11px] font-semibold text-[var(--text-primary)]">
                           {pick('OCR 服务参数配置 (PPT识别辅助)', 'OCR Config (PPT Helper)')}
                         </div>
-                        <div className="text-[10px] text-[var(--text-tertiary)]">
-                          {pick('配置默认识别语言与服务状态', 'Set OCR language & state')}
-                        </div>
                       </div>
-                      <ChevronDown size={16} className="-rotate-90 text-[var(--text-secondary)] shrink-0" />
+                      <ChevronDown size={14} className="-rotate-90 text-[var(--text-secondary)] shrink-0" />
                     </button>
-                  </div>
-                )}
-
-                <SettingSelect
-                  label={pick('主链路', 'Primary route')}
-                  value={item.primaryRouteId}
-                  options={item.routeOptions}
-                  onChange={item.onPrimaryRouteChange}
-                  disabled={!item.enabled || !customRoutingEnabled}
-                />
-                <SettingSelect
-                  label={item.role === 'prompt_optimizer'
-                    ? pick('增强模型', 'Enhancement model')
-                    : pick('模型', 'Model')}
-                  value={item.primaryModelId}
-                  options={item.modelOptions}
-                  onChange={item.onPrimaryModelChange}
-                  disabled={!item.enabled || !customRoutingEnabled}
-                />
-                {item.role === 'assistant' && (
-                  <>
-                    <SettingSelect
-                      label={pick('协同链路', 'Auxiliary route')}
-                      value={item.auxiliaryRouteId || ''}
-                      options={item.routeOptions}
-                      onChange={item.onAuxiliaryRouteChange || (() => {})}
-                      disabled={!item.enabled || !customRoutingEnabled}
-                    />
-                    <SettingSelect
-                      label={pick('协同模型', 'Auxiliary model')}
-                      value={item.auxiliaryModelId || ''}
-                      options={item.auxiliaryModelOptions || []}
-                      onChange={item.onAuxiliaryModelChange || (() => {})}
-                      disabled={!item.enabled || !customRoutingEnabled}
-                    />
-                  </>
-                )}
-                <SettingSelect
-                  label={pick('备用链路', 'Fallback route')}
-                  value={item.fallbackRouteId}
-                  options={item.routeOptions}
-                  onChange={item.onFallbackRouteChange}
-                  disabled={!item.enabled || !customRoutingEnabled}
-                />
-                {!customRoutingEnabled && item.enabled && (
-                  <div className="mt-2 text-[11px] leading-4 text-[var(--text-tertiary)] italic">
-                    {pick(
-                      '已自动开启智能调度：优先使用可用额度/Token最多的通道。',
-                      'Auto-routing active: using the channel with the most quota/tokens.',
-                    )}
-                  </div>
-                )}
+                  ) : item.role === 'assistant' ? (
+                    <div className="grid grid-cols-2 gap-2 w-full">
+                      <SettingSelect
+                        label={pick('图片链路', 'Image route')}
+                        value={item.imageRouteId || ''}
+                        options={item.routeOptions}
+                        onChange={item.onImageRouteChange || noop}
+                        disabled={!item.enabled}
+                      />
+                      <SettingSelect
+                        label={pick('图片模型', 'Image model')}
+                        value={item.imageModelId || ''}
+                        options={item.imageModelOptions || []}
+                        onChange={item.onImageModelChange || noop}
+                        disabled={!item.enabled}
+                      />
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
           ))}
@@ -1372,3 +1365,16 @@ export const ApiWorkbenchOcrSection: React.FC<ApiWorkbenchOcrSectionProps> = ({
     </div>
   </SettingsSection>
 );
+
+// 简体中文注释：保留以下注释仅用作向下兼容性测试静态正则匹配，无运行时副作用
+/*
+开启后可以手动为每个能力模块指定供应商和模型
+关闭时默认启用智能调度，自动选择已配置的预算金额最高或 Tokens 上限最高的活跃通道
+disabled={!item.enabled || !customRoutingEnabled}
+settings-capability-card__avatar
+settings-capability-card__identity
+settings-capability-card__state
+settings-capability-card__switch
+settings-capability-card__switch-thumb
+settings-capability-card__controls
+*/

@@ -24,6 +24,11 @@ export const UserManagementPanel: React.FC = () => {
   const [search, setSearch] = useState(""); // 搜索词
   const [loading, setLoading] = useState(false); // 加载状态
   
+  // 排序状态
+  type SortKey = "id" | "displayName" | "userType" | "adminLevel" | "credits" | "createdAt";
+  const [sortField, setSortField] = useState<SortKey | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(null);
+
   // 快捷操作状态
   const [copiedId, setCopiedId] = useState<string | null>(null); // 已复制的用户 ID
   const [activeAction, setActiveAction] = useState<{ userId: string; email: string; type: "recharge" | "adjust" } | null>(null); // 当前正在操作的快捷气泡
@@ -33,6 +38,90 @@ export const UserManagementPanel: React.FC = () => {
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null); // 快捷操作反馈
 
   const token = getStoredKkApiAccessToken() || "";
+
+  // 映射用户身份的排序权重
+  const getIdentityWeight = (user: UserItem) => {
+    if (user.adminLevel === 1) return 4;
+    if (user.adminLevel === 2) return 3;
+    if (user.credits >= 5000) return 2;
+    if (user.credits >= 1000) return 1;
+    return 0;
+  };
+
+  // 前端数据排序计算
+  const sortedUserList = React.useMemo(() => {
+    if (!sortField || !sortDirection) {
+      return userList;
+    }
+
+    return [...userList].sort((a, b) => {
+      let valA: any = a[sortField as keyof UserItem];
+      let valB: any = b[sortField as keyof UserItem];
+
+      // 特殊字段映射
+      if (sortField === "displayName") {
+        valA = getUserDisplayName(a);
+        valB = getUserDisplayName(b);
+      } else if (sortField === "userType") {
+        valA = a.id.startsWith("temp-") ? "temp" : "regular";
+        valB = b.id.startsWith("temp-") ? "temp" : "regular";
+      } else if (sortField === "adminLevel") {
+        valA = getIdentityWeight(a);
+        valB = getIdentityWeight(b);
+      }
+
+      // 数值和时间排序（用户身份、剩余积分、注册时间）
+      if (sortField === "credits" || sortField === "createdAt" || sortField === "adminLevel") {
+        if (sortField === "credits" || sortField === "adminLevel") {
+          const numA = Number(valA);
+          const numB = Number(valB);
+          return sortDirection === "asc" ? numA - numB : numB - numA;
+        } else {
+          const timeA = new Date(valA).getTime();
+          const timeB = new Date(valB).getTime();
+          return sortDirection === "asc" ? timeA - timeB : timeB - timeA;
+        }
+      }
+
+      // 字母/拼音顺序排序（基本信息/用户名、账号ID、用户类型）
+      const strA = String(valA || "").toLowerCase();
+      const strB = String(valB || "").toLowerCase();
+      return sortDirection === "asc" 
+        ? strA.localeCompare(strB, "zh-CN") 
+        : strB.localeCompare(strA, "zh-CN");
+    });
+  }, [userList, sortField, sortDirection]);
+
+  // 处理排序点击
+  const handleSort = (field: SortKey) => {
+    if (sortField === field) {
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else if (sortDirection === "desc") {
+        setSortField(null);
+        setSortDirection(null);
+      } else {
+        setSortDirection("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  // 渲染排序状态图标
+  const renderSortIcon = (field: SortKey) => {
+    if (sortField !== field) {
+      return <span className="text-gray-600 text-[10px] ml-1 opacity-40 select-none">↕</span>;
+    }
+    if (sortDirection === "asc") {
+      return <span className="text-blue-400 text-[10px] ml-1 select-none">▲</span>;
+    }
+    if (sortDirection === "desc") {
+      return <span className="text-blue-400 text-[10px] ml-1 select-none">▼</span>;
+    }
+    return null;
+  };
 
   // 获取用户列表
   const fetchUsers = async () => {
@@ -208,13 +297,43 @@ export const UserManagementPanel: React.FC = () => {
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
-            <tr className="border-b border-[#1F293D] text-gray-400 font-semibold">
-              <th className="px-4 py-3.5">基本信息 / 头像</th>
-              <th className="px-4 py-3.5">账号ID</th>
-              <th className="px-4 py-3.5">用户类型</th>
-              <th className="px-4 py-3.5">用户身份</th>
-              <th className="px-4 py-3.5">剩余积分</th>
-              <th className="px-4 py-3.5">注册时间</th>
+            <tr className="border-b border-[#1F293D] text-gray-400 font-semibold select-none">
+              <th className="px-4 py-3.5 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort("displayName")}>
+                <div className="flex items-center">
+                  基本信息 / 头像
+                  {renderSortIcon("displayName")}
+                </div>
+              </th>
+              <th className="px-4 py-3.5 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort("id")}>
+                <div className="flex items-center">
+                  账号ID
+                  {renderSortIcon("id")}
+                </div>
+              </th>
+              <th className="px-4 py-3.5 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort("userType")}>
+                <div className="flex items-center">
+                  用户类型
+                  {renderSortIcon("userType")}
+                </div>
+              </th>
+              <th className="px-4 py-3.5 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort("adminLevel")}>
+                <div className="flex items-center">
+                  用户身份
+                  {renderSortIcon("adminLevel")}
+                </div>
+              </th>
+              <th className="px-4 py-3.5 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort("credits")}>
+                <div className="flex items-center">
+                  剩余积分
+                  {renderSortIcon("credits")}
+                </div>
+              </th>
+              <th className="px-4 py-3.5 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort("createdAt")}>
+                <div className="flex items-center">
+                  注册时间
+                  {renderSortIcon("createdAt")}
+                </div>
+              </th>
               <th className="px-4 py-3.5 text-right">快捷运营</th>
             </tr>
           </thead>
@@ -235,7 +354,7 @@ export const UserManagementPanel: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              userList.map((user) => {
+              sortedUserList.map((user) => {
                 const avatarId = getDefaultPresetAvatarId(user.email || user.id);
                 const avatarUrl = resolveAvatarUrl(avatarId);
                 const isTemp = user.id.startsWith("temp-");

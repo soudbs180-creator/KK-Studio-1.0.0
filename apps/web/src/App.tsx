@@ -249,6 +249,7 @@ import { formatRemainingCredits } from './services/billing/remainingBalance';
 import {
   isCapabilityRouteAssignmentRouteDisabled,
   resolveEnabledCapabilityRouteAssignment,
+  resolveRedrawRouteAndModel,
 } from './services/api/capabilityRouteAssignments';
 
 
@@ -2853,8 +2854,9 @@ const AppContent: React.FC<AppContentProps> = () => {
             request.sourceImageDimensions,
             cropPlan ? `redraw-crop-${index + 1}` : 'redraw-full',
           );
-          const usesRedrawOnlyModel = Boolean(cropPlan) || plan?.mode === 'color-blocks' || plan?.mode === 'whole-image-marked';
-          const nodeModel = normalizeModelId(usesRedrawOnlyModel ? (plan?.model || request.model) : config.model);
+          const { routeId, modelId } = resolveRedrawRouteAndModel(sourceImage.provider);
+          const nodeModel = modelId;
+          const nodeProvider = routeId;
           const nodePrompt = cropPlan ? finalPrompt : [
             parentPrompt?.prompt ? `原始提示词：${parentPrompt.prompt}` : '',
             sourceImage.prompt ? `当前图片提示词：${sourceImage.prompt}` : '',
@@ -2890,8 +2892,8 @@ const AppContent: React.FC<AppContentProps> = () => {
               nodeModel,
               getModelMetadata(nodeModel)?.name || sourceImage.modelLabel,
             ) || undefined,
-            provider: sourceImage.provider || undefined,
-            providerLabel: sourceImage.providerLabel || undefined,
+            provider: nodeProvider || undefined,
+            providerLabel: nodeProvider ? (keyManager.getKey(nodeProvider)?.name || (getModelMetadata(nodeModel) as any)?.providerLabel) : undefined,
             childImageIds: [],
             referenceImages: [
               sourceReference,

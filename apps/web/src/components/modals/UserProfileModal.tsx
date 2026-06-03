@@ -1119,6 +1119,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   value={displayName}
                   onChange={(event) => setDisplayName(event.target.value)}
                   placeholder="请输入昵称"
+                  autoComplete="new-password"
                   className="h-10 w-full rounded-lg border bg-[var(--frost-input-bg)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                   style={{ borderColor: 'var(--frost-input-border)' }}
                 />
@@ -1351,6 +1352,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     value={mfaFriendlyName}
                     onChange={(event) => setMfaFriendlyName(event.target.value)}
                     placeholder="例如：我的手机"
+                    autoComplete="new-password"
                     className="h-10 w-full rounded-lg border bg-[var(--frost-input-bg)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                     style={{ borderColor: 'var(--frost-input-border)' }}
                   />

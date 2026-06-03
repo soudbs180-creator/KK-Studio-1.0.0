@@ -4071,6 +4071,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                 placeholder={pick('会根据提供商自动固定', 'Automatically fixed by provider')}
                 helper={pick('本地 API 名称固定按提供商显示；谷歌会跟随语言显示为“谷歌”或“Google”。', 'Local API names are fixed by provider; Google follows the current language.')}
                 disabled={userApiEditorReadOnly}
+                autoComplete="new-password"
               />
               <SettingSelect
                 label={pick('服务商', 'Provider')}
@@ -4256,6 +4257,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                       onChange={(value) => setProviderForm((current) => ({ ...current, name: value }))}
                       placeholder={pick('例如：Anthropic', 'For example: Anthropic')}
                       disabled={providerEditorReadOnly}
+                      autoComplete="new-password"
                     />
                     <SettingInput
                       label={pick('地址', 'URL')}
@@ -4264,6 +4266,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                       onBlur={autoFixProviderFormat}
                       placeholder="https://api.example.com/v1"
                       disabled={providerEditorReadOnly}
+                      autoComplete="new-password"
                     />
                   </>
                 )}

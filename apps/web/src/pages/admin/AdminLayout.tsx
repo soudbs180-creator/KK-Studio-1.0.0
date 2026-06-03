@@ -51,7 +51,7 @@ export const AdminLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-gray-100 p-6 md:p-8 font-sans transition-colors duration-200">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-[1720px] mx-auto">
         {/* 顶部标题栏 */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#1F293D] pb-5 mb-8 gap-4 relative">
           <div>
@@ -128,74 +128,39 @@ export const AdminLayout: React.FC = () => {
           )}
         </div>
 
-        {/* Tab 导航头 - 冰蓝高品质发光线条 */}
-        <div className="border-b border-[#1F293D] flex gap-2 md:gap-6 mb-8 overflow-x-auto scrollbar-none">
-          <button
-            onClick={() => setActiveTab("users")}
-            className={`pb-3 px-2 text-sm transition-all whitespace-nowrap ${
-              activeTab === "users"
-                ? "text-white font-bold border-b-2 border-blue-500 -mb-[1px] drop-shadow-[0_2px_4px_rgba(59,130,246,0.3)]"
-                : "text-gray-400 font-normal border-b-2 border-transparent hover:text-gray-200"
-            }`}
-          >
-            用户管理
-          </button>
-
-          <button
-            onClick={() => setActiveTab("recharge")}
-            className={`pb-3 px-2 text-sm transition-all whitespace-nowrap ${
-              activeTab === "recharge"
-                ? "text-white font-bold border-b-2 border-blue-500 -mb-[1px] drop-shadow-[0_2px_4px_rgba(59,130,246,0.3)]"
-                : "text-gray-400 font-normal border-b-2 border-transparent hover:text-gray-200"
-            }`}
-          >
-            充值管理
-          </button>
-
-          <button
-            onClick={() => setActiveTab("credits")}
-            className={`pb-3 px-2 text-sm transition-all whitespace-nowrap ${
-              activeTab === "credits"
-                ? "text-white font-bold border-b-2 border-blue-500 -mb-[1px] drop-shadow-[0_2px_4px_rgba(59,130,246,0.3)]"
-                : "text-gray-400 font-normal border-b-2 border-transparent hover:text-gray-200"
-            }`}
-          >
-            积分调整
-          </button>
-
-          <button
-            onClick={() => setActiveTab("apiConfig")}
-            className={`pb-3 px-2 text-sm transition-all whitespace-nowrap ${
-              activeTab === "apiConfig"
-                ? "text-white font-bold border-b-2 border-blue-500 -mb-[1px] drop-shadow-[0_2px_4px_rgba(59,130,246,0.3)]"
-                : "text-gray-400 font-normal border-b-2 border-transparent hover:text-gray-200"
-            }`}
-          >
-            API 计费定价
-          </button>
-
-          {adminLevel === 1 && (
-            <button
-              onClick={() => setActiveTab("staff")}
-              className={`pb-3 px-2 text-sm transition-all whitespace-nowrap ${
-                activeTab === "staff"
-                  ? "text-white font-bold border-b-2 border-blue-500 -mb-[1px] drop-shadow-[0_2px_4px_rgba(59,130,246,0.3)]"
-                  : "text-gray-400 font-normal border-b-2 border-transparent hover:text-gray-200"
-              }`}
-            >
-              人员管理 (超管)
-            </button>
-          )}
+        {/* 响应式并列主布局 (用户管理占 40%, 充值占 15%, 积分占 15%, API定价占 30%) */}
+        <div className="grid grid-cols-1 lg:grid-cols-[40fr_15fr_15fr_30fr] gap-6 items-stretch w-full mb-8">
+          <div className="flex flex-col h-full">
+            <UserManagementPanel />
+          </div>
+          <div className="flex flex-col h-full">
+            <RechargePanel />
+          </div>
+          <div className="flex flex-col h-full">
+            <CreditsPanel />
+          </div>
+          <div className="flex flex-col h-full">
+            <ApiConfigPanel />
+          </div>
         </div>
 
-        {/* 渲染子面板 */}
-        <div className="transition-all duration-200 animate-in fade-in duration-300">
-          {activeTab === "users" && <UserManagementPanel />}
-          {activeTab === "recharge" && <RechargePanel />}
-          {activeTab === "credits" && <CreditsPanel />}
-          {activeTab === "apiConfig" && <ApiConfigPanel />}
-          {activeTab === "staff" && adminLevel === 1 && <StaffPanel />}
-        </div>
+        {/* 人员管理 (高级/超级管理员 Level 1 专属面板，位于页面底部单独大卡片中) */}
+        {adminLevel === 1 && (
+          <div className="mt-8 border-t border-[#1F293D] pt-8">
+            <div className="bg-[#111827]/80 border border-[#1F293D] rounded-2xl p-6 backdrop-blur-md shadow-2xl">
+              <div className="border-b border-[#1F293D] pb-3 mb-5">
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <ShieldAlert className="text-red-400" size={18} />
+                  系统人员与权限管理 (超级管理员专属)
+                </h2>
+                <p className="text-xs text-gray-400 mt-1">
+                  高级管理员拥有人员任命的最高特权，可在此升级正式用户为普通管理员，或撤回其权限。
+                </p>
+              </div>
+              <StaffPanel />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -16,6 +16,33 @@ import {
     Trash2,
 } from 'lucide-react';
 import { useCanvas } from '../../context/CanvasContext';
+
+// 简体中文：自定义扫把（Broom）图标组件，用于清理操作
+const Broom: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ size = 24, ...props }) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        {...props}
+    >
+        <path d="M4 20h16" />
+        <path d="m11 15 4.5-4.5" />
+        <path d="m13 13 4.5-4.5" />
+        <path d="M15 11 19.5 6.5" />
+        <path d="m20 4-4.5 4.5" />
+        <path d="M11 15 8 18" />
+        <path d="m8 18-2 2" />
+        <path d="M13 13 10 16" />
+        <path d="m10 16-2 2" />
+    </svg>
+);
+
 import { useTheme } from '../../context/ThemeContext';
 import { notify } from '../../services/system/notificationService';
 import type { WorkflowUtilityNodeKind } from '../../workflow/schema';
@@ -561,7 +588,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         disabled={cleaningInvalid}
                         className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-amber-500/10 hover:text-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        <Trash2 size={16} />
+                        <Broom size={16} />
                         {cleaningInvalid ? '正在清理错误卡片...' : '清理错误卡片'}
                     </button>
 

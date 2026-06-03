@@ -76,7 +76,7 @@ export const CreditsPanel: React.FC = () => {
   };
 
   return (
-    <div className="bg-[#111827]/80 border border-[#1F293D] rounded-2xl p-6 max-w-lg backdrop-blur-md shadow-2xl">
+    <div className="bg-[#111827]/80 border border-[#1F293D] rounded-2xl p-6 w-full h-full backdrop-blur-md shadow-2xl">
       <div className="border-b border-[#1F293D] pb-3 mb-5">
         <h2 className="text-base font-bold text-white flex items-center gap-2">
           <Sliders className="text-purple-500" size={18} />
