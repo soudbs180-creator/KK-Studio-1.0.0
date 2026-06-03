@@ -2697,6 +2697,11 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             createdAt: Date.now(),
             updatedAt: Date.now(),
           });
+
+          if (providerForm.id && providerForm.id !== wuyinProvider.id) {
+            await removeUserApiProviderFromCloudRecord(providerForm.id);
+          }
+
           await refreshAfterCloudUserApiMutation();
         } else {
           // 本地模式，调用 keyManager
@@ -2724,6 +2729,11 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           } else {
             await keyManager.addKey(typedKeySlot.key, typedKeySlot);
           }
+
+          if (providerForm.id && providerForm.id !== typedProvider.id) {
+            keyManager.removeProvider(providerForm.id);
+          }
+
           await keyManager.syncToCloudNow();
         }
 

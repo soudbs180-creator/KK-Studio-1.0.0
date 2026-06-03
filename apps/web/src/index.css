@@ -153,8 +153,8 @@
   --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
-  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ease-bounce: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.25, 1, 0.5, 1);
 
   --duration-instant: 50ms;
   --duration-fast: 150ms;
@@ -17232,23 +17232,19 @@ body:not(.dark-mode) .settings-model-center-route__btn-action--danger span {
   backdrop-filter: none !important;
 }
 
-/* 🚀 个人中心模态框（UserProfileModal）重构的弹性弹出效果 */
+/* 🚀 个人中心模态框（UserProfileModal）重构的平滑弹出效果 */
 .kk-user-profile-modal-desktop-animate {
-  animation: modal-bounce-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation: modal-bounce-in 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .kk-user-profile-modal-mobile-animate {
-  animation: mobile-sheet-slide-up-elastic 0.42s cubic-bezier(0.175, 0.885, 0.32, 1.1) forwards;
+  animation: mobile-sheet-slide-up-elastic 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes modal-bounce-in {
   0% {
-    transform: scale(0.92) translate3d(0, 16px, 0);
+    transform: scale(0.95) translate3d(0, 10px, 0);
     opacity: 0;
-  }
-  60% {
-    transform: scale(1.015) translate3d(0, -3px, 0);
-    opacity: 0.9;
   }
   100% {
     transform: scale(1) translate3d(0, 0, 0);
@@ -17259,11 +17255,7 @@ body:not(.dark-mode) .settings-model-center-route__btn-action--danger span {
 @keyframes mobile-sheet-slide-up-elastic {
   0% {
     transform: translateY(100%);
-    opacity: 0.7;
-  }
-  85% {
-    transform: translateY(-6px);
-    opacity: 0.95;
+    opacity: 0.8;
   }
   100% {
     transform: translateY(0);
@@ -17289,6 +17281,33 @@ body:not(.dark-mode) .settings-model-center-route__btn-action--danger span {
   z-index: 99999 !important;
   position: relative !important;
   transition: all 0.3s ease;
+}
+
+/* 🚀 低运动设定降级，为有特殊系统诉求或低端硬件用户静默大动画 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-delay: -1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 🚀 暗色模式高反差缓释：减弱白底生成图亮度的刺眼感，悬停时优雅恢复 */
+.dark-mode .generated-image-card img,
+.dark-mode .image-node img,
+.dark-mode img.user-generated {
+  filter: brightness(0.93) contrast(1.02);
+  transition: filter var(--motion-hover, 120ms) var(--ease-default, ease-in-out);
+}
+
+.dark-mode .generated-image-card img:hover,
+.dark-mode .image-node img:hover,
+.dark-mode img.user-generated:hover {
+  filter: brightness(1) contrast(1);
 }
 
 

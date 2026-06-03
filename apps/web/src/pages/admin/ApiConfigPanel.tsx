@@ -1,7 +1,7 @@
 // 职责：管理员维护供应商、模型和积分参数，入口形态与用户 API 设置保持一致。
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Box, ExternalLink, Globe, Plus, RefreshCw, Save, Shield } from "lucide-react";
+import { Box, Edit, ExternalLink, Globe, Plus, RefreshCw, Save, Shield } from "lucide-react";
 import type {
   AdminCreditProviderDto,
   SaveAdminCreditProviderRequestDto,
@@ -56,6 +56,9 @@ type AdminProviderDraft = {
   apiKey: string;
   color: string;
   kind: AdminPresetKind;
+  isEditing?: boolean;
+  originalModels?: any[];
+  retainApiKeyFingerprints?: string[];
 };
 
 const toDraftPricing = (pricing?: AdminModelQualityPricing, fallbackCost = 1): DraftPricing => {
@@ -219,6 +222,52 @@ export const ApiConfigPanel: React.FC = () => {
     setMessage("自定义供应商草稿已创建。填写 Base URL、模型 ID 和积分档位后保存。");
   };
 
+  const handleEditProvider = (provider: AdminProvider) => {
+    const providerDetail = adminProviders.find((p) => p.providerId === provider.providerId);
+    const baseUrl = providerDetail?.baseUrl || "";
+    const providerKind = provider.providerKind || providerDetail?.providerKind || "relay";
+
+    const modelId = provider.models[0]?.id || "";
+    const displayName = provider.models[0]?.displayName || "";
+    const endpointType = provider.models[0]?.endpoint || "openai";
+    const color = provider.models[0]?.colorStart || "#3B82F6";
+
+    const modelsForDraft = providerDetail ? providerDetail.models.map(m => ({
+      modelId: m.modelId,
+      displayName: m.displayName || m.modelId,
+      description: m.description || "",
+      endpointType: m.endpointType || "openai",
+      creditCost: m.creditCost,
+      advancedEnabled: m.advancedEnabled,
+      mixWithSameModel: m.mixWithSameModel,
+      qualityPricing: m.qualityPricing || createDefaultAdminQualityPricing(m.creditCost || 1),
+      priority: m.priority,
+      weight: m.weight,
+      isActive: m.isActive,
+      color: m.color || "#3B82F6",
+      colorSecondary: m.colorSecondary || null,
+      textColor: m.textColor || "white",
+      maxCallsLimit: m.maxCallsLimit || null,
+    })) : [];
+
+    setProviderDraft({
+      providerId: provider.providerId,
+      providerName: provider.name,
+      baseUrl: baseUrl,
+      modelId: modelId,
+      displayName: displayName,
+      endpointType: endpointType,
+      apiKey: "",
+      color: color,
+      kind: providerKind,
+    isEditing: true,
+      originalModels: modelsForDraft,
+      retainApiKeyFingerprints: (providerDetail?.apiKeyEntries || []).map((entry) => entry.fingerprint).filter(Boolean),
+    });
+
+    setMessage(`已载入供应商 ${provider.name} 的配置以供修改。`);
+  };
+
   const handleDraftChange = (patch: Partial<AdminProviderDraft>) => {
     setProviderDraft((current) => current ? { ...current, ...patch } : current);
   };
@@ -240,19 +289,33 @@ export const ApiConfigPanel: React.FC = () => {
       };
       return pricing;
     }, {} as AdminModelQualityPricing);
-    const providerId = buildProviderId(providerName, baseUrl);
 
-    setSaving(true);
-    try {
-      const response = await kkWebApiClient.saveAdminCreditProvider(providerId, {
-        providerName,
-        baseUrl,
-        providerKind: providerDraft.kind,
-        apiKeys: providerDraft.apiKey.trim() ? [providerDraft.apiKey.trim()] : [],
-        retainApiKeyFingerprints: [],
-        models: [{
-          modelId,
-          displayName: providerDraft.displayName.trim() || modelId,
+    const providerId = providerDraft.isEditing && providerDraft.providerId
+      ? providerDraft.providerId
+      : buildProviderId(providerName, baseUrl);
+
+    let finalModels: any[] = [];
+    if (providerDraft.isEditing && providerDraft.originalModels && providerDraft.originalModels.length > 0) {
+      finalModels = providerDraft.originalModels.map((m, index) => {
+        if (index === 0 || m.modelId === providerDraft.modelId) {
+          return {
+            ...m,
+            modelId: providerDraft.modelId.trim(),
+            displayName: providerDraft.displayName.trim() || providerDraft.modelId.trim(),
+            endpointType: providerDraft.endpointType.trim() || "openai",
+            color: providerDraft.color || "#3B82F6",
+            creditCost: nextPricing["1K"].creditCost,
+            qualityPricing: nextPricing,
+          };
+        }
+        return m;
+      });
+
+      const hasModel = finalModels.some(m => m.modelId === providerDraft.modelId.trim());
+      if (!hasModel) {
+        finalModels[0] = {
+          modelId: providerDraft.modelId.trim(),
+          displayName: providerDraft.displayName.trim() || providerDraft.modelId.trim(),
           description: providerDraft.kind === "relay" ? "中转站模型通道" : "官方模型通道",
           endpointType: providerDraft.endpointType.trim() || "openai",
           creditCost: nextPricing["1K"].creditCost,
@@ -266,7 +329,37 @@ export const ApiConfigPanel: React.FC = () => {
           colorSecondary: null,
           textColor: "white",
           maxCallsLimit: null,
-        }],
+        };
+      }
+    } else {
+      finalModels = [{
+        modelId,
+        displayName: providerDraft.displayName.trim() || modelId,
+        description: providerDraft.kind === "relay" ? "中转站模型通道" : "官方模型通道",
+        endpointType: providerDraft.endpointType.trim() || "openai",
+        creditCost: nextPricing["1K"].creditCost,
+        advancedEnabled: true,
+        mixWithSameModel: false,
+        qualityPricing: nextPricing,
+        priority: 0,
+        weight: 0,
+        isActive: true,
+        color: providerDraft.color || "#3B82F6",
+        colorSecondary: null,
+        textColor: "white",
+        maxCallsLimit: null,
+      }];
+    }
+
+    setSaving(true);
+    try {
+      const response = await kkWebApiClient.saveAdminCreditProvider(providerId, {
+        providerName,
+        baseUrl,
+        providerKind: providerDraft.kind,
+        apiKeys: providerDraft.apiKey.trim() ? [providerDraft.apiKey.trim()] : [],
+        retainApiKeyFingerprints: providerDraft.isEditing ? (providerDraft.retainApiKeyFingerprints || []) : [],
+        models: finalModels,
       });
 
       if (!response.success) {
@@ -353,19 +446,46 @@ export const ApiConfigPanel: React.FC = () => {
 
         <div className="admin-api-nexus__provider-grid">
           {providers.filter((p) => (p.providerKind || "relay") === presetTab).map((provider) => (
-            <button
+            <div
               key={provider.providerId}
-              type="button"
               className={`admin-api-nexus__provider-card ${selectedProvider?.providerId === provider.providerId ? "is-active" : ""}`}
               onClick={() => {
                 setSelectedProviderId(provider.providerId);
                 setSelectedModelId("");
               }}
+              style={{ position: "relative" }}
             >
               <Globe size={18} />
               <strong>{provider.name}</strong>
               <span>{provider.models.length} 个模型</span>
-            </button>
+              {selectedProvider?.providerId === provider.providerId && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditProvider(provider);
+                  }}
+                  style={{
+                    position: "absolute",
+                    top: "12px",
+                    right: "12px",
+                    background: "transparent",
+                    border: "none",
+                    color: "#9ca3af",
+                    cursor: "pointer",
+                    padding: "4px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "4px",
+                  }}
+                  className="admin-api-nexus__provider-card-edit"
+                  title="修改供应商配置"
+                >
+                  <Edit size={14} />
+                </button>
+              )}
+            </div>
           ))}
           {!loading && providers.filter((p) => (p.providerKind || "relay") === presetTab).length === 0 ? (
             <div className="admin-api-nexus__empty">此分类下暂无已发布的模型供应商。先从右侧目录添加。</div>
@@ -455,19 +575,39 @@ export const ApiConfigPanel: React.FC = () => {
             </div>
           </button>
         </div>
-        {providerDraft ? (
+         {providerDraft ? (
           <div className="admin-api-nexus__draft" data-testid="admin-api-provider-draft">
             <div>
-              <strong>供应商草稿</strong>
-              <small>{providerDraft.kind === "relay" ? "中转站" : "官方"} · 保存后进入模型积分池</small>
+              <strong>{providerDraft.isEditing ? "修改供应商配置" : "供应商草稿"}</strong>
+              <small>{providerDraft.isEditing ? "正在编辑已有的供应商通道" : `${providerDraft.kind === "relay" ? "中转站" : "官方"} · 保存后进入模型积分池`}</small>
             </div>
             <label>
               <span>名称</span>
-              <input value={providerDraft.providerName} onChange={(event) => handleDraftChange({ providerName: event.target.value })} />
+              <input
+                value={providerDraft.providerName}
+                onChange={(event) => {
+                  const updatedName = event.target.value;
+                  const patch: Partial<AdminProviderDraft> = { providerName: updatedName };
+                  if (!providerDraft.isEditing) {
+                    patch.providerId = buildProviderId(updatedName, providerDraft.baseUrl);
+                  }
+                  handleDraftChange(patch);
+                }}
+              />
             </label>
             <label>
               <span>Base URL</span>
-              <input value={providerDraft.baseUrl} onChange={(event) => handleDraftChange({ baseUrl: event.target.value, providerId: buildProviderId(providerDraft.providerName, event.target.value) })} />
+              <input
+                value={providerDraft.baseUrl}
+                onChange={(event) => {
+                  const updatedUrl = event.target.value;
+                  const patch: Partial<AdminProviderDraft> = { baseUrl: updatedUrl };
+                  if (!providerDraft.isEditing) {
+                    patch.providerId = buildProviderId(providerDraft.providerName, updatedUrl);
+                  }
+                  handleDraftChange(patch);
+                }}
+              />
             </label>
             <label>
               <span>模型 ID</span>
@@ -479,7 +619,7 @@ export const ApiConfigPanel: React.FC = () => {
             </label>
             <button type="button" className="admin-api-nexus__save" disabled={saving} onClick={handleSaveDraftProvider}>
               <Save size={15} />
-              <span>{saving ? "保存中" : "保存草稿"}</span>
+              <span>{saving ? "保存中" : (providerDraft.isEditing ? "保存修改" : "保存草稿")}</span>
             </button>
           </div>
         ) : null}

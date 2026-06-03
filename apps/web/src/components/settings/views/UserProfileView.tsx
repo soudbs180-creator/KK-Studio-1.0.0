@@ -287,7 +287,7 @@ export const UserProfileView: React.FC = () => {
             <div className="mt-3.5 space-y-3.5">
               {/* 头像与昵称 */}
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white flex items-center justify-center text-sm font-bold">
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-slate-500 via-zinc-600 to-neutral-700 text-white flex items-center justify-center text-sm font-bold">
                   {user?.user_metadata?.avatar_url ? (
                     <img src={user.user_metadata.avatar_url} alt="头像" className="h-full w-full object-cover" />
                   ) : (

@@ -1,6 +1,6 @@
 
 import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus, Cpu } from 'lucide-react';
+import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus, Cpu, AlertTriangle, FolderOpen, Image as ImageIcon, Eye, Lock } from 'lucide-react';
 import { generateImage } from '../../services/llm/geminiService';
 import { llmService } from '../../services/llm/LLMService';
 import { notify } from '../../services/system/notificationService';
@@ -28,6 +28,7 @@ import { useImageGeneration } from '../../hooks/useImageGeneration';
 import { getCardDimensions } from '../../utils/styleUtils';
 import ModelLogo from '../common/ModelLogo';
 import { AITakeoverProvider, useAITakeover, AIAssistantDock, AITakeoverToggle } from '../../features/ai-takeover';
+import { useAssetStore } from '../../features/assets/assetStore';
 
 interface ChatSidebarProps {
     isOpen: boolean;
@@ -483,6 +484,94 @@ interface NormalChatSidebarProps extends ChatSidebarProps {
 const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange, selectedModel, setSelectedModel }) => {
     const { user, isTempUser, loading: authLoading } = useAuth();
 
+    // 简体中文：AI接管与本地资源池相关状态和 Hook 注入
+    const {
+        aiTakeoverMode,
+        setAiTakeoverMode,
+        messages: takeoverMessages,
+        isThinking: takeoverIsThinking,
+        sendMessage: sendTakeoverMessage,
+        pendingPlan,
+        executePendingPlan,
+        cancelPendingPlan,
+        setSelectedModel: ctxSetSelectedModel
+    } = useAITakeover();
+
+    const [showTakeoverMenu, setShowTakeoverMenu] = useState(false);
+    const [showResourcePanel, setShowResourcePanel] = useState(false);
+
+    const takeoverImgInputRef = useRef<HTMLInputElement>(null);
+    const takeoverDirInputRef = useRef<HTMLInputElement>(null);
+    const takeoverFileInputRef = useRef<HTMLInputElement>(null);
+
+    const {
+        images: takeoverImages,
+        files: takeoverFiles,
+        addImage: addTakeoverImage,
+        addFile: addTakeoverFile,
+        removeAsset: removeTakeoverAsset,
+        addImageCollection: addTakeoverImageCollection
+    } = useAssetStore();
+
+    const handleTakeoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const fileList = e.target.files;
+        if (fileList) {
+            Array.from(fileList).forEach(file => addTakeoverImage(file));
+        }
+    };
+
+    const handleTakeoverDirChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const fileList = e.target.files;
+        if (fileList) {
+            addTakeoverImageCollection(
+                Array.from(fileList).map(file => ({
+                    file,
+                    relativePath: file.webkitRelativePath
+                }))
+            );
+        }
+    };
+
+    const handleTakeoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const fileList = e.target.files;
+        if (fileList) {
+            Array.from(fileList).forEach(file => addTakeoverFile(file));
+        }
+    };
+
+    const formatBytes = (bytes: number): string => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    };
+
+    const getUploadStateText = (state: string) => {
+        switch (state) {
+            case 'linked': return '已连接';
+            case 'local_ready': return '已连接，本地可用，尚未上传';
+            case 'indexed': return '已索引';
+            case 'uploaded': return '已上传';
+            case 'used': return '正在使用';
+            case 'failed': return '失败';
+            case 'blocked_sensitive': return '敏感文件被隔离';
+            default: return state;
+        }
+    };
+
+    useEffect(() => {
+        if (!showTakeoverMenu) return;
+        const handleOutsideClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest('#btn-takeover-menu-container') && !target.closest('#btn-takeover-plus-button')) {
+                setShowTakeoverMenu(false);
+            }
+        };
+        document.addEventListener('click', handleOutsideClick);
+        return () => document.removeEventListener('click', handleOutsideClick);
+    }, [showTakeoverMenu]);
+
     // 2. Chat State
     const [sessions, setSessions] = useState<ChatSessionItem[]>(() => {
         try {
@@ -517,6 +606,34 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
 
     // 简体中文：跳转与高亮定位交互处理器
     const handleActionClick = useCallback((url: string) => {
+        if (aiTakeoverMode) {
+            if (url === 'action://takeover-prompt-only') {
+                sendTakeoverMessage('帮我只优化提示词并填充，不进行图片生成。');
+            } else if (url === 'action://takeover-prompt-doc') {
+                sendTakeoverMessage('请帮我把优化的生图模板方案整理一份文案形式输出。');
+            } else {
+                const parsedUrl = url.replace('action://', 'http://dummy');
+                try {
+                    const u = new URL(parsedUrl);
+                    const keyword = u.searchParams.get('keyword') || '';
+                    const prompts = u.searchParams.get('prompts') || '';
+
+                    if (url.startsWith('action://takeover-locate') && keyword) {
+                        sendTakeoverMessage(`定位卡片：${keyword}`);
+                    } else if (url.startsWith('action://takeover-bulk-generate') && prompts) {
+                        sendTakeoverMessage(`使用提示词开始生成：${prompts}`);
+                    } else {
+                        const mockAnchor = document.createElement('a');
+                        mockAnchor.href = url;
+                        mockAnchor.click();
+                    }
+                } catch (err) {
+                    console.error('Action parse error:', err);
+                }
+            }
+            return;
+        }
+
         if (url.startsWith('action://highlight-')) {
             const selector = url.replace('action://highlight-', '');
             if (selector === '#btn-create-canvas') {
@@ -585,7 +702,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
                 return;
             }
 
-            sendMessage(`请为以下提示词创建图片生成计划，但先不要生成，必须等待我确认：${prompts.join('，')}`);
+            sendTakeoverMessage(`请为以下提示词创建图片生成计划，但先不要生成，必须等待我确认：${prompts.join('，')}`);
             return;
         } else if (url.startsWith('action://takeover-locate')) {
             let keyword = '';
@@ -788,7 +905,6 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
 
     // Agent State Management
     const [agentMode, setAgentMode] = useState(false);
-    const { aiTakeoverMode, setAiTakeoverMode, setSelectedModel: ctxSetSelectedModel, sendMessage } = useAITakeover();
     const [currentAgent, setCurrentAgent] = useState<AgentConfig | null>(() => agentService.getActive());
 
     // 简体中文：实时同步选择的生图模型给 AI 接管 Context
@@ -1349,10 +1465,13 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
         }
     }, [expandedNodes]);
 
+    const activeMessages = aiTakeoverMode ? takeoverMessages : messages;
+    const activeIsThinking = aiTakeoverMode ? takeoverIsThinking : isThinking;
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isOpen]);
+    }, [activeMessages, isOpen]);
 
     // Cleanup drag listeners
     useEffect(() => {
@@ -1659,72 +1778,11 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
         const userText = input.trim();
         const hasKeys = keyManager.hasValidKeys();
 
-        // 简体中文：AI接管拦截逻辑 - 如果开启了AI接管模式，并且离线(无 key) 或提问了画布基础操作，我们直接在本地匹配回答，不消耗 API，也不执行 ensureModelAccess 报错阻断
         if (aiTakeoverMode) {
-            const localAnswer = matchLocalKnowledge(userText);
-            
-            // 如果未配置本地 API 密钥，且开启了接管模式，我们将匹配结果或通用指南输出，不发出远程网络请求
-            if (!hasKeys) {
-                const finalAnswer = localAnswer || `### 🔍 未能精确匹配到您的操作提问。
-由于您当前未配置本地 API 密钥，且开启了**AI接管**，我为您准备了以下常见画布与报错指南：
-
-- 🆕 [新建画布/项目](action://highlight-#btn-create-canvas)
-- 💰 [充值积分](action://open-recharge)
-- ⚙️ [配置 API 密钥](action://open-settings-api)
-- 🔍 [定位包含“猫”的卡片](action://takeover-locate?keyword=猫)
-- 🚀 [自动生成提示词“一只可爱的猫”](action://takeover-bulk-generate?prompts=一只可爱的猫)
-
-您可以直接提问上述相关功能，或点击/让AI自动执行对应动作！`;
-
-                const currentAttachments = [...attachments];
-                const userMsg: Message = {
-                    id: Date.now().toString(),
-                    role: 'user',
-                    content: userText || '(附件)',
-                    timestamp: Date.now(),
-                    attachments: currentAttachments.length > 0 ? currentAttachments : undefined
-                };
-                setMessages(prev => [...prev, userMsg]);
-                setInput('');
-                setAttachments([]);
-
-                setIsThinking(true);
-                setTimeout(() => {
-                    setMessages(prev => [...prev, {
-                        id: `assistant_${Date.now()}`,
-                        role: 'assistant',
-                        content: finalAnswer,
-                        timestamp: Date.now()
-                    }]);
-                    setIsThinking(false);
-                }, 500);
-                return;
-            } else if (localAnswer) {
-                // 有 API Key，但如果能匹配到精确的本地画布基础操作，我们也秒回，提升响应速度并节省 API
-                const currentAttachments = [...attachments];
-                const userMsg: Message = {
-                    id: Date.now().toString(),
-                    role: 'user',
-                    content: userText || '(附件)',
-                    timestamp: Date.now(),
-                    attachments: currentAttachments.length > 0 ? currentAttachments : undefined
-                };
-                setMessages(prev => [...prev, userMsg]);
-                setInput('');
-                setAttachments([]);
-
-                setIsThinking(true);
-                setTimeout(() => {
-                    setMessages(prev => [...prev, {
-                        id: `assistant_${Date.now()}`,
-                        role: 'assistant',
-                        content: localAnswer,
-                        timestamp: Date.now()
-                    }]);
-                    setIsThinking(false);
-                }, 400);
-                return;
-            }
+            setInput('');
+            setAttachments([]);
+            await sendTakeoverMessage(userText);
+            return;
         }
 
         if (!ensureModelAccess(selectedModel, '进行对话')) return;
@@ -2549,7 +2607,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
 
                     {/* Messages */}
                     <div className={`flex-1 overflow-y-auto space-y-4 scrollbar-thin ${isMobile ? 'px-3 py-3' : 'px-6 py-4'}`}>
-                        {messages.map((msg, idx) => (
+                        {activeMessages.map((msg, idx) => (
                             <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''} group`}>
                                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${msg.role === 'user'
                                     ? 'bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)]'
@@ -2662,21 +2720,35 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
                             </div>
                         ))}
 
-                        {isThinking && !(
-                            messages.length > 0 && 
-                            messages[messages.length - 1].role === 'assistant' && 
-                            !messages[messages.length - 1].content
-                        ) && (
-                            <div className="flex gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] flex items-center justify-center shrink-0">
-                                    <ModelLogo modelId={selectedModel.id} size={18} className="animate-pulse" />
+                        {activeIsThinking && (
+                            aiTakeoverMode ? (
+                                <div className="flex gap-3">
+                                    <div className="w-8 h-8 rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] flex items-center justify-center shrink-0">
+                                        <Cpu className="text-purple-500 w-4.5 h-4.5 animate-pulse" />
+                                    </div>
+                                    <div className="flex items-center gap-2 px-4 py-2.5 bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] rounded-2xl rounded-tl-md text-xs text-[var(--text-secondary)] shadow-sm">
+                                        <Loader2 className="animate-spin text-purple-500 w-3.5 h-3.5" />
+                                        <span>接管引擎正在规划...</span>
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-1.5 px-4 py-3 bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] rounded-2xl rounded-tl-md h-11">
-                                    <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce [animation-delay:-0.3s]" />
-                                    <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce [animation-delay:-0.15s]" />
-                                    <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce" />
-                                </div>
-                            </div>
+                            ) : (
+                                !(
+                                    messages.length > 0 && 
+                                    messages[messages.length - 1].role === 'assistant' && 
+                                    !messages[messages.length - 1].content
+                                ) && (
+                                    <div className="flex gap-3">
+                                        <div className="w-8 h-8 rounded-xl bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] flex items-center justify-center shrink-0">
+                                            <ModelLogo modelId={selectedModel.id} size={18} className="animate-pulse" />
+                                        </div>
+                                        <div className="flex items-center gap-1.5 px-4 py-3 bg-[var(--frost-card-sub-bg)] border border-[var(--frost-card-sub-border)] rounded-2xl rounded-tl-md h-11">
+                                            <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                            <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                            <div className="w-2 h-2 bg-[var(--accent-coral)] rounded-full animate-bounce" />
+                                        </div>
+                                    </div>
+                                )
+                            )
                         )}
                         <div ref={messagesEndRef} />
                     </div>
@@ -2686,6 +2758,109 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
                         className="px-4 pb-4 pt-2 shrink-0 flex flex-col"
                         style={isMobile ? { paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' } : undefined}
                     >
+                        {/* 简体中文：AI接管模式下的意图强确认卡片 */}
+                        {aiTakeoverMode && pendingPlan && pendingPlan.confirmation && (
+                            <div className="mb-2 p-3 rounded-xl border border-purple-900/40 bg-[#120f21]/70 backdrop-blur-md shadow-lg relative overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                <div className="absolute top-0 right-0 p-2 opacity-5">
+                                    <Cpu size={40} className="text-purple-500" />
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs font-black text-purple-400 mb-1">
+                                    <AlertTriangle size={13} className="text-amber-500" />
+                                    <span>{pendingPlan.confirmation.title}</span>
+                                </div>
+                                <div className="text-[10px] text-zinc-300 whitespace-pre-line mb-2.5 border-l-2 border-purple-500 pl-2 leading-relaxed">
+                                    {pendingPlan.confirmation.summary}
+                                </div>
+                                <div className="flex gap-2 justify-end">
+                                    <button
+                                        onClick={cancelPendingPlan}
+                                        className="px-2.5 py-1 rounded-lg border border-zinc-700 text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
+                                    >
+                                        {pendingPlan.confirmation.cancelText}
+                                    </button>
+                                    <button
+                                        onClick={executePendingPlan}
+                                        className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-[10px] font-bold text-white hover:brightness-110 hover:shadow-[0_2px_8px_rgba(168,85,247,0.25)] transition-all cursor-pointer"
+                                    >
+                                        {pendingPlan.confirmation.confirmText}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 简体中文：AI接管模式下的资源管理器面板 */}
+                        {aiTakeoverMode && showResourcePanel && (
+                            <div className="mb-2 border border-zinc-800 bg-[#090a0f]/80 backdrop-blur-md rounded-xl p-3 max-h-48 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-zinc-800/40">
+                                    <span className="text-[10px] font-bold text-zinc-400">已连结的本地项目资源池 ({takeoverImages.length + takeoverFiles.length})</span>
+                                    <button
+                                        onClick={() => setShowResourcePanel(false)}
+                                        className="text-zinc-500 hover:text-white text-[9px] cursor-pointer"
+                                    >
+                                        关闭
+                                    </button>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    {/* 图像列表 */}
+                                    {takeoverImages.map(img => (
+                                        <div key={img.id} className="flex items-center justify-between bg-zinc-900/50 border border-zinc-800/20 rounded-lg p-1 text-[9px] text-zinc-300">
+                                            <div className="flex items-center gap-1.5 truncate">
+                                                {img.thumbnailUrl ? (
+                                                    <img src={img.thumbnailUrl} alt="preview" className="w-5 h-5 rounded object-cover border border-zinc-800" />
+                                                ) : (
+                                                    <ImageIcon size={11} className="text-zinc-500" />
+                                                )}
+                                                <div className="truncate">
+                                                    <p className="truncate text-zinc-200">{img.name}</p>
+                                                    <p className="text-[8px] text-zinc-500">{formatBytes(img.size)} • {getUploadStateText(img.uploadState)}</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => removeTakeoverAsset(img.id, 'image')}
+                                                className="p-1 text-zinc-500 hover:text-rose-400 transition-all cursor-pointer"
+                                            >
+                                                <Trash2 size={10} />
+                                            </button>
+                                        </div>
+                                    ))}
+
+                                    {/* 普通文件列表 */}
+                                    {takeoverFiles.map(f => (
+                                        <div key={f.id} className={`flex items-center justify-between rounded-lg p-1 text-[9px] border ${
+                                            f.sensitive
+                                                ? 'border-red-950/40 bg-red-950/20 text-red-300'
+                                                : 'border-zinc-800/20 bg-zinc-900/50 text-zinc-300'
+                                        }`}>
+                                            <div className="flex items-center gap-1.5 truncate">
+                                                {f.sensitive ? (
+                                                    <Lock size={11} className="text-red-500 animate-pulse" />
+                                                ) : (
+                                                    <FileText size={11} className="text-zinc-500" />
+                                                )}
+                                                <div className="truncate">
+                                                    <p className="truncate text-zinc-200">{f.name}</p>
+                                                    <p className="text-[8px] text-zinc-500">
+                                                        {formatBytes(f.size)} • {f.sensitive ? '敏感被隔离' : getUploadStateText(f.uploadState)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => removeTakeoverAsset(f.id, 'file')}
+                                                className="p-1 text-zinc-500 hover:text-rose-400 transition-all cursor-pointer"
+                                            >
+                                                <Trash2 size={10} />
+                                            </button>
+                                        </div>
+                                    ))}
+
+                                    {takeoverImages.length === 0 && takeoverFiles.length === 0 && (
+                                        <p className="text-[9px] text-zinc-600 text-center py-2">暂无已导入资源，点击上方按钮进行选择。</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {/* 一体化卡片输入容器 */}
                         <div
                             className={`flex flex-col rounded-2xl border transition-all duration-300 ${
@@ -2791,14 +2966,98 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
                                         className="hidden"
                                     />
 
+                                    {/* 隐藏的 接管输入资源 Input */}
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        multiple
+                                        ref={takeoverImgInputRef}
+                                        onChange={handleTakeoverImageChange}
+                                        className="hidden"
+                                    />
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        multiple
+                                        webkitdirectory="true"
+                                        ref={takeoverDirInputRef}
+                                        onChange={handleTakeoverDirChange}
+                                        className="hidden"
+                                    />
+                                    <input
+                                        type="file"
+                                        accept=".txt,.json,.csv,.pdf,.zip,.prompt"
+                                        ref={takeoverFileInputRef}
+                                        onChange={handleTakeoverFileChange}
+                                        className="hidden"
+                                    />
+
                                     {/* 附件添加按钮 */}
-                                    <button
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)] transition-all active:scale-90 flex items-center justify-center"
-                                        title="添加附件 (图片/视频/文档)"
-                                    >
-                                        <Plus size={18} />
-                                    </button>
+                                    <div className="relative">
+                                        <button
+                                            id="btn-takeover-plus-button"
+                                            onClick={() => {
+                                                if (aiTakeoverMode) {
+                                                    setShowTakeoverMenu(prev => !prev);
+                                                } else {
+                                                    fileInputRef.current?.click();
+                                                }
+                                            }}
+                                            className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--toolbar-hover)] transition-all active:scale-90 flex items-center justify-center"
+                                            title={aiTakeoverMode ? "打开接管选项" : "添加附件 (图片/视频/文档)"}
+                                        >
+                                            <Plus size={18} />
+                                        </button>
+
+                                        {aiTakeoverMode && showTakeoverMenu && (
+                                            <div
+                                                id="btn-takeover-menu-container"
+                                                className="absolute bottom-full left-0 mb-2 z-[1000] w-40 rounded-xl border border-zinc-800 bg-[#0d0e14]/95 backdrop-blur-md p-1 shadow-[0_4px_20px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-bottom-2 duration-200"
+                                            >
+                                                <button
+                                                    onClick={() => {
+                                                        setShowTakeoverMenu(false);
+                                                        takeoverImgInputRef.current?.click();
+                                                    }}
+                                                    className="w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
+                                                >
+                                                    <ImageIcon size={13} className="text-purple-400" />
+                                                    <span>上传图片</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setShowTakeoverMenu(false);
+                                                        takeoverDirInputRef.current?.click();
+                                                    }}
+                                                    className="w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
+                                                >
+                                                    <FolderOpen size={13} className="text-pink-400" />
+                                                    <span>导入文件夹</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setShowTakeoverMenu(false);
+                                                        takeoverFileInputRef.current?.click();
+                                                    }}
+                                                    className="w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
+                                                >
+                                                    <FileText size={13} className="text-rose-400" />
+                                                    <span>连接文件</span>
+                                                </button>
+                                                <div className="h-px bg-zinc-800/40 my-1" />
+                                                <button
+                                                    onClick={() => {
+                                                        setShowTakeoverMenu(false);
+                                                        setShowResourcePanel(prev => !prev);
+                                                    }}
+                                                    className="w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
+                                                >
+                                                    <Eye size={13} className="text-zinc-400" />
+                                                    <span>资源 ({takeoverImages.length + takeoverFiles.length})</span>
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
 
                                     {/* Agent 药丸切换按钮 */}
                                     <button
@@ -3157,17 +3416,6 @@ const ChatSidebarInner: React.FC<ChatSidebarProps & { selectedModel: ChatModel; 
             props.onWidthChange?.(420);
         }
     }, [aiTakeoverMode, props.onWidthChange]);
-
-    if (aiTakeoverMode) {
-        return (
-            <div
-                className="fixed inset-y-0 right-0 z-50 flex flex-col transition-all duration-300 ease-out animate-in fade-in slide-in-from-right duration-300"
-                style={{ width: '380px', minWidth: '380px', maxWidth: '380px', pointerEvents: 'auto' }}
-            >
-                <AIAssistantDock />
-            </div>
-        );
-    }
 
     return <NormalChatSidebar {...props} />;
 };

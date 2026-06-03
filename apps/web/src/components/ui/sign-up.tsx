@@ -730,7 +730,7 @@ export const AuthComponent = ({
             <div className="relative h-[360px] w-[360px] rounded-2xl border-4 border-rose-400/90">
               <BubbleFace className="absolute left-4 top-24 h-40 w-40 bg-gradient-to-br from-amber-200 to-orange-400 shadow-2xl shadow-orange-500/35" />
               <BubbleFace className="absolute right-12 top-4 h-32 w-32 bg-gradient-to-br from-blue-200 to-blue-500 shadow-2xl shadow-blue-500/35" />
-              <BubbleFace className="absolute bottom-14 right-5 h-24 w-24 bg-gradient-to-br from-violet-200 to-violet-500 shadow-2xl shadow-violet-500/35" />
+              <BubbleFace className="absolute bottom-14 right-5 h-24 w-24 bg-gradient-to-br from-slate-200 to-slate-450 shadow-2xl shadow-slate-400/25" />
             </div>
           </div>
 
