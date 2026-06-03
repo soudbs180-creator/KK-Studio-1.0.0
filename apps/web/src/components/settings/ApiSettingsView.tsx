@@ -3098,6 +3098,87 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     });
   };
 
+  const fetchProviderModels = async () => {
+    if (!ensureBrowserDirectDiagnosticsAllowed()) {
+      return;
+    }
+
+    const baseUrl = providerForm.baseUrl.trim();
+    const apiKey = providerForm.apiKey.trim();
+    const name = providerForm.name.trim();
+    const format = providerForm.format;
+
+    if (!baseUrl || !apiKey) {
+      notify.error(
+        pick('获取失败', 'Fetch failed'),
+        pick('请先填写基础地址和 API Key。', 'Please fill in base URL and API key first.'),
+      );
+      return;
+    }
+
+    const isWuyinPreset = name === '速创 API' || /wuyinkeji/i.test(baseUrl);
+    const actionId = editingProviderId ? `provider-check:${editingProviderId}` : 'provider-check:new';
+
+    await run(actionId, async () => {
+      const response = editingProviderId
+        ? await kkWebApiClient.checkUserRouteConnectivity(editingProviderId)
+        : await kkWebApiClient.checkUserRouteConnectivity('test', { baseUrl, apiKey, format, name });
+
+      if (!response.success) {
+        notify.warning(
+          pick('获取失败', 'Fetch failed'),
+          response.error.message || pick('本地 API 安全代理暂时不可用。', 'The local API secure proxy is unavailable right now.'),
+        );
+        return;
+      }
+
+      const check = response.data;
+      if (check.ok) {
+        const modelsList = check.models || [];
+        
+        if (!isWuyinPreset) {
+          setProviderForm((current) => ({
+            ...current,
+            modelsText: formatProviderModelsText(modelsList),
+          }));
+        }
+
+        if (editingProviderId) {
+          const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
+          if (matched) {
+            const checkedAt = Date.now();
+            keyManager.updateProvider(editingProviderId, {
+              status: 'active',
+              lastChecked: checkedAt,
+              lastError: undefined,
+              models: modelsList,
+              activitySummary: {
+                ...matched.activitySummary,
+                lastLatencyMs: check.latencyMs ?? matched.activitySummary?.lastLatencyMs ?? null,
+                updatedAt: checkedAt,
+              },
+            });
+          }
+        }
+
+        notify.success(
+          pick('获取成功', 'Fetched'),
+          isWuyinPreset
+            ? pick('速创 API 连接测试成功。', 'Wuyin API connectivity check succeeded.')
+            : pick(
+                `已自动获取并回填 ${modelsList.length} 个模型。`,
+                `Successfully fetched and filled ${modelsList.length} models.`,
+              ),
+        );
+      } else {
+        notify.warning(
+          pick('获取失败', 'Fetch failed'),
+          check.message || pick('请检查基础地址和密钥是否正确。', 'Please check if base URL and API key are correct.'),
+        );
+      }
+    });
+  };
+
   const syncPricing = async (provider: ThirdPartyProvider, endpointUrlOverride?: string) => {
     if (!ensureBrowserDirectDiagnosticsAllowed()) {
       return;
@@ -4027,25 +4108,18 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                   <div className="settings-provider-fetch-item__copy">
                     <div className="settings-provider-fetch-item__title">{pick('自动获取模型', 'Fetch models')}</div>
                     <div className="settings-provider-fetch-item__helper">
-                      {pick('保存后可检测连通性并回填模型；你也可以继续使用上方手动模型。', 'After saving, connectivity can be checked and models filled. Manual models above remain available.')}
+                      {pick('检测 API 连通性并自动获取可用模型列表回填到表单中。', 'Check API connectivity and automatically fetch available models to fill into the form.')}
                     </div>
                   </div>
                   <div className={`settings-provider-fetch-item__action ${isMobile ? 'w-full flex justify-center mt-3' : ''}`}>
-                    {editingProviderId ? (
-                      <SettingsActionButton
-                        icon={RefreshCw}
-                        disabled={routeDiagnosticsActionDisabled}
-                        loading={busy === `provider-check:${editingProviderId}`}
-                        onClick={() => {
-                          const matched = thirdPartyProviders.find((item) => item.id === editingProviderId);
-                          if (matched) void refreshProvider(matched);
-                        }}
-                      >
-                        {pick('自动获取模型', 'Fetch models')}
-                      </SettingsActionButton>
-                    ) : (
-                      <SettingsBadge tone="neutral">{pick('先保存', 'Save first')}</SettingsBadge>
-                    )}
+                    <SettingsActionButton
+                      icon={RefreshCw}
+                      disabled={routeDiagnosticsActionDisabled}
+                      loading={busy === (editingProviderId ? `provider-check:${editingProviderId}` : 'provider-check:new')}
+                      onClick={() => void fetchProviderModels()}
+                    >
+                      {pick('自动获取模型', 'Fetch models')}
+                    </SettingsActionButton>
                   </div>
                 </div>
 

@@ -20,7 +20,7 @@ test("VPS bootstrap and deploy scripts reference the expected runtime artifacts"
   const movedPaymentEntrySource = readSource("scripts/dev/run-payment-sidecar-vps.mjs");
   const apiServiceSource = readSource("config/deploy/systemd/kk-api.service");
   const paymentServiceSource = readSource("config/deploy/systemd/kk-payment-sidecar.service");
-  const nginxSource = readSource("config/deploy/nginx/kk-vps.conf");
+  const nginxSource = readSource("config/deploy/nginx/kk-vps.conf.legacy");
   const postgresAccessSource = readSource("scripts/vps/repair-postgres-client-access.sh");
 
   assert.match(bootstrapSource, /bootstrap-kk-vps\.sql/);

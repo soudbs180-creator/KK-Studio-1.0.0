@@ -1762,7 +1762,18 @@ router.post('/v1/profile/user-routes/:routeId/connectivity', requireProfileAuth,
   const profileState = readProfileState(data, req.profileUserId);
   writeLocalStorage(data);
 
-  const route = resolveLocalUserRoute(profileState, routeId);
+  let route;
+  if (routeId === 'test') {
+    route = {
+      name: req.body && req.body.name || 'Test Route',
+      baseUrl: req.body && req.body.baseUrl,
+      apiKey: req.body && req.body.apiKey,
+      format: req.body && req.body.format || 'openai'
+    };
+  } else {
+    route = resolveLocalUserRoute(profileState, routeId);
+  }
+
   if (!route) {
     return res.status(404).json({
       success: false,

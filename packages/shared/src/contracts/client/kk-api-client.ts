@@ -188,6 +188,7 @@ export interface KkApiClient {
   ): Promise<ApiResponse<KeyManagerCloudStateDto>>;
   checkUserRouteConnectivity(
     routeId: string,
+    input?: { baseUrl?: string; apiKey?: string; format?: "gemini" | "openai" | "auto" | "claude"; name?: string } | ApiClientRequestOptions,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<UserRouteConnectivityCheckDto>>;
   syncUserRoutePricing(
@@ -847,14 +848,24 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
       );
     },
 
-    checkUserRouteConnectivity(routeId, options) {
+    checkUserRouteConnectivity(routeId, input, options) {
+      let requestBody: any = undefined;
+      let requestOptions = options;
+
+      if (input && (typeof input === 'object' && ('baseUrl' in input || 'apiKey' in input || 'format' in input || 'name' in input))) {
+        requestBody = input;
+      } else if (input) {
+        requestOptions = input as ApiClientRequestOptions;
+      }
+
       return requestJson<UserRouteConnectivityCheckDto>(
         config,
         `api/v1/profile/user-routes/${encodeURIComponent(routeId)}/connectivity`,
         {
           method: "POST",
+          body: requestBody ? JSON.stringify(requestBody) : undefined,
         },
-        options,
+        requestOptions,
       );
     },
 

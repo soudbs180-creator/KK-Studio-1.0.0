@@ -1,6 +1,6 @@
 
 import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus, Cpu, AlertTriangle, FolderOpen, Image as ImageIcon, Eye, Lock } from 'lucide-react';
+import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus, Cpu, AlertTriangle, FolderOpen, Image as Picture, Eye, Lock } from 'lucide-react';
 import { generateImage } from '../../services/llm/geminiService';
 import { llmService } from '../../services/llm/LLMService';
 import { notify } from '../../services/system/notificationService';
@@ -2764,7 +2764,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
                                 <div className="absolute top-0 right-0 p-2 opacity-5">
                                     <Cpu size={40} className="text-purple-500" />
                                 </div>
-                                <div className="flex items-center gap-1.5 text-xs font-black text-purple-400 mb-1">
+                                <div className="flex items-center gap-1.5 text-xs font-black text-[var(--clay-brand-lavender)] mb-1">
                                     <AlertTriangle size={13} className="text-amber-500" />
                                     <span>{pendingPlan.confirmation.title}</span>
                                 </div>
@@ -2809,7 +2809,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
                                                 {img.thumbnailUrl ? (
                                                     <img src={img.thumbnailUrl} alt="preview" className="w-5 h-5 rounded object-cover border border-zinc-800" />
                                                 ) : (
-                                                    <ImageIcon size={11} className="text-zinc-500" />
+                                                    <Picture size={11} className="text-zinc-500" />
                                                 )}
                                                 <div className="truncate">
                                                     <p className="truncate text-zinc-200">{img.name}</p>
@@ -3021,7 +3021,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
                                                     }}
                                                     className="w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 flex items-center gap-2 transition-colors cursor-pointer"
                                                 >
-                                                    <ImageIcon size={13} className="text-purple-400" />
+                                                    <Picture size={13} className="text-[var(--clay-brand-lavender)]" />
                                                     <span>上传图片</span>
                                                 </button>
                                                 <button

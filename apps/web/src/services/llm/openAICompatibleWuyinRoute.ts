@@ -285,7 +285,6 @@ export function buildWuyinImageSubmitBody(input: {
   const body: Record<string, unknown> = {
     prompt: input.prompt,
     size: resolvedSize,
-    imageSize: resolvedSize,
     aspectRatio: normalizeWuyinAspectRatio(input.aspectRatio),
   };
 

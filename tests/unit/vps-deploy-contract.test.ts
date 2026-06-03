@@ -79,7 +79,7 @@ test("VPS default web entry serves the main login app while admin stays separate
   assert.match(deploySource, /chmod 0640 "\$\{ENV_DIR\}\/kk-api\.env"/);
   assert.match(bootstrapSource, /rm -f \/etc\/nginx\/sites-enabled\/kk-api\.conf/);
   assert.match(bootstrapSource, /rm -f \/etc\/nginx\/sites-enabled\/kk-admin-4174\.conf/);
-  assert.match(deploySource, /rsync -a --delete "\$\{CURRENT_DIR\}\/apps\/web\/dist\/" "\$\{APP_SITE_ROOT\}\/"/);
+  assert.match(deploySource, /rsync -a --delete "\$\{NEW_RELEASE_DIR\}\/apps\/web\/dist\/" "\$\{NEW_APP_RELEASE_DIR\}\/"/);
   assert.match(bootstrapSource, /APP_SITE_ROOT="\$\{KK_APP_SITE_ROOT:-\/var\/www\/kk-app\}"/);
   assert.match(bootstrapSource, /"\$\{APP_SITE_ROOT\}"/);
 
@@ -102,7 +102,7 @@ test("VPS default web entry serves the main login app while admin stays separate
 
 test("VPS nginx gateway does not expose internal payment routes on public virtual hosts", () => {
   const gatewaySource = readSource("config/deploy/nginx/kk-vps-gateway.conf");
-  const legacySource = readSource("config/deploy/nginx/kk-vps.conf");
+  const legacySource = readSource("config/deploy/nginx/kk-vps.conf.legacy");
 
   for (const [label, source] of [
     ["gateway", gatewaySource],
