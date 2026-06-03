@@ -1,116 +1,47 @@
 # Project Structure
 
-This document defines ownership rules for the KK Studio repository during the migration to the final `apps/* + packages/*` layout.
-
-## Target top-level layout
-
-```text
-apps/
-  web/
-  api/
-  payment-sidecar/
-packages/
-  ui/
-  contracts/
-  shared/
-  domain/
-docs/
-scripts/
-workspace/
-```
-
-## Ownership summary
-
-- `apps/web`: browser app shell, routes, modules, and typed API clients
-- `apps/api`: main API and privileged business logic
-- `apps/payment-sidecar`: payment providers, callbacks, order persistence, and settlement write-back
-- `packages/ui`: reusable UI primitives only
-- `packages/contracts`: DTOs, envelopes, and generated/manual API clients
-- `packages/shared`: cross-runtime utilities such as env access, auth headers, and logging
-# Project Structure
-
-This document defines ownership rules for the KK Studio repository during the migration to the final `apps/* + packages/*` layout.
-
-## Target top-level layout
-
-```text
-apps/
-  web/
-  api/
-  payment-sidecar/
-packages/
-  ui/
-  contracts/
-  shared/
-  domain/
-docs/
-scripts/
-workspace/
-```
-
-## Ownership summary
-
-- `apps/web`: browser app shell, routes, modules, and typed API clients
-- `apps/api`: main API and privileged business logic
-- `apps/payment-sidecar`: payment providers, callbacks, order persistence, and settlement write-back
-- `packages/ui`: reusable UI primitives only
-- `packages/contracts`: DTOs, envelopes, and generated/manual API clients
-- `packages/shared`: cross-runtime utilities such as env access, auth headers, and logging
-- `packages/domain`: pure rules, policies, state machines, and repository interfaces
-
-## Legacy status
-
-The repository still contains frozen legacy roots:
-
-- `src/`
-- `server/`
-- `api/`
-- `billing/`
-
-These paths are transitional. Do not introduce new primary logic there.
-
-## Current runtime truth
-
-The repo is still mid-migration, so this table is the source of truth for what is live today versus what is still transitional.
+This document defines current ownership rules for KK Studio v1.5.3. It is aligned with `AGENTS.md` and the live repository layout.
 
 ## Runtime truth table
 
-| Path | Runtime role | Meaning today |
+| Path | Runtime role | Current rule |
 | --- | --- | --- |
-| `src/` | `current-live-web` | Current live browser app entrypoint. Root `vite.config.ts` and `tsconfig.json` still build this tree. |
-| `apps/web/` | `target-web` | Target browser shell after the web migration is complete. Do not describe it as the current runtime yet. |
-| `apps/api/` | `canonical-api` | Canonical Node API and privileged server flows. |
-| `apps/payment-sidecar/` | `canonical-payment` | Canonical payment service and settlement write-back runtime. |
-| `server/` | `transition-bridge` | Transitional server mounts kept alive during API migration. |
-| `api/` | `transition-bridge` | Root compatibility handlers and local-only edge-style entrypoints. |
+| `apps/web/` | primary Web runtime | Vite + React + TypeScript desktop application. New Web UI and assistant work belongs here. |
+| `apps/mobile/` | mobile workspace | Expo mobile app. Mobile code must not be pulled into Web runtime. |
+| `packages/shared/` | pure shared logic | Cross-runtime contracts, DTOs, and domain rules. No DOM, React, Node-only, or platform storage APIs. |
+| `packages/api-client/` | HTTP boundary | Typed API client surface. Platform-specific storage must be injected, not hard-coded. |
+| `packages/ui/` | design adapter layer | Tokens, base UI primitives, and adapters only. No business state or model-call logic. |
+| `server/` | Express / VPS backend | Backend routes, model proxying, billing authority, webhook handling, and file persistence. No frontend components. |
+| `migrations/` | database DDL | Only legal source for schema changes. Migrations must be idempotent. |
+| `docs/ai-assistant/` | assistant knowledge base | Module maps, flow maps, tool registry notes, UI map, safety policy, skills, and session memory. |
+| `scripts/` | automation | Governance, CI, release, verification, and maintenance scripts. |
+| `tests/` | verification | Unit, integration, contract, and E2E tests. |
+| `config/` | project config | Release manifest and project configuration. |
 
-## Runtime topology truth table
+## Ownership summary
 
-Use this table when deciding which runtime path is canonical versus transitional:
+- `apps/web/` owns browser-only runtime behavior and must reach backend behavior through `packages/api-client` or a service-layer route.
+- `apps/web/src/features/ai-takeover/` remains the compatibility entry for the existing assistant. New assistant capabilities must evolve from this system instead of creating a competing assistant.
+- `apps/web/src/context/` owns canvas, auth, billing, startup, and related runtime Contexts. Assistant prompts must receive sanitized summaries rather than raw high-frequency state.
+- `apps/web/src/services/llm/` owns model routing, provider capabilities, user-key routing, and secure proxy flows. Browser code must not directly call protected providers.
+- `server/` owns privileged backend behavior, including billing authority and protected provider proxying.
+- `packages/shared/`, `packages/api-client/`, and `packages/ui/` must stay inside their module boundaries as described in `AGENTS.md`.
 
-| Path | Runtime status | Hosted/Web role | Notes |
-| --- | --- | --- | --- |
-| `apps/api/` | `canonical` | Main business API / BFF | Owns auth-adjacent business routes, profile persistence, billing, workspace sync, generation, and model-proxy entrypoints. |
-| `apps/payment-sidecar/` | `canonical` | Main payment runtime | Owns checkout, callback handling, and settlement write-back. |
-| `server/` | `bridge` | Transitional wrapper only | Keeps old local/server entrypoints alive by mounting migrated `apps/api` route modules. Do not add new primary logic here. |
+## AI assistant structure
 
-### Hosted default
+Current assistant work must follow this upgrade path:
 
-- Hosted/Web must default to `apps/api` + PostgreSQL-backed hosted session/auth + `apps/payment-sidecar`.
-- `server/` is not a canonical Hosted entrypoint.
+```text
+apps/web/src/features/ai-takeover/
+  -> CanvasRuntimeState
+  -> ToolRegistry + Executor
+  -> DurableQueue
+  -> KnowledgeSync
+  -> docs/ai-assistant/*
+```
 
-## Web boundary
-
-- Web code must call backend behavior through typed contracts.
-- Web code must not directly access runtime business tables or database RPCs.
-- Web code must not import API or payment implementation files.
-
-## Service boundary
-
-- `apps/api` and `apps/payment-sidecar` must not import web implementation files.
-- Cross-module service imports must flow through module indexes, not deep implementation paths.
-- Shared behavior used by both services belongs in `packages/shared` or `packages/domain`.
+The first implementation layer may remain compatible with legacy `AssistantAction` values, but tool names and documentation must converge on namespaced tools such as `canvas.getState`, `assets.zipOriginals`, and `generation.createBatchJob`.
 
 ## Local artifact policy
 
-Temporary scripts, screenshots, diagnostics, and scratch files do not belong at the repo root. Move them into `workspace/diagnostics`, `workspace/local-artifacts`, or `workspace/quarantine`.
+Temporary scripts, screenshots, diagnostics, and scratch files do not belong at the repo root. Move them into `workspace/diagnostics`, `workspace/local-artifacts`, or task-specific folders under `docs/` when they are useful records.

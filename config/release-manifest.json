@@ -1,8 +1,8 @@
 {
   "appName": "KK Studio",
-  "version": "1.5.2",
-  "displayVersion": "v1.5.2",
-  "releaseDate": "2026-06-01",
+  "version": "1.5.3",
+  "displayVersion": "v1.5.3",
+  "releaseDate": "2026-06-03",
   "releaseNotes": [
     "Adapted sidebar and provider logos to light/dark themes, optimizing dark mode visual hierarchy.",
     "Aligned provider card UI layout to strict AGENTS specification golden ratio constraints.",

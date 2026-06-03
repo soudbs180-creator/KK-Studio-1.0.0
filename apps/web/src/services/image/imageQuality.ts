@@ -9,12 +9,14 @@
  * - ORIGINAL: 画布 >150% 或灯箱查看时使用，原图
  */
 
-export enum ImageQuality {
-    MICRO = 'micro',        // 微缩图：150px，用于超远距离全局查看（<50%缩放）
-    THUMBNAIL = 'thumb',    // 缩略图：300px，用于中距离查看（50%-100%缩放）
-    PREVIEW = 'preview',    // 预览：1024px，用于正常查看（100%-150%缩放）
-    ORIGINAL = 'original'   // 原图：完整尺寸，用于灯箱放大（>150%缩放）
-}
+export const ImageQuality = {
+    MICRO: 'micro',        // 微缩图：150px，用于超远距离全局查看（<50%缩放）
+    THUMBNAIL: 'thumb',    // 缩略图：300px，用于中距离查看（50%-100%缩放）
+    PREVIEW: 'preview',    // 预览：1024px，用于正常查看（100%-150%缩放）
+    ORIGINAL: 'original'   // 原图：完整尺寸，用于灯箱放大（>150%缩放）
+} as const;
+
+export type ImageQuality = typeof ImageQuality[keyof typeof ImageQuality];
 
 export type ImageQualityBias = 'default' | 'thumbnail-preferred' | 'micro-only';
 

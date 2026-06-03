@@ -1,46 +1,45 @@
 ## Project Root Guide
 
-This repository is in a deliberate migration state, so the quickest way to stay oriented is to separate the current live runtimes from the target layout.
+This guide records the current KK Studio v1.5.3 runtime layout. When it conflicts with older migration notes, use `AGENTS.md`, `AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md`, `package.json`, and `config/release-manifest.json` as the authority.
 
-### Runtime Layout (严格 AGENTS)
+### Runtime Layout
 
-- `apps/web/` 为唯一的桌面端 Web 前端运行时。
-- `apps/mobile/` 为手机端 Expo 应用。
-- `packages/shared/` 为共享包。
-- `packages/api-client/` 为统一 API 客户端。
-- `netlify/functions/` 为唯一的后端 API 服务。
-- `payment-server/` 仅处理 Stripe Webhook 例外。
-- `migrations/` 为 PostgreSQL 数据库迁移。
-- `scripts/` 为开发与 CI 脚本。
-- `docs/` 为中文规范文档。
-- `config/` 为配置目录 (包含 config/deploy)。
-- `tests/` 为测试用例。
-- `.claude/` 为 Claude Agent 配置。
+- `apps/web/` is the primary desktop Web runtime, built with Vite + React + TypeScript.
+- `apps/mobile/` is the Expo mobile workspace. Web code must not import React Native or Expo APIs.
+- `packages/shared/` contains cross-runtime pure TypeScript contracts and domain rules.
+- `packages/api-client/` is the typed HTTP API boundary used by browser code.
+- `packages/ui/` contains design tokens, adapters, and shared UI primitives only.
+- `server/` is the Express / VPS backend runtime and transition proxy surface.
+- `migrations/` is the only valid location for PostgreSQL DDL.
+- `docs/ai-assistant/` is the AI assistant knowledge base and must be updated when assistant, canvas, generation, download, or UI-map behavior changes.
+- `scripts/` contains governance, verification, release, and maintenance scripts.
+- `tests/` contains unit, integration, contract, and E2E tests.
+- `config/` contains release and project configuration, including `config/release-manifest.json`.
 
-### 1. Project source
+### Project Source
 
-These are the folders that usually matter when you are developing or deploying:
+These folders usually matter when developing or reviewing changes:
 
-- `apps/web/`: target web runtime
-- `apps/mobile/`: target mobile app runtime
-- `packages/shared/`: shared codebase
-- `packages/api-client/`: API client
-- `packages/ui/`: UI system tokens
-- `netlify/functions/`: serverless API functions
-- `payment-server/`: payment webhook shell
-- `config/`: project config data
+- `apps/web/`: desktop Web application runtime
+- `apps/mobile/`: mobile application workspace
+- `packages/shared/`: platform-neutral shared code
+- `packages/api-client/`: typed HTTP client
+- `packages/ui/`: UI token and adapter layer
+- `server/`: Express / VPS backend and proxy routes
 - `migrations/`: database migrations
-- `tests/`: tests
-- `scripts/`: project scripts
-- `docs/`: project docs, reports, screenshots
+- `docs/`: project documentation and AI assistant knowledge
+- `tests/`: test suites
+- `scripts/`: project automation
+- `config/`: release manifest and configuration
 
-### 2. Root config files
+### Root Config Files
 
 These stay in the root because tools expect them there:
 
 - `package.json`, `package-lock.json`
 - `tsconfig.json`
-- `netlify.toml`
+- `vite.config.ts` or workspace Vite configs referenced by scripts
 - `.env`, `.env.example`, `.env.local`
 - `.gitignore`, `.editorconfig`, `.npmrc`
-- `plans.md`, `implement.md`, `status.md`, `validation.md`, `AGENTS.md`
+- `AGENTS.md`, `AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md`
+- `plans.md`, `implement.md`, `status.md`, `validation.md`

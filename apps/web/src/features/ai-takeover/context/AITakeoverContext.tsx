@@ -1,20 +1,20 @@
 // 简体中文：AI 接管上下文控制中心 (AITakeover Context)
 
 import React, { createContext, useContext, useState, useCallback, useRef, ReactNode, useEffect } from 'react';
-import type { AssistantPlan, SanitizedProjectContext, AssistantAction } from '../types';
-import { LocalAssistantBrain } from '../core/localBrain';
-import { LLMBrain } from '../core/llmBrain';
+import type { AssistantPlan, SanitizedProjectContext } from '../types';
 import { buildSanitizedProjectContext } from '../core/projectContextBuilder';
-import { executeAction } from '../core/actionExecutor';
-import type { ExecutorContext } from '../core/actionExecutor';
 import { useAssetStore } from '../../assets/assetStore';
+import { durableGenerationQueue } from '../../ai-assistant-runtime/queue/DurableGenerationQueue.ts';
+import { agentRuntimeInstance } from '../../ai-assistant-runtime';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  attachments?: any[];
 }
+
 
 interface AITakeoverContextType {
   aiTakeoverMode: boolean;
@@ -29,12 +29,10 @@ interface AITakeoverContextType {
   cancelPendingPlan: () => void;
   selectedModel: any;
   setSelectedModel: (model: any) => void;
+  currentRunId: string | null;
 }
 
 const AITakeoverContext = createContext<AITakeoverContextType | null>(null);
-
-const localBrain = new LocalAssistantBrain();
-const llmBrain = new LLMBrain();
 
 interface AITakeoverProviderProps {
   children: ReactNode;
@@ -45,6 +43,7 @@ interface AITakeoverProviderProps {
   updatePromptNode: (node: any) => Promise<void> | void;
   executeGeneration: (node: any) => Promise<void> | void;
   getNextCardPosition: () => { x: number; y: number };
+  arrangeAllNodes?: (mode?: 'grid' | 'row' | 'column') => void;
   setConfig: React.Dispatch<React.SetStateAction<any>>;
   onOpenSettings?: (view?: any) => void;
   apiKeyStatus: 'missing' | 'configured_masked' | 'invalid' | 'unknown';
@@ -53,6 +52,8 @@ interface AITakeoverProviderProps {
   config?: any;
   ecommerceState?: any;
   onGenerate?: () => Promise<void> | void;
+  canvasTransform?: { x: number; y: number; scale: number } | null;
+  canvasRef?: any;
 }
 
 export function AITakeoverProvider({
@@ -64,6 +65,7 @@ export function AITakeoverProvider({
   updatePromptNode,
   executeGeneration,
   getNextCardPosition,
+  arrangeAllNodes,
   setConfig,
   onOpenSettings,
   apiKeyStatus,
@@ -71,8 +73,11 @@ export function AITakeoverProvider({
   notify,
   config,
   ecommerceState,
-  onGenerate
+  onGenerate,
+  canvasTransform,
+  canvasRef
 }: AITakeoverProviderProps) {
+
   const [aiTakeoverMode, setAiTakeoverModeState] = useState(false);
   const [selectedModel, setSelectedModel] = useState(initialModel);
 
@@ -99,6 +104,7 @@ export function AITakeoverProvider({
 
   const [isThinking, setIsThinking] = useState(false);
   const [pendingPlan, setPendingPlan] = useState<AssistantPlan | null>(null);
+  const [currentRunId, setCurrentRunId] = useState<string | null>(null);
 
   // 简体中文：前端生图最大 3 并发排队队列状态
   const [generationQueue, setGenerationQueue] = useState<any[]>([]);
@@ -152,34 +158,18 @@ export function AITakeoverProvider({
     }
   }, [notify]);
 
-  // 执行计划
-  const executePlan = useCallback(async (plan: AssistantPlan) => {
-    const assetsSummary = useAssetStore.getState().getAssetsSummary();
-    const projectContext = buildSanitizedProjectContext({
-      currentPage: 'canvas',
-      aiTakeoverEnabled: true,
-      agentEnabled: false,
+  // 执行计划（桥接到 AgentRuntime）
+  const executePlan = useCallback(async (runId: string) => {
+    const ctx = {
       activeCanvas,
       selectedNodeIds: selectedNodeIds || [],
-      apiKeyStatus,
-      providerCount: 1,
-      selectedModel: selectedModel?.id,
-      balanceKnown: true,
-      canEstimateCost: true,
-      assetsSummary,
-      errors: [],
-      config,
-      ecommerceState
-    });
-
-    const ctx: ExecutorContext = {
-      activeCanvas,
       selectedModel,
       addPromptNode,
       updatePromptNode,
       executeGeneration,
       addToQueue,
       getNextCardPosition,
+      arrangeAllNodes,
       setConfig,
       onOpenSettings,
       notify,
@@ -188,10 +178,9 @@ export function AITakeoverProvider({
       onGenerate
     };
 
-    for (const action of plan.actions) {
-      await executeAction(action, ctx);
-    }
-  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, executeGeneration, addToQueue, getNextCardPosition, setConfig, onOpenSettings, apiKeyStatus, notify, config, ecommerceState, onGenerate]);
+    await agentRuntimeInstance.executePendingRun(runId, ctx);
+  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, executeGeneration, addToQueue, getNextCardPosition, arrangeAllNodes, setConfig, onOpenSettings, notify, config, ecommerceState, onGenerate]);
+
 
   // 发送消息
   const sendMessage = useCallback(async (text: string) => {
@@ -206,6 +195,7 @@ export function AITakeoverProvider({
     setMessages(prev => [...prev, userMsg]);
     setIsThinking(true);
     setPendingPlan(null);
+    setCurrentRunId(null);
 
     // 智能脱敏上下文构建
     const assetsSummary = useAssetStore.getState().getAssetsSummary();
@@ -223,55 +213,51 @@ export function AITakeoverProvider({
       assetsSummary,
       errors: [],
       config,
-      ecommerceState
+      ecommerceState,
+      canvasTransform,
+      canvasRef
     });
 
     try {
       // 模拟大脑思考用时，提升拟人化感官
       await new Promise(resolve => setTimeout(resolve, 800));
 
-      let plan;
-      if (apiKeyStatus !== 'missing') {
-        try {
-          plan = await llmBrain.plan(text, projectContext, selectedModel?.id);
-        } catch (llmErr) {
-          console.warn('[Takeover] 云端大模型规划异常，平滑回退至本地 LocalBrain:', llmErr);
-          plan = await localBrain.plan(text, projectContext);
-        }
-      } else {
-        plan = await localBrain.plan(text, projectContext);
-      }
+      const record = await agentRuntimeInstance.run(text, projectContext, selectedModel?.id);
+      const plan = record.plan;
 
       const assistantMsg: Message = {
-        id: plan.id,
+        id: record.id,
         role: 'assistant',
         content: plan.reply,
         timestamp: Date.now()
       };
 
       setMessages(prev => [...prev, assistantMsg]);
+      setCurrentRunId(record.id);
 
       // 评估是否需要确认卡片
       if (plan.requiresConfirmation) {
         setPendingPlan(plan);
       } else {
         // 如果不需要确认，静默且自动安全地执行
-        await executePlan(plan);
+        await executePlan(record.id);
       }
     } catch (e: any) {
       notify?.error('助手脑出现异常', e.message || '未知错误');
     } finally {
       setIsThinking(false);
     }
-  }, [isThinking, activeCanvas, selectedModel, selectedNodeIds, apiKeyStatus, executePlan, notify, config, ecommerceState]);
+  }, [isThinking, activeCanvas, selectedModel, selectedNodeIds, apiKeyStatus, executePlan, notify, config, ecommerceState, canvasTransform, canvasRef]);
+
 
   // 用户点击“确认执行”
   const executePendingPlan = useCallback(async () => {
-    if (!pendingPlan) return;
-    const plan = pendingPlan;
+    if (!currentRunId) return;
+    const runId = currentRunId;
     setPendingPlan(null);
-    await executePlan(plan);
-  }, [pendingPlan, executePlan]);
+    setCurrentRunId(null);
+    await executePlan(runId);
+  }, [currentRunId, executePlan]);
 
   // 用户点击“取消计划”
   const cancelPendingPlan = useCallback(() => {
@@ -291,6 +277,110 @@ export function AITakeoverProvider({
     setMessages(prev => [...prev, cancelMsg]);
   }, []);
 
+  // 简体中文：利用 Refs 跟踪最新的 React 状态与生图回调，供单例持久化队列消费以防闭包陈旧
+  const activeCanvasRef = useRef(activeCanvas);
+  const selectedModelRef = useRef(selectedModel);
+  const addPromptNodeRef = useRef(addPromptNode);
+  const executeGenerationRef = useRef(executeGeneration);
+  const getNextCardPositionRef = useRef(getNextCardPosition);
+
+  useEffect(() => {
+    activeCanvasRef.current = activeCanvas;
+    selectedModelRef.current = selectedModel;
+    addPromptNodeRef.current = addPromptNode;
+    executeGenerationRef.current = executeGeneration;
+    getNextCardPositionRef.current = getNextCardPosition;
+  });
+
+  useEffect(() => {
+    // 向队列注册具体的图片生成任务 executor 桥接逻辑
+    durableGenerationQueue.registerExecutor(async (promptText, options, jobId, promptId) => {
+      const lastPos = getNextCardPositionRef.current();
+      const job = durableGenerationQueue.getJob(jobId);
+      const index = job ? job.prompts.findIndex(p => p.id === promptId) : 0;
+      const pos = {
+        x: lastPos.x + (index >= 0 ? index : 0) * 420,
+        y: lastPos.y
+      };
+
+      const referenceImages: any[] = [];
+      if (options.referenceImageNodeId) {
+        const sourceImg = activeCanvasRef.current?.imageNodes?.find((img: any) => img.id === options.referenceImageNodeId);
+        if (sourceImg) {
+          referenceImages.push({
+            id: sourceImg.id,
+            url: sourceImg.url,
+            label: sourceImg.name || '参考图'
+          });
+        }
+      }
+
+      const nodeId = 'takeover_batch_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+      const newNode = {
+        id: nodeId,
+        prompt: promptText,
+        position: pos,
+        aspectRatio: options.aspectRatio,
+        imageSize: options.imageSize,
+        model: options.modelId,
+        modelLabel: options.modelId,
+        provider: selectedModelRef.current?.provider || 'Google',
+        childImageIds: [],
+        timestamp: Date.now(),
+        parallelCount: options.countPerPrompt || 1,
+        isGenerating: true,
+        status: 'queued',
+        referenceImages
+      };
+
+      // 1. 先把准备执行生成的 prompt 节点加入画布
+      await addPromptNodeRef.current(newNode);
+
+      // 2. 拉起真正的生成逻辑 (由 useImageGeneration hook 承担)
+      await executeGenerationRef.current({
+        ...newNode,
+        isGenerating: true,
+        status: 'idle'
+      });
+
+      // 3. 轮询监听该卡片的生成状态（isGenerating 变为 false 时代表成功或失败）
+      return new Promise<string[]>((resolve, reject) => {
+        let attempts = 0;
+        const interval = setInterval(() => {
+          attempts++;
+          const currentCanvas = activeCanvasRef.current;
+          const node = currentCanvas?.promptNodes?.find((n: any) => n.id === nodeId);
+          if (node) {
+            if (!node.isGenerating) {
+              clearInterval(interval);
+              if (node.status === 'failed' || node.error) {
+                reject(new Error(node.error || '生图失败'));
+              } else {
+                resolve(node.childImageIds || []);
+              }
+            }
+          } else {
+            clearInterval(interval);
+            reject(new Error('Prompt node deleted'));
+          }
+
+          if (attempts > 120) {
+            clearInterval(interval);
+            reject(new Error('Generation timeout'));
+          }
+        }, 1000);
+      });
+    });
+
+    // 注册自动排版 handler
+    durableGenerationQueue.registerArrangeHandler(async (nodeIds, options) => {
+      console.log('[DurableQueue] Job completed, nodes ready to arrange:', nodeIds);
+    });
+
+    // 挂载时，自动触发/恢复排队及挂起的批量任务
+    durableGenerationQueue.processQueue();
+  }, []);
+
   return (
     <AITakeoverContext.Provider
       value={{
@@ -305,7 +395,8 @@ export function AITakeoverProvider({
         executePendingPlan,
         cancelPendingPlan,
         selectedModel,
-        setSelectedModel
+        setSelectedModel,
+        currentRunId
       }}
     >
       {children}

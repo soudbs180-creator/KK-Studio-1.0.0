@@ -4572,8 +4572,11 @@ const AppContent: React.FC<AppContentProps> = () => {
       setConfig={setConfig}
       ecommerceState={ecommerceState}
       onGenerate={handleGenerate}
+      canvasTransform={canvasTransform}
+      canvasRef={canvasRef}
     />
   );
+
 
   const selectionMenuOverlay = useSelectionMenuOverlay({
     activeCanvas,

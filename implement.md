@@ -2,11 +2,13 @@
 
 本文件是 AGENTS 明确规定的根目录例外文件。记录每个里程碑的开发与代码调整细节。
 
+> 当前事实校正（2026-06-03）：项目当前稳定版本为 `KK Studio v1.5.3`，版本源以 `config/release-manifest.json` 为准；当前 Web 主运行时为 `apps/web/`，后端运行时以 `server/` Express / VPS 路由为准。以下旧里程碑记录中的历史迁移描述只用于追溯，不得覆盖 `AGENTS.md` 与 `AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md`。
+
 ## 里程碑 1 执行细节
 - 创建 `plans.md`、`implement.md`、`status.md`、`validation.md`。
 - 清理非规范文件，确认 `docs/` 下各文档归位，合并/删除 `docs/docs`。
-- 重构 `scripts/governance/check-agent-docs.mjs`，去除已不存在的 `.agent` 依赖，将硬编码文件指向 `docs` 目录。
-- 重构 `scripts/governance/check-version-consistency.mjs`，更新 `versionTargets`，支持把 `readme` 绑定 to `docs/README.md`，剔除 `.agent` 相关逻辑。
+- 重构 `scripts/governance/check-agent-docs.mjs`，去除旧 `.agent` 依赖，将硬编码文件指向 `docs` 目录；当前已进一步把 `AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md` 与 `docs/ai-assistant/` 纳入必检。
+- 重构 `scripts/governance/check-version-consistency.mjs`，更新 `versionTargets`，支持把 `readme` 绑定 to `docs/README.md`，剔除旧 `.agent` 相关逻辑。
 - 修正 `scripts/architecture/check-import-boundaries.mjs` 和 `check-legacy-zone-boundaries.mjs`，排除遗留的根目录 `src` 检查，收敛到新结构。
 - 更新 `config/release-manifest.json`，确保配置不含敏感密钥并映射正确的路径。
 
@@ -14,7 +16,7 @@
 - **代码物理合并与清理**：
   - 合并 `@kk/contracts` 与 `@kk/domain` 模块的所有代码到 `packages/shared/src/contracts` 和 `packages/shared/src/domain`，在 `packages/shared/src/index.ts` 重新导出，并彻底删除了旧包目录。
   - 全局替换 `apps/web/src` 和其他配置文件中对 `@kk/contracts` 的引用，重定向至 `@kk/shared`。
-  - 升级 `packages/ui` 拥有真实的独立 `package.json` 工作区，同步版本为 `1.4.9`，导出安全设计令牌。
+  - 升级 `packages/ui` 拥有真实的独立 `package.json` 工作区；当前版本已同步为 `1.5.3`，导出安全设计令牌。
   - 物理清理已废弃的过渡目录 `apps/api`、`apps/admin`、`apps/payment-sidecar`、根 `billing/`。
 - **部署脚本与测试路径重组**：
   - 迁移 `deploy` 至 `config/deploy`，同步重构了 vps 部署脚本 and 部署断言测试中的指向别名。
@@ -28,8 +30,8 @@
   - 执行 `npm install` 刷新 monorepo 子工作区软链接。
 
 ## 里程碑 3 & 4 执行细节 (2026-05-25)
-- **Netlify 无服务器后端重构**：
-  - 新增 Netlify 函数公共库 `netlify/lib/`，包括 `db.ts`（支持事务和连接池单例）、`jwt.ts`（HMAC-SHA256 签发/验签）、`response.ts`（统一跨域、编码及 nosniff 头部设置）以及 `billing-plans.ts`（服务端套餐明细定义）。
+- **历史后端 API 重构记录**：
+  - 曾新增 Netlify 函数公共库 `netlify/lib/` 作为迁移阶段实现；当前后端运行事实已收口到 `server/` Express / VPS 路由，旧 Netlify 描述不得作为现行开发入口。
   - 创建了 6 个 API 端点：`auth.ts`（带密码 Hash 与 token 刷新）、`generate-image.ts`（Gemini 扣除积分后生成）、`openai-chat.ts`（OpenAI 对话扣分）、`billing.ts`（读取套餐方案并创建 checkout 会话）、`user.ts`（防篡改个人信息更新）与 `generations.ts`（获取生成历史记录）。
 - **支付与数据库硬化**：
   - 编写了前进数据库迁移 `migrations/003_strict_agents_schema.sql`，安全支持账单、充值与扣费机制。

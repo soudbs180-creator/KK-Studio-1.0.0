@@ -1,8 +1,8 @@
-import { type Canvas} from '../../types';
-import { logError, logInfo, logWarning } from '../system/systemLogService';
+import { type Canvas} from '../../types/index.ts';
+import { logError, logInfo, logWarning } from '../system/systemLogService.ts';
 import { getRuntimeOwnerId } from '../auth/runtimeSessionProfile.ts';
-import { sanitizeWorkflowForStorage } from '../../workflow/persistence/workflowSerializer';
-import { toReferenceImageDataUrl } from '../../utils/referenceImageStorage';
+import { sanitizeWorkflowForStorage } from '../../workflow/persistence/workflowSerializer.ts';
+import { toReferenceImageDataUrl } from '../../utils/referenceImageStorage.ts';
 
 /**
  * Service to handle Local File System Access API

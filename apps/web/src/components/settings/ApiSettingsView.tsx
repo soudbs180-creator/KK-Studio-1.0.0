@@ -493,7 +493,8 @@ function toReadonlyOfficialSlot(rawValue: unknown): KeySlot | null {
 
   return {
     id,
-    key: hasStoredSecret(raw.key) ? maskSecret(raw.key) : '',
+    key: hasStoredSecret(raw.key) ? maskSecret(raw.key as string) : '',
+
     name: normalizeString(raw.name) || (provider === 'OpenAI' ? 'OpenAI' : 'Google'),
     provider,
     type: provider === 'Google' || provider === 'OpenAI' ? 'official' : (baseUrl ? 'proxy' : 'third-party'),
@@ -544,7 +545,8 @@ function toReadonlyProvider(rawValue: unknown): ThirdPartyProvider | null {
     id,
     name: providerName,
     baseUrl: providerBaseUrl,
-    apiKey: hasStoredSecret(raw.apiKey ?? raw.key) ? maskSecret(raw.apiKey ?? raw.key) : '',
+    apiKey: hasStoredSecret(raw.apiKey ?? raw.key) ? maskSecret((raw.apiKey ?? raw.key) as string) : '',
+
     models: resolveEffectiveProviderModels({
       provider: providerName,
       baseUrl: providerBaseUrl,

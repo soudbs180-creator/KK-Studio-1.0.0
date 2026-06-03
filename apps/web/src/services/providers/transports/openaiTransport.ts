@@ -4,7 +4,7 @@
  * @description 标准 OpenAI 兼容协议传输层。负责按照标准 OpenAI 规范拼装 URL、Headers 和 Payload，
  *              此层纯粹按照协议通信，不夹杂任何特定供应商的品牌逻辑。
  * @author KK-Studio Team
- * @version 1.5.2
+ * @version 1.5.3
  */
 
 export interface TransportRequest {

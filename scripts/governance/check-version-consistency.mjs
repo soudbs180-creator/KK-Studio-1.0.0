@@ -55,6 +55,10 @@ function sameJson(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 const releaseManifestTarget = targets.releaseManifest || "config/release-manifest.json";
 if (releaseManifestTarget !== "config/release-manifest.json") {
   fail(`versionTargets.releaseManifest must stay aligned to config/release-manifest.json, found ${releaseManifestTarget}`);
@@ -106,12 +110,13 @@ for (const target of checkTargets) {
 }
 
 const documentationExpectations = [];
+const runtimeAppInfoPattern = new RegExp(`\`${escapeRegExp(runtimeAppInfoTarget)}\`[^\\n]*运行时只读导出`, "u");
 if (targets.progressReport && fs.existsSync(path.join(root, targets.progressReport))) {
   documentationExpectations.push({
     path: targets.progressReport,
     requiredPatterns: [
       /`config\/release-manifest\.json`[^\n]*版本真相/u,
-      /`src\/config\/appInfo\.ts`[^\n]*运行时只读导出/u,
+      runtimeAppInfoPattern,
       /`release\/publish\/stable\/manifest\.json`[^\n]*stable 发布清单/u,
     ],
   });
@@ -121,7 +126,7 @@ if (targets.sessionHandoff && fs.existsSync(path.join(root, targets.sessionHando
     path: targets.sessionHandoff,
     requiredPatterns: [
       /`config\/release-manifest\.json`[^\n]*主版本源/u,
-      /`src\/config\/appInfo\.ts`[^\n]*运行时只读导出/u,
+      runtimeAppInfoPattern,
       /`release\/publish\/stable\/manifest\.json`[^\n]*portable stable 发布清单/u,
     ],
   });

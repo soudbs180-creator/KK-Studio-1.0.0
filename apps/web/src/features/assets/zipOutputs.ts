@@ -1,107 +1,253 @@
-// 简体中文：生成图片 ZIP 打包归档器 (Zip Outputs)
-
 import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
-import { useAssetStore } from './assetStore';
+import fileSaver from 'file-saver';
+
+import { useAssetStore } from './assetStore.ts';
+import {
+  getSafeOriginalFilename,
+  resolveImageNodesForDownload,
+  resolveOriginalSourceCandidates,
+  type OriginalSourceKind,
+} from './resolveOriginalAssets.ts';
+import { type GeneratedImage } from '../../types/index.ts';
+
+const saveAs = typeof fileSaver === 'object' && fileSaver && 'saveAs' in fileSaver
+  ? (fileSaver as any).saveAs
+  : fileSaver;
 
 export interface ZipParams {
   projectName: string;
+  canvasId?: string;
   batchId: string;
-  imageNodes: any[]; // 包含 url, id, name, timestamp, parentPromptId
+  imageNodes: GeneratedImage[];
+  selectedNodeIds?: string[];
+  promptNodes?: any[];
+  preferOriginal?: boolean;
+  skipSave?: boolean;
+  fetchBlob?: (url: string) => Promise<Blob>;
 }
 
-/**
- * 将指定范围内的图片输出打包成 ZIP，并自动附加一份说明 manifest.json
- */
-export async function zipOutputs(scope: string, params: ZipParams): Promise<{ count: number; failedCount: number }> {
-  let outputs = params.imageNodes || [];
+export interface ZipManifestItem {
+  nodeId: string;
+  parentPromptId?: string;
+  filename: string;
+  sourceKind: OriginalSourceKind;
+  promptSummary?: string;
+  model?: string;
+  createdAt?: string;
+  mimeType?: string;
+  originalUrlUsed: boolean;
+}
 
-  if (scope === 'latest_batch') {
-    // 智能获取最后一批生成的图片：按时间降序排列，取最近 of 4 张
-    const sorted = [...outputs].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    outputs = sorted.slice(0, 4);
+export interface ZipManifestFailedItem {
+  nodeId: string;
+  parentPromptId?: string;
+  reason: string;
+  attemptedSources: OriginalSourceKind[];
+}
+
+export interface ZipManifest {
+  projectName: string;
+  canvasId?: string;
+  batchId: string;
+  scope: string;
+  createdAt: string;
+  count: number;
+  failedCount: number;
+  items: ZipManifestItem[];
+  failedItems: ZipManifestFailedItem[];
+}
+
+export interface ZipOutputsResult {
+  count: number;
+  failedCount: number;
+  manifest: ZipManifest;
+  zipBlob?: Blob;
+}
+
+type DownloadedImage = {
+  blob: Blob;
+  sourceKind: OriginalSourceKind;
+};
+
+const isUsableBlob = (blob: Blob | null | undefined): blob is Blob =>
+  !!blob && typeof blob.size === 'number' && blob.size > 0;
+
+const toCreatedAt = (timestamp: unknown): string | undefined => {
+  const value = Number(timestamp);
+  if (!Number.isFinite(value) || value <= 0) return undefined;
+  return new Date(value).toISOString();
+};
+
+const summarizePrompt = (prompt: unknown): string | undefined => {
+  if (typeof prompt !== 'string') return undefined;
+  const trimmed = prompt.trim();
+  return trimmed.length > 0 ? trimmed.slice(0, 120) : undefined;
+};
+
+const fetchUrlAsBlob = async (url: string, fetchBlob?: (url: string) => Promise<Blob>): Promise<Blob> => {
+  if (fetchBlob) return fetchBlob(url);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
   }
 
-  if (outputs.length === 0) {
-    throw new Error('当前画布上没有可供打包的生成图片结果。');
+  return response.blob();
+};
+
+const loadStorageImageUrl = async (id: string): Promise<string | null> => {
+  const storage = await import('../../services/storage/imageStorage.ts');
+  const strictOriginal = await storage.getStrictOriginalImage(id);
+  if (strictOriginal) return strictOriginal;
+
+  return storage.getImage(id);
+};
+
+const findLocalAssetBlob = (image: GeneratedImage): Blob | null => {
+  const { images, files } = useAssetStore.getState();
+  const matchedImage = images.find(asset => (
+    asset.id === image.id
+    || asset.name === image.fileName
+    || asset.thumbnailUrl === image.url
+  ));
+  const matchedFile = files.find(asset => (
+    asset.id === image.id
+    || asset.name === image.fileName
+  ));
+  const localFile = (matchedImage || matchedFile)?.localFile;
+
+  return localFile instanceof Blob ? localFile : null;
+};
+
+const downloadOriginalBlob = async (
+  image: GeneratedImage,
+  index: number,
+  params: ZipParams
+): Promise<DownloadedImage> => {
+  const candidates = resolveOriginalSourceCandidates(image, index);
+  let lastError: Error | null = null;
+
+  for (const candidate of candidates) {
+    try {
+      if (candidate.sourceUrl) {
+        const blob = await fetchUrlAsBlob(candidate.sourceUrl, params.fetchBlob);
+        if (isUsableBlob(blob)) {
+          return { blob, sourceKind: candidate.sourceKind };
+        }
+        throw new Error('empty_blob');
+      }
+
+      if (candidate.storageId) {
+        const storageUrl = await loadStorageImageUrl(candidate.storageId);
+        if (!storageUrl) {
+          throw new Error('storage_not_found');
+        }
+
+        const blob = await fetchUrlAsBlob(storageUrl, params.fetchBlob);
+        if (isUsableBlob(blob)) {
+          return { blob, sourceKind: 'storageId' };
+        }
+        throw new Error('empty_storage_blob');
+      }
+    } catch (error: any) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.warn(`[zipOutputs] Failed to load ${image.id} from ${candidate.sourceKind}:`, lastError.message);
+    }
+  }
+
+  const localBlob = findLocalAssetBlob(image);
+  if (isUsableBlob(localBlob)) {
+    return { blob: localBlob, sourceKind: 'localFile' };
+  }
+
+  throw lastError || new Error('no_downloadable_original_source');
+};
+
+const blobToZipData = async (blob: Blob): Promise<ArrayBuffer | Blob> => {
+  if (typeof blob.arrayBuffer === 'function') {
+    return blob.arrayBuffer();
+  }
+
+  return blob;
+};
+
+export async function zipOutputs(scope: string, params: ZipParams): Promise<ZipOutputsResult> {
+  const imageNodes = resolveImageNodesForDownload({
+    scope,
+    selectedNodeIds: params.selectedNodeIds,
+    activeCanvas: {
+      promptNodes: params.promptNodes,
+      imageNodes: params.imageNodes || [],
+    },
+  });
+
+  if (scope === 'selected_cards' && imageNodes.length === 0) {
+    throw new Error('No selected image cards or prompt child images are available to download.');
+  }
+
+  if (imageNodes.length === 0) {
+    throw new Error('No generated images are available to package on the current canvas.');
   }
 
   const zip = new JSZip();
-  const manifest = {
+  const manifest: ZipManifest = {
     projectName: params.projectName || 'KKStudio',
+    canvasId: params.canvasId,
     batchId: params.batchId,
+    scope,
     createdAt: new Date().toISOString(),
     count: 0,
-    items: [] as Array<{ id: string; filename: string; sourceCardId: string }>,
-    failedItems: [] as Array<{ id: string; name?: string; url?: string; reason: string }>
+    failedCount: 0,
+    items: [],
+    failedItems: [],
   };
 
-  const { images, files } = useAssetStore.getState();
-
-  for (let i = 0; i < outputs.length; i++) {
-    const output = outputs[i];
-    let blob: Blob;
-
-    // 优先在本地 assetStore 中寻找关联的本地 File
-    const matchedImage = images.find(img => 
-      img.id === output.id || 
-      img.name === output.name || 
-      img.thumbnailUrl === output.url
-    );
-
-    const matchedFile = files.find(f => 
-      f.id === output.id || 
-      f.name === output.name
-    );
-
-    const matchedAsset = matchedImage || matchedFile;
-
-    // 格式化安全的文件名
-    const safeName = (output.name || `image_${output.id}`)
-      .replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, '_')
-      .substring(0, 50);
-    const filename = `${String(i + 1).padStart(3, '0')}_${safeName}.png`;
+  for (let index = 0; index < imageNodes.length; index += 1) {
+    const image = imageNodes[index];
+    const filename = getSafeOriginalFilename(image, index);
+    const attemptedSources = resolveOriginalSourceCandidates(image, index).map(candidate => candidate.sourceKind);
 
     try {
-      if (matchedAsset && matchedAsset.localFile) {
-        blob = matchedAsset.localFile;
-      } else {
-        blob = await fetch(output.url).then(res => {
-          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-          return res.blob();
-        });
-      }
-
-      zip.file(filename, blob);
+      const downloaded = await downloadOriginalBlob(image, index, params);
+      zip.file(filename, await blobToZipData(downloaded.blob));
       manifest.items.push({
-        id: output.id,
+        nodeId: image.id,
+        parentPromptId: image.parentPromptId,
         filename,
-        sourceCardId: output.parentPromptId || output.id
+        sourceKind: downloaded.sourceKind,
+        promptSummary: summarizePrompt(image.prompt),
+        model: image.model,
+        createdAt: toCreatedAt(image.timestamp),
+        mimeType: image.mimeType,
+        originalUrlUsed: downloaded.sourceKind === 'originalUrl',
       });
     } catch (error: any) {
       manifest.failedItems.push({
-        id: output.id,
-        name: output.name,
-        url: output.url,
-        reason: error?.message || 'fetch_failed'
+        nodeId: image.id,
+        parentPromptId: image.parentPromptId,
+        reason: error?.message || 'fetch_failed',
+        attemptedSources,
       });
     }
   }
 
   manifest.count = manifest.items.length;
+  manifest.failedCount = manifest.failedItems.length;
   zip.file('manifest.json', JSON.stringify(manifest, null, 2));
 
-  if (manifest.items.length === 0) {
-    throw new Error('没有任何图片成功打包，请检查图片地址是否有效或是否存在跨域限制。');
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  if (!params.skipSave) {
+    if (typeof saveAs === 'function') {
+      saveAs(zipBlob, `${params.projectName || 'KKStudio'}_outputs.zip`);
+    } else {
+      console.log(`[zipOutputs] Environment non-browser: generated ${params.projectName || 'KKStudio'}_outputs.zip in memory`);
+    }
   }
 
-  // 导出生成
-  const content = await zip.generateAsync({ type: 'blob' });
-  saveAs(content, `${params.projectName || 'KKStudio'}_outputs.zip`);
-
   return {
-    count: manifest.items.length,
-    failedCount: manifest.failedItems.length
+    count: manifest.count,
+    failedCount: manifest.failedCount,
+    manifest,
+    zipBlob,
   };
 }
-

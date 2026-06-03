@@ -1,8 +1,9 @@
 // 简体中文：资产状态管理器 (Asset Store)
 
 import { create } from 'zustand';
-import type { ImageAsset, FileAsset, OutputAsset, AssetContextSummary, AssetCollection } from '../ai-takeover/types';
-import { detectSensitiveFile } from './sensitiveFileScanner';
+import type { ImageAsset, FileAsset, OutputAsset, AssetContextSummary, AssetCollection } from '../ai-takeover/types.ts';
+import { detectSensitiveFile } from './sensitiveFileScanner.ts';
+
 
 interface AssetStoreState {
   images: ImageAsset[];

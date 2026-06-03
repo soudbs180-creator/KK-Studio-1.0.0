@@ -261,13 +261,86 @@ export interface SanitizedProjectContext {
       productFilesCount?: number;
     };
   };
+  runtime?: CanvasRuntimeState;
 }
+
+export interface CanvasRuntimeState {
+  projectVersion: '1.5.3';
+  currentPage: 'canvas' | 'settings' | 'agent' | 'unknown';
+  canvas: {
+    id: string;
+    name: string;
+    promptCount: number;
+    imageCount: number;
+    groupCount: number;
+    lastModified?: number;
+  };
+  viewport: {
+    x: number;
+    y: number;
+    scale: number;
+    center: { x: number; y: number };
+    rect?: { width: number; height: number };
+  };
+  selection: {
+    selectedNodeIds: string[];
+    promptNodeIds: string[];
+    imageNodeIds: string[];
+    childImageNodeIdsFromSelectedPrompts: string[];
+    groupIds: string[];
+    count: number;
+  };
+  selectedNodes: {
+    prompts: Array<{
+      id: string;
+      prompt: string;
+      status: 'idle' | 'queued' | 'generating' | 'failed' | 'done';
+      childImageIds: string[];
+      tags?: string[];
+    }>;
+    images: Array<{
+      id: string;
+      parentPromptId?: string;
+      urlPresent: boolean;
+      originalUrlPresent: boolean;
+      apiResultUrlPresent: boolean;
+      storageIdPresent: boolean;
+      tags?: string[];
+    }>;
+  };
+  promptBarInput?: {
+    prompt: string;
+    mode: string;
+    referenceImagesCount: number;
+  };
+  recentEvents: Array<{
+    id: string;
+    type: string;
+    targetIds?: string[];
+    timestamp: number;
+    summary: string;
+  }>;
+}
+
 
 export type ToolPermission =
   | 'safe'
   | 'confirm'
   | 'dangerous'
   | 'forbidden';
+
+export interface AgentToolCallLog {
+  id: string;
+  runId: string;
+  toolName: string;
+  inputSummary: string;
+  outputSummary?: string;
+  status: 'success' | 'failed' | 'blocked';
+  error?: string;
+  startedAt: string;
+  completedAt?: string;
+  idempotencyKey?: string;
+}
 
 export interface AssetCollection {
   id: string;
@@ -277,4 +350,3 @@ export interface AssetCollection {
   assetIds: string[];
   createdAt: number;
 }
-

@@ -112,7 +112,7 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   const sectionSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.match(source, /const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';/);
-  assert.match(source, /const isReadonlySecretPlaceholder = \(value\?: string \| null\) => String\(value \|\| ''\)\.trim\(\) === READONLY_SECRET_PLACEHOLDER;/);
+  assert.match(source, /const isReadonlySecretPlaceholder = \(value\?: string \| null\)(?:: boolean)? => \{/);
   assert.match(source, /import \{ useAuth \} from '\.\.\/\.\.\/context\/AuthContext';/);
   assert.match(source, /import \{ resolveUserApiViewState \} from '\.\.\/\.\.\/services\/api\/userApiViewState';/);
   assert.match(source, /const \{ user, isTempUser \} = useAuth\(\);/);

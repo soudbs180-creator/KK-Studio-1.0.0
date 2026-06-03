@@ -42,7 +42,10 @@ interface ChatSidebarProps {
     setConfig?: any;
     ecommerceState?: any;
     onGenerate?: any;
+    canvasTransform?: { x: number; y: number; scale: number } | null;
+    canvasRef?: any;
 }
+
 
 type ChatSidebarModelMenuItem = ChatModel & {
     displayName: string;
@@ -485,8 +488,10 @@ interface NormalChatSidebarProps extends ChatSidebarProps {
     setSelectedModel: (m: ChatModel) => void;
 }
 
-const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange, selectedModel, setSelectedModel }) => {
+const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
+    const { isOpen, onToggle, onClose, isMobile, onOpenSettings, onHoverChange, onWidthChange, selectedModel, setSelectedModel } = props;
     const { user, isTempUser, loading: authLoading } = useAuth();
+
 
     // 简体中文：AI接管与本地资源池相关状态和 Hook 注入
     const {
@@ -628,8 +633,10 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
                         referenceImages: [{
                             id: latestImage.id,
                             url: latestImage.url,
-                            label: latestImage.name || '生图参考'
+                            label: (latestImage.displayLabel || latestImage.prompt || '生图参考').substring(0, 30)
                         }]
+
+
                     }));
                     notify.success('AI 接管：已帮您将最新图片设为参考图并切换至视频模式。', '您可以直接在输入框继续细化视频描述，然后点击发送！');
                 } else {
@@ -1489,7 +1496,8 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
         }
     }, [expandedNodes]);
 
-    const activeMessages = aiTakeoverMode ? takeoverMessages : messages;
+    const activeMessages = (aiTakeoverMode ? takeoverMessages : messages) as Message[];
+
     const activeIsThinking = aiTakeoverMode ? takeoverIsThinking : isThinking;
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -3445,7 +3453,7 @@ const ChatSidebarInner: React.FC<ChatSidebarProps & { selectedModel: ChatModel; 
 };
 
 const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
-    const { activeCanvas, addPromptNode, updatePromptNode, getNextCardPosition, selectedNodeIds } = useCanvas();
+    const { activeCanvas, addPromptNode, updatePromptNode, getNextCardPosition, selectedNodeIds, arrangeAllNodes } = useCanvas();
     const { executeGeneration } = useImageGeneration({
         isMobile: props.isMobile,
         getCardDimensions: (ratio, hasToolbar) => getCardDimensions(ratio, hasToolbar),
@@ -3468,6 +3476,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
             updatePromptNode={updatePromptNode}
             executeGeneration={executeGeneration}
             getNextCardPosition={getNextCardPosition}
+            arrangeAllNodes={arrangeAllNodes}
             setConfig={props.setConfig || (() => {})}
             onOpenSettings={props.onOpenSettings}
             apiKeyStatus={apiKeyStatus}
@@ -3476,6 +3485,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
             config={props.config}
             ecommerceState={props.ecommerceState}
             onGenerate={props.onGenerate}
+            canvasTransform={props.canvasTransform}
+            canvasRef={props.canvasRef}
         >
             <ChatSidebarInner
                 {...props}
@@ -3483,6 +3494,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
                 setSelectedModel={setSelectedModel}
             />
         </AITakeoverProvider>
+
     );
 };
 

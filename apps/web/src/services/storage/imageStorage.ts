@@ -11,8 +11,8 @@
  * - 删除：同时从内存和IndexedDB删除
  */
 
-import { fileSystemService } from './fileSystemService';
-import { getStorageMode } from './storagePreference';
+import { fileSystemService } from './fileSystemService.ts';
+import { getStorageMode } from './storagePreference.ts';
 
 const BASE64_LIKE_PATTERN = /^[A-Za-z0-9+/=\r\n]+$/;
 
@@ -160,7 +160,7 @@ async function toBlobFromAnyUrl(dataURL: string): Promise<Blob | null> {
         if (!normalizedSource) return null;
 
         if (normalizedSource.startsWith('data:')) {
-            const { dataURLToBlob } = await import('./blobUtils');
+            const { dataURLToBlob } = await import('./blobUtils.ts');
             const blob = await dataURLToBlob(normalizedSource);
             return blob?.size && blob.size > 0 ? blob : null;
         }
@@ -430,7 +430,7 @@ export async function saveImage(id: string, dataURL: string): Promise<void> {
         try {
             const selectedMode = await getStorageMode();
             if (selectedMode === 'opfs') {
-                const { isOPFSAvailable, saveToOPFS } = await import('./opfsService');
+                const { isOPFSAvailable, saveToOPFS } = await import('./opfsService.ts');
                 if (isOPFSAvailable() && saveObject.blob) {
                     const { baseId, quality } = parseQualityId(id);
                     const opfsType = (quality === 'micro' || quality === 'thumb') ? 'thumbnail' : 'image';
@@ -496,7 +496,7 @@ export async function getImage(id: string): Promise<string | null> {
 
             // 🚀 [OPFS Recovery] 手机端浏览器 OPFS 恢复兜底
             try {
-                const { isOPFSAvailable, getOPFSBlobUrl } = await import('./opfsService');
+                const { isOPFSAvailable, getOPFSBlobUrl } = await import('./opfsService.ts');
                 if (isOPFSAvailable()) {
                     const { baseId, quality } = parseQualityId(id);
                     const opfsType = (quality === 'micro' || quality === 'thumb') ? 'thumbnail' : 'image';
@@ -888,7 +888,7 @@ function compressImage(dataUrl: string, maxDimension: number): Promise<string> {
 // 🚀 图片质量分级功能
 // ============================================
 
-import { ImageQuality, generateAllQualities, getQualityStorageId } from '../image/imageQuality';
+import { ImageQuality, generateAllQualities, getQualityStorageId } from '../image/imageQuality.ts';
 
 /**
  * 🚀 保存图片（支持质量分级）
@@ -1062,7 +1062,7 @@ export async function saveOriginalImage(id: string, dataURL: string, isVideo: bo
             try {
                 const selectedMode = await getStorageMode();
                 if (selectedMode === 'opfs') {
-                    const { isOPFSAvailable, saveToOPFS } = await import('./opfsService');
+                    const { isOPFSAvailable, saveToOPFS } = await import('./opfsService.ts');
                     if (isOPFSAvailable() && saveObject.blob) {
                         await saveToOPFS(saveObject.blob, id, isVideo ? 'video' : 'image');
                         console.log(`[ImageStorage] 🔒 OPFS original backup successful for ${id}`);
@@ -1139,7 +1139,7 @@ export async function getOriginalImage(id: string): Promise<string | null> {
 
             // 🚀 [OPFS Recovery] 手机端浏览器 OPFS 恢复兜底 (原图)
             try {
-                const { isOPFSAvailable, getOPFSBlobUrl } = await import('./opfsService');
+                const { isOPFSAvailable, getOPFSBlobUrl } = await import('./opfsService.ts');
                 if (isOPFSAvailable()) {
                     const blobURL = await getOPFSBlobUrl(id, 'image');
                     if (blobURL) {
@@ -1251,7 +1251,7 @@ export async function getStrictOriginalImage(id: string): Promise<string | null>
 
         // 🚀 [OPFS Recovery] 手机端浏览器 OPFS 恢复兜底 (原图)
         try {
-            const { isOPFSAvailable, getOPFSBlobUrl } = await import('./opfsService');
+            const { isOPFSAvailable, getOPFSBlobUrl } = await import('./opfsService.ts');
             if (isOPFSAvailable()) {
                 const blobURL = await getOPFSBlobUrl(id, 'image');
                 if (blobURL) {

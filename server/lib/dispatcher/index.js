@@ -4,7 +4,7 @@
  * @description 后端统一 AI 路由派发器（Dispatcher）。严格执行 14 步标准流控，
  *              完美串联积分预扣除、非标适配器动态转换、网络通信及高可靠异常退款。
  * @author KK-Studio Team
- * @version 1.5.2
+ * @version 1.5.3
  */
 
 const fetch = require('node-fetch'); // 使用后端自带的 node-fetch 依赖

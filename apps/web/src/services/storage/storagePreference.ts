@@ -1,10 +1,10 @@
-﻿/**
+/**
  * Storage Preference Service
  * Manages user's storage mode preference (local folder vs browser IndexedDB vs OPFS)
  */
 
-import { getAllImageIds, getImage, getImageMetadata } from './imageStorage';
-import { notify } from '../system/notificationService';
+import { getAllImageIds, getImage, getImageMetadata } from './imageStorage.ts';
+import { notify } from '../system/notificationService.ts';
 
 // 🚀 添加OPFS模式支持手机端
 export type StorageMode = 'local' | 'browser' | 'opfs';
@@ -296,7 +296,7 @@ export async function mergeStorages(): Promise<void> {
     console.log('[StoragePreference] Starting storage merge...');
 
     try {
-        const { dataURLToBlob } = await import('./blobUtils');
+        const { dataURLToBlob } = await import('./blobUtils.ts');
         const ids = await getAllImageIds();
         console.log(`[StoragePreference] Found ${ids.length} images in browser cache to check`);
 

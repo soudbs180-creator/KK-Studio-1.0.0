@@ -14,19 +14,17 @@ test("project docs publish one runtime truth table for current and transitional 
   const handoffSource = readSource("docs/development/session-handoff.md");
 
   assert.match(projectStructureSource, /## Runtime truth table/);
-  assert.match(projectStructureSource, /\| `src\/` \| `current-live-web` \|/);
-  assert.match(projectStructureSource, /\| `apps\/web\/` \| `target-web` \|/);
-  assert.match(projectStructureSource, /\| `apps\/api\/` \| `canonical-api` \|/);
-  assert.match(projectStructureSource, /\| `apps\/payment-sidecar\/` \| `canonical-payment` \|/);
-  assert.match(projectStructureSource, /\| `server\/` \| `transition-bridge` \|/);
+  assert.match(projectStructureSource, /\| `apps\/web\/` \| primary Web runtime \|/);
+  assert.match(projectStructureSource, /\| `apps\/mobile\/` \| mobile workspace \|/);
+  assert.match(projectStructureSource, /\| `packages\/shared\/` \| pure shared logic \|/);
+  assert.match(projectStructureSource, /\| `server\/` \| Express \/ VPS backend \|/);
 
-  assert.match(rootGuideSource, /### Runtime Layout \(严格 AGENTS\)/);
-  assert.match(rootGuideSource, /- `apps\/web\/` 为唯一的桌面端 Web 前端运行时。/);
-  assert.match(rootGuideSource, /- `apps\/mobile\/` 为手机端 Expo 应用。/);
+  assert.match(rootGuideSource, /### Runtime Layout/);
+  assert.match(rootGuideSource, /- `apps\/web\/` is the primary desktop Web runtime/);
+  assert.match(rootGuideSource, /- `apps\/mobile\/` is the Expo mobile workspace/);
 
-  assert.match(handoffSource, /当前在线前端运行时：根目录 `src\/`/);
-  assert.match(handoffSource, /目标前端运行时：`apps\/web\/`/);
-  assert.match(handoffSource, /`apps\/payment-sidecar\/` is the canonical payment runtime/);
+  assert.match(handoffSource, /Primary Web runtime: `apps\/web\/`/);
+  assert.match(handoffSource, /Mobile workspace: `apps\/mobile\/`/);
 });
 
 test("verification chain includes integration tests and payment-server static checks", () => {

@@ -4,7 +4,7 @@
  * @description 后端协议适配器注册中心。负责定义不同通信协议面（Surface）的
  *              请求 Payload 组装、Headers 构造以及响应字段提取策略，实现非标接口归一化。
  * @author KK-Studio Team
- * @version 1.5.2
+ * @version 1.5.3
  */
 
 const querystring = require('querystring');

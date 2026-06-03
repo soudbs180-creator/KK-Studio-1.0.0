@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAITakeover } from '../context/AITakeoverContext';
 import { useAssetStore } from '../../assets/assetStore';
 import { ensureFileUploaded } from '../../assets/lazyUpload';
+import { durableGenerationQueue } from '../../ai-assistant-runtime';
+import type { GenerationBatchJob } from '../../ai-assistant-runtime';
 import {
   Send,
   Loader2,
@@ -16,7 +18,11 @@ import {
   Lock,
   Download,
   AlertTriangle,
-  Cpu
+  Cpu,
+  Pause,
+  Play,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
 
 const getUploadStateText = (state: string) => {
@@ -45,6 +51,17 @@ export const AIAssistantDock: React.FC = () => {
   } = useAITakeover();
 
   const { images, files, outputs, addImage, addFile, removeAsset, addImageCollection } = useAssetStore();
+
+  const [jobs, setJobs] = useState<GenerationBatchJob[]>([]);
+
+  useEffect(() => {
+    const updateJobs = () => {
+      setJobs(durableGenerationQueue.getJobs());
+    };
+    updateJobs();
+    const interval = setInterval(updateJobs, 1500); // 1.5s 刷新一次以保障极佳实时性
+    return () => clearInterval(interval);
+  }, []);
 
   const [inputVal, setInputVal] = useState('');
   const [showResourcePanel, setShowResourcePanel] = useState(false);
@@ -229,6 +246,94 @@ export const AIAssistantDock: React.FC = () => {
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* 2.5 批量生成队列进度面板与恢复 UI */}
+      {jobs.filter(j => j.status !== 'completed' || j.prompts.some(p => p.status === 'running')).length > 0 && (
+        <div className="mx-4 my-2 p-3 rounded-xl border border-zinc-800 bg-[#0d0e12]/80 backdrop-blur-md shadow-lg space-y-2">
+          <div className="flex items-center justify-between text-[10px] font-black text-zinc-400">
+            <span className="flex items-center gap-1">
+              <Cpu size={12} className="text-purple-500 animate-pulse" />
+              <span>生图队列排队中 ({jobs.filter(j => j.status === 'running' || j.status === 'queued').length})</span>
+            </span>
+            <button 
+              onClick={() => durableGenerationQueue.clearAllJobs()}
+              className="text-[9px] text-zinc-500 hover:text-zinc-300 transition-all cursor-pointer"
+            >
+              全部清空
+            </button>
+          </div>
+          
+          <div className="max-h-36 overflow-y-auto space-y-2">
+            {jobs.map(job => {
+              const total = job.prompts.length;
+              const completed = job.prompts.filter((p: any) => p.status === 'completed').length;
+              const failed = job.prompts.filter((p: any) => p.status === 'failed').length;
+              const running = job.prompts.filter((p: any) => p.status === 'running').length;
+              const percent = Math.round(((completed + failed) / total) * 100);
+
+              return (
+                <div key={job.id} className="p-2 rounded-lg bg-zinc-900/50 border border-zinc-900 flex flex-col gap-1.5 text-[9px]">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-zinc-400 truncate max-w-[150px]">Job: {job.id.substring(4, 12)}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                      job.status === 'running' ? 'bg-purple-500/20 text-purple-400 animate-pulse' :
+                      job.status === 'paused' ? 'bg-amber-500/20 text-amber-400' :
+                      job.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                      'bg-zinc-800 text-zinc-400'
+                    }`}>
+                      {job.status === 'running' ? '正在生图' :
+                       job.status === 'paused' ? '已暂停' :
+                       job.status === 'completed' ? '已完成' :
+                       job.status === 'cancelled' ? '已取消' : '排队中'}
+                    </span>
+                  </div>
+
+                  {/* 进度条 */}
+                  <div className="w-full bg-zinc-800 rounded-full h-1 relative overflow-hidden">
+                    <div 
+                      className="bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 h-full rounded-full transition-all duration-300"
+                      style={{ width: `${percent}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-[8px] text-zinc-500">
+                    <span>成功: {completed} • 失败: {failed} • 总计: {total}</span>
+                    <div className="flex gap-1.5">
+                      {job.status === 'running' && (
+                        <button 
+                          onClick={() => durableGenerationQueue.pauseJob(job.id)}
+                          className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white cursor-pointer"
+                          title="暂停任务"
+                        >
+                          <Pause size={10} />
+                        </button>
+                      )}
+                      {(job.status === 'paused' || job.status === 'queued') && (
+                        <button 
+                          onClick={() => durableGenerationQueue.resumeJob(job.id)}
+                          className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white cursor-pointer"
+                          title="恢复并继续"
+                        >
+                          <Play size={10} />
+                        </button>
+                      )}
+                      {(job.status === 'running' || job.status === 'paused' || job.status === 'queued') && (
+                        <button 
+                          onClick={() => durableGenerationQueue.cancelJob(job.id)}
+                          className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-rose-400 hover:text-rose-300 cursor-pointer"
+                          title="取消任务"
+                        >
+                          <X size={10} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 3. Confirmation Area 意图强确认卡片 */}
       {pendingPlan && pendingPlan.confirmation && (

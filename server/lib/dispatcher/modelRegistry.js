@@ -4,7 +4,7 @@
  * @description 后端模型映射注册表。负责为模型 ID 建立与适配器协议、
  *              默认渠道的静态绑定关系，解耦客户端与服务端的硬编码。
  * @author KK-Studio Team
- * @version 1.5.2
+ * @version 1.5.3
  */
 
 const models = {

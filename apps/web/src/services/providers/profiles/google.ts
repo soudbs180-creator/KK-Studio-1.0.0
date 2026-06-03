@@ -3,7 +3,7 @@
  * @module apps/web/src/services/providers/profiles
  * @description Google 官方 Gemini 渠道画像。
  * @author KK-Studio Team
- * @version 1.5.2
+ * @version 1.5.3
  */
 
 import { ProviderProfile } from './index';

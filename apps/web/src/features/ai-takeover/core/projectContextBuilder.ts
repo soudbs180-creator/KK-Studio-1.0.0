@@ -1,6 +1,7 @@
 // 简体中文：项目上下文脱敏构建器 (Project Context Builder)
 
 import type { SanitizedProjectContext, AssetContextSummary } from '../types';
+import { buildCanvasRuntimeState } from './canvasRuntimeStateBuilder';
 
 export interface ContextBuilderParams {
   currentPage: 'canvas' | 'settings' | 'agent' | 'unknown';
@@ -17,7 +18,10 @@ export interface ContextBuilderParams {
   errors: any[];
   config?: any;
   ecommerceState?: any;
+  canvasTransform?: { x: number; y: number; scale: number } | null;
+  canvasRef?: any;
 }
+
 
 /**
  * 物理性脱敏构建 SanitizedProjectContext
@@ -38,8 +42,11 @@ export function buildSanitizedProjectContext(params: ContextBuilderParams): Sani
     assetsSummary,
     errors,
     config,
-    ecommerceState
+    ecommerceState,
+    canvasTransform,
+    canvasRef
   } = params;
+
 
   // 1. 构建脱敏画布提示词卡片列表
   const promptNodes = activeCanvas?.promptNodes
@@ -106,6 +113,15 @@ export function buildSanitizedProjectContext(params: ContextBuilderParams): Sani
     } : undefined
   } : undefined;
 
+  const runtime = buildCanvasRuntimeState({
+    currentPage,
+    activeCanvas,
+    selectedNodeIds,
+    canvasTransform,
+    canvasRef,
+    config
+  });
+
   return {
     currentPage,
     aiTakeover: {
@@ -133,6 +149,8 @@ export function buildSanitizedProjectContext(params: ContextBuilderParams): Sani
       canEstimateCost
     },
     errors: sanitizedErrors,
-    promptBarInput
+    promptBarInput,
+    runtime
   };
 }
+

@@ -3,7 +3,7 @@
  * @module api
  * @description Vercel serverless proxy for user-owned Wuyin async model requests.
  * @author KK-Studio Team
- * @version 1.5.2
+ * @version 1.5.3
  */
 
 function sendJson(res, status, payload) {

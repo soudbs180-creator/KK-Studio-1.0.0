@@ -24,6 +24,8 @@ interface WorkspaceSurfacePanelsProps {
   setConfig?: any;
   ecommerceState?: any;
   onGenerate?: any;
+  canvasTransform?: { x: number; y: number; scale: number } | null;
+  canvasRef?: any;
 }
 
 export function WorkspaceSurfacePanels({
@@ -45,6 +47,8 @@ export function WorkspaceSurfacePanels({
   setConfig,
   ecommerceState,
   onGenerate,
+  canvasTransform,
+  canvasRef,
 }: WorkspaceSurfacePanelsProps) {
   return (
     <WorkspacePanels
@@ -67,9 +71,12 @@ export function WorkspaceSurfacePanels({
             setConfig={setConfig}
             ecommerceState={ecommerceState}
             onGenerate={onGenerate}
+            canvasTransform={canvasTransform}
+            canvasRef={canvasRef}
           />
         </div>
       )}
+
       renderLibraryPanel={() => (
         isMobile ? null : (
           <div id="asset-library-wrapper" style={{ pointerEvents: 'auto' }}>

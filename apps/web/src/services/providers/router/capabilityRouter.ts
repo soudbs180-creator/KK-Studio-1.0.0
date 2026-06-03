@@ -4,7 +4,7 @@
  * @description 智能能力路由器。根据调用意图、模型特质及特定渠道画像静态事实，
  *              智能判定最优的通信协议面（Surface）及安全鉴权规则，消灭硬编码。
  * @author KK-Studio Team
- * @version 1.5.2
+ * @version 1.5.3
  */
 
 import { matchProviderProfile, ApiSurface, EndpointStyle } from '../profiles/index';

@@ -1,18 +1,18 @@
-# AGENTS.md — KK Studio v1.5.2 项目总规范与 Agent 黄金法则
+# AGENTS.md — KK Studio v1.5.3 项目总规范与 Agent 黄金法则
 
 <!-- AGENTS.md - AI Agent 项目总指导文件 -->
 
 Last updated: 2026-06-03
-Project version: **KK Studio v1.5.2**
+Project version: **KK Studio v1.5.3**
 Primary companion: [`AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md`](./AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md)
 
-> 本文件是 KK Studio v1.5.2 的最高优先级开发规约。Codex、Antigravity、Claude、Cursor、人工开发者及任何自动化 Agent 在修改项目之前必须先读取本文件。任何旧文档、旧提示词、历史计划、临时代码与本文件冲突时，以本文件和当前源码为准。
+> 本文件是 KK Studio v1.5.3 的最高优先级开发规约。Codex、Antigravity、Claude、Cursor、人工开发者及任何自动化 Agent 在修改项目之前必须先读取本文件。任何旧文档、旧提示词、历史计划、临时代码与本文件冲突时，以本文件和当前源码为准。
 
 ---
 
 ## 0. 不可改错的当前项目事实
 
-1. **项目名与版本**：项目为 `KK Studio`，当前稳定版本必须写作 **v1.5.2**。版本事实以 `config/release-manifest.json` 为第一来源，`package.json` 与各 workspace package 只能作为同步投影。
+1. **项目名与版本**：项目为 `KK Studio`，当前稳定版本必须写作 **v1.5.3**。版本事实以 `config/release-manifest.json` 为第一来源，`package.json` 与各 workspace package 只能作为同步投影。
 2. **仓库名**：`soudbs180-creator/nano-banana-KK-`。
 3. **技术栈**：Web 端为 Vite + React 19 + TypeScript + Tailwind + AntD / Lobe UI Bridge；主要运行目录为 `apps/web/`。后端存在 `server/` Express / VPS 运行时与相关代理路由。共享逻辑位于 `packages/shared/`、统一 API 客户端位于 `packages/api-client/`、设计系统适配位于 `packages/ui/`。
 4. **Node 与包管理器**：以根 `package.json` 的 `engines.node` 与 `packageManager` 为准，当前为 Node 24.x 与 npm 11.x。
@@ -203,7 +203,7 @@ AI 助手理解“我在画布干嘛”必须依赖结构化运行态，而不�
 
 ```ts
 type CanvasRuntimeState = {
-  projectVersion: '1.5.2';
+  projectVersion: '1.5.3';
   userId?: string;
   canvasId: string;
   canvasName?: string;
@@ -571,7 +571,7 @@ npm run check:encoding
 ```text
 1. 读取 AGENTS.md
 2. 读取 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md
-3. 确认版本仍为 v1.5.2
+3. 确认版本仍为 v1.5.3
 4. 搜索相关源码和测试
 5. 输出简短计划
 6. 小步修改
@@ -629,9 +629,9 @@ npm run check:encoding
 6. 把 AI 接管内存队列升级为持久化 Batch Job Queue。
 7. 建立知识索引与自动更新机制。
 8. 为批量生成、下载选区、整理卡片补齐测试。
-9. 清理旧文档中与 v1.5.2 冲突的版本和运行时描述。
+9. 清理旧文档中与 v1.5.3 冲突的版本 and 运行时描述。
 10. 再考虑更高级的模型微调或蒸馏。
 
 ---
 
-**严格结论：KK Studio v1.5.2 的 AI 助手必须从“前端接管雏形”升级为“项目知识库 + 画布运行态 + 工具调用 + 持久队列 + 自更新记忆”的工程系统。任何实现都必须遵守本文件。**
+**严格结论：KK Studio v1.5.3 的 AI 助手必须从“前端接管雏形”升级为“项目知识库 + 画布运行态 + 工具调用 + 持久队列 + 自更新记忆”的工程系统。任何实现都必须遵守本文件。**

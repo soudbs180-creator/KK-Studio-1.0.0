@@ -1,0 +1,83 @@
+[
+  {
+    "id": "doc_canvas_runtime_state_md",
+    "source": "doc",
+    "path": "docs/ai-assistant/canvas-runtime-state.md",
+    "title": "画布运行态协议 (Canvas Runtime State)",
+    "summary": "画布运行态是 AI 助手精准感知画布的桥梁。每次会话发起时，助手会将当前视口位置、框选对象及近期事件脱敏摘要后组装为状态发送给模型，从而避免模型靠猜测做出规划。",
+    "contentHash": "6cc0349574da8a824d66e85733bab97b",
+    "updatedAt": "2026-06-03T10:54:17.153Z"
+  },
+  {
+    "id": "doc_flow_map_md",
+    "source": "doc",
+    "path": "docs/ai-assistant/flow-map.md",
+    "title": "流程地图 (Flow Map)",
+    "summary": "本文件整理了 KK Studio v1.5.3 的核心工作流流转路径。",
+    "contentHash": "f35aa0d2f6b55758b6568008e07007a1",
+    "updatedAt": "2026-06-03T10:54:22.678Z"
+  },
+  {
+    "id": "doc_module_map_md",
+    "source": "doc",
+    "path": "docs/ai-assistant/module-map.md",
+    "title": "模块地图 (Module Map)",
+    "summary": "本文件整理了 KK Studio v1.5.3 的核心模块，供 AI 助手理解代码依赖和调用边界。",
+    "contentHash": "c4aa4a959fb72ceedd0ab417550cfe27",
+    "updatedAt": "2026-06-03T10:54:27.814Z"
+  },
+  {
+    "id": "doc_readme_md",
+    "source": "doc",
+    "path": "docs/ai-assistant/README.md",
+    "title": "AI 助手知识库与运行指南",
+    "summary": "本目录是 KK Studio v1.5.3 AI 助手与画布 Agent 的核心知识库。它向大模型与自动化 Agent 工具提供项目架构、核心流转流程、工具注册表和安全规范等直接索引和执行依据。",
+    "contentHash": "54777c95fb10a827741f58092fb540ae",
+    "updatedAt": "2026-06-03T10:54:13.154Z"
+  },
+  {
+    "id": "doc_safety_policy_md",
+    "source": "doc",
+    "path": "docs/ai-assistant/safety-policy.md",
+    "title": "安全策略规约 (Safety Policy)",
+    "summary": "在 KK Studio v1.5.3 中，为了保障用户财产、隐私与 API 安全，AI 助手在处理任何计划前都必须严格遵守以下物理性隔离与门禁策略。",
+    "contentHash": "a74b7e3a1d2249bd3b39894cd287c35e",
+    "updatedAt": "2026-06-03T10:54:34.122Z"
+  },
+  {
+    "id": "doc_session_memory_md",
+    "source": "doc",
+    "path": "docs/ai-assistant/session-memory.md",
+    "title": "会话记忆规约 (Session Memory)",
+    "summary": "AI 助手通过会话上下文及运行态保持连续的任务处理能力。中断恢复与会话克隆需严格遵循此记忆流转标准。",
+    "contentHash": "507e4c1a75400f5b0516920401ccbda5",
+    "updatedAt": "2026-06-03T09:30:20.496Z"
+  },
+  {
+    "id": "doc_skills_md",
+    "source": "doc",
+    "path": "docs/ai-assistant/skills.md",
+    "title": "Agent 可执行手册 (Skills)",
+    "summary": "本文件归档了 AI 助手在执行任务时的标准流程手册 (Runbooks)。",
+    "contentHash": "e7d7369423e89c83dc06043e9c1f3217",
+    "updatedAt": "2026-06-03T10:21:50.492Z"
+  },
+  {
+    "id": "doc_tool_registry_md",
+    "source": "doc",
+    "path": "docs/ai-assistant/tool-registry.md",
+    "title": "工具注册表说明 (Tool Registry)",
+    "summary": "在 KK Studio v1.5.3 中，AI 助手的所有画布和系统操作被声明式地定义为具名 Tool，并受安全权限等级保护，防止敏感凭证泄露或高危破坏行为。",
+    "contentHash": "d18f852118fdeb9dae63c5239b623ca9",
+    "updatedAt": "2026-06-03T10:54:39.355Z"
+  },
+  {
+    "id": "doc_ui_map_md",
+    "source": "doc",
+    "path": "docs/ai-assistant/ui-map.md",
+    "title": "UI 映射表 (UI Map)",
+    "summary": "本文件维护 KK Studio v1.5.3 各界面入口、面板及其对应的 CSS 选择器或高亮标记，供 AI 助手进行组件聚焦与定位。",
+    "contentHash": "4a201d1b84fd1f0da60cec98b70d1cde",
+    "updatedAt": "2026-06-03T10:54:45.824Z"
+  }
+]
