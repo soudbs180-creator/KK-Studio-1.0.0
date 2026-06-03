@@ -913,7 +913,17 @@ function localProxyErrorEnvelope(req, code, message) {
 }
 
 function sendLocalProxyError(res, req, status, code, message) {
-  return res.status(status).json(localProxyErrorEnvelope(req, code, message));
+  let cleanMessage = String(message || '');
+  const lowerMessage = cleanMessage.toLowerCase();
+  if (
+    lowerMessage.includes('<html>') ||
+    lowerMessage.includes('nginx') ||
+    lowerMessage.includes('404 not found') ||
+    lowerMessage.includes('upstream error')
+  ) {
+    cleanMessage = '[速创 API 上游通道不可用] 该绘图或视频模型底层通道暂时故障或维护中 (Nginx 404)。建议在“API设置”中切换至其他速创模型（如 NanoBanana_pro 或 NanoBanana）再试，或联系速创官方管理员确认该模型通道状态。';
+  }
+  return res.status(status).json(localProxyErrorEnvelope(req, code, cleanMessage));
 }
 
 function normalizeLocalRouteValue(value) {

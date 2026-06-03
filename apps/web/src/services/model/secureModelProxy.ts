@@ -914,10 +914,20 @@ async function invokeLocalUserRouteProxy(
 
   if (!result.response?.ok || !result.payload?.success) {
     const errorCode = String(result.payload?.error?.code || '').trim();
-    const errorMessage =
+    let errorMessage =
       result.payload?.error?.message
       || result.responseBody
       || `User-route proxy failed with status ${result.response?.status ?? 500}`;
+
+    const lowerMessage = errorMessage.toLowerCase();
+    if (
+      lowerMessage.includes('<html>') ||
+      lowerMessage.includes('nginx') ||
+      lowerMessage.includes('404 not found') ||
+      lowerMessage.includes('upstream error')
+    ) {
+      errorMessage = '[速创 API 上游通道不可用] 该绘图或视频模型底层通道暂时故障或维护中 (Nginx 404)。建议在“API设置”中切换至其他速创模型（如 NanoBanana_pro 或 NanoBanana）再试，或联系速创官方管理员确认该模型通道状态。';
+    }
 
     if (
       result.response?.status === 401
@@ -1011,10 +1021,20 @@ async function invokeLocalSystemProxy(
   }
 
   if (!result.response?.ok || !result.payload?.success) {
-    const errorMessage =
+    let errorMessage =
       result.payload?.error?.message
       || result.responseBody
       || `Local system proxy failed with status ${result.response?.status ?? 500}`;
+
+    const lowerMessage = errorMessage.toLowerCase();
+    if (
+      lowerMessage.includes('<html>') ||
+      lowerMessage.includes('nginx') ||
+      lowerMessage.includes('404 not found') ||
+      lowerMessage.includes('upstream error')
+    ) {
+      errorMessage = '[速创 API 上游通道不可用] 该绘图或视频模型底层通道暂时故障或维护中 (Nginx 404)。建议在“API设置”中切换至其他速创模型（如 NanoBanana_pro 或 NanoBanana）再试，或联系速创官方管理员确认该模型通道状态。';
+    }
 
     if (
       result.response?.status === 401

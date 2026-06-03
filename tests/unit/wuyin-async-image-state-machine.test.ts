@@ -197,4 +197,45 @@ describe("Wuyin Async Image State Machine & Helper Tests", () => {
     assert.equal(infer('abc-def', 'custom-fallback'), 'custom-fallback');
   });
 
+  test("11. 提交接口未返回 id 时应当抛出错误并阻止 pending 状态", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => {
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({
+          code: 200,
+          msg: "操作成功",
+          data: {} // 模拟不带任务 ID 的响应
+        })
+      } as any;
+    };
+
+    const executor = require("../../server/lib/wuyinModelExecutor.js") as {
+      submitWuyinTask: (options: any) => Promise<any>;
+    };
+
+    try {
+      const catalogItem = {
+        id: 'image_nanoBanana2',
+        executionMode: 'async-detail',
+        endpointUrl: 'https://api.wuyinkeji.com/api/async/image_nanoBanana2',
+        kind: 'image'
+      };
+      
+      await assert.rejects(
+        async () => {
+          await executor.submitWuyinTask({
+            catalogItem,
+            apiKey: 'test-key',
+            input: { prompt: 'test' }
+          });
+        },
+        /提交接口失败: 速创 API 提交响应未返回有效的任务 ID/
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
 });

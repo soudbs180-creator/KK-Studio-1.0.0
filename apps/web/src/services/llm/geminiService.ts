@@ -82,6 +82,15 @@ function normalizeError(error: any): Error {
     return withMeta(new Error(error?.message || SECURE_PROXY_GUEST_MODE_MESSAGE));
   }
   
+  if (
+    msg.includes('<html>') ||
+    msg.includes('nginx') ||
+    msg.includes('404 not found') ||
+    msg.includes('upstream error')
+  ) {
+    return withMeta(new Error('[速创 API 上游通道不可用] 该绘图或视频模型底层通道暂时故障或维护中 (Nginx 404)。建议在“API设置”中切换至其他速创模型（如 NanoBanana_pro 或 NanoBanana）再试，或联系速创官方管理员确认该模型通道状态。'));
+  }
+
   if (msg.includes('cancelled')) return withMeta(new Error("任务已取消"));
 
   // 🚀 [Critical Fix] API 鉴权错误检测 - 优先检查状态码

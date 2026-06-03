@@ -332,6 +332,18 @@ async function submitWuyinTask({ catalogItem, apiKey, input }) {
   // 异步状态判定
   if (catalogItem.executionMode === 'async-detail' || catalogItem.executionMode === 'sora2-special') {
     const providerTaskId = extractProviderTaskId(payload);
+    if (!providerTaskId) {
+      let errMsg = extractWuyinMessage(payload);
+      const isSuccessMsg = errMsg && (
+        errMsg.includes('操作成功') ||
+        errMsg.toLowerCase().includes('success') ||
+        errMsg.toLowerCase().includes('ok')
+      );
+      if (!errMsg || isSuccessMsg) {
+        errMsg = '速创 API 提交响应未返回有效的任务 ID (data.id)';
+      }
+      throw new Error(`提交接口失败: ${errMsg}`);
+    }
     return {
       status: 'pending',
       providerTaskId,
