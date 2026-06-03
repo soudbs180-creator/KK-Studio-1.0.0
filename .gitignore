@@ -111,4 +111,4 @@ supabase/.temp/
 # KK-Studio Specific
 temp/
 !temp/README.md
-tools/
+/tools/
