@@ -998,13 +998,15 @@ function buildLocalUserRouteFromSlot(slot, providers) {
 
 function resolveLocalUserRoute(profileState, routeId) {
   const routeTarget = resolveLocalRouteIdCandidate(routeId);
+  // 简体中文注释：保留未剥离前缀的原始 routeId，用于兼容 slots/providers 本身带有 'slot_' 或 'provider_' 前缀的 ID 比对，防止 404
+  const rawRouteId = String(routeId || '').trim().toLowerCase();
   const providers = Array.isArray(profileState.providers) ? profileState.providers : [];
   const slots = Array.isArray(profileState.slots) ? profileState.slots : [];
 
   const provider = providers.find((item) => {
     const providerId = normalizeLocalRouteValue(item && item.id);
     const providerName = normalizeLocalRouteValue(item && item.name);
-    return providerId === routeTarget || providerName === routeTarget;
+    return providerId === routeTarget || providerId === rawRouteId || providerName === routeTarget;
   });
   if (provider) {
     return buildLocalUserRouteFromProvider(provider);
@@ -1013,7 +1015,7 @@ function resolveLocalUserRoute(profileState, routeId) {
   const slot = slots.find((item) => {
     const slotId = normalizeLocalRouteValue(item && item.id);
     const slotName = normalizeLocalRouteValue(item && item.name);
-    return slotId === routeTarget || slotName === routeTarget;
+    return slotId === routeTarget || slotId === rawRouteId || slotName === routeTarget;
   });
   if (slot) {
     return buildLocalUserRouteFromSlot(slot, providers);

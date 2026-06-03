@@ -15,6 +15,8 @@ export interface ContextBuilderParams {
   canEstimateCost: boolean;
   assetsSummary: AssetContextSummary;
   errors: any[];
+  config?: any;
+  ecommerceState?: any;
 }
 
 /**
@@ -34,7 +36,9 @@ export function buildSanitizedProjectContext(params: ContextBuilderParams): Sani
     balanceKnown,
     canEstimateCost,
     assetsSummary,
-    errors
+    errors,
+    config,
+    ecommerceState
   } = params;
 
   // 1. 构建脱敏画布提示词卡片列表
@@ -85,6 +89,23 @@ export function buildSanitizedProjectContext(params: ContextBuilderParams): Sani
       }))
     : [];
 
+  // 4. 构建输入框与电商上下文
+  const promptBarInput = config ? {
+    prompt: config.prompt || '',
+    referenceImagesCount: config.referenceImages?.length || 0,
+    mode: config.mode || 'image',
+    ecommerceSettings: ecommerceState ? {
+      platform: ecommerceState.sheetSettings?.[ecommerceState.activeGroupSheet]?.platform || '',
+      targetMarket: ecommerceState.sheetSettings?.[ecommerceState.activeGroupSheet]?.targetMarket || '',
+      batchCount: ecommerceState.sheetSettings?.[ecommerceState.activeGroupSheet]?.batchCount || 1,
+      productName: ecommerceState.analysis?.productName || '',
+      theme: ecommerceState.analysis?.theme || '',
+      activeGroupSheet: ecommerceState.activeGroupSheet || '',
+      requirementFileName: ecommerceState.requirementFile?.name || '',
+      productFilesCount: ecommerceState.productFiles?.length || 0
+    } : undefined
+  } : undefined;
+
   return {
     currentPage,
     aiTakeover: {
@@ -111,6 +132,7 @@ export function buildSanitizedProjectContext(params: ContextBuilderParams): Sani
       balanceKnown,
       canEstimateCost
     },
-    errors: sanitizedErrors
+    errors: sanitizedErrors,
+    promptBarInput
   };
 }

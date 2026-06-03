@@ -16,6 +16,106 @@ export class LocalAssistantBrain {
     let reply = '';
 
     switch (intentResult.intent) {
+      case 'optimize_input_prompt': {
+        const inputPrompt = context.promptBarInput?.prompt || '';
+        const isEcommerce = context.promptBarInput?.mode === 'ecommerce';
+        
+        // 匹配模板
+        const matches = matchPromptTemplates(inputPrompt, PROMPT_LIBRARY);
+        const bestMatch = matches[0]?.template;
+
+        // 执行本地提示词优化
+        const optResult = optimizePromptLocally(inputPrompt || 'a beautiful landscape', bestMatch);
+        
+        if (isEcommerce) {
+          reply = `### 🛍️ 电商模块提示词优化完成！
+已为您生成差异化商业展示与打光优化文案，并**直接替换原有组合提示词**：
+
+**优化后的英文提示词：**
+\`\`\`text
+${optResult.optimizedPromptEn}
+\`\`\`
+
+**设计意图说明：**
+${optResult.optimizedPromptZh}`;
+        } else {
+          reply = `### ✨ 输入框提示词本地优化完成！
+已将优化后的文案**直接覆盖替换输入框原有内容**：
+
+**优化后的英文提示词：**
+\`\`\`text
+${optResult.optimizedPromptEn}
+\`\`\`
+
+**中文解析：**
+${optResult.optimizedPromptZh}`;
+        }
+
+        actions.push({
+          type: 'fillInputPrompt',
+          payload: {
+            prompt: optResult.optimizedPromptEn
+          }
+        });
+        break;
+      }
+
+      case 'change_generation_mode': {
+        const mode = intentResult.extracted.style || 'image';
+        const modeLabel = mode === 'image' ? '图片' : mode === 'video' ? '视频' : mode === 'audio' ? '音频' : mode === 'ppt' ? 'PPT' : '电商';
+        reply = `### ⚙️ 生成模式切换中...
+接管引擎已在后台自动为您将模式切换至【${modeLabel}】模式。`;
+        actions.push({
+          type: 'changeMode',
+          payload: { mode: mode as any }
+        });
+        break;
+      }
+
+      case 'submit_composer': {
+        reply = `### 🚀 收到指令，正在帮您运行发送...
+接管引擎正直接调用 PromptBar 发送生成按钮为您拉起任务。`;
+        actions.push({
+          type: 'submitPromptComposer',
+          payload: {}
+        });
+        break;
+      }
+
+      case 'create_card': {
+        const prompt = context.promptBarInput?.prompt || 'a detailed visual art';
+        reply = `### 🃏 正在画布上为您新建生图提示词卡片...`;
+        actions.push({
+          type: 'fillPrompt',
+          payload: {
+            prompt,
+            modelId: context.settings.selectedModel
+          }
+        });
+        break;
+      }
+
+      case 'complex_sequence': {
+        const prompt = context.promptBarInput?.prompt || 'a fantasy landscape';
+        reply = `### 🎬 连续复合生图规划已就绪：
+1. **自动切换**：已将生成模式切换至【图片】模式。
+2. **提交任务**：已在画布上自动创建生图节点并开始出图。
+3. **图生视频预备**：出图完成后，您可以直接点击 [开启图生视频](action://takeover-image-to-video?prompt=${encodeURIComponent(prompt)}) 切换至视频模式以完成最终串联生成！`;
+        
+        actions.push({
+          type: 'changeMode',
+          payload: { mode: 'image' as any }
+        });
+        actions.push({
+          type: 'startGeneration',
+          payload: {
+            prompt,
+            count: 1
+          }
+        });
+        break;
+      }
+
       case 'help': {
         const localAnswer = matchLocalKnowledge(userInput);
         if (localAnswer) {

@@ -11221,7 +11221,7 @@ body.dark-mode .storage-selection-modal {
   -webkit-backdrop-filter: blur(20px) saturate(1.25);
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: 24px !important;
-  box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.06);
+  box-shadow: none !important;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
   cursor: pointer;
@@ -11245,9 +11245,7 @@ body.dark-mode .storage-selection-modal {
 .settings-panel .settings-model-center-route:hover {
   transform: translateY(-4px);
   border-color: var(--route-accent, #38bdf8) !important;
-  box-shadow: 
-    0 4px 12px 0 rgba(0, 0, 0, 0.10),
-    0 0 12px 0 rgba(56, 189, 248, 0.03);
+  box-shadow: none !important;
 }
 
 .settings-panel .settings-model-center-route:hover::before {
@@ -12065,7 +12063,7 @@ body.dark-mode .storage-selection-modal {
   /* .settings-panel .settings-capability-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); } */
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)) !important;
   gap: 16px !important;
-  align-items: start;
+  align-items: stretch !important;
   justify-content: start;
   overflow-x: visible !important;
 }
@@ -12083,6 +12081,7 @@ body.dark-mode .storage-selection-modal {
   border-radius: 16px;
   padding: 10px;
   padding: 16px !important;
+  box-shadow: none !important;
 }
 
 .settings-panel .settings-capability-card__header {
@@ -15004,7 +15003,8 @@ body:not(.dark-mode) .settings-log-group-badge {
 /* 电脑端宽屏自适应：一排可以展示 3 到 4 个卡片 */
 @media (min-width: 1024px) {
   .settings-panel .settings-capability-grid {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    align-items: stretch !important;
   }
   .settings-panel .settings-provider-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
@@ -15883,7 +15883,7 @@ body:not(.dark-mode) .settings-log-group-badge {
 }
 
 /* 卡片网格只在真实内容宽度够用时升级到 2A/3A，避免父容器 padding 把固定宽度挤到右侧目录里。 */
-@container model-center-pool (min-width: 556px) {
+@container model-center-pool (min-width: 530px) {
   .settings-panel .settings-model-center-route-grid {
     width: 556px !important;
     grid-template-columns: repeat(2, 270px) !important;

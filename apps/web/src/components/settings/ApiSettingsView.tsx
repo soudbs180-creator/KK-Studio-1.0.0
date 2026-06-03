@@ -408,7 +408,33 @@ function normalizeStringArray(value: unknown): string[] {
     : [];
 }
 
-const isReadonlySecretPlaceholder = (value?: string | null) => String(value || '').trim() === READONLY_SECRET_PLACEHOLDER;
+const isReadonlySecretPlaceholder = (value?: string | null): boolean => {
+  const str = String(value || '').trim();
+  return (
+    str === READONLY_SECRET_PLACEHOLDER ||
+    str.includes('...') ||
+    str.includes('••') ||
+    str === '已填写' ||
+    str === '尚未填写'
+  );
+};
+
+function maskSecret(secret?: string | null): string {
+  const clean = String(secret || '').trim();
+  if (!clean || clean === READONLY_SECRET_PLACEHOLDER) {
+    return READONLY_SECRET_PLACEHOLDER;
+  }
+  if (clean.includes('...') || clean.includes('••')) {
+    return clean;
+  }
+  if (clean.length <= 8) {
+    return '***';
+  }
+  if (clean.length <= 20) {
+    return `${clean.slice(0, 3)}...${clean.slice(-3)}`;
+  }
+  return `${clean.slice(0, 8)}...${clean.slice(-4)}`;
+}
 
 function hasStoredSecret(value: unknown): boolean {
   if (typeof value === 'string') {
@@ -467,7 +493,7 @@ function toReadonlyOfficialSlot(rawValue: unknown): KeySlot | null {
 
   return {
     id,
-    key: hasStoredSecret(raw.key) ? READONLY_SECRET_PLACEHOLDER : '',
+    key: hasStoredSecret(raw.key) ? maskSecret(raw.key) : '',
     name: normalizeString(raw.name) || (provider === 'OpenAI' ? 'OpenAI' : 'Google'),
     provider,
     type: provider === 'Google' || provider === 'OpenAI' ? 'official' : (baseUrl ? 'proxy' : 'third-party'),
@@ -518,7 +544,7 @@ function toReadonlyProvider(rawValue: unknown): ThirdPartyProvider | null {
     id,
     name: providerName,
     baseUrl: providerBaseUrl,
-    apiKey: hasStoredSecret(raw.apiKey ?? raw.key) ? READONLY_SECRET_PLACEHOLDER : '',
+    apiKey: hasStoredSecret(raw.apiKey ?? raw.key) ? maskSecret(raw.apiKey ?? raw.key) : '',
     models: resolveEffectiveProviderModels({
       provider: providerName,
       baseUrl: providerBaseUrl,
@@ -694,7 +720,7 @@ const extractDomain = (url: string) => {
   return url.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
 };
 
-const maskSecret = (value: string) => {
+const maskSecretDisplay = (value: string) => {
   if (!value.trim()) return '尚未填写';
   if (value.length <= 10) return '已填写';
   return `${value.slice(0, 6)}••••${value.slice(-4)}`;
@@ -822,7 +848,7 @@ const toOfficialForm = (slot: KeySlot): OfficialForm => ({
   id: slot.id,
   name: slot.provider === 'OpenAI' ? 'OpenAI' : 'Google',
   provider: slot.provider === 'OpenAI' ? 'OpenAI' : 'Google',
-  key: slot.key,
+  key: maskSecretDisplay(slot.key),
   mode: getMode(slot.budgetLimit, slot.tokenLimit),
   value:
     typeof slot.tokenLimit === 'number' && slot.tokenLimit > -1
@@ -836,7 +862,7 @@ const toProviderForm = (provider: ThirdPartyProvider): ProviderForm => ({
   id: provider.id,
   name: provider.name,
   baseUrl: provider.baseUrl,
-  apiKey: provider.apiKey,
+  apiKey: maskSecretDisplay(provider.apiKey),
   modelsText: formatProviderModelsText(provider.models || []),
   format: provider.format,
   group: provider.group || '',
@@ -2432,7 +2458,9 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     }
 
     const normalizedKey = officialForm.key.trim();
-    const nextKeyValue = normalizedKey || (canReusePersistedOfficialSecret ? READONLY_SECRET_PLACEHOLDER : '');
+    const nextKeyValue = isReadonlySecretPlaceholder(officialForm.key)
+      ? READONLY_SECRET_PLACEHOLDER
+      : (normalizedKey || (canReusePersistedOfficialSecret ? READONLY_SECRET_PLACEHOLDER : ''));
     if (!nextKeyValue) {
       return pick('先填写 API Key 才能保存。', 'Enter the API key before saving.');
     }
@@ -2454,7 +2482,9 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     }
 
     const normalizedApiKey = providerForm.apiKey.trim();
-    const nextApiKeyValue = normalizedApiKey || (canReusePersistedProviderSecret ? READONLY_SECRET_PLACEHOLDER : '');
+    const nextApiKeyValue = isReadonlySecretPlaceholder(providerForm.apiKey)
+      ? READONLY_SECRET_PLACEHOLDER
+      : (normalizedApiKey || (canReusePersistedProviderSecret ? READONLY_SECRET_PLACEHOLDER : ''));
     if (!providerForm.name.trim() || !providerForm.baseUrl.trim() || !nextApiKeyValue) {
       return pick('补全名称、Base URL 和 API Key 后才能保存。', 'Complete the name, base URL, and API key before saving.');
     }
@@ -2478,7 +2508,9 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     const value = officialForm.mode === 'unlimited' ? null : positive(officialForm.value);
     const normalizedKey = officialForm.key.trim();
     const nextSlotId = officialForm.id || `key_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    const nextKeyValue = normalizedKey || (canReusePersistedOfficialSecret ? READONLY_SECRET_PLACEHOLDER : '');
+    const nextKeyValue = isReadonlySecretPlaceholder(officialForm.key)
+      ? READONLY_SECRET_PLACEHOLDER
+      : (normalizedKey || (canReusePersistedOfficialSecret ? READONLY_SECRET_PLACEHOLDER : ''));
 
     if (!nextKeyValue) {
       notify.error(
@@ -2751,7 +2783,9 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     const value = providerForm.mode === 'unlimited' ? null : positive(providerForm.value);
     const normalizedApiKey = providerForm.apiKey.trim();
     const nextProviderId = providerForm.id || `provider_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    const nextApiKeyValue = normalizedApiKey || (canReusePersistedProviderSecret ? READONLY_SECRET_PLACEHOLDER : '');
+    const nextApiKeyValue = isReadonlySecretPlaceholder(providerForm.apiKey)
+      ? READONLY_SECRET_PLACEHOLDER
+      : (normalizedApiKey || (canReusePersistedProviderSecret ? READONLY_SECRET_PLACEHOLDER : ''));
     const existingProvider = selectedProvider || thirdPartyProviders.find((provider) => provider.id === providerForm.id) || null;
     const manualProviderModels = parseProviderModelsText(providerForm.modelsText);
     const connectionSignatureChanged = Boolean(

@@ -38,6 +38,10 @@ interface ChatSidebarProps {
     onOpenSettings?: (view?: 'api-management') => void;
     onHoverChange?: (isHovered: boolean) => void; // 通知父组件hover状态变化
     onWidthChange?: (width: number) => void;
+    config?: any;
+    setConfig?: any;
+    ecommerceState?: any;
+    onGenerate?: any;
 }
 
 type ChatSidebarModelMenuItem = ChatModel & {
@@ -611,6 +615,26 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = ({ isOpen, onToggle,
                 sendTakeoverMessage('帮我只优化提示词并填充，不进行图片生成。');
             } else if (url === 'action://takeover-prompt-doc') {
                 sendTakeoverMessage('请帮我把优化的生图模板方案整理一份文案形式输出。');
+            } else if (url.startsWith('action://takeover-image-to-video')) {
+                // 1. 获取画布上最新的图片节点
+                const images = activeCanvas?.imageNodes || [];
+                const latestImage = images.length > 0 ? images[images.length - 1] : null;
+
+                if (latestImage && props.setConfig) {
+                    // 2. 切换到视频模式，并设置参考图
+                    props.setConfig((prev: any) => ({
+                        ...prev,
+                        mode: 'video', // 切换到视频模式
+                        referenceImages: [{
+                            id: latestImage.id,
+                            url: latestImage.url,
+                            label: latestImage.name || '生图参考'
+                        }]
+                    }));
+                    notify.success('AI 接管：已帮您将最新图片设为参考图并切换至视频模式。', '您可以直接在输入框继续细化视频描述，然后点击发送！');
+                } else {
+                    notify.warning('AI 接管', '未能在当前画布上找到生成好的图片。');
+                }
             } else {
                 const parsedUrl = url.replace('action://', 'http://dummy');
                 try {
@@ -3444,11 +3468,14 @@ const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
             updatePromptNode={updatePromptNode}
             executeGeneration={executeGeneration}
             getNextCardPosition={getNextCardPosition}
-            setConfig={() => {}}
+            setConfig={props.setConfig || (() => {})}
             onOpenSettings={props.onOpenSettings}
             apiKeyStatus={apiKeyStatus}
             balance={balance}
             notify={notify}
+            config={props.config}
+            ecommerceState={props.ecommerceState}
+            onGenerate={props.onGenerate}
         >
             <ChatSidebarInner
                 {...props}

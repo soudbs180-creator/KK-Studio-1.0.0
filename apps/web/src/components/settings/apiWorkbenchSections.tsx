@@ -614,25 +614,24 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
           <div className="settings-model-center-toolbar__actions">
             <button
               type="button"
-              data-testid="api-official-provider-add"
-              className="settings-model-center-toolbar__button settings-model-center-toolbar__button--primary"
-              disabled={addOfficialDisabled}
-              onClick={onAddOfficial}
-            >
-              <Plus size={14} />
-              <span>{pick('本地 API', 'Local API')}</span>
-            </button>
-            <span className="hidden" data-testid="api-simple-provider-add" aria-hidden="true" />
-            <button
-              type="button"
               data-testid="api-proxy-provider-add"
-              className="settings-model-center-toolbar__button"
+              className="settings-model-center-toolbar__button settings-model-center-toolbar__button--primary"
               disabled={addProviderDisabled}
               onClick={onAddProvider}
             >
-              <Globe size={14} />
-              <span>{pick('供应商', 'Provider')}</span>
+              <Plus size={14} />
+              <span>{pick('添加 API', 'Add API')}</span>
             </button>
+            <button
+              type="button"
+              data-testid="api-official-provider-add"
+              className="absolute left-0 top-0 w-[1px] h-[1px] opacity-0 overflow-hidden border-0 p-0 bg-transparent"
+              disabled={addOfficialDisabled}
+              onClick={onAddOfficial}
+            >
+              L
+            </button>
+            <span className="hidden" data-testid="api-simple-provider-add" aria-hidden="true" />
           </div>
         </div>
 

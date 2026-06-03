@@ -1,8 +1,9 @@
 // 简体中文：AI 接管上下文控制中心 (AITakeover Context)
 
-import React, { createContext, useContext, useState, useCallback, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, ReactNode, useEffect } from 'react';
 import type { AssistantPlan, SanitizedProjectContext, AssistantAction } from '../types';
 import { LocalAssistantBrain } from '../core/localBrain';
+import { LLMBrain } from '../core/llmBrain';
 import { buildSanitizedProjectContext } from '../core/projectContextBuilder';
 import { executeAction } from '../core/actionExecutor';
 import type { ExecutorContext } from '../core/actionExecutor';
@@ -33,6 +34,7 @@ interface AITakeoverContextType {
 const AITakeoverContext = createContext<AITakeoverContextType | null>(null);
 
 const localBrain = new LocalAssistantBrain();
+const llmBrain = new LLMBrain();
 
 interface AITakeoverProviderProps {
   children: ReactNode;
@@ -48,6 +50,9 @@ interface AITakeoverProviderProps {
   apiKeyStatus: 'missing' | 'configured_masked' | 'invalid' | 'unknown';
   balance: number;
   notify: any;
+  config?: any;
+  ecommerceState?: any;
+  onGenerate?: () => Promise<void> | void;
 }
 
 export function AITakeoverProvider({
@@ -63,30 +68,35 @@ export function AITakeoverProvider({
   onOpenSettings,
   apiKeyStatus,
   balance,
-  notify
+  notify,
+  config,
+  ecommerceState,
+  onGenerate
 }: AITakeoverProviderProps) {
   const [aiTakeoverMode, setAiTakeoverModeState] = useState(false);
   const [selectedModel, setSelectedModel] = useState(initialModel);
 
-  // 同步外部选中的模型
-  React.useEffect(() => {
-    if (initialModel) {
-      setSelectedModel(initialModel);
-    }
-  }, [initialModel]);
+  const [messages, setMessages] = useState<Message[]>([]);
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: `🤖 你好！我是 **KK Studio AI 本地接管助手**。
-我目前以本地规则驱动模式运行，为您保障 API 安全。
-我可以在本地帮您**优化提示词**、**高亮定位卡片**、**诊断常见错误**，并在任务完成时**压缩 ZIP 打包下载**。
+  // 🤖 动态开场白效果
+  useEffect(() => {
+    if (messages.length <= 1) {
+      const isConfigured = apiKeyStatus !== 'missing';
+      const welcomeText = isConfigured
+        ? `你好！有什么我能帮助你的吗？`
+        : `🤖 接入AI助手api能力会更强。\n\n我目前以本地规则驱动模式运行，为您保障 API 安全。我可以在本地帮您**优化提示词**、**高亮定位卡片**、**诊断常见错误**，并在任务完成时**压缩 ZIP 打包下载**。`;
 
-请问我现在能帮您做点什么？`,
-      timestamp: Date.now()
+      setMessages([
+        {
+          id: 'welcome',
+          role: 'assistant',
+          content: welcomeText,
+          timestamp: Date.now()
+        }
+      ]);
     }
-  ]);
+  }, [apiKeyStatus]);
+
   const [isThinking, setIsThinking] = useState(false);
   const [pendingPlan, setPendingPlan] = useState<AssistantPlan | null>(null);
 
@@ -157,7 +167,9 @@ export function AITakeoverProvider({
       balanceKnown: true,
       canEstimateCost: true,
       assetsSummary,
-      errors: []
+      errors: [],
+      config,
+      ecommerceState
     });
 
     const ctx: ExecutorContext = {
@@ -170,13 +182,16 @@ export function AITakeoverProvider({
       getNextCardPosition,
       setConfig,
       onOpenSettings,
-      notify
+      notify,
+      config,
+      ecommerceState,
+      onGenerate
     };
 
     for (const action of plan.actions) {
       await executeAction(action, ctx);
     }
-  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, executeGeneration, addToQueue, getNextCardPosition, setConfig, onOpenSettings, apiKeyStatus, notify]);
+  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, executeGeneration, addToQueue, getNextCardPosition, setConfig, onOpenSettings, apiKeyStatus, notify, config, ecommerceState, onGenerate]);
 
   // 发送消息
   const sendMessage = useCallback(async (text: string) => {
@@ -206,14 +221,26 @@ export function AITakeoverProvider({
       balanceKnown: true,
       canEstimateCost: true,
       assetsSummary,
-      errors: []
+      errors: [],
+      config,
+      ecommerceState
     });
 
     try {
       // 模拟大脑思考用时，提升拟人化感官
       await new Promise(resolve => setTimeout(resolve, 800));
 
-      const plan = await localBrain.plan(text, projectContext);
+      let plan;
+      if (apiKeyStatus !== 'missing') {
+        try {
+          plan = await llmBrain.plan(text, projectContext, selectedModel?.id);
+        } catch (llmErr) {
+          console.warn('[Takeover] 云端大模型规划异常，平滑回退至本地 LocalBrain:', llmErr);
+          plan = await localBrain.plan(text, projectContext);
+        }
+      } else {
+        plan = await localBrain.plan(text, projectContext);
+      }
 
       const assistantMsg: Message = {
         id: plan.id,
@@ -236,7 +263,7 @@ export function AITakeoverProvider({
     } finally {
       setIsThinking(false);
     }
-  }, [isThinking, activeCanvas, selectedModel, selectedNodeIds, apiKeyStatus, executePlan, notify]);
+  }, [isThinking, activeCanvas, selectedModel, selectedNodeIds, apiKeyStatus, executePlan, notify, config, ecommerceState]);
 
   // 用户点击“确认执行”
   const executePendingPlan = useCallback(async () => {

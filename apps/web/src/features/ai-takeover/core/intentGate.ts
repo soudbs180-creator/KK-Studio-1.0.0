@@ -28,8 +28,77 @@ export function shouldTreatAsGeneration(input: string): boolean {
 export function analyzeIntent(input: string, context?: SanitizedProjectContext): IntentResult {
   const cleanInput = (input || '').trim();
   const lowerInput = cleanInput.toLowerCase();
+  // 1. 复杂串联模式生图+生视频
+  if ((lowerInput.includes('生图') && lowerInput.includes('视频')) || (lowerInput.includes('生成一张图片') && lowerInput.includes('生成一个视频'))) {
+    return {
+      intent: 'complex_sequence',
+      confidence: 0.95,
+      extracted: {},
+      risk: 'cost',
+      needsConfirmation: false,
+      reason: '识别到连续的生图且图生视频多阶段操作。'
+    };
+  }
 
-  // 1. API 配置引导意图
+  // 2. 切换生成模式意图
+  if (/切换(?:至|到)?(图片|视频|音频|ppt|电商|ecommerce)(?:模式)?/.test(lowerInput)) {
+    const match = lowerInput.match(/切换(?:至|到)?(图片|视频|音频|ppt|电商|ecommerce)(?:模式)?/);
+    const modeName = match ? match[1] : '';
+    let mode = 'image';
+    if (modeName.includes('视频')) mode = 'video';
+    else if (modeName.includes('音频')) mode = 'audio';
+    else if (modeName.includes('ppt')) mode = 'ppt';
+    else if (modeName.includes('电商') || modeName.includes('ecommerce')) mode = 'ecommerce';
+
+    return {
+      intent: 'change_generation_mode',
+      confidence: 0.95,
+      extracted: {
+        style: mode
+      },
+      risk: 'none',
+      needsConfirmation: false,
+      reason: '识别到切换生成模式指令。'
+    };
+  }
+
+  // 3. 帮我发送意图
+  if (/帮我发送|帮我运行|帮我出图|帮我跑图|把输入框发一下/.test(lowerInput)) {
+    return {
+      intent: 'submit_composer',
+      confidence: 0.95,
+      extracted: {},
+      risk: 'cost',
+      needsConfirmation: false,
+      reason: '识别到发送/运行生成意图。'
+    };
+  }
+
+  // 4. 帮我建卡意图
+  if (/帮我建卡|建个卡片|创建卡片/.test(lowerInput)) {
+    return {
+      intent: 'create_card',
+      confidence: 0.95,
+      extracted: {},
+      risk: 'none',
+      needsConfirmation: false,
+      reason: '识别到在画布上新建卡片意图。'
+    };
+  }
+
+  // 5. 优化输入框提示词意图
+  if (/优化(?:一下)?输入框|优化输入栏|帮我把输入框的提示词优化一下|优化提示词并且填充|优化电商提示词/.test(lowerInput)) {
+    return {
+      intent: 'optimize_input_prompt',
+      confidence: 0.95,
+      extracted: {},
+      risk: 'none',
+      needsConfirmation: false,
+      reason: '识别到优化输入框内提示词的指令。'
+    };
+  }
+
+  // 6. API 配置引导意图
   if (
     /api|key|密钥|配置|接口|设置key|专属key|设置api|密钥怎么写/.test(lowerInput) &&
     !lowerInput.includes('生成')

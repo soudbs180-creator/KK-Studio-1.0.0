@@ -1,6 +1,6 @@
 // 简体中文：定义 AI 接管的核心业务类型
 
-import type { AspectRatio, ImageSize } from '../../types';
+import type { AspectRatio, ImageSize, GenerationMode } from '../../types';
 
 // 意图枚举
 export type AssistantIntent =
@@ -14,6 +14,11 @@ export type AssistantIntent =
   | 'explain_error'                // 排查报错
   | 'configure_api'                // 引导 API 配置
   | 'upload_assets'                // 上传资源
+  | 'optimize_input_prompt'        // 优化输入框提示词
+  | 'submit_composer'              // 帮我发送/运行生成
+  | 'create_card'                  // 帮我建卡
+  | 'change_generation_mode'       // 切换生成模式
+  | 'complex_sequence'             // 连续复合多步任务（如生图再生成视频）
   | 'unknown';
 
 // 意图分析结果
@@ -23,7 +28,7 @@ export interface IntentResult {
   extracted: {
     count?: number;                // 图片张数
     subjects?: string[];           // 主体列表
-    style?: string;                // 画风/风格要求
+    style?: string;                // 画风/风格要求或模式
     folderId?: string;             // 文件夹 ID
     fileIds?: string[];            // 关联的文件 ID 列表
     cardQuery?: string;            // 查找卡片的关键字
@@ -45,7 +50,10 @@ export type AssistantAction =
   | { type: 'highlightElement'; payload: { selector: string } }
   | { type: 'openSettings'; payload: { tab: string } }
   | { type: 'zipOutputs'; payload: { scope: 'latest_batch' | 'current_batch' | 'selected_cards' | 'all_canvas_outputs' | 'asset_collection_outputs' } }
-  | { type: 'explainError'; payload: { errorCode?: string; errorMessage?: string } };
+  | { type: 'explainError'; payload: { errorCode?: string; errorMessage?: string } }
+  | { type: 'fillInputPrompt'; payload: { prompt: string } }
+  | { type: 'changeMode'; payload: { mode: GenerationMode } }
+  | { type: 'submitPromptComposer'; payload: {} };
 
 // 执行计划
 export interface AssistantPlan {
@@ -238,6 +246,21 @@ export interface SanitizedProjectContext {
     source: string;
     relatedNodeId?: string;
   }>;
+  promptBarInput?: {
+    prompt: string;
+    referenceImagesCount: number;
+    mode: string;
+    ecommerceSettings?: {
+      platform?: string;
+      targetMarket?: string;
+      batchCount?: number;
+      productName?: string;
+      theme?: string;
+      activeGroupSheet?: string;
+      requirementFileName?: string;
+      productFilesCount?: number;
+    };
+  };
 }
 
 export type ToolPermission =

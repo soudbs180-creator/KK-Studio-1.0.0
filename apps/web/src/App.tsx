@@ -4568,6 +4568,10 @@ const AppContent: React.FC<AppContentProps> = () => {
       focusWorkspace={focusWorkspace}
       handlePreviewFromLibrary={handlePreviewFromLibrary}
       handleFocusLibraryImage={handleFocusLibraryImage}
+      config={config}
+      setConfig={setConfig}
+      ecommerceState={ecommerceState}
+      onGenerate={handleGenerate}
     />
   );
 

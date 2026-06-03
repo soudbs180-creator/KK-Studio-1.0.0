@@ -21,6 +21,9 @@ export interface ExecutorContext {
     error: (title: string, desc?: string) => void;
     info: (title: string, desc?: string) => void;
   };
+  config?: any;
+  ecommerceState?: any;
+  onGenerate?: () => Promise<void> | void;
 }
 
 export async function executeAction(
@@ -36,7 +39,11 @@ export async function executeAction(
     addToQueue,
     getNextCardPosition,
     onOpenSettings,
-    notify
+    notify,
+    config,
+    setConfig,
+    ecommerceState,
+    onGenerate
   } = ctx;
 
   switch (action.type) {
@@ -239,6 +246,44 @@ export async function executeAction(
         }
       } catch (e: any) {
         notify.error('批量生成排队失败', e.message || '未知异常');
+      }
+      break;
+    }
+
+    case 'fillInputPrompt': {
+      const { prompt } = action.payload;
+      if (setConfig) {
+        setConfig((prev: any) => ({
+          ...prev,
+          prompt: prompt
+        }));
+        notify.success('输入框已填入优化提示词', '');
+      } else {
+        notify.warning('未绑定输入配置', '');
+      }
+      break;
+    }
+
+    case 'changeMode': {
+      const { mode } = action.payload;
+      if (setConfig) {
+        setConfig((prev: any) => ({
+          ...prev,
+          mode: mode
+        }));
+        notify.success(`已切换至【${mode === 'image' ? '图片' : mode === 'video' ? '视频' : mode === 'audio' ? '音频' : mode === 'ppt' ? 'PPT' : '电商'}】模式`, '');
+      } else {
+        notify.warning('未绑定输入配置', '');
+      }
+      break;
+    }
+
+    case 'submitPromptComposer': {
+      if (onGenerate) {
+        onGenerate();
+        notify.success('AI 接管：已帮您发起生成任务', '');
+      } else {
+        notify.warning('未绑定发送功能', '');
       }
       break;
     }

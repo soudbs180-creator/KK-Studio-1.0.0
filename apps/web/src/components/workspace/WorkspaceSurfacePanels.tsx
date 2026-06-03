@@ -20,6 +20,10 @@ interface WorkspaceSurfacePanelsProps {
   focusWorkspace: () => void;
   handlePreviewFromLibrary: (imageId: string) => void;
   handleFocusLibraryImage: (imageId: string) => void;
+  config?: any;
+  setConfig?: any;
+  ecommerceState?: any;
+  onGenerate?: any;
 }
 
 export function WorkspaceSurfacePanels({
@@ -37,6 +41,10 @@ export function WorkspaceSurfacePanels({
   focusWorkspace,
   handlePreviewFromLibrary,
   handleFocusLibraryImage,
+  config,
+  setConfig,
+  ecommerceState,
+  onGenerate,
 }: WorkspaceSurfacePanelsProps) {
   return (
     <WorkspacePanels
@@ -55,6 +63,10 @@ export function WorkspaceSurfacePanels({
             }}
             onHoverChange={(isHovered) => setIsSidebarHovered(isHovered)}
             onWidthChange={setChatSidebarWidth}
+            config={config}
+            setConfig={setConfig}
+            ecommerceState={ecommerceState}
+            onGenerate={onGenerate}
           />
         </div>
       )}
