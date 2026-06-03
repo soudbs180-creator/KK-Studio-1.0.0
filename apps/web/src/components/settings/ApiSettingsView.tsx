@@ -3893,6 +3893,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           {/* API 运行概览现在是公共的最上面卡片 */}
           <div className="w-full mb-4">
             <ApiWorkbenchOverviewSection
+              testId="settings-workbench-overview"
               pick={pick}
               workbenchStatusLabel={workbenchStatusLabel}
               workbenchTone={workbenchTone}

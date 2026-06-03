@@ -17186,21 +17186,22 @@ body:not(.dark-mode) .settings-model-center-route__btn-action--danger span {
 /* Model center desktop layout: provider cards span the two-slot pool; preset directory takes remaining space. */
 @media (min-width: 1024px) {
   .settings-panel .settings-model-center-layout {
-    grid-template-columns: minmax(0, 556px) minmax(270px, 1fr) !important;
+    grid-template-columns: minmax(0, 620px) minmax(270px, 1fr) !important;
     gap: 16px !important;
   }
 
   .settings-panel .settings-model-center-pool {
     width: 100% !important;
     min-width: 0 !important;
-    max-width: 556px !important;
+    max-width: 620px !important;
   }
 
   .settings-panel .settings-model-center-route-grid {
     width: 100% !important;
     max-width: 100% !important;
-    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     grid-auto-rows: auto !important;
+    gap: 12px !important; /* 调整电脑端两列网格的间隔 */
   }
 
   .settings-panel .settings-model-center-route {

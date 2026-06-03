@@ -2412,7 +2412,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             {!isOpen && !isMobile && (
                 <button
                     onClick={onToggle}
-                    className="fixed right-0 top-1/2 -translate-y-1/2 z-[2000] flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b border-[var(--frost-card-framework-border)] hover:bg-[var(--toolbar-hover)] transition-all group shadow-md"
+                    className="fixed right-0 top-1/2 -translate-y-1/2 z-[200000] flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b border-[var(--frost-card-framework-border)] hover:bg-[var(--toolbar-hover)] transition-all group shadow-md"
                     style={{
                         background: 'var(--frost-card-framework-bg)',
                         borderColor: 'var(--frost-card-framework-border)',
@@ -2459,7 +2459,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                         }
                     }}
                     onWheel={registerActivity}
-                    className={`fixed z-[9999] flex flex-col ${isMobile
+                    className={`fixed z-[200000] flex flex-col ${isMobile
                         ? 'left-0 right-0 top-0 bottom-0 border-none pb-0'
                         : 'top-0 right-0 bottom-0 border-l border-[var(--border-light)]'
                         }`}
@@ -2490,7 +2490,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                     {!isMobile && (
                         <button
                             onClick={onToggle}
-                            className="absolute -left-6 top-1/2 -translate-y-1/2 z-[2000] flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b border-[var(--frost-card-framework-border)] hover:bg-[var(--toolbar-hover)] transition-all group shadow-md"
+                            className="absolute -left-6 top-1/2 -translate-y-1/2 z-[200000] flex items-center justify-center w-6 h-12 rounded-l-lg border-l border-t border-b border-[var(--frost-card-framework-border)] hover:bg-[var(--toolbar-hover)] transition-all group shadow-md"
                             style={{
                                 background: 'var(--frost-card-framework-bg)',
                                 borderColor: 'var(--frost-card-framework-border)',

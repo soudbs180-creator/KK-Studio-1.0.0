@@ -492,6 +492,7 @@ export class KeyManager {
         }));
 
         this.loadProviders();
+        this.migrateLegacyIds();
         this.providers.forEach((provider) => {
             this.syncLegacySlotsWithProvider(provider);
         });
@@ -3404,6 +3405,9 @@ export class KeyManager {
         'wuyinkeji-nanobanana2': '1014',
         'wuyinkeji-google-omni': '1015',
         'gpt-best': '1016',
+        'google': '1017',
+        'openai': '1018',
+        'anthropic': '1019',
         'custom': '2000'
     };
 
@@ -3419,6 +3423,13 @@ export class KeyManager {
                 return key;
             }
         }
+        
+        // 补充官方直连的模糊匹配
+        if (normalizedName.includes('google') || normalizedUrl.includes('google') || normalizedUrl.includes('gemini')) return 'google';
+        if (normalizedName.includes('openai') || normalizedUrl.includes('openai')) return 'openai';
+        if (normalizedName.includes('anthropic') || normalizedUrl.includes('anthropic') || normalizedUrl.includes('claude')) return 'anthropic';
+        if (normalizedName.includes('deepseek') || normalizedUrl.includes('deepseek')) return 'deepseek';
+
         return 'custom';
     }
 
@@ -3923,6 +3934,104 @@ export class KeyManager {
             console.error('[KeyManager] Failed to load providers:', e);
             this.providers = [];
             this.providerStorageScope = 'none';
+        }
+    }
+
+    private migrateLegacyIds(): void {
+        let changed = false;
+
+        const idPrefixes: Record<string, string> = {
+            'zhipu': '1001',
+            'wanqing': '1002',
+            'sambanova': '1003',
+            'openclaw': '1004',
+            't8star': '1005',
+            'volcengine': '1006',
+            'deepseek': '1007',
+            'moonshot': '1008',
+            'siliconflow': '1009',
+            '12ai': '1010',
+            'antigravity': '1011',
+            '12ai-nanobanana': '1012',
+            'flow2api': '1013',
+            'wuyinkeji-nanobanana2': '1014',
+            'wuyinkeji-google-omni': '1015',
+            'gpt-best': '1016',
+            'google': '1017',
+            'openai': '1018',
+            'anthropic': '1019',
+            'custom': '2000'
+        };
+
+        const getPrefixAndChannel = (providerName: string, name: string, baseUrl: string): { channel: string, prefix: string } => {
+            const cleanProvider = String(providerName || '').toLowerCase().trim();
+            const cleanName = String(name || '').toLowerCase().trim();
+            const cleanUrl = String(baseUrl || '').toLowerCase().trim();
+
+            for (const key of Object.keys(idPrefixes)) {
+                if (key === 'custom') continue;
+                if (cleanProvider.includes(key) || cleanName.includes(key) || (cleanUrl && cleanUrl.includes(key))) {
+                    return { channel: key, prefix: idPrefixes[key] };
+                }
+            }
+            return { channel: 'custom', prefix: '2000' };
+        };
+
+        // 迁移第三方 providers
+        const activeProviderIds = new Set(this.providers.map(p => p.id));
+        const providerIdMap = new Map<string, string>();
+
+        this.providers.forEach((p) => {
+            const lowerId = p.id.toLowerCase();
+            if (/^[a-z0-9]+-\d{4}-\d+$/.test(lowerId)) {
+                return;
+            }
+
+            const { channel, prefix } = getPrefixAndChannel(p.name, p.name, p.baseUrl || '');
+            
+            let suffix = 1;
+            let candidate = `${channel}-${prefix}-${suffix}`;
+            while (activeProviderIds.has(candidate) || Array.from(providerIdMap.values()).includes(candidate)) {
+                suffix++;
+                candidate = `${channel}-${prefix}-${suffix}`;
+            }
+
+            providerIdMap.set(p.id, candidate);
+            p.id = candidate;
+            changed = true;
+        });
+
+        // 迁移官方 slots
+        const activeSlotIds = new Set(this.state.slots.map(s => s.id));
+        const slotIdMap = new Map<string, string>();
+
+        this.state.slots.forEach((s) => {
+            const lowerId = s.id.toLowerCase();
+            if (/^[a-z0-9]+-\d{4}-\d+$/.test(lowerId)) {
+                return;
+            }
+
+            const { channel, prefix } = getPrefixAndChannel(s.provider, s.name, s.baseUrl || '');
+            
+            let suffix = 1;
+            let candidate = `${channel}-${prefix}-${suffix}`;
+            while (activeSlotIds.has(candidate) || Array.from(slotIdMap.values()).includes(candidate)) {
+                suffix++;
+                candidate = `${channel}-${prefix}-${suffix}`;
+            }
+
+            slotIdMap.set(s.id, candidate);
+            s.id = candidate;
+            changed = true;
+        });
+
+        if (changed) {
+            this.saveProviders();
+            this.saveState();
+            console.log('[KeyManager] Migrated legacy channel IDs to new rule format:', {
+                providers: Object.fromEntries(providerIdMap),
+                slots: Object.fromEntries(slotIdMap)
+            });
         }
     }
 

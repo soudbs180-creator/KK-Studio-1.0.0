@@ -228,6 +228,7 @@ type ApiWorkbenchOverviewSectionProps = {
   activeProviders: number;
   budgetCount: number;
   activeTab: TabType;
+  testId?: string;
 };
 
 export const ApiWorkbenchOverviewSection: React.FC<ApiWorkbenchOverviewSectionProps> = ({
@@ -243,6 +244,7 @@ export const ApiWorkbenchOverviewSection: React.FC<ApiWorkbenchOverviewSectionPr
   activeProviders,
   budgetCount,
   activeTab,
+  testId,
 }) => {
   const isErrorOrDegraded = workbenchTone === 'rose' || attentionCount > 0;
   
@@ -311,7 +313,7 @@ export const ApiWorkbenchOverviewSection: React.FC<ApiWorkbenchOverviewSectionPr
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-testid={testId}>
       {/* 静态测试契约插桩，请勿删除：title={pick('API 运行概览', 'API Operations Overview')} description={pick('先看链路、状态和预算。', 'Start with routes, status, and budget.')} testId="settings-workbench-overview" */}
       {userApiPersistenceWarning || isHydratingRuntimeUserApis ? (
         <div className="grid gap-3 lg:grid-cols-2">
