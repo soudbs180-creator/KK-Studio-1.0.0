@@ -32,8 +32,8 @@
     "path": "docs/ai-assistant/module-map.md",
     "title": "模块地图 (Module Map)",
     "summary": "本文件整理了 KK Studio v1.5.3 的核心模块，供 AI 助手理解代码依赖和调用边界。",
-    "contentHash": "c4aa4a959fb72ceedd0ab417550cfe27",
-    "updatedAt": "2026-06-03T10:54:27.814Z"
+    "contentHash": "ec6ddac503f24296c1a51fd4bf070c6b",
+    "updatedAt": "2026-06-03T16:51:48.389Z"
   },
   {
     "id": "doc_readme_md",
@@ -41,8 +41,8 @@
     "path": "docs/ai-assistant/README.md",
     "title": "AI 助手与 Agent 运行时知识库 (docs/ai-assistant/README.md) - KK Studio v1.5.3",
     "summary": "本目录是 KK Studio 的 **AI 助手与 Agent 运行态知识库**。当 AI 助手执行任务、解析选区、调用接口或对画布进行操作时，必须基于本目录的协议与 Runbook。",
-    "contentHash": "41ccba654d038236bbb3e15a074c3ff2",
-    "updatedAt": "2026-06-03T15:30:10.537Z"
+    "contentHash": "e60ed4e755d1d395661dc730e23e0001",
+    "updatedAt": "2026-06-03T16:51:55.948Z"
   },
   {
     "id": "doc_runbooks_md",
@@ -75,10 +75,10 @@
     "id": "doc_skills_md",
     "source": "doc",
     "path": "docs/ai-assistant/skills.md",
-    "title": "Agent 可执行手册 (Skills)",
-    "summary": "本文件归档了 AI 助手在执行任务时的标准流程手册 (Runbooks)。",
-    "contentHash": "e7d7369423e89c83dc06043e9c1f3217",
-    "updatedAt": "2026-06-03T10:21:50.492Z"
+    "title": "Agent 可执行手册索引 (Skills Index) - KK Studio v1.5.3",
+    "summary": "本文件是 KK Studio v1.5.3 规范下 AI 助手的可执行技能手册 (Skills) 索引。",
+    "contentHash": "651c37461d2f61d8b30337f5af1c739b",
+    "updatedAt": "2026-06-03T16:54:17.599Z"
   },
   {
     "id": "doc_tool_registry_md",

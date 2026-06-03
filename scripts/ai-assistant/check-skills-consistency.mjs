@@ -62,22 +62,46 @@ function getSensitiveTools() {
   return sensitiveTools;
 }
 
-// 3. 读取 Skills 手册并解析引用的工具名
+// 3. 读取 Skills 手册并解析引用的工具名，支持递归扫描 skills.md 及 skills/*.md 文件
 function getReferencedToolsInSkills() {
   const referenced = new Set();
+  const filesToScan = [];
+
   const skillsFilePath = path.join(SKILLS_DIR, 'skills.md');
-  
-  if (!fs.existsSync(skillsFilePath)) {
-    console.warn(`[一致性校验] 警告：未找到 skills.md 文档，将尝试扫描 docs 目录下的所有 markdown。`);
+  if (fs.existsSync(skillsFilePath)) {
+    filesToScan.push(skillsFilePath);
+  }
+
+  const subSkillsDir = path.join(SKILLS_DIR, 'skills');
+  if (fs.existsSync(subSkillsDir)) {
+    try {
+      const files = fs.readdirSync(subSkillsDir);
+      for (const file of files) {
+        if (file.endsWith('.md')) {
+          filesToScan.push(path.join(subSkillsDir, file));
+        }
+      }
+    } catch (e) {
+      console.warn(`[一致性校验] 读取 skills 目录失败:`, e.message);
+    }
+  }
+
+  if (filesToScan.length === 0) {
+    console.warn(`[一致性校验] 警告：未找到 skills.md 文档及 skills 目录下的 markdown 文件。`);
     return referenced;
   }
 
-  const content = fs.readFileSync(skillsFilePath, 'utf-8');
-  // 查找符合 `- tool_name` 或者 `tool_name` 特征的文本
   const toolNameRegex = /`([a-zA-Z0-9_.-]+)`/g;
-  let match;
-  while ((match = toolNameRegex.exec(content)) !== null) {
-    referenced.add(match[1]);
+  for (const filePath of filesToScan) {
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      let match;
+      while ((match = toolNameRegex.exec(content)) !== null) {
+        referenced.add(match[1]);
+      }
+    } catch (e) {
+      console.warn(`[一致性校验] 读取文件失败: ${filePath}`, e.message);
+    }
   }
   return referenced;
 }

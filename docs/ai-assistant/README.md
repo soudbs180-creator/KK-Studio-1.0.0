@@ -22,7 +22,7 @@
 5. **[flow-map.md](flow-map.md)** 与 **[module-map.md](module-map.md)**
    - **职责**：系统交互流和模块依赖树的映射，帮助 Agent 进行全局定位。
 
-6. **[skills.md](skills.md)**、**[safety-policy.md](safety-policy.md)** 和 **[session-memory.md](session-memory.md)**
+6. **[skills.md](skills.md)** (以及 **[skills/](skills/README.md)** 专门子目录)、**[safety-policy.md](safety-policy.md)** 和 **[session-memory.md](session-memory.md)**
    - **职责**：定义助手的安全围栏与临时上下文记忆同步方式。
 
 ## 🧠 助手开发规范

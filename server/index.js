@@ -50,7 +50,8 @@ function assertRequiredEnv(options = {}) {
 }
 
 function getAllowedOrigins() {
-  const configuredOrigins = String(process.env.PAYMENT_ALLOWED_ORIGINS || '')
+  const envOrigins = process.env.ALLOWED_ORIGINS || process.env.PAYMENT_ALLOWED_ORIGINS || '';
+  const configuredOrigins = String(envOrigins)
     .split(',')
     .map((origin) => origin.trim())
     .filter((origin) => origin && origin !== '*');

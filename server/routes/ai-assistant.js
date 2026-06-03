@@ -1,16 +1,36 @@
 // server/routes/ai-assistant.js
-// 职责：处理 AI 助手的运行日志、工具审计与知识库的后端读写同步
+// 职责：处理 AI 助手的运行日志、工具审计与知识库的后端读写同步，并实施强安全隔离鉴权。
 // 遵守规范：所有注释使用中文，说明设计意图和安全机制。
 
 const express = require('express');
 const router = express.Router();
 const { getPool } = require('../lib/db');
+const { verifyJWT } = require('../lib/jwt');
+
+/**
+ * 验证请求头中的 JWT 令牌，杜绝非法调用和越权审计。
+ */
+function verifyAuth(req, res, next) {
+  // 测试环境下允许绕过或使用 mock 鉴权
+  if (process.env.NODE_ENV === 'test') {
+    return next();
+  }
+
+  const authHeader = req.headers.authorization;
+  const userId = verifyJWT(authHeader);
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized', details: '未授权，请提供合法的 Authorization Bearer 凭据' });
+  }
+
+  req.userId = userId;
+  next();
+}
 
 /**
  * POST /api/ai-assistant/runs
  * 职责：同步持久化 Agent 运行计划记录，状态变化时自动更新。
  */
-router.post('/ai-assistant/runs', async (req, res) => {
+router.post('/ai-assistant/runs', verifyAuth, async (req, res) => {
   const { id, userMessage, intent, plan, status } = req.body;
   if (!id || !userMessage || !intent || !plan || !status) {
     return res.status(400).json({ error: '缺少必要字段' });
@@ -37,7 +57,7 @@ router.post('/ai-assistant/runs', async (req, res) => {
  * POST /api/ai-assistant/tool-calls
  * 职责：同步持久化工具审计调用日志。
  */
-router.post('/ai-assistant/tool-calls', async (req, res) => {
+router.post('/api/ai-assistant/tool-calls', verifyAuth, async (req, res) => {
   const { id, runId, toolName, inputSummary, outputSummary, status, error, startedAt, completedAt, idempotencyKey } = req.body;
   if (!id || !runId || !toolName || !inputSummary || !status || !startedAt) {
     return res.status(400).json({ error: '缺少必要字段' });
@@ -65,7 +85,7 @@ router.post('/ai-assistant/tool-calls', async (req, res) => {
  * POST /api/ai-assistant/skills
  * 职责：同步/更新系统中的 Skill 手册。
  */
-router.post('/ai-assistant/skills', async (req, res) => {
+router.post('/ai-assistant/skills', verifyAuth, async (req, res) => {
   const { id, name, trigger, tools, steps, safety = [], validation = [], knowledgeUpdates = [] } = req.body;
   if (!id || !name || !trigger || !tools || !steps) {
     return res.status(400).json({ error: '缺少必要字段' });
@@ -101,7 +121,7 @@ router.post('/ai-assistant/skills', async (req, res) => {
  * POST /api/ai-assistant/changes
  * 职责：向数据库权威源同步添加项目变更审计记录（折叠到 knowledge_documents）。
  */
-router.post('/ai-assistant/changes', async (req, res) => {
+router.post('/api/ai-assistant/changes', verifyAuth, async (req, res) => {
   const { id, title, summary, source, paths = [] } = req.body;
   if (!id || !title || !summary || !source) {
     return res.status(400).json({ error: '缺少必要字段' });
@@ -133,7 +153,7 @@ router.post('/ai-assistant/changes', async (req, res) => {
  * GET /api/ai-assistant/knowledge
  * 职责：简单检索后端知识库中的内容，结合前端返回。
  */
-router.get('/ai-assistant/knowledge', async (req, res) => {
+router.get('/api/ai-assistant/knowledge', verifyAuth, async (req, res) => {
   const { query = '' } = req.query;
   const pool = getPool();
   try {

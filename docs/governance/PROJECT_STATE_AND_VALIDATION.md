@@ -184,3 +184,46 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none test
 3. 完成 `CanvasRuntimeState -> ToolRegistry -> ZIP selected originals -> DurableQueue -> KnowledgeSync` 的闭环。
 4. 清理历史文档中的旧版本、旧后端、旧目录描述。
 5. 将安全 backlog 逐条转为独立 PR。
+
+---
+
+## 2026-06-04 - 仓库结构全面整顿与安全升级
+
+### Scope
+- 统一文档路径，将根占位文件 `plans.md`、`implement.md`、`status.md` 规范地重定向至权威文件。
+- 将 `docs/ai-assistant/skills.md` 拆分为独立的 `skills/` 专属子目录。
+- 补齐 `buildCanvasRuntimeState.ts` 导出，对 `ToolRegistry.ts` 异常日志进行脱敏处理，实现 `AITakeoverContext.tsx` 中生图节点的真实自动排版及批次 tags 自动附加。
+- 后端 `routes/ai-assistant.js` 接入 JWT Bearer Token 强鉴权保护。
+- 根 `package.json` 废弃 `apps/admin` 的无效 vite 脚本并报错；在当前文档明晰 `apps/mobile` 的非 root workspaces 项目事实。
+- 升级配置 `.editorconfig` 与 `.gitattributes` 规范编码换行。
+
+### Files touched
+- `plans.md`
+- `implement.md`
+- `status.md`
+- `package.json`
+- `.editorconfig`
+- `.gitattributes`
+- `docs/README.md`
+- `docs/ai-assistant/README.md`
+- `docs/ai-assistant/skills.md`
+- `docs/ai-assistant/module-map.md`
+- `scripts/ai-assistant/check-skills-consistency.mjs`
+- `docs/ai-assistant/skills/` (子目录)
+- `apps/web/src/features/ai-assistant-runtime/context/buildCanvasRuntimeState.ts`
+- `apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts`
+- `apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx`
+- `server/routes/ai-assistant.js`
+- `server/index.js`
+- `docs/governance/PROJECT_STATE_AND_VALIDATION.md` (本文件)
+
+### Validation
+- Passed: `npm run governance:agent-docs`、`npm run governance:skills`、`npm run check:encoding`、`npm run typecheck`
+- Not run: 生产环境部署与 VPS 真实联调。
+
+### Decisions
+- 移动端 `apps/mobile` 采取方案 A 维持独立工程角色，由 release manifest 统一跟踪版本，不强制写入 Monorepo workspaces。
+
+### Risks / Next
+- 风险：若前端请求 `/api/ai-assistant` 相关的同步接口未携带 Authorization 头部，会触发 401 拦截。
+- 下一步：各处调用 AI 助手同步逻辑时，统一封装 api-client 的 Bearer 头附带逻辑。

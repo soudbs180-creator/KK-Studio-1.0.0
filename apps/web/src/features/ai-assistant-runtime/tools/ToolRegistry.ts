@@ -107,7 +107,7 @@ export class AgentToolRegistry {
       const failedLog: AgentToolCallLog = {
         ...log,
         status: 'failed',
-        error: e?.message || String(e),
+        error: redactToolSummary(e?.message || String(e)),
         completedAt: new Date().toISOString()
       };
       this.logs.push(failedLog);
@@ -186,6 +186,7 @@ toolRegistryInstance.registerAlias('ui.openSettings', 'openSettings');
 toolRegistryInstance.registerAlias('assets.zipOriginals', 'zipOutputs');
 toolRegistryInstance.registerAlias('generation.start', 'startGeneration');
 toolRegistryInstance.registerAlias('generation.createBatchJob', 'startBatchGeneration');
+toolRegistryInstance.registerAlias('generation.cancelJob', 'cancelBatchGeneration');
 toolRegistryInstance.registerAlias('generation.submitComposer', 'submitPromptComposer');
 toolRegistryInstance.registerAlias('prompt.fillPrompt', 'fillPrompt');
 toolRegistryInstance.registerAlias('prompt.optimizeInput', 'fillInputPrompt');

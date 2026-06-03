@@ -283,6 +283,7 @@ export function AITakeoverProvider({
   const addPromptNodeRef = useRef(addPromptNode);
   const executeGenerationRef = useRef(executeGeneration);
   const getNextCardPositionRef = useRef(getNextCardPosition);
+  const arrangeAllNodesRef = useRef(arrangeAllNodes);
 
   useEffect(() => {
     activeCanvasRef.current = activeCanvas;
@@ -290,6 +291,7 @@ export function AITakeoverProvider({
     addPromptNodeRef.current = addPromptNode;
     executeGenerationRef.current = executeGeneration;
     getNextCardPositionRef.current = getNextCardPosition;
+    arrangeAllNodesRef.current = arrangeAllNodes;
   });
 
   useEffect(() => {
@@ -316,6 +318,7 @@ export function AITakeoverProvider({
       }
 
       const nodeId = 'takeover_batch_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+      const tags = ['automation', 'batch:' + jobId];
       const newNode = {
         id: nodeId,
         prompt: promptText,
@@ -330,7 +333,8 @@ export function AITakeoverProvider({
         parallelCount: options.countPerPrompt || 1,
         isGenerating: true,
         status: 'queued',
-        referenceImages
+        referenceImages,
+        tags
       };
 
       // 1. 先把准备执行生成的 prompt 节点加入画布
@@ -375,6 +379,9 @@ export function AITakeoverProvider({
     // 注册自动排版 handler
     durableGenerationQueue.registerArrangeHandler(async (nodeIds, options) => {
       console.log('[DurableQueue] Job completed, nodes ready to arrange:', nodeIds);
+      if (arrangeAllNodesRef.current) {
+        arrangeAllNodesRef.current('grid');
+      }
     });
 
     // 挂载时，自动触发/恢复排队及挂起的批量任务

@@ -1,4 +1,9 @@
 # KK Studio status.md
 
-> 本文件是 CI 静态分析校验所需的文件。
-> 目前的会话状态及进展情况请参阅 Agent 会话与 `docs/development/session-handoff.md`。
+> Compatibility stub for CI and legacy Agent checks.
+>
+> Current authoritative documents:
+> - [PROJECT_STATE_AND_VALIDATION.md](docs/governance/PROJECT_STATE_AND_VALIDATION.md)
+> - [session-handoff.md](docs/development/session-handoff.md)
+>
+> Do not use this file as source of truth for implementation.

@@ -241,5 +241,23 @@ export const generationTools: AgentToolDefinition[] = [
         updatedAt: job.updatedAt
       };
     }
+  },
+  
+  // 8. generation.cancelJob - 取消批量生图任务
+  {
+    name: 'generation.cancelJob',
+    description: '取消指定的批量生图任务，并中止排队中或执行中的任务',
+    permission: 'safe',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        jobId: { type: 'string', description: '批量生图的任务ID' }
+      },
+      required: ['jobId']
+    },
+    handler: async (input: { jobId: string }, ctx) => {
+      durableGenerationQueue.cancelJob(input.jobId);
+      ctx.notify?.success?.('任务已取消', `批量生图任务 ${input.jobId} 已取消。`);
+    }
   }
 ];
