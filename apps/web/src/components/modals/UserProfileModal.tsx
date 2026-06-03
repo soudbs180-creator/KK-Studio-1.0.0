@@ -720,6 +720,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         footer={null}
         width={860}
         destroyOnClose
+        centered
         style={{
           background: 'color-mix(in srgb, var(--frost-card-framework-bg) 72%, transparent)',
         }}

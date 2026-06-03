@@ -1464,9 +1464,9 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     if (!key || isReadonlySecretPlaceholder(key)) return '';
 
     const url = providerForm.baseUrl.trim().toLowerCase();
-    const isGoogle = providerForm.format === 'gemini' || url.includes('googleapis.com');
-    const isOpenAI = providerForm.format === 'openai' || url.includes('api.openai.com');
-    const isClaude = providerForm.format === 'claude' || url.includes('api.anthropic.com');
+    const isGoogle = url.includes('googleapis.com') || (activeProviderPreset && activeProviderPreset.name === 'Google Gemini');
+    const isOpenAI = url.includes('api.openai.com') || (activeProviderPreset && activeProviderPreset.name === 'OpenAI');
+    const isClaude = url.includes('api.anthropic.com') || (activeProviderPreset && activeProviderPreset.name === 'Anthropic');
 
     if (/\s/.test(providerForm.apiKey)) {
       return pick(
@@ -3850,7 +3850,18 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       {showProviderEditor ? (
         <>
         <SettingsSection
-          title={editingProviderId ? pick('编辑模型通道', 'Edit model route') : pick('添加模型通道', 'Add model route')}
+          title={(() => {
+            const name = activeProviderPreset?.name || providerForm.name || '';
+            if (editingProviderId) {
+              return name
+                ? pick(`编辑 ${name} 通道`, `Edit ${name} route`)
+                : pick('编辑模型通道', 'Edit model route');
+            } else {
+              return name
+                ? pick(`添加 ${name} 通道`, `Add ${name} route`)
+                : pick('添加模型通道', 'Add model route');
+            }
+          })()}
           eyebrow={
             editingProviderId
               ? pick('二级页面', 'Subpage')
@@ -3916,10 +3927,10 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                       onClick={syncWuyinCatalog}
                       disabled={busy === 'sync-wuyin'}
                       className="settings-provider-editor-link cursor-pointer border-none bg-transparent hover:text-[var(--primary)] flex items-center gap-1 text-[13px] text-[var(--text-secondary)] transition-colors"
-                      style={{ padding: 0, outline: 'none' }}
+                      style={{ padding: '6px 12px', maxWidth: 'none', minWidth: '120px', outline: 'none' }}
                     >
                       <RefreshCw size={14} className={busy === 'sync-wuyin' ? 'animate-spin' : ''} />
-                      <span>{pick('同步最新价格', 'Sync Latest Prices')}</span>
+                      <span className="whitespace-nowrap">{pick('同步最新价格', 'Sync Latest Prices')}</span>
                     </button>
                   )}
                 </div>
