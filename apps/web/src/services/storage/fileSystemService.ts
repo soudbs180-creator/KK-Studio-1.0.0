@@ -42,7 +42,7 @@ const ALL_MANAGED_ROOT_DIRS = new Set([
     ...Array.from(ROOT_LEGACY_DIRS)
 ]);
 
-const MEDIA_EXTENSIONS = /\.(png|jpe?g|webp|gif|bmp|mp4|webm|mov)$/i;
+const MEDIA_EXTENSIONS = /\.(png|jpe?g|webp|gif|bmp|mp4|webm|mov|mp3|wav|m4a)$/i;
 const THUMBNAIL_EXTENSIONS = /\.(png|jpe?g|webp)$/i;
 
 const consolidatedWorkspaceHandles = new WeakSet<FileSystemDirectoryHandle>();
@@ -68,6 +68,9 @@ function extensionFromMimeType(mimeType: string | undefined, fallback: string): 
     if (normalizedMimeType.includes('mp4')) return 'mp4';
     if (normalizedMimeType.includes('webm')) return 'webm';
     if (normalizedMimeType.includes('quicktime') || normalizedMimeType.includes('mov')) return 'mov';
+    if (normalizedMimeType.includes('audio/mpeg') || normalizedMimeType.includes('mp3')) return 'mp3';
+    if (normalizedMimeType.includes('audio/wav') || normalizedMimeType.includes('wav')) return 'wav';
+    if (normalizedMimeType.includes('audio/x-m4a') || normalizedMimeType.includes('m4a')) return 'm4a';
 
     return fallback;
 }
@@ -789,6 +792,30 @@ export const fileSystemService = {
         await removeEntryIfExists(handle, DIRS.TAGS, true);
         await removeEntryIfExists(handle, DIRS.CACHE, true);
 
+        // 🚀 新规对齐：检查并补齐缩略图，防止旧数据没有缩略图
+        void (async () => {
+            try {
+                // @ts-ignore
+                for await (const entry of originalsDir.values()) {
+                    if (entry.kind !== 'file' || !THUMBNAIL_EXTENSIONS.test(entry.name)) continue;
+                    const normalizedId = normalizeStoredFileId(entry.name);
+                    const hasThumb = await findExistingFileNameByStoredId(thumbnailsDir, normalizedId, THUMBNAIL_EXTENSIONS);
+                    if (!hasThumb) {
+                        try {
+                            // @ts-ignore
+                            const originalFile = await entry.getFile();
+                            const thumbBlob = await fileSystemService.generateThumbnailFromOriginal(originalFile);
+                            await fileSystemService.saveThumbnailToHandle(handle, normalizedId, thumbBlob);
+                        } catch (err) {
+                            console.warn(`[FileSystem] 无法为原图 ${normalizedId} 补齐缩略图:`, err);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('[FileSystem] 自动补全缩略图流执行错误:', err);
+            }
+        })();
+
         logInfo(
             'FileSystem',
             'Workspace consolidated',
@@ -1074,6 +1101,19 @@ export const fileSystemService = {
                     const writable = await fileHandle.createWritable();
                     await writable.write(blob);
                     await writable.close();
+
+                    // 🚀 新规对齐：保存/更新原图时，若非视频且是图片，自动生成缩略图
+                    if (!isVideo && blob.type.startsWith('image/')) {
+                        void (async () => {
+                            try {
+                                const thumbBlob = await fileSystemService.generateThumbnailFromOriginal(blob);
+                                await fileSystemService.saveThumbnailToHandle(handle, id, thumbBlob);
+                            } catch (thumbErr) {
+                                console.warn('[FileSystem] 自动更新原图对应的缩略图失败:', thumbErr);
+                            }
+                        })();
+                    }
+
                     return existingFileName;
                 }
 
@@ -1092,6 +1132,19 @@ export const fileSystemService = {
                 `已保存${isVideo ? '视频' : '图片'}`,
                 `${filename} (${Math.round(blob.size / 1024)}KB)${canvasDirName ? `, source=${canvasDirName}` : ''}`
             );
+
+            // 🚀 新规对齐：保存/更新原图时，若非视频且是图片，自动生成缩略图
+            if (!isVideo && blob.type.startsWith('image/')) {
+                void (async () => {
+                    try {
+                        const thumbBlob = await fileSystemService.generateThumbnailFromOriginal(blob);
+                        await fileSystemService.saveThumbnailToHandle(handle, id, thumbBlob);
+                    } catch (thumbErr) {
+                        console.warn('[FileSystem] 自动生成原图对应的缩略图失败:', thumbErr);
+                    }
+                })();
+            }
+
             return filename;
         } catch (e) {
             if (isRecoverableFileSystemStateError(e)) {
@@ -1430,8 +1483,59 @@ export const fileSystemService = {
                     quality
                 );
             };
-            img.onerror = () => reject(new Error('Failed to load image'));
+            img.onerror = () => {
+                reject(new Error('Failed to load image for compression'));
+            };
             img.src = normalizedSource;
+        });
+    },
+
+    /**
+     * 🚀 从原图改制生成 WebP 缩略图工具函数
+     */
+    async generateThumbnailFromOriginal(originalBlob: Blob): Promise<Blob> {
+        return new Promise((resolve, reject) => {
+            const url = URL.createObjectURL(originalBlob);
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const maxDim = 300;
+                let w = img.width;
+                let h = img.height;
+                if (w > maxDim || h > maxDim) {
+                    if (w > h) {
+                        h = Math.round((h * maxDim) / w);
+                        w = maxDim;
+                    } else {
+                        w = Math.round((w * maxDim) / h);
+                        h = maxDim;
+                    }
+                }
+                canvas.width = w;
+                canvas.height = h;
+
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    URL.revokeObjectURL(url);
+                    reject(new Error('Failed to get 2d context'));
+                    return;
+                }
+                ctx.drawImage(img, 0, 0, w, h);
+                canvas.toBlob(
+                    (blob) => {
+                        URL.revokeObjectURL(url);
+                        if (blob) resolve(blob);
+                        else reject(new Error('Canvas to blob failed'));
+                    },
+                    'image/webp',
+                    0.7
+                );
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                reject(new Error('Failed to load image for thumbnail'));
+            };
+            img.src = url;
         });
     },
 

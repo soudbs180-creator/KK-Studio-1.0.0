@@ -1356,17 +1356,29 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                     <Play size={26} />
                                 </div>
                             ) : displaySrc && !imgError ? (
-                                <img
-                                    src={displaySrc}
-                                    decoding="async"
-                                    loading="lazy"
-                                    referrerPolicy="strict-origin-when-cross-origin"
-                                    alt={shellTitle}
-                                    className="w-full h-full object-cover block"
-                                    onError={() => {
-                                        void handleMediaLoadError();
-                                    }}
-                                />
+                                <div className="relative w-full h-full">
+                                    {!isMediaLoaded && (
+                                        <div className="absolute inset-0 flex items-center justify-center text-[var(--text-tertiary)] bg-[var(--frost-card-framework-bg)]">
+                                            <Loader2 size={24} className="animate-spin" />
+                                        </div>
+                                    )}
+                                    <img
+                                        src={displaySrc}
+                                        decoding="async"
+                                        loading="lazy"
+                                        referrerPolicy="strict-origin-when-cross-origin"
+                                        alt={shellTitle}
+                                        className="w-full h-full object-cover block"
+                                        style={{
+                                            opacity: isMediaLoaded ? 1 : 0,
+                                            transition: 'opacity 0.2s ease-in-out',
+                                        }}
+                                        onLoad={() => setIsMediaLoaded(true)}
+                                        onError={() => {
+                                            void handleMediaLoadError();
+                                        }}
+                                    />
+                                </div>
                             ) : (
                                 <div className="absolute inset-0 flex items-center justify-center text-[var(--text-tertiary)]">
                                     {isLoading ? <Loader2 size={24} className="animate-spin" /> : <ImageOff size={24} />}
@@ -1557,6 +1569,8 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                     objectFit: 'cover',
                                                     display: 'block',
                                                     imageRendering: 'auto',
+                                                    opacity: isMediaLoaded ? 1 : 0,
+                                                    transition: 'opacity 0.2s ease-in-out',
                                                 }}
 
                                                 onError={() => {
@@ -1627,9 +1641,11 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                     ) : (
                                         (() => {
                                             const isMediaExpired = image.error === '本地临时图片已失效' ||
-                                                displaySrc?.startsWith('blob:') ||
-                                                image.url?.startsWith('blob:') ||
-                                                image.originalUrl?.startsWith('blob:');
+                                                (imgError && (
+                                                    displaySrc?.startsWith('blob:') ||
+                                                    image.url?.startsWith('blob:') ||
+                                                    image.originalUrl?.startsWith('blob:')
+                                                ));
 
                                             const placeholderBg = 'rgba(10, 10, 10, 0.95)';
                                             const placeholderGlow = isMediaExpired
@@ -1712,7 +1728,25 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                     );
                                 })()}
 
-                                {((isLoading || !isMediaLoaded) && !imgError) && !image.error && !isCanvasTransforming && (
+                                {image.isGenerating && (
+                                    <div
+                                        className="absolute inset-0 z-40 rounded-lg flex flex-col items-center justify-center p-4 text-center"
+                                        style={{
+                                            background: 'rgba(10, 10, 10, 0.92)',
+                                            border: '1px solid rgba(255, 77, 139, 0.15)',
+                                            boxShadow: 'inset 0 0 16px rgba(255, 77, 139, 0.08)',
+                                        }}
+                                    >
+                                        <Loader2 className="animate-spin text-[var(--accent-coral)] mb-2" size={20} />
+                                        <span 
+                                            className="text-xs font-semibold tracking-wide text-[var(--accent-coral)]"
+                                        >
+                                            正在生成中...
+                                        </span>
+                                    </div>
+                                )}
+
+                                {((isLoading || !isMediaLoaded) && !imgError) && !image.error && !image.isGenerating && !isCanvasTransforming && (
                                     <div
                                         className={`absolute inset-0 z-50 rounded-lg flex flex-col items-center justify-center border ${
                                             isDarkMode ? 'border-white/5 animate-shimmer-inward' : 'border-black/5 animate-shimmer-inward'

@@ -73,14 +73,15 @@ npm run check:encoding
 
 ## 6. Latest Validation
 
-- Passed: `npm run verify:changes` (全量验证顺利通过，包括架构、规范、类型、冒烟测试及字符编码检查)
-- Fixed: 修正了 `tests/unit/canvas-runtime-state-builder.test.ts` 中与 v1.5.4 升级对应的项目版本号断言测试。
-- Passed: `npm run typecheck`
+- Passed: `npm run typecheck` (类型检查完全通过，确保无语法与类型断开)
+- Passed: `npm run check:encoding` (文件编码及乱码防护验证通过，符合 UTF-8 without BOM 和 LF 要求)
+- Passed: `npm run architecture:check` (架构与模块导入边界检查通过)
+- Fixed: 解决了图片卡片在加载和切换质量时，由于浏览器原生重绘导致的破损图片图标闪烁视觉 Bug。
 - Passed: 侧边和桌面工具栏折叠/展开测试以及所有的单元和集成测试。
 
 ## 7. Handoff Notes For Next Agent
 
-- Always read `AGENTS.md`, `AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md`, `package.json`, and `config/release-manifest.json` before editing.
+- Always read `AGENTS.md`, `package.json`, and `config/release-manifest.json` before editing.
+- Ensure that any new frontend components containing `<img>` or media elements handle the pending load state gracefully by managing their `opacity` via `isMediaLoaded` or a comparable local state, to avoid raw broken-image indicators displaying momentarily.
 - If user or another AI changes files in parallel, inspect `git status` and current diffs first; never revert unrelated work.
-- Treat docs that mention `src/` as live runtime, `.agent` as current rules, Netlify as the current backend, or versions before `v1.5.4` as drift unless clearly marked historical/archive.
 - For assistant work, prefer small sprint-sized changes and update this file plus `docs/ai-assistant/*` with touched files, validation, and next step.

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { type GeneratedImage, GenerationMode, type RedrawRequest, type ReferenceImage } from '../../types';
 import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy, Sparkles, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useInRouterContext } from 'react-router-dom';
 import { resolveRedrawRouteAndModel } from '../../services/api/capabilityRouteAssignments';
 
 // 简体中文：获取是否已经配置了图片生成的逻辑，根据能力路由配置是否有有效链路来判断
@@ -32,6 +32,7 @@ interface GlobalLightboxProps {
     redrawCompleteUrl?: string | null;
     onRedrawAnimationDone?: () => void;
     onUseAsSource?: (image: GeneratedImage) => void; // 🚀 新增继续创作回调
+    onOpenSettings?: () => void; // 🚀 新增可选回调，用于非路由上下文环境打开设置
 }
 
 /**
@@ -41,8 +42,9 @@ interface GlobalLightboxProps {
  * @param initialIndex Initially active item index.
  * @param onClose Close handler.
  */
-export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialIndex, onClose, onEditText, onEditPptDeck, onPartialRedraw, onDeleteImage, onDownloadPptComposite, onUseAsSource }) => {
-    const navigate = useNavigate();
+export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialIndex, onClose, onEditText, onEditPptDeck, onPartialRedraw, onDeleteImage, onDownloadPptComposite, onUseAsSource, onOpenSettings }) => {
+    const inRouterContext = useInRouterContext();
+    const navigate = inRouterContext ? useNavigate() : null;
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -1245,7 +1247,11 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                       onClick={(e) => {
                                           e.stopPropagation();
                                           if (!isImgConfigured) {
-                                              navigate('/settings/api-management');
+                                              if (onOpenSettings) {
+                                                   onOpenSettings();
+                                               } else if (navigate) {
+                                                   navigate('/settings/api-management');
+                                               }
                                               onClose();
                                               notify.info('需要配置模型', '重绘功能需要先在能力分配中配置图片模型。');
                                               return;
@@ -1267,7 +1273,11 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                                       onClick={(e) => {
                                           e.stopPropagation();
                                           if (!isImgConfigured) {
-                                              navigate('/settings/api-management');
+                                              if (onOpenSettings) {
+                                                   onOpenSettings();
+                                               } else if (navigate) {
+                                                   navigate('/settings/api-management');
+                                               }
                                               onClose();
                                               notify.info('需要配置模型', '重绘功能需要先在能力分配中配置图片模型。');
                                               return;

@@ -4723,6 +4723,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       onPartialRedraw: handleRedrawRequest,
       onDeleteImage: handleLightboxDeleteImage,
       onUseAsSource: handleDesktopUseImageAsSource,
+      onOpenSettings: () => openSettingsPanel('api-management'),
     },
     pptStackPreview: {
       state: pptStackPreview,
