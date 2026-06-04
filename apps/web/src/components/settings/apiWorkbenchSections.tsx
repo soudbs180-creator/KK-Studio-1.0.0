@@ -32,6 +32,77 @@ type CurrentViewLatencyItem = {
 
 const noop = () => {};
 
+const getDisplayId = (id: string, title: string, subtitle?: string): string => {
+  const lowerId = id.toLowerCase();
+  if (/^[a-z0-9]+-\d{4}-\d+$/.test(lowerId)) {
+    return id;
+  }
+  
+  const idPrefixes: Record<string, string> = {
+    'zhipu': '1001',
+    'wanqing': '1002',
+    'sambanova': '1003',
+    'openclaw': '1004',
+    't8star': '1005',
+    'volcengine': '1006',
+    'deepseek': '1007',
+    'moonshot': '1008',
+    'siliconflow': '1009',
+    '12ai': '1010',
+    'antigravity': '1011',
+    '12ai-nanobanana': '1012',
+    'flow2api': '1013',
+    'wuyinkeji-nanobanana2': '1014',
+    'wuyinkeji-google-omni': '1015',
+    'gpt-best': '1016',
+    'google': '1017',
+    'openai': '1018',
+    'anthropic': '1019',
+    'custom': '2000'
+  };
+
+  const cleanName = String(title || '').toLowerCase().trim();
+  const cleanUrl = String(subtitle || '').toLowerCase().trim();
+
+  let channel = 'custom';
+  let prefix = '2000';
+
+  for (const key of Object.keys(idPrefixes)) {
+    if (key === 'custom') continue;
+    if (cleanName.includes(key) || cleanUrl.includes(key)) {
+      channel = key;
+      prefix = idPrefixes[key];
+      break;
+    }
+  }
+
+  // 辅助官方直连匹配
+  if (channel === 'custom') {
+    if (cleanName.includes('google') || cleanUrl.includes('google') || cleanUrl.includes('gemini')) {
+      channel = 'google';
+      prefix = '1017';
+    } else if (cleanName.includes('openai') || cleanUrl.includes('openai')) {
+      channel = 'openai';
+      prefix = '1018';
+    } else if (cleanName.includes('anthropic') || cleanUrl.includes('anthropic') || cleanUrl.includes('claude')) {
+      channel = 'anthropic';
+      prefix = '1019';
+    } else if (cleanName.includes('deepseek') || cleanUrl.includes('deepseek')) {
+      channel = 'deepseek';
+      prefix = '1007';
+    }
+  }
+
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const suffix = Math.abs(hash % 5) + 1;
+
+  return `${channel}-${prefix}-${suffix}`;
+};
+
+
 // 简体中文：注入 API 工作台专用状态卡片的 CSS 样式，带来半透明玻璃、动态发光及柔和过渡微动效，看齐侧边栏顶级卡片设计
 const PREMIUM_CARDS_STYLE = (
   <style>{`
@@ -879,14 +950,14 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
                           {route.title}
                         </h1>
                         <div className="settings-model-center-route__id-wrapper mt-1 flex items-center gap-1.5 text-[11px] leading-none" onClick={(e) => e.stopPropagation()}>
-                          <span className="truncate max-w-[100px]">ID: {route.id}</span>
+                          <span className="truncate max-w-[100px]">ID: {getDisplayId(route.id, route.title, route.subtitle)}</span>
                           <button
                             type="button"
                             title={pick('复制 ID', 'Copy ID')}
                             className="hover:text-white transition-colors duration-150 p-0.5"
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigator.clipboard.writeText(route.id);
+                              navigator.clipboard.writeText(getDisplayId(route.id, route.title, route.subtitle));
                               notify.success(pick('成功', 'Success'), pick('复制成功', 'Copied to clipboard'));
                             }}
                           >
@@ -1270,41 +1341,43 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                 </div>
 
                 {/* 第六排：图片链路/OCR服务参数配置 */}
-                <div className="h-[48px] flex items-end">
-                  {item.role === 'ppt_generation' ? (
-                    <button
-                      type="button"
-                      onClick={item.onOcrClick}
-                      className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-[var(--border-light)] hover:bg-[var(--toolbar-hover)] transition-all active:scale-[0.99] text-left"
-                      style={{ background: 'var(--bg-secondary)', height: '36px' }}
-                      disabled={!item.enabled}
-                    >
-                      <div className="space-y-0.5">
-                        <div className="text-[11px] font-semibold text-[var(--text-primary)]">
-                          {pick('OCR 服务参数配置 (PPT识别辅助)', 'OCR Config (PPT Helper)')}
+                {(item.role === 'ppt_generation' || item.role === 'assistant') && (
+                  <div className="h-[48px] flex items-end">
+                    {item.role === 'ppt_generation' ? (
+                      <button
+                        type="button"
+                        onClick={item.onOcrClick}
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-[var(--border-light)] hover:bg-[var(--toolbar-hover)] transition-all active:scale-[0.99] text-left"
+                        style={{ background: 'var(--bg-secondary)', height: '36px' }}
+                        disabled={!item.enabled}
+                      >
+                        <div className="space-y-0.5">
+                          <div className="text-[11px] font-semibold text-[var(--text-primary)]">
+                            {pick('OCR 服务参数配置 (PPT识别辅助)', 'OCR Config (PPT Helper)')}
+                          </div>
                         </div>
+                        <ChevronDown size={14} className="-rotate-90 text-[var(--text-secondary)] shrink-0" />
+                      </button>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 w-full">
+                        <SettingSelect
+                          label={pick('图片链路', 'Image route')}
+                          value={item.imageRouteId || ''}
+                          options={item.routeOptions}
+                          onChange={item.onImageRouteChange || noop}
+                          disabled={!item.enabled}
+                        />
+                        <SettingSelect
+                          label={pick('图片模型', 'Image model')}
+                          value={item.imageModelId || ''}
+                          options={item.imageModelOptions || []}
+                          onChange={item.onImageModelChange || noop}
+                          disabled={!item.enabled}
+                        />
                       </div>
-                      <ChevronDown size={14} className="-rotate-90 text-[var(--text-secondary)] shrink-0" />
-                    </button>
-                  ) : item.role === 'assistant' ? (
-                    <div className="grid grid-cols-2 gap-2 w-full">
-                      <SettingSelect
-                        label={pick('图片链路', 'Image route')}
-                        value={item.imageRouteId || ''}
-                        options={item.routeOptions}
-                        onChange={item.onImageRouteChange || noop}
-                        disabled={!item.enabled}
-                      />
-                      <SettingSelect
-                        label={pick('图片模型', 'Image model')}
-                        value={item.imageModelId || ''}
-                        options={item.imageModelOptions || []}
-                        onChange={item.onImageModelChange || noop}
-                        disabled={!item.enabled}
-                      />
-                    </div>
-                  ) : null}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}

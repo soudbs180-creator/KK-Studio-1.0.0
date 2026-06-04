@@ -17311,6 +17311,19 @@ body:not(.dark-mode) .settings-model-center-route__btn-action--danger span {
   filter: brightness(1) contrast(1);
 }
 
+/* 🚀 彻底根除模型中心卡片的阴影残留 */
+.settings-panel .settings-model-center-route,
+.settings-panel .settings-model-center-route:hover,
+.settings-model-center-route,
+.settings-model-center-route:hover,
+.settings-panel .settings-provider-card--return-focus,
+.settings-provider-card--return-focus {
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  filter: none !important;
+}
+
+
 
 
 
