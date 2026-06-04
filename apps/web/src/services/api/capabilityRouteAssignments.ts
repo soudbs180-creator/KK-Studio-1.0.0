@@ -98,6 +98,8 @@ const normalizeAssignment = (
     auxiliaryModelId: typeof raw.auxiliaryModelId === 'string' ? raw.auxiliaryModelId.trim() || undefined : undefined,
     imageRouteId: typeof raw.imageRouteId === 'string' ? raw.imageRouteId.trim() || undefined : undefined,
     imageModelId: typeof raw.imageModelId === 'string' ? raw.imageModelId.trim() || undefined : undefined,
+    imageFallbackRouteId: typeof raw.imageFallbackRouteId === 'string' ? raw.imageFallbackRouteId.trim() || undefined : undefined,
+    imageFallbackModelId: typeof raw.imageFallbackModelId === 'string' ? raw.imageFallbackModelId.trim() || undefined : undefined,
     enabled: raw.enabled !== false,
     updatedAt: typeof raw.updatedAt === 'number' && Number.isFinite(raw.updatedAt)
       ? raw.updatedAt
@@ -310,7 +312,7 @@ export const resolveCapabilityRouteAssignment = (role: CapabilityRole): Capabili
 
   const getEffectiveValue = (
     targetRole: CapabilityRole,
-    fieldName: 'primaryRoute' | 'primaryModel' | 'fallbackRoute' | 'fallbackModel' | 'imageRoute' | 'imageModel'
+    fieldName: 'primaryRoute' | 'primaryModel' | 'fallbackRoute' | 'fallbackModel' | 'imageRoute' | 'imageModel' | 'imageFallbackRoute' | 'imageFallbackModel'
   ): string | undefined => {
     // 1. 优先读取目标角色自己显式配置的值
     const selfAssignment = getRawAssignment(targetRole);
@@ -320,6 +322,8 @@ export const resolveCapabilityRouteAssignment = (role: CapabilityRole): Capabili
         if (fieldName === 'primaryModel') return 'primaryModelId';
         if (fieldName === 'imageRoute') return 'imageRouteId';
         if (fieldName === 'imageModel') return 'imageModelId';
+        if (fieldName === 'imageFallbackRoute') return 'imageFallbackRouteId';
+        if (fieldName === 'imageFallbackModel') return 'imageFallbackModelId';
         if (fieldName === 'fallbackRoute') {
           return targetRole === 'assistant' ? 'auxiliaryRouteId' : 'fallbackRouteId';
         }
@@ -340,6 +344,8 @@ export const resolveCapabilityRouteAssignment = (role: CapabilityRole): Capabili
       if (fn === 'primaryModel') return 'primaryModelId';
       if (fn === 'imageRoute') return 'imageRouteId';
       if (fn === 'imageModel') return 'imageModelId';
+      if (fn === 'imageFallbackRoute') return 'imageFallbackRouteId';
+      if (fn === 'imageFallbackModel') return 'imageFallbackModelId';
       if (fn === 'fallbackRoute') {
         return r === 'assistant' ? 'auxiliaryRouteId' : 'fallbackRouteId';
       }
@@ -355,6 +361,8 @@ export const resolveCapabilityRouteAssignment = (role: CapabilityRole): Capabili
     if (targetRole === 'image_generation') {
       if (fieldName === 'primaryRoute') queryField = 'imageRoute';
       if (fieldName === 'primaryModel') queryField = 'imageModel';
+      if (fieldName === 'fallbackRoute') queryField = 'imageFallbackRoute';
+      if (fieldName === 'fallbackModel') queryField = 'imageFallbackModel';
       chain = ['assistant', 'prompt_optimizer', 'ecommerce_generation', 'ppt_generation'];
     } else {
       const idx = ROLE_PRIORITY_ORDER.indexOf(targetRole);
@@ -391,6 +399,8 @@ export const resolveCapabilityRouteAssignment = (role: CapabilityRole): Capabili
     auxiliaryModelId: getEffectiveValue(role, 'fallbackModel'),
     imageRouteId: getEffectiveValue(role, 'imageRoute'),
     imageModelId: getEffectiveValue(role, 'imageModel'),
+    imageFallbackRouteId: getEffectiveValue(role, 'imageFallbackRoute'),
+    imageFallbackModelId: getEffectiveValue(role, 'imageFallbackModel'),
     updatedAt: raw.updatedAt,
   };
 };

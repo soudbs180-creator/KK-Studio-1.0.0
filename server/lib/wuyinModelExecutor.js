@@ -125,8 +125,10 @@ function assertWuyinSuccess(payload) {
 /**
  * 编码本地代理任务 ID，以便前端与对应的 API 渠道和配置做绑定
  */
-function encodeLocalProxyTaskId(routeId, providerTaskId) {
-  return `${LOCAL_PROXY_TASK_PREFIX}${encodeURIComponent(String(routeId || '').trim())}:${encodeURIComponent(String(providerTaskId || '').trim())}`;
+function encodeLocalProxyTaskId(routeId, providerTaskId, modelId = '') {
+  const base = `${LOCAL_PROXY_TASK_PREFIX}${encodeURIComponent(String(routeId || '').trim())}:${encodeURIComponent(String(providerTaskId || '').trim())}`;
+  const cleanModelId = String(modelId || '').trim();
+  return cleanModelId ? `${base}:${encodeURIComponent(cleanModelId)}` : base;
 }
 
 /**
@@ -148,17 +150,30 @@ function decodeLocalProxyTaskId(localTaskId) {
   const withoutPrefix = raw.startsWith(LOCAL_PROXY_TASK_PREFIX)
     ? raw.slice(LOCAL_PROXY_TASK_PREFIX.length)
     : raw;
-  const separatorIndex = withoutPrefix.indexOf(':');
-  if (separatorIndex === -1) {
+  const firstSeparatorIndex = withoutPrefix.indexOf(':');
+  if (firstSeparatorIndex === -1) {
     return {
       routeId: '',
       providerTaskId: safeDecodeURIComponent(withoutPrefix),
+      modelId: '',
+    };
+  }
+
+  const routeId = safeDecodeURIComponent(withoutPrefix.slice(0, firstSeparatorIndex));
+  const rest = withoutPrefix.slice(firstSeparatorIndex + 1);
+  const secondSeparatorIndex = rest.indexOf(':');
+  if (secondSeparatorIndex === -1) {
+    return {
+      routeId,
+      providerTaskId: safeDecodeURIComponent(rest),
+      modelId: '',
     };
   }
 
   return {
-    routeId: safeDecodeURIComponent(withoutPrefix.slice(0, separatorIndex)),
-    providerTaskId: safeDecodeURIComponent(withoutPrefix.slice(separatorIndex + 1)),
+    routeId,
+    providerTaskId: safeDecodeURIComponent(rest.slice(0, secondSeparatorIndex)),
+    modelId: safeDecodeURIComponent(rest.slice(secondSeparatorIndex + 1)),
   };
 }
 
@@ -219,53 +234,305 @@ function normalizeVideoImages(imageUrl, imageTailUrl) {
   }).join(',');
 }
 
+function normalizeModelId(value) {
+  return String(value || '')
+    .trim()
+    .split('@')[0]
+    .split('|')[0]
+    .replace(/^models\//i, '')
+    .replace(/^\/+/, '')
+    .replace(/^api\/async\//i, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9_.-]+/g, '');
+}
+
+function getCatalogModelId(catalogItem) {
+  const explicit = catalogItem && (catalogItem.id || catalogItem.modelId);
+  if (explicit) return normalizeModelId(explicit);
+  const endpointPath = String(catalogItem && catalogItem.endpointPath || '').trim();
+  return normalizeModelId(endpointPath.split('/').pop() || '');
+}
+
+function normalizeAspectRatio(raw, fallback = 'auto', allowed = ['auto', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '21:9']) {
+  const value = String(raw || '').trim() || fallback;
+  if (value === 'auto' && allowed.includes('auto')) return value;
+  return allowed.includes(value) ? value : fallback;
+}
+
+function normalizeGptImageRatio(raw) {
+  return normalizeAspectRatio(raw, 'auto', ['auto', '1:1', '3:2', '2:3', '16:9', '9:16', '4:3', '3:4', '21:9', '9:21', '1:3', '3:1', '2:1', '1:2']);
+}
+
+function normalizeGrokAspectRatio(raw) {
+  return normalizeAspectRatio(raw === 'auto' ? '' : raw, '2:3', ['2:3', '3:2', '1:1', '16:9', '9:16']);
+}
+
+function normalizeVideoAspectRatio(raw) {
+  return normalizeAspectRatio(raw, '16:9', ['16:9', '9:16', '1:1', '4:3', '3:4']);
+}
+
+function normalizeWanPixelSize(input, fallback) {
+  const explicit = String(input && (input.size || input.imageSize || input.resolution) || '').trim();
+  if (/^\d{3,4}[*x]\d{3,4}$/i.test(explicit)) {
+    return explicit.replace(/x/i, '*');
+  }
+
+  const byRatio = {
+    '1:1': fallback === '1280*720' ? '960*960' : '1280*1280',
+    '3:4': fallback === '1280*720' ? '832*1088' : '1104*1472',
+    '4:3': fallback === '1280*720' ? '1088*832' : '1472*1104',
+    '9:16': fallback === '1280*720' ? '720*1280' : '960*1696',
+    '16:9': fallback === '1280*720' ? '1280*720' : '1696*960',
+  };
+  return byRatio[String(input && input.aspectRatio || '').trim()] || fallback;
+}
+
+function normalizeVideoResolution(raw) {
+  const value = String(raw || '').trim().toLowerCase();
+  if (value.includes('4k')) return '4k';
+  if (value.includes('1080')) return '1080p';
+  if (value.includes('540')) return '540p';
+  if (value.includes('std')) return 'std';
+  if (value.includes('pro')) return 'pro';
+  return '720p';
+}
+
+function normalizeDurationValue(primary, secondary, fallback = '10') {
+  const parsed = Number.parseFloat(String(primary ?? secondary ?? '').trim());
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return String(Math.round(parsed));
+  }
+  return fallback;
+}
+
+function joinReferenceUrls(...values) {
+  return values
+    .flatMap(value => String(value || '').split(','))
+    .map(value => value.trim())
+    .filter(Boolean)
+    .join(',');
+}
+
+function addBodyValue(body, key, value) {
+  if (value === undefined || value === null) return;
+  if (typeof value === 'string' && value.trim() === '') return;
+  if (Array.isArray(value) && value.length === 0) return;
+  body[key] = value;
+}
+
+function buildImageRequestBody(catalogItem, input) {
+  const modelId = getCatalogModelId(catalogItem);
+  const rawRefs = input.referenceImages || input.urls || input.image_urls || [];
+  const urls = normalizeImageReferences(rawRefs);
+  const body = { prompt: String(input.prompt || '') };
+
+  if (modelId === 'image_gpt' || modelId === 'gptimage2') {
+    body.size = normalizeGptImageRatio(input.aspectRatio || input.size);
+    addBodyValue(body, 'urls', urls);
+    return body;
+  }
+
+  if (modelId === 'image_nanobanana') {
+    body.imageSize = '1K';
+    body.aspectRatio = normalizeAspectRatio(input.aspectRatio);
+    addBodyValue(body, 'urls', urls);
+    return body;
+  }
+
+  if (modelId === 'image_grok_imagine') {
+    body.aspect_ratio = normalizeGrokAspectRatio(input.aspectRatio || input.aspect_ratio);
+    addBodyValue(body, 'image_urls', urls);
+    return body;
+  }
+
+  if (modelId === 'image_wan2.6' || modelId === 'image_wan26') {
+    body.size = normalizeWanPixelSize(input, '1280*1280');
+    addBodyValue(body, 'urls', urls);
+    addBodyValue(body, 'negative_prompt', input.negativePrompt || input.negative_prompt);
+    addBodyValue(body, 'prompt_extend', input.promptExtend ?? input.prompt_extend);
+    addBodyValue(body, 'watermark', input.watermark);
+    addBodyValue(body, 'seed', input.seed);
+    return body;
+  }
+
+  body.size = input.imageSize || input.size || '1K';
+  body.aspectRatio = normalizeAspectRatio(input.aspectRatio);
+  addBodyValue(body, 'urls', urls);
+  return body;
+}
+
+function buildVideoRequestBody(catalogItem, input) {
+  const modelId = getCatalogModelId(catalogItem);
+  const body = {};
+  const duration = normalizeDurationValue(input.duration, input.videoDuration, modelId === 'sora2-new' || modelId === 'submit' ? '8' : '10');
+  const imageUrls = joinReferenceUrls(input.imageUrl, input.image_url);
+  const firstFrameUrl = String(input.firstFrameUrl || input.first_frame_url || imageUrls.split(',')[0] || '').trim();
+  const lastFrameUrl = String(input.lastFrameUrl || input.last_frame_url || input.imageTailUrl || '').trim();
+  const videoUrl = String(input.videoUrl || input.video_url || '').trim();
+
+  if (modelId === 'video_package') {
+    const sourceVideo = videoUrl || String(input.video || input.imageUrl || '').trim();
+    if (!sourceVideo) {
+      throw new Error('Package_1.0 需要 video 参数，请提供公网可访问的视频 URL。');
+    }
+    body.video = sourceVideo;
+    addBodyValue(body, 'template_id', input.templateId || input.template_id || '1');
+    return body;
+  }
+
+  if (modelId === 'video_digital_humans') {
+    body.videoName = input.videoName || input.prompt || 'digital-human-video';
+    addBodyValue(body, 'audioUrl', input.audioUrl || input.audio_url);
+    addBodyValue(body, 'videoUrl', input.videoUrl || input.video_url);
+    return body;
+  }
+
+  if (modelId === 'sora2-new' || modelId === 'submit') {
+    body.prompt = String(input.prompt || '');
+    addBodyValue(body, 'url', input.url || input.imageUrl || firstFrameUrl);
+    body.aspectRatio = input.aspectRatio === '16:9' ? '16:9' : '9:16';
+    body.duration = duration;
+    body.size = String(input.size || '').toLowerCase() === 'large' ? 'large' : 'small';
+    addBodyValue(body, 'remixTargetId', input.remixTargetId || input.remix_target_id);
+    return body;
+  }
+
+  if (modelId === 'video_grok_imagine') {
+    body.prompt = String(input.prompt || '');
+    body.duration = duration;
+    body.aspect_ratio = normalizeGrokAspectRatio(input.aspectRatio || input.aspect_ratio);
+    const refs = imageUrls ? imageUrls.split(',') : [];
+    addBodyValue(body, 'image_urls', refs);
+    return body;
+  }
+
+  if (modelId === 'video_wan2.6' || modelId === 'video_wan26') {
+    body.prompt = String(input.prompt || '');
+    addBodyValue(body, 'negative_prompt', input.negativePrompt || input.negative_prompt);
+    addBodyValue(body, 'audio_url', input.audioUrl || input.audio_url);
+    addBodyValue(body, 'firstFrameUrl', firstFrameUrl);
+    body.size = normalizeWanPixelSize(input, '1280*720');
+    body.duration = ['5', '10', '15'].includes(duration) ? duration : '5';
+    addBodyValue(body, 'prompt_extend', input.promptExtend ?? input.prompt_extend);
+    addBodyValue(body, 'shot_type', input.shotType || input.shot_type);
+    addBodyValue(body, 'watermark', input.watermark);
+    addBodyValue(body, 'seed', input.seed);
+    addBodyValue(body, 'urls', joinReferenceUrls(input.urls, input.imageUrl, input.imageTailUrl, videoUrl));
+    return body;
+  }
+
+  body.prompt = String(input.prompt || '');
+
+  if (modelId === 'video_vidu') {
+    body.aspectRatio = normalizeVideoAspectRatio(input.aspectRatio);
+    body.resolution = normalizeVideoResolution(input.resolution);
+    addBodyValue(body, 'subjects', input.subjects);
+    addBodyValue(body, 'image_url', imageUrls);
+    addBodyValue(body, 'video_url', videoUrl);
+    addBodyValue(body, 'bgm', input.bgm);
+    body.duration = duration;
+    return body;
+  }
+
+  if (modelId === 'video_omni') {
+    body.aspectRatio = normalizeVideoAspectRatio(input.aspectRatio);
+    body.resolution = String(input.resolution || '').trim() || 'pro';
+    body.sound = input.sound || 'on';
+    addBodyValue(body, 'image_url', imageUrls);
+    addBodyValue(body, 'firstFrameUrl', firstFrameUrl);
+    addBodyValue(body, 'lastFrameUrl', lastFrameUrl);
+    addBodyValue(body, 'video_url', videoUrl);
+    body.duration = duration;
+    return body;
+  }
+
+  if (modelId === 'video_veo3.1_fast') {
+    addBodyValue(body, 'firstFrameUrl', firstFrameUrl);
+    addBodyValue(body, 'lastFrameUrl', lastFrameUrl);
+    const refs = joinReferenceUrls(input.urls, input.imageUrl, input.imageTailUrl);
+    addBodyValue(body, 'urls', refs ? refs.split(',').slice(0, 3) : []);
+    body.aspectRatio = input.aspectRatio === '9:16' ? '9:16' : '16:9';
+    body.size = normalizeVideoResolution(input.size || input.resolution) === '1080p' ? '1080p' : '720p';
+    return body;
+  }
+
+  const size = input.size || resolveWuyinVideoSize(input);
+  if (size) body.size = size;
+  if (duration) body.duration = duration;
+
+  const images = normalizeVideoImages(input.imageUrl, input.imageTailUrl);
+  if (images) body.images = images;
+  return body;
+}
+
+function buildAudioRequestBody(catalogItem, input) {
+  const modelId = getCatalogModelId(catalogItem);
+  if (modelId === 'voice_clone' || modelId === 'clone') {
+    const audioUrl = String(input.audioUrl || input.audio_url || '').trim();
+    if (!audioUrl) {
+      throw new Error('语音克隆需要 audio_url 参数，请提供公网可访问的音频 URL。');
+    }
+    return {
+      audio_url: audioUrl,
+      text: String(input.prompt || input.text || ''),
+      name: input.name || input.audioTitle || input.title,
+    };
+  }
+
+  const body = {
+    text: String(input.prompt || input.text || ''),
+    voice_id: String(input.voiceId || input.voice_id || 'male-qn-qingse'),
+    speed: input.speed !== undefined && input.speed !== null ? input.speed : 1,
+  };
+  addBodyValue(body, 'vol', input.volume || input.vol);
+  addBodyValue(body, 'language_boost', input.languageBoost || input.language_boost || 'auto');
+  addBodyValue(body, 'duration', input.audioDuration || input.duration);
+  addBodyValue(body, 'lyrics', input.audioLyrics || input.lyrics);
+  addBodyValue(body, 'style', input.audioStyle || input.style);
+  addBodyValue(body, 'title', input.audioTitle || input.title);
+  return body;
+}
+
+function readLastUserMessage(messages) {
+  if (!Array.isArray(messages)) return '';
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const item = messages[i];
+    if (item && item.role === 'user') {
+      return String(item.content || '').trim();
+    }
+  }
+  return '';
+}
+
 /**
  * 根据模型 kind 拼装请求体参数
  */
 function buildSubmitRequestBody(catalogItem, input) {
+  input = input || {};
   if (catalogItem.kind === 'image') {
-    const size = input.imageSize || input.size || '1K';
-    const aspectRatio = input.aspectRatio || 'auto';
-    const body = {
-      prompt: String(input.prompt || ''),
-      size,
-      aspectRatio,
-    };
-    
-    // 清洗参考图
-    const rawRefs = input.referenceImages || input.urls || [];
-    const urls = normalizeImageReferences(rawRefs);
-    if (urls.length > 0) {
-      body.urls = urls;
-    }
-    return body;
+    return buildImageRequestBody(catalogItem, input);
   }
 
   if (catalogItem.kind === 'video') {
-    const body = {
-      prompt: String(input.prompt || ''),
-      size: input.size || '1280x720',
-      duration: String(input.duration || '10'),
-      aspectRatio: input.aspectRatio || '16:9',
-    };
-    
-    const images = normalizeVideoImages(input.imageUrl, input.imageTailUrl);
-    if (images) {
-      body.images = images;
-    }
-    return body;
+    return buildVideoRequestBody(catalogItem, input);
   }
 
   if (catalogItem.kind === 'audio') {
+    return buildAudioRequestBody(catalogItem, input);
+  }
+
+  if (catalogItem.kind === 'chat') {
     return {
-      prompt: String(input.prompt || ''),
-      text: String(input.prompt || ''),
-      voice_id: String(input.voiceId || input.voice_id || ''),
-      speed: Number(input.speed || 1.0),
-      duration: input.audioDuration || input.duration,
-      lyrics: input.audioLyrics || input.lyrics,
-      style: input.audioStyle || input.style,
-      title: input.audioTitle || input.title,
+      content: String(input.content || input.prompt || readLastUserMessage(input.messages) || ''),
+      model: input.modelId || input.model || 'gemini-3-pro',
+      stream: input.stream ? 'true' : 'false',
+    };
+  }
+
+  if (catalogItem.kind === 'utility' && getCatalogModelId(catalogItem) === 'split') {
+    return {
+      video_url: input.video_url || input.videoUrl || input.imageUrl || input.prompt || '',
+      key_words: input.key_words || input.keyWords || '',
     };
   }
 
@@ -277,8 +544,21 @@ function buildSubmitRequestBody(catalogItem, input) {
  * 序列化请求 Body
  */
 function serializeBody(body, contentType) {
-  if (contentType === 'application/x-www-form-urlencoded') {
-    return new URLSearchParams(body).toString();
+  if (/application\/x-www-form-urlencoded/i.test(String(contentType || ''))) {
+    const params = new URLSearchParams();
+    Object.entries(body || {}).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      if (Array.isArray(value)) {
+        if (value.length > 0) params.set(key, value.join(','));
+        return;
+      }
+      if (typeof value === 'object') {
+        params.set(key, JSON.stringify(value));
+        return;
+      }
+      params.set(key, String(value));
+    });
+    return params.toString();
   }
   return JSON.stringify(body);
 }
@@ -287,7 +567,7 @@ function serializeBody(body, contentType) {
  * 提交 API 模型任务
  */
 async function submitWuyinTask({ catalogItem, apiKey, input, baseUrl }) {
-  let targetUrl = catalogItem.endpointUrl;
+  let targetUrl = catalogItem.endpointUrl || `https://api.wuyinkeji.com${catalogItem.endpointPath || ''}`;
   
   if (baseUrl) {
     try {
@@ -308,10 +588,11 @@ async function submitWuyinTask({ catalogItem, apiKey, input, baseUrl }) {
     targetUrl = parsed.toString();
   }
 
+  const contentType = catalogItem.contentType || catalogItem.submitContentType || 'application/json';
   const headers = {
     Authorization: apiKey,
     Accept: 'application/json',
-    'Content-Type': catalogItem.contentType || 'application/json',
+    'Content-Type': contentType,
   };
 
   const bodyObj = buildSubmitRequestBody(catalogItem, input);
@@ -469,6 +750,8 @@ async function checkWuyinTaskStatus({ catalogItem, apiKey, providerTaskId, submi
 module.exports = {
   submitWuyinTask,
   checkWuyinTaskStatus,
+  buildWuyinSubmitRequestBody: buildSubmitRequestBody,
+  serializeWuyinRequestBody: serializeBody,
   extractWuyinOutputUrls,
   encodeLocalProxyTaskId,
   decodeLocalProxyTaskId,

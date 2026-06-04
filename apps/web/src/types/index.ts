@@ -560,6 +560,8 @@ export interface CapabilityRouteAssignment {
   auxiliaryModelId?: string;
   imageRouteId?: string;
   imageModelId?: string;
+  imageFallbackRouteId?: string;
+  imageFallbackModelId?: string;
   enabled: boolean;
   updatedAt: number;
 }

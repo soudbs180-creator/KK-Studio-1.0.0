@@ -1203,11 +1203,14 @@ type ApiWorkbenchCapabilityDraft = {
   auxiliaryModelId?: string;
   imageRouteId?: string;
   imageModelId?: string;
+  imageFallbackRouteId?: string;
+  imageFallbackModelId?: string;
   routeOptions: Array<{ value: string; label: string }>;
   modelOptions: Array<{ value: string; label: string }>;
   auxiliaryModelOptions?: Array<{ value: string; label: string }>;
   fallbackModelOptions?: Array<{ value: string; label: string }>;
   imageModelOptions?: Array<{ value: string; label: string }>;
+  imageFallbackModelOptions?: Array<{ value: string; label: string }>;
   onEnabledChange: (enabled: boolean) => void;
   onPrimaryRouteChange: (value: string) => void;
   onPrimaryModelChange: (value: string) => void;
@@ -1217,6 +1220,8 @@ type ApiWorkbenchCapabilityDraft = {
   onAuxiliaryModelChange?: (value: string) => void;
   onImageRouteChange?: (value: string) => void;
   onImageModelChange?: (value: string) => void;
+  onImageFallbackRouteChange?: (value: string) => void;
+  onImageFallbackModelChange?: (value: string) => void;
   onOcrClick?: () => void;
 };
 
@@ -1261,10 +1266,10 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
               className="settings-capability-card settings-reference-card--soft" 
               style={{
                 ...SETTINGS_OVERLAY_STYLE,
-                minHeight: '430px',
+                minHeight: '480px',
                 display: 'flex',
                 flexDirection: 'column',
-                justifyContent: 'space-between',
+                justifyContent: 'flex-start',
                 padding: '20px'
               }}
             >
@@ -1299,9 +1304,9 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                 {item.description}
               </div>
 
-              <div className="space-y-3 flex-1 flex flex-col justify-end">
-                {/* 第三排：主链路 */}
-                <div>
+              <div className="space-y-3.5 flex-1 flex flex-col justify-start mt-2">
+                {/* Row 1: 主链路 */}
+                <div className="h-[52px]">
                   <SettingSelect
                     label={pick('主链路', 'Primary route')}
                     value={item.primaryRouteId}
@@ -1311,8 +1316,8 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                   />
                 </div>
 
-                {/* 第四排：主链路选择的模型 */}
-                <div>
+                {/* Row 2: 主模型 */}
+                <div className="h-[52px]">
                   <SettingSelect
                     label={item.role === 'prompt_optimizer' ? pick('增强模型', 'Enhancement model') : pick('模型', 'Model')}
                     value={item.primaryModelId}
@@ -1322,62 +1327,84 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                   />
                 </div>
 
-                {/* 第五排：AI助手（左协同链路右协同模型）/ 其它（左备用链路右备用模型） */}
-                <div className="grid grid-cols-2 gap-2">
+                {/* Row 3: 协同链路协同模型 / 备用链路备用模型 */}
+                <div className="h-[52px] grid grid-cols-2 gap-2">
                   <SettingSelect
                     label={item.role === 'assistant' ? pick('协同链路', 'Auxiliary route') : pick('备用链路', 'Fallback route')}
                     value={item.role === 'assistant' ? item.auxiliaryRouteId || '' : item.fallbackRouteId || ''}
                     options={item.routeOptions}
-                    onChange={item.role === 'assistant' ? item.onAuxiliaryRouteChange || (() => {}) : item.onFallbackRouteChange || (() => {})}
+                    onChange={item.role === 'assistant' ? item.onAuxiliaryRouteChange || noop : item.onFallbackRouteChange || noop}
                     disabled={!item.enabled}
                   />
                   <SettingSelect
                     label={item.role === 'assistant' ? pick('协同模型', 'Auxiliary model') : pick('备用模型', 'Fallback model')}
                     value={item.role === 'assistant' ? item.auxiliaryModelId || '' : item.fallbackModelId || ''}
                     options={item.role === 'assistant' ? item.auxiliaryModelOptions || [] : item.fallbackModelOptions || []}
-                    onChange={item.role === 'assistant' ? item.onAuxiliaryModelChange || (() => {}) : item.onFallbackModelChange || (() => {})}
+                    onChange={item.role === 'assistant' ? item.onAuxiliaryModelChange || noop : item.onFallbackModelChange || noop}
                     disabled={!item.enabled}
                   />
                 </div>
 
-                {/* 第六排：图片链路/OCR服务参数配置 */}
-                {(item.role === 'ppt_generation' || item.role === 'assistant') && (
-                  <div className="h-[48px] flex items-end">
-                    {item.role === 'ppt_generation' ? (
-                      <button
-                        type="button"
-                        onClick={item.onOcrClick}
-                        className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-[var(--border-light)] hover:bg-[var(--toolbar-hover)] transition-all active:scale-[0.99] text-left"
-                        style={{ background: 'var(--bg-secondary)', height: '36px' }}
+                {/* Row 4: 图片路由双栏 / OCR大按钮 / 占位 */}
+                <div className="h-[52px]">
+                  {item.role === 'assistant' ? (
+                    <div className="grid grid-cols-2 gap-2 w-full">
+                      <SettingSelect
+                        label={pick('图片链路', 'Image route')}
+                        value={item.imageRouteId || ''}
+                        options={item.routeOptions}
+                        onChange={item.onImageRouteChange || noop}
                         disabled={!item.enabled}
-                      >
-                        <div className="space-y-0.5">
-                          <div className="text-[11px] font-semibold text-[var(--text-primary)]">
-                            {pick('OCR 服务参数配置 (PPT识别辅助)', 'OCR Config (PPT Helper)')}
-                          </div>
-                        </div>
-                        <ChevronDown size={14} className="-rotate-90 text-[var(--text-secondary)] shrink-0" />
-                      </button>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-2 w-full">
-                        <SettingSelect
-                          label={pick('图片链路', 'Image route')}
-                          value={item.imageRouteId || ''}
-                          options={item.routeOptions}
-                          onChange={item.onImageRouteChange || noop}
-                          disabled={!item.enabled}
-                        />
-                        <SettingSelect
-                          label={pick('图片模型', 'Image model')}
-                          value={item.imageModelId || ''}
-                          options={item.imageModelOptions || []}
-                          onChange={item.onImageModelChange || noop}
-                          disabled={!item.enabled}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
+                      />
+                      <SettingSelect
+                        label={pick('图片模型', 'Image model')}
+                        value={item.imageModelId || ''}
+                        options={item.imageModelOptions || []}
+                        onChange={item.onImageModelChange || noop}
+                        disabled={!item.enabled}
+                      />
+                    </div>
+                  ) : item.role === 'ppt_generation' ? (
+                    <button
+                      type="button"
+                      onClick={item.onOcrClick}
+                      className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-[var(--border-light)] hover:bg-[var(--toolbar-hover)] transition-all active:scale-[0.99] text-left"
+                      style={{ background: 'var(--bg-secondary)', height: '40px', marginTop: '12px' }}
+                      disabled={!item.enabled}
+                    >
+                      <span className="text-[11px] font-semibold text-[var(--text-primary)]">
+                        {pick('OCR 服务参数配置 (PPT识别辅助)', 'OCR Config (PPT Helper)')}
+                      </span>
+                      <ChevronDown size={14} className="-rotate-90 text-[var(--text-secondary)] shrink-0" />
+                    </button>
+                  ) : (
+                    <div className="h-[52px] pointer-events-none opacity-0 select-none" />
+                  )}
+                </div>
+
+                {/* Row 5: 图片备用路由双栏 / 占位 */}
+                <div className="h-[52px]">
+                  {item.role === 'assistant' ? (
+                    <div className="grid grid-cols-2 gap-2 w-full">
+                      <SettingSelect
+                        label={pick('图片备用链路', 'Image fallback route')}
+                        value={item.imageFallbackRouteId || ''}
+                        options={item.routeOptions}
+                        onChange={item.onImageFallbackRouteChange || noop}
+                        disabled={!item.enabled}
+                      />
+                      <SettingSelect
+                        label={pick('图片备用模型', 'Image fallback model')}
+                        value={item.imageFallbackModelId || ''}
+                        options={item.imageFallbackModelOptions || []}
+                        onChange={item.onImageFallbackModelChange || noop}
+                        disabled={!item.enabled}
+                      />
+                    </div>
+                  ) : (
+                    <div className="h-[52px] pointer-events-none opacity-0 select-none" />
+                  )}
+                </div>
               </div>
             </div>
           ))}

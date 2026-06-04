@@ -53,6 +53,37 @@ export interface WuyinCatalogItem {
 
 export const WUYIN_DEFAULT_BASE_URL = 'https://api.wuyinkeji.com';
 export const WUYIN_ASYNC_DETAIL_PATH = '/api/async/detail';
+export const WUYIN_IMAGE_MODEL_PRIORITY = [
+  'image_nanoBanana2',
+  'image_nanoBanana_pro',
+  'image_nanoBanana',
+  'image_gpt',
+];
+
+function readWuyinCatalogModelId(item: { id?: string; modelId?: string; endpointPath?: string }): string {
+  const explicit = String(item.id || item.modelId || '').trim();
+  if (explicit) return explicit;
+
+  const path = String(item.endpointPath || '').trim();
+  const match = path.match(/\/api\/async\/([^/?#]+)$/i);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+function getWuyinCatalogPriority(item: { id?: string; modelId?: string; endpointPath?: string }): number {
+  const modelId = readWuyinCatalogModelId(item);
+  const index = WUYIN_IMAGE_MODEL_PRIORITY.findIndex((candidate) => candidate.toLowerCase() === modelId.toLowerCase());
+  return index >= 0 ? index : WUYIN_IMAGE_MODEL_PRIORITY.length + 1000;
+}
+
+export function sortWuyinCatalogByDefaultPriority<T extends { id?: string; modelId?: string; endpointPath?: string }>(items: T[]): T[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) => {
+      const rankDiff = getWuyinCatalogPriority(left.item) - getWuyinCatalogPriority(right.item);
+      return rankDiff || left.index - right.index;
+    })
+    .map(({ item }) => item);
+}
 
 export const WUYIN_DEFAULT_CATALOG: WuyinCatalogItem[] = [
   {
@@ -164,8 +195,8 @@ export const WUYIN_DEFAULT_CATALOG: WuyinCatalogItem[] = [
     executionMode: 'async-detail',
     endpointPath: '/api/async/image_wan2.6',
     method: 'POST',
-    contentType: 'application/json',
-    submitContentType: 'application/json',
+    contentType: 'application/x-www-form-urlencoded',
+    submitContentType: 'application/x-www-form-urlencoded',
     detailPath: '/api/async/detail',
     detailStatusMode: 'wuyin-async',
     price: 0.2,
@@ -268,8 +299,8 @@ export const WUYIN_DEFAULT_CATALOG: WuyinCatalogItem[] = [
     submitContentType: 'application/json',
     detailPath: '/api/async/detail',
     detailStatusMode: 'wuyin-async',
-    price: 0.01,
-    priceText: '0.01元/秒',
+    price: 0.02,
+    priceText: '0.02元/秒',
     priceUnit: '秒',
     aliases: ['package_1.0', 'video_package'],
     enabled: true,
@@ -382,8 +413,8 @@ export const WUYIN_DEFAULT_CATALOG: WuyinCatalogItem[] = [
     executionMode: 'sync',
     endpointPath: '/api/voice/composite',
     method: 'POST',
-    contentType: 'application/x-www-form-urlencoded',
-    submitContentType: 'application/x-www-form-urlencoded',
+    contentType: 'application/json',
+    submitContentType: 'application/json',
     price: 0.0006,
     priceText: '0.0006元/字符',
     priceUnit: '字符',
@@ -400,8 +431,8 @@ export const WUYIN_DEFAULT_CATALOG: WuyinCatalogItem[] = [
     executionMode: 'sync',
     endpointPath: '/api/voice/clone',
     method: 'POST',
-    contentType: 'application/x-www-form-urlencoded',
-    submitContentType: 'application/x-www-form-urlencoded',
+    contentType: 'application/json',
+    submitContentType: 'application/json',
     price: 6,
     priceText: '6元/次',
     priceUnit: '次',
@@ -453,9 +484,10 @@ export function buildWuyinOneKeyProvider(apiKey: string, catalog: WuyinCatalogIt
   const key = String(apiKey || '').trim();
   if (!key) throw new Error('请填写速创 API 密钥');
 
-  const supportedModels = catalog
-    .filter(item => item.enabled)
-    .map(item => item.id);
+  const enabledCatalog = sortWuyinCatalogByDefaultPriority(
+    catalog.filter(item => item.enabled)
+  );
+  const supportedModels = enabledCatalog.map(item => item.id);
 
   const provider = {
     id: 'provider_wuyin',
@@ -468,7 +500,7 @@ export function buildWuyinOneKeyProvider(apiKey: string, catalog: WuyinCatalogIt
     headerName: 'Authorization',
     authorizationValueFormat: 'raw',
     compatibilityMode: 'standard' as const,
-    models: catalog.filter(item => item.enabled).map(item => item.id), // 保存为模型ID的数组
+    models: enabledCatalog.map(item => item.id), // 保存为模型ID的数组
     pricingSnapshot: {
       fetchedAt: Date.now(),
       source: 'wuyin-catalog',

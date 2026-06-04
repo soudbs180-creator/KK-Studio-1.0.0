@@ -14,6 +14,7 @@ import {
     WUYIN_ASYNC_DETAIL_PATH,
     findWuyinCatalogItem,
     normalizeWuyinBaseUrl,
+    serializeWuyinSubmitBody,
 } from './openAICompatibleWuyinRoute';
 import { WUYIN_DEFAULT_BASE_URL } from './wuyinCatalog';
 
@@ -368,15 +369,20 @@ export class VideoCompatibleAdapter implements LLMAdapter {
         if (item.kind !== 'video') throw new Error(`当前模型不是视频模型：${item.name}`);
 
         const submitUrl = `${WUYIN_DEFAULT_BASE_URL}${item.endpointPath}`;
-        const body = buildWuyinVideoSubmitBody(options);
+        const body = buildWuyinVideoSubmitBody({
+            ...options,
+            modelId: item.id,
+            endpointPath: item.endpointPath,
+        });
+        const submitContentType = item.contentType || item.submitContentType || 'application/json';
 
         const response = await forwardUserRouteGenericRequest({
             url: submitUrl,
             method: item.method,
             keyId: keySlot.id,
-            rawBody: body,
+            body: serializeWuyinSubmitBody(body, submitContentType),
             headers: {
-                'Content-Type': item.submitContentType,
+                'Content-Type': submitContentType,
                 Accept: 'application/json',
             },
             signal: options.signal,

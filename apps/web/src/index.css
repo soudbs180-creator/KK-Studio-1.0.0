@@ -9704,17 +9704,21 @@ body.dark-mode .settings-panel {
 
 @media (max-width: 1023px) {
   .settings-shell-backdrop {
-    padding: 0;
+    padding: 16px !important;
   }
 
   .settings-shell-mobile {
-    width: 100%;
-    height: 100dvh;
-    border-radius: 0;
+    width: 100% !important;
+    max-width: 480px !important;
+    height: auto !important;
+    max-height: calc(100dvh - 32px) !important;
+    border-radius: 20px !important;
+    margin: auto !important;
+    overflow: hidden !important;
   }
 
   .settings-shell-page--mobile {
-    padding: 24px 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
+    padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 16px) !important;
   }
 }
 
@@ -12282,6 +12286,15 @@ body.dark-mode .storage-selection-modal {
 
   .settings-panel .settings-capability-card__controls {
     grid-template-columns: 1fr;
+  }
+
+  .settings-panel .settings-capability-grid {
+    justify-content: center !important;
+  }
+
+  .settings-panel .settings-capability-card {
+    width: 100% !important;
+    max-width: 100% !important;
   }
 }
 

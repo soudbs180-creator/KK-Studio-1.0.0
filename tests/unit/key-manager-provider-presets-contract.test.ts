@@ -67,6 +67,11 @@ test('provider presets preserve documented built-in routes and defaults', async 
   assert.equal(PROVIDER_PRESETS['wuyinkeji-nanobanana2'].models[0], 'image_nanoBanana2');
   assert.equal(PROVIDER_PRESETS['wuyinkeji-google-omni'].baseUrl, 'https://api.wuyinkeji.com');
   assert.equal(PROVIDER_PRESETS['wuyinkeji-google-omni'].models[0], 'video_google_omni');
+  assert.ok(
+    PROVIDER_PRESETS['wuyinkeji-google-omni'].models.indexOf('image_nanoBanana2')
+      < PROVIDER_PRESETS['wuyinkeji-google-omni'].models.indexOf('image_gpt'),
+    'Wuyin image defaults should prefer NanoBanana2 before legacy GPT-Image-2',
+  );
   assert.equal(PROVIDER_PRESETS['wuyinkeji-google-omni'].models.includes('video_grok_imagine'), true);
   assert.equal(PROVIDER_PRESETS['wuyinkeji-google-omni'].models.includes('image_wan2.6'), true);
   assert.equal(PROVIDER_PRESETS['wuyinkeji-google-omni'].models.includes('audio_tts'), true);

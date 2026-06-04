@@ -661,11 +661,11 @@ export async function testModelsList(config: ConnectionConfig): Promise<TestResu
           'video_veo3.1_fast',
           'video_grok_imagine',
           'video_wan2.6',
-          'image_gpt',
           'image_nanoBanana2',
-          'image_grok_imagine',
           'image_nanoBanana_pro',
           'image_nanoBanana',
+          'image_gpt',
+          'image_grok_imagine',
           'image_wan2.6',
           'audio_tts'
         ];

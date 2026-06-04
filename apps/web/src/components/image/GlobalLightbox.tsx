@@ -369,17 +369,6 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         return () => { active = false; };
     }, [applyDisplaySource, image, recoverLightboxSource, sanitizeUrl, trySwitchSource]);
 
-    // 2. Keyboard event listeners
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
-            if (e.key === 'ArrowLeft') handlePrev();
-            if (e.key === 'ArrowRight') handleNext();
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [currentIndex, images.length]); // Rebind listeners when the active index changes.
-
     // 3. Gallery navigation handlers
     const handlePrev = useCallback((e?: React.MouseEvent) => {
         e?.stopPropagation();
@@ -390,6 +379,18 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         e?.stopPropagation();
         setCurrentIndex(prev => (prev < images.length - 1 ? prev + 1 : 0));
     }, [images.length]);
+
+    // 2. Keyboard event listeners
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (redrawWorkspaceMode !== null) return;
+            if (e.key === 'Escape') onClose();
+            if (e.key === 'ArrowLeft') handlePrev();
+            if (e.key === 'ArrowRight') handleNext();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [currentIndex, images.length, redrawWorkspaceMode, onClose, handlePrev, handleNext]); // Rebind listeners when dependencies change.
 
     // 4. Zoom and pan interactions
     const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -439,6 +440,8 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     panRef.current = pan;
     const onCloseRef = useRef(onClose);
     onCloseRef.current = onClose;
+    const redrawWorkspaceModeRef = useRef(redrawWorkspaceMode);
+    redrawWorkspaceModeRef.current = redrawWorkspaceMode;
     const handlePrevRef = useRef(handlePrev);
     handlePrevRef.current = handlePrev;
     const handleNextRef = useRef(handleNext);
@@ -504,7 +507,8 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     };
 
     const handleTouchStart = useCallback((e: TouchEvent) => {
-        // 简体中文注释：如果点击的是控制区域或交互按钮，则直接退出，不干扰其原生点击事件
+        // 简体中文注释：如果正在重绘，或者点击的是控制区域或交互按钮，则直接退出，不干扰其原生点击事件
+        if (redrawWorkspaceModeRef.current !== null) return;
         if (isExcludedFromGesture(e.target)) return;
 
         if (e.touches.length === 1) {
@@ -540,6 +544,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     }, []);
 
     const handleTouchMove = useCallback((e: TouchEvent) => {
+        if (redrawWorkspaceModeRef.current !== null) return;
         if (e.touches.length === 1 && touchStartRef.current.length === 1) {
             const touch = e.touches[0];
             const dx = touch.clientX - touchStartRef.current[0].x;
@@ -580,6 +585,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     }, []);
 
     const handleTouchEnd = useCallback((e: TouchEvent) => {
+        if (redrawWorkspaceModeRef.current !== null) return;
         // 简体中文注释：若未记录 touchStart（比如被拦截了），则不处理后续的手势结束逻辑
         if (touchStartRef.current.length === 0) return;
 
@@ -778,8 +784,9 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     }, []);
 
     const handleBackgroundClick = useCallback(() => {
+        if (redrawWorkspaceMode !== null) return;
         if (isReady) onClose();
-    }, [isReady, onClose]);
+    }, [isReady, onClose, redrawWorkspaceMode]);
 
     // 7. [Fix] Native Video DoubleClick Capture
 
@@ -795,6 +802,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         if (!videoEl) return;
 
         const handleNativeMousedown = (e: MouseEvent) => {
+            if (redrawWorkspaceMode !== null) return;
             // Check if this is the second click (or more) of a double-click
             if (e.detail > 1) {
                 // Stop everything immediately
@@ -810,7 +818,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         return () => {
             videoEl.removeEventListener('mousedown', handleNativeMousedown, { capture: true });
         };
-    }, [onClose]);
+    }, [onClose, redrawWorkspaceMode]);
 
     if (!image) return null;
 
@@ -925,6 +933,7 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                         onDoubleClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
+                            if (redrawWorkspaceMode !== null) return;
                             onClose();
                         }}
                     >
@@ -952,7 +961,11 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                         draggable={false}
                         onLoad={handleImageLoad} // Capture real rendered dimensions.
                         onMouseDown={handleMouseDown}
-                        onDoubleClick={(e) => { e.preventDefault(); onClose(); }}
+                        onDoubleClick={(e) => {
+                            e.preventDefault();
+                            if (redrawWorkspaceMode !== null) return;
+                            onClose();
+                        }}
                         onContextMenu={(e) => {
                             if (isLoading) {
                                 e.preventDefault();

@@ -35,9 +35,29 @@ describe("Wuyin pricing catalog helpers", () => {
       data: {
         api_list: [
           {
+            id: "33",
+            name: "GPT-Image-2",
+            url: "https://api.wuyinkeji.com/api/async/image_gpt",
+            method: "POST",
+            api_type: "2",
+            balance_sum: "0.100000",
+            pay_unit: "张",
+            tags: ["付费"],
+          },
+          {
             id: "8",
             name: "grok_imagine",
             url: "https://api.wuyinkeji.com/api/async/image_grok_imagine",
+            method: "POST",
+            api_type: "2",
+            balance_sum: "0.100000",
+            pay_unit: "张",
+            tags: ["付费"],
+          },
+          {
+            id: "34",
+            name: "NanoBanana2",
+            url: "https://api.wuyinkeji.com/api/async/image_nanoBanana2",
             method: "POST",
             api_type: "2",
             balance_sum: "0.100000",
@@ -82,14 +102,18 @@ describe("Wuyin pricing catalog helpers", () => {
     try {
       const catalog = await fetchWuyinPricingCatalog("https://api.wuyinkeji.com");
       assert.deepEqual(catalog.map((item) => item.modelId), [
+        "image_gpt",
         "image_grok_imagine",
+        "image_nanoBanana2",
         "video_grok_imagine",
         "chat_index",
         "async_detail",
       ]);
-      assert.equal(catalog[1].displayPrice, "0.05元/秒");
-      assert.equal(catalog[1].endpointPath, "/api/async/video_grok_imagine");
+      assert.equal(catalog[3].displayPrice, "0.05元/秒");
+      assert.equal(catalog[3].endpointPath, "/api/async/video_grok_imagine");
       assert.deepEqual(selectWuyinGeneratableCatalogModels(catalog).map((item) => item.modelId), [
+        "image_nanoBanana2",
+        "image_gpt",
         "image_grok_imagine",
         "video_grok_imagine",
       ]);

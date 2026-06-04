@@ -77,6 +77,7 @@ import {
     extractWuyinOutputUrls,
     buildWuyinImageSubmitBody,
     findWuyinCatalogItem,
+    serializeWuyinSubmitBody,
 } from './openAICompatibleWuyinRoute';
 import { WUYIN_DEFAULT_BASE_URL } from './wuyinCatalog';
 
@@ -944,26 +945,36 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         options: ImageGenerationOptions,
         keySlot: KeySlot
     ): Promise<ImageGenerationResult> {
-        const item = findWuyinCatalogItem(options.modelId, getWuyinCatalogFromKeySlot(keySlot));
+        const catalog = getWuyinCatalogFromKeySlot(keySlot);
+        const route = resolveWuyinRequestRoute({
+            baseUrl: keySlot.baseUrl || '',
+            modelId: options.modelId,
+            provider: keySlot as any,
+            catalog,
+        });
+        const item = findWuyinCatalogItem(route.endpointModelId, catalog) || findWuyinCatalogItem(options.modelId, catalog);
         if (!item) throw new Error(`速创模型不存在：${options.modelId}`);
         if (item.kind !== 'image') throw new Error(`当前模型不是图片模型：${item.name}`);
 
-        const url = `${WUYIN_DEFAULT_BASE_URL}${item.endpointPath}`;
+        const url = `${normalizeWuyinBaseUrl(keySlot.baseUrl || WUYIN_DEFAULT_BASE_URL)}${route.endpointPath}`;
         const body = buildWuyinImageSubmitBody({
             prompt: options.prompt,
+            modelId: route.endpointModelId,
+            endpointPath: route.endpointPath,
             imageSize: options.imageSize,
             aspectRatio: options.aspectRatio,
             referenceImages: options.referenceImages,
         });
+        const submitContentType = item.contentType || item.submitContentType || route.contentType || 'application/json';
 
         const response = await forwardUserRouteGenericRequest({
             url,
             method: item.method,
             keyId: keySlot.id,
             apiKey: keySlot.key,
-            rawBody: body,
+            body: serializeWuyinSubmitBody(body, submitContentType),
             headers: {
-                'Content-Type': item.submitContentType,
+                'Content-Type': submitContentType,
                 Accept: 'application/json',
             },
             signal: options.signal,
@@ -975,7 +986,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             throw buildOpenAICompatibleHttpError({
                 message: `[${response.status}] ${raw.slice(0, 500) || 'Wuyin image request failed'}`,
                 status: response.status,
-                requestPath: item.endpointPath,
+                requestPath: route.endpointPath,
                 requestBody: JSON.stringify(body),
                 responseBody: raw.slice(0, 1600),
                 provider: keySlot.provider,
@@ -988,7 +999,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         } catch {
             throw buildOpenAICompatibleHttpError({
                 message: 'Wuyin image submit endpoint returned non-JSON payload',
-                requestPath: item.endpointPath,
+                requestPath: route.endpointPath,
                 requestBody: JSON.stringify(body),
                 responseBody: raw.slice(0, 1600),
                 provider: keySlot.provider,
@@ -1001,7 +1012,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             keyManager.reportCallResult(keySlot.id, false, message);
             throw buildOpenAICompatibleHttpError({
                 message,
-                requestPath: item.endpointPath,
+                requestPath: route.endpointPath,
                 requestBody: JSON.stringify(body),
                 responseBody: raw.slice(0, 1600),
                 provider: keySlot.provider,
@@ -1019,7 +1030,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
                 imageSize: normalizeWuyinImageSize(options.imageSize),
                 keySlotId: keySlot.id,
                 metadata: {
-                    requestPath: item.endpointPath,
+                    requestPath: route.endpointPath,
                     requestBodyPreview: JSON.stringify(body),
                 }
             };
@@ -1029,7 +1040,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         if (!taskId) {
             throw buildOpenAICompatibleHttpError({
                 message: 'Wuyin submit succeeded but no task ID was returned',
-                requestPath: item.endpointPath,
+                requestPath: route.endpointPath,
                 requestBody: JSON.stringify(body),
                 responseBody: raw.slice(0, 1600),
                 provider: keySlot.provider,
@@ -1038,9 +1049,9 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
 
         options.onTaskId?.(taskId);
         const finalResult = await this.pollWuyinImageTask(taskId, keySlot, options, {
-            submitPath: item.endpointPath,
+            submitPath: route.endpointPath,
             requestBodyPreview: JSON.stringify(body),
-            endpointModelId: item.id,
+            endpointModelId: route.endpointModelId,
         });
 
         if (!finalResult.model) {
@@ -1440,20 +1451,21 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         params.append('model', modelId);
         params.append('stream', 'false');
 
-        const headers: Record<string, string> = {
-            'Authorization': String(keySlot.key || '').trim(),
-            'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
-        };
-
         const requestBodyPreview = params.toString();
         const requestPath = '/api/chat/index';
 
-        const response = await this.fetchWithTimeout(url, {
+        const response = await forwardUserRouteGenericRequest({
+            url,
             method: 'POST',
-            headers,
             body: params.toString(),
-            signal: options.signal
-        }, this.getTimeoutMs(keySlot, 120000), 1);
+            keyId: keySlot.id,
+            apiKey: keySlot.key,
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+                Accept: 'application/json',
+            },
+            signal: options.signal,
+        });
 
         const raw = await response.text().catch(() => '');
         if (!response.ok) {

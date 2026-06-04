@@ -8,12 +8,16 @@ import {
   extractWuyinDirectEndpointPath,
   extractWuyinStatusCode,
   extractWuyinTaskId,
+  buildWuyinAudioSubmitBody,
+  buildWuyinImageSubmitBody,
+  buildWuyinVideoSubmitBody,
   mapWuyinStatus,
   normalizeWuyinAspectRatio,
   normalizeWuyinBaseUrl,
   normalizeWuyinImageSize,
   normalizeWuyinReferenceImage,
   resolveWuyinRequestRoute,
+  serializeWuyinSubmitBody,
 } from "../../apps/web/src/services/llm/openAICompatibleWuyinRoute.ts";
 
 const ROOT_DIR = process.cwd();
@@ -38,8 +42,27 @@ describe("OpenAI-compatible Wuyin route helpers", () => {
         modelId: "ignored-model",
       }),
       {
-        endpointPath: "/api/async/ignored-model",
-        endpointModelId: "ignored-model",
+        endpointPath: "/api/async/image_sora",
+        endpointModelId: "image_sora",
+        endpointUrl: undefined,
+        contentType: undefined,
+        submitContentType: undefined,
+        detailPath: undefined,
+      },
+    );
+
+    assert.deepEqual(
+      resolveWuyinRequestRoute({
+        baseUrl: "https://api.wuyinkeji.com/api/async/image_nanoBanana2",
+        modelId: "GPT-Image-2",
+      }),
+      {
+        endpointPath: "/api/async/image_nanoBanana2",
+        endpointModelId: "image_nanoBanana2",
+        endpointUrl: undefined,
+        contentType: "application/json",
+        submitContentType: "application/json",
+        detailPath: "/api/async/detail",
       },
     );
 
@@ -63,6 +86,9 @@ describe("OpenAI-compatible Wuyin route helpers", () => {
         endpointPath: "/api/async/image_nanoBanana2",
         endpointModelId: "image_nanoBanana2",
         endpointUrl: undefined,
+        contentType: undefined,
+        submitContentType: undefined,
+        detailPath: undefined,
       },
     );
 
@@ -74,6 +100,9 @@ describe("OpenAI-compatible Wuyin route helpers", () => {
       {
         endpointPath: "/api/async/image_nanoBanana_pro",
         endpointModelId: "image_nanoBanana_pro",
+        contentType: "application/json",
+        submitContentType: "application/json",
+        detailPath: "/api/async/detail",
       },
     );
 
@@ -85,6 +114,9 @@ describe("OpenAI-compatible Wuyin route helpers", () => {
       {
         endpointPath: "/api/async/image_gpt",
         endpointModelId: "image_gpt",
+        contentType: "application/json",
+        submitContentType: "application/json",
+        detailPath: "/api/async/detail",
       },
     );
 
@@ -96,6 +128,9 @@ describe("OpenAI-compatible Wuyin route helpers", () => {
       {
         endpointPath: "/api/async/image_wan2.6",
         endpointModelId: "image_wan2.6",
+        contentType: "application/x-www-form-urlencoded",
+        submitContentType: "application/x-www-form-urlencoded",
+        detailPath: "/api/async/detail",
       },
     );
   });
@@ -126,6 +161,122 @@ describe("OpenAI-compatible Wuyin route helpers", () => {
     assert.equal(mapWuyinStatus(3), "failed");
     assert.equal(mapWuyinStatus(1), "processing");
     assert.equal(mapWuyinStatus(undefined), "pending");
+  });
+
+  test("builds endpoint-specific Wuyin image payloads", () => {
+    assert.deepEqual(
+      buildWuyinImageSubmitBody({
+        modelId: "image_gpt",
+        prompt: "cat",
+        aspectRatio: "16:9",
+        imageSize: "4K",
+        referenceImages: ["https://cdn.example.com/ref.png"],
+      }),
+      {
+        prompt: "cat",
+        size: "16:9",
+        urls: ["https://cdn.example.com/ref.png"],
+      },
+    );
+
+    assert.deepEqual(
+      buildWuyinImageSubmitBody({
+        modelId: "image_nanoBanana",
+        prompt: "cat",
+        imageSize: "4K",
+        aspectRatio: "1:1",
+      }),
+      {
+        prompt: "cat",
+        imageSize: "1K",
+        aspectRatio: "1:1",
+      },
+    );
+
+    assert.deepEqual(
+      buildWuyinImageSubmitBody({
+        modelId: "image_grok_imagine",
+        prompt: "cat",
+        aspectRatio: "9:16",
+        referenceImages: ["https://cdn.example.com/ref.png"],
+      }),
+      {
+        prompt: "cat",
+        aspect_ratio: "9:16",
+        image_urls: ["https://cdn.example.com/ref.png"],
+      },
+    );
+
+    const wanBody = buildWuyinImageSubmitBody({
+      modelId: "image_wan2.6",
+      prompt: "cat",
+      aspectRatio: "16:9",
+      referenceImages: ["https://cdn.example.com/ref.png"],
+      seed: 7,
+    });
+    assert.deepEqual(wanBody, {
+      prompt: "cat",
+      size: "1696*960",
+      urls: ["https://cdn.example.com/ref.png"],
+      seed: 7,
+    });
+    const wanParams = new URLSearchParams(serializeWuyinSubmitBody(wanBody, "application/x-www-form-urlencoded"));
+    assert.equal(wanParams.get("size"), "1696*960");
+    assert.equal(wanParams.get("urls"), "https://cdn.example.com/ref.png");
+  });
+
+  test("builds endpoint-specific Wuyin video and audio payloads", () => {
+    assert.deepEqual(
+      buildWuyinVideoSubmitBody({
+        modelId: "video_grok_imagine",
+        prompt: "cat video",
+        aspectRatio: "16:9",
+        imageUrl: "https://cdn.example.com/ref.png",
+      }),
+      {
+        prompt: "cat video",
+        duration: "10",
+        aspect_ratio: "16:9",
+        image_urls: ["https://cdn.example.com/ref.png"],
+      },
+    );
+
+    assert.deepEqual(
+      buildWuyinVideoSubmitBody({
+        modelId: "sora2-new",
+        prompt: "cat video",
+        aspectRatio: "16:9",
+        imageUrl: "https://cdn.example.com/ref.png",
+        duration: 12,
+        size: "large",
+      }),
+      {
+        prompt: "cat video",
+        url: "https://cdn.example.com/ref.png",
+        aspectRatio: "16:9",
+        duration: "12",
+        size: "large",
+      },
+    );
+
+    assert.throws(
+      () => buildWuyinVideoSubmitBody({ modelId: "video_package", prompt: "package" }),
+      /Package_1\.0/,
+    );
+
+    assert.deepEqual(
+      buildWuyinAudioSubmitBody({ modelId: "audio_tts", prompt: "hello" }),
+      {
+        text: "hello",
+        voice_id: "male-qn-qingse",
+        speed: 1,
+        language_boost: "auto",
+      },
+    );
+    assert.throws(
+      () => buildWuyinAudioSubmitBody({ modelId: "voice_clone", prompt: "hello" }),
+      /语音克隆需要 audio_url/,
+    );
   });
 
   test("adapter delegates Wuyin route ownership to the helper module", () => {

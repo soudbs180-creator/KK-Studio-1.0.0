@@ -53,12 +53,8 @@ function getWuyinRouteDetails(routeId: string) {
 }
 
 export function checkIsWuyinClientDirect(routeIdOrTaskId: string): boolean {
-  let routeId = routeIdOrTaskId;
-  if (routeIdOrTaskId.startsWith('local_proxy:')) {
-    const parts = routeIdOrTaskId.slice('local_proxy:'.length).split(':');
-    routeId = decodeURIComponent(parts[0] || '');
-  }
-  return getWuyinRouteDetails(routeId) !== null;
+  void routeIdOrTaskId;
+  return false;
 }
 
 function extractUrlsFromPayload(val: any): string[] {
@@ -1872,8 +1868,19 @@ export async function forwardUserRouteGenericRequest(
     targetMethod = optionsOrUrl.method || 'POST';
     targetKeyId = optionsOrUrl.keyId || '';
     targetApiKey = optionsOrUrl.apiKey || '';
-    targetBody = optionsOrUrl.body || (optionsOrUrl.rawBody ? (typeof optionsOrUrl.rawBody === 'string' ? optionsOrUrl.rawBody : JSON.stringify(optionsOrUrl.rawBody)) : undefined);
     targetHeaders = optionsOrUrl.headers;
+    const rawContentType = String(targetHeaders?.['Content-Type'] || targetHeaders?.['content-type'] || '');
+    if (optionsOrUrl.body) {
+      targetBody = optionsOrUrl.body;
+    } else if (optionsOrUrl.rawBody) {
+      if (typeof optionsOrUrl.rawBody === 'string') {
+        targetBody = optionsOrUrl.rawBody;
+      } else if (/application\/x-www-form-urlencoded/i.test(rawContentType)) {
+        targetBody = new URLSearchParams(optionsOrUrl.rawBody).toString();
+      } else {
+        targetBody = JSON.stringify(optionsOrUrl.rawBody);
+      }
+    }
     targetSignal = optionsOrUrl.signal;
   }
 

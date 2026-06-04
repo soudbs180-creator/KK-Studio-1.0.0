@@ -492,16 +492,41 @@ export function selectWuyinCatalogModels(baseUrl: string, pricingList: ModelPric
     return [createFallbackWuyinCatalogItem(endpointModelId)];
 }
 
+const WUYIN_GENERATABLE_MODEL_PRIORITY = [
+    'image_nanoBanana2',
+    'image_nanoBanana_pro',
+    'image_nanoBanana',
+    'image_gpt',
+];
+
+function getWuyinGeneratableModelRank(item: ModelPricingInfo): number {
+    const modelId = String(item.modelId || extractWuyinEndpointDetails(item.endpointUrl || '')?.modelId || '').trim();
+    const index = WUYIN_GENERATABLE_MODEL_PRIORITY.findIndex((candidate) => candidate.toLowerCase() === modelId.toLowerCase());
+    return index >= 0 ? index : WUYIN_GENERATABLE_MODEL_PRIORITY.length + 1000;
+}
+
+function sortWuyinGeneratableCatalogModels(pricingList: ModelPricingInfo[]): ModelPricingInfo[] {
+    return pricingList
+        .map((item, index) => ({ item, index }))
+        .sort((left, right) => {
+            const rankDiff = getWuyinGeneratableModelRank(left.item) - getWuyinGeneratableModelRank(right.item);
+            return rankDiff || left.index - right.index;
+        })
+        .map(({ item }) => item);
+}
+
 export function selectWuyinGeneratableCatalogModels(pricingList: ModelPricingInfo[]): ModelPricingInfo[] {
     const filtered = pricingList.filter((item) => {
         const endpointPath = String(item.endpointPath || extractWuyinEndpointDetails(item.endpointUrl || '')?.endpointPath || '').trim();
         return /^\/api\/async\/(image|video|audio)_[a-z0-9_.-]+$/i.test(endpointPath);
     });
 
-    return filtered.length > 0 ? filtered : pricingList.filter((item) => {
+    const generatable = filtered.length > 0 ? filtered : pricingList.filter((item) => {
         const modelId = String(item.modelId || '').trim();
         return /^(image|video|audio)_/i.test(modelId);
     });
+
+    return sortWuyinGeneratableCatalogModels(generatable);
 }
 
 export function buildPricingEndpointCandidates(baseUrl: string): string[] {
@@ -988,7 +1013,7 @@ const WUYIN_FALLBACK_CATALOG: WuyinFallbackCatalogEntry[] = [
     { modelId: 'image_grok_imagine', modelName: 'grok_imagine', endpointPath: '/api/async/image_grok_imagine', apiType: '2', inputPrice: 0.1, billingUnit: '张', method: 'POST' },
     { modelId: 'image_nanoBanana_pro', modelName: 'NanoBanana_pro', endpointPath: '/api/async/image_nanoBanana_pro', apiType: '2', inputPrice: 0.3, billingUnit: '张', method: 'POST' },
     { modelId: 'image_nanoBanana', modelName: 'NanoBanana', endpointPath: '/api/async/image_nanoBanana', apiType: '2', inputPrice: 0.1, billingUnit: '张', method: 'POST' },
-    { modelId: 'video_package', modelName: 'Package_1.0', endpointPath: '/api/async/video_package', apiType: '11', inputPrice: 0.01, billingUnit: '秒', method: 'POST' },
+    { modelId: 'video_package', modelName: 'Package_1.0', endpointPath: '/api/async/video_package', apiType: '11', inputPrice: 0.02, billingUnit: '秒', method: 'POST' },
     { modelId: 'video_veo3.1_fast', modelName: 'veo3.1_fast', endpointPath: '/api/async/video_veo3.1_fast', apiType: '11', inputPrice: 0.05, billingUnit: '秒', method: 'POST' },
     { modelId: 'video_grok_imagine', modelName: 'grok_imagine', endpointPath: '/api/async/video_grok_imagine', apiType: '11', inputPrice: 0.05, billingUnit: '秒', method: 'POST' },
     { modelId: 'sora2-new', modelName: 'sora2-new', endpointPath: '/api/sora2-new/submit', apiType: '9', inputPrice: 1.2, billingUnit: '次', method: 'POST' },

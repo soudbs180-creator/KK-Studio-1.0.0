@@ -225,6 +225,8 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
       auxiliaryModelId: string;
       imageRouteId: string;
       imageModelId: string;
+      imageFallbackRouteId: string;
+      imageFallbackModelId: string;
     }>,
   ) => {
     upsertCapabilityRouteAssignment(role, patch);
@@ -289,6 +291,8 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
         auxiliaryModelId: assignment?.auxiliaryModelId || '',
         imageRouteId: assignment?.imageRouteId || '',
         imageModelId: assignment?.imageModelId || '',
+        imageFallbackRouteId: assignment?.imageFallbackRouteId || '',
+        imageFallbackModelId: assignment?.imageFallbackModelId || '',
         routeOptions: capabilityRouteOptions,
         modelOptions: getRouteModelOptions(assignment?.primaryRouteId || ''),
         auxiliaryModelOptions: getRouteModelOptions(assignment?.auxiliaryRouteId || ''),
@@ -303,6 +307,7 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
               { value: '', label: pick('自动选择', 'Automatic') },
               ...getRouteModelOptions(assignment?.imageRouteId || '')
             ],
+        imageFallbackModelOptions: getRouteModelOptions(assignment?.imageFallbackRouteId || ''),
         onEnabledChange: (val: boolean) => {
           updateCapabilityAssignment(meta.role, { enabled: val });
           if (meta.role === 'assistant') {
@@ -355,6 +360,18 @@ const ApiAdvancedSettingsView: React.FC<ApiAdvancedSettingsViewProps> = ({
           updateCapabilityAssignment(meta.role, { imageModelId: val });
           if (meta.role === 'assistant') {
             updateCapabilityAssignment('image_generation', { imageModelId: val });
+          }
+        },
+        onImageFallbackRouteChange: (val: string) => {
+          updateCapabilityAssignment(meta.role, { imageFallbackRouteId: val, imageFallbackModelId: '' });
+          if (meta.role === 'assistant') {
+            updateCapabilityAssignment('image_generation', { imageFallbackRouteId: val, imageFallbackModelId: '' });
+          }
+        },
+        onImageFallbackModelChange: (val: string) => {
+          updateCapabilityAssignment(meta.role, { imageFallbackModelId: val });
+          if (meta.role === 'assistant') {
+            updateCapabilityAssignment('image_generation', { imageFallbackModelId: val });
           }
         },
         onOcrClick: () => setShowOcrModal(true),

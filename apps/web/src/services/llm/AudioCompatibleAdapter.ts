@@ -19,6 +19,7 @@ import {
     extractWuyinFailureMessage,
     WUYIN_ASYNC_DETAIL_PATH,
     findWuyinCatalogItem,
+    serializeWuyinSubmitBody,
 } from './openAICompatibleWuyinRoute';
 import { WUYIN_DEFAULT_BASE_URL } from './wuyinCatalog';
 
@@ -323,24 +324,20 @@ export class AudioCompatibleAdapter implements LLMAdapter {
 
         const submitUrl = `${WUYIN_DEFAULT_BASE_URL}${item.endpointPath}`;
         
-        let body: any;
-        if (item.submitContentType === 'application/x-www-form-urlencoded') {
-            const params = new URLSearchParams();
-            params.set('prompt', options.prompt);
-            if (options.voiceId) params.set('voice_id', options.voiceId);
-            if (options.speed !== undefined && options.speed !== null) params.set('speed', String(options.speed));
-            body = params.toString();
-        } else {
-            body = buildWuyinAudioSubmitBody(options);
-        }
+        const body = buildWuyinAudioSubmitBody({
+            ...options,
+            modelId: item.id,
+            endpointPath: item.endpointPath,
+        });
+        const submitContentType = item.contentType || item.submitContentType || 'application/json';
 
         const response = await forwardUserRouteGenericRequest({
             url: submitUrl,
             method: item.method,
             keyId: keySlot.id,
-            rawBody: body,
+            body: serializeWuyinSubmitBody(body, submitContentType),
             headers: {
-                'Content-Type': item.submitContentType,
+                'Content-Type': submitContentType,
                 Accept: 'application/json',
             },
             signal: options.signal,

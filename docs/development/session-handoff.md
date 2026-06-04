@@ -78,10 +78,15 @@ npm run check:encoding
 - Passed: `npm run architecture:check` (架构与模块导入边界检查通过)
 - Fixed: 解决了图片卡片在加载和切换质量时，由于浏览器原生重绘导致的破损图片图标闪烁视觉 Bug。
 - Passed: 侧边和桌面工具栏折叠/展开测试以及所有的单元和集成测试。
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/openai-compatible-wuyin-route-contract.test.ts tests/unit/wuyin-refactor-extra.test.ts tests/unit/wuyin-user-route-image-mode-contract.test.ts tests/unit/wuyin-async-video-route-contract.test.ts tests/unit/wuyin-async-image-state-machine.test.ts` (32 个 Wuyin 路由、请求体、taskId、状态机单元测试通过)
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/wuyin-pricing-catalog-contract.test.ts tests/unit/key-manager-wuyin-route-regression.test.ts tests/unit/request-profile-registry.test.ts tests/unit/key-manager-shared-pricing-contract.test.ts tests/unit/key-manager-pricing-url-contract.test.ts tests/unit/model-pricing-credit-specs.test.ts tests/unit/pricingRules.test.ts` (28 个 Wuyin 目录、定价、Key Manager 回归测试通过)
+- Passed: `npm run typecheck`, `npm run build` after fixing the lightbox closing behavior during active redraw sessions (preventing accidental lightbox dismissals on background clicks, Escape key, double clicks, and swipe gestures).
 
 ## 7. Handoff Notes For Next Agent
 
 - Always read `AGENTS.md`, `package.json`, and `config/release-manifest.json` before editing.
 - Ensure that any new frontend components containing `<img>` or media elements handle the pending load state gracefully by managing their `opacity` via `isMediaLoaded` or a comparable local state, to avoid raw broken-image indicators displaying momentarily.
+- Wuyin / 速创 model routing is now endpoint-aware across image, video, audio, chat, Sora2, and utility endpoints. The frontend serializes per-model request bodies with the documented `Content-Type`, browser-side Wuyin direct calls are disabled in favor of the user-route proxy, and `local_proxy` task IDs can include the Wuyin model ID so polling can pick special detail endpoints such as `/api/sora2/detail`.
 - If user or another AI changes files in parallel, inspect `git status` and current diffs first; never revert unrelated work.
 - For assistant work, prefer small sprint-sized changes and update this file plus `docs/ai-assistant/*` with touched files, validation, and next step.
+- Lightbox redraw safety: When `redrawWorkspaceMode !== null` in `apps/web/src/components/image/GlobalLightbox.tsx`, all non-explicit close actions (Escape key, double clicking images/videos, clicking background container, mobile swipe gesture) are blocked, forcing the user to close the lightbox only via the explicit top-right "X" button.

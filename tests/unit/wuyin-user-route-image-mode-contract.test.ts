@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { createRequire } from "node:module";
+import { readSource } from "../support/workspacePaths.js";
 
 const require = createRequire(import.meta.url);
 const serverWuyinProxy = require("../../server/lib/wuyinAsyncVideoProxy.js") as {
@@ -115,5 +116,15 @@ describe("速创 API 图片模型路由与适配契约测试 (Wuyin Image Proxy 
     assert.equal(serverWuyinProxy.isWuyinAsyncVideoRoute(route2), true);
     assert.equal(serverWuyinProxy.isWuyinAsyncVideoRoute(route3), true);
     assert.equal(serverWuyinProxy.isWuyinAsyncVideoRoute(route4), false);
+  });
+
+  test("5. 后端用户路由保持 NanoBanana2 优先并用用户路由 ID 绑定详情轮询", () => {
+    const routeSource = readSource("server/routes/user.js");
+
+    assert.match(routeSource, /const WUYIN_PRIMARY_IMAGE_MODEL_ID = 'image_nanoBanana2';/);
+    assert.match(routeSource, /WUYIN_LEGACY_DEFAULT_IMAGE_MODEL_IDS/);
+    assert.match(routeSource, /submitWuyinImageTaskWithFallback/);
+    assert.match(routeSource, /encodeLocalProxyTaskId\(route\.id \|\| routeId, result\.providerTaskId, catalogItem && catalogItem\.id\)/);
+    assert.doesNotMatch(routeSource, /taskId:\s*result\.taskId,\s*\n\s*providerTaskId: result\.providerTaskId/);
   });
 });

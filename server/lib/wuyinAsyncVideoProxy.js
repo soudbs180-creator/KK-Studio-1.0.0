@@ -436,8 +436,10 @@ async function fetchWuyinVideoJson(url, apiKey, method = 'GET', body) {
   return payload;
 }
 
-function encodeLocalProxyTaskId(routeId, providerTaskId) {
-  return `${LOCAL_PROXY_TASK_PREFIX}${encodeURIComponent(String(routeId || '').trim())}:${encodeURIComponent(String(providerTaskId || '').trim())}`;
+function encodeLocalProxyTaskId(routeId, providerTaskId, modelId = '') {
+  const base = `${LOCAL_PROXY_TASK_PREFIX}${encodeURIComponent(String(routeId || '').trim())}:${encodeURIComponent(String(providerTaskId || '').trim())}`;
+  const cleanModelId = String(modelId || '').trim();
+  return cleanModelId ? `${base}:${encodeURIComponent(cleanModelId)}` : base;
 }
 
 function safeDecodeURIComponent(value) {
@@ -453,17 +455,30 @@ function decodeLocalProxyTaskId(localTaskId) {
   const withoutPrefix = raw.startsWith(LOCAL_PROXY_TASK_PREFIX)
     ? raw.slice(LOCAL_PROXY_TASK_PREFIX.length)
     : raw;
-  const separatorIndex = withoutPrefix.indexOf(':');
-  if (separatorIndex === -1) {
+  const firstSeparatorIndex = withoutPrefix.indexOf(':');
+  if (firstSeparatorIndex === -1) {
     return {
       routeId: '',
       providerTaskId: safeDecodeURIComponent(withoutPrefix),
+      modelId: '',
+    };
+  }
+
+  const routeId = safeDecodeURIComponent(withoutPrefix.slice(0, firstSeparatorIndex));
+  const rest = withoutPrefix.slice(firstSeparatorIndex + 1);
+  const secondSeparatorIndex = rest.indexOf(':');
+  if (secondSeparatorIndex === -1) {
+    return {
+      routeId,
+      providerTaskId: safeDecodeURIComponent(rest),
+      modelId: '',
     };
   }
 
   return {
-    routeId: safeDecodeURIComponent(withoutPrefix.slice(0, separatorIndex)),
-    providerTaskId: safeDecodeURIComponent(withoutPrefix.slice(separatorIndex + 1)),
+    routeId,
+    providerTaskId: safeDecodeURIComponent(rest.slice(0, secondSeparatorIndex)),
+    modelId: safeDecodeURIComponent(rest.slice(secondSeparatorIndex + 1)),
   };
 }
 

@@ -119,7 +119,7 @@ const WUYIN_FULL_DEFAULT_CATALOG = [
     kind: 'image',
     endpointPath: '/api/async/image_wan2.6',
     method: 'POST',
-    submitContentType: 'application/json',
+    submitContentType: 'application/x-www-form-urlencoded',
     detailPath: '/api/async/detail',
     price: 0.2,
     priceUnit: '张',
@@ -186,7 +186,7 @@ const WUYIN_FULL_DEFAULT_CATALOG = [
     method: 'POST',
     submitContentType: 'application/json',
     detailPath: '/api/async/detail',
-    price: 0.01,
+    price: 0.02,
     priceUnit: '秒',
     aliases: ['package_1.0', 'video_package'],
     enabled: true,
@@ -261,7 +261,7 @@ const WUYIN_FULL_DEFAULT_CATALOG = [
     kind: 'audio',
     endpointPath: '/api/voice/composite',
     method: 'POST',
-    submitContentType: 'application/x-www-form-urlencoded',
+    submitContentType: 'application/json',
     price: 0.0006,
     priceUnit: '字符',
     aliases: ['voice_composite', 'voice composite'],
@@ -273,7 +273,7 @@ const WUYIN_FULL_DEFAULT_CATALOG = [
     kind: 'audio',
     endpointPath: '/api/voice/clone',
     method: 'POST',
-    submitContentType: 'application/x-www-form-urlencoded',
+    submitContentType: 'application/json',
     price: 6,
     priceUnit: '次',
     aliases: ['voice_clone', 'voice clone'],
@@ -340,7 +340,7 @@ function mergeWuyinCatalogWithRemoteRows(remoteRows) {
       }
 
       let submitContentType = 'application/json';
-      if (path.includes('chat') || path.includes('composite') || path.includes('clone') || path.includes('split')) {
+      if (path.includes('chat') || path.includes('split') || path.includes('image_wan2.6')) {
         submitContentType = 'application/x-www-form-urlencoded';
       }
 
@@ -1168,8 +1168,33 @@ async function pollWuyinImageResultUntilComplete({ route, routeId, providerTaskI
   throw new Error('Wuyin image generation timed out after 10 minutes.');
 }
 
-function findCatalogItemInCachedCatalog(modelId) {
+const WUYIN_PRIMARY_IMAGE_MODEL_ID = 'image_nanoBanana2';
+const WUYIN_LEGACY_DEFAULT_IMAGE_MODEL_IDS = new Set([
+  'image_gpt',
+  'gpt-image-2',
+  'gpt image 2',
+  'gptimage2',
+]);
+
+function normalizeWuyinModelLookupValue(value) {
+  return String(value || '')
+    .split('@')[0]
+    .split('|')[0]
+    .replace(/^models\//i, '')
+    .replace(/^\/+/, '')
+    .replace(/^api\/async\//i, '')
+    .trim()
+    .toLowerCase();
+}
+
+function findCatalogItemInCachedCatalog(modelId, baseUrl) {
   const catalog = getCachedWuyinCatalog();
+  const directEndpointPath = extractWuyinEndpointPath(baseUrl);
+  if (directEndpointPath) {
+    const directMatch = catalog.find(item => String(item.endpointPath || '').toLowerCase() === directEndpointPath.toLowerCase());
+    if (directMatch) return directMatch;
+  }
+
   const cleanId = String(modelId || '')
     .split('@')[0]
     .split('|')[0]
@@ -1191,6 +1216,65 @@ function findCatalogItemInCachedCatalog(modelId) {
   return matched || null;
 }
 
+function findPreferredWuyinImageCatalogItem() {
+  return findCatalogItemInCachedCatalog(WUYIN_PRIMARY_IMAGE_MODEL_ID);
+}
+
+function isLegacyDefaultWuyinImageModel(modelId, catalogItem) {
+  const candidates = [
+    normalizeWuyinModelLookupValue(modelId),
+    normalizeWuyinModelLookupValue(catalogItem && catalogItem.id),
+    normalizeWuyinModelLookupValue(catalogItem && catalogItem.name),
+  ].filter(Boolean);
+  return candidates.some(candidate => WUYIN_LEGACY_DEFAULT_IMAGE_MODEL_IDS.has(candidate));
+}
+
+function isWuyinUpstreamEndpointUnavailable(error) {
+  const message = String(error && error.message || error || '').toLowerCase();
+  return (
+    message.includes('<html')
+    || message.includes('nginx')
+    || message.includes('404')
+    || message.includes('not found')
+    || message.includes('bad gateway')
+    || message.includes('502')
+    || message.includes('upstream')
+  );
+}
+
+async function submitWuyinImageTaskWithFallback({ catalogItem, route, input }) {
+  try {
+    return {
+      result: await submitWuyinTask({ catalogItem, apiKey: route.apiKey, input, baseUrl: route.baseUrl }),
+      catalogItem,
+      fallbackApplied: false,
+    };
+  } catch (error) {
+    const fallbackItem = findPreferredWuyinImageCatalogItem();
+    const shouldRetry = (
+      fallbackItem
+      && fallbackItem.id !== catalogItem.id
+      && isLegacyDefaultWuyinImageModel(input && input.modelId, catalogItem)
+      && isWuyinUpstreamEndpointUnavailable(error)
+    );
+
+    if (!shouldRetry) {
+      throw error;
+    }
+
+    return {
+      result: await submitWuyinTask({ catalogItem: fallbackItem, apiKey: route.apiKey, input, baseUrl: route.baseUrl }),
+      catalogItem: fallbackItem,
+      fallbackApplied: true,
+    };
+  }
+}
+
+function buildWuyinLocalTaskId(route, routeId, result, catalogItem) {
+  if (!result || !result.providerTaskId) return result && result.taskId || '';
+  return encodeLocalProxyTaskId(route.id || routeId, result.providerTaskId, catalogItem && catalogItem.id);
+}
+
 // 简体中文注释：处理速创 API 的图片模型提交，由统一的 wuyinModelExecutor 处理参数清洗和路由执行
 async function handleWuyinImageMode(req, res, profileState) {
   const routeId = String(req.body && req.body.routeId || '').trim();
@@ -1204,21 +1288,27 @@ async function handleWuyinImageMode(req, res, profileState) {
   }
 
   const modelId = req.body && req.body.modelId;
-  const catalogItem = findCatalogItemInCachedCatalog(modelId);
+  const catalogItem = findCatalogItemInCachedCatalog(modelId, route.baseUrl);
   if (!catalogItem) {
     return sendLocalProxyError(res, req, 404, 'MODEL_NOT_FOUND', `Wuyin model "${modelId}" was not found in catalog.`);
   }
 
   try {
-    const result = await submitWuyinTask({ catalogItem, apiKey: route.apiKey, input: req.body, baseUrl: route.baseUrl });
+    const { result, catalogItem: effectiveCatalogItem, fallbackApplied } = await submitWuyinImageTaskWithFallback({
+      catalogItem,
+      route,
+      input: req.body,
+    });
     
     if (result.status === 'pending') {
       return res.json(okEnvelope({
         urls: [],
-        taskId: result.taskId,
+        taskId: buildWuyinLocalTaskId(route, routeId, result, effectiveCatalogItem),
         providerTaskId: result.providerTaskId,
         status: 'pending',
         endpointType: 'wuyin-async-image',
+        modelId: effectiveCatalogItem.id,
+        fallbackApplied,
         submitExecTime: result.submitExecTime,
         execTime: result.submitExecTime,
         requestId: req.body && req.body.requestId,
@@ -1232,6 +1322,8 @@ async function handleWuyinImageMode(req, res, profileState) {
       providerTaskId: '',
       status: 'success',
       endpointType: 'wuyin-async-image',
+      modelId: effectiveCatalogItem.id,
+      fallbackApplied,
       submitExecTime: result.submitExecTime,
       execTime: result.submitExecTime,
       requestId: req.body && req.body.requestId,
@@ -1255,7 +1347,7 @@ async function handleWuyinVideoMode(req, res, profileState) {
   }
 
   const modelId = req.body && req.body.modelId;
-  const catalogItem = findCatalogItemInCachedCatalog(modelId);
+  const catalogItem = findCatalogItemInCachedCatalog(modelId, route.baseUrl);
   if (!catalogItem) {
     return sendLocalProxyError(res, req, 404, 'MODEL_NOT_FOUND', `Wuyin model "${modelId}" was not found in catalog.`);
   }
@@ -1264,11 +1356,98 @@ async function handleWuyinVideoMode(req, res, profileState) {
     const result = await submitWuyinTask({ catalogItem, apiKey: route.apiKey, input: req.body, baseUrl: route.baseUrl });
     
     return res.json(okEnvelope({
-      taskId: result.taskId || '',
+      taskId: buildWuyinLocalTaskId(route, routeId, result, catalogItem),
       providerTaskId: result.providerTaskId || '',
       status: result.status,
       url: result.urls[0] || '',
       urls: result.urls,
+      endpointType: 'wuyin-async-video',
+      requestId: req.body && req.body.requestId,
+      attemptId: req.body && req.body.attemptId,
+      execTime: result.submitExecTime,
+    }, req));
+  } catch (err) {
+    return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', err.message);
+  }
+}
+
+async function handleWuyinAudioMode(req, res, profileState) {
+  const routeId = String(req.body && req.body.routeId || '').trim();
+  const route = resolveLocalUserRoute(profileState, routeId);
+
+  if (!route) {
+    return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
+  }
+  if (!route.apiKey) {
+    return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
+  }
+
+  const modelId = req.body && req.body.modelId;
+  const catalogItem = findCatalogItemInCachedCatalog(modelId, route.baseUrl);
+  if (!catalogItem) {
+    return sendLocalProxyError(res, req, 404, 'MODEL_NOT_FOUND', `Wuyin model "${modelId}" was not found in catalog.`);
+  }
+  if (catalogItem.kind !== 'audio') {
+    return sendLocalProxyError(res, req, 400, 'INVALID_REQUEST', `Wuyin model "${modelId}" is not an audio model.`);
+  }
+
+  try {
+    const result = await submitWuyinTask({ catalogItem, apiKey: route.apiKey, input: req.body, baseUrl: route.baseUrl });
+    return res.json(okEnvelope({
+      url: result.urls[0] || '',
+      urls: result.urls,
+      taskId: buildWuyinLocalTaskId(route, routeId, result, catalogItem),
+      providerTaskId: result.providerTaskId || '',
+      status: result.status,
+      endpointType: 'wuyin-async-audio',
+      requestId: req.body && req.body.requestId,
+      attemptId: req.body && req.body.attemptId,
+      execTime: result.submitExecTime,
+    }, req));
+  } catch (err) {
+    return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', err.message);
+  }
+}
+
+function extractWuyinChatContent(payload) {
+  if (typeof payload === 'string') return payload;
+  if (!payload || typeof payload !== 'object') return '';
+  return String(
+    payload.content ||
+    payload.text ||
+    payload.message ||
+    payload.msg ||
+    payload.data?.content ||
+    payload.data?.text ||
+    payload.data?.message ||
+    payload.data?.answer ||
+    payload.data?.output ||
+    ''
+  ).trim();
+}
+
+async function handleWuyinChatMode(req, res, profileState) {
+  const routeId = String(req.body && req.body.routeId || '').trim();
+  const route = resolveLocalUserRoute(profileState, routeId);
+
+  if (!route) {
+    return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
+  }
+  if (!route.apiKey) {
+    return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
+  }
+
+  const catalogItem = findCatalogItemInCachedCatalog(req.body && req.body.modelId, route.baseUrl)
+    || findCatalogItemInCachedCatalog('chat_index', route.baseUrl);
+  if (!catalogItem || catalogItem.kind !== 'chat') {
+    return sendLocalProxyError(res, req, 404, 'MODEL_NOT_FOUND', 'Wuyin ChatAPI model was not found in catalog.');
+  }
+
+  try {
+    const result = await submitWuyinTask({ catalogItem, apiKey: route.apiKey, input: req.body, baseUrl: route.baseUrl });
+    const content = extractWuyinChatContent(result.raw) || JSON.stringify(result.raw || {});
+    return res.json(okEnvelope({
+      content,
       endpointType: 'openai',
       requestId: req.body && req.body.requestId,
       attemptId: req.body && req.body.attemptId,
@@ -1287,9 +1466,12 @@ async function handleWuyinTaskStatusMode(req, res, profileState) {
     return sendLocalProxyError(res, req, 400, 'INVALID_REQUEST', 'localTaskId is required for Wuyin task status.');
   }
 
-  const route = parsed.routeId
+  let route = parsed.routeId
     ? resolveLocalUserRoute(profileState, parsed.routeId)
     : findFirstWuyinVideoRoute(profileState);
+  if (!route && /^(image|video|audio)_[a-z0-9_.-]+$/i.test(String(parsed.routeId || ''))) {
+    route = findFirstWuyinVideoRoute(profileState);
+  }
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'Wuyin API route for this local task was not found.');
   }
@@ -1300,12 +1482,19 @@ async function handleWuyinTaskStatusMode(req, res, profileState) {
   const catalog = getCachedWuyinCatalog();
   let catalogItem = null;
   const rawTaskId = String(parsed.providerTaskId || '').toLowerCase();
+  const parsedModelId = normalizeWuyinModelLookupValue(parsed.modelId);
+
+  if (parsedModelId) {
+    catalogItem = catalog.find(x => normalizeWuyinModelLookupValue(x && x.id) === parsedModelId)
+      || catalog.find(x => normalizeWuyinModelLookupValue(x && x.name) === parsedModelId)
+      || catalog.find(x => Array.isArray(x.aliases) && x.aliases.some(alias => normalizeWuyinModelLookupValue(alias) === parsedModelId));
+  }
   
-  if (rawTaskId.startsWith('image_')) {
+  if (!catalogItem && rawTaskId.startsWith('image_')) {
     catalogItem = catalog.find(x => x.id === 'image_nanoBanana2') || catalog[0];
-  } else if (rawTaskId.startsWith('video_') || rawTaskId.startsWith('sora_') || rawTaskId.includes('sora')) {
+  } else if (!catalogItem && (rawTaskId.startsWith('video_') || rawTaskId.startsWith('sora_') || rawTaskId.startsWith('s_') || rawTaskId.includes('sora'))) {
     catalogItem = catalog.find(x => x.id === 'video_google_omni') || catalog.find(x => x.kind === 'video');
-  } else if (rawTaskId.startsWith('audio_')) {
+  } else if (!catalogItem && rawTaskId.startsWith('audio_')) {
     catalogItem = catalog.find(x => x.id === 'audio_tts') || catalog.find(x => x.kind === 'audio');
   }
 
@@ -1368,6 +1557,12 @@ router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
     }
     if (mode === 'video') {
       return await handleWuyinVideoMode(req, res, profileState);
+    }
+    if (mode === 'audio') {
+      return await handleWuyinAudioMode(req, res, profileState);
+    }
+    if (mode === 'chat') {
+      return await handleWuyinChatMode(req, res, profileState);
     }
     if (mode === 'task_status') {
       return await handleWuyinTaskStatusMode(req, res, profileState);

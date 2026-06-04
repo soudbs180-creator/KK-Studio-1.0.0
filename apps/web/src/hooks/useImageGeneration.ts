@@ -1932,12 +1932,17 @@ export const useImageGeneration = (options: {
           modelLabel: resolveModelDisplayName(executionNode.model, executionNode.modelLabel),
           batchKey: `${promptNodeId}:${Date.now()}`,
         });
+        const totalCount = Math.max(1, actualCount || executionNode.parallelCount || 1);
+        const batchItems = Array.from({ length: totalCount }, (_, i) => {
+          const matched = preparedItems.find(p => (typeof p.item.index === 'number' ? p.item.index : p.sourceResultIndex) === i);
+          return {
+            aspectRatio: matched?.item.aspectRatio || executionNode.aspectRatio,
+            exactDimensions: matched?.item.dimensions,
+          };
+        });
         const generatedPositions = buildGeneratedImageBatchPositions({
           basePosition: executionNode.position,
-          items: preparedItems.map(({ item }) => ({
-            aspectRatio: item.aspectRatio || executionNode.aspectRatio,
-            exactDimensions: item.dimensions,
-          })),
+          items: batchItems,
           mode: executionNode.mode,
           isMobile,
         });
@@ -1953,12 +1958,13 @@ export const useImageGeneration = (options: {
           const uniqueId = isWuyinRoute
             ? buildWuyinImageStorageId({ taskId: sourceTaskId, resultIndex: sourceResultIndex, total: preparedItems.length })
             : `${Date.now()}_${idx}_${Math.random()}`;
-          const layoutPosition = generatedPositions[layoutIndex] || getGeneratedImagePosition(
+          const targetLayoutIndex = typeof idx === 'number' ? idx : (typeof sourceResultIndex === 'number' ? sourceResultIndex : layoutIndex);
+          const layoutPosition = generatedPositions[targetLayoutIndex] || getGeneratedImagePosition(
             executionNode.position,
             item.aspectRatio || executionNode.aspectRatio,
             executionNode.mode,
-            layoutIndex,
-            acceptedImageData.length
+            targetLayoutIndex,
+            totalCount
           );
           let finalUrl = item.url;
           let finalOriginalUrl = item.originalUrl;

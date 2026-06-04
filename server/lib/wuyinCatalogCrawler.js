@@ -123,8 +123,8 @@ const WUYIN_FALLBACK_CATALOG = [
     endpointPath: '/api/async/image_wan2.6',
     endpointUrl: 'https://api.wuyinkeji.com/api/async/image_wan2.6',
     method: 'POST',
-    contentType: 'application/json',
-    submitContentType: 'application/json',
+    contentType: 'application/x-www-form-urlencoded',
+    submitContentType: 'application/x-www-form-urlencoded',
     detailPath: '/api/async/detail',
     detailStatusMode: 'wuyin-async',
     price: 0.2,
@@ -232,8 +232,8 @@ const WUYIN_FALLBACK_CATALOG = [
     submitContentType: 'application/json',
     detailPath: '/api/async/detail',
     detailStatusMode: 'wuyin-async',
-    price: 0.01,
-    priceText: '0.01元/秒',
+    price: 0.02,
+    priceText: '0.02元/秒',
     priceUnit: '秒',
     aliases: ['package_1.0', 'video_package'],
     enabled: true,
@@ -352,8 +352,8 @@ const WUYIN_FALLBACK_CATALOG = [
     endpointPath: '/api/voice/composite',
     endpointUrl: 'https://api.wuyinkeji.com/api/voice/composite',
     method: 'POST',
-    contentType: 'application/x-www-form-urlencoded',
-    submitContentType: 'application/x-www-form-urlencoded',
+    contentType: 'application/json',
+    submitContentType: 'application/json',
     price: 0.0006,
     priceText: '0.0006元/字符',
     priceUnit: '字符',
@@ -371,8 +371,8 @@ const WUYIN_FALLBACK_CATALOG = [
     endpointPath: '/api/voice/clone',
     endpointUrl: 'https://api.wuyinkeji.com/api/voice/clone',
     method: 'POST',
-    contentType: 'application/x-www-form-urlencoded',
-    submitContentType: 'application/x-www-form-urlencoded',
+    contentType: 'application/json',
+    submitContentType: 'application/json',
     price: 6,
     priceText: '6元/次',
     priceUnit: '次',
@@ -423,6 +423,36 @@ const WUYIN_FALLBACK_CATALOG = [
 ];
 
 const CACHE_FILE_PATH = path.join(__dirname, 'wuyinCatalogCache.json');
+const WUYIN_CATALOG_MODEL_PRIORITY = [
+  'image_nanoBanana2',
+  'image_nanoBanana_pro',
+  'image_nanoBanana',
+  'image_gpt',
+];
+
+function readWuyinCatalogModelId(item) {
+  const explicit = String(item && (item.id || item.modelId) || '').trim();
+  if (explicit) return explicit;
+  const endpointPath = String(item && item.endpointPath || '').trim();
+  const match = endpointPath.match(/\/api\/async\/([^/?#]+)$/i);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+function getWuyinCatalogPriority(item) {
+  const modelId = readWuyinCatalogModelId(item);
+  const index = WUYIN_CATALOG_MODEL_PRIORITY.findIndex(candidate => candidate.toLowerCase() === modelId.toLowerCase());
+  return index >= 0 ? index : WUYIN_CATALOG_MODEL_PRIORITY.length + 1000;
+}
+
+function sortWuyinCatalogForDefaultUse(items) {
+  return (Array.isArray(items) ? items : [])
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) => {
+      const rankDiff = getWuyinCatalogPriority(left.item) - getWuyinCatalogPriority(right.item);
+      return rankDiff || left.index - right.index;
+    })
+    .map(({ item }) => item);
+}
 
 /**
  * 抓取指定 URL 的纯文本
@@ -606,7 +636,7 @@ function parseWuyinDocPage(html, link) {
     contentType = ctMatch[1].trim();
   } else {
     // 兜底逻辑
-    if (endpointPath.includes('chat') || endpointPath.includes('composite') || endpointPath.includes('clone') || endpointPath.includes('split')) {
+    if (endpointPath.includes('chat') || endpointPath.includes('split') || endpointPath.includes('image_wan2.6')) {
       contentType = 'application/x-www-form-urlencoded';
     }
   }
@@ -731,17 +761,18 @@ async function refreshWuyinCatalog() {
       }
     }
 
+    const sortedItems = sortWuyinCatalogForDefaultUse(finalItems);
     const payload = {
       version: 1,
       source: 'doc-crawler',
       crawledAt: new Date().toISOString(),
-      items: finalItems,
+      items: sortedItems,
     };
 
     // 写入文件缓存
     fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(payload, null, 2), 'utf8');
-    console.log(`[wuyin-catalog] 缓存刷新成功，共写入 ${finalItems.length} 个模型接口。`);
-    return finalItems;
+    console.log(`[wuyin-catalog] 缓存刷新成功，共写入 ${sortedItems.length} 个模型接口。`);
+    return sortedItems;
   } catch (error) {
     console.error('[wuyin-catalog] 自动刷新失败，错误信息:', error.message);
     throw error;
@@ -757,13 +788,13 @@ function getCachedWuyinCatalog() {
       const raw = fs.readFileSync(CACHE_FILE_PATH, 'utf8');
       const payload = JSON.parse(raw);
       if (payload && Array.isArray(payload.items) && payload.items.length > 0) {
-        return payload.items;
+        return sortWuyinCatalogForDefaultUse(payload.items);
       }
     }
   } catch (e) {
     console.warn('[wuyin-catalog] 加载本地缓存文件失败，使用静态兜底配置:', e.message);
   }
-  return WUYIN_FALLBACK_CATALOG;
+  return sortWuyinCatalogForDefaultUse(WUYIN_FALLBACK_CATALOG);
 }
 
 module.exports = {

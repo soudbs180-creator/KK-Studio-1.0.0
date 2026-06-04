@@ -128,6 +128,7 @@ describe("Wuyin async-video route helpers", () => {
     assert.deepEqual(serverWuyinVideoProxy.decodeLocalProxyTaskId(localTaskId), {
       routeId: "provider 1",
       providerTaskId: "task/2",
+      modelId: "",
     });
     assert.equal(
       serverWuyinVideoProxy.isWuyinAsyncVideoTargetUrl("https://api.wuyinkeji.com/api/async/video_google_omni"),

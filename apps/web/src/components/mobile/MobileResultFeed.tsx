@@ -511,7 +511,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
       {/* 采用 Pinterest 自适应列布局的滚动展示区 */}
       <div 
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto overscroll-contain px-3 pr-1 pb-24 flex flex-col"
+        className="flex-1 overflow-y-auto overscroll-contain px-3 pb-24 flex flex-col"
         style={{
           paddingTop: isHistoryView ? '12px' : 'var(--mobile-content-top-inset, 76px)',
         }}
@@ -598,7 +598,12 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
 
         {isMultiSelectMode ? (
           // 简体中文：多选模式下的精致批量操作控制栏，毛玻璃暗色效果
-          <div className="w-full flex items-center justify-between gap-3 pointer-events-auto py-1">
+          <div 
+            className="w-full flex items-center justify-between gap-3 pointer-events-auto py-1"
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+          >
             <div className="min-w-0 flex flex-col justify-center">
               <span className="text-xs font-bold text-white tracking-wide">
                 {pick(`已选择 ${selectedIds.size} 项`, `Selected ${selectedIds.size} items`)}
@@ -653,7 +658,12 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
         ) : (
           // 简体中文：常规模式下的切换胶囊和计数器
           <>
-            <div className="min-w-0 flex flex-col gap-0.5 pointer-events-auto">
+            <div 
+              className="min-w-0 flex flex-col gap-0.5 pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onTouchEnd={(e) => e.stopPropagation()}
+            >
               <p className="text-[11px] leading-relaxed text-[var(--text-primary)] font-medium">
                 {pick('点击任意结果查看完整提示词和操作。', 'Tap any result to inspect the full prompt and actions.')}
               </p>
@@ -661,14 +671,23 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                 {hasSelectedSource ? `${counterLabel} / ${selectedSourceLabel}` : counterLabel}
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2 pointer-events-auto">
+            <div 
+              className="flex shrink-0 items-center gap-2 pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onTouchEnd={(e) => e.stopPropagation()}
+            >
               {/* 模式切换胶囊 */}
               <div className="flex rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-0.5 text-[11px] font-medium text-[var(--text-primary)] shadow-sm">
                 {(['standard', 'detail'] as ResultViewMode[]).map((mode) => (
                   <button
                     key={mode}
                     type="button"
-                    onClick={() => onViewModeChange(mode)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      onViewModeChange(mode);
+                    }}
                     className={`rounded-full px-3 py-1 transition-all duration-150 ${
                       viewMode === mode ? 'bg-[var(--mobile-clay-active-bg)] border border-[var(--mobile-clay-active-border)] text-[var(--text-primary)] font-bold shadow-sm' : 'text-[var(--text-secondary)] active:text-[var(--text-primary)] active:bg-[var(--mobile-clay-muted-surface-bg)]'
                     }`}
@@ -681,7 +700,9 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
               {/* 快速一键滚动回底部的圆形毛玻璃按钮，高度与切换胶囊完全对齐，具备弹性缩放交互动效 */}
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
                   bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
                 }}
                 title={pick('回到底部', 'Scroll to Bottom')}

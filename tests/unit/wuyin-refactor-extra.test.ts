@@ -168,4 +168,89 @@ describe("速创 API 重构专项单元测试", () => {
 
     assert.equal(queueRes.status, "processing");
   });
+
+  test("4. 通用执行器按具体 Wuyin endpoint 构造请求体和序列化格式", () => {
+    const build = (executor as any).buildWuyinSubmitRequestBody as (catalogItem: any, input: any) => any;
+    const serialize = (executor as any).serializeWuyinRequestBody as (body: any, contentType: string) => string;
+
+    assert.deepEqual(
+      build(
+        { id: "image_gpt", kind: "image" },
+        { prompt: "cat", aspectRatio: "16:9", imageSize: "4K", referenceImages: ["https://cdn.example.com/ref.png"] },
+      ),
+      {
+        prompt: "cat",
+        size: "16:9",
+        urls: ["https://cdn.example.com/ref.png"],
+      },
+    );
+
+    assert.deepEqual(
+      build(
+        { id: "image_nanoBanana", kind: "image" },
+        { prompt: "cat", imageSize: "4K", aspectRatio: "1:1" },
+      ),
+      {
+        prompt: "cat",
+        imageSize: "1K",
+        aspectRatio: "1:1",
+      },
+    );
+
+    const wanBody = build(
+      { id: "image_wan2.6", kind: "image" },
+      { prompt: "cat", aspectRatio: "16:9", referenceImages: ["https://cdn.example.com/ref.png"] },
+    );
+    assert.deepEqual(wanBody, {
+      prompt: "cat",
+      size: "1696*960",
+      urls: ["https://cdn.example.com/ref.png"],
+    });
+    const wanParams = new URLSearchParams(serialize(wanBody, "application/x-www-form-urlencoded"));
+    assert.equal(wanParams.get("size"), "1696*960");
+    assert.equal(wanParams.get("urls"), "https://cdn.example.com/ref.png");
+
+    assert.deepEqual(
+      build(
+        { id: "video_grok_imagine", kind: "video" },
+        { prompt: "cat video", aspectRatio: "16:9", imageUrl: "https://cdn.example.com/ref.png" },
+      ),
+      {
+        prompt: "cat video",
+        duration: "10",
+        aspect_ratio: "16:9",
+        image_urls: ["https://cdn.example.com/ref.png"],
+      },
+    );
+
+    assert.throws(
+      () => build({ id: "video_package", kind: "video" }, { prompt: "package" }),
+      /Package_1\.0/,
+    );
+
+    assert.deepEqual(
+      build(
+        { id: "audio_tts", kind: "audio" },
+        { prompt: "hello" },
+      ),
+      {
+        text: "hello",
+        voice_id: "male-qn-qingse",
+        speed: 1,
+        language_boost: "auto",
+      },
+    );
+  });
+
+  test("5. local_proxy task id 可以携带模型 ID 以便选择正确 detail 接口", () => {
+    const encoded = executor.encodeLocalProxyTaskId("slot_wuyin", "s_123", "sora2-new");
+    assert.equal(encoded, "local_proxy:slot_wuyin:s_123:sora2-new");
+
+    const parsed = executor.decodeLocalProxyTaskId(encoded);
+    assert.deepEqual(parsed, {
+      routeId: "slot_wuyin",
+      providerTaskId: "s_123",
+      modelId: "sora2-new",
+    });
+  });
 });

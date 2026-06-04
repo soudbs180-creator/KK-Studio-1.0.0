@@ -426,17 +426,11 @@ const RechargeModal: React.FC = () => {
   );
 
   return (
-    <KkModal
-      open={showRechargeModal}
-      onCancel={() => setShowRechargeModal(false)}
+    <RechargeModalWrapper
+      isOpen={showRechargeModal}
+      onClose={() => setShowRechargeModal(false)}
       title={modalTitle}
-      footer={null}
-      width={860}
-      destroyOnClose
-      centered
-      style={{
-        background: 'color-mix(in srgb, var(--frost-card-framework-bg) 72%, transparent)',
-      }}
+      isMobile={isMobile}
     >
       <div
         className={`kk-user-profile-modal__body ${
@@ -885,7 +879,78 @@ const RechargeModal: React.FC = () => {
             </div>
           </div>
         </div>
-      </KkModal>
+      </RechargeModalWrapper>
+  );
+};
+
+interface RechargeModalWrapperProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: React.ReactNode;
+  isMobile: boolean;
+  children: React.ReactNode;
+}
+
+const RechargeModalWrapper: React.FC<RechargeModalWrapperProps> = ({
+  isOpen,
+  onClose,
+  title,
+  isMobile,
+  children
+}) => {
+  if (!isOpen) return null;
+  
+  if (isMobile) {
+    return (
+      <div 
+        className="fixed inset-0 z-[10001] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+        onClick={onClose}
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
+      >
+        <div 
+          className="w-full max-w-[480px] max-h-[calc(100dvh-32px)] flex flex-col rounded-2xl border overflow-hidden text-white shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+          onClick={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+          style={{
+            borderColor: 'var(--frost-card-main-border)',
+            background: 'color-mix(in srgb, var(--frost-card-framework-bg) 88%, #0f1115)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+          }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/5 shrink-0">
+            {title}
+            <button 
+              onClick={onClose}
+              className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors p-1 rounded-lg hover:bg-white/5"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          {children}
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <KkModal
+      open={isOpen}
+      onCancel={onClose}
+      title={title}
+      footer={null}
+      width={860}
+      destroyOnClose
+      centered
+      style={{
+        background: 'color-mix(in srgb, var(--frost-card-framework-bg) 72%, transparent)',
+      }}
+    >
+      {children}
+    </KkModal>
   );
 };
 
