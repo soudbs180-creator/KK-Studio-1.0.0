@@ -415,7 +415,9 @@ const isReadonlySecretPlaceholder = (value?: string | null): boolean => {
     str.includes('...') ||
     str.includes('••') ||
     str === '已填写' ||
-    str === '尚未填写'
+    str === '尚未填写' ||
+    str.startsWith('__kk_redacted__:') ||
+    str.includes('wuyin_••••')
   );
 };
 
@@ -853,7 +855,7 @@ const toOfficialForm = (slot: KeySlot): OfficialForm => ({
   id: slot.id,
   name: slot.provider === 'OpenAI' ? 'OpenAI' : 'Google',
   provider: slot.provider === 'OpenAI' ? 'OpenAI' : 'Google',
-  key: maskSecretDisplay(slot.key),
+  key: slot.key,
   mode: getMode(slot.budgetLimit, slot.tokenLimit),
   value:
     typeof slot.tokenLimit === 'number' && slot.tokenLimit > -1
@@ -867,7 +869,7 @@ const toProviderForm = (provider: ThirdPartyProvider): ProviderForm => ({
   id: provider.id,
   name: provider.name,
   baseUrl: provider.baseUrl,
-  apiKey: maskSecretDisplay(provider.apiKey),
+  apiKey: provider.apiKey,
   modelsText: formatProviderModelsText(provider.models || []),
   format: provider.format,
   group: provider.group || '',
