@@ -215,7 +215,8 @@ export const SettingInput: React.FC<{
   helper?: string;
   disabled?: boolean;
   autoComplete?: string;
-}> = ({ label, value, onChange, onBlur, placeholder, type = 'text', helper, disabled = false, autoComplete }) => {
+  maskedPreview?: string;
+}> = ({ label, value, onChange, onBlur, placeholder, type = 'text', helper, disabled = false, autoComplete, maskedPreview }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const isPassword = type === 'password';
@@ -233,6 +234,21 @@ export const SettingInput: React.FC<{
     }
     if (isFocused) {
       return value;
+    }
+    
+    // 简体中文注释：检查 value 是否是包含已脱敏占位内容的占位密钥
+    const strVal = String(value || '').trim();
+    const isRedacted =
+      strVal === 'sk-readonly-0000' ||
+      strVal === '尚未填写' ||
+      strVal === '已填写' ||
+      strVal.includes('...') ||
+      strVal.includes('••') ||
+      strVal.startsWith('__kk_redacted__:') ||
+      strVal.includes('wuyin_••••');
+
+    if (isRedacted && maskedPreview) {
+      return maskedPreview;
     }
     return maskSecretDisplay(value);
   };

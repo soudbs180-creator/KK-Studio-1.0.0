@@ -177,6 +177,7 @@ const RATE_LIMIT_COOLDOWN_MS = 30 * 1000;
 export interface KeySlot {
     id: string;
     key: string;
+    keyPreview?: string;
     name: string;
     provider: Provider; // 注意: Updated to strict type
     type: 'official' | 'proxy' | 'third-party'; // 注意: New field for categorization
@@ -273,6 +274,7 @@ export interface ThirdPartyProvider {
     name: string;                 // Display name, for example "Zhihui AI"
     baseUrl: string;              // API base URL
     apiKey: string;               // API Key
+    apiKeyPreview?: string;
     group?: string;
     models: string[];             // Supported model list
     format: ApiProtocolFormat;    // Protocol format
@@ -1747,6 +1749,7 @@ export class KeyManager {
             return {
                 id: p.id,
                 key: p.apiKey,
+                keyPreview: p.apiKeyPreview,
                 name: p.name,
                 provider,
                 baseUrl: p.baseUrl,

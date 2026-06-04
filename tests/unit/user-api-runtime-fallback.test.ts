@@ -152,6 +152,7 @@ test('loadUserApisPayloadFromCloudRecord uses the typed auth API on non-local ru
       {
         ...createEntry('entry-1'),
         key: 'sk-readonly-0000',
+        keyPreview: '已填写',
       },
     ],
   });

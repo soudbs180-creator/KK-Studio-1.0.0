@@ -159,6 +159,7 @@ function sanitizeClientVisibleEnvelope(payload: UserApisEnvelope): UserApisEnvel
   const sanitizeItems = (
     items: unknown[],
     secretField: 'key' | 'apiKey',
+    previewField: 'keyPreview' | 'apiKeyPreview',
   ): unknown[] => items.map((item) => {
     if (!isRecord(item)) {
       return item;
@@ -170,17 +171,30 @@ function sanitizeClientVisibleEnvelope(payload: UserApisEnvelope): UserApisEnvel
       };
     }
 
+    const secretValue = String(item[secretField] || '').trim();
+    let preview = '';
+    if (secretValue && secretValue !== 'sk-readonly-0000' && !secretValue.startsWith('__kk_redacted__:') && secretValue !== '[object Object]') {
+      if (secretValue.length <= 10) {
+        preview = '已填写';
+      } else {
+        preview = `${secretValue.slice(0, 6)}••••${secretValue.slice(-4)}`;
+      }
+    } else {
+      preview = String(item[previewField] || '');
+    }
+
     return {
       ...item,
+      [previewField]: preview,
       [secretField]: toClientVisibleSecret(item[secretField]),
     };
   });
 
   return {
     version: payload.version,
-    slots: sanitizeItems(payload.slots, 'key'),
-    providers: sanitizeItems(payload.providers, 'apiKey'),
-    entries: sanitizeItems(payload.entries, 'key'),
+    slots: sanitizeItems(payload.slots, 'key', 'keyPreview'),
+    providers: sanitizeItems(payload.providers, 'apiKey', 'apiKeyPreview'),
+    entries: sanitizeItems(payload.entries, 'key', 'keyPreview'),
   };
 }
 

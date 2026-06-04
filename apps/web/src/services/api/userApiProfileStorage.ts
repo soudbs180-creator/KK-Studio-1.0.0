@@ -19,6 +19,7 @@ type JsonRecord = Record<string, unknown>;
 export interface StoredUserApiEntry {
   id: string;
   key: string;
+  keyPreview?: string;
   name: string;
   provider: string;
   type: 'official' | 'proxy' | 'third-party';
@@ -127,6 +128,7 @@ function normalizeEntry(rawEntry: unknown): StoredUserApiEntry {
       String(raw.key || '').trim() === READONLY_SECRET_PLACEHOLDER
         ? `${REDACTED_SECRET_PREFIX}key:${id}`
         : String(raw.key || ''),
+    keyPreview: typeof raw.keyPreview === 'string' ? raw.keyPreview : (typeof raw.key_preview === 'string' ? raw.key_preview : undefined),
     name: String(raw.name || `${provider} Key`).trim(),
     provider,
     type: resolveApiType(provider, baseUrl),

@@ -578,6 +578,7 @@ describe('user api cloud storage helpers', () => {
         {
           ...createEntry('entry-1'),
           key: 'sk-readonly-0000',
+          keyPreview: '已填写',
         },
       ],
     });
@@ -653,6 +654,7 @@ describe('user api cloud storage helpers', () => {
         {
           id: 'slot-1',
           key: 'sk-readonly-0000',
+          keyPreview: '',
           provider: 'Google',
           type: 'official',
           format: 'gemini',
@@ -663,6 +665,7 @@ describe('user api cloud storage helpers', () => {
           id: 'provider-1',
           name: 'SiliconFlow',
           apiKey: 'sk-readonly-0000',
+          apiKeyPreview: '',
           format: 'openai',
           isActive: true,
         },
@@ -673,6 +676,7 @@ describe('user api cloud storage helpers', () => {
             key: 'server-entry-secret',
           }),
           key: 'sk-readonly-0000',
+          keyPreview: '',
         },
       ],
     });

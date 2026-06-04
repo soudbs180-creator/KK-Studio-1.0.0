@@ -121,7 +121,7 @@ export async function callWuyinClientDirectImage(
   
   const rawRefs = payload.referenceImages || [];
   if (rawRefs.length > 0) {
-    body.urls = rawRefs.map(r => r.data || r.url).filter(Boolean);
+    body.urls = rawRefs.map(r => typeof r === 'string' ? r : (r.data || (r as any).url)).filter(Boolean);
   }
   
   const response = await fetch(targetUrl, {
@@ -283,7 +283,7 @@ export async function checkWuyinClientDirectTaskStatus(
   const message = status === 'failed' ? (payloadData.data?.message || payloadData.msg || 'Wuyin task failed.') : undefined;
   
   return {
-    status,
+    status: status === 'processing' ? 'pending' : status,
     url: urls[0],
     urls: urls.length > 0 ? urls : undefined,
     message,
@@ -346,7 +346,7 @@ export interface SecureProxyImageResponse extends SecureProxyBillingMetadata {
   status?: 'pending' | 'success' | 'failed';
   requestId?: string;
   attemptId?: string;
-  endpointType?: 'openai' | 'gemini' | 'claude';
+  endpointType?: 'openai' | 'gemini' | 'claude' | 'wuyin-async-image' | 'wuyin-async-video' | 'wuyin-async-audio';
   execTime?: number;
 }
 

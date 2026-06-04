@@ -14,6 +14,7 @@ export interface ProviderLinkProvider {
     name: string;
     baseUrl: string;
     apiKey: string;
+    apiKeyPreview?: string;
     models: string[];
     format: string;
     isActive: boolean;
@@ -121,6 +122,7 @@ export function normalizeStoredProviders<TProvider extends ProviderLinkProvider>
             name: String(raw.name || "Custom Provider"),
             baseUrl: String(raw.baseUrl || "").trim(),
             apiKey: String(raw.apiKey || "").trim(),
+            apiKeyPreview: raw.apiKeyPreview || (raw as any).api_key_preview || undefined,
             models: normalizeModels(Array.isArray(raw.models) ? raw.models : [], String(raw.name || "Custom")),
             format: normalizeApiProtocolFormat(raw.format, "auto"),
             isActive: raw.isActive !== false,

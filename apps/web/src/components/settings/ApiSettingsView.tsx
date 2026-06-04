@@ -122,6 +122,7 @@ type OfficialForm = {
   name: string;
   provider: OfficialProvider;
   key: string;
+  keyPreview?: string;
   mode: CostMode;
   value: string;
 };
@@ -131,6 +132,7 @@ type ProviderForm = {
   name: string;
   baseUrl: string;
   apiKey: string;
+  apiKeyPreview?: string;
   modelsText: string;
   format: ApiProtocolFormat;
   group: string;
@@ -144,6 +146,7 @@ const officialDefaults: OfficialForm = {
   name: '',
   provider: 'Google',
   key: '',
+  keyPreview: '',
   mode: 'unlimited',
   value: '',
 };
@@ -160,6 +163,7 @@ const providerDefaults: ProviderForm = {
   name: '',
   baseUrl: '',
   apiKey: '',
+  apiKeyPreview: '',
   modelsText: '',
   format: 'auto',
   group: '',
@@ -856,6 +860,7 @@ const toOfficialForm = (slot: KeySlot): OfficialForm => ({
   name: slot.provider === 'OpenAI' ? 'OpenAI' : 'Google',
   provider: slot.provider === 'OpenAI' ? 'OpenAI' : 'Google',
   key: slot.key,
+  keyPreview: slot.keyPreview,
   mode: getMode(slot.budgetLimit, slot.tokenLimit),
   value:
     typeof slot.tokenLimit === 'number' && slot.tokenLimit > -1
@@ -870,6 +875,7 @@ const toProviderForm = (provider: ThirdPartyProvider): ProviderForm => ({
   name: provider.name,
   baseUrl: provider.baseUrl,
   apiKey: provider.apiKey,
+  apiKeyPreview: provider.apiKeyPreview,
   modelsText: formatProviderModelsText(provider.models || []),
   format: provider.format,
   group: provider.group || '',
@@ -4093,6 +4099,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             <SettingInput
               label="API Key"
               value={officialForm.key}
+              maskedPreview={officialForm.keyPreview}
               onChange={(value) => setOfficialForm((current) => ({ ...current, key: value }))}
               placeholder={pick('输入本地 API 的 API Key', 'Enter the local API key')}
               type="password"
@@ -4279,6 +4286,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                   <SettingInput
                     label="API Key"
                     value={providerForm.apiKey}
+                    maskedPreview={providerForm.apiKeyPreview}
                     onChange={(value) => setProviderForm((current) => ({ ...current, apiKey: value }))}
                     placeholder={pick('输入该品牌的 API Key', 'Enter this provider API key')}
                     type="password"
