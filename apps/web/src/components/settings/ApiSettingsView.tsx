@@ -724,6 +724,9 @@ const extractDomain = (url: string) => {
 
 const maskSecretDisplay = (value: string) => {
   if (!value.trim()) return '尚未填写';
+  if (value.startsWith('__kk_redacted__:') || value === 'sk-readonly-0000') {
+    return '••••••••••••';
+  }
   if (value.length <= 10) return '已填写';
   return `${value.slice(0, 6)}••••${value.slice(-4)}`;
 };

@@ -236,7 +236,7 @@ function mergeUserApiEntrySets(
       ...newer,
       key: isUsableStoredSecret(newer.key)
         ? newer.key
-        : (!isEqualRevisionTie && isUsableStoredSecret(older.key))
+        : isUsableStoredSecret(older.key)
           ? older.key
           : newer.key,
     });

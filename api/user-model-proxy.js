@@ -96,7 +96,29 @@ export default async function handler(req, res) {
   const apiKey = getHeader(req, 'x-proxy-api-key');
 
   if (!targetUrl) {
-    return sendProxyError(res, 400, 'INVALID_REQUEST', 'Proxy target URL is required.');
+    const vpsBackend = process.env.VPS_BACKEND_URL || 'https://172-245-156-16.sslip.io';
+    const dest = `${vpsBackend.replace(/\/+$/, '')}/api/v1/model-proxy/user`;
+    const headers = {};
+    for (const [key, value] of Object.entries(req.headers || {})) {
+      if (key.toLowerCase() !== 'host') {
+        headers[key] = value;
+      }
+    }
+    const body = buildForwardBody(req);
+    try {
+      const upstream = await fetch(dest, {
+        method: req.method || 'POST',
+        headers,
+        body,
+      });
+      const responseText = await upstream.text().catch(() => '');
+      res.status(upstream.status);
+      res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/json; charset=utf-8');
+      return res.send(responseText);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error || 'VPS proxy failed.');
+      return sendProxyError(res, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', message);
+    }
   }
   if (!isAllowedWuyinTargetUrl(targetUrl)) {
     return sendProxyError(res, 404, 'USER_ROUTE_NOT_FOUND', 'User model proxy only handles Wuyin async requests.');

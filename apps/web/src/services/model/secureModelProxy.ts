@@ -35,8 +35,13 @@ function getWuyinRouteDetails(routeId: string) {
     if (provider) {
       const isWuyin = provider.name === '速创 API' || /wuyinkeji/i.test(provider.baseUrl || '');
       if (isWuyin && provider.apiKey) {
+        const apiKey = provider.apiKey.trim();
+        // 简体中文注释：若 API 密钥已经被脱敏，则说明前端无真实物理 Key，此时不满足前端直连条件，应返回 null 触发代理路由
+        if (apiKey.startsWith('__kk_redacted__:') || apiKey === 'sk-readonly-0000') {
+          return null;
+        }
         return {
-          apiKey: provider.apiKey,
+          apiKey,
           baseUrl: provider.baseUrl || 'https://api.wuyinkeji.com'
         };
       }
@@ -1120,6 +1125,9 @@ async function invokeLocalUserRouteProxy(
   let result: LocalUserRouteProxyHttpResult;
   try {
     result = await invokeLocalUserRouteApiHttp(activeAccessToken, body, false);
+    if (result.response && !result.response.ok && result.response.status !== 401 && result.response.status !== 403) {
+      throw new Error(`Local proxy returned error status: ${result.response.status}`);
+    }
   } catch (error: any) {
     console.warn('[secureModelProxy] 本地 API 连接失败，尝试通过 VPS 兜底...', error);
     try {
