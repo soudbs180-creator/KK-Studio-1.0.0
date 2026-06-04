@@ -789,8 +789,8 @@ const getProviderStatus = (provider: ThirdPartyProvider) => {
     if (!apiKey) {
       return { badge: 'rose' as const, status: 'error' as const, label: 'API Key 不能为空' };
     }
-    if (baseUrl && !/^https?:\/\/api\.wuyinkeji\.com/i.test(baseUrl)) {
-      return { badge: 'rose' as const, status: 'error' as const, label: 'Base URL 必须指向 https://api.wuyinkeji.com' };
+    if (baseUrl && !/^https?:\/\//i.test(baseUrl)) {
+      return { badge: 'rose' as const, status: 'error' as const, label: 'Base URL 格式不正确，必须以 http:// 或 https:// 开头' };
     }
 
     if (provider.status === 'error') {

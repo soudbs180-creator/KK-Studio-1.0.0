@@ -594,7 +594,7 @@ function parseWuyinDocPage(html, link) {
   let method = 'POST';
   const methodMatch = text.match(/请求方式[:：]\s*(?:HTTP\s+)?(GET|POST)/i);
   if (methodMatch) {
-    method = methodMatch[2].toUpperCase();
+    method = methodMatch[1].toUpperCase();
   } else if (endpointPath.includes('detail')) {
     method = 'GET';
   }

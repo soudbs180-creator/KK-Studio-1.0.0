@@ -286,8 +286,20 @@ function serializeBody(body, contentType) {
 /**
  * 提交 API 模型任务
  */
-async function submitWuyinTask({ catalogItem, apiKey, input }) {
+async function submitWuyinTask({ catalogItem, apiKey, input, baseUrl }) {
   let targetUrl = catalogItem.endpointUrl;
+  
+  if (baseUrl) {
+    try {
+      const parsedBase = new URL(baseUrl);
+      const parsedTarget = new URL(targetUrl);
+      parsedTarget.protocol = parsedBase.protocol;
+      parsedTarget.host = parsedBase.host;
+      targetUrl = parsedTarget.toString();
+    } catch (e) {
+      // ignore
+    }
+  }
   
   // 在 URL 上面拼接 key 用于上游代理鉴权
   if (apiKey) {
@@ -368,9 +380,18 @@ async function submitWuyinTask({ catalogItem, apiKey, input }) {
 /**
  * 查询异步模型任务状态
  */
-async function checkWuyinTaskStatus({ catalogItem, apiKey, providerTaskId, submitExecTime }) {
+async function checkWuyinTaskStatus({ catalogItem, apiKey, providerTaskId, submitExecTime, baseUrl }) {
   const detailPath = catalogItem.detailPath || '/api/async/detail';
   let detailUrl = `https://api.wuyinkeji.com${detailPath}`;
+
+  if (baseUrl) {
+    try {
+      const parsedBase = new URL(baseUrl);
+      detailUrl = `${parsedBase.protocol}//${parsedBase.host}${detailPath}`;
+    } catch (e) {
+      // ignore
+    }
+  }
 
   const parsed = new URL(detailUrl);
   parsed.searchParams.set('id', providerTaskId);

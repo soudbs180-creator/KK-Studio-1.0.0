@@ -1210,7 +1210,7 @@ async function handleWuyinImageMode(req, res, profileState) {
   }
 
   try {
-    const result = await submitWuyinTask({ catalogItem, apiKey: route.apiKey, input: req.body });
+    const result = await submitWuyinTask({ catalogItem, apiKey: route.apiKey, input: req.body, baseUrl: route.baseUrl });
     
     if (result.status === 'pending') {
       return res.json(okEnvelope({
@@ -1261,7 +1261,7 @@ async function handleWuyinVideoMode(req, res, profileState) {
   }
 
   try {
-    const result = await submitWuyinTask({ catalogItem, apiKey: route.apiKey, input: req.body });
+    const result = await submitWuyinTask({ catalogItem, apiKey: route.apiKey, input: req.body, baseUrl: route.baseUrl });
     
     return res.json(okEnvelope({
       taskId: result.taskId || '',
@@ -1321,7 +1321,8 @@ async function handleWuyinTaskStatusMode(req, res, profileState) {
       catalogItem,
       apiKey: route.apiKey,
       providerTaskId: parsed.providerTaskId,
-      submitExecTime: req.body.submitExecTime || 0
+      submitExecTime: req.body.submitExecTime || 0,
+      baseUrl: route.baseUrl
     });
 
     let endpointType = 'wuyin-async';

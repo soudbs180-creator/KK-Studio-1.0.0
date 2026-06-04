@@ -9,6 +9,7 @@ import { type StandardizedProxyRequest} from './ProxyRequestBuilder';
 import { kkWebApiClient, resolveKkApiModelProxyBaseUrl } from '../api/kkApiClient';
 import { compressReferenceImagesIfNeeded } from '../../utils/imageUtils';
 import { kernelFetch } from '../http/requestKernel';
+import { keyManager } from '../auth/keyManager';
 
 export interface SecureProxyChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -24,6 +25,264 @@ export function buildSecureProxyUserRouteFromSlotId(slotId: string): SecureProxy
   return {
     kind: 'key-slot',
     id: String(slotId || '').trim(),
+  };
+}
+
+function getWuyinRouteDetails(routeId: string) {
+  if (!routeId) return null;
+  try {
+    const provider = keyManager.getProvider(routeId) || keyManager.getProviderForKeySlot(routeId);
+    if (provider) {
+      const isWuyin = provider.name === '速创 API' || /wuyinkeji/i.test(provider.baseUrl || '');
+      if (isWuyin && provider.apiKey) {
+        return {
+          apiKey: provider.apiKey,
+          baseUrl: provider.baseUrl || 'https://api.wuyinkeji.com'
+        };
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  return null;
+}
+
+export function checkIsWuyinClientDirect(routeIdOrTaskId: string): boolean {
+  let routeId = routeIdOrTaskId;
+  if (routeIdOrTaskId.startsWith('local_proxy:')) {
+    const parts = routeIdOrTaskId.slice('local_proxy:'.length).split(':');
+    routeId = decodeURIComponent(parts[0] || '');
+  }
+  return getWuyinRouteDetails(routeId) !== null;
+}
+
+function extractUrlsFromPayload(val: any): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const visit = (item: any) => {
+    if (!item) return;
+    if (typeof item === 'string') {
+      const matches = item.match(/https?:\/\/[^\s"'<>]+/g) || [];
+      for (const u of matches) {
+        if (!seen.has(u)) {
+          seen.add(u);
+          out.push(u);
+        }
+      }
+      return;
+    }
+    if (Array.isArray(item)) {
+      item.forEach(visit);
+      return;
+    }
+    if (typeof item === 'object') {
+      const keys = ['result', 'results', 'url', 'urls', 'image_url', 'video_url', 'audio_url', 'output', 'outputs', 'data'];
+      keys.forEach(k => visit(item[k]));
+      for (const k in item) {
+        if (Object.prototype.hasOwnProperty.call(item, k) && !keys.includes(k)) {
+          visit(item[k]);
+        }
+      }
+    }
+  };
+  visit(val);
+  return out;
+}
+
+export async function callWuyinClientDirectImage(
+  payload: SecureProxyImageRequest & { routeId: string }
+): Promise<SecureProxyImageResponse> {
+  const route = getWuyinRouteDetails(payload.routeId);
+  if (!route) throw new Error('Wuyin route details missing');
+  
+  const apiKey = route.apiKey;
+  const baseUrl = route.baseUrl.replace(/\/+$/, '');
+  
+  const modelId = payload.modelId.split('@')[0];
+  const endpointPath = `/api/async/${modelId}`;
+  let targetUrl = `${baseUrl}${endpointPath}`;
+  
+  const parsed = new URL(targetUrl);
+  parsed.searchParams.set('key', apiKey);
+  targetUrl = parsed.toString();
+  
+  const size = payload.imageSize || '1K';
+  const aspectRatio = payload.aspectRatio || 'auto';
+  const body: Record<string, any> = {
+    prompt: payload.prompt,
+    size,
+    aspectRatio
+  };
+  
+  const rawRefs = payload.referenceImages || [];
+  if (rawRefs.length > 0) {
+    body.urls = rawRefs.map(r => r.data || r.url).filter(Boolean);
+  }
+  
+  const response = await fetch(targetUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': apiKey,
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `HTTP 错误 ${response.status}`);
+  }
+  
+  const payloadData = await response.json();
+  if (payloadData.code !== 200 && payloadData.code !== 0) {
+    throw new Error(payloadData.msg || JSON.stringify(payloadData));
+  }
+  
+  const providerTaskId = payloadData.data?.id;
+  if (!providerTaskId) {
+    throw new Error('速创 API 响应未返回有效的任务 ID');
+  }
+  
+  const localTaskId = `local_proxy:${encodeURIComponent(payload.routeId)}:${encodeURIComponent(providerTaskId)}`;
+  
+  return {
+    urls: [],
+    taskId: localTaskId,
+    status: 'pending',
+    endpointType: 'wuyin-async-image'
+  };
+}
+
+export async function callWuyinClientDirectVideo(
+  payload: SecureProxyVideoRequest & { routeId: string }
+): Promise<SecureProxyVideoResponse> {
+  const route = getWuyinRouteDetails(payload.routeId);
+  if (!route) throw new Error('Wuyin route details missing');
+  
+  const apiKey = route.apiKey;
+  const baseUrl = route.baseUrl.replace(/\/+$/, '');
+  
+  const modelId = payload.modelId.split('@')[0];
+  const endpointPath = `/api/async/${modelId}`;
+  let targetUrl = `${baseUrl}${endpointPath}`;
+  
+  const parsed = new URL(targetUrl);
+  parsed.searchParams.set('key', apiKey);
+  targetUrl = parsed.toString();
+  
+  const body: Record<string, any> = {
+    prompt: payload.prompt || '',
+    size: payload.resolution || '1280x720',
+    duration: String(payload.duration || '10'),
+    aspectRatio: payload.aspectRatio || '16:9'
+  };
+  
+  const images: string[] = [];
+  if (payload.imageUrl) images.push(payload.imageUrl);
+  if (payload.imageTailUrl) images.push(payload.imageTailUrl);
+  if (images.length > 0) {
+    body.images = images.join(',');
+  }
+  
+  const response = await fetch(targetUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': apiKey,
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `HTTP 错误 ${response.status}`);
+  }
+  
+  const payloadData = await response.json();
+  if (payloadData.code !== 200 && payloadData.code !== 0) {
+    throw new Error(payloadData.msg || JSON.stringify(payloadData));
+  }
+  
+  const providerTaskId = payloadData.data?.id;
+  if (!providerTaskId) {
+    throw new Error('速创 API 响应未返回有效的任务 ID');
+  }
+  
+  const localTaskId = `local_proxy:${encodeURIComponent(payload.routeId)}:${encodeURIComponent(providerTaskId)}`;
+  
+  return {
+    taskId: localTaskId,
+    status: 'pending',
+    endpointType: 'openai'
+  };
+}
+
+export async function checkWuyinClientDirectTaskStatus(
+  localTaskId: string
+): Promise<SecureProxyTaskStatusResponse> {
+  const parts = localTaskId.slice('local_proxy:'.length).split(':');
+  const routeId = decodeURIComponent(parts[0] || '');
+  const providerTaskId = decodeURIComponent(parts[1] || '');
+  
+  const route = getWuyinRouteDetails(routeId);
+  if (!route) throw new Error('Wuyin route details missing');
+  
+  const apiKey = route.apiKey;
+  const baseUrl = route.baseUrl.replace(/\/+$/, '');
+  
+  const detailPath = '/api/async/detail';
+  let detailUrl = `${baseUrl}${detailPath}`;
+  
+  const parsed = new URL(detailUrl);
+  parsed.searchParams.set('id', providerTaskId);
+  parsed.searchParams.set('key', apiKey);
+  detailUrl = parsed.toString();
+  
+  const response = await fetch(detailUrl, {
+    method: 'GET',
+    headers: {
+      'Authorization': apiKey,
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    }
+  });
+  
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `HTTP 错误 ${response.status}`);
+  }
+  
+  const payloadData = await response.json();
+  if (payloadData.code !== 200 && payloadData.code !== 0) {
+    throw new Error(payloadData.msg || JSON.stringify(payloadData));
+  }
+  
+  const rawStatus = payloadData.data?.status;
+  let status: 'success' | 'failed' | 'processing' = 'processing';
+  
+  // 2=success, 3=failed, 0 or 1 = processing
+  const n = Number(rawStatus);
+  if (n === 2) status = 'success';
+  else if (n === 3) status = 'failed';
+  
+  let urls: string[] = [];
+  if (status === 'success') {
+    urls = extractUrlsFromPayload(payloadData);
+    if (urls.length === 0) {
+      status = 'processing';
+    }
+  }
+  
+  const message = status === 'failed' ? (payloadData.data?.message || payloadData.msg || 'Wuyin task failed.') : undefined;
+  
+  return {
+    status,
+    url: urls[0],
+    urls: urls.length > 0 ? urls : undefined,
+    message,
+    error: status === 'failed' ? message : undefined
   };
 }
 
@@ -1221,6 +1480,16 @@ export async function callSecureSystemProxyImage(
 export async function callLocalUserRouteProxyImage(
   payload: SecureProxyImageRequest & { routeId: string },
 ): Promise<SecureProxyImageResponse> {
+  const isClientDirect = checkIsWuyinClientDirect(payload.routeId);
+  if (isClientDirect) {
+    try {
+      console.log('[secureModelProxy] Wuyin image direct route matched, calling locally...');
+      return await callWuyinClientDirectImage(payload);
+    } catch (e) {
+      console.warn('[secureModelProxy] Wuyin image direct route failed, falling back to server proxy...', e);
+    }
+  }
+
   const compressedRefs = await compressReferenceImagesIfNeeded(payload.referenceImages || []);
   const data = await invokeLocalUserRouteProxy('local image generation', {
     mode: 'image',
@@ -1289,6 +1558,16 @@ export async function callSecureSystemProxyVideo(
 export async function callLocalUserRouteProxyVideo(
   payload: SecureProxyVideoRequest & { routeId: string },
 ): Promise<SecureProxyVideoResponse> {
+  const isClientDirect = checkIsWuyinClientDirect(payload.routeId);
+  if (isClientDirect) {
+    try {
+      console.log('[secureModelProxy] Wuyin video direct route matched, calling locally...');
+      return await callWuyinClientDirectVideo(payload);
+    } catch (e) {
+      console.warn('[secureModelProxy] Wuyin video direct route failed, falling back to server proxy...', e);
+    }
+  }
+
   const data = await invokeLocalUserRouteProxy('local video generation', {
     mode: 'video',
     routeId: payload.routeId,
@@ -1383,6 +1662,16 @@ export async function checkSecureSystemProxyTaskStatus(taskId: string): Promise<
 export async function checkLocalUserRouteProxyTaskStatus(
   localTaskId: string,
 ): Promise<SecureProxyTaskStatusResponse> {
+  const isClientDirect = checkIsWuyinClientDirect(localTaskId);
+  if (isClientDirect) {
+    try {
+      console.log('[secureModelProxy] Wuyin task status direct route matched, polling locally...');
+      return await checkWuyinClientDirectTaskStatus(localTaskId);
+    } catch (e) {
+      console.warn('[secureModelProxy] Wuyin task status direct route failed, falling back to server proxy...', e);
+    }
+  }
+
   const data = await invokeLocalUserRouteProxy('local task status', {
     mode: 'task_status',
     localTaskId,
