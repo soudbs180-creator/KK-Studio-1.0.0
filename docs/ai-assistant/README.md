@@ -1,4 +1,4 @@
-# AI 助手与 Agent 运行时知识库 (docs/ai-assistant/README.md) - KK Studio v1.5.3
+# AI 助手与 Agent 运行时知识库 (docs/ai-assistant/README.md) - KK Studio v1.5.4
 
 本目录是 KK Studio 的 **AI 助手与 Agent 运行态知识库**。当 AI 助手执行任务、解析选区、调用接口或对画布进行操作时，必须基于本目录的协议与 Runbook。
 

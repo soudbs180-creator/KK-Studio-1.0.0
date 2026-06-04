@@ -1,4 +1,4 @@
-# Encoding and PowerShell Rules — KK Studio v1.5.3
+# Encoding and PowerShell Rules — KK Studio v1.5.4
 
 Last updated: 2026-06-03
 

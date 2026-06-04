@@ -1,7 +1,7 @@
 # API 集成指南
 
 > [!WARNING]
-> **本指南中描述的数据库 Schema（如 `public.admin_models`、`public.admin_settings`）及 Supabase RLS 函数属于早期版本设计，已被当前 v1.5.3 的自建 VPS PostgreSQL 运行时所废弃。此处仅保留关于 12AI API 和 NewAPI 的集成渠道与对接流程逻辑作为开发参考。请勿将此处的数据库 Schema 视为当前开发事实。**
+> **本指南中描述的数据库 Schema（如 `public.admin_models`、`public.admin_settings`）及 Supabase RLS 函数属于早期版本设计，已被当前 v1.5.4 的自建 VPS PostgreSQL 运行时所废弃。此处仅保留关于 12AI API 和 NewAPI 的集成渠道与对接流程逻辑作为开发参考。请勿将此处的数据库 Schema 视为当前开发事实。**
 
 ## 系统架构
 

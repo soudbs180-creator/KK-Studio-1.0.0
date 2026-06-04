@@ -14,3 +14,5 @@ export type { GenerationBatchJob } from './queue/DurableGenerationQueue.ts';
 
 export { knowledgeStore } from './knowledge/KnowledgeStore.ts';
 export type { KnowledgeDocument, KnowledgeSearchResult, KnowledgeChangeInput, KnowledgeChangeRecord } from './knowledge/KnowledgeStore.ts';
+
+export { writeHandoff, formatRunRecordToMarkdown } from './memory/handoffWriter.ts';

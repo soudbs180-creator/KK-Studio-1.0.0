@@ -13,7 +13,7 @@
 
 3. **[SUPABASE_CLI.md](SUPABASE_CLI.md)**, **[SUPABASE.md](SUPABASE.md)** 和 **[SUPABASE_BASELINE.md](SUPABASE_BASELINE.md)**
    - **职责**：Supabase CLI 在本地开发中的基本使用、数据同步和 CLI 命令配置。
-   - **说明**：在 v1.5.3 中，数据存储已经往 VPS 自建 PostgreSQL 迁移，Supabase 目前主要作为本地测试或 Auth 鉴权配置备份。
+   - **说明**：在 v1.5.4 中，数据存储已经往 VPS 自建 PostgreSQL 迁移，Supabase 目前主要作为本地测试或 Auth 鉴权配置备份。
 
 4. **[ALIPAY_MCP.md](ALIPAY_MCP.md)** 和 **[AUTO_UPDATE_AND_DEPLOY.md](AUTO_UPDATE_AND_DEPLOY.md)**
    - **职责**：支付宝 MCP 对接以及持续部署脚本说明。

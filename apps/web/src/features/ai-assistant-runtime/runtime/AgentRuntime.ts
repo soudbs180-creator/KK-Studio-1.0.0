@@ -7,6 +7,7 @@ import { agentPermissionPolicy } from './AgentPermissionPolicy.ts';
 import { agentRunStore } from './AgentRunStore.ts';
 import type { AgentRunRecord } from './AgentRunStore.ts';
 import { toolRegistryInstance } from '../tools/ToolRegistry.ts';
+import { writeHandoff } from '../memory/handoffWriter.ts';
 
 const localBrain = new LocalAssistantBrain();
 const llmBrain = new LLMBrain();
@@ -36,14 +37,18 @@ export class AgentRuntime {
     }
 
     // 2. 执行物理安全过滤评估
+    let isBlocked = false;
+    let blockReason = '';
     const safeActions: AssistantAction[] = [];
     for (const action of plan.actions || []) {
       const safetyCheck = agentPermissionPolicy.evaluateSafety(action);
       if (!safetyCheck.allowed) {
+        isBlocked = true;
+        blockReason = safetyCheck.reason || '该操作不允许由 AI 助手执行。';
         // 安全拦截，重写计划与答复
         plan = {
           ...plan,
-          reply: `⚠️ **安全策略拦截通知**\n${safetyCheck.reason || '该操作不允许由 AI 助手执行。'}`,
+          reply: `⚠️ **安全策略拦截通知**\n${blockReason}`,
           actions: [],
           requiresConfirmation: false,
           confirmation: undefined
@@ -64,10 +69,19 @@ export class AgentRuntime {
     // 4. 新增运行记录入库持久化 (localStorage cache)
     const record = agentRunStore.createRun(text, plan.intent, plan);
     
-    // 如果需要后端权威同步，此处可以发送异步请求，但不阻塞前台
-    this.syncRunToBackend(record);
+    if (isBlocked) {
+      agentRunStore.updateRun(record.id, {
+        status: 'failed',
+        nextStep: `安全拦截: ${blockReason}`
+      });
+      const updated = agentRunStore.getRun(record.id)!;
+      void writeHandoff(updated);
+    }
 
-    return record;
+    // 如果需要后端权威同步，此处可以发送异步请求，但不阻塞前台
+    this.syncRunToBackend(agentRunStore.getRun(record.id)!);
+
+    return agentRunStore.getRun(record.id)!;
   }
 
   /**
@@ -111,16 +125,18 @@ export class AgentRuntime {
         }
       }
 
-      agentRunStore.updateRun(runId, { 
+      const updated = agentRunStore.updateRun(runId, { 
         status: 'completed',
         toolCalls: toolCallsLogs
       });
+      void writeHandoff(updated);
     } catch (e: any) {
-      agentRunStore.updateRun(runId, { 
+      const updated = agentRunStore.updateRun(runId, { 
         status: 'failed',
         toolCalls: toolCallsLogs,
         nextStep: `执行失败，错误原因: ${e?.message || String(e)}`
       });
+      void writeHandoff(updated);
       throw e;
     } finally {
       this.syncRunToBackend(agentRunStore.getRun(runId)!);
@@ -134,8 +150,9 @@ export class AgentRuntime {
     const record = agentRunStore.getRun(runId);
     if (!record) return;
 
-    agentRunStore.updateRun(runId, { status: 'cancelled' });
-    this.syncRunToBackend(record);
+    const updated = agentRunStore.updateRun(runId, { status: 'cancelled' });
+    this.syncRunToBackend(updated);
+    void writeHandoff(updated);
   }
 
   /**

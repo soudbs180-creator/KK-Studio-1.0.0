@@ -1,11 +1,11 @@
-# KK Studio Project Handoff (v1.5.3)
+# KK Studio Project Handoff (v1.5.4)
 
-Last updated: 2026-06-03
+Last updated: 2026-06-04
 
 ## 1. Project Overview
 
 - Project name: `KK Studio`
-- Stable version: `v1.5.3`
+- Stable version: `v1.5.4`
 - Version authority: `config/release-manifest.json`
 - Package projection: root `package.json` and workspace package manifests
 - Primary rules: `AGENTS.md`
@@ -74,7 +74,7 @@ npm run check:encoding
 ## 6. Latest Validation
 
 - Passed: `npm run verify:changes` (全量验证顺利通过，包括架构、规范、类型、冒烟测试及字符编码检查)
-- Fixed: 修正了 `tests/unit/canvas-runtime-state-builder.test.ts` 中与 v1.5.3 升级对应的项目版本号断言测试。
+- Fixed: 修正了 `tests/unit/canvas-runtime-state-builder.test.ts` 中与 v1.5.4 升级对应的项目版本号断言测试。
 - Passed: `npm run typecheck`
 - Passed: 侧边和桌面工具栏折叠/展开测试以及所有的单元和集成测试。
 
@@ -82,5 +82,5 @@ npm run check:encoding
 
 - Always read `AGENTS.md`, `AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md`, `package.json`, and `config/release-manifest.json` before editing.
 - If user or another AI changes files in parallel, inspect `git status` and current diffs first; never revert unrelated work.
-- Treat docs that mention `src/` as live runtime, `.agent` as current rules, Netlify as the current backend, or versions before `v1.5.3` as drift unless clearly marked historical/archive.
+- Treat docs that mention `src/` as live runtime, `.agent` as current rules, Netlify as the current backend, or versions before `v1.5.4` as drift unless clearly marked historical/archive.
 - For assistant work, prefer small sprint-sized changes and update this file plus `docs/ai-assistant/*` with touched files, validation, and next step.

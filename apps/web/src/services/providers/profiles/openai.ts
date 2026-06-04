@@ -3,7 +3,7 @@
  * @module apps/web/src/services/providers/profiles
  * @description OpenAI 官方渠道画像。
  * @author KK-Studio Team
- * @version 1.5.3
+ * @version 1.5.4
  */
 
 import { ProviderProfile } from './index';

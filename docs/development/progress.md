@@ -1,4 +1,4 @@
-# Project Progress Report - KK Studio v1.5.3
+# Project Progress Report - KK Studio v1.5.4
 
 ## 状态
 **Current Status**: Active / Documentation Baseline Synced
@@ -6,10 +6,10 @@
 ## 1. 已完成
 
 ### 1.1 版本与说明统一
-- [x] 主项目版本统一为 `1.5.3`
+- [x] 主项目版本统一为 `1.5.4`
 - [x] 画布展示版本继续以 `src/config/appInfo.ts` 集中管理
-- [x] README、开发进度、交接文档、移动端报告同步到 `v1.5.3`
-- [x] 支付子服务与 `packages/*` 版本元信息同步到 `1.5.3`
+- [x] README、开发进度、交接文档、移动端报告同步到 `v1.5.4`
+- [x] 支付子服务与 `packages/*` 版本元信息同步到 `1.5.4`
 - [x] 修复 Node/ESM 启动链、用户路由云回退、账单 hydrate 误判与 Canvas 本地持久化问题
 - [x] 构建版本清单补充 `releaseDate / releaseNotes`，便于后续发布与更新校验
 - [x] 重构移动端设置页顶栏布局，删除中英文按钮，使文案居中，规范左侧返回和右侧关闭逻辑
@@ -28,7 +28,7 @@
 ## 2. 当前重点
 - **稳定优先**：在不破坏既有使用路径的前提下，继续把设置、后台和鉴权链路做稳
 - **部署一致性**：继续降低本地与线上环境差异，尤其是服务端配置与会话相关行为
-- **文档一致性**：今后所有“当前版本”说明以 `1.5.3` 为基线
+- **文档一致性**：今后所有“当前版本”说明以 `1.5.4` 为基线
 - **多供应商架构方案**：已补充独立供应商 / 多协议面 / surface 路由的分层改造方案，详见 `docs/development/multi-vendor-provider-architecture.md`
 - **验证链补强**：集成测试、支付侧静态校验与 Hosted 预检继续纳入默认回归口径
 - **运行时口径一致**：当前桌面 Web 主运行时以 `apps/web/` 为准，后端过渡代理与 VPS 路由以 `server/` 为准，版本事实以 `config/release-manifest.json` 为准

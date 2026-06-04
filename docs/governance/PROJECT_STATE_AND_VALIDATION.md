@@ -1,6 +1,6 @@
-# Project State and Validation — KK Studio v1.5.3
+# Project State and Validation — KK Studio v1.5.4
 
-Last updated: 2026-06-03
+Last updated: 2026-06-04
 
 ---
 
@@ -15,7 +15,7 @@ Agent 判断“现在项目处于什么状态”“哪些验证已经跑过”�
 ## 1. 当前验证基线
 
 ```text
-Project version: KK Studio v1.5.3
+Project version: KK Studio v1.5.4
 Version source of truth: config/release-manifest.json
 Node / package manager: root package.json engines.node and packageManager
 AI rules entry: AGENTS.md
@@ -144,7 +144,7 @@ node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none test
 | Web 主目录是根 `src/` | 当前是 `apps/web/` |
 | 后端入口是 `netlify/functions` | 当前是 `server/` Express / VPS |
 | payment-server 是主要后端 | 当前应收口到 `server/` |
-| 版本是 `1.4.x`、`1.5.0`、`1.5.1` | 当前稳定版本是 `KK Studio v1.5.3` |
+| 版本是 1.4.x、1.5.0、1.5.1 | 当前稳定版本是 KK Studio v1.5.4 |
 | `plans.md` 中 Netlify 为未来目标 | 仅历史，不作现行架构入口 |
 
 ---

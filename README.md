@@ -1,4 +1,4 @@
-# KK Studio v1.5.3
+# KK Studio v1.5.4
 
 > 面向 AI 创作、无限画布、智能模型路由、用户自主密钥、多端同步、积分计费与审计闭环的多模态 AI 工作台。
 
@@ -25,7 +25,7 @@ KK Studio 将 Prompt 编排、多模型调用、画布式资产管理、生成�
 
 ```text
 Project: KK Studio
-Version: v1.5.3
+Version: v1.5.4
 Repository: soudbs180-creator/nano-banana-KK-
 Version source of truth: config/release-manifest.json
 Primary Web app: apps/web/
@@ -260,7 +260,7 @@ docs/governance/ENCODING_AND_POWERSHELL.md
 
 ## 10. 项目结论
 
-KK Studio v1.5.3 的开发重点是把现有多模态创作工作台收敛为：
+KK Studio v1.5.4 的开发重点是把现有多模态创作工作台收敛为：
 
 ```text
 稳定 Monorepo 架构
