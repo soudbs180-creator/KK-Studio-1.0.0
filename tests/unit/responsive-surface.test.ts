@@ -100,7 +100,7 @@ describe('responsive surface utilities', () => {
     assert.match(settingsSource, /settings-shell-page--desktop/);
     assert.match(settingsSource, /settings-shell-page--mobile/);
     assert.match(cssSource, /--clay-desktop-shell-padding:\s*16px 28px 18px;/);
-    assert.match(cssSource, /--clay-mobile-shell-padding:\s*12px 12px calc\(env\(safe-area-inset-bottom, 0px\) \+ 14px\);/);
+    assert.match(cssSource, /--clay-mobile-shell-padding:\s*12px 8px calc\(env\(safe-area-inset-bottom, 0px\) \+ 14px\);/);
     assert.match(cssSource, /\.settings-panel \.settings-shell-page--desktop[\s\S]*padding:\s*var\(--clay-desktop-shell-padding\);/);
     assert.match(cssSource, /\.settings-panel \.settings-shell-page--mobile[\s\S]*padding:\s*var\(--clay-mobile-shell-padding\);/);
   });

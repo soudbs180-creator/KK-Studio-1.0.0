@@ -35,6 +35,10 @@ test('mobile result feed stays card-focused and defers full result actions to a 
   assert.match(tileSource, /gridColumnEnd/);
   assert.match(tileSource, /gridRowEnd/);
   assert.match(tileSource, /mobileLayout/);
+  assert.match(tileSource, /const \[isImageLoaded, setIsImageLoaded\] = React\.useState\(false\);/);
+  assert.match(tileSource, /data-testid="mobile-result-image-skeleton"/);
+  assert.match(tileSource, /style=\{\{ aspectRatio: imageAspectRatio, minHeight: '120px' \}\}/);
+  assert.match(tileSource, /onLoad=\{\(\) => setIsImageLoaded\(true\)\}/);
   assert.doesNotMatch(tileSource, /mobileTileSpan/);
 
   assert.match(detailSource, /data-testid="mobile-result-detail-screen"/);
@@ -48,6 +52,11 @@ test('mobile result feed stays card-focused and defers full result actions to a 
 
   assert.match(detailSource, /onPrevious/);
   assert.match(detailSource, /onNext/);
+  assert.match(detailSource, /const stopMobileActionPropagation = \(event: React\.SyntheticEvent\) => \{/);
+  assert.match(detailSource, /onPointerDown=\{stopMobileActionPropagation\}/);
+  assert.match(detailSource, /event\.preventDefault\(\);[\s\S]*event\.stopPropagation\(\);[\s\S]*onClick\(\);/);
+  assert.match(detailSource, /data-testid="mobile-result-detail-image-skeleton"/);
+  assert.match(detailSource, /sticky bottom-0 z-30 pointer-events-auto touch-manipulation/);
 });
 
 test('mobile result feed localizes chrome copy instead of hard-coding English in Chinese workspace', () => {
@@ -101,5 +110,20 @@ test('mobile result feed handles isLoading state and displays customized empty s
   assert.match(feedSource, /isLoading \?/);
   assert.match(feedSource, /<MobileResultFeedEmptyState \/>/);
   assert.match(feedSource, /data-testid="mobile-result-empty-state"/);
+});
+
+test('mobile result bottom controls stop touch and pointer events before they reach the feed', () => {
+  const feedSource = readSource('apps/web/src/components/mobile/MobileResultFeed.tsx');
+  const detailSource = readSource('apps/web/src/components/mobile/MobileResultDetailScreen.tsx');
+
+  assert.match(feedSource, /const stopMobileResultControlEvent = \(event: React\.SyntheticEvent\) => \{/);
+  assert.match(feedSource, /onPointerDown=\{stopMobileResultControlEvent\}/);
+  assert.match(feedSource, /className="w-full flex touch-manipulation items-center justify-between gap-3 pointer-events-auto py-1"/);
+  assert.match(feedSource, /className="flex touch-manipulation items-center gap-1 rounded-full border border-red-500\/20 bg-red-500\/10/);
+  assert.match(feedSource, /handleBatchDelete\(\);/);
+
+  assert.match(detailSource, /onTouchStart=\{stopMobileActionPropagation\}/);
+  assert.match(detailSource, /onTouchMove=\{stopMobileActionPropagation\}/);
+  assert.match(detailSource, /onTouchEnd=\{stopMobileActionPropagation\}/);
 });
 

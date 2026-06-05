@@ -115,6 +115,9 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';/);
   assert.match(source, /const isReadonlySecretPlaceholder = \(value\?: string \| null\)(?:: boolean)? => \{/);
   assert.match(source, /const resolveRuntimeSecretForSave = \(\s*draftValue: string,\s*persistedValue\?: string \| null,\s*\): string => \{/);
+  assert.match(source, /function maskSecret\(secret\?: unknown\): string \{/);
+  assert.match(source, /if \(isRecord\(secret\) && secret\.__kkUserApiSecret === true\) \{\s*return READONLY_SECRET_PLACEHOLDER;\s*\}/);
+  assert.match(source, /clean\.startsWith\('__kk_redacted__:'\)/);
   assert.match(source, /import \{ useAuth \} from '\.\.\/\.\.\/context\/AuthContext';/);
   assert.match(source, /import \{ resolveUserApiViewState \} from '\.\.\/\.\.\/services\/api\/userApiViewState';/);
   assert.match(source, /const \{ user, isTempUser \} = useAuth\(\);/);
@@ -158,7 +161,10 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.doesNotMatch(source, /`provider_\$\{Date\.now\(\)\}_\$\{Math\.random\(\)\.toString\(36\)\.slice\(2, 10\)\}`/);
   assert.match(source, /buildWuyinOneKeyProvider\(\s*wuyinApiKeyForSave,\s*catalog,\s*\{/);
   assert.match(source, /keySlotId: existingWuyinSlot\?\.id,/);
+  assert.match(settingsUiSource, /if \(str === 'sk-readonly-0000'\) return '••••••••••••';/);
   assert.match(settingsUiSource, /if \(isRedacted\) \{\s*return maskSecretDisplay\(value\);\s*\}\s*return value;/);
+  assert.doesNotMatch(settingsUiSource, /wuyin_••••/);
+  assert.doesNotMatch(settingsUiSource, /return maskedPreview;/);
   assert.match(source, /const selectedProvider = useMemo\(\(\) => \{/);
   assert.match(source, /thirdPartyProviders\.find\(\(provider\) =>/);
   assert.doesNotMatch(source, /provider\.name,\s*provider\.baseUrl/);

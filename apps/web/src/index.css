@@ -531,15 +531,27 @@
 }
 
 /* ===== 主题切换平滑过渡 ===== */
-body {
-  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+body,
+.settings-panel,
+.settings-shell-desktop,
+.settings-shell-mobile,
+.settings-reference-card,
+.settings-provider-card,
+.settings-reference-mini-metric,
+.settings-log-entry,
+.settings-provider-card__metric,
+.settings-reference-list-item,
+.settings-latency-matrix__item,
+.settings-model-center-route {
+  transition: background-color 0.12s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
 }
 
-/* 为所有可能受主题影响的属性添加过*/
-* {
-  transition-property: background-color, border-color, color, box-shadow;
-  transition-duration: 0.25s;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+body *,
+.settings-panel * {
+  transition-property: background-color, border-color, color, box-shadow !important;
+  transition-duration: 0.28s !important;
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+  transition-delay: 0s !important;
 }
 
 /* 禁用某些元素的过渡以避免性能问题 */
@@ -10864,17 +10876,17 @@ body.dark-mode .settings-panel {
    Clay Global UI Refit
    ============================================ */
 :root {
-  --clay-canvas: #fffaf0;
-  --clay-ink: #0a0a0a;
-  --clay-body: #3a3a3a;
-  --clay-body-strong: #1a1a1a;
-  --clay-muted: #6a6a6a;
-  --clay-muted-soft: #9a9a9a;
+  --clay-canvas: #ffffff;
+  --clay-ink: #000000;
+  --clay-body: #1f1f1f;
+  --clay-body-strong: #000000;
+  --clay-muted: #555555;
+  --clay-muted-soft: #777777;
   --clay-hairline: #e5e5e5;
   --clay-paper: #ffffff;
-  --clay-surface-soft: #faf5e8;
-  --clay-surface-card: #f5f0e0;
-  --clay-surface-strong: #ebe6d6;
+  --clay-surface-soft: #ffffff;
+  --clay-surface-card: #ffffff;
+  --clay-surface-strong: #ffffff;
   --clay-dark-canvas: #0b0b0c;
   --clay-dark-surface: #141414;
   --clay-dark-elevated: #1f1f1f;
@@ -10892,7 +10904,7 @@ body.dark-mode .settings-panel {
   --clay-shadow-card: none;
   --clay-shadow-shell: none;
   --clay-desktop-shell-padding: 16px 28px 18px;
-  --clay-mobile-shell-padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 14px);
+  --clay-mobile-shell-padding: 12px 8px calc(env(safe-area-inset-bottom, 0px) + 14px);
 
   --font-display: 'Plain Black', 'Inter', sans-serif;
   --font-sans: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -13492,7 +13504,7 @@ body.dark-mode .settings-panel { --settings-shell-bg: #000000; --settings-page-b
   --clay-shadow-card: none;
   --clay-shadow-shell: none;
   --clay-desktop-shell-padding: 16px 28px 18px;
-  --clay-mobile-shell-padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 14px);
+  --clay-mobile-shell-padding: 12px 8px calc(env(safe-area-inset-bottom, 0px) + 14px);
   --frost-input-bg-solid: #ffffff;
   --frost-input-bg: rgb(255 255 255 / 0.68);
   --frost-input-border: rgb(10 10 10 / 0.12);
@@ -16561,6 +16573,26 @@ body.light-mode .settings-panel .mobile-header-action-btn:active {
 
 /* 7. 二级编辑页面顶栏工具条在移动端下的安全间隙调整 */
 @media (max-width: 767px) {
+  .settings-panel .settings-shell-mobile__topbar {
+    left: 24px !important;
+    right: 24px !important;
+    width: auto !important;
+    margin: 0 !important;
+    border-radius: 18px !important;
+  }
+
+  .settings-panel .settings-shell-page--mobile {
+    padding-top: 76px !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  .settings-panel .settings-shell-page--mobile .settings-reference-stack,
+  .settings-panel .settings-shell-page--mobile .settings-dashboard-overview-grid,
+  .settings-panel .settings-shell-page--mobile .settings-dashboard-secondary-grid {
+    width: 100%;
+  }
+
   .settings-panel .settings-model-center-editor-page__bar {
     margin-top: 0px !important; /* 简体中文注释：归零移动端二级编辑器顶部的额外偏移，使其完全依赖滚动容器 of 统一 24px padding-top */
     margin-bottom: 6px !important;
@@ -17336,6 +17368,39 @@ body:not(.dark-mode) .settings-model-center-route__btn-action--danger span {
   filter: none !important;
 }
 
+/* ==========================================================================
+   KK-Studio 亮色模式高对比度细边框覆盖补齐
+   ========================================================================== */
+
+/* 亮色模式下（body:not(.dark-mode)），为设置面板内的核心容器和边框补齐灰色细边框 */
+body:not(.dark-mode) .settings-panel .settings-shell-desktop,
+body:not(.dark-mode) .settings-panel .settings-shell-mobile,
+body:not(.dark-mode) .settings-panel .settings-sidebar {
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+body:not(.dark-mode) .settings-panel .settings-reference-card,
+body:not(.dark-mode) .settings-panel .settings-provider-card,
+body:not(.dark-mode) .settings-panel .settings-reference-mini-metric,
+body:not(.dark-mode) .settings-panel .settings-log-entry,
+body:not(.dark-mode) .settings-panel .settings-provider-card__metric,
+body:not(.dark-mode) .settings-panel .settings-reference-list-item,
+body:not(.dark-mode) .settings-panel .settings-latency-matrix__item,
+body:not(.dark-mode) .settings-panel .settings-model-center-route,
+body:not(.dark-mode) .settings-panel .settings-api-quick-add,
+body:not(.dark-mode) .settings-panel .settings-dashboard-cockpit__node {
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: none !important;
+}
+
+/* 亮色模式下的输入控件、下拉选择、文本域描边 */
+body:not(.dark-mode) .settings-panel input[type="text"],
+body:not(.dark-mode) .settings-panel input[type="number"],
+body:not(.dark-mode) .settings-panel input[type="password"],
+body:not(.dark-mode) .settings-panel select,
+body:not(.dark-mode) .settings-panel textarea {
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+}
 
 
 

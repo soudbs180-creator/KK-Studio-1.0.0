@@ -26,7 +26,15 @@ test('settings workbench compacts mobile surfaces instead of stacking oversized 
 
   assert.match(
     cssSource,
-    /\.settings-panel \.settings-shell-page--mobile \{[\s\S]*padding: 12px 12px calc\(env\(safe-area-inset-bottom, 0px\) \+ 14px\);/,
+    /--clay-mobile-shell-padding: 12px 8px calc\(env\(safe-area-inset-bottom, 0px\) \+ 14px\);/,
+  );
+  assert.match(
+    cssSource,
+    /@media \(max-width: 767px\) \{[\s\S]*\.settings-panel \.settings-shell-mobile__topbar \{[\s\S]*left: 24px !important;[\s\S]*right: 24px !important;[\s\S]*width: auto !important;/,
+  );
+  assert.match(
+    cssSource,
+    /@media \(max-width: 767px\) \{[\s\S]*\.settings-panel \.settings-shell-page--mobile \{[\s\S]*padding-left: 8px !important;[\s\S]*padding-right: 8px !important;/,
   );
   assert.match(
     cssSource,
@@ -132,6 +140,25 @@ test('settings workbench compacts mobile surfaces instead of stacking oversized 
     panelSource,
     /inline-flex min-h-\[32px\] items-center gap-1 rounded-full px-3 py-1\.5 text-xs font-medium/,
   );
+});
+
+test('API workbench overview uses a compact 2x2 mobile card grid', () => {
+  const workbenchSectionsSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
+
+  assert.match(
+    workbenchSectionsSource,
+    /className="api-workbench-overview-grid grid grid-cols-2 gap-3 xl:grid-cols-4"/,
+  );
+  assert.match(
+    workbenchSectionsSource,
+    /@media \(max-width: 767px\) \{[\s\S]*\.api-workbench-overview-grid \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
+  );
+  assert.match(
+    workbenchSectionsSource,
+    /\.api-workbench-overview-grid \.premium-info-card \{[\s\S]*min-height: 128px;[\s\S]*flex-direction: column;/,
+  );
+  assert.match(workbenchSectionsSource, /premium-info-card__value/);
+  assert.match(workbenchSectionsSource, /premium-info-card__helper/);
 });
 
 test('settings workbench uses frosted glass tokens and blur layers', () => {

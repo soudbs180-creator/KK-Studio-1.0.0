@@ -23,7 +23,6 @@ import {
 } from '../utils/referenceImageStorage';
 import {
     clearPersistedCanvasStorageSnapshot,
-    persistCanvasStateToLocalStorage,
     restoreCanvasStateFromLocalStorage,
 } from './canvasPersistence';
 import { useCanvasCloudSync } from './useCanvasCloudSync';
@@ -818,8 +817,15 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isSaveBlockedRef.current = isSaveBlocked;
     }, [state, isSaveBlocked]);
 
+    const localPersistenceToken = useMemo(() => ({
+        canvases: state.canvases,
+        activeCanvasId: state.activeCanvasId,
+        subCardLayoutMode: state.subCardLayoutMode,
+    }), [state.activeCanvasId, state.canvases, state.subCardLayoutMode]);
+
     useCanvasLocalPersistence({
         state,
+        persistenceToken: localPersistenceToken,
         isLoading: isSaveBlocked,
         storageKey: STORAGE_KEY,
         stateRef,
@@ -1123,38 +1129,12 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, [updateCanvas]);
 
     const urgentUpdatePromptNode = useCallback((node: PromptNode) => {
-        // [Persistence] Bypass the debounced save and force an immediate state write.
-        // 1. Update React State (UI will reflect change)
+        // [Persistence] Request an urgent flush after React commits the updated state.
+        urgentSaveRef.current = true;
         updateCanvas(c => ({
             ...c,
             promptNodes: c.promptNodes.map(n => n.id === node.id ? { ...n, ...node } : n)
         }));
-
-        // 2. Immediate LocalStorage Save (Prevention for Refresh/Close)
-        // We use stateRef to get the most recent state since setState is async
-        const recentState = stateRef.current;
-        const activeCanvas = recentState.canvases.find(c => c.id === recentState.activeCanvasId);
-
-        if (activeCanvas) {
-            const updatedCanvases = recentState.canvases.map(c => {
-                if (c.id === recentState.activeCanvasId) {
-                    return {
-                        ...c,
-                        promptNodes: c.promptNodes.map(n => n.id === node.id ? { ...n, ...node } : n)
-                    };
-                }
-                return c;
-            });
-
-            const stateToSave = { ...recentState, canvases: updatedCanvases };
-
-            try {
-                persistCanvasStateToLocalStorage(stateToSave, 'urgent-node-save');
-                console.log(`[CanvasContext] URGENT SAVE for node ${node.id} to localStorage`);
-            } catch (e) {
-                console.error('[CanvasContext] Urgent save failed', e);
-            }
-        }
     }, [updateCanvas]);
 
     const addImageNodes = useCallback(async (nodes: GeneratedImage[], parentUpdates?: Record<string, Partial<PromptNode>>) => {
@@ -1928,19 +1908,6 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 } : c
             );
 
-            // Force save with the updated canvas state.
-            if (!prev.fileSystemHandle) {
-                try {
-                    persistCanvasStateToLocalStorage({
-                        ...prev,
-                        canvases: updatedCanvases,
-                        history: {}
-                    } as CanvasState, 'layout-save');
-                } catch (e) {
-                    console.error('Failed to save layout:', e);
-                }
-            }
-
             return { ...prev, canvases: updatedCanvases };
         });
 
@@ -2390,15 +2357,24 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
      */
     const selectNodes = useCallback((ids: string[], mode: CanvasSelectionMode = 'replace') => {
         setState(prev => {
+            const currentSelectedNodeIds = prev.selectedNodeIds || [];
+            const nextSelectedNodeIds = resolveCanvasSelectionIds(prev.selectedNodeIds, ids, mode);
+            if (
+                nextSelectedNodeIds.length === currentSelectedNodeIds.length
+                && nextSelectedNodeIds.every((id, index) => id === currentSelectedNodeIds[index])
+            ) {
+                return prev;
+            }
+
             return {
                 ...prev,
-                selectedNodeIds: resolveCanvasSelectionIds(prev.selectedNodeIds, ids, mode)
+                selectedNodeIds: nextSelectedNodeIds
             };
         });
     }, []);
 
     const clearSelection = useCallback(() => {
-        setState(prev => ({ ...prev, selectedNodeIds: [] }));
+        setState(prev => (prev.selectedNodeIds.length === 0 ? prev : { ...prev, selectedNodeIds: [] }));
     }, []);
 
     // [Layering] Bring nodes to front by assigning a higher zIndex.
@@ -2544,7 +2520,15 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Track viewport-center updates with useCallback to avoid needless loops.
     const setViewportCenter = useCallback((center: { x: number; y: number }) => {
-        setState(prev => ({ ...prev, viewportCenter: center }));
+        const roundedCenter = {
+            x: Math.round(center.x),
+            y: Math.round(center.y),
+        };
+        setState(prev => (
+            prev.viewportCenter.x === roundedCenter.x && prev.viewportCenter.y === roundedCenter.y
+                ? prev
+                : { ...prev, viewportCenter: roundedCenter }
+        ));
     }, []);
 
     // Migrate selected nodes to another canvas.

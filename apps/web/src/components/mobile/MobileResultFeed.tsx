@@ -67,6 +67,10 @@ const getFallbackWidth = (surface: ResponsiveSurface): number => {
   return 1280;
 };
 
+const stopMobileResultControlEvent = (event: React.SyntheticEvent) => {
+  event.stopPropagation();
+};
+
 const MobileResultStandardEmptySkeleton: React.FC<{ columnCount: number }> = ({ columnCount }) => {
   const skeletonCount = Math.max(4, Math.min(columnCount + 2, 6));
 
@@ -599,10 +603,12 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
         {isMultiSelectMode ? (
           // 简体中文：多选模式下的精致批量操作控制栏，毛玻璃暗色效果
           <div 
-            className="w-full flex items-center justify-between gap-3 pointer-events-auto py-1"
-            onClick={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            onTouchEnd={(e) => e.stopPropagation()}
+            className="w-full flex touch-manipulation items-center justify-between gap-3 pointer-events-auto py-1"
+            onPointerDown={stopMobileResultControlEvent}
+            onMouseDown={stopMobileResultControlEvent}
+            onClick={stopMobileResultControlEvent}
+            onTouchStart={stopMobileResultControlEvent}
+            onTouchEnd={stopMobileResultControlEvent}
           >
             <div className="min-w-0 flex flex-col justify-center">
               <span className="text-xs font-bold text-white tracking-wide">
@@ -618,8 +624,13 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
               <button
                 type="button"
                 disabled={selectedIds.size === 0}
-                onClick={handleBatchCopyPrompts}
-                className="flex items-center gap-1 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                onPointerDown={stopMobileResultControlEvent}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleBatchCopyPrompts();
+                }}
+                className="flex touch-manipulation items-center gap-1 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all"
                 title={pick('复制选中提示词', 'Copy selected prompts')}
               >
                 <Copy size={13} />
@@ -631,8 +642,13 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                 <button
                   type="button"
                   disabled={selectedIds.size === 0}
-                  onClick={handleBatchDownload}
-                  className="flex items-center gap-1 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                  onPointerDown={stopMobileResultControlEvent}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleBatchDownload();
+                  }}
+                  className="flex touch-manipulation items-center gap-1 rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all"
                   title={pick('下载选中图片', 'Download selected images')}
                 >
                   <Download size={13} />
@@ -645,8 +661,13 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                 <button
                   type="button"
                   disabled={selectedIds.size === 0}
-                  onClick={handleBatchDelete}
-                  className="flex items-center gap-1 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-400 active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                  onPointerDown={stopMobileResultControlEvent}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleBatchDelete();
+                  }}
+                  className="flex touch-manipulation items-center gap-1 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-400 active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all"
                   title={pick('删除选中图片', 'Delete selected images')}
                 >
                   <Trash2 size={13} />
@@ -659,10 +680,12 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
           // 简体中文：常规模式下的切换胶囊和计数器
           <>
             <div 
-              className="min-w-0 flex flex-col gap-0.5 pointer-events-auto"
-              onClick={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-              onTouchEnd={(e) => e.stopPropagation()}
+              className="min-w-0 flex touch-manipulation flex-col gap-0.5 pointer-events-auto"
+              onPointerDown={stopMobileResultControlEvent}
+              onMouseDown={stopMobileResultControlEvent}
+              onClick={stopMobileResultControlEvent}
+              onTouchStart={stopMobileResultControlEvent}
+              onTouchEnd={stopMobileResultControlEvent}
             >
               <p className="text-[11px] leading-relaxed text-[var(--text-primary)] font-medium">
                 {pick('点击任意结果查看完整提示词和操作。', 'Tap any result to inspect the full prompt and actions.')}
@@ -672,10 +695,12 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
               </div>
             </div>
             <div 
-              className="flex shrink-0 items-center gap-2 pointer-events-auto"
-              onClick={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-              onTouchEnd={(e) => e.stopPropagation()}
+              className="flex shrink-0 touch-manipulation items-center gap-2 pointer-events-auto"
+              onPointerDown={stopMobileResultControlEvent}
+              onMouseDown={stopMobileResultControlEvent}
+              onClick={stopMobileResultControlEvent}
+              onTouchStart={stopMobileResultControlEvent}
+              onTouchEnd={stopMobileResultControlEvent}
             >
               {/* 模式切换胶囊 */}
               <div className="flex rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-0.5 text-[11px] font-medium text-[var(--text-primary)] shadow-sm">

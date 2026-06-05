@@ -182,6 +182,110 @@ async function runFallbackVerification(error, browserPreflight) {
   console.log(JSON.stringify(summary, null, 2));
 }
 
+const SMOKE_PROFILE = {
+  id: 'drag-smoke-temp-user',
+  email: 'drag-smoke-temp-user@temp.local',
+  nickname: 'Drag Smoke Temp User',
+  avatarUrl: 'preset-default-local',
+  role: 'authenticated',
+  status: 'active',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+};
+const SMOKE_AUTH_SESSION = {
+  accessToken: 'smoke-settings-access-token',
+  refreshToken: 'smoke-settings-refresh-token',
+  expiresIn: 3600,
+  sessionExpiresAt: '2099-01-01T00:00:00.000Z',
+  profile: SMOKE_PROFILE,
+};
+
+function buildSmokeEnvelope(data) {
+  return {
+    success: true,
+    data,
+    meta: {
+      requestId: `drag-smoke-${Date.now()}`,
+      clientVersion: 'drag-smoke',
+      timestamp: new Date().toISOString(),
+    },
+  };
+}
+
+async function fulfillSmokeJson(route, data) {
+  await route.fulfill({
+    status: 200,
+    contentType: 'application/json; charset=utf-8',
+    body: JSON.stringify(buildSmokeEnvelope(data)),
+  });
+}
+
+async function installSmokeApiRoutes(page) {
+  await page.route('**/healthz', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json; charset=utf-8',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          service: 'kk-studio-api',
+          status: 'ok',
+          selfHostedCoreReady: true,
+          config: {
+            hasPostgresConfig: true,
+            hasAuthKey: true,
+            hasUserApiEncryptionSecret: true,
+          },
+          repositories: {
+            adminConsole: 'postgres',
+            authData: 'postgres',
+            creditAccounts: 'postgres',
+            creditProviders: 'postgres',
+            workspaceLayout: 'postgres',
+          },
+          persistence: {
+            userApiKeys: true,
+            keyManager: true,
+            authData: true,
+            authSessions: true,
+            tempUsers: true,
+            credits: true,
+            creditProviders: true,
+            workspaceLayout: true,
+          },
+        },
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/**', async (route) => {
+    const url = new URL(route.request().url());
+    const pathname = url.pathname.replace(/\/+$/, '');
+
+    if (pathname.endsWith('/api/v1/auth/session') || pathname.endsWith('/api/v1/auth/refresh')) {
+      await fulfillSmokeJson(route, SMOKE_AUTH_SESSION);
+      return;
+    }
+
+    if (pathname.endsWith('/api/v1/profile')) {
+      await fulfillSmokeJson(route, SMOKE_PROFILE);
+      return;
+    }
+
+    if (pathname.endsWith('/api/v1/profile/user-apis')) {
+      await fulfillSmokeJson(route, { entries: [] });
+      return;
+    }
+
+    if (pathname.endsWith('/api/v1/profile/key-manager-state')) {
+      await fulfillSmokeJson(route, { version: 1, slots: [], providers: [], entries: [] });
+      return;
+    }
+
+    await route.fallback();
+  });
+}
+
 async function resolvePlaywrightModuleUrl() {
   const npxCacheRoot = path.join(process.env.LOCALAPPDATA || "", "npm-cache", "_npx");
   if (!npxCacheRoot || !existsSync(npxCacheRoot)) {
@@ -338,7 +442,9 @@ try {
   page.on('console', msg => console.log('BROWSER_CONSOLE:', msg.text()));
   page.on('pageerror', err => console.error('BROWSER_PAGE_ERROR:', err.stack || err.message));
 
-  await page.addInitScript(() => {
+  await installSmokeApiRoutes(page);
+
+  await page.addInitScript(({ state, storageKey }) => {
     const now = Date.now();
     const expiresAt = now + 24 * 60 * 60 * 1000;
     const createdAtIso = new Date(now).toISOString();
@@ -379,6 +485,10 @@ try {
       isTempUser: true,
       tempUserExpiry: expiresAt,
     }));
+    window.localStorage.setItem(storageKey, JSON.stringify(state));
+  }, {
+    state: seededCanvasState,
+    storageKey: STORAGE_KEY,
   });
 
 
@@ -395,7 +505,21 @@ try {
 
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1500);
+  await dismissStorageModalIfPresent(page);
   await dismissSettingsPanelIfPresent(page);
+
+  if (await page.locator('[data-canvas-surface="prompt"]').count() === 0) {
+    await page.evaluate(({ state, storageKey }) => {
+      localStorage.setItem(storageKey, JSON.stringify(state));
+    }, {
+      state: seededCanvasState,
+      storageKey: STORAGE_KEY,
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2500);
+    await dismissStorageModalIfPresent(page);
+    await dismissSettingsPanelIfPresent(page);
+  }
 
   const preflight = await page.evaluate((storageKey) => {
     const rawState = localStorage.getItem(storageKey);

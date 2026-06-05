@@ -446,13 +446,17 @@ const resolveRuntimeSecretForSave = (
   return normalized;
 };
 
-function maskSecret(secret?: string | null): string {
-  const clean = String(secret || '').trim();
-  if (!clean || clean === READONLY_SECRET_PLACEHOLDER) {
+function maskSecret(secret?: unknown): string {
+  if (isRecord(secret) && secret.__kkUserApiSecret === true) {
     return READONLY_SECRET_PLACEHOLDER;
   }
-  if (clean.includes('...') || clean.includes('••')) {
-    return clean;
+
+  const clean = typeof secret === 'string' ? secret.trim() : '';
+  if (!clean || clean === READONLY_SECRET_PLACEHOLDER || clean.startsWith('__kk_redacted__:')) {
+    return READONLY_SECRET_PLACEHOLDER;
+  }
+  if (clean.includes('...') || clean.includes('••') || clean.includes('wuyin_••••')) {
+    return READONLY_SECRET_PLACEHOLDER;
   }
   if (clean.length <= 8) {
     return '***';
@@ -521,7 +525,7 @@ function toReadonlyOfficialSlot(rawValue: unknown): KeySlot | null {
   return {
     id,
     legacyIds: normalizeStringArray(raw.legacyIds),
-    key: hasStoredSecret(raw.key) ? maskSecret(raw.key as string) : '',
+    key: hasStoredSecret(raw.key) ? maskSecret(raw.key) : '',
 
     name: normalizeString(raw.name) || (provider === 'OpenAI' ? 'OpenAI' : 'Google'),
     provider,
@@ -574,7 +578,7 @@ function toReadonlyProvider(rawValue: unknown): ThirdPartyProvider | null {
     legacyIds: normalizeStringArray(raw.legacyIds),
     name: providerName,
     baseUrl: providerBaseUrl,
-    apiKey: hasStoredSecret(raw.apiKey ?? raw.key) ? maskSecret((raw.apiKey ?? raw.key) as string) : '',
+    apiKey: hasStoredSecret(raw.apiKey ?? raw.key) ? maskSecret(raw.apiKey ?? raw.key) : '',
 
     models: resolveEffectiveProviderModels({
       provider: providerName,
@@ -4233,7 +4237,6 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             <SettingInput
               label="API Key"
               value={officialForm.key}
-              maskedPreview={officialForm.keyPreview}
               onChange={(value) => setOfficialForm((current) => ({ ...current, key: value }))}
               placeholder={pick('输入本地 API 的 API Key', 'Enter the local API key')}
               type="password"
@@ -4420,7 +4423,6 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                   <SettingInput
                     label="API Key"
                     value={providerForm.apiKey}
-                    maskedPreview={providerForm.apiKeyPreview}
                     onChange={(value) => setProviderForm((current) => ({ ...current, apiKey: value }))}
                     placeholder={pick('输入该品牌的 API Key', 'Enter this provider API key')}
                     type="password"

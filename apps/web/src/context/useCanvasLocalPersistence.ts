@@ -1,8 +1,21 @@
-import { useEffect, type MutableRefObject } from 'react';
+import { useEffect, useRef, type MutableRefObject } from 'react';
 import { persistCanvasStateToLocalStorage } from './canvasPersistence';
+
+type BrowserIdleCallbackHandle = number;
+
+type BrowserIdleCallback = (
+    callback: () => void,
+    options?: { timeout?: number }
+) => BrowserIdleCallbackHandle;
+
+type BrowserIdleScheduler = Window & {
+    requestIdleCallback?: BrowserIdleCallback;
+    cancelIdleCallback?: (handle: BrowserIdleCallbackHandle) => void;
+};
 
 export function useCanvasLocalPersistence<T>(params: {
     state: T;
+    persistenceToken?: unknown;
     isLoading: boolean;
     storageKey: string;
     stateRef: MutableRefObject<T>;
@@ -12,6 +25,7 @@ export function useCanvasLocalPersistence<T>(params: {
 }): void {
     const {
         state,
+        persistenceToken,
         isLoading,
         storageKey,
         stateRef,
@@ -19,29 +33,51 @@ export function useCanvasLocalPersistence<T>(params: {
         urgentSaveRef,
         prepareBeforeUnloadState,
     } = params;
+    const localPersistenceToken = persistenceToken ?? state;
+    const hasSkippedInitialDebouncedSaveRef = useRef(false);
 
     useEffect(() => {
         if (isLoading) return;
+        if (!hasSkippedInitialDebouncedSaveRef.current) {
+            hasSkippedInitialDebouncedSaveRef.current = true;
+            urgentSaveRef.current = false;
+            return;
+        }
 
-        const saveState = async () => {
+        const saveState = () => {
             try {
-                persistCanvasStateToLocalStorage(state as any, storageKey, 'debounced-save');
+                persistCanvasStateToLocalStorage(stateRef.current as any, storageKey, 'debounced-save');
             } catch (error: any) {
                 if (error.name === 'QuotaExceededError') console.error('localStorage quota exceeded.');
                 else console.error('Failed to save state:', error);
             }
         };
 
-        let timer: any;
-        if (urgentSaveRef.current) {
-            urgentSaveRef.current = false;
-            saveState();
-        } else {
-            timer = setTimeout(saveState, 200);
-        }
+        const browserWindow = window as BrowserIdleScheduler;
+        let timer: number | undefined;
+        let idleCallbackHandle: BrowserIdleCallbackHandle | undefined;
+        const isUrgentSave = urgentSaveRef.current;
+        urgentSaveRef.current = false;
 
-        return () => clearTimeout(timer);
-    }, [isLoading, state, storageKey, urgentSaveRef]);
+        timer = window.setTimeout(() => {
+            const requestIdleCallback = browserWindow.requestIdleCallback;
+            if (requestIdleCallback) {
+                idleCallbackHandle = requestIdleCallback(saveState, { timeout: isUrgentSave ? 500 : 1500 });
+                return;
+            }
+
+            saveState();
+        }, isUrgentSave ? 0 : 600);
+
+        return () => {
+            if (timer !== undefined) {
+                window.clearTimeout(timer);
+            }
+            if (idleCallbackHandle !== undefined) {
+                browserWindow.cancelIdleCallback?.(idleCallbackHandle);
+            }
+        };
+    }, [isLoading, localPersistenceToken, stateRef, storageKey, urgentSaveRef]);
 
     useEffect(() => {
         const handleSave = (source: 'visibility' | 'beforeunload') => {

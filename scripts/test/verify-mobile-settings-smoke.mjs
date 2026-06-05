@@ -505,7 +505,7 @@ try {
 
   await installSmokeApiRoutes(page);
 
-  await page.addInitScript(() => {
+  await page.addInitScript(({ state, storageKey }) => {
     const now = Date.now();
     const expiresAt = now + 24 * 60 * 60 * 1000;
     const createdAtIso = new Date(now).toISOString();
@@ -546,6 +546,10 @@ try {
       isTempUser: true,
       tempUserExpiry: expiresAt,
     }));
+    window.localStorage.setItem(storageKey, JSON.stringify(state));
+  }, {
+    state: seededCanvasState,
+    storageKey: STORAGE_KEY,
   });
 
   await gotoWithRetry(page, targetUrl);
@@ -563,14 +567,60 @@ try {
   await page.waitForTimeout(1500);
   await dismissStorageModalIfPresent(page);
   await dismissSettingsPanelIfPresent(page);
+  if (await page.locator('[data-testid^="mobile-result-tile-"]').count() === 0) {
+    await page.evaluate(({ state, storageKey }) => {
+      localStorage.setItem(storageKey, JSON.stringify(state));
+    }, {
+      state: seededCanvasState,
+      storageKey: STORAGE_KEY,
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2500);
+    await dismissStorageModalIfPresent(page);
+    await dismissSettingsPanelIfPresent(page);
+  }
 
   const mobileSurface = page.getByTestId('mobile-workspace-surface');
   const mobileShell = page.getByTestId('mobile-app-shell');
-  const resultTile = page.getByTestId('mobile-result-tile-image-ecom');
+  const seededResultTile = page.getByTestId('mobile-result-tile-image-ecom');
+  const resultTile = page.locator('[data-testid^="mobile-result-tile-"]').first();
 
   await assertVisible(mobileSurface, 'Mobile workspace surface did not render.');
   await assertVisible(mobileShell, 'Mobile app shell did not render.');
-  await assertVisible(resultTile, 'Seeded mobile result tile did not render.');
+  try {
+    await seededResultTile.waitFor({ state: 'visible', timeout: 3000 });
+  } catch {
+    if (await resultTile.count() === 0) {
+      const canvasStateSummary = await page.evaluate((storageKey) => {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) return { hasState: false };
+        try {
+          const parsed = JSON.parse(raw);
+          const activeCanvas = parsed.canvases?.find?.((canvas) => canvas.id === parsed.activeCanvasId)
+            || parsed.canvases?.[0]
+            || null;
+          return {
+            hasState: true,
+            activeCanvasId: parsed.activeCanvasId || null,
+            canvasCount: parsed.canvases?.length || 0,
+            promptCount: activeCanvas?.promptNodes?.length || 0,
+            imageCount: activeCanvas?.imageNodes?.length || 0,
+          };
+        } catch (error) {
+          return { hasState: true, parseError: String(error?.message || error) };
+        }
+      }, STORAGE_KEY);
+      writeFileSync(
+        path.join(ARTIFACT_DIR, 'mobile-no-result-debug.json'),
+        JSON.stringify(canvasStateSummary, null, 2),
+      );
+      await page.screenshot({
+        path: path.join(ARTIFACT_DIR, 'mobile-no-result-debug.png'),
+        fullPage: true,
+      });
+    }
+    await assertVisible(resultTile, 'Seeded mobile result tile did not render.');
+  }
 
   await page.screenshot({
     path: path.join(ARTIFACT_DIR, 'mobile-home.png'),

@@ -42,6 +42,8 @@ test('mobile settings smoke verification opens settings directly on overview bef
   assert.match(scriptSource, /mobile-workspace-surface/);
   assert.match(scriptSource, /mobile-header-menu-button/);
   assert.match(scriptSource, /mobile-result-tile/);
+  assert.match(scriptSource, /\[data-testid\^="mobile-result-tile-"\]/);
+  assert.match(scriptSource, /localStorage\.setItem\(storageKey, JSON\.stringify\(state\)\);[\s\S]*page\.reload\(\{ waitUntil: 'domcontentloaded' \}\);[\s\S]*page\.waitForTimeout\(2500\);/);
   assert.match(scriptSource, /mobile-result-detail-screen/);
   assert.match(scriptSource, /设置总览\|Settings Overview/);
   assert.match(scriptSource, /添加 API|本地 API|Local API/);
@@ -61,6 +63,8 @@ test('mobile settings smoke verification opens settings directly on overview bef
   assert.match(scriptSource, /runBrowserPreflight/);
   assert.match(scriptSource, /temp_user_session_v1/);
   assert.match(scriptSource, /mobile-smoke-temp-user/);
+  assert.match(scriptSource, /page\.addInitScript\(\(\{ state, storageKey \}\) => \{/);
+  assert.match(scriptSource, /window\.localStorage\.setItem\(storageKey, JSON\.stringify\(state\)\);/);
 
   assert.match(mobileHeaderSource, /data-testid="mobile-header-menu-button"/);
   assert.match(mobileSurfaceSource, /data-testid="mobile-more-menu-settings"/);

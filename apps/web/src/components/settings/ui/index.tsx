@@ -195,10 +195,10 @@ export const IconGrid: React.FC<{
 const maskSecretDisplay = (value: string) => {
   const str = String(value || '').trim();
   if (!str) return '';
-  if (str === 'sk-readonly-0000' || str === '尚未填写') return '尚未填写';
+  if (str === '尚未填写') return '尚未填写';
+  if (str === 'sk-readonly-0000') return '••••••••••••';
   if (str.startsWith('__kk_redacted__:') || str.startsWith('__kk_r')) {
-    // 简体中文注释：对脱敏后的占位密钥，在睁眼时显示易读的 wuyin_•••• 后缀格式
-    return `wuyin_••••${str.slice(-4)}`;
+    return '••••••••••••';
   }
   if (str.length <= 10) return '已填写';
   return `${str.slice(0, 6)}••••${str.slice(-4)}`;
@@ -215,8 +215,7 @@ export const SettingInput: React.FC<{
   helper?: string;
   disabled?: boolean;
   autoComplete?: string;
-  maskedPreview?: string;
-}> = ({ label, value, onChange, onBlur, placeholder, type = 'text', helper, disabled = false, autoComplete, maskedPreview }) => {
+}> = ({ label, value, onChange, onBlur, placeholder, type = 'text', helper, disabled = false, autoComplete }) => {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === 'password';
 
@@ -237,12 +236,8 @@ export const SettingInput: React.FC<{
       strVal === '已填写' ||
       strVal.includes('...') ||
       strVal.includes('••') ||
-      strVal.startsWith('__kk_redacted__:') ||
-      strVal.includes('wuyin_••••');
+      strVal.startsWith('__kk_redacted__:');
 
-    if (isRedacted && maskedPreview) {
-      return maskedPreview;
-    }
     if (isRedacted) {
       return maskSecretDisplay(value);
     }

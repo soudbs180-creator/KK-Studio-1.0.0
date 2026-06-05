@@ -85,6 +85,12 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
     : 1;
 
   const [imgLoadError, setImgLoadError] = React.useState(false);
+  const [isImageLoaded, setIsImageLoaded] = React.useState(false);
+
+  React.useEffect(() => {
+    setImgLoadError(false);
+    setIsImageLoaded(false);
+  }, [entry.id, entry.displaySrc]);
   
   // 初始化计时器状态以反应当前已用生成时间
   const [elapsed, setElapsed] = React.useState(() => {
@@ -101,6 +107,7 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
   }, [entry.isGenerating, entry.timestamp]);
 
   const isFailed = Boolean(entry.error || imgLoadError);
+  const shouldShowImageSkeleton = Boolean(entry.displaySrc) && !entry.isGenerating && !imgLoadError && !isImageLoaded;
 
   return (
     // 简体中文：当处于多选状态且选中时，突出呈现选中边框和投影效果
@@ -169,14 +176,34 @@ const MobileResultTile: React.FC<MobileResultTileProps> = ({
               </div>
             </div>
           ) : entry.displaySrc ? (
-            /* 渲染图片 - 采用 aspectRatio 限制与自适应布局 */
-            <img
-              src={entry.displaySrc}
-              alt={promptSummary}
-              onError={() => setImgLoadError(true)}
-              className="block w-full object-cover transition-transform duration-300 group-active:scale-[0.985] group-hover:scale-[1.01]"
-              style={{ aspectRatio: imageAspectRatio }}
-            />
+            /* 图片加载态与真实图片共用同一比例盒，先稳定绘制骨架再淡入资源 */
+            <div
+              className="relative w-full overflow-hidden"
+              style={{ aspectRatio: imageAspectRatio, minHeight: '120px' }}
+            >
+              {shouldShowImageSkeleton ? (
+                <div
+                  data-testid="mobile-result-image-skeleton"
+                  className="absolute inset-0 overflow-hidden bg-[var(--mobile-clay-muted-surface-bg)]"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/0 to-black/10" />
+                  <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer-sweep" />
+                  <div className="absolute inset-x-3 bottom-3 space-y-1.5">
+                    <div className="h-1.5 w-2/3 rounded-full bg-[var(--text-muted)]/16" />
+                    <div className="h-1.5 w-1/2 rounded-full bg-[var(--text-muted)]/10" />
+                  </div>
+                </div>
+              ) : null}
+              <img
+                src={entry.displaySrc}
+                alt={promptSummary}
+                onLoad={() => setIsImageLoaded(true)}
+                onError={() => setImgLoadError(true)}
+                className={`absolute inset-0 h-full w-full object-cover transition duration-300 group-active:scale-[0.985] group-hover:scale-[1.01] ${
+                  isImageLoaded ? 'opacity-100' : 'opacity-0'
+                }`}
+              />
+            </div>
           ) : (
             /* 暂无预览占位 - 采用 aspectRatio 限制与自适应布局 */
             <div

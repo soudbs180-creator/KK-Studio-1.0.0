@@ -15,6 +15,7 @@ import {
 } from '../utils/generatedImageLayout';
 import { getPromptNodeBoundsWidth } from '../utils/promptNodeCardWidth';
 import { traceLocalPerformance } from '../services/system/localPerformanceTrace';
+import { buildPromptGroupOverlapMap } from './promptGroupOverlapMap';
 import type {
   Point,
   PromptGroupLayoutPresentationState,
@@ -50,16 +51,6 @@ const PROMPT_GROUP_TIER_WEIGHT: Record<PromptGroupTier, number> = {
   focused: 2,
   generating: 3,
 };
-
-const boundsIntersect = (
-  left: PromptGroupBounds,
-  right: PromptGroupBounds,
-) => !(
-  left.x + left.width <= right.x
-  || right.x + right.width <= left.x
-  || left.y + left.height <= right.y
-  || right.y + right.height <= left.y
-);
 
 export interface UsePromptGroupLayoutDeps {
   activeCanvas: { id: string; promptNodes: PromptNode[]; imageNodes: GeneratedImage[] } | null | undefined;
@@ -1100,24 +1091,7 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
       return currentGroupOverlapMap;
     }
 
-    const nextOverlapMap: Record<string, string[]> = {};
-    const entries = Array.from(promptGroupBoundsById.entries());
-
-    entries.forEach(([groupId]) => {
-      nextOverlapMap[groupId] = [];
-    });
-
-    for (let leftIndex = 0; leftIndex < entries.length; leftIndex += 1) {
-      const [leftId, leftBounds] = entries[leftIndex];
-      for (let rightIndex = leftIndex + 1; rightIndex < entries.length; rightIndex += 1) {
-        const [rightId, rightBounds] = entries[rightIndex];
-        if (!boundsIntersect(leftBounds, rightBounds)) continue;
-        nextOverlapMap[leftId].push(rightId);
-        nextOverlapMap[rightId].push(leftId);
-      }
-    }
-
-    return nextOverlapMap;
+    return buildPromptGroupOverlapMap(promptGroupBoundsById);
   }, [currentGroupOverlapMap, isNodeDragActive, promptGroupBoundsById]);
 
   useEffect(() => {

@@ -105,6 +105,32 @@ const PREMIUM_CARDS_STYLE = (
       border-color: var(--icon-border-hover, rgba(255, 255, 255, 0.2)) !important;
       color: var(--icon-color-hover, var(--text-primary)) !important;
     }
+    @media (max-width: 767px) {
+      .api-workbench-overview-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .api-workbench-overview-grid .premium-info-card {
+        min-height: 128px;
+        flex-direction: column;
+        gap: 9px;
+        padding: 12px;
+      }
+      .api-workbench-overview-grid .premium-info-card__icon-box {
+        height: 32px;
+        width: 32px;
+      }
+      .api-workbench-overview-grid .premium-info-card__value {
+        font-size: 15px;
+        line-height: 1.25;
+        white-space: normal;
+      }
+      .api-workbench-overview-grid .premium-info-card__helper {
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+      }
+    }
   `}</style>
 );
 
@@ -159,8 +185,8 @@ export const InfoCell: React.FC<{
         </div>
         <div className="min-w-0 flex-1 space-y-0.5">
           <div className="text-[11px] font-medium tracking-[0.12em] text-[var(--text-tertiary)]">{label}</div>
-          <div className="text-[18px] font-bold text-[var(--text-primary)] [font-variant-numeric:tabular-nums] truncate">{value}</div>
-          {helper ? <div className="text-[11.5px] leading-relaxed text-[var(--text-secondary)] break-words">{helper}</div> : null}
+          <div className="premium-info-card__value text-[18px] font-bold text-[var(--text-primary)] [font-variant-numeric:tabular-nums] truncate">{value}</div>
+          {helper ? <div className="premium-info-card__helper text-[11.5px] leading-relaxed text-[var(--text-secondary)] break-words">{helper}</div> : null}
         </div>
       </div>
     );
@@ -350,7 +376,7 @@ export const ApiWorkbenchOverviewSection: React.FC<ApiWorkbenchOverviewSectionPr
         </div>
       ) : null}
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="api-workbench-overview-grid grid grid-cols-2 gap-3 xl:grid-cols-4">
         <InfoCell
           label={pick('当前状态', 'Current status')}
           value={workbenchStatusLabel}
@@ -813,22 +839,23 @@ export const ApiWorkbenchModelCenterSection: React.FC<ApiWorkbenchModelCenterSec
           <div className="settings-model-center-toolbar__actions">
             <button
               type="button"
-              data-testid="api-proxy-provider-add"
+              data-testid="api-official-provider-add"
               className="settings-model-center-toolbar__button settings-model-center-toolbar__button--primary"
+              disabled={addOfficialDisabled}
+              onClick={onAddOfficial}
+            >
+              <Plus size={14} />
+              <span>{pick('添加本地 API', 'Add local API')}</span>
+            </button>
+            <button
+              type="button"
+              data-testid="api-proxy-provider-add"
+              className="settings-model-center-toolbar__button"
               disabled={addProviderDisabled}
               onClick={onAddProvider}
             >
               <Plus size={14} />
-              <span>{pick('添加 API', 'Add API')}</span>
-            </button>
-            <button
-              type="button"
-              data-testid="api-official-provider-add"
-              className="absolute left-0 top-0 w-[1px] h-[1px] opacity-0 overflow-hidden border-0 p-0 bg-transparent"
-              disabled={addOfficialDisabled}
-              onClick={onAddOfficial}
-            >
-              L
+              <span>{pick('添加供应商', 'Add provider')}</span>
             </button>
             <span className="hidden" data-testid="api-simple-provider-add" aria-hidden="true" />
           </div>

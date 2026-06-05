@@ -29,6 +29,9 @@ test('canvas selection reducer owns selection mode semantics outside CanvasConte
   assert.match(contextSource, /from '\.\/canvasSelection';/);
   assert.match(selectionSource, /export type CanvasSelectionMode = 'replace' \| 'add' \| 'remove' \| 'toggle';/);
   assert.match(selectionSource, /export function resolveCanvasSelectionIds/);
+  assert.match(contextSource, /const currentSelectedNodeIds = prev\.selectedNodeIds \|\| \[\];/);
+  assert.match(contextSource, /nextSelectedNodeIds\.every\(\(id, index\) => id === currentSelectedNodeIds\[index\]\)/);
+  assert.match(contextSource, /prev\.selectedNodeIds\.length === 0 \? prev : \{ \.\.\.prev, selectedNodeIds: \[\] \}/);
   assert.doesNotMatch(contextSource, /switch \(mode\)/);
   assert.doesNotMatch(contextSource, /case 'toggle'/);
 });

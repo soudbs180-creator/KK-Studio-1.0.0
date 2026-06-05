@@ -77,6 +77,10 @@ const normalizeText = (value: string | null | undefined, fallback: string): stri
   return normalized ? normalized : fallback;
 };
 
+const stopMobileActionPropagation = (event: React.SyntheticEvent) => {
+  event.stopPropagation();
+};
+
 const ActionButton: React.FC<{
   label: string;
   icon: React.ReactNode;
@@ -94,9 +98,17 @@ const ActionButton: React.FC<{
   return (
     <button
       type="button"
-      onClick={onClick}
+      onPointerDown={stopMobileActionPropagation}
+      onMouseDown={stopMobileActionPropagation}
+      onTouchStart={stopMobileActionPropagation}
+      onTouchEnd={stopMobileActionPropagation}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onClick();
+      }}
       disabled={disabled}
-      className={`flex min-h-[44px] items-center justify-center gap-2 rounded-[16px] border px-3 text-[13px] font-medium transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45 ${toneClass}`}
+      className={`flex min-h-[44px] touch-manipulation select-none items-center justify-center gap-2 rounded-[16px] border px-3 text-[13px] font-medium transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45 ${toneClass}`}
     >
       {icon}
       <span className="truncate">{label}</span>
@@ -157,20 +169,28 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
   const [currentGroupImageIndex, setCurrentGroupImageIndex] = React.useState(0);
   const [showRedrawWorkspace, setShowRedrawWorkspace] = React.useState(false);
   const [imgLoadError, setImgLoadError] = React.useState(false);
+  const [isImageLoaded, setIsImageLoaded] = React.useState(false);
 
   React.useEffect(() => {
     setCurrentGroupImageIndex(0);
     setImgLoadError(false);
+    setIsImageLoaded(false);
   }, [entry.id]);
-
-  React.useEffect(() => {
-    setImgLoadError(false);
-  }, [currentGroupImageIndex]);
 
   const hasGroup = entry.groupEntries && entry.groupEntries.length > 0;
   const currentActiveEntry = hasGroup && entry.groupEntries![currentGroupImageIndex]
     ? entry.groupEntries![currentGroupImageIndex]
     : entry;
+  const detailImageAspectRatio = Number.isFinite(currentActiveEntry.mobileLayout.aspectRatio) && currentActiveEntry.mobileLayout.aspectRatio > 0
+    ? currentActiveEntry.mobileLayout.aspectRatio
+    : 1;
+  const shouldShowImageSkeleton = Boolean(currentActiveEntry.displaySrc) && !imgLoadError && !isImageLoaded;
+
+  React.useEffect(() => {
+    setImgLoadError(false);
+    setIsImageLoaded(false);
+  }, [currentGroupImageIndex, currentActiveEntry.displaySrc]);
+
   const redrawImageUrl = currentActiveEntry.primaryImageSource || currentActiveEntry.displaySrc;
   const redrawImage: GeneratedImage | null = redrawImageUrl
     ? {
@@ -360,12 +380,34 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
               </div>
             </div>
           ) : currentActiveEntry.displaySrc ? (
-            <img 
-              src={currentActiveEntry.displaySrc} 
-              alt={promptSummary} 
-              onError={() => setImgLoadError(true)}
-              className="h-auto w-full object-cover" 
-            />
+            <div
+              className="relative w-full overflow-hidden"
+              style={{ aspectRatio: detailImageAspectRatio, minHeight: '220px' }}
+            >
+              {shouldShowImageSkeleton ? (
+                <div
+                  data-testid="mobile-result-detail-image-skeleton"
+                  className="absolute inset-0 overflow-hidden bg-[var(--mobile-clay-muted-surface-bg)]"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/0 to-black/10" />
+                  <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer-sweep" />
+                  <div className="absolute left-4 top-4 h-6 w-24 rounded-full bg-[var(--text-muted)]/12" />
+                  <div className="absolute inset-x-4 bottom-16 space-y-2">
+                    <div className="h-2 w-2/3 rounded-full bg-white/14" />
+                    <div className="h-2 w-1/2 rounded-full bg-white/10" />
+                  </div>
+                </div>
+              ) : null}
+              <img
+                src={currentActiveEntry.displaySrc}
+                alt={promptSummary}
+                onLoad={() => setIsImageLoaded(true)}
+                onError={() => setImgLoadError(true)}
+                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+                  isImageLoaded ? 'opacity-100' : 'opacity-0'
+                }`}
+              />
+            </div>
           ) : (
             <div className="flex aspect-[3/4] items-center justify-center text-[var(--text-secondary)]">
               {pick('暂无预览', 'No Preview')}
@@ -570,7 +612,15 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
         </div>
       </div>
 
-      <div className="sticky bottom-0 border-t border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-bottom-bar-bg)] px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
+      <div
+        className="sticky bottom-0 z-30 pointer-events-auto touch-manipulation border-t border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-bottom-bar-bg)] px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3"
+        onPointerDown={stopMobileActionPropagation}
+        onMouseDown={stopMobileActionPropagation}
+        onTouchStart={stopMobileActionPropagation}
+        onTouchMove={stopMobileActionPropagation}
+        onTouchEnd={stopMobileActionPropagation}
+        onClick={stopMobileActionPropagation}
+      >
         {/* 第一排平铺按钮 */}
         <div className="grid grid-cols-3 gap-2">
           <ActionButton

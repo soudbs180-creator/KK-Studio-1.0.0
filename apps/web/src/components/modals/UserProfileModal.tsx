@@ -1519,7 +1519,7 @@ const ModalWrapper: React.FC<ModalWrapperProps> = ({
         onTouchEnd={(e) => e.stopPropagation()}
       >
         <div 
-          className="w-full max-w-[480px] max-h-[calc(100dvh-32px)] flex flex-col rounded-2xl border overflow-hidden text-white shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+          className="w-full max-w-[480px] max-h-[calc(100dvh-32px)] flex flex-col rounded-2xl border overflow-hidden text-white animate-in fade-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
           onTouchEnd={(e) => e.stopPropagation()}
@@ -1528,6 +1528,7 @@ const ModalWrapper: React.FC<ModalWrapperProps> = ({
             background: 'color-mix(in srgb, var(--frost-card-framework-bg) 88%, #0f1115)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
+            boxShadow: 'var(--frost-card-framework-shadow)',
           }}
         >
           {/* Header */}
