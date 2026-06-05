@@ -48,10 +48,11 @@ Runtime note: hidden groups are raised above their member cards so the blur over
 | :--- | :--- | :--- |
 | Desktop favorites rail button | `[data-testid="project-manager-favorites"]` / `#project-manager-favorites` | Opens the global favorites surface from the left ProjectManager tool rail, directly below search. |
 | Mobile favorites entry | `[data-testid="mobile-more-menu-favorites"]` | Opens favorites from the More sheet. It is not a bottom tab. |
-| Favorites panel | `[data-testid="favorites-panel"]` / `.workspace-favorites-panel` | Global liked library for favorite images and prompts. It supports search, sort, insert, rename/edit, and delete. |
-| Reference mention panel | `[data-testid="reference-mention-panel"]` / `.reference-mention-panel` | Opens while a registered composer has an active `@` token. Tabs are Uploaded, Tags, and Liked. |
+| Favorites panel | `[data-testid="favorites-panel"]` / `.workspace-favorites-panel.is-floating` | Global liked library for favorite images and prompts. It is a draggable floating window above the workspace, starts centered, and restores the last closed drag position from `kk_favorites_panel_position_v1`. |
+| Favorites drag handle | `[data-testid="favorites-panel-drag-handle"]` / `.workspace-favorites-drag-handle` | The title area moves the Favorites panel. This surface is separate from the `@` reference popup. |
+| Reference mention panel | `[data-testid="reference-mention-panel"]` / `.reference-mention-panel.is-floating` | Opens while a registered composer has an active `@` token. It anchors near the typed `@` and uses tabs 上传内容, 标签, 喜欢. |
 | Canvas prompt composer | composer id `promptbar` | Default focused composer. Prompt favorites insert text; image references insert `@name` and add attachable images to `config.referenceImages`. |
 | Chat assistant composer | composer id `assistant` | Inserts `@name` into the chat input and attaches selected images/files as assistant context when available. |
 | AI takeover dock composer | composer id `ai-dock` | Inserts `@name` into the dock input and uses the takeover resource pool as context. |
 
-Rule: favorites are global browser/app state. Workspace mirroring, when a file-system handle exists, writes `favorites/manifest.json`, `favorites/originals/`, and `favorites/thumbnails/` without deleting canvas originals.
+Rule: favorites are global browser/app state. Workspace mirroring, when a file-system handle exists, writes `favorites/manifest.json`, `favorites/originals/`, and `favorites/thumbnails/` without deleting canvas originals. The heart entry opens the Favorites collection window with Chinese UI copy; typing `@` opens only the lightweight reference popup above the typed token.

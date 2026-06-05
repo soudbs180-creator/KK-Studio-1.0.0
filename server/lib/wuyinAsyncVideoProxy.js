@@ -181,6 +181,20 @@ function buildWuyinVideoDetailUrl(baseUrl, taskId) {
   return `${normalizeWuyinVideoBaseUrl(baseUrl)}${WUYIN_ASYNC_VIDEO_DETAIL_PATH}?id=${encodeURIComponent(String(taskId || '').trim())}`;
 }
 
+function isWuyinDetailQueryUrl(url) {
+  try {
+    const parsed = new URL(String(url || ''));
+    const pathname = parsed.pathname.replace(/\/+$/, '');
+    return (
+      pathname === '/api/async/detail'
+      || pathname === '/api/sora2/detail'
+      || pathname === '/api/img/drawDetail'
+    );
+  } catch {
+    return false;
+  }
+}
+
 function resolveWuyinVideoSize(input) {
   const explicitSize = String(input && input.size || '').trim();
   if (/^\d+x\d+$/i.test(explicitSize)) return explicitSize.toLowerCase();
@@ -405,10 +419,10 @@ async function fetchWuyinVideoJson(url, apiKey, method = 'GET', body) {
   }
 
   let targetUrl = url;
-  // 简体中文注释：对于五音科技的后端代理请求，如果 apiKey 存在，则在 URL 上面额外拼接 ?key=密钥 鉴权参数。
-  if (apiKey) {
-    const separator = targetUrl.includes('?') ? '&' : '?';
-    targetUrl = `${targetUrl}${separator}key=${encodeURIComponent(apiKey)}`;
+  if (isWuyinDetailQueryUrl(targetUrl)) {
+    const parsed = new URL(targetUrl);
+    parsed.searchParams.set('key', apiKey);
+    targetUrl = parsed.toString();
   }
 
   const headers = {

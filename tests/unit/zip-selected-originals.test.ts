@@ -43,8 +43,8 @@ test('selected ZIP packages only the selected image originalUrl', async () => {
     selectedNodeIds: ['img-1'],
     promptNodes: [],
     imageNodes: [
-      makeImage({ id: 'img-1', originalUrl: 'https://cdn.example.com/original-a.png', url: 'https://cdn.example.com/preview-a.png' }),
-      makeImage({ id: 'img-2', originalUrl: 'https://cdn.example.com/original-b.png', url: 'https://cdn.example.com/preview-b.png' }),
+      makeImage({ id: 'img-1', originalUrl: 'https://assets.kkai.plus/test-fixtures/original-a.png', url: 'https://assets.kkai.plus/test-fixtures/preview-a.png' }),
+      makeImage({ id: 'img-2', originalUrl: 'https://assets.kkai.plus/test-fixtures/original-b.png', url: 'https://assets.kkai.plus/test-fixtures/preview-b.png' }),
     ],
     skipSave: true,
     fetchBlob: async (url) => {
@@ -59,7 +59,7 @@ test('selected ZIP packages only the selected image originalUrl', async () => {
   assert.equal(result.manifest.items[0].nodeId, 'img-1');
   assert.equal(result.manifest.items[0].sourceKind, 'originalUrl');
   assert.equal(result.manifest.items[0].originalUrlUsed, true);
-  assert.deepEqual(fetchedUrls, ['https://cdn.example.com/original-a.png']);
+  assert.deepEqual(fetchedUrls, ['https://assets.kkai.plus/test-fixtures/original-a.png']);
 });
 
 test('selected ZIP resolves selected prompt child images', async () => {
@@ -72,9 +72,9 @@ test('selected ZIP resolves selected prompt child images', async () => {
       makePrompt({ id: 'prompt-1', prompt: 'parent prompt', childImageIds: ['img-1', 'img-2'] }),
     ],
     imageNodes: [
-      makeImage({ id: 'img-1', parentPromptId: 'prompt-1', apiResultUrl: 'https://cdn.example.com/api-a.png' }),
-      makeImage({ id: 'img-2', parentPromptId: 'prompt-1', url: 'https://cdn.example.com/preview-b.png' }),
-      makeImage({ id: 'img-3', parentPromptId: 'other', url: 'https://cdn.example.com/preview-c.png' }),
+      makeImage({ id: 'img-1', parentPromptId: 'prompt-1', apiResultUrl: 'https://assets.kkai.plus/test-fixtures/api-a.png' }),
+      makeImage({ id: 'img-2', parentPromptId: 'prompt-1', url: 'https://assets.kkai.plus/test-fixtures/preview-b.png' }),
+      makeImage({ id: 'img-3', parentPromptId: 'other', url: 'https://assets.kkai.plus/test-fixtures/preview-c.png' }),
     ],
     skipSave: true,
     fetchBlob: async (url) => new Blob([url], { type: 'image/png' }),
@@ -108,23 +108,23 @@ test('selected ZIP dedupes prompt and child image selections', () => {
 test('original source resolution prefers originalUrl, apiResultUrl, url, then storageId', () => {
   assert.equal(resolveOriginalSource(makeImage({
     id: 'img-1',
-    originalUrl: 'https://cdn.example.com/original.png',
-    apiResultUrl: 'https://cdn.example.com/api.png',
-    url: 'https://cdn.example.com/preview.png',
+    originalUrl: 'https://assets.kkai.plus/test-fixtures/original.png',
+    apiResultUrl: 'https://assets.kkai.plus/test-fixtures/api.png',
+    url: 'https://assets.kkai.plus/test-fixtures/preview.png',
   })).sourceKind, 'originalUrl');
 
   assert.equal(resolveOriginalSource(makeImage({
     id: 'img-2',
     originalUrl: '',
-    apiResultUrl: 'https://cdn.example.com/api.png',
-    url: 'https://cdn.example.com/preview.png',
+    apiResultUrl: 'https://assets.kkai.plus/test-fixtures/api.png',
+    url: 'https://assets.kkai.plus/test-fixtures/preview.png',
   })).sourceKind, 'apiResultUrl');
 
   assert.equal(resolveOriginalSource(makeImage({
     id: 'img-3',
     originalUrl: '',
     apiResultUrl: '',
-    url: 'https://cdn.example.com/preview.png',
+    url: 'https://assets.kkai.plus/test-fixtures/preview.png',
   })).sourceKind, 'url');
 
   assert.equal(resolveOriginalSource(makeImage({
@@ -137,9 +137,9 @@ test('original source resolution prefers originalUrl, apiResultUrl, url, then st
 
   assert.deepEqual(resolveOriginalSourceCandidates(makeImage({
     id: 'img-5',
-    originalUrl: 'https://cdn.example.com/original.png',
-    apiResultUrl: 'https://cdn.example.com/api.png',
-    url: 'https://cdn.example.com/preview.png',
+    originalUrl: 'https://assets.kkai.plus/test-fixtures/original.png',
+    apiResultUrl: 'https://assets.kkai.plus/test-fixtures/api.png',
+    url: 'https://assets.kkai.plus/test-fixtures/preview.png',
     storageId: 'stored-img-5',
   })).map(candidate => candidate.sourceKind), ['originalUrl', 'apiResultUrl', 'url', 'storageId']);
 });
@@ -155,9 +155,9 @@ test('selected ZIP falls back from originalUrl to apiResultUrl when original fai
     imageNodes: [
       makeImage({
         id: 'img-1',
-        originalUrl: 'https://cdn.example.com/fail-original.png',
-        apiResultUrl: 'https://cdn.example.com/api-result.png',
-        url: 'https://cdn.example.com/preview.png',
+        originalUrl: 'https://assets.kkai.plus/test-fixtures/fail-original.png',
+        apiResultUrl: 'https://assets.kkai.plus/test-fixtures/api-result.png',
+        url: 'https://assets.kkai.plus/test-fixtures/preview.png',
       }),
     ],
     skipSave: true,
@@ -172,9 +172,50 @@ test('selected ZIP falls back from originalUrl to apiResultUrl when original fai
   assert.equal(result.failedCount, 0);
   assert.equal(result.manifest.items[0].sourceKind, 'apiResultUrl');
   assert.deepEqual(fetchedUrls, [
-    'https://cdn.example.com/fail-original.png',
-    'https://cdn.example.com/api-result.png',
+    'https://assets.kkai.plus/test-fixtures/fail-original.png',
+    'https://assets.kkai.plus/test-fixtures/fail-original.png',
+    'https://assets.kkai.plus/test-fixtures/api-result.png',
   ]);
+});
+
+test('selected ZIP limits download concurrency and reports progress', async () => {
+  let activeDownloads = 0;
+  let maxActiveDownloads = 0;
+  const progressEvents: Array<{ completed: number; nodeId: string; status: string }> = [];
+
+  const result = await zipOutputs('selected_cards', {
+    projectName: 'Test',
+    canvasId: 'canvas-1',
+    batchId: 'batch-1',
+    selectedNodeIds: ['img-1', 'img-2', 'img-3', 'img-4'],
+    promptNodes: [],
+    imageNodes: ['img-1', 'img-2', 'img-3', 'img-4'].map(id => makeImage({
+      id,
+      url: `https://assets.kkai.plus/test-fixtures/${id}.png`,
+    })),
+    downloadConcurrency: 2,
+    skipSave: true,
+    fetchBlob: async (url) => {
+      activeDownloads += 1;
+      maxActiveDownloads = Math.max(maxActiveDownloads, activeDownloads);
+      await new Promise(resolve => setTimeout(resolve, 5));
+      activeDownloads -= 1;
+      return new Blob([url], { type: 'image/png' });
+    },
+    onProgress: event => {
+      progressEvents.push({
+        completed: event.completed,
+        nodeId: event.nodeId,
+        status: event.status
+      });
+    },
+  });
+
+  assert.equal(result.count, 4);
+  assert.equal(result.failedCount, 0);
+  assert.equal(maxActiveDownloads, 2);
+  assert.equal(progressEvents.length, 4);
+  assert.deepEqual(progressEvents.map(event => event.completed).sort((a, b) => a - b), [1, 2, 3, 4]);
 });
 
 test('selected ZIP clearly errors with no selected downloadable cards', async () => {
@@ -185,7 +226,7 @@ test('selected ZIP clearly errors with no selected downloadable cards', async ()
       batchId: 'batch-1',
       selectedNodeIds: [],
       promptNodes: [],
-      imageNodes: [makeImage({ id: 'img-1', url: 'https://cdn.example.com/a.png' })],
+      imageNodes: [makeImage({ id: 'img-1', url: 'https://assets.kkai.plus/test-fixtures/a.png' })],
       skipSave: true,
       fetchBlob: async (url) => new Blob([url], { type: 'image/png' }),
     }),
@@ -201,8 +242,8 @@ test('selected ZIP writes failedItems into manifest', async () => {
     selectedNodeIds: ['img-1', 'img-2'],
     promptNodes: [],
     imageNodes: [
-      makeImage({ id: 'img-1', url: 'https://cdn.example.com/success.png' }),
-      makeImage({ id: 'img-2', url: 'https://cdn.example.com/fail.png' }),
+      makeImage({ id: 'img-1', url: 'https://assets.kkai.plus/test-fixtures/success.png' }),
+      makeImage({ id: 'img-2', url: 'https://assets.kkai.plus/test-fixtures/fail.png' }),
     ],
     skipSave: true,
     fetchBlob: async (url) => {
@@ -226,7 +267,7 @@ test('selected ZIP returns a manifest-only archive when every download fails', a
     selectedNodeIds: ['img-1'],
     promptNodes: [],
     imageNodes: [
-      makeImage({ id: 'img-1', url: 'https://cdn.example.com/fail.png' }),
+      makeImage({ id: 'img-1', url: 'https://assets.kkai.plus/test-fixtures/fail.png' }),
     ],
     skipSave: true,
     fetchBlob: async () => {

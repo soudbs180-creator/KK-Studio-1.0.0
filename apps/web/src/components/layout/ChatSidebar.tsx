@@ -59,9 +59,11 @@ import { useAssetStore } from '../../features/assets/assetStore';
 import {
     ReferenceMentionPanel,
     buildReferenceMentionTabs,
+    computeReferenceMentionAnchor,
     favoriteComposerRegistry,
     useFavoritesStore,
     type MentionReferencePayload,
+    type ReferenceMentionAnchor,
     type ReferenceMentionCandidate,
 } from '../../features/favorites';
 import { estimateTokens, getModelContextLimit } from '../../utils/contextHelper';
@@ -1290,6 +1292,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         query: string;
         start: number;
         end: number;
+        anchor?: ReferenceMentionAnchor;
     }>({ open: false, query: '', start: 0, end: 0 });
     const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
     const [isDropActive, setIsDropActive] = useState(false);
@@ -1959,6 +1962,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             query: token,
             start: atIndex,
             end: caret,
+            anchor: computeReferenceMentionAnchor(target, atIndex),
         });
     }, [closeReferenceMentionPanel]);
 
@@ -3541,6 +3545,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                     open={mentionState.open}
                                     query={mentionState.query}
                                     tabs={referenceMentionTabs}
+                                    anchor={mentionState.anchor}
                                     onSelect={replaceActiveMentionWithCandidate}
                                     onClose={closeReferenceMentionPanel}
                                 />

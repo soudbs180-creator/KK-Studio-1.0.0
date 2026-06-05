@@ -23,8 +23,8 @@
     "path": "docs/ai-assistant/flow-map.md",
     "title": "流程地图 (Flow Map)",
     "summary": "本文件整理了 KK Studio v1.5.4 的核心工作流流转路径。",
-    "contentHash": "fb53fd34f58011c7d6f9129b259aa538",
-    "updatedAt": "2026-06-05T13:06:01.217Z"
+    "contentHash": "5010189662b55ec57c679670203acfc7",
+    "updatedAt": "2026-06-05T13:44:34.474Z"
   },
   {
     "id": "doc_module_map_md",
@@ -68,8 +68,8 @@
     "path": "docs/ai-assistant/session-memory.md",
     "title": "会话记忆规约 (Session Memory)",
     "summary": "AI 助手通过会话上下文及运行态保持连续的任务处理能力。中断恢复与会话克隆需严格遵循此记忆流转标准。",
-    "contentHash": "09153522dd020491a1b2547b82119f2a",
-    "updatedAt": "2026-06-05T13:06:15.502Z"
+    "contentHash": "d4d727a64f95e01256377bbba97b713a",
+    "updatedAt": "2026-06-05T14:18:08.214Z"
   },
   {
     "id": "doc_skills_md",
@@ -95,7 +95,7 @@
     "path": "docs/ai-assistant/ui-map.md",
     "title": "UI 映射表 (UI Map)",
     "summary": "本文件维护 KK Studio v1.5.4 各界面入口、面板及其对应的 CSS 选择器或高亮标记，供 AI 助手进行组件聚焦与定位。",
-    "contentHash": "75a342f382f1d6b2c28f6daa69ef8bda",
-    "updatedAt": "2026-06-05T13:03:43.116Z"
+    "contentHash": "8bbf54323c080950ca1620d1e123bf9e",
+    "updatedAt": "2026-06-05T13:44:25.458Z"
   }
 ]

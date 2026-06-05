@@ -8026,21 +8026,28 @@ body.dark-mode .settings-panel .apple-glass-card {
 
 .workspace-favorites-panel {
   position: fixed;
-  z-index: 942;
+  z-index: 1200;
+  width: min(720px, calc(100vw - 24px));
+  height: min(680px, calc(100vh - 24px));
+  max-height: calc(100vh - 24px);
+  pointer-events: auto;
+}
+
+.workspace-favorites-panel.is-floating {
+  transform: none;
 }
 
 .workspace-favorites-panel.is-desktop {
-  top: 88px;
-  right: 24px;
-  bottom: 24px;
-  width: min(620px, calc(100vw - 48px));
+  min-width: min(640px, calc(100vw - 24px));
 }
 
 .workspace-favorites-panel.is-mobile {
-  left: 12px;
-  right: 12px;
-  top: calc(var(--mobile-content-top-inset) - 6px);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--mobile-tabbar-total-height) + 10px);
+  width: calc(100vw - 24px);
+  height: min(78vh, calc(100vh - 112px));
+}
+
+.workspace-favorites-panel.is-dragging {
+  cursor: grabbing;
 }
 
 .workspace-favorites-card {
@@ -8051,6 +8058,24 @@ body.dark-mode .settings-panel .apple-glass-card {
   padding: 18px;
   border-radius: 24px;
   overflow: hidden;
+}
+
+.workspace-favorites-drag-handle {
+  margin: -4px -4px 0;
+  padding: 4px;
+  border-radius: 18px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.workspace-favorites-panel.is-dragging .workspace-favorites-drag-handle {
+  cursor: grabbing;
+}
+
+.workspace-favorites-drag-handle .workspace-sheet-actions,
+.workspace-favorites-drag-handle button {
+  cursor: auto;
 }
 
 .workspace-favorites-search {
@@ -8306,6 +8331,14 @@ body.dark-mode .settings-panel .apple-glass-card {
   box-shadow: var(--shadow-lg);
   backdrop-filter: blur(18px) saturate(150%);
   -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+.reference-mention-panel.is-floating {
+  position: fixed;
+  right: auto;
+  bottom: auto;
+  width: min(360px, calc(100vw - 24px));
+  transform: translateY(calc(-100% - 8px));
 }
 
 .reference-mention-tabs {

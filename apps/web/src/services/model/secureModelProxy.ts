@@ -150,11 +150,7 @@ export async function callWuyinClientDirectImage(
   
   const modelId = payload.modelId.split('@')[0];
   const endpointPath = `/api/async/${modelId}`;
-  let targetUrl = `${baseUrl}${endpointPath}`;
-  
-  const parsed = new URL(targetUrl);
-  parsed.searchParams.set('key', apiKey);
-  targetUrl = parsed.toString();
+  const targetUrl = `${baseUrl}${endpointPath}`;
   
   const size = payload.imageSize || '1K';
   const aspectRatio = payload.aspectRatio || 'auto';
@@ -215,11 +211,7 @@ export async function callWuyinClientDirectVideo(
   
   const modelId = payload.modelId.split('@')[0];
   const endpointPath = `/api/async/${modelId}`;
-  let targetUrl = `${baseUrl}${endpointPath}`;
-  
-  const parsed = new URL(targetUrl);
-  parsed.searchParams.set('key', apiKey);
-  targetUrl = parsed.toString();
+  const targetUrl = `${baseUrl}${endpointPath}`;
   
   const body: Record<string, any> = {
     prompt: payload.prompt || '',

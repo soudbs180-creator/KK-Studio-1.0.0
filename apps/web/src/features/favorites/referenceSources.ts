@@ -147,9 +147,9 @@ export function buildReferenceMentionTabs(input: ReferenceMentionBuildInput): Re
     });
 
   return [
-    { id: 'upload', label: 'Uploaded', items: dedupeMentionCandidates(uploaded) },
-    { id: 'tag', label: 'Tags', items: dedupeMentionCandidates(taggedImages) },
-    { id: 'favorite', label: 'Liked', items: dedupeMentionCandidates(favorites) },
+    { id: 'upload', label: '上传内容', items: dedupeMentionCandidates(uploaded) },
+    { id: 'tag', label: '标签', items: dedupeMentionCandidates(taggedImages) },
+    { id: 'favorite', label: '喜欢', items: dedupeMentionCandidates(favorites) },
   ];
 }
 

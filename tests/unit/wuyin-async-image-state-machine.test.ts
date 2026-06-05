@@ -238,4 +238,90 @@ describe("Wuyin Async Image State Machine & Helper Tests", () => {
     }
   });
 
+  test("12. 速创图片提交接口只通过 Authorization 鉴权，不在提交 URL 拼 key", async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init || {} });
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({
+          code: 200,
+          msg: "操作成功",
+          data: { id: "task-1" }
+        })
+      } as any;
+    }) as typeof fetch;
+
+    const executor = require("../../server/lib/wuyinModelExecutor.js") as {
+      submitWuyinTask: (options: any) => Promise<any>;
+    };
+
+    try {
+      const result = await executor.submitWuyinTask({
+        catalogItem: {
+          id: "image_nanoBanana2",
+          executionMode: "async-detail",
+          endpointUrl: "https://api.wuyinkeji.com/api/async/image_nanoBanana2",
+          kind: "image"
+        },
+        apiKey: "test-key",
+        input: { prompt: "test prompt", size: "1K", aspectRatio: "auto" }
+      });
+
+      assert.equal(result.providerTaskId, "task-1");
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].url, "https://api.wuyinkeji.com/api/async/image_nanoBanana2");
+      assert.equal((calls[0].init.headers as Record<string, string>).Authorization, "test-key");
+      assert.match(String(calls[0].init.body), /"prompt":"test prompt"/);
+      assert.doesNotMatch(calls[0].url, /[?&]key=/);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("13. 速创详情查询使用 id 和 key 查询参数，同时保留 Authorization 头", async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init || {} });
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({
+          code: 200,
+          data: {
+            status: 2,
+            result: ["https://openpt1.wuyinkeji.com/result.png"]
+          }
+        })
+      } as any;
+    }) as typeof fetch;
+
+    const executor = require("../../server/lib/wuyinModelExecutor.js") as {
+      checkWuyinTaskStatus: (options: any) => Promise<any>;
+    };
+
+    try {
+      const result = await executor.checkWuyinTaskStatus({
+        catalogItem: {
+          id: "image_nanoBanana2",
+          executionMode: "async-detail",
+          detailPath: "/api/async/detail"
+        },
+        apiKey: "test-key",
+        providerTaskId: "task-1"
+      });
+
+      assert.equal(result.status, "success");
+      assert.deepEqual(result.urls, ["https://openpt1.wuyinkeji.com/result.png"]);
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].url, "https://api.wuyinkeji.com/api/async/detail?id=task-1&key=test-key");
+      assert.equal((calls[0].init.headers as Record<string, string>).Authorization, "test-key");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
 });

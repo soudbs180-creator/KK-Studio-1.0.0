@@ -6,11 +6,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
 const { z } = require('zod');
 const { getPool } = require('../lib/db');
 const { verifyJWT, signJWT } = require('../lib/jwt');
 const credits = require('../lib/credits');
+const { createFixedWindowRateLimiter } = require('../lib/fixedWindowRateLimiter');
 
 const router = express.Router();
 const isTestRun = process.env.NODE_ENV === 'test' || process.argv.some((arg) => arg.includes('test'));
@@ -41,9 +43,12 @@ function sendInsufficientCredits(res, currentCredits, requiredCredits, requestId
   });
 }
 
-const imageLimiterMap = new Map();
 const LIMIT_WINDOW_MS = 60 * 1000;
 const MAX_IMAGE_LIMIT = 10;
+const imageLimiter = createFixedWindowRateLimiter({
+  windowMs: LIMIT_WINDOW_MS,
+  max: MAX_IMAGE_LIMIT,
+});
 
 async function handleGenerateImage(req, res) {
   const requestId = String(req.headers['x-client-request-id'] || req.headers['x-request-id'] || '').trim() || require('crypto').randomUUID();
@@ -74,22 +79,13 @@ async function handleGenerateImage(req, res) {
   // 1. 云端积分模型限流器（只对非 local-user-api 生效）
   const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   const limitKey = `${ip}:${userId}`;
-  const now = Date.now();
-  let clientLimit = imageLimiterMap.get(limitKey);
-
-  if (!clientLimit || now > clientLimit.resetTime) {
-    clientLimit = { count: 1, resetTime: now + LIMIT_WINDOW_MS };
-    imageLimiterMap.set(limitKey, clientLimit);
-  } else {
-    clientLimit.count += 1;
-    if (clientLimit.count > MAX_IMAGE_LIMIT) {
-      const retryAfter = Math.ceil((clientLimit.resetTime - now) / 1000);
-      return res.status(429).json({
-        error: `云端模型生成请求过于频繁，请在 ${retryAfter} 秒后重试。使用自带 API Key 模式不受限制。`,
-        code: 'RATE_LIMITED',
-        requestId,
-      });
-    }
+  const clientLimit = imageLimiter.check(limitKey);
+  if (!clientLimit.allowed) {
+    return res.status(429).json({
+      error: `云端模型生成请求过于频繁，请在 ${clientLimit.retryAfter} 秒后重试。使用自带 API Key 模式不受限制。`,
+      code: 'RATE_LIMITED',
+      requestId,
+    });
   }
 
   res.setHeader('X-Refresh-Token', signJWT({ userId }));
@@ -158,15 +154,15 @@ async function handleGenerateImage(req, res) {
     // 简体中文注释：P0级优化——自动创建静态资源uploads目录并落盘为物理文件，拒绝大 Base64 文本拖垮数据库
     const uploadsDir = path.join(__dirname, '../uploads');
     if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
+      await fs.promises.mkdir(uploadsDir, { recursive: true });
     }
 
     const fileExt = generatedMimeType.split('/')[1] || 'png';
-    const filename = `kkai-gen-${userId}-${Date.now()}.${fileExt}`;
+    const filename = `kkai-gen-${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
     const filePath = path.join(uploadsDir, filename);
 
     // 将 base64 数据直接写入物理磁盘文件
-    fs.writeFileSync(filePath, Buffer.from(imagePart.inlineData.data, 'base64'));
+    await fs.promises.writeFile(filePath, Buffer.from(imagePart.inlineData.data, 'base64'));
     const staticImageUrl = `/uploads/${filename}`;
 
     // 数据库仅记录轻量级的静态路径，行体积降为数十字节，极致高吞吐性能！

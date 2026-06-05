@@ -587,13 +587,6 @@ async function submitWuyinTask({ catalogItem, apiKey, input, baseUrl }) {
     }
   }
   
-  // 在 URL 上面拼接 key 用于上游代理鉴权
-  if (apiKey) {
-    const parsed = new URL(targetUrl);
-    parsed.searchParams.set('key', apiKey);
-    targetUrl = parsed.toString();
-  }
-
   const contentType = catalogItem.contentType || catalogItem.submitContentType || 'application/json';
   const headers = {
     Authorization: apiKey,

@@ -76,6 +76,14 @@ function appendWuyinApiKeyToTargetUrl(targetUrl, apiKey) {
   const token = String(apiKey || '').trim();
   if (!token) return targetUrl;
   const parsed = new URL(targetUrl);
+  const pathname = parsed.pathname.replace(/\/+$/, '');
+  const isDetailQuery =
+    pathname === '/api/async/detail'
+    || pathname === '/api/sora2/detail'
+    || pathname === '/api/img/drawDetail';
+  if (!isDetailQuery) {
+    return parsed.toString();
+  }
   parsed.searchParams.set('key', token);
   return parsed.toString();
 }

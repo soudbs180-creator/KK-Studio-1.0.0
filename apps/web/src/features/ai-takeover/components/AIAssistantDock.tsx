@@ -10,9 +10,11 @@ import type { GenerationBatchJob } from '../../ai-assistant-runtime';
 import {
   ReferenceMentionPanel,
   buildReferenceMentionTabs,
+  computeReferenceMentionAnchor,
   favoriteComposerRegistry,
   useFavoritesStore,
   type MentionReferencePayload,
+  type ReferenceMentionAnchor,
   type ReferenceMentionCandidate,
 } from '../../favorites';
 import {
@@ -68,7 +70,7 @@ export const AIAssistantDock: React.FC = () => {
   const { images, files, outputs, addImage, addFile, removeAsset, addImageCollection } = useAssetStore();
   const favoriteItems = useFavoritesStore(state => state.items);
 
-  const [jobs, setJobs] = useState<GenerationBatchJob[]>([]);
+  const [jobs, setJobs] = useState<GenerationBatchJob[]>(() => durableGenerationQueue.getJobs());
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
 
   const { maxTokens, label: maxTokensLabel } = React.useMemo(() => {
@@ -89,14 +91,11 @@ export const AIAssistantDock: React.FC = () => {
 
   const isNearLimit = percentUsed >= 80;
 
-  useEffect(() => {
-    const updateJobs = () => {
-      setJobs(durableGenerationQueue.getJobs());
-    };
-    updateJobs();
-    const interval = setInterval(updateJobs, 1500); // 1.5s 刷新一次以保障极佳实时性
-    return () => clearInterval(interval);
-  }, []);
+  useEffect(() => durableGenerationQueue.subscribe(setJobs), []);
+
+  const activeJobs = React.useMemo(() => jobs.filter(job => (
+    job.status === 'running' || job.status === 'queued' || job.status === 'paused'
+  )), [jobs]);
 
   const [inputVal, setInputVal] = useState('');
   const [showResourcePanel, setShowResourcePanel] = useState(false);
@@ -110,6 +109,7 @@ export const AIAssistantDock: React.FC = () => {
     query: string;
     start: number;
     end: number;
+    anchor?: ReferenceMentionAnchor;
   }>({ open: false, query: '', start: 0, end: 0 });
 
   const referenceMentionTabs = React.useMemo(() => buildReferenceMentionTabs({
@@ -158,6 +158,7 @@ export const AIAssistantDock: React.FC = () => {
       query: token,
       start: atIndex,
       end: caret,
+      anchor: computeReferenceMentionAnchor(target, atIndex),
     });
   }, [closeReferenceMentionPanel]);
 
@@ -577,23 +578,24 @@ export const AIAssistantDock: React.FC = () => {
       </div>
 
       {/* 2.5 批量生成队列进度面板与恢复 UI */}
-      {jobs.filter(j => j.status !== 'completed' || j.prompts.some(p => p.status === 'running')).length > 0 && (
+      {activeJobs.length > 0 && (
         <div className="mx-4 my-2 p-3 rounded-xl border border-zinc-800 bg-[#0d0e12]/80 backdrop-blur-md shadow-lg space-y-2">
           <div className="flex items-center justify-between text-[10px] font-black text-zinc-400">
             <span className="flex items-center gap-1">
               <Cpu size={12} className="text-purple-500 animate-pulse" />
-              <span>生图队列排队中 ({jobs.filter(j => j.status === 'running' || j.status === 'queued').length})</span>
+              <span>生图队列排队中 ({activeJobs.length})</span>
             </span>
             <button 
-              onClick={() => durableGenerationQueue.clearAllJobs()}
+              onClick={() => durableGenerationQueue.archiveFinishedJobs()}
               className="text-[9px] text-zinc-500 hover:text-zinc-300 transition-all cursor-pointer"
+              title="只归档已完成或已取消的历史任务，不影响正在执行的任务"
             >
-              全部清空
+              归档完成
             </button>
           </div>
           
           <div className="max-h-36 overflow-y-auto space-y-2">
-            {jobs.map(job => {
+            {activeJobs.map(job => {
               const total = job.prompts.length;
               const completed = job.prompts.filter((p: any) => p.status === 'completed').length;
               const failed = job.prompts.filter((p: any) => p.status === 'failed').length;
@@ -849,6 +851,7 @@ export const AIAssistantDock: React.FC = () => {
             open={mentionState.open}
             query={mentionState.query}
             tabs={referenceMentionTabs}
+            anchor={mentionState.anchor}
             onSelect={replaceActiveMentionWithCandidate}
             onClose={closeReferenceMentionPanel}
           />

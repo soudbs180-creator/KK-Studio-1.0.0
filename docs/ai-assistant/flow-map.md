@@ -15,7 +15,7 @@ graph TD
     Panel --> UploadTab[Uploaded: PromptBar refs + assistant asset pool images/files]
     Panel --> TagTab[Tags: loaded canvas images with image tags or inherited Prompt tags]
     Panel --> LikedTab[Liked: global favorite images]
-    LikedLibrary[FavoritesPanel] --> Registry
+    LikedLibrary[Draggable FavoritesPanel floating window] --> Registry
     Registry --> PromptBar[PromptBar composer]
     Registry --> Assistant[ChatSidebar composer]
     Registry --> Dock[AI takeover dock composer]
@@ -36,6 +36,7 @@ Rules:
 - Non-image files are assistant context only. PromptBar inserts the text label but does not attach the file to image generation.
 - Favorite deletion removes only the favorite record and mirror blobs. It must not delete the original canvas image.
 - Favorite image rename updates the favorite display name; if the source image node is loaded, update `GeneratedImage.alias` so search can find it.
+- The heart Favorites surface is not the `@` popup. Favorites opens as a draggable floating collection window with Chinese copy; the `@` popup opens above the current token in the active composer.
 
 ## 0. 本地快速功能跳转工作流
 

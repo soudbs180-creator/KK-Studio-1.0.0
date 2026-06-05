@@ -10,6 +10,7 @@ const { z } = require('zod');
 const { verifyJWT, signJWT } = require('../lib/jwt');
 const { getPool } = require('../lib/db');
 const credits = require('../lib/credits');
+const { createFixedWindowRateLimiter } = require('../lib/fixedWindowRateLimiter');
 const BackendDispatcher = require('../lib/dispatcher'); // 引入统一派发器
 
 const router = express.Router();
@@ -42,9 +43,12 @@ function sendInsufficientCredits(res, currentCredits, requiredCredits, requestId
   });
 }
 
-const chatLimiterMap = new Map();
 const LIMIT_WINDOW_MS = 60 * 1000;
 const MAX_CHAT_LIMIT = 20;
+const chatLimiter = createFixedWindowRateLimiter({
+  windowMs: LIMIT_WINDOW_MS,
+  max: MAX_CHAT_LIMIT,
+});
 
 router.post('/chat', async (req, res) => {
   const requestId = resolveRequestId(req);
@@ -78,22 +82,15 @@ router.post('/chat', async (req, res) => {
   // 1. 云端积分模型限流器（只对非 local-user-api 生效）
   const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   const limitKey = `${ip}:${userId}`;
-  const now = Date.now();
-  let clientLimit = chatLimiterMap.get(limitKey);
+  const clientLimit = chatLimiter.check(limitKey);
 
-  if (!clientLimit || now > clientLimit.resetTime) {
-    clientLimit = { count: 1, resetTime: now + LIMIT_WINDOW_MS };
-    imageLimiterMap?.set?.(limitKey, clientLimit) || chatLimiterMap.set(limitKey, clientLimit); // 兼容可能挂载不同 map
-  } else {
-    clientLimit.count += 1;
-    if (clientLimit.count > MAX_CHAT_LIMIT) {
-      const retryAfter = Math.ceil((clientLimit.resetTime - now) / 1000);
-      return res.status(429).json({
-        error: `云端模型对话请求过于频繁，请在 ${retryAfter} 秒后重试。使用自带 API Key 模式不受限制。`,
-        code: 'RATE_LIMITED',
-        requestId,
-      });
-    }
+  if (!clientLimit.allowed) {
+    const retryAfter = clientLimit.retryAfter;
+    return res.status(429).json({
+      error: `云端模型对话请求过于频繁，请在 ${retryAfter} 秒后重试。使用自带 API Key 模式不受限制。`,
+      code: 'RATE_LIMITED',
+      requestId,
+    });
   }
 
   res.setHeader('X-Refresh-Token', signJWT({ userId }));

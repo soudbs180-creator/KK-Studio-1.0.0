@@ -2,7 +2,33 @@
 
 import type { CanvasRuntimeState } from '../types.ts';
 
+const MAX_RUNTIME_TEXT_LENGTH = 500;
+const LONG_SECRET_PATTERN = /(?:Bearer\s+[a-zA-Z0-9_\-.]+|sk-[a-zA-Z0-9_\-]{8,}|[A-Za-z0-9+/=_-]{80,})/g;
 
+const sanitizeRuntimeText = (value: unknown, maxLength = MAX_RUNTIME_TEXT_LENGTH): string => {
+  if (typeof value !== 'string') return '';
+  const sanitized = value
+    .replace(LONG_SECRET_PATTERN, '***')
+    .replace(/data:[^;\s]+;base64,[A-Za-z0-9+/=]+/g, 'data:***');
+  return sanitized.length > maxLength ? `${sanitized.slice(0, maxLength)}...` : sanitized;
+};
+
+const toArray = <T>(value: T[] | undefined | null): T[] => Array.isArray(value) ? value : [];
+
+const getNodeTags = (nodeById: Map<string, any>, ids: unknown): string[] => {
+  if (!Array.isArray(ids)) return [];
+  const tags = new Set<string>();
+  for (const id of ids) {
+    const node = typeof id === 'string' ? nodeById.get(id) : undefined;
+    if (!node || !Array.isArray(node.tags)) continue;
+    for (const tag of node.tags) {
+      if (typeof tag === 'string' && tag.trim()) {
+        tags.add(tag);
+      }
+    }
+  }
+  return Array.from(tags);
+};
 
 export interface CanvasRuntimeStateBuilderParams {
   currentPage: 'canvas' | 'settings' | 'agent' | 'unknown';
@@ -29,9 +55,10 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
   // 1. 获取画布基础信息
   const canvasId = activeCanvas?.id || 'default';
   const canvasName = activeCanvas?.name || '新画布';
-  const promptNodes = activeCanvas?.promptNodes || [];
-  const imageNodes = activeCanvas?.imageNodes || [];
-  const groups = activeCanvas?.groups || [];
+  const promptNodes = toArray<Record<string, any>>(activeCanvas?.promptNodes);
+  const imageNodes = toArray<Record<string, any>>(activeCanvas?.imageNodes);
+  const groups = toArray<Record<string, any>>(activeCanvas?.groups);
+  const selectedNodeIdsSafe = toArray(selectedNodeIds).filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
 
   // 2. 提取 viewport 和 transform
   let transform = { x: 0, y: 0, scale: 1 };
@@ -69,8 +96,15 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
   }
 
   // 3. 计算选区和分类去重
-  const selectedNodeIdsSet = new Set(selectedNodeIds);
-  
+  const selectedNodeIdsSet = new Set(selectedNodeIdsSafe);
+  const nodeById = new Map<string, any>();
+  for (const node of promptNodes) {
+    if (node?.id) nodeById.set(node.id, node);
+  }
+  for (const node of imageNodes) {
+    if (node?.id) nodeById.set(node.id, node);
+  }
+
   const selectedPrompts = promptNodes.filter((n: any) => selectedNodeIdsSet.has(n.id));
   const selectedPromptIds = selectedPrompts.map((n: any) => n.id);
   
@@ -89,14 +123,12 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
     .filter((group: any) => selectedNodeIdsSet.has(group.id))
     .map((group: any) => group.id);
   const runtimeGroups = groups.map((group: any) => {
-    const memberTags = [...promptNodes, ...imageNodes]
-      .filter((node: any) => (group.nodeIds || []).includes(node.id))
-      .flatMap((node: any) => node.tags || []);
-    const tags = Array.from(new Set([...(group.tags || []), ...memberTags]));
+    const memberTags = getNodeTags(nodeById, group.nodeIds);
+    const tags = Array.from(new Set([...(Array.isArray(group.tags) ? group.tags : []), ...memberTags]));
 
     return {
       id: group.id,
-      label: group.label,
+      label: sanitizeRuntimeText(group.label, 80),
       hidden: Boolean(group.hidden),
       collapsed: Boolean(group.collapsed),
       color: group.color,
@@ -107,16 +139,25 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
 
   // 4. 模拟 recentEvents 列表
   const recentEvents: any[] = [];
-  const allNodesSorted = [...promptNodes, ...imageNodes].sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
-  if (allNodesSorted.length > 0) {
-    const latest = allNodesSorted[0];
+  let latest: any | null = null;
+  for (const node of promptNodes) {
+    if (!latest || (Number(node?.timestamp) || 0) > (Number(latest?.timestamp) || 0)) {
+      latest = node;
+    }
+  }
+  for (const node of imageNodes) {
+    if (!latest || (Number(node?.timestamp) || 0) > (Number(latest?.timestamp) || 0)) {
+      latest = node;
+    }
+  }
+  if (latest) {
     recentEvents.push({
       id: 'event_' + latest.id,
       type: latest.childImageIds ? 'prompt_created' : 'image_created',
       targetIds: [latest.id],
       timestamp: latest.timestamp || Date.now(),
       summary: latest.childImageIds 
-        ? `创建了提示词卡片: "${(latest.prompt || '').substring(0, 20)}"` 
+        ? `创建了提示词卡片: "${sanitizeRuntimeText(latest.prompt, 20)}"` 
         : `生成了图像卡片`
     });
   }
@@ -140,7 +181,7 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
       rect
     },
     selection: {
-      selectedNodeIds,
+      selectedNodeIds: selectedNodeIdsSafe,
       promptNodeIds: selectedPromptIds,
       imageNodeIds: selectedImageIds,
       childImageNodeIdsFromSelectedPrompts,
@@ -151,7 +192,7 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
     selectedNodes: {
       prompts: selectedPrompts.map((n: any) => ({
         id: n.id,
-        prompt: n.prompt || '',
+        prompt: sanitizeRuntimeText(n.prompt),
         status: n.isGenerating ? 'generating' : (n.error ? 'failed' : (n.childImageIds?.length > 0 ? 'done' : 'idle')),
         childImageIds: n.childImageIds || [],
         tags: n.tags || []
@@ -167,7 +208,7 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
       }))
     },
     promptBarInput: config ? {
-      prompt: config.prompt || '',
+      prompt: sanitizeRuntimeText(config.prompt),
       mode: config.mode || 'image',
       referenceImagesCount: config.referenceImages?.length || 0
     } : undefined,

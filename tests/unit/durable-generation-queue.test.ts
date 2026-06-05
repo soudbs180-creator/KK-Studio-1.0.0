@@ -228,6 +228,63 @@ describe('DurableGenerationQueue Tests', () => {
     assert.equal(job.prompts[1].status, 'running');
   });
 
+  it('should not duplicate an in-flight prompt when paused and resumed before completion', async () => {
+    mockLocalStorage.clear();
+    const queue = new DurableGenerationQueue();
+
+    let callCount = 0;
+    let resolveTask: ((val: string[]) => void) | null = null;
+    queue.registerExecutor(async () => {
+      callCount++;
+      return new Promise<string[]>((resolve) => {
+        resolveTask = resolve;
+      });
+    });
+
+    const job = queue.createJob([
+      { id: 'p1', prompt: 'prompt 1' },
+      { id: 'p2', prompt: 'prompt 2' }
+    ], { concurrency: 1 }, 'canvas-1');
+
+    await new Promise(resolve => setTimeout(resolve, 10));
+    queue.pauseJob(job.id);
+    queue.resumeJob(job.id);
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    assert.equal(callCount, 1);
+    assert.equal(job.prompts[0].status, 'queued');
+    assert.equal(job.prompts[1].status, 'queued');
+
+    if (resolveTask) {
+      (resolveTask as any)(['node-1']);
+    }
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    assert.equal(job.prompts[0].status, 'completed');
+    assert.equal(job.prompts[1].status, 'running');
+    assert.equal(callCount, 2);
+  });
+
+  it('should notify queue subscribers on status changes', async () => {
+    mockLocalStorage.clear();
+    const queue = new DurableGenerationQueue();
+    const snapshots: string[] = [];
+
+    queue.registerExecutor(async (_prompt, _options, _jobId, promptId) => [`node-${promptId}`]);
+    const unsubscribe = queue.subscribe((jobs) => {
+      const job = jobs[0];
+      if (job) snapshots.push(job.status);
+    });
+
+    queue.createJob([{ id: 'p1', prompt: 'prompt 1' }], { concurrency: 1 }, 'canvas-1');
+    await new Promise(resolve => setTimeout(resolve, 40));
+    unsubscribe();
+
+    assert.ok(snapshots.includes('queued'));
+    assert.ok(snapshots.includes('running'));
+    assert.ok(snapshots.includes('completed'));
+  });
+
   it('should retry on failure up to max 3 times and backoff', async () => {
     mockLocalStorage.clear();
     const originalSetTimeout = globalThis.setTimeout;

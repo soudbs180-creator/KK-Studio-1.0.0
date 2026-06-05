@@ -56,10 +56,41 @@ test("Vercel user model proxy forwards only Wuyin async requests with the user A
 
     assert.equal(res.statusCode, 200);
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].url, "https://api.wuyinkeji.com/api/async/image_nanoBanana2?key=wu-key");
+    assert.equal(calls[0].url, "https://api.wuyinkeji.com/api/async/image_nanoBanana2");
     assert.equal((calls[0].init.headers as Record<string, string>).Authorization, "wu-key");
     assert.equal((calls[0].init.headers as Record<string, string>)["Content-Type"], "application/json");
     assert.equal(calls[0].init.body, "{\"prompt\":\"test prompt\"}");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Vercel user model proxy appends the Wuyin key only for detail polling", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(url), init: init || {} });
+    return new Response(JSON.stringify({ code: 200, data: { status: 2, result: ["https://img.wuyinkeji.com/out.png"] } }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  try {
+    const res = createResponse();
+    await handler({
+      method: "GET",
+      headers: {
+        "x-proxy-target-url": "https://api.wuyinkeji.com/api/async/detail?id=task-1",
+        "x-proxy-api-key": "wu-key",
+        accept: "application/json",
+      },
+    } as any, res as any);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, "https://api.wuyinkeji.com/api/async/detail?id=task-1&key=wu-key");
+    assert.equal((calls[0].init.headers as Record<string, string>).Authorization, "wu-key");
   } finally {
     globalThis.fetch = originalFetch;
   }

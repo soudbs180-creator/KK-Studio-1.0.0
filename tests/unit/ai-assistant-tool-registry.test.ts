@@ -110,6 +110,46 @@ test('工具注册表：安全级别 safe 工具成功驱动执行', async () =>
   assert.equal(latestLog?.status, 'success');
 });
 
+test('工具注册表：审计日志保留上限，避免长会话内存无限增长', async () => {
+  const registry = new AgentToolRegistry();
+  registry.register({
+    name: 'ping',
+    description: 'lightweight test tool',
+    permission: 'safe',
+    inputSchema: {},
+    handler: async (input: any) => input
+  });
+
+  for (let index = 0; index < 205; index += 1) {
+    await registry.execute('ping', { index }, { runId: 'run-log-cap' });
+  }
+
+  const logs = registry.getLogs();
+  assert.equal(logs.length, 200);
+  assert.match(logs[0].inputSummary, /"index":5/);
+  assert.match(logs[logs.length - 1].inputSummary, /"index":204/);
+});
+
+test('工具注册表：异常日志脱敏后写入审计记录', async () => {
+  const registry = new AgentToolRegistry();
+  registry.register({
+    name: 'explode',
+    description: 'test failing tool',
+    permission: 'safe',
+    inputSchema: {},
+    handler: async () => {
+      throw new Error('Bearer abcdefghijklmnopqrstuvwxyz0123456789.secret should not leak');
+    }
+  });
+
+  await assert.rejects(() => registry.execute('explode', {}, { runId: 'run-redact' }));
+  const logs = registry.getLogs();
+  const latestLog = logs[logs.length - 1];
+  assert.equal(latestLog?.status, 'failed');
+  assert.equal(latestLog?.error?.includes('abcdefghijklmnopqrstuvwxyz'), false);
+  assert.ok(latestLog?.error?.includes('Bearer ***'));
+});
+
 test('工具注册表：namespaced 读工具返回当前画布摘要', async () => {
   const result = await toolRegistryInstance.execute('canvas.getState', {}, {
     activeCanvas: {
@@ -223,8 +263,8 @@ test('ToolRegistry: assets.resolveOriginals returns selected original source sum
       imageNodes: [
         {
           id: 'img-1',
-          url: 'https://cdn.example.com/preview.png',
-          originalUrl: 'https://cdn.example.com/original.png',
+          url: 'https://assets.kkai.plus/test-fixtures/preview.png',
+          originalUrl: 'https://assets.kkai.plus/test-fixtures/original.png',
           prompt: 'test',
           parentPromptId: 'prompt-1',
           timestamp: 100,
@@ -235,7 +275,7 @@ test('ToolRegistry: assets.resolveOriginals returns selected original source sum
         },
         {
           id: 'img-2',
-          url: 'https://cdn.example.com/other.png',
+          url: 'https://assets.kkai.plus/test-fixtures/other.png',
           prompt: 'other',
           parentPromptId: 'prompt-2',
           timestamp: 101,

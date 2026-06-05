@@ -3,6 +3,8 @@
 
 import type { ToolPermission, AgentToolCallLog } from '../../ai-takeover/types.ts';
 
+const MAX_TOOL_LOGS = 200;
+
 export interface AgentToolDefinition<Input = any, Output = any> {
   name: string;
   description: string;
@@ -27,6 +29,13 @@ export const redactToolSummary = (value: unknown): string => {
 export class AgentToolRegistry {
   private tools = new Map<string, AgentToolDefinition>();
   private logs: AgentToolCallLog[] = [];
+
+  private appendLog(log: AgentToolCallLog): void {
+    this.logs.push(log);
+    if (this.logs.length > MAX_TOOL_LOGS) {
+      this.logs.splice(0, this.logs.length - MAX_TOOL_LOGS);
+    }
+  }
 
   register<Input, Output>(tool: AgentToolDefinition<Input, Output>) {
     if (this.tools.has(tool.name)) {
@@ -71,7 +80,7 @@ export class AgentToolRegistry {
         error: `未找到工具: ${name}`,
         completedAt: new Date().toISOString()
       };
-      this.logs.push(errorLog);
+      this.appendLog(errorLog);
       throw new Error(`未找到工具: ${name}`);
     }
 
@@ -84,14 +93,9 @@ export class AgentToolRegistry {
         error: `Execution forbidden for tool: ${name}`,
         completedAt: new Date().toISOString()
       };
-      this.logs.push(blockedLog);
+      this.appendLog(blockedLog);
       throw new Error(`Execution forbidden for tool: ${name}`);
     }
-
-    console.log(`[ToolRegistry] 执行工具: ${name}`, {
-      inputSummary: log.inputSummary,
-      permission: tool.permission
-    });
 
     try {
       const output = await tool.handler(input, ctx);
@@ -100,17 +104,18 @@ export class AgentToolRegistry {
         outputSummary: redactToolSummary(output),
         completedAt: new Date().toISOString()
       };
-      this.logs.push(successLog);
+      this.appendLog(successLog);
       return output;
     } catch (e: any) {
-      console.error(`[ToolRegistry] 工具执行异常: ${name}`, e);
+      const safeError = redactToolSummary(e?.message || String(e));
+      console.error(`[ToolRegistry] 工具执行异常: ${name}`, safeError);
       const failedLog: AgentToolCallLog = {
         ...log,
         status: 'failed',
-        error: redactToolSummary(e?.message || String(e)),
+        error: safeError,
         completedAt: new Date().toISOString()
       };
-      this.logs.push(failedLog);
+      this.appendLog(failedLog);
       throw e;
     }
   }
@@ -201,4 +206,3 @@ export const TOOL_REGISTRY = toolRegistryInstance.getAllTools().map(t => ({
 }));
 
 export const getToolRegistrySchemas = () => TOOL_REGISTRY;
-

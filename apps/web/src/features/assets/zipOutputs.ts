@@ -24,6 +24,11 @@ export interface ZipParams {
   preferOriginal?: boolean;
   skipSave?: boolean;
   fetchBlob?: (url: string) => Promise<Blob>;
+  fetchTimeoutMs?: number;
+  retryAttempts?: number;
+  retryBackoffMs?: number;
+  downloadConcurrency?: number;
+  onProgress?: (event: { completed: number; total: number; nodeId: string; status: 'success' | 'failed' }) => void;
 }
 
 export interface ZipManifestItem {
@@ -69,6 +74,20 @@ type DownloadedImage = {
   sourceKind: OriginalSourceKind;
 };
 
+type DownloadResolution = {
+  image: GeneratedImage;
+  filename: string;
+  attemptedSources: OriginalSourceKind[];
+  downloaded?: DownloadedImage;
+  error?: Error;
+};
+
+const DEFAULT_DOWNLOAD_CONCURRENCY = 4;
+const MAX_DOWNLOAD_CONCURRENCY = 6;
+const DEFAULT_FETCH_TIMEOUT_MS = 30000;
+const DEFAULT_RETRY_ATTEMPTS = 1;
+const DEFAULT_RETRY_BACKOFF_MS = 500;
+
 const isUsableBlob = (blob: Blob | null | undefined): blob is Blob =>
   !!blob && typeof blob.size === 'number' && blob.size > 0;
 
@@ -84,15 +103,63 @@ const summarizePrompt = (prompt: unknown): string | undefined => {
   return trimmed.length > 0 ? trimmed.slice(0, 120) : undefined;
 };
 
-const fetchUrlAsBlob = async (url: string, fetchBlob?: (url: string) => Promise<Blob>): Promise<Blob> => {
-  if (fetchBlob) return fetchBlob(url);
+const fetchUrlAsBlobWithTimeout = async (
+  url: string,
+  params: ZipParams
+): Promise<Blob> => {
+  if (params.fetchBlob) return params.fetchBlob(url);
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
+  const timeoutMs = Number.isFinite(params.fetchTimeoutMs)
+    ? Math.max(1000, Number(params.fetchTimeoutMs))
+    : DEFAULT_FETCH_TIMEOUT_MS;
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeout = controller
+    ? setTimeout(() => controller.abort(), timeoutMs)
+    : null;
+
+  try {
+    const response = await fetch(url, controller ? { signal: controller.signal } : undefined);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return response.blob();
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      throw new Error(`fetch_timeout_${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+};
+
+const isRetryableFetchError = (error: Error): boolean =>
+  /HTTP (408|409|425|429|5\d\d)|network|timeout|failed|aborted|abort|ECONNRESET|ETIMEDOUT/i.test(error.message);
+
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+const fetchWithRetry = async (url: string, params: ZipParams): Promise<Blob> => {
+  const attempts = Number.isFinite(params.retryAttempts)
+    ? Math.max(0, Math.floor(Number(params.retryAttempts)))
+    : DEFAULT_RETRY_ATTEMPTS;
+  const backoffMs = Number.isFinite(params.retryBackoffMs)
+    ? Math.max(0, Number(params.retryBackoffMs))
+    : DEFAULT_RETRY_BACKOFF_MS;
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= attempts; attempt += 1) {
+    try {
+      return await fetchUrlAsBlobWithTimeout(url, params);
+    } catch (error: any) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (attempt >= attempts || !isRetryableFetchError(lastError)) {
+        throw lastError;
+      }
+      await sleep(backoffMs * (attempt + 1));
+    }
   }
 
-  return response.blob();
+  throw lastError || new Error('fetch_failed');
 };
 
 const loadStorageImageUrl = async (id: string): Promise<string | null> => {
@@ -130,7 +197,7 @@ const downloadOriginalBlob = async (
   for (const candidate of candidates) {
     try {
       if (candidate.sourceUrl) {
-        const blob = await fetchUrlAsBlob(candidate.sourceUrl, params.fetchBlob);
+        const blob = await fetchWithRetry(candidate.sourceUrl, params);
         if (isUsableBlob(blob)) {
           return { blob, sourceKind: candidate.sourceKind };
         }
@@ -143,7 +210,7 @@ const downloadOriginalBlob = async (
           throw new Error('storage_not_found');
         }
 
-        const blob = await fetchUrlAsBlob(storageUrl, params.fetchBlob);
+        const blob = await fetchWithRetry(storageUrl, params);
         if (isUsableBlob(blob)) {
           return { blob, sourceKind: 'storageId' };
         }
@@ -169,6 +236,32 @@ const blobToZipData = async (blob: Blob): Promise<ArrayBuffer | Blob> => {
   }
 
   return blob;
+};
+
+const normalizeConcurrency = (value: unknown): number => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return DEFAULT_DOWNLOAD_CONCURRENCY;
+  return Math.min(MAX_DOWNLOAD_CONCURRENCY, Math.max(1, Math.floor(numeric)));
+};
+
+const mapWithConcurrency = async <T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>
+): Promise<R[]> => {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(items.length, concurrency);
+
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  }));
+
+  return results;
 };
 
 export async function zipOutputs(scope: string, params: ZipParams): Promise<ZipOutputsResult> {
@@ -202,31 +295,58 @@ export async function zipOutputs(scope: string, params: ZipParams): Promise<ZipO
     failedItems: [],
   };
 
-  for (let index = 0; index < imageNodes.length; index += 1) {
-    const image = imageNodes[index];
-    const filename = getSafeOriginalFilename(image, index);
-    const attemptedSources = resolveOriginalSourceCandidates(image, index).map(candidate => candidate.sourceKind);
+  let completed = 0;
+  const downloadedItems = await mapWithConcurrency(
+    imageNodes,
+    normalizeConcurrency(params.downloadConcurrency),
+    async (image, index): Promise<DownloadResolution> => {
+      const filename = getSafeOriginalFilename(image, index);
+      const attemptedSources = resolveOriginalSourceCandidates(image, index).map(candidate => candidate.sourceKind);
 
-    try {
-      const downloaded = await downloadOriginalBlob(image, index, params);
-      zip.file(filename, await blobToZipData(downloaded.blob));
+      try {
+        const downloaded = await downloadOriginalBlob(image, index, params);
+        completed += 1;
+        params.onProgress?.({ completed, total: imageNodes.length, nodeId: image.id, status: 'success' });
+        return {
+          image,
+          filename,
+          attemptedSources,
+          downloaded,
+        };
+      } catch (error: any) {
+        completed += 1;
+        params.onProgress?.({ completed, total: imageNodes.length, nodeId: image.id, status: 'failed' });
+        return {
+          image,
+          filename,
+          attemptedSources,
+          error: error instanceof Error ? error : new Error(String(error)),
+        };
+      }
+    }
+  );
+
+  for (const item of downloadedItems) {
+    const { image } = item;
+    if (item.downloaded) {
+      zip.file(item.filename, await blobToZipData(item.downloaded.blob));
       manifest.items.push({
         nodeId: image.id,
         parentPromptId: image.parentPromptId,
-        filename,
-        sourceKind: downloaded.sourceKind,
+        filename: item.filename,
+        sourceKind: item.downloaded.sourceKind,
         promptSummary: summarizePrompt(image.prompt),
         model: image.model,
         createdAt: toCreatedAt(image.timestamp),
         mimeType: image.mimeType,
-        originalUrlUsed: downloaded.sourceKind === 'originalUrl',
+        originalUrlUsed: item.downloaded.sourceKind === 'originalUrl',
       });
-    } catch (error: any) {
+    } else {
       manifest.failedItems.push({
         nodeId: image.id,
         parentPromptId: image.parentPromptId,
-        reason: error?.message || 'fetch_failed',
-        attemptedSources,
+        reason: item.error?.message || 'fetch_failed',
+        attemptedSources: item.attemptedSources,
       });
     }
   }

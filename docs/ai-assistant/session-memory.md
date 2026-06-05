@@ -48,7 +48,9 @@ AI 助手通过会话上下文及运行态保持连续的任务处理能力。�
 
 - Global favorites live in the browser/app favorites IndexedDB store. When a workspace file-system handle exists, mirror the same records to `favorites/manifest.json`, with image blobs under `favorites/originals/` and `favorites/thumbnails/`.
 - Favorite prompt insertion uses `favoriteComposerRegistry`: last focused composer wins, with `promptbar` as fallback. This keeps clicks from FavoritesPanel deterministic after interruption.
+- The heart Favorites UI is a separate draggable floating window, not the `@` popup. It starts centered and restores the last drag position from `kk_favorites_panel_position_v1`.
 - Composer ids are `promptbar`, `assistant`, and `ai-dock`. Record UI changes to these ids in `ui-map.md` before changing selector or panel placement.
+- The `@` reference popup anchors near the typed token in the active composer and keeps the three tabs 上传内容 / 标签 / 喜欢.
 - `@Name` is user-facing text. The execution binding is stored in `ReferenceImage.mentionName` / `mentionText` and resolved again at generation submit time.
 - Generation submit must parse `@Name` and `@Name[dimension]`, reorder reference images by mention order, and append the internal reference mapping summary before entering the existing generation transaction.
 - Non-image files referenced by `@` are assistant context only. They must not be attached to image generation requests.
@@ -60,3 +62,13 @@ AI 助手通过会话上下文及运行态保持连续的任务处理能力。�
 - DurableGenerationQueue persists `outputGroup`, each prompt item `promptNodeId`, result image node IDs, and grouped `nodeIds`. Idempotent resume reuses the existing job/group binding rather than creating duplicate groups.
 - AITakeoverProvider wires queue completion into canvas updates: targeted arrange, node tags, and one output `CanvasGroup` per job with default white inner glow.
 - CanvasRuntimeState includes group summaries (`id`, `label`, `hidden`, `collapsed`, `color`, `nodeCount`, `tags`) so later assistant commands can refer to current groups structurally.
+
+## 7. Project-Wide Runtime Hardening - 2026-06-05
+
+- CanvasRuntimeState now sanitizes prompt text, prompt-bar input, group labels, and recent event summaries before they enter assistant context. Long bearer/API-key-like strings and inline base64 data are redacted.
+- CanvasRuntimeState group tag lookup uses indexed node maps, and recent-node detection is single-pass O(n) instead of sorting all candidates.
+- ToolRegistry audit logs are capped at 200 entries and store redacted error strings, preventing long assistant sessions from growing memory without bound or leaking credentials.
+- DurableGenerationQueue exposes a subscriber API for UI updates, deduplicates in-flight prompt execution, coalesces queue processing, and can archive finished jobs while preserving active jobs.
+- AIAssistantDock now subscribes to queue changes instead of polling every 1.5 seconds, and its queue panel shows active jobs first.
+- Selected-card ZIP downloads are bounded by configurable concurrency, timeout, retry, and progress callbacks; `manifest.json` still records per-item failures and all-failed runs.
+- Server chat/image generation now share a native fixed-window limiter with opportunistic expired-key pruning instead of route-local unbounded Maps. Generated image files no longer expose user IDs in public upload URLs and are written asynchronously.

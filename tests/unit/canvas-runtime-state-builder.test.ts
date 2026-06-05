@@ -154,3 +154,33 @@ test('运行态构建测试：分组摘要包含隐藏、收纳、颜色和标�
   assert.equal(state.groups[0].nodeCount, 2);
   assert.ok(state.groups[0].tags?.includes('batch:job-1'));
 });
+
+test('运行态构建测试：提示词、分组与输入框摘要会脱敏长凭证和 base64', () => {
+  const sensitiveText = 'sk-live-secret-token-value-that-should-never-leak data:image/png;base64,abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789==';
+  const mockCanvas = {
+    id: 'test-canvas-1',
+    promptNodes: [
+      { id: 'p1', prompt: sensitiveText, childImageIds: [], tags: [] }
+    ],
+    imageNodes: [],
+    groups: [
+      { id: 'group-1', label: sensitiveText, nodeIds: ['p1'] }
+    ]
+  };
+
+  const state = buildCanvasRuntimeState({
+    currentPage: 'canvas',
+    activeCanvas: mockCanvas,
+    selectedNodeIds: ['p1'],
+    config: {
+      prompt: sensitiveText,
+      mode: 'image',
+      referenceImages: []
+    }
+  });
+
+  const serialized = JSON.stringify(state);
+  assert.equal(serialized.includes('sk-live-secret-token-value'), false);
+  assert.equal(serialized.includes('data:image/png;base64'), false);
+  assert.ok(serialized.includes('***'));
+});

@@ -53,6 +53,9 @@ const MAX_CONCURRENCY = 8;
 const MAX_BATCH_SIZE = 100;
 const RETRY_ATTEMPTS = 3;
 const RETRY_BACKOFF_MS = 2000;
+const MAX_PERSISTED_JOBS = 50;
+
+export type GenerationQueueListener = (jobs: GenerationBatchJob[]) => void;
 
 const getBrowserStorage = (): Storage | null => {
   try {
@@ -137,6 +140,11 @@ export class DurableGenerationQueue {
   private executor: ((prompt: string, options: any, jobId: string, promptId: string) => Promise<string[] | GenerationExecutorResult>) | null = null;
   private arrangeHandler: ((nodeIds: string[], layout: any, job?: GenerationBatchJob) => Promise<void>) | null = null;
   private completionHandler: ((job: GenerationBatchJob, nodeIds: string[]) => Promise<void>) | null = null;
+  private listeners = new Set<GenerationQueueListener>();
+  private inFlightTasks = new Set<string>();
+  private processTimer: ReturnType<typeof setTimeout> | null = null;
+  private isProcessing = false;
+  private processRequested = false;
 
   constructor() {
     this.loadJobs();
@@ -160,9 +168,31 @@ export class DurableGenerationQueue {
     }
   }
 
+  private notifyListeners() {
+    const snapshot = [...this.jobs];
+    for (const listener of this.listeners) {
+      try {
+        listener(snapshot);
+      } catch (error) {
+        console.error('[DurableQueue] Queue listener failed:', error);
+      }
+    }
+  }
+
+  private prunePersistedJobs() {
+    if (this.jobs.length <= MAX_PERSISTED_JOBS) return;
+    const active = this.jobs.filter(job => job.status === 'queued' || job.status === 'running' || job.status === 'paused');
+    const inactive = this.jobs
+      .filter(job => job.status !== 'queued' && job.status !== 'running' && job.status !== 'paused')
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+    this.jobs = [...active, ...inactive].slice(0, MAX_PERSISTED_JOBS);
+  }
+
   private saveJobs() {
     const storage = getBrowserStorage();
+    this.prunePersistedJobs();
     if (!storage) {
+      this.notifyListeners();
       return;
     }
 
@@ -170,7 +200,21 @@ export class DurableGenerationQueue {
       storage.setItem(STORAGE_KEY, JSON.stringify(this.jobs));
     } catch (e) {
       console.error('[DurableQueue] Failed to save jobs to storage:', e);
+    } finally {
+      this.notifyListeners();
     }
+  }
+
+  private getTaskKey(jobId: string, promptId: string): string {
+    return `${jobId}:${promptId}`;
+  }
+
+  private scheduleProcess() {
+    if (this.processTimer) return;
+    this.processTimer = setTimeout(() => {
+      this.processTimer = null;
+      void this.processQueue();
+    }, 0);
   }
 
   public registerExecutor(executor: typeof this.executor) {
@@ -189,12 +233,28 @@ export class DurableGenerationQueue {
     return this.jobs;
   }
 
+  public subscribe(listener: GenerationQueueListener): () => void {
+    this.listeners.add(listener);
+    listener([...this.jobs]);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
   public getJob(id: string): GenerationBatchJob | undefined {
     return this.jobs.find(j => j.id === id);
   }
 
   public clearAllJobs() {
     this.jobs = [];
+    this.inFlightTasks.clear();
+    this.saveJobs();
+  }
+
+  public archiveFinishedJobs() {
+    this.jobs = this.jobs.filter(job => (
+      job.status === 'queued' || job.status === 'running' || job.status === 'paused'
+    ));
     this.saveJobs();
   }
 
@@ -261,7 +321,7 @@ export class DurableGenerationQueue {
     this.saveJobs();
     
     // 异步触发队列处理
-    setTimeout(() => this.processQueue(), 0);
+    this.scheduleProcess();
     
     return newJob;
   }
@@ -278,6 +338,7 @@ export class DurableGenerationQueue {
       });
       job.updatedAt = Date.now();
       this.saveJobs();
+      this.scheduleProcess();
     }
   }
 
@@ -287,7 +348,7 @@ export class DurableGenerationQueue {
       job.status = 'queued';
       job.updatedAt = Date.now();
       this.saveJobs();
-      setTimeout(() => this.processQueue(), 0);
+      this.scheduleProcess();
     }
   }
 
@@ -308,6 +369,26 @@ export class DurableGenerationQueue {
 
   // 核心队列调度循环
   public async processQueue() {
+    if (this.isProcessing) {
+      this.processRequested = true;
+      return;
+    }
+
+    this.isProcessing = true;
+    try {
+      do {
+        this.processRequested = false;
+        await this.processQueueOnce();
+      } while (this.processRequested);
+    } finally {
+      this.isProcessing = false;
+      if (this.processRequested) {
+        this.scheduleProcess();
+      }
+    }
+  }
+
+  private async processQueueOnce() {
     const runningJobs = this.jobs.filter(j => j.status === 'running');
     const queuedJobs = this.jobs.filter(j => j.status === 'queued');
 
@@ -361,23 +442,33 @@ export class DurableGenerationQueue {
       }
 
       // 递归处理下一个 Job
-      setTimeout(() => this.processQueue(), 0);
+      this.scheduleProcess();
       return;
     }
 
     // 启动新的并发子任务
-    const availableSlots = concurrencyLimit - activePrompts.length;
+    const activePromptCount = currentJob.prompts.filter(prompt => (
+      prompt.status === 'running' || this.inFlightTasks.has(this.getTaskKey(currentJob.id, prompt.id))
+    )).length;
+    const availableSlots = concurrencyLimit - activePromptCount;
     if (availableSlots > 0 && queuedPrompts.length > 0) {
-      const toStart = queuedPrompts.slice(0, availableSlots);
-      toStart.forEach(promptItem => {
+      const toStart = queuedPrompts
+        .filter(promptItem => !this.inFlightTasks.has(this.getTaskKey(currentJob.id, promptItem.id)))
+        .slice(0, availableSlots);
+      for (const promptItem of toStart) {
         promptItem.status = 'running';
-        this.saveJobs();
         this.executePromptTask(currentJob.id, promptItem.id);
-      });
+      }
+      if (toStart.length > 0) {
+        this.saveJobs();
+      }
     }
   }
 
   private async executePromptTask(jobId: string, promptId: string) {
+    const taskKey = this.getTaskKey(jobId, promptId);
+    if (this.inFlightTasks.has(taskKey)) return;
+
     const job = this.getJob(jobId);
     if (!job || job.status !== 'running') return;
 
@@ -391,18 +482,24 @@ export class DurableGenerationQueue {
       return;
     }
 
+    this.inFlightTasks.add(taskKey);
     try {
       const executionResult = normalizeExecutorResult(await this.executor(promptItem.prompt, {
         ...job.options,
         referenceImageNodeId: promptItem.referenceImageNodeId
       }, jobId, promptId));
 
-      promptItem.status = 'completed';
-      promptItem.promptNodeId = executionResult.promptNodeId;
-      promptItem.resultImageNodeIds = executionResult.resultImageNodeIds;
-      if (job.outputGroup) {
-        job.outputGroup.nodeIds = Array.from(new Set([
-          ...(job.outputGroup.nodeIds || []),
+      const activeJob = this.getJob(jobId);
+      const activePromptItem = activeJob?.prompts.find(p => p.id === promptId);
+      if (!activeJob || activeJob.status === 'cancelled' || !activePromptItem) {
+        return;
+      }
+      activePromptItem.status = 'completed';
+      activePromptItem.promptNodeId = executionResult.promptNodeId;
+      activePromptItem.resultImageNodeIds = executionResult.resultImageNodeIds;
+      if (activeJob.outputGroup) {
+        activeJob.outputGroup.nodeIds = Array.from(new Set([
+          ...(activeJob.outputGroup.nodeIds || []),
           ...(executionResult.nodeIds || []),
           ...(executionResult.promptNodeId ? [executionResult.promptNodeId] : []),
           ...executionResult.resultImageNodeIds
@@ -411,22 +508,32 @@ export class DurableGenerationQueue {
     } catch (err: any) {
       console.error(`[DurableQueue] Prompt task failed (attempt ${promptItem.retryCount + 1}):`, err);
       
-      if (promptItem.retryCount < RETRY_ATTEMPTS && job.status === 'running') {
-        promptItem.retryCount++;
-        promptItem.status = 'queued';
+      const retryJob = this.getJob(jobId);
+      const retryPromptItem = retryJob?.prompts.find(p => p.id === promptId);
+      if (!retryJob || retryJob.status === 'cancelled' || !retryPromptItem) {
+        return;
+      }
+
+      if (retryPromptItem.retryCount < RETRY_ATTEMPTS && retryJob.status === 'running') {
+        retryPromptItem.retryCount++;
+        retryPromptItem.status = 'queued';
         this.saveJobs();
         await new Promise(resolve => setTimeout(resolve, RETRY_BACKOFF_MS));
+      } else if (retryPromptItem.retryCount < RETRY_ATTEMPTS && retryJob.status === 'paused') {
+        retryPromptItem.retryCount++;
+        retryPromptItem.status = 'queued';
       } else {
-        promptItem.status = 'failed';
-        promptItem.error = err.message || 'Generation failed';
+        retryPromptItem.status = 'failed';
+        retryPromptItem.error = err.message || 'Generation failed';
       }
+    } finally {
+      this.inFlightTasks.delete(taskKey);
+      job.updatedAt = Date.now();
+      this.saveJobs();
+
+      // 触发队列循环继续调度
+      this.scheduleProcess();
     }
-
-    job.updatedAt = Date.now();
-    this.saveJobs();
-
-    // 触发队列循环继续调度
-    setTimeout(() => this.processQueue(), 0);
   }
 }
 

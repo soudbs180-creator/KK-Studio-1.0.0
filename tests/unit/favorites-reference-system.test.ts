@@ -166,6 +166,7 @@ test('reference mention tabs separate uploads, inherited tags, and liked images'
   const tagTab = tabs.find((tab) => tab.id === 'tag');
   const favoriteTab = tabs.find((tab) => tab.id === 'favorite');
 
+  assert.deepEqual(tabs.map((tab) => tab.label), ['上传内容', '标签', '喜欢']);
   assert.equal(uploadTab?.items.length, 2);
   assert.equal(tagTab?.items.length, 1);
   assert.equal(tagTab?.items[0].name, 'scene-layout');

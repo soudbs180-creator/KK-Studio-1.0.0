@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, type CSSProperties } from 'react';
 import { FileText, Heart, Image as ImageIcon, Tag } from 'lucide-react';
 import { filterMentionCandidates } from './referenceSources';
+import type { ReferenceMentionAnchor } from './caretAnchor';
 import type { ReferenceMentionCandidate, ReferenceMentionTab } from './types';
 
 interface ReferenceMentionPanelProps {
@@ -10,6 +11,7 @@ interface ReferenceMentionPanelProps {
   onSelect: (candidate: ReferenceMentionCandidate) => void;
   onClose?: () => void;
   className?: string;
+  anchor?: ReferenceMentionAnchor;
 }
 
 const tabIcons = {
@@ -32,6 +34,7 @@ export const ReferenceMentionPanel: React.FC<ReferenceMentionPanelProps> = ({
   onSelect,
   onClose,
   className = '',
+  anchor,
 }) => {
   const firstNonEmptyTab = tabs.find((tab) => tab.items.length > 0)?.id || tabs[0]?.id || 'upload';
   const [activeTab, setActiveTab] = useState<string>(firstNonEmptyTab);
@@ -47,8 +50,22 @@ export const ReferenceMentionPanel: React.FC<ReferenceMentionPanelProps> = ({
 
   if (!open) return null;
 
+  const anchorStyle: CSSProperties | undefined = anchor ? {
+    left: anchor.x,
+    top: anchor.y,
+    right: 'auto',
+    bottom: 'auto',
+  } : undefined;
+  const panelClassName = `reference-mention-panel ${anchor ? 'is-floating' : ''} ${className}`.trim();
+
   return (
-    <div className={`reference-mention-panel ${className}`.trim()} role="listbox" data-testid="reference-mention-panel">
+    <div
+      className={panelClassName}
+      role="listbox"
+      data-testid="reference-mention-panel"
+      data-anchor-mode={anchor ? 'caret' : 'composer'}
+      style={anchorStyle}
+    >
       <div className="reference-mention-tabs">
         {filteredTabs.map((tab) => {
           const Icon = tabIcons[tab.id] || ImageIcon;
@@ -93,13 +110,13 @@ export const ReferenceMentionPanel: React.FC<ReferenceMentionPanelProps> = ({
               <span className="reference-mention-copy">
                 <span className="reference-mention-name">{candidate.mentionText}</span>
                 <span className="reference-mention-meta">
-                  {candidate.fileOnly ? 'Assistant context' : candidate.source === 'tag' ? 'Tagged image' : candidate.source === 'favorite' ? 'Liked image' : 'Uploaded content'}
+                  {candidate.fileOnly ? '助手上下文' : candidate.source === 'tag' ? '标签图片' : candidate.source === 'favorite' ? '喜欢图片' : '上传内容'}
                 </span>
               </span>
             </button>
           );
         }) : (
-          <div className="reference-mention-empty">No matching references</div>
+          <div className="reference-mention-empty">没有匹配的引用</div>
         )}
       </div>
     </div>

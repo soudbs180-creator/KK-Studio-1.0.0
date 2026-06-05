@@ -49,9 +49,11 @@ import {
     ReferenceMentionPanel,
     buildReferenceMentionTabs,
     canCandidateAttachToPromptBar,
+    computeReferenceMentionAnchor,
     favoriteComposerRegistry,
     useFavoritesStore,
     type MentionReferencePayload,
+    type ReferenceMentionAnchor,
     type ReferenceMentionCandidate,
 } from '../../features/favorites';
 
@@ -1212,6 +1214,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
         query: string;
         start: number;
         end: number;
+        anchor?: ReferenceMentionAnchor;
     }>({ open: false, query: '', start: 0, end: 0 });
 
     // 🚀 [防止点击穿透] 展开后的 300ms 内，拦截模型选择按钮的点击事件，彻底根治延迟 click 事件穿透
@@ -2124,6 +2127,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
             query: token,
             start: atIndex,
             end: caret,
+            anchor: computeReferenceMentionAnchor(target, atIndex),
         });
     }, [closeReferenceMentionPanel]);
 
@@ -4039,6 +4043,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         open={mentionState.open}
                                         query={mentionState.query}
                                         tabs={referenceMentionTabs}
+                                        anchor={mentionState.anchor}
                                         onSelect={replaceActiveMentionWithCandidate}
                                         onClose={closeReferenceMentionPanel}
                                     />
@@ -5371,6 +5376,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 open={mentionState.open}
                                 query={mentionState.query}
                                 tabs={referenceMentionTabs}
+                                anchor={mentionState.anchor}
                                 onSelect={replaceActiveMentionWithCandidate}
                                 onClose={closeReferenceMentionPanel}
                             />
