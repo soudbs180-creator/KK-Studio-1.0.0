@@ -1909,6 +1909,9 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     }));
                     return;
                 }
+
+                // 简体中文注释：限制框选整理范围：如果局部整理 helper 均未成功应用，直接退出，避免误整理全画布卡片
+                return;
             }
         }
 

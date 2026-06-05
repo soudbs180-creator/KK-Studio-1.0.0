@@ -729,7 +729,8 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
         const dx = Math.abs(imageNode.position.x - expectedPosition.x);
         const dy = Math.abs(imageNode.position.y - expectedPosition.y);
 
-        return dx > 220 || dy > 260;
+        // 简体中文注释：只要未被用户手动移动过，任何大于 1 像素的微小偏移都应当被自动纠偏对齐，保证生成的副卡始终处于完美对齐状态
+        return dx > 1 || dy > 1;
       });
 
       if (!hasSevereLayoutDrift) return;

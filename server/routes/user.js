@@ -987,6 +987,7 @@ function findLocalProviderLinkedToSlot(slot, providers) {
 function buildLocalUserRouteFromProvider(provider) {
   return {
     id: String(provider.id || '').trim(),
+    legacyIds: Array.isArray(provider.legacyIds) ? provider.legacyIds : [],
     name: String(provider.name || '').trim(),
     baseUrl: String(provider.baseUrl || '').trim(),
     apiKey: String(provider.apiKey || '').trim(),
@@ -999,6 +1000,7 @@ function buildLocalUserRouteFromSlot(slot, providers) {
   const linkedProvider = findLocalProviderLinkedToSlot(slot, providers);
   return {
     id: String(slot.id || '').trim(),
+    legacyIds: Array.isArray(slot.legacyIds) ? slot.legacyIds : [],
     name: String(linkedProvider && linkedProvider.name || slot.name || '').trim(),
     baseUrl: String(linkedProvider && linkedProvider.baseUrl || slot.baseUrl || '').trim(),
     apiKey: String(linkedProvider && linkedProvider.apiKey || slot.key || '').trim(),
@@ -1011,6 +1013,25 @@ function buildLocalUserRouteFromSlot(slot, providers) {
   };
 }
 
+function getLocalRecordIdAliases(record) {
+  const aliases = [
+    String(record && record.id || '').trim(),
+    ...(Array.isArray(record && record.legacyIds) ? record.legacyIds : []),
+  ]
+    .map((value) => normalizeLocalRouteValue(value))
+    .filter(Boolean);
+
+  return Array.from(new Set(aliases));
+}
+
+function localRecordMatchesRoute(record, routeTarget, rawRouteId) {
+  const aliases = getLocalRecordIdAliases(record);
+  const name = normalizeLocalRouteValue(record && record.name);
+  return aliases.includes(routeTarget)
+    || aliases.includes(rawRouteId)
+    || name === routeTarget;
+}
+
 function resolveLocalUserRoute(profileState, routeId) {
   const routeTarget = resolveLocalRouteIdCandidate(routeId);
   // 简体中文注释：保留未剥离前缀的原始 routeId，用于兼容 slots/providers 本身带有 'slot_' 或 'provider_' 前缀的 ID 比对，防止 404
@@ -1019,18 +1040,14 @@ function resolveLocalUserRoute(profileState, routeId) {
   const slots = Array.isArray(profileState.slots) ? profileState.slots : [];
 
   const provider = providers.find((item) => {
-    const providerId = normalizeLocalRouteValue(item && item.id);
-    const providerName = normalizeLocalRouteValue(item && item.name);
-    return providerId === routeTarget || providerId === rawRouteId || providerName === routeTarget;
+    return localRecordMatchesRoute(item, routeTarget, rawRouteId);
   });
   if (provider) {
     return buildLocalUserRouteFromProvider(provider);
   }
 
   const slot = slots.find((item) => {
-    const slotId = normalizeLocalRouteValue(item && item.id);
-    const slotName = normalizeLocalRouteValue(item && item.name);
-    return slotId === routeTarget || slotId === rawRouteId || slotName === routeTarget;
+    return localRecordMatchesRoute(item, routeTarget, rawRouteId);
   });
   if (slot) {
     return buildLocalUserRouteFromSlot(slot, providers);
@@ -1079,23 +1096,27 @@ async function handleWuyinGenericProxy(req, res, profileState) {
     return null;
   }
 
-  if (!isWuyinAsyncVideoTargetUrl(targetUrl)) {
-    return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'Local user-route proxy only handles Wuyin async generic requests.');
-  }
-
   const route = resolveLocalUserRoute(profileState, routeId);
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
   }
   if (!route.apiKey) {
-    return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
+    return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'API key is required.');
   }
 
   const apiKey = String(route.apiKey || '').trim();
 
   try {
+    // 简体中文注释：根据是否为速创 (Wuyin) API，来决定 Authorization 的组装格式。
+    // 如果是速创，原样发送 apiKey；如果是其它标准 OpenAI 接口，自动补齐 'Bearer ' 前缀以确保兼容性。
+    let upstreamAuth = apiKey;
+    const isWuyin = /wuyin/i.test(route.baseUrl) || /wuyin/i.test(route.name) || /wuyinkeji/i.test(route.baseUrl) || isWuyinAsyncVideoTargetUrl(targetUrl);
+    if (!isWuyin && !apiKey.toLowerCase().startsWith('bearer ')) {
+      upstreamAuth = `Bearer ${apiKey}`;
+    }
+
     const headers = {
-      Authorization: apiKey,
+      Authorization: upstreamAuth,
       Accept: String(req.headers.accept || 'application/json'),
     };
     const init = {
@@ -1112,13 +1133,13 @@ async function handleWuyinGenericProxy(req, res, profileState) {
           : JSON.stringify(req.body || {});
     }
 
-    const upstream = await fetch(appendWuyinApiKeyToTargetUrl(targetUrl, apiKey), init);
+    const upstream = await fetch(isWuyin ? appendWuyinApiKeyToTargetUrl(targetUrl, apiKey) : targetUrl, init);
     const responseText = await upstream.text().catch(() => '');
     const contentType = upstream.headers.get('content-type') || 'application/json; charset=utf-8';
     const safeText = apiKey ? responseText.replaceAll(apiKey, '[REDACTED]') : responseText;
     return res.status(upstream.status).type(contentType).send(safeText);
   } catch (error) {
-    let errMsg = error instanceof Error ? error.message : String(error || 'Wuyin generic proxy failed.');
+    let errMsg = error instanceof Error ? error.message : String(error || 'Generic proxy failed.');
     if (apiKey) {
       errMsg = errMsg.replaceAll(apiKey, '[REDACTED]');
     }

@@ -5,6 +5,7 @@ type LegacyArrayKind = 'slots' | 'entries' | 'unknown';
 const USER_APIS_PAYLOAD_SAFE_MAX_BYTES = 900 * 1024;
 const SLOT_PERSISTED_KEYS = [
   "id",
+  "legacyIds",
   "key",
   "name",
   "provider",
@@ -46,6 +47,7 @@ const SLOT_PERSISTED_KEYS = [
 ] as const;
 const PROVIDER_PERSISTED_KEYS = [
   "id",
+  "legacyIds",
   "name",
   "baseUrl",
   "apiKey",
@@ -81,6 +83,7 @@ const PROVIDER_ACTIVITY_SUMMARY_KEYS = [
 ] as const;
 const USER_API_ENTRY_KEYS = [
   "id",
+  "legacyIds",
   "key",
   "name",
   "provider",
@@ -261,23 +264,41 @@ function getRecordId(value: unknown): string {
   return String(value.id || '').trim();
 }
 
+function getRecordIdAliases(value: unknown): string[] {
+  if (!isRecord(value)) return [];
+
+  const aliases = [
+    String(value.id || '').trim(),
+    ...(Array.isArray(value.legacyIds)
+      ? value.legacyIds.map((id) => String(id || '').trim())
+      : []),
+  ];
+
+  return Array.from(new Set(aliases.filter(Boolean)));
+}
+
 function mergeArrayRecordsById(existing: unknown[], next: unknown[]): unknown[] {
   const existingById = new Map<string, JsonRecord>();
 
   existing.forEach((item) => {
-    const id = getRecordId(item);
-    if (id && isRecord(item)) {
-      existingById.set(id, item);
+    if (!isRecord(item)) {
+      return;
     }
+
+    getRecordIdAliases(item).forEach((id) => {
+      existingById.set(id, item);
+    });
   });
 
   return next.map((item) => {
     if (!isRecord(item)) return item;
 
-    const id = getRecordId(item);
-    if (!id) return item;
+    const aliases = getRecordIdAliases(item);
+    if (aliases.length === 0) return item;
 
-    const persisted = existingById.get(id);
+    const persisted = aliases
+      .map((alias) => existingById.get(alias))
+      .find(Boolean);
     return persisted ? { ...persisted, ...item } : item;
   });
 }

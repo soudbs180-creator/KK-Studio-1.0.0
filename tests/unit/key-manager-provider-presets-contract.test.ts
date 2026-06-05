@@ -10,6 +10,7 @@ const ROOT_DIR = process.cwd();
 
 async function loadProviderPresets(): Promise<{
   PROVIDER_PRESETS: Record<string, { name: string; baseUrl: string; models: string[]; format: string; icon?: string; defaultApiKey?: string }>;
+  WUYIN_PRESET_LOGO_URL: string;
   getDocumentedStaticModelsForProvider: (strategyId: string) => string[];
 }> {
   const fullPath = path.join(ROOT_DIR, 'apps/web/src/services/auth/keyManagerProviderPresets.ts');
@@ -36,7 +37,7 @@ test('keyManager provider presets live outside the monolithic key manager', () =
 });
 
 test('provider presets preserve documented built-in routes and defaults', async () => {
-  const { PROVIDER_PRESETS, getDocumentedStaticModelsForProvider } = await loadProviderPresets();
+  const { PROVIDER_PRESETS, WUYIN_PRESET_LOGO_URL, getDocumentedStaticModelsForProvider } = await loadProviderPresets();
 
   assert.deepEqual(Object.keys(PROVIDER_PRESETS), [
     'zhipu',
@@ -66,6 +67,8 @@ test('provider presets preserve documented built-in routes and defaults', async 
   assert.equal(PROVIDER_PRESETS['12ai-nanobanana'].models.includes('gemini-3.1-flash-image-preview'), true);
   assert.equal(PROVIDER_PRESETS['wuyinkeji-nanobanana2'].models[0], 'image_nanoBanana2');
   assert.equal(PROVIDER_PRESETS['wuyinkeji-google-omni'].baseUrl, 'https://api.wuyinkeji.com');
+  assert.equal(WUYIN_PRESET_LOGO_URL, 'https://api.wuyinkeji.com/assets/img/%E6%9C%AA%E5%91%BD%E5%90%8D-2.png');
+  assert.equal(PROVIDER_PRESETS['wuyinkeji-google-omni'].icon, WUYIN_PRESET_LOGO_URL);
   assert.equal(PROVIDER_PRESETS['wuyinkeji-google-omni'].models[0], 'video_google_omni');
   assert.ok(
     PROVIDER_PRESETS['wuyinkeji-google-omni'].models.indexOf('image_nanoBanana2')

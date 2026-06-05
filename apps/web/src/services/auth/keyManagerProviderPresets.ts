@@ -9,6 +9,8 @@ export interface KeyManagerProviderPreset {
     defaultApiKey?: string;
 }
 
+export const WUYIN_PRESET_LOGO_URL = 'https://api.wuyinkeji.com/assets/img/%E6%9C%AA%E5%91%BD%E5%90%8D-2.png';
+
 export const WUYIN_PRESET_MODELS = [
     'video_google_omni',
     'video_vidu',
@@ -162,7 +164,7 @@ export const PROVIDER_PRESETS: Record<string, KeyManagerProviderPreset> = {
         baseUrl: 'https://api.wuyinkeji.com',
         models: WUYIN_PRESET_MODELS,
         format: 'openai',
-        icon: '速'
+        icon: WUYIN_PRESET_LOGO_URL
     },
     'gpt-best': {
         name: 'GPT-Best',
@@ -181,12 +183,15 @@ export const PROVIDER_PRESETS: Record<string, KeyManagerProviderPreset> = {
 };
 
 export function getDocumentedStaticModelsForProvider(strategyId: string): string[] {
-    if (strategyId !== '12ai') {
-        return [];
+    if (strategyId === '12ai') {
+        return Array.from(new Set([
+            ...(PROVIDER_PRESETS['12ai']?.models || []),
+            ...(PROVIDER_PRESETS['12ai-nanobanana']?.models || []),
+        ]));
     }
-
-    return Array.from(new Set([
-        ...(PROVIDER_PRESETS['12ai']?.models || []),
-        ...(PROVIDER_PRESETS['12ai-nanobanana']?.models || []),
-    ]));
+    const preset = PROVIDER_PRESETS[strategyId];
+    if (preset) {
+        return preset.models;
+    }
+    return [];
 }

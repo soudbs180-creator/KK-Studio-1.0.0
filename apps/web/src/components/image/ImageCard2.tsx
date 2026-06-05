@@ -1080,12 +1080,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         dragStartCanvasPos.current = { x: position.x, y: position.y };
         localPosRef.current = position;
 
-        // 绑定全局事件
-        const handleMouseMove = (mvEvent: MouseEvent | TouchEvent) => {
-            mvEvent.preventDefault(); // 防止滚动
-            const mvClientX = 'touches' in mvEvent ? mvEvent.touches[0].clientX : (mvEvent as MouseEvent).clientX;
-            const mvClientY = 'touches' in mvEvent ? mvEvent.touches[0].clientY : (mvEvent as MouseEvent).clientY;
+        // 🚀 [优化] 拖拽逻辑采用 requestAnimationFrame 进行节流以提高跟手性与流畅度
+        const updateDragPosition = () => {
+            dragRafRef.current = null;
+            if (!isDraggingRef.current || !latestPointerRef.current) return;
 
+            const { x: mvClientX, y: mvClientY } = latestPointerRef.current;
             const scale = zoomScale || 1;
             const dx = mvClientX - dragStartPos.current.x;
             const dy = mvClientY - dragStartPos.current.y;
@@ -1120,8 +1120,39 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             }
         };
 
+        // 绑定全局事件
+        const handleMouseMove = (mvEvent: MouseEvent | TouchEvent) => {
+            mvEvent.preventDefault(); // 防止滚动
+            const mvClientX = 'touches' in mvEvent ? mvEvent.touches[0].clientX : (mvEvent as MouseEvent).clientX;
+            const mvClientY = 'touches' in mvEvent ? mvEvent.touches[0].clientY : (mvEvent as MouseEvent).clientY;
+
+            latestPointerRef.current = { x: mvClientX, y: mvClientY };
+
+            if (dragRafRef.current === null) {
+                dragRafRef.current = requestAnimationFrame(updateDragPosition);
+            }
+        };
+
         const handleMouseUp = () => {
             const didDrag = wasDraggingRef.current;
+
+            // 清理可能处于 pending 状态的动画帧，确保数据同步
+            if (dragRafRef.current !== null) {
+                cancelAnimationFrame(dragRafRef.current);
+                dragRafRef.current = null;
+            }
+
+            // 如果 latestPointer 存在，在 mouseup 时做最后一次更新以保证最新坐标被算入
+            if (latestPointerRef.current) {
+                const { x: mvClientX, y: mvClientY } = latestPointerRef.current;
+                const scale = zoomScale || 1;
+                const finalPos = snapCanvasPointToGrid({
+                    x: dragStartCanvasPos.current.x + ((mvClientX - dragStartPos.current.x) / scale),
+                    y: dragStartCanvasPos.current.y + ((mvClientY - dragStartPos.current.y) / scale)
+                }, { enabled: snapToGrid });
+                localPosRef.current = finalPos;
+            }
+
             const finalPos = localPosRef.current;
             const totalDelta = {
                 x: finalPos.x - dragStartCanvasPos.current.x,

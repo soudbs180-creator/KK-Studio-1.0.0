@@ -645,6 +645,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const onDragCommitRef = useRef(onDragCommit);
     const onLivePositionChangeRef = useRef(onLivePositionChange);
     const onDragStateChangeRef = useRef(onDragStateChange);
+    const latestPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
+    const dragRafRef = useRef<number | null>(null);
     const dragRenderMetricsRef = useRef({
         cardWidth,
         cardHeight,
@@ -996,27 +998,12 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         window.dispatchEvent(new CustomEvent('kk-drag-start'));
     };
 
-    // 🚀 Simple drag - just update React state on every move
-    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
-        if (!isDraggingRef.current) return;
+    // 🚀 [优化] 拖拽逻辑采用 requestAnimationFrame 进行节流以提高跟手性与流畅度
+    const updateDragPosition = () => {
+        dragRafRef.current = null;
+        if (!isDraggingRef.current || !latestPointerRef.current) return;
 
-        // Prevent scrolling/panning while dragging card
-        if (e.cancelable) e.preventDefault();
-
-        let clientX, clientY;
-        if ('touches' in e) {
-            clientX = (e as TouchEvent).touches[0].clientX;
-            clientY = (e as TouchEvent).touches[0].clientY;
-        } else {
-            clientX = (e as MouseEvent).clientX;
-            clientY = (e as MouseEvent).clientY;
-        }
-
-        const moveDist = Math.hypot(clientX - dragStartPos.current.x, clientY - dragStartPos.current.y);
-        if (moveDist > 3) {
-            hasMoved.current = true;
-        }
-
+        const { clientX, clientY } = latestPointerRef.current;
         const scale = zoomScale || 1;
         const nextPos = snapCanvasPointToGrid({
             x: dragStartCanvasPos.current.x + ((clientX - dragStartPos.current.x) / scale),
@@ -1024,6 +1011,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         }, { enabled: snapToGrid });
         const dx = nextPos.x - localPosRef.current.x;
         const dy = nextPos.y - localPosRef.current.y;
+
         localPosRef.current = nextPos;
         onLivePositionChangeRef.current?.(node.id, nextPos);
 
@@ -1043,9 +1031,54 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         }
     };
 
+    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
+        if (!isDraggingRef.current) return;
+
+        // 防止拖拽卡片时页面滚动
+        if (e.cancelable) e.preventDefault();
+
+        let clientX, clientY;
+        if ('touches' in e) {
+            clientX = (e as TouchEvent).touches[0].clientX;
+            clientY = (e as TouchEvent).touches[0].clientY;
+        } else {
+            clientX = (e as MouseEvent).clientX;
+            clientY = (e as MouseEvent).clientY;
+        }
+
+        const moveDist = Math.hypot(clientX - dragStartPos.current.x, clientY - dragStartPos.current.y);
+        if (moveDist > 3) {
+            hasMoved.current = true;
+        }
+
+        latestPointerRef.current = { clientX, clientY };
+
+        if (dragRafRef.current === null) {
+            dragRafRef.current = requestAnimationFrame(updateDragPosition);
+        }
+    };
+
     const handleMouseUp = () => {
         if (isDraggingRef.current) {
             isDraggingRef.current = false;
+
+            // 清理可能处于 pending 状态的动画帧，确保数据同步
+            if (dragRafRef.current !== null) {
+                cancelAnimationFrame(dragRafRef.current);
+                dragRafRef.current = null;
+            }
+
+            // 如果 latestPointer 存在，在 mouseup 时做最后一次更新以保证最新坐标被算入
+            if (latestPointerRef.current) {
+                const { clientX, clientY } = latestPointerRef.current;
+                const scale = zoomScale || 1;
+                const finalPos = snapCanvasPointToGrid({
+                    x: dragStartCanvasPos.current.x + ((clientX - dragStartPos.current.x) / scale),
+                    y: dragStartCanvasPos.current.y + ((clientY - dragStartPos.current.y) / scale),
+                }, { enabled: snapToGrid });
+                localPosRef.current = finalPos;
+            }
+
             const finalPos = localPosRef.current;
             const totalDelta = {
                 x: finalPos.x - dragStartCanvasPos.current.x,
@@ -1064,6 +1097,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 onDragCommitRef.current?.(totalDelta, dragRenderMetricsRef.current.nodeId, finalPos);
             }
             onLivePositionChangeRef.current?.(dragRenderMetricsRef.current.nodeId, null);
+            latestPointerRef.current = null;
         }
     };
 
@@ -1077,6 +1111,11 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
             window.addEventListener('touchend', handleMouseUp);
         }
         return () => {
+            // 确保在卸载时清理可能存在的动画帧
+            if (dragRafRef.current !== null) {
+                cancelAnimationFrame(dragRafRef.current);
+                dragRafRef.current = null;
+            }
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
             window.removeEventListener('touchmove', handleMouseMove);

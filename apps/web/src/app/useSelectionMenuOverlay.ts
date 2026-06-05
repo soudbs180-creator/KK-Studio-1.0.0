@@ -183,17 +183,49 @@ export function useSelectionMenuOverlay({
   }, [arrangeAllNodes, closeSelectionMenu]);
 
   return React.useMemo(() => {
-    if (!selectionMenuPosition || selectedNodeIds.length === 0) {
+    if (!selectionMenuPosition || selectedNodeIds.length === 0 || !activeCanvas) {
       return null;
     }
 
-    const selectedPrompts = activeCanvas?.promptNodes.filter((node) => selectedNodeIds.includes(node.id)) || [];
-    const selectedImages = activeCanvas?.imageNodes.filter((node) => selectedNodeIds.includes(node.id)) || [];
+    const selectedPrompts = activeCanvas.promptNodes.filter((node) => selectedNodeIds.includes(node.id));
+    const selectedImages = activeCanvas.imageNodes.filter((node) => selectedNodeIds.includes(node.id));
     const videoCount = selectedImages.filter((imageNode) => (
       imageNode.mode === GenerationMode.VIDEO
       || imageNode.url?.includes('.mp4')
       || imageNode.url?.startsWith('data:video')
     )).length;
+
+    // 简体中文注释：计算当前选区是否允许整理排列
+    const canArrange = (() => {
+      // 情况 1：仅选中了 1 个 prompt 卡片，且该 prompt 卡片有生成的子图片，那么可以通过整理来重新排列它的子卡片
+      if (selectedPrompts.length === 1 && selectedImages.length === 0) {
+        const promptNode = selectedPrompts[0];
+        const childImages = activeCanvas.imageNodes.filter((image) => image.parentPromptId === promptNode.id);
+        if (childImages.length > 0) return true;
+      }
+
+      // 情况 2：计算独立的“根”节点总数。
+      const promptIdsSet = new Set(selectedPrompts.map((n) => n.id));
+      const uniqueRoots = new Set<string>();
+
+      selectedNodeIds.forEach((id) => {
+        const prompt = activeCanvas.promptNodes.find((n) => n.id === id);
+        if (prompt) {
+          uniqueRoots.add(prompt.id);
+          return;
+        }
+        const image = activeCanvas.imageNodes.find((n) => n.id === id);
+        if (!image) return;
+        // 如果图片的 parentPromptId 也在选区中，它们同属于一个 root 组
+        if (image.parentPromptId && promptIdsSet.has(image.parentPromptId)) {
+          uniqueRoots.add(image.parentPromptId);
+        } else {
+          uniqueRoots.add(image.id);
+        }
+      });
+
+      return uniqueRoots.size >= 2;
+    })();
 
     return {
       position: selectionMenuPosition,
@@ -206,6 +238,7 @@ export function useSelectionMenuOverlay({
       onTag,
       onMigrate: handleSelectionMenuMigrate,
       onArrange: handleSelectionMenuArrange,
+      canArrange,
     } satisfies SelectionMenuOverlay;
   }, [
     selectionMenuPosition,

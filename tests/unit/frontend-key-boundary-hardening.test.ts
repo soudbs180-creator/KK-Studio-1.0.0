@@ -109,10 +109,12 @@ test('LLMService uses the local user-route proxy first, falls back to cloud secu
 
 test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking server-side diagnostics', () => {
   const source = readSource('apps/web/src/components/settings/ApiSettingsView.tsx');
+  const settingsUiSource = readSource('apps/web/src/components/settings/ui/index.tsx');
   const sectionSource = readSource('apps/web/src/components/settings/apiWorkbenchSections.tsx');
 
   assert.match(source, /const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';/);
   assert.match(source, /const isReadonlySecretPlaceholder = \(value\?: string \| null\)(?:: boolean)? => \{/);
+  assert.match(source, /const resolveRuntimeSecretForSave = \(\s*draftValue: string,\s*persistedValue\?: string \| null,\s*\): string => \{/);
   assert.match(source, /import \{ useAuth \} from '\.\.\/\.\.\/context\/AuthContext';/);
   assert.match(source, /import \{ resolveUserApiViewState \} from '\.\.\/\.\.\/services\/api\/userApiViewState';/);
   assert.match(source, /const \{ user, isTempUser \} = useAuth\(\);/);
@@ -145,6 +147,18 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /if \(isReadonlySecretPlaceholder\(officialForm\.key\)\) \{/);
   assert.match(source, /if \(isReadonlySecretPlaceholder\(providerForm\.apiKey\)(?:\s*&&\s*!canReusePersistedProviderSecret)?\) \{/);
   assert.match(source, /Re-enter the real API key before saving\. Read-only placeholder secrets cannot be saved back to the account\./);
+  assert.match(source, /const runtimeKeyValue = resolveRuntimeSecretForSave\(officialForm\.key, existingOfficialSlot\?\.key\);/);
+  assert.match(source, /key: runtimeKeyValue,/);
+  assert.match(source, /const runtimeApiKeyValue = resolveRuntimeSecretForSave\(providerForm\.apiKey, existingProvider\?\.apiKey\);/);
+  assert.match(source, /apiKey: runtimeApiKeyValue,/);
+  assert.match(source, /const wuyinApiKeyForSave = shouldUseDirectUserApiRecordWrites \? nextApiKeyValue : runtimeApiKeyValue;/);
+  assert.match(source, /buildCanonicalApiRecordId/);
+  assert.match(source, /WUYIN_PRESET_LOGO_URL/);
+  assert.doesNotMatch(source, /`key_\$\{Date\.now\(\)\}_\$\{Math\.random\(\)\.toString\(36\)\.slice\(2, 10\)\}`/);
+  assert.doesNotMatch(source, /`provider_\$\{Date\.now\(\)\}_\$\{Math\.random\(\)\.toString\(36\)\.slice\(2, 10\)\}`/);
+  assert.match(source, /buildWuyinOneKeyProvider\(\s*wuyinApiKeyForSave,\s*catalog,\s*\{/);
+  assert.match(source, /keySlotId: existingWuyinSlot\?\.id,/);
+  assert.match(settingsUiSource, /if \(isRedacted\) \{\s*return maskSecretDisplay\(value\);\s*\}\s*return value;/);
   assert.match(source, /const selectedProvider = useMemo\(\(\) => \{/);
   assert.match(source, /thirdPartyProviders\.find\(\(provider\) =>/);
   assert.doesNotMatch(source, /provider\.name,\s*provider\.baseUrl/);

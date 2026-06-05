@@ -1,5 +1,6 @@
 import { normalizeApiProtocolFormat } from "../api/apiConfig.ts";
 import type { Provider } from "../../types";
+import { buildCanonicalApiRecordId } from "./keyManagerCanonicalIds.ts";
 
 export interface ProviderLinkKeySlot {
     id: string;
@@ -11,6 +12,7 @@ export interface ProviderLinkKeySlot {
 
 export interface ProviderLinkProvider {
     id: string;
+    legacyIds?: string[];
     name: string;
     baseUrl: string;
     apiKey: string;
@@ -105,9 +107,32 @@ export function normalizeStoredProviders<TProvider extends ProviderLinkProvider>
 ): TProvider[] {
     if (!Array.isArray(rawProviders)) return [];
 
-    return rawProviders.map((provider, index) => {
+    const assignedIds: string[] = rawProviders
+        .map((provider) => (
+            provider && typeof provider === "object"
+                ? String((provider as Partial<ProviderLinkProvider>).id || "").trim()
+                : ""
+        ))
+        .filter(Boolean);
+
+    return rawProviders.map((provider) => {
         const now = Date.now();
         const raw = ((provider && typeof provider === "object") ? provider : {}) as Partial<TProvider>;
+        const rawId = String(raw.id || "").trim();
+        const normalizedId = buildCanonicalApiRecordId(
+            {
+                id: rawId,
+                name: raw.name,
+                baseUrl: raw.baseUrl,
+            },
+            assignedIds,
+            { preserveNonLegacyId: true },
+        );
+        assignedIds.push(normalizedId);
+        const legacyIds = Array.from(new Set([
+            ...(Array.isArray(raw.legacyIds) ? raw.legacyIds : []),
+            ...(rawId && rawId !== normalizedId ? [rawId] : []),
+        ].filter(Boolean)));
         const usage = raw.usage || {
             totalTokens: 0,
             totalCost: 0,
@@ -118,7 +143,8 @@ export function normalizeStoredProviders<TProvider extends ProviderLinkProvider>
 
         return {
             ...raw,
-            id: String(raw.id || `provider_${now}_${index}`),
+            id: normalizedId,
+            legacyIds: legacyIds.length > 0 ? legacyIds : raw.legacyIds,
             name: String(raw.name || "Custom Provider"),
             baseUrl: String(raw.baseUrl || "").trim(),
             apiKey: String(raw.apiKey || "").trim(),

@@ -1,6 +1,9 @@
 // apps/web/src/services/llm/wuyinCatalog.ts
 // 职责：提供速创 API 的共享模型目录定义、内置 Fallback 目录以及“只填 Key”的一键接入配置构造逻辑。
 
+import { buildCanonicalApiRecordId } from '../auth/keyManagerCanonicalIds.ts';
+import { WUYIN_PRESET_LOGO_URL } from '../auth/keyManagerProviderPresets.ts';
+
 export type WuyinModelKind =
   | 'image'
   | 'video'
@@ -480,7 +483,16 @@ export const WUYIN_DEFAULT_CATALOG: WuyinCatalogItem[] = [
   },
 ];
 
-export function buildWuyinOneKeyProvider(apiKey: string, catalog: WuyinCatalogItem[] = WUYIN_DEFAULT_CATALOG) {
+export function buildWuyinOneKeyProvider(
+  apiKey: string,
+  catalog: WuyinCatalogItem[] = WUYIN_DEFAULT_CATALOG,
+  options?: {
+    providerId?: string;
+    keySlotId?: string;
+    existingProviderIds?: string[];
+    existingSlotIds?: string[];
+  },
+) {
   const key = String(apiKey || '').trim();
   if (!key) throw new Error('请填写速创 API 密钥');
 
@@ -488,14 +500,40 @@ export function buildWuyinOneKeyProvider(apiKey: string, catalog: WuyinCatalogIt
     catalog.filter(item => item.enabled)
   );
   const supportedModels = enabledCatalog.map(item => item.id);
+  const providerId = buildCanonicalApiRecordId(
+    {
+      id: options?.providerId,
+      name: '速创 API',
+      provider: 'Wuyin',
+      baseUrl: WUYIN_DEFAULT_BASE_URL,
+    },
+    options?.existingProviderIds || [],
+  );
+  const keySlotId = buildCanonicalApiRecordId(
+    {
+      id: options?.keySlotId,
+      name: '速创 API',
+      provider: 'Wuyin',
+      baseUrl: WUYIN_DEFAULT_BASE_URL,
+    },
+    options?.existingSlotIds || [],
+  );
+  const providerLegacyIds = options?.providerId && options.providerId.toLowerCase() !== providerId.toLowerCase()
+    ? [options.providerId]
+    : undefined;
+  const keySlotLegacyIds = options?.keySlotId && options.keySlotId.toLowerCase() !== keySlotId.toLowerCase()
+    ? [options.keySlotId]
+    : undefined;
 
   const provider = {
-    id: 'provider_wuyin',
+    id: providerId,
+    legacyIds: providerLegacyIds,
     name: '速创 API',
     provider: 'Wuyin',
     baseUrl: WUYIN_DEFAULT_BASE_URL,
     apiKey: key,
     format: 'openai' as const,
+    icon: WUYIN_PRESET_LOGO_URL,
     authMethod: 'header' as const,
     headerName: 'Authorization',
     authorizationValueFormat: 'raw',
@@ -510,7 +548,8 @@ export function buildWuyinOneKeyProvider(apiKey: string, catalog: WuyinCatalogIt
   };
 
   const keySlot = {
-    id: 'slot_wuyin',
+    id: keySlotId,
+    legacyIds: keySlotLegacyIds,
     name: '速创 API',
     provider: 'Wuyin',
     type: 'third-party' as const,

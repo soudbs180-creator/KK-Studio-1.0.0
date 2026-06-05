@@ -22,6 +22,7 @@ import {
   compactUserApisPayloadForTransport,
   mergeUserApisPayload,
 } from '../../apps/web/src/services/api/userApiPayload.ts';
+import { WUYIN_PRESET_LOGO_URL } from '../../apps/web/src/services/auth/keyManagerProviderPresets.ts';
 
 const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
 
@@ -103,6 +104,16 @@ function getRecordId(value: unknown): string {
   return isRecord(value) ? String(value.id || '').trim() : '';
 }
 
+function getRecordIdAliases(value: unknown): string[] {
+  if (!isRecord(value)) return [];
+  return Array.from(new Set([
+    String(value.id || '').trim(),
+    ...(Array.isArray(value.legacyIds)
+      ? value.legacyIds.map((id) => String(id || '').trim())
+      : []),
+  ].filter(Boolean)));
+}
+
 function buildRedactedSecret(recordId: string, field: string): string {
   return `${REDACTED_SECRET_PREFIX}${field}:${recordId}`;
 }
@@ -122,19 +133,18 @@ function mergeRecordArray(
   const existingById = new Map<string, Record<string, unknown>>();
 
   existing.forEach((item) => {
-    const id = getRecordId(item);
-    if (id) {
-      existingById.set(id, item);
-    }
+    getRecordIdAliases(item).forEach((id) => existingById.set(id, item));
   });
 
   return next.map((item) => {
-    const id = getRecordId(item);
-    if (!id) {
+    const aliases = getRecordIdAliases(item);
+    if (aliases.length === 0) {
       return item;
     }
 
-    const persisted = existingById.get(id);
+    const persisted = aliases
+      .map((alias) => existingById.get(alias))
+      .find(Boolean);
     if (!persisted) {
       return { ...item };
     }
@@ -1007,6 +1017,63 @@ describe('user api cloud storage helpers', () => {
     assert.equal(savedProvider.apiKey, 'server-provider-secret');
     assert.equal(savedProvider.format, 'gemini');
     assert.equal(savedProvider.isActive, true);
+  });
+
+  test('upgrades legacy Wuyin cloud records and preserves persisted secrets', async () => {
+    const api = mockApiState({
+      version: 2,
+      slots: [
+        {
+          id: 'slot_wuyin',
+          name: '速创',
+          provider: 'Wuyin',
+          type: 'third-party',
+          baseUrl: 'https://api.wuyinkeji.com',
+          key: 'server-slot-secret',
+          format: 'openai',
+        },
+      ],
+      providers: [
+        {
+          id: 'provider_wuyin',
+          name: '速创',
+          baseUrl: 'https://api.wuyinkeji.com',
+          apiKey: 'server-provider-secret',
+          format: 'openai',
+          isActive: true,
+        },
+      ],
+      entries: [],
+    });
+
+    await upsertUserApiProviderToCloudRecord({
+      id: 'provider_wuyin',
+      name: '速创 API',
+      baseUrl: 'https://api.wuyinkeji.com',
+      apiKey: 'sk-readonly-0000',
+      format: 'openai',
+      isActive: true,
+    });
+    await upsertUserApiSlotToCloudRecord({
+      id: 'slot_wuyin',
+      name: '速创 API',
+      provider: 'Wuyin',
+      type: 'third-party',
+      baseUrl: 'https://api.wuyinkeji.com',
+      key: 'sk-readonly-0000',
+      format: 'openai',
+    });
+
+    const savedPayload = api.getCurrentPayload();
+    assert.equal(savedPayload.providers.length, 1);
+    assert.equal(savedPayload.slots.length, 1);
+    assert.equal(savedPayload.providers[0].id, 'wuyinkeji-google-omni-1015-1');
+    assert.deepEqual(savedPayload.providers[0].legacyIds, ['provider_wuyin']);
+    assert.equal(savedPayload.providers[0].icon, WUYIN_PRESET_LOGO_URL);
+    assert.equal(savedPayload.providers[0].apiKey, 'server-provider-secret');
+    assert.equal(savedPayload.slots[0].id, 'wuyinkeji-google-omni-1015-1');
+    assert.deepEqual(savedPayload.slots[0].legacyIds, ['slot_wuyin']);
+    assert.equal(savedPayload.slots[0].key, 'server-slot-secret');
   });
 
   test('rejects creating a new provider when the api key is still the readonly placeholder', async () => {

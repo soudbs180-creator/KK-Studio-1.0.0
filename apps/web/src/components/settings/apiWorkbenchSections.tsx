@@ -1,4 +1,8 @@
 import React from 'react';
+import {
+  buildCanonicalApiRecordId,
+  isCanonicalApiRecordId,
+} from '../../services/auth/keyManagerCanonicalIds';
 import { notify } from '../../services/system/notificationService';
 import { Activity, Copy, Edit3, Globe, Pause, Play, Plus, RefreshCw, Shield, Timer, Trash2, Wallet, Wand2, ChevronDown, Layers3, type LucideIcon } from 'lucide-react';
 
@@ -33,73 +37,16 @@ type CurrentViewLatencyItem = {
 const noop = () => {};
 
 const getDisplayId = (id: string, title: string, subtitle?: string): string => {
-  const lowerId = id.toLowerCase();
-  if (/^[a-z0-9]+-\d{4}-\d+$/.test(lowerId)) {
-    return id;
-  }
-  
-  const idPrefixes: Record<string, string> = {
-    'zhipu': '1001',
-    'wanqing': '1002',
-    'sambanova': '1003',
-    'openclaw': '1004',
-    't8star': '1005',
-    'volcengine': '1006',
-    'deepseek': '1007',
-    'moonshot': '1008',
-    'siliconflow': '1009',
-    '12ai': '1010',
-    'antigravity': '1011',
-    '12ai-nanobanana': '1012',
-    'flow2api': '1013',
-    'wuyinkeji-nanobanana2': '1014',
-    'wuyinkeji-google-omni': '1015',
-    'gpt-best': '1016',
-    'google': '1017',
-    'openai': '1018',
-    'anthropic': '1019',
-    'custom': '2000'
-  };
-
-  const cleanName = String(title || '').toLowerCase().trim();
-  const cleanUrl = String(subtitle || '').toLowerCase().trim();
-
-  let channel = 'custom';
-  let prefix = '2000';
-
-  for (const key of Object.keys(idPrefixes)) {
-    if (key === 'custom') continue;
-    if (cleanName.includes(key) || cleanUrl.includes(key)) {
-      channel = key;
-      prefix = idPrefixes[key];
-      break;
-    }
+  const normalizedId = String(id || '').trim();
+  if (isCanonicalApiRecordId(normalizedId)) {
+    return normalizedId;
   }
 
-  // 辅助官方直连匹配
-  if (channel === 'custom') {
-    if (cleanName.includes('google') || cleanUrl.includes('google') || cleanUrl.includes('gemini')) {
-      channel = 'google';
-      prefix = '1017';
-    } else if (cleanName.includes('openai') || cleanUrl.includes('openai')) {
-      channel = 'openai';
-      prefix = '1018';
-    } else if (cleanName.includes('anthropic') || cleanUrl.includes('anthropic') || cleanUrl.includes('claude')) {
-      channel = 'anthropic';
-      prefix = '1019';
-    } else if (cleanName.includes('deepseek') || cleanUrl.includes('deepseek')) {
-      channel = 'deepseek';
-      prefix = '1007';
-    }
-  }
-
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = id.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const suffix = Math.abs(hash % 5) + 1;
-
-  return `${channel}-${prefix}-${suffix}`;
+  return buildCanonicalApiRecordId({
+    id: normalizedId,
+    name: title,
+    baseUrl: subtitle,
+  });
 };
 
 

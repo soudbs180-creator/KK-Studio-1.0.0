@@ -113,27 +113,29 @@ export function arrangeSingleSelectedPromptChildren(
     const promptBottom = prompt.position.y;
 
     if (targetMode === 'row') {
-        const totalWidth = childImages.length * avgWidth + (childImages.length - 1) * AUTO_ARRANGE_SUB_IMAGE_GAP;
-        let currentX = promptCenterX - totalWidth / 2 + avgWidth / 2;
+        const totalWidth = imageDims.reduce((sum, dims) => sum + dims.w, 0) + (childImages.length - 1) * AUTO_ARRANGE_SUB_IMAGE_GAP;
+        let currentLeft = promptCenterX - totalWidth / 2;
         const y = promptBottom + AUTO_ARRANGE_PROMPT_TO_SUB_GAP + avgHeight;
 
         childImages.forEach((image, index) => {
             const dims = imageDims[index];
-            newImagePositions[image.id] = { x: currentX, y };
-            currentX += dims.w + AUTO_ARRANGE_SUB_IMAGE_GAP;
+            newImagePositions[image.id] = { x: currentLeft + dims.w / 2, y };
+            currentLeft += dims.w + AUTO_ARRANGE_SUB_IMAGE_GAP;
         });
     } else if (targetMode === 'grid') {
         const columns = Math.min(AUTO_ARRANGE_SUB_COLUMNS, childImages.length);
-        const totalWidth = columns * avgWidth + (columns - 1) * AUTO_ARRANGE_SUB_IMAGE_GAP;
-        const startX = promptCenterX - totalWidth / 2 + avgWidth / 2;
-        const startY = promptBottom + AUTO_ARRANGE_PROMPT_TO_SUB_GAP + avgHeight;
+        const maxWidth = Math.max(...imageDims.map(dims => dims.w));
+        const maxHeight = Math.max(...imageDims.map(dims => dims.h));
+        const totalWidth = columns * maxWidth + (columns - 1) * AUTO_ARRANGE_SUB_IMAGE_GAP;
+        const startX = promptCenterX - totalWidth / 2 + maxWidth / 2;
+        const startY = promptBottom + AUTO_ARRANGE_PROMPT_TO_SUB_GAP + maxHeight;
 
         childImages.forEach((image, index) => {
             const col = index % columns;
             const row = Math.floor(index / columns);
             newImagePositions[image.id] = {
-                x: startX + col * (avgWidth + AUTO_ARRANGE_SUB_IMAGE_GAP),
-                y: startY + row * (avgHeight + AUTO_ARRANGE_SUB_IMAGE_GAP),
+                x: startX + col * (maxWidth + AUTO_ARRANGE_SUB_IMAGE_GAP),
+                y: startY + row * (maxHeight + AUTO_ARRANGE_SUB_IMAGE_GAP),
             };
         });
     } else {

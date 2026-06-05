@@ -5,6 +5,7 @@ import imagineArtIcon from '../../assets/model-logos/imagineart.png';
 import reveIcon from '../../assets/model-logos/reve.svg';
 import riffusionProducerIcon from '../../assets/model-logos/riffusion-producer.png';
 import { useTheme } from '../../context/ThemeContext';
+import { WUYIN_PRESET_LOGO_URL } from '../../services/auth/keyManagerProviderPresets';
 import { getLobeIconCdnUrl } from '../../utils/lobeIconCdn';
 
 interface ModelLogoProps {
@@ -123,6 +124,7 @@ const ICON_MATCHERS: Array<{ iconId: string; keywords: string[] }> = [
 ];
 
 const CUSTOM_ICON_MATCHERS: Array<{ iconUrl: string; keywords: string[] }> = [
+    { iconUrl: WUYIN_PRESET_LOGO_URL, keywords: ['wuyinkeji', '速创', '五音'] },
     { iconUrl: eigenAiIcon, keywords: ['eigen', 'eigen image'] },
     { iconUrl: higgsfieldIcon, keywords: ['higgsfield'] },
     { iconUrl: imagineArtIcon, keywords: ['imagineart', 'imagine art'] },
@@ -138,6 +140,10 @@ function normalizeValue(value?: string): string {
         // 保留字母、数字、中文字符和空格，防止过滤掉中文大模型/提供商关键词
         .replace(/[^a-z0-9\u4e00-\u9fa5 ]+/g, ' ')
         .replace(/\s+/g, ' ');
+}
+
+function isDirectImageUrl(value?: string): boolean {
+    return /^https?:\/\/\S+$/i.test(String(value || '').trim());
 }
 
 function matchesKeyword(candidate: string, keyword: string): boolean {
@@ -261,6 +267,12 @@ const ModelLogo: React.FC<ModelLogoProps> = ({
             : [normalizeValue(modelId), normalizeValue(modelName), normalizeValue(provider)].filter(Boolean);
     }, [modelId, provider, modelName, preferProvider]);
 
+    const directUrlCandidates = useMemo(() => {
+        return preferProvider
+            ? [provider, modelName].filter(Boolean)
+            : [modelId, modelName, provider].filter(Boolean);
+    }, [modelId, provider, modelName, preferProvider]);
+
     // 匹配 Lobe 图标库的 ID
     const iconId = useMemo(() => {
         for (const candidate of candidates) {
@@ -276,6 +288,11 @@ const ModelLogo: React.FC<ModelLogoProps> = ({
 
     // 匹配自定义图片 URL
     const customIconUrl = useMemo(() => {
+        const directUrl = directUrlCandidates.find((candidate) => isDirectImageUrl(candidate));
+        if (directUrl) {
+            return directUrl;
+        }
+
         for (const candidate of candidates) {
             const matched = CUSTOM_ICON_MATCHERS.find(({ keywords }) =>
                 keywords.some((keyword) => matchesKeyword(candidate, keyword))
@@ -285,7 +302,7 @@ const ModelLogo: React.FC<ModelLogoProps> = ({
             }
         }
         return undefined;
-    }, [candidates]);
+    }, [candidates, directUrlCandidates]);
 
     // 获取首字退化显示的文字
     const fallbackInitials = useMemo(() => {

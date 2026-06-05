@@ -1,6 +1,6 @@
 # KK Studio Project Handoff (v1.5.4)
 
-Last updated: 2026-06-04
+Last updated: 2026-06-05
 
 ## 1. Project Overview
 
@@ -82,6 +82,11 @@ npm run check:encoding
 - Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/wuyin-pricing-catalog-contract.test.ts tests/unit/key-manager-wuyin-route-regression.test.ts tests/unit/request-profile-registry.test.ts tests/unit/key-manager-shared-pricing-contract.test.ts tests/unit/key-manager-pricing-url-contract.test.ts tests/unit/model-pricing-credit-specs.test.ts tests/unit/pricingRules.test.ts` (28 个 Wuyin 目录、定价、Key Manager 回归测试通过)
 - Passed: `npm run typecheck`, `npm run build` after fixing the lightbox closing behavior during active redraw sessions (preventing accidental lightbox dismissals on background clicks, Escape key, double clicks, and swipe gestures).
 - Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/wuyin-user-route-image-mode-contract.test.ts tests/unit/wuyin-refactor-extra.test.ts tests/unit/openai-compatible-wuyin-route-contract.test.ts tests/unit/vercel-user-model-proxy.test.ts`, `npm run typecheck`, `npm run check:encoding`, and `npm run build` after removing Wuyin image model substitution and updating the proxy error copy.
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/frontend-key-boundary-hardening.test.ts --test-name-pattern "ApiSettingsView"`, `npm run typecheck`, and `npm run check:encoding` after tightening API Key display/save boundaries.
+- Noted: `npm run test:unit -- --test-name-pattern="ApiSettingsView|keyManager blocks"` was attempted but PowerShell treated `|` as a pipeline and ran the broader unit suite; it exposed an unrelated existing `clay-frosted-surface-contract.test.ts` failure in `UserProfileModal.tsx`.
+- Passed: `node --import ./scripts/test/set-log-level.mjs --test --test-isolation=none tests/unit/key-manager-canonical-ids-contract.test.ts tests/unit/key-manager-provider-presets-contract.test.ts tests/unit/key-manager-route-ids-contract.test.ts tests/unit/user-api-cloud-storage.test.ts tests/unit/frontend-key-boundary-hardening.test.ts` after unifying user API record IDs and the Wuyin preset logo.
+- Passed: `npm run typecheck -- --pretty false`, `npm run check:encoding`, and the `build` phase inside `npm run verify:changes`.
+- Noted: `npm run verify:changes` still stops in the broader `test:unit` suite on the pre-existing `tests/unit/clay-frosted-surface-contract.test.ts` assertion against `apps/web/src/components/user/UserProfileModal.tsx` hardcoded dark/shadow tokens; this is outside the API ID / Wuyin logo change set.
 
 ## 7. Handoff Notes For Next Agent
 
@@ -89,6 +94,9 @@ npm run check:encoding
 - Ensure that any new frontend components containing `<img>` or media elements handle the pending load state gracefully by managing their `opacity` via `isMediaLoaded` or a comparable local state, to avoid raw broken-image indicators displaying momentarily.
 - Wuyin / 速创 model routing is now endpoint-aware across image, video, audio, chat, Sora2, and utility endpoints. The frontend serializes per-model request bodies with the documented `Content-Type`, browser-side Wuyin direct calls are disabled in favor of the user-route proxy, and `local_proxy` task IDs can include the Wuyin model ID so polling can pick special detail endpoints such as `/api/sora2/detail`.
 - Wuyin image generation must submit the user-selected image model exactly; do not silently substitute another Wuyin image model. If production still shows the old NanoBanana2 502/404 copy, check `https://kkai.plus/app-version.json`; on 2026-06-05 production was still at commit `27f6931`, while the Wuyin branch fix was not deployed to production main yet.
+- API Key settings behavior: `SettingInput` now reveals the real in-form secret when the eye is open, while server-returned read-only placeholders still show only `keyPreview`/masked text. `ApiSettingsView` must keep `sk-readonly-0000` and `__kk_redacted__:*` as cloud reuse placeholders only; local runtime updates must use the persisted real secret or require re-entry.
+- User API ID behavior: `keyManagerCanonicalIds.ts` is now the single canonical helper for user API record IDs. New IDs use `channel-prefix-index` such as `wuyinkeji-google-omni-1015-1`; legacy IDs like `provider_wuyin`, `slot_wuyin`, `key_*`, and `provider_*` must be retained in `legacyIds` for route compatibility rather than displayed as the current ID.
+- Wuyin / 速创 preset logo: use `WUYIN_PRESET_LOGO_URL` from `keyManagerProviderPresets.ts` (`https://api.wuyinkeji.com/assets/img/%E6%9C%AA%E5%91%BD%E5%90%8D-2.png`) instead of a text fallback icon.
 - If user or another AI changes files in parallel, inspect `git status` and current diffs first; never revert unrelated work.
 - For assistant work, prefer small sprint-sized changes and update this file plus `docs/ai-assistant/*` with touched files, validation, and next step.
 - Lightbox redraw safety: When `redrawWorkspaceMode !== null` in `apps/web/src/components/image/GlobalLightbox.tsx`, all non-explicit close actions (Escape key, double clicking images/videos, clicking background container, mobile swipe gesture) are blocked, forcing the user to close the lightbox only via the explicit top-right "X" button.

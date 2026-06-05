@@ -55,6 +55,12 @@ import keyManager, {
   resolveEffectiveProviderModels,
   getModelMetadata as getGlobalModelMetadata,
 } from '../../services/auth/keyManager';
+import {
+  apiRecordMatchesIdOrLegacy,
+  buildCanonicalApiRecordId,
+  isWuyinApiRecord,
+} from '../../services/auth/keyManagerCanonicalIds';
+import { WUYIN_PRESET_LOGO_URL } from '../../services/auth/keyManagerProviderPresets';
 import { buildProviderPricingSnapshot, mergeProviderPricingSnapshot } from '../../services/auth/providerPricingSnapshot';
 import type { Supplier } from '../../services/billing/supplierService';
 import { buildWuyinOneKeyProvider, WUYIN_DEFAULT_CATALOG } from '../../services/llm/wuyinCatalog';
@@ -276,7 +282,7 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
   { name: 'NVIDIA', url: 'https://build.nvidia.com/models', baseUrl: 'https://integrate.api.nvidia.com/v1', format: 'openai', color: '#76b900', modelId: 'nvidia/llama-3.1-nemotron-ultra-253b-v1', logoName: 'nvidia nemotron', kind: 'official' },
   { name: 'OpenRouter', url: 'https://openrouter.ai', baseUrl: 'https://openrouter.ai/api/v1', format: 'openai', color: '#9ca3af', modelId: 'openai/gpt-4o', logoName: 'openrouter', kind: 'relay', keyLinks: [{ labelZh: '获取 API Key', labelEn: 'Get API Key', url: 'https://openrouter.ai/settings/keys' }, { labelZh: '接口文档', labelEn: 'API docs', url: 'https://openrouter.ai/docs' }] },
   { name: 'WorldRouter', url: 'https://www.worldrouter.ai', baseUrl: 'https://inference-api.worldrouter.ai/v1', format: 'openai', color: '#38bdf8', modelId: '', logoName: 'worldrouter', kind: 'relay' },
-  { name: '速创 API', url: 'https://api.wuyinkeji.com/type/all', baseUrl: 'https://api.wuyinkeji.com', format: 'openai', color: '#0891b2', modelId: 'video_google_omni', logoName: '速', kind: 'relay', keyLinks: [{ labelZh: '获取 API Key', labelEn: 'Get API Key', url: 'https://api.wuyinkeji.com/user/register?cps=KCyv1E6I' }, { labelZh: '接口文档', labelEn: 'API docs', url: 'https://api.wuyinkeji.com/doc/72' }] },
+  { name: '速创 API', url: 'https://api.wuyinkeji.com/type/all', baseUrl: 'https://api.wuyinkeji.com', format: 'openai', color: '#0891b2', modelId: 'video_google_omni', logoName: WUYIN_PRESET_LOGO_URL, kind: 'relay', keyLinks: [{ labelZh: '获取 API Key', labelEn: 'Get API Key', url: 'https://api.wuyinkeji.com/user/register?cps=KCyv1E6I' }, { labelZh: '接口文档', labelEn: 'API docs', url: 'https://api.wuyinkeji.com/doc/72' }] },
   { name: 'B.ai', url: 'https://b.ai', baseUrl: 'https://api.theb.ai/v1', format: 'openai', color: '#a855f7', modelId: '', logoName: 'b.ai', kind: 'relay' },
 ];
 
@@ -425,6 +431,21 @@ const isReadonlySecretPlaceholder = (value?: string | null): boolean => {
   );
 };
 
+const resolveRuntimeSecretForSave = (
+  draftValue: string,
+  persistedValue?: string | null,
+): string => {
+  const persisted = String(persistedValue || '').trim();
+  const canUsePersisted = persisted && !isReadonlySecretPlaceholder(persisted);
+  const normalized = String(draftValue || '').trim();
+
+  if (isReadonlySecretPlaceholder(draftValue) || !normalized) {
+    return canUsePersisted ? persisted : '';
+  }
+
+  return normalized;
+};
+
 function maskSecret(secret?: string | null): string {
   const clean = String(secret || '').trim();
   if (!clean || clean === READONLY_SECRET_PLACEHOLDER) {
@@ -499,6 +520,7 @@ function toReadonlyOfficialSlot(rawValue: unknown): KeySlot | null {
 
   return {
     id,
+    legacyIds: normalizeStringArray(raw.legacyIds),
     key: hasStoredSecret(raw.key) ? maskSecret(raw.key as string) : '',
 
     name: normalizeString(raw.name) || (provider === 'OpenAI' ? 'OpenAI' : 'Google'),
@@ -549,6 +571,7 @@ function toReadonlyProvider(rawValue: unknown): ThirdPartyProvider | null {
 
   return {
     id,
+    legacyIds: normalizeStringArray(raw.legacyIds),
     name: providerName,
     baseUrl: providerBaseUrl,
     apiKey: hasStoredSecret(raw.apiKey ?? raw.key) ? maskSecret((raw.apiKey ?? raw.key) as string) : '',
@@ -560,6 +583,7 @@ function toReadonlyProvider(rawValue: unknown): ThirdPartyProvider | null {
       models: rawProviderModels,
     }),
     format: providerFormat,
+    icon: normalizeString(raw.icon) || undefined,
     group: normalizeString(raw.group) || undefined,
     providerColor: normalizeString(raw.providerColor ?? raw.color) || DEFAULT_PROVIDER_COLOR,
     isActive:
@@ -1632,14 +1656,20 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     return decodeRouteParam(location.pathname.slice(API_MANAGEMENT_PROVIDER_PREFIX.length));
   }, [legacySupplierId, location.pathname, providerId]);
   const selectedOfficialSlot = useMemo(
-    () => officialSlots.find((slot) => normalizeRouteMatchValue(slot.id) === normalizeRouteMatchValue(routeOfficialId)) || null,
+    () => officialSlots.find((slot) => (
+      apiRecordMatchesIdOrLegacy(slot, routeOfficialId)
+      || normalizeRouteMatchValue(slot.id) === normalizeRouteMatchValue(routeOfficialId)
+    )) || null,
     [officialSlots, routeOfficialId]
   );
   const selectedProvider = useMemo(() => {
     const routeValue = normalizeRouteMatchValue(routeProviderId);
     if (!routeValue) return null;
 
-    return thirdPartyProviders.find((provider) => normalizeRouteMatchValue(provider.id) === routeValue) || null;
+    return thirdPartyProviders.find((provider) => (
+      apiRecordMatchesIdOrLegacy(provider, routeProviderId)
+      || normalizeRouteMatchValue(provider.id) === routeValue
+    )) || null;
   }, [routeProviderId, thirdPartyProviders]);
   const activeProviderPreset = useMemo(
     () => findProviderPresetForDraft(providerForm.name, providerForm.baseUrl),
@@ -2122,12 +2152,17 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     await refreshReadonlyProfileFallback();
   }, [hasAuthenticatedUser, refreshApiHealth, refreshCloudData, refreshReadonlyProfileFallback]);
 
+  // 简体中文注释：仅在初始化挂载或用户认证状态改变时执行健康检查与云端数据拉取
   useEffect(() => {
     refresh();
     void refreshApiHealth();
     void refreshCloudData(true);
+  }, [authenticatedUserId]);
+
+  // 简体中文注释：将 KeyManager 订阅与数据拉取解耦，消除由于云端异常引起的无限更新死循环
+  useEffect(() => {
     return keyManager.subscribe(refresh);
-  }, [refresh, refreshApiHealth, refreshCloudData]);
+  }, [refresh]);
 
   useEffect(() => {
     setCapabilityAssignments(getCapabilityRouteAssignments());
@@ -2675,10 +2710,25 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
     const value = officialForm.mode === 'unlimited' ? null : positive(officialForm.value);
     const normalizedKey = officialForm.key.trim();
-    const nextSlotId = officialForm.id || `key_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const existingOfficialSlot = selectedOfficialSlot || officialSlots.find((slot) => slot.id === officialForm.id) || null;
+    const officialBaseUrl = officialForm.provider === 'Google' ? DEFAULT_GOOGLE_BASE_URL : DEFAULT_OPENAI_BASE_URL;
+    const nextSlotId = buildCanonicalApiRecordId(
+      {
+        id: officialForm.id || existingOfficialSlot?.id,
+        name: officialForm.provider,
+        provider: officialForm.provider,
+        baseUrl: officialBaseUrl,
+      },
+      officialSlots.map((slot) => slot.id),
+    );
+    const nextSlotLegacyIds = [
+      ...(existingOfficialSlot?.legacyIds || []),
+      ...(officialForm.id && officialForm.id !== nextSlotId ? [officialForm.id] : []),
+    ].filter(Boolean);
     const nextKeyValue = isReadonlySecretPlaceholder(officialForm.key)
       ? READONLY_SECRET_PLACEHOLDER
       : (normalizedKey || (canReusePersistedOfficialSecret ? READONLY_SECRET_PLACEHOLDER : ''));
+    const runtimeKeyValue = resolveRuntimeSecretForSave(officialForm.key, existingOfficialSlot?.key);
 
     if (!nextKeyValue) {
       notify.error(
@@ -2716,39 +2766,49 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
     await run(`official-save:${officialForm.id || 'new'}`, async () => {
       if (shouldUseDirectUserApiRecordWrites) {
-        const existingSlot = selectedOfficialSlot || officialSlots.find((slot) => slot.id === officialForm.id) || null;
         await upsertUserApiSlotToCloudRecord({
           id: nextSlotId,
+          legacyIds: nextSlotLegacyIds,
           name: officialForm.provider,
           provider: officialForm.provider as Provider,
           type: 'official',
           format: officialForm.provider === 'Google' ? 'gemini' : 'openai',
-          baseUrl: officialForm.provider === 'Google' ? DEFAULT_GOOGLE_BASE_URL : DEFAULT_OPENAI_BASE_URL,
+          baseUrl: officialBaseUrl,
           key: nextKeyValue,
-          supportedModels: existingSlot?.supportedModels || [],
-          disabled: existingSlot?.disabled || false,
-          status: existingSlot?.status || 'unknown',
-          failCount: existingSlot?.failCount || 0,
-          successCount: existingSlot?.successCount || 0,
-          lastUsed: existingSlot?.lastUsed || null,
-          lastError: existingSlot?.lastError || null,
-          createdAt: existingSlot?.createdAt || Date.now(),
+          supportedModels: existingOfficialSlot?.supportedModels || [],
+          disabled: existingOfficialSlot?.disabled || false,
+          status: existingOfficialSlot?.status || 'unknown',
+          failCount: existingOfficialSlot?.failCount || 0,
+          successCount: existingOfficialSlot?.successCount || 0,
+          lastUsed: existingOfficialSlot?.lastUsed || null,
+          lastError: existingOfficialSlot?.lastError || null,
+          createdAt: existingOfficialSlot?.createdAt || Date.now(),
           updatedAt: Date.now(),
-          avgResponseTime: existingSlot?.avgResponseTime,
-          lastResponseTime: existingSlot?.lastResponseTime,
-          usedTokens: existingSlot?.usedTokens || 0,
-          totalCost: existingSlot?.totalCost || 0,
+          avgResponseTime: existingOfficialSlot?.avgResponseTime,
+          lastResponseTime: existingOfficialSlot?.lastResponseTime,
+          usedTokens: existingOfficialSlot?.usedTokens || 0,
+          totalCost: existingOfficialSlot?.totalCost || 0,
           ...payload,
         });
         await refreshAfterCloudUserApiMutation();
       } else if (officialForm.id) {
+        if (!runtimeKeyValue) {
+          notify.error(
+            pick('保存失败', 'Save failed'),
+            pick(
+              '无法在本地运行态复用只读占位符，请重新输入真实 API Key。',
+              'The local runtime cannot reuse a read-only placeholder. Re-enter the real API key.',
+            ),
+          );
+          return;
+        }
         await keyManager.updateKey(officialForm.id, {
           name: officialForm.provider,
           provider: officialForm.provider as Provider,
           type: 'official',
           format: officialForm.provider === 'Google' ? 'gemini' : 'openai',
           baseUrl: '',
-          key: normalizedKey,
+          key: runtimeKeyValue,
           ...payload,
         });
         await keyManager.syncToCloudNow();
@@ -2819,10 +2879,41 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     const isWuyinPreset = providerForm.name === '速创 API' || /wuyinkeji/i.test(providerForm.baseUrl);
     if (isWuyinPreset) {
       const normalizedApiKey = providerForm.apiKey.trim();
-      if (!normalizedApiKey) {
+      const existingWuyinProvider = selectedProvider
+        || thirdPartyProviders.find((provider) => provider.id === providerForm.id)
+        || thirdPartyProviders.find((provider) => isWuyinApiRecord({
+          id: provider.id,
+          name: provider.name,
+          provider: provider.name,
+          baseUrl: provider.baseUrl,
+        }))
+        || null;
+      const existingWuyinSlot = officialSlots.find((slot) => isWuyinApiRecord({
+        id: slot.id,
+        name: slot.name,
+        provider: slot.provider,
+        baseUrl: slot.baseUrl,
+      })) || null;
+      const nextApiKeyValue = isReadonlySecretPlaceholder(providerForm.apiKey)
+        ? READONLY_SECRET_PLACEHOLDER
+        : (normalizedApiKey || (canReusePersistedProviderSecret ? READONLY_SECRET_PLACEHOLDER : ''));
+      const runtimeApiKeyValue = resolveRuntimeSecretForSave(providerForm.apiKey, existingWuyinProvider?.apiKey);
+
+      if (!nextApiKeyValue) {
         notify.error(
           pick('保存失败', 'Save failed'),
           pick('请填写速创 API 密钥。', 'Please fill in the Wuyin API key.'),
+        );
+        return;
+      }
+
+      if (isReadonlySecretPlaceholder(providerForm.apiKey) && !canReusePersistedProviderSecret) {
+        notify.error(
+          pick('保存失败', 'Save failed'),
+          pick(
+            '请重新输入真实 API Key，当前只读占位符不能直接保存回账号。',
+            'Re-enter the real API key before saving. Read-only placeholder secrets cannot be saved back to the account.',
+          ),
         );
         return;
       }
@@ -2865,17 +2956,37 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           console.warn('读取本地速创价格配置失败:', e);
         }
 
-        const { provider: wuyinProvider, keySlot: wuyinKeySlot } = buildWuyinOneKeyProvider(normalizedApiKey, catalog);
+        const wuyinApiKeyForSave = shouldUseDirectUserApiRecordWrites ? nextApiKeyValue : runtimeApiKeyValue;
+        if (!wuyinApiKeyForSave) {
+          notify.error(
+            pick('保存失败', 'Save failed'),
+            pick(
+              '无法在本地运行态复用只读占位符，请重新输入真实 API Key。',
+              'The local runtime cannot reuse a read-only placeholder. Re-enter the real API key.',
+            ),
+          );
+          return;
+        }
+
+        const { provider: wuyinProvider, keySlot: wuyinKeySlot } = buildWuyinOneKeyProvider(
+          wuyinApiKeyForSave,
+          catalog,
+          {
+            providerId: providerForm.id || existingWuyinProvider?.id,
+            keySlotId: existingWuyinSlot?.id,
+            existingProviderIds: thirdPartyProviders.map((provider) => provider.id),
+            existingSlotIds: officialSlots.map((slot) => slot.id),
+          },
+        );
 
         if (shouldUseDirectUserApiRecordWrites) {
-          const existingProvider = thirdPartyProviders.find((provider) => provider.id === providerForm.id) || null;
           await upsertUserApiProviderToCloudRecord({
             ...wuyinProvider,
             provider: wuyinProvider.provider as Provider,
             format: wuyinProvider.format as ApiProtocolFormat,
             id: wuyinProvider.id,
             isActive: true,
-            usage: existingProvider?.usage || {
+            usage: existingWuyinProvider?.usage || {
               totalTokens: 0,
               totalCost: 0,
               dailyTokens: 0,
@@ -2883,7 +2994,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               lastReset: Date.now(),
             },
             status: 'valid',
-            createdAt: existingProvider?.createdAt || Date.now(),
+            createdAt: existingWuyinProvider?.createdAt || Date.now(),
             updatedAt: Date.now(),
             ...budgetPayload,
           });
@@ -2897,10 +3008,6 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             createdAt: Date.now(),
             updatedAt: Date.now(),
           });
-
-          if (providerForm.id && providerForm.id !== wuyinProvider.id) {
-            await removeUserApiProviderFromCloudRecord(providerForm.id);
-          }
 
           await refreshAfterCloudUserApiMutation();
         } else {
@@ -2934,6 +3041,10 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             keyManager.removeProvider(providerForm.id);
           }
 
+          if (existingWuyinSlot && existingWuyinSlot.id !== typedKeySlot.id) {
+            keyManager.removeKey(existingWuyinSlot.id);
+          }
+
           await keyManager.syncToCloudNow();
         }
 
@@ -2950,11 +3061,23 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
     const value = providerForm.mode === 'unlimited' ? null : positive(providerForm.value);
     const normalizedApiKey = providerForm.apiKey.trim();
-    const nextProviderId = providerForm.id || `provider_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const nextApiKeyValue = isReadonlySecretPlaceholder(providerForm.apiKey)
       ? READONLY_SECRET_PLACEHOLDER
       : (normalizedApiKey || (canReusePersistedProviderSecret ? READONLY_SECRET_PLACEHOLDER : ''));
     const existingProvider = selectedProvider || thirdPartyProviders.find((provider) => provider.id === providerForm.id) || null;
+    const nextProviderId = buildCanonicalApiRecordId(
+      {
+        id: providerForm.id || existingProvider?.id,
+        name: providerForm.name,
+        baseUrl: providerForm.baseUrl,
+      },
+      thirdPartyProviders.map((provider) => provider.id),
+    );
+    const nextProviderLegacyIds = [
+      ...(existingProvider?.legacyIds || []),
+      ...(providerForm.id && providerForm.id !== nextProviderId ? [providerForm.id] : []),
+    ].filter(Boolean);
+    const runtimeApiKeyValue = resolveRuntimeSecretForSave(providerForm.apiKey, existingProvider?.apiKey);
     const manualProviderModels = parseProviderModelsText(providerForm.modelsText);
     const connectionSignatureChanged = Boolean(
       existingProvider && (
@@ -3025,6 +3148,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       if (shouldUseDirectUserApiRecordWrites) {
         await upsertUserApiProviderToCloudRecord({
           id: nextProviderId,
+          legacyIds: nextProviderLegacyIds,
           name: providerForm.name.trim(),
           baseUrl: providerForm.baseUrl.trim(),
           apiKey: nextApiKeyValue,
@@ -3050,10 +3174,20 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         });
         await refreshAfterCloudUserApiMutation();
       } else if (providerForm.id) {
+        if (!runtimeApiKeyValue) {
+          notify.error(
+            pick('保存失败', 'Save failed'),
+            pick(
+              '无法在本地运行态复用只读占位符，请重新输入真实 API Key。',
+              'The local runtime cannot reuse a read-only placeholder. Re-enter the real API key.',
+            ),
+          );
+          return;
+        }
         keyManager.updateProvider(providerForm.id, {
           name: providerForm.name.trim(),
           baseUrl: providerForm.baseUrl.trim(),
-          apiKey: normalizedApiKey,
+          apiKey: runtimeApiKeyValue,
           format: providerForm.format,
           group: providerForm.group.trim() || undefined,
           providerColor: providerForm.color,
@@ -3520,7 +3654,7 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         latencyLabel: formatLatency(provider.activitySummary?.lastLatencyMs ?? null),
         isPaused: !provider.isActive,
         recommendedModel: provider.models?.[0] || 'Qwen3-235B',
-        logoName: provider.name,
+        logoName: provider.icon || provider.name,
         latencyMs: provider.activitySummary?.lastLatencyMs ?? null,
         isHighlighted: returnHighlight?.providerId === provider.id,
         cardRef: (node: HTMLElement | null) => registerProviderCardRef(provider.id, node),
@@ -4622,10 +4756,3 @@ export default ApiSettingsView;
 // supportedModels: check.ok ? check.models : slot.supportedModels,
 // models: check.ok ? check.models : provider.models,
 // onOpenPlatformAssistant={handleOpenPlatformAssistant}
-
-
-
-
-
-
-

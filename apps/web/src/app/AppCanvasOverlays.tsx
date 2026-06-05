@@ -15,6 +15,7 @@ export type SelectionMenuOverlay = {
   onTag: () => void;
   onMigrate?: () => void;
   onArrange?: (mode: ArrangeMode) => void;
+  canArrange?: boolean; // 简体中文注释：标识当前选择卡片是否符合排列整理的条件
 };
 
 interface AppCanvasOverlaysProps {
@@ -51,6 +52,7 @@ const AppCanvasOverlays: React.FC<AppCanvasOverlaysProps> = ({
         onTag={selectionMenu.onTag}
         onMigrate={selectionMenu.onMigrate}
         onArrange={selectionMenu.onArrange}
+        canArrange={selectionMenu.canArrange}
       />
     )}
   </>

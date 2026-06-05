@@ -13,11 +13,11 @@ type RouteIdModule = {
   decodeRouteSuffix: (suffix: string | null | undefined) => string;
   extractSlotRouteTarget: (suffix: string | null | undefined) => string | null;
   matchesProviderRouteSuffix: (
-    provider: { id: string; name: string },
+    provider: { id: string; name: string; legacyIds?: string[] },
     suffix: string | null | undefined,
   ) => boolean;
   matchesSlotRouteSuffix: (
-    slot: { id: string; name: string; provider: string; proxyConfig?: { serverName?: string } },
+    slot: { id: string; name: string; provider: string; legacyIds?: string[]; proxyConfig?: { serverName?: string } },
     suffix: string | null | undefined,
   ) => boolean;
 };
@@ -60,7 +60,8 @@ test('route suffix helpers preserve slot and provider matching behavior', async 
   assert.equal(extractSlotRouteTarget('plain'), null);
 
   const slot = {
-    id: 'key_abc',
+    id: 'google-1017-1',
+    legacyIds: ['key_abc'],
     name: 'Main Route',
     provider: 'Proxy',
     proxyConfig: { serverName: 'server-x' },
@@ -72,8 +73,9 @@ test('route suffix helpers preserve slot and provider matching behavior', async 
   assert.equal(matchesSlotRouteSuffix(slot, 'proxy'), true);
   assert.equal(matchesSlotRouteSuffix(slot, 'slot_main route'), false);
 
-  const provider = { id: 'provider_contract', name: 'Contract Provider' };
+  const provider = { id: 'custom-2000-1', legacyIds: ['provider_contract'], name: 'Contract Provider' };
   assert.equal(matchesProviderRouteSuffix(provider, 'provider_contract'), true);
+  assert.equal(matchesProviderRouteSuffix(provider, 'custom-2000-1'), true);
   assert.equal(matchesProviderRouteSuffix(provider, 'contract provider'), true);
   assert.equal(matchesProviderRouteSuffix(provider, 'provider_contract provider'), false);
 });

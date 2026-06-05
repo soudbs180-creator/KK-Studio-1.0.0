@@ -13,6 +13,7 @@ interface SelectionMenuProps {
     onTag: () => void;
     onMigrate?: () => void;
     onArrange?: (mode: ArrangeMode) => void;
+    canArrange?: boolean; // 简体中文注释：标识当前是否可整理排列
 }
 
 export const SelectionMenu: React.FC<SelectionMenuProps> = ({
@@ -25,7 +26,8 @@ export const SelectionMenu: React.FC<SelectionMenuProps> = ({
     onGroup,
     onTag,
     onMigrate,
-    onArrange
+    onArrange,
+    canArrange = true
 }) => {
     const [showArrangeMenu, setShowArrangeMenu] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -115,24 +117,49 @@ export const SelectionMenu: React.FC<SelectionMenuProps> = ({
             {onArrange && (
                 <div className="relative">
                     <button
-                        onClick={() => setShowArrangeMenu(!showArrangeMenu)}
-                        className="touch-target rounded-lg transition-colors haptic-press hover:bg-[var(--frost-card-sub-bg)]"
+                        onClick={() => canArrange && setShowArrangeMenu(!showArrangeMenu)}
+                        className={`touch-target rounded-lg transition-colors haptic-press ${canArrange ? 'hover:bg-[var(--frost-card-sub-bg)] cursor-pointer' : 'cursor-not-allowed opacity-35'}`}
                         style={{ color: 'var(--clay-brand-lavender)' }}
-                        title="整理选中项 (Arrange)"
+                        title={canArrange ? "整理选中项 (Arrange)" : "框选 2 个以上项目或单 Prompt 拥有子图方可整理"}
+                        disabled={!canArrange}
                     >
                         <LayoutGrid size={18} />
                     </button>
-                    {showArrangeMenu && (
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 flex min-w-[100px] flex-col gap-1 rounded-xl p-1" style={menuSurfaceStyle}>
-                            <button onClick={() => { onArrange('grid'); setShowArrangeMenu(false); }} className="flex items-center gap-2 px-3 py-1.5 text-xs rounded transition-colors whitespace-nowrap" style={{ color: 'var(--text-secondary)' }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--frost-card-sub-bg)')} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}>
+                    {showArrangeMenu && canArrange && (
+                        <div 
+                            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 flex min-w-[110px] flex-col gap-1 rounded-xl p-1 animate-in slide-in-from-top-2 duration-150" 
+                            style={{
+                                ...menuSurfaceStyle,
+                                boxShadow: 'var(--frost-card-framework-shadow), 0 10px 30px -10px rgba(99, 102, 241, 0.25)',
+                            }}
+                        >
+                            <button 
+                                onClick={() => { onArrange('grid'); setShowArrangeMenu(false); }} 
+                                className="flex items-center gap-2 px-3 py-1.5 text-xs rounded transition-all duration-200 whitespace-nowrap cursor-pointer" 
+                                style={{ color: 'var(--text-secondary)' }} 
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--frost-card-sub-bg)'; e.currentTarget.style.color = 'var(--text-primary)'; }} 
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                            >
                                 <LayoutGrid size={14} />
                                 宫格(6列)
                             </button>
-                            <button onClick={() => { onArrange('row'); setShowArrangeMenu(false); }} className="flex items-center gap-2 px-3 py-1.5 text-xs rounded transition-colors whitespace-nowrap" style={{ color: 'var(--text-secondary)' }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--frost-card-sub-bg)')} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}>
+                            <button 
+                                onClick={() => { onArrange('row'); setShowArrangeMenu(false); }} 
+                                className="flex items-center gap-2 px-3 py-1.5 text-xs rounded transition-all duration-200 whitespace-nowrap cursor-pointer" 
+                                style={{ color: 'var(--text-secondary)' }} 
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--frost-card-sub-bg)'; e.currentTarget.style.color = 'var(--text-primary)'; }} 
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                            >
                                 <Rows size={14} />
                                 横向排列
                             </button>
-                            <button onClick={() => { onArrange('column'); setShowArrangeMenu(false); }} className="flex items-center gap-2 px-3 py-1.5 text-xs rounded transition-colors whitespace-nowrap" style={{ color: 'var(--text-secondary)' }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--frost-card-sub-bg)')} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}>
+                            <button 
+                                onClick={() => { onArrange('column'); setShowArrangeMenu(false); }} 
+                                className="flex items-center gap-2 px-3 py-1.5 text-xs rounded transition-all duration-200 whitespace-nowrap cursor-pointer" 
+                                style={{ color: 'var(--text-secondary)' }} 
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--frost-card-sub-bg)'; e.currentTarget.style.color = 'var(--text-primary)'; }} 
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                            >
                                 <Columns size={14} />
                                 纵向排列
                             </button>

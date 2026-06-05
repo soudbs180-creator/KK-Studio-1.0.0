@@ -13,6 +13,12 @@ import {
   isUserApisEnvelope,
   mergeUserApisPayload,
 } from './userApiPayload.ts';
+import {
+  apiRecordMatchesIdOrLegacy,
+  canonicalizeApiRecordsForLatestRequirements,
+  getApiRecordIdAliases,
+  upgradeUserApisEnvelopeForLatestRequirements,
+} from '../auth/keyManagerCanonicalIds.ts';
 
 interface AuthenticatedProfileContext {
   userId: string;
@@ -235,26 +241,25 @@ function invalidateCachedUserApisPayload(userId: string): void {
 }
 
 function normalizeEnvelope(rawPayload: unknown): UserApisEnvelope {
+  const upgrade = (payload: UserApisEnvelope): UserApisEnvelope =>
+    upgradeUserApisEnvelopeForLatestRequirements(payload).payload;
+
   if (isUserApisEnvelope(rawPayload)) {
     const payload = rawPayload as Record<string, unknown>;
-    return {
+    return upgrade({
       version: Number(payload.version || 2),
       slots: toArray(payload.slots),
       providers: toArray(payload.providers),
       entries: toArray(payload.entries),
-    };
+    });
   }
 
-  return {
+  return upgrade({
     version: 2,
     slots: [],
     providers: extractUserApiProvidersFromPayload(rawPayload),
     entries: extractUserApiEntriesFromPayload(rawPayload),
-  };
-}
-
-function normalizeRecordId(value: unknown): string {
-  return isRecord(value) ? String(value.id || '').trim() : '';
+  });
 }
 
 function resolveUserApiEntryType(
@@ -362,14 +367,14 @@ function upsertArrayRecordById(
   existing: unknown[],
   nextRecord: JsonRecord,
 ): unknown[] {
-  const targetId = normalizeRecordId(nextRecord);
-  if (!targetId) {
+  const targetIds = getApiRecordIdAliases(nextRecord);
+  if (targetIds.length === 0) {
     return [...existing, nextRecord];
   }
 
   let matched = false;
   const merged = existing.map((item) => {
-    if (normalizeRecordId(item) !== targetId || !isRecord(item)) {
+    if (!isRecord(item) || !targetIds.some((targetId) => apiRecordMatchesIdOrLegacy(item, targetId))) {
       return item;
     }
 
@@ -414,12 +419,9 @@ function mergeRecordArrayWithPersistedSecret(
       return;
     }
 
-    const id = normalizeRecordId(item);
-    if (!id) {
-      return;
-    }
-
-    existingById.set(id, item);
+    getApiRecordIdAliases(item).forEach((id) => {
+      existingById.set(id, item);
+    });
   });
 
   return next.map((item) => {
@@ -427,12 +429,14 @@ function mergeRecordArrayWithPersistedSecret(
       return item;
     }
 
-    const id = normalizeRecordId(item);
-    if (!id) {
+    const aliases = getApiRecordIdAliases(item);
+    if (aliases.length === 0) {
       return item;
     }
 
-    const persisted = existingById.get(id);
+    const persisted = aliases
+      .map((alias) => existingById.get(alias))
+      .find(Boolean);
     if (!persisted) {
       return item;
     }
@@ -708,23 +712,34 @@ export async function upsertUserApiSlotToCloudRecord(
     throw new Error('An authenticated session is required to save official endpoint settings.');
   }
 
-  const slotId = String(slotInput.id || '').trim();
+  const existingPayload = normalizeEnvelope(
+    await loadUserApisPayloadRaw(context.userId),
+  );
+  const canonicalSlotInput = canonicalizeApiRecordsForLatestRequirements(
+    [slotInput],
+    'slot',
+  ).records[0] as JsonRecord;
+  const slotId = String(canonicalSlotInput.id || '').trim();
+  const originalSlotId = String(slotInput.id || '').trim();
   if (!slotId) {
     throw new Error('Official endpoint id is required before saving settings.');
   }
 
-  const existingPayload = normalizeEnvelope(
-    await loadUserApisPayloadRaw(context.userId),
-  );
   const existingSlots = existingPayload.slots.filter(isRecord);
-  const existingSlot = existingSlots.find((item) => normalizeRecordId(item) === slotId);
+  const existingSlot = existingSlots.find((item) => (
+    apiRecordMatchesIdOrLegacy(item, slotId)
+    || apiRecordMatchesIdOrLegacy(item, String(slotInput.id || '').trim())
+  ));
   const nextSlot: JsonRecord = {
     ...(existingSlot || {}),
-    ...slotInput,
+    ...canonicalSlotInput,
     id: slotId,
   };
+  if (originalSlotId && originalSlotId.toLowerCase() !== slotId.toLowerCase() && nextSlot.updatedAt === undefined) {
+    nextSlot.updatedAt = Date.now();
+  }
 
-  if (existingSlot && shouldReusePersistedSecret(slotInput.key)) {
+  if (existingSlot && shouldReusePersistedSecret(canonicalSlotInput.key)) {
     nextSlot.key = existingSlot.key;
   }
 
@@ -759,7 +774,7 @@ export async function removeUserApiSlotFromCloudRecord(
   );
   const nextPayload: UserApisEnvelope = {
     ...existingPayload,
-    slots: existingPayload.slots.filter((item) => normalizeRecordId(item) !== normalizedSlotId),
+    slots: existingPayload.slots.filter((item) => !apiRecordMatchesIdOrLegacy(item, normalizedSlotId)),
   };
 
   return persistUserApisPayloadViaApi(context, nextPayload, existingPayload);
@@ -774,23 +789,34 @@ export async function upsertUserApiProviderToCloudRecord(
     throw new Error('An authenticated session is required to save provider settings.');
   }
 
-  const providerId = String(providerInput.id || '').trim();
+  const existingPayload = normalizeEnvelope(
+    await loadUserApisPayloadRaw(context.userId),
+  );
+  const canonicalProviderInput = canonicalizeApiRecordsForLatestRequirements(
+    [providerInput],
+    'provider',
+  ).records[0] as JsonRecord;
+  const providerId = String(canonicalProviderInput.id || '').trim();
+  const originalProviderId = String(providerInput.id || '').trim();
   if (!providerId) {
     throw new Error('Provider id is required before saving provider settings.');
   }
 
-  const existingPayload = normalizeEnvelope(
-    await loadUserApisPayloadRaw(context.userId),
-  );
   const existingProviders = existingPayload.providers.filter(isRecord);
-  const existingProvider = existingProviders.find((item) => normalizeRecordId(item) === providerId);
+  const existingProvider = existingProviders.find((item) => (
+    apiRecordMatchesIdOrLegacy(item, providerId)
+    || apiRecordMatchesIdOrLegacy(item, String(providerInput.id || '').trim())
+  ));
   const nextProvider: JsonRecord = {
     ...(existingProvider || {}),
-    ...providerInput,
+    ...canonicalProviderInput,
     id: providerId,
   };
+  if (originalProviderId && originalProviderId.toLowerCase() !== providerId.toLowerCase() && nextProvider.updatedAt === undefined) {
+    nextProvider.updatedAt = Date.now();
+  }
 
-  if (existingProvider && shouldReusePersistedSecret(providerInput.apiKey)) {
+  if (existingProvider && shouldReusePersistedSecret(canonicalProviderInput.apiKey)) {
     nextProvider.apiKey = existingProvider.apiKey;
   }
 
@@ -825,7 +851,7 @@ export async function removeUserApiProviderFromCloudRecord(
   );
   const nextPayload: UserApisEnvelope = {
     ...existingPayload,
-    providers: existingPayload.providers.filter((item) => normalizeRecordId(item) !== normalizedProviderId),
+    providers: existingPayload.providers.filter((item) => !apiRecordMatchesIdOrLegacy(item, normalizedProviderId)),
   };
 
   return persistUserApisPayloadViaApi(context, nextPayload, existingPayload);

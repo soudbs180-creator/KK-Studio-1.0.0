@@ -2,6 +2,7 @@ export interface RouteIdSlot {
     id: string;
     name?: string;
     provider?: string;
+    legacyIds?: string[];
     proxyConfig?: {
         serverName?: string;
     };
@@ -10,6 +11,7 @@ export interface RouteIdSlot {
 export interface RouteIdProvider {
     id: string;
     name?: string;
+    legacyIds?: string[];
 }
 
 export function extractSlotRouteTarget(suffix: string | null | undefined): string | null {
@@ -36,16 +38,24 @@ export function matchesSlotRouteSuffix(slot: RouteIdSlot, suffix: string | null 
 
     const routeTarget = extractSlotRouteTarget(decodedSuffix);
     const slotIdLower = String(slot.id || '').trim().toLowerCase();
+    const legacyIdSet = new Set(
+        (Array.isArray(slot.legacyIds) ? slot.legacyIds : [])
+            .map((id) => String(id || '').trim().toLowerCase())
+            .filter(Boolean)
+    );
     const slotNameLower = String(slot.name || '').trim().toLowerCase();
     const slotSuffixLower = String(slot.proxyConfig?.serverName || slot.provider || 'Custom').trim().toLowerCase();
     const providerLower = String(slot.provider || '').trim().toLowerCase();
 
     if (routeTarget) {
-        return slotIdLower === routeTarget;
+        return slotIdLower === routeTarget
+            || legacyIdSet.has(routeTarget)
+            || legacyIdSet.has(decodedSuffix);
     }
 
     return (
         slotIdLower === decodedSuffix ||
+        legacyIdSet.has(decodedSuffix) ||
         slotNameLower === decodedSuffix ||
         slotSuffixLower === decodedSuffix ||
         providerLower === decodedSuffix
@@ -62,12 +72,21 @@ export function matchesProviderRouteSuffix(
     const routeTarget = extractSlotRouteTarget(decodedSuffix);
     const providerIdLower = String(provider.id || '').trim().toLowerCase();
     const providerNameLower = String(provider.name || '').trim().toLowerCase();
+    const legacyIdSet = new Set(
+        (Array.isArray(provider.legacyIds) ? provider.legacyIds : [])
+            .map((id) => String(id || '').trim().toLowerCase())
+            .filter(Boolean)
+    );
 
     if (routeTarget) {
-        return providerIdLower === routeTarget;
+        return providerIdLower === routeTarget
+            || legacyIdSet.has(routeTarget)
+            || legacyIdSet.has(decodedSuffix);
     }
 
-    return providerIdLower === decodedSuffix || providerNameLower === decodedSuffix;
+    return providerIdLower === decodedSuffix
+        || legacyIdSet.has(decodedSuffix)
+        || providerNameLower === decodedSuffix;
 }
 
 export function buildStableSystemRouteId(baseModelId: string, providerId?: string, fallbackIndex?: number): string {
