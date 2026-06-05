@@ -118,6 +118,9 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /function maskSecret\(secret\?: unknown\): string \{/);
   assert.match(source, /if \(isRecord\(secret\) && secret\.__kkUserApiSecret === true\) \{\s*return READONLY_SECRET_PLACEHOLDER;\s*\}/);
   assert.match(source, /clean\.startsWith\('__kk_redacted__:'\)/);
+  assert.match(source, /revealUserApiSecretFromCloudRecord/);
+  assert.match(source, /const savedSecretReadOnlyHelper = pick\(/);
+  assert.match(source, /点击右侧眼睛会从后端临时取回明文用于核对/);
   assert.match(source, /import \{ useAuth \} from '\.\.\/\.\.\/context\/AuthContext';/);
   assert.match(source, /import \{ resolveUserApiViewState \} from '\.\.\/\.\.\/services\/api\/userApiViewState';/);
   assert.match(source, /const \{ user, isTempUser \} = useAuth\(\);/);
@@ -162,7 +165,8 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /buildWuyinOneKeyProvider\(\s*wuyinApiKeyForSave,\s*catalog,\s*\{/);
   assert.match(source, /keySlotId: existingWuyinSlot\?\.id,/);
   assert.match(settingsUiSource, /if \(str === 'sk-readonly-0000'\) return '••••••••••••';/);
-  assert.match(settingsUiSource, /if \(isRedacted\) \{\s*return maskSecretDisplay\(value\);\s*\}\s*return value;/);
+  assert.match(settingsUiSource, /if \(isRedactedPasswordValue\(value\)\) \{\s*return maskSecretDisplay\(value\);\s*\}\s*return value;/);
+  assert.match(settingsUiSource, /await onReveal\(\);[\s\S]*setShowPassword\(true\);/);
   assert.doesNotMatch(settingsUiSource, /wuyin_••••/);
   assert.doesNotMatch(settingsUiSource, /return maskedPreview;/);
   assert.match(source, /const selectedProvider = useMemo\(\(\) => \{/);
@@ -187,14 +191,46 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /<div className="rounded-\[22px\] border px-4 py-3 text-\[1[34]px\] leading-6 text-\[var\(--state-warning-text\)\]" style=\{SETTINGS_WARNING_STYLE\}>\s*\{userApiEditorReadOnlyHelper\}\s*<\/div>/);
   assert.match(source, /<SettingInput[\s\S]*?value=\{getOfficialDisplayName\(officialForm\.provider\)\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);
   assert.match(source, /<SettingSelect[\s\S]*?value=\{officialForm\.provider\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);
-  assert.match(source, /<SettingInput[\s\S]*?label="API Key"[\s\S]*?value=\{officialForm\.key\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);
+  assert.match(source, /<SettingInput[\s\S]*?label="API Key"[\s\S]*?value=\{officialForm\.key\}[\s\S]*?onReveal=\{isReadonlySecretPlaceholder\(officialForm\.key\) \? revealOfficialSecret : undefined\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);
   assert.match(source, /<SettingInput[\s\S]*?value=\{providerForm\.name\}[\s\S]*?disabled=\{providerEditorReadOnly\}/);
   assert.match(source, /<SettingInput[\s\S]*?value=\{providerForm\.baseUrl\}[\s\S]*?disabled=\{providerEditorReadOnly\}/);
-  assert.match(source, /<SettingInput[\s\S]*?label="API Key"[\s\S]*?value=\{providerForm\.apiKey\}[\s\S]*?disabled=\{providerEditorReadOnly\}/);
+  assert.match(source, /<SettingInput[\s\S]*?label="API Key"[\s\S]*?value=\{providerForm\.apiKey\}[\s\S]*?onReveal=\{isReadonlySecretPlaceholder\(providerForm\.apiKey\) \? revealProviderSecret : undefined\}[\s\S]*?disabled=\{providerEditorReadOnly\}/);
   assert.match(source, /<SettingSelect[\s\S]*?value=\{providerForm\.format\}[\s\S]*?disabled=\{providerEditorReadOnly\}/);
   assert.match(source, /<SettingToggle[\s\S]*?checked=\{providerForm\.isActive\}[\s\S]*?disabled=\{providerEditorReadOnly\}/);
   assert.match(source, /<SegmentedControlMulti[\s\S]*?value=\{getModeOption\(officialForm\.mode\)\}[\s\S]*?disabled=\{userApiEditorReadOnly\}/);
   assert.match(source, /<SegmentedControlMulti[\s\S]*?value=\{getModeOption\(providerForm\.mode\)\}[\s\S]*?disabled=\{providerEditorReadOnly\}/);
+});
+
+test('request-boundary helpers block placeholder secrets before provider transport', () => {
+  const apiConfigSource = readSource('apps/web/src/services/api/apiConfig.ts');
+  const secureProxySource = readSource('apps/web/src/services/model/secureModelProxy.ts');
+  const videoServiceSource = readSource('apps/web/src/services/video/videoService.ts');
+  const veoVideoServiceSource = readSource('apps/web/src/services/video/VeoVideoService.ts');
+
+  assert.match(apiConfigSource, /export function normalizeApiKeyForTransport\(value: unknown\): string \{/);
+  assert.match(apiConfigSource, /token === 'sk-readonly-0000'/);
+  assert.match(apiConfigSource, /token\.startsWith\('__kk_redacted__:'\)/);
+  assert.match(apiConfigSource, /token === '\[object Object\]'/);
+  assert.match(apiConfigSource, /token\.includes\('\.\.\.'\)/);
+  assert.match(apiConfigSource, /isEncryptedSecretJsonString\(token\)/);
+  assert.match(apiConfigSource, /if \(!token\) \{\s*return '';\s*\}/);
+  assert.match(apiConfigSource, /return token \? `\$\{endpoint\}\?key=\$\{encodeURIComponent\(token\)\}` : endpoint;/);
+  assert.match(apiConfigSource, /headers\[headerName\] = headerName === 'Authorization'[\s\S]*: token;/);
+
+  assert.match(secureProxySource, /function normalizeUserApiSecretForTransport\(value: unknown\): string \{/);
+  assert.match(secureProxySource, /targetApiKey = normalizeUserApiSecretForTransport\(rawTargetApiKey\);/);
+  assert.match(secureProxySource, /if \(rawTargetApiKey && !targetApiKey\) \{/);
+  assert.match(secureProxySource, /LOCAL_USER_ROUTE_SECRET_REQUIRED_CODE/);
+  assert.match(secureProxySource, /proxyHeaders\['X-Proxy-Api-Key'\] = targetApiKey;/);
+
+  assert.match(videoServiceSource, /import \{ getApiKeyToken \} from '\.\.\/api\/apiConfig';/);
+  assert.match(videoServiceSource, /const apiKeyToken = getApiKeyToken\(apiKey\);/);
+  assert.match(videoServiceSource, /apiKey = getApiKeyToken\(apiKey\);/);
+  assert.match(videoServiceSource, /Re-enter or reveal the real API key before retrying\./);
+
+  assert.match(veoVideoServiceSource, /import \{ getApiKeyToken \} from '\.\.\/api\/apiConfig';/);
+  assert.match(veoVideoServiceSource, /apiKey = getApiKeyToken\(apiKey\);/);
+  assert.match(veoVideoServiceSource, /Re-enter or reveal the real API key before retrying\./);
 });
 
 test('AuthContext keeps KeyManager scoped to the current KK runtime user and clears auth state on invalidation', () => {

@@ -45,7 +45,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
     return (
         <div className="w-full lg:hidden">
             <div
-                className="ios-mobile-header-glass rounded-[24px] border px-3 py-1.5"
+                className="ios-mobile-header-glass rounded-[20px] border p-2"
                 style={{
                     background: 'var(--mobile-clay-shell-bg)',
                     borderColor: 'var(--mobile-clay-border)',

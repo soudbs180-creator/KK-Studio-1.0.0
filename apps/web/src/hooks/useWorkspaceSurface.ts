@@ -10,7 +10,8 @@ export type SettingsSurfaceView =
   | 'api-management'
   | 'consumption-records'
   | 'storage-settings'
-  | 'system-logs';
+  | 'system-logs'
+  | 'user-profile';
 
 interface UseWorkspaceSurfaceOptions {
   showSettingsPanel: boolean;
@@ -36,7 +37,7 @@ export function useWorkspaceSurface({
   const [chatSidebarWidth, setChatSidebarWidth] = useState(420);
   const [responsiveSurface, setResponsiveSurface] = useState(() => resolveResponsiveSurface(window.innerWidth));
   const isMobile = isCompactResponsiveSurface(responsiveSurface);
-  const [workspaceSurface, setWorkspaceSurface] = useState<Extract<AppSurface, 'workspace' | 'library'>>('workspace');
+  const [workspaceSurface, setWorkspaceSurface] = useState<Extract<AppSurface, 'workspace' | 'library' | 'favorites'>>('workspace');
 
   const activeAppSurface: AppSurface = showSettingsPanel
     ? 'settings'
@@ -50,7 +51,9 @@ export function useWorkspaceSurface({
     ? 'chat'
     : workspaceSurface === 'library'
       ? 'history'
-      : null;
+      : workspaceSurface === 'favorites'
+        ? 'favorites'
+        : null;
 
   const currentMobileTab: MobilePrimaryTab = activeAppSurface === 'library'
     ? 'library'
@@ -85,6 +88,12 @@ export function useWorkspaceSurface({
 
   const openLibrarySurface = useCallback(() => {
     setWorkspaceSurface('library');
+    setShowUserMenu(false);
+    setIsChatOpen(false);
+  }, [setShowUserMenu]);
+
+  const openFavoritesSurface = useCallback(() => {
+    setWorkspaceSurface('favorites');
     setShowUserMenu(false);
     setIsChatOpen(false);
   }, [setShowUserMenu]);
@@ -149,6 +158,7 @@ export function useWorkspaceSurface({
     currentMobileTab,
     focusWorkspace,
     openLibrarySurface,
+    openFavoritesSurface,
     toggleChatPanel,
     openProfileSurface,
     openSettingsSurface,

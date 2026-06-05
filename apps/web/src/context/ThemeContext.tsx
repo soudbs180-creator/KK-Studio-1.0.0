@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useLayoutEffect, useState } from 'react';
 
 export type Theme = 'dark' | 'light' | 'system';
 export type ResolvedTheme = 'dark' | 'light';
@@ -14,6 +14,9 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const THEME_TRANSITION_CLASS = 'theme-transitioning';
+const THEME_TRANSITION_MS = 260;
+let themeTransitionTimer: number | undefined;
 
 const getSystemTheme = (): ResolvedTheme => {
     if (typeof window === 'undefined') return 'light';
@@ -32,7 +35,16 @@ const resolveThemeMode = (theme: Theme): ResolvedTheme => (
     theme === 'system' ? getSystemTheme() : theme
 );
 
-const applyResolvedThemeToDocument = (mode: ResolvedTheme) => {
+const getAppliedDocumentTheme = (): ResolvedTheme | null => {
+    if (typeof document === 'undefined') {
+        return null;
+    }
+
+    const appliedTheme = document.documentElement.dataset.theme || document.body.dataset.theme;
+    return appliedTheme === 'dark' || appliedTheme === 'light' ? appliedTheme : null;
+};
+
+const applyResolvedThemeToDocument = (mode: ResolvedTheme, animate = false) => {
     if (typeof document === 'undefined') {
         return;
     }
@@ -40,8 +52,31 @@ const applyResolvedThemeToDocument = (mode: ResolvedTheme) => {
     const body = document.body;
     const root = document.documentElement;
 
+    if (animate) {
+        body.classList.add(THEME_TRANSITION_CLASS);
+        root.classList.add(THEME_TRANSITION_CLASS);
+        body.dataset.themeTransition = 'active';
+        root.dataset.themeTransition = 'active';
+
+        if (themeTransitionTimer !== undefined) {
+            window.clearTimeout(themeTransitionTimer);
+        }
+
+        themeTransitionTimer = window.setTimeout(() => {
+            body.classList.remove(THEME_TRANSITION_CLASS);
+            root.classList.remove(THEME_TRANSITION_CLASS);
+            delete body.dataset.themeTransition;
+            delete root.dataset.themeTransition;
+            themeTransitionTimer = undefined;
+        }, THEME_TRANSITION_MS);
+    }
+
     body.classList.toggle('dark-mode', mode === 'dark');
+    body.classList.toggle('light-mode', mode === 'light');
     root.classList.toggle('dark', mode === 'dark');
+    root.classList.toggle('light', mode === 'light');
+    root.classList.toggle('dark-mode', mode === 'dark');
+    root.classList.toggle('light-mode', mode === 'light');
     body.dataset.theme = mode;
     root.dataset.theme = mode;
     root.style.colorScheme = mode;
@@ -56,14 +91,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [theme, setThemeState] = useState<Theme>(getStoredTheme);
     const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveThemeMode(getStoredTheme()));
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (typeof window === 'undefined') return;
 
         const media = window.matchMedia('(prefers-color-scheme: dark)');
 
         const applyMode = (mode: ResolvedTheme) => {
+            const appliedTheme = getAppliedDocumentTheme();
+            applyResolvedThemeToDocument(mode, appliedTheme !== null && appliedTheme !== mode);
             setResolvedTheme((currentMode) => (currentMode === mode ? currentMode : mode));
-            applyResolvedThemeToDocument(mode);
         };
 
         if (theme === 'system') {

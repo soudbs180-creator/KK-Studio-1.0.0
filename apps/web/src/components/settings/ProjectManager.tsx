@@ -5,6 +5,7 @@ import JSZip from 'jszip';
 import {
     Focus,
     Grid3x3,
+    Heart,
     Layers,
     LayoutDashboard,
     Magnet,
@@ -50,6 +51,7 @@ import type { WorkflowTemplateDefinition, WorkflowTemplateId } from '../../workf
 
 interface ProjectManagerProps {
     onSearch: () => void;
+    onFavorites?: () => void;
     isSidebarOpen: boolean;
     onToggleSidebar: () => void;
     isMobile: boolean;
@@ -77,6 +79,7 @@ interface ProjectManagerProps {
 
 const ProjectManager: React.FC<ProjectManagerProps> = ({
     onSearch,
+    onFavorites,
     isMobile,
     onFitToAll,
     onResetView,
@@ -862,6 +865,22 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                 >
                                     <Search size={20} />
                                 </button>
+
+                                {onFavorites && (
+                                    <button
+                                        id="project-manager-favorites"
+                                        data-testid="project-manager-favorites"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            onFavorites();
+                                        }}
+                                        className={desktopIconButtonClass}
+                                        title="Favorites"
+                                        tabIndex={-1}
+                                    >
+                                        <Heart size={20} />
+                                    </button>
+                                )}
 
                                 <div className="my-1 h-px w-full" style={{ backgroundColor: 'var(--frost-card-framework-border)' }} />
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { type PromptNode, AspectRatio, GenerationMode, type PromptGenerationMetadata, type EcommerceEditableTaskState, type EcommerceFrameworkQueueItem } from '../../types';
 import type { EcommerceGroupSlotState } from '../../services/ecommerce/groupSlotState.ts';
-import { Sparkles, Loader2, Video, Image, Music, Copy, Check, Languages, Info, Shield, CheckCircle2, AlertTriangle, Download } from 'lucide-react';
+import { Sparkles, Loader2, Video, Image, Music, Copy, Check, Languages, Info, Shield, CheckCircle2, AlertTriangle, Download, Heart } from 'lucide-react';
 import { getCardDimensions } from '../../utils/styleUtils';
 import { generateTagColor } from '../../utils/colorUtils';
 import { notify } from '../../services/system/notificationService';
@@ -22,6 +22,7 @@ import { getPromptNodeBaseCardWidth, getPromptNodeCardWidth } from '../../utils/
 import { snapCanvasPointToGrid } from '../../utils/canvasSnapToGrid';
 import EcommerceCardActions from '../ecommerce/EcommerceCardActions';
 import EcommerceCanvasWorkbenchCard from '../ecommerce/EcommerceCanvasWorkbenchCard';
+import { useFavoritesStore } from '../../features/favorites';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -629,6 +630,16 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     const hasMoved = useRef(false);
     const [activeTab, setActiveTab] = useState<'raw' | 'opt'>('raw');
     const [copyStatus, setCopyStatus] = useState<'idle' | 'en' | 'zh'>('idle');
+    const favoriteItems = useFavoritesStore(state => state.items);
+    const addPromptFavorite = useFavoritesStore(state => state.addPromptFavorite);
+    const removeFavorite = useFavoritesStore(state => state.removeFavorite);
+    const promptFavorite = favoriteItems.find(item => (
+        item.kind === 'favorite-prompt'
+        && (
+            item.sourcePromptId === node.id
+            || item.prompt.trim() === node.prompt.trim()
+        )
+    ));
     const [frameworkRemarkDraft, setFrameworkRemarkDraft] = useState(() => resolveFrameworkRemarkLabel(node));
     const frameworkRemarkSkipCommitRef = useRef(false);
     const ecommerceFrameworkCardClassName = isEcommerceFrameworkCard
@@ -1517,6 +1528,22 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 </button>
                             </div>
                         )}
+
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (promptFavorite) {
+                                    void removeFavorite(promptFavorite.id);
+                                } else {
+                                    void addPromptFavorite(node);
+                                }
+                            }}
+                            className={`p-1 rounded hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer ${promptFavorite ? 'text-[var(--accent-coral)]' : 'text-[var(--text-tertiary)] hover:text-[var(--accent-coral)]'}`}
+                            title={promptFavorite ? 'Remove from favorites' : 'Add prompt to favorites'}
+                            aria-pressed={Boolean(promptFavorite)}
+                        >
+                            <Heart size={14} fill={promptFavorite ? 'currentColor' : 'none'} />
+                        </button>
 
                         {/* Delete Button */}
                         {onDelete && (

@@ -4,6 +4,7 @@
  */
 
 const LOCAL_PROXY_TASK_PREFIX = 'local_proxy:';
+const { normalizeUserApiSecretForTransport } = require('./userApiSecret');
 
 /**
  * 递归深度寻找并提取 API 响应中所有的有效 HTTP(S) 资源 URL
@@ -567,6 +568,11 @@ function serializeBody(body, contentType) {
  * 提交 API 模型任务
  */
 async function submitWuyinTask({ catalogItem, apiKey, input, baseUrl }) {
+  apiKey = normalizeUserApiSecretForTransport(apiKey);
+  if (!apiKey) {
+    throw new Error('Wuyin API key is required.');
+  }
+
   let targetUrl = catalogItem.endpointUrl || `https://api.wuyinkeji.com${catalogItem.endpointPath || ''}`;
   
   if (baseUrl) {
@@ -662,6 +668,11 @@ async function submitWuyinTask({ catalogItem, apiKey, input, baseUrl }) {
  * 查询异步模型任务状态
  */
 async function checkWuyinTaskStatus({ catalogItem, apiKey, providerTaskId, submitExecTime, baseUrl }) {
+  apiKey = normalizeUserApiSecretForTransport(apiKey);
+  if (!apiKey) {
+    throw new Error('Wuyin API key is required.');
+  }
+
   const detailPath = catalogItem.detailPath || '/api/async/detail';
   let detailUrl = `https://api.wuyinkeji.com${detailPath}`;
 

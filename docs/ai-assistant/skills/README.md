@@ -14,7 +14,10 @@
 6. [update-ui-map-after-layout-change.md](update-ui-map-after-layout-change.md) —— UI 变更后同步 UI Map 规约
 7. [recover-interrupted-agent-task.md](recover-interrupted-agent-task.md) —— 系统中断/异常断开后恢复任务队列 Skill
 8. [security-sensitive-change.md](security-sensitive-change.md) —— 敏感配置/密钥安全隔离操作规约
+9. [single-generate-to-canvas.md](single-generate-to-canvas.md) —— 单图生图 Skill
+10. [quick-open-settings-view.md](quick-open-settings-view.md) —— 快速打开设置功能 Skill
 
 ## ⚖️ 设计准则
 - 所有技能设计均要求**工具优先，不模拟 UI**。
 - 涉及敏感操作（`confirm` 或 `dangerous`）必须在技能规约中明确防护机制。
+- 本地导航类操作必须控制底层功能线路，不能依赖按钮的页面位置。

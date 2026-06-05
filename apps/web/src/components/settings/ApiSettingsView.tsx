@@ -37,6 +37,7 @@ import {
   loadUserApisPayloadMetadataFromCloudRecord,
   removeUserApiProviderFromCloudRecord,
   removeUserApiSlotFromCloudRecord,
+  revealUserApiSecretFromCloudRecord,
   upsertUserApiProviderToCloudRecord,
   upsertUserApiSlotToCloudRecord,
 } from '../../services/api/userApiCloudRecordStorage';
@@ -920,11 +921,23 @@ const toProviderForm = (provider: ThirdPartyProvider): ProviderForm => ({
           : '',
 });
 
+const toProviderFormFromPreset = (preset: ProviderPreset): ProviderForm => ({
+  ...providerDefaults,
+  name: preset.name,
+  baseUrl: preset.baseUrl,
+  apiKey: '',
+  apiKeyPreview: '',
+  modelsText: '',
+  format: preset.format,
+  color: preset.color,
+});
+
 const toProviderFormFromSupplier = (supplier: Supplier): ProviderForm => ({
   ...providerDefaults,
   name: supplier.name,
   baseUrl: supplier.baseUrl,
-  apiKey: supplier.apiKey,
+  apiKey: '',
+  apiKeyPreview: '',
   format: supplier.format,
   mode: getMode(supplier.budgetLimit, undefined),
   value: typeof supplier.budgetLimit === 'number' && supplier.budgetLimit > -1 ? String(supplier.budgetLimit) : '',
@@ -1819,6 +1832,10 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
     || canUseSessionlessLocalApiBridge;
   const canReusePersistedOfficialSecret = Boolean(editingOfficialId && selectedOfficialSlot);
   const canReusePersistedProviderSecret = Boolean(editingProviderId && selectedProvider);
+  const savedSecretReadOnlyHelper = pick(
+    '已保存的 API Key 默认只显示遮罩。点击右侧眼睛会从后端临时取回明文用于核对；需要更换时清空后输入新的真实 API Key 并保存。',
+    'Saved API keys show a mask by default. Click the eye to temporarily reveal the saved plaintext from the backend; to replace it, clear the field, enter the real new API key, and save.',
+  );
   const diagnosticsAvailability = resolveApiWorkbenchDiagnosticsAvailability({
     hasWorkbenchAccess,
     isApiReachable: apiHealth?.reachable,
@@ -2027,7 +2044,19 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
   const updateCapabilityAssignment = useCallback((
     role: CapabilityRole,
-    patch: Partial<{ enabled: boolean; primaryRouteId: string; primaryModelId: string; fallbackRouteId: string; auxiliaryRouteId: string; auxiliaryModelId: string }>,
+    patch: Partial<{
+      enabled: boolean;
+      primaryRouteId: string;
+      primaryModelId: string;
+      fallbackRouteId: string;
+      fallbackModelId: string;
+      auxiliaryRouteId: string;
+      auxiliaryModelId: string;
+      imageRouteId: string;
+      imageModelId: string;
+      imageFallbackRouteId: string;
+      imageFallbackModelId: string;
+    }>,
   ) => {
     upsertCapabilityRouteAssignment(role, patch);
     setCapabilityAssignments(getCapabilityRouteAssignments());
@@ -2044,17 +2073,30 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         primaryRouteId: assignment?.primaryRouteId || '',
         primaryModelId: assignment?.primaryModelId || '',
         fallbackRouteId: assignment?.fallbackRouteId || '',
+        fallbackModelId: assignment?.fallbackModelId || '',
         auxiliaryRouteId: assignment?.auxiliaryRouteId || '',
         auxiliaryModelId: assignment?.auxiliaryModelId || '',
+        imageRouteId: assignment?.imageRouteId || '',
+        imageModelId: assignment?.imageModelId || '',
+        imageFallbackRouteId: assignment?.imageFallbackRouteId || '',
+        imageFallbackModelId: assignment?.imageFallbackModelId || '',
         routeOptions: capabilityRouteOptions,
         modelOptions: getRouteModelOptions(assignment?.primaryRouteId || '', meta.role),
+        fallbackModelOptions: getRouteModelOptions(assignment?.fallbackRouteId || '', meta.role),
         auxiliaryModelOptions: getRouteModelOptions(assignment?.auxiliaryRouteId || '', meta.role),
+        imageModelOptions: getRouteModelOptions(assignment?.imageRouteId || '', 'image_generation'),
+        imageFallbackModelOptions: getRouteModelOptions(assignment?.imageFallbackRouteId || '', 'image_generation'),
         onEnabledChange: (enabled: boolean) => updateCapabilityAssignment(meta.role, { enabled }),
-        onPrimaryRouteChange: (value: string) => updateCapabilityAssignment(meta.role, { primaryRouteId: value }),
+        onPrimaryRouteChange: (value: string) => updateCapabilityAssignment(meta.role, { primaryRouteId: value, primaryModelId: '' }),
         onPrimaryModelChange: (value: string) => updateCapabilityAssignment(meta.role, { primaryModelId: value }),
-        onFallbackRouteChange: (value: string) => updateCapabilityAssignment(meta.role, { fallbackRouteId: value }),
-        onAuxiliaryRouteChange: (value: string) => updateCapabilityAssignment(meta.role, { auxiliaryRouteId: value }),
+        onFallbackRouteChange: (value: string) => updateCapabilityAssignment(meta.role, { fallbackRouteId: value, fallbackModelId: '' }),
+        onFallbackModelChange: (value: string) => updateCapabilityAssignment(meta.role, { fallbackModelId: value }),
+        onAuxiliaryRouteChange: (value: string) => updateCapabilityAssignment(meta.role, { auxiliaryRouteId: value, auxiliaryModelId: '' }),
         onAuxiliaryModelChange: (value: string) => updateCapabilityAssignment(meta.role, { auxiliaryModelId: value }),
+        onImageRouteChange: (value: string) => updateCapabilityAssignment(meta.role, { imageRouteId: value, imageModelId: '' }),
+        onImageModelChange: (value: string) => updateCapabilityAssignment(meta.role, { imageModelId: value }),
+        onImageFallbackRouteChange: (value: string) => updateCapabilityAssignment(meta.role, { imageFallbackRouteId: value, imageFallbackModelId: '' }),
+        onImageFallbackModelChange: (value: string) => updateCapabilityAssignment(meta.role, { imageFallbackModelId: value }),
       };
     })
   ), [capabilityAssignments, capabilityRouteOptions, getRouteModelOptions, pick, updateCapabilityAssignment]);
@@ -2545,6 +2587,68 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       notify.error(pick('操作失败', 'Action failed'), message);
     } finally {
       setBusy((current) => (current === key ? null : current));
+    }
+  };
+
+  const revealOfficialSecret = async () => {
+    const recordId = String(editingOfficialId || officialForm.id || '').trim();
+    if (!recordId) {
+      throw new Error(pick('当前接口还没有保存，无法查看已保存密钥。', 'This endpoint has not been saved yet, so there is no saved key to reveal.'));
+    }
+
+    const busyKey = `official-reveal:${recordId}`;
+    setBusy(busyKey);
+    try {
+      const secret = await revealUserApiSecretFromCloudRecord(
+        { recordType: 'slot', recordId, field: 'key' },
+        authenticatedUserId || undefined,
+      );
+      if (!secret) {
+        throw new Error(pick('没有找到可查看的已保存 API Key。', 'No saved API key is available to reveal.'));
+      }
+
+      setOfficialForm((current) => ({ ...current, key: secret }));
+      notify.success(pick('已显示密钥', 'Key revealed'), pick('已从后端临时取回当前接口的 API Key。', 'The saved API key was temporarily retrieved from the backend.'));
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : pick('当前密钥暂时无法查看。', 'The current key cannot be revealed right now.');
+      notify.error(pick('查看失败', 'Reveal failed'), message);
+      throw error;
+    } finally {
+      setBusy((current) => (current === busyKey ? null : current));
+    }
+  };
+
+  const revealProviderSecret = async () => {
+    const recordId = String(editingProviderId || providerForm.id || '').trim();
+    if (!recordId) {
+      throw new Error(pick('当前通道还没有保存，无法查看已保存密钥。', 'This route has not been saved yet, so there is no saved key to reveal.'));
+    }
+
+    const busyKey = `provider-reveal:${recordId}`;
+    setBusy(busyKey);
+    try {
+      const secret = await revealUserApiSecretFromCloudRecord(
+        { recordType: 'provider', recordId, field: 'apiKey' },
+        authenticatedUserId || undefined,
+      );
+      if (!secret) {
+        throw new Error(pick('没有找到可查看的已保存 API Key。', 'No saved API key is available to reveal.'));
+      }
+
+      setProviderForm((current) => ({ ...current, apiKey: secret }));
+      notify.success(pick('已显示密钥', 'Key revealed'), pick('已从后端临时取回当前通道的 API Key。', 'The saved API key was temporarily retrieved from the backend.'));
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : pick('当前密钥暂时无法查看。', 'The current key cannot be revealed right now.');
+      notify.error(pick('查看失败', 'Reveal failed'), message);
+      throw error;
+    } finally {
+      setBusy((current) => (current === busyKey ? null : current));
     }
   };
 
@@ -3707,63 +3811,31 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
       kind: (preset.kind || 'official') as 'official' | 'relay',
       onApply: () => {
         if (!ensureProviderActionsAllowed()) return;
-        
-        // 查找是否已经存在相同预设的供应商（根据名字或baseUrl匹配）
-        const existingProvider = thirdPartyProviders.find(
-          (p) => p.name === preset.name || p.baseUrl === preset.baseUrl
-        );
-
-        if (existingProvider) {
-          // 如果已经配置过该预设，直接切换为编辑状态并加载已有数据
-          setProviderForm(toProviderForm(existingProvider));
-          setEditingOfficialId(null);
-          setEditingProviderId(existingProvider.id);
-          setProviderPricingEndpointDraft(
-            (existingProvider.pricingSnapshot as any)?.pricingEndpoint ||
-              buildDefaultProviderPricingEndpoint(existingProvider.baseUrl)
-          );
-          setShowPricingEndpointOverride(Boolean((existingProvider.pricingSnapshot as any)?.pricingEndpoint));
-          setActiveTab('third-party');
-          navigate(buildProviderEditorPath(existingProvider.id));
-          notify.success(
-            pick('已载入已有模型通道', 'Provider loaded'),
-            pick(`已自动匹配并载入已配置的 ${preset.name} 渠道。`, `Matched and loaded the existing ${preset.name} configuration.`),
-          );
-        } else {
-          // 否则，作为新配置预填
-          setProviderForm((current) => ({
-            ...current,
-            name: preset.name,
-            baseUrl: preset.baseUrl,
-            format: preset.format,
-            color: preset.color,
-            apiKey: '',
-            modelsText: '',
-          }));
-          setEditingOfficialId(null);
-          setEditingProviderId(null);
-          setProviderPricingEndpointDraft(buildDefaultProviderPricingEndpoint(preset.baseUrl));
-          setShowPricingEndpointOverride(false);
-          setActiveTab('third-party');
-          navigate(buildProviderEditorPath(null), {
-            state: {
-              presetProviderDraft: {
-                name: preset.name,
-                baseUrl: preset.baseUrl,
-                format: preset.format,
-                color: preset.color,
-                modelsText: '',
-              },
+        const nextDraft = toProviderFormFromPreset(preset);
+        setProviderForm(nextDraft);
+        setEditingOfficialId(null);
+        setEditingProviderId(null);
+        setProviderPricingEndpointDraft(buildDefaultProviderPricingEndpoint(nextDraft.baseUrl));
+        setShowPricingEndpointOverride(false);
+        setActiveTab('third-party');
+        navigate(buildProviderEditorPath(null), {
+          state: {
+            presetProviderDraft: {
+              name: nextDraft.name,
+              baseUrl: nextDraft.baseUrl,
+              format: nextDraft.format,
+              color: nextDraft.color,
+              modelsText: nextDraft.modelsText,
             },
-          });
-          notify.success(
-            pick('已预填模型通道', 'Provider prefilled'),
-            pick(`已载入 ${preset.name} 的名称、地址和协议；只需要填写 API Key。`, `Loaded ${preset.name} name, URL, and protocol. Enter the API key to continue.`),
-          );
-        }
+          },
+        });
+        notify.success(
+          pick('已预填模型通道', 'Provider prefilled'),
+          pick(`已载入 ${preset.name} 的名称、地址和协议；只需要填写 API Key。`, `Loaded ${preset.name} name, URL, and protocol. Enter the API key to continue.`),
+        );
       },
     }))
-  ), [navigate, pick, ensureProviderActionsAllowed, setProviderForm, setEditingOfficialId, setEditingProviderId, setProviderPricingEndpointDraft, setShowPricingEndpointOverride, thirdPartyProviders]);
+  ), [navigate, pick, ensureProviderActionsAllowed, setProviderForm, setEditingOfficialId, setEditingProviderId, setProviderPricingEndpointDraft, setShowPricingEndpointOverride]);
 
   const stageMeta = resolveApiWorkbenchStageMeta({
     activeTab,
@@ -4241,7 +4313,11 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
               placeholder={pick('输入本地 API 的 API Key', 'Enter the local API key')}
               type="password"
               autoComplete="new-password"
-              helper={pick('这里只保存当前接口使用的密钥，不会 and 刷新动作混用。', 'This field only saves the key for this endpoint and does not trigger refresh behavior.')}
+              helper={isReadonlySecretPlaceholder(officialForm.key)
+                ? savedSecretReadOnlyHelper
+                : pick('这里只保存当前接口使用的密钥，不会和刷新动作混用。', 'This field only saves the key for this endpoint and does not trigger refresh behavior.')}
+              onReveal={isReadonlySecretPlaceholder(officialForm.key) ? revealOfficialSecret : undefined}
+              revealLoading={busy === `official-reveal:${editingOfficialId || officialForm.id || ''}`}
               disabled={userApiEditorReadOnly}
             />
 
@@ -4427,6 +4503,9 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
                     placeholder={pick('输入该品牌的 API Key', 'Enter this provider API key')}
                     type="password"
                     autoComplete="new-password"
+                    helper={isReadonlySecretPlaceholder(providerForm.apiKey) ? savedSecretReadOnlyHelper : undefined}
+                    onReveal={isReadonlySecretPlaceholder(providerForm.apiKey) ? revealProviderSecret : undefined}
+                    revealLoading={busy === `provider-reveal:${editingProviderId || providerForm.id || ''}`}
                     disabled={providerEditorReadOnly}
                   />
                   {providerKeyDiagnostics ? (

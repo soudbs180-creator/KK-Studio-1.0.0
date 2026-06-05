@@ -1,6 +1,7 @@
 // 简体中文：画布操作相关的 AI 助手工具 (Canvas Tools)
 
 import type { AgentToolDefinition } from './ToolRegistry.ts';
+import { resolveAgentNodeArrangeUpdates } from '../canvas/agentCanvasLayout.ts';
 
 const getContextSelectedNodeIds = (ctx: any): string[] =>
   ctx?.selectedNodeIds || ctx?.activeCanvas?.selectedNodeIds || [];
@@ -141,11 +142,34 @@ export const canvasTools: AgentToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        mode: { type: 'string', enum: ['grid', 'row', 'column'], description: '布局模式' }
+        nodeIds: { type: 'array', items: { type: 'string' } },
+        mode: { type: 'string', enum: ['grid', 'row', 'column'], description: '布局模式' },
+        preset: { type: 'string', enum: ['grid', 'row', 'column', 'compact-grid'] },
+        columns: { type: 'number' },
+        gap: { type: 'number' }
       }
     },
-    handler: async (input: { mode?: 'grid' | 'row' | 'column' }, ctx) => {
+    handler: async (input: { nodeIds?: string[]; mode?: 'grid' | 'row' | 'column'; preset?: 'grid' | 'row' | 'column' | 'compact-grid'; columns?: number; gap?: number }, ctx) => {
       const mode = input?.mode || 'grid';
+      const nodeIds = Array.isArray(input?.nodeIds) ? input.nodeIds.filter(Boolean) : [];
+
+      if (nodeIds.length > 0 && typeof ctx.updateNodes === 'function' && ctx.activeCanvas) {
+        const updates = resolveAgentNodeArrangeUpdates(ctx.activeCanvas, nodeIds, {
+          mode,
+          preset: input.preset,
+          columns: input.columns,
+          gap: input.gap
+        });
+        ctx.updateNodes(updates);
+        ctx.notify?.success?.('画布已整理', `已按 ${input.preset || mode} 模式整理 ${nodeIds.length} 个节点。`);
+        return {
+          status: 'arranged',
+          mode,
+          preset: input.preset,
+          selectedCount: nodeIds.length
+        };
+      }
+
       if (typeof ctx.arrangeAllNodes !== 'function') {
         throw new Error('canvas.arrangeNodes requires arrangeAllNodes in ExecutorContext.');
       }

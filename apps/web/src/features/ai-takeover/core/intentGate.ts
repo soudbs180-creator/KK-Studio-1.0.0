@@ -11,6 +11,76 @@ const explicitGenerateWords = [
   '生成', '开始生成', '直接生成', '出图', '跑图', '批量生成', '每张都生成', '创造', '绘图'
 ];
 
+const quickSettingsRoutes = [
+  {
+    view: 'user-profile',
+    label: '个人中心',
+    pattern: /个人中心|用户中心|个人资料|个人信息|账户中心|账号中心|我的账户|我的账号|profile/
+  },
+  {
+    view: 'api-management',
+    label: 'API 工作台',
+    pattern: /\bapi\b|api\s*设置|api工作台|api\s*工作台|接口设置|接口管理|模型配置|模型设置|供应商|密钥管理/
+  },
+  {
+    view: 'consumption-records',
+    label: '计费账本',
+    pattern: /计费|账单|消费|消耗|用量|积分记录|充值记录|消费记录/
+  },
+  {
+    view: 'storage-settings',
+    label: '存储设置',
+    pattern: /存储|容量|空间|资源存储|清理缓存/
+  },
+  {
+    view: 'dashboard',
+    label: '设置总览',
+    pattern: /设置总览|设置首页|设置面板|打开设置|系统设置|settings/
+  }
+] as const;
+
+function resolveQuickSettingsRoute(input: string): { view: string; label: string } | null {
+  const isNavigationRequest = /帮我打开|帮我看|打开|查看|进入|跳到|跳转|去|定位到|带我去/.test(input);
+  if (!isNavigationRequest) return null;
+
+  const matched = quickSettingsRoutes.find(route => route.pattern.test(input));
+  return matched ? { view: matched.view, label: matched.label } : null;
+}
+
+function extractSimpleGeneratePrompt(input: string): string {
+  return input
+    .replace(/^(请|麻烦|帮我|请帮我|麻烦帮我|给我|我要|我想要)\s*/g, '')
+    .replace(/^(直接)?(生成|开始生成|出图|跑图|绘图|画|创建|做)\s*(一个|一张|一下|个|张)?\s*/g, '')
+    .replace(/(\d+)\s*(张|个)/g, '')
+    .replace(/[“”"]/g, '')
+    .trim();
+}
+
+const matchAny = (input: string, patterns: RegExp[]): boolean =>
+  patterns.some(pattern => pattern.test(input));
+
+function extractAspectRatio(input: string): string | undefined {
+  const match = input.match(/(?:aspect\s*ratio|ratio|比例|画幅|比例改成|比例调整为|改成比例)?\s*(\d{1,2})\s*[:：]\s*(\d{1,2})/i);
+  if (!match) return undefined;
+  return `${match[1]}:${match[2]}`;
+}
+
+function extractLayoutPreset(input: string): 'compact-grid' | 'grid' | 'row' | 'column' | undefined {
+  if (matchAny(input, [/紧凑|紧密|compact|密集|排版布局|紧凑.*布局|布局.*紧凑/i])) {
+    return 'compact-grid';
+  }
+  if (matchAny(input, [/横排|一行|row/i])) return 'row';
+  if (matchAny(input, [/竖排|一列|column/i])) return 'column';
+  if (matchAny(input, [/网格|宫格|grid/i])) return 'grid';
+  return undefined;
+}
+
+function extractTaskDomain(input: string): 'ecommerce' | 'general' {
+  return matchAny(input, [/电商|商品|主图|详情页|A\+|亚马逊|淘宝|京东|排版|布局|卖点|产品图/i])
+    ? 'ecommerce'
+    : 'general';
+}
+
 /**
  * 核心判断：是否应该被当做生图任务处理
  * 规则：若只包含提示词润色/优化的词汇，而没有明确的“生成/出图/跑图”指令，则不能生成图片，只能优化提示词。
@@ -98,7 +168,34 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
     };
   }
 
-  // 6. API 配置引导意图
+  // 6. 系统日志查看意图。安全 UI 操作必须优先于 API 配置兜底识别。
+  if (/打开日志|查看日志|系统日志|日志流|运行日志|我的日志/.test(lowerInput)) {
+    return {
+      intent: 'open_logs',
+      confidence: 0.95,
+      extracted: {},
+      risk: 'none',
+      needsConfirmation: false,
+      reason: '匹配到查看或打开系统日志的指示。'
+    };
+  }
+
+  // 6.2. 设置页快速跳转。凡是“帮我打开/查看/进入某功能”，优先走本地 UI 工具，不请求模型。
+  const quickSettingsRoute = resolveQuickSettingsRoute(lowerInput);
+  if (quickSettingsRoute) {
+    return {
+      intent: 'open_settings_view',
+      confidence: 0.95,
+      extracted: {
+        settingsView: quickSettingsRoute.view
+      },
+      risk: 'none',
+      needsConfirmation: false,
+      reason: `匹配到快速打开设置页子功能：${quickSettingsRoute.label}。`
+    };
+  }
+
+  // 6.5. API 配置引导意图
   if (
     /api|key|密钥|配置|接口|设置key|专属key|设置api|密钥怎么写/.test(lowerInput) &&
     !lowerInput.includes('生成')
@@ -111,6 +208,28 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
       needsConfirmation: false,
       reason: '匹配到 API 密钥配置相关的指示词。'
     };
+  }
+
+  // 6.8. 简单“生成一个...”直接复用画布输入框配置并发送，不绕到独立建卡确认流。
+  if (
+    shouldTreatAsGeneration(cleanInput) &&
+    !/批量|文件夹|每张|所有图片|全部图片|多张|几张/.test(lowerInput) &&
+    !/报错|错误|失败|崩溃|断开|不工作|故障|限流|退款|无法运行|下载|导出|打包|保存结果|上传|导入|添加图片|添加文件/.test(lowerInput)
+  ) {
+    const countMatch = lowerInput.match(/(\d+)\s*(张|个)/);
+    const count = countMatch ? parseInt(countMatch[1], 10) : 1;
+    if (count <= 1) {
+      return {
+        intent: 'submit_composer',
+        confidence: 0.93,
+        extracted: {
+          prompt: extractSimpleGeneratePrompt(cleanInput)
+        },
+        risk: 'cost',
+        needsConfirmation: false,
+        reason: '识别到简单单次生成指令，复用画布输入框当前模型、比例、参考图等配置并直接发送。'
+      };
+    }
   }
 
   // 2. 错误排查意图
@@ -174,15 +293,27 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
   }
 
   // 6. 文件夹批量生成意图
-  if (
-    /批量|文件夹|每张|所有图片|全部图片/.test(lowerInput) &&
-    (/生成|出图|跑图|风格化/.test(lowerInput) || shouldTreatAsGeneration(cleanInput))
-  ) {
+  const isFolderBatchRequest = /批量|文件夹|每张|所有图片|全部图片|全部图|所有图/.test(lowerInput);
+  const isBatchTransformRequest = /生成|出图|跑图|风格化|修改|改成|处理|重绘|重做|换成|调整/.test(lowerInput)
+    || shouldTreatAsGeneration(cleanInput);
+  if (isFolderBatchRequest && isBatchTransformRequest) {
+    const aspectRatio = extractAspectRatio(cleanInput);
+    const layoutPreset = extractLayoutPreset(cleanInput) || 'grid';
+    const taskDomain = extractTaskDomain(cleanInput);
     return {
       intent: 'batch_generate_from_folder',
       confidence: 0.9,
       extracted: {
-        count: 0 // 待后续在 Context 中解析真实数量
+        count: 0, // 待后续在 Context 中解析真实数量
+        taskDomain,
+        aspectRatio,
+        layoutPreset,
+        outputGroup: {
+          label: taskDomain === 'ecommerce' ? 'AI ecommerce batch' : 'AI batch output',
+          color: '#ffffff',
+          includePromptNodes: true,
+          tags: ['automation']
+        }
       },
       risk: 'cost',
       needsConfirmation: true, // 批量生成涉及消耗额度和参考图，属于高风险操作，强制弹卡片确认

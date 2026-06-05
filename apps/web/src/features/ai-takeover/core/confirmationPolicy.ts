@@ -30,7 +30,9 @@ const CONFIRM_ACTIONS = [
   'deductCredits',
   'deleteCard',
   'overwriteOutput',
-  'publishProject'
+  'publishProject',
+  'generation.createBatchJob',
+  'ecommerce.createBatchTransformJob'
 ];
 
 export const confirmationPolicy = {

@@ -65,21 +65,21 @@ export const AppStartupScreen: React.FC<{
   return (
     <div
       data-testid="app-startup-screen"
-      className="fixed inset-0 flex flex-col items-center justify-center bg-black text-white"
+      className="fixed inset-0 flex flex-col items-center justify-center bg-[var(--bg-base)] text-[var(--text-primary)]"
     >
       <div
         data-testid="app-startup-shell"
         className="flex flex-col items-center gap-6 w-full max-w-[280px] text-center"
       >
         {/* 简体中文注释：大字号进度数字 */}
-        <div className="text-4xl font-semibold tracking-tight text-white/90">
+        <div className="text-4xl font-semibold tracking-tight text-[var(--text-primary)]">
           {displayProgress}%
         </div>
         
         {/* 简体中文注释：加载进度条轨道，带有 data-testid 供自动化测试识别 */}
         <div
           data-testid="app-startup-progress-track"
-          className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden"
+          className="w-full h-1.5 bg-[rgb(17_24_39_/_0.10)] dark:bg-white/10 rounded-full overflow-hidden"
           aria-hidden
         >
           <div
@@ -92,7 +92,7 @@ export const AppStartupScreen: React.FC<{
         </div>
         
         {/* 简体中文注释：加载字样提示，带呼吸动画 */}
-        <div className="text-sm font-medium text-white/50 tracking-wider animate-pulse">
+        <div className="text-sm font-medium text-[var(--text-secondary)] tracking-wider animate-pulse">
           {loadingText}
         </div>
 

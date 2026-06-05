@@ -1,6 +1,6 @@
 # AI Assistant Runbooks — KK Studio v1.5.4
 
-Last updated: 2026-06-03  
+Last updated: 2026-06-05
 Primary rules: `AGENTS.md`  
 Detailed roadmap: `docs/ai-assistant/AI_ASSISTANT_ROADMAP.md`
 
@@ -117,6 +117,7 @@ docs/ai-assistant/session-memory.md
 批量生成 30 张头像
 批量生成商品主图并整理成卡片组
 对这个文件夹每张图都生成一张图
+帮我把这个文件夹里面的图片全部修改成紧凑的排版布局，比例改成4:5
 把这些 prompt 都跑一遍
 ```
 
@@ -131,6 +132,7 @@ docs/ai-assistant/session-memory.md
 ```text
 canvas.getState
 generation.createBatchJob
+ecommerce.createBatchTransformJob
 generation.getJobStatus
 generation.pauseJob
 generation.resumeJob
@@ -144,19 +146,22 @@ knowledge.recordChange
 
 ```text
 1. IntentGate 识别批量生成意图。
-2. Planner 输出 BatchGenerationPlan。
-3. 计算成本、数量、上传范围、模型和比例。
-4. ConfirmationPolicy 展示确认卡。
-5. 用户确认后调用 generation.createBatchJob。
-6. DurableGenerationQueue 写入 idempotencyKey。
-7. 按 defaultConcurrency=3 执行，最大不超过 maxConcurrency=8。
-8. 每个 item 创建 queued PromptNode。
-9. 调用现有 useImageGeneration / executeGeneration 路径，不复制生成 API。
-10. 成功后保存 originalUrl / storageId。
-11. 创建 Image 节点并关联 Prompt。
-12. 执行 canvas.arrangeNodes。
-13. 打 automation 和 batch:<jobId> tag。
-14. 写入 ToolCallLog、AgentRunRecord、KnowledgeSync。
+2. 提取 `taskDomain`、`aspectRatio`、`layoutPreset` 和 `outputGroup`。
+3. Planner 输出 BatchGenerationPlan。
+4. 计算成本、数量、上传范围、模型和比例。
+5. 对电商/商品图批量转换调用 `ecommerce.createBatchTransformJob`；通用批量调用 `generation.createBatchJob`。
+6. ConfirmationPolicy 展示确认卡。
+7. 用户确认后写入 DurableGenerationQueue。
+8. DurableGenerationQueue 写入 idempotencyKey 和 outputGroup。
+9. 按 defaultConcurrency=3 执行，最大不超过 maxConcurrency=8。
+10. 每个 item 创建 queued PromptNode，并记录 promptNodeId。
+11. 调用现有 useImageGeneration / executeGeneration 路径，不复制生成 API。
+12. 成功后保存 originalUrl / storageId。
+13. 创建 Image 节点并关联 Prompt，记录 resultImageNodeIds。
+14. 执行 `canvas.arrangeNodes({ nodeIds, preset })`，只整理本 job 节点。
+15. 创建或更新一个 `CanvasGroup`，默认 `color: '#ffffff'`。
+16. 打 automation 和 batch:<jobId> tag。
+17. 写入 ToolCallLog、AgentRunRecord、KnowledgeSync。
 ```
 
 ### Safety
@@ -178,6 +183,17 @@ retryBackoffMs = 2000
 requireIdempotencyKey = true
 ```
 
+### Layout And Group Defaults
+
+```text
+compact-grid -> layout=grid, columns=min(4,count), gap=24
+outputGroup.color = '#ffffff'
+outputGroup.includePromptNodes = true
+outputGroup.tags includes automation and batch:<jobId>
+```
+
+“文件夹里面的图片”当前默认指已导入资源池或图片集合。未来接本地目录选择器时，必须新增文件系统权限确认，不得让 LLM 直接读取任意本地目录。
+
 ### Validation
 
 必须覆盖：
@@ -185,6 +201,9 @@ requireIdempotencyKey = true
 ```text
 tests/unit/durable-generation-queue.test.ts
 tests/unit/generation-batch-idempotency.test.ts
+tests/unit/ai-takeover-intentGate.test.ts
+tests/unit/ai-assistant-tool-registry.test.ts
+tests/unit/canvas-runtime-state-builder.test.ts
 ```
 
 验证：
@@ -192,8 +211,10 @@ tests/unit/generation-batch-idempotency.test.ts
 - 幂等 key 防重复。
 - 失败重试。
 - 暂停 / 恢复。
-- 结果自动布局。
-- tag 写入。
+- `outputGroup` 持久化。
+- `promptNodeId` 和结果图片节点写入。
+- 结果自动目标布局。
+- tag 写入和一个 job 一个分组。
 - 中断后可恢复。
 
 ### Knowledge Updates

@@ -116,3 +116,41 @@ test('运行态构建测试：框选图片卡片', () => {
   assert.equal(state.selectedNodes.images[0].urlPresent, true);
   assert.equal(state.selectedNodes.images[0].apiResultUrlPresent, false);
 });
+
+test('运行态构建测试：分组摘要包含隐藏、收纳、颜色和标签', () => {
+  const mockCanvas = {
+    id: 'test-canvas-1',
+    promptNodes: [
+      { id: 'p1', prompt: 'product', childImageIds: [], tags: ['automation', 'batch:job-1'] }
+    ],
+    imageNodes: [
+      { id: 'img1', parentPromptId: 'p1', url: 'http://foo/img1.jpg', tags: ['batch:job-1'] }
+    ],
+    groups: [
+      {
+        id: 'group-1',
+        label: 'AI ecommerce batch',
+        nodeIds: ['p1', 'img1'],
+        bounds: { x: 0, y: 0, width: 100, height: 100 },
+        color: '#ffffff',
+        hidden: true,
+        collapsed: false
+      }
+    ]
+  };
+
+  const state = buildCanvasRuntimeState({
+    currentPage: 'canvas',
+    activeCanvas: mockCanvas,
+    selectedNodeIds: ['group-1']
+  });
+
+  assert.deepEqual(state.selection.groupIds, ['group-1']);
+  assert.equal(state.groups.length, 1);
+  assert.equal(state.groups[0].label, 'AI ecommerce batch');
+  assert.equal(state.groups[0].hidden, true);
+  assert.equal(state.groups[0].collapsed, false);
+  assert.equal(state.groups[0].color, '#ffffff');
+  assert.equal(state.groups[0].nodeCount, 2);
+  assert.ok(state.groups[0].tags?.includes('batch:job-1'));
+});

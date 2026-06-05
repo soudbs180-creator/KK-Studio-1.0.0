@@ -25,6 +25,9 @@ interface AuthenticatedProfileContext {
   email: string | null;
 }
 
+export type UserApiSecretRecordType = 'slot' | 'provider' | 'entry';
+export type UserApiSecretField = 'key' | 'apiKey';
+
 export interface UserApisEnvelope {
   version: number;
   slots: unknown[];
@@ -688,6 +691,30 @@ export async function loadUserApisPayloadFromCloudRecord(
   return shouldPreferSessionlessLegacyContext()
     ? cloneEnvelope(payload)
     : sanitizeClientVisibleEnvelope(payload);
+}
+
+export async function revealUserApiSecretFromCloudRecord(
+  input: {
+    recordType: UserApiSecretRecordType;
+    recordId: string;
+    field: UserApiSecretField;
+  },
+  expectedUserId?: string,
+): Promise<string> {
+  const context = await getAuthenticatedProfileContext(expectedUserId);
+  if (!context) {
+    throw new Error('An authenticated session is required to reveal saved user API secrets.');
+  }
+
+  const response = await legacyWebApiClient.revealUserApiSecret(input);
+  if (!response.success) {
+    throw new Error(response.error?.message || 'Failed to reveal saved user API secret.');
+  }
+  if (!response.data) {
+    throw new Error('Failed to reveal saved user API secret.');
+  }
+
+  return String(response.data.secret || '').trim();
 }
 
 export async function saveUserApisPayloadToCloudRecord(

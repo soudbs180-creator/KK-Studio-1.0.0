@@ -8,6 +8,7 @@ import {
     buildGeminiHeaders,
     buildProxyHeaders,
     formatAuthorizationHeaderValue,
+    getApiKeyToken,
     normalizeGeminiBaseUrl,
     normalizeGeminiModelId,
 } from '../api/apiConfig';
@@ -214,8 +215,8 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
     }
 
     private getAuthorizationHeaderValue(rawKey: string, keySlot?: KeySlot): string {
-        const token = String(rawKey || '').trim();
-        if (!token) return 'Bearer ';
+        const token = getApiKeyToken(rawKey);
+        if (!token) return '';
         const runtime = keySlot
             ? this.resolveChannelRuntime(keySlot.baseUrl || '', keySlot)
             : null;
@@ -223,9 +224,9 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
     }
 
     private getQueryApiKey(rawKey: string): string {
-        const token = String(rawKey || '').trim();
+        const token = getApiKeyToken(rawKey);
         if (!token) return '';
-        return token.replace(/^Bearer\s+/i, '').trim();
+        return token;
     }
 
     private getRequestPathFromUrl(url: string): string {
@@ -247,11 +248,15 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const includeJsonContentType = options.includeJsonContentType !== false;
         const includeAccept = options.includeAccept !== false;
         const runtime = this.resolveChannelRuntime(keySlot.baseUrl || '', keySlot);
+        const token = getApiKeyToken(keySlot.key);
+        if (!token) {
+            throw new Error('Saved API key is empty or unavailable. Re-enter or reveal the real API key before retrying.');
+        }
         let headers: Record<string, string> = {
             ...(includeAccept ? { Accept: 'application/json' } : {}),
             ...buildProxyHeaders(
                 runtime.authMethod as AuthMethod,
-                keySlot.key,
+                token,
                 runtime.headerName,
                 keySlot.group,
                 runtime.authorizationValueFormat,
@@ -1256,7 +1261,10 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
     }
 
     private build12AIAsyncImageHeaders(keySlot: KeySlot): Record<string, string> {
-        const token = String(keySlot.key || '').trim();
+        const token = this.getQueryApiKey(keySlot.key);
+        if (!token) {
+            throw new Error('Saved API key is empty or unavailable. Re-enter or reveal the real API key before retrying.');
+        }
         const headers: Record<string, string> = {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
@@ -1948,7 +1956,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         if (keySlot.headerName && keySlot.headerName !== 'Authorization') {
             delete headers.Authorization;
             delete headers.authorization;
-            headers[keySlot.headerName] = keySlot.key;
+            headers[keySlot.headerName] = this.getQueryApiKey(keySlot.key);
         }
 
         headers = this.applyCustomHeaders(headers, keySlot);
@@ -2073,7 +2081,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         if (keySlot.headerName && keySlot.headerName !== 'Authorization') {
             delete headers.Authorization;
             delete headers.authorization;
-            headers[keySlot.headerName] = keySlot.key;
+            headers[keySlot.headerName] = this.getQueryApiKey(keySlot.key);
         }
         headers = this.applyCustomHeaders(headers, keySlot);
 
@@ -2464,11 +2472,11 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             options.providerConfig?.google?.imageConfig?.imageSize || options.imageSize
         );
 
-        const normalizedKey = String(keySlot.key || '').trim();
+        const normalizedKey = this.getQueryApiKey(keySlot.key);
         if (!normalizedKey) {
             throw new Error('Gemini API Key / Token 不能为空');
         }
-        const queryKey = this.getQueryApiKey(normalizedKey);
+        const queryKey = normalizedKey;
         if (!queryKey) {
             throw new Error('12AI API Key is empty or invalid');
         }
@@ -2949,8 +2957,4 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         };
     }
 }
-
-
-
-
 

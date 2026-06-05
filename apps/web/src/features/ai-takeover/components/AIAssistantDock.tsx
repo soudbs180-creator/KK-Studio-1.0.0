@@ -1,12 +1,20 @@
 // 简体中文：AI接管右侧固定助手面板组件 (AIAssistantDock)
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAITakeover } from '../context/AITakeoverContext';
 import { useAssetStore } from '../../assets/assetStore';
 import { ensureFileUploaded } from '../../assets/lazyUpload';
 import { estimateTokens, getModelContextLimit } from '../../../utils/contextHelper';
 import { durableGenerationQueue } from '../../ai-assistant-runtime';
 import type { GenerationBatchJob } from '../../ai-assistant-runtime';
+import {
+  ReferenceMentionPanel,
+  buildReferenceMentionTabs,
+  favoriteComposerRegistry,
+  useFavoritesStore,
+  type MentionReferencePayload,
+  type ReferenceMentionCandidate,
+} from '../../favorites';
 import {
   Send,
   Loader2,
@@ -51,10 +59,14 @@ export const AIAssistantDock: React.FC = () => {
     cancelPendingPlan,
     compressContext,
     isCompressing,
-    selectedModel
+    selectedModel,
+    onOpenSettings,
+    notify,
+    activeCanvas
   } = useAITakeover();
 
   const { images, files, outputs, addImage, addFile, removeAsset, addImageCollection } = useAssetStore();
+  const favoriteItems = useFavoritesStore(state => state.items);
 
   const [jobs, setJobs] = useState<GenerationBatchJob[]>([]);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
@@ -89,9 +101,30 @@ export const AIAssistantDock: React.FC = () => {
   const [inputVal, setInputVal] = useState('');
   const [showResourcePanel, setShowResourcePanel] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const imgInputRef = useRef<HTMLInputElement>(null);
   const dirInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [mentionState, setMentionState] = useState<{
+    open: boolean;
+    query: string;
+    start: number;
+    end: number;
+  }>({ open: false, query: '', start: 0, end: 0 });
+
+  const referenceMentionTabs = React.useMemo(() => buildReferenceMentionTabs({
+    assistantImages: images,
+    assistantFiles: files,
+    promptNodes: activeCanvas?.promptNodes || [],
+    imageNodes: activeCanvas?.imageNodes || [],
+    favorites: favoriteItems,
+  }), [
+    activeCanvas?.imageNodes,
+    activeCanvas?.promptNodes,
+    favoriteItems,
+    files,
+    images,
+  ]);
 
   // 滚动至最新消息
   useEffect(() => {
@@ -99,6 +132,82 @@ export const AIAssistantDock: React.FC = () => {
   }, [messages, isThinking]);
 
   // 处理文本发送
+  const closeReferenceMentionPanel = useCallback(() => {
+    setMentionState(prev => prev.open ? { ...prev, open: false, query: '' } : prev);
+  }, []);
+
+  const updateReferenceMentionFromTextarea = useCallback((target: HTMLTextAreaElement) => {
+    const value = target.value;
+    const caret = target.selectionStart ?? value.length;
+    const beforeCaret = value.slice(0, caret);
+    const atIndex = beforeCaret.lastIndexOf('@');
+
+    if (atIndex < 0) {
+      closeReferenceMentionPanel();
+      return;
+    }
+
+    const token = beforeCaret.slice(atIndex + 1);
+    if (/[\s,，。；;:：()[\]{}<>]/.test(token)) {
+      closeReferenceMentionPanel();
+      return;
+    }
+
+    setMentionState({
+      open: true,
+      query: token,
+      start: atIndex,
+      end: caret,
+    });
+  }, [closeReferenceMentionPanel]);
+
+  const applyDockInputChange = useCallback((nextValue: string, caret?: number) => {
+    setInputVal(nextValue);
+    window.requestAnimationFrame(() => {
+      const textarea = inputRef.current;
+      if (!textarea) return;
+      textarea.focus();
+      if (typeof caret === 'number') {
+        textarea.setSelectionRange(caret, caret);
+      }
+    });
+  }, []);
+
+  const insertDockComposerPayload = useCallback((payload: MentionReferencePayload) => {
+    const text = payload.text || '';
+    if (!text) return;
+
+    const textarea = inputRef.current;
+    const current = textarea?.value ?? inputVal;
+    const start = textarea?.selectionStart ?? current.length;
+    const end = textarea?.selectionEnd ?? start;
+    const nextValue = `${current.slice(0, start)}${text}${current.slice(end)}`;
+
+    applyDockInputChange(nextValue, start + text.length);
+  }, [applyDockInputChange, inputVal]);
+
+  useEffect(() => favoriteComposerRegistry.register({
+    id: 'ai-dock',
+    label: 'AI takeover dock',
+    insert: insertDockComposerPayload,
+    focus: () => inputRef.current?.focus(),
+  }), [insertDockComposerPayload]);
+
+  const replaceActiveMentionWithCandidate = useCallback((candidate: ReferenceMentionCandidate) => {
+    const current = inputRef.current?.value ?? inputVal;
+    const start = Math.max(0, mentionState.start);
+    const end = Math.max(start, mentionState.end);
+    const mentionText = candidate.mentionText || `@${candidate.name}`;
+    const rawPrefix = current.slice(0, start);
+    const rawSuffix = current.slice(end);
+    const prefix = rawPrefix && !/[\s(（,，:：]$/.test(rawPrefix) ? `${rawPrefix} ` : rawPrefix;
+    const suffixSpacer = rawSuffix && !/^[\s,，。；;:：)\]）]/.test(rawSuffix) ? ' ' : '';
+    const nextValue = `${prefix}${mentionText}${suffixSpacer}${rawSuffix}`;
+
+    setMentionState(prev => ({ ...prev, open: false, query: '' }));
+    applyDockInputChange(nextValue, prefix.length + mentionText.length + suffixSpacer.length);
+  }, [applyDockInputChange, inputVal, mentionState.end, mentionState.start]);
+
   const handleSend = () => {
     if (!inputVal.trim() || isThinking) return;
     sendMessage(inputVal);
@@ -136,32 +245,129 @@ export const AIAssistantDock: React.FC = () => {
 
   // 处理 Action 链接点击
   const handleActionLink = (url: string) => {
-    // 匹配自定义 action：
-    if (url === 'action://takeover-prompt-only') {
-      sendMessage('帮我只优化提示词并填充，不进行图片生成。');
-    } else if (url === 'action://takeover-prompt-doc') {
-      sendMessage('请帮我把优化的生图模板方案整理一份文案形式输出。');
-    } else {
-      // 其它 action 分发给全局 window 以匹配 App.tsx
-      const parsedUrl = url.replace('action://', 'http://dummy');
-      let x = 0, y = 0, nodeId = '';
-      try {
-        const u = new URL(parsedUrl);
-        const keyword = u.searchParams.get('keyword') || '';
-        const prompts = u.searchParams.get('prompts') || '';
+    const isTakeoverAction = url === 'action://takeover-prompt-only' ||
+                             url === 'action://takeover-prompt-doc' ||
+                             url.startsWith('action://takeover-bulk-generate');
 
-        if (url.startsWith('action://takeover-locate') && keyword) {
-          sendMessage(`定位卡片：${keyword}`);
-        } else if (url.startsWith('action://takeover-bulk-generate') && prompts) {
-          sendMessage(`使用提示词开始生成：${prompts}`);
-        } else {
-          // 普通 action 直接触发
-          const mockAnchor = document.createElement('a');
-          mockAnchor.href = url;
-          mockAnchor.click();
+    if (isTakeoverAction) {
+      if (url === 'action://takeover-prompt-only') {
+        sendMessage('帮我只优化提示词并填充，不进行图片生成。');
+      } else if (url === 'action://takeover-prompt-doc') {
+        sendMessage('请帮我把优化的生图模板方案整理一份文案形式输出。');
+      } else {
+        const parsedUrl = url.replace('action://', 'http://dummy');
+        try {
+          const u = new URL(parsedUrl);
+          const prompts = u.searchParams.get('prompts') || '';
+
+          if (url.startsWith('action://takeover-bulk-generate') && prompts) {
+            sendMessage(`使用提示词开始生成：${prompts}`);
+          }
+        } catch (err) {
+          console.error('Action parse error:', err);
         }
+      }
+      return;
+    }
+
+    // 常规动作放行与跳转处理器（与 ChatSidebar 保持百分之百体验一致）
+    if (url.startsWith('action://highlight-')) {
+      const selector = url.replace('action://highlight-', '');
+      if (selector === '#btn-create-canvas') {
+        const trigger = document.querySelector('#project-manager-trigger') as HTMLElement;
+        if (trigger) trigger.click();
+      }
+      setTimeout(() => {
+        const el = document.querySelector(selector) as HTMLElement;
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('highlight-glow-ring');
+          setTimeout(() => {
+            el.classList.remove('highlight-glow-ring');
+          }, 3000);
+          if (notify) notify.success('已为您高亮定位对应操作区域', '');
+        } else {
+          if (notify) notify.warning('未找到对应界面元素，请先展开相应功能区', '');
+        }
+      }, 100);
+    } else if (url === 'action://open-recharge') {
+      window.dispatchEvent(new CustomEvent('open-recharge-modal'));
+    } else if (url === 'action://open-settings-logs') {
+      if (onOpenSettings) onOpenSettings('system-logs');
+      if (notify) notify.success('已为您打开系统日志面板', '');
+    } else if (url === 'action://open-settings-api') {
+      if (onOpenSettings) onOpenSettings('api-management');
+      // 延迟高亮智能定位到 API Key 输入框
+      setTimeout(() => {
+        const inputs = Array.from(document.querySelectorAll('input, textarea')) as HTMLElement[];
+        const keyInput = inputs.find(el => {
+          const placeholder = el.getAttribute('placeholder') || '';
+          const id = el.getAttribute('id') || '';
+          const name = el.getAttribute('name') || '';
+          return id.toLowerCase().includes('key') ||
+                 name.toLowerCase().includes('key') ||
+                 placeholder.toLowerCase().includes('key') ||
+                 placeholder.toLowerCase().includes('密钥') ||
+                 placeholder.toLowerCase().includes('token');
+        });
+        const el = keyInput || document.querySelector('.settings-api-key-input') || document.querySelector('input[type="password"]');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('highlight-glow-ring');
+          el.focus();
+          setTimeout(() => {
+            el.classList.remove('highlight-glow-ring');
+          }, 3000);
+          if (notify) notify.success('已为您打开设置并定位至 API 密钥输入框', '');
+        } else {
+          if (notify) notify.warning('已打开 API 管理，请手动在下方输入框填写密钥', '');
+        }
+      }, 300);
+    } else if (url === 'action://open-settings') {
+      if (onOpenSettings) onOpenSettings();
+    } else if (url.startsWith('action://takeover-locate')) {
+      let keyword = '';
+      try {
+        const parsedUrl = new URL(url.replace('action://', 'http://dummy'));
+        keyword = (parsedUrl.searchParams.get('keyword') || '').trim();
       } catch (err) {
-        console.error('Action parse error:', err);
+        console.error('Parse takeover-locate url failed:', err);
+      }
+
+      if (!keyword) {
+        if (notify) notify.warning('AI接管定位失败', '未指定要查找的关键字');
+        return;
+      }
+
+      // 搜索匹配卡片
+      const nodes = activeCanvas?.promptNodes || [];
+      const matchedNode = nodes.find((n: any) =>
+        (n.prompt || '').toLowerCase().includes(keyword.toLowerCase()) ||
+        (n.optimizedPromptEn || '').toLowerCase().includes(keyword.toLowerCase()) ||
+        (n.optimizedPromptZh || '').toLowerCase().includes(keyword.toLowerCase())
+      );
+
+      if (matchedNode) {
+        const locateEvent = new CustomEvent('canvas-center-on-node', {
+          detail: {
+            x: matchedNode.position.x,
+            y: matchedNode.position.y,
+            nodeId: matchedNode.id
+          }
+        });
+        window.dispatchEvent(locateEvent);
+        if (notify) notify.success(`AI接管：已为您平滑定位到包含“${keyword}”的卡片`, '');
+      } else {
+        if (notify) notify.warning('AI接管定位', `未在当前画布上找到包含“${keyword}”的卡片`);
+      }
+    } else {
+      // 其它普通 action 直接触发
+      try {
+        const mockAnchor = document.createElement('a');
+        mockAnchor.href = url;
+        mockAnchor.click();
+      } catch (err) {
+        console.error('Fallback Action click error:', err);
       }
     }
   };
@@ -241,13 +447,13 @@ export const AIAssistantDock: React.FC = () => {
           </button>
         </div>
 
-        {/* Context Limit Indicator 栏 */}
-        <div className="px-4 pb-3 pt-1.5 border-t border-zinc-800/85 bg-zinc-950/20 flex flex-col gap-1.5 animate-in fade-in duration-300">
+        {/* Context Limit Indicator 胶囊栏 */}
+        <div className="mx-auto my-2.5 px-5 py-2.5 rounded-full border border-zinc-800/80 bg-zinc-950/40 backdrop-blur-md flex flex-col gap-1.5 shadow-[0_6px_20px_rgba(0,0,0,0.2)] w-[88%] max-w-[340px] select-none transition-all duration-300 hover:border-purple-500/40 animate-in fade-in duration-300">
           <div className="flex items-center justify-between text-[10px] text-zinc-400">
             <span className="flex items-center gap-1.5">
-              <span>🧠 上下文额度:</span>
+              <span>🧠 上下文:</span>
               <span className="font-semibold text-zinc-200">
-                {totalTokensUsed >= 1000 ? `${(totalTokensUsed / 1000).toFixed(1)}k` : totalTokensUsed} / {maxTokensLabel} Tokens
+                {totalTokensUsed >= 1000 ? `${(totalTokensUsed / 1000).toFixed(1)}k` : totalTokensUsed} / {maxTokensLabel}
               </span>
               <span className="text-purple-400">({percentUsed}%)</span>
             </span>
@@ -255,7 +461,7 @@ export const AIAssistantDock: React.FC = () => {
             <button
               onClick={compressContext}
               disabled={isCompressing || messages.filter(m => m.id !== 'welcome').length <= 1}
-              className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all flex items-center gap-1 cursor-pointer select-none border ${
+              className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold transition-all flex items-center gap-1 cursor-pointer select-none border ${
                 isNearLimit
                   ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 hover:bg-amber-500/30 animate-pulse'
                   : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
@@ -286,9 +492,9 @@ export const AIAssistantDock: React.FC = () => {
           </div>
 
           {isNearLimit && (
-            <div className="text-[9px] text-amber-400/90 flex items-center gap-1 mt-0.5 animate-pulse">
+            <div className="text-[9px] text-amber-400/90 flex items-center justify-center gap-1 mt-0.5 animate-pulse">
               <AlertTriangle size={10} />
-              <span>用量超 80%，建议立即压缩上下文以防信息溢出。</span>
+              <span>用量超 80%，请及时压缩。</span>
             </div>
           )}
         </div>
@@ -639,15 +845,38 @@ export const AIAssistantDock: React.FC = () => {
       {/* 6. Input Area 输入输入区域 */}
       <div className="p-4 border-t border-zinc-800 bg-[#0d0e14]">
         <div className="relative flex items-center border border-zinc-800 bg-zinc-900/40 rounded-xl px-3 py-1.5 focus-within:border-purple-600/80 focus-within:ring-1 focus-within:ring-purple-600/20 transition-all">
+          <ReferenceMentionPanel
+            open={mentionState.open}
+            query={mentionState.query}
+            tabs={referenceMentionTabs}
+            onSelect={replaceActiveMentionWithCandidate}
+            onClose={closeReferenceMentionPanel}
+          />
           <textarea
+            ref={inputRef}
             value={inputVal}
-            onChange={e => setInputVal(e.target.value)}
+            onChange={e => {
+              setInputVal(e.target.value);
+              updateReferenceMentionFromTextarea(e.target);
+            }}
             onKeyDown={e => {
+              if (mentionState.open) {
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  closeReferenceMentionPanel();
+                  return;
+                }
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  return;
+                }
+              }
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleSend();
               }
             }}
+            onFocus={() => favoriteComposerRegistry.markFocused('ai-dock')}
             placeholder="输入对话或指令（回车发送）..."
             rows={1}
             disabled={isThinking}

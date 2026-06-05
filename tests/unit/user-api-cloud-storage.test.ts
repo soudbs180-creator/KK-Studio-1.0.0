@@ -11,6 +11,7 @@ import {
   combineUserApisEnvelopeSources,
   getUserApisPayloadDensity,
   loadUserApisPayloadFromCloudRecord,
+  revealUserApiSecretFromCloudRecord,
   removeUserApiProviderFromCloudRecord,
   removeUserApiSlotFromCloudRecord,
   resetUserApisPayloadCacheForTests,
@@ -31,6 +32,7 @@ const originalGetUserApiEntries = legacyWebApiClient.getUserApiEntries;
 const originalReplaceUserApisPayload = legacyWebApiClient.replaceUserApisPayload;
 const originalReplaceKeyManagerCloudState = legacyWebApiClient.replaceKeyManagerCloudState;
 const originalReplaceUserApiEntries = legacyWebApiClient.replaceUserApiEntries;
+const originalRevealUserApiSecret = legacyWebApiClient.revealUserApiSecret;
 const originalKkApiBaseUrl = process.env.VITE_KK_API_BASE_URL;
 const locationLike = globalThis as { location?: { origin?: string } };
 const originalLocation = locationLike.location;
@@ -273,6 +275,40 @@ function mockApiState(initialPayload: unknown) {
     };
   };
 
+  legacyWebApiClient.revealUserApiSecret = async (input) => {
+    const recordType = String(input.recordType || '');
+    const recordId = String(input.recordId || '');
+    const field = String(input.field || '');
+    const collection =
+      recordType === 'slot'
+        ? currentPayload.slots
+        : recordType === 'provider'
+          ? currentPayload.providers
+          : recordType === 'entry'
+            ? currentPayload.entries
+            : [];
+    const record = collection.find((item) => getRecordIdAliases(item).includes(recordId));
+    const secret = record ? String(record[field] || '').trim() : '';
+
+    return secret
+      ? {
+          success: true,
+          data: {
+            recordType: recordType as 'slot' | 'provider' | 'entry',
+            recordId,
+            field: field as 'key' | 'apiKey',
+            secret,
+          },
+        }
+      : {
+          success: false,
+          error: {
+            code: 'USER_API_SECRET_NOT_FOUND',
+            message: 'not found',
+          },
+        };
+  };
+
   return {
     getCurrentPayload: () => normalizeEnvelope(currentPayload),
     unifiedReplaceCalls,
@@ -289,6 +325,7 @@ afterEach(() => {
   legacyWebApiClient.replaceUserApisPayload = originalReplaceUserApisPayload;
   legacyWebApiClient.replaceKeyManagerCloudState = originalReplaceKeyManagerCloudState;
   legacyWebApiClient.replaceUserApiEntries = originalReplaceUserApiEntries;
+  legacyWebApiClient.revealUserApiSecret = originalRevealUserApiSecret;
   if (typeof originalKkApiBaseUrl === 'string') {
     process.env.VITE_KK_API_BASE_URL = originalKkApiBaseUrl;
   } else {
@@ -977,6 +1014,35 @@ describe('user api cloud storage helpers', () => {
     assert.equal(savedProvider.format, 'openai');
     assert.equal(savedProvider.isActive, true);
     assert.equal(payload.providers[0].apiKey, buildRedactedSecret('provider-1', 'apiKey'));
+  });
+
+  test('reveals a saved provider secret only through the explicit reveal API', async () => {
+    mockApiState({
+      version: 2,
+      slots: [],
+      providers: [
+        {
+          id: 'provider-1',
+          name: 'SiliconFlow',
+          baseUrl: 'https://api.siliconflow.cn/v1',
+          apiKey: 'provider-secret',
+          format: 'openai',
+          isActive: true,
+        },
+      ],
+      entries: [],
+    });
+
+    const visiblePayload = await loadUserApisPayloadFromCloudRecord() as MutableEnvelope;
+    assert.equal(visiblePayload.providers[0].apiKey, 'sk-readonly-0000');
+
+    const secret = await revealUserApiSecretFromCloudRecord({
+      recordType: 'provider',
+      recordId: 'provider-1',
+      field: 'apiKey',
+    });
+
+    assert.equal(secret, 'provider-secret');
   });
 
   test('reuses the persisted provider secret when editing with the readonly placeholder', async () => {

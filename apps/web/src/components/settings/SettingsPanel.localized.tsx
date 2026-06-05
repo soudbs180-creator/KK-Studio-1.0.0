@@ -45,17 +45,83 @@ const ViewFallback: React.FC = () => (
     <div className="w-48 h-8 rounded-lg mb-3 bg-black/5 dark:bg-white/10"></div>
     <div className="w-3/4 h-4 rounded-md mb-10 bg-black/5 dark:bg-white/5"></div>
     
-    {/* Items Skeleton */}
-    <div className="flex flex-col gap-4">
-      {[...Array(3)].map((_, i) => (
-        <div key={i} className="w-full h-[76px] rounded-[22px] flex items-center px-5 gap-4 bg-black/5 dark:bg-white/5">
-          <div className="w-11 h-11 rounded-[14px] bg-black/10 dark:bg-white/10"></div>
-          <div className="flex flex-col gap-2.5 flex-1">
-            <div className="w-1/4 h-5 rounded-md bg-black/10 dark:bg-white/10"></div>
-            <div className="w-2/5 h-3.5 rounded-md bg-black/5 dark:bg-white/5"></div>
+    {/* Items Skeleton Grid */}
+    <div className="settings-card-grid-container">
+      {/* 卡片 1: 2x2 跨行跨列卡片 */}
+      <div 
+        className="dashboard-grid-card a-card-span-2-col a-card-span-2-row flex flex-col justify-between p-4 bg-black/5 dark:bg-white/5" 
+        style={{ height: '276px', cursor: 'default' }}
+      >
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-black/10 dark:bg-white/10 shrink-0"></div>
+          <div className="flex-1 space-y-2">
+            <div className="w-1/4 h-4 rounded bg-black/10 dark:bg-white/10"></div>
+            <div className="w-2/5 h-3 rounded bg-black/5 dark:bg-white/5"></div>
           </div>
         </div>
-      ))}
+        <div className="grid grid-cols-2 gap-2 mt-4">
+          <div className="h-12 rounded-lg bg-black/10 dark:bg-white/10"></div>
+          <div className="h-12 rounded-lg bg-black/10 dark:bg-white/10"></div>
+          <div className="h-12 rounded-lg bg-black/10 dark:bg-white/10"></div>
+          <div className="h-12 rounded-lg bg-black/10 dark:bg-white/10"></div>
+        </div>
+      </div>
+
+      {/* 卡片 2: 2x1 跨列卡片 */}
+      <div 
+        className="dashboard-grid-card a-card-span-2-col flex items-center justify-between p-4 bg-black/5 dark:bg-white/5" 
+        style={{ height: '130px', cursor: 'default' }}
+      >
+        <div className="flex items-center gap-3 w-full">
+          <div className="w-9 h-9 rounded-xl bg-black/10 dark:bg-white/10 shrink-0"></div>
+          <div className="flex-1 space-y-2">
+            <div className="w-1/3 h-4 rounded bg-black/10 dark:bg-white/10"></div>
+            <div className="w-1/2 h-3 rounded bg-black/5 dark:bg-white/5"></div>
+          </div>
+        </div>
+      </div>
+
+      {/* 卡片 3: 1x1 卡片 */}
+      <div 
+        className="dashboard-grid-card flex flex-col justify-between p-4 bg-black/5 dark:bg-white/5" 
+        style={{ height: '130px', cursor: 'default' }}
+      >
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-xl bg-black/10 dark:bg-white/10 shrink-0"></div>
+          <div className="flex-1 space-y-2">
+            <div className="w-1/2 h-4 rounded bg-black/10 dark:bg-white/10"></div>
+            <div className="w-3/4 h-3 rounded bg-black/5 dark:bg-white/5"></div>
+          </div>
+        </div>
+      </div>
+
+      {/* 卡片 4: 1x1 卡片 */}
+      <div 
+        className="dashboard-grid-card flex flex-col justify-between p-4 bg-black/5 dark:bg-white/5" 
+        style={{ height: '130px', cursor: 'default' }}
+      >
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-xl bg-black/10 dark:bg-white/10 shrink-0"></div>
+          <div className="flex-1 space-y-2">
+            <div className="w-1/2 h-4 rounded bg-black/10 dark:bg-white/10"></div>
+            <div className="w-3/4 h-3 rounded bg-black/5 dark:bg-white/5"></div>
+          </div>
+        </div>
+      </div>
+
+      {/* 卡片 5: 2x1 跨列卡片 */}
+      <div 
+        className="dashboard-grid-card a-card-span-2-col flex flex-col justify-between p-4 bg-black/5 dark:bg-white/5" 
+        style={{ height: '130px', cursor: 'default' }}
+      >
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-xl bg-black/10 dark:bg-white/10 shrink-0"></div>
+          <div className="flex-1 space-y-2">
+            <div className="w-1/3 h-4 rounded bg-black/10 dark:bg-white/10"></div>
+            <div className="w-1/2 h-3 rounded bg-black/5 dark:bg-white/5"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 );
@@ -593,10 +659,13 @@ const SettingsWorkbenchPanel: React.FC<SettingsPanelProps> = ({
     <div
       className="settings-panel settings-shell-backdrop"
       style={{
-        padding: isMobile ? 0 : 24,
+        padding: isMobile ? '0px' : '24px',
         background: 'var(--settings-backdrop-bg)',
         backdropFilter: 'blur(18px)',
-        right: !isMobile && isChatOpen ? chatSidebarWidth : 0, // 简体中文：若 AI 助手开启，则在右侧主动避让（扣除）其宽度，保持同屏常驻
+        left: '0px',
+        top: '0px',
+        bottom: '0px',
+        right: !isMobile && isChatOpen ? `${chatSidebarWidth}px` : '0px', // 简体中文：若 AI 助手开启，则在右侧主动避让（扣除）其宽度，保持同屏常驻
         ['--chat-sidebar-width' as any]: !isMobile && isChatOpen ? `${chatSidebarWidth}px` : '0px',
       }}
       onClick={onClose}

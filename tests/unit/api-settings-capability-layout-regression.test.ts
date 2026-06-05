@@ -23,6 +23,7 @@ test('capability routing cards keep their toggles in a compact card header state
   assert.match(source, /settings-capability-card__controls/);
   assert.doesNotMatch(source, /<div key=\{item\.role\} className="rounded-\[18px\] border p-3"/);
   assert.doesNotMatch(source, /settings-capability-card__toggle/);
+  assert.doesNotMatch(source, /pointer-events-none opacity-0 select-none/);
   assert.match(
     uiSource,
     /settings-control-toggle settings-toggle-button relative h-7 w-12 shrink-0 overflow-hidden rounded-\[var\(--radius-control-md\)\] border/,

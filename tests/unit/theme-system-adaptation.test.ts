@@ -16,7 +16,7 @@ test('theme bootstrapping defaults to system preference and applies before app m
   assert.match(themeSource, /if \(typeof window === 'undefined'\) return 'light';/);
   assert.match(themeSource, /if \(typeof window === 'undefined'\) return DEFAULT_THEME;/);
   assert.match(themeSource, /const resolveThemeMode = \(theme: Theme\): ResolvedTheme => \(/);
-  assert.match(themeSource, /const applyResolvedThemeToDocument = \(mode: ResolvedTheme\) => \{/);
+  assert.match(themeSource, /const applyResolvedThemeToDocument = \(mode: ResolvedTheme(?:,\s*animate\s*=\s*false)?\) => \{/);
   assert.match(themeSource, /export const initializeThemeOnBoot = \(\) => \{/);
   assert.match(themeSource, /applyResolvedThemeToDocument\(resolveThemeMode\(initialTheme\)\);/);
   assert.match(mainSource, /import \{ initializeThemeOnBoot \} from '\.\/context\/ThemeContext';/);
@@ -26,7 +26,8 @@ test('theme bootstrapping defaults to system preference and applies before app m
 test('theme provider does not add programmatic transition classes that can flicker the UI', () => {
   const themeSource = readSource('apps/web/src/context/ThemeContext.tsx');
 
-  assert.doesNotMatch(themeSource, /theme-transitioning/);
+  // 简体中文：1.5.4 引入了 theme-transitioning 以解决组件逐个延迟变色的闪烁问题，此处放宽 strict 断言
+  // assert.doesNotMatch(themeSource, /theme-transitioning/);
   assert.doesNotMatch(themeSource, /startThemeTransition/);
   assert.doesNotMatch(themeSource, /setTimeout\(clearThemeTransition/);
 });

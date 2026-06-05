@@ -35,9 +35,9 @@ export type ImageSize = typeof ImageSize[keyof typeof ImageSize];
 // For now, let's keep it as string union or just string to allow custom models.
 export type ModelType = string;
 
-export type AppSurface = 'workspace' | 'library' | 'chat' | 'settings' | 'profile';
+export type AppSurface = 'workspace' | 'library' | 'favorites' | 'chat' | 'settings' | 'profile';
 
-export type WorkspacePanel = 'history' | 'chat' | null;
+export type WorkspacePanel = 'history' | 'favorites' | 'chat' | null;
 
 export type MobilePrimaryTab = 'create' | 'library' | 'chat' | 'me';
 
@@ -211,6 +211,9 @@ export interface ReferenceImage {
   data: string; // Base64 or URL
   mimeType: string;
   url?: string; // Optional URL for thumbnail/reference
+  mentionName?: string; // User-facing @ reference name used for semantic binding
+  mentionText?: string;
+  mentionSourceId?: string;
 }
 
 export interface NormalizedRect {
@@ -1028,7 +1031,8 @@ export interface CanvasGroup {
   // 🎯 [Layering] Z-index for rendering order
   zIndex?: number;
   label?: string;
-  color?: string; // Border color
+  color?: string; // Group glow color
+  hidden?: boolean;
   collapsed?: boolean;
   type: 'custom';
 }

@@ -24,16 +24,19 @@ export class AgentRuntime {
     const apiKeyStatus = context.settings.apiKeyStatus;
     let plan: AssistantPlan;
 
-    // 1. 调用大脑生成结构化执行计划
-    if (apiKeyStatus !== 'missing') {
+    // 1. 先走本地快速判定：设置跳转、发送、建卡、低风险动作都应尽量本地直达。
+    const localPlan = await localBrain.plan(text, context);
+    const shouldFallbackToLLM = apiKeyStatus !== 'missing' && localPlan.intent === 'unknown';
+
+    if (shouldFallbackToLLM) {
       try {
         plan = await llmBrain.plan(text, context, modelId);
       } catch (err) {
         console.warn('[AgentRuntime] 云端规划器异常，自动平滑回退到 LocalBrain:', err);
-        plan = await localBrain.plan(text, context);
+        plan = localPlan;
       }
     } else {
-      plan = await localBrain.plan(text, context);
+      plan = localPlan;
     }
 
     // 2. 执行物理安全过滤评估

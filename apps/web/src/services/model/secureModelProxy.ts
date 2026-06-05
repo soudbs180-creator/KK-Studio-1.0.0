@@ -11,6 +11,55 @@ import { compressReferenceImagesIfNeeded } from '../../utils/imageUtils';
 import { kernelFetch } from '../http/requestKernel';
 import { keyManager } from '../auth/keyManager';
 
+const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';
+const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isEncryptedSecretEnvelope(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value.__kkUserApiSecret === true) return true;
+
+  const keys = Object.keys(value).map((key) => key.toLowerCase());
+  const hasCipher = keys.some((key) => key === 'ciphertext' || key === 'cipher_text' || key === 'cipher');
+  const hasIv = keys.includes('iv') || keys.includes('nonce');
+  return hasCipher && hasIv;
+}
+
+function isEncryptedSecretJsonString(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return false;
+  try {
+    return isEncryptedSecretEnvelope(JSON.parse(trimmed));
+  } catch {
+    return false;
+  }
+}
+
+function normalizeUserApiSecretForTransport(value: unknown): string {
+  if (value == null || isEncryptedSecretEnvelope(value) || typeof value !== 'string') {
+    return '';
+  }
+
+  const token = value.trim();
+  if (
+    !token
+    || token === READONLY_SECRET_PLACEHOLDER
+    || token.startsWith(REDACTED_SECRET_PREFIX)
+    || token === '[object Object]'
+    || /^\[object\s+[^\]]+\]$/.test(token)
+    || /[\u2022\u25cf\u25e6\u2219\u2027\u2026]/.test(token)
+    || token.includes('...')
+    || isEncryptedSecretJsonString(token)
+  ) {
+    return '';
+  }
+
+  return token;
+}
+
 export interface SecureProxyChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -35,9 +84,9 @@ function getWuyinRouteDetails(routeId: string) {
     if (provider) {
       const isWuyin = provider.name === '速创 API' || /wuyinkeji/i.test(provider.baseUrl || '');
       if (isWuyin && provider.apiKey) {
-        const apiKey = provider.apiKey.trim();
+        const apiKey = normalizeUserApiSecretForTransport(provider.apiKey);
         // 简体中文注释：若 API 密钥已经被脱敏，则说明前端无真实物理 Key，此时不满足前端直连条件，应返回 null 触发代理路由
-        if (apiKey.startsWith('__kk_redacted__:') || apiKey === 'sk-readonly-0000') {
+        if (!apiKey) {
           return null;
         }
         return {
@@ -1867,7 +1916,15 @@ export async function forwardUserRouteGenericRequest(
     targetUrl = optionsOrUrl.url || '';
     targetMethod = optionsOrUrl.method || 'POST';
     targetKeyId = optionsOrUrl.keyId || '';
-    targetApiKey = optionsOrUrl.apiKey || '';
+    const rawTargetApiKey = optionsOrUrl.apiKey || '';
+    targetApiKey = normalizeUserApiSecretForTransport(rawTargetApiKey);
+    if (rawTargetApiKey && !targetApiKey) {
+      throw buildSecureProxyBoundaryError('Saved user API key is not available for transport. Re-enter or reveal the real API key before retrying.', {
+        code: LOCAL_USER_ROUTE_SECRET_REQUIRED_CODE,
+        status: 400,
+        feature: 'generic user-route forwarding',
+      });
+    }
     targetHeaders = optionsOrUrl.headers;
     const rawContentType = String(targetHeaders?.['Content-Type'] || targetHeaders?.['content-type'] || '');
     if (optionsOrUrl.body) {

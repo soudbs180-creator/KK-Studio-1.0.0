@@ -87,3 +87,38 @@ test("Vercel user model proxy rejects non-Wuyin targets and missing user API key
   assert.equal(missingKeyRes.statusCode, 400);
   assert.deepEqual((missingKeyRes.body as { error: { code: string } }).error.code, "USER_ROUTE_SECRET_REQUIRED");
 });
+
+test("Vercel user model proxy blocks placeholder secrets before upstream fetch", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCount = 0;
+  globalThis.fetch = (async () => {
+    fetchCount += 1;
+    return new Response("{}", { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    for (const apiKey of [
+      "sk-readonly-0000",
+      "__kk_redacted__:provider:route-1",
+      "••••••••••••",
+      "sk-live...tail",
+      "[object Object]",
+    ]) {
+      const res = createResponse();
+      await handler({
+        method: "GET",
+        headers: {
+          "x-proxy-target-url": "https://api.wuyinkeji.com/api/async/detail?id=task-1",
+          "x-proxy-api-key": apiKey,
+        },
+      } as any, res as any);
+
+      assert.equal(res.statusCode, 400);
+      assert.deepEqual((res.body as { error: { code: string } }).error.code, "USER_ROUTE_SECRET_REQUIRED");
+    }
+
+    assert.equal(fetchCount, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

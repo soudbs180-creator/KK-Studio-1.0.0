@@ -27,6 +27,11 @@ test('ApiSettingsView adds route pool, capability roles, and OCR sections withou
   assert.match(viewSource, /<ApiWorkbenchRoutePoolSection/);
   assert.match(viewSource, /<ApiWorkbenchCapabilitySection/);
   assert.match(viewSource, /<ApiWorkbenchOcrSection/);
+  assert.match(viewSource, /fallbackModelId: assignment\?\.fallbackModelId \|\| ''/);
+  assert.match(viewSource, /imageRouteId: assignment\?\.imageRouteId \|\| ''/);
+  assert.match(viewSource, /imageFallbackRouteId: assignment\?\.imageFallbackRouteId \|\| ''/);
+  assert.match(viewSource, /fallbackModelOptions: getRouteModelOptions/);
+  assert.match(viewSource, /imageFallbackModelOptions: getRouteModelOptions/);
   assert.match(viewSource, /Enter the API key before saving\./);
   assert.match(viewSource, /providerEditorValidationMessage[\s\S]*name, base URL, and API key/i);
 });

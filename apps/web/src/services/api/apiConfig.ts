@@ -80,13 +80,61 @@ export function resolveApiProtocolFormat(
 }
 
 export function getApiKeyToken(apiKey: string): string {
-    return String(apiKey || '')
+    const token = String(apiKey || '')
         .replace(/[\u200B-\u200D\uFEFF]/g, '')
         .replace(/\r?\n|\r|\t/g, '')
         .trim()
         .replace(/^Bearer\s+/i, '')
         .replace(/\s+/g, '')
         .trim();
+
+    return normalizeApiKeyForTransport(token);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isEncryptedSecretEnvelope(value: unknown): boolean {
+    if (!isRecord(value)) return false;
+    if (value.__kkUserApiSecret === true) return true;
+
+    const keys = Object.keys(value).map((key) => key.toLowerCase());
+    const hasCipher = keys.some((key) => key === 'ciphertext' || key === 'cipher_text' || key === 'cipher');
+    const hasIv = keys.includes('iv') || keys.includes('nonce');
+    return hasCipher && hasIv;
+}
+
+function isEncryptedSecretJsonString(value: string): boolean {
+    const trimmed = value.trim();
+    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return false;
+    try {
+        return isEncryptedSecretEnvelope(JSON.parse(trimmed));
+    } catch {
+        return false;
+    }
+}
+
+export function normalizeApiKeyForTransport(value: unknown): string {
+    if (value == null || isEncryptedSecretEnvelope(value) || typeof value !== 'string') {
+        return '';
+    }
+
+    const token = value.trim();
+    if (
+        !token
+        || token === 'sk-readonly-0000'
+        || token.startsWith('__kk_redacted__:')
+        || token === '[object Object]'
+        || /^\[object\s+[^\]]+\]$/.test(token)
+        || /[\u2022\u25cf\u25e6\u2219\u2027\u2026]/.test(token)
+        || token.includes('...')
+        || isEncryptedSecretJsonString(token)
+    ) {
+        return '';
+    }
+
+    return token;
 }
 
 export function formatAuthorizationHeaderValue(
@@ -94,10 +142,13 @@ export function formatAuthorizationHeaderValue(
     valueFormat: ProviderStrategyAuthorizationValueFormat = 'bearer'
 ): string {
     const token = getApiKeyToken(apiKey);
+    if (!token) {
+        return '';
+    }
     if (valueFormat === 'raw') {
         return token;
     }
-    return /^Bearer\s+/i.test(apiKey) ? apiKey : `Bearer ${token}`;
+    return `Bearer ${token}`;
 }
 
 /**
@@ -120,7 +171,12 @@ export function buildApiUrl(
     const apiVersion = useBeta ? 'v1beta' : 'v1';
     const url = `${base}/${apiVersion}/models/${normalizedModel}:${action}`;
 
-    return authMethod === 'query' && apiKey ? `${url}?key=${encodeURIComponent(getApiKeyToken(apiKey))}` : url;
+    if (authMethod === 'query') {
+        const token = getApiKeyToken(apiKey || '');
+        return token ? `${url}?key=${encodeURIComponent(token)}` : url;
+    }
+
+    return url;
 }
 
 /**
@@ -137,10 +193,14 @@ export function buildHeaders(
     };
 
     if (authMethod === 'header') {
+        const token = getApiKeyToken(apiKey);
+        if (!token) {
+            return headers;
+        }
         const effectiveHeaderName = headerName || 'x-goog-api-key';
         headers[effectiveHeaderName] = effectiveHeaderName === 'Authorization'
-            ? formatAuthorizationHeaderValue(apiKey, authorizationValueFormat)
-            : getApiKeyToken(apiKey);
+            ? formatAuthorizationHeaderValue(token, authorizationValueFormat)
+            : token;
     }
 
     return headers;
@@ -185,6 +245,9 @@ export function applyOpenAICompatAuthToUrl(
     }
 
     const token = getApiKeyToken(apiKey);
+    if (!token) {
+        return url;
+    }
 
     try {
         const parsed = new URL(url);
@@ -286,8 +349,8 @@ export function buildGeminiEndpoint(
     const normalizedModel = normalizeGeminiModelId(model);
     const endpoint = `${cleanBase}/v1beta/models/${encodeURIComponent(normalizedModel)}:${action}`;
     if (resolveGeminiAuthMethod(baseUrl, authMethod, provider) === 'query') {
-        const encodedKey = encodeURIComponent(getApiKeyToken(apiKey));
-        return `${endpoint}?key=${encodedKey}`;
+        const token = getApiKeyToken(apiKey);
+        return token ? `${endpoint}?key=${encodeURIComponent(token)}` : endpoint;
     }
     return endpoint;
 }
@@ -301,8 +364,8 @@ export function buildGeminiModelsEndpoint(
     const cleanBase = normalizeGeminiBaseUrl(baseUrl);
     const endpoint = `${cleanBase}/v1beta/models`;
     if (resolveGeminiAuthMethod(baseUrl, authMethod, provider) === 'query') {
-        const encodedKey = encodeURIComponent(getApiKeyToken(apiKey));
-        return `${endpoint}?key=${encodedKey}`;
+        const token = getApiKeyToken(apiKey);
+        return token ? `${endpoint}?key=${encodeURIComponent(token)}` : endpoint;
     }
     return endpoint;
 }
@@ -322,10 +385,15 @@ export function buildGeminiHeaders(
         return headers;
     }
 
+    const token = getApiKeyToken(apiKey);
+    if (!token) {
+        return headers;
+    }
+
     const effectiveHeaderName = headerName || 'Authorization';
     headers[effectiveHeaderName] = effectiveHeaderName === 'Authorization'
-        ? formatAuthorizationHeaderValue(apiKey, authorizationValueFormat)
-        : getApiKeyToken(apiKey);
+        ? formatAuthorizationHeaderValue(token, authorizationValueFormat)
+        : token;
 
     return headers;
 }
@@ -346,9 +414,14 @@ export function buildClaudeHeaders(
         return headers;
     }
 
+    const token = getApiKeyToken(apiKey);
+    if (!token) {
+        return headers;
+    }
+
     headers[headerName] = headerName === 'Authorization'
-        ? formatAuthorizationHeaderValue(apiKey, authorizationValueFormat)
-        : getApiKeyToken(apiKey);
+        ? formatAuthorizationHeaderValue(token, authorizationValueFormat)
+        : token;
 
     return headers;
 }
@@ -368,16 +441,20 @@ export function buildProxyHeaders(
     };
 
     if (authMethod === 'header' && apiKey) {
-        if (headerName === 'Authorization' && !/^Bearer\s+/i.test(apiKey)) {
-            headers[headerName] = formatAuthorizationHeaderValue(apiKey, authorizationValueFormat);
-        } else {
-            headers[headerName] = headerName === 'Authorization'
-                ? formatAuthorizationHeaderValue(apiKey, authorizationValueFormat)
-                : apiKey;
+        const token = getApiKeyToken(apiKey);
+        if (token) {
+            if (headerName === 'Authorization' && !/^Bearer\s+/i.test(apiKey)) {
+                headers[headerName] = formatAuthorizationHeaderValue(token, authorizationValueFormat);
+            } else {
+                headers[headerName] = headerName === 'Authorization'
+                    ? formatAuthorizationHeaderValue(token, authorizationValueFormat)
+                    : token;
+            }
         }
     }
 
-    if (apiKey.startsWith('sk-or-') || headerName.toLowerCase() === 'authorization') {
+    const token = getApiKeyToken(apiKey);
+    if (token && (token.startsWith('sk-or-') || headerName.toLowerCase() === 'authorization')) {
         if (typeof window !== 'undefined') {
             headers['HTTP-Referer'] = window.location.origin;
             headers['X-Title'] = 'KK Studio';

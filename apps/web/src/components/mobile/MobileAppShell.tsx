@@ -34,7 +34,7 @@ const MobileAppShell: React.FC<MobileAppShellProps> = ({
         <div 
           className="absolute inset-0 -z-10 pointer-events-none"
           style={{
-            background: 'linear-gradient(to bottom, rgba(10, 10, 12, 1) 0%, rgba(10, 10, 12, 0.98) 18%, rgba(10, 10, 12, 0.92) 36%, rgba(10, 10, 12, 0.76) 54%, rgba(10, 10, 12, 0.48) 70%, rgba(10, 10, 12, 0.24) 84%, rgba(10, 10, 12, 0.08) 93%, rgba(10, 10, 12, 0) 100%)'
+            background: 'var(--mobile-header-scrim-bg)'
           }}
         />
         <div style={{ paddingTop: 'env(safe-area-inset-top)' }}>

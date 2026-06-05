@@ -23,7 +23,7 @@ test('video services do not retain compiler-proven unused locals', () => {
 
   assert.match(
     videoServiceSource,
-    /executeVideoGeneration\(requestBody, apiKey, model, apiBase, onProgress, signal, startTime, mode\)/,
+    /executeVideoGeneration\(requestBody, (apiKey|apiKeyToken), model, apiBase, onProgress, signal, startTime, mode\)/,
   );
   assert.doesNotMatch(videoServiceSource, /startTime, mode, modeLabel/);
   assert.doesNotMatch(videoServiceSource, /mode: VideoGenerationResult\['mode'\],\s*modeLabel: string/);

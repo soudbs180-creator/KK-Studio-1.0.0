@@ -85,6 +85,25 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
     }
   });
   const childImageNodeIdsFromSelectedPrompts = Array.from(childImageNodeIdsFromSelectedPromptsSet);
+  const selectedGroupIds = groups
+    .filter((group: any) => selectedNodeIdsSet.has(group.id))
+    .map((group: any) => group.id);
+  const runtimeGroups = groups.map((group: any) => {
+    const memberTags = [...promptNodes, ...imageNodes]
+      .filter((node: any) => (group.nodeIds || []).includes(node.id))
+      .flatMap((node: any) => node.tags || []);
+    const tags = Array.from(new Set([...(group.tags || []), ...memberTags]));
+
+    return {
+      id: group.id,
+      label: group.label,
+      hidden: Boolean(group.hidden),
+      collapsed: Boolean(group.collapsed),
+      color: group.color,
+      nodeCount: Array.isArray(group.nodeIds) ? group.nodeIds.length : 0,
+      tags
+    };
+  });
 
   // 4. 模拟 recentEvents 列表
   const recentEvents: any[] = [];
@@ -125,9 +144,10 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
       promptNodeIds: selectedPromptIds,
       imageNodeIds: selectedImageIds,
       childImageNodeIdsFromSelectedPrompts,
-      groupIds: [],
+      groupIds: selectedGroupIds,
       count: selectedNodeIds.length
     },
+    groups: runtimeGroups,
     selectedNodes: {
       prompts: selectedPrompts.map((n: any) => ({
         id: n.id,

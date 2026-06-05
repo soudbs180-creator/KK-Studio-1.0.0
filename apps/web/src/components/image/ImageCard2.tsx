@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { type GeneratedImage, GenerationMode, ImageSize } from '../../types';
-import { Download, Trash2, Loader2, ImageOff, Play, Pause, Music } from 'lucide-react';
+import { Download, Trash2, Loader2, ImageOff, Play, Pause, Music, Heart } from 'lucide-react';
 import { getCardDimensions, FOOTER_HEIGHT } from '../../utils/styleUtils';
 import { getLaunchTimelineByOffset, getPromptBarLaunchPoint } from '../../utils/cardLaunch';
 import { generateTagColor } from '../../utils/colorUtils';
@@ -23,6 +23,7 @@ import { base64ToBlob, generateDownloadFilename, triggerDownload } from '../../u
 import { snapCanvasPointToGrid } from '../../utils/canvasSnapToGrid';
 import { safeOpenLink } from '../../utils/browserUtils';
 import { useTheme } from '../../context/ThemeContext';
+import { useFavoritesStore } from '../../features/favorites';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -168,6 +169,19 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     }, [onDragCommit]);
 
     const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+    const favoriteItems = useFavoritesStore(state => state.items);
+    const addImageFavorite = useFavoritesStore(state => state.addImageFavorite);
+    const removeFavorite = useFavoritesStore(state => state.removeFavorite);
+    const imageFavorite = useMemo(() => favoriteItems.find(item => (
+        item.kind === 'favorite-image'
+        && (
+            item.sourceImageId === image.id
+            || (!!image.storageId && item.storageId === image.storageId)
+            || (!!image.originalUrl && item.originalUrl === image.originalUrl)
+            || (!!image.apiResultUrl && item.apiResultUrl === image.apiResultUrl)
+            || (!!image.url && item.url === image.url)
+        )
+    )), [favoriteItems, image.apiResultUrl, image.id, image.originalUrl, image.storageId, image.url]);
     const isPptSubCard = image.mode === GenerationMode.PPT && Boolean(image.parentPromptId);
 
     useEffect(() => {
@@ -992,6 +1006,15 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         }
 
         void handleSingleDownload(e);
+    };
+
+    const handleToggleFavorite = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (imageFavorite) {
+            void removeFavorite(imageFavorite.id);
+            return;
+        }
+        void addImageFavorite(image);
     };
 
     const wasDraggingRef = useRef(false);
@@ -1959,6 +1982,14 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                 <span className={joinClasses('inline-flex items-center rounded-md font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-light)] whitespace-nowrap', capsulePaddingClass, modelCapsuleTextClass)}>
                                                     {aspectSizeLabel}
                                                 </span>
+                                                <button
+                                                    onClick={handleToggleFavorite}
+                                                    className={joinClasses(imageFavorite ? 'text-[var(--accent-coral)]' : 'hover:text-[var(--accent-coral)]', 'transition-colors', iconButtonPaddingClass)}
+                                                    title={imageFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                                                    aria-pressed={Boolean(imageFavorite)}
+                                                >
+                                                    <Heart size={actionIconSize} fill={imageFavorite ? 'currentColor' : 'none'} />
+                                                </button>
                                                 <div className="relative" ref={downloadMenuRef}>
                                                     <button onClick={handleDownload} className={joinClasses('hover:text-[var(--accent-coral)] transition-colors', iconButtonPaddingClass)} title={isPptSubCard ? '下载选项' : '下载原图'}>
                                                         <Download size={actionIconSize} />

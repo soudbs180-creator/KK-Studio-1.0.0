@@ -3,6 +3,7 @@ import ChatSidebar from '../layout/ChatSidebar';
 import type { AppSurface, Canvas, WorkspacePanel } from '../../types';
 import type { SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
 import { AssetLibraryPanel } from './AssetLibraryPanel';
+import { FavoritesPanel } from '../../features/favorites';
 import WorkspacePanels from './WorkspacePanels';
 
 interface WorkspaceSurfacePanelsProps {
@@ -15,11 +16,12 @@ interface WorkspaceSurfacePanelsProps {
   openSettingsSurface: (view?: SettingsSurfaceView) => void;
   setIsSidebarHovered: (isHovered: boolean) => void;
   setChatSidebarWidth: (width: number) => void;
-  workspaceSurface: Extract<AppSurface, 'workspace' | 'library'>;
+  workspaceSurface: Extract<AppSurface, 'workspace' | 'library' | 'favorites'>;
   activeCanvas: Canvas | null | undefined;
   focusWorkspace: () => void;
   handlePreviewFromLibrary: (imageId: string) => void;
   handleFocusLibraryImage: (imageId: string) => void;
+  onRenameFavoriteImage?: (imageId: string, name: string) => void;
   config?: any;
   setConfig?: any;
   ecommerceState?: any;
@@ -43,6 +45,7 @@ export function WorkspaceSurfacePanels({
   focusWorkspace,
   handlePreviewFromLibrary,
   handleFocusLibraryImage,
+  onRenameFavoriteImage,
   config,
   setConfig,
   ecommerceState,
@@ -91,6 +94,17 @@ export function WorkspaceSurfacePanels({
             />
           </div>
         )
+      )}
+
+      renderFavoritesPanel={() => (
+        <div id="favorites-panel-wrapper" style={{ pointerEvents: 'auto' }}>
+          <FavoritesPanel
+            isOpen={workspaceSurface === 'favorites'}
+            isMobile={isMobile}
+            onClose={focusWorkspace}
+            onRenameImageAlias={onRenameFavoriteImage}
+          />
+        </div>
       )}
     />
   );

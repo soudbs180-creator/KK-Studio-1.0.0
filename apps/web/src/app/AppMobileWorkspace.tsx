@@ -16,7 +16,7 @@ import AppPromptComposer, { type AppPromptBarProps } from './AppPromptComposer';
 interface AppMobileWorkspaceProps {
   isMobile: boolean;
   surface: ResponsiveSurface;
-  workspaceSurface: 'workspace' | 'library';
+  workspaceSurface: 'workspace' | 'library' | 'favorites';
   mobileScreen: MobileSurfaceScreen;
   setMobileScreen: (screen: MobileSurfaceScreen) => void;
   onOpenSettings: () => void;
@@ -30,7 +30,7 @@ interface AppMobileWorkspaceProps {
   projectCount: number;
   focusWorkspace: () => void;
   setIsSearchOpen: (isOpen: boolean) => void;
-  setWorkspaceSurface: (surface: 'workspace' | 'library') => void;
+  setWorkspaceSurface: (surface: 'workspace' | 'library' | 'favorites') => void;
   setIsChatOpen: (isOpen: boolean) => void;
   openProfileSurface: (view: UserProfileView) => void;
   onShowRecharge: () => void;
@@ -137,6 +137,10 @@ const AppMobileWorkspace: React.FC<AppMobileWorkspaceProps> = ({
       }}
       onOpenHistory={() => {
         setWorkspaceSurface('library');
+        setMobileScreen('home');
+      }}
+      onOpenFavorites={() => {
+        setWorkspaceSurface('favorites');
         setMobileScreen('home');
       }}
       onOpenChat={() => {

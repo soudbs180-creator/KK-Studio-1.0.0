@@ -239,7 +239,7 @@ test('remaining active chrome and fallback surfaces consume Clay frosted tokens'
   assert.match(workflowUtilitySource, /var\(--frost-card-sub-bg\)/);
   assert.match(lazyBoundarySource, /var\(--frost-card-framework-blur\)/);
   assert.match(errorBoundarySource, /var\(--bg-canvas\)/);
-  assert.match(mainSource, /var\(--bg-canvas, #0b0b0c\)/);
+  assert.match(mainSource, /var\(--bg-canvas,\s*#(?:0b0b0c|ffffff)\)/);
   assert.match(userProfileSource, /kk-user-profile-modal/);
   assert.match(userProfileSource, /var\(--frost-card-framework-bg\)/);
   assert.match(userProfileSource, /var\(--frost-card-main-border\)/);

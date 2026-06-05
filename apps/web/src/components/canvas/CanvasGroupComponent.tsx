@@ -1,8 +1,23 @@
 import React, { useRef, useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import { type CanvasGroup} from '../../types';
-import { Type, GripHorizontal, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Type, GripHorizontal, Trash2, Eye, EyeOff, Archive, Maximize2, Check } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { elevateCanvasStackZIndex } from '../../utils/canvasUtils';
+
+const GROUP_BORDER_COLOR_SWATCHES = [
+    '#ffffff',
+    '#60a5fa',
+    '#34d399',
+    '#f59e0b',
+    '#fb7185',
+    '#a78bfa',
+    '#94a3b8',
+    '#111827',
+];
+
+function normalizeHexColor(color: string | undefined): string {
+    return /^#[0-9a-fA-F]{6}$/.test(color || '') ? color! : '#ffffff';
+}
 
 export interface CanvasGroupProps {
     group: CanvasGroup;
@@ -35,6 +50,8 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     const pendingDelta = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const isCollapsed = Boolean(group.collapsed);
+    const isHidden = Boolean(group.hidden);
+    const groupBorderColor = group.color || '#ffffff';
     const fallbackStackZIndex = ((group.zIndex ?? 0) * 100) + (isDragging ? 30 : highlighted ? 20 : 10);
     const stackZIndex = stackZIndexOverride ?? fallbackStackZIndex;
     const effectiveStackZIndex = elevateCanvasStackZIndex(stackZIndex, isDragging);
@@ -46,16 +63,23 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
     const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
+    const groupGlowShadow = [
+        'var(--frost-card-framework-shadow)',
+        `inset 0 0 0 1px color-mix(in srgb, ${groupBorderColor} 34%, transparent)`,
+        `inset 0 0 22px color-mix(in srgb, ${groupBorderColor} 18%, transparent)`,
+    ].join(', ');
     const groupSurfaceStyle: React.CSSProperties = {
         background: highlighted
             ? 'color-mix(in srgb, var(--frost-card-framework-bg) 88%, var(--state-info-bg) 12%)'
+            : isHidden
+                ? 'color-mix(in srgb, var(--frost-card-framework-bg) 70%, transparent)'
             : isDragging
                 ? 'var(--frost-card-main-bg)'
                 : 'var(--frost-card-framework-bg)',
         borderColor: highlighted
             ? 'var(--state-info-border)'
-            : 'var(--frost-card-framework-border)',
-        boxShadow: 'var(--frost-card-framework-shadow)',
+            : 'color-mix(in srgb, #ffffff 26%, transparent)',
+        boxShadow: groupGlowShadow,
         WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
         backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
     };
@@ -79,14 +103,30 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
     };
     const groupCollapsedCardStyle: React.CSSProperties = {
         ...groupHeaderSurfaceStyle,
+        borderColor: highlighted ? 'var(--state-info-border)' : 'color-mix(in srgb, #ffffff 26%, transparent)',
+        boxShadow: [
+            'var(--frost-card-sub-shadow)',
+            `inset 0 0 0 1px color-mix(in srgb, ${groupBorderColor} 34%, transparent)`,
+            `inset 0 0 18px color-mix(in srgb, ${groupBorderColor} 16%, transparent)`,
+        ].join(', '),
         minWidth: 180,
         maxWidth: 320,
+    };
+    const hiddenOverlayStyle: React.CSSProperties = {
+        background: 'color-mix(in srgb, var(--frost-card-framework-bg) 58%, transparent)',
+        boxShadow: [
+            `inset 0 0 0 1px color-mix(in srgb, ${groupBorderColor} 38%, transparent)`,
+            `inset 0 0 36px color-mix(in srgb, ${groupBorderColor} 22%, transparent)`,
+        ].join(', '),
+        WebkitBackdropFilter: 'blur(18px) saturate(0.82)',
+        backdropFilter: 'blur(18px) saturate(0.82)',
     };
 
     // Rename state
     const [isEditing, setIsEditing] = useState(false);
     const defaultGroupLabel = '分组';
-    const collapsedToggleLabel = isCollapsed ? '展开分组' : '折叠分组';
+    const hiddenToggleLabel = isHidden ? '显示卡片' : '隐藏/模糊卡片';
+    const collapsedToggleLabel = isCollapsed ? '展开分组' : '收纳分组';
     const [label, setLabel] = useState(group.label || defaultGroupLabel);
     const inputRef = useRef<HTMLInputElement>(null);
     // Use computed bounds if available, otherwise fall back to stored group bounds
@@ -98,6 +138,24 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
         height: 44,
     };
     const renderedBounds = isCollapsed ? compactBounds : bounds;
+    const hiddenDisplayLabel = group.label || defaultGroupLabel;
+    const hiddenDisplayLabelLength = Math.max(2, Array.from(hiddenDisplayLabel).length);
+    const hiddenLabelFontSize = Math.max(
+        16,
+        Math.min(
+            52,
+            Math.max(14, (renderedBounds.width - 80) / (hiddenDisplayLabelLength * 0.62)),
+            renderedBounds.height * 0.18,
+            18 / Math.max(zoom, 0.34),
+        ),
+    );
+    const hiddenLabelStyle: React.CSSProperties = {
+        color: 'var(--text-primary)',
+        fontSize: hiddenLabelFontSize,
+        lineHeight: 1.12,
+        maxWidth: Math.max(96, renderedBounds.width - 72),
+        textShadow: '0 2px 18px rgba(0, 0, 0, 0.35)',
+    };
 
     // Sync label
     useEffect(() => {
@@ -175,6 +233,15 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
         onUpdateGroup?.({ ...group, collapsed: !group.collapsed });
     }, [group, onUpdateGroup]);
 
+    const handleToggleHidden = useCallback((e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        onUpdateGroup?.({ ...group, hidden: !group.hidden });
+    }, [group, onUpdateGroup]);
+
+    const handleUpdateColor = useCallback((color: string) => {
+        onUpdateGroup?.({ ...group, color });
+    }, [group, onUpdateGroup]);
+
     const flushPendingDrag = useCallback(() => {
         if (!onGroupDrag) return;
 
@@ -223,14 +290,14 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
         };
 
         const handleMouseUp = () => {
-            setIsDragging(false);
-            onDragStateChange?.(false);
-            lastPos.current = null;
             if (rafRef.current) {
                 cancelAnimationFrame(rafRef.current);
                 rafRef.current = null;
             }
             flushPendingDrag();
+            setIsDragging(false);
+            onDragStateChange?.(false);
+            lastPos.current = null;
             pendingDelta.current = { x: 0, y: 0 };
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
@@ -278,7 +345,7 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                             title={collapsedToggleLabel}
                             aria-label={collapsedToggleLabel}
                         >
-                            <Eye size={14} />
+                            <Maximize2 size={14} />
                             <span>展开分组</span>
                         </button>
                         <span
@@ -334,6 +401,17 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                         )}
                         <button
                             type="button"
+                            onClick={handleToggleHidden}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className="flex h-6 w-6 items-center justify-center rounded-lg transition-colors hover:bg-[var(--frost-card-sub-bg)]"
+                            style={{ color: highlighted ? 'var(--state-info-text)' : 'var(--text-tertiary)' }}
+                            title={hiddenToggleLabel}
+                            aria-label={hiddenToggleLabel}
+                        >
+                            {isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
+                        </button>
+                        <button
+                            type="button"
                             onClick={handleToggleCollapsed}
                             onMouseDown={(e) => e.stopPropagation()}
                             className="flex h-6 w-6 items-center justify-center rounded-lg transition-colors hover:bg-[var(--frost-card-sub-bg)]"
@@ -341,8 +419,22 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                             title={collapsedToggleLabel}
                             aria-label={collapsedToggleLabel}
                         >
-                            <EyeOff size={14} />
+                            <Archive size={14} />
                         </button>
+                    </div>
+                )}
+                {!isCollapsed && isHidden && (
+                    <div
+                        className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[30px] px-8 text-center"
+                        style={hiddenOverlayStyle}
+                    >
+                        <span
+                            className="block truncate font-semibold"
+                            style={hiddenLabelStyle}
+                            title={hiddenDisplayLabel}
+                        >
+                            {hiddenDisplayLabel}
+                        </span>
                     </div>
                 )}
             </div>
@@ -373,6 +465,41 @@ export const CanvasGroupComponent: React.FC<CanvasGroupProps> = ({
                         <Type size={14} />
                         重命名
                     </button>
+                    <div className="px-3 py-2">
+                        <div className="mb-2 text-xs font-medium text-[var(--text-tertiary)]">内发光颜色</div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            {GROUP_BORDER_COLOR_SWATCHES.map((color) => {
+                                const selected = color.toLowerCase() === groupBorderColor.toLowerCase();
+                                return (
+                                    <button
+                                        key={color}
+                                        type="button"
+                                        onClick={() => handleUpdateColor(color)}
+                                        className="flex h-6 w-6 items-center justify-center rounded-full border transition-transform hover:scale-105"
+                                        style={{
+                                            background: color,
+                                            borderColor: selected ? 'var(--text-primary)' : 'color-mix(in srgb, #ffffff 45%, transparent)',
+                                            boxShadow: selected ? `0 0 0 2px color-mix(in srgb, ${color} 40%, transparent)` : 'none',
+                                            color: color === '#111827' ? '#ffffff' : '#111827',
+                                        }}
+                                        title={color}
+                                        aria-label={color}
+                                    >
+                                        {selected && <Check size={13} />}
+                                    </button>
+                                );
+                            })}
+                            <input
+                                type="color"
+                                value={normalizeHexColor(groupBorderColor)}
+                                onChange={(e) => handleUpdateColor(e.currentTarget.value)}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                className="h-6 w-6 cursor-pointer rounded-full border border-[var(--frost-card-sub-border)] bg-transparent p-0"
+                                title="自定义内发光颜色"
+                                aria-label="自定义内发光颜色"
+                            />
+                        </div>
+                    </div>
                     <div className="h-[1px] bg-[var(--border-light)] my-1" />
                     <button
                         onClick={() => {

@@ -4,7 +4,8 @@ import React, { createContext, useContext, useState, useCallback, useRef, ReactN
 import type { AssistantPlan, SanitizedProjectContext } from '../types';
 import { buildSanitizedProjectContext } from '../core/projectContextBuilder';
 import { useAssetStore } from '../../assets/assetStore';
-import { durableGenerationQueue } from '../../ai-assistant-runtime/queue/DurableGenerationQueue.ts';
+import { durableGenerationQueue, type GenerationExecutorResult } from '../../ai-assistant-runtime/queue/DurableGenerationQueue.ts';
+import { resolveAgentGroupBounds, resolveAgentNodeArrangeUpdates } from '../../ai-assistant-runtime/canvas/agentCanvasLayout.ts';
 import { agentRuntimeInstance } from '../../ai-assistant-runtime';
 import { llmService } from '../../../services/llm/LLMService';
 
@@ -33,6 +34,9 @@ interface AITakeoverContextType {
   currentRunId: string | null;
   compressContext: () => Promise<void>;
   isCompressing: boolean;
+  onOpenSettings?: (view?: any) => void;
+  notify?: any;
+  activeCanvas?: any;
 }
 
 const AITakeoverContext = createContext<AITakeoverContextType | null>(null);
@@ -44,9 +48,13 @@ interface AITakeoverProviderProps {
   selectedNodeIds: string[];
   addPromptNode: (node: any) => Promise<void> | void;
   updatePromptNode: (node: any) => Promise<void> | void;
+  updateNodes?: (updates: { promptNodes?: any[]; imageNodes?: any[] }) => void;
   executeGeneration: (node: any) => Promise<void> | void;
   getNextCardPosition: () => { x: number; y: number };
   arrangeAllNodes?: (mode?: 'grid' | 'row' | 'column') => void;
+  addGroup?: (group: any) => void;
+  updateGroup?: (group: any) => void;
+  setNodeTags?: (ids: string[], tags: string[]) => void;
   setConfig: React.Dispatch<React.SetStateAction<any>>;
   onOpenSettings?: (view?: any) => void;
   apiKeyStatus: 'missing' | 'configured_masked' | 'invalid' | 'unknown';
@@ -66,9 +74,13 @@ export function AITakeoverProvider({
   selectedNodeIds,
   addPromptNode,
   updatePromptNode,
+  updateNodes,
   executeGeneration,
   getNextCardPosition,
   arrangeAllNodes,
+  addGroup,
+  updateGroup,
+  setNodeTags,
   setConfig,
   onOpenSettings,
   apiKeyStatus,
@@ -140,25 +152,6 @@ export function AITakeoverProvider({
     }
   }, [messages, selectedModel, isCompressing, notify]);
 
-  // 🤖 动态开场白效果
-  useEffect(() => {
-    if (messages.length <= 1) {
-      const isConfigured = apiKeyStatus !== 'missing';
-      const welcomeText = isConfigured
-        ? `你好！有什么我能帮助你的吗？`
-        : `🤖 接入AI助手api能力会更强。\n\n我目前以本地规则驱动模式运行，为您保障 API 安全。我可以在本地帮您**优化提示词**、**高亮定位卡片**、**诊断常见错误**，并在任务完成时**压缩 ZIP 打包下载**。`;
-
-      setMessages([
-        {
-          id: 'welcome',
-          role: 'assistant',
-          content: welcomeText,
-          timestamp: Date.now()
-        }
-      ]);
-    }
-  }, [apiKeyStatus]);
-
   const [isThinking, setIsThinking] = useState(false);
   const [pendingPlan, setPendingPlan] = useState<AssistantPlan | null>(null);
   const [currentRunId, setCurrentRunId] = useState<string | null>(null);
@@ -223,10 +216,14 @@ export function AITakeoverProvider({
       selectedModel,
       addPromptNode,
       updatePromptNode,
+      updateNodes,
       executeGeneration,
       addToQueue,
       getNextCardPosition,
       arrangeAllNodes,
+      addGroup,
+      updateGroup,
+      setNodeTags,
       setConfig,
       onOpenSettings,
       notify,
@@ -236,7 +233,7 @@ export function AITakeoverProvider({
     };
 
     await agentRuntimeInstance.executePendingRun(runId, ctx);
-  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, executeGeneration, addToQueue, getNextCardPosition, arrangeAllNodes, setConfig, onOpenSettings, notify, config, ecommerceState, onGenerate]);
+  }, [activeCanvas, selectedModel, selectedNodeIds, addPromptNode, updatePromptNode, updateNodes, executeGeneration, addToQueue, getNextCardPosition, arrangeAllNodes, addGroup, updateGroup, setNodeTags, setConfig, onOpenSettings, notify, config, ecommerceState, onGenerate]);
 
 
   // 发送消息
@@ -338,17 +335,25 @@ export function AITakeoverProvider({
   const activeCanvasRef = useRef(activeCanvas);
   const selectedModelRef = useRef(selectedModel);
   const addPromptNodeRef = useRef(addPromptNode);
+  const updateNodesRef = useRef(updateNodes);
   const executeGenerationRef = useRef(executeGeneration);
   const getNextCardPositionRef = useRef(getNextCardPosition);
   const arrangeAllNodesRef = useRef(arrangeAllNodes);
+  const addGroupRef = useRef(addGroup);
+  const updateGroupRef = useRef(updateGroup);
+  const setNodeTagsRef = useRef(setNodeTags);
 
   useEffect(() => {
     activeCanvasRef.current = activeCanvas;
     selectedModelRef.current = selectedModel;
     addPromptNodeRef.current = addPromptNode;
+    updateNodesRef.current = updateNodes;
     executeGenerationRef.current = executeGeneration;
     getNextCardPositionRef.current = getNextCardPosition;
     arrangeAllNodesRef.current = arrangeAllNodes;
+    addGroupRef.current = addGroup;
+    updateGroupRef.current = updateGroup;
+    setNodeTagsRef.current = setNodeTags;
   });
 
   useEffect(() => {
@@ -371,6 +376,15 @@ export function AITakeoverProvider({
             url: sourceImg.url,
             label: sourceImg.name || '参考图'
           });
+        } else {
+          const assetImg = useAssetStore.getState().images.find((img: any) => img.id === options.referenceImageNodeId);
+          if (assetImg?.thumbnailUrl) {
+            referenceImages.push({
+              id: assetImg.id,
+              url: assetImg.thumbnailUrl,
+              label: assetImg.name || 'Reference image'
+            });
+          }
         }
       }
 
@@ -405,7 +419,7 @@ export function AITakeoverProvider({
       });
 
       // 3. 轮询监听该卡片的生成状态（isGenerating 变为 false 时代表成功或失败）
-      return new Promise<string[]>((resolve, reject) => {
+      return new Promise<GenerationExecutorResult>((resolve, reject) => {
         let attempts = 0;
         const interval = setInterval(() => {
           attempts++;
@@ -417,7 +431,12 @@ export function AITakeoverProvider({
               if (node.status === 'failed' || node.error) {
                 reject(new Error(node.error || '生图失败'));
               } else {
-                resolve(node.childImageIds || []);
+                const resultImageNodeIds = node.childImageIds || [];
+                resolve({
+                  promptNodeId: nodeId,
+                  resultImageNodeIds,
+                  nodeIds: [nodeId, ...resultImageNodeIds]
+                } as any);
               }
             }
           } else {
@@ -436,8 +455,78 @@ export function AITakeoverProvider({
     // 注册自动排版 handler
     durableGenerationQueue.registerArrangeHandler(async (nodeIds, options) => {
       console.log('[DurableQueue] Job completed, nodes ready to arrange:', nodeIds);
+      const canvas = activeCanvasRef.current;
+      if (canvas && updateNodesRef.current && nodeIds.length > 0) {
+        const updates = resolveAgentNodeArrangeUpdates(canvas, nodeIds, {
+          mode: options.layout,
+          preset: options.layoutPreset,
+          columns: options.columns,
+          gap: options.gap
+        });
+        updateNodesRef.current(updates);
+        return;
+      }
+
       if (arrangeAllNodesRef.current) {
-        arrangeAllNodesRef.current('grid');
+        arrangeAllNodesRef.current(options.layout || 'grid');
+      }
+    });
+
+    durableGenerationQueue.registerCompletionHandler(async (job, nodeIds) => {
+      const outputGroup = job.outputGroup;
+      if (!outputGroup || nodeIds.length === 0) {
+        return;
+      }
+
+      const canvas = activeCanvasRef.current;
+      if (!canvas) {
+        return;
+      }
+
+      const groupId = outputGroup.groupId || `assistant_batch_group_${job.id}`;
+      outputGroup.groupId = groupId;
+      const tags = Array.from(new Set([
+        'automation',
+        `batch:${job.id}`,
+        ...(outputGroup.tags || [])
+      ]));
+      const nodeIdSet = new Set(nodeIds);
+
+      if (updateNodesRef.current) {
+        updateNodesRef.current({
+          promptNodes: (canvas.promptNodes || [])
+            .filter((node: any) => nodeIdSet.has(node.id))
+            .map((node: any) => ({
+              id: node.id,
+              updates: { tags: Array.from(new Set([...(node.tags || []), ...tags])) }
+            })),
+          imageNodes: (canvas.imageNodes || [])
+            .filter((node: any) => nodeIdSet.has(node.id))
+            .map((node: any) => ({
+              id: node.id,
+              updates: { tags: Array.from(new Set([...(node.tags || []), ...tags])) }
+            }))
+        });
+      } else if (setNodeTagsRef.current) {
+        setNodeTagsRef.current(nodeIds, tags);
+      }
+
+      const bounds = resolveAgentGroupBounds(canvas, nodeIds);
+      const existingGroup = (canvas.groups || []).find((group: any) => group.id === groupId);
+      const nextGroup = {
+        ...(existingGroup || {}),
+        id: groupId,
+        nodeIds: Array.from(new Set([...(existingGroup?.nodeIds || []), ...nodeIds])),
+        bounds,
+        label: outputGroup.label || 'AI batch output',
+        color: outputGroup.color || '#ffffff',
+        type: 'custom'
+      };
+
+      if (existingGroup) {
+        updateGroupRef.current?.(nextGroup);
+      } else {
+        addGroupRef.current?.(nextGroup);
       }
     });
 
@@ -462,7 +551,10 @@ export function AITakeoverProvider({
         setSelectedModel,
         currentRunId,
         compressContext,
-        isCompressing
+        isCompressing,
+        onOpenSettings,
+        notify,
+        activeCanvas
       }}
     >
       {children}

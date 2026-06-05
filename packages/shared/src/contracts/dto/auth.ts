@@ -86,6 +86,22 @@ export interface ReplaceUserApisPayloadRequestDto {
   entries: UserApiEntryDto[];
 }
 
+export type UserApiSecretRecordType = "slot" | "provider" | "entry";
+export type UserApiSecretField = "key" | "apiKey";
+
+export interface RevealUserApiSecretRequestDto {
+  recordType: UserApiSecretRecordType;
+  recordId: string;
+  field: UserApiSecretField;
+}
+
+export interface RevealUserApiSecretResponseDto {
+  recordType: UserApiSecretRecordType;
+  recordId: string;
+  field: UserApiSecretField;
+  secret: string;
+}
+
 export interface KeyManagerCloudRecordDto {
   [key: string]: unknown;
 }

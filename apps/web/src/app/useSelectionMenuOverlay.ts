@@ -154,6 +154,7 @@ export function useSelectionMenuOverlay({
         height: (maxY - minY) + padding + topExtra + bottomExtra,
       },
       label: mergedLabel,
+      color: '#ffffff',
       type: 'custom',
     };
 

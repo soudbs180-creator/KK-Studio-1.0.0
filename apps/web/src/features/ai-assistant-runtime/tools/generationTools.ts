@@ -2,7 +2,80 @@
 
 import type { AgentToolDefinition } from './ToolRegistry.ts';
 import { durableGenerationQueue } from '../queue/DurableGenerationQueue.ts';
-import type { BatchGenerationPlan } from '../../ai-takeover/types.ts';
+import type { AssistantOutputGroupPlan, BatchGenerationPlan } from '../../ai-takeover/types.ts';
+
+type BatchLayoutPreset = 'grid' | 'row' | 'column' | 'compact-grid';
+
+const normalizeLayoutOptions = (params: {
+  count: number;
+  layoutPreset?: BatchLayoutPreset;
+  layout?: 'grid' | 'row' | 'column';
+  columns?: number;
+  gap?: number;
+}) => {
+  const preset = params.layoutPreset || params.layout || 'grid';
+  const layout = preset === 'compact-grid' ? 'grid' : preset;
+  const columns = Number.isFinite(params.columns)
+    ? Math.max(1, Math.floor(Number(params.columns)))
+    : preset === 'compact-grid'
+      ? Math.max(1, Math.min(4, params.count))
+      : undefined;
+  const gap = Number.isFinite(params.gap)
+    ? Math.max(0, Number(params.gap))
+    : preset === 'compact-grid'
+      ? 24
+      : undefined;
+
+  return {
+    layout: layout as 'grid' | 'row' | 'column',
+    layoutPreset: preset,
+    columns,
+    gap
+  };
+};
+
+const createDefaultOutputGroup = (params: {
+  label?: string;
+  jobId?: string;
+  tags?: string[];
+}): AssistantOutputGroupPlan => ({
+  label: params.label || 'AI batch output',
+  color: '#ffffff',
+  includePromptNodes: true,
+  tags: Array.from(new Set(['automation', ...(params.jobId ? [`batch:${params.jobId}`] : []), ...(params.tags || [])]))
+});
+
+const buildQueueOptions = (params: {
+  selectedModel: any;
+  count: number;
+  aspectRatio?: string;
+  imageSize?: string;
+  countPerPrompt?: number;
+  concurrency?: number;
+  layoutPreset?: BatchLayoutPreset;
+  layout?: 'grid' | 'row' | 'column';
+  columns?: number;
+  gap?: number;
+  outputGroup?: AssistantOutputGroupPlan;
+}) => {
+  const layoutOptions = normalizeLayoutOptions({
+    count: params.count,
+    layoutPreset: params.layoutPreset,
+    layout: params.layout,
+    columns: params.columns,
+    gap: params.gap
+  });
+
+  return {
+    modelId: params.selectedModel?.id || 'gemini-2.5-flash',
+    aspectRatio: params.aspectRatio || '1:1',
+    imageSize: params.imageSize || '1K',
+    countPerPrompt: params.countPerPrompt || 1,
+    concurrency: params.concurrency || 3,
+    ...layoutOptions,
+    outputGroup: params.outputGroup
+  };
+};
 
 export const generationTools: AgentToolDefinition[] = [
   // 1. startGeneration - 启动绘图
@@ -82,17 +155,23 @@ export const generationTools: AgentToolDefinition[] = [
           referenceImageNodeId: imageId
         }));
 
+        const outputGroup = plan.outputGroup || createDefaultOutputGroup({
+          label: plan.taskDomain === 'ecommerce' ? 'AI ecommerce batch' : 'AI batch output',
+          jobId: plan.id,
+          tags: ['batch:' + plan.id]
+        });
         const job = durableGenerationQueue.createJob(
           prompts,
-          {
-            modelId: selectedModel?.id || 'gemini-2.5-flash',
-            aspectRatio: '1:1',
-            imageSize: '1K',
-            countPerPrompt: 1,
-            concurrency: 3,
-            layout: 'grid'
-          },
-          activeCanvas?.id || 'default'
+          buildQueueOptions({
+            selectedModel,
+            count,
+            aspectRatio: String(plan.aspectRatio || '1:1'),
+            countPerPrompt: plan.output.countPerImage,
+            layoutPreset: plan.layoutPreset,
+            outputGroup
+          }),
+          activeCanvas?.id || 'default',
+          plan.id
         );
 
         notify.success('批量生成计划已提交', `任务已加入持久化队列 (Job ID: ${job.id})，共 ${count} 张图`);
@@ -157,14 +236,19 @@ export const generationTools: AgentToolDefinition[] = [
 
       const job = durableGenerationQueue.createJob(
         formattedPrompts,
-        {
-          modelId: selectedModel?.id || 'gemini-2.5-flash',
+        buildQueueOptions({
+          selectedModel,
+          count: formattedPrompts.length,
           aspectRatio: options?.aspectRatio || '1:1',
           imageSize: options?.imageSize || '1K',
           countPerPrompt: options?.countPerPrompt || 1,
           concurrency: options?.concurrency || 3,
-          layout: options?.layout || 'grid'
-        },
+          layout: options?.layout || 'grid',
+          layoutPreset: options?.layoutPreset,
+          columns: options?.columns,
+          gap: options?.gap,
+          outputGroup: options?.outputGroup
+        }),
         activeCanvas?.id || 'default',
         idempotencyKey
       );
@@ -174,7 +258,72 @@ export const generationTools: AgentToolDefinition[] = [
     }
   },
 
-  // 5. generation.pauseJob - 暂停批量生图任务
+  // 5. ecommerce.createBatchTransformJob - Ecommerce batch adapter
+  {
+    name: 'ecommerce.createBatchTransformJob',
+    description: 'Create an ecommerce batch image transform job from imported images or canvas image nodes.',
+    permission: 'confirm',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        imageIds: { type: 'array', items: { type: 'string' } },
+        rawUserRequest: { type: 'string' },
+        aspectRatio: { type: 'string' },
+        layoutPreset: { type: 'string', enum: ['grid', 'row', 'column', 'compact-grid'] },
+        outputGroup: { type: 'object' },
+        idempotencyKey: { type: 'string' }
+      },
+      required: ['rawUserRequest']
+    },
+    handler: async (input: {
+      imageIds?: string[];
+      rawUserRequest: string;
+      aspectRatio?: string;
+      layoutPreset?: BatchLayoutPreset;
+      outputGroup?: AssistantOutputGroupPlan;
+      idempotencyKey?: string;
+    }, ctx) => {
+      const { activeCanvas, selectedModel, notify } = ctx;
+      const imageIds = Array.isArray(input.imageIds) && input.imageIds.length > 0
+        ? input.imageIds
+        : (activeCanvas?.imageNodes || []).map((image: any) => image.id);
+      if (imageIds.length === 0) {
+        throw new Error('ecommerce.createBatchTransformJob requires imported images or canvas image nodes.');
+      }
+      const prompts = imageIds.map((imageId: string, idx: number) => ({
+        id: 'ecommerce_prompt_item_' + Date.now() + '_' + idx + '_' + Math.random().toString(36).substring(2, 9),
+        prompt: input.rawUserRequest,
+        referenceImageNodeId: imageId
+      }));
+      const outputGroup = input.outputGroup || createDefaultOutputGroup({
+        label: 'AI ecommerce batch',
+        tags: ['ecommerce']
+      });
+
+      const job = durableGenerationQueue.createJob(
+        prompts,
+        buildQueueOptions({
+          selectedModel,
+          count: prompts.length,
+          aspectRatio: input.aspectRatio || '4:5',
+          layoutPreset: input.layoutPreset || 'compact-grid',
+          outputGroup
+        }),
+        activeCanvas?.id || 'default',
+        input.idempotencyKey
+      );
+
+      notify.success('电商批量任务已创建', `Job ID: ${job.id}，共 ${prompts.length} 张参考图。`);
+      return {
+        id: job.id,
+        status: job.status,
+        promptCount: job.prompts.length,
+        outputGroup: job.outputGroup
+      };
+    }
+  },
+
+  // 6. generation.pauseJob - 暂停批量生图任务
   {
     name: 'generation.pauseJob',
     description: '暂停指定的批量生图任务',
@@ -238,6 +387,7 @@ export const generationTools: AgentToolDefinition[] = [
         failedCount: job.prompts.filter(prompt => prompt.status === 'failed').length,
         runningCount: job.prompts.filter(prompt => prompt.status === 'running').length,
         queuedCount: job.prompts.filter(prompt => prompt.status === 'queued').length,
+        outputGroup: job.outputGroup,
         updatedAt: job.updatedAt
       };
     }

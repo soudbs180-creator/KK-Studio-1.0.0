@@ -35,7 +35,8 @@ const CONFIRM_ACTIONS = [
   'deleteCard',
   'overwriteOutput',
   'publishProject',
-  'generation.createBatchJob' // 新别名工具也应被强确认拦截
+  'generation.createBatchJob',
+  'ecommerce.createBatchTransformJob'
 ];
 
 export class AgentPermissionPolicy {

@@ -12,8 +12,8 @@
    - 关联工具：`assets.zipOriginals`
 
 2. **[批量重绘生图 Skill (batch-generate-to-canvas)](skills/batch-generate-to-canvas.md)**
-   - 职责：绑定图片资源文件夹依次发起重绘生成，并基于持久化生成队列驱动与控制任务（暂停、恢复、取消）。
-   - 关联工具：`generation.createBatchJob`
+   - 职责：绑定已导入资源池/图片集合发起批量重绘生成，支持电商紧凑布局、比例提取、输出自动打组，并基于持久化生成队列驱动与控制任务（暂停、恢复、取消）。
+   - 关联工具：`generation.createBatchJob`, `ecommerce.createBatchTransformJob`
 
 3. **[整理卡片布局 Skill (arrange-selected-cards)](skills/arrange-selected-cards.md)**
    - 职责：对画布上被选中卡片进行智能自动排列。
@@ -42,6 +42,10 @@
 9. **[单图生图 Skill (single-generate-to-canvas)](skills/single-generate-to-canvas.md)**
    - 职责：规范单个提示词的出图与排队机制，进行成本估算确认。
    - 关联工具：`generation.start`
+
+10. **[快速打开设置功能 Skill (quick-open-settings-view)](skills/quick-open-settings-view.md)**
+   - 职责：把“帮我打开个人中心 / API / 日志 / 存储 / 计费”等本地导航指令直接映射到底层设置路由能力。
+   - 关联工具：`ui.openSettings`
 
 ---
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { type GeneratedImage, GenerationMode, type RedrawRequest, type ReferenceImage } from '../../types';
-import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy, Sparkles, Trash2 } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw, Pen, Copy, Sparkles, Trash2, Heart } from 'lucide-react';
 import { useNavigate, useInRouterContext } from 'react-router-dom';
 import { resolveRedrawRouteAndModel } from '../../services/api/capabilityRouteAssignments';
 
@@ -19,6 +19,7 @@ import { clampGenerationDurationMs, formatGenerationDurationSeconds } from '../.
 import { pickByDocumentLanguage } from '../../utils/localeText';
 import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 import { safeOpenLink } from '../../utils/browserUtils';
+import { useFavoritesStore } from '../../features/favorites';
 
 interface GlobalLightboxProps {
     images: GeneratedImage[];
@@ -52,6 +53,9 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     const [redrawWorkspaceMode, setRedrawWorkspaceMode] = useState<'fresh' | 'regenerate' | null>(null);
     const [regenerateReferenceImages, setRegenerateReferenceImages] = useState<ReferenceImage[]>([]);
     const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+    const favoriteItems = useFavoritesStore(state => state.items);
+    const addImageFavorite = useFavoritesStore(state => state.addImageFavorite);
+    const removeFavorite = useFavoritesStore(state => state.removeFavorite);
     const [isMobile, setIsMobile] = useState(() =>
         typeof window !== 'undefined' ? isPhoneResponsiveWidth(window.innerWidth) : false
     );
@@ -67,6 +71,16 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
     const sourceSessionRef = useRef(0);
 
     const image = images[currentIndex];
+    const imageFavorite = favoriteItems.find(item => (
+        item.kind === 'favorite-image'
+        && (
+            item.sourceImageId === image.id
+            || (!!image.storageId && item.storageId === image.storageId)
+            || (!!image.originalUrl && item.originalUrl === image.originalUrl)
+            || (!!image.apiResultUrl && item.apiResultUrl === image.apiResultUrl)
+            || (!!image.url && item.url === image.url)
+        )
+    ));
     const currentRedrawSourceId = image?.redraw?.sourceImageId || image?.partialRedraw?.sourceImageId;
     const sourceImageForRegenerate = currentRedrawSourceId
         ? images.find((item) => item.id === currentRedrawSourceId)
@@ -759,6 +773,15 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
         void handleSingleDownload(e);
     };
 
+    const handleToggleFavorite = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (imageFavorite) {
+            void removeFavorite(imageFavorite.id);
+            return;
+        }
+        void addImageFavorite(image);
+    };
+
     const handleCopyOriginal = async (e: React.MouseEvent) => {
         e.stopPropagation();
 
@@ -1125,6 +1148,15 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
 
                           {/* 第二排：业务操作按钮（使用 flex-wrap 弹性多排包裹自适应） */}
                           <div className="flex flex-wrap w-full items-center gap-2">
+                              <button
+                                  onClick={handleToggleFavorite}
+                                  className={`${actionButtonClass} ${imageFavorite ? 'border-[var(--accent-coral)] text-[var(--accent-coral)]' : 'hover:border-[var(--accent-coral)] hover:text-[var(--accent-coral)]'} flex-1 justify-center`}
+                                  title={imageFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                                  aria-pressed={Boolean(imageFavorite)}
+                              >
+                                  <Heart size={16} fill={imageFavorite ? 'currentColor' : 'none'} />
+                                  Favorite
+                              </button>
                               {onUseAsSource && !isVideo && !isAudio && (
                                   <button
                                       onClick={(e) => {
@@ -1237,6 +1269,16 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                               <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }} className="p-2 hover:bg-[var(--bg-secondary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-1 border-l border-[var(--border-light)]" title="重置"><RotateCcw size={16} /></button>
                           </div>
    
+                          <button
+                              onClick={handleToggleFavorite}
+                              className={`${actionButtonClass} ${imageFavorite ? 'border-[var(--accent-coral)] text-[var(--accent-coral)]' : 'hover:border-[var(--accent-coral)] hover:text-[var(--accent-coral)]'}`}
+                              title={imageFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                              aria-pressed={Boolean(imageFavorite)}
+                          >
+                              <Heart size={16} fill={imageFavorite ? 'currentColor' : 'none'} />
+                              Favorite
+                          </button>
+
                           {/* Continue generation / Use as source action */}
                           {onUseAsSource && !isVideo && !isAudio && (
                               <button

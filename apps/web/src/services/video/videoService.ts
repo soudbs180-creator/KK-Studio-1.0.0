@@ -13,6 +13,7 @@
  */
 
 import { getModelCapabilities } from '../model/modelCapabilities';
+import { getApiKeyToken } from '../api/apiConfig';
 
 export interface VideoGenerationConfig {
     prompt: string;
@@ -49,6 +50,11 @@ export async function generateVideo(
     onProgress?: (status: string) => void,
     signal?: AbortSignal
 ): Promise<VideoGenerationResult> {
+    const apiKeyToken = getApiKeyToken(apiKey);
+    if (!apiKeyToken) {
+        throw new Error('Saved API key is empty or unavailable. Re-enter or reveal the real API key before retrying.');
+    }
+
     const startTime = Date.now();
     const model = config.model || 'veo-3.1-generate-preview';
     const images = config.referenceImages || [];
@@ -158,7 +164,7 @@ export async function generateVideo(
     // 确保包含版本号 (通常是 v1beta)
     const apiBase = cleanBase.includes('/v1') ? cleanBase : `${cleanBase}/v1beta`;
 
-    return await executeVideoGeneration(requestBody, apiKey, model, apiBase, onProgress, signal, startTime, mode);
+    return await executeVideoGeneration(requestBody, apiKeyToken, model, apiBase, onProgress, signal, startTime, mode);
 }
 
 /**
@@ -174,6 +180,10 @@ async function executeVideoGeneration(
     startTime: number,
     mode: VideoGenerationResult['mode']
 ): Promise<VideoGenerationResult> {
+    apiKey = getApiKeyToken(apiKey);
+    if (!apiKey) {
+        throw new Error('Saved API key is empty or unavailable. Re-enter or reveal the real API key before retrying.');
+    }
 
     // 1. 发起生成请求
     onProgress?.('开始视频生成...');
@@ -287,6 +297,11 @@ export async function downloadVideoWithAuth(
     signal?: AbortSignal,
     maxRetries = 3
 ): Promise<Blob> {
+    apiKey = getApiKeyToken(apiKey);
+    if (!apiKey) {
+        throw new Error('Saved API key is empty or unavailable. Re-enter or reveal the real API key before retrying.');
+    }
+
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {

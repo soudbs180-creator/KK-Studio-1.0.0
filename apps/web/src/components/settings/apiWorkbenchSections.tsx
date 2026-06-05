@@ -1240,7 +1240,7 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
               className="settings-capability-card settings-reference-card--soft" 
               style={{
                 ...SETTINGS_OVERLAY_STYLE,
-                minHeight: '480px',
+                minHeight: item.role === 'assistant' ? '420px' : item.role === 'ppt_generation' ? '340px' : '312px',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'flex-start',
@@ -1278,7 +1278,7 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                 {item.description}
               </div>
 
-              <div className="space-y-3.5 flex-1 flex flex-col justify-start mt-2">
+              <div className="space-y-3.5 mt-2">
                 {/* Row 1: 主链路 */}
                 <div className="h-[52px]">
                   <SettingSelect
@@ -1319,9 +1319,9 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                   />
                 </div>
 
-                {/* Row 4: 图片路由双栏 / OCR大按钮 / 占位 */}
-                <div className="h-[52px]">
-                  {item.role === 'assistant' ? (
+                {/* Row 4: AI 助手图片路由 / PPT OCR 参数 */}
+                {item.role === 'assistant' ? (
+                  <div className="h-[52px]">
                     <div className="grid grid-cols-2 gap-2 w-full">
                       <SettingSelect
                         label={pick('图片链路', 'Image route')}
@@ -1338,7 +1338,9 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                         disabled={!item.enabled}
                       />
                     </div>
-                  ) : item.role === 'ppt_generation' ? (
+                  </div>
+                ) : item.role === 'ppt_generation' ? (
+                  <div className="h-[52px]">
                     <button
                       type="button"
                       onClick={item.onOcrClick}
@@ -1351,14 +1353,12 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                       </span>
                       <ChevronDown size={14} className="-rotate-90 text-[var(--text-secondary)] shrink-0" />
                     </button>
-                  ) : (
-                    <div className="h-[52px] pointer-events-none opacity-0 select-none" />
-                  )}
-                </div>
+                  </div>
+                ) : null}
 
-                {/* Row 5: 图片备用路由双栏 / 占位 */}
-                <div className="h-[52px]">
-                  {item.role === 'assistant' ? (
+                {/* Row 5: AI 助手图片备用路由 */}
+                {item.role === 'assistant' ? (
+                  <div className="h-[52px]">
                     <div className="grid grid-cols-2 gap-2 w-full">
                       <SettingSelect
                         label={pick('图片备用链路', 'Image fallback route')}
@@ -1375,10 +1375,8 @@ export const ApiWorkbenchCapabilitySection: React.FC<ApiWorkbenchCapabilitySecti
                         disabled={!item.enabled}
                       />
                     </div>
-                  ) : (
-                    <div className="h-[52px] pointer-events-none opacity-0 select-none" />
-                  )}
-                </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           ))}

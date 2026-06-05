@@ -2,6 +2,18 @@
 
 import type { AspectRatio, ImageSize, GenerationMode } from '../../types';
 
+export type AssistantBatchTaskDomain = 'general' | 'ecommerce';
+export type AssistantBatchLayoutPreset = 'grid' | 'row' | 'column' | 'compact-grid';
+
+export interface AssistantOutputGroupPlan {
+  groupId?: string;
+  label: string;
+  color: string;
+  includePromptNodes: boolean;
+  tags: string[];
+  nodeIds?: string[];
+}
+
 // 意图枚举
 export type AssistantIntent =
   | 'help'                         // 帮助/问答
@@ -19,6 +31,8 @@ export type AssistantIntent =
   | 'create_card'                  // 帮我建卡
   | 'change_generation_mode'       // 切换生成模式
   | 'complex_sequence'             // 连续复合多步任务（如生图再生成视频）
+  | 'open_logs'                    // 打开/查看系统日志
+  | 'open_settings_view'           // 快速打开设置页子功能
   | 'unknown';
 
 // 意图分析结果
@@ -33,6 +47,12 @@ export interface IntentResult {
     fileIds?: string[];            // 关联的文件 ID 列表
     cardQuery?: string;            // 查找卡片的关键字
     downloadScope?: string;        // 下载范围
+    prompt?: string;               // 直接发送生成时提取的提示词
+    settingsView?: string;         // 设置页子功能 ID
+    taskDomain?: AssistantBatchTaskDomain;
+    aspectRatio?: AspectRatio | string;
+    layoutPreset?: AssistantBatchLayoutPreset;
+    outputGroup?: AssistantOutputGroupPlan;
   };
   risk: 'none' | 'low' | 'cost' | 'upload' | 'destructive';
   needsConfirmation: boolean;      // 是否需要强确认卡片
@@ -46,6 +66,8 @@ export type AssistantAction =
   | { type: 'fillPrompt'; payload: { prompt: string; negativePrompt?: string; modelId?: string } }
   | { type: 'startGeneration'; payload: { prompt: string; count: number; options?: any } }
   | { type: 'startBatchGeneration'; payload: { plan: BatchGenerationPlan } }
+  | { type: 'generation.createBatchJob'; payload: { prompts: any[]; options?: any; idempotencyKey?: string } }
+  | { type: 'ecommerce.createBatchTransformJob'; payload: { imageIds?: string[]; rawUserRequest: string; aspectRatio?: string; layoutPreset?: AssistantBatchLayoutPreset; outputGroup?: AssistantOutputGroupPlan; idempotencyKey?: string } }
   | { type: 'locateCard'; payload: { keyword: string } }
   | { type: 'highlightElement'; payload: { selector: string } }
   | { type: 'openSettings'; payload: { tab: string } }
@@ -83,6 +105,9 @@ export interface BatchGenerationPlan {
   id: string;
   sourceCollectionId: string;
   imageIds: string[];
+  taskDomain?: AssistantBatchTaskDomain;
+  aspectRatio?: AspectRatio | string;
+  layoutPreset?: AssistantBatchLayoutPreset;
   promptStrategy: {
     mode: 'single_template' | 'per_image_filename' | 'per_image_ai';
     templateId?: string;
@@ -100,6 +125,7 @@ export interface BatchGenerationPlan {
   };
   costPolicy: CostPolicy;
   confirmationRequired: boolean;
+  outputGroup?: AssistantOutputGroupPlan;
 }
 
 // 资源种类
@@ -291,6 +317,15 @@ export interface CanvasRuntimeState {
     groupIds: string[];
     count: number;
   };
+  groups: Array<{
+    id: string;
+    label?: string;
+    hidden: boolean;
+    collapsed: boolean;
+    color?: string;
+    nodeCount: number;
+    tags?: string[];
+  }>;
   selectedNodes: {
     prompts: Array<{
       id: string;

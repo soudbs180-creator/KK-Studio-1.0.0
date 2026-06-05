@@ -23,6 +23,9 @@ test('工具注册表：已注册工具清单检查', () => {
   assert.ok(toolRegistryInstance.getTool('assets.zipOriginals'));
   assert.ok(toolRegistryInstance.getTool('generation.createBatchJob'));
   assert.ok(toolRegistryInstance.getTool('generation.getJobStatus'));
+  const ecommerceBatchTool = toolRegistryInstance.getTool('ecommerce.createBatchTransformJob');
+  assert.ok(ecommerceBatchTool);
+  assert.equal(ecommerceBatchTool.permission, 'confirm');
   assert.ok(toolRegistryInstance.getTool('knowledge.searchProject'));
   assert.ok(toolRegistryInstance.getTool('knowledge.recordChange'));
   assert.ok(toolRegistryInstance.getTool('ui.recordLayoutChange'));
@@ -143,6 +146,73 @@ test('工具注册表：canvas.arrangeNodes 调用注入的画布整理能力', 
   assert.equal(arrangedMode, 'row');
   assert.equal(result.status, 'arranged');
   assert.equal(result.selectedCount, 1);
+});
+
+test('ToolRegistry: canvas.arrangeNodes supports targeted compact node layout', async () => {
+  let updatePayload: any = null;
+  let arrangeAllCalled = false;
+  const result = await toolRegistryInstance.execute('canvas.arrangeNodes', {
+    nodeIds: ['p1', 'img1'],
+    preset: 'compact-grid',
+    columns: 2,
+    gap: 24
+  }, {
+    activeCanvas: {
+      id: 'canvas-1',
+      promptNodes: [
+        { id: 'p1', prompt: 'test', position: { x: 0, y: 180 }, height: 180, childImageIds: [] }
+      ],
+      imageNodes: [
+        { id: 'img1', url: 'blob:1', position: { x: 400, y: 360 }, aspectRatio: '4:5' }
+      ],
+      groups: [],
+      selectedNodeIds: []
+    },
+    updateNodes: (updates: any) => {
+      updatePayload = updates;
+    },
+    arrangeAllNodes: () => {
+      arrangeAllCalled = true;
+    },
+    notify: {
+      success: () => {}
+    }
+  });
+
+  assert.equal(result.status, 'arranged');
+  assert.equal(result.preset, 'compact-grid');
+  assert.equal(result.selectedCount, 2);
+  assert.equal(arrangeAllCalled, false);
+  assert.equal(updatePayload.promptNodes.length, 1);
+  assert.equal(updatePayload.imageNodes.length, 1);
+});
+
+test('ToolRegistry: ecommerce batch transform tool creates a grouped durable job', async () => {
+  const result = await toolRegistryInstance.execute('ecommerce.createBatchTransformJob', {
+    imageIds: ['img-1', 'img-2'],
+    rawUserRequest: 'compact ecommerce layout',
+    aspectRatio: '4:5',
+    layoutPreset: 'compact-grid',
+    idempotencyKey: 'tool-registry-ecommerce-batch'
+  }, {
+    activeCanvas: {
+      id: 'canvas-1',
+      imageNodes: [
+        { id: 'img-1', url: 'blob:1', position: { x: 0, y: 0 }, aspectRatio: '1:1' },
+        { id: 'img-2', url: 'blob:2', position: { x: 300, y: 0 }, aspectRatio: '1:1' }
+      ],
+      promptNodes: [],
+      groups: []
+    },
+    selectedModel: { id: 'test-model' },
+    notify: {
+      success: () => {}
+    }
+  });
+
+  assert.equal(result.promptCount, 2);
+  assert.equal(result.outputGroup.color, '#ffffff');
+  assert.equal(result.outputGroup.includePromptNodes, true);
 });
 
 test('ToolRegistry: assets.resolveOriginals returns selected original source summary', async () => {

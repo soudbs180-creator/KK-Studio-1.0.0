@@ -9,6 +9,10 @@
 | 功能组件 | CSS 选择器 / 标识符 | 描述 |
 | :--- | :--- | :--- |
 | **API 设置面板** | `.settings-api-management` / `#settings-panel` | 系统设置中的 API 密钥管理面板 |
+| **系统日志面板** | `action://open-settings-logs` / `system-logs` | AI 接管与聊天 action 链接可直接打开系统日志维护面板 |
+| **个人中心设置页** | `user-profile` / `/settings/user-profile` | 设置页中的个人中心入口，AI 助手通过 `openSettings({ tab: 'user-profile' })` 打开 |
+| **设置功能路由** | `dashboard` / `api-management` / `consumption-records` / `storage-settings` / `system-logs` / `user-profile` | AI 助手快速导航的稳定功能 ID；UI 按钮位置变化时仍以这些 ID 调用底层能力 |
+| **能力分配卡片** | `[data-testid="settings-workbench-capability"]` / `.settings-capability-card` | API 工作台高级模式的能力路由分配卡片，非 AI 助手卡片不保留不可见占位行 |
 | **大卡片输入区** | `.input-bar` / `textarea` | 底部生图与聊天输入框 |
 | **项目列表侧边栏** | `.project-manager-sidebar` | 左侧项目与画布切换面板 |
 | **AI 接管激活按钮** | `#btn-ai-takeover-toggle` | 底部输入区旁的 AI 接管按钮 |
@@ -22,3 +26,32 @@
 ## 2. UI 变更通知原则
 
 当开发人员修改或重构上述 DOM 的 id、class 或相对位置时，**必须**在此文件中同步更新，防止 AI 助手的 `highlightElement` 与聚焦指令失效。
+
+AI 助手默认控制底层功能线路而不是 UI 坐标：打开设置页、提交生成、整理卡片、批量生成等操作应优先调用 ToolRegistry 或 Context API。按钮移动到别的位置时，需要更新本 UI Map 和对应 Skill/Runbook，但不应改变 `ui.openSettings`、`generation.submitComposer` 等工具语义。
+
+## 3. Canvas Group Controls - 2026-06-05
+
+| Component | Selector / State | Assistant meaning |
+| :--- | :--- | :--- |
+| Manual canvas group frame | `.group-container` | Expanded group shell. `group.color` renders as a weak inner glow, defaulting to `#ffffff`; it is not a hard border stroke. |
+| Collapsed canvas group strip | `.canvas-group-collapsed-card` | Compact storage strip. `group.collapsed=true` removes member cards from render queues until expanded. |
+| Group toolbar eye button | `group.hidden` | Visual hide/blur only. It keeps member nodes rendered and applies a blurred overlay; it must not call the collapse helper. |
+| Group toolbar archive button | `group.collapsed` | Collapses the group into a single strip. This is the only toolbar action that hides member nodes from render queues. |
+| Group context menu | right-click on group frame | Rename remains in the right-click menu. Glow color selection also lives here; do not add a separate settings button for this. |
+| Hidden group title | centered overlay label | When `group.hidden=true`, render the group label in the center of the blurred group. Size is computed from group bounds and zoom, with truncation to avoid overflow. |
+
+Runtime note: hidden groups are raised above their member cards so the blur overlay can visually cover cards. Dragging a group writes member positions into `liveNodePositionByIdRef` before committing `moveSelectedNodesImmediate`, preventing the group frame from moving ahead of its cards.
+
+## 4. Favorites And @ References - 2026-06-05
+
+| Component | Selector / State | Assistant meaning |
+| :--- | :--- | :--- |
+| Desktop favorites rail button | `[data-testid="project-manager-favorites"]` / `#project-manager-favorites` | Opens the global favorites surface from the left ProjectManager tool rail, directly below search. |
+| Mobile favorites entry | `[data-testid="mobile-more-menu-favorites"]` | Opens favorites from the More sheet. It is not a bottom tab. |
+| Favorites panel | `[data-testid="favorites-panel"]` / `.workspace-favorites-panel` | Global liked library for favorite images and prompts. It supports search, sort, insert, rename/edit, and delete. |
+| Reference mention panel | `[data-testid="reference-mention-panel"]` / `.reference-mention-panel` | Opens while a registered composer has an active `@` token. Tabs are Uploaded, Tags, and Liked. |
+| Canvas prompt composer | composer id `promptbar` | Default focused composer. Prompt favorites insert text; image references insert `@name` and add attachable images to `config.referenceImages`. |
+| Chat assistant composer | composer id `assistant` | Inserts `@name` into the chat input and attaches selected images/files as assistant context when available. |
+| AI takeover dock composer | composer id `ai-dock` | Inserts `@name` into the dock input and uses the takeover resource pool as context. |
+
+Rule: favorites are global browser/app state. Workspace mirroring, when a file-system handle exists, writes `favorites/manifest.json`, `favorites/originals/`, and `favorites/thumbnails/` without deleting canvas originals.

@@ -77,7 +77,7 @@ const MobileResultStandardEmptySkeleton: React.FC<{ columnCount: number }> = ({ 
   return (
     <div
       data-testid="mobile-result-empty-standard-skeleton"
-      className="min-h-0 flex-1 rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-3"
+      className="min-h-0 flex-1 rounded-[20px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-3"
     >
       <div
         className="grid h-full min-h-[190px] gap-2.5 overflow-hidden"
@@ -105,7 +105,7 @@ const MobileResultStandardEmptySkeleton: React.FC<{ columnCount: number }> = ({ 
 const MobileResultDetailEmptySkeleton: React.FC = () => (
   <div
     data-testid="mobile-result-empty-detail-skeleton"
-    className="min-h-0 flex-1 rounded-[24px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-4"
+    className="min-h-0 flex-1 rounded-[20px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-4"
   >
     <div className="flex h-full min-h-[190px] flex-col gap-3 overflow-hidden">
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-[18px] border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-muted-surface-bg)]/80">
@@ -164,6 +164,37 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
 
   // 简体中文：本地搜索过滤关键词状态
   const [searchQuery, setSearchQuery] = useState('');
+
+  // 简体中文：监听输入法/输入框的聚焦状态，以在软键盘弹出时隐藏悬浮按钮，防止误触和穿模
+  const [isInputActive, setIsInputActive] = useState(false);
+
+  React.useEffect(() => {
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+        setIsInputActive(true);
+      }
+    };
+
+    const handleFocusOut = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+        setTimeout(() => {
+          const activeEl = document.activeElement;
+          if (!activeEl || (activeEl.tagName !== 'INPUT' && activeEl.tagName !== 'TEXTAREA')) {
+            setIsInputActive(false);
+          }
+        }, 100);
+      }
+    };
+
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+    return () => {
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+    };
+  }, []);
 
   // 简体中文：定义多选状态与选中条目的 Set 集合，以便进行批量操作
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
@@ -592,7 +623,13 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
       </div>
 
       {/* 底部悬浮操作与模式切换控制区，多选模式下切换为批量操作栏 */}
-      <div className="absolute bottom-0 inset-x-0 z-20 flex items-end justify-between gap-4 px-4 pb-4 pt-4 select-none pointer-events-none">
+      <div 
+        className={`absolute bottom-0 inset-x-0 z-20 flex items-end justify-between gap-4 px-4 pb-4 pt-4 select-none pointer-events-none transition-all duration-300 transform ${
+          isInputActive 
+            ? 'opacity-0 pointer-events-none translate-y-6' 
+            : 'opacity-100'
+        }`}
+      >
         <div 
           className="absolute inset-0 -z-10"
           style={{
@@ -694,8 +731,14 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                 {hasSelectedSource ? `${counterLabel} / ${selectedSourceLabel}` : counterLabel}
               </div>
             </div>
+            {/* 简体中文：打包模式切换与回底按钮的一体化磨砂圆角容器，通过 pointer-events-auto 和事件冒泡拦截，彻底杜绝穿模点击 */}
             <div 
-              className="flex shrink-0 touch-manipulation items-center gap-2 pointer-events-auto"
+              className="flex shrink-0 touch-manipulation items-center gap-1.5 pointer-events-auto rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)]/45 p-1 text-[11px] font-medium shadow-lg"
+              style={{
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.25)',
+              }}
               onPointerDown={stopMobileResultControlEvent}
               onMouseDown={stopMobileResultControlEvent}
               onClick={stopMobileResultControlEvent}
@@ -703,7 +746,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
               onTouchEnd={stopMobileResultControlEvent}
             >
               {/* 模式切换胶囊 */}
-              <div className="flex rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] p-0.5 text-[11px] font-medium text-[var(--text-primary)] shadow-sm">
+              <div className="flex rounded-full bg-black/10 dark:bg-white/5 p-0.5 text-[11px] font-medium text-[var(--text-primary)]">
                 {(['standard', 'detail'] as ResultViewMode[]).map((mode) => (
                   <button
                     key={mode}
@@ -714,7 +757,9 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                       onViewModeChange(mode);
                     }}
                     className={`rounded-full px-3 py-1 transition-all duration-150 ${
-                      viewMode === mode ? 'bg-[var(--mobile-clay-active-bg)] border border-[var(--mobile-clay-active-border)] text-[var(--text-primary)] font-bold shadow-sm' : 'text-[var(--text-secondary)] active:text-[var(--text-primary)] active:bg-[var(--mobile-clay-muted-surface-bg)]'
+                      viewMode === mode 
+                        ? 'bg-[var(--mobile-clay-active-bg)] border border-[var(--mobile-clay-active-border)] text-white font-bold shadow-sm' 
+                        : 'text-[var(--text-secondary)] active:text-[var(--text-primary)]'
                     }`}
                   >
                     {mode === 'detail' ? pick('详细', 'Detail') : pick('标准', 'Standard')}
@@ -731,7 +776,7 @@ const MobileResultFeed: React.FC<MobileResultFeedProps> = ({
                   bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
                 }}
                 title={pick('回到底部', 'Scroll to Bottom')}
-                className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--mobile-clay-border)] bg-[var(--mobile-clay-surface-bg)] text-[var(--text-primary)] shadow-sm hover:text-[var(--text-primary)] active:scale-90 active:bg-[var(--mobile-clay-active-bg)] transition-all duration-150"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-black/10 dark:bg-white/5 text-[var(--text-primary)] shadow-sm hover:text-[var(--text-primary)] active:scale-90 active:bg-[var(--mobile-clay-active-bg)] transition-all duration-150"
               >
                 <ArrowDown size={14} />
               </button>

@@ -1,5 +1,20 @@
 // 简体中文：持久化批量任务生成队列 (Durable Generation Queue)
 
+export interface GenerationBatchOutputGroup {
+  groupId?: string;
+  label: string;
+  color: string;
+  includePromptNodes?: boolean;
+  tags?: string[];
+  nodeIds?: string[];
+}
+
+export interface GenerationExecutorResult {
+  promptNodeId?: string;
+  resultImageNodeIds: string[];
+  nodeIds?: string[];
+}
+
 export interface GenerationBatchJob {
   id: string;
   idempotencyKey: string;
@@ -23,9 +38,11 @@ export interface GenerationBatchJob {
     countPerPrompt: number;
     concurrency: number;
     layout: 'grid' | 'row' | 'column';
+    layoutPreset?: 'grid' | 'row' | 'column' | 'compact-grid';
     columns?: number;
     gap?: number;
   };
+  outputGroup?: GenerationBatchOutputGroup;
   createdAt: number;
   updatedAt: number;
 }
@@ -83,10 +100,43 @@ const normalizeConcurrency = (value: unknown): number => {
   return Math.min(Math.floor(numeric), MAX_CONCURRENCY);
 };
 
+const normalizeExecutorResult = (value: string[] | GenerationExecutorResult): GenerationExecutorResult => {
+  if (Array.isArray(value)) {
+    return {
+      resultImageNodeIds: value
+    };
+  }
+
+  const resultImageNodeIds = Array.isArray(value?.resultImageNodeIds)
+    ? value.resultImageNodeIds
+    : [];
+
+  return {
+    promptNodeId: value?.promptNodeId,
+    resultImageNodeIds,
+    nodeIds: value?.nodeIds
+  };
+};
+
+const getJobOutputNodeIds = (job: GenerationBatchJob): string[] => {
+  const includePromptNodes = job.outputGroup?.includePromptNodes !== false;
+  const promptNodeIds = includePromptNodes
+    ? job.prompts.map(prompt => prompt.promptNodeId).filter((id): id is string => Boolean(id))
+    : [];
+  const imageNodeIds = job.prompts.flatMap(prompt => prompt.resultImageNodeIds || []);
+
+  return Array.from(new Set([
+    ...promptNodeIds,
+    ...imageNodeIds,
+    ...(job.outputGroup?.nodeIds || [])
+  ]));
+};
+
 export class DurableGenerationQueue {
   private jobs: GenerationBatchJob[] = [];
-  private executor: ((prompt: string, options: any, jobId: string, promptId: string) => Promise<string[]>) | null = null;
-  private arrangeHandler: ((nodeIds: string[], layout: any) => Promise<void>) | null = null;
+  private executor: ((prompt: string, options: any, jobId: string, promptId: string) => Promise<string[] | GenerationExecutorResult>) | null = null;
+  private arrangeHandler: ((nodeIds: string[], layout: any, job?: GenerationBatchJob) => Promise<void>) | null = null;
+  private completionHandler: ((job: GenerationBatchJob, nodeIds: string[]) => Promise<void>) | null = null;
 
   constructor() {
     this.loadJobs();
@@ -131,6 +181,10 @@ export class DurableGenerationQueue {
     this.arrangeHandler = handler;
   }
 
+  public registerCompletionHandler(handler: typeof this.completionHandler) {
+    this.completionHandler = handler;
+  }
+
   public getJobs(): GenerationBatchJob[] {
     return this.jobs;
   }
@@ -164,6 +218,12 @@ export class DurableGenerationQueue {
 
     const existing = this.jobs.find(j => j.idempotencyKey === stableIdempotencyKey);
     if (existing) {
+      const outputGroup = options?.outputGroup;
+      if (!existing.outputGroup && outputGroup) {
+        existing.outputGroup = outputGroup;
+        existing.updatedAt = Date.now();
+        this.saveJobs();
+      }
       console.log(`[DurableQueue] Idempotency match found for key: ${stableIdempotencyKey}`);
       return existing;
     }
@@ -188,9 +248,11 @@ export class DurableGenerationQueue {
         countPerPrompt: options?.countPerPrompt || 1,
         concurrency: normalizeConcurrency(options?.concurrency),
         layout: options?.layout || 'grid',
+        layoutPreset: options?.layoutPreset,
         columns: options?.columns,
         gap: options?.gap
       },
+      outputGroup: options?.outputGroup,
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
@@ -269,16 +331,32 @@ export class DurableGenerationQueue {
     const allPromptsFinished = currentJob.prompts.every(p => p.status === 'completed' || p.status === 'failed');
     if (allPromptsFinished) {
       currentJob.status = 'completed';
+      const outputNodeIds = getJobOutputNodeIds(currentJob);
+      if (currentJob.outputGroup) {
+        currentJob.outputGroup.nodeIds = outputNodeIds;
+      }
       currentJob.updatedAt = Date.now();
       this.saveJobs();
       
       // 触发自动排版
-      const allResultIds = currentJob.prompts.flatMap(p => p.resultImageNodeIds || []);
-      if (allResultIds.length > 0 && this.arrangeHandler) {
+      if (outputNodeIds.length > 0 && this.arrangeHandler) {
         try {
-          await this.arrangeHandler(allResultIds, currentJob.options);
+          await this.arrangeHandler(outputNodeIds, currentJob.options, currentJob);
         } catch (err) {
           console.error('[DurableQueue] Layout auto-arrangement failed:', err);
+        }
+      }
+
+      if (outputNodeIds.length > 0 && this.completionHandler) {
+        try {
+          await this.completionHandler(currentJob, outputNodeIds);
+          if (currentJob.outputGroup) {
+            currentJob.outputGroup.nodeIds = outputNodeIds;
+          }
+          currentJob.updatedAt = Date.now();
+          this.saveJobs();
+        } catch (err) {
+          console.error('[DurableQueue] Completion handler failed:', err);
         }
       }
 
@@ -314,13 +392,22 @@ export class DurableGenerationQueue {
     }
 
     try {
-      const imageNodeIds = await this.executor(promptItem.prompt, {
+      const executionResult = normalizeExecutorResult(await this.executor(promptItem.prompt, {
         ...job.options,
         referenceImageNodeId: promptItem.referenceImageNodeId
-      }, jobId, promptId);
+      }, jobId, promptId));
 
       promptItem.status = 'completed';
-      promptItem.resultImageNodeIds = imageNodeIds;
+      promptItem.promptNodeId = executionResult.promptNodeId;
+      promptItem.resultImageNodeIds = executionResult.resultImageNodeIds;
+      if (job.outputGroup) {
+        job.outputGroup.nodeIds = Array.from(new Set([
+          ...(job.outputGroup.nodeIds || []),
+          ...(executionResult.nodeIds || []),
+          ...(executionResult.promptNodeId ? [executionResult.promptNodeId] : []),
+          ...executionResult.resultImageNodeIds
+        ]));
+      }
     } catch (err: any) {
       console.error(`[DurableQueue] Prompt task failed (attempt ${promptItem.retryCount + 1}):`, err);
       

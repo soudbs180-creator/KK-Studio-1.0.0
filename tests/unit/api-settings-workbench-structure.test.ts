@@ -20,6 +20,11 @@ test('ApiSettingsView default mode exposes a Model Center provider pool with a p
   assert.match(viewSource, /navigate\(buildProviderEditorPath\(null\)\)/);
   assert.match(viewSource, /Provider prefilled/);
   assert.doesNotMatch(viewSource, /saveProvider\(\)[\s\S]{0,180}Provider prefilled/);
+  assert.match(viewSource, /const toProviderFormFromPreset = \(preset: ProviderPreset\): ProviderForm => \(\{[\s\S]*apiKey: '',[\s\S]*apiKeyPreview: '',/);
+  assert.match(viewSource, /const toProviderFormFromSupplier = \(supplier: Supplier\): ProviderForm => \(\{[\s\S]*apiKey: '',[\s\S]*apiKeyPreview: '',/);
+  assert.match(viewSource, /const nextDraft = toProviderFormFromPreset\(preset\);[\s\S]*setEditingProviderId\(null\);[\s\S]*navigate\(buildProviderEditorPath\(null\),/);
+  assert.doesNotMatch(viewSource, /const existingProvider = thirdPartyProviders\.find\([\s\S]{0,160}p\.name === preset\.name/);
+  assert.doesNotMatch(viewSource, /Provider loaded/);
 
   assert.match(sectionsSource, /testId="settings-model-center"/);
   assert.doesNotMatch(sectionsSource, /data-testid="api-connection-wizard-open"/);

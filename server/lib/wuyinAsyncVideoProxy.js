@@ -3,6 +3,7 @@ const WUYIN_ASYNC_VIDEO_DETAIL_PATH = '/api/async/detail';
 const WUYIN_ASYNC_VIDEO_DEFAULT_ENDPOINT_PATH = '/api/async/video_google_omni';
 const WUYIN_ASYNC_VIDEO_DEFAULT_MODEL = 'video_google_omni';
 const LOCAL_PROXY_TASK_PREFIX = 'local_proxy:';
+const { normalizeUserApiSecretForTransport } = require('./userApiSecret');
 
 let wuyinEndpoints = {};
 try {
@@ -398,8 +399,13 @@ function assertWuyinVideoSuccessEnvelope(payload) {
 }
 
 async function fetchWuyinVideoJson(url, apiKey, method = 'GET', body) {
-  // 简体中文注释：对于五音科技的后端代理请求，如果 apiKey 存在，则在 URL 上面额外拼接 ?key=密钥 鉴权参数。
+  apiKey = normalizeUserApiSecretForTransport(apiKey);
+  if (!apiKey) {
+    throw new Error('Wuyin API key is required.');
+  }
+
   let targetUrl = url;
+  // 简体中文注释：对于五音科技的后端代理请求，如果 apiKey 存在，则在 URL 上面额外拼接 ?key=密钥 鉴权参数。
   if (apiKey) {
     const separator = targetUrl.includes('?') ? '&' : '?';
     targetUrl = `${targetUrl}${separator}key=${encodeURIComponent(apiKey)}`;

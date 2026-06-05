@@ -18,7 +18,7 @@ test('canonical design manuals define the Clay-first global UI system', () => {
 
   for (const source of [rootManual, docsManual, agentRules]) {
     assert.match(source, /Clay/i);
-    assert.match(source, /#fffaf0/i);
+    assert.match(source, /#(?:fffaf0|ffffff)/i);
     assert.match(source, /#0a0a0a/i);
     assert.match(source, /#3a3a3a/i);
     assert.match(source, /#6a6a6a/i);
@@ -41,7 +41,7 @@ test('global tokens use Clay light and dark palettes with bold color-block hiera
   const cssSource = readSource('apps/web/src/index.css');
 
   assert.match(cssSource, /Clay Global UI Refit/i);
-  assert.match(cssSource, /--clay-canvas:\s*#fffaf0;/);
+  assert.match(cssSource, /--clay-canvas:\s*#(?:fffaf0|ffffff);/);
   assert.match(cssSource, /--clay-ink:\s*#0a0a0a;/);
   assert.match(cssSource, /--clay-body:\s*#3a3a3a;/);
   assert.match(cssSource, /--clay-muted:\s*#6a6a6a;/);

@@ -1,5 +1,5 @@
 import type { KeySlot } from '../auth/keyManager.ts';
-import { formatAuthorizationHeaderValue } from '../api/apiConfig.ts';
+import { formatAuthorizationHeaderValue, getApiKeyToken } from '../api/apiConfig.ts';
 import { isLikelyDocumentationBaseUrl, resolveProviderRuntime, type ProviderStrategyVideoApiStyle } from '../api/providerStrategy.ts';
 import type { LLMAdapter, VideoGenerationOptions, VideoGenerationResult } from './LLMAdapter.ts';
 import { AsyncTaskPoller, PollCancelledError } from '../http/AsyncTaskPoller';
@@ -145,7 +145,10 @@ export class VideoCompatibleAdapter implements LLMAdapter {
         cleanBase: string,
         modelId?: string,
     ): Record<string, string> {
-        const token = String(keySlot.key || '').trim();
+        const token = getApiKeyToken(keySlot.key);
+        if (!token) {
+            throw new Error('Saved API key is empty or unavailable. Re-enter or reveal the real API key before retrying.');
+        }
         const runtime = this.resolveRuntime(cleanBase, keySlot, modelId);
         const headerName = keySlot.headerName || runtime.headerName || 'Authorization';
         const headers: Record<string, string> = {};
@@ -156,7 +159,7 @@ export class VideoCompatibleAdapter implements LLMAdapter {
 
         headers[headerName] = headerName === 'Authorization'
             ? formatAuthorizationHeaderValue(token, runtime.authorizationValueFormat)
-            : keySlot.key;
+            : token;
 
         return headers;
     }

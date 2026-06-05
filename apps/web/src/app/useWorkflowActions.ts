@@ -31,7 +31,7 @@ interface UseWorkflowActionsDeps {
   selectNodes: (ids: string[], mode?: 'replace' | 'toggle' | 'add' | 'remove') => void;
   bringNodesToFront: (ids: string[]) => void;
   setActiveSourceImage: (id: string | null) => void;
-  setWorkspaceSurface: (surface: 'workspace' | 'library') => void;
+  setWorkspaceSurface: (surface: 'workspace' | 'library' | 'favorites') => void;
   handleOpenPreview: (imageId: string) => void;
   handleNavigateToNode: (x: number, y: number, id?: string) => void;
   handleExportPptxEditable: (node: PromptNode) => Promise<void>;

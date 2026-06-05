@@ -51,10 +51,19 @@ import { useAuth } from '../../context/AuthContext';
 import { useBilling } from '../../context/BillingContext';
 import { useCanvas } from '../../context/CanvasContext';
 import { useImageGeneration } from '../../hooks/useImageGeneration';
+import type { SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
 import { getCardDimensions } from '../../utils/styleUtils';
 import ModelLogo from '../common/ModelLogo';
 import { AITakeoverProvider, useAITakeover, AIAssistantDock, AITakeoverToggle } from '../../features/ai-takeover';
 import { useAssetStore } from '../../features/assets/assetStore';
+import {
+    ReferenceMentionPanel,
+    buildReferenceMentionTabs,
+    favoriteComposerRegistry,
+    useFavoritesStore,
+    type MentionReferencePayload,
+    type ReferenceMentionCandidate,
+} from '../../features/favorites';
 import { estimateTokens, getModelContextLimit } from '../../utils/contextHelper';
 
 interface ChatSidebarProps {
@@ -62,7 +71,7 @@ interface ChatSidebarProps {
     onToggle: () => void;
     onClose?: () => void;
     isMobile: boolean;
-    onOpenSettings?: (view?: 'api-management') => void;
+    onOpenSettings?: (view?: SettingsSurfaceView) => void;
     onHoverChange?: (isHovered: boolean) => void; // 通知父组件hover状态变化
     onWidthChange?: (width: number) => void;
     config?: any;
@@ -221,10 +230,49 @@ const createWelcomeMessage = (): Message => ({
     timestamp: Date.now()
 });
 
+const cleanGreeting = (text: string): string => {
+    let cleaned = text.trim();
+    // 移除开头的“你好”、“在吗”、“hello”、“hi”、“哈喽”及常见标点
+    cleaned = cleaned.replace(/^(你好[，！,!]?|在吗[？?]?|hello[,\s]?|hi[,\s]?|哈喽[，！,!]?)/i, '');
+    return cleaned.trim() || text.trim();
+};
+
+const getFirstSubstantialQuestion = (messages: Message[]): Message | undefined => {
+    return messages.find(m => {
+        if (m.role !== 'user' || !m.content || m.content === '(附件)') return false;
+        const cleaned = cleanGreeting(m.content);
+        return cleaned.length > 0 && !/^[\s,.:!?;，。：！？；、]+$/.test(cleaned);
+    });
+};
+
+const summarizeSessionTitle = async (
+    questionContent: string,
+    modelId: string,
+    preferredKeyId?: string
+): Promise<string> => {
+    try {
+        const prompt = `请简要总结以下用户的问题/需求，生成一个通俗易懂、非常简短的会话标题（不超过 10 个字，直接返回标题，不要有任何解释、标点符号或前缀，也不要说“分支”、“总结”等字眼）：\n"${questionContent}"`;
+        const response = await llmService.chat({
+            modelId,
+            messages: [{ role: 'user', content: prompt }],
+            stream: false,
+            preferredKeyId
+        });
+        const summary = response?.trim();
+        if (summary && summary.length > 0 && summary.length < 30) {
+            return summary.replace(/^["'“‘|]|[”’"']$/g, '').trim();
+        }
+        return '';
+    } catch (e) {
+        console.warn('[ChatSidebar] Summarize title failed:', e);
+        return '';
+    }
+};
+
 const getSessionTitle = (messages: Message[]): string => {
-    const firstUser = messages.find(m => m.role === 'user' && m.content && m.content !== '(附件)');
-    if (!firstUser) return '新对话';
-    return firstUser.content.slice(0, 18);
+    const firstSubstantial = getFirstSubstantialQuestion(messages);
+    if (!firstSubstantial) return '新对话';
+    return cleanGreeting(firstSubstantial.content).slice(0, 18);
 };
 
 const formatSessionMeta = (session: ChatSessionItem): string => {
@@ -527,7 +575,8 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     const {
         aiTakeoverMode,
         setAiTakeoverMode,
-        messages: takeoverMessages,
+        messages,
+        setMessages,
         isThinking: takeoverIsThinking,
         sendMessage: sendTakeoverMessage,
         pendingPlan,
@@ -535,6 +584,8 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         cancelPendingPlan,
         setSelectedModel: ctxSetSelectedModel
     } = useAITakeover();
+
+    const apiKeyStatus = keyManager.hasValidKeys() ? 'configured_masked' : 'missing';
 
     const [showTakeoverMenu, setShowTakeoverMenu] = useState(false);
     const [showResourcePanel, setShowResourcePanel] = useState(false);
@@ -551,6 +602,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         removeAsset: removeTakeoverAsset,
         addImageCollection: addTakeoverImageCollection
     } = useAssetStore();
+    const favoriteItems = useFavoritesStore(state => state.items);
 
     const handleTakeoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const fileList = e.target.files;
@@ -657,7 +709,15 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         return loadedSessions;
     });
     const [activeSessionId, setActiveSessionId] = useState<string>(() => sessions[0]?.id || `session_${Date.now()}`);
-    const [messages, setMessages] = useState<Message[]>(() => sessions[0]?.messages || [createWelcomeMessage()]);
+    // 简体中文：同步当前活动会话到全局接管助理的消息流中
+    useEffect(() => {
+        const active = sessions.find(s => s.id === activeSessionId);
+        if (active) {
+            setMessages(active.messages?.length ? active.messages : [createWelcomeMessage()]);
+        } else {
+            setMessages([createWelcomeMessage()]);
+        }
+    }, [activeSessionId, sessions, setMessages]);
     
     const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
     const [isCompressing, setIsCompressing] = useState(false);
@@ -743,9 +803,27 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     });
     const remainingBalanceDisplay = billingLoading ? '...' : formatRemainingCredits(balance, 'zh-CN');
 
-    // 简体中文：跳转与高亮定位交互处理器
+    const referenceMentionTabs = useMemo(() => buildReferenceMentionTabs({
+        assistantImages: takeoverImages,
+        assistantFiles: takeoverFiles,
+        promptNodes: activeCanvas?.promptNodes || [],
+        imageNodes: activeCanvas?.imageNodes || [],
+        favorites: favoriteItems,
+    }), [
+        activeCanvas?.imageNodes,
+        activeCanvas?.promptNodes,
+        favoriteItems,
+        takeoverFiles,
+        takeoverImages,
+    ]);
+
     const handleActionClick = useCallback((url: string) => {
-        if (aiTakeoverMode) {
+        const isTakeoverAction = url === 'action://takeover-prompt-only' ||
+                                 url === 'action://takeover-prompt-doc' ||
+                                 url.startsWith('action://takeover-image-to-video') ||
+                                 url.startsWith('action://takeover-bulk-generate');
+
+        if (aiTakeoverMode && isTakeoverAction) {
             if (url === 'action://takeover-prompt-only') {
                 sendTakeoverMessage('帮我只优化提示词并填充，不进行图片生成。');
             } else if (url === 'action://takeover-prompt-doc') {
@@ -776,12 +854,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                 const parsedUrl = url.replace('action://', 'http://dummy');
                 try {
                     const u = new URL(parsedUrl);
-                    const keyword = u.searchParams.get('keyword') || '';
                     const prompts = u.searchParams.get('prompts') || '';
 
-                    if (url.startsWith('action://takeover-locate') && keyword) {
-                        sendTakeoverMessage(`定位卡片：${keyword}`);
-                    } else if (url.startsWith('action://takeover-bulk-generate') && prompts) {
+                    if (url.startsWith('action://takeover-bulk-generate') && prompts) {
                         sendTakeoverMessage(`使用提示词开始生成：${prompts}`);
                     } else {
                         const mockAnchor = document.createElement('a');
@@ -818,6 +893,8 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             }, 100);
         } else if (url === 'action://open-recharge') {
             setShowRechargeModal(true);
+        } else if (url === 'action://open-settings-logs') {
+            if (onOpenSettings) onOpenSettings('system-logs');
         } else if (url === 'action://open-settings-api') {
             if (onOpenSettings) onOpenSettings('api-management');
             // 延迟高亮智能定位到 API Key 输入框
@@ -1080,8 +1157,10 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
     // 简体中文：AI接管模式下的动作自动拦截并静默执行
     useEffect(() => {
-        if (!aiTakeoverMode || !messages || messages.length === 0) return;
-        const lastMessage = messages[messages.length - 1];
+        if (!aiTakeoverMode) return;
+        const currentMessages = messages;
+        if (!currentMessages || currentMessages.length === 0) return;
+        const lastMessage = currentMessages[currentMessages.length - 1];
         
         if (lastMessage.role === 'assistant' && !executedMessageIdsRef.current.has(lastMessage.id)) {
             executedMessageIdsRef.current.add(lastMessage.id);
@@ -1090,9 +1169,17 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             const matches = lastMessage.content.match(actionRegex);
             if (matches && matches.length > 0) {
                 matches.forEach(actionUrl => {
-                    setTimeout(() => {
-                        handleActionClick(actionUrl);
-                    }, 200);
+                    // 过滤机制：防止执行任何会触发 sendTakeoverMessage 的交互链接以防无限循环
+                    const isMessageAction =
+                        actionUrl === 'action://takeover-prompt-only' ||
+                        actionUrl === 'action://takeover-prompt-doc' ||
+                        actionUrl.startsWith('action://takeover-bulk-generate');
+
+                    if (!isMessageAction) {
+                        setTimeout(() => {
+                            handleActionClick(actionUrl);
+                        }, 200);
+                    }
                 });
             }
         }
@@ -1198,6 +1285,12 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const sessionImportRef = useRef<HTMLInputElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+    const [mentionState, setMentionState] = useState<{
+        open: boolean;
+        query: string;
+        start: number;
+        end: number;
+    }>({ open: false, query: '', start: 0, end: 0 });
     const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
     const [isDropActive, setIsDropActive] = useState(false);
 
@@ -1586,6 +1679,10 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         return rows;
     }, [activeBranchTrail, expandedNodes, sessionMap, sessions, showArchived, sessionSearch]);
 
+    const prevActiveSessionIdRef = useRef(activeSessionId);
+    const summarizingSessionIdsRef = useRef<Set<string>>(new Set());
+    const lastSessionIdRef = useRef(activeSessionId);
+
     useEffect(() => {
         const active = sessions.find(s => s.id === activeSessionId);
         if (active) {
@@ -1599,16 +1696,67 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     }, [activeSessionId, sessions]);
 
     useEffect(() => {
+        // 1. 如果 activeSessionId 改变了，说明是切换会话，更新 Ref 后直接跳过，防止旧消息覆盖新会话
+        if (prevActiveSessionIdRef.current !== activeSessionId) {
+            prevActiveSessionIdRef.current = activeSessionId;
+            return;
+        }
+
+        let needsSummary = false;
+        let substantialQuestion: string | undefined;
+
         setSessions(prev => prev.map(session => {
             if (session.id !== activeSessionId) return session;
+
+            // 避免完全一致时的多余渲染
+            if (JSON.stringify(session.messages) === JSON.stringify(messages)) return session;
+
+            const firstSubstantial = getFirstSubstantialQuestion(messages);
+            let updatedTitle = session.title;
+            let customTitle = session.customTitle;
+
+            // 发现第一个实质性提问且标题未锁定时，立刻生成本地临时标题并锁定 customTitle
+            if (firstSubstantial && !customTitle) {
+                const cleanedText = cleanGreeting(firstSubstantial.content);
+                updatedTitle = cleanedText.slice(0, 16) || '新对话';
+                customTitle = true; // 锁定标题，后面就算问什么内容都不会被影响
+                needsSummary = true;
+                substantialQuestion = firstSubstantial.content;
+            }
+
             return {
                 ...session,
                 messages,
-                title: session.customTitle ? session.title : getSessionTitle(messages),
+                title: updatedTitle,
+                customTitle,
                 updatedAt: Date.now()
             };
         }));
-    }, [messages, activeSessionId]);
+
+        // 2. 发起大模型异步标题总结
+        if (needsSummary && substantialQuestion && selectedModel && !summarizingSessionIdsRef.current.has(activeSessionId)) {
+            const currentSessionId = activeSessionId;
+            const currentModelId = selectedModel.id;
+            const preferredKeyId = resolveAssistantPreferredKeyId();
+
+            summarizingSessionIdsRef.current.add(currentSessionId);
+
+            (async () => {
+                const aiTitle = await summarizeSessionTitle(substantialQuestion!, currentModelId, preferredKeyId);
+                if (aiTitle) {
+                    setSessions(prev => prev.map(session => {
+                        if (session.id !== currentSessionId) return session;
+                        return {
+                            ...session,
+                            title: aiTitle,
+                            customTitle: true,
+                            updatedAt: Date.now()
+                        };
+                    }));
+                }
+            })();
+        }
+    }, [messages, activeSessionId, selectedModel]);
 
     useEffect(() => {
         try {
@@ -1634,14 +1782,22 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         }
     }, [expandedNodes]);
 
-    const activeMessages = (aiTakeoverMode ? takeoverMessages : messages) as Message[];
+    const activeMessages = messages as Message[];
 
     const activeIsThinking = aiTakeoverMode ? takeoverIsThinking : isThinking;
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [activeMessages, isOpen]);
+        if (!isOpen) return;
+        const isSessionSwitch = lastSessionIdRef.current !== activeSessionId;
+        lastSessionIdRef.current = activeSessionId;
+
+        if (isSessionSwitch) {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+        } else {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [activeMessages, isOpen, activeSessionId]);
 
     // Cleanup drag listeners
     useEffect(() => {
@@ -1776,6 +1932,136 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             registerActivity();
         }
     }, [registerActivity]);
+
+    const closeReferenceMentionPanel = useCallback(() => {
+        setMentionState(prev => prev.open ? { ...prev, open: false, query: '' } : prev);
+    }, []);
+
+    const updateReferenceMentionFromTextarea = useCallback((target: HTMLTextAreaElement) => {
+        const value = target.value;
+        const caret = target.selectionStart ?? value.length;
+        const beforeCaret = value.slice(0, caret);
+        const atIndex = beforeCaret.lastIndexOf('@');
+
+        if (atIndex < 0) {
+            closeReferenceMentionPanel();
+            return;
+        }
+
+        const token = beforeCaret.slice(atIndex + 1);
+        if (/[\s,，。；;:：()[\]{}<>]/.test(token)) {
+            closeReferenceMentionPanel();
+            return;
+        }
+
+        setMentionState({
+            open: true,
+            query: token,
+            start: atIndex,
+            end: caret,
+        });
+    }, [closeReferenceMentionPanel]);
+
+    const resolveAttachmentType = useCallback((mimeType?: string): Attachment['type'] => {
+        const value = String(mimeType || '').toLowerCase();
+        if (value.startsWith('image/')) return 'image';
+        if (value.startsWith('video/')) return 'video';
+        if (value.startsWith('audio/')) return 'audio';
+        return 'document';
+    }, []);
+
+    const addCandidateAsAssistantAttachment = useCallback(async (candidate?: ReferenceMentionCandidate) => {
+        if (!candidate) return;
+
+        const asset = candidate.assistantAsset;
+        if (asset?.kind === 'file' && asset.sensitive) {
+            notify.warning('Sensitive file blocked', candidate.name);
+            return;
+        }
+
+        if (asset?.localFile) {
+            await appendFilesAsAttachments([asset.localFile]);
+            return;
+        }
+
+        const data = candidate.referenceImage?.url
+            || candidate.referenceImage?.data
+            || candidate.previewUrl
+            || candidate.originalUrl
+            || candidate.apiResultUrl
+            || candidate.url
+            || (asset?.kind === 'file' ? asset.uploadedUrl || asset.id : undefined)
+            || candidate.id;
+
+        const attachment: Attachment = {
+            id: `mention_${candidate.id}_${Date.now()}`,
+            type: resolveAttachmentType(candidate.mimeType),
+            name: candidate.name,
+            data,
+            mimeType: candidate.mimeType,
+            size: asset?.size,
+        };
+
+        setAttachments(prev => {
+            const duplicate = prev.some((item) => item.name === attachment.name && item.data === attachment.data);
+            return duplicate ? prev : [...prev, attachment];
+        });
+        registerActivity();
+    }, [appendFilesAsAttachments, registerActivity, resolveAttachmentType]);
+
+    const applyAssistantInputChange = useCallback((nextValue: string, caret?: number) => {
+        setInput(nextValue);
+        window.requestAnimationFrame(() => {
+            const textarea = inputRef.current;
+            if (!textarea) return;
+            textarea.focus();
+            if (typeof caret === 'number') {
+                textarea.setSelectionRange(caret, caret);
+            }
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 140) + 'px';
+        });
+    }, []);
+
+    const insertAssistantComposerPayload = useCallback((payload: MentionReferencePayload) => {
+        const text = payload.text || '';
+        if (!text) return;
+
+        const textarea = inputRef.current;
+        const current = textarea?.value ?? input;
+        const start = textarea?.selectionStart ?? current.length;
+        const end = textarea?.selectionEnd ?? start;
+        const nextValue = `${current.slice(0, start)}${text}${current.slice(end)}`;
+        const caret = start + text.length;
+
+        applyAssistantInputChange(nextValue, caret);
+        void addCandidateAsAssistantAttachment(payload.candidate);
+    }, [addCandidateAsAssistantAttachment, applyAssistantInputChange, input]);
+
+    useEffect(() => favoriteComposerRegistry.register({
+        id: 'assistant',
+        label: 'AI assistant',
+        insert: insertAssistantComposerPayload,
+        focus: () => inputRef.current?.focus(),
+        addAssistantAttachment: addCandidateAsAssistantAttachment,
+    }), [addCandidateAsAssistantAttachment, insertAssistantComposerPayload]);
+
+    const replaceActiveMentionWithCandidate = useCallback((candidate: ReferenceMentionCandidate) => {
+        const current = inputRef.current?.value ?? input;
+        const start = Math.max(0, mentionState.start);
+        const end = Math.max(start, mentionState.end);
+        const mentionText = candidate.mentionText || `@${candidate.name}`;
+        const rawPrefix = current.slice(0, start);
+        const rawSuffix = current.slice(end);
+        const prefix = rawPrefix && !/[\s(（,，:：]$/.test(rawPrefix) ? `${rawPrefix} ` : rawPrefix;
+        const suffixSpacer = rawSuffix && !/^[\s,，。；;:：)\]）]/.test(rawSuffix) ? ' ' : '';
+        const nextValue = `${prefix}${mentionText}${suffixSpacer}${rawSuffix}`;
+        const caret = prefix.length + mentionText.length + suffixSpacer.length;
+
+        setMentionState(prev => ({ ...prev, open: false, query: '' }));
+        applyAssistantInputChange(nextValue, caret);
+        void addCandidateAsAssistantAttachment(candidate);
+    }, [addCandidateAsAssistantAttachment, applyAssistantInputChange, input, mentionState.end, mentionState.start]);
 
     // 处理文档选择
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2711,12 +2997,12 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                         </div>
 
                         {/* Context Limit Indicator 栏 */}
-                        <div className="px-4 pb-3 pt-1 border-t border-[var(--border-light)]/40 bg-[var(--bg-primary)]/10 flex flex-col gap-1.5">
+                        <div className="mx-auto my-2.5 px-5 py-2.5 rounded-full border border-[var(--border-light)]/30 bg-[var(--bg-primary)]/60 backdrop-blur-md flex flex-col gap-1.5 shadow-[0_6px_20px_rgba(0,0,0,0.15)] w-[88%] max-w-[340px] select-none transition-all duration-300 hover:border-[var(--primary)]/50">
                             <div className="flex items-center justify-between text-[10px] text-[var(--text-tertiary)]">
                                 <span className="flex items-center gap-1">
-                                    <span>🧠 上下文额度:</span>
+                                    <span>🧠 上下文:</span>
                                     <span className="font-semibold text-[var(--text-secondary)]">
-                                        {totalTokensUsed >= 1000 ? `${(totalTokensUsed / 1000).toFixed(1)}k` : totalTokensUsed} / {maxTokensLabel} Tokens
+                                        {totalTokensUsed >= 1000 ? `${(totalTokensUsed / 1000).toFixed(1)}k` : totalTokensUsed} / {maxTokensLabel}
                                     </span>
                                     <span>({percentUsed}%)</span>
                                 </span>
@@ -2724,7 +3010,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                 <button
                                     onClick={handleCompressContext}
                                     disabled={isCompressing || messages.filter(m => m.id !== 'welcome').length <= 1}
-                                    className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all flex items-center gap-1 cursor-pointer select-none border ${
+                                    className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold transition-all flex items-center gap-1 cursor-pointer select-none border ${
                                         isNearLimit
                                             ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 hover:bg-amber-500/30 animate-pulse'
                                             : 'bg-[var(--frost-card-sub-bg)] border-[var(--frost-card-sub-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--primary)]'
@@ -2734,10 +3020,10 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                     {isCompressing ? (
                                         <>
                                             <Loader2 size={10} className="animate-spin" />
-                                            <span>正在压缩...</span>
+                                            <span>压缩中...</span>
                                         </>
                                     ) : (
-                                        <span>🗜️ 压缩上下文</span>
+                                        <span>🗜️ 压缩</span>
                                     )}
                                 </button>
                             </div>
@@ -2760,9 +3046,9 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                             </div>
 
                             {isNearLimit && (
-                                <div className="text-[9px] text-amber-400/90 flex items-center gap-1 mt-0.5 animate-pulse">
+                                <div className="text-[9px] text-amber-400/90 flex items-center justify-center gap-1 mt-0.5 animate-pulse">
                                     <AlertTriangle size={10} />
-                                    <span>上下文用量已超 80%，AI 可能会开始遗忘，请及时压缩。</span>
+                                    <span>上下文用量已超 80%，请及时压缩。</span>
                                 </div>
                             )}
                         </div>
@@ -3207,6 +3493,22 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                             </div>
                         )}
 
+                        {/* 简体中文：AI接管且未配置 API 密钥时的专属提醒横幅 */}
+                        {aiTakeoverMode && apiKeyStatus === 'missing' && (
+                            <div className="mb-2 p-2.5 rounded-xl border border-purple-500/20 bg-purple-500/5 text-[11px] text-[var(--clay-brand-lavender)] flex items-center justify-between gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                <div className="flex items-center gap-1.5 leading-normal">
+                                    <Cpu size={12} className="animate-pulse shrink-0 text-purple-500" />
+                                    <span>AI接管：当前已开启本地规则驱动与隐私安全沙箱保护。</span>
+                                </div>
+                                <button
+                                    onClick={() => handleActionClick('action://open-settings-api')}
+                                    className="shrink-0 px-2 py-0.5 rounded-md bg-purple-500/20 border border-purple-500/40 text-[9px] font-bold text-white hover:bg-purple-500/30 transition-all active:scale-95"
+                                >
+                                    配置密钥
+                                </button>
+                            </div>
+                        )}
+
                         {/* 一体化卡片输入容器 */}
                         <div
                             className={`flex flex-col rounded-2xl border transition-all duration-300 ${
@@ -3235,6 +3537,13 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                         >
                             {/* 1. 文本域输入行 */}
                             <div className="w-full flex items-start">
+                                <ReferenceMentionPanel
+                                    open={mentionState.open}
+                                    query={mentionState.query}
+                                    tabs={referenceMentionTabs}
+                                    onSelect={replaceActiveMentionWithCandidate}
+                                    onClose={closeReferenceMentionPanel}
+                                />
                                 <textarea
                                     ref={inputRef}
                                     className="w-full border-none shadow-none text-[15px] p-0.5 bg-transparent resize-none scrollbar-thin focus:outline-none text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] leading-relaxed"
@@ -3246,10 +3555,22 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                         registerActivity();
                                         e.target.style.height = 'auto';
                                         e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
+                                        updateReferenceMentionFromTextarea(e.target);
                                     }}
                                     onKeyDown={e => {
                                         if ((e.nativeEvent as KeyboardEvent).isComposing) {
                                             return;
+                                        }
+                                        if (mentionState.open) {
+                                            if (e.key === 'Escape') {
+                                                e.preventDefault();
+                                                closeReferenceMentionPanel();
+                                                return;
+                                            }
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                return;
+                                            }
                                         }
                                         if (e.key === 'Enter' && !e.shiftKey) {
                                             e.preventDefault();
@@ -3257,6 +3578,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                         }
                                     }}
                                     onPaste={handleInputPaste}
+                                    onFocus={() => favoriteComposerRegistry.markFocused('assistant')}
                                     autoFocus
                                 />
                             </div>
@@ -3416,14 +3738,14 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                         }}
                                         className={`px-2.5 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 active:scale-95 select-none group ${
                                             agentMode
-                                                ? 'bg-gradient-to-r from-[var(--clay-brand-coral)] to-[var(--clay-brand-pink)] text-white border-transparent shadow-[0_2px_8px_rgba(244,63,94,0.25)]'
+                                                ? 'agent-active-btn'
                                                 : 'bg-black/10 dark:bg-white/[0.03] hover:bg-black/20 dark:hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-black/10 dark:border-white/[0.06] hover:border-black/15 dark:hover:border-white/[0.12] backdrop-blur-sm shadow-sm'
                                         }`}
                                         title={agentMode ? 'Agent 已开启：可自动路由问答/生成图/改图/文档任务' : '开启 Agent 增强模式'}
                                     >
                                         <Bot size={11} className={agentMode ? 'animate-pulse text-white' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors'} />
                                         <span>Agent</span>
-                                        <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300 ${agentMode ? 'bg-white animate-pulse scale-110 shadow-[0_0_4px_rgba(255,255,255,0.8)]' : 'bg-[var(--clay-brand-coral)]/40 group-hover:bg-[var(--clay-brand-coral)]/70'}`} />
+                                        <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300 ${agentMode ? 'bg-white animate-pulse scale-110 shadow-[0_0_4px_rgba(255,255,255,0.8)]' : 'bg-emerald-500/40 group-hover:bg-emerald-500/70'}`} />
                                     </button>
 
                                     {/* 简体中文：AI接管药丸切换按钮 */}
@@ -3435,14 +3757,14 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                                         }}
                                         className={`px-2.5 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 active:scale-95 select-none group ${
                                             aiTakeoverMode
-                                                ? 'bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 text-white border-transparent shadow-[0_2px_8px_rgba(219,39,119,0.25)]'
+                                                ? 'ai-takeover-active-btn'
                                                 : 'bg-black/10 dark:bg-white/[0.03] hover:bg-black/20 dark:hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-black/10 dark:border-white/[0.06] hover:border-black/15 dark:hover:border-white/[0.12] backdrop-blur-sm shadow-sm'
                                         }`}
                                         title={aiTakeoverMode ? 'AI 接管已开启：自动为您批量生图、定位卡片或聚焦 API 输入框' : '开启 AI 接管'}
                                     >
                                         <Cpu size={11} className={aiTakeoverMode ? 'animate-pulse text-white' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors'} />
                                         <span>AI接管</span>
-                                        <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300 ${aiTakeoverMode ? 'bg-white animate-pulse scale-110 shadow-[0_0_4px_rgba(255,255,255,0.8)]' : 'bg-purple-500/40 group-hover:bg-purple-500/70'}`} />
+                                        <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300 ${aiTakeoverMode ? 'bg-white animate-pulse scale-110 shadow-[0_0_4px_rgba(255,255,255,0.8)]' : 'ai-takeover-inactive-dot'}`} />
                                     </button>
                                 </div>
 
@@ -3767,7 +4089,18 @@ const ChatSidebarInner: React.FC<ChatSidebarProps & { selectedModel: ChatModel; 
 };
 
 const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
-    const { activeCanvas, addPromptNode, updatePromptNode, getNextCardPosition, selectedNodeIds, arrangeAllNodes } = useCanvas();
+    const {
+        activeCanvas,
+        addPromptNode,
+        updatePromptNode,
+        updateNodes,
+        getNextCardPosition,
+        selectedNodeIds,
+        arrangeAllNodes,
+        addGroup,
+        updateGroup,
+        setNodeTags,
+    } = useCanvas();
     const { executeGeneration } = useImageGeneration({
         isMobile: props.isMobile,
         getCardDimensions: (ratio, hasToolbar) => getCardDimensions(ratio, hasToolbar),
@@ -3788,9 +4121,13 @@ const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
             selectedNodeIds={selectedNodeIds}
             addPromptNode={addPromptNode}
             updatePromptNode={updatePromptNode}
+            updateNodes={updateNodes}
             executeGeneration={executeGeneration}
             getNextCardPosition={getNextCardPosition}
             arrangeAllNodes={arrangeAllNodes}
+            addGroup={addGroup}
+            updateGroup={updateGroup}
+            setNodeTags={setNodeTags}
             setConfig={props.setConfig || (() => {})}
             onOpenSettings={props.onOpenSettings}
             apiKeyStatus={apiKeyStatus}
@@ -3813,5 +4150,3 @@ const ChatSidebar: React.FC<ChatSidebarProps> = (props) => {
 };
 
 export default ChatSidebar;
-
-

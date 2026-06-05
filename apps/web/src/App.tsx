@@ -261,6 +261,11 @@ import { calculateImageHash } from './utils/imageUtils';
 import { useImageGeneration } from './hooks/useImageGeneration';
 import { useWorkspaceSurface, type SettingsSurfaceView } from './hooks/useWorkspaceSurface';
 import { WorkspaceSurfacePanels } from './components/workspace/WorkspaceSurfacePanels';
+import {
+  appendReferenceMappingToPrompt,
+  reorderReferenceImagesByMentions,
+  useFavoritesStore,
+} from './features/favorites';
 // import { notify } from './services/system/notificationService'; // [FIX] Dynamic Import
 
 // ProjectManager imported from components
@@ -331,6 +336,11 @@ const AppContent: React.FC<AppContentProps> = () => {
   const [lockedGroupBoundsById, setLockedGroupBoundsById] = useState<Record<string, { x: number; y: number; width: number; height: number }>>({});
   const nodeDragReleaseFrameRef = useRef<number | null>(null);
   const promptGroupLayoutStateByIdRef = useRef<Record<string, PromptGroupLayoutPresentationState>>({});
+  const loadFavorites = useFavoritesStore(state => state.load);
+
+  useEffect(() => {
+    void loadFavorites();
+  }, [loadFavorites]);
 
 
 
@@ -1764,6 +1774,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     activeAppSurface,
     activeWorkspacePanel,
     focusWorkspace,
+    openFavoritesSurface,
     toggleChatPanel,
     openProfileSurface,
     openSettingsSurface,
@@ -2408,12 +2419,31 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
 
     const trimmedPrompt = submitGuard.trimmedPrompt;
+    const referenceMentionBinding = reorderReferenceImagesByMentions({
+      prompt: trimmedPrompt,
+      referenceImages: config.referenceImages || [],
+      resolveNameForReference: (reference) => (
+        reference.mentionName
+        || reference.mentionText?.replace(/^@+/, '')
+        || undefined
+      ),
+    });
+    const submissionPrompt = appendReferenceMappingToPrompt(
+      trimmedPrompt,
+      referenceMentionBinding.mappingSummary,
+    );
+    const submissionConfig = referenceMentionBinding.orderedReferenceImages === config.referenceImages
+      ? config
+      : {
+        ...config,
+        referenceImages: referenceMentionBinding.orderedReferenceImages,
+      };
 
     // Real billing guard and deduction flow
     // Route-aware billing: when the request resolves to a user-owned key/channel,
     // it must never enter the system-credit deduction flow.
     const initialSubmissionContext = await prepareInitialGenerationSubmissionContext({
-      config,
+      config: submissionConfig,
       activeCanvasRef,
       activeSourceImage,
       draftNodeId,
@@ -2429,13 +2459,13 @@ const AppContent: React.FC<AppContentProps> = () => {
     await runInitialGenerationSubmissionTransaction({
       activeSourceImage,
       addPromptNode,
-      config,
+      config: submissionConfig,
       deletePromptNode,
       executeGeneration,
       getCanvas: () => activeCanvasRef.current || undefined,
       initialSubmissionContext,
       prepareGenerationReferenceImages,
-      rawPrompt: trimmedPrompt,
+      rawPrompt: submissionPrompt,
       resolveGenerationPlacement,
       setActiveSourceImage,
       setConfig,
@@ -3207,9 +3237,11 @@ const AppContent: React.FC<AppContentProps> = () => {
         }
       });
 
-      const syncedStack = Number.isFinite(highestMemberStack)
-        ? Math.max(fallbackStack, highestMemberStack - 1)
-        : fallbackStack;
+      const syncedStack = group.hidden && Number.isFinite(highestMemberStack)
+        ? Math.max(fallbackStack, highestMemberStack + 30)
+        : Number.isFinite(highestMemberStack)
+          ? Math.max(fallbackStack, highestMemberStack - 1)
+          : fallbackStack;
 
       stackMap.set(group.id, syncedStack);
     });
@@ -3549,6 +3581,62 @@ const AppContent: React.FC<AppContentProps> = () => {
     workflowUtilityNodesById,
     canvasPerformanceProfile,
   });
+
+  const applyLiveCanvasGroupNodeDelta = useCallback((
+    groupId: string,
+    nodeIds: string[] | null | undefined,
+    delta: { x: number; y: number },
+  ) => {
+    if (!groupId || !nodeIds?.length) {
+      return;
+    }
+
+    applyLiveNodeDeltaToDraggedSet(`canvas-group:${groupId}`, nodeIds, delta);
+  }, [applyLiveNodeDeltaToDraggedSet]);
+
+  const clearLiveCanvasGroupNodePositions = useCallback((
+    groupId: string,
+    nodeIds: string[] | null | undefined,
+  ) => {
+    if (!groupId) {
+      return;
+    }
+
+    const ownerId = `canvas-group:${groupId}`;
+    const nodeIdSet = new Set([
+      ...(nodeIds || []),
+      ...(liveDerivedNodeIdsByOwnerRef.current[ownerId] || []),
+    ]);
+    let nextLivePositions = liveNodePositionByIdRef.current;
+    let hasLivePositionChanged = false;
+
+    nodeIdSet.forEach((nodeId) => {
+      if (!(nodeId in nextLivePositions)) {
+        return;
+      }
+
+      if (nextLivePositions === liveNodePositionByIdRef.current) {
+        nextLivePositions = { ...nextLivePositions };
+      }
+      delete nextLivePositions[nodeId];
+      hasLivePositionChanged = true;
+    });
+
+    if (ownerId in liveDerivedNodeIdsByOwnerRef.current) {
+      const nextDerivedNodeIdsByOwner = { ...liveDerivedNodeIdsByOwnerRef.current };
+      delete nextDerivedNodeIdsByOwner[ownerId];
+      liveDerivedNodeIdsByOwnerRef.current = nextDerivedNodeIdsByOwner;
+    }
+
+    if (hasLivePositionChanged) {
+      liveNodePositionByIdRef.current = nextLivePositions;
+      setLiveNodePositionVersion((prev) => prev + 1);
+    }
+  }, [
+    liveDerivedNodeIdsByOwnerRef,
+    liveNodePositionByIdRef,
+    setLiveNodePositionVersion,
+  ]);
 
   const imageLoadSchedulingById = React.useMemo(() => {
     const scheduling = new Map<string, ScheduledImageLoadState>();
@@ -4249,8 +4337,17 @@ const AppContent: React.FC<AppContentProps> = () => {
 
           selectNodes(nodeIds, 'toggle');
         }}
-        onGroupDrag={(delta, sourceNodeIds) => moveSelectedNodesImmediate(delta, sourceNodeIds, { snapToGrid })}
-        onDragStateChange={handleCanvasNodeDragStateChange}
+        onGroupDrag={(delta, sourceNodeIds) => {
+          const nodeIds = sourceNodeIds || group.nodeIds;
+          applyLiveCanvasGroupNodeDelta(group.id, nodeIds, delta);
+          moveSelectedNodesImmediate(delta, nodeIds, { snapToGrid });
+        }}
+        onDragStateChange={(dragging) => {
+          handleCanvasNodeDragStateChange(dragging);
+          if (!dragging) {
+            clearLiveCanvasGroupNodePositions(group.id, group.nodeIds);
+          }
+        }}
         onUpdateGroup={updateGroup}
         computedBounds={getComputedGroupBounds(group)}
       />
@@ -4258,6 +4355,8 @@ const AppContent: React.FC<AppContentProps> = () => {
   ), [
     canvasGroupStackZIndexById,
     canvasTransform.scale,
+    applyLiveCanvasGroupNodeDelta,
+    clearLiveCanvasGroupNodePositions,
     getComputedGroupBounds,
     handleCanvasNodeDragStateChange,
     highlightedId,
@@ -4377,6 +4476,8 @@ const AppContent: React.FC<AppContentProps> = () => {
     ? `calc(min(100vw - 60px, ${chatSidebarWidth + 28}px))`
     : workspaceSurface === 'library'
       ? '428px'
+      : workspaceSurface === 'favorites'
+        ? '668px'
       : '48px';
 
   useEffect(() => {
@@ -4570,6 +4671,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       focusWorkspace={focusWorkspace}
       handlePreviewFromLibrary={handlePreviewFromLibrary}
       handleFocusLibraryImage={handleFocusLibraryImage}
+      onRenameFavoriteImage={(imageId, name) => updateImageNode(imageId, { alias: name })}
       config={config}
       setConfig={setConfig}
       ecommerceState={ecommerceState}
@@ -4655,6 +4757,9 @@ const AppContent: React.FC<AppContentProps> = () => {
       onSearch={() => {
         focusWorkspace();
         setIsSearchOpen(true);
+      }}
+      onFavorites={() => {
+        openFavoritesSurface();
       }}
       isSidebarOpen={isSidebarOpen}
       onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}

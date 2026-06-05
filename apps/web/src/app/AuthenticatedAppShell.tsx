@@ -178,9 +178,9 @@ export const StartupRuntimeBanner: React.FC = () => {
       style={{
         left: bannerLeft === null ? '50%' : `${bannerLeft}px`,
         transform: 'translateX(-50%)',
-        borderColor: isWarning ? 'rgba(245, 158, 11, 0.35)' : 'rgba(148, 163, 184, 0.28)',
-        background: isWarning ? 'rgba(120, 53, 15, 0.88)' : 'rgba(31, 41, 55, 0.82)',
-        color: isWarning ? '#fef3c7' : '#e5e7eb',
+        borderColor: isWarning ? 'var(--state-warning-border, rgba(245, 158, 11, 0.24))' : 'var(--border-default, rgba(17, 24, 39, 0.14))',
+        background: isWarning ? 'var(--state-warning-bg, rgba(245, 158, 11, 0.12))' : 'var(--bg-overlay, #ffffff)',
+        color: isWarning ? 'var(--state-warning-text, #b45309)' : 'var(--text-secondary, #3a3a3a)',
       }}
     >
       {message}
@@ -202,7 +202,7 @@ export const AuthenticatedAppShell: React.FC<AuthenticatedAppShellProps> = ({
 
   if (loading) {
     // 简体中文注释：登录态检测期间直接显示纯黑占位，不使用大型进度条，秒进登录页面
-    return <div className="fixed inset-0 bg-[#09090b]" />;
+    return <div className="fixed inset-0 bg-[var(--bg-base)]" />;
   }
 
   if (shouldShowLoginForAuthGate({ user, session, isTempUser })) {

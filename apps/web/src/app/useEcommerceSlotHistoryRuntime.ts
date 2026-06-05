@@ -11,7 +11,7 @@ type EcommerceSlotHistoryStateSnapshot = {
   groupSlots: Record<EcommerceGroupSheet, EcommerceGroupSlotState[]>;
 };
 
-type SetWorkspaceSurface = (surface: 'workspace' | 'library') => void;
+type SetWorkspaceSurface = (surface: 'workspace' | 'library' | 'favorites') => void;
 type SetPreviewImages = (images: GeneratedImage[] | null) => void;
 type SetPreviewInitialIndex = (index: number) => void;
 

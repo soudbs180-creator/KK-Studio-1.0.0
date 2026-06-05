@@ -9,6 +9,15 @@ import { optimizePromptLocally } from '../prompts/localPromptOptimizer';
 import { safetyPolicy } from './safetyPolicy';
 import { confirmationPolicy } from './confirmationPolicy';
 
+const SETTINGS_VIEW_LABELS: Record<string, string> = {
+  dashboard: '设置总览',
+  'api-management': 'API 工作台',
+  'consumption-records': '计费账本',
+  'storage-settings': '存储设置',
+  'system-logs': '系统日志',
+  'user-profile': '个人中心'
+};
+
 export class LocalAssistantBrain {
   async plan(userInput: string, context: SanitizedProjectContext): Promise<AssistantPlan> {
     const intentResult = analyzeIntent(userInput, context);
@@ -73,8 +82,20 @@ ${optResult.optimizedPromptZh}`;
       }
 
       case 'submit_composer': {
-        reply = `### 🚀 收到指令，正在帮您运行发送...
+        const prompt = (intentResult.extracted.prompt || '').trim();
+
+        if (prompt) {
+          reply = `### 🚀 已接管画布输入框并发送
+我会先把「${prompt}」填入当前画布输入框，然后复用当前已设置的模型、比例、参考图和生成参数直接发送。`;
+          actions.push({
+            type: 'fillInputPrompt',
+            payload: { prompt }
+          });
+        } else {
+          reply = `### 🚀 收到指令，正在帮您运行发送...
 接管引擎正直接调用 PromptBar 发送生成按钮为您拉起任务。`;
+        }
+
         actions.push({
           type: 'submitPromptComposer',
           payload: {}
@@ -182,6 +203,31 @@ ${optResult.optimizedPromptZh}
         break;
       }
 
+      case 'open_logs': {
+        reply = `### ⚙️ 正在为您打开系统日志面板
+已为您自动打开“系统日志”维护面板，您可以在其中实时观察 KK Studio 的运行实况、API 请求流以及排障告警信息。
+您也可以手动点击 👉 [跳转到系统日志页面](action://open-settings-logs) 快速打开该面板。`;
+
+        actions.push({
+          type: 'openSettings',
+          payload: { tab: 'system-logs' }
+        });
+        break;
+      }
+
+      case 'open_settings_view': {
+        const settingsView = intentResult.extracted.settingsView || 'dashboard';
+        const label = SETTINGS_VIEW_LABELS[settingsView] || '设置页';
+        reply = `### ⚙️ 正在为您打开${label}
+这是本地安全跳转，我会直接调用设置页路由，不需要先配置模型。`;
+
+        actions.push({
+          type: 'openSettings',
+          payload: { tab: settingsView }
+        });
+        break;
+      }
+
       case 'search_card': {
         const query = (intentResult.extracted.cardQuery || '').trim();
         const lowerQuery = query.toLowerCase();
@@ -283,6 +329,17 @@ ${optResult.optimizedPromptZh}
         // 从资产池获取图片数量
         const imageIds = context.assets?.images?.map(img => img.id) || [];
         const imageCount = imageIds.length;
+        const taskDomain = intentResult.extracted.taskDomain || 'general';
+        const aspectRatio = intentResult.extracted.aspectRatio || '1:1';
+        const layoutPreset = intentResult.extracted.layoutPreset || 'grid';
+        const batchPlanId = 'batch_' + Date.now();
+        const extractedOutputGroup = intentResult.extracted.outputGroup;
+        const outputGroup = {
+          label: extractedOutputGroup?.label || (taskDomain === 'ecommerce' ? 'AI ecommerce batch' : 'AI batch output'),
+          color: extractedOutputGroup?.color || '#ffffff',
+          includePromptNodes: extractedOutputGroup?.includePromptNodes ?? true,
+          tags: Array.from(new Set([...(extractedOutputGroup?.tags || []), 'automation', `batch:${batchPlanId}`]))
+        };
 
         reply = `### 📁 准备从选定文件夹执行批量重绘生图
 我已将导入的项目资源池共 **${imageCount}** 张参考图绑定至批量任务中。
@@ -292,9 +349,12 @@ ${optResult.optimizedPromptZh}
           type: 'startBatchGeneration',
           payload: {
             plan: {
-              id: 'batch_' + Date.now(),
+              id: batchPlanId,
               sourceCollectionId: 'assets_pool',
               imageIds,
+              taskDomain,
+              aspectRatio,
+              layoutPreset,
               promptStrategy: {
                 mode: 'single_template',
                 rawUserStyle: userInput,
@@ -311,7 +371,8 @@ ${optResult.optimizedPromptZh}
               costPolicy: {
                 requiresCredits: context.settings.apiKeyStatus === 'missing'
               },
-              confirmationRequired: true
+              confirmationRequired: true,
+              outputGroup
             }
           }
         });

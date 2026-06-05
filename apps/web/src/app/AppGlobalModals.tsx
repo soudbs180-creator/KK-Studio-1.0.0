@@ -82,23 +82,23 @@ class SettingsPanelLoadBoundary extends React.Component<SettingsPanelLoadBoundar
           alignItems: 'center',
           justifyContent: 'center',
           padding: 24,
-          background: 'rgba(0, 0, 0, 0.62)',
+          background: 'var(--mobile-clay-overlay-bg, rgba(10, 10, 10, 0.24))',
           backdropFilter: 'blur(14px)',
         }}
       >
         <div
           style={{
             width: 'min(520px, 100%)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
+            border: '1px solid var(--border-default, rgba(17, 24, 39, 0.14))',
             borderRadius: 18,
             padding: 20,
-            background: 'rgba(16, 16, 18, 0.96)',
-            color: '#fffaf0',
-            boxShadow: '0 24px 80px rgba(0, 0, 0, 0.42)',
+            background: 'var(--bg-surface, #ffffff)',
+            color: 'var(--text-primary, #0a0a0a)',
+            boxShadow: 'var(--frost-card-framework-shadow, none)',
           }}
         >
           <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.35 }}>设置页加载失败</div>
-          <div style={{ marginTop: 8, color: 'rgba(255, 250, 240, 0.72)', fontSize: 13, lineHeight: 1.7 }}>
+          <div style={{ marginTop: 8, color: 'var(--text-secondary, #3a3a3a)', fontSize: 13, lineHeight: 1.7 }}>
             {helper}
           </div>
           <pre
@@ -106,11 +106,11 @@ class SettingsPanelLoadBoundary extends React.Component<SettingsPanelLoadBoundar
               marginTop: 14,
               maxHeight: 110,
               overflow: 'auto',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              border: '1px solid var(--border-subtle, rgba(17, 24, 39, 0.10))',
               borderRadius: 12,
               padding: 12,
-              background: 'rgba(255, 255, 255, 0.04)',
-              color: 'rgba(255, 250, 240, 0.72)',
+              background: 'var(--bg-tertiary, #ffffff)',
+              color: 'var(--text-secondary, #3a3a3a)',
               fontSize: 11,
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
@@ -127,8 +127,8 @@ class SettingsPanelLoadBoundary extends React.Component<SettingsPanelLoadBoundar
                 border: 0,
                 borderRadius: 10,
                 padding: '0 14px',
-                background: '#fffaf0',
-                color: '#111',
+                background: 'var(--accent-coral, #ff6b5a)',
+                color: '#ffffff',
                 fontWeight: 800,
                 cursor: 'pointer',
               }}
@@ -140,11 +140,11 @@ class SettingsPanelLoadBoundary extends React.Component<SettingsPanelLoadBoundar
               onClick={this.props.onClose}
               style={{
                 minHeight: 38,
-                border: '1px solid rgba(255, 255, 255, 0.12)',
+                border: '1px solid var(--border-default, rgba(17, 24, 39, 0.14))',
                 borderRadius: 10,
                 padding: '0 14px',
-                background: 'rgba(255, 255, 255, 0.04)',
-                color: '#fffaf0',
+                background: 'var(--bg-surface, #ffffff)',
+                color: 'var(--text-primary, #0a0a0a)',
                 fontWeight: 800,
                 cursor: 'pointer',
               }}

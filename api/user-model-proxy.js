@@ -27,6 +27,51 @@ function getHeader(req, name) {
   return String(headers[name] || headers[name.toLowerCase()] || '').trim();
 }
 
+function isObjectRecord(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isEncryptedSecretEnvelope(value) {
+  if (!isObjectRecord(value)) return false;
+  if (value.__kkUserApiSecret === true) return true;
+  const keys = Object.keys(value).map((key) => key.toLowerCase());
+  const hasCipher = keys.some((key) => key === 'ciphertext' || key === 'cipher_text' || key === 'cipher');
+  const hasIv = keys.includes('iv') || keys.includes('nonce');
+  return hasCipher && hasIv;
+}
+
+function isEncryptedSecretJsonString(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return false;
+  try {
+    return isEncryptedSecretEnvelope(JSON.parse(trimmed));
+  } catch {
+    return false;
+  }
+}
+
+function normalizeUserApiSecretForTransport(value) {
+  if (value == null || isEncryptedSecretEnvelope(value) || typeof value !== 'string') {
+    return '';
+  }
+
+  const token = value.trim();
+  if (
+    !token
+    || token === 'sk-readonly-0000'
+    || token.startsWith('__kk_redacted__:')
+    || token === '[object Object]'
+    || /^\[object\s+[^\]]+\]$/.test(token)
+    || /[\u2022\u25cf\u25e6\u2219\u2027\u2026]/.test(token)
+    || token.includes('...')
+    || isEncryptedSecretJsonString(token)
+  ) {
+    return '';
+  }
+
+  return token;
+}
+
 function appendWuyinApiKeyToTargetUrl(targetUrl, apiKey) {
   const token = String(apiKey || '').trim();
   if (!token) return targetUrl;
@@ -93,7 +138,7 @@ export default async function handler(req, res) {
   }
 
   const targetUrl = getHeader(req, 'x-proxy-target-url');
-  const apiKey = getHeader(req, 'x-proxy-api-key');
+  const apiKey = normalizeUserApiSecretForTransport(getHeader(req, 'x-proxy-api-key'));
 
   if (!targetUrl) {
     const vpsBackend = process.env.VPS_BACKEND_URL || 'https://172-245-156-16.sslip.io';

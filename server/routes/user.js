@@ -40,6 +40,10 @@ const {
   encodeLocalProxyTaskId,
   extractWuyinOutputUrls
 } = require('../lib/wuyinModelExecutor');
+const {
+  isSendableUserApiSecret,
+  normalizeUserApiSecretForTransport,
+} = require('../lib/userApiSecret');
 
 const router = express.Router();
 const ACCESS_TOKEN_COOKIE_NAME = 'kk.api.access_token';
@@ -1013,6 +1017,10 @@ function buildLocalUserRouteFromSlot(slot, providers) {
   };
 }
 
+function getLocalRouteApiKeyForTransport(route) {
+  return normalizeUserApiSecretForTransport(route && route.apiKey);
+}
+
 function getLocalRecordIdAliases(record) {
   const aliases = [
     String(record && record.id || '').trim(),
@@ -1022,6 +1030,52 @@ function getLocalRecordIdAliases(record) {
     .filter(Boolean);
 
   return Array.from(new Set(aliases));
+}
+
+function localRecordMatchesId(record, recordId) {
+  const target = normalizeLocalRouteValue(recordId);
+  if (!target) return false;
+  return getLocalRecordIdAliases(record).includes(target);
+}
+
+function revealProfileApiSecret(profileState, input) {
+  const recordType = String(input && input.recordType || '').trim();
+  const recordId = String(input && input.recordId || '').trim();
+  const field = String(input && input.field || '').trim();
+
+  const collection =
+    recordType === 'slot'
+      ? profileState.slots
+      : recordType === 'provider'
+        ? profileState.providers
+        : recordType === 'entry'
+          ? profileState.entries
+          : null;
+  const expectedField = recordType === 'provider' ? 'apiKey' : recordType === 'slot' || recordType === 'entry' ? 'key' : '';
+
+  if (!Array.isArray(collection) || !recordId || field !== expectedField) {
+    return { ok: false, status: 400, code: 'INVALID_REVEAL_REQUEST' };
+  }
+
+  const record = collection.find((item) => localRecordMatchesId(item, recordId));
+  if (!record) {
+    return { ok: false, status: 404, code: 'USER_API_SECRET_NOT_FOUND' };
+  }
+
+  const secret = String(record && record[field] || '').trim();
+  if (!isSendableUserApiSecret(secret)) {
+    return { ok: false, status: 404, code: 'USER_API_SECRET_NOT_AVAILABLE' };
+  }
+
+  return {
+    ok: true,
+    value: {
+      recordType,
+      recordId: String(record.id || recordId),
+      field,
+      secret,
+    },
+  };
 }
 
 function localRecordMatchesRoute(record, routeTarget, rawRouteId) {
@@ -1100,11 +1154,10 @@ async function handleWuyinGenericProxy(req, res, profileState) {
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
   }
-  if (!route.apiKey) {
+  const apiKey = getLocalRouteApiKeyForTransport(route);
+  if (!apiKey) {
     return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'API key is required.');
   }
-
-  const apiKey = String(route.apiKey || '').trim();
 
   try {
     // 简体中文注释：根据是否为速创 (Wuyin) API，来决定 Authorization 的组装格式。
@@ -1152,10 +1205,15 @@ async function pollWuyinImageResultUntilComplete({ route, routeId, providerTaskI
   const startedAt = Date.now();
   const maxDurationMs = 10 * 60 * 1000;
   let delayMs = 2500;
+  const apiKey = getLocalRouteApiKeyForTransport(route);
+
+  if (!apiKey) {
+    throw new Error('Wuyin API key is required.');
+  }
 
   while (Date.now() - startedAt < maxDurationMs) {
     const detailUrl = buildWuyinVideoDetailUrl(route.baseUrl, providerTaskId);
-    const payload = await fetchWuyinVideoJson(detailUrl, route.apiKey, 'GET');
+    const payload = await fetchWuyinVideoJson(detailUrl, apiKey, 'GET');
 
     const status = mapWuyinVideoStatus(extractWuyinVideoStatusCode(payload));
     const urls = extractWuyinOutputUrls(payload);
@@ -1246,8 +1304,12 @@ function isWuyinUpstreamEndpointUnavailable(error) {
 
 async function submitWuyinImageTaskWithFallback({ catalogItem, route, input }) {
   try {
+    const apiKey = getLocalRouteApiKeyForTransport(route);
+    if (!apiKey) {
+      throw new Error('Wuyin API key is required.');
+    }
     return {
-      result: await submitWuyinTask({ catalogItem, apiKey: route.apiKey, input, baseUrl: route.baseUrl }),
+      result: await submitWuyinTask({ catalogItem, apiKey, input, baseUrl: route.baseUrl }),
       catalogItem,
       fallbackApplied: false,
     };
@@ -1269,7 +1331,8 @@ async function handleWuyinImageMode(req, res, profileState) {
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
   }
-  if (!route.apiKey) {
+  const apiKey = getLocalRouteApiKeyForTransport(route);
+  if (!apiKey) {
     return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
   }
 
@@ -1328,7 +1391,8 @@ async function handleWuyinVideoMode(req, res, profileState) {
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
   }
-  if (!route.apiKey) {
+  const apiKey = getLocalRouteApiKeyForTransport(route);
+  if (!apiKey) {
     return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
   }
 
@@ -1339,7 +1403,7 @@ async function handleWuyinVideoMode(req, res, profileState) {
   }
 
   try {
-    const result = await submitWuyinTask({ catalogItem, apiKey: route.apiKey, input: req.body, baseUrl: route.baseUrl });
+    const result = await submitWuyinTask({ catalogItem, apiKey, input: req.body, baseUrl: route.baseUrl });
     
     return res.json(okEnvelope({
       taskId: buildWuyinLocalTaskId(route, routeId, result, catalogItem),
@@ -1364,7 +1428,8 @@ async function handleWuyinAudioMode(req, res, profileState) {
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
   }
-  if (!route.apiKey) {
+  const apiKey = getLocalRouteApiKeyForTransport(route);
+  if (!apiKey) {
     return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
   }
 
@@ -1378,7 +1443,7 @@ async function handleWuyinAudioMode(req, res, profileState) {
   }
 
   try {
-    const result = await submitWuyinTask({ catalogItem, apiKey: route.apiKey, input: req.body, baseUrl: route.baseUrl });
+    const result = await submitWuyinTask({ catalogItem, apiKey, input: req.body, baseUrl: route.baseUrl });
     return res.json(okEnvelope({
       url: result.urls[0] || '',
       urls: result.urls,
@@ -1419,7 +1484,8 @@ async function handleWuyinChatMode(req, res, profileState) {
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
   }
-  if (!route.apiKey) {
+  const apiKey = getLocalRouteApiKeyForTransport(route);
+  if (!apiKey) {
     return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
   }
 
@@ -1430,7 +1496,7 @@ async function handleWuyinChatMode(req, res, profileState) {
   }
 
   try {
-    const result = await submitWuyinTask({ catalogItem, apiKey: route.apiKey, input: req.body, baseUrl: route.baseUrl });
+    const result = await submitWuyinTask({ catalogItem, apiKey, input: req.body, baseUrl: route.baseUrl });
     const content = extractWuyinChatContent(result.raw) || JSON.stringify(result.raw || {});
     return res.json(okEnvelope({
       content,
@@ -1461,7 +1527,8 @@ async function handleWuyinTaskStatusMode(req, res, profileState) {
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'Wuyin API route for this local task was not found.');
   }
-  if (!route.apiKey) {
+  const apiKey = getLocalRouteApiKeyForTransport(route);
+  if (!apiKey) {
     return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
   }
 
@@ -1494,7 +1561,7 @@ async function handleWuyinTaskStatusMode(req, res, profileState) {
   try {
     const result = await checkWuyinTaskStatus({
       catalogItem,
-      apiKey: route.apiKey,
+      apiKey,
       providerTaskId: parsed.providerTaskId,
       submitExecTime: req.body.submitExecTime || 0,
       baseUrl: route.baseUrl
@@ -1726,6 +1793,33 @@ router.get('/v1/profile/user-apis', async (req, res) => {
     data: {
       entries: profileState.entries || []
     },
+    meta: buildMeta(req),
+  });
+});
+
+// 3.1 显式查看单条已保存密钥。普通列表接口仍不应默认返回所有明文密钥。
+router.post('/v1/profile/user-apis/reveal-secret', async (req, res) => {
+  const data = readLocalStorage();
+  const profileState = readProfileState(data, req.profileUserId);
+  writeLocalStorage(data);
+
+  const result = revealProfileApiSecret(profileState, req.body);
+  if (!result.ok) {
+    return res.status(result.status).json({
+      success: false,
+      error: {
+        code: result.code,
+        message: result.code === 'INVALID_REVEAL_REQUEST'
+          ? 'Invalid user API secret reveal request.'
+          : 'The requested user API secret is not available.',
+      },
+      meta: buildMeta(req),
+    });
+  }
+
+  return res.json({
+    success: true,
+    data: result.value,
     meta: buildMeta(req),
   });
 });
@@ -1994,6 +2088,7 @@ router.post('/v1/profile/user-routes/:routeId/connectivity', requireProfileAuth,
 
   const cleanBase = String(route.baseUrl || '').trim().replace(/\/$/, '');
   const format = route.format || 'openai';
+  const apiKey = getLocalRouteApiKeyForTransport(route);
 
   // Wuyin/Suchuang exposes its catalog through a site endpoint, not /v1/models.
   const isWuyin = routeId === 'wuyinkeji'
@@ -2004,7 +2099,6 @@ router.post('/v1/profile/user-routes/:routeId/connectivity', requireProfileAuth,
     || /wuyinkeji/i.test(route.baseUrl);
 
   if (isWuyin) {
-    const apiKey = String(route.apiKey || '').trim();
     const baseUrl = String(route.baseUrl || '').trim();
 
     if (!apiKey) {
@@ -2062,6 +2156,19 @@ router.post('/v1/profile/user-routes/:routeId/connectivity', requireProfileAuth,
   let latencyMs = null;
   const start = Date.now();
 
+  if (!apiKey) {
+    return res.json({
+      success: true,
+      data: {
+        routeId,
+        ok: false,
+        message: 'API Key 涓嶈兘涓虹┖',
+        models: []
+      },
+      meta: buildMeta(req)
+    });
+  }
+
   try {
     let targetUrl = `${cleanBase}/v1/models`;
     const headers = {
@@ -2069,9 +2176,9 @@ router.post('/v1/profile/user-routes/:routeId/connectivity', requireProfileAuth,
     };
     
     if (format === 'gemini') {
-      targetUrl = `${cleanBase}/v1beta/models?key=${route.apiKey}`;
+      targetUrl = `${cleanBase}/v1beta/models?key=${apiKey}`;
     } else {
-      headers['Authorization'] = `Bearer ${route.apiKey}`;
+      headers['Authorization'] = `Bearer ${apiKey}`;
     }
 
     const controller = new AbortController();

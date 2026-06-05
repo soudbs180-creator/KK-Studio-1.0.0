@@ -6,6 +6,7 @@
  */
 
 import { AspectRatio } from '../../types';
+import { getApiKeyToken } from '../api/apiConfig';
 
 /**
  * Veo视频配置
@@ -53,6 +54,11 @@ export async function startVeoVideoGeneration(
     apiKey: string,
     baseUrl?: string
 ): Promise<{ operationId: string }> {
+    apiKey = getApiKeyToken(apiKey);
+    if (!apiKey) {
+        throw new Error('Saved API key is empty or unavailable. Re-enter or reveal the real API key before retrying.');
+    }
+
     const model = config.model || 'veo-3.1-generate-preview';
     const cleanBase = baseUrl || 'https://generativelanguage.googleapis.com';
 
@@ -104,6 +110,11 @@ export async function pollVeoVideoOperation(
     onProgress?: (percent: number) => void,
     signal?: AbortSignal
 ): Promise<VeoVideoResult> {
+    apiKey = getApiKeyToken(apiKey);
+    if (!apiKey) {
+        throw new Error('Saved API key is empty or unavailable. Re-enter or reveal the real API key before retrying.');
+    }
+
     const cleanBase = baseUrl || 'https://generativelanguage.googleapis.com';
     // 轮询 URL: 使用 header 认证 (不需要 query 参数)
     const pollUrl = `${cleanBase}/v1beta/${operationId}`;
@@ -165,6 +176,11 @@ export async function pollVeoVideoOperation(
  * 下载视频
  */
 async function downloadVideo(uri: string, apiKey: string): Promise<Blob> {
+    apiKey = getApiKeyToken(apiKey);
+    if (!apiKey) {
+        throw new Error('Saved API key is empty or unavailable. Re-enter or reveal the real API key before retrying.');
+    }
+
     const response = await fetch(uri, {
         headers: { 'x-goog-api-key': apiKey }
     });
@@ -184,6 +200,11 @@ export async function cancelVeoVideoOperation(
     apiKey: string,
     baseUrl?: string
 ): Promise<void> {
+    apiKey = getApiKeyToken(apiKey);
+    if (!apiKey) {
+        throw new Error('Saved API key is empty or unavailable. Re-enter or reveal the real API key before retrying.');
+    }
+
     const cleanBase = baseUrl || 'https://generativelanguage.googleapis.com';
     // 取消 URL: 使用 header 认证
     const cancelUrl = `${cleanBase}/v1beta/${operationId}:cancel`;

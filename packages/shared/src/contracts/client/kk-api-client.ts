@@ -29,6 +29,8 @@ import type {
   TempUserSessionDto,
   UpdatePasswordRequestDto,
   UpdatePasswordResponseDto,
+  RevealUserApiSecretRequestDto,
+  RevealUserApiSecretResponseDto,
   UserRouteConnectivityCheckDto,
   UserRoutePricingSyncRequestDto,
   UserRoutePricingSyncDto,
@@ -179,6 +181,10 @@ export interface KkApiClient {
     input: ReplaceUserApisPayloadRequestDto,
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<KeyManagerCloudStateDto>>;
+  revealUserApiSecret(
+    input: RevealUserApiSecretRequestDto,
+    options?: ApiClientRequestOptions,
+  ): Promise<ApiResponse<RevealUserApiSecretResponseDto>>;
   getKeyManagerCloudState(
     options?: ApiClientRequestOptions,
   ): Promise<ApiResponse<KeyManagerCloudStateDto>>;
@@ -819,6 +825,18 @@ export function createKkApiClient(config: ApiClientConfig): KkApiClient {
         "api/v1/profile/user-apis/payload",
         {
           method: "PUT",
+          body: JSON.stringify(input),
+        },
+        options,
+      );
+    },
+
+    revealUserApiSecret(input, options) {
+      return requestJson<RevealUserApiSecretResponseDto>(
+        config,
+        "api/v1/profile/user-apis/reveal-secret",
+        {
+          method: "POST",
           body: JSON.stringify(input),
         },
         options,

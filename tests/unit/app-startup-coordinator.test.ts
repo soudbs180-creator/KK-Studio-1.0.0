@@ -90,7 +90,7 @@ test('app startup coordinator drives staged post-login bootstrapping', () => {
     authenticatedShellSource,
     /export const AuthenticatedAppShell: React\.FC<AuthenticatedAppShellProps> = \(\{[\s\S]*showCostEstimation,[\s\S]*onExitCostEstimation,[\s\S]*AppContentComponent,[\s\S]*showStartupBanner = true,[\s\S]*\}\) =>/,
   );
-  assert.match(authenticatedShellSource, /if \(loading\) \{\s*\/\/ 简体中文注释：登录态检测期间直接显示纯黑占位，不使用大型进度条，秒进登录页面\s*return <div className="fixed inset-0 bg-\[#09090b\]" \/>;\s*\}/);
+  assert.match(authenticatedShellSource, /if \(loading\) \{\s*\/\/ 简体中文注释：登录态检测期间直接显示纯黑占位，不使用大型进度条，秒进登录页面\s*return <div className="fixed inset-0 bg-\[(?:#09090b|var\(--bg-base\))\]" \/>;\s*\}/);
   assert.match(authenticatedShellSource, /<CostEstimation onBack=\{onExitCostEstimation\} \/>/);
   assert.doesNotMatch(authenticatedShellSource, /showWorkspaceStartupSkeleton/);
   assert.match(authenticatedShellSource, /const showStartupRuntimeBanner = showStartupBanner && !isBackgroundReady;/);

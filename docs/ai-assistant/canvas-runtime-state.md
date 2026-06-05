@@ -33,6 +33,15 @@ export interface CanvasRuntimeState {
     groupIds: string[];
     count: number;
   };
+  groups: Array<{
+    id: string;
+    label?: string;
+    hidden: boolean;
+    collapsed: boolean;
+    color?: string;
+    nodeCount: number;
+    tags?: string[];
+  }>;
   selectedNodes: {
     prompts: Array<{
       id: string;
@@ -71,3 +80,6 @@ export interface CanvasRuntimeState {
 1. **选中图片节点**: 当 `selection.imageNodeIds` 不为空时，如果用户说“下载这些图”，代表仅下载这些选中的图片。
 2. **选中 Prompt 节点**: 当选中 Prompt 节点时，自动在 `childImageNodeIdsFromSelectedPrompts` 中装载其子图 ID，供打包下载解析使用。
 3. **坐标投影**: 在执行“定位卡片”或“在该处建卡”等工具时，画布中的坐标通过 `viewport.scale` 与中心做映射计算，保证聚焦精确无偏。
+4. **分组摘要**: `groups` 记录每个 `CanvasGroup` 的名称、隐藏/收纳状态、内发光颜色、节点数和标签。AI 助手可用它理解“刚刚那组”“隐藏这个组”“把这个分组展开”等指令。
+5. **隐藏与收纳**: `hidden=true` 只代表视觉模糊隐藏，卡片仍在画布渲染和连接线逻辑中；`collapsed=true` 才代表收纳成条并从普通卡片渲染队列中过滤成员节点。
+6. **批量输出追踪**: 批量任务创建的分组应带 `automation` 与 `batch:<jobId>` 标签，`color` 默认 `#ffffff`，用于后续恢复、重排、隐藏或下载该批次。

@@ -23,6 +23,7 @@ export class LLMBrain {
 - [只优化提示词并填充](action://takeover-prompt-only) ：只优化提示词并填充到输入框。
 - [整理我的批量方案为文案](action://takeover-prompt-doc) ：整理生图文案。
 - [去设置API](action://open-settings-api) ：高亮打开API Key管理。
+- [打开系统日志](action://open-settings-logs) ：打开系统日志维护面板。
 - [立即去充值](action://open-recharge) ：打开充值。
 
 [动作计划 json schema]
@@ -33,11 +34,15 @@ export class LLMBrain {
 - {"type": "startGeneration", "payload": {"prompt": "提示词", "count": 数量}} ：在画布上新建卡片并开始生成。
 - {"type": "submitPromptComposer", "payload": {}} ：帮我发送（点击生图发送键）。
 - {"type": "locateCard", "payload": {"keyword": "关键词"}} ：高亮定位卡片。
-- {"type": "openSettings", "payload": {"tab": "api-management"}} ：打开API密钥设置。
+- {"type": "openSettings", "payload": {"tab": "dashboard" | "api-management" | "consumption-records" | "storage-settings" | "system-logs" | "user-profile"}} ：打开设置页的具体功能面板。
 
 [任务拆解要求]
 - 若用户要求“帮我把输入框的提示词优化一下”，你应当获取 context.promptBarInput.prompt 进行优化，并返回 fillInputPrompt 动作（如果是电商模式，则直接优化电商的原输入框提示词）。
 - 若用户要求“帮我发送”或“帮我建卡”，你必须返回 {"type": "submitPromptComposer", "payload": {}} 或 {"type": "startGeneration", "payload": {"prompt": context.promptBarInput.prompt, "count": 1}}。
+- 若用户要求“打开日志 / 查看日志 / 系统日志”，这是安全 UI 操作，必须返回 {"type": "openSettings", "payload": {"tab": "system-logs"}}，不得要求用户先配置模型。
+- 若用户要求“帮我打开个人中心 / 用户中心 / 我的账号”，这是安全 UI 操作，必须返回 {"type": "openSettings", "payload": {"tab": "user-profile"}}。
+- 若用户要求“帮我打开 API / API 工作台 / 接口设置”，这是安全 UI 操作，必须返回 {"type": "openSettings", "payload": {"tab": "api-management"}}；只有用户明确要求填写、读取或保存密钥时，才提醒安全边界。
+- 若用户说“生成一个...”且没有批量、文件夹、每张图分别参考等复杂约束，优先返回 {"type": "fillInputPrompt", "payload": {"prompt": "提取出的提示词"}} 和 {"type": "submitPromptComposer", "payload": {}}，复用当前画布输入框的模型、比例、参考图和生成设置。
 - 若用户要求连续的多阶段任务（如“生成一张图片，再切换到视频模式用生成的这张图片再给我生成一个视频”）：
   第一步：先切换至图片模式 {"type": "changeMode", "payload": {"mode": "image"}}；
   第二步：直接发起生图 {"type": "startGeneration", "payload": {"prompt": "用户当前的提示词", "count": 1}}；

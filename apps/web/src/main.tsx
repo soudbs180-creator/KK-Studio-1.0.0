@@ -145,8 +145,8 @@ function FatalScreen({ error }: { error: FatalError }) {
     <div
       style={{
         minHeight: '100vh',
-        background: 'var(--bg-canvas, #0b0b0c)',
-        color: 'var(--text-primary, #fffaf0)',
+        background: 'var(--bg-canvas, #ffffff)',
+        color: 'var(--text-primary, #0a0a0a)',
         fontFamily: 'Inter, system-ui, sans-serif',
         display: 'flex',
         alignItems: 'center',
@@ -158,16 +158,16 @@ function FatalScreen({ error }: { error: FatalError }) {
         style={{
           width: '100%',
           maxWidth: '920px',
-          background: 'var(--frost-card-framework-bg, #141414)',
-          border: '1px solid var(--frost-card-framework-border, rgba(255,250,240,0.14))',
+          background: 'var(--frost-card-framework-bg, #ffffff)',
+          border: '1px solid var(--frost-card-framework-border, rgba(17,24,39,0.14))',
           borderRadius: '24px',
           padding: '28px',
-          boxShadow: 'var(--frost-card-framework-shadow, 0 12px 28px rgba(0,0,0,0.24))',
+          boxShadow: 'var(--frost-card-framework-shadow, none)',
           backdropFilter: 'blur(var(--frost-card-framework-blur, 24px)) saturate(160%)',
         }}
       >
         <div style={{ marginBottom: '18px' }}>
-          <div style={{ fontSize: '14px', color: 'var(--text-secondary, #d6d0c4)', marginBottom: '8px' }}>
+          <div style={{ fontSize: '14px', color: 'var(--text-secondary, #3a3a3a)', marginBottom: '8px' }}>
             {pickByResolvedLanguage(language, 'KK Studio 启动诊断', 'KK Studio Startup Diagnostics')}
           </div>
           <h1 style={{ fontSize: '28px', lineHeight: 1.2, color: 'var(--state-danger-text, #f87171)', margin: 0 }}>
@@ -177,17 +177,17 @@ function FatalScreen({ error }: { error: FatalError }) {
 
         <div
           style={{
-            background: 'var(--frost-card-sub-bg, #1f1f1f)',
-            border: '1px solid var(--frost-card-sub-border, rgba(255,250,240,0.12))',
+            background: 'var(--frost-card-sub-bg, #ffffff)',
+            border: '1px solid var(--frost-card-sub-border, rgba(17,24,39,0.12))',
             borderRadius: '12px',
             padding: '16px',
             marginBottom: '16px',
           }}
         >
-          <div style={{ fontSize: '14px', color: 'var(--text-secondary, #d6d0c4)', marginBottom: '6px' }}>
+          <div style={{ fontSize: '14px', color: 'var(--text-secondary, #3a3a3a)', marginBottom: '6px' }}>
             {pickByResolvedLanguage(language, '错误信息', 'Error details')}
           </div>
-          <div style={{ fontSize: '16px', color: 'var(--text-primary, #fffaf0)', fontWeight: 600, marginBottom: '10px' }}>
+          <div style={{ fontSize: '16px', color: 'var(--text-primary, #0a0a0a)', fontWeight: 600, marginBottom: '10px' }}>
             {localizeStartupErrorText(error.message)}
           </div>
           {error.details && (
@@ -198,7 +198,7 @@ function FatalScreen({ error }: { error: FatalError }) {
                 wordBreak: 'break-word',
                 fontSize: '12px',
                 lineHeight: 1.6,
-                color: 'var(--text-secondary, #d6d0c4)',
+                color: 'var(--text-secondary, #3a3a3a)',
                 maxHeight: '320px',
                 overflow: 'auto',
               }}
@@ -250,9 +250,9 @@ function FatalScreen({ error }: { error: FatalError }) {
               window.location.reload();
             }}
             style={{
-              border: '1px solid var(--frost-card-sub-border, rgba(255,250,240,0.12))',
-              background: 'var(--frost-card-sub-bg, #1f1f1f)',
-              color: 'var(--text-primary, #fff)',
+              border: '1px solid var(--frost-card-sub-border, rgba(17,24,39,0.12))',
+              background: 'var(--frost-card-sub-bg, #ffffff)',
+              color: 'var(--text-primary, #0a0a0a)',
               borderRadius: '10px',
               padding: '10px 16px',
               cursor: 'pointer',
@@ -317,14 +317,14 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
           <div
             style={{
               minHeight: '100vh',
-              background: '#0b0b0c',
+              background: 'var(--bg-canvas, #ffffff)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontFamily: 'Inter, system-ui, sans-serif',
             }}
           >
-            <div style={{ color: '#fffaf0', fontSize: '15px' }}>
+            <div style={{ color: 'var(--text-primary, #0a0a0a)', fontSize: '15px' }}>
               {pickByResolvedLanguage(language, '正在更新应用资源，请稍候...', 'Updating application resources, please wait...')}
             </div>
           </div>

@@ -21,6 +21,7 @@ import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../util
 import { X, Loader2, Sparkles, ChevronDown, Plus, Pin } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
+import { useCanvas } from '../../context/CanvasContext';
 import { useLocale } from '../../context/LocaleContext';
 import { formatRemainingCredits } from '../../services/billing/remainingBalance';
 import { getModelCredits } from '../../services/model/modelPricing';
@@ -43,6 +44,16 @@ import {
 } from '../../services/ecommerce/ecommerceModelPolicy.ts';
 import type { EcommerceAnalysisResult } from '../../services/ecommerce/types';
 import type { EcommerceGroupSlotState } from '../../services/ecommerce/groupSlotState.ts';
+import { useAssetStore } from '../../features/assets/assetStore';
+import {
+    ReferenceMentionPanel,
+    buildReferenceMentionTabs,
+    canCandidateAttachToPromptBar,
+    favoriteComposerRegistry,
+    useFavoritesStore,
+    type MentionReferencePayload,
+    type ReferenceMentionCandidate,
+} from '../../features/favorites';
 
 const PROMPT_CONFIG_SYNC_DELAY_MS = 320;
 const PROMPT_TEXTAREA_LINE_HEIGHT_PX = 22.5;
@@ -1184,6 +1195,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
     chatSidebarWidth = 420,
 }) => {
     const { pick } = useLocale();
+    const { activeCanvas } = useCanvas();
+    const favoriteItems = useFavoritesStore(state => state.items);
+    const assetImages = useAssetStore(state => state.images);
+    const assetFiles = useAssetStore(state => state.files);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     // Track composition state so IME input is not interrupted by background sync.
@@ -1192,6 +1207,12 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const [mobileCategory, setMobileCategory] = useState<string>('featured');
     const [mobileSubView, setMobileSubView] = useState<'input' | 'model' | 'settings'>('input');
     const [isExpanded, setIsExpanded] = useState(false);
+    const [mentionState, setMentionState] = useState<{
+        open: boolean;
+        query: string;
+        start: number;
+        end: number;
+    }>({ open: false, query: '', start: 0, end: 0 });
 
     // 🚀 [防止点击穿透] 展开后的 300ms 内，拦截模型选择按钮的点击事件，彻底根治延迟 click 事件穿透
     const [justExpanded, setJustExpanded] = useState(false);
@@ -2057,12 +2078,170 @@ const PromptBar: React.FC<PromptBarProps> = ({
         target.style.height = `${newHeight}px`;
     }, []);
 
+    const referenceMentionTabs = useMemo(() => buildReferenceMentionTabs({
+        promptBarReferences: config.referenceImages,
+        assistantImages: assetImages,
+        assistantFiles: assetFiles,
+        promptNodes: activeCanvas?.promptNodes || [],
+        imageNodes: activeCanvas?.imageNodes || [],
+        favorites: favoriteItems,
+    }), [
+        activeCanvas?.imageNodes,
+        activeCanvas?.promptNodes,
+        assetFiles,
+        assetImages,
+        config.referenceImages,
+        favoriteItems,
+    ]);
+
+    const closeReferenceMentionPanel = useCallback(() => {
+        setMentionState(prev => prev.open ? { ...prev, open: false, query: '' } : prev);
+    }, []);
+
+    const updateReferenceMentionFromTextarea = useCallback((target: HTMLTextAreaElement) => {
+        if (isComposingRef.current) {
+            return;
+        }
+
+        const value = target.value;
+        const caret = target.selectionStart ?? value.length;
+        const beforeCaret = value.slice(0, caret);
+        const atIndex = beforeCaret.lastIndexOf('@');
+
+        if (atIndex < 0) {
+            closeReferenceMentionPanel();
+            return;
+        }
+
+        const token = beforeCaret.slice(atIndex + 1);
+        if (/[\s,，。；;:：()[\]{}<>]/.test(token)) {
+            closeReferenceMentionPanel();
+            return;
+        }
+
+        setMentionState({
+            open: true,
+            query: token,
+            start: atIndex,
+            end: caret,
+        });
+    }, [closeReferenceMentionPanel]);
+
+    const addMentionCandidateToPromptBar = useCallback((candidate?: ReferenceMentionCandidate) => {
+        if (!candidate || !canCandidateAttachToPromptBar(candidate) || !candidate.referenceImage) {
+            return;
+        }
+
+        const reference: ReferenceImage = {
+            ...candidate.referenceImage,
+            id: candidate.referenceImage.id || candidate.storageId || candidate.id,
+            storageId: candidate.referenceImage.storageId || candidate.storageId,
+            mimeType: candidate.referenceImage.mimeType || candidate.mimeType || 'image/png',
+            mentionName: candidate.name,
+            mentionText: candidate.mentionText,
+            mentionSourceId: candidate.id,
+        };
+
+        setConfig(prev => {
+            const alreadyExists = prev.referenceImages.some((image) => (
+                (reference.storageId && image.storageId === reference.storageId)
+                || image.id === reference.id
+                || (candidate.name && image.mentionName === candidate.name)
+            ));
+            if (alreadyExists) {
+                return prev;
+            }
+
+            const maxRefImages = getModelCapabilities(prev.model)?.maxRefImages ?? 5;
+            if (prev.referenceImages.length >= maxRefImages) {
+                notify.warning('参考图数量限制', `最多只能添加 ${maxRefImages} 张参考图`);
+                return prev;
+            }
+
+            return {
+                ...prev,
+                referenceImages: [...prev.referenceImages, reference],
+            };
+        });
+    }, [setConfig]);
+
+    const applyPromptTextChange = useCallback((nextValue: string, caret?: number) => {
+        promptDraftRef.current = nextValue;
+        setPromptDraft(nextValue);
+        commitPromptToConfig(nextValue);
+
+        window.requestAnimationFrame(() => {
+            const textarea = textareaRef.current;
+            if (!textarea) return;
+            textarea.focus();
+            if (typeof caret === 'number') {
+                textarea.setSelectionRange(caret, caret);
+            }
+            resizePromptTextarea(textarea);
+        });
+    }, [commitPromptToConfig, resizePromptTextarea]);
+
+    const insertPromptComposerPayload = useCallback((payload: MentionReferencePayload) => {
+        const text = payload.text || '';
+        if (!text) return;
+
+        const textarea = textareaRef.current;
+        const current = promptDraftRef.current;
+        const start = textarea?.selectionStart ?? current.length;
+        const end = textarea?.selectionEnd ?? start;
+        const nextValue = `${current.slice(0, start)}${text}${current.slice(end)}`;
+        const caret = start + text.length;
+
+        applyPromptTextChange(nextValue, caret);
+        addMentionCandidateToPromptBar(payload.candidate);
+    }, [addMentionCandidateToPromptBar, applyPromptTextChange]);
+
+    useEffect(() => {
+        favoriteComposerRegistry.setFallbackComposer('promptbar');
+        return favoriteComposerRegistry.register({
+            id: 'promptbar',
+            label: 'Canvas prompt',
+            insert: insertPromptComposerPayload,
+            focus: () => textareaRef.current?.focus(),
+            addReferenceImage: (reference, source) => {
+                addMentionCandidateToPromptBar(source || {
+                    id: reference.mentionSourceId || reference.storageId || reference.id,
+                    source: 'upload',
+                    kind: 'uploaded-image',
+                    name: reference.mentionName || reference.id,
+                    mentionText: reference.mentionText || `@${reference.mentionName || reference.id}`,
+                    mimeType: reference.mimeType,
+                    storageId: reference.storageId,
+                    referenceImage: reference,
+                });
+            },
+        });
+    }, [addMentionCandidateToPromptBar, insertPromptComposerPayload]);
+
+    const replaceActiveMentionWithCandidate = useCallback((candidate: ReferenceMentionCandidate) => {
+        const current = promptDraftRef.current;
+        const start = Math.max(0, mentionState.start);
+        const end = Math.max(start, mentionState.end);
+        const mentionText = candidate.mentionText || `@${candidate.name}`;
+        const rawPrefix = current.slice(0, start);
+        const rawSuffix = current.slice(end);
+        const prefix = rawPrefix && !/[\s(（,，:：]$/.test(rawPrefix) ? `${rawPrefix} ` : rawPrefix;
+        const suffixSpacer = rawSuffix && !/^[\s,，。；;:：)\]）]/.test(rawSuffix) ? ' ' : '';
+        const nextValue = `${prefix}${mentionText}${suffixSpacer}${rawSuffix}`;
+        const caret = prefix.length + mentionText.length + suffixSpacer.length;
+
+        setMentionState(prev => ({ ...prev, open: false, query: '' }));
+        applyPromptTextChange(nextValue, caret);
+        addMentionCandidateToPromptBar(candidate);
+    }, [addMentionCandidateToPromptBar, applyPromptTextChange, mentionState.end, mentionState.start]);
+
     const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const target = e.target;
         promptDraftRef.current = target.value;
         setPromptDraft(target.value);
         resizePromptTextarea(target);
-    }, [resizePromptTextarea]);
+        updateReferenceMentionFromTextarea(target);
+    }, [resizePromptTextarea, updateReferenceMentionFromTextarea]);
 
     useEffect(() => {
         if (textareaRef.current) {
@@ -2080,7 +2259,8 @@ const PromptBar: React.FC<PromptBarProps> = ({
         setPromptDraft(nextValue);
         resizePromptTextarea(e.currentTarget);
         commitPromptToConfig(nextValue);
-    }, [commitPromptToConfig, resizePromptTextarea]);
+        updateReferenceMentionFromTextarea(e.currentTarget);
+    }, [commitPromptToConfig, resizePromptTextarea, updateReferenceMentionFromTextarea]);
 
     const formatReferenceImageError = useCallback((err: unknown, fileName?: string) => {
         const fileLabel = fileName ? `“${fileName}”` : '当前文件';
@@ -2358,6 +2538,17 @@ const PromptBar: React.FC<PromptBarProps> = ({
         if (isComposingRef.current || (e.nativeEvent as KeyboardEvent).isComposing) {
             return;
         }
+        if (mentionState.open) {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                closeReferenceMentionPanel();
+                return;
+            }
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                return;
+            }
+        }
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             // 始终允许发送新请求，即使正在生成中
@@ -2368,7 +2559,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                 textareaRef.current?.blur();
             }
         }
-    }, [flushPromptDraftToConfig, onGenerate, isMobile, setIsExpanded, textareaRef]);
+    }, [closeReferenceMentionPanel, flushPromptDraftToConfig, mentionState.open, onGenerate, isMobile, setIsExpanded, textareaRef]);
 
     const primeClipboardImageFiles = useCallback(async (files: File[]) => {
         const preparedFiles = await Promise.all(files.map(async (file) => {
@@ -3843,7 +4034,14 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 )}
 
                                 {/* 右侧：文字输入框 */}
-                                <div className="flex-1 min-w-0">
+                                <div className="relative flex-1 min-w-0">
+                                    <ReferenceMentionPanel
+                                        open={mentionState.open}
+                                        query={mentionState.query}
+                                        tabs={referenceMentionTabs}
+                                        onSelect={replaceActiveMentionWithCandidate}
+                                        onClose={closeReferenceMentionPanel}
+                                    />
                                     <textarea
                                         ref={textareaRef}
                                         value={promptDraft}
@@ -3851,6 +4049,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         onKeyDown={handleKeyDown}
                                         onPaste={handlePaste}
                                         onFocus={() => {
+                                            favoriteComposerRegistry.markFocused('promptbar');
                                             setActiveMenu(null);
                                             onFocus?.();
                                         }}
@@ -5088,9 +5287,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
                         <div
                             data-mobile-composer-section="primary-input"
                             className={[
-                                shouldUseMobileInlineMedia && !isEmbeddedMobileComposer ? 'mt-1 flex items-center gap-2 px-3' : '',
+                                'relative',
+                                shouldUseMobileInlineMedia && !isEmbeddedMobileComposer ? 'relative mt-1 flex items-center gap-2 px-3' : '',
                                 isEmbeddedMobileComposer
-                                    ? 'mt-2 flex items-center gap-2 rounded-[22px] border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-3 py-2.5'
+                                    ? 'relative mt-2 flex items-center gap-2 rounded-[22px] border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-3 py-2.5'
                                     : '',
                             ].filter(Boolean).join(' ')}
                         >
@@ -5167,6 +5367,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     </svg>
                                 </button>
                             )}
+                            <ReferenceMentionPanel
+                                open={mentionState.open}
+                                query={mentionState.query}
+                                tabs={referenceMentionTabs}
+                                onSelect={replaceActiveMentionWithCandidate}
+                                onClose={closeReferenceMentionPanel}
+                            />
                             <textarea
                                 ref={textareaRef}
                                 value={promptDraft}
@@ -5174,6 +5381,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                 onKeyDown={handleKeyDown}
                                 onPaste={handlePaste}
                                 onFocus={() => {
+                                    favoriteComposerRegistry.markFocused('promptbar');
                                     setActiveMenu(null);
                                     onFocus?.(); // 通知侧边栏: 输入框有焦点,不要自动隐藏
                                 }}

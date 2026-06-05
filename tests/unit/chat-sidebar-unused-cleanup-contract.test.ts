@@ -27,3 +27,10 @@ test('ChatSidebar does not retain source-proven unused locals', () => {
   assert.doesNotMatch(source, /\bhandleClear\b/);
   assert.doesNotMatch(source, /\bgetTransformOrigin\b/);
 });
+
+test('ChatSidebar action links can open the system logs settings view', () => {
+  const source = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
+
+  assert.match(source, /action:\/\/open-settings-logs/);
+  assert.match(source, /onOpenSettings\) onOpenSettings\('system-logs'\)/);
+});

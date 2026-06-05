@@ -6,6 +6,7 @@ interface WorkspacePanelsProps {
   activePanel: WorkspacePanel;
   renderChatSidebar?: () => ReactNode;
   renderLibraryPanel?: () => ReactNode;
+  renderFavoritesPanel?: () => ReactNode;
   auxiliaryPanels?: ReactNode;
   isMobile?: boolean;
 }
@@ -15,12 +16,14 @@ const WorkspacePanels: React.FC<WorkspacePanelsProps> = ({
   activePanel,
   renderChatSidebar,
   renderLibraryPanel,
+  renderFavoritesPanel,
   auxiliaryPanels,
   isMobile,
 }) => (
   <>
     {(activePanel === 'chat' || (!isMobile && renderChatSidebar)) ? renderChatSidebar?.() : null}
     {activeSurface === 'library' ? renderLibraryPanel?.() : null}
+    {activeSurface === 'favorites' ? renderFavoritesPanel?.() : null}
     {auxiliaryPanels}
   </>
 );

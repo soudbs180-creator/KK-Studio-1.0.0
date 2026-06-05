@@ -215,8 +215,11 @@ export const SettingInput: React.FC<{
   helper?: string;
   disabled?: boolean;
   autoComplete?: string;
-}> = ({ label, value, onChange, onBlur, placeholder, type = 'text', helper, disabled = false, autoComplete }) => {
+  onReveal?: () => void | Promise<void>;
+  revealLoading?: boolean;
+}> = ({ label, value, onChange, onBlur, placeholder, type = 'text', helper, disabled = false, autoComplete, onReveal, revealLoading = false }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const [isRevealing, setIsRevealing] = useState(false);
   const isPassword = type === 'password';
 
   const resolvedAutoComplete = autoComplete || (
@@ -225,23 +228,48 @@ export const SettingInput: React.FC<{
       : undefined
   );
 
-  const getDisplayValue = () => {
-    if (!isPassword) return value;
-    if (!showPassword) return value;
-    
-    const strVal = String(value || '').trim();
-    const isRedacted =
+  const isRedactedPasswordValue = (rawValue: string) => {
+    const strVal = String(rawValue || '').trim();
+    return (
       strVal === 'sk-readonly-0000' ||
       strVal === '尚未填写' ||
       strVal === '已填写' ||
       strVal.includes('...') ||
       strVal.includes('••') ||
-      strVal.startsWith('__kk_redacted__:');
+      strVal.startsWith('__kk_redacted__:')
+    );
+  };
 
-    if (isRedacted) {
+  const getDisplayValue = () => {
+    if (!isPassword) return value;
+    if (!showPassword) return value;
+
+    if (isRedactedPasswordValue(value)) {
       return maskSecretDisplay(value);
     }
     return value;
+  };
+
+  const handlePasswordToggle = async () => {
+    if (showPassword) {
+      setShowPassword(false);
+      return;
+    }
+
+    if (isRedactedPasswordValue(value) && onReveal) {
+      setIsRevealing(true);
+      try {
+        await onReveal();
+        setShowPassword(true);
+      } catch {
+        // Caller owns user-facing error messages.
+      } finally {
+        setIsRevealing(false);
+      }
+      return;
+    }
+
+    setShowPassword(true);
   };
 
   return (
@@ -270,10 +298,10 @@ export const SettingInput: React.FC<{
         {isPassword && (
           <button
             type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            disabled={disabled}
+            onClick={() => void handlePasswordToggle()}
+            disabled={disabled || revealLoading || isRevealing}
             className="absolute inset-y-0 right-0 flex items-center pr-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer bg-transparent border-none outline-none disabled:cursor-not-allowed disabled:opacity-50"
-            title={showPassword ? '隐藏密钥' : '查看密钥'}
+            title={showPassword ? '隐藏密钥' : (isRevealing || revealLoading ? '正在查看密钥' : '查看密钥')}
           >
             {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>

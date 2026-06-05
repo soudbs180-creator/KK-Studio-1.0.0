@@ -106,6 +106,23 @@ describe('generation runtime extraction contract', () => {
     assert.match(guardSource, /notify\.warning\('已拦截重复发送'/);
   });
 
+  test('initial generation submission binds @ references before execution', () => {
+    const appSource = readSource('apps/web/src/App.tsx');
+    const handleGenerateSource = appSource.slice(
+      appSource.indexOf('const handleGenerate = useCallback'),
+      appSource.indexOf('// Handle reference images'),
+    );
+
+    assert.match(appSource, /reorderReferenceImagesByMentions,/);
+    assert.match(appSource, /appendReferenceMappingToPrompt,/);
+    assert.match(handleGenerateSource, /const referenceMentionBinding = reorderReferenceImagesByMentions\(\{/);
+    assert.match(handleGenerateSource, /referenceImages: config\.referenceImages \|\| \[\]/);
+    assert.match(handleGenerateSource, /const submissionPrompt = appendReferenceMappingToPrompt\(/);
+    assert.match(handleGenerateSource, /const submissionConfig =/);
+    assert.match(handleGenerateSource, /config: submissionConfig/);
+    assert.match(handleGenerateSource, /rawPrompt: submissionPrompt/);
+  });
+
   test('generation billing helpers are owned by useGenerationRuntime', () => {
     const appSource = readSource('apps/web/src/App.tsx');
     const hookSource = readSource('apps/web/src/app/useGenerationRuntime.ts');
@@ -415,7 +432,7 @@ describe('generation runtime extraction contract', () => {
     assert.match(appSource, /const \{[\s\S]*runInitialGenerationSubmissionTransaction,[\s\S]*\} = useGenerationRuntime\(\{/);
     assert.match(handleGenerateSource, /await runInitialGenerationSubmissionTransaction\(\{/);
     assert.match(handleGenerateSource, /prepareGenerationReferenceImages,/);
-    assert.match(handleGenerateSource, /rawPrompt: trimmedPrompt,/);
+    assert.match(handleGenerateSource, /rawPrompt: submissionPrompt,/);
     assert.doesNotMatch(appSource, /const \{[\s\S]*prepareInitialGeneratingPromptNodeContext,[\s\S]*\} = useGenerationRuntime\(\{/);
     assert.doesNotMatch(handleGenerateSource, /const initialGeneratingNode = await prepareInitialGeneratingPromptNodeContext\(\{/);
     assert.doesNotMatch(handleGenerateSource, /const finalReferenceImages = prepareGenerationReferenceImages/);

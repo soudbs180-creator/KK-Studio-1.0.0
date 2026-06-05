@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Check, Clock3, FolderOpen, MessageSquare, Plus, Search, Settings, Sun, Moon, Languages, PackageOpen, Trash2 } from 'lucide-react';
+import { Check, Clock3, FolderOpen, Heart, MessageSquare, Plus, Search, Settings, Sun, Moon, Languages, PackageOpen, Trash2 } from 'lucide-react';
 
 // 简体中文：自定义扫把（Broom）图标组件，用于清理操作
 const Broom: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ size = 24, ...props }) => (
@@ -60,6 +60,7 @@ export interface MobileWorkspaceSurfaceProps {
   onOpenProjects: () => void;
   onOpenSearch: () => void;
   onOpenHistory: () => void;
+  onOpenFavorites: () => void;
   onOpenChat: () => void;
   onOpenProfile: () => void;
   onBillingClick?: () => void;
@@ -80,7 +81,7 @@ export interface MobileWorkspaceSurfaceProps {
   composer: React.ReactNode;
   overlays?: React.ReactNode;
   isLoading?: boolean;
-  workspaceSurface?: 'workspace' | 'library';
+  workspaceSurface?: 'workspace' | 'library' | 'favorites';
   onCloseHistory?: () => void;
 }
 
@@ -102,6 +103,7 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   projectCount,
   onOpenSearch,
   onOpenHistory,
+  onOpenFavorites,
   onOpenChat,
   onOpenProfile,
   onBillingClick,
@@ -229,11 +231,11 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
           <div
             className="relative rounded-t-[30px] border px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-4 text-[var(--text-primary)]"
             style={{
-              background: 'linear-gradient(to bottom, rgba(20, 20, 22, 0.95) 0%, rgba(20, 20, 22, 0.65) 100%)',
+              background: 'var(--mobile-clay-shell-bg)',
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)',
-              borderColor: 'rgba(255, 255, 255, 0.08)',
-              boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.5)'
+              borderColor: 'var(--mobile-clay-border)',
+              boxShadow: 'var(--mobile-clay-shadow)'
             }}
           >
             <div className="mb-4 flex items-start justify-between gap-3">
@@ -444,6 +446,11 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
                 <div className="mt-1 text-xs text-[var(--text-tertiary)]">{pick('查找历史提示词和结果', 'Find history prompts and results')}</div>
               </button>
               {/* 电商生图独立入口（使用 PackageOpen 呼应电脑端） */}
+              <button type="button" onClick={() => runFromMoreSheet(onOpenFavorites)} className={moreSheetActionClass} data-testid="mobile-more-menu-favorites">
+                <Heart size={17} className="mb-2.5 text-[var(--accent-coral)]" />
+                <div className="text-sm font-semibold">{pick('鏀惰棌', 'Favorites')}</div>
+                <div className="mt-1 text-xs text-[var(--text-tertiary)]">{pick('鏀惰棌鍥剧墖鍜屾彁绀鸿瘝', 'Liked images and prompts')}</div>
+              </button>
               <button type="button" onClick={() => runFromMoreSheet(() => onScreenChange('ecommerce'))} className={moreSheetActionClass}>
                 <PackageOpen size={17} className="mb-2.5 text-[var(--accent-color)]" />
                 <div className="text-sm font-semibold">{pick('电商生图', 'E-commerce Gen')}</div>

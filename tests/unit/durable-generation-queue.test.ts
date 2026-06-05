@@ -263,4 +263,62 @@ describe('DurableGenerationQueue Tests', () => {
       globalThis.setTimeout = originalSetTimeout;
     }
   });
+
+  it('should persist output group node ids and reuse the same job by idempotency key', async () => {
+    mockLocalStorage.clear();
+    const queue = new DurableGenerationQueue();
+    let arrangedIds: string[] = [];
+    let completedGroupId = '';
+
+    queue.registerExecutor(async (_prompt, _options, _jobId, promptId) => ({
+      promptNodeId: `prompt-node-${promptId}`,
+      resultImageNodeIds: [`image-node-${promptId}`]
+    }));
+    queue.registerArrangeHandler(async (nodeIds) => {
+      arrangedIds = nodeIds;
+    });
+    queue.registerCompletionHandler(async (job, nodeIds) => {
+      if (job.outputGroup) {
+        job.outputGroup.groupId = job.outputGroup.groupId || `group-${job.id}`;
+        job.outputGroup.nodeIds = nodeIds;
+        completedGroupId = job.outputGroup.groupId;
+      }
+    });
+
+    const prompts = [
+      { id: 'p1', prompt: 'compact product layout' },
+      { id: 'p2', prompt: 'compact product layout' }
+    ];
+    const outputGroup = {
+      label: 'AI ecommerce batch',
+      color: '#ffffff',
+      includePromptNodes: true,
+      tags: ['automation']
+    };
+    const job = queue.createJob(prompts, {
+      concurrency: 2,
+      layoutPreset: 'compact-grid',
+      outputGroup
+    }, 'canvas-1', 'grouped-key');
+
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    assert.equal(job.status, 'completed');
+    assert.ok(job.outputGroup?.nodeIds?.includes('prompt-node-p1'));
+    assert.ok(job.outputGroup?.nodeIds?.includes('image-node-p1'));
+    assert.deepEqual(arrangedIds.sort(), (job.outputGroup?.nodeIds || []).slice().sort());
+    assert.equal(completedGroupId, job.outputGroup?.groupId);
+
+    const sameJob = queue.createJob(prompts, {
+      concurrency: 2,
+      outputGroup: {
+        ...outputGroup,
+        groupId: 'should-not-replace-existing'
+      }
+    }, 'canvas-1', 'grouped-key');
+
+    assert.equal(sameJob.id, job.id);
+    assert.equal(queue.getJobs().length, 1);
+    assert.equal(sameJob.outputGroup?.groupId, completedGroupId);
+  });
 });
