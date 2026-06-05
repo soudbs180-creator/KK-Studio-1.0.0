@@ -936,7 +936,7 @@ function sendLocalProxyError(res, req, status, code, message) {
     lowerMessage.includes('404 not found') ||
     lowerMessage.includes('upstream error')
   ) {
-    cleanMessage = '[速创 API 上游通道不可用] 该绘图或视频模型底层通道暂时故障或维护中 (Nginx 404)。建议在“API设置”中切换至其他速创模型（如 NanoBanana_pro 或 NanoBanana）再试，或联系速创官方管理员确认该模型通道状态。';
+    cleanMessage = '[速创 API 转发异常] 上游返回了 HTML/404 响应。系统会严格按你选择的速创模型提交，不会自动切换模型；请检查当前部署版本、代理目标 URL、请求参数和参考图是否为公网可访问 URL。';
   }
   return res.status(status).json(localProxyErrorEnvelope(req, code, cleanMessage));
 }
@@ -1169,12 +1169,6 @@ async function pollWuyinImageResultUntilComplete({ route, routeId, providerTaskI
 }
 
 const WUYIN_PRIMARY_IMAGE_MODEL_ID = 'image_nanoBanana2';
-const WUYIN_LEGACY_DEFAULT_IMAGE_MODEL_IDS = new Set([
-  'image_gpt',
-  'gpt-image-2',
-  'gpt image 2',
-  'gptimage2',
-]);
 
 function normalizeWuyinModelLookupValue(value) {
   return String(value || '')
@@ -1216,19 +1210,6 @@ function findCatalogItemInCachedCatalog(modelId, baseUrl) {
   return matched || null;
 }
 
-function findPreferredWuyinImageCatalogItem() {
-  return findCatalogItemInCachedCatalog(WUYIN_PRIMARY_IMAGE_MODEL_ID);
-}
-
-function isLegacyDefaultWuyinImageModel(modelId, catalogItem) {
-  const candidates = [
-    normalizeWuyinModelLookupValue(modelId),
-    normalizeWuyinModelLookupValue(catalogItem && catalogItem.id),
-    normalizeWuyinModelLookupValue(catalogItem && catalogItem.name),
-  ].filter(Boolean);
-  return candidates.some(candidate => WUYIN_LEGACY_DEFAULT_IMAGE_MODEL_IDS.has(candidate));
-}
-
 function isWuyinUpstreamEndpointUnavailable(error) {
   const message = String(error && error.message || error || '').toLowerCase();
   return (
@@ -1250,23 +1231,7 @@ async function submitWuyinImageTaskWithFallback({ catalogItem, route, input }) {
       fallbackApplied: false,
     };
   } catch (error) {
-    const fallbackItem = findPreferredWuyinImageCatalogItem();
-    const shouldRetry = (
-      fallbackItem
-      && fallbackItem.id !== catalogItem.id
-      && isLegacyDefaultWuyinImageModel(input && input.modelId, catalogItem)
-      && isWuyinUpstreamEndpointUnavailable(error)
-    );
-
-    if (!shouldRetry) {
-      throw error;
-    }
-
-    return {
-      result: await submitWuyinTask({ catalogItem: fallbackItem, apiKey: route.apiKey, input, baseUrl: route.baseUrl }),
-      catalogItem: fallbackItem,
-      fallbackApplied: true,
-    };
+    throw error;
   }
 }
 
@@ -1580,7 +1545,7 @@ router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
       lowerMessage.includes('404 not found') ||
       lowerMessage.includes('upstream error')
     ) {
-      message = '[速创 API 上游通道不可用] 该绘图或视频模型底层通道暂时故障或维护中 (Nginx 404)。建议在“API设置”中切换至其他速创模型（如 NanoBanana_pro 或 NanoBanana）再试，或联系速创官方管理员确认该模型通道状态。';
+      message = '[速创 API 转发异常] 上游返回了 HTML/404 响应。系统会严格按你选择的速创模型提交，不会自动切换模型；请检查当前部署版本、代理目标 URL、请求参数和参考图是否为公网可访问 URL。';
     }
 
     return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', message);

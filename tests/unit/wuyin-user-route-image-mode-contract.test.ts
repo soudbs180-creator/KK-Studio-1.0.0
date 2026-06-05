@@ -118,12 +118,16 @@ describe("速创 API 图片模型路由与适配契约测试 (Wuyin Image Proxy 
     assert.equal(serverWuyinProxy.isWuyinAsyncVideoRoute(route4), false);
   });
 
-  test("5. 后端用户路由保持 NanoBanana2 优先并用用户路由 ID 绑定详情轮询", () => {
+  test("5. 后端用户路由保持用户选择的速创图片模型并用用户路由 ID 绑定详情轮询", () => {
     const routeSource = readSource("server/routes/user.js");
 
     assert.match(routeSource, /const WUYIN_PRIMARY_IMAGE_MODEL_ID = 'image_nanoBanana2';/);
-    assert.match(routeSource, /WUYIN_LEGACY_DEFAULT_IMAGE_MODEL_IDS/);
     assert.match(routeSource, /submitWuyinImageTaskWithFallback/);
+    assert.doesNotMatch(routeSource, /WUYIN_IMAGE_FALLBACK_MODEL_IDS/);
+    assert.doesNotMatch(routeSource, /isLegacyDefaultWuyinImageModel/);
+    assert.doesNotMatch(routeSource, /fallbackAttempts/);
+    assert.doesNotMatch(routeSource, /建议在“API设置”中切换至其他速创模型/);
+    assert.match(routeSource, /严格按你选择的速创模型提交/);
     assert.match(routeSource, /encodeLocalProxyTaskId\(route\.id \|\| routeId, result\.providerTaskId, catalogItem && catalogItem\.id\)/);
     assert.doesNotMatch(routeSource, /taskId:\s*result\.taskId,\s*\n\s*providerTaskId: result\.providerTaskId/);
   });
