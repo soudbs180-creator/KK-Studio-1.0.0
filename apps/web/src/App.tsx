@@ -5444,7 +5444,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       <InfiniteCanvas
         id="canvas-container"
         ref={canvasRef}
-        showGrid={showGrid}
+        showGrid={canvasMode === 'board' ? false : showGrid}
         onTransformChange={handleCanvasTransformChange}
         onInteractionChange={handleCanvasInteractionChange}
         cardPositions={[

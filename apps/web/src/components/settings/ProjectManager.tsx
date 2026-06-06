@@ -13,7 +13,6 @@ import {
     Square,
     Sun,
     Trash2,
-    MousePointer,
     Palette,
     Network,
     Cpu,
@@ -1114,7 +1113,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                     title={canvasMode === 'board' ? '切换到正常模式' : '切换到画板模式'}
                                     tabIndex={-1}
                                 >
-                                    {canvasMode === 'board' ? <Palette size={20} /> : <MousePointer size={20} />}
+                                    {canvasMode === 'board' ? <Palette size={20} /> : <Grid3x3 size={20} />}
                                 </button>
 
                                 <button
