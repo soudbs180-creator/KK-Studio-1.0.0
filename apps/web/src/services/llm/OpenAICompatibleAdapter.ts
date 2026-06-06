@@ -964,8 +964,6 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         const url = `${normalizeWuyinBaseUrl(keySlot.baseUrl || WUYIN_DEFAULT_BASE_URL)}${route.endpointPath}`;
         const body = buildWuyinImageSubmitBody({
             prompt: options.prompt,
-            modelId: route.endpointModelId,
-            endpointPath: route.endpointPath,
             imageSize: options.imageSize,
             aspectRatio: options.aspectRatio,
             referenceImages: options.referenceImages,

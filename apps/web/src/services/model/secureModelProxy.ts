@@ -40,7 +40,15 @@ function isEncryptedSecretJsonString(value: string): boolean {
 }
 
 function normalizeUserApiSecretForTransport(value: unknown): string {
-  if (value == null || isEncryptedSecretEnvelope(value) || typeof value !== 'string') {
+  if (value == null) {
+    return '';
+  }
+
+  if (isEncryptedSecretEnvelope(value)) {
+    return JSON.stringify(value);
+  }
+
+  if (typeof value !== 'string') {
     return '';
   }
 
@@ -53,9 +61,12 @@ function normalizeUserApiSecretForTransport(value: unknown): string {
     || /^\[object\s+[^\]]+\]$/.test(token)
     || /[\u2022\u25cf\u25e6\u2219\u2027\u2026]/.test(token)
     || token.includes('...')
-    || isEncryptedSecretJsonString(token)
   ) {
     return '';
+  }
+
+  if (isEncryptedSecretJsonString(token)) {
+    return token;
   }
 
   return token;

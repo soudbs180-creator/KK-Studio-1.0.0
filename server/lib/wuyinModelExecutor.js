@@ -552,9 +552,12 @@ async function submitWuyinTask({ catalogItem, apiKey, input, baseUrl }) {
     try {
       const parsedBase = new URL(baseUrl);
       const parsedTarget = new URL(targetUrl);
-      parsedTarget.protocol = parsedBase.protocol;
-      parsedTarget.host = parsedBase.host;
-      targetUrl = parsedTarget.toString();
+      const isOfficialBase = parsedBase.host.toLowerCase().includes('wuyinkeji.com');
+      if (!isOfficialBase) {
+        parsedTarget.protocol = parsedBase.protocol;
+        parsedTarget.host = parsedBase.host;
+        targetUrl = parsedTarget.toString();
+      }
     } catch (e) {
       // ignore
     }
@@ -645,7 +648,10 @@ async function checkWuyinTaskStatus({ catalogItem, apiKey, providerTaskId, submi
   if (baseUrl) {
     try {
       const parsedBase = new URL(baseUrl);
-      detailUrl = `${parsedBase.protocol}//${parsedBase.host}${detailPath}`;
+      const isOfficialBase = parsedBase.host.toLowerCase().includes('wuyinkeji.com');
+      if (!isOfficialBase) {
+        detailUrl = `${parsedBase.protocol}//${parsedBase.host}${detailPath}`;
+      }
     } catch (e) {
       // ignore
     }

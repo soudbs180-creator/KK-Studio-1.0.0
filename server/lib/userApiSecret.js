@@ -32,7 +32,7 @@ function getBlockedUserApiSecretReason(value) {
   }
 
   if (isEncryptedSecretEnvelope(value)) {
-    return 'encrypted-envelope';
+    return '';
   }
 
   if (typeof value !== 'string') {
@@ -61,7 +61,7 @@ function getBlockedUserApiSecretReason(value) {
   }
 
   if (isEncryptedSecretJsonString(token)) {
-    return 'encrypted-envelope';
+    return '';
   }
 
   return '';

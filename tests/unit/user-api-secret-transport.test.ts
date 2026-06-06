@@ -18,8 +18,6 @@ test("user API secret transport guard blocks placeholders and encrypted envelope
     ["[object Object]", "object-string"],
     ["\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022", "masked-preview"],
     ["sk-live...tail", "masked-preview"],
-    [{ __kkUserApiSecret: true, ciphertext: "cipher", iv: "iv" }, "encrypted-envelope"],
-    [JSON.stringify({ ciphertext: "cipher", nonce: "nonce" }), "encrypted-envelope"],
   ];
 
   for (const [value, reason] of blockedCases) {
@@ -27,6 +25,17 @@ test("user API secret transport guard blocks placeholders and encrypted envelope
     assert.equal(isSendableUserApiSecret(value), false);
     assert.equal(normalizeUserApiSecretForTransport(value), "");
   }
+});
+
+test("user API secret transport guard preserves encrypted envelope for backend handling", () => {
+  const envelope = { __kkUserApiSecret: true, ciphertext: "cipher", iv: "iv" };
+  assert.equal(getBlockedUserApiSecretReason(envelope), "");
+  assert.equal(isSendableUserApiSecret(envelope), true);
+  
+  const jsonStr = JSON.stringify({ ciphertext: "cipher", nonce: "nonce" });
+  assert.equal(getBlockedUserApiSecretReason(jsonStr), "");
+  assert.equal(isSendableUserApiSecret(jsonStr), true);
+  assert.equal(normalizeUserApiSecretForTransport(jsonStr), jsonStr);
 });
 
 test("user API secret transport guard preserves real user-entered key text", () => {
