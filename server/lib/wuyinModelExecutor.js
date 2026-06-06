@@ -333,8 +333,14 @@ function buildImageRequestBody(catalogItem, input) {
     return body;
   }
 
-  if (modelId === 'image_nanobanana') {
-    body.imageSize = '1K';
+  // 简体中文注释：纠正速创 NanoBanana 家族的规格格式，使用 size 字段并支持动态尺寸参数
+  if (
+    modelId === 'image_nanobanana' ||
+    modelId === 'image_nanobanana2' ||
+    modelId === 'image_nanobanana_pro' ||
+    modelId === 'image_nanobananapro'
+  ) {
+    body.size = input.imageSize || input.size || '1K';
     body.aspectRatio = normalizeAspectRatio(input.aspectRatio);
     addBodyValue(body, 'urls', urls);
     return body;

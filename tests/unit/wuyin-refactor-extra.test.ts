@@ -192,7 +192,7 @@ describe("速创 API 重构专项单元测试", () => {
       ),
       {
         prompt: "cat",
-        imageSize: "1K",
+        size: "4K",
         aspectRatio: "1:1",
       },
     );
