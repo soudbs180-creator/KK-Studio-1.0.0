@@ -163,7 +163,7 @@ export function buildCanvasRuntimeState(params: CanvasRuntimeStateBuilderParams)
   }
 
   return {
-    projectVersion: '1.5.4',
+    projectVersion: '1.5.5',
     currentPage,
     canvas: {
       id: canvasId,

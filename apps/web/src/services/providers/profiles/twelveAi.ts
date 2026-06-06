@@ -3,7 +3,7 @@
  * @module apps/web/src/services/providers/profiles
  * @description 12AI 多协议聚合渠道画像。支持标准 OpenAI 对话、Gemini 原生及专属异步生图任务。
  * @author KK-Studio Team
- * @version 1.5.4
+ * @version 1.5.5
  */
 
 import { ProviderProfile } from './index';

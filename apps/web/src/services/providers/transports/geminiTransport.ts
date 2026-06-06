@@ -4,7 +4,7 @@
  * @description Google Gemini 原生多模态协议传输层。负责按照 Google 官方 generateContent 规范
  *              拼接 REST API 请求路径及拼装 contents/parts 结构体，只专注于协议规范，解耦品牌特判。
  * @author KK-Studio Team
- * @version 1.5.4
+ * @version 1.5.5
  */
 
 import { TransportRequest } from './openaiTransport';

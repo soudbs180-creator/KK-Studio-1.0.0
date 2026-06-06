@@ -8,7 +8,7 @@
 
 ```typescript
 export interface CanvasRuntimeState {
-  projectVersion: '1.5.4';
+  projectVersion: '1.5.5';
   currentPage: 'canvas' | 'settings' | 'agent' | 'unknown';
   canvas: {
     id: string;

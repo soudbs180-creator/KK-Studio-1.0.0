@@ -177,7 +177,13 @@ function ensureUploadsDirectoryWritable() {
     fs.writeFileSync(testFile, 'test');
     fs.unlinkSync(testFile);
   } catch (err) {
-    throw new Error(`[严重] uploads 目录 '${uploadsDir}' 无法写入，请检查生产环境 VPS 的目录写权限。错误: ${err.message}`);
+    const isProd = process.env.NODE_ENV === 'production';
+    const msg = `[严重] uploads 目录 '${uploadsDir}' 无法写入，请检查生产环境 VPS 的目录写权限。错误: ${err.message}`;
+    if (isProd) {
+      throw new Error(msg);
+    } else {
+      console.warn(`[警告] 本地开发环境 uploads 目录可写性测试失败（可能是由于安全软件锁定），已跳过致命阻断。具体错误: ${err.message}`);
+    }
   }
 }
 

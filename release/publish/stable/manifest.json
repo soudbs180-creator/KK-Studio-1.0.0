@@ -1,16 +1,16 @@
 {
   "appName": "KK Studio",
-  "version": "1.5.4",
-  "displayVersion": "v1.5.4",
-  "buildTime": "2026-06-04T18:00:00.000Z",
-  "releaseDate": "2026-06-04",
+  "version": "1.5.5",
+  "displayVersion": "v1.5.5",
+  "buildTime": "2026-06-06T12:13:33.000Z",
+  "releaseDate": "2026-06-06",
   "releaseNotes": [
     "Consolidated AgentRuntime loop, CanvasRuntimeState builder, redact ToolRegistry logs, and task Handoff Writer.",
     "verified kkai.plus same-origin API workaround."
   ],
   "channel": "stable",
-  "packageFile": "KK-Studio-Portable-1.5.4.zip",
-  "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.5.4/KK-Studio-Portable-1.5.4.zip",
+  "packageFile": "KK-Studio-Portable-1.5.5.zip",
+  "downloadUrl": "https://github.com/soudbs180/kk-studio/releases/download/v1.5.5/KK-Studio-Portable-1.5.5.zip",
   "sha256": "9bce82c7a9bb2a74d0f14648b6093050352c116b3bcc50f43b6c2c15bb777316",
   "size": 52917247
 }

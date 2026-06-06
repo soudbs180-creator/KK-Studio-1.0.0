@@ -166,6 +166,36 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
 
     const [isDragging, setIsDragging] = useState(false);
     const isDraggingRef = useRef(false);
+    const [isSlowLoading, setIsSlowLoading] = useState(false);
+
+    useEffect(() => {
+        const handleFitToAll = (e: Event) => {
+            const customEvent = e as CustomEvent<{ centerX: number; centerY: number }>;
+            if (!customEvent.detail) return;
+            const { centerX, centerY } = customEvent.detail;
+            
+            // 计算当前卡片与中心点的物理距离
+            const dx = position.x - centerX;
+            const dy = position.y - centerY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // 渐进延迟，系数为 0.2ms/px，限制最大延迟为 1200ms
+            const delay = Math.min(1200, distance * 0.2);
+            
+            setIsSlowLoading(true);
+            
+            const timer = setTimeout(() => {
+                setIsSlowLoading(false);
+            }, delay);
+            
+            return () => clearTimeout(timer);
+        };
+        
+        window.addEventListener('kk-fit-to-all', handleFitToAll);
+        return () => {
+            window.removeEventListener('kk-fit-to-all', handleFitToAll);
+        };
+    }, [position.x, position.y]);
     useEffect(() => {
         onDragCommitRef.current = onDragCommit;
     }, [onDragCommit]);
@@ -1372,6 +1402,34 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         boxShadow: 'none',
         overflow: 'visible',
     } as const;
+
+    if (isSlowLoading) {
+        return (
+            <div
+                ref={containerRef}
+                style={{
+                    position: 'absolute',
+                    left: `${snapCanvasCoordinate(position.x - nodeWidth / 2, zoomScale || 1) - originX}px`,
+                    top: `${snapCanvasCoordinate(position.y - cardHeight, zoomScale || 1) - originY}px`,
+                    width: `${nodeWidth}px`,
+                    height: `${cardHeight}px`,
+                    pointerEvents: 'none',
+                    opacity: 0.8,
+                }}
+                className="gpu-accelerated transition-opacity duration-300"
+            >
+                <div
+                    className="w-full h-full rounded-2xl border animate-pulse"
+                    style={{
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        borderColor: 'rgba(255, 255, 255, 0.08)',
+                        backdropFilter: 'blur(8px)',
+                    }}
+                />
+            </div>
+        );
+    }
+
     if (detailLevel === 'thumbnail-shell') {
         const isThumbnailShell = detailLevel === 'thumbnail-shell';
         const shellTitle = image.alias || image.fileName || image.prompt || 'Image';

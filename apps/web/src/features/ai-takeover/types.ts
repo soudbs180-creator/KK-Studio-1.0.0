@@ -298,7 +298,7 @@ export interface SanitizedProjectContext {
 }
 
 export interface CanvasRuntimeState {
-  projectVersion: '1.5.4';
+  projectVersion: string;
   currentPage: 'canvas' | 'settings' | 'agent' | 'unknown';
   canvas: {
     id: string;

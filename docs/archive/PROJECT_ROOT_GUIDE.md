@@ -1,6 +1,6 @@
 ## Project Root Guide
 
-This guide records the current KK Studio v1.5.4 runtime layout. When it conflicts with older migration notes, use `AGENTS.md`, `AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md`, `package.json`, and `config/release-manifest.json` as the authority.
+This guide records the current KK Studio v1.5.5 runtime layout. When it conflicts with older migration notes, use `AGENTS.md`, `AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md`, `package.json`, and `config/release-manifest.json` as the authority.
 
 ### Runtime Layout
 

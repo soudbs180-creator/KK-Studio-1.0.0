@@ -887,6 +887,13 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         syncTransformRef.current = newTransform;
         setTransform(newTransform);
         emitTransformChange(newTransform);
+
+        // 派发自定义事件，通知子卡片进行由内向外的慢加载优化以减小渲染压力
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('kk-fit-to-all', {
+                detail: { centerX, centerY }
+            }));
+        }
     }, [cardPositions, emitTransformChange, resetView]);
 
     // Expose methods to parent

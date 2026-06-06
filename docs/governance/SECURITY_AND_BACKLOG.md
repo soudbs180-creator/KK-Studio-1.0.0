@@ -1,5 +1,5 @@
 <!-- AI_ROUTING_KEY: security, backlog, secret, cors, jwt, billing -->
-# Security and Engineering Backlog — KK Studio v1.5.4
+# Security and Engineering Backlog — KK Studio v1.5.5
 
 Last updated: 2026-06-03  
 Primary rules: `AGENTS.md`
@@ -11,7 +11,7 @@ Primary rules: `AGENTS.md`
 本文件整合历史审计报告与优化提示词中的安全、后端、计费、CORS、JWT、Provider、数据库、工程质量待办，并统一到当前事实：
 
 ```text
-当前项目版本：KK Studio v1.5.4
+当前项目版本：KK Studio v1.5.5
 当前后端事实：server/ Express / VPS
 当前 Web 入口：apps/web/
 历史 Netlify / payment-server 描述：只作迁移追溯，不作为当前开发入口

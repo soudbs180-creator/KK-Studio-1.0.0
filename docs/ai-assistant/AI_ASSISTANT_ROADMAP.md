@@ -1,4 +1,4 @@
-# AI Assistant Roadmap — KK Studio v1.5.4
+# AI Assistant Roadmap — KK Studio v1.5.5
 
 Last updated: 2026-06-03  
 Primary rules: `AGENTS.md`
@@ -217,7 +217,7 @@ apps/web/src/features/ai-assistant-runtime/context/buildCanvasRuntimeState.ts
 
 ```ts
 export interface CanvasRuntimeState {
-  projectVersion: '1.5.4';
+  projectVersion: '1.5.5';
   currentPage: 'canvas' | 'settings' | 'agent' | 'unknown';
   canvas: {
     id: string;
@@ -745,9 +745,9 @@ ui.updateWindowLayout
 
 ### Sprint 0：文档与治理固化
 
-1. 确认 `AGENTS.md` 和本文件存在，且都写明 **KK Studio v1.5.4**。
+1. 确认 `AGENTS.md` 和本文件存在，且都写明 **KK Studio v1.5.5**。
 2. 修改 `scripts/governance/check-agent-docs.mjs`，把本文件加入必检。
-3. 检查 token：`KK Studio v1.5.4`、`ToolRegistry`、`CanvasRuntimeState`。
+3. 检查 token：`KK Studio v1.5.5`、`ToolRegistry`、`CanvasRuntimeState`。
 4. 搜索旧文档中明显错误的 `1.4.x`、`1.5.0`、`1.5.1` 或与 `1.5.4` 冲突的描述，只修正文档，不改业务代码。
 5. 运行 `npm run governance:check`。
 6. 更新 `docs/development/session-handoff.md`，记录下一步 Sprint 1。
@@ -915,7 +915,7 @@ const files = {
   assistantPlan: 'AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md',
 };
 
-expectIncludes(assistantPlan, files.assistantPlan, 'KK Studio v1.5.4');
+expectIncludes(assistantPlan, files.assistantPlan, 'KK Studio v1.5.5');
 expectIncludes(assistantPlan, files.assistantPlan, 'ToolRegistry');
 expectIncludes(assistantPlan, files.assistantPlan, 'CanvasRuntimeState');
 ```
@@ -937,12 +937,12 @@ expectIncludes(assistantPlan, files.assistantPlan, 'CanvasRuntimeState');
 ## 16. 给 Codex / Antigravity 的首条提示词
 
 ```text
-请严格读取并遵守 AGENTS.md 与 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md。当前项目版本必须保持 KK Studio v1.5.4，不要改错版本。
+请严格读取并遵守 AGENTS.md 与 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md。当前项目版本必须保持 KK Studio v1.5.5，不要改错版本。
 
 本轮只执行 Sprint 0：
 1. 检查 AGENTS.md 与 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md 是否存在。
-2. 修改 scripts/governance/check-agent-docs.mjs，把 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md 加入必检文件，并检查 token：KK Studio v1.5.4、ToolRegistry、CanvasRuntimeState。
-3. 搜索旧文档中明显错误的 1.4.x、1.5.0、1.5.1 或与 v1.5.4 冲突的描述，只修正文档，不改业务代码。
+2. 修改 scripts/governance/check-agent-docs.mjs，把 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md 加入必检文件，并检查 token：KK Studio v1.5.5、ToolRegistry、CanvasRuntimeState。
+3. 搜索旧文档中明显错误的 1.4.x、1.5.0、1.5.1 或与 v1.5.5 冲突的描述，只修正文档，不改业务代码。
 4. 运行 npm run governance:check。
 5. 若失败，只修复与文档检查相关的问题。
 6. 更新 docs/development/session-handoff.md，记录本轮结果和下一步 Sprint 1。
@@ -953,7 +953,7 @@ expectIncludes(assistantPlan, files.assistantPlan, 'CanvasRuntimeState');
 第二轮提示词：
 
 ```text
-请继续严格遵守 AGENTS.md 与 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md。当前项目版本仍为 KK Studio v1.5.4。
+请继续严格遵守 AGENTS.md 与 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md。当前项目版本仍为 KK Studio v1.5.5。
 
 本轮执行 Sprint 1：实现 CanvasRuntimeState。
 1. 新增 apps/web/src/features/ai-assistant-runtime/context/buildCanvasRuntimeState.ts。
@@ -970,7 +970,7 @@ expectIncludes(assistantPlan, files.assistantPlan, 'CanvasRuntimeState');
 
 ## 17. 最终验收清单
 
-- [ ] `AGENTS.md` 与本文件均明确 v1.5.4。
+- [ ] `AGENTS.md` 与本文件均明确 v1.5.5。
 - [ ] `governance:check` 会检查两份文件。
 - [ ] AI 助手上下文包含 CanvasRuntimeState。
 - [ ] 画布选区、Prompt 子图、图片节点可被工具准确解析。
@@ -994,7 +994,7 @@ expectIncludes(assistantPlan, files.assistantPlan, 'CanvasRuntimeState');
 4. 不要绕过现有 `CanvasContext`、`useImageGeneration`、`LLMService`。
 5. 不要把用户凭证或私密会话信息写入知识库或日志。
 6. 不要忘记更新知识库、Skills 和 handoff；这是助手保持“最新认知”的关键。
-7. 不要把版本写错；本项目当前是 **KK Studio v1.5.4**。
+7. 不要把版本写错；本项目当前是 **KK Studio v1.5.5**。
 
 ---
 
@@ -1068,7 +1068,7 @@ const files = {
   assistantPlan: 'AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md',
 };
 
-expectIncludes(assistantPlan, files.assistantPlan, 'KK Studio v1.5.4');
+expectIncludes(assistantPlan, files.assistantPlan, 'KK Studio v1.5.5');
 expectIncludes(assistantPlan, files.assistantPlan, 'ToolRegistry');
 expectIncludes(assistantPlan, files.assistantPlan, 'CanvasRuntimeState');
 ```
@@ -1090,12 +1090,12 @@ expectIncludes(assistantPlan, files.assistantPlan, 'CanvasRuntimeState');
 ## 14. 给 Codex / Antigravity 的首条提示词
 
 ```text
-请严格读取并遵守 AGENTS.md 与 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md。当前项目版本必须保持 KK Studio v1.5.4，不要改错版本。
+请严格读取并遵守 AGENTS.md 与 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md。当前项目版本必须保持 KK Studio v1.5.5，不要改错版本。
 
 本轮只执行 Sprint 0：
 1. 检查 AGENTS.md 与 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md 是否存在。
-2. 修改 scripts/governance/check-agent-docs.mjs，把 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md 加入必检文件，并检查 token：KK Studio v1.5.4、ToolRegistry、CanvasRuntimeState。
-3. 搜索旧文档中明显错误的 1.4.x、1.5.0、1.5.1 或与 v1.5.4 冲突的描述，只修正文档，不改业务代码。
+2. 修改 scripts/governance/check-agent-docs.mjs，把 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md 加入必检文件，并检查 token：KK Studio v1.5.5、ToolRegistry、CanvasRuntimeState。
+3. 搜索旧文档中明显错误的 1.4.x、1.5.0、1.5.1 或与 v1.5.5 冲突的描述，只修正文档，不改业务代码。
 4. 运行 npm run governance:check。
 5. 若失败，只修复与文档检查相关的问题。
 6. 更新 docs/development/session-handoff.md，记录本轮结果和下一步 Sprint 1。
@@ -1106,7 +1106,7 @@ expectIncludes(assistantPlan, files.assistantPlan, 'CanvasRuntimeState');
 第二轮提示词：
 
 ```text
-请继续严格遵守 AGENTS.md 与 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md。当前项目版本仍为 KK Studio v1.5.4。
+请继续严格遵守 AGENTS.md 与 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md。当前项目版本仍为 KK Studio v1.5.5。
 
 本轮执行 Sprint 1：实现 CanvasRuntimeState。
 1. 新增 apps/web/src/features/ai-assistant-runtime/context/buildCanvasRuntimeState.ts。
@@ -1123,7 +1123,7 @@ expectIncludes(assistantPlan, files.assistantPlan, 'CanvasRuntimeState');
 
 ## 15. 最终验收清单
 
-- [ ] `AGENTS.md` 与本文件均明确 v1.5.4。
+- [ ] `AGENTS.md` 与本文件均明确 v1.5.5。
 - [ ] `governance:check` 会检查两份文件。
 - [ ] AI 助手上下文包含 CanvasRuntimeState。
 - [ ] 画布选区、Prompt 子图、图片节点可被工具准确解析。
@@ -1147,7 +1147,7 @@ expectIncludes(assistantPlan, files.assistantPlan, 'CanvasRuntimeState');
 4. 不要绕过现有 `CanvasContext`、`useImageGeneration`、`LLMService`。
 5. 不要把用户凭证或私密会话信息写入知识库或日志。
 6. 不要忘记更新知识库、Skills 和 handoff；这是助手保持“最新认知”的关键。
-7. 不要把版本写错；本项目当前是 **KK Studio v1.5.4**。
+7. 不要把版本写错；本项目当前是 **KK Studio v1.5.5**。
 
 ---
 

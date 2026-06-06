@@ -1,11 +1,11 @@
-# KK Studio Project Handoff (v1.5.4)
+# KK Studio Project Handoff (v1.5.5)
 
 Last updated: 2026-06-05
 
 ## 1. Project Overview
 
 - Project name: `KK Studio`
-- Stable version: `v1.5.4`
+- Stable version: `v1.5.5`
 - Version authority: `config/release-manifest.json`
 - Package projection: root `package.json` and workspace package manifests
 - Primary rules: `AGENTS.md`

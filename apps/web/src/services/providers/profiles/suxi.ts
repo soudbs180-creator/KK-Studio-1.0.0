@@ -3,7 +3,7 @@
  * @module apps/web/src/services/providers/profiles
  * @description New Suxi AI 多端混合代理渠道画像。
  * @author KK-Studio Team
- * @version 1.5.4
+ * @version 1.5.5
  */
 
 import { ProviderProfile } from './index';

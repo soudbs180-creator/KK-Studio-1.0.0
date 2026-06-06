@@ -1,8 +1,8 @@
-# AGENTS.md — KK Studio v1.5.4 AI / Agent 最高执行规范
-<!-- CI Tokens: AGENTS.md - AI Agent 项目总指导文件, KK Studio v1.5.4, AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md, ToolRegistry, CanvasRuntimeState -->
+# AGENTS.md — KK Studio v1.5.5 AI / Agent 最高执行规范
+<!-- CI Tokens: AGENTS.md - AI Agent 项目总指导文件, KK Studio v1.5.5, AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md, ToolRegistry, CanvasRuntimeState -->
 
 Last updated: 2026-06-04  
-Project version: **KK Studio v1.5.4**
+Project version: **KK Studio v1.5.5**
 
 > 本文件是 Codex、Claude、Cursor、Antigravity、自动化 Agent 与任何 AI 编程工具修改本项目之前必须读取的最高优先级规则入口。
 
@@ -31,7 +31,7 @@ Agent 接到任务后，先用下表判断需要读取哪些文档。不要把�
 ## 1. 不可改错的当前项目事实
 
 1. 项目名：`KK Studio`。
-2. 当前稳定版本：`v1.5.4`。
+2. 当前稳定版本：`v1.5.5`。
 3. 版本事实第一来源：`config/release-manifest.json`。
 4. 仓库名：`soudbs180-creator/nano-banana-KK-`。
 5. Web 主运行时：`apps/web/`。
@@ -343,7 +343,7 @@ AI 助手理解“我在画布干嘛”必须依赖结构化运行态。
 
 ```ts
 type CanvasRuntimeState = {
-  projectVersion: '1.5.4';
+  projectVersion: '1.5.5';
   currentPage?: 'canvas' | 'settings' | 'agent' | 'unknown';
   userId?: string;
   canvasId: string;
@@ -772,7 +772,7 @@ AI 助手能力改造任务只有同时满足以下条件才算完成：
 7. 建立知识索引与自动更新机制。
 8. 建立项目核心能力（Capabilities）的基线规格书，并固化在 `openspec/specs/` 中。
 9. 为批量生成、下载选区、整理卡片补齐测试。
-10. 清理旧文档中与 v1.5.4 冲突的版本、目录、后端和部署描述。
+10. 清理旧文档中与 v1.5.5 冲突的版本、目录、后端和部署描述。
 11. 再考虑微调、蒸馏或专用模型训练。
 
 

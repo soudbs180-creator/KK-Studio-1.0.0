@@ -1,8 +1,8 @@
 {
   "appName": "KK Studio",
-  "version": "1.5.4",
-  "displayVersion": "v1.5.4",
-  "releaseDate": "2026-06-04",
+  "version": "1.5.5",
+  "displayVersion": "v1.5.5",
+  "releaseDate": "2026-06-06",
   "releaseNotes": [
     "Consolidated AgentRuntime loop, CanvasRuntimeState builder, redact ToolRegistry logs, and task Handoff Writer.",
     "verified kkai.plus same-origin API workaround."

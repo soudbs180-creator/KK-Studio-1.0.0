@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Home, Minus, Plus } from 'lucide-react';
+import { Home, Minus, Plus, Minimize2 } from 'lucide-react';
 
 // 简体中文：定义导航面板的 Props 接口
 interface AppCanvasNavigationPanelProps {
@@ -18,12 +18,50 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('kk_canvas_minimap_collapsed') === 'true';
+    }
+    return false;
+  });
+
+  const toggleCollapsed = () => {
+    const next = !isCollapsed;
+    setIsCollapsed(next);
+    localStorage.setItem('kk_canvas_minimap_collapsed', String(next));
+  };
+
   // 小地图的固定物理物理尺寸
   const miniWidth = 200;
   const miniHeight = 120;
   const padding = 150; // 包围盒的外边距 padding，防止内容顶格
 
   if (isMobile || !activeCanvas) return null;
+
+  const scale = canvasTransform.scale || 1;
+  const zoomPercent = Math.round(scale * 100);
+
+  if (isCollapsed) {
+    return (
+      <div
+        onClick={toggleCollapsed}
+        className="canvas-nav-panel flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border cursor-pointer select-none text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:scale-105 active:scale-95 transition-all duration-200"
+        style={{
+          height: '32px',
+          background: 'var(--frost-card-framework-bg)',
+          border: '1px solid var(--frost-card-framework-border)',
+          boxShadow: 'var(--frost-card-framework-shadow)',
+          backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.2)',
+          WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.2)',
+        }}
+        title="展开小地图"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-coral)] animate-pulse" />
+        <span className="font-bold tracking-wider">展开地图</span>
+        <span className="text-[10px] text-[var(--text-tertiary)]">({zoomPercent}%)</span>
+      </div>
+    );
+  }
 
   // 1. 获取所有可见卡片的绝对位置
   const promptNodes = activeCanvas.promptNodes || [];
@@ -40,7 +78,6 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const containerHeight = canvasRect?.height || window.innerHeight;
 
   // 3. 计算视口（Viewport）在真实世界坐标系中的边界
-  const scale = canvasTransform.scale || 1;
   const viewportMinX = -canvasTransform.x / scale;
   const viewportMinY = -canvasTransform.y / scale;
   const viewportMaxX = (containerWidth - canvasTransform.x) / scale;
@@ -147,7 +184,6 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const miniViewportH = (viewportMaxY - viewportMinY) * scaleMini;
 
   // 10. 缩放控制器的交互行为
-  const zoomPercent = Math.round(scale * 100);
   // 计算进度百分比以映射 CSS Slider 填充进度 (10% - 300%)
   const zoomProgress = Math.max(0, Math.min(100, (zoomPercent - 10) / 290 * 100));
 
@@ -180,67 +216,81 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.2)',
       }}
     >
-      {/* 简体中文：小地图 SVG 渲染层 */}
-      <svg
-        ref={svgRef}
-        width={miniWidth}
-        height={miniHeight}
-        onMouseDown={handleMouseDown}
-        className="rounded-xl cursor-crosshair overflow-hidden"
-        style={{
-          background: 'rgba(0, 0, 0, 0.12)',
-          border: '1px solid rgba(255, 255, 255, 0.05)',
-        }}
-      >
-        {/* 背景网格装饰，提供高端空间感 */}
-        <defs>
-          <pattern id="minimap-grid" width="20" height="20" patternUnits="userSpaceOnUse">
-            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255, 255, 255, 0.02)" strokeWidth="1" />
-          </pattern>
-        </defs>
-        <rect width={miniWidth} height={miniHeight} fill="url(#minimap-grid)" />
-
-        {/* 渲染所有卡片小方块 */}
-        {visibleNodes.map((node: any) => {
-          const isImage = node.url || node.storageId;
-          const w = isImage ? 380 : 500;
-          const h = isImage ? 380 : 300;
-
-          const pos = mapToMini(node.position.x, node.position.y);
-          const rw = w * scaleMini;
-          const rh = h * scaleMini;
-
-          return (
-            <rect
-              key={node.id}
-              x={pos.x}
-              y={pos.y}
-              width={Math.max(2, rw)}
-              height={Math.max(2, rh)}
-              rx={Math.max(1, scaleMini * 24)} // 等比例圆角
-              fill={isImage ? 'rgba(129, 140, 248, 0.35)' : 'rgba(244, 63, 94, 0.35)'}
-              stroke={isImage ? 'rgba(129, 140, 248, 0.5)' : 'rgba(244, 63, 94, 0.5)'}
-              strokeWidth="0.5"
-            />
-          );
-        })}
-
-        {/* 渲染当前视口聚焦边界框 */}
-        <rect
-          x={miniViewportPos.x}
-          y={miniViewportPos.y}
-          width={Math.max(6, miniViewportW)}
-          height={Math.max(6, miniViewportH)}
-          rx="2"
-          fill="rgba(255, 82, 64, 0.08)"
-          stroke="var(--accent-coral)"
-          strokeWidth="1.2"
+      {/* 简体中文：小地图 SVG 渲染层包装，提供折叠交互 */}
+      <div className="relative group/nav-map">
+        <svg
+          ref={svgRef}
+          width={miniWidth}
+          height={miniHeight}
+          onMouseDown={handleMouseDown}
+          className="rounded-xl cursor-crosshair overflow-hidden"
           style={{
-            cursor: isDragging ? 'grabbing' : 'grab',
-            transition: isDragging ? 'none' : 'x 0.1s ease-out, y 0.1s ease-out, width 0.1s ease-out, height 0.1s ease-out',
+            background: 'rgba(0, 0, 0, 0.12)',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
           }}
-        />
-      </svg>
+        >
+          {/* 背景网格装饰，提供高端空间感 */}
+          <defs>
+            <pattern id="minimap-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255, 255, 255, 0.02)" strokeWidth="1" />
+            </pattern>
+          </defs>
+          <rect width={miniWidth} height={miniHeight} fill="url(#minimap-grid)" />
+
+          {/* 渲染所有卡片小方块 */}
+          {visibleNodes.map((node: any) => {
+            const isImage = node.url || node.storageId;
+            const w = isImage ? 380 : 500;
+            const h = isImage ? 380 : 300;
+
+            const pos = mapToMini(node.position.x, node.position.y);
+            const rw = w * scaleMini;
+            const rh = h * scaleMini;
+
+            return (
+              <rect
+                key={node.id}
+                x={pos.x}
+                y={pos.y}
+                width={Math.max(2, rw)}
+                height={Math.max(2, rh)}
+                rx={Math.max(1, scaleMini * 24)} // 等比例圆角
+                fill={isImage ? 'rgba(129, 140, 248, 0.35)' : 'rgba(244, 63, 94, 0.35)'}
+                stroke={isImage ? 'rgba(129, 140, 248, 0.5)' : 'rgba(244, 63, 94, 0.5)'}
+                strokeWidth="0.5"
+              />
+            );
+          })}
+
+          {/* 渲染当前视口聚焦边界框 */}
+          <rect
+            x={miniViewportPos.x}
+            y={miniViewportPos.y}
+            width={Math.max(6, miniViewportW)}
+            height={Math.max(6, miniViewportH)}
+            rx="2"
+            fill="rgba(255, 82, 64, 0.08)"
+            stroke="var(--accent-coral)"
+            strokeWidth="1.2"
+            style={{
+              cursor: isDragging ? 'grabbing' : 'grab',
+              transition: isDragging ? 'none' : 'x 0.1s ease-out, y 0.1s ease-out, width 0.1s ease-out, height 0.1s ease-out',
+            }}
+          />
+        </svg>
+
+        {/* 折叠小地图按钮 */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleCollapsed();
+          }}
+          className="absolute top-1.5 right-1.5 p-1 rounded-lg bg-black/40 hover:bg-black/60 text-white/70 hover:text-white transition-all duration-200 cursor-pointer border border-white/5 opacity-0 group-hover/nav-map:opacity-100"
+          title="收起小地图"
+        >
+          <Minimize2 size={11} />
+        </button>
+      </div>
 
       {/* 简体中文：横向缩放及定位控制栏 */}
       <div className="flex items-center justify-between gap-1.5 px-0.5">

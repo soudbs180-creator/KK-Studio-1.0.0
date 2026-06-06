@@ -15531,12 +15531,12 @@ body:not(.dark-mode) .settings-log-group-badge {
   }
   .settings-panel .settings-provider-card {
     width: 260px !important;
-    height: 150px !important;
+    height: auto !important;
     min-width: 260px !important;
     max-width: 260px !important;
     min-height: 150px !important;
-    max-height: 150px !important;
-    overflow: hidden;
+    max-height: none !important;
+    overflow: visible;
   }
   .settings-panel .settings-capability-card {
     width: 100% !important;
@@ -15556,7 +15556,7 @@ body:not(.dark-mode) .settings-log-group-badge {
 .settings-card-grid-container {
   display: grid;
   grid-template-columns: 1fr;
-  grid-auto-rows: 130px;
+  grid-auto-rows: minmax(130px, auto);
   gap: 16px;
   justify-content: center;
   width: 100%;
@@ -15632,7 +15632,7 @@ body:not(.dark-mode) .settings-log-group-badge {
 .settings-panel .settings-provider-grid {
   display: grid !important;
   grid-template-columns: repeat(1, 270px) !important;
-  grid-auto-rows: 130px !important;
+  grid-auto-rows: minmax(130px, auto) !important;
   justify-content: start !important;
   width: 100% !important;
   overflow-x: visible !important;
@@ -15652,17 +15652,17 @@ body:not(.dark-mode) .settings-log-group-badge {
   }
 }
 
-/* 强制重写 ConsoleEndpointCard 内部尺寸，确保完美匹配 270*130 */
+/* 强制重写 ConsoleEndpointCard 内部尺寸，确保自适应高且不裁剪 */
 .settings-panel .settings-provider-card {
   width: 270px !important;
-  height: 130px !important;
+  height: auto !important;
   min-width: 270px !important;
   max-width: 270px !important;
   min-height: 130px !important;
-  max-height: 130px !important;
+  max-height: none !important;
   margin: 0 !important;
   box-sizing: border-box !important;
-  overflow: hidden !important;
+  overflow: visible !important;
 }
 
 /* 统一的 A卡片 (dashboard-grid-card) 样式定义，确保全设置页样式一致 */
@@ -15709,11 +15709,10 @@ body:not(.dark-mode) .settings-log-group-badge {
 @media (min-width: 768px) {
   .dashboard-grid-card {
     width: 270px !important;
-    height: 130px !important;
+    height: auto !important;
     min-width: 270px !important;
     max-width: 270px !important;
     min-height: 130px !important;
-    max-height: 130px !important;
     box-sizing: border-box !important;
   }
 

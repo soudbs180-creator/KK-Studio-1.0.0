@@ -4,7 +4,7 @@
  * @description 后端统一 AI 路由派发器（Dispatcher）。严格执行标准流控，
  *              支持 Keep-Alive 连接复用、内存拓扑极速缓存、均匀洗牌算法及坏 Key 自动熔断冷却。
  * @author KK-Studio Team
- * @version 1.5.4
+ * @version 1.5.5
  */
 
 const http = require('http');
