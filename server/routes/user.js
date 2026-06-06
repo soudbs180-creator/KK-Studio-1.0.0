@@ -1636,16 +1636,7 @@ router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
   } catch (error) {
     let message = error instanceof Error ? error.message : String(error || 'Wuyin user-route proxy failed.');
 
-    // 简体中文注释：智能识别并清洗速创 API (Wuyin) 上游返回的 Nginx 404/502 巨幅 HTML 原始报错，极大地优化用户排障体验
-    const lowerMessage = message.toLowerCase();
-    if (
-      lowerMessage.includes('<html>') ||
-      lowerMessage.includes('nginx') ||
-      lowerMessage.includes('404 not found') ||
-      lowerMessage.includes('upstream error')
-    ) {
-      message = '[速创 API 转发异常] 上游返回了 HTML/404 响应。系统会严格按你选择的速创模型提交，不会自动切换模型；请检查当前部署版本、代理目标 URL、请求参数和参考图是否为公网可访问 URL。';
-    }
+
 
     return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', message);
   }

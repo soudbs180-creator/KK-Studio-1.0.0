@@ -180,7 +180,8 @@ describe("速创 API 重构专项单元测试", () => {
       ),
       {
         prompt: "cat",
-        size: "16:9",
+        size: "4K",
+        aspectRatio: "16:9",
         urls: ["https://cdn.example.com/ref.png"],
       },
     );
@@ -203,11 +204,12 @@ describe("速创 API 重构专项单元测试", () => {
     );
     assert.deepEqual(wanBody, {
       prompt: "cat",
-      size: "1696*960",
+      size: "1K",
+      aspectRatio: "16:9",
       urls: ["https://cdn.example.com/ref.png"],
     });
     const wanParams = new URLSearchParams(serialize(wanBody, "application/x-www-form-urlencoded"));
-    assert.equal(wanParams.get("size"), "1696*960");
+    assert.equal(wanParams.get("size"), "1K");
     assert.equal(wanParams.get("urls"), "https://cdn.example.com/ref.png");
 
     assert.deepEqual(

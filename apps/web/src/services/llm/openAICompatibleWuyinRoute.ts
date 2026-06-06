@@ -370,66 +370,19 @@ export function extractWuyinOutputUrls(payload: unknown): string[] {
 
 export function buildWuyinImageSubmitBody(input: {
   prompt: string;
-  modelId?: string;
-  endpointPath?: string;
   imageSize?: string;
   size?: string;
   aspectRatio?: string;
   referenceImages?: Array<string | { data: string; mimeType: string; url?: string }>;
-  negativePrompt?: string;
-  promptExtend?: boolean | string;
-  watermark?: boolean | string;
-  seed?: string | number;
 }): Record<string, unknown> {
-  const modelId = normalizeWuyinEndpointModelId(input);
-  const normalizedModelId = normalizeWuyinModelId(modelId);
   const refs = (input.referenceImages || []).map((ref, index) =>
     normalizeWuyinReferenceImage(ref, index).value
   );
-  const body: Record<string, unknown> = { prompt: input.prompt };
-
-  if (normalizedModelId === 'image_gpt' || normalizedModelId === 'gptimage2') {
-    body.size = normalizeWuyinGptImageRatio(input.aspectRatio);
-    appendWuyinBodyValue(body, 'urls', refs);
-    return body;
-  }
-
-  // 简体中文注释：纠正速创 NanoBanana 家族的规格格式，使用 size 字段并支持动态尺寸参数
-  if (
-    normalizedModelId === 'image_nanobanana' ||
-    normalizedModelId === 'image_nanobanana2' ||
-    normalizedModelId === 'image_nanobanana_pro' ||
-    normalizedModelId === 'image_nanobananapro'
-  ) {
-    body.size = normalizeWuyinImageSize(input.imageSize || input.size);
-    body.aspectRatio = normalizeWuyinAspectRatio(input.aspectRatio);
-    appendWuyinBodyValue(body, 'urls', refs);
-    return body;
-  }
-
-  if (normalizedModelId === 'image_grok_imagine') {
-    body.aspect_ratio = normalizeWuyinGrokAspectRatio(input.aspectRatio);
-    appendWuyinBodyValue(body, 'image_urls', refs);
-    return body;
-  }
-
-  if (normalizedModelId === 'image_wan2.6' || normalizedModelId === 'image_wan26') {
-    body.size = normalizeWuyinWanPixelSize({
-      size: input.size,
-      imageSize: input.imageSize,
-      aspectRatio: input.aspectRatio,
-      defaultSize: '1280*1280',
-    });
-    appendWuyinBodyValue(body, 'urls', refs);
-    appendWuyinBodyValue(body, 'negative_prompt', input.negativePrompt);
-    appendWuyinBodyValue(body, 'prompt_extend', input.promptExtend);
-    appendWuyinBodyValue(body, 'watermark', input.watermark);
-    appendWuyinBodyValue(body, 'seed', input.seed);
-    return body;
-  }
-
-  body.size = normalizeWuyinImageSize(input.imageSize || input.size);
-  body.aspectRatio = normalizeWuyinAspectRatio(input.aspectRatio);
+  const body: Record<string, unknown> = {
+    prompt: input.prompt,
+    size: normalizeWuyinImageSize(input.imageSize || input.size),
+    aspectRatio: normalizeWuyinAspectRatio(input.aspectRatio)
+  };
   appendWuyinBodyValue(body, 'urls', refs);
   return body;
 }

@@ -322,49 +322,16 @@ function addBodyValue(body, key, value) {
 }
 
 function buildImageRequestBody(catalogItem, input) {
-  const modelId = getCatalogModelId(catalogItem);
   const rawRefs = input.referenceImages || input.urls || input.image_urls || [];
   const urls = normalizeImageReferences(rawRefs);
-  const body = { prompt: String(input.prompt || '') };
-
-  if (modelId === 'image_gpt' || modelId === 'gptimage2') {
-    body.size = normalizeGptImageRatio(input.aspectRatio || input.size);
-    addBodyValue(body, 'urls', urls);
-    return body;
+  const body = {
+    prompt: String(input.prompt || ''),
+    size: input.imageSize || input.size || '1K',
+    aspectRatio: normalizeAspectRatio(input.aspectRatio),
+  };
+  if (urls.length > 0) {
+    body.urls = urls;
   }
-
-  // 简体中文注释：纠正速创 NanoBanana 家族的规格格式，使用 size 字段并支持动态尺寸参数
-  if (
-    modelId === 'image_nanobanana' ||
-    modelId === 'image_nanobanana2' ||
-    modelId === 'image_nanobanana_pro' ||
-    modelId === 'image_nanobananapro'
-  ) {
-    body.size = input.imageSize || input.size || '1K';
-    body.aspectRatio = normalizeAspectRatio(input.aspectRatio);
-    addBodyValue(body, 'urls', urls);
-    return body;
-  }
-
-  if (modelId === 'image_grok_imagine') {
-    body.aspect_ratio = normalizeGrokAspectRatio(input.aspectRatio || input.aspect_ratio);
-    addBodyValue(body, 'image_urls', urls);
-    return body;
-  }
-
-  if (modelId === 'image_wan2.6' || modelId === 'image_wan26') {
-    body.size = normalizeWanPixelSize(input, '1280*1280');
-    addBodyValue(body, 'urls', urls);
-    addBodyValue(body, 'negative_prompt', input.negativePrompt || input.negative_prompt);
-    addBodyValue(body, 'prompt_extend', input.promptExtend ?? input.prompt_extend);
-    addBodyValue(body, 'watermark', input.watermark);
-    addBodyValue(body, 'seed', input.seed);
-    return body;
-  }
-
-  body.size = input.imageSize || input.size || '1K';
-  body.aspectRatio = normalizeAspectRatio(input.aspectRatio);
-  addBodyValue(body, 'urls', urls);
   return body;
 }
 

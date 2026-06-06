@@ -166,7 +166,6 @@ describe("OpenAI-compatible Wuyin route helpers", () => {
   test("builds endpoint-specific Wuyin image payloads", () => {
     assert.deepEqual(
       buildWuyinImageSubmitBody({
-        modelId: "image_gpt",
         prompt: "cat",
         aspectRatio: "16:9",
         imageSize: "4K",
@@ -174,14 +173,14 @@ describe("OpenAI-compatible Wuyin route helpers", () => {
       }),
       {
         prompt: "cat",
-        size: "16:9",
+        size: "4K",
+        aspectRatio: "16:9",
         urls: ["https://cdn.example.com/ref.png"],
       },
     );
 
     assert.deepEqual(
       buildWuyinImageSubmitBody({
-        modelId: "image_nanoBanana",
         prompt: "cat",
         imageSize: "4K",
         aspectRatio: "1:1",
@@ -195,33 +194,31 @@ describe("OpenAI-compatible Wuyin route helpers", () => {
 
     assert.deepEqual(
       buildWuyinImageSubmitBody({
-        modelId: "image_grok_imagine",
         prompt: "cat",
         aspectRatio: "9:16",
         referenceImages: ["https://cdn.example.com/ref.png"],
       }),
       {
         prompt: "cat",
-        aspect_ratio: "9:16",
-        image_urls: ["https://cdn.example.com/ref.png"],
+        size: "1K",
+        aspectRatio: "9:16",
+        urls: ["https://cdn.example.com/ref.png"],
       },
     );
 
     const wanBody = buildWuyinImageSubmitBody({
-      modelId: "image_wan2.6",
       prompt: "cat",
       aspectRatio: "16:9",
       referenceImages: ["https://cdn.example.com/ref.png"],
-      seed: 7,
     });
     assert.deepEqual(wanBody, {
       prompt: "cat",
-      size: "1696*960",
+      size: "1K",
+      aspectRatio: "16:9",
       urls: ["https://cdn.example.com/ref.png"],
-      seed: 7,
     });
     const wanParams = new URLSearchParams(serializeWuyinSubmitBody(wanBody, "application/x-www-form-urlencoded"));
-    assert.equal(wanParams.get("size"), "1696*960");
+    assert.equal(wanParams.get("size"), "1K");
     assert.equal(wanParams.get("urls"), "https://cdn.example.com/ref.png");
   });
 
