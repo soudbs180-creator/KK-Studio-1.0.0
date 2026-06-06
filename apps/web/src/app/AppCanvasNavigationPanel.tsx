@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Home, Minus, Plus, Minimize2 } from 'lucide-react';
+import { Minus, Plus, Minimize2, Map } from 'lucide-react';
 
 // 简体中文：定义导航面板的 Props 接口
 interface AppCanvasNavigationPanelProps {
@@ -25,13 +25,16 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     return false;
   });
 
-  const toggleCollapsed = () => {
+  const toggleCollapsed = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
     const next = !isCollapsed;
     setIsCollapsed(next);
     localStorage.setItem('kk_canvas_minimap_collapsed', String(next));
   };
 
-  // 小地图的固定物理物理尺寸
+  // 小地图的固定物理尺寸
   const miniWidth = 200;
   const miniHeight = 120;
   const padding = 150; // 包围盒的外边距 padding，防止内容顶格
@@ -41,13 +44,14 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const scale = canvasTransform.scale || 1;
   const zoomPercent = Math.round(scale * 100);
 
+  // 胶囊折叠态 UI
   if (isCollapsed) {
     return (
       <div
         onClick={toggleCollapsed}
-        className="canvas-nav-panel flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border cursor-pointer select-none text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:scale-105 active:scale-95 transition-all duration-200"
+        className="canvas-nav-panel flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-full border cursor-pointer select-none text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:scale-105 active:scale-95 transition-all duration-200"
         style={{
-          height: '32px',
+          height: '34px',
           background: 'var(--frost-card-framework-bg)',
           border: '1px solid var(--frost-card-framework-border)',
           boxShadow: 'var(--frost-card-framework-shadow)',
@@ -56,9 +60,9 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         }}
         title="展开小地图"
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-coral)] animate-pulse" />
+        <Map size={12} className="text-[var(--accent-coral)]" />
         <span className="font-bold tracking-wider">展开地图</span>
-        <span className="text-[10px] text-[var(--text-tertiary)]">({zoomPercent}%)</span>
+        <span className="text-[10px] text-[var(--text-tertiary)] font-bold">({zoomPercent}%)</span>
       </div>
     );
   }
@@ -77,17 +81,22 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const containerWidth = canvasRect?.width || window.innerWidth;
   const containerHeight = canvasRect?.height || window.innerHeight;
 
+  // 避免容器宽高计算为 0 导致缩放比例计算出错
+  const safeContainerWidth = containerWidth <= 0 || isNaN(containerWidth) ? 800 : containerWidth;
+  const safeContainerHeight = containerHeight <= 0 || isNaN(containerHeight) ? 600 : containerHeight;
+
   // 3. 计算视口（Viewport）在真实世界坐标系中的边界
-  const viewportMinX = -canvasTransform.x / scale;
-  const viewportMinY = -canvasTransform.y / scale;
-  const viewportMaxX = (containerWidth - canvasTransform.x) / scale;
-  const viewportMaxY = (containerHeight - canvasTransform.y) / scale;
+  const safeScale = scale <= 0 || isNaN(scale) ? 1 : scale;
+  const viewportMinX = -canvasTransform.x / safeScale;
+  const viewportMinY = -canvasTransform.y / safeScale;
+  const viewportMaxX = (safeContainerWidth - canvasTransform.x) / safeScale;
+  const viewportMaxY = (safeContainerHeight - canvasTransform.y) / safeScale;
 
   // 4. 汇总所有元素（卡片 + 视口）计算总的真实坐标包围盒
-  let minX = viewportMinX;
-  let maxX = viewportMaxX;
-  let minY = viewportMinY;
-  let maxY = viewportMaxY;
+  let minX = isNaN(viewportMinX) ? 0 : viewportMinX;
+  let maxX = isNaN(viewportMaxX) ? 100 : viewportMaxX;
+  let minY = isNaN(viewportMinY) ? 0 : viewportMinY;
+  let maxY = isNaN(viewportMaxY) ? 100 : viewportMaxY;
 
   visibleNodes.forEach((node: any) => {
     // 估算卡片占用的真实尺寸（Prompt 卡片约 500x300，图片卡片约 380x380）
@@ -110,22 +119,34 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const totalWidth = maxX - minX;
   const totalHeight = maxY - minY;
 
+  // 强防零值及 NaN，防止小地图缩放计算除以零导致坐标系崩溃
+  const safeTotalWidth = totalWidth <= 0 || isNaN(totalWidth) ? 1 : totalWidth;
+  const safeTotalHeight = totalHeight <= 0 || isNaN(totalHeight) ? 1 : totalHeight;
+
   // 5. 计算等比例缩放至小地图 (200x120) 的比例因子
-  const scaleMiniX = miniWidth / totalWidth;
-  const scaleMiniY = miniHeight / totalHeight;
-  const scaleMini = Math.min(scaleMiniX, scaleMiniY);
+  const scaleMiniX = miniWidth / safeTotalWidth;
+  const scaleMiniY = miniHeight / safeTotalHeight;
+  let scaleMini = Math.min(scaleMiniX, scaleMiniY);
+  if (isNaN(scaleMini) || scaleMini === Infinity || scaleMini <= 0) {
+    scaleMini = 0.1;
+  }
 
   // 让内容在小地图中居中的偏移值
-  const contentWidth = totalWidth * scaleMini;
-  const contentHeight = totalHeight * scaleMini;
+  const contentWidth = safeTotalWidth * scaleMini;
+  const contentHeight = safeTotalHeight * scaleMini;
   const dx = (miniWidth - contentWidth) / 2;
   const dy = (miniHeight - contentHeight) / 2;
 
+  const safeDx = isNaN(dx) ? 0 : dx;
+  const safeDy = isNaN(dy) ? 0 : dy;
+
   // 6. 真实坐标映射至小地图相对坐标的辅助函数
   const mapToMini = (X: number, Y: number) => {
+    const xVal = (X - minX) * scaleMini + safeDx;
+    const yVal = (Y - minY) * scaleMini + safeDy;
     return {
-      x: (X - minX) * scaleMini + dx,
-      y: (Y - minY) * scaleMini + dy,
+      x: isNaN(xVal) ? 0 : xVal,
+      y: isNaN(yVal) ? 0 : yVal,
     };
   };
 
@@ -139,15 +160,18 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
     const my = clientY - rect.top;
 
     // 逆映射：小地图坐标 (mx, my) 映射回真实画布坐标 (canvasX, canvasY)
-    const canvasX = (mx - dx) / scaleMini + minX;
-    const canvasY = (my - dy) / scaleMini + minY;
+    const canvasX = (mx - safeDx) / scaleMini + minX;
+    const canvasY = (my - safeDy) / scaleMini + minY;
 
     // 平移大画布：将所点击/拖动的位置重定心至屏幕物理中心
-    const newX = containerWidth / 2 - canvasX * scale;
-    const newY = containerHeight / 2 - canvasY * scale;
+    const newX = safeContainerWidth / 2 - (isNaN(canvasX) ? 0 : canvasX) * scale;
+    const newY = safeContainerHeight / 2 - (isNaN(canvasY) ? 0 : canvasY) * scale;
 
-    canvasRef.current?.setView(newX, newY, scale);
-  }, [dx, dy, scaleMini, minX, minY, containerWidth, containerHeight, scale, canvasRef]);
+    const finalX = isNaN(newX) ? 0 : newX;
+    const finalY = isNaN(newY) ? 0 : newY;
+
+    canvasRef.current?.setView(finalX, finalY, scale);
+  }, [safeDx, scaleMini, minX, minY, safeContainerWidth, safeContainerHeight, scale, canvasRef]);
 
   // 8. 拖动小地图视口框的交互处理
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -188,20 +212,38 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
   const zoomProgress = Math.max(0, Math.min(100, (zoomPercent - 10) / 290 * 100));
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
     const newScale = parseInt(e.target.value, 10) / 100;
-    canvasRef.current?.zoomTo(newScale);
+    
+    if (canvasRef.current) {
+      if (typeof canvasRef.current.zoomTo === 'function') {
+        canvasRef.current.zoomTo(newScale);
+      } else {
+        // 兜底方案：如果 zoomTo 未暴露，使用 setView 针对中心进行缩放
+        const container = document.getElementById('canvas-container');
+        if (container) {
+          const rect = container.getBoundingClientRect();
+          const centerX = rect.width / 2;
+          const centerY = rect.height / 2;
+          
+          const scaleRatio = newScale / scale;
+          const newX = centerX - (centerX - canvasTransform.x) * scaleRatio;
+          const newY = centerY - (centerY - canvasTransform.y) * scaleRatio;
+          
+          canvasRef.current.setView(newX, newY, newScale);
+        }
+      }
+    }
   };
 
-  const handleZoomIn = () => {
-    canvasRef.current?.zoomIn();
+  const handleZoomIn = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    canvasRef.current?.zoomIn?.();
   };
 
-  const handleZoomOut = () => {
-    canvasRef.current?.zoomOut();
-  };
-
-  const handleFitToAll = () => {
-    canvasRef.current?.fitToAll();
+  const handleZoomOut = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    canvasRef.current?.zoomOut?.();
   };
 
   return (
@@ -216,8 +258,8 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.2)',
       }}
     >
-      {/* 简体中文：小地图 SVG 渲染层包装，提供折叠交互 */}
-      <div className="relative group/nav-map">
+      {/* 简体中文：小地图 SVG 画面层，移除了外部的 Header 及定位全览按钮 */}
+      <div className="relative">
         <svg
           ref={svgRef}
           width={miniWidth}
@@ -229,7 +271,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
             border: '1px solid rgba(255, 255, 255, 0.05)',
           }}
         >
-          {/* 背景网格装饰，提供高端空间感 */}
+          {/* 背景网格装饰，提供空间感 */}
           <defs>
             <pattern id="minimap-grid" width="20" height="20" patternUnits="userSpaceOnUse">
               <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255, 255, 255, 0.02)" strokeWidth="1" />
@@ -279,34 +321,22 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
           />
         </svg>
 
-        {/* 折叠小地图按钮 */}
+        {/* 折叠小地图按钮 - 精致的悬浮圆扣，与 Body 完美融合，不占用额外头部栏空间 */}
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleCollapsed();
-          }}
-          className="absolute top-1.5 right-1.5 p-1 rounded-lg bg-black/40 hover:bg-black/60 text-white/70 hover:text-white transition-all duration-200 cursor-pointer border border-white/5 opacity-0 group-hover/nav-map:opacity-100"
+          onClick={toggleCollapsed}
+          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white/70 hover:text-white transition-all duration-200 cursor-pointer border border-white/10 shadow-md backdrop-blur-md"
           title="收起小地图"
         >
           <Minimize2 size={11} />
         </button>
       </div>
 
-      {/* 简体中文：横向缩放及定位控制栏 */}
-      <div className="flex items-center justify-between gap-1.5 px-0.5">
-        {/* 全览定位按钮 */}
-        <button
-          onClick={handleFitToAll}
-          className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-all outline-none"
-          title="定位全览 (Home)"
-        >
-          <Home size={13} />
-        </button>
-
+      {/* 简体中文：横向缩放控制栏 */}
+      <div className="flex items-center justify-between gap-1.5 px-0.5 mt-0.5">
         {/* 缩小按钮 */}
         <button
           onClick={handleZoomOut}
-          className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-all outline-none"
+          className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] active:scale-90 transition-all outline-none cursor-pointer"
           title="缩小"
         >
           <Minus size={13} />
@@ -320,6 +350,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
             max="300"
             value={zoomPercent}
             onChange={handleSliderChange}
+            onMouseDown={(e) => e.stopPropagation()}
             className="zoom-slider cursor-pointer w-full h-1"
             style={{
               '--zoom-slider-progress': `${zoomProgress}%`,
@@ -330,7 +361,7 @@ const AppCanvasNavigationPanel: React.FC<AppCanvasNavigationPanelProps> = ({
         {/* 放大按钮 */}
         <button
           onClick={handleZoomIn}
-          className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-all outline-none"
+          className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] active:scale-90 transition-all outline-none cursor-pointer"
           title="放大"
         >
           <Plus size={13} />
