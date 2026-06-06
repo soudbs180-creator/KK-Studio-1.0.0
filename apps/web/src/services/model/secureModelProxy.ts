@@ -10,6 +10,7 @@ import { kkWebApiClient, resolveKkApiModelProxyBaseUrl } from '../api/kkApiClien
 import { compressReferenceImagesIfNeeded } from '../../utils/imageUtils';
 import { kernelFetch } from '../http/requestKernel';
 import { keyManager } from '../auth/keyManager';
+import { normalizeWuyinImageSize, normalizeWuyinAspectRatio, normalizeWuyinReferenceImage } from '../llm/openAICompatibleWuyinRoute';
 
 const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';
 const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
@@ -102,8 +103,12 @@ function getWuyinRouteDetails(routeId: string) {
 }
 
 export function checkIsWuyinClientDirect(routeIdOrTaskId: string): boolean {
-  void routeIdOrTaskId;
-  return false;
+  if (!routeIdOrTaskId) return false;
+  const routeId = routeIdOrTaskId.startsWith('local_proxy:')
+    ? decodeURIComponent(routeIdOrTaskId.slice('local_proxy:'.length).split(':')[0] || '')
+    : routeIdOrTaskId;
+  const route = getWuyinRouteDetails(routeId);
+  return route !== null;
 }
 
 function extractUrlsFromPayload(val: any): string[] {
@@ -152,8 +157,8 @@ export async function callWuyinClientDirectImage(
   const endpointPath = `/api/async/${modelId}`;
   const targetUrl = `${baseUrl}${endpointPath}`;
   
-  const size = payload.imageSize || '1K';
-  const aspectRatio = payload.aspectRatio || 'auto';
+  const size = normalizeWuyinImageSize(payload.imageSize);
+  const aspectRatio = normalizeWuyinAspectRatio(payload.aspectRatio);
   const body: Record<string, any> = {
     prompt: payload.prompt,
     size,
@@ -162,7 +167,7 @@ export async function callWuyinClientDirectImage(
   
   const rawRefs = payload.referenceImages || [];
   if (rawRefs.length > 0) {
-    body.urls = rawRefs.map(r => typeof r === 'string' ? r : (r.data || (r as any).url)).filter(Boolean);
+    body.urls = rawRefs.map((r, index) => normalizeWuyinReferenceImage(r, index).value);
   }
   
   const response = await fetch(targetUrl, {
