@@ -691,7 +691,6 @@ function buildWuyinImageRequestBody(input) {
   const body = {
     prompt: String(input.prompt || ''),
     size,
-    imageSize: size,
     aspectRatio,
   };
 

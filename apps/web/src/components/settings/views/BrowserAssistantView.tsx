@@ -1886,35 +1886,35 @@ export const BrowserAssistantView: React.FC = () => {
               <div className="flex">
                 <button
                   onClick={() => setPlaygroundTab('extract')}
-                  className={`pb-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                  className={`pb-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap ${
                     playgroundTab === 'extract'
                       ? 'border-blue-500 text-slate-900 dark:text-white'
                       : 'border-transparent text-slate-400 hover:text-slate-300'
                   }`}
                 >
-                  <ShoppingBag size={12} className="inline mr-1 v-align-middle" />
+                  <ShoppingBag size={12} />
                   <span>商品抓取与抠图</span>
                 </button>
                 <button
                   onClick={() => setPlaygroundTab('generate')}
-                  className={`pb-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                  className={`pb-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap ${
                     playgroundTab === 'generate'
                       ? 'border-blue-500 text-slate-900 dark:text-white'
                       : 'border-transparent text-slate-400 hover:text-slate-300'
                   }`}
                 >
-                  <Sparkles size={12} className="inline mr-1 v-align-middle" />
+                  <Sparkles size={12} />
                   <span>免 API 生图与社交分发</span>
                 </button>
                 <button
                   onClick={() => setPlaygroundTab('pipeline')}
-                  className={`pb-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                  className={`pb-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap ${
                     playgroundTab === 'pipeline'
                       ? 'border-blue-500 text-slate-900 dark:text-white'
                       : 'border-transparent text-slate-400 hover:text-slate-300'
                   }`}
                 >
-                  <Cpu size={12} className="inline mr-1 v-align-middle" />
+                  <Cpu size={12} />
                   <span>全自动宏流水线</span>
                 </button>
               </div>

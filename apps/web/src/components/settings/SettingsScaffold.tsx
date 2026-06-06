@@ -172,7 +172,7 @@ export const SettingsBadge: React.FC<{ children: ReactNode; tone?: Tone; classNa
       fontSize: 'var(--type-micro)',
     }}
   >
-    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{children}</span>
+    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap flex items-center gap-1">{children}</span>
   </span>
 );
 

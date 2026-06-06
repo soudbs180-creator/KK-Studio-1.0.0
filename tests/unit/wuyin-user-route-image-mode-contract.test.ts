@@ -64,7 +64,6 @@ describe("速创 API 图片模型路由与适配契约测试 (Wuyin Image Proxy 
 
     assert.equal(requestBody.prompt, "生成一幅赛博朋克猫咪插画");
     assert.equal(requestBody.size, "2K");
-    assert.equal(requestBody.imageSize, "2K");
     assert.equal(requestBody.aspectRatio, "16:9");
     
     // 简体中文注释：验证 Base64 去除了 data: 前缀与换行空格

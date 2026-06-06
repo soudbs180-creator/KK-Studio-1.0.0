@@ -188,7 +188,7 @@ describe("OpenAI-compatible Wuyin route helpers", () => {
       }),
       {
         prompt: "cat",
-        imageSize: "1K",
+        size: "4K",
         aspectRatio: "1:1",
       },
     );

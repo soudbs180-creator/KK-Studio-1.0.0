@@ -394,8 +394,14 @@ export function buildWuyinImageSubmitBody(input: {
     return body;
   }
 
-  if (normalizedModelId === 'image_nanobanana') {
-    body.imageSize = '1K';
+  // 简体中文注释：纠正速创 NanoBanana 家族的规格格式，使用 size 字段并支持动态尺寸参数
+  if (
+    normalizedModelId === 'image_nanobanana' ||
+    normalizedModelId === 'image_nanobanana2' ||
+    normalizedModelId === 'image_nanobanana_pro' ||
+    normalizedModelId === 'image_nanobananapro'
+  ) {
+    body.size = normalizeWuyinImageSize(input.imageSize || input.size);
     body.aspectRatio = normalizeWuyinAspectRatio(input.aspectRatio);
     appendWuyinBodyValue(body, 'urls', refs);
     return body;
