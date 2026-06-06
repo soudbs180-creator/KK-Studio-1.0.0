@@ -552,61 +552,6 @@ function resolveWuyinImageEndpointPath(modelId) {
   if (wuyinEndpoints[cleanRaw]) {
     return wuyinEndpoints[cleanRaw];
   }
-  if (wuyinEndpoints[cleanRaw.toLowerCase()]) {
-    return wuyinEndpoints[cleanRaw.toLowerCase()];
-  }
-
-  const normalized = raw.toLowerCase().replace(/[^a-z0-9]+/g, '');
-
-  if (
-    normalized === 'imagenanobanana2'
-    || normalized === 'nanobanana2'
-    || normalized === 'nanobanana2preview'
-    || normalized === 'gemini31flashimagepreview'
-    || normalized === 'gemini31flashimage'
-  ) {
-    return '/api/async/image_nanoBanana2';
-  }
-
-  if (
-    normalized === 'imagenanobananapro'
-    || normalized === 'nanobananapro'
-    || normalized === 'gemini3proimagepreview'
-  ) {
-    return '/api/async/image_nanoBanana_pro';
-  }
-
-  if (
-    normalized === 'imagenanobanana'
-    || normalized === 'nanobanana'
-    || normalized === 'gemini25flashimage'
-  ) {
-    return '/api/async/image_nanoBanana';
-  }
-
-  if (
-    normalized === 'imagegpt'
-    || normalized === 'gptimage2'
-    || normalized === 'gptimage'
-  ) {
-    return '/api/async/image_gpt';
-  }
-
-  if (
-    normalized === 'imagegrokimagine'
-    || normalized === 'grokimagine'
-  ) {
-    return '/api/async/image_grok_imagine';
-  }
-
-  if (
-    normalized === 'imagewan26'
-    || normalized === 'wan26'
-    || normalized === 'wan'
-  ) {
-    return '/api/async/image_wan2.6';
-  }
-
   if (/^image[a-z0-9_.-]+$/i.test(raw)) {
     return `/api/async/${raw}`;
   }
