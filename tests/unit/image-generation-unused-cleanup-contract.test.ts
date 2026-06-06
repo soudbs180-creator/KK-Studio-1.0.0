@@ -12,6 +12,13 @@ test('useImageGeneration does not retain compiler-proven unused locals', () => {
   const source = readSource('apps/web/src/hooks/useImageGeneration.ts');
 
   assert.match(source, /import \{ saveOriginalImage, getImage, normalizePersistableMediaSource \} from '\.\.\/services\/storage\/imageStorage';/);
+  assert.doesNotMatch(source, /import \{ llmService \} from '\.\.\/services\/llm\/LLMService';/);
+  assert.doesNotMatch(source, /import \{ generateImage, cancelGeneration \} from '\.\.\/services\/llm\/geminiService';/);
+  assert.doesNotMatch(source, /from '\.\.\/services\/image\/partialRedraw';/);
+  assert.doesNotMatch(source, /from '\.\.\/services\/model\/secureModelProxy';/);
+  assert.match(source, /await import\('\.\.\/services\/llm\/LLMService'\)/);
+  assert.match(source, /await import\('\.\.\/services\/llm\/geminiService'\)/);
+  assert.match(source, /await import\('\.\.\/services\/image\/partialRedraw'\)/);
   assert.doesNotMatch(source, /\bsaveImage\b/);
   assert.doesNotMatch(source, /\bisCreditBasedModel\b/);
   assert.doesNotMatch(source, /\bGENERATE_TIMEOUT_MS\b/);

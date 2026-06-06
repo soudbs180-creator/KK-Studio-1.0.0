@@ -56,6 +56,7 @@ export interface UseEcommerceNodeGenerationRuntimeDeps {
   ecommerceState: EcommerceNodeGenerationRuntimeState;
   setEcommerceNodeGenerationRuntimeState: SetEcommerceNodeGenerationRuntimeState;
   enablePromptOptimization: boolean;
+  promptOptimizerArchetype?: string;
   configPrompt: string;
   updatePromptNode: UpdateEcommerceGeneratedPromptNode;
   handleRetryNode: (node: PromptNode) => Promise<void>;
@@ -113,6 +114,7 @@ export function useEcommerceNodeGenerationRuntime({
   ecommerceState,
   setEcommerceNodeGenerationRuntimeState,
   enablePromptOptimization,
+  promptOptimizerArchetype,
   configPrompt,
   updatePromptNode,
   handleRetryNode,
@@ -220,6 +222,7 @@ export function useEcommerceNodeGenerationRuntime({
       referenceImages: optimizerReferenceImages,
       options: {
         preferredModelId: latestNode.model,
+        preferredArchetypeId: promptOptimizerArchetype,
         aspectRatio: String(nextAspectRatio),
         imageSize: String(nextImageSize),
         mode: GenerationMode.ECOMMERCE,
@@ -396,6 +399,7 @@ export function useEcommerceNodeGenerationRuntime({
       referenceImages: latestNode.referenceImages || [],
       options: {
         preferredModelId: latestNode.model,
+        preferredArchetypeId: promptOptimizerArchetype,
         aspectRatio: String(nextGenerationSettings.aspectRatio),
         imageSize: String(nextGenerationSettings.imageSize),
         mode: GenerationMode.ECOMMERCE,

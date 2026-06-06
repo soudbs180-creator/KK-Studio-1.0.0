@@ -1,7 +1,7 @@
 import type { PromptNode, ReferenceImage } from '../types';
-import { optimizePromptForImage, summarizePromptOptimizerError } from '../services/llm/promptOptimizerService';
 
-type PromptOptimizationOptions = NonNullable<Parameters<typeof optimizePromptForImage>[1]>;
+type PromptOptimizerModule = typeof import('../services/llm/promptOptimizerService');
+type PromptOptimizationOptions = NonNullable<Parameters<PromptOptimizerModule['optimizePromptForImage']>[1]>;
 
 interface OptimizeGenerationPromptArgs {
   enabled?: boolean;
@@ -18,7 +18,19 @@ interface OptimizeGenerationPromptResult {
   promptOptimizerResult?: PromptNode['promptOptimizerResult'];
 }
 
-export const summarizePromptOptimizationError = summarizePromptOptimizerError;
+export const summarizePromptOptimizationError = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message || error.name;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+};
 
 function buildPromptOptimizerReferenceImages(referenceImages?: ReferenceImage[]): NonNullable<PromptOptimizationOptions['referenceImages']> {
   return (referenceImages || [])
@@ -53,6 +65,7 @@ export async function optimizeGenerationPrompt({
   }
 
   try {
+    const { optimizePromptForImage } = await import('../services/llm/promptOptimizerService');
     const optimized = await optimizePromptForImage(rawPrompt, {
       ...options,
       referenceImages: buildPromptOptimizerReferenceImages(referenceImages),

@@ -19,6 +19,8 @@ const CostEstimation = lazyWithRetry(() => import('../../pages/CostEstimation'))
 const StorageSettingsView = lazyWithRetry(() => import('./views/StorageSettingsView.localized.tsx'));
 const SystemLogsView = lazyWithRetry(() => import('./views/SystemLogsView.localized.tsx'));
 const UserProfileView = lazyWithRetry(() => import('./views/UserProfileView.tsx'));
+const BrowserAssistantView = lazyWithRetry(() => import('./views/BrowserAssistantView.tsx'));
+const AiManagementView = lazyWithRetry(() => import('./views/AiManagementView.tsx'));
 
 type SettingsWorkbenchRouteDefinition =
   | { path: ''; kind: 'dashboard'; index: true }
@@ -32,7 +34,9 @@ type SettingsWorkbenchRouteDefinition =
   | { path: 'consumption-records'; kind: 'billing' }
   | { path: 'storage-settings'; kind: 'storage' }
   | { path: 'system-logs'; kind: 'logs' }
-  | { path: 'user-profile'; kind: 'profile' };
+  | { path: 'user-profile'; kind: 'profile' }
+  | { path: 'browser-assistant'; kind: 'browser-assistant' }
+  | { path: 'ai-management'; kind: 'ai-management' };
 
 const SETTINGS_WORKBENCH_ROUTE_DEFINITIONS: SettingsWorkbenchRouteDefinition[] = [
   { path: '', kind: 'dashboard', index: true },
@@ -47,6 +51,8 @@ const SETTINGS_WORKBENCH_ROUTE_DEFINITIONS: SettingsWorkbenchRouteDefinition[] =
   { path: 'storage-settings', kind: 'storage' },
   { path: 'system-logs', kind: 'logs' },
   { path: 'user-profile', kind: 'profile' },
+  { path: 'browser-assistant', kind: 'browser-assistant' },
+  { path: 'ai-management', kind: 'ai-management' },
 ];
 
 interface SettingsRouteOptions {
@@ -105,6 +111,10 @@ function getRouteElement(
       return <SystemLogsView key={routeRefreshKey} />;
     case 'profile':
       return <UserProfileView key={routeRefreshKey} />;
+    case 'browser-assistant':
+      return <BrowserAssistantView key={routeRefreshKey} />;
+    case 'ai-management':
+      return <AiManagementView key={routeRefreshKey} />;
     default:
       return <Navigate to={(options.dashboardBasePath || '/settings')} replace />;
   }
@@ -115,12 +125,12 @@ export function createSettingsRouteObjects(options: SettingsRouteOptions = {}): 
 
   return [
     ...SETTINGS_WORKBENCH_ROUTE_DEFINITIONS.map((definition) => ({
-      path: definition.path,
+      path: `${basePath}${definition.path ? `/${definition.path}` : ''}`,
       index: definition.kind === 'dashboard' ? definition.index : undefined,
       element: getRouteElement(definition, options),
     })),
     ...LEGACY_SETTINGS_ROUTE_REDIRECTS.map(({ path, target }) => ({
-      path,
+      path: `${basePath}/${path}`,
       element: <Navigate to={basePath === '/settings' ? buildSettingsPath(target) : `${basePath}${buildSettingsPath(target)}`} replace />,
     })),
     {

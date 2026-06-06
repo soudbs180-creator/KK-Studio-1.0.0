@@ -1,16 +1,17 @@
 import React, { Suspense, useLayoutEffect, useState } from 'react';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 
-import LoginScreen from '../components/auth/LoginScreen';
-import AdminRechargeFloatingPanel from '../components/admin/AdminRechargeFloatingPanel';
 import { AppStartupScreen } from '../components/common/AppStartupScreen';
 import NotificationToast from '../components/common/NotificationToast';
 import { useAuth } from '../context/AuthContext';
 import { useAppStartup } from '../context/AppStartupContext';
 import { shouldShowLoginForAuthGate } from './authGate';
+import { KKAI_FEATURE_FLAGS } from './kkaiFeatureFlags';
 import { pickByDocumentLanguage } from '../utils/localeText';
 
 const CostEstimation = lazyWithRetry(() => import('../pages/CostEstimation'));
+const LoginScreen = lazyWithRetry(() => import('../components/auth/LoginScreen'));
+const AdminRechargeFloatingPanelGate = lazyWithRetry(() => import('../components/admin/AdminRechargeFloatingPanelGate'));
 const PROMPT_BAR_CONTAINER_ID = 'prompt-bar-container';
 const PROMPT_BAR_TEXTAREA_SELECTOR = 'textarea.input-bar-textarea, textarea';
 
@@ -206,7 +207,11 @@ export const AuthenticatedAppShell: React.FC<AuthenticatedAppShellProps> = ({
   }
 
   if (shouldShowLoginForAuthGate({ user, session, isTempUser })) {
-    return <LoginScreen />;
+    return (
+      <Suspense fallback={<AppStartupScreen stage="signed_out" warning={sessionRecoveryWarning} />}>
+        <LoginScreen />
+      </Suspense>
+    );
   }
 
   return (
@@ -219,7 +224,11 @@ export const AuthenticatedAppShell: React.FC<AuthenticatedAppShellProps> = ({
         <>
           {showStartupRuntimeBanner ? <StartupRuntimeBanner /> : null}
           <NotificationToast />
-          <AdminRechargeFloatingPanel />
+          {KKAI_FEATURE_FLAGS.admin ? (
+            <Suspense fallback={null}>
+              <AdminRechargeFloatingPanelGate />
+            </Suspense>
+          ) : null}
           <AppContentComponent />
         </>
       )}

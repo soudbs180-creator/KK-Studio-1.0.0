@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { Canvas } from '../types';
-import { syncService } from '../services/system/syncService';
 import {
     buildCanvasCloudSyncSignature,
     getCachedStrippedCanvases,
@@ -38,7 +37,9 @@ export function useCanvasCloudSync(canvases: Canvas[], isLoading: boolean, enabl
         cloudMediaSyncWarningShownRef.current = false;
 
         const timer = setTimeout(() => {
-            syncService.saveLayout(cloudSyncLayoutPayload).catch(e => console.error('[CanvasContext] Cloud save failed', e));
+            import('../services/system/syncService')
+                .then(({ syncService }) => syncService.saveLayout(cloudSyncLayoutPayload))
+                .catch(e => console.error('[CanvasContext] Cloud save failed', e));
         }, 3000);
 
         return () => clearTimeout(timer);

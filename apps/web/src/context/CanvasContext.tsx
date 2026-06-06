@@ -3,7 +3,6 @@ import { type Canvas, type PromptNode, type GeneratedImage, AspectRatio, type Ca
 import { startTransition } from 'react';
 import { shouldEnableWorkspaceCloudSync } from '../app/kkaiFeatureFlags';
 import { saveImage, saveOriginalImage, getImage, getImageByQuality, deleteImage, clearAllImages, normalizePersistableMediaSource } from '../services/storage/imageStorage';
-import { syncService } from '../services/system/syncService';
 import { fileSystemService } from '../services/storage/fileSystemService';
 import { dataURLToBlob as base64ToBlob, safeRevokeBlobUrl } from '../utils/blobUtils';
 import { calculateImageHash } from '../utils/imageUtils';
@@ -736,6 +735,7 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             if (!canLoadCloudLayout) return;
 
             try {
+                const { syncService } = await import('../services/system/syncService');
                 const cloudCanvases = await syncService.loadLayout();
                 if (cloudCanvases && cloudCanvases.length > 0) {
                     setState(prev => {
@@ -1736,13 +1736,97 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updateCanvas(canvas => deleteCanvasPromptNode(canvas, id));
     }, [updateCanvas, pushToHistory]);
 
-    const linkNodes = useCallback((promptId: string, imageId: string) => {
-        updateCanvas(canvas => linkCanvasPromptToImage(canvas, promptId, imageId));
-    }, [updateCanvas]);
+    const linkNodes = useCallback((fromId: string, toId: string) => {
+        pushToHistory();
+        updateCanvas(canvas => {
+            const fromPrompt = canvas.promptNodes.find(n => n.id === fromId);
+            const fromImage = canvas.imageNodes.find(n => n.id === fromId);
+            const toPrompt = canvas.promptNodes.find(n => n.id === toId);
+            const toImage = canvas.imageNodes.find(n => n.id === toId);
+            const fromUtility = canvas.workflow?.nodes?.find(n => n.id === fromId);
+            const toUtility = canvas.workflow?.nodes?.find(n => n.id === toId);
 
-    const unlinkNodes = useCallback((promptId: string, imageId: string) => {
-        updateCanvas(canvas => unlinkCanvasPromptFromImage(canvas, promptId, imageId));
-    }, [updateCanvas]);
+            if (fromPrompt && toImage) {
+                // 传统 Prompt -> Image
+                const promptId = fromId;
+                const imageId = toId;
+                return linkCanvasPromptToImage(canvas, promptId, imageId);
+            } else if (fromImage && toPrompt) {
+                // 图生图 Image -> Prompt
+                return {
+                    ...canvas,
+                    promptNodes: canvas.promptNodes.map(node =>
+                        node.id === toId
+                            ? { ...node, sourceImageId: fromId, lastModified: Date.now() }
+                            : node
+                    ),
+                };
+            } else if ((fromPrompt || fromImage || fromUtility) && (toPrompt || toImage || toUtility)) {
+                // DAG 可视化节点流通用 Sequence 连接，存入 workflow.edges
+                if (canvas.workflow) {
+                    const newEdge = {
+                        id: `edge:${fromId}:sequence:${toId}`,
+                        from: fromId,
+                        to: toId,
+                        role: 'sequence' as any,
+                        state: 'active' as any
+                    };
+                    const alreadyExists = (canvas.workflow.edges || []).some(
+                        e => e.from === fromId && e.to === toId
+                    );
+                    if (alreadyExists) return canvas;
+
+                    return {
+                        ...canvas,
+                        workflow: {
+                            ...canvas.workflow,
+                            edges: [...(canvas.workflow.edges || []), newEdge]
+                        }
+                    };
+                }
+            }
+            return canvas;
+        });
+    }, [updateCanvas, pushToHistory]);
+
+    const unlinkNodes = useCallback((fromId: string, toId: string) => {
+        pushToHistory();
+        updateCanvas(canvas => {
+            const fromPrompt = canvas.promptNodes.find(n => n.id === fromId);
+            const fromImage = canvas.imageNodes.find(n => n.id === fromId);
+            const toPrompt = canvas.promptNodes.find(n => n.id === toId);
+            const toImage = canvas.imageNodes.find(n => n.id === toId);
+
+            if (fromPrompt && toImage) {
+                // 传统 Prompt -> Image 断开
+                const promptId = fromId;
+                const imageId = toId;
+                return unlinkCanvasPromptFromImage(canvas, promptId, imageId);
+            } else if (fromImage && toPrompt) {
+                // 图生图 Image -> Prompt 断开
+                return {
+                    ...canvas,
+                    promptNodes: canvas.promptNodes.map(node =>
+                        node.id === toId && node.sourceImageId === fromId
+                            ? { ...node, sourceImageId: undefined, lastModified: Date.now() }
+                            : node
+                    ),
+                };
+            }
+
+            // 过滤 workflow.edges 中的自定义边
+            if (canvas.workflow?.edges) {
+                return {
+                    ...canvas,
+                    workflow: {
+                        ...canvas.workflow,
+                        edges: canvas.workflow.edges.filter(edge => !(edge.from === fromId && edge.to === toId))
+                    }
+                };
+            }
+            return canvas;
+        });
+    }, [updateCanvas, pushToHistory]);
 
 
     const undo = useCallback(() => {
@@ -2673,6 +2757,30 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return summary;
     }, []);
 
+    const addCanvasDrawing = useCallback((drawing: CanvasDrawing) => {
+        pushToHistory();
+        updateCanvas(canvas => ({
+            ...canvas,
+            drawings: [...(canvas.drawings || []), drawing]
+        }));
+    }, [updateCanvas, pushToHistory]);
+
+    const deleteCanvasDrawing = useCallback((id: string) => {
+        pushToHistory();
+        updateCanvas(canvas => ({
+            ...canvas,
+            drawings: (canvas.drawings || []).filter(d => d.id !== id)
+        }));
+    }, [updateCanvas, pushToHistory]);
+
+    const clearCanvasDrawings = useCallback(() => {
+        pushToHistory();
+        updateCanvas(canvas => ({
+            ...canvas,
+            drawings: []
+        }));
+    }, [updateCanvas, pushToHistory]);
+
     // [Performance] Cache the context value so high-frequency state like viewportCenter does not rerender every consumer.
     const contextValue = React.useMemo(() => ({
         state, activeCanvas, createCanvas, switchCanvas, deleteCanvas, renameCanvas,
@@ -2703,7 +2811,10 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         migrateNodes,
         mergeCanvasInto,
         cleanupInvalidCards,
-        urgentUpdatePromptNode
+        urgentUpdatePromptNode,
+        addCanvasDrawing,
+        deleteCanvasDrawing,
+        clearCanvasDrawings
     }), [
         state, activeCanvas, createCanvas, switchCanvas, deleteCanvas, renameCanvas,
         addPromptNode, updatePromptNode, addImageNodes, updatePromptNodePosition, updateImageNodePosition, updateImageNodeDimensions, updateImageNode,
@@ -2712,7 +2823,8 @@ export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         deleteImageNode, deletePromptNode, linkNodes, unlinkNodes, clearAllData, canCreateCanvas,
         undo, redo, pushToHistory, canUndo, canRedo, arrangeAllNodes, getNextCardPosition,
         connectLocalFolder, disconnectLocalFolder, changeLocalFolder, refreshLocalFolder,
-        isShellReady, isLoading, loadingProgress, selectNodes, clearSelection, bringNodesToFront, moveSelectedNodes, moveSelectedNodesImmediate, findSmartPosition, findNextGroupPosition, addGroup, removeGroup, updateGroup, setNodeTags, setViewportCenter, migrateNodes, mergeCanvasInto, cleanupInvalidCards, urgentUpdatePromptNode
+        isShellReady, isLoading, loadingProgress, selectNodes, clearSelection, bringNodesToFront, moveSelectedNodes, moveSelectedNodesImmediate, findSmartPosition, findNextGroupPosition, addGroup, removeGroup, updateGroup, setNodeTags, setViewportCenter, migrateNodes, mergeCanvasInto, cleanupInvalidCards, urgentUpdatePromptNode,
+        addCanvasDrawing, deleteCanvasDrawing, clearCanvasDrawings
     ]);
 
     return (

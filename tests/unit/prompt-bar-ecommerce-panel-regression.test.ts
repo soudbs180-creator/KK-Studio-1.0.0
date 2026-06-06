@@ -12,7 +12,7 @@ test('PromptBar delegates ecommerce-specific composer UI to a dedicated panel co
   const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
   const ecommercePanelSource = readSource('apps/web/src/components/layout/prompt-bar/DesktopComposerEcommercePanel.tsx');
 
-  assert.match(promptBarSource, /import DesktopComposerEcommercePanel from '\.\/prompt-bar\/DesktopComposerEcommercePanel';/);
+  assert.match(promptBarSource, /DesktopComposerEcommercePanel = (lazyWithRetry|React\.lazy|lazy)/);
   assert.match(promptBarSource, /<DesktopComposerEcommercePanel/);
   assert.doesNotMatch(promptBarSource, /<EcommerceImportPanel/);
   assert.doesNotMatch(promptBarSource, /<EcommerceAnalysisReviewPanel/);

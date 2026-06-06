@@ -33,6 +33,9 @@ export type AssistantIntent =
   | 'complex_sequence'             // 连续复合多步任务（如生图再生成视频）
   | 'open_logs'                    // 打开/查看系统日志
   | 'open_settings_view'           // 快速打开设置页子功能
+  | 'extract_page_content'         // 抓取指定网页内容（包括价格、主图等商品信息）
+  | 'control_multidevice'          // 网页控制多端相关设置与诊断
+  | 'arrange_nodes'                // 整理卡片/排版布局
   | 'unknown';
 
 // 意图分析结果
@@ -72,11 +75,14 @@ export type AssistantAction =
   | { type: 'highlightElement'; payload: { selector: string } }
   | { type: 'openSettings'; payload: { tab: string } }
   | { type: 'locateApiCard'; payload: { idOrName: string } }
-  | { type: 'zipOutputs'; payload: { scope: 'latest_batch' | 'current_batch' | 'selected_cards' | 'all_canvas_outputs' | 'asset_collection_outputs' } }
+  | { type: 'zipOutputs'; payload: { scope: 'latest_batch' | 'current_batch' | 'selected_cards' | 'all_canvas_outputs' | 'asset_collection_outputs'; selectedNodeIds?: string[] } }
+  | { type: 'canvas.arrangeNodes'; payload: { nodeIds: string[]; mode: string; preset?: string } }
   | { type: 'explainError'; payload: { errorCode?: string; errorMessage?: string } }
   | { type: 'fillInputPrompt'; payload: { prompt: string } }
   | { type: 'changeMode'; payload: { mode: GenerationMode } }
-  | { type: 'submitPromptComposer'; payload: {} };
+  | { type: 'submitPromptComposer'; payload: {} }
+  | { type: 'browser.extract'; payload: { url: string; targets: ('price' | 'title' | 'image' | 'description')[]; label?: string } }
+  | { type: 'browser.control'; payload: { command: 'open' | 'click' | 'fill' | 'extract'; args?: any } };
 
 // 执行计划
 export interface AssistantPlan {

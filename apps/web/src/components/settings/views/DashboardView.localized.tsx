@@ -9,6 +9,7 @@ import {
   RefreshCw,
   ScrollText,
   Wallet,
+  Globe,
 } from 'lucide-react';
 
 import { useBilling } from '../../../context/BillingContext';
@@ -865,6 +866,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                   showLabel={false}
                 />
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 卡片 7: 浏览器助手 (Browser Assistant) - 电脑端占 2*1 格 (2A) */}
+        <div 
+          className="dashboard-grid-card a-card-span-2-col group dashboard-left-col-span-2"
+          onClick={() => onNavigate('browser-assistant')}
+        >
+          <div className="dashboard-card-glow" style={{ background: '#4f46e5' }} />
+          <div className="flex items-center gap-3 w-full h-full">
+            <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                <Globe size={13} />
+                <span className="text-[9px] font-bold uppercase tracking-wider">{pick('浏览器助手', 'Browser Assistant')}</span>
+                <span className="text-[9px] bg-indigo-500/10 border border-indigo-500/30 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap">
+                  {pick('连通就绪', 'Connected')}
+                </span>
+              </div>
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white">{pick('网页抓取与多端自动化', 'Web Extraction & Multi-device Agent')}</h3>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-normal truncate">
+                {pick('控制本地浏览器一键抓取价格与海报生图素材', 'Control local browser to extract price and generation assets')}
+              </p>
+            </div>
+            <div className="shrink-0 flex items-center justify-center h-9 w-9 rounded-full bg-indigo-600/20 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 transition-all duration-200 group-hover:bg-indigo-600/40 group-hover:scale-110">
+              <ArrowRight size={16} />
             </div>
           </div>
         </div>

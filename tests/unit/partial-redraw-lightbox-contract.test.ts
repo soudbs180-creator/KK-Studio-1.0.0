@@ -11,7 +11,8 @@ const ROOT_DIR = process.cwd();
 test('lightbox uses the unified RedrawWorkspace and no longer wires the legacy inpaint contract', () => {
   const lightboxSource = readSource('apps/web/src/components/image/GlobalLightbox.tsx');
 
-  assert.match(lightboxSource, /import \{ RedrawWorkspace \} from '\.\/RedrawWorkspace';/);
+  assert.match(lightboxSource, /const RedrawWorkspace = React\.lazy\(\(\) =>\s*import\('\.\/RedrawWorkspace'\)\.then\(\(module\) => \(\{ default: module\.RedrawWorkspace \}\)\),\s*\);/);
+  assert.doesNotMatch(lightboxSource, /import \{ RedrawWorkspace \} from '\.\/RedrawWorkspace';/);
   assert.match(lightboxSource, /onPartialRedraw\?: \(image: GeneratedImage, request: RedrawRequest\) => void;/);
   assert.match(lightboxSource, /setRedrawWorkspaceMode\('fresh'\)/);
   assert.match(lightboxSource, /setRedrawWorkspaceMode\('regenerate'\)/);

@@ -32,7 +32,6 @@ import { useTheme } from '../../context/ThemeContext';
 import { useLocale } from '../../context/LocaleContext';
 // 简体中文：导入全局通知服务以在移动端提供操作反馈
 import { notify } from '../../services/system/notificationService';
-import { useAdminRole } from '../../hooks/useAdminRole';
 import type {
   MobileResultEntry,
   MobileSurfaceScreen,
@@ -139,7 +138,6 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
   const { toggleTheme, isDarkMode } = useTheme();
   const { toggleLanguage, isChinese, pick } = useLocale();
   // 🚀 [移动端专属] 提取真实的用户角色，以在头部用户名右侧进行徽章渲染
-  const { accountRole } = useAdminRole();
   const [showProjectList, setShowProjectList] = useState(false);
   const [resultViewMode, setResultViewMode] = useState<ResultViewMode>('standard');
   const activeEntryIndex = useMemo(
@@ -179,7 +177,6 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
         title={title}
         userName={userName}
         userAvatarUrl={userAvatarUrl}
-        userRole={accountRole}
       />
     </div>
   );

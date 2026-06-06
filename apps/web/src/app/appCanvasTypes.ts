@@ -52,6 +52,7 @@ export type PromptGroupRenderItem = {
   node: PromptNode;
   childNodes: GeneratedImage[];
   detailLevel: CanvasCardDetailLevel;
+  isPlaceholder?: boolean;
 };
 
 export type ImageRenderItem = {
@@ -63,6 +64,7 @@ export type ImageRenderItem = {
   detailLevel: CanvasCardDetailLevel;
   loadPriority: number;
   loadBand: 0 | 1 | 2 | 3;
+  isPlaceholder?: boolean;
 };
 
 export type PreviewRenderItem = {

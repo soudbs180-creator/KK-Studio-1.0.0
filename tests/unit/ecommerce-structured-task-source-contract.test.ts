@@ -63,6 +63,11 @@ test('ecommerce structured task flow is wired through analysis, generation, disp
   assert.match(postBuildSyncSource, /editableTask:\s*renderTask\.taskState/);
 
   assert.match(imageCardSource, /image\.displayLabel \|\| /);
+  assert.doesNotMatch(
+    optimizePromptSource,
+    /import \{ optimizePromptForImage, summarizePromptOptimizerError \} from '\.\.\/services\/llm\/promptOptimizerService';/,
+  );
+  assert.match(optimizePromptSource, /await import\('\.\.\/services\/llm\/promptOptimizerService'\)/);
   assert.match(optimizePromptSource, /const optimized = await optimizePromptForImage\(rawPrompt,\s*\{/);
   assert.match(optimizerRulebookSource, /ecommerceContext\?:/);
   assert.match(optimizerRulebookSource, /Structured ecommerce context to preserve:/);

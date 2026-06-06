@@ -6,8 +6,19 @@ import {
 } from 'lucide-react';
 import { AspectRatio, ImageSize } from '../../types';
 import { notify } from '../../services/system/notificationService';
-import { generateImage } from '../../services/llm/geminiService';
-import { llmService } from '../../services/llm/LLMService';
+
+type GeminiServiceModule = typeof import('../../services/llm/geminiService');
+type LlmServiceModule = typeof import('../../services/llm/LLMService');
+
+const generateMobileEcommerceImage: GeminiServiceModule['generateImage'] = async (...args) => {
+  const { generateImage: runGenerateImage } = await import('../../services/llm/geminiService');
+  return runGenerateImage(...args);
+};
+
+const chatWithMobileEcommerceLlm: LlmServiceModule['llmService']['chat'] = async (...args) => {
+  const { llmService: runtimeLlmService } = await import('../../services/llm/LLMService');
+  return runtimeLlmService.chat(...args);
+};
 
 // 声明全局变量以支持只读环境标记
 declare global {
@@ -255,7 +266,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
 
           try {
             // 调用 geminiService 底层的真实生图 API
-            const result = await generateImage(
+            const result = await generateMobileEcommerceImage(
               currentTask.optimizedPromptEn,
               config.aspectRatio as AspectRatio || AspectRatio.SQUARE,
               resolution as ImageSize || ImageSize.SIZE_1K,
@@ -390,7 +401,7 @@ const MobileEcommercePanel: React.FC<MobileEcommercePanelProps> = ({
       `;
 
       // 前端直连 LLM 服务发起提问
-      const aiResponse = await llmService.chat({
+      const aiResponse = await chatWithMobileEcommerceLlm({
         modelId: 'gemini-2.5-flash',
         messages: [
           { role: 'system', content: systemPrompt },

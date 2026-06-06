@@ -117,8 +117,13 @@ test('ecommerce group export runtime owns slot sync and export wiring', () => {
   assert.match(hookSource, /resolveLatestEcommerceSlotImage: \(node: PromptNode, deliveryKind\?: 'default' \| 'desktop' \| 'mobile'\) => EcommerceLatestSlotImage \| null;/);
   assert.match(hookSource, /buildEcommerceGroupExportManifest/);
   assert.match(hookSource, /applyEcommerceSlotResult/);
-  assert.match(hookSource, /new JSZip\(\)/);
-  assert.match(hookSource, /saveEcommerceBlob\(content,/);
+  assert.match(hookSource, /from '\.\.\/utils\/archiveRuntime\.ts';/);
+  assert.match(hookSource, /createZipArchive\(\)/);
+  assert.match(hookSource, /saveBlobAs\(content,/);
+  assert.match(hookSource, /import\('\.\.\/services\/ecommerce\/groupExportManifest\.ts'\)/);
+  assert.doesNotMatch(hookSource, /import JSZip from 'jszip';/);
+  assert.doesNotMatch(hookSource, /import \{ buildEcommerceGroupExportManifest \} from '\.\.\/services\/ecommerce\/groupExportManifest\.ts';/);
+  assert.doesNotMatch(hookSource, /new JSZip\(\)/);
 
   assert.match(appSource, /import \{[^}]*useEcommerceGroupExportRuntime[^}]*\} from '\.\/app\/useEcommerceGroupExportRuntime';/);
   assert.match(appSource, /const \{\s*handleExportEcommerceGroup\s*\} = useEcommerceGroupExportRuntime\(\{/);

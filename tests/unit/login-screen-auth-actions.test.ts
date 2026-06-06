@@ -8,6 +8,8 @@ import ts from 'typescript';
 const ROOT_DIR = process.cwd();
 const LOGIN_SCREEN_PATH = 'apps/web/src/components/auth/LoginScreen.tsx';
 const LOGIN_SCREEN_CSS_PATH = 'apps/web/src/components/auth/LoginScreen.css';
+const INDEX_HTML_PATH = 'apps/web/index.html';
+const TURNSTILE_WIDGET_PATH = 'apps/web/src/components/auth/TurnstileWidget.tsx';
 
 
 
@@ -23,7 +25,10 @@ test('LoginScreen stays parseable and keeps the server-backed sign-in actions co
 
   assert.deepEqual((sourceFile as any).parseDiagnostics, []);
   assert.match(source, /const \{ loginAsTempUser \} = useAuth\(\);/);
-  assert.match(source, /import \{ startGoogleSignIn \} from '\.\.\/\.\.\/services\/auth\/googleAuth\.ts';/);
+  assert.match(source, /const \{ startGoogleSignIn \} = await import\('\.\.\/\.\.\/services\/auth\/googleAuth\.ts'\);/);
+  assert.match(source, /const \{ startWechatLogin \} = await import\('\.\.\/\.\.\/services\/auth\/wechatAuth\.ts'\);/);
+  assert.doesNotMatch(source, /import \{ startGoogleSignIn \} from '\.\.\/\.\.\/services\/auth\/googleAuth\.ts';/);
+  assert.doesNotMatch(source, /import \{ startWechatLogin \} from '\.\.\/\.\.\/services\/auth\/wechatAuth\.ts';/);
   assert.match(source, /const handleGoogleLogin = async \(\) => \{/);
   assert.match(source, /const handleTempUserEntry = async \(\) => \{/);
   assert.match(source, /await loginAsTempUser\(\);/);
@@ -78,4 +83,17 @@ test('LoginScreen styles do not hide the Turnstile module label or hint', () => 
   assert.doesNotMatch(source, /\.auth-turnstile-head,\s*\.auth-turnstile-help\s*\{\s*display:\s*none;\s*\}/);
   assert.match(source, /\.auth-turnstile-head \{[\s\S]*display:\s*flex;/);
   assert.match(source, /\.auth-turnstile-help \{[\s\S]*display:\s*block;/);
+});
+
+test('Turnstile only connects to Cloudflare when the auth widget requests it', () => {
+  const htmlSource = readSource(INDEX_HTML_PATH);
+  const widgetSource = readSource(TURNSTILE_WIDGET_PATH);
+
+  assert.doesNotMatch(htmlSource, /challenges\.cloudflare\.com/);
+  assert.doesNotMatch(htmlSource, /data-turnstile-script/);
+  assert.match(widgetSource, /const TURNSTILE_SCRIPT_URL = 'https:\/\/challenges\.cloudflare\.com\/turnstile\/v0\/api\.js\?render=explicit';/);
+  assert.match(widgetSource, /function ensureTurnstileConnectionHints\(\): void \{/);
+  assert.match(widgetSource, /dnsPrefetch\.rel = 'dns-prefetch';/);
+  assert.match(widgetSource, /preconnect\.rel = 'preconnect';/);
+  assert.match(widgetSource, /ensureTurnstileConnectionHints\(\);\s*const script = document\.createElement\('script'\);/);
 });

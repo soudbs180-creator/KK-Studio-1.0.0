@@ -436,7 +436,7 @@ export interface PromptOptimizerResult {
   meta: {
     version: string;
     timestamp: string;
-    optimization_mode?: 'auto';
+    optimization_mode?: 'auto' | 'manual';
     engine?: 'local-rulebook' | 'ai-enhanced';
     ai_status?: 'skipped' | 'enhanced' | 'failed-fallback';
     route_id?: string;
@@ -551,7 +551,8 @@ export type CapabilityRole =
   | 'ecommerce_generation'
   | 'assistant'
   | 'prompt_optimizer'
-  | 'ocr_document';
+  | 'ocr_document'
+  | 'video_generation';
 
 export interface CapabilityRouteAssignment {
   role: CapabilityRole;
@@ -933,6 +934,7 @@ export interface PromptNode {
   optimizedPromptZh?: string;
   promptOptimizerResult?: PromptOptimizerResult; // 🎯 [New] 完整的提示词优化结果
   promptOptimizationEnabled?: boolean;
+  promptOptimizerArchetype?: string;
   thinkingMode?: 'minimal' | 'high';
   enableGrounding?: boolean;
   enableImageSearch?: boolean;
@@ -1042,7 +1044,12 @@ export interface CanvasDrawing {
   points: { x: number; y: number }[];
   color: string;
   width: number;
-  type: 'pen' | 'marker';
+  type: 'pen' | 'marker' | 'rect' | 'circle' | 'line' | 'arrow' | 'text';
+  fillColor?: string;
+  text?: string;
+  fontSize?: number;
+  bindingNodeId?: string;
+  bindingGroupId?: string;
 }
 
 export interface AgentWorkflowData {
@@ -1166,6 +1173,7 @@ export const VIDEO_RESOLUTION_DURATION_MAP = {
 export interface GenerationConfig {
   prompt: string;
   enablePromptOptimization?: boolean;
+  promptOptimizerArchetype?: string;
   aspectRatio: AspectRatio;
   imageSize: ImageSize;
   referenceImages: ReferenceImage[];

@@ -1,4 +1,4 @@
-import JSZip from 'jszip';
+import type JSZip from 'jszip';
 
 import type {
   OpenXmlParsedRow,
@@ -37,6 +37,30 @@ type DrawingAnchorBinding = {
   embedRid: string;
   mediaPath?: string;
 };
+
+type JSZipRuntime = {
+  loadAsync(data: ArrayBuffer | Blob | Uint8Array): Promise<JSZip>;
+};
+type JSZipRuntimeModule = JSZipRuntime | {
+  default?: JSZipRuntime;
+};
+
+function isJSZipRuntime(value: unknown): value is JSZipRuntime {
+  return Boolean(value) && typeof (value as JSZipRuntime).loadAsync === 'function';
+}
+
+async function loadJSZipRuntime(): Promise<JSZipRuntime> {
+  const zipModule = await import('jszip') as unknown as JSZipRuntimeModule;
+  const runtime = isJSZipRuntime(zipModule)
+    ? zipModule
+    : zipModule.default;
+
+  if (!isJSZipRuntime(runtime)) {
+    throw new Error('XLSX ZIP runtime is unavailable.');
+  }
+
+  return runtime;
+}
 
 function decodeXml(value: string): string {
   return value
@@ -423,7 +447,8 @@ async function loadPreviewMap(zip: JSZip, bindings: Map<string, CellImageBinding
 
 export async function parseOpenXmlWorkbook(input: Blob | File | ArrayBuffer, fileName = 'requirement.xlsx'): Promise<OpenXmlWorkbookParseResult> {
   const arrayBuffer = input instanceof ArrayBuffer ? input : await input.arrayBuffer();
-  const zip = await JSZip.loadAsync(arrayBuffer);
+  const JSZipRuntime = await loadJSZipRuntime();
+  const zip = await JSZipRuntime.loadAsync(arrayBuffer);
 
   const sharedStringsXml = await zip.file('xl/sharedStrings.xml')?.async('string');
   const workbookXml = await zip.file('xl/workbook.xml')?.async('string');

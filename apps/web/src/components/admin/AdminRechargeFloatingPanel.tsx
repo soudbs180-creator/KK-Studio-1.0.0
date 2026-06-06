@@ -2,12 +2,15 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, ExternalLink, Loader2 } from 'lucide-react';
 
 import type { AdminRechargeSubmissionDto } from '../../../../../packages/shared/src/index.ts';
-import { useAdminRole } from '../../hooks/useAdminRole';
 import { kkWebApiClient } from '../../services/api/kkApiClient';
 import { listAdminRechargeSubmissions } from '../../services/billing/rechargeSubmissionService';
 import { notify } from '../../services/system/notificationService';
 import { readRuntimeEnv } from '../../utils/runtimeEnv';
 import { safeOpenLink } from '../../utils/browserUtils';
+
+interface AdminRechargeFloatingPanelProps {
+  enabled?: boolean;
+}
 
 function formatAmount(value: number | undefined, currencyCode: string | undefined): string {
   const symbol = currencyCode === 'USD' ? '$' : '楼';
@@ -62,8 +65,7 @@ function openAdminRechargePage(submissionId?: string) {
   safeOpenLink(`${baseUrl.replace(/\/$/, '')}${suffix}`);
 }
 
-const AdminRechargeFloatingPanel: React.FC = () => {
-  const { isAdmin, adminSessionActive } = useAdminRole();
+const AdminRechargeFloatingPanel: React.FC<AdminRechargeFloatingPanelProps> = ({ enabled = false }) => {
   const [items, setItems] = useState<AdminRechargeSubmissionDto[]>([]);
   const [collapsed, setCollapsed] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -77,7 +79,7 @@ const AdminRechargeFloatingPanel: React.FC = () => {
   const latest = payingItems[0];
 
   useEffect(() => {
-    if (!isAdmin || !adminSessionActive) {
+    if (!enabled) {
       setItems([]);
       return undefined;
     }
@@ -103,9 +105,9 @@ const AdminRechargeFloatingPanel: React.FC = () => {
       window.clearInterval(timer);
       window.clearInterval(clock);
     };
-  }, [adminSessionActive, isAdmin]);
+  }, [enabled]);
 
-  if (!isAdmin || !adminSessionActive || payingItems.length === 0) {
+  if (!enabled || payingItems.length === 0) {
     return null;
   }
 

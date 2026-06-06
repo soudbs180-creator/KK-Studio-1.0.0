@@ -26,7 +26,9 @@ test('ecommerce framework workbench lives on the canvas instead of PromptBar aft
   assert.match(desktopPanelSource, /activeFrameworkId\?: string \| null;/);
   assert.doesNotMatch(desktopPanelSource, /data-testid="ecommerce-framework-companion-panel"/);
   assert.doesNotMatch(desktopPanelSource, /data-testid="ecommerce-group-overview-workbench"/);
-  assert.match(canvasNodeSource, /import EcommerceCanvasWorkbenchCard from '..\/ecommerce\/EcommerceCanvasWorkbenchCard';/);
+  assert.doesNotMatch(canvasNodeSource, /import EcommerceCanvasWorkbenchCard from '..\/ecommerce\/EcommerceCanvasWorkbenchCard';/);
+  assert.match(canvasNodeSource, /const EcommerceCanvasWorkbenchCard = React\.lazy\(\(\) => import\('..\/ecommerce\/EcommerceCanvasWorkbenchCard'\)\);/);
+  assert.match(canvasNodeSource, /<React\.Suspense/);
   assert.match(canvasNodeSource, /ecommerceFrameworkTaskNodes\?: PromptNode\[\];/);
   assert.match(canvasNodeSource, /getPromptNodeBaseCardWidth\(node\)/);
   assert.match(canvasNodeSource, /getPromptNodeCardWidth\(node, isMobile, viewportWidth\)/);

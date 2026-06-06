@@ -16,6 +16,11 @@
 8. [security-sensitive-change.md](security-sensitive-change.md) —— 敏感配置/密钥安全隔离操作规约
 9. [single-generate-to-canvas.md](single-generate-to-canvas.md) —— 单图生图 Skill
 10. [quick-open-settings-view.md](quick-open-settings-view.md) —— 快速打开设置功能 Skill
+11. [agent-image-understanding-routing.md](agent-image-understanding-routing.md) —— 多模态图像理解与路由降级 Skill
+12. [toolbox-plugin-multi-instance-runtime.md](toolbox-plugin-multi-instance-runtime.md) —— 工具箱插件运行时多实例与常驻 Skill
+13. [ppt-outline-batch-generation.md](ppt-outline-batch-generation.md) —— PPT大纲生图与幻灯片批量排版 Skill
+14. [audio-multimedia-generation-playback.md](audio-multimedia-generation-playback.md) —— 音频多媒体生成与播放器并发控制 Skill
+15. [smart-cdn-offline-fallback.md](smart-cdn-offline-fallback.md) —— 智能 CDN 优先加载与离线兜底 SW 路由 Skill
 
 ## ⚖️ 设计准则
 - 所有技能设计均要求**工具优先，不模拟 UI**。

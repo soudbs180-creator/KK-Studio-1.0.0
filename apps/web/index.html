@@ -10,12 +10,6 @@
     <meta name="description" content="KK Studio - AI Image Generation Workspace" />
     <title>KK Studio - AI Image Workspace</title>
     <link rel="icon" type="image/png" href="/logo.png" />
-    <link rel="dns-prefetch" href="//challenges.cloudflare.com" />
-    <link rel="preconnect" href="https://challenges.cloudflare.com" crossorigin />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet" />
     <style>
         * {
             box-sizing: border-box;
@@ -30,7 +24,7 @@
         }
 
         body {
-            font-family: 'HarmonyOS Sans SC', 'Inter', sans-serif;
+            font-family: 'HarmonyOS Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
             background: #000000;
             color: #ffffff;
         }
@@ -44,7 +38,7 @@
 
 <body>
     <script>
-        // 简体中文注释：立即执行脚本，避免 React 挂载前由于亮暗色状态不同产生首屏闪白
+        // Apply the persisted theme before React mounts to avoid a first-paint flash.
         (function () {
             try {
                 var stored = localStorage.getItem('theme') || localStorage.getItem('kk_theme');
@@ -73,7 +67,7 @@
         })();
     </script>
     <div id="root">
-        <!-- 简体中文注释：静态极简加载圆环，在 React 挂载前展示 -->
+        <!-- Minimal startup indicator shown before React mounts. -->
         <div class="app-startup-screen" style="display: flex; align-items: center; justify-content: center; position: fixed; inset: 0; z-index: 99999; background: #000000;">
             <div class="spinner" style="width: 24px; height: 24px; border: 2px solid rgba(56, 189, 248, 0.2); border-top-color: rgb(56, 189, 248); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
         </div>
@@ -83,32 +77,10 @@
             }
         </style>
     </div>
-    <script>
-        (function () {
-            var turnstileScriptUrl = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-            var turnstileScriptSelector = 'script[data-turnstile-script="true"]';
-
-            if (document.querySelector(turnstileScriptSelector)) {
-                return;
-            }
-
-            var script = document.createElement('script');
-            script.src = turnstileScriptUrl;
-            script.async = true;
-            script.defer = true;
-            script.dataset.turnstileScript = 'true';
-
-            if ('fetchPriority' in script) {
-                script.fetchPriority = 'high';
-            }
-
-            document.head.appendChild(script);
-        })();
-    </script>
     <script type="module" src="/src/bootstrap.tsx"></script>
     <script>
-        // 简体中文注释：首屏自愈自诊断机制。若 React 在 6 秒内未能成功挂载（表现为 .app-startup-screen 依然存在），
-        // 说明发生了强缓存导致的 js 加载或 SyntaxError 崩溃。此时自动尝试强刷一次以拉取最新资源。
+        // Startup self-healing: if React still has not mounted after 6 seconds,
+        // retry once with a cache-busting query to recover from stale assets.
         (function () {
             window.setTimeout(function () {
                 var startupScreen = document.querySelector('.app-startup-screen');
@@ -121,7 +93,7 @@
                     } else {
                         var info = document.createElement('div');
                         info.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,0.9);color:white;padding:10px 20px;border-radius:8px;font-size:12px;z-index:999999;box-shadow:0 4px 12px rgba(0,0,0,0.35);font-family:sans-serif;';
-                        info.innerText = '检测到应用加载异常，请尝试手动清理浏览器缓存后重试。';
+                        info.innerText = '\u68c0\u6d4b\u5230\u5e94\u7528\u52a0\u8f7d\u5f02\u5e38\uff0c\u8bf7\u5c1d\u8bd5\u624b\u52a8\u6e05\u7406\u6d4f\u89c8\u5668\u7f13\u5b58\u540e\u91cd\u8bd5\u3002';
                         document.body.appendChild(info);
                     }
                 }

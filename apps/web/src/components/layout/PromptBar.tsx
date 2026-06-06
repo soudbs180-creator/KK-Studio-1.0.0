@@ -13,11 +13,13 @@ import { blobToDataURL } from '../../services/storage/blobUtils';
 import { fileSystemService } from '../../services/storage/fileSystemService'; // 🚀 参考图持久化
 import { notify } from '../../services/system/notificationService';
 import { traceLocalPerformance } from '../../services/system/localPerformanceTrace';
-import ImageOptionsPanel from '../image/ImageOptionsPanel';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
+const ImageOptionsPanel = lazyWithRetry(() => import('../image/ImageOptionsPanel'));
 import MobileEmbeddedAdvancedDrawer from './prompt-bar/MobileEmbeddedAdvancedDrawer';
-import VideoOptionsPanel from '../video/VideoOptionsPanel';
+const VideoOptionsPanel = lazyWithRetry(() => import('../video/VideoOptionsPanel'));
 import ImagePreview from '../image/ImagePreview';
 import { toggleModelPin, getPinnedModels, filterAndSortModels } from '../../utils/modelSorting';
+import { safeRevokeBlobUrl } from '../../utils/blobUtils';
 import { X, Loader2, Sparkles, ChevronDown, Plus, Pin } from 'lucide-react'; // [NEW] Mobile Icons & Star & Sparkles
 import { useBilling } from '../../context/BillingContext';
 import { useAuth } from '../../context/AuthContext';
@@ -34,7 +36,7 @@ import { getPromptBarModePatch } from './prompt-bar/composerModeRegistry';
 import DesktopComposerModeSwitcher from './prompt-bar/DesktopComposerModeSwitcher';
 import DesktopComposerModePanel from './prompt-bar/DesktopComposerModePanel';
 import DesktopComposerPromptTools from './prompt-bar/DesktopComposerPromptTools';
-import DesktopComposerEcommercePanel from './prompt-bar/DesktopComposerEcommercePanel';
+const DesktopComposerEcommercePanel = lazyWithRetry(() => import('./prompt-bar/DesktopComposerEcommercePanel'));
 import { routeEcommerceDroppedFiles } from './prompt-bar/ecommerceDropRouting';
 import { getCanonicalProviderDisplayName } from '../../utils/providerDisplay';
 import {
@@ -57,6 +59,19 @@ import {
     type ReferenceMentionCandidate,
 } from '../../features/favorites';
 
+// [FIX] Imports for PPT Outline generation
+import type { PPTOutline, PPTStyleSpec } from '../../utils/pptPrompts';
+import {
+  generateOutlineSystemPrompt,
+  generateOutlineUserPrompt,
+  parseOutlineResponse
+} from '../../utils/pptPrompts';
+import type { RefinementHistoryEntry } from '../../utils/pptOutlineRefiner';
+import {
+  buildOutlineRefinementPrompt,
+  parseRefinedOutline
+} from '../../utils/pptOutlineRefiner';
+
 const PROMPT_CONFIG_SYNC_DELAY_MS = 320;
 const PROMPT_TEXTAREA_LINE_HEIGHT_PX = 22.5;
 const PROMPT_TEXTAREA_MIN_ROWS = 2;
@@ -64,6 +79,13 @@ const PROMPT_TEXTAREA_MAX_ROWS = 6;
 const PROMPT_TEXTAREA_MIN_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TEXTAREA_MIN_ROWS;
 const PROMPT_TEXTAREA_MAX_HEIGHT_PX = PROMPT_TEXTAREA_LINE_HEIGHT_PX * PROMPT_TEXTAREA_MAX_ROWS;
 const MODEL_MENU_SKELETON_COUNT = 3;
+
+type LlmServiceModule = typeof import('../../services/llm/LLMService');
+
+const chatWithLlm: LlmServiceModule['llmService']['chat'] = async (...args) => {
+    const { llmService: runtimeLlmService } = await import('../../services/llm/LLMService');
+    return runtimeLlmService.chat(...args);
+};
 
 type ModelMenuLoadingState = 'idle' | 'refreshing_with_cache' | 'bootstrapping_without_cache';
 
@@ -1227,6 +1249,23 @@ const PromptBar: React.FC<PromptBarProps> = ({
         }
     }, [isExpanded]);
 
+    const referenceImagesRef = useRef(config.referenceImages);
+    useEffect(() => {
+        referenceImagesRef.current = config.referenceImages;
+    }, [config.referenceImages]);
+
+    useEffect(() => {
+        return () => {
+            if (referenceImagesRef.current && Array.isArray(referenceImagesRef.current)) {
+                referenceImagesRef.current.forEach(img => {
+                    if (img.url) {
+                        safeRevokeBlobUrl(img.url);
+                    }
+                });
+            }
+        };
+    }, []);
+
     // 🚀 [供应商分组模型库] 手机端与电脑端当前选中的供应商 ID (为 null 时显示供应商大组)
     const [desktopActiveProvider, setDesktopActiveProvider] = useState<string | null>(null);
     const [mobileActiveProvider, setMobileActiveProvider] = useState<string | null>(null);
@@ -1390,6 +1429,10 @@ const PromptBar: React.FC<PromptBarProps> = ({
     const [pptOutlineDraft, setPptOutlineDraft] = useState('');
     const [pptDragIndex, setPptDragIndex] = useState<number | null>(null);
     const [pptDropIndex, setPptDropIndex] = useState<number | null>(null);
+    const [globalStyleSpec, setGlobalStyleSpec] = useState<any>(null);
+    const [refineQuery, setRefineQuery] = useState('');
+    const [isRefining, setIsRefining] = useState(false);
+    const [refinementHistory, setRefinementHistory] = useState<RefinementHistoryEntry[]>([]);
     const pptOutlineImportInputRef = useRef<HTMLInputElement | null>(null);
     const [uploadingCount, setUploadingCount] = useState(0); // [NEW] Uploading indicator count
     const pendingReferenceUploads = useMemo(() => {
@@ -2758,17 +2801,148 @@ const PromptBar: React.FC<PromptBarProps> = ({
             .slice(0, 20);
     }, []);
 
-    const generatePptOutlineByTopic = useCallback(() => {
-        const topic = promptDraft.trim() || '主题演示';
-        const total = Math.min(20, Math.max(1, Number(config.parallelCount) || 1));
-        const pages = Array.from({ length: total }).map((_, idx) => {
-            const pageNo = idx + 1;
-            if (pageNo === 1) return `封面：${topic}`;
-            if (pageNo === total) return `总结与行动建议：${topic}`;
-            return `${topic} - 第${pageNo}页内核内容`;
+    const outlineToText = useCallback((outline: PPTOutline): string => {
+        return outline.pages.map(page => {
+            const bulletsText = page.bullets && page.bullets.length > 0 ? `：${page.bullets.join('；')}` : '';
+            const layoutText = ` (${page.layout})`;
+            return `${page.title}${bulletsText}${layoutText}`;
+        }).join('\n');
+    }, []);
+
+    const textToOutline = useCallback((text: string, styleSpec?: PPTStyleSpec): PPTOutline => {
+        const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+        const pages = lines.map((line, idx) => {
+            const layoutMatch = line.match(/\((cover|toc|title-body|image-text|comparison|ending)\)$/i);
+            const layout = layoutMatch ? (layoutMatch[1].toLowerCase() as any) : (idx === 0 ? 'cover' : idx === lines.length - 1 ? 'ending' : 'title-body');
+            
+            const remaining = layoutMatch ? line.slice(0, line.lastIndexOf('(')).trim() : line;
+            
+            let title = remaining;
+            let bullets: string[] = [];
+            
+            const colonIdx = remaining.indexOf('：');
+            if (colonIdx !== -1) {
+                title = remaining.substring(0, colonIdx).trim();
+                bullets = remaining.substring(colonIdx + 1).split('；').map(b => b.trim()).filter(Boolean);
+            }
+            
+            return {
+                layout,
+                title,
+                bullets,
+                subtitle: layout === 'cover' || layout === 'ending' ? bullets[0] || '' : undefined,
+                imagePrompt: ''
+            };
         });
-        setPptOutlineDraft(pages.join('\n'));
-    }, [config.parallelCount, promptDraft]);
+        
+        return {
+            title: pages[0]?.title || '演示主题',
+            pages,
+            styleSpec
+        };
+    }, []);
+
+    const generatePptOutlineByTopic = useCallback(async () => {
+        const topic = promptDraft.trim();
+        if (!topic) {
+            notify.warning('请输入主题', '请先在输入框中填写 PPT 的主题或大纲要求。');
+            return;
+        }
+
+        setIsRefining(true);
+        setPptOutlineDraft('正在通过 AI 规划视觉一致性大纲，请稍候...');
+        
+        try {
+            const total = Math.min(20, Math.max(1, Number(config.parallelCount) || 1));
+            const systemPrompt = generateOutlineSystemPrompt({
+                pageCount: total <= 7 ? 'short' : total <= 12 ? 'normal' : 'long',
+                language: '中文'
+            });
+            const userPrompt = generateOutlineUserPrompt(topic, {
+                extraRequirements: `页数限制：${total}页左右（请尽可能符合这个页数）`
+            });
+
+            const responseText = await chatWithLlm({
+                modelId: 'gemini-2.5-flash',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                temperature: 0.2
+            });
+
+            const outline = parseOutlineResponse(responseText);
+            const formattedText = outlineToText(outline);
+            
+            setGlobalStyleSpec(outline.styleSpec);
+            setPptOutlineDraft(formattedText);
+            
+            notify.success('AI大纲生成完毕', `已规划出符合视觉一致性的 ${outline.pages.length} 页幻灯片。`);
+        } catch (error: any) {
+            console.error('Failed to generate outline by AI:', error);
+            notify.error('大纲生成失败', error.message || '大模型生成大纲时出现异常，已降级为静态模式。');
+            
+            const total = Math.min(20, Math.max(1, Number(config.parallelCount) || 1));
+            const pages = Array.from({ length: total }).map((_, idx) => {
+                const pageNo = idx + 1;
+                if (pageNo === 1) return `封面：${topic} (cover)`;
+                if (pageNo === total) return `总结与行动建议 (ending)`;
+                return `${topic} - 第${pageNo}页 (title-body)`;
+            });
+            setPptOutlineDraft(pages.join('\n'));
+        } finally {
+            setIsRefining(false);
+        }
+    }, [config.parallelCount, promptDraft, outlineToText]);
+
+    const handleRefinePptOutline = useCallback(async () => {
+        if (!refineQuery.trim()) return;
+        
+        setIsRefining(true);
+        const query = refineQuery.trim();
+        setRefineQuery('');
+
+        try {
+            const currentOutline = textToOutline(pptOutlineDraft, globalStyleSpec);
+            
+            const { systemPrompt, userPrompt } = buildOutlineRefinementPrompt({
+                currentOutline,
+                userRequirement: query,
+                history: refinementHistory,
+                language: '中文'
+            });
+
+            const responseText = await chatWithLlm({
+                modelId: 'gemini-2.5-flash',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                temperature: 0.1
+            });
+
+            const refinedOutline = parseRefinedOutline(responseText);
+            const formattedText = outlineToText(refinedOutline);
+            setPptOutlineDraft(formattedText);
+            
+            if (refinedOutline.styleSpec) {
+                setGlobalStyleSpec(refinedOutline.styleSpec);
+            }
+
+            setRefinementHistory(prev => [
+                ...prev,
+                { role: 'user', content: query },
+                { role: 'assistant', content: `已成功精炼大纲。最新大纲包含 ${refinedOutline.pages.length} 页。` }
+            ]);
+
+            notify.success('大纲精炼完毕', '已根据您的意见调整了大纲内容。');
+        } catch (err: any) {
+            console.error('Failed to refine outline:', err);
+            notify.error('精炼大纲失败', err.message || '调整大纲时遇到大模型响应错误，请稍后重试。');
+        } finally {
+            setIsRefining(false);
+        }
+    }, [pptOutlineDraft, globalStyleSpec, refineQuery, refinementHistory, outlineToText, textToOutline]);
 
     const applyPptOutlineDraft = useCallback(() => {
         const slides = parsePptSlides(pptOutlineDraft);
@@ -2948,6 +3122,13 @@ const PromptBar: React.FC<PromptBarProps> = ({
         setConfig((previousConfig) => ({
             ...previousConfig,
             enablePromptOptimization: !previousConfig.enablePromptOptimization,
+        }));
+    }, [setConfig]);
+
+    const handleSelectPromptOptimizerArchetype = useCallback((archetype: string) => {
+        setConfig((previousConfig) => ({
+            ...previousConfig,
+            promptOptimizerArchetype: archetype,
         }));
     }, [setConfig]);
 
@@ -3446,31 +3627,35 @@ const PromptBar: React.FC<PromptBarProps> = ({
                     </div>
                 </div>
             ) : (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT || config.mode === GenerationMode.ECOMMERCE) ? (
-                <ImageOptionsPanel
-                    aspectRatio={config.aspectRatio}
-                    imageSize={config.imageSize}
-                    onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
-                    onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
-                    availableRatios={availableRatios}
-                    availableSizes={availableSizes}
-                    ecommerceSheetSettings={config.mode === GenerationMode.ECOMMERCE ? ecommerceSheetSettings : undefined}
-                    onUpdateEcommerceSheetSetting={config.mode === GenerationMode.ECOMMERCE ? onUpdateEcommerceSheetSetting : undefined}
-                    activeEcommerceSheet={config.mode === GenerationMode.ECOMMERCE ? activeEcommerceFooterSheet : undefined}
-                    onActiveEcommerceSheetChange={config.mode === GenerationMode.ECOMMERCE ? onActivateEcommerceGroupSheet : undefined}
-                />
+                <React.Suspense fallback={null}>
+                    <ImageOptionsPanel
+                        aspectRatio={config.aspectRatio}
+                        imageSize={config.imageSize}
+                        onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
+                        onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
+                        availableRatios={availableRatios}
+                        availableSizes={availableSizes}
+                        ecommerceSheetSettings={config.mode === GenerationMode.ECOMMERCE ? ecommerceSheetSettings : undefined}
+                        onUpdateEcommerceSheetSetting={config.mode === GenerationMode.ECOMMERCE ? onUpdateEcommerceSheetSetting : undefined}
+                        activeEcommerceSheet={config.mode === GenerationMode.ECOMMERCE ? activeEcommerceFooterSheet : undefined}
+                        onActiveEcommerceSheetChange={config.mode === GenerationMode.ECOMMERCE ? onActivateEcommerceGroupSheet : undefined}
+                    />
+                </React.Suspense>
             ) : (
-                <VideoOptionsPanel
-                    aspectRatio={config.aspectRatio}
-                    resolution={config.videoResolution || '720p'}
-                    duration={config.videoDuration || '4s'}
-                    audio={config.videoAudio || false}
-                    onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
-                    onResolutionChange={(res) => updateConfigFields({ videoResolution: res })}
-                    onDurationChange={(dur) => updateConfigFields({ videoDuration: dur })}
-                    onAudioChange={(audio) => updateConfigFields({ videoAudio: audio })}
-                    availableRatios={availableRatios}
-                    supportsAudio={!!getModelCapabilities(config.model)?.supportsVideoAudio}
-                />
+                <React.Suspense fallback={null}>
+                    <VideoOptionsPanel
+                        aspectRatio={config.aspectRatio}
+                        resolution={config.videoResolution || '720p'}
+                        duration={config.videoDuration || '4s'}
+                        audio={config.videoAudio || false}
+                        onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
+                        onResolutionChange={(res) => updateConfigFields({ videoResolution: res })}
+                        onDurationChange={(dur) => updateConfigFields({ videoDuration: dur })}
+                        onAudioChange={(audio) => updateConfigFields({ videoAudio: audio })}
+                        availableRatios={availableRatios}
+                        supportsAudio={!!getModelCapabilities(config.model)?.supportsVideoAudio}
+                    />
+                </React.Suspense>
             )}
         />
     );
@@ -4080,42 +4265,44 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             {/* 电商配置面板（电商模式下显示） */}
                             {config.mode === GenerationMode.ECOMMERCE && (
                                 <div className="w-full">
-                                    <DesktopComposerEcommercePanel
-                                        config={config}
-                                        requirementFileName={ecommerceRequirementFileName}
-                                        productFileCount={ecommerceProductFileCount}
-                                        extraReferenceCount={ecommerceExtraReferenceCount}
-                                        productFiles={ecommerceProductFiles}
-                                        extraReferenceFiles={ecommerceExtraReferenceFiles}
-                                        itemReferenceFiles={ecommerceItemReferenceFiles}
-                                        ecommerceAnalysis={ecommerceAnalysis}
-                                        ecommerceSelection={ecommerceSelection}
-                                        taskStates={ecommerceTaskStates}
-                                        groupSlots={ecommerceGroupSlots}
-                                        activeTaskState={ecommerceActiveTaskState}
-                                        activeFrameworkId={ecommerceActiveFrameworkId}
-                                        frameworkSummary={ecommerceFrameworkSummary}
-                                        analysisConfirmed={ecommerceAnalysisConfirmed}
-                                        confirmingAnalysis={ecommerceConfirmingAnalysis}
-                                        activeGroupSheet={ecommerceActiveGroupSheet}
-                                        ecommerceAnalyzing={ecommerceAnalyzing}
-                                        onPickRequirementFile={onPickEcommerceRequirementFile}
-                                        onPickProductFiles={onPickEcommerceProductFiles}
-                                        onPickExtraReferenceFiles={onPickEcommerceExtraReferenceFiles}
-                                        onClearRequirementFile={onClearEcommerceRequirementFile}
-                                        onRemoveProductFile={onRemoveEcommerceProductFile}
-                                        onRemoveExtraReferenceFile={onRemoveEcommerceExtraReferenceFile}
-                                        onPickItemReferenceFiles={onPickEcommerceItemReferenceFiles}
-                                        onRemoveItemReferenceFile={onRemoveEcommerceItemReferenceFile}
-                                        onAnalyzeFile={onAnalyzeEcommerceFile || onGenerate}
-                                        onResetAnalysis={onResetEcommerceAnalysis}
-                                        onConfirmAnalysis={onConfirmEcommerceAnalysis}
-                                        onToggleSelection={onToggleEcommerceSelection}
-                                        onActivateGroupSheet={onActivateEcommerceGroupSheet}
-                                        onActivateTaskBySourceKey={onActivateEcommerceTaskBySourceKey}
-                                        onPreviewSlotHistory={onPreviewEcommerceSlotHistory}
-                                        onTaskStateChange={onChangeEcommerceTaskState}
-                                    />
+                                    <React.Suspense fallback={null}>
+                                        <DesktopComposerEcommercePanel
+                                            config={config}
+                                            requirementFileName={ecommerceRequirementFileName}
+                                            productFileCount={ecommerceProductFileCount}
+                                            extraReferenceCount={ecommerceExtraReferenceCount}
+                                            productFiles={ecommerceProductFiles}
+                                            extraReferenceFiles={ecommerceExtraReferenceFiles}
+                                            itemReferenceFiles={ecommerceItemReferenceFiles}
+                                            ecommerceAnalysis={ecommerceAnalysis}
+                                            ecommerceSelection={ecommerceSelection}
+                                            taskStates={ecommerceTaskStates}
+                                            groupSlots={ecommerceGroupSlots}
+                                            activeTaskState={ecommerceActiveTaskState}
+                                            activeFrameworkId={ecommerceActiveFrameworkId}
+                                            frameworkSummary={ecommerceFrameworkSummary}
+                                            analysisConfirmed={ecommerceAnalysisConfirmed}
+                                            confirmingAnalysis={ecommerceConfirmingAnalysis}
+                                            activeGroupSheet={ecommerceActiveGroupSheet}
+                                            ecommerceAnalyzing={ecommerceAnalyzing}
+                                            onPickRequirementFile={onPickEcommerceRequirementFile}
+                                            onPickProductFiles={onPickEcommerceProductFiles}
+                                            onPickExtraReferenceFiles={onPickEcommerceExtraReferenceFiles}
+                                            onClearRequirementFile={onClearEcommerceRequirementFile}
+                                            onRemoveProductFile={onRemoveEcommerceProductFile}
+                                            onRemoveExtraReferenceFile={onRemoveEcommerceExtraReferenceFile}
+                                            onPickItemReferenceFiles={onPickEcommerceItemReferenceFiles}
+                                            onRemoveItemReferenceFile={onRemoveEcommerceItemReferenceFile}
+                                            onAnalyzeFile={onAnalyzeEcommerceFile || onGenerate}
+                                            onResetAnalysis={onResetEcommerceAnalysis}
+                                            onConfirmAnalysis={onConfirmEcommerceAnalysis}
+                                            onToggleSelection={onToggleEcommerceSelection}
+                                            onActivateGroupSheet={onActivateEcommerceGroupSheet}
+                                            onActivateTaskBySourceKey={onActivateEcommerceTaskBySourceKey}
+                                            onPreviewSlotHistory={onPreviewEcommerceSlotHistory}
+                                            onTaskStateChange={onChangeEcommerceTaskState}
+                                        />
+                                    </React.Suspense>
                                 </div>
                             )}
 
@@ -4737,31 +4924,35 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         </div>
                                     </div>
                                 ) : (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT || config.mode === GenerationMode.ECOMMERCE) ? (
-                                    <ImageOptionsPanel
-                                        aspectRatio={config.aspectRatio}
-                                        imageSize={config.imageSize}
-                                        onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
-                                        onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
-                                        availableRatios={availableRatios}
-                                        availableSizes={availableSizes}
-                                        ecommerceSheetSettings={config.mode === GenerationMode.ECOMMERCE ? ecommerceSheetSettings : undefined}
-                                        onUpdateEcommerceSheetSetting={config.mode === GenerationMode.ECOMMERCE ? onUpdateEcommerceSheetSetting : undefined}
-                                        activeEcommerceSheet={config.mode === GenerationMode.ECOMMERCE ? activeEcommerceFooterSheet : undefined}
-                                        onActiveEcommerceSheetChange={config.mode === GenerationMode.ECOMMERCE ? onActivateEcommerceGroupSheet : undefined}
-                                    />
+                                    <React.Suspense fallback={null}>
+                                        <ImageOptionsPanel
+                                            aspectRatio={config.aspectRatio}
+                                            imageSize={config.imageSize}
+                                            onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
+                                            onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
+                                            availableRatios={availableRatios}
+                                            availableSizes={availableSizes}
+                                            ecommerceSheetSettings={config.mode === GenerationMode.ECOMMERCE ? ecommerceSheetSettings : undefined}
+                                            onUpdateEcommerceSheetSetting={config.mode === GenerationMode.ECOMMERCE ? onUpdateEcommerceSheetSetting : undefined}
+                                            activeEcommerceSheet={config.mode === GenerationMode.ECOMMERCE ? activeEcommerceFooterSheet : undefined}
+                                            onActiveEcommerceSheetChange={config.mode === GenerationMode.ECOMMERCE ? onActivateEcommerceGroupSheet : undefined}
+                                        />
+                                    </React.Suspense>
                                 ) : (
-                                    <VideoOptionsPanel
-                                        aspectRatio={config.aspectRatio}
-                                        resolution={config.videoResolution || '720p'}
-                                        duration={config.videoDuration || '4s'}
-                                        audio={config.videoAudio || false}
-                                        onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
-                                        onResolutionChange={(res) => updateConfigFields({ videoResolution: res })}
-                                        onDurationChange={(dur) => updateConfigFields({ videoDuration: dur })}
-                                        onAudioChange={(audio) => updateConfigFields({ videoAudio: audio })}
-                                        availableRatios={availableRatios}
-                                        supportsAudio={!!getModelCapabilities(config.model)?.supportsVideoAudio}
-                                    />
+                                    <React.Suspense fallback={null}>
+                                        <VideoOptionsPanel
+                                            aspectRatio={config.aspectRatio}
+                                            resolution={config.videoResolution || '720p'}
+                                            duration={config.videoDuration || '4s'}
+                                            audio={config.videoAudio || false}
+                                            onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
+                                            onResolutionChange={(res) => updateConfigFields({ videoResolution: res })}
+                                            onDurationChange={(dur) => updateConfigFields({ videoDuration: dur })}
+                                            onAudioChange={(audio) => updateConfigFields({ videoAudio: audio })}
+                                            availableRatios={availableRatios}
+                                            supportsAudio={!!getModelCapabilities(config.model)?.supportsVideoAudio}
+                                        />
+                                    </React.Suspense>
                                 )}
                             </div>
                         </div>
@@ -4899,6 +5090,7 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                     showPptOutlinePanel={showPptOutlinePanel}
                                     onTogglePptOutlinePanel={handleTogglePptOutlinePanel}
                                     onTogglePromptOptimization={handleTogglePromptOptimization}
+                                    onSelectPromptOptimizerArchetype={handleSelectPromptOptimizerArchetype}
                                 />
 
                                 {showPptOutlinePanel && config.mode === GenerationMode.PPT && (
@@ -5048,6 +5240,44 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         >
                                             生成前检查
                                         </button>
+                                    </div>
+
+                                    {/* AI 大纲精炼微调输入区 */}
+                                    <div className="mt-3 pt-3 border-t border-[color:var(--frost-card-sub-border)] flex flex-col gap-2">
+                                        <div className="text-[10px] font-semibold text-[var(--text-secondary)] flex justify-between items-center">
+                                            <span>AI 智能微调大纲</span>
+                                            {isRefining && <span className="text-indigo-400 animate-pulse">正在精炼中...</span>}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={refineQuery}
+                                                onChange={(e) => setRefineQuery(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && !isRefining) {
+                                                        handleRefinePptOutline();
+                                                    }
+                                                }}
+                                                placeholder="输入微调意见，例如：增加第3页的要点，或者删去封面"
+                                                className="flex-1 rounded-lg border px-3 py-1.5 text-xs focus:outline-none"
+                                                style={{
+                                                    backgroundColor: 'var(--frost-card-sub-bg)',
+                                                    borderColor: 'var(--frost-card-sub-border)',
+                                                    color: 'var(--text-primary)',
+                                                }}
+                                            />
+                                            <button
+                                                onClick={handleRefinePptOutline}
+                                                disabled={isRefining || !refineQuery.trim()}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                                                    isRefining || !refineQuery.trim()
+                                                        ? 'bg-slate-700 text-white/40 cursor-not-allowed'
+                                                        : 'bg-[var(--accent-coral)] hover:opacity-90 text-white cursor-pointer'
+                                                }`}
+                                            >
+                                                发送
+                                            </button>
+                                        </div>
                                     </div>
                                     </div>
                                 )}
@@ -5251,42 +5481,44 @@ const PromptBar: React.FC<PromptBarProps> = ({
                             </div>
                         )}
 
-                        <DesktopComposerEcommercePanel
-                            config={config}
-                            requirementFileName={ecommerceRequirementFileName}
-                            productFileCount={ecommerceProductFileCount}
-                            extraReferenceCount={ecommerceExtraReferenceCount}
-                             productFiles={ecommerceProductFiles}
-                             extraReferenceFiles={ecommerceExtraReferenceFiles}
-                             itemReferenceFiles={ecommerceItemReferenceFiles}
-                             ecommerceAnalysis={ecommerceAnalysis}
-                            ecommerceSelection={ecommerceSelection}
-                            taskStates={ecommerceTaskStates}
-                            groupSlots={ecommerceGroupSlots}
-                            activeTaskState={ecommerceActiveTaskState}
-                            activeFrameworkId={ecommerceActiveFrameworkId}
-                            frameworkSummary={ecommerceFrameworkSummary}
-                            analysisConfirmed={ecommerceAnalysisConfirmed}
-                            confirmingAnalysis={ecommerceConfirmingAnalysis}
-                            activeGroupSheet={ecommerceActiveGroupSheet}
-                            ecommerceAnalyzing={ecommerceAnalyzing}
-                            onPickRequirementFile={onPickEcommerceRequirementFile}
-                            onPickProductFiles={onPickEcommerceProductFiles}
-                            onPickExtraReferenceFiles={onPickEcommerceExtraReferenceFiles}
-                            onClearRequirementFile={onClearEcommerceRequirementFile}
-                             onRemoveProductFile={onRemoveEcommerceProductFile}
-                             onRemoveExtraReferenceFile={onRemoveEcommerceExtraReferenceFile}
-                             onPickItemReferenceFiles={onPickEcommerceItemReferenceFiles}
-                             onRemoveItemReferenceFile={onRemoveEcommerceItemReferenceFile}
-                             onAnalyzeFile={onAnalyzeEcommerceFile || onGenerate}
-                            onResetAnalysis={onResetEcommerceAnalysis}
-                            onConfirmAnalysis={onConfirmEcommerceAnalysis}
-                            onToggleSelection={onToggleEcommerceSelection}
-                            onActivateGroupSheet={onActivateEcommerceGroupSheet}
-                            onActivateTaskBySourceKey={onActivateEcommerceTaskBySourceKey}
-                            onPreviewSlotHistory={onPreviewEcommerceSlotHistory}
-                            onTaskStateChange={onChangeEcommerceTaskState}
-                        />
+                        <React.Suspense fallback={null}>
+                            <DesktopComposerEcommercePanel
+                                config={config}
+                                requirementFileName={ecommerceRequirementFileName}
+                                productFileCount={ecommerceProductFileCount}
+                                extraReferenceCount={ecommerceExtraReferenceCount}
+                                 productFiles={ecommerceProductFiles}
+                                 extraReferenceFiles={ecommerceExtraReferenceFiles}
+                                 itemReferenceFiles={ecommerceItemReferenceFiles}
+                                 ecommerceAnalysis={ecommerceAnalysis}
+                                ecommerceSelection={ecommerceSelection}
+                                taskStates={ecommerceTaskStates}
+                                groupSlots={ecommerceGroupSlots}
+                                activeTaskState={ecommerceActiveTaskState}
+                                activeFrameworkId={ecommerceActiveFrameworkId}
+                                frameworkSummary={ecommerceFrameworkSummary}
+                                analysisConfirmed={ecommerceAnalysisConfirmed}
+                                confirmingAnalysis={ecommerceConfirmingAnalysis}
+                                activeGroupSheet={ecommerceActiveGroupSheet}
+                                ecommerceAnalyzing={ecommerceAnalyzing}
+                                onPickRequirementFile={onPickEcommerceRequirementFile}
+                                onPickProductFiles={onPickEcommerceProductFiles}
+                                onPickExtraReferenceFiles={onPickEcommerceExtraReferenceFiles}
+                                onClearRequirementFile={onClearEcommerceRequirementFile}
+                                 onRemoveProductFile={onRemoveEcommerceProductFile}
+                                 onRemoveExtraReferenceFile={onRemoveEcommerceExtraReferenceFile}
+                                 onPickItemReferenceFiles={onPickEcommerceItemReferenceFiles}
+                                 onRemoveItemReferenceFile={onRemoveEcommerceItemReferenceFile}
+                                 onAnalyzeFile={onAnalyzeEcommerceFile || onGenerate}
+                                onResetAnalysis={onResetEcommerceAnalysis}
+                                onConfirmAnalysis={onConfirmEcommerceAnalysis}
+                                onToggleSelection={onToggleEcommerceSelection}
+                                onActivateGroupSheet={onActivateEcommerceGroupSheet}
+                                onActivateTaskBySourceKey={onActivateEcommerceTaskBySourceKey}
+                                onPreviewSlotHistory={onPreviewEcommerceSlotHistory}
+                                onTaskStateChange={onChangeEcommerceTaskState}
+                            />
+                        </React.Suspense>
 
                         {/* Text Input Area */}
                         <div
@@ -5814,32 +6046,36 @@ const PromptBar: React.FC<PromptBarProps> = ({
                                         </div>
                                     </div>
                                 ) : (config.mode === GenerationMode.IMAGE || config.mode === GenerationMode.PPT || config.mode === GenerationMode.ECOMMERCE) ? (
-                                    <ImageOptionsPanel
-                                        aspectRatio={config.aspectRatio}
-                                        imageSize={config.imageSize}
-                                        
-                                        onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
-                                        onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
-                                        availableRatios={availableRatios}
-                                        availableSizes={availableSizes}
-                                        ecommerceSheetSettings={config.mode === GenerationMode.ECOMMERCE ? ecommerceSheetSettings : undefined}
-                                        onUpdateEcommerceSheetSetting={config.mode === GenerationMode.ECOMMERCE ? onUpdateEcommerceSheetSetting : undefined}
-                                        activeEcommerceSheet={config.mode === GenerationMode.ECOMMERCE ? activeEcommerceFooterSheet : undefined}
-                                        onActiveEcommerceSheetChange={config.mode === GenerationMode.ECOMMERCE ? onActivateEcommerceGroupSheet : undefined}
-                                    />
+                                    <React.Suspense fallback={null}>
+                                        <ImageOptionsPanel
+                                            aspectRatio={config.aspectRatio}
+                                            imageSize={config.imageSize}
+                                            
+                                            onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
+                                            onImageSizeChange={(size) => updateConfigFields({ imageSize: size })}
+                                            availableRatios={availableRatios}
+                                            availableSizes={availableSizes}
+                                            ecommerceSheetSettings={config.mode === GenerationMode.ECOMMERCE ? ecommerceSheetSettings : undefined}
+                                            onUpdateEcommerceSheetSetting={config.mode === GenerationMode.ECOMMERCE ? onUpdateEcommerceSheetSetting : undefined}
+                                            activeEcommerceSheet={config.mode === GenerationMode.ECOMMERCE ? activeEcommerceFooterSheet : undefined}
+                                            onActiveEcommerceSheetChange={config.mode === GenerationMode.ECOMMERCE ? onActivateEcommerceGroupSheet : undefined}
+                                        />
+                                    </React.Suspense>
                                 ) : (
-                                    <VideoOptionsPanel
-                                        aspectRatio={config.aspectRatio}
-                                        resolution={config.videoResolution || '720p'}
-                                        duration={config.videoDuration || '4s'}
-                                        audio={config.videoAudio || false}
-                                        onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
-                                        onResolutionChange={(res) => updateConfigFields({ videoResolution: res })}
-                                        onDurationChange={(dur) => updateConfigFields({ videoDuration: dur })}
-                                        onAudioChange={(audio) => updateConfigFields({ videoAudio: audio })}
-                                        availableRatios={availableRatios}
-                                        supportsAudio={!!getModelCapabilities(config.model)?.supportsVideoAudio}
-                                    />
+                                    <React.Suspense fallback={null}>
+                                        <VideoOptionsPanel
+                                            aspectRatio={config.aspectRatio}
+                                            resolution={config.videoResolution || '720p'}
+                                            duration={config.videoDuration || '4s'}
+                                            audio={config.videoAudio || false}
+                                            onAspectRatioChange={(ratio) => updateConfigFields({ aspectRatio: ratio })}
+                                            onResolutionChange={(res) => updateConfigFields({ videoResolution: res })}
+                                            onDurationChange={(dur) => updateConfigFields({ videoDuration: dur })}
+                                            onAudioChange={(audio) => updateConfigFields({ videoAudio: audio })}
+                                            availableRatios={availableRatios}
+                                            supportsAudio={!!getModelCapabilities(config.model)?.supportsVideoAudio}
+                                        />
+                                    </React.Suspense>
                                 )}
                                 networkControls={!isMobile && (groundingSupported || imageSearchSupported) ? (
                                     <div

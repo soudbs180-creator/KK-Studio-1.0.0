@@ -21,7 +21,7 @@ test('shared settings ui primitives use a calmer desktop density scale', () => {
 });
 
 test('settings workbench compacts mobile surfaces instead of stacking oversized cards', () => {
-  const cssSource = readSource('apps/web/src/index.css');
+  const cssSource = readSource('apps/web/src/index.css') + '\n' + readSource('apps/web/src/styles/settings.css');
   const panelSource = readSource('apps/web/src/components/settings/SettingsPanel.localized.tsx');
 
   assert.match(
@@ -162,7 +162,7 @@ test('API workbench overview uses a compact 2x2 mobile card grid', () => {
 });
 
 test('settings workbench uses frosted glass tokens and blur layers', () => {
-  const cssSource = readSource('apps/web/src/index.css');
+  const cssSource = readSource('apps/web/src/index.css') + '\n' + readSource('apps/web/src/styles/settings.css');
 
   assert.match(
     cssSource,

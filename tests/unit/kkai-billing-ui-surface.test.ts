@@ -12,6 +12,7 @@ test('KKAI keeps billing surfaces feature-gated and restores the desktop assista
   const appSource = readSource('apps/web/src/App.tsx');
   const desktopChromeSource = readSource('apps/web/src/app/AppDesktopChrome.tsx');
   const mobileWorkspaceSource = readSource('apps/web/src/app/AppMobileWorkspace.tsx');
+  const mobileWorkspaceSurfaceSource = readSource('apps/web/src/components/mobile/MobileWorkspaceSurface.tsx');
   const globalModalsSource = readSource('apps/web/src/app/AppGlobalModals.tsx');
   const chatSidebarSource = readSource('apps/web/src/components/layout/ChatSidebar.tsx');
   const promptBarSource = readSource('apps/web/src/components/layout/PromptBar.tsx');
@@ -32,6 +33,8 @@ test('KKAI keeps billing surfaces feature-gated and restores the desktop assista
 
   assert.match(mobileWorkspaceSource, /onBillingClick=\{billingUiEnabled \? \(\) => openProfileSurface\('main'\) : undefined\}/);
   assert.match(mobileWorkspaceSource, /onRechargeClick=\{billingUiEnabled \? onShowRecharge : undefined\}/);
+  assert.doesNotMatch(mobileWorkspaceSurfaceSource, /useAdminRole/);
+  assert.doesNotMatch(mobileWorkspaceSurfaceSource, /userRole=\{accountRole\}/);
   assert.match(globalModalsSource, /rechargeModal\.enabled && rechargeModal\.isOpen/);
 
   assert.match(chatSidebarSource, /const billingUiEnabled = KKAI_FEATURE_FLAGS\.billing;/);
@@ -58,6 +61,7 @@ test('KKAI keeps billing surfaces feature-gated and restores the desktop assista
 test('manual recharge UI exposes reserved dynamic channels and admin paid-order handling surface', () => {
   const rechargeModalSource = readSource('apps/web/src/components/modals/RechargeModal.tsx');
   const floatingPanelSource = readSource('apps/web/src/components/admin/AdminRechargeFloatingPanel.tsx');
+  const floatingPanelGateSource = readSource('apps/web/src/components/admin/AdminRechargeFloatingPanelGate.tsx');
   const authenticatedShellSource = readSource('apps/web/src/app/AuthenticatedAppShell.tsx');
 
   assert.match(rechargeModalSource, /支付宝静态码/);
@@ -70,10 +74,20 @@ test('manual recharge UI exposes reserved dynamic channels and admin paid-order 
   assert.match(rechargeModalSource, /支付成功但积分未到账/);
   assert.match(rechargeModalSource, /markRechargeSubmissionPaid/);
 
-  assert.match(floatingPanelSource, /useAdminRole/);
+  assert.doesNotMatch(floatingPanelSource, /useAdminRole/);
+  assert.match(floatingPanelSource, /enabled = false/);
   assert.match(floatingPanelSource, /paymentMarkedAt/);
   assert.match(floatingPanelSource, /直接处理/);
   assert.match(floatingPanelSource, /进入处理/);
   assert.match(floatingPanelSource, /slice\(0,\s*10\)/);
-  assert.match(authenticatedShellSource, /AdminRechargeFloatingPanel/);
+  assert.doesNotMatch(authenticatedShellSource, /import AdminRechargeFloatingPanel from '\.\.\/components\/admin\/AdminRechargeFloatingPanel';/);
+  assert.doesNotMatch(authenticatedShellSource, /useAdminRole/);
+  assert.match(authenticatedShellSource, /import \{ KKAI_FEATURE_FLAGS \} from '\.\/kkaiFeatureFlags';/);
+  assert.match(authenticatedShellSource, /const AdminRechargeFloatingPanelGate = lazyWithRetry\(\(\) => import\('\.\.\/components\/admin\/AdminRechargeFloatingPanelGate'\)\);/);
+  assert.match(authenticatedShellSource, /KKAI_FEATURE_FLAGS\.admin \? \(\s*<Suspense fallback=\{null\}>\s*<AdminRechargeFloatingPanelGate \/>\s*<\/Suspense>\s*\) : null/);
+
+  assert.match(floatingPanelGateSource, /import \{ useAdminRole \} from '\.\.\/\.\.\/hooks\/useAdminRole';/);
+  assert.match(floatingPanelGateSource, /const AdminRechargeFloatingPanel = lazyWithRetry\(\(\) => import\('\.\/AdminRechargeFloatingPanel'\)\);/);
+  assert.match(floatingPanelGateSource, /const \{ isAdmin, adminSessionActive \} = useAdminRole\(\);/);
+  assert.match(floatingPanelGateSource, /<AdminRechargeFloatingPanel enabled=\{enabled\} \/>/);
 });

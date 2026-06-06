@@ -22,20 +22,41 @@ interface GpuBackgroundProps {
     mode?: GpuBackgroundMode;
 }
 
+let isGpuSupportedCache: boolean | null = null;
+let recommendedCountCache: number | null = null;
+
 function getRecommendedParticleCount(): number {
     if (typeof window === 'undefined') return 20;
+    if (recommendedCountCache !== null) return recommendedCountCache;
 
     const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    const gl = (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')) as WebGLRenderingContext | null;
 
-    if (!gl) return 20;
+    if (!gl) {
+        recommendedCountCache = 20;
+        isGpuSupportedCache = false;
+        return 20;
+    }
+
+    // 显式释放临时 WebGL 上下文，防止内存泄露与 context 堆积警告
+    const ext = gl.getExtension('WEBGL_lose_context');
+    if (ext) {
+        ext.loseContext();
+    }
 
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     const isLowEndDevice = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4;
 
-    if (isMobile) return 25;
-    if (isLowEndDevice) return 40;
-    return 60;
+    let count = 60;
+    if (isMobile) {
+        count = 25;
+    } else if (isLowEndDevice) {
+        count = 40;
+    }
+
+    recommendedCountCache = count;
+    isGpuSupportedCache = true;
+    return count;
 }
 
 const GpuBackground: React.FC<GpuBackgroundProps> = ({
@@ -247,8 +268,21 @@ export default GpuBackground;
 
 export function isGpuAccelerated(): boolean {
     if (typeof window === 'undefined') return false;
+    if (isGpuSupportedCache !== null) return isGpuSupportedCache;
 
     const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-    return gl !== null;
+    const gl = (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')) as WebGLRenderingContext | null;
+
+    if (!gl) {
+        isGpuSupportedCache = false;
+        return false;
+    }
+
+    const ext = gl.getExtension('WEBGL_lose_context');
+    if (ext) {
+        ext.loseContext();
+    }
+
+    isGpuSupportedCache = true;
+    return true;
 }

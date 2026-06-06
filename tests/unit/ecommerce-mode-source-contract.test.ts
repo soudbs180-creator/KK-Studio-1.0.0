@@ -29,6 +29,6 @@ test('ecommerce mode is wired into the shared mode entry surfaces', () => {
   assert.match(mobileTabBarSource, /\[GenerationMode\.ECOMMERCE\]:/);
   assert.match(
     promptBarSource,
-    /\(config\.mode === GenerationMode\.IMAGE \|\| config\.mode === GenerationMode\.PPT \|\| config\.mode === GenerationMode\.ECOMMERCE\) \? \(\s*<ImageOptionsPanel/,
+    /\(config\.mode === GenerationMode\.IMAGE \|\| config\.mode === GenerationMode\.PPT \|\| config\.mode === GenerationMode\.ECOMMERCE\) \? \(\s*(<React\.Suspense[^>]*>\s*)?<ImageOptionsPanel/,
   );
 });

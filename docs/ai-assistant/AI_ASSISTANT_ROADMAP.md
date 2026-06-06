@@ -703,223 +703,45 @@ scripts/ai-assistant/check-skills-consistency.mjs
 ```text
 docs/ai-assistant/generated/project-index.json
 docs/ai-assistant/generated/module-map.json
-docs/ai-assistant/generated/tool-registry.json
-docs/ai-assistant/generated/ui-map.json
-```
+docs/ai-assistant/ge---
 
-### 7.4 数据结构
+## 11. Sprint 7：多模态路由与媒体生成
 
-```ts
-interface KnowledgeDocument {
-  id: string;
-  source: 'code' | 'doc' | 'test' | 'runtime' | 'skill' | 'handoff';
-  path: string;
-  title: string;
-  summary: string;
-  contentHash: string;
-  updatedAt: string;
-}
+### 11.1 路由契约与工具更新
+- 多模态路由：`provider.getModelCapabilities` 必须在生图或提示词处理前，判定当前所处文本模型是否支持多模态输入（image understanding）。若不支持，自动拦截 Base64 或二进制数据块并向用户预警降级，规避 API 失败。
+- 音频卡片：支持创建 `audio` 卡片，包含 `originalUrl` 与 `mimeType`，以及 HTML5 音频控制 UI（播放/暂停、播放条）。播放卡片 A 时，主线程拦截并通知其他正在播放的卡片进行 `PAUSE`，实现并发排他。
+- 视频/Suno 等多媒体：对齐 `@aitu` 多媒体输入流，保证其存储和下载在 Assets 模块收口。
 
-interface ModuleMapEntry {
-  id: string;
-  name: string;
-  description: string;
-  files: string[];
-  publicApis: string[];
-  dependencies: string[];
-  flows: string[];
-  tests: string[];
-}
-
-interface FlowMapEntry {
-  id: string;
-  name: string;
-  trigger: string;
-  steps: Array<{
-    module: string;
-    action: string;
-    file?: string;
-  }>;
-  safety: string[];
-  tests: string[];
-}
+### 11.2 新增工具
+```text
+provider.getModelCapabilities
+canvas.createAudioCard
+audio.playbackControl
 ```
 
 ---
 
-## 8. Sprint 6：Skills / Runbooks 自动收录
+## 12. Sprint 8：智能 CDN 与工具箱多实例
 
-### 8.1 项目内 Skill 定义
+### 12.1 Service Worker 与 CDN 智能降级
+- 离线回退：Service Worker 拦截资源。对于核心入口（`index.html`、`sw.js` 等）强同源优先，不经过 CDN。
+- 超时与脏缓存清理：对版本化资源进行 `Cache First` 校验，未命中走 CDN。任一 CDN 超时或故障时，在 200ms 内触发 `fetchWithFallback` 快速降级回源站拉取，并对该 CDN 降级 5 分钟。
+- 偏好持久化：主线程测速后，向 SW 广播 `SW_CDN_SET_PREFERENCE` 持久化节点偏好，下次刷新时无需重新测速即可使用。
 
-本项目中的 Skills 是给 AI 助手和 AI 编程工具读取的可执行操作手册。
+### 12.2 工具箱 Iframe 共享运行时
+- 统一运行模型：iframe 辅助工具与内部 React 工具共享统一属性定义（如 `autoPinOnOpen`）。
+- 多实例管理：如果定义声明了 `multiInstance: true`，右键点击图标允许新开窗口，分配新 `instanceId`，并各自由 WindowManager 维护位置和尺寸，互不相干。
 
-建议目录：
-
+### 12.3 新增工具
 ```text
-docs/ai-assistant/skills/
-├── download-selected-originals.md
-├── batch-generate-to-canvas.md
-├── arrange-selected-cards.md
-├── update-ui-map-after-layout-change.md
-├── add-new-agent-tool.md
-└── recover-interrupted-agent-task.md
-```
-
-模板：
-
-```md
-# Skill: <name>
-
-## Trigger
-用户怎么说会触发。
-
-## Preconditions
-需要哪些上下文或权限。
-
-## Tools
-会调用哪些工具。
-
-## Steps
-严格步骤。
-
-## Safety
-确认、禁止、脱敏、成本规则。
-
-## Validation
-如何测试。
-
-## Knowledge Updates
-完成后更新哪些知识文件。
-```
-
-### 8.2 自动更新规则
-
-以下情况必须更新 Skills / Runbooks：
-
-- 新增 Tool
-- 新增 Flow
-- 修改 UI 位置或选择器
-- 修改画布状态结构
-- 修改批量生成或下载逻辑
-- 修复用户调试中发现的关键流程错误
-
-### 8.3 一致性检查
-
-`scripts/ai-assistant/check-skills-consistency.mjs` 必须校验：
-
-- 每个 confirm / dangerous 工具有 Skill。
-- 每个 flow-map flow 有 Skill 或 runbook。
-- Skill 中引用的工具名存在于 tool-registry。
-
----
-
-## 9. 中断续跑与 Agent 记忆
-
-### 9.1 AgentRunStore
-
-新增：
-
-```text
-apps/web/src/features/ai-assistant-runtime/runtime/AgentRunStore.ts
-```
-
-记录：
-
-```ts
-interface AgentRunRecord {
-  id: string;
-  userMessage: string;
-  intent: string;
-  plan: unknown;
-  status: 'planning' | 'waiting_confirmation' | 'running' | 'completed' | 'failed' | 'cancelled';
-  toolCalls: AgentToolCallLog[];
-  createdAt: string;
-  updatedAt: string;
-  nextStep?: string;
-}
-```
-
-### 9.2 Handoff Writer
-
-新增：
-
-```text
-apps/web/src/features/ai-assistant-runtime/memory/handoffWriter.ts
-```
-
-每次复杂任务完成、失败或中断时生成：
-
-```md
-## AI Assistant Handoff - <timestamp>
-
-- User request:
-- Intent:
-- Plan:
-- Files touched:
-- Tools called:
-- Results:
-- Validation:
-- Next step:
-```
-
-源码开发任务还必须更新：
-
-```text
-docs/development/session-handoff.md
-```
-
-### 9.3 启动恢复流程
-
-助手启动时：
-
-```text
-load pending AgentRunRecord
-load pending GenerationBatchJob
-load taskPersistence pending tasks
-rebuild CanvasRuntimeState
-recover UI event bindings
-show recovery banner only if user-visible action is needed
+ui.openToolWindow
+ui.pinTool
+ui.updateWindowLayout
 ```
 
 ---
 
-## 10. Planner 规则
-
-| 用户意图 | 当前 intent | 新工具链 |
-|---|---|---|
-| 下载选中卡片 | `download_outputs` | `canvas.getState -> canvas.getSelectedNodes -> assets.zipOriginals` |
-| 批量生成图片 | `generate_images` / `batch_generate_from_folder` | `generation.createBatchJob -> canvas.arrangeNodes -> knowledge.recordChange` |
-| 整理卡片 | 新增 `arrange_cards` | `canvas.getSelectedNodes -> canvas.arrangeNodes` |
-| 定位卡片 | `search_card` | `canvas.locateNodes` |
-| 优化输入框 | `optimize_input_prompt` | `fillInputPrompt` 或 `prompt.optimizeInput` |
-| 发送当前输入框 | `submit_composer` | `generation.submitComposer` |
-| UI 位置变化 | 新增 `record_ui_change` | `ui.recordLayoutChange -> knowledge.recordChange -> skills.upsertSkill` |
-| 新增助手能力 | 新增 `extend_assistant_capability` | `knowledge.recordChange -> skills.upsertSkill -> tests scaffold` |
-
-未来 `LLMBrain` 应优先输出 `toolCalls`，保留 legacy `actions` 直到迁移完成：
-
-```json
-{
-  "id": "plan_xxx",
-  "reply": "已准备打包当前选区的原图。",
-  "intent": "download_outputs",
-  "confidence": 0.98,
-  "toolCalls": [
-    {
-      "toolName": "assets.zipOriginals",
-      "args": {
-        "scope": "selected_cards",
-        "preferOriginal": true
-      }
-    }
-  ],
-  "requiresConfirmation": false
-}
-```
-
----
-
-## 11. Codex / Antigravity 实施顺序
+## 13. Codex / Antigravity 实施顺序
 
 ### Sprint 0：文档与治理固化
 
@@ -941,7 +763,7 @@ show recovery banner only if user-visible action is needed
 ### Sprint 2：ToolRegistry 兼容层
 
 1. 新增 `ToolRegistry`。
-2. 注册 canvas/assets/generation 最小工具。
+2. 注册 canvas/assets/generation 最小工具.
 3. 写 `actionToToolCall` 适配器。
 4. 保持现有 AI 助手 UI 不破。
 5. 新增单测。
@@ -981,11 +803,27 @@ show recovery banner only if user-visible action is needed
 5. 新增 `check-skills-consistency.mjs`。
 6. 加入 `governance:check` 或 `verify:changes`。
 
+### Sprint 7：多模态路由与媒体生成
+
+1. 实现 `provider.getModelCapabilities` 工具。
+2. 新增多模态降级校验与拦截警告逻辑。
+3. 创建音频卡片节点类型及自定义 UI 播放组件。
+4. 在主线程实现音频卡片播放的排他 `PAUSE` 机制。
+5. 新增单测验证。
+
+### Sprint 8：智能 CDN 与工具箱多实例
+
+1. 升级 Service Worker，添加 `index.html` 等同源优先路由规则。
+2. 实现 `fetchWithFallback` 快速回源与故障 CDN 降级（5分钟）。
+3. 主线程 CDN 测速并通过 `SW_CDN_SET_PREFERENCE` 消息广播。
+4. 统一 iframe 工具和内部 React 组件配置，在 WindowManager 中支持多实例。
+5. 新增测试。
+
 ---
 
-## 12. 关键文件清单
+## 14. 关键文件清单
 
-### 12.1 新增文件
+### 14.1 新增文件
 
 ```text
 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md
@@ -1008,6 +846,159 @@ apps/web/src/features/ai-assistant-runtime/runtime/AgentAuditLog.ts
 apps/web/src/features/ai-assistant-runtime/context/buildCanvasRuntimeState.ts
 apps/web/src/features/ai-assistant-runtime/context/recentCanvasEvents.ts
 apps/web/src/features/ai-assistant-runtime/tools/ToolRegistry.ts
+apps/web/src/features/ai-assistant-runtime/tools/canvasTools.ts
+apps/web/src/features/ai-assistant-runtime/tools/assetTools.ts
+apps/web/src/features/ai-assistant-runtime/tools/generationTools.ts
+apps/web/src/features/ai-assistant-runtime/tools/knowledgeTools.ts
+apps/web/src/features/ai-assistant-runtime/tools/uiTools.ts
+apps/web/src/features/ai-assistant-runtime/tools/skillTools.ts
+apps/web/src/features/ai-assistant-runtime/queue/DurableGenerationQueue.ts
+apps/web/src/features/ai-assistant-runtime/queue/queuePersistence.ts
+apps/web/src/features/ai-assistant-runtime/queue/rateLimiter.ts
+apps/web/src/features/ai-assistant-runtime/queue/idempotency.ts
+apps/web/src/features/ai-assistant-runtime/knowledge/KnowledgeStore.ts
+apps/web/src/features/ai-assistant-runtime/knowledge/KnowledgeRetriever.ts
+apps/web/src/features/ai-assistant-runtime/knowledge/knowledgeSync.ts
+apps/web/src/features/ai-assistant-runtime/memory/AgentMemoryStore.ts
+apps/web/src/features/ai-assistant-runtime/memory/handoffWriter.ts
+
+apps/web/src/features/assets/resolveOriginalAssets.ts
+
+scripts/ai-assistant/build-knowledge-index.mjs
+scripts/ai-assistant/check-skills-consistency.mjs
+
+tests/unit/canvas-runtime-state-builder.test.ts
+tests/unit/ai-assistant-tool-registry.test.ts
+tests/unit/zip-selected-originals.test.ts
+tests/unit/durable-generation-queue.test.ts
+tests/unit/generation-batch-idempotency.test.ts
+tests/unit/agent-knowledge-index-contract.test.ts
+```
+
+### 14.2 必须修改文件
+
+```text
+scripts/governance/check-agent-docs.mjs
+apps/web/src/features/ai-takeover/types.ts
+apps/web/src/features/ai-takeover/context/AITakeoverContext.tsx
+apps/web/src/features/ai-takeover/core/projectContextBuilder.ts
+apps/web/src/features/ai-takeover/core/llmBrain.ts
+apps/web/src/features/ai-takeover/core/localBrain.ts
+apps/web/src/features/ai-takeover/core/actionExecutor.ts
+apps/web/src/features/ai-takeover/core/intentGate.ts
+apps/web/src/features/ai-takeover/core/confirmationPolicy.ts
+apps/web/src/features/ai-takeover/core/safetyPolicy.ts
+apps/web/src/features/assets/zipOutputs.ts
+apps/web/src/context/CanvasContext.tsx
+apps/web/src/context/canvasContextState.ts
+apps/web/src/components/canvas/InfiniteCanvas.tsx
+```
+
+不要一次性全改。按 Sprint 小步提交。
+
+---
+
+## 15. 治理脚本更新
+
+修改：
+
+```text
+scripts/governance/check-agent-docs.mjs
+```
+
+新增：
+
+```js
+const files = {
+  ...,
+  agents: 'AGENTS.md',
+  assistantPlan: 'AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md',
+};
+
+expectIncludes(assistantPlan, files.assistantPlan, 'KK Studio v1.5.4');
+expectIncludes(assistantPlan, files.assistantPlan, 'ToolRegistry');
+expectIncludes(assistantPlan, files.assistantPlan, 'CanvasRuntimeState');
+```
+
+后续新增：
+
+```json
+{
+  "scripts": {
+    "ai-assistant:check": "node scripts/ai-assistant/check-skills-consistency.mjs"
+  }
+}
+```
+
+再并入 `governance:check` 或 `verify:changes`。
+
+---
+
+## 16. 给 Codex / Antigravity 的首条提示词
+
+```text
+请严格读取并遵守 AGENTS.md 与 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md。当前项目版本必须保持 KK Studio v1.5.4，不要改错版本。
+
+本轮只执行 Sprint 0：
+1. 检查 AGENTS.md 与 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md 是否存在。
+2. 修改 scripts/governance/check-agent-docs.mjs，把 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md 加入必检文件，并检查 token：KK Studio v1.5.4、ToolRegistry、CanvasRuntimeState。
+3. 搜索旧文档中明显错误的 1.4.x、1.5.0、1.5.1 或与 v1.5.4 冲突的描述，只修正文档，不改业务代码。
+4. 运行 npm run governance:check。
+5. 若失败，只修复与文档检查相关的问题。
+6. 更新 docs/development/session-handoff.md，记录本轮结果和下一步 Sprint 1。
+
+禁止进行大规模重构。禁止改生成逻辑。禁止改 UI。
+```
+
+第二轮提示词：
+
+```text
+请继续严格遵守 AGENTS.md 与 AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md。当前项目版本仍为 KK Studio v1.5.4。
+
+本轮执行 Sprint 1：实现 CanvasRuntimeState。
+1. 新增 apps/web/src/features/ai-assistant-runtime/context/buildCanvasRuntimeState.ts。
+2. 从 activeCanvas、selectedNodeIds、canvas transform、promptBarInput 构建脱敏 CanvasRuntimeState。
+3. 扩展 apps/web/src/features/ai-takeover/types.ts 的 SanitizedProjectContext，新增 runtime?: CanvasRuntimeState，保持旧字段兼容。
+4. 修改 projectContextBuilder 和 AITakeoverContext，让 AI 助手能收到 runtime 摘要。
+5. 不要泄露敏感凭证、长随机串、完整 base64 或大 URL。
+6. 新增 tests/unit/canvas-runtime-state-builder.test.ts。
+7. 运行 npm run typecheck 和相关单测。
+8. 更新 docs/development/session-handoff.md。
+```
+
+---
+
+## 17. 最终验收清单
+
+- [ ] `AGENTS.md` 与本文件均明确 v1.5.4。
+- [ ] `governance:check` 会检查两份文件。
+- [ ] AI 助手上下文包含 CanvasRuntimeState。
+- [ ] 画布选区、Prompt 子图、图片节点可被工具准确解析。
+- [ ] “下载选择的卡片”可直接打包选区原图，不模拟 UI。
+- [ ] 批量生成走 DurableGenerationQueue，不循环输入框。
+- [ ] 批量生成结果自动整齐排列并打 batch / automation tag。
+- [ ] ToolRegistry 有权限、审计、测试。
+- [ ] confirm / dangerous / forbidden 权限生效。
+- [ ] 新增或修改助手能力后，会更新 docs/ai-assistant 知识库和 Skills。
+- [ ] UI 位置变化会更新 ui-map。
+- [ ] 中断后可通过 AgentRunStore、queuePersistence、taskPersistence、session-handoff 继续。
+- [ ] `npm run verify:changes` 或分阶段验证通过。
+
+---
+
+## 18. 重要提醒
+
+1. 不要把本方案实现成“聊天模型自己乱操作”。必须是结构化工具调用。
+2. 不要把所有状态塞给 LLM。必须脱敏、摘要、按需检索。
+3. 不要把本地缓存当权威数据库。
+4. 不要绕过现有 `CanvasContext`、`useImageGeneration`、`LLMService`。
+5. 不要把用户凭证或私密会话信息写入知识库或日志。
+6. 不要忘记更新知识库、Skills 和 handoff；这是助手保持“最新认知”的关键。
+7. 不要把版本写错；本项目当前是 **KK Studio v1.5.4**。
+
+---
+
+**结论：本文件定义的是一条可执行工程路线。先把现有 AI 接管雏形接入 CanvasRuntimeState 与 ToolRegistry，再跑通选区原图下载和持久批量生成，最后建立知识库、Skills 与中断续跑机制。完成后，KK Studio 的 AI 助手就能成为项目内可靠执行层，而不是慢速模拟用户操作的聊天框。**time/tools/ToolRegistry.ts
 apps/web/src/features/ai-assistant-runtime/tools/canvasTools.ts
 apps/web/src/features/ai-assistant-runtime/tools/assetTools.ts
 apps/web/src/features/ai-assistant-runtime/tools/generationTools.ts

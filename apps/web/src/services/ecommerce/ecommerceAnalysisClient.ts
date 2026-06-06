@@ -1,8 +1,4 @@
-import { nutrientDocumentService } from '../document/nutrientDocumentService.ts';
-import { normalizeEcommerceAnalysis } from './normalize/ecommerceAnalysisNormalizer.ts';
-import { analyzeEcommerceTextFallback } from './text/fallbackTextAnalysis.ts';
 import type { EcommerceAnalysisResult } from './types';
-import { parseOpenXmlWorkbook } from './xlsx/openXmlWorkbookParser.ts';
 
 type SupportedLocalFallbackExtension = 'xlsx' | 'txt' | 'md' | 'pdf' | 'doc' | 'docx';
 
@@ -33,6 +29,7 @@ async function analyzeRequirementFileTextLocally(
   file: File,
   sourceText: string,
 ): Promise<EcommerceAnalysisResult> {
+  const { analyzeEcommerceTextFallback } = await import('./text/fallbackTextAnalysis.ts');
   return analyzeEcommerceTextFallback({
     text: sourceText,
     sourceFileName: file.name,
@@ -44,6 +41,7 @@ async function extractDocumentTextLocally(file: File): Promise<string> {
   const extension = getFileExtension(file);
 
   if (extension === 'pdf') {
+    const { nutrientDocumentService } = await import('../document/nutrientDocumentService.ts');
     const extractedText = await nutrientDocumentService.extractTextFromPdf(file, { fileName: file.name });
     if (extractedText.text.trim()) {
       return extractedText.text;
@@ -55,6 +53,7 @@ async function extractDocumentTextLocally(file: File): Promise<string> {
   }
 
   if (extension === 'doc' || extension === 'docx') {
+    const { nutrientDocumentService } = await import('../document/nutrientDocumentService.ts');
     const pdfDocument = await nutrientDocumentService.convertDocumentToPdf(file, { fileName: file.name });
     const extractedText = await nutrientDocumentService.extractTextFromPdf(pdfDocument.blob, { fileName: pdfDocument.fileName });
     return extractedText.text;
@@ -91,6 +90,10 @@ async function analyzeRequirementFileLocally(file: File): Promise<EcommerceAnaly
   const extension = getFileExtension(file);
 
   if (extension === 'xlsx') {
+    const [{ parseOpenXmlWorkbook }, { normalizeEcommerceAnalysis }] = await Promise.all([
+      import('./xlsx/openXmlWorkbookParser.ts'),
+      import('./normalize/ecommerceAnalysisNormalizer.ts'),
+    ]);
     const parsedWorkbook = await parseOpenXmlWorkbook(file, file.name);
     return normalizeEcommerceAnalysis(parsedWorkbook, 'gemini-3.1-flash-image-preview');
   }

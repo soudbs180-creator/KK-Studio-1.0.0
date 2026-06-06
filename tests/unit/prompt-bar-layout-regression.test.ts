@@ -23,7 +23,7 @@ test('prompt bar keeps footer wrapping while allowing full desktop control label
     footerSource,
     /className="input-bar-footer flex w-full min-w-0 flex-wrap items-center gap-1\.5 px-1 pb-1 pt-0\.5 min-h-\[42px\]"/,
   );
-  assert.match(promptBarSource, /import DesktopComposerEcommercePanel from '\.\/prompt-bar\/DesktopComposerEcommercePanel';/);
+  assert.match(promptBarSource, /DesktopComposerEcommercePanel = (lazyWithRetry|React\.lazy|lazy)/);
   assert.match(ecommercePanelSource, /const DesktopComposerEcommercePanel: React\.FC/);
   assert.match(promptBarSource, /import PromptBarTopRow from '\.\/prompt-bar\/PromptBarTopRow';/);
   assert.match(promptBarSource, /import PromptBarFooter from '\.\/prompt-bar\/PromptBarFooter';/);

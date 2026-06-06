@@ -1,6 +1,11 @@
 import { GenerationMode, type Canvas } from '../types/index.ts';
 
 export function deleteCanvasImageNode(canvas: Canvas, id: string): Canvas {
+    const hasMatchingDrawing = canvas.drawings?.some(d => d.bindingNodeId === id);
+    const nextDrawings = hasMatchingDrawing
+        ? (canvas.drawings || []).filter(d => d.bindingNodeId !== id)
+        : canvas.drawings;
+
     return {
         ...canvas,
         imageNodes: canvas.imageNodes.filter(node => node.id !== id),
@@ -9,6 +14,7 @@ export function deleteCanvasImageNode(canvas: Canvas, id: string): Canvas {
             childImageIds: prompt.childImageIds.filter(childId => childId !== id),
             sourceImageId: prompt.sourceImageId === id ? undefined : prompt.sourceImageId,
         })),
+        drawings: nextDrawings,
     };
 }
 
@@ -86,10 +92,16 @@ export function deleteCanvasPromptNode(canvas: Canvas, id: string): Canvas {
         return image;
     });
 
+    const hasMatchingDrawingForPrompt = canvas.drawings?.some(d => d.bindingNodeId && toDeletePromptIds.has(d.bindingNodeId));
+    const nextDrawings = hasMatchingDrawingForPrompt
+        ? (canvas.drawings || []).filter(d => !d.bindingNodeId || !toDeletePromptIds.has(d.bindingNodeId))
+        : canvas.drawings;
+
     return {
         ...canvas,
         promptNodes: nextPromptNodes,
         imageNodes: nextImageNodes,
+        drawings: nextDrawings,
     };
 }
 

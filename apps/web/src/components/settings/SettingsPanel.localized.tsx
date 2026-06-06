@@ -26,7 +26,7 @@ import {
   type SettingsNavItem,
   type SettingsViewId,
 } from './settingsRegistry';
-import { renderSettingsRouteElements } from './settingsRouteConfig';
+import { createSettingsRouteObjects, renderSettingsRouteElements } from './settingsRouteConfig';
 
 export interface SettingsPanelProps {
   isOpen: boolean;
@@ -312,7 +312,7 @@ const SettingsDesktopShell: React.FC<{
                 {renderSettingsRouteElements({
                   initialSupplier,
                   refreshKey: contentRefreshKey,
-                  onDashboardNavigate: (view) => onNavigate(resolveCanonicalSettingsViewId(view)),
+                  onDashboardNavigate: (view: SettingsViewId) => onNavigate(resolveCanonicalSettingsViewId(view)),
                 })}
               </Routes>
             </Suspense>
@@ -460,7 +460,7 @@ const SettingsMobileShell: React.FC<{
           <Routes>
             {renderSettingsRouteElements({
               initialSupplier,
-              onDashboardNavigate: (view) => onNavigate(resolveCanonicalSettingsViewId(view)),
+              onDashboardNavigate: (view: SettingsViewId) => onNavigate(resolveCanonicalSettingsViewId(view)),
             })}
           </Routes>
         </Suspense>

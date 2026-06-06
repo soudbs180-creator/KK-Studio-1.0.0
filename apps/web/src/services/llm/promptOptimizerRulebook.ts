@@ -17,6 +17,7 @@ export type ReferenceImageInput = {
 
 export type PromptOptimizationRulebookOptions = {
   preferredModelId?: string;
+  preferredArchetypeId?: string;
   aspectRatio?: string;
   imageSize?: string;
   mode?: string;
@@ -478,12 +479,14 @@ export const buildPromptOptimizerLocalRulebookResult = (
     mode: options?.mode,
     aspectRatio: options?.aspectRatio,
     referenceImageCount: options?.referenceImages?.length || 0,
+    preferredArchetypeId: options?.preferredArchetypeId,
   });
   const profile = getRulebookProfile(route.strategyId, options?.mode);
   const routeInstruction = buildAutomaticOptimizationInstruction(input, {
     mode: options?.mode,
     aspectRatio: options?.aspectRatio,
     referenceImageCount: options?.referenceImages?.length || 0,
+    preferredArchetypeId: options?.preferredArchetypeId,
   });
   const missingInputs = detectReadableMissingInputs(input, route, options?.mode);
   const ecommerceLines = summarizeEcommerceContext(options);

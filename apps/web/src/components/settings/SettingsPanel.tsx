@@ -1,4 +1,5 @@
 import React from 'react';
+import '../../styles/settings.css';
 import SettingsWorkbenchPanel, {
   type SettingsPanelProps,
 } from './SettingsPanel.localized';

@@ -1,6 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
 import { ChevronRight, Download, Loader2, Sparkles, Trash2 } from 'lucide-react';
 import { type GeneratedImage, GenerationMode, ImageSize, type PromptNode} from '../types';
 import { resolveImageCost } from '../services/billing/costService';
@@ -8,6 +6,7 @@ import { notify } from '../services/system/notificationService';
 import { generateTagColor } from '../utils/colorUtils';
 import { getResolvedCreditCost, isCreditBillingTarget } from '../utils/creditBilling';
 import { resolveModelDisplayName } from '../utils/modelDisplayName';
+import { createZipArchive, loadFileSaver } from '../utils/archiveRuntime';
 
 interface MobileCardGroup {
   id: string;
@@ -330,6 +329,7 @@ const MobileChatFeed: React.FC<MobileChatFeedProps> = ({
 
     try {
       const bundleName = sanitizeFileName(group.label);
+      const saveBlobPromise = loadFileSaver();
 
       if (group.images.length === 1) {
         const image = group.images[0];
@@ -342,10 +342,14 @@ const MobileChatFeed: React.FC<MobileChatFeedProps> = ({
         const response = await fetch(source);
         const blob = await response.blob();
         const extension = getMediaExtension(image, source, blob.type);
+        const saveBlob = await saveBlobPromise;
 
-        saveAs(blob, `${bundleName}.${extension}`);
+        saveBlob(blob, `${bundleName}.${extension}`);
       } else {
-        const zip = new JSZip();
+        const [zip, saveBlob] = await Promise.all([
+          createZipArchive(),
+          saveBlobPromise,
+        ]);
 
         await Promise.all(
           group.images.map(async (image, index) => {
@@ -364,7 +368,7 @@ const MobileChatFeed: React.FC<MobileChatFeedProps> = ({
         );
 
         const zipBlob = await zip.generateAsync({ type: 'blob' });
-        saveAs(zipBlob, `${bundleName}.zip`);
+        saveBlob(zipBlob, `${bundleName}.zip`);
       }
 
       notify.success(COPY.downloadSuccessTitle, COPY.downloadSuccessBody);

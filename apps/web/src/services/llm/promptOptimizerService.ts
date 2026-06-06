@@ -279,6 +279,7 @@ const buildOptimizerMeta = ({
     validationStatus,
     engine,
     aiStatus,
+    optMode,
 }: {
     version: string;
     timestamp: string;
@@ -287,10 +288,11 @@ const buildOptimizerMeta = ({
     validationStatus: 'ready' | 'needs-review';
     engine: 'local-rulebook' | 'ai-enhanced';
     aiStatus: 'skipped' | 'enhanced' | 'failed-fallback';
+    optMode?: 'auto' | 'manual';
 }): PromptOptimizerRouteMeta => ({
     version,
     timestamp,
-    optimization_mode: 'auto',
+    optimization_mode: optMode || 'auto',
     engine,
     ai_status: aiStatus,
     route_id: route.strategyId,
@@ -376,6 +378,7 @@ const buildOptimizerCacheKey = (
         mode: options?.mode,
         aspectRatio: options?.aspectRatio,
         referenceImageCount: options?.referenceImages?.length || 0,
+        preferredArchetypeId: options?.preferredArchetypeId,
     });
     const refSign = (options?.referenceImages || [])
         .map((ref) => `${cleanText(ref.mimeType).toLowerCase()}:${buildOptimizerCacheFingerprint(ref.data)}`)
@@ -389,6 +392,7 @@ const buildOptimizerCacheKey = (
         cleanText(options?.aspectRatio).toLowerCase(),
         cleanText(options?.imageSize).toLowerCase(),
         cleanText(options?.mode).toLowerCase(),
+        cleanText(options?.preferredArchetypeId).toLowerCase(),
         autoroute.strategyId,
         strategy,
         buildOptimizerCacheFingerprint(input),
@@ -525,12 +529,14 @@ const buildOptimizationUserMessage = (
         mode: options?.mode,
         aspectRatio: options?.aspectRatio,
         referenceImageCount: options?.referenceImages?.length || 0,
+        preferredArchetypeId: options?.preferredArchetypeId,
     });
     const missingInputs = detectReadableMissingInputs(input, autoroute, options?.mode);
     const autoInstruction = buildAutomaticOptimizationInstruction(input, {
         mode: options?.mode,
         aspectRatio: options?.aspectRatio,
         referenceImageCount: options?.referenceImages?.length || 0,
+        preferredArchetypeId: options?.preferredArchetypeId,
     });
 
     return [
@@ -578,6 +584,7 @@ const sanitizePromptOptimizerResult = (
         mode: options?.mode,
         aspectRatio: options?.aspectRatio,
         referenceImageCount: options?.referenceImages?.length || 0,
+        preferredArchetypeId: options?.preferredArchetypeId,
     });
     const params = typeof parsed?.params === 'object' && parsed.params ? parsed.params : {};
     const missingInputs = normalizeTextList(parsed?.missing_inputs, 6);
@@ -637,6 +644,7 @@ const sanitizePromptOptimizerResult = (
             validationStatus: normalizedMissingInputs.length > 0 ? 'needs-review' : 'ready',
             engine: 'ai-enhanced',
             aiStatus: 'enhanced',
+            optMode: (!options?.preferredArchetypeId || options.preferredArchetypeId === 'auto') ? 'auto' : 'manual',
         }),
     };
 };

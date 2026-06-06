@@ -114,7 +114,6 @@ import {
   resolveApiWorkbenchDiagnosticsAvailability,
   resolveApiWorkbenchStageMeta,
 } from './apiWorkbenchState';
-import ApiAdvancedSettingsView from './ApiAdvancedSettingsView';
 type CostMode = 'unlimited' | 'amount' | 'tokens';
 type OfficialProvider = 'Google' | 'OpenAI';
 type TabType = ApiManagementTab;
@@ -4130,92 +4129,22 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             />
           </div>
 
-          {/* 工作台顶部居中高级/标准模式切换胶囊，应用亮暗色彩彻底隔离与细腻阻尼点击反馈 */}
-          <div className="flex justify-center mb-2 sm:mb-4 mt-2 w-full animate-fadeIn">
-            <div 
-              className={`flex rounded-full border p-0.5 text-xs font-semibold shadow-sm transition-[background-color,border-color] duration-300 ${
-                isDarkMode 
-                  ? 'border-white/10 bg-white/5 text-slate-300' 
-                  : 'border-[var(--settings-border-subtle)] bg-[var(--settings-surface-overlay)] text-[var(--text-secondary)]'
-              }`}
-            >
-              {/* 标准模式按钮 */}
-              <button
-                type="button"
-                onClick={() => setShowAdvancedWorkbench(false)}
-                aria-label={showAdvancedWorkbench ? 'Hide advanced mode' : undefined}
-                className={`rounded-full px-4 py-1.5 cursor-pointer border-none font-bold active:scale-[0.965] ${
-                  !showAdvancedWorkbench
-                    ? isDarkMode
-                      ? 'bg-[#fffaf0] text-[#0a0a0a] shadow-sm font-extrabold'
-                      : 'bg-[var(--clay-ink)] text-white shadow-sm font-extrabold'
-                    : isDarkMode
-                      ? 'bg-transparent text-slate-400 hover:text-white'
-                      : 'bg-transparent text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
-                }`}
-                style={{
-                  transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background-color 240ms cubic-bezier(0.16, 1, 0.3, 1), color 240ms cubic-bezier(0.16, 1, 0.3, 1)'
-                }}
-              >
-                {pick('标准模式', 'Standard Mode')}
-              </button>
-
-              {/* 高级模式按钮 */}
-              <button
-                type="button"
-                onClick={() => setShowAdvancedWorkbench(true)}
-                aria-label={!showAdvancedWorkbench ? 'Advanced mode' : undefined}
-                className={`rounded-full px-4 py-1.5 cursor-pointer border-none font-bold active:scale-[0.965] ${
-                  showAdvancedWorkbench
-                    ? isDarkMode
-                      ? 'bg-[#fffaf0] text-[#0a0a0a] shadow-sm font-extrabold'
-                      : 'bg-[var(--clay-ink)] text-white shadow-sm font-extrabold'
-                    : isDarkMode
-                      ? 'bg-transparent text-slate-400 hover:text-white'
-                      : 'bg-transparent text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
-                }`}
-                style={{
-                  transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1), background-color 240ms cubic-bezier(0.16, 1, 0.3, 1), color 240ms cubic-bezier(0.16, 1, 0.3, 1)'
-                }}
-              >
-                {pick('高级模式', 'Advanced Mode')}
-              </button>
-            </div>
-          </div>
-
-          {showAdvancedWorkbench ? (
-            <>
-              <ApiAdvancedSettingsView
-                embedded={true}
-                modelCenterRoutes={modelCenterRoutes}
-                modelCenterPresets={modelCenterPresets}
-                modelCenterPresetTab={modelCenterPresetTab}
-                setModelCenterPresetTab={setModelCenterPresetTab}
-                userApiActionsDisabled={userApiActionsDisabled}
-                providerActionsDisabled={providerActionsDisabled}
-                handleCreateOfficialAction={handleCreateOfficialAction}
-                beginCreateProvider={beginCreateProvider}
-                connectedChannels={connectedChannels}
-              />
-            </>
-          ) : (
-            <ApiWorkbenchModelCenterSection
-              pick={pick}
-              routes={modelCenterRoutes}
-              presets={modelCenterPresets}
-              connectedSummary={connectedChannels > 0 ? pick(`${connectedChannels} 条链路`, `${connectedChannels} routes`) : pick('等待接入', 'Waiting')}
-              autoRoutingSummary={pick(
-                '默认自动优先使用预算金额或 Tokens 上限最高的可用通道。',
-                'By default, routing prefers the available channel with the highest budget or token limit.',
-              )}
-              addOfficialDisabled={userApiActionsDisabled}
-              addProviderDisabled={providerActionsDisabled}
-              presetTab={modelCenterPresetTab}
-              onPresetTabChange={setModelCenterPresetTab}
-              onAddOfficial={handleCreateOfficialAction}
-              onAddProvider={beginCreateProvider}
-            />
-          )}
+          <ApiWorkbenchModelCenterSection
+            pick={pick}
+            routes={modelCenterRoutes}
+            presets={modelCenterPresets}
+            connectedSummary={connectedChannels > 0 ? pick(`${connectedChannels} 条链路`, `${connectedChannels} routes`) : pick('等待接入', 'Waiting')}
+            autoRoutingSummary={pick(
+              '默认自动优先使用预算金额或 Tokens 上限最高的可用通道。',
+              'By default, routing prefers the available channel with the highest budget or token limit.',
+            )}
+            addOfficialDisabled={userApiActionsDisabled}
+            addProviderDisabled={providerActionsDisabled}
+            presetTab={modelCenterPresetTab}
+            onPresetTabChange={setModelCenterPresetTab}
+            onAddOfficial={handleCreateOfficialAction}
+            onAddProvider={beginCreateProvider}
+          />
         </>
       ) : null}
 

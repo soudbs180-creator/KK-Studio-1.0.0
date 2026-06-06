@@ -3,6 +3,110 @@
 import type { AgentToolDefinition } from './ToolRegistry.ts';
 import { knowledgeStore } from '../knowledge/KnowledgeStore.ts';
 
+// ==========================================
+// 1. 布局变更节流双缓冲池 (rAF Layout Throttle)
+// ==========================================
+const pendingLayoutUpdates = new Map<string, any>();
+let layoutAnimationFrameId: number | null = null;
+
+const applyPendingLayoutUpdates = (updateToolWindowLayout: Function) => {
+  layoutAnimationFrameId = null;
+  pendingLayoutUpdates.forEach((layoutInput, instanceId) => {
+    try {
+      updateToolWindowLayout(instanceId, layoutInput);
+    } catch (e) {
+      console.error(`[rAF Layout] Failed to update layout for ${instanceId}:`, e);
+    }
+  });
+  pendingLayoutUpdates.clear();
+};
+
+// ==========================================
+// 2. 原生音频控制总线 (Exclusive Audio Broker)
+// ==========================================
+interface KkAudioBroker {
+  instances: Map<string, HTMLAudioElement>;
+  register: (nodeId: string, audioEl: HTMLAudioElement) => void;
+  unregister: (nodeId: string) => void;
+  play: (nodeId: string) => void;
+  pauseAllExcept: (nodeId: string) => void;
+}
+
+if (typeof window !== 'undefined' && !(window as any).__KK_AUDIO_BROKER__) {
+  const instances = new Map<string, HTMLAudioElement>();
+  (window as any).__KK_AUDIO_BROKER__ = {
+    instances,
+    register: (nodeId: string, audioEl: HTMLAudioElement) => {
+      instances.set(nodeId, audioEl);
+    },
+    unregister: (nodeId: string) => {
+      const el = instances.get(nodeId);
+      if (el) {
+        try {
+          el.pause();
+          el.src = ''; // 显式置空资源，阻断内存泄漏
+          el.load();
+        } catch {}
+      }
+      instances.delete(nodeId);
+    },
+    play: (nodeId: string) => {
+      instances.forEach((el, id) => {
+        if (id !== nodeId) {
+          try {
+            el.pause();
+          } catch {}
+        }
+      });
+      const target = instances.get(nodeId);
+      if (target) {
+        target.play().catch(e => console.warn('[AudioBroker] Play failed:', e));
+      }
+    },
+    pauseAllExcept: (nodeId: string) => {
+      instances.forEach((el, id) => {
+        if (id !== nodeId) {
+          try {
+            el.pause();
+          } catch {}
+        }
+      });
+    }
+  } as KkAudioBroker;
+}
+
+// ==========================================
+// 3. Iframe 垃圾回收与多实例控制 (Iframe Reclaimer)
+// ==========================================
+if (typeof window !== 'undefined' && !(window as any).__KK_IFRAME_REGISTRY__) {
+  const activeIframes = new Map<string, HTMLIFrameElement>();
+  (window as any).__KK_IFRAME_REGISTRY__ = {
+    activeIframes,
+    register: (instanceId: string, iframeEl: HTMLIFrameElement) => {
+      activeIframes.set(instanceId, iframeEl);
+    },
+    unregister: (instanceId: string) => {
+      const iframe = activeIframes.get(instanceId);
+      if (iframe) {
+        try {
+          iframe.onload = null;
+          iframe.src = 'about:blank';
+          if (iframe.contentWindow) {
+            try {
+              iframe.contentWindow.document.write('');
+              iframe.contentWindow.close();
+            } catch {}
+          }
+          iframe.remove();
+        } catch (e) {
+          console.warn('[IframeRegistry] Error reclaiming iframe:', e);
+        }
+      }
+      activeIframes.delete(instanceId);
+    }
+  };
+}
+
 export const uiTools: AgentToolDefinition[] = [
   // 1. highlightElement - DOM 元素高亮
   {
@@ -166,5 +270,136 @@ export const uiTools: AgentToolDefinition[] = [
       required: ['component', 'summary']
     },
     handler: async (input: any) => knowledgeStore.recordLayoutChange(input)
+  },
+  {
+    name: 'ui.switchPptEditorMode',
+    description: '切换 PPT 编辑器的显示模式（缩略图列表与大纲编辑）',
+    permission: 'safe',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mode: { type: 'string', enum: ['thumbnail', 'outline'] }
+      },
+      required: ['mode']
+    },
+    handler: async (input: { mode: 'thumbnail' | 'outline' }, ctx) => {
+      const { setPptEditorMode, notify } = ctx;
+      if (typeof setPptEditorMode === 'function') {
+        setPptEditorMode(input.mode);
+      }
+      notify.success('编辑器模式已切换', `已成功切换为 PPT ${input.mode === 'outline' ? '大纲' : '缩略图'}编辑模式。`);
+    }
+  },
+  {
+    name: 'ui.openToolWindow',
+    description: '打开工具箱中的外部 Iframe 工具或 React 内部组件窗口',
+    permission: 'safe',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        toolId: { type: 'string', description: '工具唯一标识' },
+        url: { type: 'string', description: '外部 Iframe URL（若为外部工具）' },
+        options: { type: 'object', description: '窗口初始化大小、位置等参数' }
+      },
+      required: ['toolId']
+    },
+    handler: async (input: { toolId: string; url?: string; options?: any }, ctx) => {
+      const { openToolWindowInstance, notify } = ctx;
+      if (typeof openToolWindowInstance === 'function') {
+        await openToolWindowInstance(input.toolId, input.url, input.options);
+      }
+      notify.success('工具窗口已打开', `工具 ${input.toolId} 窗口实例创建成功。`);
+    }
+  },
+  {
+    name: 'ui.pinTool',
+    description: '常驻或取消常驻工具箱中的特定工具至侧边常驻栏',
+    permission: 'safe',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        toolId: { type: 'string' },
+        pinned: { type: 'boolean' }
+      },
+      required: ['toolId', 'pinned']
+    },
+    handler: async (input: { toolId: string; pinned: boolean }, ctx) => {
+      const { togglePinTool, notify } = ctx;
+      if (typeof togglePinTool === 'function') {
+        togglePinTool(input.toolId, input.pinned);
+      }
+      notify.success(input.pinned ? '工具已常驻' : '已取消工具常驻', '');
+    }
+  },
+  {
+    name: 'ui.updateWindowLayout',
+    description: '动态更新已打开工具窗口的位置、尺寸、最小化或置顶层级状态',
+    permission: 'safe',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        instanceId: { type: 'string' },
+        x: { type: 'number' },
+        y: { type: 'number' },
+        width: { type: 'number' },
+        height: { type: 'number' },
+        minimized: { type: 'boolean' }
+      },
+      required: ['instanceId']
+    },
+    handler: async (input: { instanceId: string; x?: number; y?: number; width?: number; height?: number; minimized?: boolean }, ctx) => {
+      const { updateToolWindowLayout, notify } = ctx;
+      if (typeof updateToolWindowLayout === 'function') {
+        // 双缓冲合并最新状态到 rAF 渲染缓冲池中
+        const existing = pendingLayoutUpdates.get(input.instanceId) || {};
+        pendingLayoutUpdates.set(input.instanceId, { ...existing, ...input });
+
+        if (!layoutAnimationFrameId) {
+          layoutAnimationFrameId = requestAnimationFrame(() => applyPendingLayoutUpdates(updateToolWindowLayout));
+        }
+      }
+      if (input.minimized !== undefined) {
+        notify.success(input.minimized ? '已最小化窗口' : '已还原窗口', '');
+      }
+    }
+  },
+  {
+    name: 'audio.playbackControl',
+    description: '控制画布上音频多媒体播放器的播放、暂停或进度',
+    permission: 'safe',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        nodeId: { type: 'string', description: '音频卡片节点 ID' },
+        action: { type: 'string', enum: ['PLAY', 'PAUSE', 'STOP'] }
+      },
+      required: ['nodeId', 'action']
+    },
+    handler: async (input: { nodeId: string; action: 'PLAY' | 'PAUSE' | 'STOP' }, ctx) => {
+      const { controlAudioPlayback, notify } = ctx;
+      
+      // 毫秒级原生排他性播放，消除重音叠音
+      const broker = (window as any).__KK_AUDIO_BROKER__;
+      if (broker) {
+        if (input.action === 'PLAY') {
+          broker.play(input.nodeId);
+        } else if (input.action === 'PAUSE' || input.action === 'STOP') {
+          const target = broker.instances.get(input.nodeId);
+          if (target) {
+            try {
+              target.pause();
+              if (input.action === 'STOP') {
+                target.currentTime = 0;
+              }
+            } catch {}
+          }
+        }
+      }
+
+      if (typeof controlAudioPlayback === 'function') {
+        controlAudioPlayback(input.nodeId, input.action);
+      }
+      notify.success(`音频指令 ${input.action} 执行成功`, '');
+    }
   }
 ];

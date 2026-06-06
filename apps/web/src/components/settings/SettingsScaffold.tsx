@@ -203,7 +203,8 @@ export const SettingsHero: React.FC<SettingsHeroProps> = ({
 
   // 简体中文注释：对普通标题在中文环境下进行静默映射劫持，统一大标题为简约名称，满足与侧边栏、总览卡片标题的 100% 统合。
   let title = rawTitle;
-  if (title === 'API 配置') title = 'API 工作台';
+  if (title === 'API 配置') title = '供应商配置';
+  else if (title === 'API 工作台') title = '供应商配置';
   else if (title === '存储维护') title = '存储维护';
   else if (title === '日志') title = '系统日志';
   else if (title === '计费中心') title = '计费账本';

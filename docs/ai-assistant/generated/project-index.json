@@ -5,8 +5,8 @@
     "path": "docs/ai-assistant/AI_ASSISTANT_ROADMAP.md",
     "title": "AI Assistant Roadmap — KK Studio v1.5.4",
     "summary": "Last updated: 2026-06-03",
-    "contentHash": "3d6b55cc6f6cbce3c2c5973f277ab83b",
-    "updatedAt": "2026-06-04T01:49:32.274Z"
+    "contentHash": "8093c5f39d354e4733e3b007563a26a3",
+    "updatedAt": "2026-06-05T15:34:59.346Z"
   },
   {
     "id": "doc_canvas_runtime_state_md",
@@ -68,8 +68,8 @@
     "path": "docs/ai-assistant/session-memory.md",
     "title": "会话记忆规约 (Session Memory)",
     "summary": "AI 助手通过会话上下文及运行态保持连续的任务处理能力。中断恢复与会话克隆需严格遵循此记忆流转标准。",
-    "contentHash": "d4d727a64f95e01256377bbba97b713a",
-    "updatedAt": "2026-06-05T14:18:08.214Z"
+    "contentHash": "9acaf58f9c01f4e150914922154ba13c",
+    "updatedAt": "2026-06-06T03:13:04.701Z"
   },
   {
     "id": "doc_skills_md",

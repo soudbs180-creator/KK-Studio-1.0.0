@@ -24,6 +24,7 @@ import { snapCanvasPointToGrid } from '../../utils/canvasSnapToGrid';
 import { safeOpenLink } from '../../utils/browserUtils';
 import { useTheme } from '../../context/ThemeContext';
 import { useFavoritesStore } from '../../features/favorites';
+import { canvasLivePositionStore, updateConnectorDom } from '../../app/canvasLivePositionStore';
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -63,6 +64,7 @@ const snapCanvasCoordinate = (value: number, scale: number = 1) => {
 type FooterDensity = 'normal' | 'compact' | 'tight';
 
 interface ImageNodeProps {
+    id?: string;
     image: GeneratedImage;
     detailLevel?: CanvasCardDetailLevel;
     loadPriority?: number;
@@ -367,6 +369,27 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
     useEffect(() => () => {
         onLivePositionChange?.(image.id, null);
     }, [image.id, onLivePositionChange]);
+
+    useEffect(() => {
+        if (isChatMode) return;
+
+        const unsubscribe = canvasLivePositionStore.subscribe(image.id, (pos) => {
+            if (pos && containerRef.current) {
+                const renderLeft = snapCanvasCoordinate(pos.x - nodeWidth / 2, zoomScale || 1);
+                const renderTop = snapCanvasCoordinate(pos.y - cardHeight, zoomScale || 1);
+
+                containerRef.current.style.left = `${renderLeft - originX}px`;
+                containerRef.current.style.top = `${renderTop - originY}px`;
+
+                // 🚀 如果存在 parentPromptId，同时更新连线！
+                if (image.parentPromptId) {
+                    updateConnectorDom(image.parentPromptId, image.id);
+                }
+            }
+        });
+
+        return () => unsubscribe();
+    }, [image.id, image.parentPromptId, nodeWidth, cardHeight, zoomScale, originX, originY, isChatMode]);
 
     useLayoutEffect(() => {
         const updateHeight = () => {
@@ -708,13 +731,45 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
             ? `${footerTimeLabel} | ${creditFooterLabel}`
             : `${footerTimeLabel} | 词元 ${image.tokens || 0} | ${footerCostLabel}`;
 
-    // 🚀 根据画布缩放自动选择合适质量 - 使用队列加载优化
+        const sanitizeUrl = useCallback((url: string | null | undefined): string | undefined => {
+        if (!url) return undefined;
+        if (url.startsWith('data:')) {
+            const parts = url.split(',');
+            if (parts.length === 2) {
+                return `${parts[0]},${parts[1].replace(/[\r\n\s]+/g, '')}`;
+            }
+            return url;
+        }
+        if (url.startsWith('http') || url.startsWith('blob:')) {
+            return url;
+        }
+        const mimeType = image.mimeType || 'image/png';
+        return `data:${mimeType};base64,${url.replace(/[\r\n\s]+/g, '')}`;
+    }, [image.mimeType]);
+
+    // 🚀 根据画布缩放自动选择合适 quality - 使用队列加载优化
     useEffect(() => {
-        // 🚀 如果不可见，取消加载并跳过
+        // 🚀 如果不可见，取消加载并降级显存
         if (!isVisible) {
             cancelImageLoad(imageStorageKey);
             if (qualityDebounceRef.current) {
                 clearTimeout(qualityDebounceRef.current);
+            }
+            // 🚀 [生产级性能优化] 移出视口时，将图片降级为极轻量级微缩略图 (MICRO)，释放 GPU 大图显存，且滑回时能从微缩略图平滑渐变重载，杜绝“硬白块闪烁”的体验断层
+            if (!image.isGenerating && displaySrc && currentQuality !== ImageQuality.MICRO) {
+                loadImage(imageStorageKey, ImageQuality.MICRO, -100).then((microUrl) => {
+                    if (!isVisible && microUrl) {
+                        setDisplaySrc(sanitizeUrl(microUrl));
+                        setCurrentQuality(ImageQuality.MICRO);
+                        loadedRef.current = false;
+                        setIsLoading(false);
+                    }
+                }).catch(() => {
+                    setDisplaySrc(undefined);
+                    loadedRef.current = false;
+                    setIsLoading(true);
+                    setIsMediaLoaded(false);
+                });
             }
             return;
         }
@@ -751,28 +806,11 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         // 🚀 [Fix] 使用 ref 替代闭包变量，避免 cleanup 误取消有效加载结果
         const loadId = ++loadGenRef.current;
 
-        const loadQualityImage = async () => {
+                const loadQualityImage = async () => {
             if (qualityLoadingRef.current) return;
             // 🚀 如果已被新一轮加载取代，跳过
             if (loadId !== loadGenRef.current) return;
             qualityLoadingRef.current = true;
-
-            const sanitizeUrl = (url: string | null | undefined): string | undefined => {
-                if (!url) return undefined;
-                if (url.startsWith('data:')) {
-                    const parts = url.split(',');
-                    if (parts.length === 2) {
-                        return `${parts[0]},${parts[1].replace(/[\r\n\s]+/g, '')}`;
-                    }
-                    return url;
-                }
-                if (url.startsWith('http') || url.startsWith('blob:')) {
-                    return url;
-                }
-                // Assume it's raw base64 if it has no recognizable prefix
-                const mimeType = image.mimeType || 'image/png';
-                return `data:${mimeType};base64,${url.replace(/[\r\n\s]+/g, '')}`;
-            };
 
             try {
                 lastZoomRef.current = currentZoom;
@@ -902,7 +940,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                 clearTimeout(qualityDebounceRef.current);
             }
         };
-    }, [zoomScale, image.id, image.storageId, isVisible, retryTick, image.isGenerating, displaySrc, currentQuality, isCanvasTransforming, preloadDisplaySource, detailLevel, qualityBias, imageStorageKey, isNew, loadBand, loadPriority]); // Re-evaluate when performance detail mode changes
+        }, [zoomScale, image.id, image.storageId, isVisible, retryTick, image.isGenerating, displaySrc, currentQuality, isCanvasTransforming, preloadDisplaySource, detailLevel, qualityBias, imageStorageKey, isNew, loadBand, loadPriority, sanitizeUrl]); // Re-evaluate when performance detail mode changes
 
     const handleRetryLoad = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
@@ -1351,6 +1389,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         return (
             <div
                 ref={containerRef}
+                id={`image-card-${image.id}`}
+                data-x={image.position.x}
+                data-y={image.position.y}
                 className={`image-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
                 style={isChatMode ? {
                     ...imageNodeContainerStyle,
@@ -1442,7 +1483,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                     </div>
 
                     <div
-                        className={`${isThumbnailShell ? 'px-3 py-2.5' : 'px-3 py-3'} border-t border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] cursor-pointer`}
+                        className={`${isThumbnailShell ? 'px-3 py-2' : 'px-3 py-3'} border-t border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] cursor-pointer`}
                         onClick={(e) => {
                             e.stopPropagation();
                             if (canHandleCardClick()) onClick?.(image.id);
@@ -1463,9 +1504,12 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                 <span className="text-[11px] text-[var(--text-tertiary)] shrink-0">{aspectSizeLabel}</span>
                             )}
                         </div>
-                        <div className={`${isThumbnailShell ? 'mt-2 text-[12px]' : 'mt-2.5 text-[13px]'} leading-5 text-[var(--text-primary)] font-medium`}>
-                            {shellSubtitle}
-                        </div>
+                        {/* 🚀 [LOD 优化] 当处于超小缩放的 thumbnail-shell 模式时，不再渲染字幕文本，精简 DOM 层级与排版计算 */}
+                        {!isThumbnailShell && (
+                            <div className="mt-2.5 text-[13px] leading-5 text-[var(--text-primary)] font-medium">
+                                {shellSubtitle}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -1477,6 +1521,9 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         <>
             <div
                 ref={containerRef}
+                id={`image-card-${image.id}`}
+                data-x={image.position.x}
+                data-y={image.position.y}
                 className={`image-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group select-none`}
                 style={isChatMode ? {
                     ...imageNodeContainerStyle,

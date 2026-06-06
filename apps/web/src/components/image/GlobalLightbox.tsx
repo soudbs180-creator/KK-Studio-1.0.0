@@ -10,7 +10,6 @@ const isImageConfigured = () => {
     const { routeId, modelId } = resolveRedrawRouteAndModel();
     return Boolean(routeId && modelId);
 };
-import { RedrawWorkspace } from './RedrawWorkspace';
 import { notify } from '../../services/system/notificationService';
 import { getImage, getStrictOriginalImage } from '../../services/storage/imageStorage';
 import { writeTextToClipboard, writeImageToClipboard } from '../../utils/clipboard';
@@ -20,6 +19,10 @@ import { pickByDocumentLanguage } from '../../utils/localeText';
 import { isPhoneResponsiveWidth } from '../../utils/responsiveSurface';
 import { safeOpenLink } from '../../utils/browserUtils';
 import { useFavoritesStore } from '../../features/favorites';
+
+const RedrawWorkspace = React.lazy(() =>
+    import('./RedrawWorkspace').then((module) => ({ default: module.RedrawWorkspace })),
+);
 
 interface GlobalLightboxProps {
     images: GeneratedImage[];
@@ -1442,23 +1445,25 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
             </div>
 
             {redrawWorkspaceMode && redrawWorkspaceImageUrl && (
-                <RedrawWorkspace
-                    image={redrawWorkspaceImage}
-                    imageUrl={redrawWorkspaceImageUrl}
-                    isMobile={isMobile}
-                    initialPrompt={redrawWorkspaceMode === 'regenerate' ? (image.redraw?.strictPrompt || image.prompt || '') : ''}
-                    initialRegions={redrawWorkspaceMode === 'regenerate' ? (image.redraw?.regions || []) : []}
-                    initialColorBlocks={redrawWorkspaceMode === 'regenerate' ? (image.redraw?.colorBlocks || []) : []}
-                    initialReferenceImages={redrawWorkspaceMode === 'regenerate' ? regenerateReferenceImages : []}
-                    onCancel={() => setRedrawWorkspaceMode(null)}
-                    onSubmit={(request) => {
-                        setRedrawWorkspaceMode(null);
-                        if (onPartialRedraw) {
-                            onPartialRedraw(redrawWorkspaceImage, request);
-                        }
-                        onClose();
-                    }}
-                />
+                <React.Suspense fallback={null}>
+                    <RedrawWorkspace
+                        image={redrawWorkspaceImage}
+                        imageUrl={redrawWorkspaceImageUrl}
+                        isMobile={isMobile}
+                        initialPrompt={redrawWorkspaceMode === 'regenerate' ? (image.redraw?.strictPrompt || image.prompt || '') : ''}
+                        initialRegions={redrawWorkspaceMode === 'regenerate' ? (image.redraw?.regions || []) : []}
+                        initialColorBlocks={redrawWorkspaceMode === 'regenerate' ? (image.redraw?.colorBlocks || []) : []}
+                        initialReferenceImages={redrawWorkspaceMode === 'regenerate' ? regenerateReferenceImages : []}
+                        onCancel={() => setRedrawWorkspaceMode(null)}
+                        onSubmit={(request) => {
+                            setRedrawWorkspaceMode(null);
+                            if (onPartialRedraw) {
+                                onPartialRedraw(redrawWorkspaceImage, request);
+                            }
+                            onClose();
+                        }}
+                    />
+                </React.Suspense>
             )}
         </div>,
         document.body

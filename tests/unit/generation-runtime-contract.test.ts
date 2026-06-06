@@ -1153,7 +1153,7 @@ describe('generation runtime extraction contract', () => {
     assert.match(attemptRequestSource, /const requestResult = await executeRetryGeneratedMediaRequest\(\{/);
     assert.match(retryNodeSource, /completeRetryGeneratedMediaBatch\(\{/);
     assert.match(retryNodeSource, /generateImage,/);
-    assert.match(retryNodeSource, /generateVideo: \(videoRequest\) => llmService\.generateVideo\(videoRequest\),/);
+    assert.match(retryNodeSource, /generateVideo,/);
     assert.doesNotMatch(retryNodeSource, /executeRetryGeneratedMediaRequest/);
     assert.doesNotMatch(retryNodeSource, /let generatedMediaContext: RetryGeneratedMediaResultContext;/);
     assert.doesNotMatch(retryNodeSource, /prepareRetryVideoGenerationRequest/);
@@ -1266,7 +1266,7 @@ describe('generation runtime extraction contract', () => {
     assert.match(retryNodeSource, /executionNode,/);
     assert.match(retryNodeSource, /timeoutMs: GENERATE_TIMEOUT_MS,/);
     assert.match(retryNodeSource, /generateImage,/);
-    assert.match(retryNodeSource, /generateVideo: \(videoRequest\) => llmService\.generateVideo\(videoRequest\),/);
+    assert.match(retryNodeSource, /generateVideo,/);
     assert.match(retryNodeSource, /sourcePrompt: node\.prompt,/);
     assert.doesNotMatch(retryNodeSource, /const \{ requestId, timeoutGuard \} = prepareRetryGeneratedMediaAttemptContext\(\{/);
     assert.doesNotMatch(retryNodeSource, /const \{ currentMode, taskPrompt \} = prepareRetryGenerationTaskPromptContext\(\{/);

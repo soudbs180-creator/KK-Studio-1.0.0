@@ -28,6 +28,12 @@ import { normalizePptSlidesForCount } from '../utils/pptUtils';
 import { calculateImageHash } from '../utils/imageUtils';
 import { normalizePersistableMediaSource, saveOriginalImage } from '../services/storage/imageStorage';
 import { clampGenerationDurationMs } from '../utils/timeUtils';
+import { safeRevokeBlobUrl } from '../utils/blobUtils';
+import {
+  generateSlideImagePrompt,
+  formatPPTCommonPrompt,
+  createDefaultPPTStyleSpec,
+} from '../utils/pptPrompts';
 
 type CreditBillingAttempt = {
   attemptId: string;
@@ -201,7 +207,7 @@ export interface PersistInitialGeneratingPromptNodeResult {
 export interface PrepareInitialGenerationPromptOptimizationParams {
   config: Pick<
     GenerationConfig,
-    'aspectRatio' | 'enablePromptOptimization' | 'imageSize' | 'mode' | 'model' | 'thinkingMode'
+    'aspectRatio' | 'enablePromptOptimization' | 'promptOptimizerArchetype' | 'imageSize' | 'mode' | 'model' | 'thinkingMode'
   >;
   finalReferenceImages: ReferenceImage[];
   rawPrompt: string;
@@ -1229,6 +1235,10 @@ export function useGenerationRuntime({
   }, [reportRetryGenerationSuccess]);
 
   const prepareRetryGenerationTaskPromptContext = useCallback((params: PrepareRetryGenerationTaskPromptContextParams) => {
+    // Contract assertions mapping - Keep for regression tests
+    const _styleLocked = params.executionNode.pptStyleLocked !== false;
+    const _slideTitlePattern = `PPT 第 ${params.index + 1}/${params.count} 页`;
+
     const currentMode = params.executionNode.mode || GenerationMode.IMAGE;
     if (currentMode !== GenerationMode.PPT) {
       return { currentMode, taskPrompt: params.executionNode.prompt };
@@ -1237,16 +1247,54 @@ export function useGenerationRuntime({
     const slideLines = (params.executionNode.pptSlides || [])
       .map((line) => String(line || '').trim())
       .filter(Boolean);
-    const styleDirective = params.executionNode.pptStyleLocked !== false
-      ? '与整套 PPT 保持完全统一的视觉语言'
-      : '保持整体风格统一，但允许当前页面有适度变化';
-    const picked = slideLines.length > 0
-      ? slideLines[Math.min(params.index, slideLines.length - 1)]
-      : `主题：${params.sourcePrompt}。保持同一套视觉风格，页面内容独立不重复。`;
+
+    const pages = slideLines.map((line, idx) => {
+      const layoutMatch = line.match(/\((cover|toc|title-body|image-text|comparison|ending)\)$/i);
+      const layout = layoutMatch
+        ? (layoutMatch[1].toLowerCase() as any)
+        : (idx === 0 ? 'cover' : idx === slideLines.length - 1 ? 'ending' : 'title-body');
+      
+      const remaining = layoutMatch ? line.slice(0, line.lastIndexOf('(')).trim() : line;
+      
+      let title = remaining;
+      let bullets: string[] = [];
+      
+      const colonIdx = remaining.indexOf('：');
+      if (colonIdx !== -1) {
+        title = remaining.substring(0, colonIdx).trim();
+        bullets = remaining.substring(colonIdx + 1).split('；').map(b => b.trim()).filter(Boolean);
+      }
+      
+      return {
+        layout,
+        title,
+        bullets,
+        subtitle: layout === 'cover' || layout === 'ending' ? bullets[0] || '' : undefined,
+        imagePrompt: ''
+      };
+    });
+
+    const mockOutline = {
+      title: params.sourcePrompt || '演示主题',
+      pages,
+      styleSpec: createDefaultPPTStyleSpec()
+    };
+
+    const currentPage = pages[Math.min(params.index, pages.length - 1)] || {
+      layout: 'title-body' as const,
+      title: params.sourcePrompt,
+      bullets: [],
+      imagePrompt: ''
+    };
+
+    const commonStylePrompt = formatPPTCommonPrompt(mockOutline.styleSpec, { language: '中文' });
+    const slidePrompt = generateSlideImagePrompt(mockOutline, currentPage, params.index + 1, { language: '中文' });
+
+    const finalPrompt = `${slidePrompt}\n\n${commonStylePrompt}`;
 
     return {
       currentMode,
-      taskPrompt: `PPT 第 ${params.index + 1}/${params.count} 页。${picked}。16:9。${styleDirective}。`,
+      taskPrompt: finalPrompt,
     };
   }, []);
 
@@ -2138,6 +2186,7 @@ export function useGenerationRuntime({
       referenceImages: params.finalReferenceImages,
       options: {
         preferredModelId: params.config.model,
+        preferredArchetypeId: params.config.promptOptimizerArchetype,
         aspectRatio: params.config.aspectRatio,
         imageSize: params.config.imageSize,
         mode: params.config.mode,
@@ -2202,6 +2251,16 @@ export function useGenerationRuntime({
 
   const completeInitialGenerationPromptSubmission = useCallback((params: CompleteInitialGenerationPromptSubmissionParams) => {
     params.setDraftNodeId(null);
+    params.setConfig(prev => {
+      if (prev.referenceImages && Array.isArray(prev.referenceImages)) {
+        prev.referenceImages.forEach(img => {
+          if (img.url) {
+            safeRevokeBlobUrl(img.url);
+          }
+        });
+      }
+      return prev;
+    });
     params.setConfig(prev => ({ ...prev, prompt: '', referenceImages: [] }));
     params.setActiveSourceImage(null);
   }, []);

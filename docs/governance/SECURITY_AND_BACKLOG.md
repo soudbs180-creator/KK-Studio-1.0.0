@@ -1,3 +1,4 @@
+<!-- AI_ROUTING_KEY: security, backlog, secret, cors, jwt, billing -->
 # Security and Engineering Backlog — KK Studio v1.5.4
 
 Last updated: 2026-06-03  

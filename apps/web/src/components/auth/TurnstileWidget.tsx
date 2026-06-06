@@ -10,6 +10,9 @@ import { getTurnstileStatusMessage, mapTurnstileErrorMessage } from './authLocal
 const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 const TURNSTILE_TIMEOUT_MS = 12000;
 const TURNSTILE_SCRIPT_SELECTOR = 'script[data-turnstile-script="true"]';
+const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com';
+const TURNSTILE_DNS_PREFETCH_SELECTOR = 'link[data-turnstile-dns-prefetch="true"]';
+const TURNSTILE_PRECONNECT_SELECTOR = 'link[data-turnstile-preconnect="true"]';
 
 type TurnstileTheme = 'light' | 'dark' | 'auto';
 type TurnstileAppearance = 'always' | 'execute' | 'interaction-only';
@@ -122,6 +125,29 @@ async function waitForTurnstile(
   throw new Error(mapTurnstileErrorMessage(language, 'Timed out while waiting for Turnstile'));
 }
 
+function ensureTurnstileConnectionHints(): void {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  if (!document.querySelector(TURNSTILE_DNS_PREFETCH_SELECTOR)) {
+    const dnsPrefetch = document.createElement('link');
+    dnsPrefetch.rel = 'dns-prefetch';
+    dnsPrefetch.href = '//challenges.cloudflare.com';
+    dnsPrefetch.dataset.turnstileDnsPrefetch = 'true';
+    document.head.appendChild(dnsPrefetch);
+  }
+
+  if (!document.querySelector(TURNSTILE_PRECONNECT_SELECTOR)) {
+    const preconnect = document.createElement('link');
+    preconnect.rel = 'preconnect';
+    preconnect.href = TURNSTILE_ORIGIN;
+    preconnect.crossOrigin = 'anonymous';
+    preconnect.dataset.turnstilePreconnect = 'true';
+    document.head.appendChild(preconnect);
+  }
+}
+
 export async function ensureTurnstileScript(language: ResolvedLanguage = getDocumentLanguage()): Promise<void> {
   if (typeof window === 'undefined') {
     return;
@@ -142,6 +168,8 @@ export async function ensureTurnstileScript(language: ResolvedLanguage = getDocu
       waitForTurnstile(TURNSTILE_TIMEOUT_MS, language).then(resolve).catch(reject);
       return;
     }
+
+    ensureTurnstileConnectionHints();
 
     const script = document.createElement('script');
     script.src = TURNSTILE_SCRIPT_URL;

@@ -15,13 +15,16 @@ Agent 接到任务后，先用下表判断需要读取哪些文档。不要把�
 | 任务类型 | 必读文档 | 继续读取 | 输出要求 |
 |---|---|---|---|
 | 任意代码修改 | `AGENTS.md` | `package.json`、`config/release-manifest.json`、相关源码与测试 | 简短计划、最小变更、验证记录、交接说明 |
+| 新增/修改核心能力 (Capability) | `AGENTS.md` §20 | `openspec/project.md`、对应 specs 与 changes | 遵循 OpenSpec 三阶段工作流，创建 proposal 与 tasks，校验并归档 |
 | AI 助手 / 画布 Agent | `AGENTS.md` | `docs/ai-assistant/AI_ASSISTANT_ROADMAP.md`、`docs/ai-assistant/RUNBOOKS.md` | ToolRegistry、CanvasRuntimeState、权限、测试、知识更新 |
 | 下载选中卡片 / 打包原图 | `AGENTS.md` §8、§9 | `docs/ai-assistant/RUNBOOKS.md` 中 `download-selected-originals` | 调用工具，不模拟 UI；ZIP manifest 完整 |
 | 批量生成 / 自动整理 | `AGENTS.md` §9 | `AI_ASSISTANT_ROADMAP.md` Sprint 4、`RUNBOOKS.md` | DurableQueue、限速、幂等、确认、自动布局 |
+| 多模态路由/多实例/音视频/智能CDN | `AGENTS.md` §8、§9 | `docs/ai-assistant/skills/` 目录下相关规约文件 | 精确降级/多实例独立窗口/播放器排他/SW回退 |
 | 安全 / 密钥 / CORS / JWT / 计费 | `AGENTS.md` §6、§12 | `docs/governance/SECURITY_AND_BACKLOG.md` | 不泄露密钥；不绕过账务；有迁移 / 测试 / 审计 |
 | 数据库结构变更 | `AGENTS.md` §13 | `migrations/`、相关测试、`SECURITY_AND_BACKLOG.md` | 只写 migrations；幂等；验证 SQL 与业务使用 |
 | 文档、状态、验证整理 | `AGENTS.md` | `docs/governance/PROJECT_STATE_AND_VALIDATION.md` | 修正文档漂移；记录已验证 / 未验证 |
 | 编码、乱码、PowerShell | `AGENTS.md` §15 | `docs/governance/ENCODING_AND_POWERSHELL.md` | UTF-8 without BOM、LF、显式编码、检查脚本 |
+
 
 ---
 
@@ -81,15 +84,15 @@ Agent 接到任务后，先用下表判断需要读取哪些文档。不要把�
 每次开始任务必须执行：
 
 ```text
-1. 读取 AGENTS.md
-2. 按文档路由总表读取相关细则
+1. 读取 AGENTS.md 并检查 openspec/ 目录下与当前任务相关的核心能力 (Specs) 与待决变更 (Changes)
+2. 按文档路由总表读取相关细则与已有功能规格书
 3. 读取 package.json 和 config/release-manifest.json
 4. 搜索相关源码和测试
 5. 判断模块归属
-6. 输出简短计划
-7. 小步修改
-8. 运行相关验证
-9. 更新知识库 / handoff / 状态文档
+6. 若涉及行为或能力变更，按 §20 要求初始化 OpenSpec 变更目录，输出包含 proposal.md 与 tasks.md 的简短计划
+7. 获得用户批准后开始执行，小步修改
+8. 运行相关验证，包括 openspec validate [change-id] --strict
+9. 更新知识库 / handoff / 状态文档 / 归档变更
 10. 给出完成范围、验证结果、未完成风险
 ```
 
@@ -156,11 +159,14 @@ LLM 永远不得直接读写密钥、生产数据库、付款状态、积分余�
 - 未完成步骤
 - 下一步最小操作
 
+对于规范驱动开发（OpenSpec），复杂变更必须留存 `openspec/changes/<change-id>/tasks.md`，并在每次会话结束时同步已完成的任务状态（标记为 `- [x]`），未完成的任务保持 `- [ ]` 或者是 `- [/]`。
+
 优先写入：
 
 ```text
 docs/development/session-handoff.md
 docs/ai-assistant/session-memory.md
+openspec/changes/<change-id>/tasks.md
 ```
 
 根目录 `implement.md`、`status.md`、`validation.md` 只记录里程碑级事实；如果迁移到 `docs/governance/`，同步更新引用。
@@ -422,6 +428,7 @@ canvas.getState
 canvas.getSelectedNodes
 canvas.createPromptCards
 canvas.createImageCards
+canvas.createAudioCard
 canvas.updateNodes
 canvas.arrangeNodes
 canvas.locateNodes
@@ -432,6 +439,11 @@ generation.getJobStatus
 generation.pauseJob
 generation.resumeJob
 generation.submitComposer
+provider.getModelCapabilities
+audio.playbackControl
+ui.openToolWindow
+ui.pinTool
+ui.updateWindowLayout
 knowledge.searchProject
 knowledge.recordChange
 skills.upsertSkill
@@ -743,6 +755,7 @@ AI 助手能力改造任务只有同时满足以下条件才算完成：
 10. 知识库和 Skills / Runbooks 更新。
 11. 测试或验证记录完成。
 12. 中断后下一次 Agent 可继续。
+13. 对于核心能力变更，完成 OpenSpec 规范的所有阶段（创建、执行、校验和归档），`tasks.md` 中所有任务均已标记为已完成 `[x]`，并通过 `openspec validate` 严格校验。
 
 缺任一项，不得声称完成，只能声称部分完成。
 
@@ -757,9 +770,11 @@ AI 助手能力改造任务只有同时满足以下条件才算完成：
 5. 修复 `selected_cards` ZIP，优先下载原图。
 6. 将 AI 接管内存队列升级为持久化 Batch Job Queue。
 7. 建立知识索引与自动更新机制。
-8. 为批量生成、下载选区、整理卡片补齐测试。
-9. 清理旧文档中与 v1.5.4 冲突的版本、目录、后端和部署描述。
-10. 再考虑微调、蒸馏或专用模型训练。
+8. 建立项目核心能力（Capabilities）的基线规格书，并固化在 `openspec/specs/` 中。
+9. 为批量生成、下载选区、整理卡片补齐测试。
+10. 清理旧文档中与 v1.5.4 冲突的版本、目录、后端和部署描述。
+11. 再考虑微调、蒸馏或专用模型训练。
+
 
 ---
 
@@ -781,3 +796,64 @@ AI 助手能力改造任务只有同时满足以下条件才算完成：
 更新知识。
 明确交接。
 ```
+
+---
+
+## 20. 规范驱动开发 (OpenSpec) 规范
+
+KK Studio 引入规范驱动开发 (OpenSpec) 机制。对于涉及项目核心功能与行为的复杂变更，AI 助手必须采用 Spec-Driven 模式，确保开发质量与向后兼容性。
+
+### 20.1 核心理念与 Quick Checklist
+- **不要重复造轮子**：在新增任何功能规格前，必须首先在 `openspec/specs/` 中搜索并检查是否已有相似的能力 (Capability)。使用 `rg` 或是项目内置命令，严禁创建重复的能力定义。
+- **挑选唯一 Change-ID**：使用小写连字符形式的动词引导 ID，例如 `add-canvas-minimap`、`update-generation-queue` 等。
+- **模板与脚手架**：在 `openspec/changes/<change-id>/` 目录下创建 `proposal.md`、`tasks.md`、以及受影响的规格书 Delta。
+- **书写 Delta 规范**：使用 `## ADDED Requirements`、`## MODIFIED Requirements` 等标志；每个 Requirement 下必须附带至少一个基于场景驱动的 `#### Scenario:` 定义。
+- **从不跳过 Approval**：在 `proposal.md` 未得到用户明确批准前，严禁修改任何业务代码。
+
+### 20.2 三阶段工作流
+
+#### Stage 1: 创建变更提案 (Creating Changes)
+- **触发条件**：当任务属于“添加新功能”、“对已有接口/Schema 进行破坏性修改”、“重大架构/设计模式重构”或“涉及安全/计费机制变更”时，必须触发该阶段。
+- **豁免条件**：对于纯粹的 Bug 修复（恢复原定逻辑）、排版/格式/注释优化、非破坏性依赖升级、仅修改测试用例以覆盖现有行为等微小任务，可免除创建 OpenSpec 变更。
+- **操作步骤**：
+  1. 检索 `openspec/project.md` 确认项目开发共识。
+  2. 生成 Change-ID，并在 `openspec/changes/<change-id>/` 创建 `proposal.md` (说明动机、影响、技术抉择) 与 `tasks.md` (任务 TODO 列表)。
+  3. 执行 `openspec validate <change-id> --strict` 检验规范草案。
+
+#### Stage 2: 执行变更 (Implementing Changes)
+- **工作顺序**：
+  1. 研读 `proposal.md` 与 `design.md`（如有），明确最终目标与设计约束。
+  2. 研读 `tasks.md` 建立分步开发认知。
+  3. 严防并发：完成任务中的单项后，及时标记为已完成 `[x]`。不得在所有工作做完前提前修改任务状态。
+  4. 绝不跨过批准门槛：必须等待 Proposal 状态为 approved。
+
+#### Stage 3: 归档变更 (Archiving Changes)
+- **工作顺序**：
+  1. 部署与验证完成（通过 `openspec validate --strict` 校验）。
+  2. 归档变更：将 `changes/<change-id>/` 移动至 `changes/archive/YYYY-MM-DD-<change-id>/`。
+  3. 将修改后的能力规范合入 `specs/` 目录下的全局真实规格书中。
+
+### 20.3 规范目录结构与规范要求
+
+核心能力均按照下述目录布局在项目根目录下维护：
+
+```text
+openspec/
+├── project.md              # 项目总体约定与公共规范
+├── specs/                  # 全局当前已实现核心能力 (Capability) 的真实规格书
+│   └── [capability-id]/    # 聚焦的单项核心能力
+│       ├── spec.md         # 该能力的具体 Requirement 与 Scenario 描述
+│       └── design.md       # 该能力所采用的技术实现模式与接口定义
+└── changes/                # 正在执行与审查中的变更提案
+    ├── [change-id]/
+    │   ├── proposal.md     # 变更的起因、影响范围与用户确认说明
+    │   ├── tasks.md        # 变更执行的详细分步 TODO 列表
+    │   └── design.md       # 变更涉及的技术决策 (可选)
+    └── archive/            # 历史已归档的变更记录
+        └── YYYY-MM-DD-[change-id]/
+```
+
+所有的 Capability `spec.md` 必须严谨描述：
+- **Requirement**：清晰界定的具体要求。
+- **Scenario**：具体的运行实例与断言（包括输入、预期输出和副作用），作为编写单元测试和集成测试的直接依据。
+

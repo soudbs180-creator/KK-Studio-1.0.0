@@ -10,8 +10,6 @@ import {
   type PromptCompletedTask,
   type TaskProviderType,
 } from '../types';
-import { llmService } from '../services/llm/LLMService';
-import { generateImage, cancelGeneration } from '../services/llm/geminiService';
 import { useCanvas } from '../context/CanvasContext';
 import { useBilling } from '../context/BillingContext';
 import { useAppStartup } from '../context/AppStartupContext';
@@ -46,18 +44,55 @@ import { resolveProviderIdentity } from '../utils/providerDisplay';
 import { getReferenceImageLookupIds } from '../utils/referenceImageStorage';
 import { normalizeModelId } from '../utils/modelIdNormalization';
 import { resolveModelDisplayName } from '../utils/modelDisplayName';
-import { compositePartialRedrawResult, compositeRedrawCropResult } from '../services/image/partialRedraw';
-import {
-  isSecureProxyGuestModeError,
-  isSecureProxySessionReauthError,
-  SECURE_PROXY_GUEST_MODE_MESSAGE,
-  SECURE_PROXY_SESSION_REAUTH_MESSAGE,
-} from '../services/model/secureModelProxy';
+type LlmServiceModule = typeof import('../services/llm/LLMService');
+type GeminiServiceModule = typeof import('../services/llm/geminiService');
+type PartialRedrawModule = typeof import('../services/image/partialRedraw');
 
 const SYNC_BRIDGE_RECOVERY_RETRY_MS = 2500;
 const SYNC_BRIDGE_RECOVERY_MAX_AGE_MS = 15 * 60 * 1000;
 const RETRO_RECOVERABLE_SYNC_BRIDGE_ERROR_CODES = new Set(['SYNC_REQUEST_INTERRUPTED', 'SYNC_BRIDGE_TIMEOUT']);
 const RETRO_RECOVERABLE_SYNC_BRIDGE_ERROR_TEXT_HINTS = ['::INTERRUPTED::', '页面刷新或离开时中断了同步生成请求', '同步生成恢复超时'];
+
+const SECURE_PROXY_SESSION_REAUTH_CODE = 'SESSION_REAUTH_REQUIRED';
+const SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE = 'GUEST_MODE_UNAVAILABLE';
+const SECURE_PROXY_SESSION_REAUTH_MESSAGE = '\u767b\u5f55\u4f1a\u8bdd\u5df2\u8fc7\u671f\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55\u540e\u518d\u8bd5\u3002';
+const SECURE_PROXY_GUEST_MODE_MESSAGE = '\u6e38\u5ba2\u6a21\u5f0f\u6682\u4e0d\u652f\u6301\u5f53\u524d\u53d7\u4fdd\u62a4\u4ee3\u7406\uff0c\u8bf7\u5148\u767b\u5f55\u6b63\u5f0f\u8d26\u53f7\u3002';
+
+const checkTaskStatus: LlmServiceModule['llmService']['checkTaskStatus'] = async (...args) => {
+  const { llmService: runtimeLlmService } = await import('../services/llm/LLMService');
+  return runtimeLlmService.checkTaskStatus(...args);
+};
+
+const generateAudio: LlmServiceModule['llmService']['generateAudio'] = async (...args) => {
+  const { llmService: runtimeLlmService } = await import('../services/llm/LLMService');
+  return runtimeLlmService.generateAudio(...args);
+};
+
+const generateVideo: LlmServiceModule['llmService']['generateVideo'] = async (...args) => {
+  const { llmService: runtimeLlmService } = await import('../services/llm/LLMService');
+  return runtimeLlmService.generateVideo(...args);
+};
+
+const generateImage: GeminiServiceModule['generateImage'] = async (...args) => {
+  const { generateImage: runGenerateImage } = await import('../services/llm/geminiService');
+  return runGenerateImage(...args);
+};
+
+const cancelGeneration: GeminiServiceModule['cancelGeneration'] = (id) => {
+  void import('../services/llm/geminiService').then(({ cancelGeneration: runCancelGeneration }) => {
+    runCancelGeneration(id);
+  });
+};
+
+const compositePartialRedrawResult: PartialRedrawModule['compositePartialRedrawResult'] = async (...args) => {
+  const { compositePartialRedrawResult: runCompositePartialRedrawResult } = await import('../services/image/partialRedraw');
+  return runCompositePartialRedrawResult(...args);
+};
+
+const compositeRedrawCropResult: PartialRedrawModule['compositeRedrawCropResult'] = async (...args) => {
+  const { compositeRedrawCropResult: runCompositeRedrawCropResult } = await import('../services/image/partialRedraw');
+  return runCompositeRedrawCropResult(...args);
+};
 
 function safeDecodeURIComponent(value: string): string {
   try {
@@ -333,11 +368,11 @@ export const useImageGeneration = (options: {
   }, []);
 
   const getDisplayableGenerationError = useCallback((error: any) => {
-    if (isSecureProxySessionReauthError(error)) {
+    if (error && typeof error === 'object' && error.code === SECURE_PROXY_SESSION_REAUTH_CODE) {
       return error?.message || SECURE_PROXY_SESSION_REAUTH_MESSAGE;
     }
 
-    if (isSecureProxyGuestModeError(error)) {
+    if (error && typeof error === 'object' && error.code === SECURE_PROXY_GUEST_MODE_UNAVAILABLE_CODE) {
       return error?.message || SECURE_PROXY_GUEST_MODE_MESSAGE;
     }
 
@@ -1164,7 +1199,7 @@ export const useImageGeneration = (options: {
     if (!targetTaskId) return;
 
     try {
-      const result = await llmService.checkTaskStatus(
+      const result = await checkTaskStatus(
         targetTaskId,
         node.mode || GenerationMode.IMAGE,
         node.keySlotId ? { id: node.keySlotId } as any : undefined,
@@ -1446,7 +1481,7 @@ export const useImageGeneration = (options: {
         if (freshNode?.isGenerating) pollTaskStatus(freshNode, targetTaskId);
       }, 15000);
     }
-  }, [llmService, addImageNodes, urgentUpdatePromptNode, resolvePendingTaskState, getExpectedGenerationCount, getGeneratedImagePosition, buildPptPageAlias, getPendingTaskIds, extractErrorDetails, filterUniqueGeneratedSources, shouldRefreshServerBillingState, refreshBilling, attachCompletedTasksToPrompt, prepareCompletedTaskResults, resolveFailedBillingState]);
+  }, [addImageNodes, urgentUpdatePromptNode, resolvePendingTaskState, getExpectedGenerationCount, getGeneratedImagePosition, buildPptPageAlias, getPendingTaskIds, extractErrorDetails, filterUniqueGeneratedSources, shouldRefreshServerBillingState, refreshBilling, attachCompletedTasksToPrompt, prepareCompletedTaskResults, resolveFailedBillingState]);
 
   useTaskRecovery(activeCanvas, pollTaskStatus, canStartBackgroundRecovery);
 
@@ -1642,7 +1677,7 @@ export const useImageGeneration = (options: {
           let apiResult: any = null;
           
           if (isAudio) {
-            const audioResult = await llmService.generateAudio({ modelId: executionNode.model, prompt: taskPrompt, audioDuration: executionNode.audioDuration, audioLyrics: executionNode.audioLyrics, preferredKeyId: executionNode.keySlotId, providerConfig: {} });
+            const audioResult = await generateAudio({ modelId: executionNode.model, prompt: taskPrompt, audioDuration: executionNode.audioDuration, audioLyrics: executionNode.audioLyrics, preferredKeyId: executionNode.keySlotId, providerConfig: {} });
             videoUrl = audioResult.url;
             resolvedResultKeySlotId = audioResult.keySlotId || resolvedResultKeySlotId;
             resolvedProvider = audioResult.provider || resolvedProvider;
@@ -1655,7 +1690,7 @@ export const useImageGeneration = (options: {
             resolvedPromptTokens = toFiniteNumber((audioResult as any).usage?.promptTokens);
             resolvedCompletionTokens = toFiniteNumber((audioResult as any).usage?.completionTokens);
           } else if (isVideo) {
-            const videoResult = await llmService.generateVideo({ 
+            const videoResult = await generateVideo({ 
               modelId: executionNode.model, prompt: taskPrompt, aspectRatio: executionNode.aspectRatio === '9:16' ? '9:16' : '16:9', 
               imageUrl: files[0]?.data, videoDuration: executionNode.videoDuration, preferredKeyId: executionNode.keySlotId, 
               providerConfig: {}, 

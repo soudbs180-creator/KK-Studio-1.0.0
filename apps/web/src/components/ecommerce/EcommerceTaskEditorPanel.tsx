@@ -1,7 +1,6 @@
 import React from 'react';
 import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 
-import { optimizePromptForImage } from '../../services/llm/promptOptimizerService';
 import type { EcommerceAPlusControlMode, EcommerceEditableTaskState, ReferenceImage } from '../../types';
 
 export type EcommerceTaskStateUpdater =
@@ -221,6 +220,7 @@ const EcommerceTaskEditorPanel: React.FC<EcommerceTaskEditorPanelProps> = ({
       }
 
       const rawPrompt = taskState.promptOverride || taskState.resolvedPromptPreview || taskState.sparseUserIntent || taskState.displayLabel;
+      const { optimizePromptForImage } = await import('../../services/llm/promptOptimizerService');
       const optimized = await optimizePromptForImage(rawPrompt, {
         mode: 'ecommerce',
         aspectRatio: taskState.effectiveSizeTier || taskState.declaredSizeText || taskState.outputTypeLabel,

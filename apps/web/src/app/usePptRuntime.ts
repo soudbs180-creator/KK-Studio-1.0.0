@@ -1,6 +1,4 @@
 import { useCallback, type Dispatch, type RefObject, type SetStateAction } from 'react';
-import { saveAs } from 'file-saver';
-import JSZip from 'jszip';
 
 import { GenerationMode, type GeneratedImage, type PromptNode, type PptEditableImageLayer, type PptEditablePage } from '../types';
 import { buildPptxSlideRelationshipsXml, buildPptxSlideXml } from './buildPptxSlideDocuments';
@@ -13,6 +11,7 @@ import {
   type PptRuntimeCanvasSnapshot,
 } from './pptRuntimeHelpers';
 import { base64ToBlob } from '../utils/downloadUtils';
+import { createZipArchive, saveBlobAs } from '../utils/archiveRuntime';
 import { pickByDocumentLanguage } from '../utils/localeText';
 import {
   buildPptEditablePages,
@@ -411,7 +410,7 @@ export function usePptRuntime({
     const exportBundle = requirePptEditableExportBundle(node);
     if (!exportBundle) return;
 
-    const zip = new JSZip();
+    const zip = await createZipArchive();
     const { promptNode, images, pages, imageById } = exportBundle;
     const outlinePages = syncPptSlidesFromEditablePages(pages);
     const pageSummaries: Array<Record<string, unknown>> = [];
@@ -593,7 +592,7 @@ export function usePptRuntime({
     zip.file('outline/slides-preview.html', slidesHtml);
 
     const blob = await zip.generateAsync({ type: 'blob' });
-    saveAs(blob, `ppt-editable-package-${Date.now()}.zip`);
+    await saveBlobAs(blob, `ppt-editable-package-${Date.now()}.zip`);
 
     import('../services/system/notificationService').then(({ notify }) => {
       notify.success('导出完成', `已导出 ${pages.length} 页，以及 editable 图层包、预览页和素材目录`);
@@ -639,7 +638,7 @@ export function usePptRuntime({
       `<a:srgbClr val="${normalizeColor(value, fallback)}">${opacity < 1 ? `<a:alpha val="${toAlphaValue(opacity)}"/>` : ''}</a:srgbClr>`
     );
 
-    const zip = new JSZip();
+    const zip = await createZipArchive();
     const visibleImageIds = Array.from(new Set(
       pages.flatMap((page) => page.layers.reduce<string[]>((ids, layer) => {
         if (!layer.visible || layer.type !== 'image') {
@@ -769,7 +768,7 @@ ${paragraphs}
     }
 
     const pptxBlob = await zip.generateAsync({ type: 'blob' });
-    saveAs(pptxBlob, `ppt-layered-${Date.now()}.pptx`);
+    await saveBlobAs(pptxBlob, `ppt-layered-${Date.now()}.pptx`);
 
     import('../services/system/notificationService').then(({ notify }) => {
       notify.success('PPTX 导出完成', `已导出 ${pages.length} 页的可编辑图层 PPTX`);
@@ -795,7 +794,7 @@ ${paragraphs}
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;');
 
-    const zip = new JSZip();
+    const zip = await createZipArchive();
     writePptxPackageSkeleton({
       zip,
       slideCount: ordered.length,
@@ -890,7 +889,7 @@ ${paragraphs}
     }
 
     const pptxBlob = await zip.generateAsync({ type: 'blob' });
-    saveAs(pptxBlob, `ppt-slides-${Date.now()}.pptx`);
+    await saveBlobAs(pptxBlob, `ppt-slides-${Date.now()}.pptx`);
     import('../services/system/notificationService').then(({ notify }) => {
       notify.success('PPTX export complete', `Exported ${ordered.length} slides as a .pptx file`);
     });
@@ -906,7 +905,7 @@ ${paragraphs}
       return;
     }
 
-    const zip = new JSZip();
+    const zip = await createZipArchive();
     const pagesMeta: PptPackagePageMeta[] = [];
 
     for (let i = 0; i < childImages.length; i += 1) {
@@ -988,7 +987,7 @@ ${paragraphs}
     zip.file('outline/slides-preview.html', slidesHtml);
 
     const blob = await zip.generateAsync({ type: 'blob' });
-    saveAs(blob, `ppt-pages-${Date.now()}.zip`);
+    await saveBlobAs(blob, `ppt-pages-${Date.now()}.zip`);
 
     import('../services/system/notificationService').then(({ notify }) => {
       notify.success('导出完成', `已导出 ${childImages.length} 页与 pages/outline/meta 目录`);
@@ -1061,7 +1060,7 @@ ${paragraphs}
 
     try {
       const blob = await stitchPptImagesToBlob(bundle.images);
-      saveAs(blob, `ppt-full-screen-${Date.now()}.png`);
+      await saveBlobAs(blob, `ppt-full-screen-${Date.now()}.png`);
       import('../services/system/notificationService').then(({ notify }) => {
         notify.success('导出完成', `已导出 ${bundle.images.length} 页整屏长图`);
       });
@@ -1083,7 +1082,7 @@ ${paragraphs}
       const res = await fetch(target.originalUrl || target.url);
       const blob = await res.blob();
       const name = `ppt-page-${String(pageIndex + 1).padStart(2, '0')}.png`;
-      saveAs(blob, name);
+      await saveBlobAs(blob, name);
       import('../services/system/notificationService').then(({ notify }) => {
         notify.success('导出完成', `已导出图 ${pageIndex + 1}`);
       });

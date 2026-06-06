@@ -56,6 +56,15 @@ interface CanvasInteractionState {
     idleRelaxationMs: number;
 }
 
+interface CachedCanvasRect {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+    width: number;
+    height: number;
+}
+
 const MIN_RESTORED_CANVAS_VIEW_SCALE = 0.35;
 
 const isValidTransform = (value: any): value is Transform => {
@@ -89,6 +98,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
     const containerRef = useRef<HTMLDivElement>(null);
     const gridRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null); // 🚀 [性能优化] 直接操作DOM
+    const containerRectRef = useRef<CachedCanvasRect | null>(null);
     const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, scale: 1 });
     const [isDragging, setIsDragging] = useState(false);
     const dragStart = useRef({ x: 0, y: 0 });
@@ -162,6 +172,23 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         onResetView,
         onTransformChange,
     ]);
+
+    const readContainerRect = useCallback((): CachedCanvasRect | null => {
+        const container = containerRef.current;
+        if (!container) return null;
+
+        const rect = container.getBoundingClientRect();
+        const cachedRect = {
+            left: rect.left,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+            width: rect.width,
+            height: rect.height,
+        };
+        containerRectRef.current = cachedRect;
+        return cachedRect;
+    }, []);
 
     const emitTransformChange = useCallback((nextTransform: Transform) => {
         callbackRef.current.onTransformChange?.(nextTransform);
@@ -303,10 +330,9 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
     const setGridGlowTarget = useCallback((clientX: number, clientY: number, opacity: number, scale: number) => {
         if (!showGrid) return;
 
-        const container = containerRef.current;
-        if (!container) return;
+        const rect = containerRectRef.current || readContainerRect();
+        if (!rect) return;
 
-        const rect = container.getBoundingClientRect();
         const nextX = Math.max(0, Math.min(rect.width, clientX - rect.left));
         const nextY = Math.max(0, Math.min(rect.height, clientY - rect.top));
         const current = gridGlowCurrentRef.current;
@@ -324,7 +350,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
 
         gridGlowTargetRef.current = { x: nextX, y: nextY, opacity, scale };
         queueGridGlowAnimation();
-    }, [applyGridGlow, queueGridGlowAnimation, showGrid]);
+    }, [applyGridGlow, queueGridGlowAnimation, readContainerRect, showGrid]);
 
     const scheduleGridGlowIdleFade = useCallback(() => {
         if (!showGrid) return;
@@ -354,10 +380,9 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
 
     // Center the canvas on mount OR restore from localStorage
     useEffect(() => {
-        const container = containerRef.current;
-        if (!container) return;
+        const rect = readContainerRect();
+        if (!rect) return;
 
-        const rect = container.getBoundingClientRect();
         const initialGlow = {
             x: rect.width / 2,
             y: rect.height / 2,
@@ -396,7 +421,35 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         setTransform(initialTransform);
         syncTransformRef.current = initialTransform;
         emitTransformChange(initialTransform);
-    }, [applyGridGlow, emitTransformChange]);
+    }, [applyGridGlow, emitTransformChange, readContainerRect]);
+
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        readContainerRect();
+        const handleResize = () => {
+            readContainerRect();
+        };
+
+        window.addEventListener('resize', handleResize, { passive: true });
+
+        if (typeof ResizeObserver === 'undefined') {
+            return () => {
+                window.removeEventListener('resize', handleResize);
+            };
+        }
+
+        const resizeObserver = new ResizeObserver(() => {
+            readContainerRect();
+        });
+        resizeObserver.observe(container);
+
+        return () => {
+            resizeObserver.disconnect();
+            window.removeEventListener('resize', handleResize);
+        };
+    }, [readContainerRect]);
 
     // Save view to localStorage on change (debounced)
     useEffect(() => {
@@ -611,10 +664,9 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
     const handleWindowMouseMoveForGlow = useCallback((e: MouseEvent) => {
         if (!showGrid) return;
 
-        const container = containerRef.current;
-        if (!container) return;
+        const rect = containerRectRef.current || readContainerRect();
+        if (!rect) return;
 
-        const rect = container.getBoundingClientRect();
         const isInside =
             e.clientX >= rect.left
             && e.clientX <= rect.right
@@ -637,7 +689,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
             isDraggingRef.current ? 0.72 : 0.96
         );
         scheduleGridGlowIdleFade();
-    }, [fadeGridGlow, scheduleGridGlowIdleFade, setGridGlowTarget, showGrid]);
+    }, [fadeGridGlow, readContainerRect, scheduleGridGlowIdleFade, setGridGlowTarget, showGrid]);
 
     const handleMouseUp = useCallback((e: MouseEvent) => {
         if (isDraggingRef.current) {
@@ -668,48 +720,117 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         }
     }, [emitTransformChange, settleInteractionPhase]);
 
+    const mousePositionRef = useRef<{ clientX: number; clientY: number } | null>(null);
+
     // Zoom controls
     const zoomIn = useCallback(() => {
-        const newScale = Math.min(3, transform.scale * 1.1);
+        const currentTransform = syncTransformRef.current;
+        const newScale = Math.min(3, currentTransform.scale * 1.1);
         const container = containerRef.current;
         if (!container) return;
 
         const rect = container.getBoundingClientRect();
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
+        let centerX = rect.width / 2;
+        let centerY = rect.height / 2;
 
-        const scaleRatio = newScale / transform.scale;
-        const newX = centerX - (centerX - transform.x) * scaleRatio;
-        const newY = centerY - (centerY - transform.y) * scaleRatio;
+        // 🚀 若鼠标在画布内，以鼠标位置为中心缩放，体验极大提升
+        if (mousePositionRef.current) {
+            centerX = mousePositionRef.current.clientX - rect.left;
+            centerY = mousePositionRef.current.clientY - rect.top;
+        }
+
+        const scaleRatio = newScale / currentTransform.scale;
+        const newX = centerX - (centerX - currentTransform.x) * scaleRatio;
+        const newY = centerY - (centerY - currentTransform.y) * scaleRatio;
 
         const newTransform = snapTransformForText({ x: newX, y: newY, scale: newScale });
         syncTransformRef.current = newTransform;
-        setTransform(newTransform);
+        if (viewportRef.current) {
+            viewportRef.current.style.transform = buildViewportTransform(newTransform, true);
+        }
+
+        if (zoomTimeoutRef.current) {
+            clearTimeout(zoomTimeoutRef.current);
+        }
+        zoomTimeoutRef.current = setTimeout(() => {
+            setTransform(newTransform);
+            emitTransformChange(newTransform);
+        }, 50);
+
         activateInteractionPhase('zoom');
         scheduleZoomIdleSettle();
-        emitTransformChange(newTransform);
-    }, [activateInteractionPhase, emitTransformChange, scheduleZoomIdleSettle, transform]);
+    }, [activateInteractionPhase, emitTransformChange, scheduleZoomIdleSettle]);
 
     const zoomOut = useCallback(() => {
-        const newScale = Math.max(0.1, transform.scale / 1.1);
+        const currentTransform = syncTransformRef.current;
+        const newScale = Math.max(0.1, currentTransform.scale / 1.1);
         const container = containerRef.current;
         if (!container) return;
 
         const rect = container.getBoundingClientRect();
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
+        let centerX = rect.width / 2;
+        let centerY = rect.height / 2;
 
-        const scaleRatio = newScale / transform.scale;
-        const newX = centerX - (centerX - transform.x) * scaleRatio;
-        const newY = centerY - (centerY - transform.y) * scaleRatio;
+        // 🚀 若鼠标在画布内，以鼠标位置为中心缩放，体验极大提升
+        if (mousePositionRef.current) {
+            centerX = mousePositionRef.current.clientX - rect.left;
+            centerY = mousePositionRef.current.clientY - rect.top;
+        }
+
+        const scaleRatio = newScale / currentTransform.scale;
+        const newX = centerX - (centerX - currentTransform.x) * scaleRatio;
+        const newY = centerY - (centerY - currentTransform.y) * scaleRatio;
 
         const newTransform = snapTransformForText({ x: newX, y: newY, scale: newScale });
         syncTransformRef.current = newTransform;
-        setTransform(newTransform);
+        if (viewportRef.current) {
+            viewportRef.current.style.transform = buildViewportTransform(newTransform, true);
+        }
+
+        if (zoomTimeoutRef.current) {
+            clearTimeout(zoomTimeoutRef.current);
+        }
+        zoomTimeoutRef.current = setTimeout(() => {
+            setTransform(newTransform);
+            emitTransformChange(newTransform);
+        }, 50);
+
         activateInteractionPhase('zoom');
         scheduleZoomIdleSettle();
-        emitTransformChange(newTransform);
-    }, [activateInteractionPhase, emitTransformChange, scheduleZoomIdleSettle, transform]);
+    }, [activateInteractionPhase, emitTransformChange, scheduleZoomIdleSettle]);
+
+    const zoomTo = useCallback((newScale: number) => {
+        const currentTransform = syncTransformRef.current;
+        const container = containerRef.current;
+        if (!container) return;
+
+        const rect = container.getBoundingClientRect();
+        
+        // 滑块改变通常为操作控制条，统一以屏幕几何中心缩放，防止视野偏移猛烈
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        const scaleRatio = newScale / currentTransform.scale;
+        const newX = centerX - (centerX - currentTransform.x) * scaleRatio;
+        const newY = centerY - (centerY - currentTransform.y) * scaleRatio;
+
+        const newTransform = snapTransformForText({ x: newX, y: newY, scale: newScale });
+        syncTransformRef.current = newTransform;
+        if (viewportRef.current) {
+            viewportRef.current.style.transform = buildViewportTransform(newTransform, true);
+        }
+
+        if (zoomTimeoutRef.current) {
+            clearTimeout(zoomTimeoutRef.current);
+        }
+        zoomTimeoutRef.current = setTimeout(() => {
+            setTransform(newTransform);
+            emitTransformChange(newTransform);
+        }, 50);
+
+        activateInteractionPhase('zoom');
+        scheduleZoomIdleSettle();
+    }, [activateInteractionPhase, emitTransformChange, scheduleZoomIdleSettle]);
 
     const resetView = useCallback(() => {
         const container = containerRef.current;
@@ -774,6 +895,7 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         zoomOut,
         resetView,
         fitToAll,
+        zoomTo,
         setView: (x: number, y: number, scale: number) => {
             const newTransform = snapTransformForText({ x, y, scale });
             syncTransformRef.current = newTransform;
@@ -878,7 +1000,16 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         const container = containerRef.current;
         if (!container) return;
 
+        const handleMouseMoveTracker = (e: MouseEvent) => {
+            mousePositionRef.current = { clientX: e.clientX, clientY: e.clientY };
+        };
+        const handleMouseLeaveTracker = () => {
+            mousePositionRef.current = null;
+        };
+
         container.addEventListener('wheel', handleWheel, { passive: false });
+        container.addEventListener('mousemove', handleMouseMoveTracker, { passive: true });
+        container.addEventListener('mouseleave', handleMouseLeaveTracker, { passive: true });
         // Touch Listeners (Passive: false to allow preventDefault)
         container.addEventListener('touchstart', handleTouchStart, { passive: false });
         container.addEventListener('touchmove', handleTouchMove, { passive: false });
@@ -888,10 +1019,12 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
         window.addEventListener('mousemove', handleMouseMove, { passive: true });
         window.addEventListener('mousemove', handleWindowMouseMoveForGlow, { passive: true });
         window.addEventListener('mouseup', handleMouseUp, { passive: true });
-        window.addEventListener('keydown', handleKeyDown, { passive: true });
+        window.addEventListener('keydown', handleKeyDown);
 
         return () => {
             container.removeEventListener('wheel', handleWheel);
+            container.removeEventListener('mousemove', handleMouseMoveTracker);
+            container.removeEventListener('mouseleave', handleMouseLeaveTracker);
             container.removeEventListener('touchstart', handleTouchStart);
             container.removeEventListener('touchmove', handleTouchMove);
             container.removeEventListener('touchend', handleTouchEnd);
@@ -928,11 +1061,11 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
 
     return (
         <div className="relative w-full h-full">
-            {/* Canvas Container */}
+            {/* CanvasLayer - 承载网格和视口卡片，拥有独立的合成层与隔离属性 */}
             <div
                 ref={containerRef}
                 id={id}
-                className={`canvas-container outline-none focus:outline-none gpu-accelerated ${isDragging ? 'is-dragging' : ''} ${isZooming ? 'is-zooming' : ''} ${isImageDragOver ? 'ring-4 ring-[color:var(--clay-brand-pink)]' : ''}`}
+                className={`canvas-layer canvas-container outline-none focus:outline-none gpu-accelerated ${isDragging ? 'is-dragging' : ''} ${isZooming ? 'is-zooming' : ''} ${isImageDragOver ? 'ring-4 ring-[color:var(--clay-brand-pink)]' : ''}`}
                 tabIndex={-1}
                 onMouseDownCapture={handleMouseDownCapture}
                 onMouseDown={handleMouseDown}
@@ -957,7 +1090,10 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                         callbackRef.current.onCanvasDoubleClick?.();
                     }
                 }}
-                style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+                style={{ 
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                    contain: 'layout style' // 开启浏览器渲染隔离
+                }}
             >
                 {/* 拖拽悬停效果 - 只显示边框高亮，不显示提示文本 */}
                 {/* Grid Background */}
@@ -981,9 +1117,12 @@ const InfiniteCanvas = forwardRef<InfiniteCanvasHandle, InfiniteCanvasProps>(({ 
                 </div>
             </div>
 
-            {/* 简体中文：画布更新通知悬浮框 - 依然保留在左下角绝对定位，向上偏移避开缩放卡片和版本号卡片 */}
-            <div className="absolute bottom-[285px] left-4 z-50 select-none">
-                <UpdateNotification />
+            {/* UILayer - 承载不受视口变换影响的同级浮动 UI */}
+            <div className="canvas-ui-layer pointer-events-none absolute inset-0 z-10">
+                {/* 简体中文：画布更新通知悬浮框 - 依然保留在左下角绝对定位，向上偏移避开缩放卡片和版本号卡片 */}
+                <div className="absolute bottom-[285px] left-4 z-50 select-none pointer-events-auto">
+                    <UpdateNotification />
+                </div>
             </div>
         </div>
     );

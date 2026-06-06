@@ -105,6 +105,24 @@ test('selected ZIP dedupes prompt and child image selections', () => {
   assert.deepEqual(images.map(image => image.id).sort(), ['img-1', 'img-2']);
 });
 
+test('latest ZIP scope selects the newest four images without requiring full-array sorting semantics', () => {
+  const images = resolveImageNodesForDownload({
+    scope: 'latest_batch',
+    activeCanvas: {
+      imageNodes: [
+        makeImage({ id: 'img-1', timestamp: 10 }),
+        makeImage({ id: 'img-2', timestamp: 50 }),
+        makeImage({ id: 'img-3', timestamp: 30 }),
+        makeImage({ id: 'img-4', timestamp: 40 }),
+        makeImage({ id: 'img-5', timestamp: 20 }),
+        makeImage({ id: 'img-6', timestamp: 60 }),
+      ],
+    },
+  });
+
+  assert.deepEqual(images.map(image => image.id), ['img-6', 'img-2', 'img-4', 'img-3']);
+});
+
 test('original source resolution prefers originalUrl, apiResultUrl, url, then storageId', () => {
   assert.equal(resolveOriginalSource(makeImage({
     id: 'img-1',

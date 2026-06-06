@@ -184,6 +184,8 @@ function ensureUploadsDirectoryWritable() {
 function startServer(port = Number(process.env.PORT || 8080), options = {}) {
   assertRequiredEnv(options);
   ensureUploadsDirectoryWritable();
+  const { startReconciliationDaemon } = require('./lib/dispatcher/reconciliation');
+  startReconciliationDaemon();
   const runtimeApp = options.app || app;
   return runtimeApp.listen(port, () => {
     console.log(`[server] 后端主服务已启动，正在运行在端口 :${port}`);

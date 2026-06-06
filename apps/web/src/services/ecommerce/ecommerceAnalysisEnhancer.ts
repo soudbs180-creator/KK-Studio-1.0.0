@@ -1,6 +1,12 @@
 import type { EcommerceAnalysisResult } from './types';
-import { llmService } from '../llm/LLMService';
 import { keyManager } from '../auth/keyManager';
+
+type LlmServiceModule = typeof import('../llm/LLMService');
+
+const chatWithLlm: LlmServiceModule['llmService']['chat'] = async (...args) => {
+  const { llmService: runtimeLlmService } = await import('../llm/LLMService');
+  return runtimeLlmService.chat(...args);
+};
 
 export interface ProductImageInlineData {
   mimeType: string;
@@ -92,7 +98,7 @@ export async function enhanceAnalysisWithAI(
       '请分析上传的产品图片，识别产品特征并返回 JSON。',
     ].join('\n');
 
-    const raw = await llmService.chat({
+    const raw = await chatWithLlm({
       modelId,
       messages: [
         { role: 'system', content: ANALYSIS_SYSTEM_PROMPT },

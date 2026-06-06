@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { saveAs } from 'file-saver';
-import JSZip from 'jszip';
 import {
     Focus,
     Grid3x3,
@@ -15,8 +13,15 @@ import {
     Square,
     Sun,
     Trash2,
+    MousePointer,
+    Palette,
+    Network,
+    Cpu,
+    Eye,
+    Save,
 } from 'lucide-react';
 import { useCanvas } from '../../context/CanvasContext';
+import { createZipArchive, saveBlobAs } from '../../utils/archiveRuntime';
 
 // 简体中文：自定义扫把（Broom）图标组件，用于清理操作
 const Broom: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ size = 24, ...props }) => (
@@ -57,12 +62,12 @@ interface ProjectManagerProps {
     isMobile: boolean;
     onFitToAll: () => void;
     onResetView: () => void;
-    onToggleGrid: () => void;
+    onToggleCanvasMode: () => void;
     onToggleSnapToGrid: () => void;
     onAutoArrange: () => void;
     onToggleChat?: () => void;
     isChatOpen?: boolean;
-    showGrid?: boolean;
+    canvasMode?: 'normal' | 'board';
     showSnapToGrid?: boolean;
     onOpenProfile?: () => void;
     mobilePromptOptimizationEnabled?: boolean;
@@ -75,6 +80,8 @@ interface ProjectManagerProps {
     desktopScale?: number;
     desktopOffset?: number;
     isUserMenuOpen?: boolean;
+    onOpenMarkdownImport?: () => void;
+    onOpenMermaidImport?: () => void;
 }
 
 const ProjectManager: React.FC<ProjectManagerProps> = ({
@@ -83,14 +90,19 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     isMobile,
     onFitToAll,
     onResetView,
-    onToggleGrid,
+    onToggleCanvasMode,
     onToggleSnapToGrid,
     onAutoArrange,
-    showGrid = true,
+    canvasMode = 'normal',
     showSnapToGrid = false,
     desktopScale = 1,
     desktopOffset = 0,
     isUserMenuOpen = false,
+    onOpenMarkdownImport,
+    onOpenMermaidImport,
+    workflowTemplates = [],
+    onApplyWorkflowTemplate,
+    onAddWorkflowUtilityCard,
 }) => {
     const {
         state,
@@ -122,7 +134,88 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     };
 
     const [showDropdown, setShowDropdown] = useState(false);
+    const [showWorkflowDropdown, setShowWorkflowDropdown] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+
+    const workflowTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    const openWorkflowMenu = useCallback(() => {
+        if (workflowTimerRef.current) {
+            clearTimeout(workflowTimerRef.current);
+            workflowTimerRef.current = null;
+        }
+        setShowWorkflowDropdown(true);
+    }, []);
+
+    const closeWorkflowMenuDelayed = useCallback(() => {
+        if (workflowTimerRef.current) {
+            clearTimeout(workflowTimerRef.current);
+        }
+        workflowTimerRef.current = setTimeout(() => {
+            setShowWorkflowDropdown(false);
+        }, 1200);
+    }, []);
+
+    const handleWorkflowMenuMouseEnter = useCallback(() => {
+        if (workflowTimerRef.current) {
+            clearTimeout(workflowTimerRef.current);
+            workflowTimerRef.current = null;
+        }
+    }, []);
+
+    const handleAddUtilityCardWithSafety = useCallback((kind: WorkflowUtilityNodeKind) => {
+        try {
+            if (!onAddWorkflowUtilityCard) {
+                notify.error('添加失败', '工作流添加接口未准备就绪。');
+                return;
+            }
+            if (!activeCanvas) {
+                notify.error('无法执行', '未找到当前活动项目。');
+                return;
+            }
+
+            onAddWorkflowUtilityCard(kind);
+            notify.success('节点添加成功', `已在画布添加“${kind === 'preview' ? '预览卡' : kind === 'save' ? '保存卡' : '提示增强卡'}”`);
+        } catch (error) {
+            console.error('Failed to add workflow utility card', error);
+            notify.error('添加失败', '系统运行时发生异常，请重试。');
+        }
+    }, [activeCanvas, onAddWorkflowUtilityCard]);
+
+    const handleApplyTemplateWithSafety = useCallback((templateId: WorkflowTemplateId, title: string) => {
+        try {
+            if (!onApplyWorkflowTemplate) {
+                notify.error('应用失败', '工作流模板接口未就绪。');
+                return;
+            }
+            if (!activeCanvas) {
+                notify.error('无法执行', '未找到当前活动项目。');
+                return;
+            }
+
+            const templateNodes = activeCanvas.workflow?.nodes || [];
+            const hasDuplicate = templateNodes.some(n => n.tags?.includes(`template:${templateId}`));
+            if (hasDuplicate) {
+                if (!window.confirm(`当前画布可能已应用过“${title}”，继续应用可能会生成重复节点，是否继续？`)) {
+                    return;
+                }
+            }
+
+            onApplyWorkflowTemplate(templateId);
+            notify.success('应用模板成功', `已将工作流模板“${title}”部署到画布。`);
+        } catch (error) {
+            console.error('Failed to apply workflow template', error);
+            notify.error('应用模板失败', '网络或状态同步发生异常。');
+        }
+    }, [activeCanvas, onApplyWorkflowTemplate]);
+
+    useEffect(() => {
+        return () => {
+            if (workflowTimerRef.current) {
+                clearTimeout(workflowTimerRef.current);
+            }
+        };
+    }, []);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
     const [isDownloading, setIsDownloading] = useState(false);
@@ -272,6 +365,8 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         return () => clearTimeout(timer);
     }, [showDropdown]);
 
+    // 采用防抖控制，已安全地移除硬编码的 8s 销毁定时器
+
     const saveEdit = useCallback(() => {
         if (editingId && editName.trim()) {
             renameCanvas(editingId, editName.trim());
@@ -326,7 +421,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         setShowDropdown(false);
 
         try {
-            const zip = new JSZip();
+            const zip = await createZipArchive();
             const folder = zip.folder(activeCanvas.name) || zip;
 
             let count = 0;
@@ -356,7 +451,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
             }
 
             const content = await zip.generateAsync({ type: 'blob' });
-            saveAs(content, `${activeCanvas.name}_images.zip`);
+            await saveBlobAs(content, `${activeCanvas.name}_images.zip`);
         } catch (error) {
             console.error('Download failed', error);
             notify.error('下载失败', '打包图片时出现问题，请稍后重试。');
@@ -609,6 +704,108 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                         </svg>
                         清空项目数据
                     </button>
+                </div>
+            </div>
+        </>
+    ) : null;
+
+    const workflowDropdown = showWorkflowDropdown && onAddWorkflowUtilityCard && onApplyWorkflowTemplate ? (
+        <>
+            <div
+                className="fixed inset-0 z-40 cursor-default"
+                onClick={(event) => {
+                    event.stopPropagation();
+                    setShowWorkflowDropdown(false);
+                }}
+            />
+            <div
+                className="absolute left-full top-0 ml-3 w-72 z-50 overflow-hidden rounded-2xl border transition-all duration-300 ease-out will-change-[transform,opacity]"
+                style={frostedProjectManagerShellStyle}
+                onMouseEnter={handleWorkflowMenuMouseEnter}
+                onMouseLeave={closeWorkflowMenuDelayed}
+            >
+                <div
+                    className="flex items-center justify-between border-b px-4 py-3"
+                    style={frostedProjectManagerSubSurfaceStyle}
+                >
+                    <h3 className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-tertiary)' }}>
+                        工作流引擎
+                    </h3>
+                    <span className="text-[10px] text-blue-400 font-semibold px-1.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 animate-pulse">
+                        BETA
+                    </span>
+                </div>
+
+                <div className="p-3 border-b border-[color:var(--frost-card-sub-border)]">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-tertiary)' }}>
+                        添加工作流卡片
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                        <button
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                handleAddUtilityCardWithSafety('preview');
+                                setShowWorkflowDropdown(false);
+                            }}
+                            className="flex flex-col items-center justify-center p-2 rounded-xl border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)] active:scale-95 group cursor-pointer"
+                        >
+                            <Eye size={16} className="text-indigo-400 mb-1 group-hover:scale-110 transition-transform duration-200" />
+                            <span className="text-[11px] font-medium">预览卡</span>
+                        </button>
+                        <button
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                handleAddUtilityCardWithSafety('save');
+                                setShowWorkflowDropdown(false);
+                            }}
+                            className="flex flex-col items-center justify-center p-2 rounded-xl border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)] active:scale-95 group cursor-pointer"
+                        >
+                            <Save size={16} className="text-emerald-400 mb-1 group-hover:scale-110 transition-transform duration-200" />
+                            <span className="text-[11px] font-medium">保存卡</span>
+                        </button>
+                        <button
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                handleAddUtilityCardWithSafety('agent');
+                                setShowWorkflowDropdown(false);
+                            }}
+                            className="flex flex-col items-center justify-center p-2 rounded-xl border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] text-[var(--text-secondary)] transition-all hover:bg-[var(--toolbar-hover)] hover:text-[var(--text-primary)] active:scale-95 group cursor-pointer"
+                        >
+                            <Cpu size={16} className="text-amber-400 mb-1 group-hover:scale-110 transition-transform duration-200" />
+                            <span className="text-[11px] font-medium">增强卡</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div
+                    className="p-3 space-y-1.5 max-h-60 overflow-y-auto custom-scrollbar"
+                    style={frostedProjectManagerSubSurfaceStyle}
+                >
+                    <div className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-tertiary)' }}>
+                        应用工作流模板
+                    </div>
+                    {workflowTemplates && workflowTemplates.length > 0 ? (
+                        workflowTemplates.map((template) => (
+                            <button
+                                key={template.id}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleApplyTemplateWithSafety(template.id, template.title);
+                                    setShowWorkflowDropdown(false);
+                                }}
+                                className="flex w-full flex-col rounded-xl border border-[color:var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] px-3 py-2 text-left transition-colors hover:bg-[var(--frost-card-main-bg)] active:scale-[0.98] cursor-pointer group"
+                            >
+                                <div className="text-xs font-semibold text-gray-900 dark:text-white group-hover:text-[var(--accent-coral)] transition-colors">
+                                    {template.title}
+                                </div>
+                                <div className="mt-0.5 text-[10px] leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
+                                    {template.description}
+                                </div>
+                            </button>
+                        ))
+                    ) : (
+                        <div className="text-xs py-2 px-1 text-[var(--text-tertiary)] italic">暂无预设模板</div>
+                    )}
                 </div>
             </div>
         </>
@@ -911,13 +1108,13 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                 <button
                                     onClick={(event) => {
                                         event.stopPropagation();
-                                        onToggleGrid();
+                                        onToggleCanvasMode();
                                     }}
-                                    className={desktopIconButtonClass}
-                                    title="显示或隐藏网格"
+                                    className={`${desktopIconButtonClass} ${canvasMode === 'board' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : ''}`}
+                                    title={canvasMode === 'board' ? '切换到正常模式' : '切换到画板模式'}
                                     tabIndex={-1}
                                 >
-                                    {showGrid ? <Grid3x3 size={20} /> : <Square size={20} />}
+                                    {canvasMode === 'board' ? <Palette size={20} /> : <MousePointer size={20} />}
                                 </button>
 
                                 <button
@@ -945,6 +1142,27 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                 >
                                     <LayoutDashboard size={20} />
                                 </button>
+
+                                {onAddWorkflowUtilityCard && onApplyWorkflowTemplate && (
+                                    <div 
+                                        className="relative"
+                                        onMouseEnter={openWorkflowMenu}
+                                        onMouseLeave={closeWorkflowMenuDelayed}
+                                    >
+                                        <button
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                setShowWorkflowDropdown((prev) => !prev);
+                                            }}
+                                            className={`${desktopIconButtonClass} ${showWorkflowDropdown ? 'bg-[var(--toolbar-hover)] text-[var(--accent-coral)]' : ''}`}
+                                            title="工作流与模板"
+                                            tabIndex={-1}
+                                        >
+                                            <Network size={20} />
+                                        </button>
+                                        {workflowDropdown}
+                                    </div>
+                                )}
 
                                 <div className="my-1 h-px w-full" style={{ backgroundColor: 'var(--frost-card-framework-border)' }} />
 

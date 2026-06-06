@@ -1,5 +1,5 @@
 export const featureFlags = {
-  experimentalWorkflowGraph: false,
+  experimentalWorkflowGraph: true,
   experimentalWorkflowHighRiskNodes: false,
 } as const;
 

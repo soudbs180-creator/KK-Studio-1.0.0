@@ -93,6 +93,14 @@ type KnowledgeProjection = {
   skills: AgentSkillRecord[];
 };
 
+export interface PendingSyncTask {
+  id: string;
+  type: 'upsert_skill' | 'delete_skill' | 'record_change';
+  payload: any;
+  retries: number;
+  nextRetryTime: number;
+}
+
 const DEFAULT_STORAGE_KEY = 'kk_agent_knowledge_projection_v1';
 
 const BASELINE_DOCUMENTS: KnowledgeDocument[] = [
@@ -208,6 +216,8 @@ export class KnowledgeStore {
   private readonly storageKey: string;
   private readonly storage: Storage | null;
   private projection: KnowledgeProjection = emptyProjection();
+  private pendingQueue: PendingSyncTask[] = [];
+  private syncSchedulerActive = false;
 
   constructor(
     storageKey = DEFAULT_STORAGE_KEY,
@@ -216,6 +226,29 @@ export class KnowledgeStore {
     this.storageKey = storageKey;
     this.storage = storage;
     this.projection = this.loadProjection();
+    this.loadPendingQueue();
+    this.startSyncScheduler();
+  }
+
+  private loadPendingQueue(): void {
+    if (!this.storage) return;
+    try {
+      const raw = this.storage.getItem('kk_pending_sync_queue_v1');
+      if (raw) {
+        this.pendingQueue = JSON.parse(raw);
+      }
+    } catch {
+      this.pendingQueue = [];
+    }
+  }
+
+  private savePendingQueue(): void {
+    if (!this.storage) return;
+    try {
+      this.storage.setItem('kk_pending_sync_queue_v1', JSON.stringify(this.pendingQueue));
+    } catch {
+      // 忽略
+    }
   }
 
   listDocuments(): KnowledgeDocument[] {
@@ -232,6 +265,10 @@ export class KnowledgeStore {
 
   listSkills(): AgentSkillRecord[] {
     return [...this.projection.skills];
+  }
+
+  getPendingTasks(): PendingSyncTask[] {
+    return [...this.pendingQueue];
   }
 
   clearProjection(): void {
@@ -326,29 +363,130 @@ export class KnowledgeStore {
     return record;
   }
 
-  private async syncChangeToBackend(record: KnowledgeChangeRecord) {
+  deleteSkill(id: string): void {
+    this.projection.skills = this.projection.skills.filter(skill => skill.id !== id);
+    this.saveProjection();
+    void this.syncDeleteSkillToBackend(id);
+  }
+
+  private async syncDeleteSkillToBackend(id: string) {
+    const success = await this.executeDeleteSkill(id);
+    if (!success) {
+      this.enqueueTask('delete_skill', id);
+    }
+  }
+
+  private async executeDeleteSkill(id: string): Promise<boolean> {
     try {
-      // 优雅适配后端同步接口
-      await fetch('/api/ai-assistant/changes', {
+      const res = await fetch(`/api/ai-assistant/skills/${id}`, { method: 'DELETE' });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  private async syncChangeToBackend(record: KnowledgeChangeRecord) {
+    const success = await this.executeChangeSync(record);
+    if (!success) {
+      this.enqueueTask('record_change', record);
+    }
+  }
+
+  private async executeChangeSync(record: KnowledgeChangeRecord): Promise<boolean> {
+    try {
+      const res = await fetch('/api/ai-assistant/changes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(record)
       });
+      return res.ok;
     } catch {
-      // 优雅忽略
+      return false;
     }
   }
 
   private async syncSkillToBackend(record: AgentSkillRecord) {
+    const success = await this.executeSkillSync(record);
+    if (!success) {
+      this.enqueueTask('upsert_skill', record);
+    }
+  }
+
+  private async executeSkillSync(record: AgentSkillRecord): Promise<boolean> {
     try {
-      await fetch('/api/ai-assistant/skills', {
+      const res = await fetch('/api/ai-assistant/skills', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(record)
       });
+      return res.ok;
     } catch {
-      // 优雅忽略
+      return false;
     }
+  }
+
+  private enqueueTask(type: PendingSyncTask['type'], payload: any): void {
+    const isDup = this.pendingQueue.some(t => 
+      t.type === type && 
+      (type === 'delete_skill' ? t.payload === payload : t.payload.id === payload.id)
+    );
+    if (isDup) return;
+
+    const task: PendingSyncTask = {
+      id: createId('synctask'),
+      type,
+      payload,
+      retries: 0,
+      nextRetryTime: Date.now(),
+    };
+    this.pendingQueue.push(task);
+    this.savePendingQueue();
+  }
+
+  private startSyncScheduler(): void {
+    if (this.syncSchedulerActive || typeof window === 'undefined') return;
+    this.syncSchedulerActive = true;
+
+    const runScheduler = async () => {
+      if (!navigator.onLine) {
+        setTimeout(runScheduler, 15000);
+        return;
+      }
+
+      const now = Date.now();
+      const tasksToRun = this.pendingQueue.filter(t => now >= t.nextRetryTime);
+      
+      for (const task of tasksToRun) {
+        let success = false;
+        if (task.type === 'delete_skill') {
+          success = await this.executeDeleteSkill(task.payload);
+        } else if (task.type === 'upsert_skill') {
+          success = await this.executeSkillSync(task.payload);
+        } else if (task.type === 'record_change') {
+          success = await this.executeChangeSync(task.payload);
+        }
+
+        if (success) {
+          this.pendingQueue = this.pendingQueue.filter(t => t.id !== task.id);
+        } else {
+          task.retries += 1;
+          const backoff = Math.min(300000, 5000 * Math.pow(2, task.retries));
+          task.nextRetryTime = Date.now() + backoff;
+        }
+      }
+
+      if (tasksToRun.length > 0) {
+        this.savePendingQueue();
+      }
+
+      setTimeout(runScheduler, 10000);
+    };
+
+    window.addEventListener('online', () => {
+      this.pendingQueue.forEach(t => { t.nextRetryTime = Date.now(); });
+    });
+
+    setTimeout(runScheduler, 5000);
   }
 
   searchProject(query: string, limit = 8): KnowledgeSearchResult[] {

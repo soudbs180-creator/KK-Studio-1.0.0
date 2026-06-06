@@ -1,9 +1,9 @@
 import { useCallback, useEffect, type RefObject } from 'react';
-import JSZip from 'jszip';
 
-import { buildEcommerceGroupExportManifest } from '../services/ecommerce/groupExportManifest.ts';
+import type { BuildEcommerceGroupExportManifestInput } from '../services/ecommerce/groupExportManifest.ts';
 import { applyEcommerceSlotResult, type EcommerceGroupSlotState } from '../services/ecommerce/groupSlotState.ts';
 import { type EcommerceGroupSheet, type GeneratedImage, type PromptNode } from '../types/index.ts';
+import { createZipArchive, saveBlobAs } from '../utils/archiveRuntime.ts';
 
 export interface EcommerceLatestSlotImage {
   image: GeneratedImage;
@@ -28,12 +28,6 @@ export type SetEcommerceGroupExportState = (
 export type ResolvePptImageBlobForEcommerce = (
   image: GeneratedImage
 ) => Promise<{ blob: Blob; isOriginal: boolean }>;
-
-type SaveEcommerceBlob = (data: Blob | string, filename?: string) => void;
-type FileSaverRuntimeModule = SaveEcommerceBlob | {
-  default?: SaveEcommerceBlob;
-  saveAs?: SaveEcommerceBlob;
-};
 
 export interface UseEcommerceGroupExportRuntimeDeps {
   activeCanvas?: EcommerceGroupExportCanvasSnapshot | null;
@@ -127,19 +121,6 @@ async function normalizeImageToAPUSMobile(blob: Blob, isMobile: boolean): Promis
     };
     img.src = url;
   });
-}
-
-async function saveEcommerceBlob(content: Blob, fileName: string): Promise<void> {
-  const fileSaverModule = await import('file-saver') as unknown as FileSaverRuntimeModule;
-  const saveBlob = typeof fileSaverModule === 'function'
-    ? fileSaverModule
-    : fileSaverModule.saveAs ?? fileSaverModule.default;
-
-  if (!saveBlob) {
-    throw new Error('File saver runtime is unavailable.');
-  }
-
-  saveBlob(content, fileName);
 }
 
 export function resolveLatestEcommerceSlotImageFromCanvas(
@@ -315,10 +296,9 @@ export function useEcommerceGroupExportRuntime({
 
     const packageType = groupNode.ecommerce.sourceSheet === '主图' ? 'main-image-group' : 'a-plus-group';
     const packageLabel = groupNode.ecommerce.sourceSheet === '主图' ? '主图包' : 'A+包';
-    const zip = new JSZip();
     const exportables: Array<{ fileName: string; image: GeneratedImage; isMobile: boolean }> = [];
 
-    const manifest = buildEcommerceGroupExportManifest({
+    const manifestInput: BuildEcommerceGroupExportManifestInput = {
       packageType,
       groupId: groupNode.id,
       groupLabel: groupNode.ecommerce.sourceSheet,
@@ -406,7 +386,7 @@ export function useEcommerceGroupExportRuntime({
           fileName,
         };
       }),
-    });
+    };
 
     if (exportables.length === 0) {
       void import('../services/system/notificationService').then(({ notify }) => {
@@ -414,6 +394,12 @@ export function useEcommerceGroupExportRuntime({
       });
       return;
     }
+
+    const [{ buildEcommerceGroupExportManifest }, zip] = await Promise.all([
+      import('../services/ecommerce/groupExportManifest.ts'),
+      createZipArchive(),
+    ]);
+    const manifest = buildEcommerceGroupExportManifest(manifestInput);
 
     zip.file('manifest.json', JSON.stringify(manifest, null, 2));
 
@@ -432,7 +418,7 @@ export function useEcommerceGroupExportRuntime({
     }
 
     const content = await zip.generateAsync({ type: 'blob' });
-    await saveEcommerceBlob(content, `${sanitizeEcommerceExportName(packageLabel, packageLabel)}-${Date.now()}.zip`);
+    await saveBlobAs(content, `${sanitizeEcommerceExportName(packageLabel, packageLabel)}-${Date.now()}.zip`);
     void import('../services/system/notificationService').then(({ notify }) => {
       if (fallbackQualityFiles.length > 0) {
         notify.warning('部分图片非原始质量', `${fallbackQualityFiles.length} 张图片使用了回退源：${fallbackQualityFiles.slice(0, 3).join('、')}${fallbackQualityFiles.length > 3 ? '…' : ''}`);

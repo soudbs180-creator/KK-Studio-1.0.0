@@ -15,7 +15,10 @@ import {
 
 import type { GeneratedImage, MobileResultEntry, RedrawRequest } from '../../types';
 import { useLocale } from '../../context/LocaleContext';
-import { RedrawWorkspace } from '../image/RedrawWorkspace';
+
+const RedrawWorkspace = React.lazy(() =>
+  import('../image/RedrawWorkspace').then((module) => ({ default: module.RedrawWorkspace })),
+);
 
 interface MobileResultDetailScreenProps {
   entry: MobileResultEntry;
@@ -706,18 +709,20 @@ const MobileResultDetailScreen: React.FC<MobileResultDetailScreenProps> = ({
       </div>
     </section>
     {showRedrawWorkspace && redrawImage && redrawImageUrl ? (
-      <RedrawWorkspace
-        image={redrawImage}
-        imageUrl={redrawImageUrl}
-        isMobile
-        defaultModel={currentActiveEntry.modelId || currentActiveEntry.modelLabel}
-        onCancel={() => setShowRedrawWorkspace(false)}
-        onSubmit={(request) => {
-          setShowRedrawWorkspace(false);
-          onPartialRedraw(currentActiveEntry, request);
-          onClose();
-        }}
-      />
+      <React.Suspense fallback={null}>
+        <RedrawWorkspace
+          image={redrawImage}
+          imageUrl={redrawImageUrl}
+          isMobile
+          defaultModel={currentActiveEntry.modelId || currentActiveEntry.modelLabel}
+          onCancel={() => setShowRedrawWorkspace(false)}
+          onSubmit={(request) => {
+            setShowRedrawWorkspace(false);
+            onPartialRedraw(currentActiveEntry, request);
+            onClose();
+          }}
+        />
+      </React.Suspense>
     ) : null}
     </>
   );

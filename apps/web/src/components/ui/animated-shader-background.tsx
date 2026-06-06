@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { cn } from "@/lib/utils";
 
@@ -125,6 +125,11 @@ const AnoAI: React.FC<AnimatedShaderBackgroundProps> = ({ className }) => {
 
       geometry.dispose();
       material.dispose();
+      try {
+        renderer.forceContextLoss();
+      } catch (e) {
+        // 防止特定低版本 three.js 没有定义此函数时报错
+      }
       renderer.dispose();
     };
   }, []);

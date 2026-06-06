@@ -18,10 +18,9 @@ const WorkspacePanels: React.FC<WorkspacePanelsProps> = ({
   renderLibraryPanel,
   renderFavoritesPanel,
   auxiliaryPanels,
-  isMobile,
 }) => (
   <>
-    {(activePanel === 'chat' || (!isMobile && renderChatSidebar)) ? renderChatSidebar?.() : null}
+    {activePanel === 'chat' ? renderChatSidebar?.() : null}
     {activeSurface === 'library' ? renderLibraryPanel?.() : null}
     {activeSurface === 'favorites' ? renderFavoritesPanel?.() : null}
     {auxiliaryPanels}

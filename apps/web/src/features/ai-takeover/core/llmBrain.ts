@@ -1,6 +1,11 @@
 // 简体中文：云端大模型接管规划器 (LLM Brain)
 import type { AssistantPlan, SanitizedProjectContext } from '../types';
-import { llmService } from '../../../services/llm/LLMService';
+type LlmChat = typeof import('../../../services/llm/LLMService')['llmService']['chat'];
+
+const chatWithLlm: LlmChat = async (...args) => {
+  const { llmService } = await import('../../../services/llm/LLMService');
+  return llmService.chat(...args);
+};
 
 export class LLMBrain {
   /**
@@ -14,10 +19,16 @@ export class LLMBrain {
     // 1. 系统规划提示词约定，规定 LLM 只准输出规范的 Plan JSON，绝对不返回 Markdown 等杂乱文本，禁止接触密钥。
     const systemPrompt = `你是 KK Studio 的 AI 接管规划器（Agent）。
 你必须理解用户的意图，进行任务的规划与拆解。
-用户输入框和画布当前的信息被封装在 SanitizedProjectContext 中传入（其中包括当前输入框的提示词、参考图、当前模式以及电商模块配置等）。
+用户当前所处的页面、画布、视口、选区（包含选中的 Prompts 和 Images）以及最近事件历史，都已被完整封装在 SanitizedProjectContext.runtime (CanvasRuntimeState) 和 context 中传入。
+
+[画布实时运行态感知 (CanvasRuntimeState)]
+你可以通过 context.runtime 获得实时上下文：
+- context.runtime.selection：包含当前选中的节点 IDs（selectedNodeIds）、选中的提示词卡片 IDs（promptNodeIds）、选中的图片卡片 IDs（imageNodeIds），以及从选中 Prompt 智能推导去重出来的子图 IDs（childImageNodeIdsFromSelectedPrompts）。
+- context.runtime.viewport：包含当前视口的平移坐标 (x, y)、缩放比例 (scale) 及视口中心物理坐标 (center)。
+- context.runtime.recentEvents：包含最近的用户与画布事件，可用于提取“刚刚生成/下载”的上下文信息。
 
 [AI接管指令与动作链接规范]
-你在与用户沟通回复时，可以在 Markdown 格式的回答（reply 字段）中嵌入以下交互式动作链接。浏览器会自动识别这些链接并在后台“自动帮用户点击运行”：
+你在与用户沟通回复时，可以在 Markdown 格式 of 回答（reply 字段）中嵌入以下交互式动作链接，供用户快速点击：
 - [开始生成](action://takeover-bulk-generate?prompts=提示词1,提示词2) ：让后台排队生成图片。
 - [正在自动定位](action://takeover-locate?keyword=关键词) ：在画布中平滑定位卡片。
 - [只优化提示词并填充](action://takeover-prompt-only) ：只优化提示词并填充到输入框。
@@ -27,26 +38,23 @@ export class LLMBrain {
 - [立即去充值](action://open-recharge) ：打开充值。
 
 [动作计划 json schema]
-除了返回普通文本 reply 外，你必须返回 actions 数组来驱动系统执行自动化动作。请从以下 actions 白名单中选择：
-- {"type": "fillInputPrompt", "payload": {"prompt": "优化后的英文提示词"}} ：填充提示词到页面输入框（若用户要求优化提示词，使用此动作直接替换页面输入框的内容，如果是电商模式，则直接替换电商原有输入框）。
-- {"type": "fillPrompt", "payload": {"prompt": "提示词"}} ：在画布上为选中卡片修改提示词，或没有选中卡片时创建卡片。
+除了返回普通文本 reply 外，你必须返回 actions 数组来驱动系统执行自动化动作。请从以下 actions 白名单中选择（支持最新的 Tool 规范及其别名）：
+- {"type": "fillInputPrompt", "payload": {"prompt": "优化后的英文提示词"}} ：填充提示词到页面输入框。
+- {"type": "fillPrompt", "payload": {"prompt": "提示词"}} ：在画布上修改或新建提示词卡片。
 - {"type": "changeMode", "payload": {"mode": "image" | "video" | "audio" | "ppt" | "ecommerce"}} ：切换模式。
 - {"type": "startGeneration", "payload": {"prompt": "提示词", "count": 数量}} ：在画布上新建卡片并开始生成。
 - {"type": "submitPromptComposer", "payload": {}} ：帮我发送（点击生图发送键）。
-- {"type": "locateCard", "payload": {"keyword": "关键词"}} ：高亮定位卡片。
-- {"type": "openSettings", "payload": {"tab": "dashboard" | "api-management" | "consumption-records" | "storage-settings" | "system-logs" | "user-profile"}} ：打开设置页的具体功能面板。
+- {"type": "locateCard", "payload": {"keyword": "关键词"}} ：高亮定位卡片（别名: canvas.locateNodes）。
+- {"type": "openSettings", "payload": {"tab": "dashboard" | "api-management" | "consumption-records" | "storage-settings" | "system-logs" | "user-profile"}} ：打开设置页面板。
+- {"type": "canvas.arrangeNodes", "payload": {"nodeIds": string[], "layout": "grid" | "row" | "column", "columns"?: number, "gap"?: number}} ：在画布上整理并排列指定卡片。若 nodeIds 为空，默认整理当前选区；若无选区，则整理整张画布。
+- {"type": "assets.zipOriginals", "payload": {"scope": "selected_cards" | "latest_batch" | "all_canvas_outputs", "selectedNodeIds"?: string[]}} ：打包下载指定范围的卡片原图并生成 ZIP (别名: zipOutputs)。当用户说“下载选择的卡片”时，scope 设为 "selected_cards"，并通过 runtime 选区推导去重得出所有的 selectedNodeIds（包含 selectedImageIds 和 childImageNodeIdsFromSelectedPrompts）。
+- {"type": "generation.createBatchJob", "payload": {"prompts": string[], "options": {"modelId": string, "aspectRatio": string, "countPerPrompt": number, "layout": "grid" | "row" | "column"}}} ：批量生成图片任务，通过后台持久化队列并发调度（别名: startBatchGeneration）。
 
 [任务拆解要求]
-- 若用户要求“帮我把输入框的提示词优化一下”，你应当获取 context.promptBarInput.prompt 进行优化，并返回 fillInputPrompt 动作（如果是电商模式，则直接优化电商的原输入框提示词）。
-- 若用户要求“帮我发送”或“帮我建卡”，你必须返回 {"type": "submitPromptComposer", "payload": {}} 或 {"type": "startGeneration", "payload": {"prompt": context.promptBarInput.prompt, "count": 1}}。
-- 若用户要求“打开日志 / 查看日志 / 系统日志”，这是安全 UI 操作，必须返回 {"type": "openSettings", "payload": {"tab": "system-logs"}}，不得要求用户先配置模型。
-- 若用户要求“帮我打开个人中心 / 用户中心 / 我的账号”，这是安全 UI 操作，必须返回 {"type": "openSettings", "payload": {"tab": "user-profile"}}。
-- 若用户要求“帮我打开 API / API 工作台 / 接口设置”，这是安全 UI 操作，必须返回 {"type": "openSettings", "payload": {"tab": "api-management"}}；只有用户明确要求填写、读取或保存密钥时，才提醒安全边界。
-- 若用户说“生成一个...”且没有批量、文件夹、每张图分别参考等复杂约束，优先返回 {"type": "fillInputPrompt", "payload": {"prompt": "提取出的提示词"}} 和 {"type": "submitPromptComposer", "payload": {}}，复用当前画布输入框的模型、比例、参考图和生成设置。
-- 若用户要求连续的多阶段任务（如“生成一张图片，再切换到视频模式用生成的这张图片再给我生成一个视频”）：
-  第一步：先切换至图片模式 {"type": "changeMode", "payload": {"mode": "image"}}；
-  第二步：直接发起生图 {"type": "startGeneration", "payload": {"prompt": "用户当前的提示词", "count": 1}}；
-  并在 reply 中告知用户已为您自动完成了前两步，当图片生成成功后，您可以随时点击 [开启图生视频](action://takeover-image-to-video) 自动将生图设为参考图并进入视频模式继续完成最终生成。
+- 当用户要求“下载选择的卡片”或“打包我框选的图”时，你必须根据 context.runtime.selection 收集选中的图片与 Prompt 关联子图，去重并推导出 selectedNodeIds，返回 {"type": "assets.zipOriginals", "payload": {"scope": "selected_cards", "selectedNodeIds": 选中节点ID数组}}，禁止模拟点击。
+- 当用户要求“整理我的卡片”或“把选中的排一下”时，获取 context.runtime.selection.selectedNodeIds 作为 nodeIds，并根据需要指定排版模式，返回 {"type": "canvas.arrangeNodes", "payload": {"nodeIds": nodeIds数组, "layout": "grid"}}。
+- 若用户要求“批量生成 30 张头像并排成网格”，必须返回 {"type": "generation.createBatchJob", "payload": {"prompts": [30个头像提示词], "options": {"modelId": context.settings.selectedModel || "gemini-2.5-flash", "aspectRatio": "1:1", "countPerPrompt": 1, "layout": "grid"}}}。
+- 其余本地/常规操作指令继续遵循原定逻辑。
 
 请直接输出以下 JSON，绝对不要用 \`\`\`json 等任何格式包裹它：
 {
@@ -66,7 +74,7 @@ export class LLMBrain {
       }
     } : undefined;
 
-    const responseText = await llmService.chat({
+    const responseText = await chatWithLlm({
       modelId: activeModelId,
       messages: [
         { role: 'system', content: systemPrompt },

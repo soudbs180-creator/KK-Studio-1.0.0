@@ -94,6 +94,9 @@ export interface CanvasContextType {
     updateWorkflowNode: (id: string, updates: Partial<WorkflowNode>) => void;
     updateWorkflowNodePosition: (id: string, pos: { x: number; y: number }) => void;
     deleteWorkflowNode: (id: string) => void;
+    addCanvasDrawing: (drawing: CanvasDrawing) => void;
+    deleteCanvasDrawing: (id: string) => void;
+    clearCanvasDrawings: () => void;
 }
 
 export const CanvasContext = createContext<CanvasContextType | undefined>(undefined);

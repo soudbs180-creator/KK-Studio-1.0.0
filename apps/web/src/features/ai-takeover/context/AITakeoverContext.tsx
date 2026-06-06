@@ -7,7 +7,13 @@ import { useAssetStore } from '../../assets/assetStore';
 import { durableGenerationQueue, type GenerationExecutorResult } from '../../ai-assistant-runtime/queue/DurableGenerationQueue.ts';
 import { resolveAgentGroupBounds, resolveAgentNodeArrangeUpdates } from '../../ai-assistant-runtime/canvas/agentCanvasLayout.ts';
 import { agentRuntimeInstance } from '../../ai-assistant-runtime';
-import { llmService } from '../../../services/llm/LLMService';
+
+type LlmChat = typeof import('../../../services/llm/LLMService')['llmService']['chat'];
+
+const chatWithLlm: LlmChat = async (...args) => {
+  const { llmService } = await import('../../../services/llm/LLMService');
+  return llmService.chat(...args);
+};
 
 interface Message {
   id: string;
@@ -120,7 +126,7 @@ export function AITakeoverProvider({
 
       const promptText = "请为我们之前的对话内容进行一次高度精炼的摘要总结，提炼出核心的事实、当前的任务状态和关键决策。要求言简意赅，不要有任何客套话。";
       
-      const responseText = await llmService.chat({
+      const responseText = await chatWithLlm({
         modelId: selectedModel?.id || 'gemini-2.5-flash',
         messages: [
           ...history,

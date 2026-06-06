@@ -7,7 +7,6 @@ import {
   updateTaskStatus,
   modeToTaskType
 } from '../services/persistence/taskPersistence';
-import { llmService } from '../services/llm/LLMService';
 import { keyManager } from '../services/auth/keyManager';
 import { resolveProviderRuntime } from '../services/api/providerStrategy';
 import { normalizePersistentResultUrl } from '../utils/imageResultPersistence';
@@ -21,6 +20,13 @@ interface TaskRecoveryState {
 type RecoveryReason = 'initial' | 'visibility' | 'online' | 'manual';
 
 const RECOVERY_THROTTLE_MS = 30_000;
+
+type LlmServiceModule = typeof import('../services/llm/LLMService');
+
+const checkTaskStatuses: LlmServiceModule['llmService']['checkTaskStatuses'] = async (...args) => {
+  const { llmService: runtimeLlmService } = await import('../services/llm/LLMService');
+  return runtimeLlmService.checkTaskStatuses(...args);
+};
 
 type TaskRecoveryCanvasSnapshot = {
   promptNodes?: PromptNode[];
@@ -118,7 +124,7 @@ export function useTaskRecovery(
         if (group.length < 2) continue;
 
         try {
-          await llmService.checkTaskStatuses(
+          await checkTaskStatuses(
             group.map((entry) => entry.task.taskId),
             GenerationMode.IMAGE,
             { id: group[0].task.keySlotId },

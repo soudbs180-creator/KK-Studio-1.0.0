@@ -182,5 +182,144 @@ export const canvasTools: AgentToolDefinition[] = [
         selectedCount: getContextSelectedNodeIds(ctx).length
       };
     }
+  },
+  {
+    name: 'canvas.createPromptCards',
+    description: '在画布上批量创建占位的提示词卡片组',
+    permission: 'safe',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompts: {
+          type: 'array',
+          items: { type: 'string' }
+        }
+      },
+      required: ['prompts']
+    },
+    handler: async (input: { prompts: string[] }, ctx) => {
+      const { prompts } = input;
+      const { addPromptNode, addPromptNodes, getNextCardPosition, notify, activeCanvas } = ctx;
+      if (!prompts || prompts.length === 0) return;
+
+      const lastPos = getNextCardPosition();
+      
+      // 空间位置感知避免重叠算法
+      const existingPositions = [
+        ...(activeCanvas?.promptNodes || []).map((n: any) => n.position),
+        ...(activeCanvas?.imageNodes || []).map((n: any) => n.position),
+        ...(activeCanvas?.audioNodes || []).map((n: any) => n.position)
+      ].filter(Boolean);
+
+      let startX = lastPos.x;
+      let startY = lastPos.y;
+
+      while (existingPositions.some(pos => Math.abs(pos.x - startX) < 150 && Math.abs(pos.y - startY) < 150)) {
+        startY += 260; // 发生重叠时，向下平移避开
+      }
+
+      const nodes = prompts.map((promptText, i) => ({
+        id: 'takeover_ppt_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substring(2, 9),
+        prompt: promptText,
+        position: { x: startX + i * 440, y: startY },
+        aspectRatio: '16:9',
+        imageSize: '1K',
+        model: 'gemini-2.5-flash',
+        childImageIds: [],
+        timestamp: Date.now()
+      }));
+
+      // 批量事务处理：若支持批量写入则单次写入，避免 React 触发循环重绘
+      if (typeof addPromptNodes === 'function') {
+        await addPromptNodes(nodes);
+      } else {
+        await Promise.all(nodes.map(node => addPromptNode(node)));
+      }
+      notify.success('卡片已批量创建', `已成功在画布中生成了 ${prompts.length} 个大纲占位卡片。`);
+    }
+  },
+  {
+    name: 'canvas.createAudioCard',
+    description: '在画布上创建音频卡片节点，用于播放语音或音乐',
+    permission: 'safe',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: '音频来源提示词或文案' },
+        url: { type: 'string', description: '音频资源 URL 链接' },
+        mimeType: { type: 'string', description: '音频多媒体 MIME 类型' }
+      },
+      required: ['url']
+    },
+    handler: async (input: { prompt?: string; url: string; mimeType?: string }, ctx) => {
+      const { prompt, url, mimeType } = input;
+      const { addAudioNode, addPromptNode, getNextCardPosition, notify } = ctx;
+      const pos = getNextCardPosition();
+
+      // 底层性能优化：使用原生 Audio 对象在后台异步抓取音频时长，避免 UI 渲染后的二次排版抖动
+      let duration = 0;
+      try {
+        duration = await new Promise<number>((resolve) => {
+          const tempAudio = new Audio();
+          // 处理可能的跨域 CORS 设置，如果是原生播放，乐观配置
+          tempAudio.crossOrigin = 'anonymous';
+          tempAudio.src = url;
+          tempAudio.preload = 'metadata';
+          
+          const timer = setTimeout(() => {
+            tempAudio.src = ''; // 显式置空释放内存
+            resolve(0); // 超时兜底，不阻塞卡片创建
+          }, 1500);
+
+          tempAudio.onloadedmetadata = () => {
+            clearTimeout(timer);
+            const dur = tempAudio.duration;
+            tempAudio.src = ''; // 显式置空释放资源，防内存泄漏
+            resolve(Number.isFinite(dur) ? dur : 0);
+          };
+
+          tempAudio.onerror = () => {
+            clearTimeout(timer);
+            tempAudio.src = '';
+            resolve(0);
+          };
+        });
+      } catch {
+        duration = 0;
+      }
+      
+      const node = {
+        id: 'audio_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
+        prompt: prompt || 'TTS 音频',
+        url,
+        mimeType: mimeType || 'audio/mpeg',
+        position: pos,
+        status: 'idle',
+        duration,
+        timestamp: Date.now()
+      };
+
+      let done = false;
+      if (typeof addAudioNode === 'function') {
+        await addAudioNode(node);
+        done = true;
+      } else if (typeof addPromptNode === 'function') {
+        // 环境韧性：降级为带有特殊标签的 PromptNode 呈现，避免缺失专门音频节点时报错崩溃
+        await addPromptNode({
+          ...node,
+          aspectRatio: '1:1',
+          optimizedPromptEn: url,
+          optimizedPromptZh: '音频卡片（降级模式）',
+          tags: ['audio']
+        });
+        done = true;
+      }
+
+      if (done) {
+        notify.success('音频节点生成成功', `已挂载音频卡片至画布 (时长: ${duration.toFixed(1)}s)。`);
+      } else {
+        notify.warning('未检测到节点挂载能力', '无法在画布上创建音频节点。');
+      }
+    }
   }
 ];

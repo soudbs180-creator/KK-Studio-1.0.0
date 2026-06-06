@@ -158,85 +158,10 @@ const ROOT_WATCH_FILES = new Set([
 
 const APP_MANUAL_CHUNK_GROUPS: Array<{ name: string; patterns: string[] }> = [
     {
-        name: 'settings-shell',
-        patterns: [
-            '/src/components/settings/SettingsPanel',
-            '/src/routes/settingsRoutes.tsx',
-        ],
-    },
-    {
-        name: 'settings-views',
-        patterns: [
-            '/src/components/settings/ApiSettingsView.tsx',
-            '/src/components/settings/views/',
-            '/src/pages/CostEstimation.tsx',
-        ],
-    },
-    {
-        name: 'account-user-profile',
-        patterns: [
-            '/src/components/modals/UserProfileModal.tsx',
-        ],
-    },
-    {
-        name: 'account-recharge',
-        patterns: [
-            '/src/components/modals/RechargeModal.tsx',
-        ],
-    },
-    {
-        name: 'account-tag-input',
-        patterns: [
-            '/src/components/modals/TagInputModal.tsx',
-        ],
-    },
-    {
-        name: 'storage-modals',
-        patterns: [
-            '/src/components/modals/StorageSelectionModal.tsx',
-            '/src/components/modals/MigrateModal.tsx',
-        ],
-    },
-    {
-        name: 'search-tools',
-        patterns: [
-            '/src/components/layout/SearchPalette.tsx',
-            '/src/components/common/TutorialOverlay.tsx',
-        ],
-    },
-    {
         name: 'canvas-core',
         patterns: [
             '/src/components/canvas/',
             '/src/context/CanvasContext.tsx',
-        ],
-    },
-    {
-        name: 'workspace-layout',
-        patterns: [
-            '/src/components/layout/PromptBar.tsx',
-            '/src/components/layout/ChatSidebar.tsx',
-            '/src/components/MobileChatFeed.tsx',
-        ],
-    },
-    {
-        name: 'image-workbench',
-        patterns: [
-            '/src/components/image/ImageCard.tsx',
-            '/src/components/image/ImageCard2.tsx',
-            '/src/components/image/GlobalLightbox.tsx',
-            '/src/components/image/InpaintModal.tsx',
-            '/src/components/image/PartialRedrawModal.tsx',
-            '/src/components/image/ImageOptionsPanel.tsx',
-            '/src/components/image/PptStackPreviewModal.tsx',
-            '/src/components/image/PptDeckEditorModal.tsx',
-        ],
-    },
-    {
-        name: 'provider-adapters',
-        patterns: [
-            '/src/services/llm/',
-            '/src/services/ecommerce/',
         ],
     },
     {
@@ -245,10 +170,124 @@ const APP_MANUAL_CHUNK_GROUPS: Array<{ name: string; patterns: string[] }> = [
             '/src/services/model/',
             '/src/services/auth/keyManager.ts',
             '/src/services/api/providerStrategy.ts',
+            '/src/services/llm/syncImageBridge.ts',
             '/src/hooks/useImageGeneration.ts',
         ],
     },
+    {
+        name: 'workspace-layout',
+        patterns: [
+            '/src/components/layout/PromptBar.tsx',
+            '/src/components/MobileChatFeed.tsx',
+        ],
+    },
+    {
+        name: 'image-workbench',
+        patterns: [
+            '/src/components/image/ImageCard.tsx',
+            '/src/components/image/ImageCard2.tsx',
+            '/src/components/image/ImageOptionsPanel.tsx',
+        ],
+    },
+    {
+        name: 'provider-adapters',
+        patterns: [
+            '/src/services/llm/',
+        ],
+    },
+    {
+        name: 'ecommerce-core',
+        patterns: [
+            '/src/services/ecommerce/assetRoleBindings.ts',
+            '/src/services/ecommerce/copyResolver.ts',
+            '/src/services/ecommerce/ecommerceModelPolicy.ts',
+            '/src/services/ecommerce/renderTaskBuilder.ts',
+            '/src/services/ecommerce/seriesTemplateExtractor.ts',
+            '/src/services/ecommerce/taskMerger.ts',
+        ],
+    },
+    {
+        name: 'ecommerce-analysis-tools',
+        patterns: [
+            '/src/services/ecommerce/ecommerceAnalysisClient.ts',
+            '/src/services/ecommerce/ecommerceAnalysisEnhancer.ts',
+        ],
+    },
+    {
+        name: 'ecommerce-normalize-tools',
+        patterns: [
+            '/src/services/ecommerce/normalize/',
+            '/src/services/ecommerce/xlsx/referenceBindingResolver.ts',
+        ],
+    },
+    {
+        name: 'ecommerce-document-tools',
+        patterns: [
+            '/src/services/ecommerce/text/',
+            '/src/services/ecommerce/xlsx/',
+            '/src/services/document/nutrientDocumentService.ts',
+        ],
+    },
+    {
+        name: 'ecommerce-export-tools',
+        patterns: [
+            '/src/services/ecommerce/groupExportManifest.ts',
+        ],
+    },
+    {
+        name: 'ecommerce-services',
+        patterns: [
+            '/src/services/ecommerce/',
+        ],
+    },
 ];
+
+const DEFERRED_HTML_MODULE_PRELOAD_PREFIXES = [
+    'account-recharge-',
+    'account-tag-input-',
+    'account-user-profile-',
+    'settings-shell-',
+    'settings-views-',
+    'storage-modals-',
+    'search-tools-',
+    'image-viewer-modals-',
+    'GlobalLightbox-',
+    'PptDeckEditorModal-',
+    'PptStackPreviewModal-',
+    'RechargeModal-',
+    'TagInputModal-',
+    'UserProfileModal-',
+    'WechatQrModal-',
+    'RedrawWorkspace-',
+    'SearchPalette-',
+    'StorageSelectionModal-',
+    'MigrateModal-',
+    'TutorialOverlay-',
+    'animated-shader-background-',
+    'three-vendor-',
+    'authRedirect-',
+    'identityLinking-',
+    'rechargeSubmissionService-',
+    'ChatSidebar-',
+    'provider-adapters-',
+    'ecommerce-normalize-tools-',
+    'ecommerce-analysis-tools-',
+    'ecommerce-document-tools-',
+    'ecommerce-export-tools-',
+    'zip-vendor-',
+    'AdminLayout-',
+    'MarkdownToCardsModal-',
+    'MermaidRenderer-',
+];
+
+function getOutputAssetBasename(fileName: string): string {
+    return fileName.replace(/\\/g, '/').split('/').pop() || fileName;
+}
+
+function isDeferredHtmlModulePreload(fileName: string): boolean {
+    const basename = getOutputAssetBasename(fileName);
+    return DEFERRED_HTML_MODULE_PRELOAD_PREFIXES.some((prefix) => basename.startsWith(prefix));
+}
 
 function shouldIgnoreWatchPath(targetPath: string): boolean {
     const normalized = targetPath.replace(/\\/g, '/');
@@ -305,8 +344,13 @@ function resolveManualChunk(id: string): string | undefined {
     }
 
     if (normalizedId.includes('/node_modules/')) {
-        if (normalizedId.includes('/antd/')) {
-            return 'antd-vendor';
+        if (
+            normalizedId.includes('/node_modules/jszip/')
+            || normalizedId.includes('/node_modules/pako/')
+            || normalizedId.includes('/node_modules/lie/')
+            || normalizedId.includes('/node_modules/immediate/')
+        ) {
+            return 'zip-vendor';
         }
 
         if (normalizedId.includes('/framer-motion/') || normalizedId.includes('/motion/')) {
@@ -665,6 +709,15 @@ export default defineConfig(({ mode }) => {
             // 确保构建时清理旧文件
             emptyOutDir: true,
             chunkSizeWarningLimit: 1100,
+            modulePreload: {
+                resolveDependencies(_filename, deps, context) {
+                    if (context.hostType !== 'html') {
+                        return deps;
+                    }
+
+                    return deps.filter((dep) => !isDeferredHtmlModulePreload(dep));
+                },
+            },
             rollupOptions: {
                 input: {
                     index: path.resolve(__dirname, 'index.html'),

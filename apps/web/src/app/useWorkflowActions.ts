@@ -11,8 +11,7 @@ import {
   createPreviewWorkflowNode,
   createSaveWorkflowNode,
 } from '../workflow/templates/workflowTemplates';
-import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
+import { createZipArchive, saveBlobAs } from '../utils/archiveRuntime';
 
 interface UseWorkflowActionsDeps {
   activeCanvas: { name?: string; imageNodes: GeneratedImage[]; promptNodes: PromptNode[] } | null | undefined;
@@ -124,7 +123,7 @@ export function useWorkflowActions(deps: UseWorkflowActionsDeps) {
     }
 
     try {
-      const zip = new JSZip();
+      const zip = await createZipArchive();
       const safeFolderName = (nameHint || 'kk-studio-export').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'kk-studio-export';
       const folder = zip.folder(safeFolderName) || zip;
 
@@ -152,7 +151,7 @@ export function useWorkflowActions(deps: UseWorkflowActionsDeps) {
       }
 
       const content = await zip.generateAsync({ type: 'blob' });
-      saveAs(content, `${safeFolderName}.zip`);
+      await saveBlobAs(content, `${safeFolderName}.zip`);
       notifyWorkflowCard('success', '导出完成', `已导出 ${exportedCount} 张图片。`);
       return true;
     } catch (error: any) {

@@ -1,10 +1,12 @@
-import React from 'react';
-import ChatSidebar from '../layout/ChatSidebar';
+import React, { Suspense } from 'react';
 import type { AppSurface, Canvas, WorkspacePanel } from '../../types';
 import type { SettingsSurfaceView } from '../../hooks/useWorkspaceSurface';
 import { AssetLibraryPanel } from './AssetLibraryPanel';
 import { FavoritesPanel } from '../../features/favorites';
 import WorkspacePanels from './WorkspacePanels';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
+
+const ChatSidebar = lazyWithRetry(() => import('../layout/ChatSidebar'));
 
 interface WorkspaceSurfacePanelsProps {
   activeSurface: AppSurface;
@@ -60,23 +62,25 @@ export function WorkspaceSurfacePanels({
       isMobile={isMobile}
       renderChatSidebar={() => (
         <div id="chat-sidebar-wrapper" style={{ pointerEvents: 'auto' }}>
-          <ChatSidebar
-            isOpen={isChatOpen}
-            onToggle={toggleChatPanel}
-            onClose={() => setIsChatOpen(false)}
-            isMobile={isMobile}
-            onOpenSettings={(view) => {
-              openSettingsSurface(view || 'api-management');
-            }}
-            onHoverChange={(isHovered) => setIsSidebarHovered(isHovered)}
-            onWidthChange={setChatSidebarWidth}
-            config={config}
-            setConfig={setConfig}
-            ecommerceState={ecommerceState}
-            onGenerate={onGenerate}
-            canvasTransform={canvasTransform}
-            canvasRef={canvasRef}
-          />
+          <Suspense fallback={null}>
+            <ChatSidebar
+              isOpen={isChatOpen}
+              onToggle={toggleChatPanel}
+              onClose={() => setIsChatOpen(false)}
+              isMobile={isMobile}
+              onOpenSettings={(view) => {
+                openSettingsSurface(view || 'api-management');
+              }}
+              onHoverChange={(isHovered) => setIsSidebarHovered(isHovered)}
+              onWidthChange={setChatSidebarWidth}
+              config={config}
+              setConfig={setConfig}
+              ecommerceState={ecommerceState}
+              onGenerate={onGenerate}
+              canvasTransform={canvasTransform}
+              canvasRef={canvasRef}
+            />
+          </Suspense>
         </div>
       )}
 

@@ -261,13 +261,66 @@ ${optResult.optimizedPromptZh}
 
       case 'download_outputs': {
         const scope = (intentResult.extracted.downloadScope || 'latest_batch') as any;
-        reply = `### 📦 正在准备为您打包图片结果...
+        const selectedIds = context.runtime?.selection?.selectedNodeIds || context.canvas?.selectedNodeIds || [];
+        
+        if (scope === 'selected_cards') {
+          if (selectedIds.length === 0) {
+            reply = `### 📦 打包下载提示
+当前没有选中的图片卡片或可下载子图。您可以先在画布上选中卡片，或者我可以直接帮您打包下载最新一次生成的批次。`;
+            actions.push({
+              type: 'zipOutputs',
+              payload: { scope: 'latest_batch' }
+            });
+            break;
+          }
+          
+          reply = `### 📦 正在准备为您打包选中的 **${selectedIds.length}** 张卡片原图...
+我将在后台使用 JSZip 将您选中的生成结果压缩为 ZIP，包含其原图文件及说明清单 \`manifest.json\`。打包完成后浏览器会自动弹出下载。`;
+        } else {
+          reply = `### 📦 正在准备为您打包图片结果...
 我将在后台使用 JSZip 将您指定的生成结果压缩为 ZIP，并在其根目录下自动生成说明元数据文件 \`manifest.json\`。打包完成后浏览器会自动弹出下载保存。`;
+        }
 
         actions.push({
           type: 'zipOutputs',
-          payload: { scope }
+          payload: { 
+            scope,
+            selectedNodeIds: selectedIds
+          }
         });
+        break;
+      }
+
+      case 'arrange_nodes': {
+        const layoutPreset = intentResult.extracted.layoutPreset || 'grid';
+        const selectedIds = context.runtime?.selection?.selectedNodeIds || context.canvas?.selectedNodeIds || [];
+        const count = selectedIds.length;
+
+        if (count > 0) {
+          reply = `### 📐 画布节点智能整理排版
+我已检测到您当前选中了 **${count}** 个卡片，正在后台自动为您执行排版整理，排版模式设为：【${layoutPreset === 'grid' ? '网格' : layoutPreset === 'row' ? '横排' : '竖排'}】。`;
+          
+          actions.push({
+            type: 'canvas.arrangeNodes',
+            payload: {
+              nodeIds: selectedIds,
+              mode: layoutPreset === 'compact-grid' ? 'grid' : layoutPreset,
+              preset: layoutPreset
+            }
+          });
+        } else {
+          reply = `### 📐 画布节点智能整理排版
+检测到您当前未选中任何卡片，我将在后台为您自动整理画布上的**所有卡片**，排版模式设为：【${layoutPreset === 'grid' ? '网格' : layoutPreset === 'row' ? '横排' : '竖排'}】。`;
+
+          actions.push({
+            type: 'canvas.arrangeNodes',
+            payload: {
+              nodeIds: [],
+              mode: layoutPreset === 'compact-grid' ? 'grid' : layoutPreset,
+              preset: layoutPreset
+            }
+          });
+        }
         break;
       }
 

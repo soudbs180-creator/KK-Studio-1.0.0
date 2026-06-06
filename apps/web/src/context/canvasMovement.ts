@@ -1,4 +1,4 @@
-import type { Canvas } from '../types';
+import type { Canvas } from '../types/index.ts';
 import { snapCanvasPointToGrid } from '../utils/canvasSnapToGrid.ts';
 import { isWorkflowUtilityNodeKind } from '../workflow/schema.ts';
 
@@ -89,10 +89,31 @@ export function moveSelectedCanvasNodes(input: {
         }
         : canvas.workflow;
 
+    const drawings = (canvas.drawings || []).map((drawing) => {
+        const isBoundToMovedNode = drawing.bindingNodeId && selectedSet.has(drawing.bindingNodeId);
+        const isBoundToMovedGroup = drawing.bindingGroupId && selectedSet.has(drawing.bindingGroupId);
+        const parentPromptId = drawing.bindingNodeId
+            ? imageNodes.find((img) => img.id === drawing.bindingNodeId)?.parentPromptId
+            : undefined;
+        const isMovingWithParentPrompt = parentPromptId && movedPromptIds.has(parentPromptId);
+
+        if (isBoundToMovedNode || isBoundToMovedGroup || isMovingWithParentPrompt) {
+            return {
+                ...drawing,
+                points: drawing.points.map((p) => ({
+                    x: p.x + delta.x,
+                    y: p.y + delta.y,
+                })),
+            };
+        }
+        return drawing;
+    });
+
     return {
         ...canvas,
         promptNodes,
         imageNodes,
         workflow,
+        drawings,
     };
 }

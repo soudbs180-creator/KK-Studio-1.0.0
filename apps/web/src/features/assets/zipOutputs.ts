@@ -1,6 +1,3 @@
-import JSZip from 'jszip';
-import fileSaver from 'file-saver';
-
 import { useAssetStore } from './assetStore.ts';
 import {
   getSafeOriginalFilename,
@@ -9,10 +6,7 @@ import {
   type OriginalSourceKind,
 } from './resolveOriginalAssets.ts';
 import { type GeneratedImage } from '../../types/index.ts';
-
-const saveAs = typeof fileSaver === 'object' && fileSaver && 'saveAs' in fileSaver
-  ? (fileSaver as any).saveAs
-  : fileSaver;
+import { createZipArchive, saveBlobAs } from '../../utils/archiveRuntime.ts';
 
 export interface ZipParams {
   projectName: string;
@@ -282,7 +276,7 @@ export async function zipOutputs(scope: string, params: ZipParams): Promise<ZipO
     throw new Error('No generated images are available to package on the current canvas.');
   }
 
-  const zip = new JSZip();
+  const zip = await createZipArchive();
   const manifest: ZipManifest = {
     projectName: params.projectName || 'KKStudio',
     canvasId: params.canvasId,
@@ -357,8 +351,8 @@ export async function zipOutputs(scope: string, params: ZipParams): Promise<ZipO
 
   const zipBlob = await zip.generateAsync({ type: 'blob' });
   if (!params.skipSave) {
-    if (typeof saveAs === 'function') {
-      saveAs(zipBlob, `${params.projectName || 'KKStudio'}_outputs.zip`);
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      await saveBlobAs(zipBlob, `${params.projectName || 'KKStudio'}_outputs.zip`);
     } else {
       console.log(`[zipOutputs] Environment non-browser: generated ${params.projectName || 'KKStudio'}_outputs.zip in memory`);
     }

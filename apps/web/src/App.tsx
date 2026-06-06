@@ -1,22 +1,21 @@
 import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, startTransition } from 'react';
 import InfiniteCanvas, { type InfiniteCanvasHandle } from './components/canvas/InfiniteCanvas';
+import CanvasDrawingsLayer from './components/canvas/CanvasDrawingsLayer';
+import CanvasDrawingInteractionOverlay from './components/canvas/CanvasDrawingInteractionOverlay';
+import { PenTool, Type, Shapes, Palette, Trash, Scissors } from 'lucide-react';
 import ImageNode from './components/image/ImageCard';
 import PromptNodeComponent from './components/canvas/PromptNodeComponent';
 // KeyManagerModal removed - integrated into UserProfileModal
 import { APP_DISPLAY_VERSION } from './config/appInfo';
 import { AspectRatio, ImageSize, type GenerationConfig, type PromptNode, type GeneratedImage, GenerationMode, KnownModel, type CanvasGroup, type RedrawRequest, type RedrawCropPlan, type MobileResultEntry, type MobileSurfaceScreen, type EcommerceEditableTaskState, type EcommerceGroupSheet, type EcommerceSheetSetting, type EcommerceFrameworkRuntimeState } from './types';
 import { CanvasGroupComponent } from './components/canvas/CanvasGroupComponent';
-import { generateImage, cancelGeneration } from './services/llm/geminiService';
 import { getModelCredits } from './services/model/modelPricing';
 import { keyManager, getModelMetadata, normalizeModelId } from './services/auth/keyManager';
 import { adminModelService } from './services/model/adminModelService';
 import { unifiedModelService } from './services/model/unifiedModelService';
 import { buildRedrawReferenceImage } from './services/image/partialRedraw';
-import { analyzeEcommerceRequirementFile } from './services/ecommerce/ecommerceAnalysisClient.ts';
 import type { EcommerceAnalysisResult } from './services/ecommerce/types';
 import type { EcommerceGroupSlotState } from './services/ecommerce/groupSlotState.ts';
-import { llmService } from './services/llm/LLMService';
-import { cancelSecureSystemProxyTask } from './services/model/secureModelProxy';
 import { getCardDimensions } from './utils/styleUtils';
 import { buildGeneratedImageBatchPositions } from './utils/generatedImageLayout';
 import { getViewportPreferredPosition } from './utils/canvasUtils';
@@ -45,7 +44,7 @@ import {
 } from './app/appCanvasTypes';
 import { buildSoftConnectorPath, getSoftConnectorPointAt } from './canvas/connectorGeometry';
 import AppDesktopChrome from './app/AppDesktopChrome';
-import AppZoomControl from './app/AppZoomControl';
+import AppCanvasNavigationPanel from './app/AppCanvasNavigationPanel';
 import AppCanvasOverlays from './app/AppCanvasOverlays';
 import { getCollapsedCanvasGroupNodeIds } from './app/collapsedCanvasGroups';
 import AppMobileWorkspace from './app/AppMobileWorkspace';
@@ -121,6 +120,37 @@ import { useEcommerceSubmitRuntime } from './app/useEcommerceSubmitRuntime';
 import { isCompactResponsiveSurface, resolveResponsiveSurface } from './utils/responsiveSurface';
 
 const GENERATE_TIMEOUT_MS = 600000;
+
+type GeminiServiceModule = typeof import('./services/llm/geminiService');
+type EcommerceAnalysisModule = typeof import('./services/ecommerce/ecommerceAnalysisClient.ts');
+type LlmServiceModule = typeof import('./services/llm/LLMService');
+type SecureModelProxyModule = typeof import('./services/model/secureModelProxy');
+
+const generateImage: GeminiServiceModule['generateImage'] = async (...args) => {
+  const { generateImage: runGenerateImage } = await import('./services/llm/geminiService');
+  return runGenerateImage(...args);
+};
+
+const cancelGeneration: GeminiServiceModule['cancelGeneration'] = (id) => {
+  void import('./services/llm/geminiService').then(({ cancelGeneration: runCancelGeneration }) => {
+    runCancelGeneration(id);
+  });
+};
+
+const analyzeEcommerceRequirementFile: EcommerceAnalysisModule['analyzeEcommerceRequirementFile'] = async (...args) => {
+  const { analyzeEcommerceRequirementFile: runAnalyzeEcommerceRequirementFile } = await import('./services/ecommerce/ecommerceAnalysisClient.ts');
+  return runAnalyzeEcommerceRequirementFile(...args);
+};
+
+const generateVideo: LlmServiceModule['llmService']['generateVideo'] = async (...args) => {
+  const { llmService: runtimeLlmService } = await import('./services/llm/LLMService');
+  return runtimeLlmService.generateVideo(...args);
+};
+
+const cancelSecureSystemProxyTask: SecureModelProxyModule['cancelSecureSystemProxyTask'] = async (...args) => {
+  const { cancelSecureSystemProxyTask: runCancelSecureSystemProxyTask } = await import('./services/model/secureModelProxy');
+  return runCancelSecureSystemProxyTask(...args);
+};
 
 type EcommerceRuntimeState = {
   requirementFile: File | null;
@@ -379,7 +409,11 @@ const AppContent: React.FC<AppContentProps> = () => {
     state, // 简体中文注释：迁移功能需要读取完整画布列表。
     migrateNodes, // 简体中文注释：将选中的节点迁移到其他项目。
     createCanvas, // 简体中文注释：必要时创建新的目标项目。
-    switchCanvas  // 简体中文注释：迁移完成后切换到目标项目。
+    switchCanvas,  // 简体中文注释：迁移完成后切换到目标项目。
+    addCanvasDrawing,
+    deleteCanvasDrawing,
+    clearCanvasDrawings,
+    unlinkNodes
   } = useCanvas();
 
   const imageNodesById = React.useMemo(
@@ -706,6 +740,10 @@ const AppContent: React.FC<AppContentProps> = () => {
   const [settingsInitialSupplier, setSettingsInitialSupplier] = useState<Supplier | null>(null);
   const [settingsPanelSessionKey, setSettingsPanelSessionKey] = useState(0);
   const [showGrid, setShowGrid] = useState(true);
+  const [canvasMode, setCanvasMode] = useState<'normal' | 'board'>('normal');
+  const [activeDrawingTool, setActiveDrawingTool] = useState<'pen' | 'rect' | 'circle' | 'line' | 'arrow' | 'text' | 'select'>('pen');
+  const [activeDrawingColor, setActiveDrawingColor] = useState<string>('#ef4444');
+  const [activeDrawingWidth, setActiveDrawingWidth] = useState<number>(3);
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [promptBarUiBusy, setPromptBarUiBusy] = useState(false);
   const openSettingsPanel = useCallback((
@@ -813,6 +851,10 @@ const AppContent: React.FC<AppContentProps> = () => {
   const [taggingNodeIds, setTaggingNodeIds] = useState<string[]>([]);
   const [initialTags, setInitialTags] = useState<string[]>([]);
 
+  // Markdown & Mermaid Modal State
+  const [showMarkdownModal, setShowMarkdownModal] = useState(false);
+  const [showMermaidModal, setShowMermaidModal] = useState(false);
+
   // Tag Constraints State
   const [tagLimits, setTagLimits] = useState({ maxTags: 10, maxChars: 6 });
 
@@ -857,6 +899,9 @@ const AppContent: React.FC<AppContentProps> = () => {
     setIsTagModalOpen(true);
     setSelectionMenuPosition(null);
   }, [allCanvasTags, imageNodesById, promptNodesById, selectedNodeIds]);
+
+
+
 
   const handleSaveTags = useCallback(async (tags: string[]) => {
     const firstId = taggingNodeIds[0];
@@ -1078,6 +1123,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         return {
           prompt: parsed.prompt || '', // Restore the persisted prompt
           enablePromptOptimization: parsed.enablePromptOptimization || false,
+          promptOptimizerArchetype: parsed.promptOptimizerArchetype || 'auto',
           aspectRatio: AspectRatio.AUTO, // [Default: Auto]
           imageSize: ImageSize.SIZE_1K,
           parallelCount: parsed.parallelCount || 1,
@@ -1102,6 +1148,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     return {
       prompt: '',
       enablePromptOptimization: false,
+      promptOptimizerArchetype: 'auto',
       aspectRatio: AspectRatio.AUTO, // [Default: Auto]
       imageSize: ImageSize.SIZE_1K,
       parallelCount: 1,
@@ -1483,6 +1530,7 @@ const AppContent: React.FC<AppContentProps> = () => {
 
     const toSave = {
       enablePromptOptimization: config.enablePromptOptimization || false,
+      promptOptimizerArchetype: config.promptOptimizerArchetype || 'auto',
       aspectRatio: config.aspectRatio,
       imageSize: config.imageSize,
       parallelCount: config.parallelCount,
@@ -1513,6 +1561,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     localStorage.setItem('kk_generation_config', JSON.stringify(toSave));
   }, [
     config.enablePromptOptimization,
+    config.promptOptimizerArchetype,
     config.aspectRatio, config.imageSize, config.parallelCount,
     config.model, config.enableGrounding, config.enableImageSearch, config.thinkingMode, config.mode, config.pptSlides, config.pptStyleLocked,
     config.referenceImages, // Add referenceImages to dep array
@@ -1885,6 +1934,131 @@ const AppContent: React.FC<AppContentProps> = () => {
     }
     return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   }, []);
+
+  const handleInsertMarkdownCards = useCallback(async (cards: any[]) => {
+    if (!cards || cards.length === 0) return;
+
+    const defaultAspectRatio = config.aspectRatio || AspectRatio.SQUARE;
+    const defaultImageSize = config.imageSize || ImageSize.SIZE_1K;
+    const defaultModel = config.model;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    for (const card of cards) {
+      const promptText = card.prompt + (card.bullets.length > 0 ? '\n' + card.bullets.map((b: string) => `- ${b}`).join('\n') : '');
+      const promptNode: PromptNode = {
+        id: card.id,
+        prompt: promptText,
+        originalPrompt: card.prompt,
+        position: card.position,
+        aspectRatio: defaultAspectRatio,
+        imageSize: defaultImageSize,
+        model: defaultModel,
+        childImageIds: [],
+        timestamp: Date.now(),
+        tags: card.bullets,
+      };
+
+      if (card.position.x < minX) minX = card.position.x;
+      if (card.position.y < minY) minY = card.position.y;
+      if (card.position.x > maxX) maxX = card.position.x;
+      if (card.position.y > maxY) maxY = card.position.y;
+
+      await addPromptNode(promptNode);
+    }
+
+    const nodeIds = cards.map(c => c.id);
+    selectNodes(nodeIds);
+
+    const CARD_WIDTH = 320;
+    const CARD_HEIGHT = 220;
+    const groupPadding = 40;
+    const groupX = minX - groupPadding;
+    const groupY = minY - groupPadding;
+    const groupW = (maxX - minX) + CARD_WIDTH + groupPadding * 2;
+    const groupH = (maxY - minY) + CARD_HEIGHT + groupPadding * 2;
+
+    const newGroupId = createEphemeralId('group');
+    addGroup({
+      id: newGroupId,
+      nodeIds: nodeIds,
+      bounds: {
+        x: groupX,
+        y: groupY,
+        width: groupW,
+        height: groupH,
+      },
+      label: 'Markdown 导入组',
+      color: '#4f46e5',
+      type: 'custom',
+    });
+
+    setShowMarkdownModal(false);
+  }, [config, addPromptNode, addGroup, selectNodes, createEphemeralId]);
+
+  const handleInsertMermaidCards = useCallback(async (data: {
+    nodes: Array<{ id: string; label: string; x: number; y: number }>;
+    edges: Array<{ from: string; to: string; label?: string }>;
+    groupName?: string;
+  }) => {
+    if (!data.nodes || data.nodes.length === 0) return;
+
+    const defaultAspectRatio = config.aspectRatio || AspectRatio.SQUARE;
+    const defaultImageSize = config.imageSize || ImageSize.SIZE_1K;
+    const defaultModel = config.model;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    for (const node of data.nodes) {
+      const promptNode: PromptNode = {
+        id: node.id,
+        prompt: node.label,
+        originalPrompt: node.label,
+        position: { x: node.x, y: node.y },
+        aspectRatio: defaultAspectRatio,
+        imageSize: defaultImageSize,
+        model: defaultModel,
+        childImageIds: [],
+        timestamp: Date.now(),
+        tags: [],
+      };
+
+      if (node.x < minX) minX = node.x;
+      if (node.y < minY) minY = node.y;
+      if (node.x > maxX) maxX = node.x;
+      if (node.y > maxY) maxY = node.y;
+
+      await addPromptNode(promptNode);
+    }
+
+    const nodeIds = data.nodes.map(n => n.id);
+    selectNodes(nodeIds);
+
+    const CARD_WIDTH = 300;
+    const CARD_HEIGHT = 180;
+    const groupPadding = 40;
+    const groupX = minX - groupPadding;
+    const groupY = minY - groupPadding;
+    const groupW = (maxX - minX) + CARD_WIDTH + groupPadding * 2;
+    const groupH = (maxY - minY) + CARD_HEIGHT + groupPadding * 2;
+
+    const newGroupId = createEphemeralId('group');
+    addGroup({
+      id: newGroupId,
+      nodeIds: nodeIds,
+      bounds: {
+        x: groupX,
+        y: groupY,
+        width: groupW,
+        height: groupH,
+      },
+      label: data.groupName || 'Mermaid 转换组',
+      color: '#059669',
+      type: 'custom',
+    });
+
+    setShowMermaidModal(false);
+  }, [config, addPromptNode, addGroup, selectNodes, createEphemeralId]);
 
   const readBlobAsDataUrl = useCallback((blob: Blob) => new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -2582,7 +2756,7 @@ const AppContent: React.FC<AppContentProps> = () => {
       executionNode,
       extractErrorDetails,
       generateImage,
-      generateVideo: (videoRequest) => llmService.generateVideo(videoRequest),
+      generateVideo,
       getCardDimensions,
       isMobile,
       normalizePersistableMediaSource,
@@ -2608,6 +2782,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     ecommerceState,
     setEcommerceNodeGenerationRuntimeState: updateEcommerceNodeGenerationRuntimeState,
     enablePromptOptimization: Boolean(config.enablePromptOptimization),
+    promptOptimizerArchetype: config.promptOptimizerArchetype,
     configPrompt: config.prompt,
     updatePromptNode,
     handleRetryNode,
@@ -3328,14 +3503,16 @@ const AppContent: React.FC<AppContentProps> = () => {
       };
     }
 
-    // Buffer: Load 2 screens worth of content around the viewport to prevent flash on drag
-    const BUFFER = canvasPerformanceProfile.overscanBuffer;
+    // RENDER_BUFFER: Load 1.2 screens worth of content around the viewport
+    const RENDER_BUFFER = canvasPerformanceProfile.overscanBuffer;
+    // VIRTUAL_BUFFER: Load 2.5 screens worth of content around the viewport, unmounting inside
+    const VIRTUAL_BUFFER = Math.max(RENDER_BUFFER * 2.5, 2500);
 
     // Viewport Render Bounds in Canvas Coordinates
-    const vLeft = -canvasTransform.x / canvasTransform.scale - BUFFER;
-    const vTop = -canvasTransform.y / canvasTransform.scale - BUFFER;
-    const vRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale + BUFFER;
-    const vBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale + BUFFER;
+    const vLeft = -canvasTransform.x / canvasTransform.scale - VIRTUAL_BUFFER;
+    const vTop = -canvasTransform.y / canvasTransform.scale - VIRTUAL_BUFFER;
+    const vRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale + VIRTUAL_BUFFER;
+    const vBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale + VIRTUAL_BUFFER;
     const getPromptGroupStackZIndex = (promptNode: PromptNode) => (
       promptGroupStackZIndexById.get(promptNode.id)
       ?? ((promptGroupLayerById.get(promptNode.id) ?? promptNode.zIndex ?? 0) * 100 + 10)
@@ -3401,14 +3578,14 @@ const AppContent: React.FC<AppContentProps> = () => {
           return false;
         }
 
-        // Estimate Bounds (Center X, Bottom Y)
-        const w = 800;
-        const h = 800;
+        // High-precision Bounds (Center X, Bottom Y)
+        const width = getPromptNodeBoundsWidth(n, isMobile);
+        const height = n.height || 200;
         const position = resolveViewportNodePosition(n);
-        const x = position.x - w / 2;
-        const y = position.y - h;
+        const x = position.x - width / 2;
+        const y = position.y - height;
 
-        return !(x > vRight || x + w < vLeft || y > vBottom || y + h < vTop);
+        return !(x > vRight || x + width < vLeft || y > vBottom || y + height < vTop);
       })
       .sort((a, b) => {
         const zDiff = getPromptGroupStackZIndex(a) - getPromptGroupStackZIndex(b);
@@ -3427,12 +3604,13 @@ const AppContent: React.FC<AppContentProps> = () => {
           return false;
         }
 
-        const w = 800;
-        const h = 1200;
+        // High-precision Bounds (Center X, Bottom Y)
+        const { width, totalHeight } = getCardDimensions(n.aspectRatio, true);
+        const height = imageCardHeightById[n.id] ?? totalHeight;
         const position = resolveViewportNodePosition(n);
-        const x = position.x - w / 2;
-        const y = position.y - h;
-        return !(x > vRight || x + w < vLeft || y > vBottom || y + h < vTop);
+        const x = position.x - width / 2;
+        const y = position.y - height;
+        return !(x > vRight || x + width < vLeft || y > vBottom || y + height < vTop);
       })
       .sort((a, b) => {
         const zDiff = getImageGroupStackZIndex(a) - getImageGroupStackZIndex(b);
@@ -3471,7 +3649,7 @@ const AppContent: React.FC<AppContentProps> = () => {
     };
 
     return { visiblePromptNodes, visibleImageNodes, visibleWorkflowUtilityNodes, visibleGroups, nowTimestamp };
-  }, [activeCanvas, canvasPerformanceProfile.overscanBuffer, canvasTransform, collapsedCanvasGroupNodeIds, getComputedGroupBounds, isNodeDragActive, isPptDeckChildImageNode, liveNodePositionVersion, promptGroupLayerById, promptGroupStackZIndexById, standaloneImageStackZIndexById]);
+  }, [activeCanvas, canvasPerformanceProfile.overscanBuffer, canvasTransform, collapsedCanvasGroupNodeIds, getComputedGroupBounds, isNodeDragActive, isPptDeckChildImageNode, liveNodePositionVersion, promptGroupLayerById, promptGroupStackZIndexById, standaloneImageStackZIndexById, isMobile, imageCardHeightById]);
 
   const getSharedImageNodeProps = useCallback((image: GeneratedImage): SharedImageNodeProps => ({
     image,
@@ -3829,8 +4007,25 @@ const AppContent: React.FC<AppContentProps> = () => {
 
   const handleRootMouseUp = useCallback((e: React.MouseEvent) => {
     handleSelectionMouseUp(e);
+
+    // 智能连线物理吸附与释放完成判定
+    if (dragConnection?.active) {
+      const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+      if (targetEl) {
+        const cardEl = targetEl.closest('[id^="prompt-card-"], [id^="image-card-"], [id^="workflow-card-"]');
+        if (cardEl) {
+          const match = cardEl.id.match(/^(prompt-card|image-card|workflow-card)-(.*)$/);
+          if (match) {
+            const targetId = match[2];
+            handleConnectEnd(targetId);
+            return;
+          }
+        }
+      }
+    }
+
     handleDragConnectionMouseUp();
-  }, [handleSelectionMouseUp, handleDragConnectionMouseUp]);
+  }, [handleSelectionMouseUp, handleDragConnectionMouseUp, dragConnection, handleConnectEnd]);
 
   const {
     resolveWorkflowSourceIdsFromSelection,
@@ -3897,11 +4092,38 @@ const AppContent: React.FC<AppContentProps> = () => {
 
   const renderImageWorkflowItem = useCallback((item: ImageRenderItem) => {
     const node = item.node;
+
+    if (item.isPlaceholder) {
+      const { width: nodeWidth, totalHeight } = getCardDimensions(node.aspectRatio, true);
+      const cardHeight = imageCardHeightById[node.id] ?? totalHeight;
+      const renderedImagePosition = resolveLiveImagePosition(node) ?? node.position;
+      const left = renderedImagePosition.x - nodeWidth / 2;
+      const top = renderedImagePosition.y - cardHeight;
+      const stackZIndex = item.stackZIndexOverride ?? item.groupLayerZIndex;
+
+      return (
+        <div
+          id={`image-card-${node.id}`}
+          data-x={node.position.x}
+          data-y={node.position.y}
+          className="image-node absolute pointer-events-none"
+          style={{
+            left: `${left}px`,
+            top: `${top}px`,
+            width: `${nodeWidth}px`,
+            height: `${cardHeight}px`,
+            zIndex: stackZIndex,
+          }}
+        />
+      );
+    }
+
     const imageDetailLevel = node.parentPromptId ? 'full' : item.detailLevel;
     const renderedImagePosition = resolveLiveImagePosition(node) ?? node.position;
 
     return (
       <ImageNode
+        id={`image-card-${node.id}`}
         {...getSharedImageNodeProps(node)}
         detailLevel={imageDetailLevel}
         loadPriority={item.loadPriority}
@@ -3909,6 +4131,23 @@ const AppContent: React.FC<AppContentProps> = () => {
         groupLayerZIndex={item.groupLayerZIndex}
         stackZIndexOverride={item.stackZIndexOverride}
         position={renderedImagePosition}
+        isVisible={(() => {
+          const screenLeft = -canvasTransform.x / canvasTransform.scale;
+          const screenTop = -canvasTransform.y / canvasTransform.scale;
+          const screenRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale;
+          const screenBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale;
+          const w = 400;
+          const h = 600;
+          const x = renderedImagePosition.x - w / 2;
+          const y = renderedImagePosition.y - h;
+          const margin = 150;
+          return !(
+            x > screenRight + margin ||
+            x + w < screenLeft - margin ||
+            y > screenBottom + margin ||
+            y + h < screenTop - margin
+          );
+        })()}
         onLivePositionChange={handleLiveNodePositionChange}
         onHeightChange={handleImageCardHeightChange}
         highlighted={highlightedId === node.id}
@@ -3949,11 +4188,36 @@ const AppContent: React.FC<AppContentProps> = () => {
     resolveLiveImagePosition,
     selectedNodeIds,
     snapToGrid,
+    imageCardHeightById,
   ]);
 
   const renderPromptGroupWorkflowItem = useCallback((item: PromptGroupRenderItem) => {
     const { groupView } = item;
     const node = groupView.rootPrompt;
+
+    if (item.isPlaceholder) {
+      const width = getPromptNodeBoundsWidth(node, isMobile);
+      const height = node.height || 200;
+      const position = resolveLivePromptPosition(node) ?? node.position;
+      const left = position.x - width / 2;
+      const top = position.y - height;
+      const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
+
+      return (
+        <div
+          id={`prompt-card-${node.id}`}
+          className="absolute pointer-events-none"
+          style={{
+            left: `${left}px`,
+            top: `${top}px`,
+            width: `${width}px`,
+            height: `${height}px`,
+            zIndex: groupStackZIndex + 20,
+          }}
+        />
+      );
+    }
+
     const groupNodeIds = promptGroupNodeIdsById.get(node.id) || [node.id];
     const promptGroupLayoutState = promptGroupLayoutStateByIdRef.current[node.id];
     const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);
@@ -3996,6 +4260,12 @@ const AppContent: React.FC<AppContentProps> = () => {
             width={connectorSvgWidth}
             height={connectorSvgHeight}
             viewBox={`0 0 ${connectorSvgWidth} ${connectorSvgHeight}`}
+            data-left={connectorSvgLeft}
+            data-top={connectorSvgTop}
+            {...childVisualLayouts.reduce((acc, layout) => {
+              acc[`data-card-height-${layout.childNode.id}`] = layout.resolvedImageHeight;
+              return acc;
+            }, {} as Record<string, number>)}
             style={{
               width: `${connectorSvgWidth}px`,
               height: `${connectorSvgHeight}px`,
@@ -4008,6 +4278,7 @@ const AppContent: React.FC<AppContentProps> = () => {
             <g>
               {groupConnectorLayouts.map((segment) => (
                 <path
+                  id={`connector-${segment.key}`}
                   key={segment.key}
                   d={segment.path}
                   fill="none"
@@ -4076,6 +4347,7 @@ const AppContent: React.FC<AppContentProps> = () => {
         {childVisualLayouts.map((childLayout, childIndex) => (
           <React.Fragment key={childLayout.childNode.id}>
             <ImageNode
+              id={`image-card-${childLayout.childNode.id}`}
               {...getSharedImageNodeProps(childLayout.childNode)}
               detailLevel="full"
               loadPriority={1200}
@@ -4240,66 +4512,113 @@ const AppContent: React.FC<AppContentProps> = () => {
     ]
   );
 
-  const canvasRenderItems = React.useMemo<CanvasRenderItem[]>(() => ([
-    ...visiblePromptGroupViews
-      .filter((groupView) => !collapsedCanvasGroupNodeIds.has(groupView.rootPrompt.id))
-      .map((groupView) => {
-        const visibleChildImages = groupView.childImages.filter((imageNode) => !collapsedCanvasGroupNodeIds.has(imageNode.id));
+  const canvasRenderItems = React.useMemo<CanvasRenderItem[]>(() => {
+    const RENDER_BUFFER = canvasPerformanceProfile.overscanBuffer;
+    const rLeft = -canvasTransform.x / canvasTransform.scale - RENDER_BUFFER;
+    const rTop = -canvasTransform.y / canvasTransform.scale - RENDER_BUFFER;
+    const rRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale + RENDER_BUFFER;
+    const rBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale + RENDER_BUFFER;
+
+    return [
+      ...visiblePromptGroupViews
+        .filter((groupView) => !collapsedCanvasGroupNodeIds.has(groupView.rootPrompt.id))
+        .map((groupView) => {
+          const visibleChildImages = groupView.childImages.filter((imageNode) => !collapsedCanvasGroupNodeIds.has(imageNode.id));
+          
+          const promptWidth = getPromptNodeBoundsWidth(groupView.rootPrompt, isMobile);
+          const promptHeight = groupView.rootPrompt.height || 200;
+          const promptPos = liveNodePositionByIdRef.current[groupView.rootPrompt.id] ?? groupView.rootPrompt.position;
+          const promptInRender = !(
+            promptPos.x - promptWidth / 2 > rRight ||
+            promptPos.x + promptWidth / 2 < rLeft ||
+            promptPos.y - promptHeight > rBottom ||
+            promptPos.y < rTop
+          );
+
+          const anyChildInRender = visibleChildImages.some((child) => {
+            const { width: cW, totalHeight: cH } = getCardDimensions(child.aspectRatio, true);
+            const cHeight = imageCardHeightById[child.id] ?? cH;
+            const cPos = liveNodePositionByIdRef.current[child.id] ?? child.position;
+            return !(
+              cPos.x - cW / 2 > rRight ||
+              cPos.x + cW / 2 < rLeft ||
+              cPos.y - cHeight > rBottom ||
+              cPos.y < rTop
+            );
+          });
+
+          const isGroupPlaceholder = !promptInRender && !anyChildInRender;
+
+          return {
+            id: groupView.id,
+            kind: 'prompt-group' as const,
+            groupView: {
+              ...groupView,
+              childImages: visibleChildImages,
+              intraGroupEdges: groupView.intraGroupEdges.filter((edge) => !collapsedCanvasGroupNodeIds.has(edge.toId)),
+            },
+            node: groupView.rootPrompt,
+            childNodes: visibleChildImages,
+            detailLevel: canvasPerformanceProfile.cardDetailLevel,
+            isPlaceholder: isGroupPlaceholder,
+          };
+        }),
+      ...standaloneVisibleImageNodes.map((node) => {
+        const { width, totalHeight } = getCardDimensions(node.aspectRatio, true);
+        const height = imageCardHeightById[node.id] ?? totalHeight;
+        const pos = liveNodePositionByIdRef.current[node.id] ?? node.position;
+        const isImagePlaceholder = (
+          pos.x - width / 2 > rRight ||
+          pos.x + width / 2 < rLeft ||
+          pos.y - height > rBottom ||
+          pos.y < rTop
+        );
+
         return {
-          id: groupView.id,
-          kind: 'prompt-group' as const,
-          groupView: {
-            ...groupView,
-            childImages: visibleChildImages,
-            intraGroupEdges: groupView.intraGroupEdges.filter((edge) => !collapsedCanvasGroupNodeIds.has(edge.toId)),
-          },
-          node: groupView.rootPrompt,
-          childNodes: visibleChildImages,
+          id: node.id,
+          kind: 'image' as const,
+          node,
           detailLevel: canvasPerformanceProfile.cardDetailLevel,
+          loadPriority: imageLoadSchedulingById.get(node.id)?.loadPriority ?? 0,
+          loadBand: imageLoadSchedulingById.get(node.id)?.loadBand ?? 0,
+          groupLayerZIndex: node.parentPromptId
+            ? (promptGroupLayerById.get(node.parentPromptId) ?? node.zIndex ?? 0)
+            : (node.zIndex ?? 0),
+          stackZIndexOverride: node.parentPromptId
+            ? promptGroupStackZIndexById.get(node.parentPromptId)
+            : standaloneImageStackZIndexById.get(node.id),
+          isPlaceholder: isImagePlaceholder,
         };
       }),
-    ...standaloneVisibleImageNodes.map((node) => ({
-      id: node.id,
-      kind: 'image' as const,
-      node,
-      detailLevel: canvasPerformanceProfile.cardDetailLevel,
-      loadPriority: imageLoadSchedulingById.get(node.id)?.loadPriority ?? 0,
-      loadBand: imageLoadSchedulingById.get(node.id)?.loadBand ?? 0,
-      groupLayerZIndex: node.parentPromptId
-        ? (promptGroupLayerById.get(node.parentPromptId) ?? node.zIndex ?? 0)
-        : (node.zIndex ?? 0),
-      stackZIndexOverride: node.parentPromptId
-        ? promptGroupStackZIndexById.get(node.parentPromptId)
-        : standaloneImageStackZIndexById.get(node.id),
-    })),
-    ...visibleWorkflowUtilityNodes.filter((node) => !collapsedCanvasGroupNodeIds.has(node.id)).flatMap((node): Array<PreviewRenderItem | SaveRenderItem | AgentRenderItem> => {
-      if (node.kind === 'preview') {
-        return [{
-          id: node.id,
-          kind: 'preview',
-          node,
-        }];
-      }
+      ...visibleWorkflowUtilityNodes.filter((node) => !collapsedCanvasGroupNodeIds.has(node.id)).flatMap((node): Array<PreviewRenderItem | SaveRenderItem | AgentRenderItem> => {
+        if (node.kind === 'preview') {
+          return [{
+            id: node.id,
+            kind: 'preview',
+            node,
+          }];
+        }
 
-      if (node.kind === 'save') {
-        return [{
-          id: node.id,
-          kind: 'save',
-          node,
-        }];
-      }
+        if (node.kind === 'save') {
+          return [{
+            id: node.id,
+            kind: 'save',
+            node,
+          }];
+        }
 
-      if (node.kind === 'agent') {
-        return [{
-          id: node.id,
-          kind: 'agent',
-          node,
-        }];
-      }
+        if (node.kind === 'agent') {
+          return [{
+            id: node.id,
+            kind: 'agent',
+            node,
+          }];
+        }
 
-      return [];
-    }),
-  ]), [
+        return [];
+      }),
+    ];
+  }, [
     collapsedCanvasGroupNodeIds,
     promptGroupLayerById,
     promptGroupStackZIndexById,
@@ -4309,6 +4628,10 @@ const AppContent: React.FC<AppContentProps> = () => {
     imageLoadSchedulingById,
     visiblePromptGroupViews,
     visibleWorkflowUtilityNodes,
+    canvasTransform,
+    canvasPerformanceProfile.overscanBuffer,
+    isMobile,
+    imageCardHeightById,
   ]);
 
   const renderedVisibleGroups = React.useMemo(() => (
@@ -4766,9 +5089,9 @@ const AppContent: React.FC<AppContentProps> = () => {
       isMobile={isMobile}
       onFitToAll={handleFitToAll}
       onResetView={handleResetView}
-      onToggleGrid={handleToggleGrid}
+      onToggleCanvasMode={() => setCanvasMode(prev => prev === 'normal' ? 'board' : 'normal')}
       onToggleSnapToGrid={handleToggleSnapToGrid}
-      showGrid={showGrid}
+      canvasMode={canvasMode}
       showSnapToGrid={snapToGrid}
       onAutoArrange={handleAutoArrange}
       onToggleChat={toggleChatPanel}
@@ -4781,6 +5104,8 @@ const AppContent: React.FC<AppContentProps> = () => {
       }}
       onAddWorkflowUtilityCard={handleAddWorkflowUtilityCard}
       isUserMenuOpen={showUserMenu}
+      onOpenMarkdownImport={() => setShowMarkdownModal(true)}
+      onOpenMermaidImport={() => setShowMermaidModal(true)}
     />
   ) : null;
 
@@ -4864,6 +5189,16 @@ const AppContent: React.FC<AppContentProps> = () => {
       enabled: billingUiEnabled,
       isOpen: showRechargeModal,
     },
+    markdownModal: {
+      isOpen: showMarkdownModal,
+      onClose: () => setShowMarkdownModal(false),
+      onInsert: handleInsertMarkdownCards,
+    },
+    mermaidModal: {
+      isOpen: showMermaidModal,
+      onClose: () => setShowMermaidModal(false),
+      onInsert: handleInsertMermaidCards,
+    },
   };
 
 
@@ -4881,6 +5216,124 @@ const AppContent: React.FC<AppContentProps> = () => {
         showConnections={true}
         mode={backgroundMode}
       />
+      {/* 简体中文：画板模式顶部控制栏，使用磨砂质感毛玻璃高定设计 */}
+      {canvasMode === 'board' && !isMobile && (
+        <div 
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-[101] flex items-center gap-3 px-4 py-2 rounded-2xl border shadow-xl transition-all duration-300 pointer-events-auto"
+          style={{
+            background: 'var(--frost-card-framework-bg)',
+            border: '1px solid var(--frost-card-framework-border)',
+            boxShadow: 'var(--frost-card-framework-shadow)',
+            WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+            backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+          }}
+        >
+          {/* 工具选择 */}
+          <div className="flex items-center gap-1.5 border-r pr-3 border-[var(--frost-card-framework-border)]">
+            <button
+              onClick={() => setActiveDrawingTool('pen')}
+              className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all ${activeDrawingTool === 'pen' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+              title="自由画笔"
+            >
+              <PenTool size={18} />
+            </button>
+            <button
+              onClick={() => setActiveDrawingTool('select')}
+              className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all ${activeDrawingTool === 'select' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+              title="框选为参考图"
+            >
+              <Scissors size={18} />
+            </button>
+            <button
+              onClick={() => setActiveDrawingTool('text')}
+              className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all ${activeDrawingTool === 'text' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+              title="文本工具"
+            >
+              <Type size={18} />
+            </button>
+            
+            {/* 形状下拉 */}
+            <div className="relative group/shape flex items-center">
+              <button
+                className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all ${['rect', 'circle', 'line', 'arrow'].includes(activeDrawingTool) ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+                title="形状工具"
+              >
+                <Shapes size={18} />
+              </button>
+              <div className="absolute top-full left-0 mt-2 hidden group-hover/shape:flex flex-col gap-1 p-1.5 rounded-xl border shadow-lg bg-[var(--frost-card-framework-bg)] border-[var(--frost-card-framework-border)] backdrop-blur-md z-[102] w-28">
+                <button
+                  onClick={() => setActiveDrawingTool('rect')}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${activeDrawingTool === 'rect' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+                >
+                  <span className="w-3 h-3 border border-current rounded-sm inline-block" />
+                  矩形
+                </button>
+                <button
+                  onClick={() => setActiveDrawingTool('circle')}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${activeDrawingTool === 'circle' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+                >
+                  <span className="w-3 h-3 border border-current rounded-full inline-block" />
+                  圆形
+                </button>
+                <button
+                  onClick={() => setActiveDrawingTool('line')}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${activeDrawingTool === 'line' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+                >
+                  <span className="w-3 h-px bg-current inline-block transform" style={{ transform: 'translateY(-1px)' }} />
+                  直线
+                </button>
+                <button
+                  onClick={() => setActiveDrawingTool('arrow')}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${activeDrawingTool === 'arrow' ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)]' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+                >
+                  <span className="text-[10px] inline-block font-bold">→</span>
+                  箭头
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 颜色选择 */}
+          <div className="flex items-center gap-1.5 border-r pr-3 border-[var(--frost-card-framework-border)]">
+            {['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#000000', '#ffffff'].map(color => (
+              <button
+                key={color}
+                onClick={() => setActiveDrawingColor(color)}
+                className={`w-5 h-5 rounded-full border transition-all ${activeDrawingColor === color ? 'scale-120 ring-2 ring-[var(--accent-coral)] border-transparent' : 'border-white/20 hover:scale-110'}`}
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+
+          {/* 笔宽选择 */}
+          <div className="flex items-center gap-1.5 border-r pr-3 border-[var(--frost-card-framework-border)]">
+            {[2, 4, 8].map(w => (
+              <button
+                key={w}
+                onClick={() => setActiveDrawingWidth(w)}
+                className={`flex items-center justify-center rounded-lg transition-colors text-[10px] h-7 w-7 ${activeDrawingWidth === w ? 'bg-[var(--toolbar-active)] text-[var(--accent-coral)] font-bold' : 'text-[var(--text-secondary)] hover:bg-[var(--toolbar-hover)]'}`}
+                title={`线宽: ${w}px`}
+              >
+                {w === 2 ? '细' : w === 4 ? '中' : '粗'}
+              </button>
+            ))}
+          </div>
+
+          {/* 清除全部 */}
+          <button
+            onClick={() => {
+              if (window.confirm('确认清除当前项目的所有画板手绘和形状吗？此操作无法撤销。')) {
+                clearCanvasDrawings();
+              }
+            }}
+            className="flex h-9 px-3 items-center gap-1.5 rounded-xl text-xs text-red-400 transition-colors hover:bg-red-500/10 active:scale-95"
+            title="清除全部画板内容"
+          >
+            <Trash size={15} />
+            清除
+          </button>
+        </div>
+      )}
       {/* 简体中文：左上角等宽悬浮控制卡片 */}
       {!isMobile && (
         <div className="desktop-left-chrome fixed top-4 left-4 z-[100] w-52 pointer-events-auto select-none">
@@ -4906,36 +5359,36 @@ const AppContent: React.FC<AppContentProps> = () => {
 
       {/* 简体中文：左下角悬浮缩放卡片 - 竖直摆放，极致纤细宽度 (w-10)，不要和侧边工具栏宽度一致，版本号在其下方另外渲染为精致的独立毛玻璃卡片 */}
       {!isMobile && (
-        <div className="desktop-zoom-rail fixed bottom-4 left-4 z-50 w-10 flex flex-col items-center gap-2 pointer-events-auto select-none">
-          <div
-            className="desktop-zoom-control-shell transition-all duration-300"
-            aria-hidden={desktopSideRailLayout.hideZoomControl}
-            style={{
-              opacity: desktopSideRailLayout.hideZoomControl ? 0 : 1,
-              visibility: desktopSideRailLayout.hideZoomControl ? 'hidden' : 'visible',
-              pointerEvents: desktopSideRailLayout.hideZoomControl ? 'none' : 'auto',
-            }}
-          >
-            <AppZoomControl
-              scale={canvasTransform.scale}
-              transform={canvasTransform}
-              canvasRef={canvasRef}
-            />
-          </div>
-          <div 
-            className="w-full py-1.5 flex items-center justify-center rounded-xl border transition-all duration-300"
-            style={{
-              background: 'var(--frost-card-framework-bg)',
-              border: '1px solid var(--frost-card-framework-border)',
-              boxShadow: 'var(--frost-card-framework-shadow)',
-              WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
-              backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
-            }}
-          >
-            <span className="text-[10px] text-[var(--text-secondary)] font-bold tracking-tight leading-none text-center">
-              {APP_DISPLAY_VERSION}
-            </span>
-          </div>
+        <div 
+          className="desktop-navigation-panel fixed top-4 z-[100] pointer-events-auto select-none"
+          style={{
+            right: isChatOpen ? `${chatSidebarWidth + 16}px` : '16px',
+            transition: 'right 0.3s ease-out'
+          }}
+        >
+          <AppCanvasNavigationPanel
+            activeCanvas={activeCanvas}
+            canvasTransform={canvasTransform}
+            canvasRef={canvasRef}
+            isMobile={isMobile}
+          />
+        </div>
+      )}
+
+      {/* 简体中文：左下角精致独立的毛玻璃版本号卡片 */}
+      {!isMobile && (
+        <div className="desktop-version-badge fixed bottom-4 left-4 z-50 py-1.5 px-3 flex items-center justify-center rounded-xl border select-none pointer-events-auto"
+          style={{
+            background: 'var(--frost-card-framework-bg)',
+            border: '1px solid var(--frost-card-framework-border)',
+            boxShadow: 'var(--frost-card-framework-shadow)',
+            WebkitBackdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+            backdropFilter: 'blur(var(--frost-card-framework-blur)) saturate(1.16)',
+          }}
+        >
+          <span className="text-[10px] text-[var(--text-secondary)] font-bold tracking-tight leading-none text-center">
+            {APP_DISPLAY_VERSION}
+          </span>
         </div>
       )}
 
@@ -5070,6 +5523,60 @@ const AppContent: React.FC<AppContentProps> = () => {
         onImageDrop={handleImageDrop}
       >
         {/* 1. Connection Lines Layer (SVG) - Below all cards */}
+                {/* Drawings Layer */}
+        {activeCanvas?.drawings && (
+          <svg
+            className="absolute inset-0 pointer-events-none overflow-visible"
+            style={{ zIndex: 10 }}
+          >
+            <CanvasDrawingsLayer drawings={activeCanvas.drawings} />
+          </svg>
+        )}
+
+        {/* Canvas Drawing Interaction Layer */}
+        <CanvasDrawingInteractionOverlay
+          canvasRef={canvasRef}
+          canvasMode={canvasMode}
+          activeTool={activeDrawingTool}
+          activeColor={activeDrawingColor}
+          activeWidth={activeDrawingWidth}
+          drawings={activeCanvas?.drawings || []}
+          addCanvasDrawing={addCanvasDrawing}
+          promptNodes={activeCanvas?.promptNodes || []}
+          imageNodes={activeCanvas?.imageNodes || []}
+          onAddReferenceImage={async (img) => {
+            let finalImg = { ...img };
+            if (img.data && !img.storageId) {
+              try {
+                // 计算手绘图形的 Hash 值作为 storageId
+                const storageId = await calculateImageHash(img.data);
+                const fullDataUrl = `data:${img.mimeType || 'image/png'};base64,${img.data}`;
+                
+                // 将图片存入 IndexedDB，避免大图 base64 撑爆 localStorage
+                const storage = await import('./services/storage/imageStorage');
+                await storage.saveImage(storageId, fullDataUrl);
+                
+                // 如果本地物理文件系统句柄存在，同步保存至文件系统
+                const { fileSystemService } = await import('./services/storage/fileSystemService');
+                const handle = fileSystemService.getGlobalHandle();
+                if (handle) {
+                  await fileSystemService.saveReferenceImage(handle, storageId, img.data, img.mimeType || 'image/png');
+                }
+                
+                // 补充 storageId，以便在 localStorage 存储时，只保留 storageId 并擦除 base64 占用的空间
+                finalImg = { ...img, storageId };
+              } catch (e) {
+                console.error('[App] 保存框选参考图到本地存储失败:', e);
+              }
+            }
+
+            setConfig(prev => ({
+              ...prev,
+              referenceImages: [...prev.referenceImages, finalImg]
+            }));
+          }}
+        />
+
         <svg
           className="absolute top-0 left-0 pointer-events-none"
           shapeRendering="geometricPrecision"
@@ -5279,6 +5786,10 @@ const AppContent: React.FC<AppContentProps> = () => {
                 ? '#34d399'
                 : '#f59e0b';
 
+            const midPoint = getSoftConnectorPointAt(startX, startY, endX, endY, 0.5);
+            const btnX = midPoint.x;
+            const btnY = midPoint.y;
+
             return (
               <g key={`workflow-edge-${edge.id}`}>
                 <circle cx={startX} cy={startY} r={connectorDotStart} fill={strokeColor} opacity="0.4" />
@@ -5294,6 +5805,17 @@ const AppContent: React.FC<AppContentProps> = () => {
                   opacity="0.45"
                 />
                 <circle cx={endX} cy={endY} r={connectorDotEnd} fill={strokeColor} opacity="0.55" />
+
+                {showConnectorButtons && (
+                  <ConnectorDisconnectButton
+                    x={btnX}
+                    y={btnY}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      unlinkNodes(edge.from, edge.to);
+                    }}
+                  />
+                )}
               </g>
             );
           })}

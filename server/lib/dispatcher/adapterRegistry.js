@@ -86,13 +86,21 @@ const adapters = {
 };
 
 /**
- * 根据协议面标识获取具体的协议适配器
- * @param {string} adapterId 适配器协议 ID
+ * 根据协议面标识获取具体的协议适配器，兼容数据库中配置的 endpoint_type
+ * @param {string} adapterIdOrType 适配器协议 ID 或 endpoint_type
  */
-function getAdapter(adapterId) {
-  const adapter = adapters[adapterId];
+function getAdapter(adapterIdOrType) {
+  let resolvedId = adapterIdOrType;
+  // 中文注释：将数据库配置的 endpoint_type 归一化映射到具体的适配器实现
+  if (adapterIdOrType === 'openai') {
+    resolvedId = 'openai_chat_completions';
+  } else if (adapterIdOrType === 'custom_form' || adapterIdOrType === 'form') {
+    resolvedId = 'custom_form_urlencoded';
+  }
+
+  const adapter = adapters[resolvedId];
   if (!adapter) {
-    throw new Error(`未找到匹配的后端适配器协议面: ${adapterId}`);
+    throw new Error(`未找到匹配的后端适配器协议面: ${adapterIdOrType} (映射为: ${resolvedId})`);
   }
   return adapter;
 }

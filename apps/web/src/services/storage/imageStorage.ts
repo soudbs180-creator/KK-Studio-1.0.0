@@ -150,6 +150,59 @@ class ImageMemoryCache {
 // ========== 全局缓存实例 ==========
 const memoryCache = new ImageMemoryCache(100); // 100MB限制
 
+// ========== IndexedDB并发调度队列 ==========
+class IndexedDBQueue {
+    private activeCount = 0;
+    private maxConcurrency = 4;
+    private queue: Array<{
+        fn: () => Promise<any>;
+        resolve: (val: any) => void;
+        reject: (err: any) => void;
+    }> = [];
+
+    async enqueue<T>(fn: () => Promise<T>): Promise<T> {
+        return new Promise((resolve, reject) => {
+            this.queue.push({ fn, resolve, reject });
+            this.scheduleNext();
+        });
+    }
+
+    private scheduleNext() {
+        if (this.activeCount >= this.maxConcurrency || this.queue.length === 0) {
+            return;
+        }
+
+        const runTask = () => {
+            if (this.queue.length === 0) return;
+            const { fn, resolve, reject } = this.queue.shift()!;
+            this.activeCount++;
+
+            fn()
+                .then(val => {
+                    this.activeCount--;
+                    resolve(val);
+                    this.scheduleNext();
+                })
+                .catch(err => {
+                    this.activeCount--;
+                    reject(err);
+                    this.scheduleNext();
+                });
+        };
+
+        // 简体中文：支持 requestIdleCallback 时分配到空闲帧运行，否则回退到 setTimeout
+        if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+            window.requestIdleCallback(() => {
+                runTask();
+            }, { timeout: 100 });
+        } else {
+            setTimeout(runTask, 0);
+        }
+    }
+}
+
+const idbQueue = new IndexedDBQueue();
+
 // ========== IndexedDB操作 ==========
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -459,102 +512,104 @@ export async function getImage(id: string): Promise<string | null> {
         return url;
     }
 
-    // 2. 内存未命中，从IndexedDB读取
-    try {
-        const db = await openDB();
-        const transaction = db.transaction(IMAGES_STORE, 'readonly');
-        const store = transaction.objectStore(IMAGES_STORE);
+    // 2. 内存未命中，使用并发调度队列从IndexedDB/磁盘读取
+    return idbQueue.enqueue(async () => {
+        try {
+            const db = await openDB();
+            const transaction = db.transaction(IMAGES_STORE, 'readonly');
+            const store = transaction.objectStore(IMAGES_STORE);
 
-        const result: { id: string; blob?: Blob; url?: string } | undefined = await new Promise((resolve, reject) => {
-            const request = store.get(id);
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
+            const result: { id: string; blob?: Blob; url?: string } | undefined = await new Promise((resolve, reject) => {
+                const request = store.get(id);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
 
-        if (!result) {
-            console.debug(`[ImageStorage] ${id} not found in IndexedDB. Attempting local recovery...`);
+            if (!result) {
+                console.debug(`[ImageStorage] ${id} not found in IndexedDB. Attempting local recovery...`);
 
-            const globalHandle = fileSystemService.getGlobalHandle();
-            if (globalHandle) {
-                try {
-                    const blob = await fileSystemService.loadOriginalFromDisk(globalHandle, id);
-                    if (blob) {
-                        const blobURL = URL.createObjectURL(blob);
-                        memoryCache.set(id, blobURL);
+                const globalHandle = fileSystemService.getGlobalHandle();
+                if (globalHandle) {
+                    try {
+                        const blob = await fileSystemService.loadOriginalFromDisk(globalHandle, id);
+                        if (blob) {
+                            const blobURL = URL.createObjectURL(blob);
+                            memoryCache.set(id, blobURL);
 
-                        saveImage(id, blobURL).catch(error => {
-                            console.warn('[ImageStorage] Failed to restore local image back to IndexedDB:', error);
-                        });
+                            saveImage(id, blobURL).catch(error => {
+                                console.warn('[ImageStorage] Failed to restore local image back to IndexedDB:', error);
+                            });
 
-                        console.log(`[ImageStorage] Recovered ${id} from local storage fallback`);
-                        return blobURL;
+                            console.log(`[ImageStorage] Recovered ${id} from local storage fallback`);
+                            return blobURL;
+                        }
+                    } catch (error) {
+                        console.warn(`[ImageStorage] Failed local recovery for ${id}:`, error);
                     }
-                } catch (error) {
-                    console.warn(`[ImageStorage] Failed local recovery for ${id}:`, error);
                 }
+
+                // 🚀 [OPFS Recovery] 手机端浏览器 OPFS 恢复兜底
+                try {
+                    const { isOPFSAvailable, getOPFSBlobUrl } = await import('./opfsService.ts');
+                    if (isOPFSAvailable()) {
+                        const { baseId, quality } = parseQualityId(id);
+                        const opfsType = (quality === 'micro' || quality === 'thumb') ? 'thumbnail' : 'image';
+                        const blobURL = await getOPFSBlobUrl(baseId, opfsType);
+                        if (blobURL) {
+                            memoryCache.set(id, blobURL);
+
+                            // 异步静默写入 IndexedDB 缓存
+                            fetch(blobURL)
+                                .then(res => res.blob())
+                                .then(blob => {
+                                    const saveObject: StoredImageRecord = {
+                                        id,
+                                        timestamp: Date.now(),
+                                        blob
+                                    };
+                                    openDB().then(db => {
+                                        const tx = db.transaction(IMAGES_STORE, 'readwrite');
+                                        tx.objectStore(IMAGES_STORE).put(saveObject);
+                                    }).catch(() => {});
+                                })
+                                .catch(() => {});
+
+                            console.log(`[ImageStorage] Recovered ${id} from OPFS (quality: ${quality})`);
+                            return blobURL;
+                        }
+                    }
+                } catch (opfsErr) {
+                    console.warn(`[ImageStorage] Failed OPFS recovery for ${id}:`, opfsErr);
+                }
+
+                return null;
             }
 
-            // 🚀 [OPFS Recovery] 手机端浏览器 OPFS 恢复兜底
-            try {
-                const { isOPFSAvailable, getOPFSBlobUrl } = await import('./opfsService.ts');
-                if (isOPFSAvailable()) {
-                    const { baseId, quality } = parseQualityId(id);
-                    const opfsType = (quality === 'micro' || quality === 'thumb') ? 'thumbnail' : 'image';
-                    const blobURL = await getOPFSBlobUrl(baseId, opfsType);
-                    if (blobURL) {
-                        memoryCache.set(id, blobURL);
-
-                        // 异步静默写入 IndexedDB 缓存
-                        fetch(blobURL)
-                            .then(res => res.blob())
-                            .then(blob => {
-                                const saveObject: StoredImageRecord = {
-                                    id,
-                                    timestamp: Date.now(),
-                                    blob
-                                };
-                                openDB().then(db => {
-                                    const tx = db.transaction(IMAGES_STORE, 'readwrite');
-                                    tx.objectStore(IMAGES_STORE).put(saveObject);
-                                }).catch(() => {});
-                            })
-                            .catch(() => {});
-
-                        console.log(`[ImageStorage] Recovered ${id} from OPFS (quality: ${quality})`);
-                        return blobURL;
-                    }
+            // 🚀 关键：优先使用Blob，创建Blob URL
+            if (result.blob) {
+                if (result.blob.size === 0) {
+                    console.warn(`[ImageStorage] Invalid empty blob detected for ${id}, ignoring corrupted cache`);
+                    return null;
                 }
-            } catch (opfsErr) {
-                console.warn(`[ImageStorage] Failed OPFS recovery for ${id}:`, opfsErr);
+                const blobURL = URL.createObjectURL(result.blob);
+                memoryCache.set(id, blobURL);
+                console.debug(`[ImageStorage] Loaded ${id} as Blob URL`);
+                return blobURL;
+            }
+
+            // Fallback: 旧数据为Base64字符串（兼容）
+            if (result.url) {
+                console.warn(`[ImageStorage] ${id} is old Base64 format`);
+                memoryCache.set(id, result.url);
+                return result.url;
             }
 
             return null;
+        } catch (error) {
+            console.error('[ImageStorage] Failed to get from IndexedDB:', error);
+            return null;
         }
-
-        // 🚀 关键：优先使用Blob，创建Blob URL
-        if (result.blob) {
-            if (result.blob.size === 0) {
-                console.warn(`[ImageStorage] Invalid empty blob detected for ${id}, ignoring corrupted cache`);
-                return null;
-            }
-            const blobURL = URL.createObjectURL(result.blob);
-            memoryCache.set(id, blobURL);
-            console.debug(`[ImageStorage] Loaded ${id} as Blob URL`);
-            return blobURL;
-        }
-
-        // Fallback: 旧数据为Base64字符串（兼容）
-        if (result.url) {
-            console.warn(`[ImageStorage] ${id} is old Base64 format`);
-            memoryCache.set(id, result.url);
-            return result.url;
-        }
-
-        return null;
-    } catch (error) {
-        console.error('[ImageStorage] Failed to get from IndexedDB:', error);
-        return null;
-    }
+    });
 }
 
 /**

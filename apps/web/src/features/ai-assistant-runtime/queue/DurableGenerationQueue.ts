@@ -135,6 +135,28 @@ const getJobOutputNodeIds = (job: GenerationBatchJob): string[] => {
   ]));
 };
 
+const cloneOutputGroup = (outputGroup?: GenerationBatchOutputGroup): GenerationBatchOutputGroup | undefined => {
+  if (!outputGroup) return undefined;
+
+  return {
+    ...outputGroup,
+    tags: outputGroup.tags ? [...outputGroup.tags] : undefined,
+    nodeIds: outputGroup.nodeIds ? [...outputGroup.nodeIds] : undefined,
+  };
+};
+
+const cloneJob = (job: GenerationBatchJob): GenerationBatchJob => ({
+  ...job,
+  prompts: job.prompts.map(prompt => ({
+    ...prompt,
+    resultImageNodeIds: prompt.resultImageNodeIds ? [...prompt.resultImageNodeIds] : undefined,
+  })),
+  options: { ...job.options },
+  outputGroup: cloneOutputGroup(job.outputGroup),
+});
+
+const cloneJobs = (jobs: GenerationBatchJob[]): GenerationBatchJob[] => jobs.map(cloneJob);
+
 export class DurableGenerationQueue {
   private jobs: GenerationBatchJob[] = [];
   private executor: ((prompt: string, options: any, jobId: string, promptId: string) => Promise<string[] | GenerationExecutorResult>) | null = null;
@@ -169,7 +191,7 @@ export class DurableGenerationQueue {
   }
 
   private notifyListeners() {
-    const snapshot = [...this.jobs];
+    const snapshot = cloneJobs(this.jobs);
     for (const listener of this.listeners) {
       try {
         listener(snapshot);
@@ -230,18 +252,23 @@ export class DurableGenerationQueue {
   }
 
   public getJobs(): GenerationBatchJob[] {
-    return this.jobs;
+    return cloneJobs(this.jobs);
   }
 
   public subscribe(listener: GenerationQueueListener): () => void {
     this.listeners.add(listener);
-    listener([...this.jobs]);
+    listener(cloneJobs(this.jobs));
     return () => {
       this.listeners.delete(listener);
     };
   }
 
   public getJob(id: string): GenerationBatchJob | undefined {
+    const job = this.findJob(id);
+    return job ? cloneJob(job) : undefined;
+  }
+
+  private findJob(id: string): GenerationBatchJob | undefined {
     return this.jobs.find(j => j.id === id);
   }
 
@@ -285,7 +312,7 @@ export class DurableGenerationQueue {
         this.saveJobs();
       }
       console.log(`[DurableQueue] Idempotency match found for key: ${stableIdempotencyKey}`);
-      return existing;
+      return cloneJob(existing);
     }
 
     const newJob: GenerationBatchJob = {
@@ -323,11 +350,11 @@ export class DurableGenerationQueue {
     // 异步触发队列处理
     this.scheduleProcess();
     
-    return newJob;
+    return cloneJob(newJob);
   }
 
   public pauseJob(jobId: string) {
-    const job = this.getJob(jobId);
+    const job = this.findJob(jobId);
     if (job && (job.status === 'queued' || job.status === 'running')) {
       job.status = 'paused';
       // 暂停时将正在运行的子任务重置为 queued
@@ -343,7 +370,7 @@ export class DurableGenerationQueue {
   }
 
   public resumeJob(jobId: string) {
-    const job = this.getJob(jobId);
+    const job = this.findJob(jobId);
     if (job && job.status === 'paused') {
       job.status = 'queued';
       job.updatedAt = Date.now();
@@ -353,7 +380,7 @@ export class DurableGenerationQueue {
   }
 
   public cancelJob(jobId: string) {
-    const job = this.getJob(jobId);
+    const job = this.findJob(jobId);
     if (job) {
       job.status = 'cancelled';
       job.prompts.forEach(p => {
@@ -469,7 +496,7 @@ export class DurableGenerationQueue {
     const taskKey = this.getTaskKey(jobId, promptId);
     if (this.inFlightTasks.has(taskKey)) return;
 
-    const job = this.getJob(jobId);
+    const job = this.findJob(jobId);
     if (!job || job.status !== 'running') return;
 
     const promptItem = job.prompts.find(p => p.id === promptId);
@@ -489,7 +516,7 @@ export class DurableGenerationQueue {
         referenceImageNodeId: promptItem.referenceImageNodeId
       }, jobId, promptId));
 
-      const activeJob = this.getJob(jobId);
+      const activeJob = this.findJob(jobId);
       const activePromptItem = activeJob?.prompts.find(p => p.id === promptId);
       if (!activeJob || activeJob.status === 'cancelled' || !activePromptItem) {
         return;
@@ -508,7 +535,7 @@ export class DurableGenerationQueue {
     } catch (err: any) {
       console.error(`[DurableQueue] Prompt task failed (attempt ${promptItem.retryCount + 1}):`, err);
       
-      const retryJob = this.getJob(jobId);
+      const retryJob = this.findJob(jobId);
       const retryPromptItem = retryJob?.prompts.find(p => p.id === promptId);
       if (!retryJob || retryJob.status === 'cancelled' || !retryPromptItem) {
         return;

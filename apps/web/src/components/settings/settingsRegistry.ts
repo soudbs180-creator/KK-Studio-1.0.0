@@ -6,6 +6,8 @@ import {
   LayoutDashboard,
   Layers3,
   ScrollText,
+  Globe,
+  Wand2,
 } from 'lucide-react';
 
 import { KKAI_FEATURE_FLAGS } from '../../app/kkaiFeatureFlags';
@@ -17,7 +19,9 @@ export type CanonicalSettingsViewId =
   | 'consumption-records'
   | 'storage-settings'
   | 'system-logs'
-  | 'user-profile';
+  | 'user-profile'
+  | 'browser-assistant'
+  | 'ai-management';
 
 export type LegacySettingsViewId =
   | 'admin-console'
@@ -130,6 +134,8 @@ export const SETTINGS_PATHS: Record<CanonicalSettingsViewId, string> = {
   'storage-settings': 'storage-settings',
   'system-logs': 'system-logs',
   'user-profile': 'user-profile',
+  'browser-assistant': 'browser-assistant',
+  'ai-management': 'ai-management',
 };
 
 export const LEGACY_SETTINGS_VIEW_ALIASES: Record<LegacySettingsViewId, CanonicalSettingsViewId> = {
@@ -170,16 +176,28 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     statusSummaryLabelEn: 'System status',
   },
   'api-management': {
-    eyebrow: 'API Workspace',
-    titleZh: 'API 工作台',
-    titleEn: 'API Workspace',
-    descriptionZh: '管理本地 API、供应商和预算。',
-    descriptionEn: 'Manage local APIs, providers, and budgets.',
+    eyebrow: 'Provider Settings',
+    titleZh: '供应商配置',
+    titleEn: 'Provider Settings',
+    descriptionZh: '管理您的本地 API、供应商通道和计费限额。',
+    descriptionEn: 'Manage local APIs, provider channels, and billing limit policies.',
     primaryActionLabelZh: '配置本地 API',
     primaryActionLabelEn: 'Configure local API',
     primaryActionTarget: 'api-management',
-    statusSummaryLabelZh: '路由状态',
-    statusSummaryLabelEn: 'Route status',
+    statusSummaryLabelZh: '通道状态',
+    statusSummaryLabelEn: 'Channel status',
+  },
+  'ai-management': {
+    eyebrow: 'AI Settings',
+    titleZh: 'AI 管理',
+    titleEn: 'AI Management',
+    descriptionZh: '配置核心大模型能力预设，并扩展定制化的 AI 助手 Skill。',
+    descriptionEn: 'Configure core LLM capability presets and extend custom AI assistant Skills.',
+    primaryActionLabelZh: '返回设置总览',
+    primaryActionLabelEn: 'Back to Settings Overview',
+    primaryActionTarget: 'dashboard',
+    statusSummaryLabelZh: '配置状态',
+    statusSummaryLabelEn: 'Configuration status',
   },
 
   'consumption-records': {
@@ -230,6 +248,18 @@ export const SETTINGS_VIEW_META: Record<CanonicalSettingsViewId, SettingsViewMet
     statusSummaryLabelZh: '账户状态',
     statusSummaryLabelEn: 'Account status',
   },
+  'browser-assistant': {
+    eyebrow: 'Browser Assistant',
+    titleZh: '浏览器助手与多端控制',
+    titleEn: 'Browser Assistant & Multi-device Control',
+    descriptionZh: '管理本地浏览器守护进程、Chrome 插件连通状态及网页控制多端服务。',
+    descriptionEn: 'Manage browser daemon, Chrome extension connectivity, and multi-device Web controls.',
+    primaryActionLabelZh: '开始连通性测试',
+    primaryActionLabelEn: 'Start connectivity doctor',
+    primaryActionTarget: 'browser-assistant',
+    statusSummaryLabelZh: '多端连接状态',
+    statusSummaryLabelEn: 'Multi-device status',
+  },
 };
 
 export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
@@ -256,13 +286,23 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
   },
   {
     id: 'api-management',
-    labelZh: 'API 工作台',
-    labelEn: 'API Workspace',
-    descriptionZh: '本地 API、供应商、预算。',
-    descriptionEn: 'Local APIs, providers, budgets.',
+    labelZh: '供应商配置',
+    labelEn: 'Provider Settings',
+    descriptionZh: '管理您的本地 API 通道与服务供应商。',
+    descriptionEn: 'Local APIs and provider channels configuration.',
     icon: KeyRound,
     section: 'workspace',
     path: SETTINGS_PATHS['api-management'],
+  },
+  {
+    id: 'ai-management',
+    labelZh: 'AI 管理',
+    labelEn: 'AI Management',
+    descriptionZh: '能力预设、Skill 管理。',
+    descriptionEn: 'Capability presets, Skill management.',
+    icon: Wand2,
+    section: 'workspace',
+    path: SETTINGS_PATHS['ai-management'],
   },
   {
     id: 'storage-settings',
@@ -283,6 +323,16 @@ export const SETTINGS_NAV_ITEM_DEFINITIONS: SettingsNavItemDefinition[] = [
     icon: ScrollText,
     section: 'system',
     path: SETTINGS_PATHS['system-logs'],
+  },
+  {
+    id: 'browser-assistant',
+    labelZh: '浏览器助手',
+    labelEn: 'Browser Assistant',
+    descriptionZh: '多端控制、插件下载、网页价格抓取。',
+    descriptionEn: 'Multi-device, extension, price extraction.',
+    icon: Globe,
+    section: 'system',
+    path: SETTINGS_PATHS['browser-assistant'],
   },
 ];
 
@@ -319,6 +369,7 @@ export function getCurrentSettingsViewId(pathname: string): CanonicalSettingsVie
 
   if (!currentPath) return 'dashboard';
   if (currentPath.startsWith('api-management')) return 'api-management';
+  if (currentPath.startsWith('ai-management')) return 'ai-management';
   if (currentPath.startsWith('user-profile')) return 'user-profile';
   if (topLevelPath && topLevelPath in LEGACY_SETTINGS_VIEW_ALIASES) {
     return coerceEnabledSettingsViewId(LEGACY_SETTINGS_VIEW_ALIASES[topLevelPath as LegacySettingsViewId]);
@@ -426,6 +477,10 @@ export function getSettingsNavItemByPath(
 
   if (topLevelPath === 'api-management') {
     return navItems.find((item) => item.id === 'api-management');
+  }
+
+  if (topLevelPath === 'ai-management') {
+    return navItems.find((item) => item.id === 'ai-management');
   }
 
   if (topLevelPath in LEGACY_SETTINGS_VIEW_ALIASES) {

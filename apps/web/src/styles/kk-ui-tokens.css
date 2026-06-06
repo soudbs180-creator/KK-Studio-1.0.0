@@ -1,4 +1,4 @@
-/* 中文注释：建立核心变量桥梁，用于统一 antd/Lobe UI 主题与现有系统旧样式变量的渲染 */
+/* 中文注释：建立核心变量桥梁，用于统一原生 KK UI 适配层与现有系统旧样式变量的渲染 */
 :root {
   --kk-color-brand-primary: #6366f1;
   --kk-color-brand-coral: #ff6b5a;

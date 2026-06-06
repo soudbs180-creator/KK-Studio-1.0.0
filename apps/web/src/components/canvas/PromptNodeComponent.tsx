@@ -21,8 +21,10 @@ import { buildPptDeckModuleState } from '../../utils/pptDeckModules';
 import { getPromptNodeBaseCardWidth, getPromptNodeCardWidth } from '../../utils/promptNodeCardWidth';
 import { snapCanvasPointToGrid } from '../../utils/canvasSnapToGrid';
 import EcommerceCardActions from '../ecommerce/EcommerceCardActions';
-import EcommerceCanvasWorkbenchCard from '../ecommerce/EcommerceCanvasWorkbenchCard';
 import { useFavoritesStore } from '../../features/favorites';
+import { canvasLivePositionStore, updateConnectorDom } from '../../app/canvasLivePositionStore';
+
+const EcommerceCanvasWorkbenchCard = React.lazy(() => import('../ecommerce/EcommerceCanvasWorkbenchCard'));
 
 const truncateByChars = (text: string, maxChars: number): string => {
     if (!text) return '';
@@ -709,6 +711,29 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
     }, [node.id]);
 
     useEffect(() => {
+        if (isChatMode) return;
+
+        const unsubscribe = canvasLivePositionStore.subscribe(node.id, (pos) => {
+            if (pos && containerRef.current) {
+                const renderLeft = snapCanvasCoordinate(pos.x - cardWidth / 2, zoomScale || 1);
+                const renderTop = snapCanvasCoordinate(pos.y - cardHeight, zoomScale || 1);
+
+                containerRef.current.style.left = `${renderLeft - originX}px`;
+                containerRef.current.style.top = `${renderTop - originY}px`;
+
+                // 🚀 同时更新这组下属所有子图像节点的局部连接线！
+                if (node.childImageIds && node.childImageIds.length > 0) {
+                    node.childImageIds.forEach((childImageId) => {
+                        updateConnectorDom(node.id, childImageId);
+                    });
+                }
+            }
+        });
+
+        return () => unsubscribe();
+    }, [node.id, node.childImageIds, cardWidth, cardHeight, zoomScale, originX, originY, isChatMode]);
+
+    useEffect(() => {
         // 🚀 默认展示优化后的结果 (若存在)
         if (node.promptOptimizerResult || (node.optimizedPromptEn && node.optimizedPromptZh)) {
             setActiveTab('opt');
@@ -1201,6 +1226,9 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         return (
             <div
                 ref={containerRef}
+                id={`prompt-card-${node.id}`}
+                data-x={node.position.x}
+                data-y={node.position.y}
                 className={`prompt-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none`}
                 style={isChatMode ? {
                     opacity: 1,
@@ -1235,7 +1263,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 >
                     {onConnectStart && !isChatMode && (
                         <div
-                            className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 bg-transparent hover:bg-[rgba(255,77,139,0.22)] rounded-full z-50 cursor-crosshair transition-colors"
+                            className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-7 h-7 flex items-center justify-center z-50 cursor-crosshair group/connector"
                             onMouseDown={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
@@ -1245,7 +1273,11 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 });
                             }}
                             title="拖拽连线"
-                        />
+                        >
+                            {/* Inner Dot and Outer Pulsing Glow */}
+                            <div className="w-2.5 h-2.5 rounded-full bg-[var(--connector-color,#6366f1)] border border-white/20 transition-all duration-300 shadow-[0_0_8px_rgba(99,102,241,0.5)] group-hover/connector:scale-125 group-hover/connector:bg-[var(--accent-coral,#ef4444)] group-hover/connector:shadow-[0_0_12px_rgba(239,68,68,0.8)]" />
+                            <div className="absolute inset-0 rounded-full border border-[var(--connector-color,#6366f1)] opacity-0 scale-50 group-hover/connector:scale-100 group-hover/connector:opacity-30 group-hover/connector:animate-pulse transition-all duration-300" />
+                        </div>
                     )}
 
                     <div className={`flex items-center justify-between gap-2 border-b border-[var(--frost-card-main-border)] ${isThumbnailShell ? 'px-3 py-2' : 'px-4 py-2.5'}`}>
@@ -1284,14 +1316,15 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                             onClickPrompt?.(node, activeTab === 'opt');
                         }}
                     >
-                        {shellReferenceImages.length > 0 && (
+                        {/* 🚀 [LOD 优化] 当处于超小缩放的 thumbnail-shell 模式时，不再渲染参考小图，减少 DOM 深度与图片加载开销 */}
+                        {!isThumbnailShell && shellReferenceImages.length > 0 && (
                             <div className="flex gap-2">
                                 {shellReferenceImages.map((img, index) => {
                                     const thumbSrc = img.data || img.url || '';
                                     return (
                                         <div
                                             key={img.id || index}
-                                            className={`${isThumbnailShell ? 'w-12 h-12' : 'w-14 h-14'} rounded-xl overflow-hidden border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] shrink-0`}
+                                            className="w-14 h-14 rounded-xl overflow-hidden border border-[var(--frost-card-sub-border)] bg-[var(--frost-card-sub-bg)] shrink-0"
                                         >
                                             {thumbSrc ? (
                                                 <img
@@ -1312,17 +1345,24 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                         )}
 
                         <div className="space-y-2">
-                            <div
-                                className={`${isThumbnailShell ? 'text-[13px] leading-5' : 'text-[14px] leading-6'} font-medium text-[var(--text-primary)]`}
-                                style={{
-                                    display: '-webkit-box',
-                                    WebkitLineClamp: isThumbnailShell ? 2 : 4,
-                                    WebkitBoxOrient: 'vertical' as any,
-                                    overflow: 'hidden',
-                                }}
-                            >
-                                {shellPreviewText || '输入提示词...'}
-                            </div>
+                                                        {/* 🚀 [LOD 优化] 当处于超小缩放的 thumbnail-shell 模式时，改用静态字符截短，规避 -webkit-line-clamp 排版开销 */}
+                            {isThumbnailShell ? (
+                                <div className="text-[13px] leading-5 font-medium text-[var(--text-primary)]">
+                                    {truncateByChars(shellPreviewText || '输入提示词...', 36)}
+                                </div>
+                            ) : (
+                                <div
+                                    className="text-[14px] leading-6 font-medium text-[var(--text-primary)]"
+                                    style={{
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 4,
+                                        WebkitBoxOrient: 'vertical' as any,
+                                        overflow: 'hidden',
+                                    }}
+                                >
+                                    {shellPreviewText || '输入提示词...'}
+                                </div>
+                            )}
 
                             {!isThumbnailShell && node.tags && node.tags.length > 0 && (
                                 <div className="flex flex-wrap gap-1.5">
@@ -1355,6 +1395,8 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
         <div
             ref={containerRef}
             id={`prompt-card-${node.id}`}
+            data-x={node.position.x}
+            data-y={node.position.y}
             className={`prompt-node ${isChatMode ? 'relative w-full max-w-[460px] mx-auto my-3' : 'absolute'} flex flex-col items-center group antialiased select-none ${node.isNew && !canvasTransform && !isChatMode ? 'is-new' : ''}`}
             style={isChatMode ? {
                 opacity: 1,
@@ -1608,27 +1650,35 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                 <div className={ecommerceFrameworkCardClassName}>
                     {isEcommerceFrameworkCard ? (
                         <div data-testid="ecommerce-canvas-framework-workbench">
-                        <EcommerceCanvasWorkbenchCard
-                            node={node} onDeleteTask={onDelete ? (taskNode) => onDelete(taskNode.id) : undefined}
-                            taskNodes={ecommerceFrameworkTaskNodes}
-                            activeTaskState={activeEcommerceTaskState}
-                            frameworkStatus={ecommerceFrameworkStatus}
-                            onActivateTask={onActivateEcommerceTask}
-                            onTaskStateChange={onEcommerceTaskStateChange}
-                            onToggleSelected={onToggleEcommerceSelected}
-                            onGenerateNode={onGenerateEcommerceNode}
-                            onOptimizeTaskPrompt={onOptimizeEcommerceTaskPrompt}
-                            onRegenerateUnsatisfied={onRegenerateUnsatisfiedEcommerceNode}
-                            onGenerateFramework={onGenerateEcommerceFramework}
-                            onPauseFramework={onPauseEcommerceFramework}
-                            onResumeFramework={onResumeEcommerceFramework}
-                            onPauseNodeQueue={onPauseEcommerceNodeQueue}
-                            onResumeNodeQueue={onResumeEcommerceNodeQueue}
-                            onSetFrameworkConcurrency={onSetEcommerceFrameworkConcurrency}
-                            onCancelNodeQueue={onCancelEcommerceNodeQueue}
-                            onConfirmDesktop={onConfirmEcommerceDesktop}
-                            onGenerateMobile={onRetryEcommerceModule}
-                        />
+                        <React.Suspense
+                            fallback={(
+                                <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-3 py-4 text-center text-xs text-[var(--text-secondary)]">
+                                    Loading...
+                                </div>
+                            )}
+                        >
+                            <EcommerceCanvasWorkbenchCard
+                                node={node} onDeleteTask={onDelete ? (taskNode) => onDelete(taskNode.id) : undefined}
+                                taskNodes={ecommerceFrameworkTaskNodes}
+                                activeTaskState={activeEcommerceTaskState}
+                                frameworkStatus={ecommerceFrameworkStatus}
+                                onActivateTask={onActivateEcommerceTask}
+                                onTaskStateChange={onEcommerceTaskStateChange}
+                                onToggleSelected={onToggleEcommerceSelected}
+                                onGenerateNode={onGenerateEcommerceNode}
+                                onOptimizeTaskPrompt={onOptimizeEcommerceTaskPrompt}
+                                onRegenerateUnsatisfied={onRegenerateUnsatisfiedEcommerceNode}
+                                onGenerateFramework={onGenerateEcommerceFramework}
+                                onPauseFramework={onPauseEcommerceFramework}
+                                onResumeFramework={onResumeEcommerceFramework}
+                                onPauseNodeQueue={onPauseEcommerceNodeQueue}
+                                onResumeNodeQueue={onResumeEcommerceNodeQueue}
+                                onSetFrameworkConcurrency={onSetEcommerceFrameworkConcurrency}
+                                onCancelNodeQueue={onCancelEcommerceNodeQueue}
+                                onConfirmDesktop={onConfirmEcommerceDesktop}
+                                onGenerateMobile={onRetryEcommerceModule}
+                            />
+                        </React.Suspense>
                         </div>
                     ) : (
                     <>

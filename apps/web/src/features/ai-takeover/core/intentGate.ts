@@ -339,6 +339,21 @@ export function analyzeIntent(input: string, context?: SanitizedProjectContext):
     };
   }
 
+  // 7.5. 整理与排版画布卡片意图
+  if (/整理|排版|排列|对齐|排成一排|排网格|自动整理/.test(lowerInput)) {
+    const layoutPreset = extractLayoutPreset(cleanInput) || 'grid';
+    return {
+      intent: 'arrange_nodes',
+      confidence: 0.95,
+      extracted: {
+        layoutPreset
+      },
+      risk: 'none',
+      needsConfirmation: false,
+      reason: '识别到整理与排列卡片排版意图。'
+    };
+  }
+
   // 8. 优化提示词/润色提示词意图 (最高优先级生图冲突拦截)
   if (promptOnlyWords.some(word => lowerInput.includes(word)) || lowerInput.includes('提示词')) {
     return {

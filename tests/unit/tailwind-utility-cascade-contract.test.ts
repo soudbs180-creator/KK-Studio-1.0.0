@@ -32,3 +32,15 @@ test('global reset stays in the base layer so Tailwind spacing utilities keep pr
   assert.doesNotMatch(htmlInlineReset, /\*\s*\{[^}]*margin:\s*0\s*;/s);
   assert.doesNotMatch(htmlInlineReset, /\*\s*\{[^}]*padding:\s*0\s*;/s);
 });
+
+test('startup html avoids render-blocking third-party font requests', () => {
+  const htmlSource = readSource('apps/web/index.html');
+
+  assert.doesNotMatch(htmlSource, /fonts\.googleapis\.com/);
+  assert.doesNotMatch(htmlSource, /fonts\.gstatic\.com/);
+  assert.doesNotMatch(htmlSource, /family=Inter/);
+  assert.match(
+    htmlSource,
+    /font-family:\s*'HarmonyOS Sans SC',\s*-apple-system,\s*BlinkMacSystemFont,\s*'Segoe UI',\s*system-ui,\s*sans-serif;/,
+  );
+});

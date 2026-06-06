@@ -41,6 +41,7 @@ const CAPABILITY_ROLES: CapabilityRole[] = [
   'assistant',
   'prompt_optimizer',
   'ocr_document',
+  'video_generation',
 ];
 
 const listeners = new Set<() => void>();
@@ -222,6 +223,8 @@ const getSmartAutoAssignment = (role: CapabilityRole): CapabilityRouteAssignment
     let filtered = candidates;
     if (role === 'image_generation' || role === 'ecommerce_generation') {
       filtered = candidates.filter((c) => c.capabilities.image);
+    } else if (role === 'video_generation') {
+      filtered = candidates.filter((c) => c.capabilities.video);
     } else if (role === 'assistant' || role === 'ppt_generation' || role === 'prompt_optimizer') {
       filtered = candidates.filter((c) => c.capabilities.chat);
     }
@@ -270,6 +273,12 @@ const getSmartAutoAssignment = (role: CapabilityRole): CapabilityRouteAssignment
         m.toLowerCase().includes('banana'),
       );
       if (imgModel) primaryModelId = imgModel;
+    } else if (role === 'video_generation') {
+      const vidModel = bestCandidate.supportedModels.find((m) =>
+        m.toLowerCase().includes('veo') ||
+        m.toLowerCase().includes('video'),
+      );
+      if (vidModel) primaryModelId = vidModel;
     } else {
       const chatModel = bestCandidate.supportedModels.find((m) =>
         m.toLowerCase().includes('gemini-2.5-pro') ||
@@ -297,12 +306,13 @@ const getSmartAutoAssignment = (role: CapabilityRole): CapabilityRouteAssignment
 
 export const getCapabilityRouteAssignments = () => readAssignments();
 
-// 优先级顺序：AI助手 (assistant) > 全局能力补充 (prompt_optimizer) > 电商生成 (ecommerce_generation) > PPT生成辅助 (ppt_generation)
+// 优先级顺序：AI助手 (assistant) > 全局能力补充 (prompt_optimizer) > 电商生成 (ecommerce_generation) > PPT生成辅助 (ppt_generation) > 视频生成 (video_generation)
 const ROLE_PRIORITY_ORDER: CapabilityRole[] = [
   'assistant',
   'prompt_optimizer',
   'ecommerce_generation',
   'ppt_generation',
+  'video_generation',
 ];
 
 // 简体中文注释：根据后备和优先级配置解析继承后的分配设置

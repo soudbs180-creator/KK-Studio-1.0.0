@@ -75,6 +75,28 @@ const dedupeById = (images: GeneratedImage[]): GeneratedImage[] => {
   return result;
 };
 
+const selectLatestImageNodes = (imageNodes: GeneratedImage[], limit: number): GeneratedImage[] => {
+  if (limit <= 0) return [];
+
+  const latest: GeneratedImage[] = [];
+  const getTimestamp = (image: GeneratedImage): number => Number(image.timestamp) || 0;
+
+  for (const image of imageNodes) {
+    let insertAt = latest.findIndex(candidate => getTimestamp(image) > getTimestamp(candidate));
+    if (insertAt === -1) {
+      if (latest.length >= limit) continue;
+      insertAt = latest.length;
+    }
+
+    latest.splice(insertAt, 0, image);
+    if (latest.length > limit) {
+      latest.pop();
+    }
+  }
+
+  return latest;
+};
+
 export function resolveImageNodesForDownload(params: ImageNodesDownloadParams): GeneratedImage[] {
   const scope = normalizeScope(params.scope);
   const imageNodes = params.activeCanvas?.imageNodes || [];
@@ -98,9 +120,7 @@ export function resolveImageNodesForDownload(params: ImageNodesDownloadParams): 
   }
 
   if (scope === 'latest_batch') {
-    return [...imageNodes]
-      .sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0))
-      .slice(0, 4);
+    return selectLatestImageNodes(imageNodes, 4);
   }
 
   return imageNodes;

@@ -25,13 +25,17 @@ test('default runtime auth state starts signed out until a server session exists
 test('AuthenticatedAppShell routes only fully signed-out users back to LoginScreen before the workspace renders', () => {
   const source = readSource('apps/web/src/app/AuthenticatedAppShell.tsx');
 
-  assert.match(source, /import LoginScreen from '\.\.\/components\/auth\/LoginScreen';/);
+  assert.doesNotMatch(source, /import LoginScreen from '\.\.\/components\/auth\/LoginScreen';/);
+  assert.match(source, /const LoginScreen = lazyWithRetry\(\(\) => import\('\.\.\/components\/auth\/LoginScreen'\)\);/);
   assert.match(source, /import \{ AppStartupScreen \} from '\.\.\/components\/common\/AppStartupScreen';/);
   assert.match(source, /import \{ useAuth \} from '\.\.\/context\/AuthContext';/);
   assert.match(source, /import \{ shouldShowLoginForAuthGate \} from '\.\/authGate';/);
   assert.match(source, /const \{ session, user, isTempUser, loading, sessionRecoveryWarning \} = useAuth\(\);/);
   assert.match(source, /if \(loading\) \{\s*\/\/ 简体中文注释：登录态检测期间直接显示纯黑占位，不使用大型进度条，秒进登录页面\s*return <div className="fixed inset-0 bg-\[(?:#09090b|var\(--bg-base\))\]" \/>;\s*\}/);
-  assert.match(source, /if \(shouldShowLoginForAuthGate\(\{ user, session, isTempUser \}\)\) \{\s*return <LoginScreen \/>\s*;\s*\}/);
+  assert.match(
+    source,
+    /if \(shouldShowLoginForAuthGate\(\{ user, session, isTempUser \}\)\) \{\s*return \(\s*<Suspense fallback=\{<AppStartupScreen stage="signed_out" warning=\{sessionRecoveryWarning\} \/>\}>\s*<LoginScreen \/>\s*<\/Suspense>\s*\);\s*\}/,
+  );
   assert.doesNotMatch(source, /if \(!user \|\| \(!session && !isTempUser\)\) \{\s*return <LoginScreen \/>\s*;\s*\}/);
   assert.doesNotMatch(source, /if \(!session \|\| !user \|\| isTempUser\) \{\s*return <LoginScreen \/>\s*;\s*\}/);
 });

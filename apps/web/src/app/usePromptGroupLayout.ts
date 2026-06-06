@@ -16,6 +16,7 @@ import {
 import { getPromptNodeBoundsWidth } from '../utils/promptNodeCardWidth';
 import { traceLocalPerformance } from '../services/system/localPerformanceTrace';
 import { buildPromptGroupOverlapMap } from './promptGroupOverlapMap';
+import { canvasLivePositionStore } from './canvasLivePositionStore';
 import type {
   Point,
   PromptGroupLayoutPresentationState,
@@ -566,7 +567,12 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
 
     if (hasLivePositionChanged) {
       liveNodePositionByIdRef.current = nextLivePositions;
-      syncLiveNodePositionState();
+      companionIds.forEach((nodeId) => {
+        const pos = nextLivePositions[nodeId];
+        if (pos) {
+          canvasLivePositionStore.setPosition(nodeId, pos);
+        }
+      });
     }
   }, [
     liveDerivedNodeIdsByOwnerRef,
@@ -1032,7 +1038,12 @@ export function usePromptGroupLayout(deps: UsePromptGroupLayoutDeps): UsePromptG
 
     if (hasLivePositionChanged) {
       liveNodePositionByIdRef.current = nextLivePositions;
-      syncLiveNodePositionState();
+      if (position) {
+        canvasLivePositionStore.setPosition(nodeId, position);
+      } else {
+        canvasLivePositionStore.setPosition(nodeId, null);
+        syncLiveNodePositionState();
+      }
     }
 
     if (!groupId) {

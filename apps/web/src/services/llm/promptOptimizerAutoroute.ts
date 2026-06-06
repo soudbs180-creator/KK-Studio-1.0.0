@@ -23,6 +23,7 @@ type PromptOptimizerAutorouteInput = {
   mode?: PromptOptimizerMode;
   aspectRatio?: string;
   referenceImageCount?: number;
+  preferredArchetypeId?: string; // 🎯 [New] 手动选择场景模式
 };
 
 export type PromptOptimizerAutorouteDecision = {
@@ -174,8 +175,10 @@ export function resolveAutomaticOptimizationRoute(
   rawPrompt: string,
   options?: PromptOptimizerAutorouteInput,
 ): PromptOptimizerAutorouteDecision {
-  const archetypeId = inferPromptOptimizationArchetype(rawPrompt, options?.mode);
-  return ROUTES[archetypeId];
+  const archetypeId = (options?.preferredArchetypeId && options.preferredArchetypeId !== 'auto')
+    ? (options.preferredArchetypeId as PromptOptimizerArchetypeId)
+    : inferPromptOptimizationArchetype(rawPrompt, options?.mode);
+  return ROUTES[archetypeId] || ROUTES.balanced;
 }
 
 export function buildAutomaticOptimizationInstruction(

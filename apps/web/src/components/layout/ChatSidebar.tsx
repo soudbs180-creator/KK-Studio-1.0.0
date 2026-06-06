@@ -1,7 +1,6 @@
 
 import React, { useDeferredValue, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { ArrowUp, Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Film, GitBranch, Layout, Loader2, MessageSquare, Mic, Pencil, Plus, RotateCcw, Square, User, X, Search, Download, Upload, Archive, Edit2, Trash2, Minus, Cpu, AlertTriangle, FolderOpen, Image as Picture, Eye, Lock, Ghost } from 'lucide-react';
-import { generateImage } from '../../services/llm/geminiService';
 
 // 简体中文：自定义扫把（Broom）图标组件，弥补内置图标库版本缺失
 const Broom: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ size = 24, ...props }) => (
@@ -28,7 +27,6 @@ const Broom: React.FC<React.SVGProps<SVGSVGElement> & { size?: number }> = ({ si
         <path d="m10 16-2 2" />
     </svg>
 );
-import { llmService } from '../../services/llm/LLMService';
 import { notify } from '../../services/system/notificationService';
 import { keyManager } from '../../services/auth/keyManager';
 import {
@@ -224,6 +222,18 @@ const CHAT_SESSION_TREE_EXPAND_KEY = 'kk_chat_sidebar_tree_expand_v1';
 const MODEL_MENU_SKELETON_COUNT = 3;
 
 type ModelMenuLoadingState = 'idle' | 'refreshing_with_cache' | 'bootstrapping_without_cache';
+type ChatOptions = import('../../services/llm/LLMAdapter').ChatOptions;
+type GenerateImageFn = typeof import('../../services/llm/geminiService').generateImage;
+
+const chatWithLlm = async (options: ChatOptions): Promise<string> => {
+    const { llmService } = await import('../../services/llm/LLMService');
+    return llmService.chat(options);
+};
+
+const generateImageOnDemand: GenerateImageFn = async (...args) => {
+    const { generateImage } = await import('../../services/llm/geminiService');
+    return generateImage(...args);
+};
 
 const createWelcomeMessage = (): Message => ({
     id: 'welcome',
@@ -254,7 +264,7 @@ const summarizeSessionTitle = async (
 ): Promise<string> => {
     try {
         const prompt = `请简要总结以下用户的问题/需求，生成一个通俗易懂、非常简短的会话标题（不超过 10 个字，直接返回标题，不要有任何解释、标点符号或前缀，也不要说“分支”、“总结”等字眼）：\n"${questionContent}"`;
-        const response = await llmService.chat({
+        const response = await chatWithLlm({
             modelId,
             messages: [{ role: 'user', content: prompt }],
             stream: false,
@@ -478,7 +488,7 @@ Return STRICT JSON only:
 {"intent":"qa|image-generate|image-edit","prompt":"string","confidence":0-1,"reason":"short"}`;
 
     const plannerUser = `User text:\n${userText}\n\nAttachments:\n${attachmentSummary}`;
-    const plannedRaw = await llmService.chat({
+    const plannedRaw = await chatWithLlm({
         modelId: plannerModelId,
         messages: [
             { role: 'system', content: plannerSystem },
@@ -766,7 +776,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
 
             const promptText = "请为我们之前的对话内容进行一次高度精炼的摘要总结，提炼出核心的事实、当前的任务状态和关键决策。要求言简意赅，不要有任何客套话。";
             
-            const responseText = await llmService.chat({
+            const responseText = await chatWithLlm({
                 modelId: selectedModel.id,
                 messages: [
                     ...history,
@@ -2173,7 +2183,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             }
 
             // 2. 调用生成服务
-            const result = await generateImage(
+            const result = await generateImageOnDemand(
                 prompt,
                 AspectRatio.SQUARE, // 默认方形
                 targetSize,
@@ -2377,7 +2387,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
             history.push({ role: 'user', content: messageContent });
 
             // 调用API (传递附件数据)
-            const responseText = await llmService.chat({
+            const responseText = await chatWithLlm({
                 modelId: selectedModel.id,
                 messages: history,
                 inlineData: inlineData.length > 0 ? inlineData : undefined,
@@ -2535,7 +2545,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content: '', modelId: selectedModel.id } : m)));
 
         try {
-            const responseText = await llmService.chat({
+            const responseText = await chatWithLlm({
                 modelId: selectedModel.id,
                 messages: history,
                 inlineData: inlineData.length > 0 ? inlineData : undefined,

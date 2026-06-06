@@ -1,3 +1,4 @@
+<!-- AI_ROUTING_KEY: state, validation, verification, milestone, handoff -->
 # Project State and Validation — KK Studio v1.5.4
 
 Last updated: 2026-06-04
