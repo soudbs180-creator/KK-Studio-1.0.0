@@ -10,7 +10,7 @@ import { kkWebApiClient, resolveKkApiModelProxyBaseUrl } from '../api/kkApiClien
 import { compressReferenceImagesIfNeeded } from '../../utils/imageUtils';
 import { kernelFetch } from '../http/requestKernel';
 import { keyManager } from '../auth/keyManager';
-import { normalizeWuyinImageSize, normalizeWuyinAspectRatio, normalizeWuyinReferenceImage } from '../llm/openAICompatibleWuyinRoute';
+import { normalizeWuyinImageSize, normalizeWuyinAspectRatio, normalizeWuyinReferenceImage, normalizeWuyinBaseUrl } from '../llm/openAICompatibleWuyinRoute';
 
 const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';
 const REDACTED_SECRET_PREFIX = '__kk_redacted__:';
@@ -103,7 +103,7 @@ function getWuyinRouteDetails(routeId: string) {
         }
         return {
           apiKey,
-          baseUrl: provider.baseUrl || 'https://api.wuyinkeji.com'
+          baseUrl: normalizeWuyinBaseUrl(provider.baseUrl || 'https://api.wuyinkeji.com')
         };
       }
     }
