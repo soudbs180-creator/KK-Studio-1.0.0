@@ -17,6 +17,7 @@ const userRouter = require('./routes/user');
 const chatRouter = require('./routes/chat');
 const ocrRouter = require('./routes/ocr');
 const aiAssistantRouter = require('./routes/ai-assistant');
+const configRouter = require('./routes/config');
 
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://kkai.plus',
@@ -145,6 +146,7 @@ function createApp() {
   app.use('/api', generateImageRouter);
   app.use('/api', ocrRouter);
   app.use('/api', aiAssistantRouter);
+  app.use('/api', configRouter);
 
   app.use((err, _req, res, _next) => {
     console.error('[server] request failed:', err);

@@ -157,7 +157,7 @@ test('ApiSettingsView keeps BYOK actions behind auth without hard-blocking serve
   assert.match(source, /key: runtimeKeyValue,/);
   assert.match(source, /const runtimeApiKeyValue = resolveRuntimeSecretForSave\(providerForm\.apiKey, existingProvider\?\.apiKey\);/);
   assert.match(source, /apiKey: runtimeApiKeyValue,/);
-  assert.match(source, /const wuyinApiKeyForSave = shouldUseDirectUserApiRecordWrites \? nextApiKeyValue : runtimeApiKeyValue;/);
+  assert.match(source, /const wuyinApiKeyForSave = resolveRuntimeSecretForSave\([\s\S]*?providerForm\.apiKey,[\s\S]*?shouldUseDirectUserApiRecordWrites/);
   assert.match(source, /buildCanonicalApiRecordId/);
   assert.match(source, /WUYIN_PRESET_LOGO_URL/);
   assert.doesNotMatch(source, /`key_\$\{Date\.now\(\)\}_\$\{Math\.random\(\)\.toString\(36\)\.slice\(2, 10\)\}`/);

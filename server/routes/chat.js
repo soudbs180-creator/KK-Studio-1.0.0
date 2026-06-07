@@ -96,6 +96,50 @@ router.post('/chat', async (req, res) => {
   res.setHeader('X-Refresh-Token', signJWT({ userId }));
 
   try {
+    const { getActiveGatewayProvider } = require('../utils/apiGatewayConfig');
+    const { SuchuangProvider } = require('../providers/suchuangProvider');
+    const activeProvider = getActiveGatewayProvider();
+
+    if (activeProvider === 'suchuang') {
+      const modelName = parsed.data.model || 'chat_index';
+      console.log(`Routing ${modelName} to Suchuang API Gateway`);
+
+      const pool = getPool();
+      const requiredCredits = await credits.getOperationCost(pool, 'chat');
+      const availableCredits = await credits.getUserCredits(userId);
+      if (availableCredits < requiredCredits) {
+        return sendInsufficientCredits(res, availableCredits, requiredCredits, requestId);
+      }
+
+      const currentCredits = await credits.deductCredits(userId, requiredCredits, 'chat');
+      let result;
+      try {
+        const lastMsg = parsed.data.messages[parsed.data.messages.length - 1]?.content || '';
+        result = await SuchuangProvider.generateText({
+          prompt: lastMsg,
+          modelId: modelName,
+          stream: false
+        });
+      } catch (err) {
+        try {
+          await credits.refundCredits(userId, requiredCredits, 'chat', currentCredits);
+        } catch (refundErr) {
+          console.error('[P0 ALERT] 积分退款失败，需人工介入', refundErr);
+        }
+        throw err;
+      }
+
+      res.setHeader('X-Refresh-Token', signJWT({ userId }));
+      res.setHeader('X-Client-Request-Id', requestId);
+
+      return res.json({
+        role: 'assistant',
+        content: result.text,
+        credits: currentCredits,
+        creditsCost: requiredCredits,
+      });
+    }
+
     // 2. 组装 Unified Internal Request payload
     const unifiedPayload = {
       task_type: 'chat',

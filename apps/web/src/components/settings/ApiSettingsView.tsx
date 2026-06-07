@@ -65,6 +65,15 @@ import { WUYIN_PRESET_LOGO_URL } from '../../services/auth/keyManagerProviderPre
 import { buildProviderPricingSnapshot, mergeProviderPricingSnapshot } from '../../services/auth/providerPricingSnapshot';
 import type { Supplier } from '../../services/billing/supplierService';
 import { buildWuyinOneKeyProvider, WUYIN_DEFAULT_CATALOG } from '../../services/llm/wuyinCatalog';
+import {
+  SUCHUANG_IMAGE_MODELS,
+  SUCHUANG_VIDEO_MODELS,
+  SUCHUANG_AUDIO_MODELS
+} from '../../config/suchuangModels';
+import {
+  PROVIDER_MODEL_LIBRARIES,
+  getProviderModelPriceLabel
+} from '../../config/providerModelLibraries';
 import { notify } from '../../services/system/notificationService';
 import {
   SETTINGS_ELEVATED_STYLE,
@@ -1051,12 +1060,22 @@ const PresetModelsCardComponent: React.FC<PresetModelsCardProps> = ({
       const meta = getModelMetadata(modelId);
       const type = inferModelType(modelId);
       const brand = inferModelBrand(modelId);
+
+      const suchuangModelList = [
+        ...SUCHUANG_IMAGE_MODELS,
+        ...SUCHUANG_VIDEO_MODELS,
+        ...SUCHUANG_AUDIO_MODELS
+      ];
+      const foundSuchuang = suchuangModelList.find(m => m.modelId === modelId);
+      const priceLabel = foundSuchuang ? getProviderModelPriceLabel(foundSuchuang) : undefined;
+
       return {
         id: modelId,
         name: meta.name || modelId,
         description: meta.description || '',
         type,
         brand,
+        priceLabel
       };
     });
   }, [models, getModelMetadata]);
@@ -1378,7 +1397,7 @@ const PresetModelsCardComponent: React.FC<PresetModelsCardProps> = ({
                             <div className="mt-4 flex justify-between items-center">
                               <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)] bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full border flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                {pick('就绪', 'Ready')}
+                                {model.priceLabel ? model.priceLabel : pick('就绪', 'Ready')}
                               </span>
                               <button
                                 type="button"
@@ -3063,7 +3082,10 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
           console.warn('读取本地速创价格配置失败:', e);
         }
 
-        const wuyinApiKeyForSave = shouldUseDirectUserApiRecordWrites ? nextApiKeyValue : runtimeApiKeyValue;
+        const wuyinApiKeyForSave = resolveRuntimeSecretForSave(
+          providerForm.apiKey,
+          shouldUseDirectUserApiRecordWrites ? (existingWuyinProvider?.apiKey || existingWuyinSlot?.key) : runtimeApiKeyValue
+        );
         if (!wuyinApiKeyForSave) {
           notify.error(
             pick('保存失败', 'Save failed'),
@@ -4021,7 +4043,92 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   };
 
   const renderAdvancedPanels = () => {
-    return null;
+    if (!showAdvancedWorkbench) return null;
+
+    return (
+      <>
+        <ApiWorkbenchCurrentViewSection
+          pick={pick}
+          activeTab={activeTab}
+          onChangeTab={setActiveTab}
+          latencyCards={latencyCards}
+          formatLatency={formatLatency}
+        />
+
+        <ApiWorkbenchStageSection
+          pick={pick}
+          showDiagnostics={showDiagnostics}
+          onToggleDiagnostics={handleToggleDiagnostics}
+          stage={userApiViewState.stage}
+          stageTone={stageTone}
+          stageTitle={stageTitle}
+          stageDescription={stageDescription}
+          stageInteractionLabel={stageInteractionLabel}
+          stageNextActionLabel={stageNextActionLabel}
+          stageBannerStyle={stageBannerStyle}
+          primaryActionIcon={stagePrimaryActionIcon}
+          primaryActionTone={stagePrimaryActionTone}
+          onPrimaryAction={handleStagePrimaryAction}
+          primaryActionLoading={busy === 'sync-cloud' || busy === 'health-check'}
+          primaryActionTestId="api-workbench-stage-action"
+          isUsingReadonlyProfileFallback={shouldUseReadonlySnapshotForDisplay}
+          runtimeRouteCount={officialSlots.length + thirdPartyProviders.length}
+        />
+
+        {showDiagnostics && (
+          <div className="space-y-4 w-full">
+            <div className="flex justify-center my-4">
+              <button
+                type="button"
+                className="px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] bg-[var(--settings-surface-elevated)] border border-[var(--settings-border-subtle)] rounded-lg hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+                onClick={() => setShowAdvancedDetails(!showAdvancedDetails)}
+              >
+                {showAdvancedDetails ? pick('隐藏更多高级选项', 'Hide more advanced items') : pick('更多高级选项', 'More advanced items')}
+              </button>
+            </div>
+            {showAdvancedDetails && (
+              <ApiWorkbenchDiagnosticsSection
+                pick={pick}
+                diagnosticsActionDisabled={diagnosticsRefreshDisabled}
+                onRefreshDiagnostics={() => void refreshApiHealth(true)}
+                apiReachable={apiHealth?.reachable}
+                apiErrorMessage={null}
+                persistenceWritable={!isUserApiPersistenceDegraded}
+                isAuthenticated={hasAuthenticatedUser}
+                hasReadonlySnapshot={hasReadonlySnapshot}
+              />
+            )}
+          </div>
+        )}
+
+        <ApiWorkbenchRoutePoolSection
+          pick={pick}
+          items={routePoolItems}
+        />
+
+        <ApiWorkbenchCapabilitySection
+          pick={pick}
+          items={capabilityCards}
+          customRoutingEnabled={customRoutingEnabled}
+          onCustomRoutingToggle={handleCustomRoutingToggle}
+        />
+
+        <ApiWorkbenchOcrSection
+          pick={pick}
+          enabled={ocrSettings.enabled !== false}
+          defaultLanguage={ocrSettings.defaultLanguage || 'zh'}
+          keySourceLabel={ocrKeySourceLabel}
+          healthLabel={ocrHealthLabel}
+          onEnabledChange={(enabled) => updateOcrServiceSettings({ enabled })}
+          onDefaultLanguageChange={(value) => updateOcrServiceSettings({ defaultLanguage: value })}
+        />
+
+        <ApiWorkbenchPlatformSection
+          pick={pick}
+          onOpenPlatformAssistant={handleOpenPlatformAssistant}
+        />
+      </>
+    );
   };
 
   if (officialRouteMissing) {
@@ -4145,6 +4252,17 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
             onAddOfficial={handleCreateOfficialAction}
             onAddProvider={beginCreateProvider}
           />
+
+          <div className="flex justify-center mt-6 mb-4">
+            <button
+              type="button"
+              className="px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] bg-[var(--settings-surface-elevated)] border border-[var(--settings-border-subtle)] rounded-lg hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+              onClick={() => setShowAdvancedWorkbench(!showAdvancedWorkbench)}
+            >
+              {showAdvancedWorkbench ? pick('隐藏高级模式', 'Hide advanced mode') : pick('高级模式', 'Advanced mode')}
+            </button>
+          </div>
+          {renderAdvancedPanels()}
         </>
       ) : null}
 
@@ -4691,8 +4809,20 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         </SettingsSection>
         {selectedProvider && (
           <PresetModelsCardComponent
-            title={pick('可用模型', 'Available models')}
-            models={selectedProvider.models || []}
+            title={
+              selectedProvider.name === '速创 API' || /wuyinkeji/i.test(selectedProvider.baseUrl)
+                ? pick('速创 API 模型库', 'Suchuang API Models')
+                : pick('可用模型', 'Available models')
+            }
+            models={
+              selectedProvider.name === '速创 API' || /wuyinkeji/i.test(selectedProvider.baseUrl)
+                ? [
+                    ...SUCHUANG_IMAGE_MODELS.map(m => m.modelId),
+                    ...SUCHUANG_VIDEO_MODELS.map(m => m.modelId),
+                    ...SUCHUANG_AUDIO_MODELS.map(m => m.modelId)
+                  ]
+                : selectedProvider.models || []
+            }
             onSync={() => void refreshProvider(selectedProvider)}
             syncLoading={busy === `provider-check:${selectedProvider.id}`}
             isMobile={isMobile}

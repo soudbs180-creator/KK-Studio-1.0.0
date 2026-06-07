@@ -97,6 +97,10 @@ async function handleGenerateImage(req, res) {
   let currentCredits = 0;
   let creditsDeducted = false;
 
+  const { getActiveGatewayProvider } = require('../utils/apiGatewayConfig');
+  const { SuchuangProvider } = require('../providers/suchuangProvider');
+  const activeProvider = getActiveGatewayProvider();
+
   try {
     requiredCredits = await credits.getOperationCost(pool, operationKey);
     const availableCredits = await credits.getUserCredits(userId);
@@ -113,6 +117,54 @@ async function handleGenerateImage(req, res) {
 
     currentCredits = await credits.deductCredits(userId, requiredCredits, operationKey);
     creditsDeducted = true;
+
+    if (activeProvider === 'suchuang') {
+      const modelName = req.body.model || 'image_nanoBanana2';
+      console.log(`Routing ${modelName} to Suchuang API Gateway`);
+
+      const result = await SuchuangProvider.generateImage({
+        prompt,
+        modelId: modelName,
+        aspectRatio,
+        referenceImages: referenceImageBase64 ? [referenceImageBase64] : [],
+        generateCount: 1,
+      });
+
+      const imageUrl = result.image;
+      if (!imageUrl) {
+        throw new Error('Suchuang API failed to return image URL.');
+      }
+
+      const uploadsDir = path.join(__dirname, '../uploads');
+      if (!fs.existsSync(uploadsDir)) {
+        await fs.promises.mkdir(uploadsDir, { recursive: true });
+      }
+
+      const fileExt = imageUrl.split('.').pop()?.split('?')[0] || 'png';
+      const filename = `kkai-gen-${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
+      const filePath = path.join(uploadsDir, filename);
+
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to download image from Suchuang upstream: ${imageResponse.statusText}`);
+      }
+      const arrayBuffer = await imageResponse.arrayBuffer();
+      await fs.promises.writeFile(filePath, Buffer.from(arrayBuffer));
+      const staticImageUrl = `/uploads/${filename}`;
+
+      await pool.query(
+        'INSERT INTO public.generations (user_id, prompt, image_url, model, type) VALUES ($1, $2, $3, $4, $5)',
+        [userId, prompt, staticImageUrl, modelName, operationKey]
+      );
+
+      return res.json({
+        success: true,
+        image: staticImageUrl,
+        text: '',
+        credits: currentCredits,
+        creditsCost: requiredCredits,
+      });
+    }
 
     const contents = [{ text: prompt }];
     if (referenceImageBase64) {
