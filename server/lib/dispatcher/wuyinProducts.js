@@ -302,6 +302,28 @@ const WUYIN_PRODUCTS = {
     },
     responseFields: ['data.url', 'data.duration', 'data.subtitle', 'data.words'],
   },
+  voice_clone: {
+    id: 'voice_clone',
+    displayName: '语音克隆（同步）',
+    docUrl: 'https://api.wuyinkeji.com/doc/12',
+    category: 'audio',
+    executionMode: 'sync',
+    endpoint: 'https://api.wuyinkeji.com/api/voice/clone',
+    method: 'POST',
+    contentType: 'application/json;charset:utf-8;',
+    auth: HEADER_AUTH,
+    enabled: false,
+    executable: false,
+    disabledReason: 'Documented in Wuyin catalog, but execution is disabled by default. Enable only after adding explicit consent/compliance controls.',
+    price: { amount: 6, currency: 'CNY', unit: 'request', points: null },
+    qps: 30,
+    requestFields: {
+      audio_url: field(true, 'string', { publicUrl: true }),
+      text: field(true, 'string'),
+      name: field(false, 'string'),
+    },
+    responseFields: ['data.demo_audio', 'data.voice_id'],
+  },
   'sora2-new': {
     id: 'sora2-new',
     displayName: 'sora2-new',
@@ -352,15 +374,8 @@ const WUYIN_DETAIL_PRODUCT = {
   method: 'GET',
   contentType: 'application/json',
   auth: ASYNC_AUTH,
-  requestFields: {
-    id: field(true, 'string'),
-  },
-  responseStatusMap: {
-    0: 'initializing',
-    1: 'processing',
-    2: 'succeeded',
-    3: 'failed',
-  },
+  requestFields: { id: field(true, 'string') },
+  responseStatusMap: { 0: 'initializing', 1: 'processing', 2: 'succeeded', 3: 'failed' },
 };
 
 const WUYIN_SORA2_DETAIL_PRODUCT = {
@@ -371,15 +386,8 @@ const WUYIN_SORA2_DETAIL_PRODUCT = {
   method: 'GET',
   contentType: 'application/x-www-form-urlencoded;charset:utf-8;',
   auth: ASYNC_AUTH,
-  requestFields: {
-    id: field(true, 'string'),
-  },
-  responseStatusMap: {
-    0: 'queued',
-    1: 'succeeded',
-    2: 'failed',
-    3: 'processing',
-  },
+  requestFields: { id: field(true, 'string') },
+  responseStatusMap: { 0: 'queued', 1: 'succeeded', 2: 'failed', 3: 'processing' },
 };
 
 function getWuyinProduct(modelId) {
@@ -389,7 +397,7 @@ function getWuyinProduct(modelId) {
 function listWuyinProducts(options = {}) {
   const products = Object.values(WUYIN_PRODUCTS);
   if (options.includeDisabled === true) return products;
-  return products.filter((product) => product.enabled !== false);
+  return products.filter((product) => product.enabled !== false && product.executable !== false);
 }
 
 module.exports = {
