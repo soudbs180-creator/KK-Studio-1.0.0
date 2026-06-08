@@ -44,6 +44,47 @@ function wuyinTaskContract(category, adapterId = 'wuyin_documented_task') {
   };
 }
 
+const TWELVE_AI_CONTRACT = {
+  providerId: '12ai-documented-multi-protocol',
+  displayName: '12AI',
+  docs: ['https://doc.12ai.org/docs/api'],
+  allowGenericFallback: false,
+  supportedTasks: {
+    chat: {
+      adapterId: 'twelveai_multi_protocol',
+      method: 'POST',
+      baseUrl: 'https://cdn.12ai.org',
+      directBaseUrl: 'https://api.12ai.org',
+      auth: 'OpenAI/Claude: Authorization: Bearer <sk-token>; Gemini: ?key=<sk-token>',
+      contentType: 'application/json',
+      protocols: {
+        openai_chat: {
+          endpoint: '/v1/chat/completions',
+          requestShape: '{ model, messages }',
+          responseShape: 'OpenAI-compatible chat completion',
+        },
+        claude_messages: {
+          endpoint: '/v1/messages',
+          requiredHeaders: ['anthropic-version: 2023-06-01'],
+          requestShape: '{ model, messages, system?, max_tokens?, temperature?, stream? }',
+          responseShape: 'Claude Messages response',
+        },
+        gemini_generate_content: {
+          endpoint: '/v1beta/models/{model}:generateContent?key=<token>',
+          requestShape: '{ contents: [{ parts: [{ text }] }] }',
+          responseShape: 'Gemini candidates/content/parts response',
+        },
+      },
+      note: '12AI 是独立厂商多协议预设，不混用 OpenAI/Claude/Gemini 官方 profile；只复用统一内部请求抽象。',
+    },
+  },
+  documentedButNotExecutableYet: {
+    responses: ['/v1/responses', '/v1/responses/{response_id}', '/v1/responses/{response_id}/cancel'],
+    images: ['/v1beta/models/{model}:generateContent', '/v1/images/generations', '/v1/images/edits', '/v1/task/submit', '/v1/task/{task_id}'],
+    videos: ['/v1/videos', '/v1/videos/{id}', '/v1/videos/{id}/content'],
+  },
+};
+
 const STRICT_PROVIDER_CONTRACTS = {
   'openai-official': {
     providerId: 'openai-official',
@@ -191,6 +232,8 @@ const STRICT_PROVIDER_CONTRACTS = {
       chat: openAIChatContract({ adapterId: 'apimart_chat_completions', baseUrl: 'https://api.apimart.ai/v1', endpoint: '/chat/completions', responseShape: '{ code, data: OpenAI-compatible chat completion }' }),
     },
   },
+  '12ai-documented-multi-protocol': TWELVE_AI_CONTRACT,
+  '12ai-docs-pending': TWELVE_AI_CONTRACT,
   'wuyin-suchuang-form': {
     providerId: 'wuyin-suchuang-form',
     displayName: 'Wuyin / 速创',
@@ -211,14 +254,6 @@ const STRICT_PROVIDER_CONTRACTS = {
       audio: wuyinTaskContract('audio'),
       utility: wuyinTaskContract('utility'),
     },
-  },
-  '12ai-docs-pending': {
-    providerId: '12ai-docs-pending',
-    displayName: '12AI',
-    docs: ['https://doc.12ai.org/docs/api'],
-    allowGenericFallback: false,
-    requiresDocsVerification: true,
-    supportedTasks: {},
   },
 };
 
