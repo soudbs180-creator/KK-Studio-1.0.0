@@ -178,7 +178,20 @@ function buildWuyinVideoSubmitUrl(baseUrl, route) {
 }
 
 function buildWuyinVideoDetailUrl(baseUrl, taskId) {
-  return `${normalizeWuyinVideoBaseUrl(baseUrl)}${WUYIN_ASYNC_VIDEO_DETAIL_PATH}?id=${encodeURIComponent(String(taskId || '').trim())}`;
+  const cleanBase = normalizeWuyinVideoBaseUrl(baseUrl);
+  let detailPath = WUYIN_ASYNC_VIDEO_DETAIL_PATH;
+  let finalBase = cleanBase;
+  if (cleanBase.includes('/proxy') || cleanBase.includes(':8080')) {
+    try {
+      const parsed = new URL(cleanBase);
+      finalBase = `${parsed.protocol}//${parsed.host}`;
+      detailPath = '/proxy/detail';
+    } catch (e) {
+      finalBase = cleanBase.replace(/\/proxy\/.*/i, '');
+      detailPath = '/proxy/detail';
+    }
+  }
+  return `${finalBase}${detailPath}?id=${encodeURIComponent(String(taskId || '').trim())}`;
 }
 
 function isWuyinDetailQueryUrl(url) {
@@ -189,6 +202,7 @@ function isWuyinDetailQueryUrl(url) {
       pathname === '/api/async/detail'
       || pathname === '/api/sora2/detail'
       || pathname === '/api/img/drawDetail'
+      || pathname === '/proxy/detail'
     );
   } catch {
     return false;

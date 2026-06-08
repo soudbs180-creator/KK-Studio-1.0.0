@@ -821,7 +821,17 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
         signal?: AbortSignal
     ): Promise<{ payload: any; requestPath: string }> {
         const cleanBase = normalizeWuyinBaseUrl(keySlot.baseUrl || '');
-        const detailUrl = new URL(`${cleanBase}${WUYIN_ASYNC_DETAIL_PATH}`);
+        let detailUrl: URL;
+        if (cleanBase.includes('/proxy') || cleanBase.includes(':8080')) {
+            try {
+                const parsedBase = new URL(cleanBase);
+                detailUrl = new URL(`${parsedBase.protocol}//${parsedBase.host}/proxy/detail`);
+            } catch {
+                detailUrl = new URL(`${cleanBase.replace(/\/proxy\/.*/i, '')}/proxy/detail`);
+            }
+        } else {
+            detailUrl = new URL(`${cleanBase}${WUYIN_ASYNC_DETAIL_PATH}`);
+        }
         detailUrl.searchParams.set('id', taskId);
         
         const response = await forwardUserRouteGenericRequest({
@@ -835,7 +845,7 @@ export class OpenAICompatibleAdapter implements LLMAdapter {
             signal,
         });
 
-        const requestPath = `${WUYIN_ASYNC_DETAIL_PATH}?id=${encodeURIComponent(taskId)}`;
+        const requestPath = `${detailUrl.pathname}?id=${encodeURIComponent(taskId)}`;
         const raw = await response.text().catch(() => '');
 
         if (!response.ok) {

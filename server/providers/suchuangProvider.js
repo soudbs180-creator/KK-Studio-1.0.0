@@ -176,7 +176,7 @@ async function _submitJson(endpointPath, body, apiKey, nodeId, projectId, modelI
 
 async function _pollAsyncDetail(taskId, mediaType, apiKey, modelId, useProxy) {
   const baseUrl = getGatewayBaseUrl('suchuang');
-  const detailUrl = `${baseUrl.replace(/\/+$/, '')}/api/async/detail?id=${encodeURIComponent(taskId)}`;
+  const detailUrl = `${baseUrl.replace(/\/+$/, '')}/api/async/detail?key=${encodeURIComponent(apiKey)}&id=${encodeURIComponent(taskId)}`;
   
   const response = await fetch(detailUrl, {
     method: 'GET',

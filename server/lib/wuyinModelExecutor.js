@@ -650,7 +650,11 @@ async function checkWuyinTaskStatus({ catalogItem, apiKey, providerTaskId, submi
       const parsedBase = new URL(baseUrl);
       const isOfficialBase = parsedBase.host.toLowerCase().includes('wuyinkeji.com');
       if (!isOfficialBase) {
-        detailUrl = `${parsedBase.protocol}//${parsedBase.host}${detailPath}`;
+        if (baseUrl.includes('/proxy') || baseUrl.includes(':8080')) {
+          detailUrl = `${parsedBase.protocol}//${parsedBase.host}/proxy/detail`;
+        } else {
+          detailUrl = `${parsedBase.protocol}//${parsedBase.host}${detailPath}`;
+        }
       }
     } catch (e) {
       // ignore

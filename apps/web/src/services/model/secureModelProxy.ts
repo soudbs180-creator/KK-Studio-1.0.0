@@ -289,9 +289,18 @@ export async function checkWuyinClientDirectTaskStatus(
   
   const apiKey = route.apiKey;
   const baseUrl = route.baseUrl.replace(/\/+$/, '');
-  
-  const detailPath = '/api/async/detail';
-  let detailUrl = `${baseUrl}${detailPath}`;
+  let detailUrl = '';
+  if (baseUrl.includes('/proxy') || baseUrl.includes(':8080')) {
+    try {
+      const parsedBase = new URL(baseUrl);
+      detailUrl = `${parsedBase.protocol}//${parsedBase.host}/proxy/detail`;
+    } catch {
+      detailUrl = `${baseUrl.replace(/\/proxy\/.*/i, '')}/proxy/detail`;
+    }
+  } else {
+    const detailPath = '/api/async/detail';
+    detailUrl = `${baseUrl}${detailPath}`;
+  }
   
   const parsed = new URL(detailUrl);
   parsed.searchParams.set('id', providerTaskId);
