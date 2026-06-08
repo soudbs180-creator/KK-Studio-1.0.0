@@ -1,20 +1,25 @@
 /**
  * @file adapterRegistry.js
  * @module server/lib/dispatcher
- * @description 后端协议适配器注册中心。负责定义不同通信协议面（Surface）的
- *              请求 Payload 组装、Headers 构造以及响应字段提取策略，实现非标接口归一化。
+ * @description AI Router 协议适配器注册中心。负责把统一 Chat/Image 请求转换为不同供应商协议，
+ *              并把响应归一化为统一结果。管理员系统渠道和用户自带 Key 共用这些适配器；
+ *              管理员积分计费只包在外层，不影响协议执行。
  * @author KK-Studio Team
- * @version 1.6.0
+ * @version 2.0.0
  */
 
 const querystring = require('querystring');
+const { matchProviderProfile } = require('./providerProfiles');
 
-function normalizeBaseUrl(baseUrl) {
+function normalizeBaseUrl(baseUrl, options = {}) {
   let clean = String(baseUrl || '').trim().replace(/\/+$/, '');
   const suffixes = [
     '/v1/chat/completions',
     '/chat/completions',
     '/api/chat/completions',
+    '/v1/messages',
+    '/messages',
+    '/v1beta/models',
   ];
 
   let changed = true;
@@ -31,76 +36,72 @@ function normalizeBaseUrl(baseUrl) {
   }
 
   if (!clean) return '';
-  if (!/\/v\d+(?:beta)?$/i.test(clean) && !clean.endsWith('/compatible-mode')) {
+  if (options.noVersionAppend) return clean;
+  if (!/\/v\d+(?:beta)?$/i.test(clean) && !clean.endsWith('/compatible-mode') && !/\/api\/v\d+$/i.test(clean)) {
     return `${clean}/v1`;
   }
   return clean;
 }
 
-function getHostname(value) {
-  try {
-    return new URL(String(value || '').trim()).hostname.toLowerCase();
-  } catch {
-    return '';
-  }
-}
-
 function normalizeAdapterId(adapterIdOrType, channel = {}) {
   const explicit = String(adapterIdOrType || '').trim().toLowerCase();
-  const profile = String(channel.request_profile_id || channel.provider_kind || channel.provider_id || '').trim().toLowerCase();
-  const baseUrl = String(channel.base_url || '').trim().toLowerCase();
-  const hostname = getHostname(channel.base_url);
+  const profile = matchProviderProfile(channel);
 
-  // 中文注释：显式配置优先，但 auto/default/openai 仍允许根据 URL 自动纠偏，降低第三方接入门槛。
   if (explicit && !['auto', 'default', 'openai'].includes(explicit)) {
     if (['custom_form', 'form', 'wuyin_form', 'suchuang_form'].includes(explicit)) return 'custom_form_urlencoded';
     if (['openai_chat', 'openai_compat', 'openai-compatible', 'chat_completions'].includes(explicit)) return 'openai_chat_completions';
+    if (['anthropic', 'claude', 'claude_messages'].includes(explicit)) return 'anthropic_messages';
+    if (['gemini', 'google_gemini', 'generate_content'].includes(explicit)) return 'google_gemini_generate_content';
     return explicit;
   }
 
-  if (
-    profile.includes('wuyin')
-    || profile.includes('suchuang')
-    || hostname.includes('wuyinkeji.com')
-    || baseUrl.includes('/api/chat/index')
-  ) {
-    return 'custom_form_urlencoded';
-  }
+  return profile.adapterId || 'openai_chat_completions';
+}
 
-  // 中文注释：绝大多数第三方中转站都声称 OpenAI-compatible；统一走该协议面，并由 OpenAICompatAdapter 清洗重复路径。
-  return 'openai_chat_completions';
+function normalizeMessages(messages = []) {
+  return (Array.isArray(messages) ? messages : [])
+    .map((message) => ({
+      role: message.role === 'assistant' ? 'assistant' : message.role === 'system' ? 'system' : 'user',
+      content: typeof message.content === 'string' ? message.content : JSON.stringify(message.content || ''),
+    }))
+    .filter((message) => message.content.length > 0);
+}
+
+function splitSystemPrompt(messages = []) {
+  const normalized = normalizeMessages(messages);
+  const systemMessages = normalized.filter((message) => message.role === 'system');
+  const rest = normalized.filter((message) => message.role !== 'system');
+  return {
+    systemPrompt: systemMessages.map((message) => message.content).join('\n\n').trim(),
+    messages: rest,
+  };
 }
 
 class OpenAICompatAdapter {
-  /**
-   * 拼装标准 OpenAI 兼容的 HTTP 请求
-   */
   buildRequest(provider, modelId, unifiedPayload) {
     const baseUrl = normalizeBaseUrl(provider.base_url || 'https://api.openai.com/v1');
     const url = `${baseUrl}/chat/completions`;
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${provider.api_key}`
+      'Authorization': `Bearer ${provider.api_key}`,
     };
 
     const body = JSON.stringify({
       model: modelId,
-      messages: unifiedPayload.messages,
+      messages: normalizeMessages(unifiedPayload.messages),
       temperature: unifiedPayload.temperature ?? 0.7,
       max_tokens: unifiedPayload.max_tokens,
-      stream: unifiedPayload.stream ?? false
+      stream: unifiedPayload.stream ?? false,
     });
 
     return { url, method: 'POST', headers, body };
   }
 
-  /**
-   * 解析标准 OpenAI 响应
-   */
   extractContent(data) {
     const content = data?.choices?.[0]?.message?.content
       || data?.choices?.[0]?.delta?.content
-      || data?.output_text;
+      || data?.output_text
+      || data?.data?.choices?.[0]?.message?.content;
     if (typeof content !== 'string' || content.length === 0) {
       throw new Error('OpenAI 兼容协议返回空内容');
     }
@@ -108,36 +109,115 @@ class OpenAICompatAdapter {
   }
 }
 
-class CustomFormUrlencodedAdapter {
-  /**
-   * 拼装非标的 x-www-form-urlencoded 表单请求（如速创 API 般高度定制）
-   */
+class AnthropicMessagesAdapter {
   buildRequest(provider, modelId, unifiedPayload) {
-    // 取得消息历史中最后一条 user 消息
-    const messages = unifiedPayload.messages || [];
+    const baseUrl = normalizeBaseUrl(provider.base_url || 'https://api.anthropic.com/v1');
+    const url = `${baseUrl}/messages`;
+    const { systemPrompt, messages } = splitSystemPrompt(unifiedPayload.messages);
+    const headers = {
+      'Content-Type': 'application/json',
+      'x-api-key': provider.api_key,
+      'anthropic-version': provider.anthropic_version || '2023-06-01',
+    };
+
+    const bodyPayload = {
+      model: modelId,
+      messages: messages.map((message) => ({
+        role: message.role === 'assistant' ? 'assistant' : 'user',
+        content: message.content,
+      })),
+      max_tokens: unifiedPayload.max_tokens || 4096,
+      temperature: unifiedPayload.temperature ?? 0.7,
+      stream: unifiedPayload.stream ?? false,
+    };
+    if (systemPrompt) {
+      bodyPayload.system = systemPrompt;
+    }
+
+    return { url, method: 'POST', headers, body: JSON.stringify(bodyPayload) };
+  }
+
+  extractContent(data) {
+    const content = Array.isArray(data?.content)
+      ? data.content.map((item) => item?.text || '').join('').trim()
+      : data?.completion || data?.text;
+    if (typeof content !== 'string' || content.length === 0) {
+      throw new Error('Claude Messages 协议返回空内容');
+    }
+    return content;
+  }
+}
+
+class GoogleGeminiGenerateContentAdapter {
+  buildRequest(provider, modelId, unifiedPayload) {
+    const baseUrl = normalizeBaseUrl(provider.base_url || 'https://generativelanguage.googleapis.com/v1beta', { noVersionAppend: true });
+    const cleanBase = baseUrl.replace(/\/+$/, '');
+    const url = `${cleanBase}/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(provider.api_key)}`;
+    const { systemPrompt, messages } = splitSystemPrompt(unifiedPayload.messages);
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+
+    const contents = messages.map((message) => ({
+      role: message.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: message.content }],
+    }));
+
+    const bodyPayload = {
+      contents,
+      generationConfig: {
+        temperature: unifiedPayload.temperature ?? 0.7,
+        maxOutputTokens: unifiedPayload.max_tokens,
+      },
+    };
+    if (systemPrompt) {
+      bodyPayload.systemInstruction = { parts: [{ text: systemPrompt }] };
+    }
+
+    return { url, method: 'POST', headers, body: JSON.stringify(bodyPayload) };
+  }
+
+  extractContent(data) {
+    const parts = data?.candidates?.[0]?.content?.parts || [];
+    const content = parts.map((part) => part?.text || '').join('').trim();
+    if (!content) {
+      throw new Error('Gemini generateContent 协议返回空内容');
+    }
+    return content;
+  }
+}
+
+class CustomFormUrlencodedAdapter {
+  buildRequest(provider, modelId, unifiedPayload) {
+    const messages = normalizeMessages(unifiedPayload.messages);
     const lastUserMessage = [...messages].reverse().find(msg => msg.role === 'user');
     const content = lastUserMessage ? lastUserMessage.content : unifiedPayload.user_input || '';
 
-    const url = provider.base_url; // 对于定制接口，直接使用完整的 URL 端点
+    const url = provider.base_url;
     const headers = {
       'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
-      'Authorization': provider.api_key // 自定义 API 密钥头部
+      'Authorization': provider.api_key,
     };
 
     const body = querystring.stringify({
-      content: content,
+      content,
       model: modelId,
-      stream: 'false'
+      stream: 'false',
     });
 
     return { url, method: 'POST', headers, body };
   }
 
-  /**
-   * 解析扁平表单响应，支持多种可能的内容字段
-   */
   extractContent(data) {
-    const content = data?.content || data?.text || data?.message || data?.data?.content || data?.data?.text;
+    const content = data?.content
+      || data?.text
+      || data?.message
+      || data?.msg
+      || data?.data?.content
+      || data?.data?.text
+      || data?.data?.message
+      || data?.data?.answer
+      || data?.data?.output;
     if (typeof content !== 'string' || content.length === 0) {
       throw new Error('表单自定义协议返回空内容');
     }
@@ -146,15 +226,12 @@ class CustomFormUrlencodedAdapter {
 }
 
 const adapters = {
-  'openai_chat_completions': new OpenAICompatAdapter(),
-  'custom_form_urlencoded': new CustomFormUrlencodedAdapter()
+  openai_chat_completions: new OpenAICompatAdapter(),
+  anthropic_messages: new AnthropicMessagesAdapter(),
+  google_gemini_generate_content: new GoogleGeminiGenerateContentAdapter(),
+  custom_form_urlencoded: new CustomFormUrlencodedAdapter(),
 };
 
-/**
- * 根据协议面标识获取具体的协议适配器，兼容数据库中配置的 endpoint_type。
- * @param {string|object} adapterIdOrType 适配器协议 ID、endpoint_type 或完整渠道对象
- * @param {object} channel 完整渠道对象，可用于自动识别第三方协议画像
- */
 function getAdapter(adapterIdOrType, channel = {}) {
   const channelConfig = typeof adapterIdOrType === 'object' && adapterIdOrType
     ? adapterIdOrType
@@ -174,5 +251,5 @@ function getAdapter(adapterIdOrType, channel = {}) {
 module.exports = {
   getAdapter,
   normalizeAdapterId,
-  normalizeBaseUrl
+  normalizeBaseUrl,
 };
