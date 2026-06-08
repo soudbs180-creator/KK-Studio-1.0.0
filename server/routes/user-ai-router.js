@@ -2,7 +2,7 @@
  * @file user-ai-router.js
  * @module server/routes
  * @description 用户自带 Key 的统一 AI Router。该路由不做系统积分扣费，只复用通用 Provider Profile + Adapter
- *              执行用户自己的接口。当前优先接管 mode=chat，其它图片/视频/音频继续交给 legacy user.js。
+ *              执行用户自己的接口。命中已知厂商强预设时，必须通过 strictProviderContracts 校验，禁止回落旧逻辑。
  */
 
 const fs = require('fs');
@@ -13,6 +13,7 @@ const express = require('express');
 const fetch = require('node-fetch');
 const { verifyJWT, signJWT } = require('../lib/jwt');
 const { getAdapter, normalizeAdapterId } = require('../lib/dispatcher/adapterRegistry');
+const { assertStrictTaskSupported } = require('../lib/dispatcher/strictProviderContracts');
 
 const router = express.Router();
 const LOCAL_STORAGE_PATH = path.resolve(__dirname, '../../.kk-local/local-user-apis.json');
@@ -49,16 +50,16 @@ function okEnvelope(data, req) {
   };
 }
 
-function errorEnvelope(req, code, message) {
+function errorEnvelope(req, code, message, extra = {}) {
   return {
     success: false,
-    error: { code, message },
+    error: { code, message, ...extra },
     meta: buildMeta(req),
   };
 }
 
-function sendUserRouterError(res, req, status, code, message) {
-  return res.status(status).json(errorEnvelope(req, code, message));
+function sendUserRouterError(res, req, status, code, message, extra = {}) {
+  return res.status(status).json(errorEnvelope(req, code, message, extra));
 }
 
 function isObjectRecord(value) {
@@ -252,6 +253,32 @@ function resolveModelId(route, body) {
   return 'gpt-4o-mini';
 }
 
+function enforceStrictContract(req, res, { profileId, taskType, adapterId, modelId }) {
+  try {
+    const contractTask = assertStrictTaskSupported(profileId, taskType, { modelId });
+    if (contractTask?.adapterId && contractTask.adapterId !== adapterId) {
+      return sendUserRouterError(
+        res,
+        req,
+        400,
+        'STRICT_PROVIDER_ADAPTER_MISMATCH',
+        `强预设 ${profileId} 的 ${taskType} 任务必须使用 ${contractTask.adapterId}，当前为 ${adapterId}。已阻止旧逻辑污染。`,
+        { route: { profileId, taskType, adapterId, expectedAdapterId: contractTask.adapterId, modelId } },
+      );
+    }
+    return null;
+  } catch (err) {
+    return sendUserRouterError(
+      res,
+      req,
+      err.statusCode || 400,
+      err.code || 'STRICT_PROVIDER_CONTRACT_REJECTED',
+      err.message,
+      { route: err.route || { profileId, taskType, modelId } },
+    );
+  }
+}
+
 async function handleUnifiedUserChatMode(req, res, profileState) {
   const routeId = String(req.body?.routeId || req.headers['x-key-slot-id'] || '').trim();
   const route = resolveLocalUserRoute(profileState, routeId);
@@ -281,9 +308,17 @@ async function handleUnifiedUserChatMode(req, res, profileState) {
     request_profile_id: route.requestProfileId || route.format || '',
     provider_kind: 'user',
   };
-  const adapterId = normalizeAdapterId(endpointType, channel);
-  const adapter = getAdapter(endpointType, channel);
   const modelId = resolveModelId(route, req.body || {});
+  const adapterId = normalizeAdapterId(endpointType, channel);
+  const strictErrorResponse = enforceStrictContract(req, res, {
+    profileId: channel.request_profile_id,
+    taskType: 'chat',
+    adapterId,
+    modelId,
+  });
+  if (strictErrorResponse) return strictErrorResponse;
+
+  const adapter = getAdapter(endpointType, channel);
   const unifiedPayload = {
     task_type: 'chat',
     model: modelId,
@@ -351,6 +386,7 @@ async function handleUnifiedUserChatMode(req, res, profileState) {
         adapter: adapterId,
         requestProfileId: channel.request_profile_id || null,
         model: modelId,
+        strictContractChecked: Boolean(channel.request_profile_id),
       },
     }, req));
   } catch (err) {
