@@ -4,6 +4,7 @@
  * @description AI Router 管理员供应商保存路由。它覆盖旧 admin credit-providers PUT 入口，
  *              确保探测得到的 requestProfileId / routeStrategy / endpointType 能完整落库。
  *              注意：这里不实现独立请求协议，真实请求仍交给通用 Dispatcher/Adapter；管理员只多一层积分计费。
+ *              文档未核对完整的 provider 不允许保存为可执行计费模型。
  */
 
 const crypto = require('crypto');
@@ -11,6 +12,8 @@ const express = require('express');
 const { z } = require('zod');
 const { getPool } = require('../lib/db');
 const { verifyJWT, signJWT } = require('../lib/jwt');
+const { getStrictProviderContract } = require('../lib/dispatcher/strictProviderContracts');
+const { matchProviderProfile } = require('../lib/dispatcher/providerProfiles');
 
 const router = express.Router();
 
@@ -140,12 +143,63 @@ function normalizeModelRouteFields(model) {
   };
 }
 
+function resolveProfileForModel(providerPayload, model) {
+  const explicitProfileId = String(model.requestProfileId || '').trim();
+  if (explicitProfileId) {
+    return explicitProfileId;
+  }
+
+  const matched = matchProviderProfile({
+    baseUrl: providerPayload.baseUrl,
+    providerName: providerPayload.providerName,
+    providerHint: providerPayload.providerName,
+    providerKind: providerPayload.providerKind,
+    endpointType: model.endpointType,
+  });
+  return matched?.id || '';
+}
+
+function validateExecutableProviderModels(payload) {
+  const violations = [];
+  payload.models.forEach((model) => {
+    const profileId = resolveProfileForModel(payload, model);
+    const contract = getStrictProviderContract(profileId);
+    const endpointType = String(model.endpointType || '').trim();
+    const isDocsPending = endpointType === 'docs_pending_adapter'
+      || profileId === '12ai-docs-pending'
+      || Boolean(contract?.requiresDocsVerification)
+      || Object.keys(contract?.supportedTasks || {}).length === 0 && contract?.allowGenericFallback === false;
+
+    if (isDocsPending && model.isActive !== false) {
+      violations.push({
+        modelId: model.modelId,
+        displayName: model.displayName,
+        profileId,
+        endpointType,
+        docs: contract?.docs || [],
+      });
+    }
+  });
+
+  return violations;
+}
+
 router.put('/v1/admin/credit-providers/:providerId', adminAuth(2), async (req, res) => {
   const parsed = saveCreditProviderSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
       error: 'Invalid credit provider payload.',
       details: parsed.error.issues,
+    });
+  }
+
+  const docsPendingViolations = validateExecutableProviderModels(parsed.data);
+  if (docsPendingViolations.length > 0) {
+    return res.status(400).json({
+      error: 'Provider documentation is not verified for executable routing.',
+      code: 'DOCS_PENDING_PROVIDER_NOT_EXECUTABLE',
+      message: '文档未核对完整的预设不能保存为启用的管理员计费模型。请先补充官方 endpoint、鉴权、请求体和响应结构，或将模型设为 inactive。',
+      violations: docsPendingViolations,
     });
   }
 
