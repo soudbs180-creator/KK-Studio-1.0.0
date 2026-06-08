@@ -1,10 +1,10 @@
 /**
  * @file user-wuyin-strict-router.js
  * @module server/routes
- * @description 用户自带 Key 的 Wuyin/速创严格文档路由。该路由在 legacy user.js 之前拦截 Wuyin image/video/status/audio：
- *              - 已核对文档的 image/video 严格走 /api/async/<model> JSON 提交
- *              - 状态查询严格走 /api/async/detail?id=...
- *              - audio 与任意未核对模型直接拒绝
+ * @description 用户自带 Key 的 Wuyin/速创严格文档路由。该路由在 legacy user.js 之前拦截 Wuyin image/video/audio/utility/status：
+ *              - 提交请求严格由 wuyinProducts.js 的模型文档 contract 生成
+ *              - JSON / form-urlencoded / sync / async / sora2-special 按各自文档执行
+ *              - 状态查询按 resultMode 走 /api/async/detail 或 /api/sora2/detail
  *              - 禁止 x-proxy-target-url 通用转发绕过文档契约
  */
 
@@ -15,12 +15,10 @@ const https = require('https');
 const express = require('express');
 const fetch = require('node-fetch');
 const { verifyJWT, signJWT } = require('../lib/jwt');
-const {
-  assertStrictTaskSupported,
-  resolveWuyinTaskTypeByModel,
-} = require('../lib/dispatcher/strictProviderContracts');
+const { assertStrictTaskSupported } = require('../lib/dispatcher/strictProviderContracts');
 const {
   WUYIN_ASYNC_DETAIL_ENDPOINT,
+  WUYIN_SORA2_DETAIL_ENDPOINT,
   getWuyinProduct,
 } = require('../lib/dispatcher/wuyinProducts');
 const {
@@ -198,11 +196,16 @@ function getRouteApiKey(route) {
 
 function isWuyinProxyTarget(value) {
   const raw = String(value || '').trim().toLowerCase();
-  return raw.includes('wuyinkeji.com') || raw.includes('/api/async/') || raw.includes('/api/chat/index') || raw.includes('/api/sora') || raw.includes('/api/img/');
+  return raw.includes('wuyinkeji.com') || raw.includes('/api/async/') || raw.includes('/api/chat/index') || raw.includes('/api/sora') || raw.includes('/api/img/') || raw.includes('/api/voice/');
 }
 
 function extractModelId(req) {
-  return String(req.body?.modelId || req.body?.model || '').split('@')[0].split('|')[0].replace(/^models\//i, '').replace(/^api\/async\//i, '').trim();
+  return String(req.body?.modelId || req.body?.model || '')
+    .split('@')[0]
+    .split('|')[0]
+    .replace(/^models\//i, '')
+    .replace(/^api\/async\//i, '')
+    .trim();
 }
 
 function appendQuery(url, params = {}) {
@@ -215,14 +218,17 @@ function appendQuery(url, params = {}) {
   return parsed.toString();
 }
 
-function makeWuyinUrl(endpoint, apiKey, extraQuery = {}) {
-  return appendQuery(endpoint, { key: apiKey, ...extraQuery });
+function makeWuyinUrl(productOrEndpoint, apiKey, extraQuery = {}) {
+  const endpoint = typeof productOrEndpoint === 'string' ? productOrEndpoint : productOrEndpoint.endpoint;
+  const auth = typeof productOrEndpoint === 'string' ? '' : String(productOrEndpoint.auth || '');
+  const needsQueryKey = auth.includes('key query') || auth.includes('?key') || endpoint.includes('/api/async/') || endpoint.includes('/api/sora2') || endpoint.includes('/api/img/');
+  return appendQuery(endpoint, { ...(needsQueryKey ? { key: apiKey } : {}), ...extraQuery });
 }
 
 function responseCodeOk(payload) {
   const code = payload?.code;
   if (code === undefined || code === null || code === '') return true;
-  return ['0', '200'].includes(String(code));
+  return ['0', '1', '200'].includes(String(code));
 }
 
 function readMessage(payload) {
@@ -263,66 +269,142 @@ function extractUrls(payload) {
   return urls;
 }
 
-function requireHttpUrls(values, fieldName, maxCount) {
-  const raw = Array.isArray(values) ? values : String(values || '').split(',');
-  return raw
-    .map((value) => String(value || '').trim())
-    .filter(Boolean)
-    .slice(0, maxCount)
-    .map((value, index) => {
-      if (/^blob:/i.test(value) || /^data:/i.test(value) || (!/^https?:\/\//i.test(value))) {
-        throw new Error(`Wuyin 文档要求 ${fieldName} ${index + 1} 必须是公网 HTTP(S) URL，不能使用 base64/blob/本地地址。`);
-      }
-      return value;
-    });
+function toInputAliases(fieldName) {
+  const aliases = [fieldName];
+  const map = {
+    urls: ['referenceImages', 'imageUrls', 'image_urls', 'images'],
+    image_urls: ['referenceImages', 'urls', 'imageUrls', 'images'],
+    images: ['referenceImages', 'urls', 'imageUrls', 'image_urls'],
+    image_url: ['referenceImages', 'urls', 'imageUrl', 'firstFrameUrl'],
+    subjects: ['referenceImages', 'urls', 'subjectUrls'],
+    firstFrameUrl: ['firstFrameUrl', 'first_frame_url', 'referenceImages'],
+    lastFrameUrl: ['lastFrameUrl', 'last_frame_url'],
+    video_url: ['videoUrl', 'video_url', 'url'],
+    videoUrl: ['videoUrl', 'video_url', 'url'],
+    audio_url: ['audioUrl', 'audio_url'],
+    audioUrl: ['audioUrl', 'audio_url'],
+    video: ['video', 'videoUrl', 'video_url', 'url'],
+    url: ['url', 'imageUrl', 'videoUrl'],
+    text: ['text', 'prompt'],
+    prompt: ['prompt'],
+  };
+  return Array.from(new Set([...aliases, ...(map[fieldName] || [])]));
 }
 
-function enumValue(value, allowed, fallback) {
+function readInputValue(input, fieldName) {
+  for (const alias of toInputAliases(fieldName)) {
+    if (input?.[alias] !== undefined && input?.[alias] !== null && input?.[alias] !== '') {
+      return input[alias];
+    }
+  }
+  return undefined;
+}
+
+function normalizeBooleanLike(value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'boolean') return value;
+  const normalized = String(value).trim().toLowerCase();
+  if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+  if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+  return fallback;
+}
+
+function normalizeList(value) {
+  if (Array.isArray(value)) return value.map((item) => String(item || '').trim()).filter(Boolean);
+  return String(value || '').split(',').map((item) => item.trim()).filter(Boolean);
+}
+
+function validateUrlValue(value, fieldName, options = {}) {
   const normalized = String(value || '').trim();
-  return allowed.includes(normalized) ? normalized : fallback;
+  if (!normalized) return normalized;
+  if (options.allowBase64 && (/^data:/i.test(normalized) || /^[A-Za-z0-9+/]+=*$/.test(normalized.slice(0, 120)))) {
+    return normalized;
+  }
+  if (!/^https?:\/\//i.test(normalized)) {
+    throw new Error(`Wuyin 文档要求 ${fieldName} 必须是 HTTP(S) URL${options.allowBase64 ? ' 或文档允许的 base64' : ''}。`);
+  }
+  return normalized;
 }
 
-function buildImageBody(product, input) {
-  const prompt = String(input?.prompt || '').trim();
-  if (!prompt) throw new Error('Wuyin 文档要求 prompt 为必填。');
-  const urls = requireHttpUrls(input?.referenceImages || input?.urls || input?.image_urls || [], 'urls', 14);
-  const body = { prompt };
-
-  if (product.id === 'image_gpt') {
-    const allowed = product.requestFields.size.enum;
-    body.size = enumValue(input?.size || input?.aspectRatio || product.requestFields.size.default, allowed, product.requestFields.size.default);
-  } else {
-    body.size = enumValue(String(input?.size || input?.imageSize || product.requestFields.size.default || '1K').toUpperCase(), product.requestFields.size.enum, product.requestFields.size.default);
-    body.aspectRatio = enumValue(input?.aspectRatio || product.requestFields.aspectRatio.default, product.requestFields.aspectRatio.enum, product.requestFields.aspectRatio.default);
+function normalizeFieldValue(fieldName, spec, rawValue) {
+  if (rawValue === undefined || rawValue === null || rawValue === '') {
+    if (spec.default !== undefined) return spec.default;
+    if (spec.required) throw new Error(`Wuyin 文档要求 ${fieldName} 为必填。`);
+    return undefined;
   }
 
-  if (urls.length > 0) body.urls = urls;
+  if (Array.isArray(spec.enum)) {
+    const candidate = String(rawValue).trim();
+    return spec.enum.includes(candidate) ? candidate : (spec.default !== undefined ? spec.default : candidate);
+  }
+
+  if (spec.type === 'boolean') {
+    return normalizeBooleanLike(rawValue, spec.default);
+  }
+
+  if (spec.type === 'float') {
+    const numberValue = Number(rawValue);
+    return Number.isFinite(numberValue) ? numberValue : spec.default;
+  }
+
+  if (String(spec.type).startsWith('array')) {
+    const values = normalizeList(rawValue).slice(0, spec.maxItems || 100);
+    if (spec.publicUrl || spec.publicUrlCsv || spec.allowBase64) {
+      return values.map((value) => validateUrlValue(value, fieldName, spec));
+    }
+    return values;
+  }
+
+  if (spec.publicUrl || spec.allowBase64) {
+    return validateUrlValue(rawValue, fieldName, spec);
+  }
+
+  if (spec.publicUrlCsv) {
+    return normalizeList(rawValue).slice(0, spec.maxItems || 100).map((value) => validateUrlValue(value, fieldName, spec)).join(',');
+  }
+
+  return String(rawValue).trim();
+}
+
+function buildDocumentedBody(product, input) {
+  const body = {};
+  for (const [fieldName, spec] of Object.entries(product.requestFields || {})) {
+    const raw = readInputValue(input, fieldName);
+    const value = normalizeFieldValue(fieldName, spec, raw);
+    if (value !== undefined && value !== null && value !== '') {
+      body[fieldName] = value;
+    }
+  }
   return body;
 }
 
-function buildVideoBody(product, input) {
-  const prompt = String(input?.prompt || '').trim();
-  if (!prompt) throw new Error('Wuyin 文档要求 prompt 为必填。');
-  const body = {
-    prompt,
-    size: /^\d+x\d+$/i.test(String(input?.size || '')) ? String(input.size) : product.requestFields.size.default,
-    duration: String(input?.duration || input?.videoDuration || product.requestFields.duration.default),
-  };
-  const images = requireHttpUrls(input?.referenceImages || input?.urls || input?.images || [], 'images', 7);
-  if (images.length > 0) body.images = images.join(',');
-  return body;
+function serializeBody(product, body) {
+  const contentType = String(product.contentType || 'application/json').toLowerCase();
+  if (contentType.includes('x-www-form-urlencoded')) {
+    const params = new URLSearchParams();
+    Object.entries(body).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        params.set(key, JSON.stringify(value));
+      } else {
+        params.set(key, String(value));
+      }
+    });
+    return params.toString();
+  }
+  return JSON.stringify(body);
 }
 
-async function fetchWuyinJson(url, apiKey, method, body) {
+async function fetchWuyinJson(url, apiKey, method, product, body) {
   const isHttps = url.startsWith('https');
+  const hasBody = body !== undefined && body !== null;
   const response = await fetch(url, {
     method,
     headers: {
       Authorization: apiKey,
       Accept: 'application/json',
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      ...(hasBody ? { 'Content-Type': product.contentType || 'application/json' } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
+    body: hasBody ? serializeBody(product, body) : undefined,
     agent: isHttps ? httpsAgent : httpAgent,
   });
   const text = await response.text();
@@ -335,47 +417,68 @@ async function fetchWuyinJson(url, apiKey, method, body) {
   return json;
 }
 
-function mapStatus(value) {
+function mapAsyncStatus(value) {
   const normalized = String(value ?? '').toLowerCase();
   if (normalized === '2' || normalized === 'success' || normalized === 'succeeded' || normalized === 'completed') return 'success';
   if (normalized === '3' || normalized === 'failed' || normalized === 'fail' || normalized === 'error') return 'failed';
   return 'pending';
 }
 
-async function submitStrictTask({ req, route, mode, modelId, apiKey }) {
+function mapSora2Status(value) {
+  const normalized = String(value ?? '').toLowerCase();
+  if (normalized === '1' || normalized === 'success' || normalized === 'succeeded' || normalized === 'completed') return 'success';
+  if (normalized === '2' || normalized === 'failed' || normalized === 'fail' || normalized === 'error') return 'failed';
+  return 'pending';
+}
+
+function mapStatusByProduct(product, value) {
+  return product.resultMode === 'wuyin-sora2-detail' ? mapSora2Status(value) : mapAsyncStatus(value);
+}
+
+async function submitStrictTask({ req, mode, modelId, apiKey }) {
   const product = getWuyinProduct(modelId);
   if (!product) {
     throw Object.assign(new Error(`Wuyin 模型 ${modelId || '(empty)'} 没有在已核对文档中声明，已阻止请求。`), { statusCode: 400, code: 'WUYIN_MODEL_NOT_DOCUMENTED' });
+  }
+  if (product.enabled === false) {
+    throw Object.assign(new Error(`Wuyin 模型 ${modelId} 当前文档标记为不可用或维护中，已阻止请求。`), { statusCode: 400, code: 'WUYIN_MODEL_DISABLED_BY_DOC' });
   }
   if (product.category !== mode) {
     throw Object.assign(new Error(`Wuyin 模型 ${modelId} 是 ${product.category}，不能用于 ${mode}。`), { statusCode: 400, code: 'WUYIN_MODEL_TASK_MISMATCH' });
   }
   assertStrictTaskSupported('wuyin-suchuang-form', mode, { modelId });
 
-  const body = mode === 'image' ? buildImageBody(product, req.body || {}) : buildVideoBody(product, req.body || {});
-  const submitUrl = makeWuyinUrl(product.endpoint, apiKey);
+  const body = buildDocumentedBody(product, req.body || {});
+  const submitUrl = makeWuyinUrl(product, apiKey);
   const startedAt = Date.now();
-  const payload = await fetchWuyinJson(submitUrl, apiKey, 'POST', body);
+  const payload = await fetchWuyinJson(submitUrl, apiKey, product.method || 'POST', product, body);
   assertWuyinOk(payload, 'Wuyin 任务提交');
 
   const urls = extractUrls(payload);
   const providerTaskId = extractProviderTaskId(payload);
-  if (urls.length > 0) {
-    return { status: 'success', urls, providerTaskId: '', product, submitExecTime: Date.now() - startedAt, body };
+  const isAsync = product.resultEndpoint && product.executionMode !== 'sync';
+  if (!isAsync || urls.length > 0) {
+    return { status: 'success', urls, providerTaskId: providerTaskId || '', product, submitExecTime: Date.now() - startedAt, body, raw: payload };
   }
   if (!providerTaskId) {
     throw new Error('Wuyin API 提交成功但没有返回文档要求的任务 ID。');
   }
-  return { status: 'pending', urls: [], providerTaskId, product, submitExecTime: Date.now() - startedAt, body };
+  return { status: 'pending', urls: [], providerTaskId, product, submitExecTime: Date.now() - startedAt, body, raw: payload };
 }
 
-async function queryStrictTaskStatus({ providerTaskId, apiKey }) {
-  const url = makeWuyinUrl(WUYIN_ASYNC_DETAIL_ENDPOINT, apiKey, { id: providerTaskId });
+async function queryStrictTaskStatus({ providerTaskId, apiKey, product }) {
+  const detailEndpoint = product.resultMode === 'wuyin-sora2-detail' ? WUYIN_SORA2_DETAIL_ENDPOINT : WUYIN_ASYNC_DETAIL_ENDPOINT;
+  const detailProduct = {
+    endpoint: detailEndpoint,
+    contentType: product.resultMode === 'wuyin-sora2-detail' ? 'application/x-www-form-urlencoded;charset:utf-8;' : 'application/json',
+    auth: 'Authorization header and key query parameter',
+  };
+  const url = makeWuyinUrl(detailProduct, apiKey, { id: providerTaskId });
   const startedAt = Date.now();
-  const payload = await fetchWuyinJson(url, apiKey, 'GET');
+  const payload = await fetchWuyinJson(url, apiKey, 'GET', detailProduct);
   assertWuyinOk(payload, 'Wuyin 任务状态查询');
   const data = isObjectRecord(payload.data) ? payload.data : payload;
-  const status = mapStatus(data.status ?? payload.status);
+  const status = mapStatusByProduct(product, data.status ?? payload.status);
   return {
     status,
     urls: status === 'success' ? extractUrls(payload) : [],
@@ -396,7 +499,7 @@ async function handleSubmitMode(req, res, profileState, mode) {
   const modelId = extractModelId(req);
 
   try {
-    const result = await submitStrictTask({ req, route, mode, modelId, apiKey });
+    const result = await submitStrictTask({ req, mode, modelId, apiKey });
     const taskId = result.providerTaskId ? encodeLocalProxyTaskId(route.id || routeId, result.providerTaskId, result.product.id) : '';
     return res.json(okEnvelope({
       urls: result.urls,
@@ -404,7 +507,7 @@ async function handleSubmitMode(req, res, profileState, mode) {
       taskId,
       providerTaskId: result.providerTaskId,
       status: result.status,
-      endpointType: `wuyin-async-${mode}`,
+      endpointType: `wuyin-${result.product.executionMode || result.product.resultMode || 'documented'}-${mode}`,
       modelId: result.product.id,
       requestId: req.body?.requestId,
       attemptId: req.body?.attemptId,
@@ -412,9 +515,11 @@ async function handleSubmitMode(req, res, profileState, mode) {
       execTime: result.submitExecTime,
       route: {
         provider: 'wuyin-suchuang-form',
-        adapter: 'wuyin_async_task',
+        adapter: 'wuyin_documented_task',
         strictContractChecked: true,
         docUrl: result.product.docUrl,
+        contentType: result.product.contentType,
+        resultMode: result.product.resultMode || result.product.executionMode || 'sync',
       },
     }, req));
   } catch (err) {
@@ -426,8 +531,12 @@ async function handleStatusMode(req, res, profileState) {
   const localTaskId = String(req.body?.localTaskId || req.body?.taskId || '').trim();
   const parsed = decodeLocalProxyTaskId(localTaskId);
   if (!parsed.providerTaskId) return sendError(res, req, 400, 'INVALID_REQUEST', 'localTaskId/taskId is required for Wuyin task status.');
-  if (!parsed.modelId || !getWuyinProduct(parsed.modelId)) {
+  const product = getWuyinProduct(parsed.modelId);
+  if (!product) {
     return sendError(res, req, 400, 'WUYIN_STATUS_MODEL_REQUIRED', '严格 Wuyin 状态查询要求 taskId 内包含已核对文档模型 ID。旧格式 taskId 不再允许猜测查询。');
+  }
+  if (!product.resultEndpoint) {
+    return sendError(res, req, 400, 'WUYIN_STATUS_NOT_ASYNC', '该 Wuyin 模型按文档不是异步详情查询任务。');
   }
 
   const route = resolveLocalUserRoute(profileState, parsed.routeId || req.body?.routeId || req.headers['x-key-slot-id']);
@@ -438,8 +547,7 @@ async function handleStatusMode(req, res, profileState) {
   if (!apiKey) return sendError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
 
   try {
-    const result = await queryStrictTaskStatus({ providerTaskId: parsed.providerTaskId, apiKey });
-    const product = getWuyinProduct(parsed.modelId);
+    const result = await queryStrictTaskStatus({ providerTaskId: parsed.providerTaskId, apiKey, product });
     return res.json(okEnvelope({
       taskId: localTaskId,
       providerTaskId: parsed.providerTaskId,
@@ -448,15 +556,16 @@ async function handleStatusMode(req, res, profileState) {
       urls: result.urls,
       message: result.message || undefined,
       error: result.status === 'failed' ? (result.message || 'Wuyin task failed.') : undefined,
-      endpointType: `wuyin-async-${product.category}`,
+      endpointType: `wuyin-${product.resultMode || 'detail'}-${product.category}`,
       modelId: product.id,
       detailExecTime: result.detailExecTime,
       execTime: result.detailExecTime,
       route: {
         provider: 'wuyin-suchuang-form',
-        adapter: 'wuyin_async_task',
+        adapter: 'wuyin_documented_task',
         strictContractChecked: true,
-        docUrl: 'https://api.wuyinkeji.com/doc/47',
+        docUrl: product.resultMode === 'wuyin-sora2-detail' ? 'https://api.wuyinkeji.com/doc/36' : 'https://api.wuyinkeji.com/doc/47',
+        resultMode: product.resultMode,
       },
     }, req));
   } catch (err) {
@@ -467,11 +576,11 @@ async function handleStatusMode(req, res, profileState) {
 router.all('/v1/model-proxy/user', async (req, res, next) => {
   const targetUrl = String(req.headers['x-proxy-target-url'] || '').trim();
   if (targetUrl && isWuyinProxyTarget(targetUrl)) {
-    return sendError(res, req, 400, 'WUYIN_GENERIC_PROXY_DISABLED', 'Wuyin 通用转发已禁用。请使用 image/video/task_status 模式并按官方文档契约执行。');
+    return sendError(res, req, 400, 'WUYIN_GENERIC_PROXY_DISABLED', 'Wuyin 通用转发已禁用。请使用 image/video/audio/task_status 模式并按官方文档契约执行。');
   }
 
   const mode = String(req.body?.mode || '').trim();
-  if (!['image', 'video', 'audio', 'task_status'].includes(mode)) return next();
+  if (!['image', 'video', 'audio', 'utility', 'task_status'].includes(mode)) return next();
 
   const authState = resolveProfileUserId(req);
   if (!authState) return sendError(res, req, 401, 'UNAUTHORIZED', 'Authentication is required for Wuyin strict routing.');
@@ -480,9 +589,6 @@ router.all('/v1/model-proxy/user', async (req, res, next) => {
   const data = readLocalStorage();
   const profileState = readProfileState(data, authState.userId);
 
-  if (mode === 'audio') {
-    return sendError(res, req, 400, 'WUYIN_AUDIO_DOC_NOT_CONFIGURED', '当前没有已核对的 Wuyin 音频文档 contract，已阻止猜测式音频请求。');
-  }
   if (mode === 'task_status') return handleStatusMode(req, res, profileState);
   const handled = await handleSubmitMode(req, res, profileState, mode);
   if (handled) return handled;
