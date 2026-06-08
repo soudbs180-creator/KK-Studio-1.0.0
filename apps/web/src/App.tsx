@@ -4218,6 +4218,11 @@ const AppContent: React.FC<AppContentProps> = () => {
       );
     }
 
+    const screenLeft = -canvasTransform.x / canvasTransform.scale;
+    const screenTop = -canvasTransform.y / canvasTransform.scale;
+    const screenRight = (window.innerWidth - canvasTransform.x) / canvasTransform.scale;
+    const screenBottom = (window.innerHeight - canvasTransform.y) / canvasTransform.scale;
+
     const groupNodeIds = promptGroupNodeIdsById.get(node.id) || [node.id];
     const promptGroupLayoutState = promptGroupLayoutStateByIdRef.current[node.id];
     const groupStackZIndex = promptGroupStackZIndexById.get(node.id) ?? ((groupView.baseOrder * 100) + 10);

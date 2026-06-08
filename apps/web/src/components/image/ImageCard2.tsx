@@ -809,6 +809,11 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
         const currentZoom = zoomScale || 1.0;
         const targetQuality = getAppropriateQuality(currentZoom, qualityBias);
 
+        // 🚀 [性能优化红线] 全局缩放过小时（< 0.18），跳过图片解码与重载，只展示微缩卡片骨架
+        if (currentZoom < 0.18) {
+            return;
+        }
+
         if (image.isGenerating && displaySrc) {
             return;
         }
@@ -1510,7 +1515,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                 </div>
                             ) : displaySrc && !imgError ? (
                                 <div className="relative w-full h-full">
-                                    {!isMediaLoaded && (
+                                    {!isMediaLoaded && zoomScale >= 0.18 && (
                                         <div className="absolute inset-0 flex items-center justify-center text-[var(--text-tertiary)] bg-[var(--frost-card-framework-bg)]">
                                             <Loader2 size={24} className="animate-spin" />
                                         </div>
@@ -1534,7 +1539,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                 </div>
                             ) : (
                                 <div className="absolute inset-0 flex items-center justify-center text-[var(--text-tertiary)]">
-                                    {isLoading ? <Loader2 size={24} className="animate-spin" /> : <ImageOff size={24} />}
+                                    {isLoading && zoomScale >= 0.18 ? <Loader2 size={24} className="animate-spin" /> : <ImageOff size={24} />}
                                 </div>
                             )}
                         </div>
