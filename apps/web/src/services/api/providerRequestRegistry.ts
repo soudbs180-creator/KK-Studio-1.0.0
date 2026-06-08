@@ -86,6 +86,10 @@ export function classifyProviderEndpointHints(endpointTypes?: string[]): Provide
 export function resolveProviderChatNativeSurface(input: {
     runtime: ResolvedProviderRuntime;
 }): ResolvedChatSurface | null {
+    if (input.runtime.requestProfileId === 'apimart') {
+        return null;
+    }
+
     if (input.runtime.protocolFamily === 'gemini-native') {
         return 'gemini-native-chat';
     }
@@ -143,6 +147,15 @@ export function resolveProviderImageRoute(input: ProviderImageRouteInput): Provi
     const endpointHints = classifyProviderEndpointHints(input.endpointTypes);
     const isGeminiImage = isGeminiImageLikeModel(input.modelId);
     const strategyId = input.runtime.strategyId;
+
+    if (input.runtime.requestProfileId === 'apimart') {
+        return buildImageDecision(
+            input,
+            'provider-images',
+            'apimart-openai-compatible-provider-images',
+            endpointHints,
+        );
+    }
 
     if (strategyId === 'wuyinkeji') {
         return buildImageDecision(
