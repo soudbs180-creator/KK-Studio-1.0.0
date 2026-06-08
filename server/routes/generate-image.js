@@ -1,7 +1,8 @@
 /**
  * @file generate-image.js
  * @module server/routes
- * @description 平台代理 Google Gemini 图像生成与编辑路由。处理积分预扣、图像生成配置组装、安全过滤及错误发生时的退款链路。
+ * @description 平台代理图像生成与编辑路由。处理积分预扣、图像生成配置组装、安全过滤及错误发生时的退款链路。
+ *              命中 Wuyin/速创时必须按 strictProviderContracts 中的官方文档契约执行，禁止旧模型/旧表单逻辑污染。
  */
 
 const fs = require('fs');
@@ -13,6 +14,7 @@ const { getPool } = require('../lib/db');
 const { verifyJWT, signJWT } = require('../lib/jwt');
 const credits = require('../lib/credits');
 const { createFixedWindowRateLimiter } = require('../lib/fixedWindowRateLimiter');
+const { assertStrictTaskSupported } = require('../lib/dispatcher/strictProviderContracts');
 
 const router = express.Router();
 const isTestRun = process.env.NODE_ENV === 'test' || process.argv.some((arg) => arg.includes('test'));
@@ -20,7 +22,9 @@ const isTestRun = process.env.NODE_ENV === 'test' || process.argv.some((arg) => 
 const GenerateRequestSchema = z.object({
   prompt: z.string().min(1).max(1000),
   referenceImageBase64: z.string().optional(),
-  aspectRatio: z.enum(['1:1', '16:9', '9:16']).default('1:1'),
+  aspectRatio: z.enum(['auto', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '21:9']).default('1:1'),
+  size: z.string().max(40).optional(),
+  model: z.string().max(120).optional(),
   creditSettlement: z.enum(['server', 'client']).optional(),
   executionLane: z.enum(['local-user-api', 'cloud-credit-model']).optional(),
 });
@@ -41,6 +45,17 @@ function sendInsufficientCredits(res, currentCredits, requiredCredits, requestId
     credits: Math.max(0, Number(currentCredits) || 0),
     creditsCost: requiredCredits,
   });
+}
+
+function assertWuyinImageContract(modelName) {
+  const contractTask = assertStrictTaskSupported('wuyin-suchuang-form', 'image', { modelId: modelName });
+  if (contractTask?.adapterId !== 'wuyin_async_task') {
+    const error = new Error(`Wuyin 图片模型 ${modelName} 必须走 wuyin_async_task 文档化异步契约。`);
+    error.code = 'WUYIN_IMAGE_CONTRACT_MISMATCH';
+    error.statusCode = 400;
+    throw error;
+  }
+  return contractTask;
 }
 
 const LIMIT_WINDOW_MS = 60 * 1000;
@@ -67,16 +82,16 @@ async function handleGenerateImage(req, res) {
       error: 'Invalid generation options or prompt too long.',
       code: 'INVALID_REQUEST',
       requestId,
+      details: parsed.error.issues,
     });
   }
 
-  const { prompt, referenceImageBase64, aspectRatio, executionLane } = parsed.data;
+  const { prompt, referenceImageBase64, aspectRatio, executionLane, size } = parsed.data;
   const isLocalUserApi = executionLane === 'local-user-api';
   if (isLocalUserApi) {
     return rejectLocalUserApiRequest(res, requestId);
   }
 
-  // 1. 云端积分模型限流器（只对非 local-user-api 生效）
   const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   const limitKey = `${ip}:${userId}`;
   const clientLimit = imageLimiter.check(limitKey);
@@ -119,20 +134,25 @@ async function handleGenerateImage(req, res) {
     creditsDeducted = true;
 
     if (activeProvider === 'suchuang') {
-      const modelName = req.body.model || 'image_nanoBanana2';
-      console.log(`Routing ${modelName} to Suchuang API Gateway`);
+      const modelName = parsed.data.model || 'image_nanoBanana2';
+      const contractTask = assertWuyinImageContract(modelName);
+      console.log(`Routing ${modelName} to Wuyin documented async image API`, {
+        endpointPattern: contractTask.endpointPattern,
+        resultEndpoint: contractTask.resultEndpoint,
+      });
 
       const result = await SuchuangProvider.generateImage({
         prompt,
         modelId: modelName,
         aspectRatio,
+        size,
         referenceImages: referenceImageBase64 ? [referenceImageBase64] : [],
         generateCount: 1,
       });
 
       const imageUrl = result.image;
       if (!imageUrl) {
-        throw new Error('Suchuang API failed to return image URL.');
+        throw new Error('Wuyin API failed to return image URL.');
       }
 
       const uploadsDir = path.join(__dirname, '../uploads');
@@ -146,7 +166,7 @@ async function handleGenerateImage(req, res) {
 
       const imageResponse = await fetch(imageUrl);
       if (!imageResponse.ok) {
-        throw new Error(`Failed to download image from Suchuang upstream: ${imageResponse.statusText}`);
+        throw new Error(`Failed to download image from Wuyin upstream: ${imageResponse.statusText}`);
       }
       const arrayBuffer = await imageResponse.arrayBuffer();
       await fs.promises.writeFile(filePath, Buffer.from(arrayBuffer));
@@ -163,6 +183,13 @@ async function handleGenerateImage(req, res) {
         text: '',
         credits: currentCredits,
         creditsCost: requiredCredits,
+        route: {
+          provider: 'wuyin-suchuang-form',
+          model: modelName,
+          strictContractChecked: true,
+          adapter: 'wuyin_async_task',
+          docUrl: result.wuyinDocUrl,
+        },
       });
     }
 
@@ -189,7 +216,7 @@ async function handleGenerateImage(req, res) {
       contents,
       config: {
         responseModalities: [Modality.IMAGE, Modality.TEXT],
-        imageConfig: isEditMode ? undefined : { aspectRatio },
+        imageConfig: isEditMode ? undefined : { aspectRatio: ['1:1', '16:9', '9:16'].includes(aspectRatio) ? aspectRatio : '1:1' },
       },
     });
 
@@ -203,7 +230,6 @@ async function handleGenerateImage(req, res) {
     const generatedText = parts.find((part) => part.text)?.text ?? '';
     const actionType = isEditMode ? 'image_edit' : 'image_generation';
 
-    // 简体中文注释：P0级优化——自动创建静态资源uploads目录并落盘为物理文件，拒绝大 Base64 文本拖垮数据库
     const uploadsDir = path.join(__dirname, '../uploads');
     if (!fs.existsSync(uploadsDir)) {
       await fs.promises.mkdir(uploadsDir, { recursive: true });
@@ -213,11 +239,9 @@ async function handleGenerateImage(req, res) {
     const filename = `kkai-gen-${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
     const filePath = path.join(uploadsDir, filename);
 
-    // 将 base64 数据直接写入物理磁盘文件
     await fs.promises.writeFile(filePath, Buffer.from(imagePart.inlineData.data, 'base64'));
     const staticImageUrl = `/uploads/${filename}`;
 
-    // 数据库仅记录轻量级的静态路径，行体积降为数十字节，极致高吞吐性能！
     await pool.query(
       'INSERT INTO public.generations (user_id, prompt, image_url, model, type) VALUES ($1, $2, $3, $4, $5)',
       [userId, prompt, staticImageUrl, 'gemini-2.5-flash-image', actionType]
@@ -225,13 +249,18 @@ async function handleGenerateImage(req, res) {
 
     return res.json({
       success: true,
-      image: staticImageUrl, // 直接返回静态路径，前端零解码开销！
+      image: staticImageUrl,
       text: generatedText,
       credits: currentCredits,
       creditsCost: requiredCredits,
+      route: {
+        provider: 'google-gemini-official',
+        model: 'gemini-2.5-flash-image',
+        sdk: '@google/genai',
+      },
     });
   } catch (err) {
-    console.error('[Gemini Image Generation Error]', err);
+    console.error('[Image Generation Error]', err);
     if (!creditsDeducted && credits.isInsufficientCreditsError(err)) {
       return sendInsufficientCredits(res, currentCredits, requiredCredits, requestId);
     }
@@ -261,11 +290,13 @@ async function handleGenerateImage(req, res) {
       });
     }
 
-    return res.status(500).json({
+    return res.status(err.statusCode || 500).json({
       error: creditsDeducted
         ? 'Image generation or edit failed. Credits refunded.'
         : 'Image generation or edit failed. No credits were charged.',
-      code: 'AI_GENERATION_FAILED',
+      message: err.message,
+      code: err.code || 'AI_GENERATION_FAILED',
+      route: err.route,
       requestId,
     });
   }
