@@ -42,9 +42,11 @@ const REQUEST_PROFILES: RequestProfile[] = [
   {
     id: "12ai",
     displayName: "12AI",
-    docSources: ["https://doc.12ai.org/api/"],
+    docSources: ["https://doc.12ai.org/api/", "https://doc.12ai.org/docs/api"],
     providerAliases: ["12ai", "12 api", "12api"],
-    docsUrlPatterns: [/^https?:\/\/doc\.12ai\.org\/api(?:\/|$)/i],
+    docsUrlPatterns: [
+      /^https?:\/\/doc\.12ai\.org\/(?:api|docs\/api)(?:\/|$|[?#])/i,
+    ],
     hostPatterns: [/^cdn\.12ai\.org$/i, /^new\.12ai\.org$/i, /^hk\.12ai\.org$/i, /(^|\.)12ai\.(org|xyz|io|net)$/i],
     basePatterns: [/12ai\.(org|xyz|io|net)/i],
     supportedProtocolFamilies: ["openai-compatible", "gemini-native", "claude-native"],
@@ -87,9 +89,11 @@ const REQUEST_PROFILES: RequestProfile[] = [
   {
     id: "wuyinkeji",
     displayName: "Wuyin Keji",
-    docSources: ["https://api.wuyinkeji.com/doc/65", "https://api.wuyinkeji.com/doc/72"],
-    providerAliases: ["wuyin", "wuyin keji", "wuyinkeji", "wu yin", "suchuang", "su chuang"],
-    docsUrlPatterns: [/^https?:\/\/api\.wuyinkeji\.com\/doc\/\d+(?:$|[?#])/i],
+    docSources: ["https://api.wuyinkeji.com/type/all", "https://api.wuyinkeji.com/doc/65", "https://api.wuyinkeji.com/doc/72"],
+    providerAliases: ["wuyin", "wuyin keji", "wuyinkeji", "wu yin", "suchuang", "su chuang", "速创", "速创 api"],
+    docsUrlPatterns: [
+      /^https?:\/\/api\.wuyinkeji\.com\/(?:type\/all|doc\/\d+)(?:$|[?#])/i,
+    ],
     hostPatterns: [/^api\.wuyinkeji\.com$/i],
     basePatterns: [/api\.wuyinkeji\.com/i, /wuyinkeji/i],
     supportedProtocolFamilies: ["openai-compatible", "gemini-native"],
@@ -142,7 +146,6 @@ const REQUEST_PROFILES: RequestProfile[] = [
       image: "chat-image",
     },
     apiBaseUrlPolicy: "runtime-supplied",
-    fallbackProfileId: "12ai",
   },
 ];
 
@@ -266,5 +269,5 @@ export function resolveLocalRequestProfile(input: {
     return getRequestProfile(evidence.profileId)!;
   }
 
-  return getRequestProfile("12ai")!;
+  return getRequestProfile("generic-openai")!;
 }
