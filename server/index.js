@@ -13,6 +13,7 @@ const cors = require('cors');
 const webhookRouter = require('./routes/webhook');
 const generateImageRouter = require('./routes/generate-image');
 const creditProviderRouter = require('./routes/credit-provider-router');
+const userAiRouter = require('./routes/user-ai-router');
 const adminRouter = require('./routes/admin');
 const userRouter = require('./routes/user');
 const chatRouter = require('./routes/chat');
@@ -142,6 +143,8 @@ function createApp() {
   app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
   app.use('/webhook', webhookRouter);
+  // 简体中文注释：用户自带 Key 的新 AI Router 必须挂在 legacy userRouter 前；只接管 mode=chat，其它模式 next() 回落旧逻辑。
+  app.use('/api', userAiRouter);
   app.use('/api', userRouter);
   // 简体中文注释：AI Router 新保存入口必须挂在 legacy adminRouter 之前，否则旧路由会吞掉 requestProfileId/routeStrategy。
   app.use('/api', creditProviderRouter);
