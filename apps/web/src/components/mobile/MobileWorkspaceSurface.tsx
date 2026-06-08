@@ -445,8 +445,8 @@ const MobileWorkspaceSurface: React.FC<MobileWorkspaceSurfaceProps> = ({
               {/* 电商生图独立入口（使用 PackageOpen 呼应电脑端） */}
               <button type="button" onClick={() => runFromMoreSheet(onOpenFavorites)} className={moreSheetActionClass} data-testid="mobile-more-menu-favorites">
                 <Heart size={17} className="mb-2.5 text-[var(--accent-coral)]" />
-                <div className="text-sm font-semibold">{pick('鏀惰棌', 'Favorites')}</div>
-                <div className="mt-1 text-xs text-[var(--text-tertiary)]">{pick('鏀惰棌鍥剧墖鍜屾彁绀鸿瘝', 'Liked images and prompts')}</div>
+                <div className="text-sm font-semibold">{pick('收藏', 'Favorites')}</div>
+                <div className="mt-1 text-xs text-[var(--text-tertiary)]">{pick('收藏图片和提示词', 'Liked images and prompts')}</div>
               </button>
               <button type="button" onClick={() => runFromMoreSheet(() => onScreenChange('ecommerce'))} className={moreSheetActionClass}>
                 <PackageOpen size={17} className="mb-2.5 text-[var(--accent-color)]" />

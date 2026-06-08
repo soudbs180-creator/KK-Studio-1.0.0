@@ -194,6 +194,31 @@ describe("provider strategy", () => {
     assert.equal(evidence.canUseAsApiBaseUrl, false);
   });
 
+  test("marks any third-party llms.txt as provider evidence", () => {
+    const evidence = detectGptBestEvidence({
+      baseUrl: "https://api.example-relay.com/llms.txt",
+    });
+
+    assert.equal(evidence.providerId, "gpt-best");
+    assert.equal(evidence.sourceType, "docs-url");
+    assert.equal(evidence.isDocumentationUrl, true);
+    assert.equal(evidence.canUseAsApiBaseUrl, false);
+    assert.equal(evidence.reason, "Matched generic LLMs.txt documentation URL.");
+  });
+
+  test("recognizes generic llms provider aliases as gpt-best evidence", () => {
+    const evidence = detectGptBestEvidence({
+      provider: "llms-aggregator",
+      baseUrl: "https://gateway.example.com/v1",
+    });
+
+    assert.equal(evidence.providerId, "gpt-best");
+    assert.equal(evidence.sourceType, "explicit-provider");
+    assert.equal(evidence.isDocumentationUrl, false);
+    assert.equal(evidence.canUseAsApiBaseUrl, true);
+    assert.equal(evidence.reason, "Matched generic LLMs.txt provider alias.");
+  });
+
   test("keeps GPT Best explicit provider aliases usable with non-doc API hosts", () => {
     const evidence = detectGptBestEvidence({
       provider: "GPT Best",

@@ -1639,7 +1639,7 @@ const PromptNodeComponent: React.FC<PromptNodeProps> = React.memo(({
                                 }
                             }}
                             className={`p-1 rounded hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer ${promptFavorite ? 'text-[var(--accent-coral)]' : 'text-[var(--text-tertiary)] hover:text-[var(--accent-coral)]'}`}
-                            title={promptFavorite ? 'Remove from favorites' : 'Add prompt to favorites'}
+                            title={promptFavorite ? '取消收藏' : '收藏提示词'}
                             aria-pressed={Boolean(promptFavorite)}
                         >
                             <Heart size={14} fill={promptFavorite ? 'currentColor' : 'none'} />

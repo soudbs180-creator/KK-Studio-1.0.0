@@ -645,26 +645,32 @@ export function detectGptBestEvidence(input: {
     }, 'gpt-best');
 
     if (evidence.profileId === 'gpt-best' && evidence.sourceType === 'explicit-provider') {
+        const isGenericLlm = String(input.provider || '').toLowerCase().includes('llms');
         return {
             providerId: 'gpt-best',
             confidence: 'high',
             sourceType: 'explicit-provider',
             isDocumentationUrl: evidence.isDocumentationUrl,
             canUseAsApiBaseUrl: evidence.canUseAsApiBaseUrl,
-            reason: evidence.isDocumentationUrl
-                ? 'Matched GPT Best provider alias and Apifox documentation URL.'
-                : 'Matched GPT Best provider alias.',
+            reason: isGenericLlm
+                ? 'Matched generic LLMs.txt provider alias.'
+                : (evidence.isDocumentationUrl
+                    ? 'Matched GPT Best provider alias and Apifox documentation URL.'
+                    : 'Matched GPT Best provider alias.'),
         };
     }
 
     if (evidence.profileId === 'gpt-best' && evidence.sourceType === 'docs-url') {
+        const isGenericLlm = String(input.baseUrl || '').toLowerCase().includes('llms.txt');
         return {
             providerId: 'gpt-best',
             confidence: 'medium',
             sourceType: 'docs-url',
             isDocumentationUrl: true,
             canUseAsApiBaseUrl: false,
-            reason: 'Matched GPT Best Apifox documentation URL.',
+            reason: isGenericLlm
+                ? 'Matched generic LLMs.txt documentation URL.'
+                : 'Matched GPT Best Apifox documentation URL.',
         };
     }
 

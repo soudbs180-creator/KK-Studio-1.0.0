@@ -1154,11 +1154,11 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                               <button
                                   onClick={handleToggleFavorite}
                                   className={`${actionButtonClass} ${imageFavorite ? 'border-[var(--accent-coral)] text-[var(--accent-coral)]' : 'hover:border-[var(--accent-coral)] hover:text-[var(--accent-coral)]'} flex-1 justify-center`}
-                                  title={imageFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                                  title={imageFavorite ? '取消收藏' : '添加至收藏'}
                                   aria-pressed={Boolean(imageFavorite)}
                               >
                                   <Heart size={16} fill={imageFavorite ? 'currentColor' : 'none'} />
-                                  Favorite
+                                  收藏
                               </button>
                               {onUseAsSource && !isVideo && !isAudio && (
                                   <button
@@ -1275,11 +1275,11 @@ export const GlobalLightbox: React.FC<GlobalLightboxProps> = ({ images, initialI
                           <button
                               onClick={handleToggleFavorite}
                               className={`${actionButtonClass} ${imageFavorite ? 'border-[var(--accent-coral)] text-[var(--accent-coral)]' : 'hover:border-[var(--accent-coral)] hover:text-[var(--accent-coral)]'}`}
-                              title={imageFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                              title={imageFavorite ? '取消收藏' : '添加至收藏'}
                               aria-pressed={Boolean(imageFavorite)}
                           >
                               <Heart size={16} fill={imageFavorite ? 'currentColor' : 'none'} />
-                              Favorite
+                              收藏
                           </button>
 
                           {/* Continue generation / Use as source action */}

@@ -179,11 +179,20 @@ function matchesRegex(patterns: RegExp[], value: string): boolean {
 
 function matchesProviderAlias(profile: RequestProfile, provider?: string): boolean {
   const normalized = normalizeProviderAlias(provider);
-  return Boolean(normalized) && profile.providerAliases.includes(normalized);
+  if (!normalized) return false;
+  if (profile.id === "gpt-best" && (normalized.includes("llms.txt") || normalized.includes("llms"))) {
+    return true;
+  }
+  return profile.providerAliases.includes(normalized);
 }
 
 function matchesDocumentationUrl(profile: RequestProfile, baseUrl?: string): boolean {
-  return matchesRegex(profile.docsUrlPatterns, normalizeBaseUrl(baseUrl));
+  const normalized = normalizeBaseUrl(baseUrl);
+  if (!normalized) return false;
+  if (profile.id === "gpt-best" && /\/llms\.txt(?:$|[?#])/i.test(normalized)) {
+    return true;
+  }
+  return matchesRegex(profile.docsUrlPatterns, normalized);
 }
 
 function matchesApiBase(profile: RequestProfile, baseUrl?: string): boolean {

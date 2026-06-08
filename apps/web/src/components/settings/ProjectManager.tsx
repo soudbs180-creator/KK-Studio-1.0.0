@@ -1071,7 +1071,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                                             onFavorites();
                                         }}
                                         className={desktopIconButtonClass}
-                                        title="Favorites"
+                                        title="收藏"
                                         tabIndex={-1}
                                     >
                                         <Heart size={20} />

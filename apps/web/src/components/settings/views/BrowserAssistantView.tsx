@@ -179,7 +179,7 @@ const workerCode = `
       const steps = [
         { progress: 20, log: '【抓取线程】正在提取天猫详情页 DOM 并清洗无效标签页...' },
         { progress: 40, log: '【抠图线程】加载 BGE-Remove-Background WASM。处理遮罩图像分割...' },
-        { progress: 60, log: '【生图调度】免 API 网页多实例管理器调起！准备并发执行...' },
+        { progress: 60, log: '【生图调度】网页直通网页多实例管理器调起！准备并发执行...' },
         { progress: 80, log: '【LLM线程】本地大模型 Qwen 开始执行上下文润色，提取耳机高保真属性...' },
         { progress: 100, log: '【分发线程】通过 Native Bridge 发送登录凭证，正在填入小红书草稿...' }
       ];
@@ -335,7 +335,7 @@ export const BrowserAssistantView: React.FC = () => {
   const [writeBackLoading, setWriteBackLoading] = useState(false);
 
   // AI Takeover 自然语言模拟输入
-  const [takeoverInput, setTakeoverInput] = useState('用免 API 代理多开 2 个号并发跑 3 张商品海报图');
+  const [takeoverInput, setTakeoverInput] = useState('用网页直通代理多开 2 个号并发跑 3 张商品海报图');
   const [takeoverOutput, setTakeoverOutput] = useState<{
     intent: string;
     routing: string;
@@ -418,7 +418,7 @@ export const BrowserAssistantView: React.FC = () => {
   };
 
 
-  // 外部免 API 生图平台管理
+  // 外部网页直通生图平台管理
   const [platforms, setPlatforms] = useState<ImageGenPlatform[]>([
     {
       id: 'midjourney',
@@ -608,7 +608,7 @@ export const BrowserAssistantView: React.FC = () => {
     if (platform && isMountedRef.current) {
       notify.success(
         platform.enabled ? '已禁用该平台' : '已启用该平台',
-        `${platform.name} 将${platform.enabled ? '不再' : '会'}加入 AI 免 API 生图调度池`
+        `${platform.name} 将${platform.enabled ? '不再' : '会'}加入 AI 网页直通生图调度池`
       );
     }
   };
@@ -829,7 +829,7 @@ export const BrowserAssistantView: React.FC = () => {
     }, 1000);
   };
 
-  // 8. 外部免 API 网站生图 (Web Worker 计算隔离)
+  // 8. 外部网页直通网站生图 (Web Worker 计算隔离)
   const handleGenTest = () => {
     if (!promptText) {
       notify.warning('请输入 Prompt', '生图测试需要有效的提示词');
@@ -916,7 +916,7 @@ export const BrowserAssistantView: React.FC = () => {
     const pubSteps = [
       '正在加载小红书分发适配器...',
       '已成功定位小红书创作者页面标签页...',
-      '正在上传刚生成的免 API 高清商品海报图...',
+      '正在上传刚生成的网页直通高清商品海报图...',
       'AI 正在读取商品信息，智能生成小红书发帖文案...',
       '正在自动填充标题、标签，并保存至草稿箱...'
     ];
@@ -1019,7 +1019,7 @@ export const BrowserAssistantView: React.FC = () => {
         setPipelineRunning(false);
         return;
       }
-      logsBufferRef.current.push(`【路由中心】已选择：[AI 代理免 API 路线] -> 检测到活跃多开 Session 池: ${activeUsernames.join(', ')}。`);
+      logsBufferRef.current.push(`【路由中心】已选择：[网页直通代理路线] -> 检测到活跃多开 Session 池: ${activeUsernames.join(', ')}。`);
     }
 
     setPipelineLogs([...logsBufferRef.current]);
@@ -1095,10 +1095,10 @@ export const BrowserAssistantView: React.FC = () => {
         intent = 'extract_product';
       }
 
-      if (takeoverInput.includes('免 API') || takeoverInput.includes('代理') || takeoverInput.includes('多开')) {
+      if (takeoverInput.includes('网页直通') || takeoverInput.includes('代理') || takeoverInput.includes('多开')) {
         parsedRouting = 'agent_proxy';
         parsedSessions = sessions.filter((s) => s.platformId === 'leonardo' && s.enabled).map((s) => s.username);
-        reason = '检测到包含“免 API / 代理 / 多开”关键字，AI 接管引擎已自动将本生成任务切换至免 API 代理轮询调度池';
+        reason = '检测到包含“网页直通 / 代理 / 多开”关键字，AI 接管引擎已自动将本生成任务切换至网页直通代理轮询调度池';
       }
 
       // 提取 Prompt
@@ -1151,7 +1151,7 @@ export const BrowserAssistantView: React.FC = () => {
         } else {
           setPlaygroundTab('generate');
           setRoutingMode('api');
-          notify.success('参数回注成功', '已切换至「免 API 生图与社交分发」，并已填入提取的提示词！');
+          notify.success('参数回注成功', '已切换至「网页直通生图与社交分发」，并已填入提取的提示词！');
         }
       }
     }, 1000);
@@ -1291,7 +1291,7 @@ export const BrowserAssistantView: React.FC = () => {
           </div>
         </div>
 
-        {/* 阶段五优化：外部免 API 平台与多账号 Session 混合池管理 */}
+        {/* 阶段五优化：外部网页直通平台与多账号 Session 混合池管理 */}
         <div className="dashboard-grid-card a-card-span-2-col p-4" style={{ cursor: 'default' }}>
           <div className="flex items-center justify-between">
             <div>
@@ -1300,7 +1300,7 @@ export const BrowserAssistantView: React.FC = () => {
             </div>
             <SettingsBadge tone="emerald">
               <Coins size={11} className="mr-1 inline" />
-              <span>多开免 API 调度</span>
+              <span>多开网页直通调度</span>
             </SettingsBadge>
           </div>
           <p className="text-xs text-slate-400 mt-1">
@@ -1568,7 +1568,7 @@ export const BrowserAssistantView: React.FC = () => {
             </SettingsBadge>
           </div>
           <p className="text-xs text-slate-400 mt-2">
-            结合本地大模型网关、智能剪贴板多模态流入与屏幕感知转译，无需消耗昂贵的在线云端 API 额度，全面实现免 API 的电商创作闭环。
+            结合本地大模型网关、智能剪贴板多模态流入与屏幕感知转译，无需消耗昂贵的在线云端 API 额度，全面实现网页直通的电商创作闭环。
           </p>
 
           <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1792,7 +1792,7 @@ export const BrowserAssistantView: React.FC = () => {
             </SettingsBadge>
           </div>
           <p className="text-xs text-slate-400 mt-2">
-            AI Takeover 引擎会智能识别你的输入意图。如果解析到“免 API”或“代理多开”的诉求，其后端分发逻辑会自动触发多端控制，不需要用户手动切换。
+            AI Takeover 引擎会智能识别你的输入意图。如果解析到“网页直通”或“代理多开”的诉求，其后端分发逻辑会自动触发多端控制，不需要用户手动切换。
           </p>
 
           <div className="mt-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
@@ -1803,7 +1803,7 @@ export const BrowserAssistantView: React.FC = () => {
                   type="text"
                   value={takeoverInput}
                   onChange={(e) => setTakeoverInput(e.target.value)}
-                  placeholder="在此输入生成或提取的命令，例如：帮我用免 API 跑 3 张模特海报..."
+                  placeholder="在此输入生成或提取的命令，例如：帮我用网页直通跑 3 张模特海报..."
                   className="flex-1 bg-black/15 dark:bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
                   disabled={takeoverLoading}
                 />
@@ -1829,10 +1829,10 @@ export const BrowserAssistantView: React.FC = () => {
               {/* 快捷配置按钮 */}
               <div className="flex gap-2">
                 <button
-                  onClick={() => setTakeoverInput('用免 API 代理多开 2 个号并发跑 3 张商品海报图')}
+                  onClick={() => setTakeoverInput('用网页直通代理多开 2 个号并发跑 3 张商品海报图')}
                   className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/5 text-[9px] text-slate-400 transition-colors cursor-pointer"
                 >
-                  快捷指令 A (免 API 多开并发)
+                  快捷指令 A (网页直通多开并发)
                 </button>
                 <button
                   onClick={() => setTakeoverInput('用 Leonardo 官方 API 扣减 10 积分生成一张蒸汽朋克海报')}
@@ -1856,7 +1856,7 @@ export const BrowserAssistantView: React.FC = () => {
                     <div className="flex justify-between">
                       <span className="text-slate-400">物理路由:</span>
                       <span className={`font-bold font-mono ${takeoverOutput.routing === 'agent_proxy' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                        {takeoverOutput.routing === 'agent_proxy' ? 'AI 代理 (免 API)' : '付费 API 通道'}
+                        {takeoverOutput.routing === 'agent_proxy' ? '网页直通 (无需Key)' : '付费 API 通道'}
                       </span>
                     </div>
                     {takeoverOutput.routing === 'agent_proxy' && takeoverOutput.sessions.length > 0 && (
@@ -1904,7 +1904,7 @@ export const BrowserAssistantView: React.FC = () => {
                   }`}
                 >
                   <Sparkles size={12} />
-                  <span>免 API 生图与社交分发</span>
+                  <span>网页直通生图与社交分发</span>
                 </button>
                 <button
                   onClick={() => setPlaygroundTab('pipeline')}
@@ -2079,7 +2079,7 @@ export const BrowserAssistantView: React.FC = () => {
               </div>
             )}
 
-            {/* Tab 2: 外部免 API 生图与一键社交分发 */}
+            {/* Tab 2: 外部网页直通生图与一键社交分发 */}
             {playgroundTab === 'generate' && (
               <div>
                 <p className="text-xs text-slate-400 mt-1">
@@ -2124,7 +2124,7 @@ export const BrowserAssistantView: React.FC = () => {
                         ) : (
                           <>
                             <Sparkles size={13} />
-                            <span>免 API 批量生图测试</span>
+                            <span>网页直通批量生图测试</span>
                           </>
                         )}
                       </button>
@@ -2163,7 +2163,7 @@ export const BrowserAssistantView: React.FC = () => {
                         </span>
                         <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
                           <Check size={11} className="text-emerald-400" />
-                          <span>原图 CDN 拦截已完成 (免 API)</span>
+                          <span>原图 CDN 拦截已完成 (网页直通)</span>
                         </span>
                       </div>
                       <h4 className="text-xs font-bold text-slate-200">
@@ -2237,7 +2237,7 @@ export const BrowserAssistantView: React.FC = () => {
                             : 'bg-white/5 text-slate-400 hover:text-slate-300'
                         }`}
                       >
-                        AI 代理通道 (免 API)
+                        网页直通通道 (无需 Key)
                       </button>
                     </div>
                   </div>

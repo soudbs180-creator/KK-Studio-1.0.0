@@ -2090,7 +2090,7 @@ const ImageNodeComponent: React.FC<ImageNodeProps> = React.memo(({
                                                 <button
                                                     onClick={handleToggleFavorite}
                                                     className={joinClasses(imageFavorite ? 'text-[var(--accent-coral)]' : 'hover:text-[var(--accent-coral)]', 'transition-colors', iconButtonPaddingClass)}
-                                                    title={imageFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                                                    title={imageFavorite ? '取消收藏' : '添加至收藏'}
                                                     aria-pressed={Boolean(imageFavorite)}
                                                 >
                                                     <Heart size={actionIconSize} fill={imageFavorite ? 'currentColor' : 'none'} />
