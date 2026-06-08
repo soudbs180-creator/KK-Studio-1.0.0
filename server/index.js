@@ -18,6 +18,7 @@ const chatRouter = require('./routes/chat');
 const ocrRouter = require('./routes/ocr');
 const aiAssistantRouter = require('./routes/ai-assistant');
 const configRouter = require('./routes/config');
+const providerProbeRouter = require('./routes/provider-probe');
 
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://kkai.plus',
@@ -142,6 +143,7 @@ function createApp() {
   app.use('/webhook', webhookRouter);
   app.use('/api', userRouter);
   app.use('/api', adminRouter);
+  app.use('/api', providerProbeRouter);
   app.use('/api', chatRouter);
   app.use('/api', generateImageRouter);
   app.use('/api', ocrRouter);
