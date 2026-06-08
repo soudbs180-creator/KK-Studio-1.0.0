@@ -3,9 +3,9 @@
  * @module server/lib/dispatcher
  * @description 后端统一 AI 路由派发器（Dispatcher）。严格执行标准流控，
  *              支持 Keep-Alive 连接复用、内存拓扑缓存、显式供应商锁定、
- *              priority-failover、weighted-random、多 Key 熔断、渠道级隔离及智能第三方协议适配。
+ *              priority-failover、weighted-random、多 Key 熔断、渠道级隔离、厂商文档契约校验及智能第三方协议适配。
  * @author KK-Studio Team
- * @version 2.1.0
+ * @version 2.4.0
  */
 
 const http = require('http');
@@ -16,6 +16,8 @@ const { getPool } = require('../db');
 const credits = require('../credits');
 const { getModelConfig } = require('./modelRegistry');
 const { getAdapter, normalizeAdapterId } = require('./adapterRegistry');
+const { matchProviderProfile } = require('./providerProfiles');
+const { assertStrictTaskSupported } = require('./strictProviderContracts');
 
 const httpAgent = new http.Agent({
   keepAlive: true,
@@ -157,7 +159,6 @@ function chooseWeightedRandomOrder(channels, seed = '') {
   const scored = channels.map((channel, index) => {
     const weight = Math.max(1, Number(channel.weight || 1));
     const hash = (stableHashInt(`${seed}:${channel.provider_id}:${channel.id || index}:${channel.base_url}`) % 1000000) / 1000000;
-    // Efraimidis-Spirakis weighted sampling order: higher weight has higher chance to appear earlier.
     return {
       channel,
       score: Math.pow(Math.max(hash, 0.000001), 1 / weight),
@@ -179,6 +180,56 @@ function chooseChannelOrder(channels, strategy, seed = '') {
   }
 
   return choosePriorityFailoverOrder(channels);
+}
+
+function resolveChannelProfile(channel) {
+  const explicitProfileId = String(channel.request_profile_id || channel.requestProfileId || '').trim();
+  if (explicitProfileId) {
+    return {
+      id: explicitProfileId,
+      source: 'request_profile_id',
+    };
+  }
+
+  const matched = matchProviderProfile({
+    baseUrl: channel.base_url,
+    provider_id: channel.provider_id,
+    provider_name: channel.provider_name,
+    providerHint: channel.provider_id || channel.provider_name,
+    endpoint_type: channel.endpoint_type || channel.adapterId,
+  });
+
+  return {
+    id: matched?.id || '',
+    source: matched?.id ? 'matched_profile' : 'unknown',
+  };
+}
+
+function enforceStrictContractForChannel(channel, unifiedPayload, adapterId) {
+  const profile = resolveChannelProfile(channel);
+  if (!profile.id) return { profileId: null, contractTask: null };
+
+  const taskType = unifiedPayload.task_type || 'chat';
+  const modelId = channel.model_id || unifiedPayload.model;
+  const contractTask = assertStrictTaskSupported(profile.id, taskType, { modelId });
+  if (contractTask?.adapterId && contractTask.adapterId !== adapterId) {
+    const error = new Error(`强预设 ${profile.id} 的 ${taskType} 任务必须使用 ${contractTask.adapterId}，当前为 ${adapterId}。已阻止旧逻辑污染。`);
+    error.statusCode = 400;
+    error.code = 'STRICT_PROVIDER_ADAPTER_MISMATCH';
+    error.route = {
+      profileId: profile.id,
+      profileSource: profile.source,
+      taskType,
+      modelId,
+      adapterId,
+      expectedAdapterId: contractTask.adapterId,
+      providerId: channel.provider_id,
+      providerName: channel.provider_name,
+    };
+    throw error;
+  }
+
+  return { profileId: profile.id, profileSource: profile.source, contractTask };
 }
 
 class BackendDispatcher {
@@ -249,7 +300,7 @@ class BackendDispatcher {
       api_keys: [apiKey],
       model_id: realModelName,
       endpoint_type: adapterId,
-      request_profile_id: adapterId,
+      request_profile_id: providerId || adapterId,
       route_strategy: 'priority-failover',
       credit_cost: null,
       priority: 0,
@@ -384,6 +435,7 @@ class BackendDispatcher {
       let finalContent = '';
       let finalTokensUsed = 0;
       let usedChannelInfo = null;
+      let usedContractInfo = null;
       let lastAttemptError = null;
       const attemptedRoutes = [];
 
@@ -399,7 +451,23 @@ class BackendDispatcher {
         }
 
         const adapterId = normalizeAdapterId(channel.endpoint_type || channel.adapterId, channel);
-        console.log(`[BackendDispatcher] 尝试渠道 [${channel.provider_name || channel.provider_id}] provider=${channel.provider_id} adapter=${adapterId} (${channelIndex + 1}/${sortedChannels.length}) strategy=${routePlan.effectiveStrategy} key=${keysToUse.length}/${shuffledKeys.length} selected=${targetProviderId || 'auto'}`);
+        let contractInfo;
+        try {
+          contractInfo = enforceStrictContractForChannel(channel, unifiedPayload, adapterId);
+        } catch (strictErr) {
+          lastAttemptError = strictErr;
+          attemptedRoutes.push({
+            providerId: channel.provider_id,
+            adapter: adapterId,
+            requestProfileId: channel.request_profile_id || null,
+            status: 'blocked_by_contract',
+            error: strictErr.message,
+          });
+          console.warn(`[BackendDispatcher] 渠道 [${channel.provider_id}] 被文档契约阻止: ${strictErr.message}`);
+          continue;
+        }
+
+        console.log(`[BackendDispatcher] 尝试渠道 [${channel.provider_name || channel.provider_id}] provider=${channel.provider_id} adapter=${adapterId} profile=${contractInfo.profileId || 'generic'} (${channelIndex + 1}/${sortedChannels.length}) strategy=${routePlan.effectiveStrategy} key=${keysToUse.length}/${shuffledKeys.length} selected=${targetProviderId || 'auto'}`);
 
         for (let keyIndex = 0; keyIndex < keysToUse.length; keyIndex++) {
           const currentKey = keysToUse[keyIndex];
@@ -412,7 +480,7 @@ class BackendDispatcher {
             const adapter = getAdapter(channel.endpoint_type || channel.adapterId, channel);
             const transportReq = adapter.buildRequest(activeProvider, channel.model_id, unifiedPayload);
 
-            console.log(`[BackendDispatcher] Key [${keyIndex + 1}/${keysToUse.length}] 请求 URL: ${transportReq.url} | adapter=${adapterId}`);
+            console.log(`[BackendDispatcher] Key [${keyIndex + 1}/${keysToUse.length}] 请求 URL: ${transportReq.url} | adapter=${adapterId} | profile=${contractInfo.profileId || 'generic'}`);
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 60000);
@@ -436,6 +504,7 @@ class BackendDispatcher {
             attemptedRoutes.push({
               providerId: channel.provider_id,
               adapter: adapterId,
+              requestProfileId: contractInfo.profileId || channel.request_profile_id || null,
               status: response.status,
             });
 
@@ -450,9 +519,10 @@ class BackendDispatcher {
                 providerId: channel.provider_id,
                 providerName: channel.provider_name,
                 adapter: adapterId,
-                requestProfileId: channel.request_profile_id || null,
+                requestProfileId: contractInfo.profileId || channel.request_profile_id || null,
                 requestedStrategy: routePlan.requestedStrategy,
                 effectiveStrategy: routePlan.effectiveStrategy,
+                strictContractChecked: Boolean(contractInfo.profileId),
                 explicitProviderLocked: Boolean(targetProviderId),
               };
 
@@ -467,8 +537,9 @@ class BackendDispatcher {
 
             const responseData = await response.json();
             finalContent = adapter.extractContent(responseData);
-            finalTokensUsed = responseData?.usage?.total_tokens || responseData?.usage?.totalTokens || 0;
+            finalTokensUsed = responseData?.usage?.total_tokens || responseData?.usage?.totalTokens || responseData?.data?.usage?.total_tokens || 0;
             usedChannelInfo = channel;
+            usedContractInfo = contractInfo;
             requestSuccess = true;
 
             try {
@@ -523,7 +594,9 @@ class BackendDispatcher {
           providerId: usedChannelInfo.provider_id,
           providerName: usedChannelInfo.provider_name,
           adapter: normalizeAdapterId(usedChannelInfo.endpoint_type || usedChannelInfo.adapterId, usedChannelInfo),
-          requestProfileId: usedChannelInfo.request_profile_id || null,
+          requestProfileId: usedContractInfo?.profileId || usedChannelInfo.request_profile_id || null,
+          profileSource: usedContractInfo?.profileSource || null,
+          strictContractChecked: Boolean(usedContractInfo?.profileId),
           baseModelId,
           requestedStrategy: routePlan.requestedStrategy,
           effectiveStrategy: routePlan.effectiveStrategy,
@@ -575,8 +648,8 @@ class BackendDispatcher {
       );
 
       const error = new Error(`AI 请求处理失败，已安全回滚并退还 ${requiredCredits} 积分。`);
-      error.statusCode = 500;
-      error.code = 'AI_CHAT_FAILED';
+      error.statusCode = err.statusCode || 500;
+      error.code = err.code || 'AI_CHAT_FAILED';
       error.route = err.route;
       throw error;
     }
