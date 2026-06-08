@@ -22,7 +22,7 @@ const ChatMessageSchema = z.object({
 
 const ChatRequestSchema = z.object({
   messages: z.array(ChatMessageSchema).min(1).max(40),
-  model: z.string().optional(), // 支持模型选择传递
+  model: z.string().trim().min(1).max(256).optional(), // 支持模型/供应商选择传递，例如 gpt-4o-mini@system_openai
   creditSettlement: z.enum(['server', 'client']).optional(),
   executionLane: z.enum(['local-user-api', 'cloud-credit-model']).optional(),
 });
@@ -99,9 +99,12 @@ router.post('/chat', async (req, res) => {
     const { getActiveGatewayProvider } = require('../utils/apiGatewayConfig');
     const { SuchuangProvider } = require('../providers/suchuangProvider');
     const activeProvider = getActiveGatewayProvider();
+    const requestedModel = String(parsed.data.model || '').trim();
 
-    if (activeProvider === 'suchuang') {
-      const modelName = parsed.data.model || 'chat_index';
+    // 简体中文注释：仅在用户没有显式选择模型/供应商时保留 ACTIVE_API_PROVIDER= suchuang 的旧全局兜底；
+    // 一旦前端传入 model 或 model@provider，必须交给 BackendDispatcher 按用户选择路由，避免全局开关覆盖用户选择。
+    if (activeProvider === 'suchuang' && !requestedModel) {
+      const modelName = 'chat_index';
       console.log(`Routing ${modelName} to Suchuang API Gateway`);
 
       const pool = getPool();
@@ -137,15 +140,19 @@ router.post('/chat', async (req, res) => {
         content: result.text,
         credits: currentCredits,
         creditsCost: requiredCredits,
+        provider: 'suchuang',
+        providerName: '速创 API Gateway',
+        model: modelName,
       });
     }
 
     // 2. 组装 Unified Internal Request payload
     const unifiedPayload = {
       task_type: 'chat',
-      model: parsed.data.model || process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini',
+      model: requestedModel || process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini',
       messages: parsed.data.messages,
-      temperature: 0.7
+      temperature: 0.7,
+      requestId
     };
 
     // 3. 彻底委托给统一派发器执行
@@ -153,7 +160,7 @@ router.post('/chat', async (req, res) => {
 
     res.setHeader('X-Refresh-Token', signJWT({ userId }));
     res.setHeader('X-Client-Request-Id', requestId);
-    
+
     return res.json(result);
   } catch (err) {
     if (err.statusCode === 402) {
@@ -163,6 +170,7 @@ router.post('/chat', async (req, res) => {
       error: err.message || 'Chat failed.',
       code: err.code || 'AI_CHAT_FAILED',
       requestId,
+      route: err.route,
     });
   }
 });
