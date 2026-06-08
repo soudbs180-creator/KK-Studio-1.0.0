@@ -6,7 +6,7 @@
  *              命中强预设时返回 strictContract；文档未解析的预设返回 ok=false，禁止误认为可执行。
  */
 
-const fetch = require('node-fetch');
+const { isPrivateHost } = require('../fetchClient');
 const { normalizeBaseUrl } = require('./adapterRegistry');
 const { matchProviderProfile } = require('./providerProfiles');
 const { getStrictProviderContract } = require('./strictProviderContracts');
@@ -88,6 +88,15 @@ function withStrictContract(result, profile) {
 }
 
 async function fetchJson(url, options) {
+  try {
+    const parsed = new URL(url);
+    if (isPrivateHost(parsed.hostname)) {
+      return { ok: false, status: 400, text: 'SSRF Blocked: Private host access rejected.', data: null };
+    }
+  } catch (err) {
+    return { ok: false, status: 400, text: err.message, data: null };
+  }
+
   const timeout = withTimeout();
   try {
     const response = await fetch(url, {

@@ -870,20 +870,14 @@ function ensureLocalStorage() {
   }
 }
 
-function readLocalStorage() {
-  ensureLocalStorage();
-  try {
-    const raw = fs.readFileSync(LOCAL_STORAGE_PATH, 'utf8');
-    const parsed = JSON.parse(raw);
-    return isObjectRecord(parsed) ? parsed : createEmptyLocalStorage();
-  } catch (e) {
-    return createEmptyLocalStorage();
-  }
+const localUserRouteStore = require('../lib/dispatcher/localUserRouteStore');
+
+async function readLocalStorage() {
+  return localUserRouteStore.readLocalStorage();
 }
 
-function writeLocalStorage(data) {
-  ensureLocalStorage();
-  fs.writeFileSync(LOCAL_STORAGE_PATH, JSON.stringify(data, null, 2), 'utf8');
+async function writeLocalStorage(data) {
+  return localUserRouteStore.writeLocalStorage(data);
 }
 
 function readProfileState(data, userId) {
@@ -1086,28 +1080,8 @@ function localRecordMatchesRoute(record, routeTarget, rawRouteId) {
     || name === routeTarget;
 }
 
-function resolveLocalUserRoute(profileState, routeId) {
-  const routeTarget = resolveLocalRouteIdCandidate(routeId);
-  // 简体中文注释：保留未剥离前缀的原始 routeId，用于兼容 slots/providers 本身带有 'slot_' 或 'provider_' 前缀的 ID 比对，防止 404
-  const rawRouteId = String(routeId || '').trim().toLowerCase();
-  const providers = Array.isArray(profileState.providers) ? profileState.providers : [];
-  const slots = Array.isArray(profileState.slots) ? profileState.slots : [];
-
-  const provider = providers.find((item) => {
-    return localRecordMatchesRoute(item, routeTarget, rawRouteId);
-  });
-  if (provider) {
-    return buildLocalUserRouteFromProvider(provider);
-  }
-
-  const slot = slots.find((item) => {
-    return localRecordMatchesRoute(item, routeTarget, rawRouteId);
-  });
-  if (slot) {
-    return buildLocalUserRouteFromSlot(slot, providers);
-  }
-
-  return null;
+async function resolveLocalUserRoute(userId, routeId) {
+  return localUserRouteStore.resolveLocalUserRoute(userId, routeId);
 }
 
 function appendWuyinApiKeyToTargetUrl(targetUrl, apiKey) {
@@ -1154,14 +1128,14 @@ function findFirstWuyinVideoRoute(profileState) {
   return null;
 }
 
-async function handleWuyinGenericProxy(req, res, profileState) {
+async function handleWuyinGenericProxy(req, res, userId) {
   const targetUrl = String(req.headers['x-proxy-target-url'] || '').trim();
   const routeId = String(req.headers['x-key-slot-id'] || '').trim();
   if (!targetUrl) {
     return null;
   }
 
-  const route = resolveLocalUserRoute(profileState, routeId);
+  const route = await resolveLocalUserRoute(userId, routeId);
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
   }
@@ -1337,7 +1311,7 @@ function buildWuyinLocalTaskId(route, routeId, result, catalogItem) {
 // 简体中文注释：处理速创 API 的图片模型提交，由统一的 wuyinModelExecutor 处理参数清洗和路由执行
 async function handleWuyinImageMode(req, res, profileState) {
   const routeId = String(req.body && req.body.routeId || '').trim();
-  const route = resolveLocalUserRoute(profileState, routeId);
+  const route = await resolveLocalUserRoute(profileState, routeId);
 
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
@@ -1397,7 +1371,7 @@ async function handleWuyinImageMode(req, res, profileState) {
 // 简体中文注释：处理速创 API 的视频模型提交，利用通用执行器自动分流和适配参数
 async function handleWuyinVideoMode(req, res, profileState) {
   const routeId = String(req.body && req.body.routeId || '').trim();
-  const route = resolveLocalUserRoute(profileState, routeId);
+  const route = await resolveLocalUserRoute(profileState, routeId);
 
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
@@ -1434,7 +1408,7 @@ async function handleWuyinVideoMode(req, res, profileState) {
 
 async function handleWuyinAudioMode(req, res, profileState) {
   const routeId = String(req.body && req.body.routeId || '').trim();
-  const route = resolveLocalUserRoute(profileState, routeId);
+  const route = await resolveLocalUserRoute(profileState, routeId);
 
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
@@ -1490,7 +1464,7 @@ function extractWuyinChatContent(payload) {
 
 async function handleWuyinChatMode(req, res, profileState) {
   const routeId = String(req.body && req.body.routeId || '').trim();
-  const route = resolveLocalUserRoute(profileState, routeId);
+  const route = await resolveLocalUserRoute(profileState, routeId);
 
   if (!route) {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
@@ -1530,7 +1504,7 @@ async function handleWuyinTaskStatusMode(req, res, profileState) {
   }
 
   let route = parsed.routeId
-    ? resolveLocalUserRoute(profileState, parsed.routeId)
+    ? await resolveLocalUserRoute(profileState, parsed.routeId)
     : findFirstWuyinVideoRoute(profileState);
   if (!route && /^(image|video|audio)_[a-z0-9_.-]+$/i.test(String(parsed.routeId || ''))) {
     route = findFirstWuyinVideoRoute(profileState);
@@ -1604,6 +1578,305 @@ async function handleWuyinTaskStatusMode(req, res, profileState) {
   }
 }
 
+// 简体中文注释：处理 12AI 自有 Key 的图片生成，支持同步 Gemini Native 和异步生图任务
+async function handleTwelveAIImageMode(req, res, route, profileState) {
+  const apiKey = getLocalRouteApiKeyForTransport(route);
+  if (!apiKey) {
+    return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', '12AI API key is required.');
+  }
+
+  const modelId = String(req.body && req.body.modelId || '').trim();
+  const prompt = String(req.body && req.body.prompt || '').trim();
+  const aspectRatio = String(req.body && (req.body.aspect_ratio || req.body.aspectRatio) || '1:1').trim();
+  const preferAsync = req.body && (req.body.executionLane === 'local-user-api' || req.body.preferAsync);
+
+  const isGeminiModel = /gemini|nanobanana/i.test(modelId);
+  const baseUrl = route.baseUrl || 'https://cdn.12ai.org';
+
+  try {
+    if (isGeminiModel && !preferAsync) {
+      // 1. 同步生成 (Gemini Native)
+      const url = `${baseUrl.replace(/\/+$/, '')}/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+      const payload = {
+        contents: req.body.contents || [{
+          parts: [{ text: prompt }]
+        }],
+        generationConfig: req.body.generationConfig || {
+          responseModalities: ["IMAGE"],
+          imageConfig: {
+            aspectRatio: aspectRatio,
+            imageSize: "1K"
+          }
+        }
+      };
+
+      const upstream = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!upstream.ok) {
+        const errText = await upstream.text().catch(() => '');
+        throw new Error(`12AI Gemini Image API returned HTTP ${upstream.status}: ${errText}`);
+      }
+
+      const resJson = await upstream.json();
+      const parts = resJson.candidates?.[0]?.content?.parts || [];
+      const imagePart = parts.find(part => part.inlineData);
+      if (!imagePart?.inlineData?.data) {
+        throw new Error('12AI Gemini Image API failed to return inlineData image.');
+      }
+
+      const generatedMimeType = imagePart.inlineData.mimeType || 'image/png';
+      const fileExt = generatedMimeType.split('/')[1] || 'png';
+      const filename = `kkai-gen-${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
+      const uploadsDir = path.join(__dirname, '../uploads');
+      if (!fs.existsSync(uploadsDir)) {
+        await fs.promises.mkdir(uploadsDir, { recursive: true });
+      }
+      const filePath = path.join(uploadsDir, filename);
+      await fs.promises.writeFile(filePath, Buffer.from(imagePart.inlineData.data, 'base64'));
+      const staticImageUrl = `/uploads/${filename}`;
+
+      return res.json(okEnvelope({
+        urls: [staticImageUrl],
+        taskId: '',
+        providerTaskId: '',
+        status: 'success',
+        endpointType: '12ai-sync-image',
+        modelId,
+        requestId: req.body && req.body.requestId,
+        attemptId: req.body && req.body.attemptId,
+      }, req));
+    } else {
+      // 2. 异步生成 (Standard or Gemini Async)
+      let url = `${baseUrl.replace(/\/+$/, '')}/v1/task/submit`;
+      let payload = {};
+
+      if (isGeminiModel) {
+        // Gemini Async 需要 query 参数 model
+        url = `${url}?model=${modelId}`;
+        payload = {
+          contents: req.body.contents || [{
+            parts: [{ text: prompt }]
+          }],
+          generationConfig: req.body.generationConfig || {
+            responseModalities: ["IMAGE"],
+            imageConfig: {
+              aspectRatio: aspectRatio,
+              imageSize: "1K"
+            }
+          }
+        };
+      } else {
+        // Standard Async (FLUX / SD3 等)
+        payload = {
+          model: modelId,
+          input: {
+            prompt: prompt,
+            aspect_ratio: aspectRatio
+          }
+        };
+      }
+
+      const upstream = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!upstream.ok) {
+        const errText = await upstream.text().catch(() => '');
+        throw new Error(`12AI Async Image API returned HTTP ${upstream.status}: ${errText}`);
+      }
+
+      const resJson = await upstream.json();
+      const providerTaskId = resJson.task_id;
+      if (!providerTaskId) {
+        throw new Error(`12AI Async Image API did not return task_id: ${JSON.stringify(resJson)}`);
+      }
+
+      const localTaskId = encodeLocalProxyTaskId(route.id, providerTaskId, modelId);
+
+      return res.json(okEnvelope({
+        urls: [],
+        taskId: localTaskId,
+        providerTaskId,
+        status: 'pending',
+        endpointType: '12ai-async-image',
+        modelId,
+        requestId: req.body && req.body.requestId,
+        attemptId: req.body && req.body.attemptId,
+      }, req));
+    }
+  } catch (err) {
+    const safeMsg = err.message && apiKey ? err.message.replaceAll(apiKey, '[REDACTED]') : String(err);
+    return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', safeMsg);
+  }
+}
+
+// 简体中文注释：处理 12AI 自有 Key 的视频生成提交
+async function handleTwelveAIVideoMode(req, res, route, profileState) {
+  const apiKey = getLocalRouteApiKeyForTransport(route);
+  if (!apiKey) {
+    return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', '12AI API key is required.');
+  }
+
+  const modelId = String(req.body && req.body.modelId || 'sora-2').trim();
+  const prompt = String(req.body && req.body.prompt || '').trim();
+  const aspectRatio = String(req.body && (req.body.aspect_ratio || req.body.aspectRatio) || '16:9').trim();
+  const duration = String(req.body && (req.body.duration || req.body.seconds) || '8').trim();
+
+  // 映射 aspect_ratio 到 size (根据 12AI 支持 1280x720 或者是 720x1280)
+  let size = '1280x720';
+  if (aspectRatio === '9:16') {
+    size = '720x1280';
+  } else if (aspectRatio === '1:1') {
+    size = '1024x1024';
+  }
+
+  const baseUrl = route.baseUrl || 'https://cdn.12ai.org';
+
+  try {
+    const url = `${baseUrl.replace(/\/+$/, '')}/v1/videos`;
+    const payload = {
+      model: modelId,
+      prompt: prompt,
+      size: size,
+      seconds: duration
+    };
+
+    const upstream = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!upstream.ok) {
+      const errText = await upstream.text().catch(() => '');
+      throw new Error(`12AI Video API returned HTTP ${upstream.status}: ${errText}`);
+    }
+
+    const resJson = await upstream.json();
+    const providerTaskId = resJson.id;
+    if (!providerTaskId) {
+      throw new Error(`12AI Video API did not return id: ${JSON.stringify(resJson)}`);
+    }
+
+    const localTaskId = encodeLocalProxyTaskId(route.id, providerTaskId, modelId);
+
+    return res.json(okEnvelope({
+      taskId: localTaskId,
+      providerTaskId,
+      status: 'pending',
+      endpointType: '12ai-async-video',
+      requestId: req.body && req.body.requestId,
+      attemptId: req.body && req.body.attemptId,
+    }, req));
+  } catch (err) {
+    const safeMsg = err.message && apiKey ? err.message.replaceAll(apiKey, '[REDACTED]') : String(err);
+    return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', safeMsg);
+  }
+}
+
+// 简体中文注释：查询 12AI 异步任务的状态 (涵盖图片异步生成及视频异步生成)
+async function handleTwelveAITaskStatusMode(req, res, route, profileState) {
+  const apiKey = getLocalRouteApiKeyForTransport(route);
+  if (!apiKey) {
+    return sendLocalProxyError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', '12AI API key is required.');
+  }
+
+  const localTaskId = String(req.body && (req.body.localTaskId || req.body.taskId) || '').trim();
+  const parsed = decodeLocalProxyTaskId(localTaskId);
+  if (!parsed.providerTaskId) {
+    return sendLocalProxyError(res, req, 400, 'INVALID_REQUEST', 'localTaskId is required for 12AI task status.');
+  }
+
+  const providerTaskId = parsed.providerTaskId;
+  const modelId = parsed.modelId || '';
+  const isVideo = /video|sora|veo|omni|vidu/i.test(modelId);
+
+  const baseUrl = route.baseUrl || 'https://cdn.12ai.org';
+
+  try {
+    let url = '';
+    if (isVideo) {
+      url = `${baseUrl.replace(/\/+$/, '')}/v1/videos/${providerTaskId}`;
+    } else {
+      url = `${baseUrl.replace(/\/+$/, '')}/v1/task/${providerTaskId}`;
+    }
+
+    const upstream = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!upstream.ok) {
+      const errText = await upstream.text().catch(() => '');
+      throw new Error(`12AI Task Status API returned HTTP ${upstream.status}: ${errText}`);
+    }
+
+    const resJson = await upstream.json();
+    let normalizedStatus = 'pending';
+    let urls = [];
+    let errorMessage = '';
+
+    const upstreamStatus = String(resJson.status || '').toLowerCase();
+
+    if (isVideo) {
+      if (upstreamStatus === 'completed') {
+        normalizedStatus = 'success';
+        if (resJson.output) {
+          urls = [resJson.output];
+        }
+      } else if (upstreamStatus === 'failed') {
+        normalizedStatus = 'failed';
+        errorMessage = resJson.error?.message || '12AI video generation failed.';
+      } else {
+        normalizedStatus = 'pending';
+      }
+    } else {
+      if (upstreamStatus === 'success') {
+        normalizedStatus = 'success';
+        if (resJson.result && Array.isArray(resJson.result.urls)) {
+          urls = resJson.result.urls;
+        }
+      } else if (upstreamStatus === 'failed') {
+        normalizedStatus = 'failed';
+        errorMessage = resJson.error?.message || '12AI image generation failed.';
+      } else {
+        normalizedStatus = 'pending';
+      }
+    }
+
+    return res.json(okEnvelope({
+      taskId: localTaskId,
+      providerTaskId,
+      status: normalizedStatus,
+      url: urls[0] || undefined,
+      urls: urls,
+      message: errorMessage || undefined,
+      error: normalizedStatus === 'failed' ? (errorMessage || '12AI task failed.') : undefined,
+      endpointType: isVideo ? '12ai-async-video' : '12ai-async-image',
+    }, req));
+  } catch (err) {
+    const safeMsg = err.message && apiKey ? err.message.replaceAll(apiKey, '[REDACTED]') : String(err);
+    return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', safeMsg);
+  }
+}
+
 router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
   const data = readLocalStorage();
   const profileState = readProfileState(data, req.profileUserId);
@@ -1616,6 +1889,39 @@ router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
     }
 
     const mode = String(req.body && req.body.mode || '').trim();
+
+    // 简体中文注释：在分流逻辑前，先获取 route 并判断是否为 12AI 策略渠道
+    let route = null;
+    let is12AI = false;
+    const routeId = String(req.body && req.body.routeId || '').trim();
+    if (routeId) {
+      route = await resolveLocalUserRoute(profileState, routeId);
+    } else if (mode === 'task_status') {
+      const localTaskId = String(req.body && (req.body.localTaskId || req.body.taskId) || '').trim();
+      const parsed = decodeLocalProxyTaskId(localTaskId);
+      if (parsed.routeId) {
+        route = await resolveLocalUserRoute(profileState, parsed.routeId);
+      }
+    }
+
+    if (route) {
+      is12AI = String(route.requestProfileId || '').toLowerCase().startsWith('12ai') 
+        || /12ai/i.test(route.baseUrl) 
+        || /12ai/i.test(route.name);
+    }
+
+    if (is12AI) {
+      if (mode === 'image') {
+        return await handleTwelveAIImageMode(req, res, route, profileState);
+      }
+      if (mode === 'video') {
+        return await handleTwelveAIVideoMode(req, res, route, profileState);
+      }
+      if (mode === 'task_status') {
+        return await handleTwelveAITaskStatusMode(req, res, route, profileState);
+      }
+    }
+
     if (mode === 'image') {
       return await handleWuyinImageMode(req, res, profileState);
     }
@@ -1635,8 +1941,6 @@ router.all('/v1/model-proxy/user', requireProfileAuth, async (req, res) => {
     return sendLocalProxyError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'Local user-route proxy does not handle this mode.');
   } catch (error) {
     let message = error instanceof Error ? error.message : String(error || 'Wuyin user-route proxy failed.');
-
-
 
     return sendLocalProxyError(res, req, 502, 'LOCAL_USER_ROUTE_PROXY_UPSTREAM_ERROR', message);
   }
@@ -2061,9 +2365,9 @@ router.post('/v1/auth/register', async (req, res) => {
 // 6. 检测个人通道连通性与自动获取模型列表
 router.post('/v1/profile/user-routes/:routeId/connectivity', requireProfileAuth, async (req, res) => {
   const routeId = req.params.routeId;
-  const data = readLocalStorage();
+  const data = await readLocalStorage();
   const profileState = readProfileState(data, req.profileUserId);
-  writeLocalStorage(data);
+  await writeLocalStorage(data);
 
   let route;
   if (routeId === 'test') {
@@ -2074,7 +2378,7 @@ router.post('/v1/profile/user-routes/:routeId/connectivity', requireProfileAuth,
       format: req.body && req.body.format || 'openai'
     };
   } else {
-    route = resolveLocalUserRoute(profileState, routeId);
+    route = await resolveLocalUserRoute(profileState, routeId);
   }
 
   if (!route) {
@@ -2241,11 +2545,11 @@ router.post('/v1/profile/user-routes/:routeId/connectivity', requireProfileAuth,
 // 7. 同步个人通道价格目录
 router.post('/v1/profile/user-routes/:routeId/pricing-sync', requireProfileAuth, async (req, res) => {
   const routeId = req.params.routeId;
-  const data = readLocalStorage();
+  const data = await readLocalStorage();
   const profileState = readProfileState(data, req.profileUserId);
-  writeLocalStorage(data);
+  await writeLocalStorage(data);
 
-  const route = resolveLocalUserRoute(profileState, routeId);
+  const route = await resolveLocalUserRoute(profileState, routeId);
   if (!route) {
     return res.status(404).json({
       success: false,

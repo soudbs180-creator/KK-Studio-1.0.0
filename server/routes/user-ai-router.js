@@ -8,11 +8,13 @@
 const http = require('http');
 const https = require('https');
 const express = require('express');
-const fetch = require('node-fetch');
+const { fetchWithRetries } = require('../lib/fetchClient');
 const { verifyJWT, signJWT } = require('../lib/jwt');
 const { getAdapter, normalizeAdapterId } = require('../lib/dispatcher/adapterRegistry');
 const { assertStrictTaskSupported } = require('../lib/dispatcher/strictProviderContracts');
-const { resolveLocalUserRoute } = require('../lib/dispatcher/localUserRouteStore');
+const localUserRouteStore = require('../lib/dispatcher/localUserRouteStore');
+const { resolveLocalUserRoute, readLocalStorage, writeLocalStorage, readProfileState, writeProfileState } = localUserRouteStore;
+const metricsCollector = require('../lib/dispatcher/metricsCollector');
 
 const router = express.Router();
 const TEMP_USER_ID_HEADER = 'x-kk-temp-user-id';
@@ -139,6 +141,43 @@ function enforceStrictContract(req, res, { profileId, taskType, adapterId, model
   }
 }
 
+async function updateLocalUserSlotStatus(userId, routeId, status) {
+  try {
+    const data = await readLocalStorage();
+    const profileState = readProfileState(data, userId);
+    
+    const slot = profileState.slots.find(s => {
+      const slotIdNormalized = String(s.id || '').toLowerCase();
+      const decodedRouteId = (() => {
+        try {
+          return decodeURIComponent(String(routeId || '')).trim();
+        } catch {
+          return String(routeId || '').trim();
+        }
+      })();
+      const normalizedRouteId = decodedRouteId.toLowerCase();
+      let strippedRouteId = normalizedRouteId;
+      if (normalizedRouteId.startsWith('slot_key_')) strippedRouteId = normalizedRouteId.slice(9);
+      else if (normalizedRouteId.startsWith('slot_')) strippedRouteId = normalizedRouteId.slice(5);
+      else if (normalizedRouteId.startsWith('provider_')) strippedRouteId = normalizedRouteId.slice(9);
+
+      return slotIdNormalized === normalizedRouteId || slotIdNormalized === strippedRouteId;
+    });
+
+    if (slot) {
+      slot.status = status;
+      slot.updatedAt = Date.now();
+      writeProfileState(data, userId, profileState);
+      await writeLocalStorage(data);
+      console.log(`[UserAiRouter] 成功将用户 ${userId} 的 slot ${routeId} 状态变更为 ${status}`);
+    } else {
+      console.warn(`[UserAiRouter] 未能找到用户 ${userId} 对应的 slot ${routeId} 进行状态变更`);
+    }
+  } catch (err) {
+    console.error(`[UserAiRouter] 变更用户 ${userId} 的 slot ${routeId} 状态时出错:`, err);
+  }
+}
+
 async function handleUnifiedUserChatMode(req, res, userId) {
   const routeId = String(req.body?.routeId || req.headers['x-key-slot-id'] || '').trim();
   const route = await resolveLocalUserRoute(userId, routeId);
@@ -179,13 +218,14 @@ async function handleUnifiedUserChatMode(req, res, userId) {
   if (strictErrorResponse) return strictErrorResponse;
 
   const adapter = getAdapter(endpointType, channel);
+  const streamRequested = Boolean(req.body?.stream);
   const unifiedPayload = {
     task_type: 'chat',
     model: modelId,
     messages,
     temperature: req.body?.temperature,
     max_tokens: req.body?.max_tokens || req.body?.maxTokens,
-    stream: false,
+    stream: streamRequested,
     requestId: req.body?.requestId,
     attemptId: req.body?.attemptId,
   };
@@ -200,14 +240,62 @@ async function handleUnifiedUserChatMode(req, res, userId) {
   const startedAt = Date.now();
 
   try {
-    const isHttps = transportReq.url.startsWith('https');
-    const upstream = await fetch(transportReq.url, {
+    const upstream = await fetchWithRetries(transportReq.url, {
       method: transportReq.method,
       headers: transportReq.headers,
       body: transportReq.body,
       signal: controller.signal,
-      agent: isHttps ? httpsAgent : httpAgent,
+      stream: streamRequested,
     });
+
+    if (streamRequested) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders();
+
+      if (upstream.body) {
+        const reader = upstream.body.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            res.write(value);
+          }
+          metricsCollector.recordRequest({
+            modelId,
+            providerId: channel.provider_id,
+            success: true,
+            latency: Date.now() - startedAt,
+          });
+        } catch (streamErr) {
+          console.error('[UserAiRouter Stream Error]', streamErr);
+          res.write(`data: ${JSON.stringify({ error: { message: streamErr.message || 'Stream transmission failed.', code: 'STREAM_TRANSMIT_ERROR' } })}\n\n`);
+          
+          metricsCollector.recordRequest({
+            modelId,
+            providerId: channel.provider_id,
+            success: false,
+            latency: Date.now() - startedAt,
+          });
+
+          const streamStatus = streamErr.statusCode;
+          if (streamStatus === 401) {
+            await updateLocalUserSlotStatus(userId, routeId, 'invalid');
+          } else if (streamStatus === 429) {
+            await updateLocalUserSlotStatus(userId, routeId, 'rate_limited');
+          }
+        } finally {
+          res.end();
+          clearTimeout(timeoutId);
+        }
+      } else {
+        res.end();
+        clearTimeout(timeoutId);
+      }
+      return;
+    }
+
     const rawText = await upstream.text();
     let payload = null;
     try {
@@ -216,18 +304,15 @@ async function handleUnifiedUserChatMode(req, res, userId) {
       payload = null;
     }
 
-    if (!upstream.ok) {
-      const cleanMessage = rawText.replaceAll(apiKey, '[REDACTED]').slice(0, 600);
-      return sendUserRouterError(
-        res,
-        req,
-        upstream.status,
-        'USER_AI_ROUTER_UPSTREAM_ERROR',
-        `User-owned API returned ${upstream.status}: ${cleanMessage}`,
-      );
-    }
-
     const content = adapter.extractContent(payload);
+
+    metricsCollector.recordRequest({
+      modelId,
+      providerId: channel.provider_id,
+      success: true,
+      latency: Date.now() - startedAt,
+    });
+
     return res.json(okEnvelope({
       content,
       role: 'assistant',
@@ -250,8 +335,23 @@ async function handleUnifiedUserChatMode(req, res, userId) {
       },
     }, req));
   } catch (err) {
+    const status = err.statusCode || 502;
     const message = err?.name === 'AbortError' ? 'User-owned API request timed out.' : err?.message || 'User-owned API request failed.';
-    return sendUserRouterError(res, req, 502, 'USER_AI_ROUTER_REQUEST_FAILED', message.replaceAll(apiKey, '[REDACTED]'));
+    
+    metricsCollector.recordRequest({
+      modelId,
+      providerId: channel.provider_id,
+      success: false,
+      latency: Date.now() - startedAt,
+    });
+
+    if (status === 401) {
+      await updateLocalUserSlotStatus(userId, routeId, 'invalid');
+    } else if (status === 429) {
+      await updateLocalUserSlotStatus(userId, routeId, 'rate_limited');
+    }
+
+    return sendUserRouterError(res, req, status, 'USER_AI_ROUTER_REQUEST_FAILED', message.replaceAll(apiKey, '[REDACTED]'));
   } finally {
     clearTimeout(timeoutId);
   }

@@ -117,7 +117,7 @@ export const SUCHUANG_IMAGE_MODELS: SuchuangModel[] = [
     provider: 'SuchuangProvider',
     vendor: 'xAI',
     modelId: 'image_grok_imagine',
-    status: '正常',
+    status: '维护中',
     docId: 63,
     docUrl: 'https://api.wuyinkeji.com/doc/63',
     priceLabel: '0.1 元/张',

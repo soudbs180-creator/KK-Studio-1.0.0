@@ -215,9 +215,76 @@ async function resolveLocalUserRoute(userId, routeId) {
   return null;
 }
 
+function hasLegacyProfilePayload(data) {
+  return Array.isArray(data.slots) || Array.isArray(data.providers) || Array.isArray(data.entries);
+}
+
+function createEmptyProfileState(version = 2) {
+  return {
+    version,
+    slots: [],
+    providers: [],
+    entries: [],
+  };
+}
+
+function readProfileState(data, userId) {
+  if (!isObjectRecord(data.profiles)) {
+    data.profiles = {};
+  }
+  const profiles = data.profiles;
+  if (isObjectRecord(profiles[userId])) {
+    return normalizeProfileState(profiles[userId]);
+  }
+  const shouldMigrateLegacyPayload = Object.keys(profiles).length === 0 && hasLegacyProfilePayload(data);
+  const nextProfile = shouldMigrateLegacyPayload
+    ? normalizeProfileState(data)
+    : createEmptyProfileState(Number.parseInt(data.version, 10) || 2);
+  profiles[userId] = nextProfile;
+  delete data.slots;
+  delete data.providers;
+  delete data.entries;
+  return nextProfile;
+}
+
+function writeProfileState(data, userId, profileState) {
+  if (!isObjectRecord(data.profiles)) {
+    data.profiles = {};
+  }
+  data.version = 2;
+  data.profiles[userId] = normalizeProfileState(profileState);
+  delete data.slots;
+  delete data.providers;
+  delete data.entries;
+}
+
+async function writeLocalStorage(data) {
+  const dir = path.dirname(LOCAL_STORAGE_PATH);
+  try {
+    await fs.mkdir(dir, { recursive: true });
+  } catch (err) {
+    // 忽略目录已存在等错误
+  }
+  const raw = JSON.stringify(data, null, 2);
+  await fs.writeFile(LOCAL_STORAGE_PATH, raw, 'utf8');
+
+  // 使内存缓存及索引失效，并重新计算签名
+  const stat = await fs.stat(LOCAL_STORAGE_PATH);
+  const signature = `${stat.mtimeMs}:${stat.size}`;
+  cache = {
+    signature,
+    payload: data,
+    indexes: new Map(),
+    readPromise: null,
+  };
+}
+
 module.exports = {
   resolveLocalUserRoute,
   readLocalStorage,
+  writeLocalStorage,
   normalizeProfileState,
   buildProfileRouteIndex,
+  readProfileState,
+  writeProfileState,
 };

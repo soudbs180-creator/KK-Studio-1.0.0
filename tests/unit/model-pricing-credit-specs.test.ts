@@ -64,7 +64,7 @@ describe("admin credit model specs", () => {
 
     assert.equal(catalog[0].specs.length, 1);
     assert.equal(catalog[0].specs[0].routeUnits.length, 1);
-    assert.equal(catalog[0].specs[0].routeUnits[0].requestProfileId, "12ai");
+    assert.equal(catalog[0].specs[0].routeUnits[0].requestProfileId, "generic-openai");
     assert.equal(catalog[0].specs[0].routeUnits[0].requestSurface, "async-image");
   });
 

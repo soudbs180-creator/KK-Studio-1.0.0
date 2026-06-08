@@ -324,6 +324,23 @@ function addBodyValue(body, key, value) {
 function buildImageRequestBody(catalogItem, input) {
   const rawRefs = input.referenceImages || input.urls || input.image_urls || [];
   const urls = normalizeImageReferences(rawRefs);
+  const modelId = getCatalogModelId(catalogItem);
+
+  if (modelId === 'image_wan2.6') {
+    const body = {
+      prompt: String(input.prompt || ''),
+      size: normalizeWanPixelSize(input, '1280*1280'),
+    };
+    if (urls.length > 0) {
+      body.urls = urls;
+    }
+    addBodyValue(body, 'negative_prompt', input.negativePrompt || input.negative_prompt);
+    addBodyValue(body, 'prompt_extend', input.promptExtend ?? input.prompt_extend);
+    addBodyValue(body, 'watermark', input.watermark);
+    addBodyValue(body, 'seed', input.seed);
+    return body;
+  }
+
   const body = {
     prompt: String(input.prompt || ''),
     size: input.imageSize || input.size || '1K',
@@ -523,7 +540,11 @@ function serializeBody(body, contentType) {
     Object.entries(body || {}).forEach(([key, value]) => {
       if (value === undefined || value === null) return;
       if (Array.isArray(value)) {
-        if (value.length > 0) params.set(key, value.join(','));
+        if (key === 'urls') {
+          params.set(key, JSON.stringify(value));
+        } else if (value.length > 0) {
+          params.set(key, value.join(','));
+        }
         return;
       }
       if (typeof value === 'object') {

@@ -137,6 +137,7 @@
         "tests/unit/openai-compatible-task-payload-contract.test.ts",
         "tests/unit/openai-compatible-image-routing-errors-contract.test.ts",
         "tests/unit/openai-compatible-twelve-ai-async-route-contract.test.ts",
+        "tests/unit/twelveai-user-route-proxy-contract.test.ts",
         "tests/unit/openai-compatible-wuyin-route-contract.test.ts",
         "tests/unit/openai-compatible-unused-cleanup-contract.test.ts",
         "tests/unit/onboarding-unused-cleanup-contract.test.ts",

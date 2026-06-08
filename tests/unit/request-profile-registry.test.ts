@@ -18,6 +18,7 @@ describe("request profile registry", () => {
         "gpt-best",
         "suxi",
         "wuyinkeji",
+        "apimart",
         "openai-official",
         "anthropic-official",
         "generic-openai",
@@ -38,6 +39,7 @@ describe("request profile registry", () => {
 
     assert.ok(profile);
     assert.deepEqual(profile!.docSources, [
+      "https://api.wuyinkeji.com/type/all",
       "https://api.wuyinkeji.com/doc/65",
       "https://api.wuyinkeji.com/doc/72",
     ]);
@@ -45,12 +47,12 @@ describe("request profile registry", () => {
     assert.equal(profile!.requestSurfaceDefaults.video, "async-video");
   });
 
-  test("falls back unknown local providers to the 12AI request profile", () => {
+  test("falls back unknown local providers to the generic-openai request profile", () => {
     const profile = resolveLocalRequestProfile({
       provider: "Custom",
       baseUrl: "https://unknown-provider.example.com/v1",
     });
 
-    assert.equal(profile.id, "12ai");
+    assert.equal(profile.id, "generic-openai");
   });
 });

@@ -6,14 +6,17 @@
  *              这样前端无需让用户选择专业接口类型，用户只填 Base URL 与 Key 即可。
  */
 
-const fs = require('fs');
-const path = require('path');
 const express = require('express');
 const { verifyJWT, signJWT } = require('../lib/jwt');
 const { probeProvider } = require('../lib/dispatcher/providerProbe');
+const {
+  readLocalStorage,
+  writeLocalStorage,
+  readProfileState,
+  writeProfileState,
+} = require('../lib/dispatcher/localUserRouteStore');
 
 const router = express.Router();
-const LOCAL_STORAGE_PATH = path.resolve(__dirname, '../../.kk-local/local-user-apis.json');
 const TEMP_USER_ID_HEADER = 'x-kk-temp-user-id';
 const READONLY_SECRET_PLACEHOLDER = 'sk-readonly-0000';
 
@@ -34,96 +37,6 @@ function okEnvelope(data, req) {
 
 function isObjectRecord(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function createEmptyLocalStorage() {
-  return {
-    version: 2,
-    profiles: {},
-  };
-}
-
-function createEmptyProfileState(version = 2) {
-  return {
-    version,
-    slots: [],
-    providers: [],
-    entries: [],
-  };
-}
-
-function normalizeProfileState(value) {
-  const source = isObjectRecord(value) ? value : {};
-  return {
-    version: Number.parseInt(source.version, 10) || 2,
-    slots: Array.isArray(source.slots) ? source.slots : [],
-    providers: Array.isArray(source.providers) ? source.providers : [],
-    entries: Array.isArray(source.entries) ? source.entries : [],
-  };
-}
-
-function hasLegacyProfilePayload(data) {
-  return Array.isArray(data.slots) || Array.isArray(data.providers) || Array.isArray(data.entries);
-}
-
-function ensureLocalStorage() {
-  const dir = path.dirname(LOCAL_STORAGE_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(LOCAL_STORAGE_PATH)) {
-    fs.writeFileSync(LOCAL_STORAGE_PATH, JSON.stringify(createEmptyLocalStorage(), null, 2), 'utf8');
-  }
-}
-
-function readLocalStorage() {
-  ensureLocalStorage();
-  try {
-    const raw = fs.readFileSync(LOCAL_STORAGE_PATH, 'utf8');
-    const parsed = JSON.parse(raw);
-    return isObjectRecord(parsed) ? parsed : createEmptyLocalStorage();
-  } catch {
-    return createEmptyLocalStorage();
-  }
-}
-
-function writeLocalStorage(data) {
-  ensureLocalStorage();
-  fs.writeFileSync(LOCAL_STORAGE_PATH, JSON.stringify(data, null, 2), 'utf8');
-}
-
-function readProfileState(data, userId) {
-  if (!isObjectRecord(data.profiles)) {
-    data.profiles = {};
-  }
-
-  const profiles = data.profiles;
-  if (isObjectRecord(profiles[userId])) {
-    return normalizeProfileState(profiles[userId]);
-  }
-
-  const shouldMigrateLegacyPayload = Object.keys(profiles).length === 0 && hasLegacyProfilePayload(data);
-  const nextProfile = shouldMigrateLegacyPayload
-    ? normalizeProfileState(data)
-    : createEmptyProfileState(Number.parseInt(data.version, 10) || 2);
-
-  profiles[userId] = nextProfile;
-  delete data.slots;
-  delete data.providers;
-  delete data.entries;
-  return nextProfile;
-}
-
-function writeProfileState(data, userId, profileState) {
-  if (!isObjectRecord(data.profiles)) {
-    data.profiles = {};
-  }
-
-  data.version = 2;
-  data.profiles[userId] = normalizeProfileState(profileState);
-  delete data.slots;
-  delete data.providers;
-  delete data.entries;
 }
 
 function resolveProfileUserId(req) {
@@ -331,26 +244,26 @@ function readPayloadFromRequest(req) {
   };
 }
 
-function saveEnrichedProfile(req, profileState) {
-  const data = readLocalStorage();
+async function saveEnrichedProfile(req, profileState) {
+  const data = await readLocalStorage();
   writeProfileState(data, req.profileUserId, profileState);
-  writeLocalStorage(data);
+  await writeLocalStorage(data);
 }
 
 router.put(['/v1/profile/key-manager', '/v1/profile/key-manager-state'], requireProfileAuth, async (req, res) => {
   const enriched = await enrichProfileState(readPayloadFromRequest(req));
-  saveEnrichedProfile(req, enriched);
+  await saveEnrichedProfile(req, enriched);
   return res.json(okEnvelope(enriched, req));
 });
 
 router.put('/v1/profile/user-apis/payload', requireProfileAuth, async (req, res) => {
   const enriched = await enrichProfileState(readPayloadFromRequest(req));
-  saveEnrichedProfile(req, enriched);
+  await saveEnrichedProfile(req, enriched);
   return res.json(okEnvelope(enriched, req));
 });
 
 router.put('/v1/profile/user-apis', requireProfileAuth, async (req, res) => {
-  const data = readLocalStorage();
+  const data = await readLocalStorage();
   const profileState = readProfileState(data, req.profileUserId);
   const nextData = {
     ...profileState,
@@ -359,13 +272,13 @@ router.put('/v1/profile/user-apis', requireProfileAuth, async (req, res) => {
 
   const enriched = await enrichProfileState(nextData);
   writeProfileState(data, req.profileUserId, enriched);
-  writeLocalStorage(data);
+  await writeLocalStorage(data);
 
   return res.json(okEnvelope({ entries: enriched.entries.map(normalizeEntryForResponse) }, req));
 });
 
 router.post('/v1/profile/user-apis', requireProfileAuth, async (req, res) => {
-  const data = readLocalStorage();
+  const data = await readLocalStorage();
   const profileState = readProfileState(data, req.profileUserId);
   const nextData = {
     ...profileState,
@@ -374,7 +287,7 @@ router.post('/v1/profile/user-apis', requireProfileAuth, async (req, res) => {
 
   const enriched = await enrichProfileState(nextData);
   writeProfileState(data, req.profileUserId, enriched);
-  writeLocalStorage(data);
+  await writeLocalStorage(data);
 
   return res.json(okEnvelope({ entries: enriched.entries.map(normalizeEntryForResponse) }, req));
 });

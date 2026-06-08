@@ -195,16 +195,37 @@ function inferSize(resolution = '', aspectRatio = '') {
   return `${Math.round(base * rawW / rawH)}x${base}`;
 }
 
-async function _submitJson(endpointUrl, body, apiKey) {
+async function _submitJson(endpointUrl, body, apiKey, contentType = 'application/json') {
   const targetUrl = buildWuyinUrl(endpointUrl, apiKey);
+  const isForm = String(contentType || '').toLowerCase().includes('x-www-form-urlencoded');
+
+  const headers = {
+    ...authHeaders(apiKey),
+    'Accept': 'application/json'
+  };
+
+  let requestBody;
+  if (isForm) {
+    headers['Content-Type'] = 'application/x-www-form-urlencoded;charset=utf-8';
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(body)) {
+      if (value === undefined || value === null) continue;
+      if (Array.isArray(value)) {
+        params.set(key, JSON.stringify(value));
+      } else {
+        params.set(key, String(value));
+      }
+    }
+    requestBody = params.toString();
+  } else {
+    headers['Content-Type'] = 'application/json';
+    requestBody = JSON.stringify(body);
+  }
+
   const response = await fetch(targetUrl, {
     method: 'POST',
-    headers: {
-      ...authHeaders(apiKey),
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    },
-    body: JSON.stringify(body)
+    headers,
+    body: requestBody
   });
 
   if (!response.ok) {
@@ -257,7 +278,7 @@ async function _pollAsyncDetail(taskId, mediaType, apiKey, modelId) {
 }
 
 async function _submitAndPoll({ product, body, mediaType, apiKey, modelId }) {
-  const submitData = await _submitJson(product.endpoint, body, apiKey);
+  const submitData = await _submitJson(product.endpoint, body, apiKey, product.contentType);
   const payload = submitData.data || submitData;
   const directUrls = extractWuyinOutputUrls(submitData);
   if (directUrls.length > 0) {
@@ -359,6 +380,32 @@ async function generateImage(args) {
 
   if (modelId === 'image_gpt') {
     body.size = normalizeAspectRatio(args.aspectRatio || args.size || 'auto', product);
+  } else if (modelId === 'image_wan2.6') {
+    // 官方 Wan2.6 图片模型使用 宽*高 的格式。根据比例进行智能自动映射
+    let aspect = args.aspectRatio || '1:1';
+    let sizeVal = '1280*1280';
+    if (aspect === '1:1') sizeVal = '1280*1280';
+    else if (aspect === '3:4') sizeVal = '1104*1472';
+    else if (aspect === '4:3') sizeVal = '1472*1104';
+    else if (aspect === '9:16') sizeVal = '960*1696';
+    else if (aspect === '16:9') sizeVal = '1696*960';
+    else if (args.size && /^\d+[\*x]\d+$/.test(String(args.size))) {
+      sizeVal = String(args.size).replace('x', '*');
+    }
+    body.size = sizeVal;
+
+    if (args.negativePrompt || args.negative_prompt) {
+      body.negative_prompt = args.negativePrompt || args.negative_prompt;
+    }
+    if (args.promptExtend !== undefined || args.prompt_extend !== undefined) {
+      body.prompt_extend = args.promptExtend !== undefined ? !!args.promptExtend : !!args.prompt_extend;
+    }
+    if (args.watermark !== undefined) {
+      body.watermark = !!args.watermark;
+    }
+    if (args.seed !== undefined && args.seed !== null) {
+      body.seed = String(args.seed);
+    }
   } else {
     body.size = normalizeImageSize(args.size || args.imageSize || product.requestFields.size.default || '1K');
     body.aspectRatio = normalizeAspectRatio(args.aspectRatio || product.requestFields.aspectRatio.default || 'auto', product);
@@ -413,14 +460,46 @@ async function generateVideo(args) {
   const publicUrls = Array.isArray(rawRefs) ? rawRefs.map(getPublicUrl).filter(Boolean) : [];
   const maxImages = 7;
 
+  // 确定是用 '*' 还是 'x' 拼接
+  const sizeField = product.requestFields && product.requestFields.size;
+  let useAsterisk = false;
+  if (sizeField && typeof sizeField.default === 'string') {
+    useAsterisk = sizeField.default.includes('*');
+  } else if (modelId.includes('wan2.6')) {
+    useAsterisk = true;
+  }
+
+  let sizeVal = args.size && /^\d+[x*]\d+$/i.test(String(args.size)) ? String(args.size) : inferSize(resolution, aspectRatio);
+  if (useAsterisk) {
+    sizeVal = sizeVal.replace(/x/i, '*');
+  } else {
+    sizeVal = sizeVal.replace(/\*/g, 'x');
+  }
+
   const body = {
     prompt,
-    size: args.size && /^\d+x\d+$/i.test(String(args.size)) ? args.size : inferSize(resolution, aspectRatio),
+    size: sizeVal,
     duration,
   };
 
   if (publicUrls.length > 0) {
     body.images = publicUrls.slice(0, maxImages).join(',');
+  }
+
+  // 为 video_wan2.6 模型适配独有的高级参数
+  if (modelId === 'video_wan2.6') {
+    if (args.negativePrompt || args.negative_prompt) {
+      body.negative_prompt = args.negativePrompt || args.negative_prompt;
+    }
+    if (args.audioUrl || args.audio_url) {
+      body.audio_url = getPublicUrl(args.audioUrl || args.audio_url);
+    }
+    if (args.firstFrameUrl) {
+      body.firstFrameUrl = getPublicUrl(args.firstFrameUrl);
+    }
+    if (args.promptExtend !== undefined || args.prompt_extend !== undefined) {
+      body.prompt_extend = args.promptExtend !== undefined ? !!args.promptExtend : !!args.prompt_extend;
+    }
   }
 
   const result = await _submitAndPoll({
@@ -441,8 +520,90 @@ async function generateVideo(args) {
   };
 }
 
-async function generateAudio() {
-  throw new Error('当前 Wuyin 音频模型尚未提供已核对文档定义，AI Router 已阻止猜测式音频请求。');
+async function generateAudio(args) {
+  const apiKey = getApiKey();
+  const modelId = String(args.modelId || args.model || 'audio_tts');
+  const product = getWuyinProduct(modelId);
+  if (!product || product.category !== 'audio') {
+    throw new Error(`Wuyin 音频模型未配置或文档未核对: ${modelId}`);
+  }
+
+  const text = args.text || args.prompt || '';
+  if (!text) {
+    throw new Error('Wuyin 音频生成文档要求 text 必填。');
+  }
+
+  const voiceId = args.voiceId || args.voice_id || '1';
+
+  if (modelId === 'audio_tts') {
+    const body = {
+      text,
+      voice_id: String(voiceId),
+      speed: String(args.speed || '1'),
+      vol: String(args.vol || '1'),
+      language_boost: String(args.language_boost || 'auto')
+    };
+
+    const result = await _submitAndPoll({
+      product,
+      body,
+      mediaType: 'audio',
+      apiKey,
+      modelId,
+    });
+
+    return {
+      success: true,
+      audio: result.urls[0],
+      urls: result.urls,
+      raw: result.raw,
+      wuyinProduct: product.id,
+      wuyinDocUrl: product.docUrl,
+    };
+  } else if (modelId === 'voice_composite') {
+    const body = {
+      text,
+      voice_id: String(voiceId),
+      speed: parseFloat(args.speed || 1.0),
+      vol: parseFloat(args.vol || 1.0)
+    };
+    if (args.language_boost) {
+      body.language_boost = String(args.language_boost);
+    }
+
+    const targetUrl = buildWuyinUrl(product.endpoint, apiKey);
+    const response = await fetch(targetUrl, {
+      method: 'POST',
+      headers: {
+        ...authHeaders(apiKey),
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`Wuyin 同步音频合成失败 (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    assertSuchuangCode(data, 'Wuyin 同步音频合成');
+    const payload = data.data || data;
+
+    return {
+      success: true,
+      audio: payload.url,
+      urls: [payload.url],
+      duration: payload.duration,
+      subtitle: payload.subtitle,
+      raw: data,
+      wuyinProduct: product.id,
+      wuyinDocUrl: product.docUrl,
+    };
+  } else {
+    throw new Error(`未支持的 Wuyin 音频模型: ${modelId}`);
+  }
 }
 
 const SuchuangProvider = {

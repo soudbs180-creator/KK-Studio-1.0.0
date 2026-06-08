@@ -5,7 +5,7 @@
  *              支持用户挂载本地物理磁盘文件夹，将大体积图片、视频和音频文件直接持久化落盘，
  *              实现 VPS 服务器带宽零承压。
  * @author KK-Studio Team
- * @version 1.5.5
+ * @version 1.5.6
  */
 
 const DB_NAME = 'kk-studio-workspace-db';

@@ -32,7 +32,7 @@ test("Suxi image routing stays on dedicated surfaces instead of being swallowed 
 });
 
 test("12AI image routing requires an explicit async preference instead of blanket async short-circuiting", () => {
-  const routerSource = readSource("apps/web/src/services/api/providerSurfaceRouter.ts");
+  const routerSource = readSource("apps/web/src/services/api/providerRequestRegistry.ts");
   const adapterSource = readSource("apps/web/src/services/llm/OpenAICompatibleAdapter.ts");
 
   assert.match(
@@ -41,7 +41,7 @@ test("12AI image routing requires an explicit async preference instead of blanke
   );
   assert.match(
     routerSource,
-    /input\.runtime\.strategyId === '12ai' && input\.preferAsync && input\.isAsyncImageModel\?\.\(input\.modelId\)/,
+    /strategyId === '12ai' && input\.preferAsync && input\.isAsyncImageModel\?\.\(input\.modelId\)/,
   );
   assert.match(
     adapterSource,

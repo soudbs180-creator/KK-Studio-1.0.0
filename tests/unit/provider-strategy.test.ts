@@ -172,7 +172,7 @@ describe("provider strategy", () => {
     assert.equal(shouldBypassChatCompatibilityForImages(runtime), true);
   });
 
-  test("falls back unknown local providers to the 12AI request profile without changing their strategy id", () => {
+  test("falls back unknown local providers to the generic-openai request profile without changing their strategy id", () => {
     const runtime = resolveProviderRuntime({
       provider: "Custom",
       baseUrl: "https://unknown-provider.example.com/v1",
@@ -180,7 +180,7 @@ describe("provider strategy", () => {
     });
 
     assert.equal(runtime.strategyId, "generic-openai");
-    assert.equal(runtime.requestProfileId, "12ai");
+    assert.equal(runtime.requestProfileId, "generic-openai");
   });
 
   test("marks GPT Best llms.txt as provider evidence but not an API base", () => {

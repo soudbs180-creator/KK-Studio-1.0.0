@@ -2,7 +2,7 @@
 <!-- CI Tokens: AGENTS.md - AI Agent 项目总指导文件, KK Studio v1.5.5, AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md, ToolRegistry, CanvasRuntimeState -->
 
 Last updated: 2026-06-04  
-Project version: **KK Studio v1.5.5**
+Project version: **KK Studio v1.5.6**
 
 > 本文件是 Codex、Claude、Cursor、Antigravity、自动化 Agent 与任何 AI 编程工具修改本项目之前必须读取的最高优先级规则入口。
 
@@ -343,7 +343,7 @@ AI 助手理解“我在画布干嘛”必须依赖结构化运行态。
 
 ```ts
 type CanvasRuntimeState = {
-  projectVersion: '1.5.5';
+  projectVersion: '1.5.6';
   currentPage?: 'canvas' | 'settings' | 'agent' | 'unknown';
   userId?: string;
   canvasId: string;

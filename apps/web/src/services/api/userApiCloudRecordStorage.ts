@@ -572,8 +572,8 @@ async function persistUserApisPayloadViaApi(
   );
   const compactExistingPayload = compactUserApisPayloadForTransport(existingPayload, {
     maxBytes: Number.POSITIVE_INFINITY,
-  });
-  const compactNextPayload = compactUserApisPayloadForTransport(payload);
+  }) as unknown as UserApisEnvelope;
+  const compactNextPayload = compactUserApisPayloadForTransport(payload) as unknown as UserApisEnvelope;
   const persistablePayload: UserApisEnvelope = {
     version: compactNextPayload.version,
     slots: mergeRecordArrayWithPersistedSecret(compactExistingPayload.slots, compactNextPayload.slots, 'key'),

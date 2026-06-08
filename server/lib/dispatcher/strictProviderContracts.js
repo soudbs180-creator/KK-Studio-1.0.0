@@ -77,11 +77,40 @@ const TWELVE_AI_CONTRACT = {
       },
       note: '12AI 是独立厂商多协议预设，不混用 OpenAI/Claude/Gemini 官方 profile；只复用统一内部请求抽象。',
     },
+    image: {
+      adapterId: 'twelveai_image',
+      method: 'POST',
+      auth: 'Authorization: Bearer <token>',
+      contentType: 'application/json',
+      protocols: {
+        sync_image: {
+          endpoint: '/v1beta/models/{model}:generateContent?key=<token>',
+          requestShape: '{ contents, generationConfig }',
+          responseShape: 'Gemini candidates/content/parts response',
+        },
+        async_image: {
+          endpoint: '/v1/task/submit',
+          requestShape: '{ model, input: { prompt, images?, aspect_ratio?, image_size?, n? }, callback_url? }',
+          responseShape: '{ success, task_id, status }',
+        },
+      },
+    },
+    video: {
+      adapterId: 'twelveai_video',
+      method: 'POST',
+      auth: 'Authorization: Bearer <token>',
+      contentType: 'application/json',
+      protocols: {
+        async_video: {
+          endpoint: '/v1/task/submit',
+          requestShape: '{ model, input: { prompt, aspect_ratio?, duration?, image_url?, image_tail_url? }, callback_url? }',
+          responseShape: '{ success, task_id, status }',
+        },
+      },
+    },
   },
   documentedButNotExecutableYet: {
     responses: ['/v1/responses', '/v1/responses/{response_id}', '/v1/responses/{response_id}/cancel'],
-    images: ['/v1beta/models/{model}:generateContent', '/v1/images/generations', '/v1/images/edits', '/v1/task/submit', '/v1/task/{task_id}'],
-    videos: ['/v1/videos', '/v1/videos/{id}', '/v1/videos/{id}/content'],
   },
 };
 

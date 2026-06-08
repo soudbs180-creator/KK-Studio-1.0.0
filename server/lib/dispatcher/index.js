@@ -11,13 +11,14 @@
 const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
-const fetch = require('node-fetch');
+const { fetchWithRetries } = require('../fetchClient');
 const { getPool } = require('../db');
 const credits = require('../credits');
 const { getModelConfig } = require('./modelRegistry');
 const { getAdapter, normalizeAdapterId } = require('./adapterRegistry');
 const { matchProviderProfile } = require('./providerProfiles');
 const { assertStrictTaskSupported } = require('./strictProviderContracts');
+const metricsCollector = require('./metricsCollector');
 
 const httpAgent = new http.Agent({
   keepAlive: true,
@@ -341,6 +342,7 @@ class BackendDispatcher {
   }
 
   async dispatch(userId, unifiedPayload) {
+    const startTime = Date.now();
     const pool = getPool();
     const modelId = unifiedPayload.model || 'gpt-4o-mini';
     const isImageIntent = unifiedPayload.task_type === 'image';
@@ -485,17 +487,15 @@ class BackendDispatcher {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-            const isHttps = transportReq.url.startsWith('https');
-            const activeAgent = isHttps ? httpsAgent : httpAgent;
-
             let response;
             try {
-              response = await fetch(transportReq.url, {
+              response = await fetchWithRetries(transportReq.url, {
                 method: transportReq.method,
                 headers: transportReq.headers,
                 body: transportReq.body,
                 signal: controller.signal,
-                agent: activeAgent,
+                maxRetries: channel.maxRetries ?? 3,
+                timeout: channel.timeout ?? 60000,
               });
             } finally {
               clearTimeout(timeoutId);
@@ -507,33 +507,6 @@ class BackendDispatcher {
               requestProfileId: contractInfo.profileId || channel.request_profile_id || null,
               status: response.status,
             });
-
-            if (!response.ok) {
-              const errorText = await response.text();
-              const statusCode = response.status;
-              const errObj = new Error(`AI 供应商返回状态码 (${statusCode}): ${errorText.slice(0, 300)}`);
-              errObj.statusCode = statusCode;
-              errObj.providerErrorText = errorText;
-              errObj.route = {
-                model: baseModelId,
-                providerId: channel.provider_id,
-                providerName: channel.provider_name,
-                adapter: adapterId,
-                requestProfileId: contractInfo.profileId || channel.request_profile_id || null,
-                requestedStrategy: routePlan.requestedStrategy,
-                effectiveStrategy: routePlan.effectiveStrategy,
-                strictContractChecked: Boolean(contractInfo.profileId),
-                explicitProviderLocked: Boolean(targetProviderId),
-              };
-
-              if (isFatalProviderError(statusCode, errorText)) {
-                fuseBadKey(currentKey, `status=${statusCode}`);
-                if (statusCode === 404 || statusCode === 403 || String(errorText).toLowerCase().includes('unsupported')) {
-                  fuseBadChannel(channel, `status=${statusCode}`);
-                }
-              }
-              throw errObj;
-            }
 
             const responseData = await response.json();
             finalContent = adapter.extractContent(responseData);
@@ -553,6 +526,29 @@ class BackendDispatcher {
 
             break;
           } catch (err) {
+            const errorText = err.message || '';
+            const statusCode = err.statusCode || 502;
+            err.statusCode = statusCode;
+            err.providerErrorText = errorText;
+            err.route = {
+              model: baseModelId,
+              providerId: channel.provider_id,
+              providerName: channel.provider_name,
+              adapter: adapterId,
+              requestProfileId: contractInfo.profileId || channel.request_profile_id || null,
+              requestedStrategy: routePlan.requestedStrategy,
+              effectiveStrategy: routePlan.effectiveStrategy,
+              strictContractChecked: Boolean(contractInfo.profileId),
+              explicitProviderLocked: Boolean(targetProviderId),
+            };
+
+            if (isFatalProviderError(statusCode, errorText)) {
+              fuseBadKey(currentKey, `status=${statusCode}`);
+              if (statusCode === 404 || statusCode === 403 || String(errorText).toLowerCase().includes('unsupported')) {
+                fuseBadChannel(channel, `status=${statusCode}`);
+              }
+            }
+
             lastAttemptError = err;
             console.warn(`[BackendDispatcher] 渠道 [${channel.provider_id}] Key [${keyIndex + 1}/${keysToUse.length}] 调用异常: ${err.message}`);
           }
@@ -579,6 +575,13 @@ class BackendDispatcher {
         'UPDATE public.billing_jobs SET status = $1, updated_at = NOW() WHERE id = $2',
         ['completed', requestId]
       );
+
+      metricsCollector.recordRequest({
+        modelId: usedChannelInfo?.model_id || baseModelId,
+        providerId: usedChannelInfo?.provider_id,
+        success: true,
+        latency: Date.now() - startTime,
+      });
 
       return {
         role: 'assistant',
@@ -608,6 +611,13 @@ class BackendDispatcher {
       };
 
     } catch (err) {
+      metricsCollector.recordRequest({
+        modelId: baseModelId,
+        providerId: err.route?.providerId || targetProviderId,
+        success: false,
+        latency: Date.now() - startTime,
+      });
+
       console.error('[BackendDispatcher Error]', err);
 
       if (err.statusCode === 402 || !creditsDeducted) {
@@ -653,6 +663,32 @@ class BackendDispatcher {
       error.route = err.route;
       throw error;
     }
+  }
+
+  getCircuitBreakerStatus() {
+    const now = Date.now();
+    let activeFusedKeys = 0;
+    for (const [key, cooldownUntil] of KEY_BREAKER.entries()) {
+      if (cooldownUntil > now) {
+        activeFusedKeys++;
+      } else {
+        KEY_BREAKER.delete(key);
+      }
+    }
+
+    let activeFusedChannels = 0;
+    for (const [chan, cooldownUntil] of CHANNEL_BREAKER.entries()) {
+      if (cooldownUntil > now) {
+        activeFusedChannels++;
+      } else {
+        CHANNEL_BREAKER.delete(chan);
+      }
+    }
+
+    return {
+      activeFusedKeys,
+      activeFusedChannels,
+    };
   }
 }
 

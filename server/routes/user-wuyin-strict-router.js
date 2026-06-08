@@ -8,12 +8,7 @@
  *              - 禁止 x-proxy-target-url 通用转发绕过文档契约
  */
 
-const fs = require('fs');
-const path = require('path');
-const http = require('http');
-const https = require('https');
 const express = require('express');
-const fetch = require('node-fetch');
 const { verifyJWT, signJWT } = require('../lib/jwt');
 const { assertStrictTaskSupported } = require('../lib/dispatcher/strictProviderContracts');
 const {
@@ -26,13 +21,11 @@ const {
   encodeLocalProxyTaskId,
 } = require('../lib/wuyinModelExecutor');
 const { normalizeUserApiSecretForTransport } = require('../lib/userApiSecret');
+const { resolveLocalUserRoute } = require('../lib/dispatcher/localUserRouteStore');
+const { fetchWithRetries } = require('../lib/fetchClient');
 
 const router = express.Router();
-const LOCAL_STORAGE_PATH = path.resolve(__dirname, '../../.kk-local/local-user-apis.json');
 const TEMP_USER_ID_HEADER = 'x-kk-temp-user-id';
-
-const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 80, maxFreeSockets: 10, timeout: 60000, freeSocketTimeout: 30000 });
-const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 80, maxFreeSockets: 10, timeout: 60000, freeSocketTimeout: 30000 });
 
 function buildMeta(req) {
   return {
@@ -53,37 +46,6 @@ function sendError(res, req, status, code, message, extra = {}) {
   return res.status(status).json(errorEnvelope(req, code, message, extra));
 }
 
-function isObjectRecord(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function readLocalStorage() {
-  try {
-    const raw = fs.readFileSync(LOCAL_STORAGE_PATH, 'utf8');
-    const parsed = JSON.parse(raw);
-    return isObjectRecord(parsed) ? parsed : { version: 2, profiles: {} };
-  } catch {
-    return { version: 2, profiles: {} };
-  }
-}
-
-function normalizeProfileState(value) {
-  const source = isObjectRecord(value) ? value : {};
-  return {
-    version: Number.parseInt(source.version, 10) || 2,
-    slots: Array.isArray(source.slots) ? source.slots : [],
-    providers: Array.isArray(source.providers) ? source.providers : [],
-    entries: Array.isArray(source.entries) ? source.entries : [],
-  };
-}
-
-function readProfileState(data, userId) {
-  if (isObjectRecord(data.profiles) && isObjectRecord(data.profiles[userId])) {
-    return normalizeProfileState(data.profiles[userId]);
-  }
-  return normalizeProfileState(data);
-}
-
 function resolveProfileUserId(req) {
   const verifiedUserId = verifyJWT(req.headers.authorization || '');
   if (verifiedUserId) {
@@ -95,93 +57,6 @@ function resolveProfileUserId(req) {
   if (allowLocalTempUser && /^temp-[a-zA-Z0-9_.-]{4,128}$/.test(tempUserId)) {
     return { userId: tempUserId, refreshToken: null };
   }
-  return null;
-}
-
-function normalizeRouteValue(value) {
-  return String(value || '').trim().toLowerCase();
-}
-
-function normalizeProviderLinkValue(value) {
-  return String(value || '').trim().replace(/\/+$/, '').toLowerCase();
-}
-
-function resolveRouteIdCandidate(value) {
-  const decoded = (() => {
-    try { return decodeURIComponent(String(value || '').trim()); } catch { return String(value || '').trim(); }
-  })();
-  const normalized = decoded.toLowerCase();
-  if (normalized.startsWith('slot_key_')) return normalized.slice(5);
-  if (normalized.startsWith('slot_')) return normalized.slice(5);
-  if (normalized.startsWith('provider_')) return normalized.slice('provider_'.length);
-  return normalized;
-}
-
-function recordAliases(record) {
-  return [String(record?.id || '').trim(), ...(Array.isArray(record?.legacyIds) ? record.legacyIds : [])]
-    .map(normalizeRouteValue)
-    .filter(Boolean);
-}
-
-function recordMatchesRoute(record, routeTarget, rawRouteId) {
-  const aliases = recordAliases(record);
-  const name = normalizeRouteValue(record?.name);
-  return aliases.includes(routeTarget) || aliases.includes(rawRouteId) || name === routeTarget;
-}
-
-function findProviderLinkedToSlot(slot, providers) {
-  const slotBaseUrl = normalizeProviderLinkValue(slot?.baseUrl);
-  const slotKey = String(slot?.key || '').trim();
-  const slotName = normalizeRouteValue(slot?.name);
-
-  const strongMatch = providers.find((provider) => {
-    const providerBaseUrl = normalizeProviderLinkValue(provider?.baseUrl);
-    if (!providerBaseUrl || providerBaseUrl !== slotBaseUrl) return false;
-    const providerKey = String(provider?.apiKey || '').trim();
-    const providerName = normalizeRouteValue(provider?.name);
-    return (slotKey && providerKey && slotKey === providerKey) || (slotName && providerName && slotName === providerName);
-  });
-  if (strongMatch) return strongMatch;
-
-  const sameBaseProviders = providers.filter((provider) => slotBaseUrl && normalizeProviderLinkValue(provider?.baseUrl) === slotBaseUrl);
-  return sameBaseProviders.length === 1 ? sameBaseProviders[0] : null;
-}
-
-function buildRouteFromProvider(provider) {
-  return {
-    id: String(provider?.id || '').trim(),
-    legacyIds: Array.isArray(provider?.legacyIds) ? provider.legacyIds : [],
-    name: String(provider?.name || '').trim(),
-    baseUrl: String(provider?.baseUrl || '').trim(),
-    apiKey: String(provider?.apiKey || '').trim(),
-    requestProfileId: String(provider?.requestProfileId || provider?.profileId || '').trim(),
-  };
-}
-
-function buildRouteFromSlot(slot, providers) {
-  const linkedProvider = findProviderLinkedToSlot(slot, providers);
-  return {
-    id: String(slot?.id || '').trim(),
-    legacyIds: Array.isArray(slot?.legacyIds) ? slot.legacyIds : [],
-    name: String(linkedProvider?.name || slot?.name || '').trim(),
-    baseUrl: String(linkedProvider?.baseUrl || slot?.baseUrl || '').trim(),
-    apiKey: String(linkedProvider?.apiKey || slot?.key || '').trim(),
-    requestProfileId: String(linkedProvider?.requestProfileId || slot?.requestProfileId || linkedProvider?.profileId || '').trim(),
-  };
-}
-
-function resolveLocalUserRoute(profileState, routeId) {
-  const routeTarget = resolveRouteIdCandidate(routeId);
-  const rawRouteId = String(routeId || '').trim().toLowerCase();
-  const providers = Array.isArray(profileState.providers) ? profileState.providers : [];
-  const slots = Array.isArray(profileState.slots) ? profileState.slots : [];
-
-  const provider = providers.find((item) => recordMatchesRoute(item, routeTarget, rawRouteId));
-  if (provider) return buildRouteFromProvider(provider);
-
-  const slot = slots.find((item) => recordMatchesRoute(item, routeTarget, rawRouteId));
-  if (slot) return buildRouteFromSlot(slot, providers);
-
   return null;
 }
 
@@ -395,9 +270,8 @@ function serializeBody(product, body) {
 }
 
 async function fetchWuyinJson(url, apiKey, method, product, body) {
-  const isHttps = url.startsWith('https');
   const hasBody = body !== undefined && body !== null;
-  const response = await fetch(url, {
+  const response = await fetchWithRetries(url, {
     method,
     headers: {
       Authorization: apiKey,
@@ -405,16 +279,8 @@ async function fetchWuyinJson(url, apiKey, method, product, body) {
       ...(hasBody ? { 'Content-Type': product.contentType || 'application/json' } : {}),
     },
     body: hasBody ? serializeBody(product, body) : undefined,
-    agent: isHttps ? httpsAgent : httpAgent,
   });
-  const text = await response.text();
-  let json = null;
-  try { json = text ? JSON.parse(text) : null; } catch { json = null; }
-  if (!response.ok) {
-    throw new Error(`Wuyin API HTTP ${response.status}: ${text.slice(0, 500)}`);
-  }
-  if (!json) throw new Error('Wuyin API 返回的不是有效 JSON。');
-  return json;
+  return response.json();
 }
 
 function mapAsyncStatus(value) {
@@ -488,9 +354,9 @@ async function queryStrictTaskStatus({ providerTaskId, apiKey, product }) {
   };
 }
 
-async function handleSubmitMode(req, res, profileState, mode) {
+async function handleSubmitMode(req, res, userId, mode) {
   const routeId = String(req.body?.routeId || req.headers['x-key-slot-id'] || '').trim();
-  const route = resolveLocalUserRoute(profileState, routeId);
+  const route = await resolveLocalUserRoute(userId, routeId);
   if (!route) return sendError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
   if (!isWuyinRoute(route)) return null;
 
@@ -527,7 +393,7 @@ async function handleSubmitMode(req, res, profileState, mode) {
   }
 }
 
-async function handleStatusMode(req, res, profileState) {
+async function handleStatusMode(req, res, userId) {
   const localTaskId = String(req.body?.localTaskId || req.body?.taskId || '').trim();
   const parsed = decodeLocalProxyTaskId(localTaskId);
   if (!parsed.providerTaskId) return sendError(res, req, 400, 'INVALID_REQUEST', 'localTaskId/taskId is required for Wuyin task status.');
@@ -539,7 +405,7 @@ async function handleStatusMode(req, res, profileState) {
     return sendError(res, req, 400, 'WUYIN_STATUS_NOT_ASYNC', '该 Wuyin 模型按文档不是异步详情查询任务。');
   }
 
-  const route = resolveLocalUserRoute(profileState, parsed.routeId || req.body?.routeId || req.headers['x-key-slot-id']);
+  const route = await resolveLocalUserRoute(userId, parsed.routeId || req.body?.routeId || req.headers['x-key-slot-id']);
   if (!route) return sendError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'Wuyin API route for this task was not found.');
   if (!isWuyinRoute(route)) return null;
 
@@ -586,11 +452,8 @@ router.all('/v1/model-proxy/user', async (req, res, next) => {
   if (!authState) return sendError(res, req, 401, 'UNAUTHORIZED', 'Authentication is required for Wuyin strict routing.');
   if (authState.refreshToken) res.setHeader('X-Refresh-Token', authState.refreshToken);
 
-  const data = readLocalStorage();
-  const profileState = readProfileState(data, authState.userId);
-
-  if (mode === 'task_status') return handleStatusMode(req, res, profileState);
-  const handled = await handleSubmitMode(req, res, profileState, mode);
+  if (mode === 'task_status') return handleStatusMode(req, res, authState.userId);
+  const handled = await handleSubmitMode(req, res, authState.userId, mode);
   if (handled) return handled;
   return next();
 });

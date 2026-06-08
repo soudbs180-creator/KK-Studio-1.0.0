@@ -3,7 +3,7 @@
  * @module api
  * @description Vercel serverless proxy for the public Wuyin model and pricing catalog.
  * @author KK-Studio Team
- * @version 1.5.5
+ * @version 1.5.6
  */
 
 const WUYIN_PRICE_CATALOG_URL = 'https://api.wuyinkeji.com/themes/DigitalBlue/api?action=api_list';

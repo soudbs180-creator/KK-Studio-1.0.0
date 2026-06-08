@@ -1,7 +1,7 @@
 {
   "name": "kk-studio",
   "private": true,
-  "version": "1.5.5",
+  "version": "1.5.6",
   "workspaces": [
     "packages/*",
     "apps/web"
