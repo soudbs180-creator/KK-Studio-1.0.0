@@ -2,10 +2,10 @@
  * @file index.js
  * @module server/lib/dispatcher
  * @description 后端统一 AI 路由派发器（Dispatcher）。严格执行标准流控，
- *              支持 Keep-Alive 连接复用、内存拓扑缓存、加权负载均衡、显式供应商锁定、
- *              多 Key 熔断、渠道级隔离及智能第三方协议适配。
+ *              支持 Keep-Alive 连接复用、内存拓扑缓存、显式供应商锁定、
+ *              priority-failover、weighted-random、多 Key 熔断、渠道级隔离及智能第三方协议适配。
  * @author KK-Studio Team
- * @version 1.6.0
+ * @version 2.1.0
  */
 
 const http = require('http');
@@ -17,13 +17,12 @@ const credits = require('../credits');
 const { getModelConfig } = require('./modelRegistry');
 const { getAdapter, normalizeAdapterId } = require('./adapterRegistry');
 
-// 1. 建立全局高性能 HTTP/HTTPS 连接复用池，杜绝大并发下 TCP 端口耗尽
 const httpAgent = new http.Agent({
   keepAlive: true,
   maxSockets: 150,
   maxFreeSockets: 15,
   timeout: 60000,
-  freeSocketTimeout: 30000
+  freeSocketTimeout: 30000,
 });
 
 const httpsAgent = new https.Agent({
@@ -31,17 +30,17 @@ const httpsAgent = new https.Agent({
   maxSockets: 150,
   maxFreeSockets: 15,
   timeout: 60000,
-  freeSocketTimeout: 30000
+  freeSocketTimeout: 30000,
 });
 
-// 2. 建立极速内存拓扑缓存层，消除高频对话时频繁物理查询数据库的 I/O 延迟
 const ROUTE_CACHE = new Map();
 const CACHE_TTL_MS = 30000;
 
-// 3. 建立内存坏 Key/坏渠道熔断冷却器，防范单一第三方异常拖垮其它渠道
 const BREAKER_COOLDOWN_MS = 300000;
 const KEY_BREAKER = new Map();
 const CHANNEL_BREAKER = new Map();
+
+const ROUTE_STRATEGIES = new Set(['priority-failover', 'weighted-random', 'parallel-race']);
 
 function shuffle(array) {
   const result = [...array];
@@ -126,35 +125,63 @@ function isFatalProviderError(statusCode, errorText = '') {
     || normalized.includes('unsupported');
 }
 
-function chooseWeightedOrder(channels, seed = '') {
-  const grouped = new Map();
-  for (const channel of channels) {
-    const priority = Number(channel.priority || 0);
-    if (!grouped.has(priority)) grouped.set(priority, []);
-    grouped.get(priority).push(channel);
+function normalizeRouteStrategy(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return ROUTE_STRATEGIES.has(normalized) ? normalized : 'priority-failover';
+}
+
+function resolveRouteStrategy(channels, unifiedPayload = {}) {
+  const explicit = normalizeRouteStrategy(unifiedPayload.routeStrategy || unifiedPayload.route_strategy || '');
+  if (explicit !== 'priority-failover') return explicit;
+
+  const firstConfigured = channels.find((channel) => String(channel.route_strategy || '').trim());
+  return normalizeRouteStrategy(firstConfigured?.route_strategy || 'priority-failover');
+}
+
+function choosePriorityFailoverOrder(channels) {
+  return [...channels].sort((left, right) => {
+    const priorityDiff = Number(right.priority || 0) - Number(left.priority || 0);
+    if (priorityDiff !== 0) return priorityDiff;
+
+    const weightDiff = Number(right.weight || 0) - Number(left.weight || 0);
+    if (weightDiff !== 0) return weightDiff;
+
+    const providerDiff = String(left.provider_id || '').localeCompare(String(right.provider_id || ''));
+    if (providerDiff !== 0) return providerDiff;
+
+    return String(left.id || '').localeCompare(String(right.id || ''));
+  });
+}
+
+function chooseWeightedRandomOrder(channels, seed = '') {
+  const scored = channels.map((channel, index) => {
+    const weight = Math.max(1, Number(channel.weight || 1));
+    const hash = (stableHashInt(`${seed}:${channel.provider_id}:${channel.id || index}:${channel.base_url}`) % 1000000) / 1000000;
+    // Efraimidis-Spirakis weighted sampling order: higher weight has higher chance to appear earlier.
+    return {
+      channel,
+      score: Math.pow(Math.max(hash, 0.000001), 1 / weight),
+    };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map((item) => item.channel);
+}
+
+function chooseChannelOrder(channels, strategy, seed = '') {
+  if (strategy === 'weighted-random') {
+    return chooseWeightedRandomOrder(channels, seed);
   }
 
-  const ordered = [];
-  const priorities = Array.from(grouped.keys()).sort((a, b) => b - a);
-  for (const priority of priorities) {
-    const group = grouped.get(priority) || [];
-    const scored = group.map((channel, index) => {
-      const weight = Math.max(1, Number(channel.weight || 1));
-      const hash = (stableHashInt(`${seed}:${channel.provider_id}:${channel.id || index}`) % 1000000) / 1000000;
-      // 中文注释：同 priority 内按加权随机得分排序，避免旧逻辑永远打满最高 weight 渠道。
-      return { channel, score: Math.pow(Math.max(hash, 0.000001), 1 / weight) };
-    });
-    scored.sort((a, b) => b.score - a.score);
-    ordered.push(...scored.map(item => item.channel));
+  if (strategy === 'parallel-race') {
+    // 简体中文注释：parallel-race 会同时命中多个供应商，容易造成重复扣费或第三方重复消耗。
+    // 在计费幂等和取消上游请求能力完善前，先安全降级为 weighted-random + failover。
+    return chooseWeightedRandomOrder(channels, seed);
   }
-  return ordered;
+
+  return choosePriorityFailoverOrder(channels);
 }
 
 class BackendDispatcher {
-  /**
-   * 解析模型路由别名，支持 "model@provider" 和 "model@system_provider" 格式。
-   * 用户选择了具体供应商时，targetProviderId 会锁定 failover 范围，不会自动串到其它供应商。
-   */
   parseModelRoute(modelId) {
     const rawId = String(modelId || '').trim();
     const separatorIndex = rawId.indexOf('@');
@@ -192,7 +219,7 @@ class BackendDispatcher {
     const channels = result.rows;
     ROUTE_CACHE.set(baseModelId, {
       channels,
-      expiresAt: now + CACHE_TTL_MS
+      expiresAt: now + CACHE_TTL_MS,
     });
 
     return channels;
@@ -223,13 +250,14 @@ class BackendDispatcher {
       model_id: realModelName,
       endpoint_type: adapterId,
       request_profile_id: adapterId,
+      route_strategy: 'priority-failover',
       credit_cost: null,
       priority: 0,
-      weight: 1
+      weight: 1,
     }];
   }
 
-  resolveCandidateChannels({ channels, baseModelId, modelId, targetProviderId, requestId }) {
+  resolveCandidateChannels({ channels, baseModelId, modelId, targetProviderId, requestId, unifiedPayload }) {
     let matched = channels;
 
     if (targetProviderId) {
@@ -249,7 +277,16 @@ class BackendDispatcher {
 
     const healthyChannels = matched.filter(channel => !isChannelFused(channel));
     const usableChannels = healthyChannels.length > 0 ? healthyChannels : matched;
-    return chooseWeightedOrder(usableChannels, requestId || modelId || baseModelId);
+    const requestedStrategy = resolveRouteStrategy(usableChannels, unifiedPayload);
+    const effectiveStrategy = requestedStrategy === 'parallel-race' ? 'weighted-random' : requestedStrategy;
+
+    return {
+      channels: chooseChannelOrder(usableChannels, requestedStrategy, requestId || modelId || baseModelId),
+      requestedStrategy,
+      effectiveStrategy,
+      parallelRaceDowngraded: requestedStrategy === 'parallel-race',
+      fusedChannelCount: matched.length - healthyChannels.length,
+    };
   }
 
   async dispatch(userId, unifiedPayload) {
@@ -267,19 +304,26 @@ class BackendDispatcher {
       console.error('[BackendDispatcher] 无法从数据库动态获取渠道配置，将使用降级兜底逻辑。', dbErr);
     }
 
-    let sortedChannels = [];
+    let routePlan = {
+      channels: [],
+      requestedStrategy: 'priority-failover',
+      effectiveStrategy: 'priority-failover',
+      parallelRaceDowngraded: false,
+      fusedChannelCount: 0,
+    };
+
     if (channels.length > 0) {
-      sortedChannels = this.resolveCandidateChannels({
+      routePlan = this.resolveCandidateChannels({
         channels,
         baseModelId,
         modelId,
         targetProviderId,
-        requestId
+        requestId,
+        unifiedPayload,
       });
     }
 
-    // 中文注释：只有用户没有显式指定供应商时才允许硬编码兜底；显式选择必须失败即停，避免其它接口互相影响。
-    if (sortedChannels.length === 0) {
+    if (routePlan.channels.length === 0) {
       if (targetProviderId) {
         const error = new Error(`用户选择的供应商没有可用渠道：${targetProviderId}`);
         error.statusCode = 400;
@@ -287,9 +331,16 @@ class BackendDispatcher {
         error.route = { model: baseModelId, selectedProvider: targetProviderId };
         throw error;
       }
-      sortedChannels = this.buildFallbackChannels(baseModelId);
+      routePlan = {
+        channels: this.buildFallbackChannels(baseModelId),
+        requestedStrategy: 'priority-failover',
+        effectiveStrategy: 'priority-failover',
+        parallelRaceDowngraded: false,
+        fusedChannelCount: 0,
+      };
     }
 
+    const sortedChannels = routePlan.channels;
     let requiredCredits = 0;
     const firstChannel = sortedChannels[0];
     if (firstChannel && firstChannel.credit_cost !== null && firstChannel.credit_cost !== undefined) {
@@ -334,6 +385,7 @@ class BackendDispatcher {
       let finalTokensUsed = 0;
       let usedChannelInfo = null;
       let lastAttemptError = null;
+      const attemptedRoutes = [];
 
       for (let channelIndex = 0; channelIndex < sortedChannels.length; channelIndex++) {
         const channel = sortedChannels[channelIndex];
@@ -347,13 +399,13 @@ class BackendDispatcher {
         }
 
         const adapterId = normalizeAdapterId(channel.endpoint_type || channel.adapterId, channel);
-        console.log(`[BackendDispatcher] 尝试渠道 [${channel.provider_name || channel.provider_id}] provider=${channel.provider_id} adapter=${adapterId} (${channelIndex + 1}/${sortedChannels.length}) key=${keysToUse.length}/${shuffledKeys.length} selected=${targetProviderId || 'auto'}`);
+        console.log(`[BackendDispatcher] 尝试渠道 [${channel.provider_name || channel.provider_id}] provider=${channel.provider_id} adapter=${adapterId} (${channelIndex + 1}/${sortedChannels.length}) strategy=${routePlan.effectiveStrategy} key=${keysToUse.length}/${shuffledKeys.length} selected=${targetProviderId || 'auto'}`);
 
         for (let keyIndex = 0; keyIndex < keysToUse.length; keyIndex++) {
           const currentKey = keysToUse[keyIndex];
           const activeProvider = {
             base_url: channel.base_url,
-            api_key: currentKey
+            api_key: currentKey,
           };
 
           try {
@@ -375,11 +427,17 @@ class BackendDispatcher {
                 headers: transportReq.headers,
                 body: transportReq.body,
                 signal: controller.signal,
-                agent: activeAgent
+                agent: activeAgent,
               });
             } finally {
               clearTimeout(timeoutId);
             }
+
+            attemptedRoutes.push({
+              providerId: channel.provider_id,
+              adapter: adapterId,
+              status: response.status,
+            });
 
             if (!response.ok) {
               const errorText = await response.text();
@@ -392,7 +450,10 @@ class BackendDispatcher {
                 providerId: channel.provider_id,
                 providerName: channel.provider_name,
                 adapter: adapterId,
-                explicitProviderLocked: Boolean(targetProviderId)
+                requestProfileId: channel.request_profile_id || null,
+                requestedStrategy: routePlan.requestedStrategy,
+                effectiveStrategy: routePlan.effectiveStrategy,
+                explicitProviderLocked: Boolean(targetProviderId),
               };
 
               if (isFatalProviderError(statusCode, errorText)) {
@@ -462,9 +523,15 @@ class BackendDispatcher {
           providerId: usedChannelInfo.provider_id,
           providerName: usedChannelInfo.provider_name,
           adapter: normalizeAdapterId(usedChannelInfo.endpoint_type || usedChannelInfo.adapterId, usedChannelInfo),
+          requestProfileId: usedChannelInfo.request_profile_id || null,
           baseModelId,
-          locked: Boolean(targetProviderId)
-        } : undefined
+          requestedStrategy: routePlan.requestedStrategy,
+          effectiveStrategy: routePlan.effectiveStrategy,
+          parallelRaceDowngraded: routePlan.parallelRaceDowngraded,
+          fusedChannelCount: routePlan.fusedChannelCount,
+          attemptedRoutes,
+          locked: Boolean(targetProviderId),
+        } : undefined,
       };
 
     } catch (err) {
@@ -485,7 +552,7 @@ class BackendDispatcher {
           cost: requiredCredits,
           originalError: err.message,
           refundError: refundErr.message,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
       }
 
