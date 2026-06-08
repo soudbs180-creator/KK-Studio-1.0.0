@@ -1,8 +1,8 @@
 /**
  * @file provider-probe.js
  * @module server/routes
- * @description 管理员供应商探测路由。用于在保存第三方/官方 API 前自动识别协议、模型列表和推荐适配器，
- *              避免用户手动理解 endpoint_type、request_profile 等专业字段。
+ * @description 通用供应商探测路由。管理员系统渠道和用户自带 Key 共用同一套协议探测、模型发现和适配器推荐逻辑；
+ *              管理员系统渠道只是在真实请求前后额外包积分计费与审计，不改变底层请求协议。
  */
 
 const express = require('express');
@@ -24,7 +24,7 @@ function okEnvelope(data, req) {
   };
 }
 
-function adminAuth(requiredLevel) {
+function userAuth() {
   return async (req, res, next) => {
     const userId = verifyJWT(req.headers.authorization);
     if (!userId) {
@@ -34,7 +34,7 @@ function adminAuth(requiredLevel) {
     try {
       const pool = getPool();
       const result = await pool.query(
-        'SELECT COALESCE(admin_level, 0) AS admin_level FROM public.users WHERE id = $1',
+        'SELECT id, COALESCE(admin_level, 0) AS admin_level FROM public.users WHERE id = $1',
         [userId]
       );
 
@@ -42,19 +42,27 @@ function adminAuth(requiredLevel) {
         return res.status(401).json({ error: 'User not found.' });
       }
 
-      const adminLevel = Number(result.rows[0].admin_level || 0);
-      const allowed = requiredLevel === 1 ? adminLevel === 1 : adminLevel === 1 || adminLevel === 2;
-      if (!allowed) {
-        return res.status(403).json({ error: 'Admin permission required.' });
-      }
-
-      req.adminUserId = userId;
-      req.adminLevel = adminLevel;
+      req.userId = userId;
+      req.adminLevel = Number(result.rows[0].admin_level || 0);
       res.setHeader('X-Refresh-Token', signJWT({ userId }));
       return next();
     } catch (err) {
       return next(err);
     }
+  };
+}
+
+function adminAuth(requiredLevel) {
+  return async (req, res, next) => {
+    return userAuth()(req, res, () => {
+      const adminLevel = Number(req.adminLevel || 0);
+      const allowed = requiredLevel === 1 ? adminLevel === 1 : adminLevel === 1 || adminLevel === 2;
+      if (!allowed) {
+        return res.status(403).json({ error: 'Admin permission required.' });
+      }
+      req.adminUserId = req.userId;
+      return next();
+    });
   };
 }
 
@@ -69,7 +77,7 @@ const probeProviderSchema = z.object({
   requestProfileId: z.string().max(120).optional().default(''),
 });
 
-router.post('/v1/admin/provider-probe', adminAuth(2), async (req, res) => {
+async function handleProbe(req, res, ownerKind) {
   const parsed = probeProviderSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -79,14 +87,31 @@ router.post('/v1/admin/provider-probe', adminAuth(2), async (req, res) => {
   }
 
   try {
-    const result = await probeProvider(parsed.data);
-    return res.json(okEnvelope(result, req));
+    const result = await probeProvider({
+      ...parsed.data,
+      ownerKind,
+    });
+    return res.json(okEnvelope({
+      ...result,
+      ownerKind,
+      billingMode: ownerKind === 'admin' ? 'system-credit-before-request' : 'user-owned-api-no-system-credit',
+    }, req));
   } catch (err) {
     return res.status(err.statusCode || 500).json({
       error: err.message || 'Provider probe failed.',
       code: err.code || 'PROVIDER_PROBE_FAILED',
     });
   }
+}
+
+// 管理员系统渠道：与用户渠道共用探测逻辑，保存后真实请求会额外走积分预扣/退款/审计。
+router.post('/v1/admin/provider-probe', adminAuth(2), async (req, res) => {
+  return handleProbe(req, res, 'admin');
+});
+
+// 用户自带 Key：与管理员渠道共用探测逻辑，但真实请求不走系统积分扣费。
+router.post('/v1/profile/provider-probe', userAuth(), async (req, res) => {
+  return handleProbe(req, res, 'user');
 });
 
 module.exports = router;
