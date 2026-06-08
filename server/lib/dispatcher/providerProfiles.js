@@ -126,18 +126,22 @@ const PROVIDER_PROFILES = [
     },
   },
   {
-    id: '12ai-docs-pending',
-    label: '12AI Docs-Pending Preset',
+    id: '12ai-documented-multi-protocol',
+    aliases: ['12ai-docs-pending'],
+    label: '12AI Documented Multi-Protocol',
     providerKind: 'relay',
-    protocolFamily: '12ai-docs-pending',
-    adapterId: 'docs_pending_adapter',
-    domains: ['12ai.org', 'doc.12ai.org'],
-    providerHints: ['12ai', '12AI'],
+    protocolFamily: '12ai-documented-multi-protocol',
+    adapterId: 'twelveai_multi_protocol',
+    domains: ['12ai.org', 'cdn.12ai.org', 'api.12ai.org', 'doc.12ai.org'],
+    providerHints: ['12ai', '12AI', '12 AI'],
+    defaultBaseUrl: 'https://cdn.12ai.org',
     modelDiscovery: 'manual',
-    requiresDocsVerification: true,
+    fallbackModels: ['gpt-5.1', 'gemini-3-pro-preview'],
     strictDocs: {
       source: 'https://doc.12ai.org/docs/api',
-      notes: '文档入口当前未返回可解析接口细节；禁止私加 endpoint/鉴权/请求体。',
+      defaultBaseUrl: 'https://cdn.12ai.org',
+      directBaseUrl: 'https://api.12ai.org',
+      notes: '12AI 独立多协议预设：OpenAI Chat 使用 /v1/chat/completions，Claude Messages 使用 /v1/messages，Gemini Generate Content 使用 /v1beta/models/{model}:generateContent?key=。不要混用其它厂商 profile。',
     },
   },
   {
@@ -236,7 +240,7 @@ const PROVIDER_PROFILES = [
     strictDocs: {
       source: 'https://api.wuyinkeji.com/type/all',
       catalog: 'https://api.wuyinkeji.com/type/all',
-      notes: 'Wuyin 必须按模型文档分 task 执行：chat 走 /api/chat/index 表单；image/video 走 /api/async/<model> JSON + /api/async/detail。',
+      notes: 'Wuyin 必须按模型文档分 task 执行：chat 走 /api/chat/index 表单；image/video/audio/utility 走各自产品文档 contract。',
     },
   },
   {
@@ -250,6 +254,10 @@ const PROVIDER_PROFILES = [
   },
 ];
 
+function profileIdMatches(profile, id) {
+  return profile.id === id || (Array.isArray(profile.aliases) && profile.aliases.includes(id));
+}
+
 function matchProviderProfile(input = {}) {
   const baseUrl = String(input.baseUrl || input.base_url || '').trim();
   const hostname = safeHostname(baseUrl);
@@ -259,7 +267,7 @@ function matchProviderProfile(input = {}) {
   const lowerBaseUrl = baseUrl.toLowerCase();
 
   if (requestProfileId) {
-    const byId = PROVIDER_PROFILES.find((profile) => profile.id === requestProfileId);
+    const byId = PROVIDER_PROFILES.find((profile) => profileIdMatches(profile, requestProfileId));
     if (byId) return byId;
     const byProtocol = PROVIDER_PROFILES.find((profile) => profile.protocolFamily === requestProfileId);
     if (byProtocol) return byProtocol;
@@ -294,7 +302,7 @@ function matchProviderProfile(input = {}) {
 }
 
 function getProviderProfile(profileId) {
-  return PROVIDER_PROFILES.find((profile) => profile.id === profileId) || null;
+  return PROVIDER_PROFILES.find((profile) => profileIdMatches(profile, profileId)) || null;
 }
 
 module.exports = {
