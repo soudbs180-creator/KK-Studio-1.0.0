@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 
 import { resolveProviderRuntime } from "../../apps/web/src/services/api/providerStrategy.ts";
 import { resolveChatSurface, resolveImageSurface } from "../../apps/web/src/services/api/providerSurfaceRouter.ts";
+import { resolveProviderImageRoute } from "../../apps/web/src/services/api/providerRequestRegistry.ts";
 
 describe("provider surface router", () => {
   test("routes New Suxi image models to provider images even when chat compatibility is stored", () => {
@@ -146,6 +147,42 @@ describe("provider surface router", () => {
       }),
       "gemini-native-image",
     );
+  });
+
+  test("records a route-family decision for official Gemini image routes", () => {
+    const runtime = resolveProviderRuntime({
+      provider: "Google",
+      baseUrl: "https://generativelanguage.googleapis.com",
+      format: "gemini",
+    });
+
+    const decision = resolveProviderImageRoute({
+      runtime,
+      modelId: "gemini-2.5-flash-image",
+      compatibilityMode: runtime.compatibilityMode,
+    });
+
+    assert.equal(decision.surface, "gemini-native-image");
+    assert.equal(decision.routeFamily, "official-native");
+    assert.equal(decision.reason, "native-gemini-image-protocol");
+  });
+
+  test("records a provider-native route-family decision for Wuyin own async image routes", () => {
+    const runtime = resolveProviderRuntime({
+      provider: "Wuyin Keji",
+      baseUrl: "https://api.wuyinkeji.com",
+      format: "openai",
+    });
+
+    const decision = resolveProviderImageRoute({
+      runtime,
+      modelId: "image_nanoBanana2",
+      compatibilityMode: runtime.compatibilityMode,
+    });
+
+    assert.equal(decision.surface, "async-image");
+    assert.equal(decision.routeFamily, "provider-native");
+    assert.equal(decision.reason, "wuyinkeji-own-async-image-route");
   });
 
   test("routes response-only models to the responses surface", () => {
