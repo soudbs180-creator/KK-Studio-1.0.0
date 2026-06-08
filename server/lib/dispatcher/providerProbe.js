@@ -1,23 +1,16 @@
 /**
  * @file providerProbe.js
  * @module server/lib/dispatcher
- * @description 第三方/官方 API 地址与密钥的自动探测器。用户只需要填写 Base URL 与 Key，
- *              系统负责识别 OpenAI-compatible、速创/悟因表单协议、模型列表和推荐适配器。
+ * @description AI Router 通用供应商探测器。用户或管理员只需要填写 Base URL 与 Key，
+ *              系统根据供应商画像库自动识别协议族、模型发现方式、推荐适配器和规范化地址。
  */
 
 const fetch = require('node-fetch');
-const { normalizeAdapterId, normalizeBaseUrl } = require('./adapterRegistry');
+const { normalizeBaseUrl } = require('./adapterRegistry');
+const { matchProviderProfile } = require('./providerProfiles');
 
 const PROBE_TIMEOUT_MS = 12000;
 const DEFAULT_MODELS = ['gpt-4o-mini', 'gpt-4o', 'chat_index'];
-
-function safeHostname(value) {
-  try {
-    return new URL(String(value || '').trim()).hostname.toLowerCase();
-  } catch {
-    return '';
-  }
-}
 
 function uniqueStrings(values) {
   return Array.from(new Set(
@@ -48,18 +41,6 @@ function redactUrl(url) {
   }
 }
 
-function isLikelyWuyinLike(input) {
-  const baseUrl = String(input.baseUrl || '').toLowerCase();
-  const profile = String(input.providerHint || '').toLowerCase();
-  const hostname = safeHostname(input.baseUrl);
-  return hostname.includes('wuyinkeji.com')
-    || profile.includes('wuyin')
-    || profile.includes('suchuang')
-    || input.providerName?.includes?.('速创')
-    || baseUrl.includes('/api/chat/index')
-    || baseUrl.includes('/api/async/');
-}
-
 function normalizeModelRows(rows, fallbackModels = []) {
   const ids = [];
   if (Array.isArray(rows)) {
@@ -67,7 +48,7 @@ function normalizeModelRows(rows, fallbackModels = []) {
       if (typeof row === 'string') {
         ids.push(row);
       } else if (row && typeof row === 'object') {
-        ids.push(row.id || row.model || row.name || row.model_id);
+        ids.push(row.id || row.model || row.name || row.model_id || row.display_name);
       }
     }
   }
@@ -104,13 +85,36 @@ async function fetchJson(url, options) {
   }
 }
 
-function buildOpenAIModelsUrl(baseUrl) {
-  return `${normalizeBaseUrl(baseUrl).replace(/\/+$/, '')}/models`;
+function normalizeBaseUrlForProfile(baseUrl, profile) {
+  if (profile.defaultBaseUrl && (!baseUrl || baseUrl === profile.defaultBaseUrl)) {
+    return profile.defaultBaseUrl;
+  }
+  if (profile.protocolFamily === 'gemini-native') {
+    return normalizeBaseUrl(baseUrl || profile.defaultBaseUrl, { noVersionAppend: true });
+  }
+  if (profile.protocolFamily === 'wuyin-form') {
+    const rawBaseUrl = String(baseUrl || profile.defaultBaseUrl || 'https://api.wuyinkeji.com').trim();
+    let normalizedBaseUrl = rawBaseUrl.replace(/\/+$/, '');
+    if (!normalizedBaseUrl.toLowerCase().includes('/api/chat/index') && !normalizedBaseUrl.toLowerCase().includes('/api/async/')) {
+      normalizedBaseUrl = `${normalizedBaseUrl}/api/chat/index`;
+    }
+    return normalizedBaseUrl;
+  }
+  return normalizeBaseUrl(baseUrl || profile.defaultBaseUrl || '');
 }
 
-async function probeOpenAICompatible(input) {
-  const normalizedBaseUrl = normalizeBaseUrl(input.baseUrl);
-  const modelsUrl = buildOpenAIModelsUrl(input.baseUrl);
+function buildOpenAIModelsUrl(baseUrl, profile) {
+  return `${normalizeBaseUrlForProfile(baseUrl, profile).replace(/\/+$/, '')}/models`;
+}
+
+function buildGeminiModelsUrl(baseUrl, apiKey, profile) {
+  const normalized = normalizeBaseUrlForProfile(baseUrl, profile).replace(/\/+$/, '');
+  return `${normalized}/models?key=${encodeURIComponent(apiKey)}`;
+}
+
+async function probeOpenAICompatible(input, profile) {
+  const normalizedBaseUrl = normalizeBaseUrlForProfile(input.baseUrl, profile);
+  const modelsUrl = buildOpenAIModelsUrl(input.baseUrl, profile);
   const warnings = [];
   const diagnostics = [];
 
@@ -124,7 +128,7 @@ async function probeOpenAICompatible(input) {
     });
 
     diagnostics.push({
-      step: 'openai.models',
+      step: `${profile.id}.models`,
       url: redactUrl(modelsUrl),
       ok: response.ok,
       status: response.status,
@@ -136,13 +140,14 @@ async function probeOpenAICompatible(input) {
         : Array.isArray(response.data?.models)
           ? response.data.models
           : [];
-      const models = normalizeModelRows(modelRows, input.modelId ? [input.modelId] : []);
+      const models = normalizeModelRows(modelRows, input.modelId ? [input.modelId] : profile.fallbackModels || []);
       return {
         ok: true,
-        confidence: models.length > 0 ? 0.92 : 0.78,
-        providerKind: input.providerKind || 'relay',
-        adapterId: 'openai_chat_completions',
-        requestProfileId: 'openai-compatible',
+        confidence: models.length > 0 ? 0.93 : 0.78,
+        providerKind: profile.providerKind || input.providerKind || 'relay',
+        adapterId: profile.adapterId || 'openai_chat_completions',
+        requestProfileId: profile.id,
+        protocolFamily: profile.protocolFamily,
         normalizedBaseUrl,
         models,
         warnings,
@@ -154,21 +159,22 @@ async function probeOpenAICompatible(input) {
       return {
         ok: false,
         confidence: 0.75,
-        providerKind: input.providerKind || 'relay',
-        adapterId: 'openai_chat_completions',
-        requestProfileId: 'openai-compatible',
+        providerKind: profile.providerKind || input.providerKind || 'relay',
+        adapterId: profile.adapterId || 'openai_chat_completions',
+        requestProfileId: profile.id,
+        protocolFamily: profile.protocolFamily,
         normalizedBaseUrl,
-        models: normalizeModelRows([], input.modelId ? [input.modelId] : DEFAULT_MODELS),
+        models: normalizeModelRows([], input.modelId ? [input.modelId] : profile.fallbackModels || DEFAULT_MODELS),
         warnings: [`模型列表接口鉴权失败 (${response.status})，请检查 API Key。`],
         diagnostics,
       };
     }
 
-    warnings.push(`模型列表接口不可用 (${response.status})，将按 OpenAI-compatible 第三方中转继续配置。`);
+    warnings.push(`模型列表接口不可用 (${response.status})，将按 ${profile.label || profile.id} 继续配置。`);
   } catch (error) {
     warnings.push(`模型列表探测失败：${error.name === 'AbortError' ? '请求超时' : error.message}`);
     diagnostics.push({
-      step: 'openai.models',
+      step: `${profile.id}.models`,
       url: redactUrl(modelsUrl),
       ok: false,
       error: error.name === 'AbortError' ? 'timeout' : error.message,
@@ -177,82 +183,88 @@ async function probeOpenAICompatible(input) {
 
   return {
     ok: true,
-    confidence: 0.62,
-    providerKind: input.providerKind || 'relay',
-    adapterId: 'openai_chat_completions',
-    requestProfileId: 'openai-compatible',
+    confidence: profile.id === 'generic-openai-compatible' ? 0.62 : 0.82,
+    providerKind: profile.providerKind || input.providerKind || 'relay',
+    adapterId: profile.adapterId || 'openai_chat_completions',
+    requestProfileId: profile.id,
+    protocolFamily: profile.protocolFamily,
     normalizedBaseUrl,
-    models: normalizeModelRows([], input.modelId ? [input.modelId] : DEFAULT_MODELS),
+    models: normalizeModelRows([], input.modelId ? [input.modelId] : profile.fallbackModels || DEFAULT_MODELS),
     warnings,
     diagnostics,
   };
 }
 
-function probeWuyinLike(input) {
-  const rawBaseUrl = String(input.baseUrl || '').trim();
-  const fallbackBase = rawBaseUrl || 'https://api.wuyinkeji.com';
-  let normalizedBaseUrl = fallbackBase.replace(/\/+$/, '');
-  if (!normalizedBaseUrl.toLowerCase().includes('/api/chat/index') && !normalizedBaseUrl.toLowerCase().includes('/api/async/')) {
-    normalizedBaseUrl = `${normalizedBaseUrl}/api/chat/index`;
-  }
+async function probeGeminiNative(input, profile) {
+  const normalizedBaseUrl = normalizeBaseUrlForProfile(input.baseUrl, profile);
+  const modelsUrl = buildGeminiModelsUrl(input.baseUrl, input.apiKey, profile);
+  const diagnostics = [];
+  const warnings = [];
 
-  const modelHints = uniqueStrings([
-    input.modelId,
-    'chat_index',
-    'gemini-2.5-flash',
-    'gemini-2.5-pro',
-    'image_nanoBanana2',
-    'image_nanoBanana',
-  ]);
+  try {
+    const response = await fetchJson(modelsUrl, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    });
+    diagnostics.push({ step: `${profile.id}.models`, url: redactUrl(modelsUrl), ok: response.ok, status: response.status });
+    if (response.ok) {
+      const modelRows = Array.isArray(response.data?.models) ? response.data.models : [];
+      const models = normalizeModelRows(
+        modelRows.map((row) => ({ id: String(row.name || '').replace(/^models\//, '') })),
+        input.modelId ? [input.modelId] : profile.fallbackModels || []
+      );
+      return {
+        ok: true,
+        confidence: 0.92,
+        providerKind: profile.providerKind,
+        adapterId: profile.adapterId,
+        requestProfileId: profile.id,
+        protocolFamily: profile.protocolFamily,
+        normalizedBaseUrl,
+        models,
+        warnings,
+        diagnostics,
+      };
+    }
+    warnings.push(`Gemini 模型列表不可用 (${response.status})，将使用内置模型候选。`);
+  } catch (error) {
+    warnings.push(`Gemini 模型列表探测失败：${error.name === 'AbortError' ? '请求超时' : error.message}`);
+    diagnostics.push({ step: `${profile.id}.models`, url: redactUrl(modelsUrl), ok: false, error: error.name === 'AbortError' ? 'timeout' : error.message });
+  }
 
   return {
     ok: true,
-    confidence: 0.88,
-    providerKind: input.providerKind || 'relay',
-    adapterId: 'custom_form_urlencoded',
-    requestProfileId: 'wuyin-form-url-encoded',
+    confidence: 0.78,
+    providerKind: profile.providerKind,
+    adapterId: profile.adapterId,
+    requestProfileId: profile.id,
+    protocolFamily: profile.protocolFamily,
     normalizedBaseUrl,
-    models: normalizeModelRows(modelHints),
-    warnings: ['已识别为速创/悟因类非标准协议，系统会自动使用表单适配器，不需要用户手动选择接口类型。'],
-    diagnostics: [{
-      step: 'profile.match',
-      ok: true,
-      reason: 'wuyin-like-url-or-provider-hint',
-    }],
+    models: normalizeModelRows([], input.modelId ? [input.modelId] : profile.fallbackModels || []),
+    warnings,
+    diagnostics,
   };
 }
 
-function inferOfficialProvider(input) {
-  const hostname = safeHostname(input.baseUrl);
-  if (hostname.includes('api.openai.com')) {
-    return {
-      providerKind: 'official',
-      requestProfileId: 'openai-official',
-      adapterId: 'openai_chat_completions',
-    };
-  }
-  if (hostname.includes('dashscope.aliyuncs.com')) {
-    return {
-      providerKind: 'official',
-      requestProfileId: 'dashscope-openai-compatible',
-      adapterId: 'openai_chat_completions',
-    };
-  }
-  if (hostname.includes('ark.cn-beijing.volces.com')) {
-    return {
-      providerKind: 'official',
-      requestProfileId: 'volcengine-openai-compatible',
-      adapterId: 'openai_chat_completions',
-    };
-  }
-  if (hostname.includes('api.deepseek.com')) {
-    return {
-      providerKind: 'official',
-      requestProfileId: 'deepseek-openai-compatible',
-      adapterId: 'openai_chat_completions',
-    };
-  }
-  return null;
+function probeProfileOnly(input, profile) {
+  return {
+    ok: true,
+    confidence: profile.id === 'generic-openai-compatible' ? 0.6 : 0.86,
+    providerKind: profile.providerKind || input.providerKind || 'relay',
+    adapterId: profile.adapterId || 'openai_chat_completions',
+    requestProfileId: profile.id,
+    protocolFamily: profile.protocolFamily,
+    normalizedBaseUrl: normalizeBaseUrlForProfile(input.baseUrl, profile),
+    models: normalizeModelRows([], input.modelId ? [input.modelId] : profile.fallbackModels || DEFAULT_MODELS),
+    warnings: profile.protocolFamily === 'wuyin-form'
+      ? ['已识别为速创/悟因类非标准协议，系统会自动使用表单适配器，不需要用户手动选择接口类型。']
+      : ['该供应商不一定支持标准 /models 接口，系统将使用画像库与手动模型候选。'],
+    diagnostics: [{
+      step: 'profile.match',
+      ok: true,
+      reason: profile.id,
+    }],
+  };
 }
 
 async function probeProvider(input) {
@@ -269,37 +281,14 @@ async function probeProvider(input) {
     throw error;
   }
 
-  if (isLikelyWuyinLike(input)) {
-    return probeWuyinLike(input);
+  const profile = matchProviderProfile(input);
+  if (profile.protocolFamily === 'wuyin-form' || profile.modelDiscovery === 'manual') {
+    return probeProfileOnly(input, profile);
   }
-
-  const officialProfile = inferOfficialProvider(input);
-  const result = await probeOpenAICompatible({
-    ...input,
-    providerKind: officialProfile?.providerKind || input.providerKind,
-  });
-
-  if (officialProfile) {
-    return {
-      ...result,
-      providerKind: officialProfile.providerKind,
-      requestProfileId: officialProfile.requestProfileId,
-      adapterId: officialProfile.adapterId,
-      confidence: Math.max(result.confidence, 0.9),
-    };
+  if (profile.protocolFamily === 'gemini-native') {
+    return probeGeminiNative(input, profile);
   }
-
-  const inferredAdapter = normalizeAdapterId(input.endpointType || 'auto', {
-    base_url: baseUrl,
-    provider_id: input.providerHint,
-    provider_kind: input.providerKind,
-    request_profile_id: input.requestProfileId,
-  });
-
-  return {
-    ...result,
-    adapterId: inferredAdapter,
-  };
+  return probeOpenAICompatible(input, profile);
 }
 
 module.exports = {
