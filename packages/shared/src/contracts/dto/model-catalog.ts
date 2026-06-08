@@ -8,9 +8,13 @@ export type ProviderProtocolFamily =
   | "gemini-native"
   | "claude-native"
   | "openrouter-openai"
+  | "azure-openai"
+  | "wuyin-form"
   | "wuyin-async-image"
   | "wuyin-async-video"
   | "12ai-flow";
+
+export type AiRouterRouteStrategy = "priority-failover" | "weighted-random" | "parallel-race";
 
 export interface ModelCatalogItemDto {
   id: EntityId;
@@ -42,7 +46,8 @@ export interface ActiveCreditModelDto {
   description?: string;
   endpointType: string;
   requestProfileId?: string;
-  routeStrategy?: "priority-failover" | "weighted-random" | "parallel-race";
+  protocolFamily?: ProviderProtocolFamily | string;
+  routeStrategy?: AiRouterRouteStrategy;
   creditCost: number;
   priority: number;
   weight: number;
@@ -72,7 +77,8 @@ export interface AdminCreditProviderModelDto {
   description?: string;
   endpointType: string;
   requestProfileId?: string;
-  routeStrategy?: "priority-failover" | "weighted-random" | "parallel-race";
+  protocolFamily?: ProviderProtocolFamily | string;
+  routeStrategy?: AiRouterRouteStrategy;
   creditCost: number;
   priority?: number;
   weight?: number;
@@ -112,6 +118,9 @@ export interface SaveAdminCreditProviderModelRequestDto {
   displayName: string;
   description?: string;
   endpointType: string;
+  requestProfileId?: string;
+  protocolFamily?: ProviderProtocolFamily | string;
+  routeStrategy?: AiRouterRouteStrategy;
   creditCost: number;
   advancedEnabled: boolean;
   mixWithSameModel: boolean;
@@ -141,6 +150,7 @@ export interface SaveAdminCreditProviderResponseDto {
   apiKeyCount: number;
   modelCount: number;
   saved: boolean;
+  routeEngine?: "unified-ai-router" | string;
 }
 
 export interface DeleteAdminCreditProviderResponseDto {
