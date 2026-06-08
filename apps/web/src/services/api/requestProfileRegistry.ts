@@ -3,6 +3,7 @@ export type RequestProfileId =
   | "gpt-best"
   | "suxi"
   | "wuyinkeji"
+  | "apimart"
   | "openai-official"
   | "anthropic-official"
   | "generic-openai";
@@ -99,6 +100,24 @@ const REQUEST_PROFILES: RequestProfile[] = [
     supportedProtocolFamilies: ["openai-compatible", "gemini-native"],
     requestSurfaceDefaults: {
       image: "async-image",
+      video: "async-video",
+    },
+    apiBaseUrlPolicy: "runtime-supplied",
+  },
+  {
+    id: "apimart",
+    displayName: "APIMart",
+    docSources: ["https://docs.apimart.ai/cn", "https://docs.apimart.ai/llms.txt"],
+    providerAliases: ["apimart", "api mart", "apimart ai", "apimart.ai"],
+    docsUrlPatterns: [
+      /^https?:\/\/docs\.apimart\.ai\/(?:cn|llms\.txt|.*)(?:$|[?#])/i,
+    ],
+    hostPatterns: [/^api\.apimart\.ai$/i],
+    basePatterns: [/api\.apimart\.ai/i, /apimart\.ai/i],
+    supportedProtocolFamilies: ["openai-compatible"],
+    requestSurfaceDefaults: {
+      chat: "openai-chat",
+      image: "provider-images",
       video: "async-video",
     },
     apiBaseUrlPolicy: "runtime-supplied",
