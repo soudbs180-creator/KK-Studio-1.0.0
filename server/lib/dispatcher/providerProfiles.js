@@ -1,9 +1,8 @@
 /**
  * @file providerProfiles.js
  * @module server/lib/dispatcher
- * @description AI Router 供应商画像库。画像只描述“如何识别/归类供应商”，不承载积分、用户或管理员差异。
- *              管理员系统渠道和用户自带 Key 共享这些画像；管理员只在外层增加计费与审计。
- *              对已知第三方预设必须严格按官方文档声明的协议调用，禁止落入 generic 猜测路径。
+ * @description AI Router 供应商画像库。画像只负责识别厂商；具体 endpoint、鉴权、请求体、响应结构由
+ *              strictProviderContracts 与 adapter 执行。已知厂商禁止走 generic 猜测路径。
  */
 
 function safeHostname(value) {
@@ -35,9 +34,10 @@ const PROVIDER_PROFILES = [
     label: 'Azure OpenAI',
     providerKind: 'official',
     protocolFamily: 'azure-openai',
-    adapterId: 'openai_chat_completions',
+    adapterId: 'azure_openai_chat_completions',
     domains: ['openai.azure.com'],
     modelDiscovery: 'manual-or-openai-compatible',
+    requiresDocsVerification: true,
   },
   {
     id: 'anthropic-official',
@@ -65,18 +65,18 @@ const PROVIDER_PROFILES = [
     id: 'deepseek-official',
     label: 'DeepSeek Official',
     providerKind: 'official',
-    protocolFamily: 'openai-compatible',
-    adapterId: 'openai_chat_completions',
+    protocolFamily: 'deepseek-openai-compatible',
+    adapterId: 'deepseek_chat_completions',
     domains: ['api.deepseek.com'],
-    defaultBaseUrl: 'https://api.deepseek.com/v1',
-    modelDiscovery: 'openai-models',
+    defaultBaseUrl: 'https://api.deepseek.com',
+    modelDiscovery: 'manual-or-openai-compatible',
     fallbackModels: ['deepseek-chat', 'deepseek-reasoner'],
   },
   {
     id: 'dashscope-openai-compatible',
     label: 'Alibaba DashScope OpenAI-Compatible',
     providerKind: 'official',
-    protocolFamily: 'openai-compatible',
+    protocolFamily: 'dashscope-openai-compatible',
     adapterId: 'openai_chat_completions',
     domains: ['dashscope.aliyuncs.com'],
     pathHints: ['/compatible-mode'],
@@ -88,7 +88,7 @@ const PROVIDER_PROFILES = [
     id: 'volcengine-ark-openai-compatible',
     label: 'Volcengine Ark OpenAI-Compatible',
     providerKind: 'official',
-    protocolFamily: 'openai-compatible',
+    protocolFamily: 'volcengine-ark-openai-compatible',
     adapterId: 'openai_chat_completions',
     domains: ['ark.cn-beijing.volces.com'],
     defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
@@ -106,9 +106,7 @@ const PROVIDER_PROFILES = [
     modelDiscovery: 'openai-models',
     strictDocs: {
       source: 'https://gpt-best.apifox.cn/llms.txt',
-      chatEndpoint: '/v1/chat/completions',
-      auth: 'Authorization: Bearer <token>',
-      notes: 'GPT-Best 文档索引声明所有对话模型兼容 OpenAI 格式，并提供 Models、OpenAI Chat、Claude 官方格式、Gemini 官方格式等 API 文档入口。',
+      notes: 'GPT-Best 文档索引声明聊天模型兼容 OpenAI 格式，并另有 Claude/Gemini/视频/绘图等独立文档；未建 contract 的任务禁止猜测执行。',
     },
   },
   {
@@ -121,22 +119,10 @@ const PROVIDER_PROFILES = [
     providerHints: ['apimart', 'API Mart', 'APIMart'],
     defaultBaseUrl: 'https://api.apimart.ai/v1',
     modelDiscovery: 'manual-or-openai-compatible',
-    fallbackModels: [
-      'gpt-5',
-      'gpt-5-mini',
-      'gpt-5-nano',
-      'claude-sonnet-4-5-20250929',
-      'claude-haiku-4-5-20251001',
-      'gemini-2.5-flash',
-      'gemini-2.5-pro',
-      'deepseek-v3.1-250821',
-    ],
+    fallbackModels: ['gpt-5', 'gpt-5-mini', 'gpt-5-nano', 'claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001', 'gemini-2.5-flash', 'gemini-2.5-pro', 'deepseek-v3.1-250821'],
     strictDocs: {
       source: 'https://docs.apimart.ai/cn',
-      chatEndpoint: '/v1/chat/completions',
-      auth: 'Authorization: Bearer <token>',
       responseEnvelope: 'APIMart examples wrap OpenAI chat response under { code, data }.',
-      defaultStream: true,
     },
   },
   {
@@ -151,14 +137,14 @@ const PROVIDER_PROFILES = [
     requiresDocsVerification: true,
     strictDocs: {
       source: 'https://doc.12ai.org/docs/api',
-      notes: '当前文档入口在抓取环境没有返回可解析的接口细节；为避免私加错误 endpoint，命中 12AI 时必须显式补充官方 endpoint/鉴权/请求体后再启用。',
+      notes: '文档入口当前未返回可解析接口细节；禁止私加 endpoint/鉴权/请求体。',
     },
   },
   {
     id: 'siliconflow-openai-compatible',
     label: 'SiliconFlow OpenAI-Compatible',
     providerKind: 'relay',
-    protocolFamily: 'openai-compatible',
+    protocolFamily: 'siliconflow-openai-compatible',
     adapterId: 'openai_chat_completions',
     domains: ['api.siliconflow.cn'],
     defaultBaseUrl: 'https://api.siliconflow.cn/v1',
@@ -178,7 +164,7 @@ const PROVIDER_PROFILES = [
     id: 'moonshot-openai-compatible',
     label: 'Moonshot OpenAI-Compatible',
     providerKind: 'official',
-    protocolFamily: 'openai-compatible',
+    protocolFamily: 'moonshot-openai-compatible',
     adapterId: 'openai_chat_completions',
     domains: ['api.moonshot.cn'],
     defaultBaseUrl: 'https://api.moonshot.cn/v1',
@@ -188,7 +174,7 @@ const PROVIDER_PROFILES = [
     id: 'zhipu-openai-compatible',
     label: 'Zhipu OpenAI-Compatible',
     providerKind: 'official',
-    protocolFamily: 'openai-compatible',
+    protocolFamily: 'zhipu-openai-compatible',
     adapterId: 'openai_chat_completions',
     domains: ['open.bigmodel.cn'],
     defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
@@ -198,7 +184,7 @@ const PROVIDER_PROFILES = [
     id: 'mistral-openai-compatible',
     label: 'Mistral Official',
     providerKind: 'official',
-    protocolFamily: 'openai-compatible',
+    protocolFamily: 'mistral-openai-compatible',
     adapterId: 'openai_chat_completions',
     domains: ['api.mistral.ai'],
     defaultBaseUrl: 'https://api.mistral.ai/v1',
@@ -208,7 +194,7 @@ const PROVIDER_PROFILES = [
     id: 'cohere-openai-compatible',
     label: 'Cohere OpenAI-Compatible',
     providerKind: 'official',
-    protocolFamily: 'openai-compatible',
+    protocolFamily: 'cohere-openai-compatible',
     adapterId: 'openai_chat_completions',
     domains: ['api.cohere.ai'],
     defaultBaseUrl: 'https://api.cohere.ai/compatibility/v1',
@@ -218,7 +204,7 @@ const PROVIDER_PROFILES = [
     id: 'ollama-openai-compatible',
     label: 'Ollama Local OpenAI-Compatible',
     providerKind: 'relay',
-    protocolFamily: 'openai-compatible',
+    protocolFamily: 'ollama-openai-compatible',
     adapterId: 'openai_chat_completions',
     domains: ['localhost', '127.0.0.1'],
     pathHints: [':11434'],
@@ -236,9 +222,9 @@ const PROVIDER_PROFILES = [
   },
   {
     id: 'wuyin-suchuang-form',
-    label: 'Wuyin/Suchuang Form API',
+    label: 'Wuyin/Suchuang Documented API',
     providerKind: 'relay',
-    protocolFamily: 'wuyin-form',
+    protocolFamily: 'wuyin-documented-multi-task',
     adapterId: 'custom_form_urlencoded',
     domains: ['wuyinkeji.com', 'api.wuyinkeji.com'],
     providerHints: ['wuyin', 'suchuang', '速创', '悟因'],
@@ -246,11 +232,11 @@ const PROVIDER_PROFILES = [
     defaultBaseUrl: 'https://api.wuyinkeji.com/api/chat/index',
     modelDiscovery: 'wuyin-catalog',
     catalogUrl: 'https://api.wuyinkeji.com/type/all',
-    fallbackModels: ['chat_index', 'image_nanoBanana2', 'image_nanoBanana', 'image_gpt', 'video_google_omni', 'audio_tts'],
+    fallbackModels: ['chat_index', 'image_nanoBanana2', 'image_nanoBanana_pro', 'image_gpt', 'video_google_omni'],
     strictDocs: {
       source: 'https://api.wuyinkeji.com/type/all',
       catalog: 'https://api.wuyinkeji.com/type/all',
-      notes: 'Wuyin/速创目录入口是产品目录，聊天接口走现有专用表单适配器；不要把它强行当成 OpenAI-compatible。',
+      notes: 'Wuyin 必须按模型文档分 task 执行：chat 走 /api/chat/index 表单；image/video 走 /api/async/<model> JSON + /api/async/detail。',
     },
   },
   {
