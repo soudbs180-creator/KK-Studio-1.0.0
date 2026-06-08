@@ -5,7 +5,7 @@
  *              并把响应归一化为统一结果。管理员系统渠道和用户自带 Key 共用这些适配器；
  *              管理员积分计费只包在外层，不影响协议执行。
  * @author KK-Studio Team
- * @version 2.3.0
+ * @version 2.4.0
  */
 
 const querystring = require('querystring');
@@ -54,6 +54,7 @@ function normalizeAdapterId(adapterIdOrType, channel = {}) {
     if (['anthropic', 'claude', 'claude_messages'].includes(explicit)) return 'anthropic_messages';
     if (['gemini', 'google_gemini', 'generate_content'].includes(explicit)) return 'google_gemini_generate_content';
     if (['apimart', 'apimart_chat', 'apimart_chat_completions'].includes(explicit)) return 'apimart_chat_completions';
+    if (['12ai', 'twelveai', '12ai_auto', 'twelveai_auto', 'twelveai_multi_protocol'].includes(explicit)) return 'twelveai_multi_protocol';
     if (['docs_pending', 'docs_pending_adapter'].includes(explicit)) return 'docs_pending_adapter';
     return explicit;
   }
@@ -78,6 +79,30 @@ function splitSystemPrompt(messages = []) {
     systemPrompt: systemMessages.map((message) => message.content).join('\n\n').trim(),
     messages: rest,
   };
+}
+
+function normalize12AIOrigin(baseUrl) {
+  let clean = String(baseUrl || 'https://cdn.12ai.org').trim().replace(/\/+$/, '');
+  clean = clean
+    .replace(/\/v1beta\/models$/i, '')
+    .replace(/\/v1\/chat\/completions$/i, '')
+    .replace(/\/v1\/messages$/i, '')
+    .replace(/\/v1$/i, '')
+    .replace(/\/v1beta$/i, '')
+    .replace(/\/+$/, '');
+  return clean || 'https://cdn.12ai.org';
+}
+
+function infer12AIProtocol(modelId, unifiedPayload = {}) {
+  const explicit = String(unifiedPayload.protocol || unifiedPayload.protocolFamily || unifiedPayload.endpointProtocol || '').trim().toLowerCase();
+  if (explicit.includes('gemini')) return 'gemini';
+  if (explicit.includes('claude') || explicit.includes('anthropic')) return 'claude';
+  if (explicit.includes('openai')) return 'openai';
+
+  const model = String(modelId || '').trim().toLowerCase();
+  if (model.startsWith('gemini-')) return 'gemini';
+  if (model.startsWith('claude-')) return 'claude';
+  return 'openai';
 }
 
 class OpenAICompatAdapter {
@@ -114,8 +139,6 @@ class OpenAICompatAdapter {
 
 class DeepSeekChatCompletionsAdapter extends OpenAICompatAdapter {
   buildRequest(provider, modelId, unifiedPayload) {
-    // DeepSeek 官方文档 OpenAI SDK base_url 是 https://api.deepseek.com，聊天路径是 /chat/completions。
-    // 这里故意不复用 normalizeBaseUrl 默认追加 /v1 的行为，避免旧 OpenAI 泛化逻辑污染 DeepSeek 官方预设。
     let baseUrl = String(provider.base_url || 'https://api.deepseek.com').trim().replace(/\/+$/, '');
     baseUrl = baseUrl
       .replace(/\/v1$/i, '')
@@ -144,14 +167,6 @@ class APIMartChatCompletionsAdapter extends OpenAICompatAdapter {
   buildRequest(provider, modelId, unifiedPayload) {
     const baseUrl = normalizeBaseUrl(provider.base_url || 'https://api.apimart.ai/v1');
     const url = `${baseUrl}/chat/completions`;
-    const bodyPayload = {
-      model: modelId,
-      messages: normalizeMessages(unifiedPayload.messages),
-      temperature: unifiedPayload.temperature ?? 0.7,
-      max_tokens: unifiedPayload.max_tokens,
-      stream: unifiedPayload.stream ?? false,
-    };
-
     return {
       url,
       method: 'POST',
@@ -159,7 +174,13 @@ class APIMartChatCompletionsAdapter extends OpenAICompatAdapter {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${provider.api_key}`,
       },
-      body: JSON.stringify(bodyPayload),
+      body: JSON.stringify({
+        model: modelId,
+        messages: normalizeMessages(unifiedPayload.messages),
+        temperature: unifiedPayload.temperature ?? 0.7,
+        max_tokens: unifiedPayload.max_tokens,
+        stream: unifiedPayload.stream ?? false,
+      }),
     };
   }
 
@@ -181,12 +202,6 @@ class AnthropicMessagesAdapter {
     const baseUrl = normalizeBaseUrl(provider.base_url || 'https://api.anthropic.com/v1');
     const url = `${baseUrl}/messages`;
     const { systemPrompt, messages } = splitSystemPrompt(unifiedPayload.messages);
-    const headers = {
-      'Content-Type': 'application/json',
-      'x-api-key': provider.api_key,
-      'anthropic-version': provider.anthropic_version || '2023-06-01',
-    };
-
     const bodyPayload = {
       model: modelId,
       messages: messages.map((message) => ({
@@ -201,7 +216,16 @@ class AnthropicMessagesAdapter {
       bodyPayload.system = systemPrompt;
     }
 
-    return { url, method: 'POST', headers, body: JSON.stringify(bodyPayload) };
+    return {
+      url,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': provider.api_key,
+        'anthropic-version': provider.anthropic_version || '2023-06-01',
+      },
+      body: JSON.stringify(bodyPayload),
+    };
   }
 
   extractContent(data) {
@@ -221,15 +245,10 @@ class GoogleGeminiGenerateContentAdapter {
     const cleanBase = baseUrl.replace(/\/+$/, '');
     const url = `${cleanBase}/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(provider.api_key)}`;
     const { systemPrompt, messages } = splitSystemPrompt(unifiedPayload.messages);
-    const headers = {
-      'Content-Type': 'application/json',
-    };
-
     const contents = messages.map((message) => ({
       role: message.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: message.content }],
     }));
-
     const bodyPayload = {
       contents,
       generationConfig: {
@@ -241,7 +260,12 @@ class GoogleGeminiGenerateContentAdapter {
       bodyPayload.systemInstruction = { parts: [{ text: systemPrompt }] };
     }
 
-    return { url, method: 'POST', headers, body: JSON.stringify(bodyPayload) };
+    return {
+      url,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bodyPayload),
+    };
   }
 
   extractContent(data) {
@@ -254,25 +278,96 @@ class GoogleGeminiGenerateContentAdapter {
   }
 }
 
+class TwelveAIMultiProtocolAdapter {
+  buildRequest(provider, modelId, unifiedPayload) {
+    const origin = normalize12AIOrigin(provider.base_url || 'https://cdn.12ai.org');
+    const protocol = infer12AIProtocol(modelId, unifiedPayload);
+
+    if (protocol === 'gemini') {
+      const gemini = new GoogleGeminiGenerateContentAdapter();
+      return gemini.buildRequest({
+        base_url: `${origin}/v1beta`,
+        api_key: provider.api_key,
+      }, modelId, unifiedPayload);
+    }
+
+    if (protocol === 'claude') {
+      const { systemPrompt, messages } = splitSystemPrompt(unifiedPayload.messages);
+      const bodyPayload = {
+        model: modelId,
+        messages: messages.map((message) => ({
+          role: message.role === 'assistant' ? 'assistant' : 'user',
+          content: message.content,
+        })),
+        max_tokens: unifiedPayload.max_tokens || 4096,
+        temperature: unifiedPayload.temperature ?? 0.7,
+        stream: unifiedPayload.stream ?? false,
+      };
+      if (systemPrompt) {
+        bodyPayload.system = systemPrompt;
+      }
+      return {
+        url: `${origin}/v1/messages`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${provider.api_key}`,
+          'anthropic-version': provider.anthropic_version || '2023-06-01',
+        },
+        body: JSON.stringify(bodyPayload),
+      };
+    }
+
+    return {
+      url: `${origin}/v1/chat/completions`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${provider.api_key}`,
+      },
+      body: JSON.stringify({
+        model: modelId,
+        messages: normalizeMessages(unifiedPayload.messages),
+        temperature: unifiedPayload.temperature ?? 0.7,
+        max_tokens: unifiedPayload.max_tokens,
+        stream: unifiedPayload.stream ?? false,
+      }),
+    };
+  }
+
+  extractContent(data) {
+    const openaiContent = data?.choices?.[0]?.message?.content
+      || data?.choices?.[0]?.delta?.content
+      || data?.output_text;
+    if (typeof openaiContent === 'string' && openaiContent.length > 0) return openaiContent;
+
+    const claudeContent = Array.isArray(data?.content)
+      ? data.content.map((item) => item?.text || '').join('').trim()
+      : data?.completion || data?.text;
+    if (typeof claudeContent === 'string' && claudeContent.length > 0) return claudeContent;
+
+    const geminiParts = data?.candidates?.[0]?.content?.parts || [];
+    const geminiContent = geminiParts.map((part) => part?.text || '').join('').trim();
+    if (geminiContent) return geminiContent;
+
+    throw new Error('12AI 文档化多协议返回空内容或非预期结构');
+  }
+}
+
 class CustomFormUrlencodedAdapter {
   buildRequest(provider, modelId, unifiedPayload) {
     const messages = normalizeMessages(unifiedPayload.messages);
     const lastUserMessage = [...messages].reverse().find(msg => msg.role === 'user');
     const content = lastUserMessage ? lastUserMessage.content : unifiedPayload.user_input || '';
-
-    const url = provider.base_url;
-    const headers = {
-      'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
-      'Authorization': provider.api_key,
+    return {
+      url: provider.base_url,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+        'Authorization': provider.api_key,
+      },
+      body: querystring.stringify({ content, model: modelId, stream: 'false' }),
     };
-
-    const body = querystring.stringify({
-      content,
-      model: modelId,
-      stream: 'false',
-    });
-
-    return { url, method: 'POST', headers, body };
   }
 
   extractContent(data) {
@@ -308,6 +403,7 @@ const adapters = {
   apimart_chat_completions: new APIMartChatCompletionsAdapter(),
   anthropic_messages: new AnthropicMessagesAdapter(),
   google_gemini_generate_content: new GoogleGeminiGenerateContentAdapter(),
+  twelveai_multi_protocol: new TwelveAIMultiProtocolAdapter(),
   custom_form_urlencoded: new CustomFormUrlencodedAdapter(),
   docs_pending_adapter: new DocsPendingAdapter(),
 };
