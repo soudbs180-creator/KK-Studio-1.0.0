@@ -3,7 +3,7 @@
  * @module server/lib/dispatcher
  * @description AI Router 通用供应商探测器。用户或管理员只需要填写 Base URL 与 Key，
  *              系统根据供应商画像库自动识别协议族、模型发现方式、推荐适配器和规范化地址。
- *              命中强预设时返回 strictContract，提示执行层禁止 generic/旧逻辑回落。
+ *              命中强预设时返回 strictContract；文档未解析的预设返回 ok=false，禁止误认为可执行。
  */
 
 const fetch = require('node-fetch');
@@ -119,7 +119,7 @@ function normalizeBaseUrlForProfile(baseUrl, profile) {
   if (profile.protocolFamily === 'gemini-native') {
     return normalizeBaseUrl(baseUrl || profile.defaultBaseUrl, { noVersionAppend: true });
   }
-  if (profile.protocolFamily === 'wuyin-form') {
+  if (profile.protocolFamily === 'wuyin-form' || profile.protocolFamily === 'wuyin-documented-multi-task') {
     const rawBaseUrl = String(baseUrl || profile.defaultBaseUrl || 'https://api.wuyinkeji.com').trim();
     let normalizedBaseUrl = rawBaseUrl.replace(/\/+$/, '');
     if (!normalizedBaseUrl.toLowerCase().includes('/api/chat/index') && !normalizedBaseUrl.toLowerCase().includes('/api/async/')) {
@@ -274,6 +274,30 @@ async function probeGeminiNative(input, profile) {
 }
 
 function probeProfileOnly(input, profile) {
+  if (profile.requiresDocsVerification || profile.adapterId === 'docs_pending_adapter') {
+    return withStrictContract({
+      ok: false,
+      confidence: 0.98,
+      providerKind: profile.providerKind || input.providerKind || 'relay',
+      adapterId: profile.adapterId || 'docs_pending_adapter',
+      requestProfileId: profile.id,
+      protocolFamily: profile.protocolFamily,
+      normalizedBaseUrl: normalizeBaseUrlForProfile(input.baseUrl, profile),
+      models: [],
+      executable: false,
+      warnings: [
+        `${profile.label || profile.id} 文档入口未返回可解析的 endpoint/鉴权/请求体/响应结构。`,
+        '该预设只允许保存为待核对状态，不允许发起任何模型请求，也不会回落 generic-openai-compatible。',
+      ],
+      diagnostics: [{
+        step: 'profile.docs_pending',
+        ok: false,
+        reason: profile.id,
+        docs: profile.strictDocs?.source || profile.strictDocs?.sources || null,
+      }],
+    }, profile);
+  }
+
   return withStrictContract({
     ok: true,
     confidence: profile.id === 'generic-openai-compatible' ? 0.6 : 0.86,
@@ -283,8 +307,8 @@ function probeProfileOnly(input, profile) {
     protocolFamily: profile.protocolFamily,
     normalizedBaseUrl: normalizeBaseUrlForProfile(input.baseUrl, profile),
     models: normalizeModelRows([], input.modelId ? [input.modelId] : profile.fallbackModels || DEFAULT_MODELS),
-    warnings: profile.protocolFamily === 'wuyin-form'
-      ? ['已识别为 Wuyin/速创强预设：聊天、图片、视频必须按各自文档 contract 执行，旧表单逻辑不得影响异步模型。']
+    warnings: profile.protocolFamily === 'wuyin-form' || profile.protocolFamily === 'wuyin-documented-multi-task'
+      ? ['已识别为 Wuyin/速创强预设：聊天、图片、视频、音频和工具必须按各自文档 contract 执行，旧表单逻辑不得影响其它模型。']
       : ['该供应商不一定支持标准 /models 接口，系统将使用画像库与手动模型候选。'],
     diagnostics: [{
       step: 'profile.match',
@@ -309,7 +333,7 @@ async function probeProvider(input) {
   }
 
   const profile = matchProviderProfile(input);
-  if (profile.protocolFamily === 'wuyin-form' || profile.modelDiscovery === 'manual') {
+  if (profile.protocolFamily === 'wuyin-form' || profile.protocolFamily === 'wuyin-documented-multi-task' || profile.modelDiscovery === 'manual') {
     return probeProfileOnly(input, profile);
   }
   if (profile.protocolFamily === 'gemini-native') {
