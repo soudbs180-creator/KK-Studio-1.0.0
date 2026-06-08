@@ -5,7 +5,7 @@
  *              并把响应归一化为统一结果。管理员系统渠道和用户自带 Key 共用这些适配器；
  *              管理员积分计费只包在外层，不影响协议执行。
  * @author KK-Studio Team
- * @version 2.0.0
+ * @version 2.2.0
  */
 
 const querystring = require('querystring');
@@ -52,6 +52,8 @@ function normalizeAdapterId(adapterIdOrType, channel = {}) {
     if (['openai_chat', 'openai_compat', 'openai-compatible', 'chat_completions'].includes(explicit)) return 'openai_chat_completions';
     if (['anthropic', 'claude', 'claude_messages'].includes(explicit)) return 'anthropic_messages';
     if (['gemini', 'google_gemini', 'generate_content'].includes(explicit)) return 'google_gemini_generate_content';
+    if (['apimart', 'apimart_chat', 'apimart_chat_completions'].includes(explicit)) return 'apimart_chat_completions';
+    if (['docs_pending', 'docs_pending_adapter'].includes(explicit)) return 'docs_pending_adapter';
     return explicit;
   }
 
@@ -104,6 +106,43 @@ class OpenAICompatAdapter {
       || data?.data?.choices?.[0]?.message?.content;
     if (typeof content !== 'string' || content.length === 0) {
       throw new Error('OpenAI 兼容协议返回空内容');
+    }
+    return content;
+  }
+}
+
+class APIMartChatCompletionsAdapter extends OpenAICompatAdapter {
+  buildRequest(provider, modelId, unifiedPayload) {
+    const baseUrl = normalizeBaseUrl(provider.base_url || 'https://api.apimart.ai/v1');
+    const url = `${baseUrl}/chat/completions`;
+    const bodyPayload = {
+      model: modelId,
+      messages: normalizeMessages(unifiedPayload.messages),
+      temperature: unifiedPayload.temperature ?? 0.7,
+      max_tokens: unifiedPayload.max_tokens,
+      stream: unifiedPayload.stream ?? false,
+    };
+
+    return {
+      url,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${provider.api_key}`,
+      },
+      body: JSON.stringify(bodyPayload),
+    };
+  }
+
+  extractContent(data) {
+    // APIMart 文档示例把 OpenAI chat completion 放在 { code, data } 外壳里。
+    const payload = data?.data && typeof data.data === 'object' ? data.data : data;
+    const content = payload?.choices?.[0]?.message?.content
+      || payload?.choices?.[0]?.delta?.content
+      || payload?.output_text;
+    if (typeof content !== 'string' || content.length === 0) {
+      const code = data?.code != null ? ` code=${data.code}` : '';
+      throw new Error(`APIMart 协议返回空内容或非预期结构。${code}`);
     }
     return content;
   }
@@ -225,11 +264,23 @@ class CustomFormUrlencodedAdapter {
   }
 }
 
+class DocsPendingAdapter {
+  buildRequest() {
+    throw new Error('该第三方预设缺少可验证的官方接口文档，AI Router 已阻止猜测式请求。请补充官方 endpoint、鉴权方式、请求体和响应结构后再启用。');
+  }
+
+  extractContent() {
+    throw new Error('该第三方预设缺少可验证的官方接口文档，无法解析响应。');
+  }
+}
+
 const adapters = {
   openai_chat_completions: new OpenAICompatAdapter(),
+  apimart_chat_completions: new APIMartChatCompletionsAdapter(),
   anthropic_messages: new AnthropicMessagesAdapter(),
   google_gemini_generate_content: new GoogleGeminiGenerateContentAdapter(),
   custom_form_urlencoded: new CustomFormUrlencodedAdapter(),
+  docs_pending_adapter: new DocsPendingAdapter(),
 };
 
 function getAdapter(adapterIdOrType, channel = {}) {
