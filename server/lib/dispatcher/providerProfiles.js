@@ -3,6 +3,7 @@
  * @module server/lib/dispatcher
  * @description AI Router 供应商画像库。画像只描述“如何识别/归类供应商”，不承载积分、用户或管理员差异。
  *              管理员系统渠道和用户自带 Key 共享这些画像；管理员只在外层增加计费与审计。
+ *              对已知第三方预设必须严格按官方文档声明的协议调用，禁止落入 generic 猜测路径。
  */
 
 function safeHostname(value) {
@@ -94,6 +95,66 @@ const PROVIDER_PROFILES = [
     modelDiscovery: 'manual-or-openai-compatible',
   },
   {
+    id: 'gpt-best-openai-compatible',
+    label: 'GPT-Best OpenAI-Compatible',
+    providerKind: 'relay',
+    protocolFamily: 'gpt-best-openai-compatible',
+    adapterId: 'openai_chat_completions',
+    domains: ['gpt-best.com', 'api.gpt-best.com', 'gpt-best.apifox.cn'],
+    providerHints: ['gpt-best', 'gptbest', 'GPT-Best'],
+    defaultBaseUrl: 'https://api.gpt-best.com/v1',
+    modelDiscovery: 'openai-models',
+    strictDocs: {
+      source: 'https://gpt-best.apifox.cn/llms.txt',
+      chatEndpoint: '/v1/chat/completions',
+      auth: 'Authorization: Bearer <token>',
+      notes: 'GPT-Best 文档索引声明所有对话模型兼容 OpenAI 格式，并提供 Models、OpenAI Chat、Claude 官方格式、Gemini 官方格式等 API 文档入口。',
+    },
+  },
+  {
+    id: 'apimart-openai-compatible',
+    label: 'APIMart OpenAI-Compatible',
+    providerKind: 'relay',
+    protocolFamily: 'apimart-openai-compatible',
+    adapterId: 'apimart_chat_completions',
+    domains: ['api.apimart.ai', 'docs.apimart.ai', 'apimart.ai'],
+    providerHints: ['apimart', 'API Mart', 'APIMart'],
+    defaultBaseUrl: 'https://api.apimart.ai/v1',
+    modelDiscovery: 'manual-or-openai-compatible',
+    fallbackModels: [
+      'gpt-5',
+      'gpt-5-mini',
+      'gpt-5-nano',
+      'claude-sonnet-4-5-20250929',
+      'claude-haiku-4-5-20251001',
+      'gemini-2.5-flash',
+      'gemini-2.5-pro',
+      'deepseek-v3.1-250821',
+    ],
+    strictDocs: {
+      source: 'https://docs.apimart.ai/cn',
+      chatEndpoint: '/v1/chat/completions',
+      auth: 'Authorization: Bearer <token>',
+      responseEnvelope: 'APIMart examples wrap OpenAI chat response under { code, data }.',
+      defaultStream: true,
+    },
+  },
+  {
+    id: '12ai-docs-pending',
+    label: '12AI Docs-Pending Preset',
+    providerKind: 'relay',
+    protocolFamily: '12ai-docs-pending',
+    adapterId: 'docs_pending_adapter',
+    domains: ['12ai.org', 'doc.12ai.org'],
+    providerHints: ['12ai', '12AI'],
+    modelDiscovery: 'manual',
+    requiresDocsVerification: true,
+    strictDocs: {
+      source: 'https://doc.12ai.org/docs/api',
+      notes: '当前文档入口在抓取环境没有返回可解析的接口细节；为避免私加错误 endpoint，命中 12AI 时必须显式补充官方 endpoint/鉴权/请求体后再启用。',
+    },
+  },
+  {
     id: 'siliconflow-openai-compatible',
     label: 'SiliconFlow OpenAI-Compatible',
     providerKind: 'relay',
@@ -179,11 +240,18 @@ const PROVIDER_PROFILES = [
     providerKind: 'relay',
     protocolFamily: 'wuyin-form',
     adapterId: 'custom_form_urlencoded',
-    domains: ['wuyinkeji.com'],
+    domains: ['wuyinkeji.com', 'api.wuyinkeji.com'],
     providerHints: ['wuyin', 'suchuang', '速创', '悟因'],
-    pathHints: ['/api/chat/index', '/api/async/'],
+    pathHints: ['/api/chat/index', '/api/async/', '/type/all'],
+    defaultBaseUrl: 'https://api.wuyinkeji.com/api/chat/index',
     modelDiscovery: 'wuyin-catalog',
+    catalogUrl: 'https://api.wuyinkeji.com/type/all',
     fallbackModels: ['chat_index', 'image_nanoBanana2', 'image_nanoBanana', 'image_gpt', 'video_google_omni', 'audio_tts'],
+    strictDocs: {
+      source: 'https://api.wuyinkeji.com/type/all',
+      catalog: 'https://api.wuyinkeji.com/type/all',
+      notes: 'Wuyin/速创目录入口是产品目录，聊天接口走现有专用表单适配器；不要把它强行当成 OpenAI-compatible。',
+    },
   },
   {
     id: 'generic-openai-compatible',
@@ -213,11 +281,11 @@ function matchProviderProfile(input = {}) {
 
   if (endpointType) {
     const byAdapter = PROVIDER_PROFILES.find((profile) => profile.adapterId === endpointType);
-    if (byAdapter && endpointType !== 'openai_chat_completions') return byAdapter;
+    if (byAdapter && !['openai_chat_completions', 'apimart_chat_completions'].includes(endpointType)) return byAdapter;
   }
 
   for (const profile of PROVIDER_PROFILES) {
-    if (Array.isArray(profile.domains) && hostname && profile.domains.some((domain) => hostname.includes(domain))) {
+    if (Array.isArray(profile.domains) && hostname && profile.domains.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`) || hostname.includes(domain))) {
       if (!profile.pathHints || includesAny(lowerBaseUrl, profile.pathHints) || !profile.pathHints.length) {
         return profile;
       }
