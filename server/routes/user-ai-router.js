@@ -5,8 +5,6 @@
  *              执行用户自己的接口。命中已知厂商强预设时，必须通过 strictProviderContracts 校验，禁止回落旧逻辑。
  */
 
-const fs = require('fs');
-const path = require('path');
 const http = require('http');
 const https = require('https');
 const express = require('express');
@@ -14,9 +12,9 @@ const fetch = require('node-fetch');
 const { verifyJWT, signJWT } = require('../lib/jwt');
 const { getAdapter, normalizeAdapterId } = require('../lib/dispatcher/adapterRegistry');
 const { assertStrictTaskSupported } = require('../lib/dispatcher/strictProviderContracts');
+const { resolveLocalUserRoute } = require('../lib/dispatcher/localUserRouteStore');
 
 const router = express.Router();
-const LOCAL_STORAGE_PATH = path.resolve(__dirname, '../../.kk-local/local-user-apis.json');
 const TEMP_USER_ID_HEADER = 'x-kk-temp-user-id';
 
 const httpAgent = new http.Agent({
@@ -62,40 +60,6 @@ function sendUserRouterError(res, req, status, code, message, extra = {}) {
   return res.status(status).json(errorEnvelope(req, code, message, extra));
 }
 
-function isObjectRecord(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function normalizeProfileState(value) {
-  const source = isObjectRecord(value) ? value : {};
-  return {
-    version: Number.parseInt(source.version, 10) || 2,
-    slots: Array.isArray(source.slots) ? source.slots : [],
-    providers: Array.isArray(source.providers) ? source.providers : [],
-    entries: Array.isArray(source.entries) ? source.entries : [],
-  };
-}
-
-function readLocalStorage() {
-  try {
-    const raw = fs.readFileSync(LOCAL_STORAGE_PATH, 'utf8');
-    const parsed = JSON.parse(raw);
-    return isObjectRecord(parsed) ? parsed : { version: 2, profiles: {} };
-  } catch {
-    return { version: 2, profiles: {} };
-  }
-}
-
-function readProfileState(data, userId) {
-  if (!isObjectRecord(data.profiles)) {
-    data.profiles = {};
-  }
-  if (isObjectRecord(data.profiles[userId])) {
-    return normalizeProfileState(data.profiles[userId]);
-  }
-  return normalizeProfileState(data);
-}
-
 function verifyRequestJwt(req) {
   const authHeader = req.headers.authorization || '';
   return verifyJWT(authHeader);
@@ -115,110 +79,6 @@ function resolveProfileUserId(req) {
   if (allowLocalTempUser && /^temp-[a-zA-Z0-9_.-]{4,128}$/.test(tempUserId)) {
     return { userId: tempUserId, refreshToken: null };
   }
-
-  return null;
-}
-
-function normalizeRouteValue(value) {
-  return String(value || '').trim().toLowerCase();
-}
-
-function normalizeProviderLinkValue(value) {
-  return String(value || '').trim().replace(/\/+$/, '').toLowerCase();
-}
-
-function resolveRouteIdCandidate(value) {
-  const decoded = (() => {
-    try {
-      return decodeURIComponent(String(value || '').trim());
-    } catch {
-      return String(value || '').trim();
-    }
-  })();
-  const normalized = decoded.toLowerCase();
-  if (normalized.startsWith('slot_key_')) return normalized.slice(5);
-  if (normalized.startsWith('slot_')) return normalized.slice(5);
-  if (normalized.startsWith('provider_')) return normalized.slice('provider_'.length);
-  return normalized;
-}
-
-function recordAliases(record) {
-  return [
-    String(record?.id || '').trim(),
-    ...(Array.isArray(record?.legacyIds) ? record.legacyIds : []),
-  ].map(normalizeRouteValue).filter(Boolean);
-}
-
-function recordMatchesRoute(record, routeTarget, rawRouteId) {
-  const aliases = recordAliases(record);
-  const name = normalizeRouteValue(record?.name);
-  return aliases.includes(routeTarget) || aliases.includes(rawRouteId) || name === routeTarget;
-}
-
-function findProviderLinkedToSlot(slot, providers) {
-  const slotBaseUrl = normalizeProviderLinkValue(slot?.baseUrl);
-  const slotKey = String(slot?.key || '').trim();
-  const slotName = normalizeRouteValue(slot?.name);
-
-  const strongMatch = providers.find((provider) => {
-    const providerBaseUrl = normalizeProviderLinkValue(provider?.baseUrl);
-    if (!providerBaseUrl || providerBaseUrl !== slotBaseUrl) return false;
-    const providerKey = String(provider?.apiKey || '').trim();
-    const providerName = normalizeRouteValue(provider?.name);
-    return (slotKey && providerKey && slotKey === providerKey) || (slotName && providerName && slotName === providerName);
-  });
-  if (strongMatch) return strongMatch;
-
-  const sameBaseProviders = providers.filter((provider) => (
-    slotBaseUrl && normalizeProviderLinkValue(provider?.baseUrl) === slotBaseUrl
-  ));
-  return sameBaseProviders.length === 1 ? sameBaseProviders[0] : null;
-}
-
-function buildRouteFromProvider(provider) {
-  return {
-    id: String(provider?.id || '').trim(),
-    legacyIds: Array.isArray(provider?.legacyIds) ? provider.legacyIds : [],
-    name: String(provider?.name || '').trim(),
-    baseUrl: String(provider?.baseUrl || '').trim(),
-    apiKey: String(provider?.apiKey || '').trim(),
-    models: Array.isArray(provider?.models) ? provider.models : [],
-    format: String(provider?.format || 'auto').trim() || 'auto',
-    endpointType: String(provider?.endpointType || provider?.adapterId || '').trim(),
-    requestProfileId: String(provider?.requestProfileId || provider?.profileId || '').trim(),
-  };
-}
-
-function buildRouteFromSlot(slot, providers) {
-  const linkedProvider = findProviderLinkedToSlot(slot, providers);
-  return {
-    id: String(slot?.id || '').trim(),
-    legacyIds: Array.isArray(slot?.legacyIds) ? slot.legacyIds : [],
-    name: String(linkedProvider?.name || slot?.name || '').trim(),
-    baseUrl: String(linkedProvider?.baseUrl || slot?.baseUrl || '').trim(),
-    apiKey: String(linkedProvider?.apiKey || slot?.key || '').trim(),
-    models: Array.isArray(linkedProvider?.models)
-      ? linkedProvider.models
-      : Array.isArray(slot?.supportedModels)
-        ? slot.supportedModels
-        : [],
-    format: String(linkedProvider?.format || slot?.format || 'auto').trim() || 'auto',
-    endpointType: String(linkedProvider?.endpointType || slot?.endpointType || linkedProvider?.adapterId || '').trim(),
-    requestProfileId: String(linkedProvider?.requestProfileId || slot?.requestProfileId || linkedProvider?.profileId || '').trim(),
-  };
-}
-
-function resolveLocalUserRoute(profileState, routeId) {
-  const routeTarget = resolveRouteIdCandidate(routeId);
-  const rawRouteId = String(routeId || '').trim().toLowerCase();
-  const providers = Array.isArray(profileState.providers) ? profileState.providers : [];
-  const slots = Array.isArray(profileState.slots) ? profileState.slots : [];
-
-  const provider = providers.find((item) => recordMatchesRoute(item, routeTarget, rawRouteId));
-  if (provider) return buildRouteFromProvider(provider);
-
-  const slot = slots.find((item) => recordMatchesRoute(item, routeTarget, rawRouteId));
-  if (slot) return buildRouteFromSlot(slot, providers);
 
   return null;
 }
@@ -279,9 +139,9 @@ function enforceStrictContract(req, res, { profileId, taskType, adapterId, model
   }
 }
 
-async function handleUnifiedUserChatMode(req, res, profileState) {
+async function handleUnifiedUserChatMode(req, res, userId) {
   const routeId = String(req.body?.routeId || req.headers['x-key-slot-id'] || '').trim();
-  const route = resolveLocalUserRoute(profileState, routeId);
+  const route = await resolveLocalUserRoute(userId, routeId);
   if (!route) {
     return sendUserRouterError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'User API route was not found.');
   }
@@ -411,9 +271,7 @@ router.all('/v1/model-proxy/user', async (req, res, next) => {
     res.setHeader('X-Refresh-Token', authState.refreshToken);
   }
 
-  const data = readLocalStorage();
-  const profileState = readProfileState(data, authState.userId);
-  return handleUnifiedUserChatMode(req, res, profileState);
+  return handleUnifiedUserChatMode(req, res, authState.userId);
 });
 
 module.exports = router;
