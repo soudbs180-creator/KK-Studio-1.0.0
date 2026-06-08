@@ -341,6 +341,7 @@ export function AITakeoverProvider({
   const activeCanvasRef = useRef(activeCanvas);
   const selectedModelRef = useRef(selectedModel);
   const addPromptNodeRef = useRef(addPromptNode);
+  const updatePromptNodeRef = useRef(updatePromptNode);
   const updateNodesRef = useRef(updateNodes);
   const executeGenerationRef = useRef(executeGeneration);
   const getNextCardPositionRef = useRef(getNextCardPosition);
@@ -353,6 +354,7 @@ export function AITakeoverProvider({
     activeCanvasRef.current = activeCanvas;
     selectedModelRef.current = selectedModel;
     addPromptNodeRef.current = addPromptNode;
+    updatePromptNodeRef.current = updatePromptNode;
     updateNodesRef.current = updateNodes;
     executeGenerationRef.current = executeGeneration;
     getNextCardPositionRef.current = getNextCardPosition;
@@ -368,7 +370,10 @@ export function AITakeoverProvider({
       const lastPos = getNextCardPositionRef.current();
       const job = durableGenerationQueue.getJob(jobId);
       const index = job ? job.prompts.findIndex(p => p.id === promptId) : 0;
-      const pos = {
+      const strayDraft = activeCanvasRef.current?.promptNodes?.find((node: any) => node.isDraft);
+      const useDraft = index === 0 && strayDraft;
+      const nodeId = useDraft ? strayDraft.id : ('takeover_batch_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9));
+      const pos = useDraft ? strayDraft.position : {
         x: lastPos.x + (index >= 0 ? index : 0) * 420,
         y: lastPos.y
       };
@@ -394,9 +399,8 @@ export function AITakeoverProvider({
         }
       }
 
-      const nodeId = 'takeover_batch_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
       const tags = ['automation', 'batch:' + jobId];
-      const newNode = {
+      const nodeData = {
         id: nodeId,
         prompt: promptText,
         position: pos,
@@ -409,17 +413,29 @@ export function AITakeoverProvider({
         timestamp: Date.now(),
         parallelCount: options.countPerPrompt || 1,
         isGenerating: true,
+        isDraft: false,
         status: 'queued',
         referenceImages,
         tags
       };
 
-      // 1. 先把准备执行生成的 prompt 节点加入画布
-      await addPromptNodeRef.current(newNode);
+      // 1. 先把准备执行生成的 prompt 节点加入或更新到画布
+      if (useDraft) {
+        console.log('[TakeoverQueue] Found stray draft during queue generation, converting it:', strayDraft.id);
+        await updatePromptNodeRef.current({
+          ...strayDraft,
+          ...nodeData
+        });
+        setConfig((prev: any) => ({ ...prev, prompt: '', referenceImages: [] }));
+      } else {
+        console.log('[TakeoverQueue] Creating new node for queue generation:', nodeId);
+        await addPromptNodeRef.current(nodeData);
+      }
 
       // 2. 拉起真正的生成逻辑 (由 useImageGeneration hook 承担)
       await executeGenerationRef.current({
-        ...newNode,
+        ...(useDraft ? strayDraft : {}),
+        ...nodeData,
         isGenerating: true,
         status: 'idle'
       });
