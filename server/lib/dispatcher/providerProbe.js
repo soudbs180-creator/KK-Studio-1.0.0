@@ -3,11 +3,13 @@
  * @module server/lib/dispatcher
  * @description AI Router 通用供应商探测器。用户或管理员只需要填写 Base URL 与 Key，
  *              系统根据供应商画像库自动识别协议族、模型发现方式、推荐适配器和规范化地址。
+ *              命中强预设时返回 strictContract，提示执行层禁止 generic/旧逻辑回落。
  */
 
 const fetch = require('node-fetch');
 const { normalizeBaseUrl } = require('./adapterRegistry');
 const { matchProviderProfile } = require('./providerProfiles');
+const { getStrictProviderContract } = require('./strictProviderContracts');
 
 const PROBE_TIMEOUT_MS = 12000;
 const DEFAULT_MODELS = ['gpt-4o-mini', 'gpt-4o', 'chat_index'];
@@ -58,6 +60,31 @@ function normalizeModelRows(rows, fallbackModels = []) {
     id,
     displayName: id,
   }));
+}
+
+function withStrictContract(result, profile) {
+  const contract = getStrictProviderContract(profile.id);
+  if (!contract) return result;
+  return {
+    ...result,
+    strictContract: {
+      providerId: contract.providerId,
+      displayName: contract.displayName,
+      docs: contract.docs,
+      allowGenericFallback: Boolean(contract.allowGenericFallback),
+      requiresDocsVerification: Boolean(contract.requiresDocsVerification),
+      supportedTasks: Object.keys(contract.supportedTasks || {}),
+    },
+    warnings: [
+      ...(result.warnings || []),
+      contract.allowGenericFallback === false
+        ? `${contract.displayName} 已命中强预设：执行时只允许使用官方文档 contract，不允许回落 generic/旧逻辑。`
+        : '',
+      contract.requiresDocsVerification
+        ? `${contract.displayName} 文档未核对完整，已禁止猜测式请求。`
+        : '',
+    ].filter(Boolean),
+  };
 }
 
 async function fetchJson(url, options) {
@@ -141,7 +168,7 @@ async function probeOpenAICompatible(input, profile) {
           ? response.data.models
           : [];
       const models = normalizeModelRows(modelRows, input.modelId ? [input.modelId] : profile.fallbackModels || []);
-      return {
+      return withStrictContract({
         ok: true,
         confidence: models.length > 0 ? 0.93 : 0.78,
         providerKind: profile.providerKind || input.providerKind || 'relay',
@@ -152,11 +179,11 @@ async function probeOpenAICompatible(input, profile) {
         models,
         warnings,
         diagnostics,
-      };
+      }, profile);
     }
 
     if (response.status === 401 || response.status === 403) {
-      return {
+      return withStrictContract({
         ok: false,
         confidence: 0.75,
         providerKind: profile.providerKind || input.providerKind || 'relay',
@@ -167,7 +194,7 @@ async function probeOpenAICompatible(input, profile) {
         models: normalizeModelRows([], input.modelId ? [input.modelId] : profile.fallbackModels || DEFAULT_MODELS),
         warnings: [`模型列表接口鉴权失败 (${response.status})，请检查 API Key。`],
         diagnostics,
-      };
+      }, profile);
     }
 
     warnings.push(`模型列表接口不可用 (${response.status})，将按 ${profile.label || profile.id} 继续配置。`);
@@ -181,7 +208,7 @@ async function probeOpenAICompatible(input, profile) {
     });
   }
 
-  return {
+  return withStrictContract({
     ok: true,
     confidence: profile.id === 'generic-openai-compatible' ? 0.62 : 0.82,
     providerKind: profile.providerKind || input.providerKind || 'relay',
@@ -192,7 +219,7 @@ async function probeOpenAICompatible(input, profile) {
     models: normalizeModelRows([], input.modelId ? [input.modelId] : profile.fallbackModels || DEFAULT_MODELS),
     warnings,
     diagnostics,
-  };
+  }, profile);
 }
 
 async function probeGeminiNative(input, profile) {
@@ -213,7 +240,7 @@ async function probeGeminiNative(input, profile) {
         modelRows.map((row) => ({ id: String(row.name || '').replace(/^models\//, '') })),
         input.modelId ? [input.modelId] : profile.fallbackModels || []
       );
-      return {
+      return withStrictContract({
         ok: true,
         confidence: 0.92,
         providerKind: profile.providerKind,
@@ -224,7 +251,7 @@ async function probeGeminiNative(input, profile) {
         models,
         warnings,
         diagnostics,
-      };
+      }, profile);
     }
     warnings.push(`Gemini 模型列表不可用 (${response.status})，将使用内置模型候选。`);
   } catch (error) {
@@ -232,7 +259,7 @@ async function probeGeminiNative(input, profile) {
     diagnostics.push({ step: `${profile.id}.models`, url: redactUrl(modelsUrl), ok: false, error: error.name === 'AbortError' ? 'timeout' : error.message });
   }
 
-  return {
+  return withStrictContract({
     ok: true,
     confidence: 0.78,
     providerKind: profile.providerKind,
@@ -243,11 +270,11 @@ async function probeGeminiNative(input, profile) {
     models: normalizeModelRows([], input.modelId ? [input.modelId] : profile.fallbackModels || []),
     warnings,
     diagnostics,
-  };
+  }, profile);
 }
 
 function probeProfileOnly(input, profile) {
-  return {
+  return withStrictContract({
     ok: true,
     confidence: profile.id === 'generic-openai-compatible' ? 0.6 : 0.86,
     providerKind: profile.providerKind || input.providerKind || 'relay',
@@ -257,14 +284,14 @@ function probeProfileOnly(input, profile) {
     normalizedBaseUrl: normalizeBaseUrlForProfile(input.baseUrl, profile),
     models: normalizeModelRows([], input.modelId ? [input.modelId] : profile.fallbackModels || DEFAULT_MODELS),
     warnings: profile.protocolFamily === 'wuyin-form'
-      ? ['已识别为速创/悟因类非标准协议，系统会自动使用表单适配器，不需要用户手动选择接口类型。']
+      ? ['已识别为 Wuyin/速创强预设：聊天、图片、视频必须按各自文档 contract 执行，旧表单逻辑不得影响异步模型。']
       : ['该供应商不一定支持标准 /models 接口，系统将使用画像库与手动模型候选。'],
     diagnostics: [{
       step: 'profile.match',
       ok: true,
       reason: profile.id,
     }],
-  };
+  }, profile);
 }
 
 async function probeProvider(input) {
