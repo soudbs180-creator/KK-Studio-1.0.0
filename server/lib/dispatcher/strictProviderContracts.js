@@ -31,6 +31,19 @@ function openAIChatContract({
   };
 }
 
+function wuyinTaskContract(category, adapterId = 'wuyin_documented_task') {
+  const products = listWuyinProducts({ includeDisabled: false }).filter((item) => item.category === category);
+  return {
+    adapterId,
+    method: 'POST',
+    auth: 'Authorization header + ?key=<token> when documented',
+    contentType: 'per model document',
+    models: products.map((item) => item.id),
+    docs: products.map((item) => item.docUrl),
+    resultEndpoint: 'per model document',
+  };
+}
+
 const STRICT_PROVIDER_CONTRACTS = {
   'openai-official': {
     providerId: 'openai-official',
@@ -38,16 +51,8 @@ const STRICT_PROVIDER_CONTRACTS = {
     docs: ['https://developers.openai.com/api/reference/resources/chat'],
     allowGenericFallback: false,
     supportedTasks: {
-      chat: openAIChatContract({
-        baseUrl: 'https://api.openai.com/v1',
-        endpoint: '/chat/completions',
-      }),
-      models: {
-        method: 'GET',
-        baseUrl: 'https://api.openai.com/v1',
-        endpoint: '/models',
-        auth: 'Authorization: Bearer <token>',
-      },
+      chat: openAIChatContract({ baseUrl: 'https://api.openai.com/v1', endpoint: '/chat/completions' }),
+      models: { method: 'GET', baseUrl: 'https://api.openai.com/v1', endpoint: '/models', auth: 'Authorization: Bearer <token>' },
     },
   },
   'anthropic-official': {
@@ -114,36 +119,21 @@ const STRICT_PROVIDER_CONTRACTS = {
     displayName: 'Alibaba DashScope OpenAI-Compatible',
     docs: ['https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope'],
     allowGenericFallback: false,
-    supportedTasks: {
-      chat: openAIChatContract({
-        baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-        endpoint: '/chat/completions',
-      }),
-    },
+    supportedTasks: { chat: openAIChatContract({ baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', endpoint: '/chat/completions' }) },
   },
   'volcengine-ark-openai-compatible': {
     providerId: 'volcengine-ark-openai-compatible',
     displayName: 'Volcengine Ark OpenAI-Compatible',
     docs: ['https://www.volcengine.com/docs/82379/1099475'],
     allowGenericFallback: false,
-    supportedTasks: {
-      chat: openAIChatContract({
-        baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-        endpoint: '/chat/completions',
-      }),
-    },
+    supportedTasks: { chat: openAIChatContract({ baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', endpoint: '/chat/completions' }) },
   },
   'siliconflow-openai-compatible': {
     providerId: 'siliconflow-openai-compatible',
     displayName: 'SiliconFlow OpenAI-Compatible',
     docs: ['https://docs.siliconflow.cn/en/api-reference/chat-completions/chat-completions'],
     allowGenericFallback: false,
-    supportedTasks: {
-      chat: openAIChatContract({
-        baseUrl: 'https://api.siliconflow.cn/v1',
-        endpoint: '/chat/completions',
-      }),
-    },
+    supportedTasks: { chat: openAIChatContract({ baseUrl: 'https://api.siliconflow.cn/v1', endpoint: '/chat/completions' }) },
   },
   'openrouter-openai-compatible': {
     providerId: 'openrouter-openai-compatible',
@@ -151,11 +141,7 @@ const STRICT_PROVIDER_CONTRACTS = {
     docs: ['https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request'],
     allowGenericFallback: false,
     supportedTasks: {
-      chat: openAIChatContract({
-        baseUrl: 'https://openrouter.ai/api/v1',
-        endpoint: '/chat/completions',
-        responseShape: 'OpenAI-compatible chat completion with optional openrouter_metadata',
-      }),
+      chat: openAIChatContract({ baseUrl: 'https://openrouter.ai/api/v1', endpoint: '/chat/completions', responseShape: 'OpenAI-compatible chat completion with optional openrouter_metadata' }),
     },
   },
   'moonshot-openai-compatible': {
@@ -163,36 +149,28 @@ const STRICT_PROVIDER_CONTRACTS = {
     displayName: 'Moonshot OpenAI-Compatible',
     docs: ['https://platform.moonshot.cn/docs/api-reference'],
     allowGenericFallback: false,
-    supportedTasks: {
-      chat: openAIChatContract({ baseUrl: 'https://api.moonshot.cn/v1', endpoint: '/chat/completions' }),
-    },
+    supportedTasks: { chat: openAIChatContract({ baseUrl: 'https://api.moonshot.cn/v1', endpoint: '/chat/completions' }) },
   },
   'zhipu-openai-compatible': {
     providerId: 'zhipu-openai-compatible',
     displayName: 'Zhipu OpenAI-Compatible',
     docs: ['https://open.bigmodel.cn/dev/api/normal-model/glm-4'],
     allowGenericFallback: false,
-    supportedTasks: {
-      chat: openAIChatContract({ baseUrl: 'https://open.bigmodel.cn/api/paas/v4', endpoint: '/chat/completions' }),
-    },
+    supportedTasks: { chat: openAIChatContract({ baseUrl: 'https://open.bigmodel.cn/api/paas/v4', endpoint: '/chat/completions' }) },
   },
   'mistral-openai-compatible': {
     providerId: 'mistral-openai-compatible',
     displayName: 'Mistral Official',
     docs: ['https://docs.mistral.ai/api/'],
     allowGenericFallback: false,
-    supportedTasks: {
-      chat: openAIChatContract({ baseUrl: 'https://api.mistral.ai/v1', endpoint: '/chat/completions' }),
-    },
+    supportedTasks: { chat: openAIChatContract({ baseUrl: 'https://api.mistral.ai/v1', endpoint: '/chat/completions' }) },
   },
   'cohere-openai-compatible': {
     providerId: 'cohere-openai-compatible',
     displayName: 'Cohere OpenAI-Compatible',
     docs: ['https://docs.cohere.com/v2/docs/compatibility-api'],
     allowGenericFallback: false,
-    supportedTasks: {
-      chat: openAIChatContract({ baseUrl: 'https://api.cohere.ai/compatibility/v1', endpoint: '/chat/completions' }),
-    },
+    supportedTasks: { chat: openAIChatContract({ baseUrl: 'https://api.cohere.ai/compatibility/v1', endpoint: '/chat/completions' }) },
   },
   'gpt-best-openai-compatible': {
     providerId: 'gpt-best-openai-compatible',
@@ -200,16 +178,8 @@ const STRICT_PROVIDER_CONTRACTS = {
     docs: ['https://gpt-best.apifox.cn/llms.txt'],
     allowGenericFallback: false,
     supportedTasks: {
-      chat: openAIChatContract({
-        baseUrl: 'https://api.gpt-best.com/v1',
-        endpoint: '/chat/completions',
-        docs: ['https://gpt-best.apifox.cn/llms.txt'],
-      }),
-      models: {
-        method: 'GET',
-        endpoint: '/models',
-        auth: 'Authorization: Bearer <token>',
-      },
+      chat: openAIChatContract({ baseUrl: 'https://api.gpt-best.com/v1', endpoint: '/chat/completions', docs: ['https://gpt-best.apifox.cn/llms.txt'] }),
+      models: { method: 'GET', endpoint: '/models', auth: 'Authorization: Bearer <token>' },
     },
   },
   'apimart-openai-compatible': {
@@ -218,25 +188,13 @@ const STRICT_PROVIDER_CONTRACTS = {
     docs: ['https://docs.apimart.ai/cn'],
     allowGenericFallback: false,
     supportedTasks: {
-      chat: openAIChatContract({
-        adapterId: 'apimart_chat_completions',
-        baseUrl: 'https://api.apimart.ai/v1',
-        endpoint: '/chat/completions',
-        responseShape: '{ code, data: OpenAI-compatible chat completion }',
-      }),
+      chat: openAIChatContract({ adapterId: 'apimart_chat_completions', baseUrl: 'https://api.apimart.ai/v1', endpoint: '/chat/completions', responseShape: '{ code, data: OpenAI-compatible chat completion }' }),
     },
   },
   'wuyin-suchuang-form': {
     providerId: 'wuyin-suchuang-form',
     displayName: 'Wuyin / 速创',
-    docs: [
-      'https://api.wuyinkeji.com/type/all',
-      'https://api.wuyinkeji.com/doc/65',
-      'https://api.wuyinkeji.com/doc/55',
-      'https://api.wuyinkeji.com/doc/53',
-      'https://api.wuyinkeji.com/doc/72',
-      'https://api.wuyinkeji.com/doc/47',
-    ],
+    docs: ['https://api.wuyinkeji.com/type/all', ...listWuyinProducts({ includeDisabled: true }).map((item) => item.docUrl)],
     allowGenericFallback: false,
     supportedTasks: {
       chat: {
@@ -248,24 +206,10 @@ const STRICT_PROVIDER_CONTRACTS = {
         fields: ['content', 'model', 'stream', 'image_url'],
         note: '仅限聊天旧接口。image/video/audio 不允许走该 adapter。',
       },
-      image: {
-        adapterId: 'wuyin_async_task',
-        method: 'POST',
-        endpointPattern: '/api/async/<modelId>',
-        auth: 'Authorization header + ?key=<token>',
-        contentType: 'application/json',
-        models: listWuyinProducts().filter((item) => item.category === 'image').map((item) => item.id),
-        resultEndpoint: '/api/async/detail?id=<taskId>',
-      },
-      video: {
-        adapterId: 'wuyin_async_task',
-        method: 'POST',
-        endpointPattern: '/api/async/<modelId>',
-        auth: 'Authorization header + ?key=<token>',
-        contentType: 'application/json',
-        models: listWuyinProducts().filter((item) => item.category === 'video').map((item) => item.id),
-        resultEndpoint: '/api/async/detail?id=<taskId>',
-      },
+      image: wuyinTaskContract('image'),
+      video: wuyinTaskContract('video'),
+      audio: wuyinTaskContract('audio'),
+      utility: wuyinTaskContract('utility'),
     },
   },
   '12ai-docs-pending': {
@@ -307,12 +251,7 @@ function assertStrictTaskSupported(profileId, taskType, options = {}) {
     const error = new Error(`${contract.displayName} 预设未声明 ${resolvedTaskType} 任务，AI Router 已阻止 generic/旧逻辑回落。请先按官方文档补充 contract。`);
     error.code = 'STRICT_PROVIDER_TASK_NOT_SUPPORTED';
     error.statusCode = 400;
-    error.route = {
-      profileId,
-      taskType: resolvedTaskType,
-      originalTaskType: taskType,
-      docs: contract.docs,
-    };
+    error.route = { profileId, taskType: resolvedTaskType, originalTaskType: taskType, docs: contract.docs };
     throw error;
   }
 
@@ -321,13 +260,7 @@ function assertStrictTaskSupported(profileId, taskType, options = {}) {
     const error = new Error(`${contract.displayName} 预设未声明模型 ${modelId} 可用于 ${resolvedTaskType}，AI Router 已阻止猜测式请求。`);
     error.code = 'STRICT_PROVIDER_MODEL_NOT_SUPPORTED';
     error.statusCode = 400;
-    error.route = {
-      profileId,
-      taskType: resolvedTaskType,
-      modelId,
-      allowedModels: task.models,
-      docs: contract.docs,
-    };
+    error.route = { profileId, taskType: resolvedTaskType, modelId, allowedModels: task.models, docs: contract.docs };
     throw error;
   }
 
