@@ -186,6 +186,39 @@ function normalizeModelsFromProbe(result, fallbackModels) {
   return Array.from(new Set([...probed, ...fallback]));
 }
 
+function normalizeEntryForResponse(entry) {
+  const now = Date.now();
+  const record = isObjectRecord(entry) ? entry : {};
+  return {
+    id: String(record.id || '').trim(),
+    key: String(record.key || ''),
+    name: String(record.name || record.provider || 'Custom Key').trim(),
+    provider: String(record.provider || 'Custom').trim(),
+    type: ['official', 'proxy', 'third-party'].includes(record.type) ? record.type : 'third-party',
+    format: ['gemini', 'openai', 'auto', 'claude'].includes(record.format) ? record.format : 'auto',
+    baseUrl: String(record.baseUrl || record.base_url || '').trim() || undefined,
+    supportedModels: Array.isArray(record.supportedModels) ? record.supportedModels.map((model) => String(model || '').trim()).filter(Boolean) : [],
+    disabled: Boolean(record.disabled),
+    createdAt: Number(record.createdAt || record.created_at || now),
+    updatedAt: Number(record.updatedAt || record.updated_at || now),
+    status: ['valid', 'invalid', 'rate_limited', 'unknown'].includes(record.status) ? record.status : 'unknown',
+    failCount: Number(record.failCount || record.fail_count || 0),
+    successCount: Number(record.successCount || record.success_count || 0),
+    totalCost: Number(record.totalCost || record.total_cost || 0),
+    budgetLimit: Number.isFinite(Number(record.budgetLimit ?? record.budget_limit)) ? Number(record.budgetLimit ?? record.budget_limit) : -1,
+    tokenLimit: Number.isFinite(Number(record.tokenLimit ?? record.token_limit)) ? Number(record.tokenLimit ?? record.token_limit) : -1,
+    usedTokens: Number(record.usedTokens || record.used_tokens || 0),
+    lastUsed: record.lastUsed == null && record.last_used == null ? null : Number(record.lastUsed ?? record.last_used),
+    lastError: record.lastError == null && record.last_error == null ? null : String(record.lastError ?? record.last_error),
+    endpointType: record.endpointType || record.adapterId,
+    adapterId: record.adapterId || record.endpointType,
+    requestProfileId: record.requestProfileId,
+    protocolFamily: record.protocolFamily,
+    routeStrategy: record.routeStrategy,
+    aiRouterProbe: record.aiRouterProbe,
+  };
+}
+
 async function enrichApiRecord(record, ownerKind) {
   if (!isObjectRecord(record)) {
     return record;
@@ -289,36 +322,46 @@ async function enrichProfileState(profileState) {
   };
 }
 
-router.put(['/v1/profile/key-manager', '/v1/profile/key-manager-state'], requireProfileAuth, async (req, res) => {
-  const nextData = {
+function readPayloadFromRequest(req) {
+  return {
     version: req.body.version || 2,
     slots: req.body.slots || [],
     providers: req.body.providers || [],
     entries: req.body.entries || [],
   };
+}
 
+function saveEnrichedProfile(req, profileState) {
   const data = readLocalStorage();
-  const enriched = await enrichProfileState(nextData);
-  writeProfileState(data, req.profileUserId, enriched);
+  writeProfileState(data, req.profileUserId, profileState);
   writeLocalStorage(data);
+}
 
+router.put(['/v1/profile/key-manager', '/v1/profile/key-manager-state'], requireProfileAuth, async (req, res) => {
+  const enriched = await enrichProfileState(readPayloadFromRequest(req));
+  saveEnrichedProfile(req, enriched);
   return res.json(okEnvelope(enriched, req));
 });
 
-router.put(['/v1/profile/user-apis', '/v1/profile/user-apis/payload'], requireProfileAuth, async (req, res) => {
+router.put('/v1/profile/user-apis/payload', requireProfileAuth, async (req, res) => {
+  const enriched = await enrichProfileState(readPayloadFromRequest(req));
+  saveEnrichedProfile(req, enriched);
+  return res.json(okEnvelope(enriched, req));
+});
+
+router.put('/v1/profile/user-apis', requireProfileAuth, async (req, res) => {
+  const data = readLocalStorage();
+  const profileState = readProfileState(data, req.profileUserId);
   const nextData = {
-    version: req.body.version || 2,
-    slots: req.body.slots || [],
-    providers: req.body.providers || [],
+    ...profileState,
     entries: req.body.entries || [],
   };
 
-  const data = readLocalStorage();
   const enriched = await enrichProfileState(nextData);
   writeProfileState(data, req.profileUserId, enriched);
   writeLocalStorage(data);
 
-  return res.json(okEnvelope(enriched, req));
+  return res.json(okEnvelope({ entries: enriched.entries.map(normalizeEntryForResponse) }, req));
 });
 
 router.post('/v1/profile/user-apis', requireProfileAuth, async (req, res) => {
@@ -333,7 +376,7 @@ router.post('/v1/profile/user-apis', requireProfileAuth, async (req, res) => {
   writeProfileState(data, req.profileUserId, enriched);
   writeLocalStorage(data);
 
-  return res.json(okEnvelope({ entries: enriched.entries }, req));
+  return res.json(okEnvelope({ entries: enriched.entries.map(normalizeEntryForResponse) }, req));
 });
 
 module.exports = router;
