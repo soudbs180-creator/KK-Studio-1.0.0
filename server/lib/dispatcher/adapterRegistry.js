@@ -5,7 +5,7 @@
  *              并把响应归一化为统一结果。管理员系统渠道和用户自带 Key 共用这些适配器；
  *              管理员积分计费只包在外层，不影响协议执行。
  * @author KK-Studio Team
- * @version 2.2.0
+ * @version 2.3.0
  */
 
 const querystring = require('querystring');
@@ -50,6 +50,7 @@ function normalizeAdapterId(adapterIdOrType, channel = {}) {
   if (explicit && !['auto', 'default', 'openai'].includes(explicit)) {
     if (['custom_form', 'form', 'wuyin_form', 'suchuang_form'].includes(explicit)) return 'custom_form_urlencoded';
     if (['openai_chat', 'openai_compat', 'openai-compatible', 'chat_completions'].includes(explicit)) return 'openai_chat_completions';
+    if (['deepseek', 'deepseek_chat', 'deepseek_chat_completions'].includes(explicit)) return 'deepseek_chat_completions';
     if (['anthropic', 'claude', 'claude_messages'].includes(explicit)) return 'anthropic_messages';
     if (['gemini', 'google_gemini', 'generate_content'].includes(explicit)) return 'google_gemini_generate_content';
     if (['apimart', 'apimart_chat', 'apimart_chat_completions'].includes(explicit)) return 'apimart_chat_completions';
@@ -111,6 +112,34 @@ class OpenAICompatAdapter {
   }
 }
 
+class DeepSeekChatCompletionsAdapter extends OpenAICompatAdapter {
+  buildRequest(provider, modelId, unifiedPayload) {
+    // DeepSeek 官方文档 OpenAI SDK base_url 是 https://api.deepseek.com，聊天路径是 /chat/completions。
+    // 这里故意不复用 normalizeBaseUrl 默认追加 /v1 的行为，避免旧 OpenAI 泛化逻辑污染 DeepSeek 官方预设。
+    let baseUrl = String(provider.base_url || 'https://api.deepseek.com').trim().replace(/\/+$/, '');
+    baseUrl = baseUrl
+      .replace(/\/v1$/i, '')
+      .replace(/\/chat\/completions$/i, '')
+      .replace(/\/+$/, '');
+    const url = `${baseUrl}/chat/completions`;
+    return {
+      url,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${provider.api_key}`,
+      },
+      body: JSON.stringify({
+        model: modelId,
+        messages: normalizeMessages(unifiedPayload.messages),
+        temperature: unifiedPayload.temperature ?? 0.7,
+        max_tokens: unifiedPayload.max_tokens,
+        stream: unifiedPayload.stream ?? false,
+      }),
+    };
+  }
+}
+
 class APIMartChatCompletionsAdapter extends OpenAICompatAdapter {
   buildRequest(provider, modelId, unifiedPayload) {
     const baseUrl = normalizeBaseUrl(provider.base_url || 'https://api.apimart.ai/v1');
@@ -135,7 +164,6 @@ class APIMartChatCompletionsAdapter extends OpenAICompatAdapter {
   }
 
   extractContent(data) {
-    // APIMart 文档示例把 OpenAI chat completion 放在 { code, data } 外壳里。
     const payload = data?.data && typeof data.data === 'object' ? data.data : data;
     const content = payload?.choices?.[0]?.message?.content
       || payload?.choices?.[0]?.delta?.content
@@ -276,6 +304,7 @@ class DocsPendingAdapter {
 
 const adapters = {
   openai_chat_completions: new OpenAICompatAdapter(),
+  deepseek_chat_completions: new DeepSeekChatCompletionsAdapter(),
   apimart_chat_completions: new APIMartChatCompletionsAdapter(),
   anthropic_messages: new AnthropicMessagesAdapter(),
   google_gemini_generate_content: new GoogleGeminiGenerateContentAdapter(),
