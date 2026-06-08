@@ -1,15 +1,22 @@
 /**
  * @file suchuangProvider.js
- * @description 独立的速创 API Provider。支持文本 (Form-urlencoded)、生图、生视频、音频等原生协议。
- * 密钥只在 Authorization 请求头传输，不进行 URL query 拼接。
+ * @description Wuyin/速创 API Provider。严格按 Wuyin 官方文档调用：
+ * - 图像/视频异步任务：POST /api/async/<model>，Content-Type: application/json
+ * - 鉴权：Authorization header，同时按文档在 query 里传 key
+ * - 查询结果：GET /api/async/detail?id=...，状态 0/1/2/3
+ * - 模型 endpoint 和参数约束来自 server/lib/dispatcher/wuyinProducts.js
  */
 
 const { buildGatewayUrl, getGatewayBaseUrl } = require('../utils/apiGatewayConfig');
+const {
+  WUYIN_ASYNC_DETAIL_ENDPOINT,
+  getWuyinProduct,
+} = require('../lib/dispatcher/wuyinProducts');
 
 function getApiKey() {
   const apiKey = String(process.env.SUCHUANG_API_KEY || '').trim();
   if (!apiKey) {
-    throw new Error('SUCHUANG_API_KEY 未配置，请在设置中心配置速创 API Key');
+    throw new Error('SUCHUANG_API_KEY 未配置，请在设置中心配置 Wuyin/速创 API Key');
   }
   return apiKey;
 }
@@ -18,11 +25,38 @@ function authHeaders(apiKey = getApiKey()) {
   return { Authorization: apiKey };
 }
 
+function appendQuery(url, params = {}) {
+  const parsed = new URL(url);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value).trim()) {
+      parsed.searchParams.set(key, String(value));
+    }
+  });
+  return parsed.toString();
+}
+
+function buildWuyinUrl(absoluteEndpoint, apiKey, extraQuery = {}) {
+  const configuredBase = String(getGatewayBaseUrl('suchuang') || '').trim().replace(/\/+$/, '');
+  const endpoint = String(absoluteEndpoint || '').trim();
+  let url = endpoint;
+
+  if (configuredBase) {
+    try {
+      const path = new URL(endpoint).pathname;
+      url = `${configuredBase}${path}`;
+    } catch {
+      url = buildGatewayUrl('suchuang', '', endpoint);
+    }
+  }
+
+  return appendQuery(url, { key: apiKey, ...extraQuery });
+}
+
 function isSuccessCode(code) {
   return code === undefined || code === null || ['0', '200'].includes(String(code));
 }
 
-function assertSuchuangCode(data, action = '速创 API 请求') {
+function assertSuchuangCode(data, action = 'Wuyin API 请求') {
   if (!isSuccessCode(data?.code)) {
     throw new Error(`${action}失败: ${data?.msg || data?.message || `code ${data?.code}`}`);
   }
@@ -40,7 +74,6 @@ function getTextFromChatResponse(data) {
     || '';
 }
 
-const RUNNING_STATUSES = new Set(['0', '1', 'init', 'initializing', 'running', 'processing', 'pending']);
 const SUCCESS_STATUSES = new Set(['2', 'success', 'succeeded', 'completed', 'complete', 'done']);
 const FAILED_STATUSES = new Set(['3', 'failed', 'fail', 'error', 'cancelled', 'canceled']);
 
@@ -111,7 +144,7 @@ function getPublicUrl(urlOrRef) {
         return rawUrl;
       }
     } catch {
-      // 忽略
+      // ignore
     }
   }
 
@@ -129,13 +162,23 @@ function getPublicUrl(urlOrRef) {
     return `${tosEndpoint}/${bucket}/${filename}`;
   }
 
-  throw new Error('速创 API 需要公网可访问的素材 URL，请先配置 TOS 或带 R2_PUBLIC_BASE_URL 的 Cloudflare R2。');
+  throw new Error('Wuyin API 文档要求参考图片必须是公网 URL，请先上传到公网存储或配置 R2/TOS。');
+}
+
+function normalizeEnumValue(value, allowed, fallback) {
+  const normalized = String(value || '').trim();
+  return allowed.includes(normalized) ? normalized : fallback;
 }
 
 function normalizeImageSize(size) {
-  const s = String(size || '').toUpperCase().trim();
-  if (['1K', '2K', '4K'].includes(s)) return s;
-  return '1K';
+  return normalizeEnumValue(String(size || '').toUpperCase(), ['1K', '2K', '4K'], '1K');
+}
+
+function normalizeAspectRatio(value, product) {
+  const field = product?.requestFields?.aspectRatio || product?.requestFields?.size;
+  const allowed = Array.isArray(field?.enum) ? field.enum : [];
+  const fallback = field?.default || 'auto';
+  return allowed.length > 0 ? normalizeEnumValue(value || fallback, allowed, fallback) : String(value || fallback);
 }
 
 function inferSize(resolution = '', aspectRatio = '') {
@@ -152,8 +195,8 @@ function inferSize(resolution = '', aspectRatio = '') {
   return `${Math.round(base * rawW / rawH)}x${base}`;
 }
 
-async function _submitJson(endpointPath, body, apiKey, nodeId, projectId, modelId, useProxy) {
-  const targetUrl = buildGatewayUrl('suchuang', '', endpointPath);
+async function _submitJson(endpointUrl, body, apiKey) {
+  const targetUrl = buildWuyinUrl(endpointUrl, apiKey);
   const response = await fetch(targetUrl, {
     method: 'POST',
     headers: {
@@ -166,18 +209,17 @@ async function _submitJson(endpointPath, body, apiKey, nodeId, projectId, modelI
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`速创 API 请求失败 (${response.status}): ${errorText}`);
+    throw new Error(`Wuyin API 请求失败 (${response.status}): ${errorText}`);
   }
 
   const data = await response.json();
-  assertSuchuangCode(data, '速创任务提交');
+  assertSuchuangCode(data, 'Wuyin 任务提交');
   return data;
 }
 
-async function _pollAsyncDetail(taskId, mediaType, apiKey, modelId, useProxy) {
-  const baseUrl = getGatewayBaseUrl('suchuang');
-  const detailUrl = `${baseUrl.replace(/\/+$/, '')}/api/async/detail?key=${encodeURIComponent(apiKey)}&id=${encodeURIComponent(taskId)}`;
-  
+async function _pollAsyncDetail(taskId, mediaType, apiKey, modelId) {
+  const detailUrl = buildWuyinUrl(WUYIN_ASYNC_DETAIL_ENDPOINT, apiKey, { id: taskId });
+
   const response = await fetch(detailUrl, {
     method: 'GET',
     headers: {
@@ -189,46 +231,34 @@ async function _pollAsyncDetail(taskId, mediaType, apiKey, modelId, useProxy) {
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`速创 API 状态查询失败 (${response.status}): ${errorText}`);
+    throw new Error(`Wuyin API 状态查询失败 (${response.status}): ${errorText}`);
   }
 
   const data = await response.json();
-  assertSuchuangCode(data, '速创任务状态查询');
+  assertSuchuangCode(data, 'Wuyin 任务状态查询');
 
   const payload = data.data || data;
   const statusVal = String(payload.status !== undefined ? payload.status : data.status || '').toLowerCase();
-  
   let mappedStatus = 'processing';
-  
-  // Sora2: 1 = success, 2 = failed, 0 or 3 = processing
-  if (String(modelId).toLowerCase() === 'sora2-new' || String(modelId).toLowerCase() === 'sora2') {
-    if (statusVal === '1') mappedStatus = 'success';
-    else if (statusVal === '2') mappedStatus = 'failed';
-  } else {
-    // wuyin-async: 2 = success, 3 = failed, 0 or 1 = processing
-    if (statusVal === '2' || SUCCESS_STATUSES.has(statusVal)) mappedStatus = 'success';
-    else if (statusVal === '3' || FAILED_STATUSES.has(statusVal)) mappedStatus = 'failed';
-  }
+
+  if (statusVal === '2' || SUCCESS_STATUSES.has(statusVal)) mappedStatus = 'success';
+  else if (statusVal === '3' || FAILED_STATUSES.has(statusVal)) mappedStatus = 'failed';
+  else if (statusVal === '0' || statusVal === '1') mappedStatus = 'processing';
 
   const urls = mappedStatus === 'success' ? extractWuyinOutputUrls(data) : [];
-  if (mappedStatus === 'success' && urls.length === 0) {
-    mappedStatus = 'processing'; // 降级判定，等有了 URL 再判定成功
-  }
-
   const message = mappedStatus === 'failed' ? (payload.message || payload.msg || data.msg || 'Wuyin task failed') : undefined;
 
   return {
     status: mappedStatus,
     urls,
-    message
+    message,
+    raw: data,
   };
 }
 
-async function _submitAndPoll({ endpointPath, body, mediaType, apiKey, nodeId, projectId, modelId, useProxy }) {
-  const submitData = await _submitJson(endpointPath, body, apiKey, nodeId, projectId, modelId, useProxy);
+async function _submitAndPoll({ product, body, mediaType, apiKey, modelId }) {
+  const submitData = await _submitJson(product.endpoint, body, apiKey);
   const payload = submitData.data || submitData;
-  
-  // 3. 如果提交响应已直接返回媒体 URL，直接使用。
   const directUrls = extractWuyinOutputUrls(submitData);
   if (directUrls.length > 0) {
     return {
@@ -238,10 +268,9 @@ async function _submitAndPoll({ endpointPath, body, mediaType, apiKey, nodeId, p
     };
   }
 
-  // 4. 否则提取任务 ID 并进行轮询
   const taskId = String(payload.id || payload.task_id || payload.taskId || submitData.id || submitData.task_id || '').trim();
   if (!taskId) {
-    throw new Error('速创 API 提交成功但未返回有效的任务 ID (data.id)');
+    throw new Error('Wuyin API 提交成功但未返回文档要求的任务 ID。');
   }
 
   const maxPolls = mediaType === 'video' ? 180 : 90;
@@ -249,27 +278,27 @@ async function _submitAndPoll({ endpointPath, body, mediaType, apiKey, nodeId, p
 
   for (let i = 0; i < maxPolls; i++) {
     await new Promise(resolve => setTimeout(resolve, delayMs));
-    const result = await _pollAsyncDetail(taskId, mediaType, apiKey, modelId, useProxy);
-    
+    const result = await _pollAsyncDetail(taskId, mediaType, apiKey, modelId);
+
     if (result.status === 'success') {
       return {
         status: 'success',
         urls: result.urls,
-        raw: submitData
+        raw: result.raw
       };
     }
     if (result.status === 'failed') {
-      throw new Error(result.message || '速创异步生成任务失败');
+      throw new Error(result.message || 'Wuyin 异步生成任务失败');
     }
   }
 
-  throw new Error(`速创异步生成超时 (${mediaType} 超时限制)`);
+  throw new Error(`Wuyin 异步生成超时 (${mediaType} 超时限制)`);
 }
 
 async function generateText(args) {
   const apiKey = getApiKey();
   const targetUrl = buildGatewayUrl('suchuang', 'chat', '/api/chat/index');
-  
+
   const prompt = args.prompt || '';
   const modelId = args.modelId || args.model || '';
   const imageUrl = args.referenceImageBase64 ? getPublicUrl(args.referenceImageBase64) : '';
@@ -295,12 +324,12 @@ async function generateText(args) {
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`速创 ChatAPI 请求失败 (${response.status}): ${errorText}`);
+    throw new Error(`Wuyin ChatAPI 请求失败 (${response.status}): ${errorText}`);
   }
 
   const data = await response.json();
-  assertSuchuangCode(data, '速创 ChatAPI');
-  
+  assertSuchuangCode(data, 'Wuyin ChatAPI');
+
   const text = getTextFromChatResponse(data);
   return {
     success: true,
@@ -312,40 +341,43 @@ async function generateText(args) {
 async function generateImage(args) {
   const apiKey = getApiKey();
   const modelId = String(args.modelId || args.model || 'image_nanoBanana2');
-  const endpointPath = args.endpointPath || `/api/async/${modelId}`;
+  const product = getWuyinProduct(modelId);
+  if (!product || product.category !== 'image') {
+    throw new Error(`Wuyin 图片模型未配置或文档未核对: ${modelId}`);
+  }
 
   const prompt = args.prompt || '';
-  const size = args.size || args.imageSize || '1K';
-  const aspectRatio = args.aspectRatio || '1:1';
-  
+  if (!prompt) {
+    throw new Error('Wuyin 图片生成文档要求 prompt 为必填。');
+  }
+
   const rawRefs = args.referenceImages || args.urls || [];
   const publicUrls = Array.isArray(rawRefs) ? rawRefs.map(getPublicUrl).filter(Boolean) : [];
+  const body = {
+    prompt,
+  };
 
-  const normalizedEndpoint = String(endpointPath).toLowerCase();
-  const ratio = !aspectRatio || String(aspectRatio).toLowerCase() === 'auto' ? '1:1' : String(aspectRatio);
-
-  const body = normalizedEndpoint.includes('/api/async/image_gpt')
-    ? { prompt, size: ratio }
-    : { prompt, size: normalizeImageSize(size), aspectRatio: ratio };
+  if (modelId === 'image_gpt') {
+    body.size = normalizeAspectRatio(args.aspectRatio || args.size || 'auto', product);
+  } else {
+    body.size = normalizeImageSize(args.size || args.imageSize || product.requestFields.size.default || '1K');
+    body.aspectRatio = normalizeAspectRatio(args.aspectRatio || product.requestFields.aspectRatio.default || 'auto', product);
+  }
 
   if (publicUrls.length > 0) {
     body.urls = publicUrls;
   }
 
-  // generateCount 用循环提交实现，限制在 1 到 4
   const generateCount = Math.max(1, Math.min(4, Number(args.generateCount || 1)));
   const results = [];
 
   for (let i = 0; i < generateCount; i++) {
     const res = await _submitAndPoll({
-      endpointPath,
+      product,
       body,
       mediaType: 'image',
       apiKey,
-      nodeId: args.nodeId,
-      projectId: args.projectId,
       modelId,
-      useProxy: args.useProxy
     });
     results.push(res);
   }
@@ -355,29 +387,35 @@ async function generateImage(args) {
     success: true,
     image: allUrls[0],
     urls: allUrls,
-    raw: results[0]?.raw
+    raw: results[0]?.raw,
+    wuyinProduct: product.id,
+    wuyinDocUrl: product.docUrl,
   };
 }
 
 async function generateVideo(args) {
   const apiKey = getApiKey();
   const modelId = String(args.modelId || args.model || 'video_google_omni');
-  const endpointPath = args.endpointPath || `/api/async/${modelId}`;
+  const product = getWuyinProduct(modelId);
+  if (!product || product.category !== 'video') {
+    throw new Error(`Wuyin 视频模型未配置或文档未核对: ${modelId}`);
+  }
 
   const prompt = args.prompt || '';
+  if (!prompt) {
+    throw new Error('Wuyin 视频生成文档要求 prompt 为必填。');
+  }
+
   const resolution = args.resolution || args.size || '720p';
   const aspectRatio = args.aspectRatio || '16:9';
-  const duration = Number(args.duration || args.videoDuration || 10);
-  
+  const duration = Number(args.duration || args.videoDuration || product.requestFields.duration.default || 10);
   const rawRefs = args.referenceImages || args.urls || [];
   const publicUrls = Array.isArray(rawRefs) ? rawRefs.map(getPublicUrl).filter(Boolean) : [];
+  const maxImages = 7;
 
-  const maxImages = modelId === 'video_google_omni' || modelId === 'video_vidu' || modelId === 'video_omni' ? 7 : 1;
-
-  const size = inferSize(resolution, aspectRatio);
   const body = {
     prompt,
-    size,
+    size: args.size && /^\d+x\d+$/i.test(String(args.size)) ? args.size : inferSize(resolution, aspectRatio),
     duration,
   };
 
@@ -386,70 +424,25 @@ async function generateVideo(args) {
   }
 
   const result = await _submitAndPoll({
-    endpointPath,
+    product,
     body,
     mediaType: 'video',
     apiKey,
-    nodeId: args.nodeId,
-    projectId: args.projectId,
     modelId,
-    useProxy: args.useProxy
   });
 
   return {
     success: true,
     video: result.urls[0],
     urls: result.urls,
-    raw: result.raw
+    raw: result.raw,
+    wuyinProduct: product.id,
+    wuyinDocUrl: product.docUrl,
   };
 }
 
-async function generateAudio(args) {
-  const apiKey = getApiKey();
-  const modelId = String(args.modelId || args.model || 'audio_tts');
-  const endpointPath = args.endpointPath || `/api/async/${modelId}`;
-
-  const text = args.prompt || args.text || '';
-  const voice = args.voice || args.voiceId || 'zh_female_qingxin';
-  const advancedParams = args.advancedParams || {};
-
-  const body = {
-    text,
-    voice_id: voice || advancedParams.voice_id || advancedParams.voice || 'zh_female_qingxin',
-    speed: Number(advancedParams.speed || 1),
-    vol: Number(advancedParams.vol || 1),
-    language_boost: advancedParams.language_boost || 'auto'
-  };
-
-  const isSync = endpointPath.includes('/api/voice/composite') || endpointPath.includes('/api/voice/clone');
-
-  if (isSync) {
-    const result = await _submitJson(endpointPath, body, apiKey, args.nodeId, args.projectId, modelId, args.useProxy);
-    const urls = extractWuyinOutputUrls(result);
-    return {
-      success: true,
-      audio: urls[0],
-      urls,
-      raw: result
-    };
-  } else {
-    const result = await _submitAndPoll({
-      endpointPath,
-      body,
-      mediaType: 'audio',
-      apiKey,
-      nodeId: args.nodeId,
-      projectId: args.projectId,
-      modelId,
-      useProxy: args.useProxy
-    });
-    return {
-      success: true,
-      audio: result.urls[0],
-      urls: result.urls,
-      raw: result.raw
-    };
-  }
+async function generateAudio() {
+  throw new Error('当前 Wuyin 音频模型尚未提供已核对文档定义，AI Router 已阻止猜测式音频请求。');
 }
 
 const SuchuangProvider = {
