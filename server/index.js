@@ -12,6 +12,7 @@ const express = require('express');
 const cors = require('cors');
 const webhookRouter = require('./routes/webhook');
 const generateImageRouter = require('./routes/generate-image');
+const creditProviderRouter = require('./routes/credit-provider-router');
 const adminRouter = require('./routes/admin');
 const userRouter = require('./routes/user');
 const chatRouter = require('./routes/chat');
@@ -142,6 +143,8 @@ function createApp() {
 
   app.use('/webhook', webhookRouter);
   app.use('/api', userRouter);
+  // 简体中文注释：AI Router 新保存入口必须挂在 legacy adminRouter 之前，否则旧路由会吞掉 requestProfileId/routeStrategy。
+  app.use('/api', creditProviderRouter);
   app.use('/api', adminRouter);
   app.use('/api', providerProbeRouter);
   app.use('/api', chatRouter);
