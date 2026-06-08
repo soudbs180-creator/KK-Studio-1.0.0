@@ -14,6 +14,7 @@ const webhookRouter = require('./routes/webhook');
 const generateImageRouter = require('./routes/generate-image');
 const creditProviderRouter = require('./routes/credit-provider-router');
 const userApiPayloadRouter = require('./routes/user-api-payload-router');
+const userWuyinStrictRouter = require('./routes/user-wuyin-strict-router');
 const userAiRouter = require('./routes/user-ai-router');
 const adminRouter = require('./routes/admin');
 const userRouter = require('./routes/user');
@@ -146,6 +147,8 @@ function createApp() {
   app.use('/webhook', webhookRouter);
   // 简体中文注释：用户 API 配置保存增强层必须在 legacy userRouter 前，保存时自动补齐 AI Router 元数据。
   app.use('/api', userApiPayloadRouter);
+  // 简体中文注释：Wuyin/速创 image/video/status 必须先走严格文档路由，禁止 generic proxy 或 legacy catalog 猜测。
+  app.use('/api', userWuyinStrictRouter);
   // 简体中文注释：用户自带 Key 的新 AI Router 必须挂在 legacy userRouter 前；只接管 mode=chat，其它模式 next() 回落旧逻辑。
   app.use('/api', userAiRouter);
   app.use('/api', userRouter);
