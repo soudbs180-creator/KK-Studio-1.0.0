@@ -50,6 +50,47 @@ function expectNotIncludes(relativePath, token, reason) {
   }
 }
 
+function collectFiles(relativeDir, options = {}) {
+  const absoluteDir = abs(relativeDir);
+  const collected = [];
+  const allowedExtensions = options.allowedExtensions || new Set([".js", ".cjs", ".mjs", ".ts", ".tsx", ".json", ".md", ".sh", ".ps1"]);
+  const ignoredSegments = options.ignoredSegments || new Set(["node_modules", ".git", "dist", "build", ".next", "coverage"]);
+
+  if (!fs.existsSync(absoluteDir)) {
+    return collected;
+  }
+
+  for (const entry of fs.readdirSync(absoluteDir, { withFileTypes: true })) {
+    if (ignoredSegments.has(entry.name)) {
+      continue;
+    }
+
+    const absolutePath = path.join(absoluteDir, entry.name);
+    const relativePath = path.relative(root, absolutePath).split(path.sep).join("/");
+    if (entry.isDirectory()) {
+      collected.push(...collectFiles(relativePath, options));
+      continue;
+    }
+
+    if (allowedExtensions.has(path.extname(entry.name))) {
+      collected.push(relativePath);
+    }
+  }
+
+  return collected.sort();
+}
+
+function expectActiveFilesDoNotReference(files, tokens, reason) {
+  for (const file of files) {
+    const source = read(file);
+    for (const token of tokens) {
+      if (source.includes(token)) {
+        fail(`${file} must not reference ${JSON.stringify(token)}. ${reason}`);
+      }
+    }
+  }
+}
+
 const manifest = readJson("config/release-manifest.json");
 const rootPackage = readJson("package.json");
 const expectedVersion = manifest.version;
@@ -116,6 +157,28 @@ expectIncludes("AGENTS.md", "apps/web/", "Current Web runtime must be explicit."
 expectIncludes("AGENTS.md", "server/", "Current backend runtime must be explicit.");
 expectIncludes("docs/governance/PROJECT_STATE_AND_VALIDATION.md", "apps/web/", "Current Web runtime must be explicit.");
 expectIncludes("docs/governance/PROJECT_STATE_AND_VALIDATION.md", "server/", "Current backend runtime must be explicit.");
+
+const activeFiles = [
+  "package.json",
+  ...collectFiles("scripts"),
+  ...collectFiles("tests"),
+  ...collectFiles("apps/web"),
+  ...collectFiles("packages"),
+  ...collectFiles("server"),
+];
+
+expectActiveFilesDoNotReference(
+  activeFiles,
+  [
+    "apps/api/src/server",
+    "apps/api/.env",
+    "apps/api/.env.local",
+    "apps/api/.env.local.example",
+    "payment-server",
+    "netlify/functions",
+  ],
+  "Active code, scripts, and tests must use the current server/ backend baseline.",
+);
 
 if (failures.length > 0) {
   for (const failure of failures) {
