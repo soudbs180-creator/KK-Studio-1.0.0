@@ -92,6 +92,44 @@ function expectActiveFilesDoNotReference(files, tokens, reason) {
   }
 }
 
+function expectNoWuyinBrowserDirect() {
+  const file = "apps/web/src/services/model/secureModelProxy.ts";
+  if (!exists(file)) {
+    fail(`${file} is required for local user-route proxy governance.`);
+    return;
+  }
+
+  const source = read(file);
+  const forbiddenPatterns = [
+    {
+      pattern: /export\s+async\s+function\s+callWuyinClientDirect(?:Image|Video)\b/,
+      message: "Frontend must not expose browser-direct Wuyin submit helpers; route Wuyin image/video through /api/v1/model-proxy/user and server/routes/user-wuyin-strict-router.js.",
+    },
+    {
+      pattern: /export\s+async\s+function\s+checkWuyinClientDirectTaskStatus\b/,
+      message: "Frontend must not poll Wuyin detail endpoints directly; task status must go through the server strict router so model-aware detail endpoints are enforced.",
+    },
+    {
+      pattern: /checkIsWuyinClientDirect\([^)]*\)\s*:\s*boolean\s*{[\s\S]*?return\s+route\s*!==\s*null\s*;/,
+      message: "checkIsWuyinClientDirect must not enable direct Wuyin browser calls. It should return false or be removed after callers are migrated.",
+    },
+    {
+      pattern: /fetch\(targetUrl,\s*{[\s\S]*?Authorization['"]?\s*:\s*apiKey/,
+      message: "Browser-side fetch(targetUrl) with a user Wuyin API key is forbidden; the server must own secret transport and documented request construction.",
+    },
+    {
+      pattern: /fetch\(detailUrl,\s*{[\s\S]*?Authorization['"]?\s*:\s*apiKey/,
+      message: "Browser-side Wuyin detail polling with a user API key is forbidden; use task_status through the strict server route.",
+    },
+  ];
+
+  for (const { pattern, message } of forbiddenPatterns) {
+    if (pattern.test(source)) {
+      fail(`${file}: ${message}`);
+    }
+  }
+}
+
 const manifest = readJson("config/release-manifest.json");
 const rootPackage = readJson("package.json");
 const expectedVersion = manifest.version;
@@ -180,6 +218,8 @@ expectActiveFilesDoNotReference(
   ],
   "Active code, scripts, and tests must use the current server/ backend baseline.",
 );
+
+expectNoWuyinBrowserDirect();
 
 if (failures.length > 0) {
   for (const failure of failures) {
