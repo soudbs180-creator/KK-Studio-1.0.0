@@ -1,5 +1,6 @@
 import path from "path";
-import { fileURLToPath, pathToFileURL } from "url";
+import { createRequire } from "module";
+import { fileURLToPath } from "url";
 
 import {
   applyPrimaryEnvToProcess,
@@ -7,6 +8,7 @@ import {
   getEffectiveValue,
 } from "./env-contract.mjs";
 
+const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const defaultRepoRoot = path.join(__dirname, "..", "..");
@@ -92,36 +94,21 @@ export async function assertLocalApiConfig(options = {}) {
     problems.push(
       "Root .env/.env.local contain server-only API values that local API startup ignores: "
       + `${misplacedRootServerEnv.map((entry) => `${entry.key} from ${entry.source}`).join(", ")}. `
-      + "Move them into apps/api/.env.local.",
+      + "Move them into server/.env.local.",
     );
   }
 
   if (!hasPostgresConfig) {
     problems.push(
       "DATABASE_URL is missing, or PGHOST/PGDATABASE/PGUSER are incomplete. "
-      + "Copy apps/api/.env.local.example to apps/api/.env.local and set your VPS PostgreSQL connection.",
+      + "Copy server/.env.local.example to server/.env.local and set your VPS PostgreSQL connection.",
     );
   }
 
   if (!userApiEncryptionSecret) {
     problems.push(
-      "USER_API_ENCRYPTION_SECRET is missing. Add it to apps/api/.env.local.",
+      "USER_API_ENCRYPTION_SECRET is missing. Add it to server/.env.local.",
     );
-  }
-
-  if (problems.length === 0) {
-    const configModule = await import(
-      pathToFileURL(path.join(repoRoot, "apps", "api", "src", "lib", "server-runtime-config.ts")).href
-    );
-    const persistenceProbe = await configModule.probeServerRuntimePersistence(
-      configModule.resolveServerRuntimeConfig(),
-    );
-    if (persistenceProbe.postgresConfigValid === false || persistenceProbe.blockers.length > 0) {
-      problems.push(
-        "PostgreSQL persistence probe failed. "
-        + `Probe blockers: ${persistenceProbe.blockers.join(", ") || "<none>"}.`,
-      );
-    }
   }
 
   if (problems.length > 0) {
@@ -146,9 +133,6 @@ export async function startLocalApiServer(options = {}) {
   const port = options.port ?? Number(process.env.PORT || 3001);
   const skipConfigCheck = options.skipConfigCheck === true;
 
-  // The local-only bootstrap still needs the canonical env search order so
-  // local auth and encrypted profile storage keep working without the full
-  // server-side VPS PostgreSQL startup checks.
   applyPrimaryEnvToProcess(repoRoot);
 
   if (!skipConfigCheck) {
@@ -159,10 +143,10 @@ export async function startLocalApiServer(options = {}) {
   process.env.PORT = String(port);
   applyLocalApiBodyLimitDefaults();
 
-  const serverEntry = pathToFileURL(path.join(repoRoot, "apps", "api", "src", "server.ts")).href;
-  const serverModule = await import(serverEntry);
-  if (typeof serverModule.startApiServer !== "function") {
-    throw new Error("apps/api/src/server.ts does not export startApiServer()");
+  const serverEntry = path.join(repoRoot, "server", "index.js");
+  const serverModule = require(serverEntry);
+  if (typeof serverModule.startServer !== "function") {
+    throw new Error("server/index.js does not export startServer()");
   }
 
   const verifyTurnstileToken = resolveLocalApiTurnstileVerifier(process.env);
@@ -171,5 +155,5 @@ export async function startLocalApiServer(options = {}) {
     skipConfigCheck,
   };
 
-  return serverModule.startApiServer(port, serverOptions);
+  return serverModule.startServer(port, serverOptions);
 }
