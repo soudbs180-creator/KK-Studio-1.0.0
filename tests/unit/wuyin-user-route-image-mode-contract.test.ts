@@ -1,133 +1,53 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { createRequire } from "node:module";
 import { readSource } from "../support/workspacePaths.js";
 
-const require = createRequire(import.meta.url);
-const serverWuyinProxy = require("../../server/lib/wuyinAsyncVideoProxy.js") as {
-  resolveWuyinImageEndpointPath: (modelId: string) => string;
-  buildWuyinImageRequestBody: (input: any) => any;
-  extractWuyinOutputUrls: (payload: any) => string[];
-  normalizeWuyinVideoBaseUrl: (baseUrl: string) => string;
-  isWuyinAsyncVideoRoute: (route: any, modelId?: string) => boolean;
-};
+describe("Wuyin / Suchuang documented API routing", () => {
+  test("strict Wuyin router is mounted before the legacy user router", () => {
+    const indexSource = readSource("server/index.js");
+    const strictRouterIndex = indexSource.indexOf("userWuyinStrictRouter");
+    const legacyRouterIndex = indexSource.indexOf("userRouter");
 
-describe("速创 API 图片模型路由与适配契约测试 (Wuyin Image Proxy Contract Tests)", () => {
-  
-  test("1. 正确解析与转换速创专属图片模型 ID 对应的 API Endpoint 路径", () => {
-    // 简体中文注释：测试各模型是否能转换为对应的速创专有异步图片接口端点
-    assert.equal(
-      serverWuyinProxy.resolveWuyinImageEndpointPath("image_nanoBanana2@slot_key_123"),
-      "/api/async/image_nanoBanana2"
+    assert.ok(strictRouterIndex >= 0, "expected userWuyinStrictRouter to be mounted");
+    assert.ok(legacyRouterIndex >= 0, "expected legacy userRouter to remain mounted after strict routers");
+    assert.ok(
+      strictRouterIndex < legacyRouterIndex,
+      "Wuyin strict router must intercept before legacy userRouter can guess or proxy old requests",
     );
-    assert.equal(
-      serverWuyinProxy.resolveWuyinImageEndpointPath("image_nanoBanana_pro"),
-      "/api/async/image_nanoBanana_pro"
-    );
-    assert.equal(
-      serverWuyinProxy.resolveWuyinImageEndpointPath("image_nanoBanana"),
-      "/api/async/image_nanoBanana"
-    );
-    assert.equal(
-      serverWuyinProxy.resolveWuyinImageEndpointPath("image_gpt"),
-      "/api/async/image_gpt"
-    );
-    assert.equal(
-      serverWuyinProxy.resolveWuyinImageEndpointPath("image_grok_imagine"),
-      "/api/async/image_grok_imagine"
-    );
-    assert.equal(
-      serverWuyinProxy.resolveWuyinImageEndpointPath("image_wan2.6"),
-      "/api/async/image_wan2.6"
-    );
-
-    // 简体中文注释：异常流检测，未知或错误的速创图片模型抛出 Error
-    assert.throws(() => {
-      serverWuyinProxy.resolveWuyinImageEndpointPath("unknown_wuyin_model");
-    }, /Unknown Wuyin image model/);
   });
 
-  test("2. 规范化并清洗速创图片请求体 (buildWuyinImageRequestBody)", () => {
-    // 简体中文注释：测试请求体参数（包含分辨率、纵横比、多图参考列表）的提取清洗
-    const inputPayload = {
-      prompt: "生成一幅赛博朋克猫咪插画",
-      aspectRatio: "16:9",
-      imageSize: "2K",
-      referenceImages: [
-        "https://example.com/ref1.png",
-        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
-        "  plain_base64_data_without_uri_header  "
-      ]
-    };
+  test("legacy target-url Wuyin proxy is converted into the documented strict contract", () => {
+    const strictSource = readSource("server/routes/user-wuyin-strict-router.js");
 
-    const requestBody = serverWuyinProxy.buildWuyinImageRequestBody(inputPayload);
-
-    assert.equal(requestBody.prompt, "生成一幅赛博朋克猫咪插画");
-    assert.equal(requestBody.size, "2K");
-    assert.equal(requestBody.aspectRatio, "16:9");
-    
-    // 简体中文注释：验证 Base64 去除了 data: 前缀与换行空格
-    assert.deepEqual(requestBody.urls, [
-      "https://example.com/ref1.png",
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
-      "plain_base64_data_without_uri_header"
-    ]);
+    assert.match(strictSource, /parseWuyinTargetUrl/);
+    assert.match(strictSource, /handleGenericWuyinProxy/);
+    assert.match(strictSource, /getWuyinProduct\(asyncMatch\[1\]\)/);
+    assert.match(strictSource, /buildDocumentedBody\(product, readGenericProxyInputBody\(req\)\)/);
+    assert.match(strictSource, /WUYIN_MODEL_NOT_DOCUMENTED/);
+    assert.match(strictSource, /WUYIN_GENERIC_PROXY_DISABLED/);
+    assert.match(strictSource, /\/api\/sora2-new\/submit/);
+    assert.match(strictSource, /\/api\/voice\/composite/);
+    assert.match(strictSource, /\/api\/img\/split/);
+    assert.doesNotMatch(strictSource, /fetch\(targetUrl/);
   });
 
-  test("3. 深度递归提取 API 多层嵌套响应中的有效图片 URL (extractWuyinOutputUrls)", () => {
-    // 简体中文注释：测试从速创各种复杂数据包中深度提取图片链接
-    const complexPayload = {
-      code: 200,
-      msg: "success",
-      data: {
-        status: 2,
-        result: "生成的图像存放在：https://img.wuyinkeji.com/out1.png 以及 https://img.wuyinkeji.com/out2.png",
-        details: {
-          image_url: "https://img.wuyinkeji.com/out3.png",
-          imageUrl: "https://img.wuyinkeji.com/out4.png"
-        },
-        outputs: [
-          "https://img.wuyinkeji.com/out5.png",
-          { url: "https://img.wuyinkeji.com/out6.png" }
-        ]
-      }
-    };
+  test("strict status routing requires model-bearing task ids and documented detail endpoints", () => {
+    const strictSource = readSource("server/routes/user-wuyin-strict-router.js");
 
-    const extractedUrls = serverWuyinProxy.extractWuyinOutputUrls(complexPayload);
-    
-    assert.ok(extractedUrls.includes("https://img.wuyinkeji.com/out1.png"));
-    assert.ok(extractedUrls.includes("https://img.wuyinkeji.com/out2.png"));
-    assert.ok(extractedUrls.includes("https://img.wuyinkeji.com/out3.png"));
-    assert.ok(extractedUrls.includes("https://img.wuyinkeji.com/out4.png"));
-    assert.ok(extractedUrls.includes("https://img.wuyinkeji.com/out5.png"));
-    assert.ok(extractedUrls.includes("https://img.wuyinkeji.com/out6.png"));
-    assert.equal(extractedUrls.length, 6);
+    assert.match(strictSource, /decodeLocalProxyTaskId/);
+    assert.match(strictSource, /getWuyinProduct\(parsed\.modelId\)/);
+    assert.match(strictSource, /WUYIN_STATUS_MODEL_REQUIRED/);
+    assert.match(strictSource, /WUYIN_ASYNC_DETAIL_ENDPOINT/);
+    assert.match(strictSource, /WUYIN_SORA2_DETAIL_ENDPOINT/);
   });
 
-  test("4. 识别速创异步图片模型渠道判定 (isWuyinAsyncVideoRoute)", () => {
-    // 简体中文注释：验证只要是速创域名或名称中带 wuyin，就被判定为速创异步模型路由
-    const route1 = { name: "速创科技通道", baseUrl: "https://api.wuyinkeji.com/api/async" };
-    const route2 = { name: "Other Channel", baseUrl: "https://api.wuyinkeji.com" };
-    const route3 = { name: "wuyin-model", baseUrl: "https://some-proxy.com" };
-    const route4 = { name: "Google Official", baseUrl: "https://generativelanguage.googleapis.com" };
+  test("governance blocks browser-direct Wuyin transport before merge", () => {
+    const governanceSource = readSource("scripts/governance/check-current-facts.mjs");
 
-    assert.equal(serverWuyinProxy.isWuyinAsyncVideoRoute(route1), true);
-    assert.equal(serverWuyinProxy.isWuyinAsyncVideoRoute(route2), true);
-    assert.equal(serverWuyinProxy.isWuyinAsyncVideoRoute(route3), true);
-    assert.equal(serverWuyinProxy.isWuyinAsyncVideoRoute(route4), false);
-  });
-
-  test("5. 后端用户路由保持用户选择的速创图片模型并用用户路由 ID 绑定详情轮询", () => {
-    const routeSource = readSource("server/routes/user.js");
-
-    assert.match(routeSource, /const WUYIN_PRIMARY_IMAGE_MODEL_ID = 'image_nanoBanana2';/);
-    assert.match(routeSource, /submitWuyinImageTaskWithFallback/);
-    assert.doesNotMatch(routeSource, /WUYIN_IMAGE_FALLBACK_MODEL_IDS/);
-    assert.doesNotMatch(routeSource, /isLegacyDefaultWuyinImageModel/);
-    assert.doesNotMatch(routeSource, /fallbackAttempts/);
-    assert.doesNotMatch(routeSource, /建议在“API设置”中切换至其他速创模型/);
-    assert.match(routeSource, /严格按你选择的速创模型提交/);
-    assert.match(routeSource, /encodeLocalProxyTaskId\(route\.id \|\| routeId, result\.providerTaskId, catalogItem && catalogItem\.id\)/);
-    assert.doesNotMatch(routeSource, /taskId:\s*result\.taskId,\s*\n\s*providerTaskId: result\.providerTaskId/);
+    assert.match(governanceSource, /expectNoWuyinBrowserDirect/);
+    assert.match(governanceSource, /callWuyinClientDirect/);
+    assert.match(governanceSource, /checkWuyinClientDirectTaskStatus/);
+    assert.match(governanceSource, /fetch\(targetUrl\)/);
+    assert.match(governanceSource, /fetch\(detailUrl\)/);
   });
 });

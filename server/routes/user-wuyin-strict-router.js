@@ -5,7 +5,7 @@
  *              - 提交请求严格由 wuyinProducts.js 的模型文档 contract 生成
  *              - JSON / form-urlencoded / sync / async / sora2-special 按各自文档执行
  *              - 状态查询按 resultMode 走 /api/async/detail 或 /api/sora2/detail
- *              - 禁止 x-proxy-target-url 通用转发绕过文档契约
+ *              - 兼容旧 x-proxy-target-url 入口时也必须反解到文档模型后重新组包，禁止任意透传
  */
 
 const express = require('express');
@@ -317,6 +317,98 @@ function mapStatusByProduct(product, value) {
   return product.resultMode === 'wuyin-sora2-detail' ? mapSora2Status(value) : mapAsyncStatus(value);
 }
 
+function parseWuyinTargetUrl(targetUrl) {
+  const raw = String(targetUrl || '').trim();
+  if (!raw) return null;
+  try {
+    const parsed = new URL(raw);
+    if (!/^api\.wuyinkeji\.com$/i.test(parsed.hostname)) return null;
+    const pathname = parsed.pathname.replace(/\/+$/, '');
+
+    if (pathname === '/api/async/detail') {
+      return { kind: 'detail', endpoint: WUYIN_ASYNC_DETAIL_ENDPOINT, resultMode: 'wuyin-async-detail', id: parsed.searchParams.get('id') || '' };
+    }
+    if (pathname === '/api/sora2/detail') {
+      return { kind: 'detail', endpoint: WUYIN_SORA2_DETAIL_ENDPOINT, resultMode: 'wuyin-sora2-detail', id: parsed.searchParams.get('id') || '' };
+    }
+    if (pathname === '/api/sora2-new/submit') {
+      return { kind: 'submit', product: getWuyinProduct('sora2-new') };
+    }
+    if (pathname === '/api/voice/composite') {
+      return { kind: 'submit', product: getWuyinProduct('voice_composite') };
+    }
+    if (pathname === '/api/voice/clone') {
+      return { kind: 'submit', product: getWuyinProduct('voice_clone') };
+    }
+    if (pathname === '/api/img/split') {
+      return { kind: 'submit', product: getWuyinProduct('img_split') };
+    }
+
+    const asyncMatch = pathname.match(/^\/api\/async\/([a-z0-9_.-]+)$/i);
+    if (asyncMatch) {
+      return { kind: 'submit', product: getWuyinProduct(asyncMatch[1]) };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function readGenericProxyInputBody(req) {
+  if (isObjectRecord(req.body)) return req.body;
+  if (typeof req.body === 'string') {
+    const text = req.body.trim();
+    if (!text) return {};
+    try {
+      return JSON.parse(text);
+    } catch {
+      return Object.fromEntries(new URLSearchParams(text));
+    }
+  }
+  return {};
+}
+
+async function handleGenericWuyinProxy(req, res, authState, target) {
+  const routeId = String(req.headers['x-key-slot-id'] || req.body?.routeId || '').trim();
+  const route = await resolveLocalUserRoute(authState.userId, routeId);
+  if (!route) return sendError(res, req, 404, 'USER_ROUTE_NOT_FOUND', 'Wuyin user API route was not found for generic proxy compatibility.');
+  if (!isWuyinRoute(route, { modelId: target.product?.id, routeId })) {
+    return sendError(res, req, 400, 'WUYIN_ROUTE_NOT_RECOGNIZED', '当前用户路由不是 Wuyin/速创 API，已阻止旧通用代理。');
+  }
+
+  const apiKey = getRouteApiKey(route);
+  if (!apiKey) return sendError(res, req, 400, 'USER_ROUTE_SECRET_REQUIRED', 'Wuyin API key is required.');
+
+  try {
+    if (target.kind === 'detail') {
+      const providerTaskId = String(target.id || req.query?.id || req.body?.id || '').trim();
+      if (!providerTaskId) return sendError(res, req, 400, 'INVALID_REQUEST', 'Wuyin detail query requires id.');
+      const detailProduct = {
+        endpoint: target.endpoint,
+        contentType: target.resultMode === 'wuyin-sora2-detail' ? 'application/x-www-form-urlencoded;charset:utf-8;' : 'application/json',
+        auth: 'Authorization header and key query parameter',
+      };
+      const url = makeWuyinUrl(detailProduct, apiKey, { id: providerTaskId });
+      const payload = await fetchWuyinJson(url, apiKey, 'GET', detailProduct);
+      return res.json(payload);
+    }
+
+    const product = target.product;
+    if (!product) return sendError(res, req, 400, 'WUYIN_MODEL_NOT_DOCUMENTED', '旧通用代理目标不是已核对的 Wuyin 文档模型，已阻止。');
+    if (product.enabled === false || product.executable === false) {
+      return sendError(res, req, 400, 'WUYIN_MODEL_DISABLED_BY_DOC', `Wuyin 模型 ${product.id} 当前文档标记为不可用或禁用执行，已阻止请求。`);
+    }
+    assertStrictTaskSupported('wuyin-suchuang-form', product.category, { modelId: product.id });
+    const body = buildDocumentedBody(product, readGenericProxyInputBody(req));
+    const url = makeWuyinUrl(product, apiKey);
+    const payload = await fetchWuyinJson(url, apiKey, product.method || req.method || 'POST', product, body);
+    assertWuyinOk(payload, 'Wuyin 任务提交');
+    return res.json(payload);
+  } catch (err) {
+    return sendError(res, req, err.statusCode || 502, err.code || 'WUYIN_STRICT_GENERIC_PROXY_ERROR', err.message);
+  }
+}
+
 async function submitStrictTask({ req, mode, modelId, apiKey }) {
   const product = getWuyinProduct(modelId);
   if (!product) throw Object.assign(new Error(`Wuyin 模型 ${modelId || '(empty)'} 没有在已核对文档中声明，已阻止请求。`), { statusCode: 400, code: 'WUYIN_MODEL_NOT_DOCUMENTED' });
@@ -437,23 +529,25 @@ async function handleStatusMode(req, res, userId) {
 
 router.all('/v1/model-proxy/user', async (req, res, next) => {
   const targetUrl = String(req.headers['x-proxy-target-url'] || '').trim();
-  if (targetUrl && isWuyinProxyTarget(targetUrl)) {
-    return sendError(res, req, 400, 'WUYIN_GENERIC_PROXY_DISABLED', 'Wuyin 通用转发已禁用。请使用 image/video/audio/task_status 模式并按官方文档契约执行。');
+  const genericTarget = parseWuyinTargetUrl(targetUrl);
+  if (targetUrl && isWuyinProxyTarget(targetUrl) && !genericTarget) {
+    return sendError(res, req, 400, 'WUYIN_GENERIC_PROXY_DISABLED', 'Wuyin 通用转发目标不在已核对文档模型或详情端点内，已阻止。');
   }
 
   const mode = String(req.body?.mode || '').trim();
-  if (!['image', 'video', 'audio', 'utility', 'task_status'].includes(mode)) return next();
+  if (!genericTarget && !['image', 'video', 'audio', 'utility', 'task_status'].includes(mode)) return next();
 
   const modelId = extractModelId(req);
   const isDocumentedWuyinModel = Boolean(getWuyinProduct(modelId));
   const routeId = String(req.body?.routeId || req.headers['x-key-slot-id'] || '').trim();
-  const isWuyinHinted = isWuyinLikeText(routeId) || isWuyinLikeText(req.body?.modelId) || isWuyinLikeText(req.body?.model);
-  if (!isDocumentedWuyinModel && !isWuyinHinted) return next();
+  const isWuyinHinted = Boolean(genericTarget) || isWuyinLikeText(routeId) || isWuyinLikeText(req.body?.modelId) || isWuyinLikeText(req.body?.model);
+  if (!genericTarget && !isDocumentedWuyinModel && !isWuyinHinted) return next();
 
   const authState = resolveProfileUserId(req);
   if (!authState) return sendError(res, req, 401, 'UNAUTHORIZED', 'Authentication is required for Wuyin strict routing.');
   if (authState.refreshToken) res.setHeader('X-Refresh-Token', authState.refreshToken);
 
+  if (genericTarget) return handleGenericWuyinProxy(req, res, authState, genericTarget);
   if (mode === 'task_status') return handleStatusMode(req, res, authState.userId);
   const handled = await handleSubmitMode(req, res, authState.userId, mode);
   if (handled) return handled;

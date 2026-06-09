@@ -8,8 +8,8 @@ export const FRONTEND_ENV_RELATIVE_PATHS = [
 ];
 
 export const API_ENV_RELATIVE_PATHS = [
-  path.join("apps", "api", ".env"),
-  path.join("apps", "api", ".env.local"),
+  path.join("server", ".env"),
+  path.join("server", ".env.local"),
 ];
 
 export const PRIMARY_ENV_RELATIVE_PATHS = [
@@ -20,8 +20,8 @@ export const PRIMARY_ENV_RELATIVE_PATHS = [
 export const FUNCTION_ENV_RELATIVE_PATHS = [];
 
 export const IGNORED_LEGACY_ENV_RELATIVE_PATHS = [
-  path.join("server", ".env"),
-  path.join("server", ".env.local"),
+  path.join("apps", "api", ".env"),
+  path.join("apps", "api", ".env.local"),
 ];
 
 const PLACEHOLDER_PATTERNS = [
