@@ -54,7 +54,7 @@ function expectNotIncludes(relativePath, token, reason) {
 function collectFiles(relativeDir, options = {}) {
   const absoluteDir = abs(relativeDir);
   const collected = [];
-  const allowedExtensions = options.allowedExtensions || new Set([".js", ".cjs", ".mjs", ".ts", ".tsx", ".json", ".md", ".sh", ".ps1"]);
+  const allowedExtensions = options.allowedExtensions || new Set([".js", ".cjs", ".mjs", ".ts", ".tsx", ".json", ".md", ".sh", ".ps1", ".yml", ".yaml"]);
   const ignoredSegments = options.ignoredSegments || new Set(["node_modules", ".git", "dist", "build", ".next", "coverage"]);
 
   if (!fs.existsSync(absoluteDir)) {
@@ -199,6 +199,7 @@ expectIncludes("docs/governance/PROJECT_STATE_AND_VALIDATION.md", "server/", "Cu
 
 const activeFiles = [
   "package.json",
+  ...collectFiles(".github"),
   ...collectFiles("scripts"),
   ...collectFiles("tests"),
   ...collectFiles("apps/web"),
@@ -215,8 +216,11 @@ expectActiveFilesDoNotReference(
     "apps/api/.env.local.example",
     "payment-server",
     "netlify/functions",
+    "NETLIFY_AUTH_TOKEN",
+    "NETLIFY_SITE_ID",
+    "netlify deploy",
   ],
-  "Active code, scripts, and tests must use the current server/ backend baseline.",
+  "Active code, scripts, tests, and workflows must use the current server/Vercel deployment baseline.",
 );
 
 expectNoWuyinBrowserDirect();
