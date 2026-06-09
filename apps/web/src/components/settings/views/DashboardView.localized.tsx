@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
-  ArrowRight,
   Coins,
   Cpu,
   Globe,
@@ -10,7 +9,6 @@ import {
   Layers,
   LayoutDashboard,
   Monitor,
-  RefreshCw,
   ScrollText,
   Sparkles,
   Wallet,
@@ -34,14 +32,12 @@ import {
   type SystemLogEntry,
 } from '../../../services/system/systemLogService';
 import {
-  SettingsActionButton,
   SettingsBadge,
   SettingsCardGridContainer,
   SettingsHero,
   SettingsViewShell,
 } from '../SettingsScaffold';
 import {
-  getSettingsPrimaryActionMeta,
   getSettingsStatusSummaryLabel,
   getSettingsViewMeta,
 } from '../settingsRegistry';
@@ -62,8 +58,23 @@ type DashboardBucket = {
   label: string;
   amount: number;
   count: number;
-  percentage: number;
+  barPercentage: number;
+  linePercentage: number;
+  isMajorTick: boolean;
 };
+
+type ChartPoint = {
+  x: number;
+  y: number;
+};
+
+const CHART_WIDTH = 320;
+const CHART_HEIGHT = 138;
+const CHART_PADDING_X = 16;
+const CHART_TOP = 12;
+const CHART_BOTTOM = 120;
+const CHART_INNER_WIDTH = CHART_WIDTH - CHART_PADDING_X * 2;
+const CHART_INNER_HEIGHT = CHART_BOTTOM - CHART_TOP;
 
 const isSameLocalDay = (value?: string | null) => {
   if (!value) return false;
@@ -83,23 +94,47 @@ const getLogTone = (level: LogLevel) => {
   return 'online' as const;
 };
 
-const buildChartPaths = (points: number[]) => {
-  if (points.length === 0) {
-    return { linePath: '', areaPath: '' };
+const clampPercentage = (value: number) => Math.max(0, Math.min(100, value));
+
+const buildChartPoint = (percentage: number, index: number, total: number): ChartPoint => {
+  const normalized = clampPercentage(percentage);
+  const x = CHART_PADDING_X + (total <= 1 ? CHART_INNER_WIDTH : (CHART_INNER_WIDTH * index) / (total - 1));
+  const y = CHART_BOTTOM - (normalized / 100) * CHART_INNER_HEIGHT;
+
+  return {
+    x: Number(x.toFixed(2)),
+    y: Number(y.toFixed(2)),
+  };
+};
+
+const buildSmoothCurvePath = (points: ChartPoint[]) => {
+  if (points.length === 0) return '';
+  if (points.length === 1) return `M ${points[0]!.x} ${points[0]!.y}`;
+
+  const [firstPoint] = points;
+  let path = `M ${firstPoint!.x} ${firstPoint!.y}`;
+
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1]!;
+    const current = points[index]!;
+    const controlX = Number(((previous.x + current.x) / 2).toFixed(2));
+    const controlY = previous.y;
+    path += ` C ${controlX} ${controlY}, ${controlX} ${current.y}, ${current.x} ${current.y}`;
   }
 
-  const step = points.length > 1 ? 100 / (points.length - 1) : 100;
-  const linePath = points
-    .map((point, index) => {
-      const x = Number((index * step).toFixed(2));
-      const y = Number((100 - point).toFixed(2));
-      return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
-    })
-    .join(' ');
+  return path;
+};
+
+const buildChartPaths = (points: ChartPoint[]) => {
+  const linePath = buildSmoothCurvePath(points);
+  const firstPoint = points[0];
+  const lastPoint = points[points.length - 1];
 
   return {
     linePath,
-    areaPath: `${linePath} L 100 100 L 0 100 Z`,
+    areaPath: firstPoint && lastPoint
+      ? `${linePath} L ${lastPoint.x} ${CHART_BOTTOM} L ${firstPoint.x} ${CHART_BOTTOM} Z`
+      : '',
   };
 };
 
@@ -212,10 +247,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     () => getSettingsViewMeta('dashboard', registryLanguage),
     [registryLanguage],
   );
-  const dashboardPrimaryAction = useMemo(
-    () => getSettingsPrimaryActionMeta('dashboard', registryLanguage),
-    [registryLanguage],
-  );
   const dashboardStatusSummaryLabel = useMemo(
     () => getSettingsStatusSummaryLabel('dashboard', registryLanguage),
     [registryLanguage],
@@ -239,7 +270,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const [storedImages, setStoredImages] = useState(0);
   const [storageSnapshotPending, setStorageSnapshotPending] = useState(true);
   const [logs, setLogs] = useState<SystemLogEntry[]>(() => getTodayLogs());
-  const [refreshing, setRefreshing] = useState(false);
   const storageSnapshotTimerRef = useRef<number | null>(null);
   const storageSnapshotIdleRef = useRef<number | null>(null);
 
@@ -338,34 +368,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   }, [cancelScheduledStorageSnapshotRefresh, refreshStorageSnapshot]);
 
   const refreshDashboard = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      const nextStats = keyManager.getStats();
-      const allSlots = keyManager.getSlots();
-      const providers = keyManager.getProviders();
-      const cost = getTodayCosts();
-      const [nextStorageMode] = await Promise.all([
-        getStorageMode(),
-      ]);
+    const nextStats = keyManager.getStats();
+    const allSlots = keyManager.getSlots();
+    const providers = keyManager.getProviders();
+    const cost = getTodayCosts();
+    const [nextStorageMode] = await Promise.all([
+      getStorageMode(),
+    ]);
 
-      const official = allSlots.filter((slot) => {
-        if (!slot.key || slot.disabled) return false;
-        if (slot.baseUrl) return false;
-        if (slot.provider === 'SystemProxy') return false;
-        return slot.type === 'official' || slot.provider === 'Google' || slot.provider === 'OpenAI';
-      });
+    const official = allSlots.filter((slot) => {
+      if (!slot.key || slot.disabled) return false;
+      if (slot.baseUrl) return false;
+      if (slot.provider === 'SystemProxy') return false;
+      return slot.type === 'official' || slot.provider === 'Google' || slot.provider === 'OpenAI';
+    });
 
-      setStats(nextStats);
-      setTodayCostUsd(cost.totalCostUsd || 0);
-      setTodayTokens(cost.totalTokens || 0);
-      setOfficialCount(official.length);
-      setProviderCount(providers.length);
-      setActiveProviderCount(providers.filter((item) => item.isActive).length);
-      setStorageMode(nextStorageMode);
-      scheduleStorageSnapshotRefresh();
-    } finally {
-      setRefreshing(false);
-    }
+    setStats(nextStats);
+    setTodayCostUsd(cost.totalCostUsd || 0);
+    setTodayTokens(cost.totalTokens || 0);
+    setOfficialCount(official.length);
+    setProviderCount(providers.length);
+    setActiveProviderCount(providers.filter((item) => item.isActive).length);
+    setStorageMode(nextStorageMode);
+    scheduleStorageSnapshotRefresh();
   }, [scheduleStorageSnapshotRefresh]);
 
   useEffect(() => {
@@ -389,9 +414,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     [usageLogs],
   );
 
+  const totalCreditSpend = useMemo(
+    () => todayUsageLogs.reduce((sum, log) => sum + Math.abs(Number(log.amount) || 0), 0),
+    [todayUsageLogs],
+  );
+
   const usageBuckets = useMemo<DashboardBucket[]>(() => {
-    const buckets = Array.from({ length: 6 }, (_, index) => ({
-      label: `${String(index * 4).padStart(2, '0')}:00`,
+    const buckets = Array.from({ length: 12 }, (_, index) => ({
+      label: `${String(index * 2).padStart(2, '0')}:00`,
       amount: 0,
       count: 0,
     }));
@@ -400,7 +430,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
       const createdAt = new Date(log.created_at);
       if (Number.isNaN(createdAt.getTime())) return;
 
-      const bucketIndex = Math.min(5, Math.floor(createdAt.getHours() / 4));
+      const bucketIndex = Math.min(11, Math.floor(createdAt.getHours() / 2));
       const amount = Math.abs(Number(log.amount) || 0);
       buckets[bucketIndex]!.amount += amount;
       buckets[bucketIndex]!.count += 1;
@@ -408,18 +438,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
     const maxAmount = Math.max(1, ...buckets.map((bucket) => bucket.amount));
     const maxCount = Math.max(1, ...buckets.map((bucket) => bucket.count));
+    const totalCount = Math.max(1, todayUsageLogs.length);
+    let runningAmount = 0;
+    let runningCount = 0;
 
-    return buckets.map((bucket) => {
-      const base = bucket.amount > 0
-        ? Math.round((bucket.amount / maxAmount) * 88)
-        : Math.round((bucket.count / maxCount) * 44);
+    return buckets.map((bucket, index) => {
+      runningAmount += bucket.amount;
+      runningCount += bucket.count;
+
+      const barBase = totalCreditSpend > 0
+        ? (bucket.amount / maxAmount) * 100
+        : (bucket.count / maxCount) * 100;
+      const lineBase = totalCreditSpend > 0
+        ? (runningAmount / totalCreditSpend) * 100
+        : (runningCount / totalCount) * 100;
 
       return {
         ...bucket,
-        percentage: bucket.amount === 0 && bucket.count === 0 ? 10 : Math.max(16, base),
+        barPercentage: bucket.amount === 0 && bucket.count === 0 ? 4 : Math.max(10, Math.round(barBase)),
+        linePercentage: bucket.amount === 0 && bucket.count === 0 && runningAmount === 0 && runningCount === 0 ? 0 : Math.round(lineBase),
+        isMajorTick: index % 2 === 0,
       };
     });
-  }, [todayUsageLogs]);
+  }, [todayUsageLogs, totalCreditSpend]);
 
   const importantLogs = useMemo(
     () =>
@@ -450,6 +491,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const logHealth = logs.length > 0 ? Math.max(0, 100 - Math.round((importantLogCount / logs.length) * 100)) : 100;
   const storageHealth = storageMode ? 100 : 36;
   const storageProgress = Math.min(100, (storageUsageMb / 1024) * 100);
+  const hasUsageSignal = totalCreditSpend > 0 || todayUsageCount > 0 || todayCostUsd > 0 || todayTokens > 0;
   const browserReadiness = Math.min(
     100,
     25
@@ -462,14 +504,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     () => usageBuckets.slice().sort((left, right) => right.amount - left.amount || right.count - left.count)[0] ?? usageBuckets[0],
     [usageBuckets],
   );
-  const { linePath, areaPath } = useMemo(
-    () => buildChartPaths(usageBuckets.map((bucket) => bucket.percentage)),
-    [usageBuckets],
+  const chartPoints = useMemo(
+    () => usageBuckets.map((bucket, index) => buildChartPoint(hasUsageSignal ? bucket.linePercentage : 0, index, usageBuckets.length)),
+    [hasUsageSignal, usageBuckets],
   );
-
-  const totalCreditSpend = useMemo(
-    () => todayUsageLogs.reduce((sum, log) => sum + Math.abs(Number(log.amount) || 0), 0),
-    [todayUsageLogs],
+  const { linePath, areaPath } = useMemo(
+    () => buildChartPaths(chartPoints),
+    [chartPoints],
   );
 
   const systemReadiness = Math.round((
@@ -657,24 +698,75 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           grid-template-columns: minmax(0, 1fr);
         }
 
+        .dashboard-chart-summary {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+
         .dashboard-chart {
-          min-height: 220px;
+          position: relative;
+          min-height: 254px;
+          overflow: hidden;
           border: 1px solid var(--settings-border-subtle);
           border-radius: 18px;
-          background: linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.08), rgb(255 255 255 / 0.02));
+          background:
+            linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.10), rgb(255 255 255 / 0.015)),
+            repeating-linear-gradient(0deg, transparent 0 33px, rgb(255 255 255 / 0.055) 34px 35px);
           padding: 14px;
         }
 
+        .dashboard-chart__header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 8px;
+        }
+
+        .dashboard-chart__title {
+          color: var(--text-secondary);
+          font-size: var(--type-caption);
+          font-weight: 700;
+        }
+
+        .dashboard-chart__legend {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          color: var(--text-tertiary);
+          font-size: var(--type-micro);
+          white-space: nowrap;
+        }
+
+        .dashboard-chart__legend::before {
+          width: 22px;
+          height: 3px;
+          border-radius: 999px;
+          content: "";
+          background: rgb(var(--settings-accent-rgb));
+        }
+
         .dashboard-chart svg {
+          display: block;
           width: 100%;
-          height: 140px;
-          overflow: visible;
+          height: 158px;
           color: rgb(var(--settings-accent-rgb));
+        }
+
+        .dashboard-chart__grid {
+          stroke: rgb(255 255 255 / 0.08);
+          stroke-width: 1;
+        }
+
+        .dashboard-chart__axis {
+          stroke: rgb(255 255 255 / 0.16);
+          stroke-width: 1.2;
         }
 
         .dashboard-chart__area {
           fill: currentColor;
-          opacity: 0.14;
+          opacity: 0.16;
         }
 
         .dashboard-chart__line {
@@ -682,21 +774,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           stroke: currentColor;
           stroke-linecap: round;
           stroke-linejoin: round;
-          stroke-width: 3;
-          filter: drop-shadow(0 8px 14px rgb(var(--settings-accent-rgb) / 0.28));
+          stroke-width: 3.5;
+          filter: drop-shadow(0 8px 14px rgb(var(--settings-accent-rgb) / 0.34));
         }
 
         .dashboard-chart__dot {
           fill: var(--settings-surface-elevated);
           stroke: currentColor;
-          stroke-width: 3;
+          stroke-width: 2.6;
+        }
+
+        .dashboard-chart__empty {
+          position: absolute;
+          inset: 74px 18px auto;
+          display: flex;
+          justify-content: center;
+          pointer-events: none;
+        }
+
+        .dashboard-chart__empty span {
+          border: 1px solid var(--settings-border-subtle);
+          border-radius: 999px;
+          background: var(--settings-surface-overlay);
+          color: var(--text-tertiary);
+          font-size: var(--type-caption);
+          padding: 6px 10px;
         }
 
         .dashboard-chart-bars {
           display: grid;
-          grid-template-columns: repeat(6, minmax(0, 1fr));
-          gap: 8px;
-          min-height: 74px;
+          grid-template-columns: repeat(12, minmax(0, 1fr));
+          gap: 5px;
+          min-height: 70px;
           align-items: end;
           margin-top: 10px;
         }
@@ -712,7 +821,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         .dashboard-chart-bar__track {
           display: flex;
           width: 100%;
-          height: 52px;
+          height: 50px;
           align-items: flex-end;
           justify-content: center;
           border-radius: 999px;
@@ -722,20 +831,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         .dashboard-chart-bar__fill {
           width: 100%;
-          min-height: 6px;
+          min-height: 4px;
           border-radius: 999px;
-          background: linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.92), rgb(var(--settings-accent-rgb) / 0.32));
+          background: linear-gradient(180deg, rgb(var(--settings-accent-rgb) / 0.88), rgb(var(--settings-accent-rgb) / 0.28));
           height: var(--bucket-height);
-          transition: height 0.32s ease;
+          opacity: var(--bucket-opacity);
+          transition: height 0.32s ease, opacity 0.32s ease;
         }
 
         .dashboard-chart-bar small {
           max-width: 100%;
           overflow: hidden;
           color: var(--text-tertiary);
-          font-size: 10px;
+          font-size: 9px;
           text-overflow: ellipsis;
           white-space: nowrap;
+        }
+
+        .dashboard-chart-bar small[data-major="false"] {
+          opacity: 0.34;
         }
 
         .dashboard-health-grid {
@@ -911,8 +1025,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         }
 
         .dashboard-inline-row strong {
+          min-width: 0;
+          overflow: hidden;
           color: var(--text-primary);
           font-size: var(--type-caption);
+          text-overflow: ellipsis;
           white-space: nowrap;
         }
 
@@ -956,13 +1073,137 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         }
 
         @media (max-width: 640px) {
+          .settings-hero-flat-header .settings-hero-card__header {
+            gap: 12px;
+          }
+
+          .settings-hero-flat-header .settings-reference-grid-4 {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 8px !important;
+          }
+
+          .dashboard-command-center {
+            gap: 10px;
+          }
+
+          .dashboard-panel {
+            border-radius: 18px;
+            padding: 12px;
+          }
+
+          .dashboard-panel__header {
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+          }
+
+          .dashboard-panel__icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 12px;
+          }
+
+          .dashboard-panel__eyebrow {
+            font-size: 9px;
+            letter-spacing: 0.10em;
+          }
+
+          .dashboard-panel__title {
+            font-size: 14px;
+          }
+
+          .dashboard-panel__action .inline-flex {
+            max-width: 108px;
+            padding-inline: 8px;
+          }
+
+          .dashboard-chart-summary,
           .dashboard-health-grid,
           .dashboard-topology__rail {
             grid-template-columns: 1fr;
           }
 
+          .dashboard-metric-tile {
+            border-radius: 14px;
+            padding: 10px;
+          }
+
+          .dashboard-metric-tile__value {
+            font-size: 18px;
+          }
+
+          .dashboard-chart {
+            min-height: 232px;
+            border-radius: 16px;
+            padding: 10px;
+          }
+
+          .dashboard-chart__header {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 4px;
+          }
+
+          .dashboard-chart svg {
+            height: 146px;
+          }
+
+          .dashboard-chart__empty {
+            inset: 68px 10px auto;
+          }
+
+          .dashboard-chart-bars {
+            gap: 3px;
+            min-height: 58px;
+            margin-top: 8px;
+          }
+
+          .dashboard-chart-bar__track {
+            height: 42px;
+          }
+
+          .dashboard-chart-bar small {
+            font-size: 8px;
+          }
+
           .dashboard-topology__rail::before {
             display: none;
+          }
+
+          .dashboard-flow-step {
+            grid-template-columns: auto minmax(0, 1fr);
+            align-items: flex-start;
+            border-radius: 14px;
+            padding: 9px;
+          }
+
+          .dashboard-flow-step strong {
+            grid-column: 2;
+            justify-self: start;
+          }
+
+          .dashboard-inline-row {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 4px;
+          }
+
+          .dashboard-inline-row strong {
+            max-width: 100%;
+          }
+        }
+
+        @media (max-width: 380px) {
+          .settings-hero-flat-header .settings-reference-grid-4 {
+            grid-template-columns: 1fr !important;
+          }
+
+          .dashboard-panel__action {
+            display: none;
+          }
+
+          .dashboard-chart-bar small[data-major="false"] {
+            visibility: hidden;
           }
         }
       `}</style>
@@ -976,24 +1217,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         description={pick(
           '把设置总览升级成可读数据的运营驾驶舱：消耗趋势、API 路由、浏览器助手链路、存储和日志健康度都在一个屏幕内判断。',
           'A data-first settings command center for spend trends, API routing, browser-assistant pipeline, storage, and log health.',
-        )}
-        actions={(
-          <>
-            <SettingsActionButton
-              icon={RefreshCw}
-              loading={refreshing}
-              onClick={() => void refreshDashboard()}
-            >
-              {pick('刷新状态', 'Refresh')}
-            </SettingsActionButton>
-            <SettingsActionButton
-              icon={ArrowRight}
-              tone="primary"
-              onClick={() => onNavigate(dashboardPrimaryAction.target)}
-            >
-              {dashboardPrimaryAction.label}
-            </SettingsActionButton>
-          </>
         )}
         metrics={(
           <>
@@ -1031,12 +1254,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           tone="indigo"
           icon={<Activity size={18} />}
           eyebrow={pick('消耗曲线', 'Spend curve')}
-          title={pick('今日调用与积分消耗趋势', 'Today usage and credit spend')}
+          title={pick('今日累计消耗趋势', 'Today cumulative spend trend')}
           action={<SettingsBadge tone={todayUsageCount > 0 ? 'indigo' : 'neutral'}>{pick(`${todayUsageCount} 次`, `${todayUsageCount} calls`)}</SettingsBadge>}
           onClick={() => onNavigate('consumption-records')}
         >
           <div className="dashboard-chart-shell">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="dashboard-chart-summary">
               <MetricTile
                 label={pick('账单金额', 'Billed amount')}
                 value={formatUsd(todayCostUsd)}
@@ -1044,42 +1267,62 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                 tone="emerald"
               />
               <MetricTile
-                label={pick('峰值窗口', 'Peak window')}
+                label={pick('峰值时段', 'Peak period')}
                 value={peakUsageBucket?.label.replace(':00', '') || '--'}
-                helper={peakUsageBucket ? pick(`${formatNumber(peakUsageBucket.count)} 次请求`, `${formatNumber(peakUsageBucket.count)} calls`) : pick('暂无峰值', 'No peak yet')}
+                helper={peakUsageBucket && hasUsageSignal ? pick(`${formatNumber(peakUsageBucket.count)} 次请求`, `${formatNumber(peakUsageBucket.count)} calls`) : pick('暂无峰值', 'No peak yet')}
                 tone="indigo"
               />
             </div>
 
-            <div className="dashboard-chart" aria-label={pick('今日消耗曲线图', 'Today spend curve chart')}>
-              <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img">
+            <div className="dashboard-chart" aria-label={pick('今日累计消耗曲线图', 'Today cumulative spend curve chart')}>
+              <div className="dashboard-chart__header">
+                <span className="dashboard-chart__title">{pick('累计曲线 / 分段柱状', 'Cumulative curve / interval bars')}</span>
+                <span className="dashboard-chart__legend">{pick('累计消耗', 'Cumulative spend')}</span>
+              </div>
+              <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} role="img">
+                {[25, 50, 75, 100].map((grid) => {
+                  const y = CHART_BOTTOM - (grid / 100) * CHART_INNER_HEIGHT;
+                  return <line key={grid} className="dashboard-chart__grid" x1={CHART_PADDING_X} x2={CHART_WIDTH - CHART_PADDING_X} y1={y} y2={y} />;
+                })}
+                <line className="dashboard-chart__axis" x1={CHART_PADDING_X} x2={CHART_WIDTH - CHART_PADDING_X} y1={CHART_BOTTOM} y2={CHART_BOTTOM} />
                 {areaPath ? <path className="dashboard-chart__area" d={areaPath} /> : null}
                 {linePath ? <path className="dashboard-chart__line" d={linePath} /> : null}
-                {usageBuckets.map((bucket, index) => {
-                  const x = usageBuckets.length > 1 ? (index * 100) / (usageBuckets.length - 1) : 100;
-                  const y = 100 - bucket.percentage;
-                  return (
-                    <circle
-                      key={bucket.label}
-                      className="dashboard-chart__dot"
-                      cx={x}
-                      cy={y}
-                      r="2.6"
-                    />
-                  );
-                })}
+                {chartPoints.map((point, index) => (
+                  <circle
+                    key={usageBuckets[index]?.label || index}
+                    className="dashboard-chart__dot"
+                    cx={point.x}
+                    cy={point.y}
+                    r={usageBuckets[index]?.isMajorTick ? 3.2 : 2.1}
+                  />
+                ))}
               </svg>
+              {!hasUsageSignal ? (
+                <div className="dashboard-chart__empty">
+                  <span>{pick('今天还没有消耗数据，曲线保持基线。', 'No spend data today. The curve stays on baseline.')}</span>
+                </div>
+              ) : null}
 
               <div className="dashboard-chart-bars">
                 {usageBuckets.map((bucket) => (
-                  <div key={bucket.label} className="dashboard-chart-bar" title={`${bucket.label} · ${formatNumber(bucket.amount, 2)} credits · ${bucket.count} calls`}>
+                  <div
+                    key={bucket.label}
+                    className="dashboard-chart-bar"
+                    title={pick(
+                      `${bucket.label} · ${formatNumber(bucket.amount, 2)} 积分 · ${bucket.count} 次`,
+                      `${bucket.label} · ${formatNumber(bucket.amount, 2)} credits · ${bucket.count} calls`,
+                    )}
+                  >
                     <span className="dashboard-chart-bar__track">
                       <span
                         className="dashboard-chart-bar__fill"
-                        style={{ ['--bucket-height' as string]: `${bucket.percentage}%` }}
+                        style={{
+                          ['--bucket-height' as string]: `${hasUsageSignal ? bucket.barPercentage : 4}%`,
+                          ['--bucket-opacity' as string]: bucket.amount > 0 || bucket.count > 0 ? '1' : '0.26',
+                        }}
                       />
                     </span>
-                    <small>{bucket.label.replace(':00', '')}</small>
+                    <small data-major={bucket.isMajorTick ? 'true' : 'false'}>{bucket.label.replace(':00', '')}</small>
                   </div>
                 ))}
               </div>
