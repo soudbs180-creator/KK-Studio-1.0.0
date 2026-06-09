@@ -26,7 +26,7 @@ test("App delegates workspace panel rendering to a dedicated shell component", (
   assert.match(layerSource, /<AssetLibraryPanel/);
   assert.match(panelsSource, /renderChatSidebar\?: \(\) => ReactNode;/);
   assert.match(panelsSource, /renderLibraryPanel\?: \(\) => ReactNode;/);
-  assert.match(panelsSource, /activePanel === 'chat' \? renderChatSidebar\?\.\(\) : null/);
+  assert.match(panelsSource, /activePanel === 'chat' \|\| !isMobile\) \? renderChatSidebar\?\.\(\) : null/);
   assert.doesNotMatch(panelsSource, /!isMobile && renderChatSidebar/);
   assert.match(panelsSource, /\{activeSurface === 'library' \? renderLibraryPanel\?\.\(\) : null\}/);
   assert.doesNotMatch(panelsSource, /chatSidebar\?: ReactNode;/);

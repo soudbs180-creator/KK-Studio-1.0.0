@@ -75,7 +75,7 @@ test('Admin API config uses the same official and relay card model while exposin
   assert.match(source, /handleSaveDraftProvider/);
   assert.match(source, /data-testid="admin-api-provider-draft"/);
   assert.doesNotMatch(source, /admin-pricing-draft/);
-  assert.match(source, /API 供应商与模型积分/);
+  assert.match(source, /API 供应商配置/);
   assert.match(cssSource, /\.admin-api-nexus \{/);
   assert.match(cssSource, /\.admin-api-nexus__pricing-grid \{/);
   assert.match(cssSource, /\.admin-api-nexus__draft \{/);
