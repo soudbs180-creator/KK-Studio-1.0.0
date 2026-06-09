@@ -763,38 +763,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
         </div>
 
-        {/* 卡片 2: API 工作台 (API Workspace) - 电脑端占 2*1 格 (2A) */}
-        <button
-          type="button"
-          aria-label={pick('+ 添加 API', '+ Add API')}
-          className="dashboard-grid-card a-card-span-2-col group dashboard-left-col-span-2"
-          onClick={() => onNavigate('api-management')}
-        >
-          <div className="dashboard-card-glow" style={{ background: '#3b82f6' }} />
-          <div className="flex items-center gap-3 w-full h-full">
-            {/* 左侧：信息区域 */}
-            <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-                <KeyRound size={14} />
-                <span className="text-[9px] font-bold uppercase tracking-wider">{pick('API 工作台', 'API Workspace')}</span>
-                <span className="text-[9px] bg-blue-500/10 border border-blue-500/30 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap">
-                  {officialCount} {pick('官方', 'Official')} / {activeProviderCount} {pick('在线', 'Online')}
-                </span>
-              </div>
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white">{pick('多供应商与能力分配', 'API & Capability Routing')}</h3>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-normal truncate">
-                {pick('管理本地 API 密钥与第三方中转', 'Manage API keys and external proxies')}
-              </p>
-            </div>
-            {/* 右侧：圆形箭头按钮引导 */}
-            <div className="shrink-0 flex items-center justify-center h-9 w-9 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-600 dark:text-blue-400 transition-all duration-200 group-hover:bg-blue-600/40 group-hover:scale-110">
-              <ArrowRight size={16} />
-            </div>
-          </div>
-        </button>
-
-
-
         {/* 卡片 4: 计费账本 (Billing Ledger) - 占 1*1 格 (1A) */}
         <div 
           className="dashboard-grid-card dashboard-left-col-1"
@@ -869,6 +837,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             </div>
           </div>
         </div>
+
+        {/* 卡片 2: API 工作台 (API Workspace) - 电脑端占 2*1 格 (2A) */}
+        <button
+          type="button"
+          aria-label={pick('+ 添加 API', '+ Add API')}
+          className="dashboard-grid-card a-card-span-2-col group dashboard-left-col-span-2"
+          onClick={() => onNavigate('api-management')}
+        >
+          <div className="dashboard-card-glow" style={{ background: '#3b82f6' }} />
+          <div className="flex items-center gap-3 w-full h-full">
+            {/* 左侧：信息区域 */}
+            <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                <KeyRound size={14} />
+                <span className="text-[9px] font-bold uppercase tracking-wider">{pick('API 工作台', 'API Workspace')}</span>
+                <span className="text-[9px] bg-blue-500/10 border border-blue-500/30 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap">
+                  {officialCount} {pick('官方', 'Official')} / {activeProviderCount} {pick('在线', 'Online')}
+                </span>
+              </div>
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white">{pick('多供应商与能力分配', 'API & Capability Routing')}</h3>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-normal truncate">
+                {pick('管理本地 API 密钥与第三方中转', 'Manage API keys and external proxies')}
+              </p>
+            </div>
+            {/* 右侧：圆形箭头按钮引导 */}
+            <div className="shrink-0 flex items-center justify-center h-9 w-9 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-600 dark:text-blue-400 transition-all duration-200 group-hover:bg-blue-600/40 group-hover:scale-110">
+              <ArrowRight size={16} />
+            </div>
+          </div>
+        </button>
 
         {/* 卡片 7: 浏览器助手 (Browser Assistant) - 电脑端占 2*1 格 (2A) */}
         <div 
