@@ -81,6 +81,11 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     adminModelService.setStartupStage(nextStage);
   };
 
+  // 简体中文注释：监听 stage 的改变并将其安全地同步至底层单例服务，防止在 React 的 state updater 中触发副作用导致死循环
+  useEffect(() => {
+    applyServiceStage(stage);
+  }, [stage]);
+
   useEffect(() => {
     startupRunIdRef.current += 1;
     const startupRunId = startupRunIdRef.current;
@@ -96,9 +101,7 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setLatestStartupSnapshot(nextStage, user?.id || null);
       startTransition(() => {
         setStage((currentStage) => {
-          const resolvedStage = hasReachedStage(currentStage, nextStage) ? currentStage : nextStage;
-          applyServiceStage(resolvedStage);
-          return resolvedStage;
+          return hasReachedStage(currentStage, nextStage) ? currentStage : nextStage;
         });
       });
     };
@@ -195,9 +198,7 @@ export const AppStartupProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const advanceTo = React.useCallback((nextStage: AppStartupStage) => {
     startTransition(() => {
       setStage((currentStage) => {
-        const resolvedStage = hasReachedStage(currentStage, nextStage) ? currentStage : nextStage;
-        applyServiceStage(resolvedStage);
-        return resolvedStage;
+        return hasReachedStage(currentStage, nextStage) ? currentStage : nextStage;
       });
     });
   }, []);

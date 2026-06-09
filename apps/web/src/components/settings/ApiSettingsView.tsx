@@ -2151,8 +2151,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
         .filter((provider): provider is ThirdPartyProvider => Boolean(provider))
         .sort((left, right) => right.updatedAt - left.updatedAt);
 
-      setReadonlyOfficialSlots(nextOfficialSlots);
-      setReadonlyProviders(nextProviders);
+      setReadonlyOfficialSlots((prev) => (prev.length === 0 && nextOfficialSlots.length === 0) ? prev : nextOfficialSlots);
+      setReadonlyProviders((prev) => (prev.length === 0 && nextProviders.length === 0) ? prev : nextProviders);
       if (nextOfficialSlots.length > 0 || nextProviders.length > 0) {
         writeUserApiViewSnapshot(authenticatedUserId, nextOfficialSlots, nextProviders);
       } else {
@@ -2202,8 +2202,8 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
 
     if (!isUserApiPersistenceDegradedFromHealth(nextHealth)) {
       clearUserApiViewSnapshot(authenticatedUserId);
-      setReadonlyOfficialSlots([]);
-      setReadonlyProviders([]);
+      setReadonlyOfficialSlots((prev) => prev.length === 0 ? prev : []);
+      setReadonlyProviders((prev) => prev.length === 0 ? prev : []);
     }
   }, [authenticatedUserId, pick, refresh, refreshApiHealth]);
   const refreshAfterCloudUserApiMutation = useCallback(async () => {
@@ -2253,23 +2253,22 @@ const ApiSettingsViewInner: React.FC<{ initialSupplier?: Supplier | null }> = ({
   useEffect(() => {
     const cachedSnapshot = readUserApiViewSnapshot(authenticatedUserId);
     if (!cachedSnapshot) {
-      setReadonlyOfficialSlots([]);
-      setReadonlyProviders([]);
+      setReadonlyOfficialSlots((prev) => prev.length === 0 ? prev : []);
+      setReadonlyProviders((prev) => prev.length === 0 ? prev : []);
       return;
     }
 
-    setReadonlyOfficialSlots(
-      cachedSnapshot.officialSlots
-        .map((slot) => toReadonlyOfficialSlot(slot))
-        .filter((slot): slot is KeySlot => Boolean(slot))
-        .filter(isOfficialSlot),
-    );
-    setReadonlyProviders(
-      cachedSnapshot.providers
-        .map((provider) => toReadonlyProvider(provider))
-        .filter((provider): provider is ThirdPartyProvider => Boolean(provider))
-        .sort((left, right) => right.updatedAt - left.updatedAt),
-    );
+    const nextOfficial = cachedSnapshot.officialSlots
+      .map((slot) => toReadonlyOfficialSlot(slot))
+      .filter((slot): slot is KeySlot => Boolean(slot))
+      .filter(isOfficialSlot);
+    setReadonlyOfficialSlots((prev) => (prev.length === 0 && nextOfficial.length === 0) ? prev : nextOfficial);
+
+    const nextProviders = cachedSnapshot.providers
+      .map((provider) => toReadonlyProvider(provider))
+      .filter((provider): provider is ThirdPartyProvider => Boolean(provider))
+      .sort((left, right) => right.updatedAt - left.updatedAt);
+    setReadonlyProviders((prev) => (prev.length === 0 && nextProviders.length === 0) ? prev : nextProviders);
   }, [authenticatedUserId]);
 
   useEffect(() => {

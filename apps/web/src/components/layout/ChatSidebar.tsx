@@ -240,7 +240,7 @@ const createWelcomeMessage = (): Message => ({
     id: 'welcome',
     role: 'assistant',
     content: '你好！我是 KK Studio 数字助手。\n有什么我可以帮您？\n\n试试输入 "/image 一只猫" 来生成图片！',
-    timestamp: Date.now()
+    timestamp: 0
 });
 
 const cleanGreeting = (text: string): string => {
@@ -722,15 +722,7 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         return loadedSessions;
     });
     const [activeSessionId, setActiveSessionId] = useState<string>(() => sessions[0]?.id || `session_${Date.now()}`);
-    // 简体中文：同步当前活动会话到全局接管助理的消息流中
-    useEffect(() => {
-        const active = sessions.find(s => s.id === activeSessionId);
-        if (active) {
-            setMessages(active.messages?.length ? active.messages : [createWelcomeMessage()]);
-        } else {
-            setMessages([createWelcomeMessage()]);
-        }
-    }, [activeSessionId, sessions, setMessages]);
+    
     
     const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
     const [isCompressing, setIsCompressing] = useState(false);
@@ -1161,7 +1153,12 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     // 简体中文：实时同步选择的生图模型给 AI 接管 Context
     useEffect(() => {
         if (selectedModel) {
-            ctxSetSelectedModel(selectedModel);
+            ctxSetSelectedModel((prev: any) => {
+                if (prev?.id === selectedModel.id && prev?.name === selectedModel.name && prev?.description === selectedModel.description) {
+                    return prev;
+                }
+                return selectedModel;
+            });
         }
     }, [selectedModel, ctxSetSelectedModel]);
 
@@ -1203,7 +1200,14 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     useEffect(() => {
         const updateModels = () => {
             const models = buildAvailableChatModels(canBrowseSystemCreditModels);
-            setAvailableModels(models);
+            
+            // 简体中文：在模型列表内容一致时跳过更新，避免触发子组件不必要的重新渲染
+            setAvailableModels((prevModels) => {
+                if (JSON.stringify(prevModels) === JSON.stringify(models)) {
+                    return prevModels;
+                }
+                return models;
+            });
 
             if (models.length > 0) {
                 const assistantPreferredModel = resolveAssistantPreferredModel(models);
@@ -1215,7 +1219,12 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                     lastPreferredModelIdRef.current = preferredModelId;
                     const match = models.find(m => m.id === preferredModelId);
                     if (match) {
-                        setSelectedModel(match);
+                        setSelectedModel(prev => {
+                            if (prev?.id === match.id && prev?.name === match.name && prev?.description === match.description) {
+                                return prev;
+                            }
+                            return match;
+                        });
                         return;
                     }
                 }
@@ -1223,10 +1232,20 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
                 const exists = models.find(m => m.id === selectedModel.id);
                 const staleDisabledCapabilityModel = isCapabilityRouteAssignmentModelDisabled('assistant', selectedModel.id);
                 if (!exists || staleDisabledCapabilityModel) {
-                    setSelectedModel(assistantPreferredModel);
+                    setSelectedModel(prev => {
+                        if (prev?.id === assistantPreferredModel.id && prev?.name === assistantPreferredModel.name && prev?.description === assistantPreferredModel.description) {
+                            return prev;
+                        }
+                        return assistantPreferredModel;
+                    });
                 } else {
                     if (exists.name !== selectedModel.name || exists.description !== selectedModel.description) {
-                        setSelectedModel(exists);
+                        setSelectedModel(prev => {
+                            if (prev?.id === exists.id && prev?.name === exists.name && prev?.description === exists.description) {
+                                return prev;
+                            }
+                            return exists;
+                        });
                     }
                 }
             }
@@ -1311,11 +1330,6 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     // 3. Layout State
     const [keyboardHeight, setKeyboardHeight] = useState(0);
     const [sidebarWidth, setSidebarWidth] = useState(() => {
-        // [NEW] Added width sync
-        setTimeout(() => onWidthChange && onWidthChange(
-            Math.max(320, parseInt(localStorage.getItem('kk_chat_width') || '420', 10))
-        ), 0);
-
         const saved = localStorage.getItem('kk_chat_width');
         return saved ? Math.max(320, parseInt(saved, 10)) : 420;
     });
@@ -1700,7 +1714,13 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
     useEffect(() => {
         const active = sessions.find(s => s.id === activeSessionId);
         if (active) {
-            setMessages(active.messages?.length ? active.messages : [createWelcomeMessage()]);
+            // 简体中文：在内容一致时跳过更新，阻断双向同步死循环
+            setMessages((prevMessages) => {
+                if (JSON.stringify(prevMessages) === JSON.stringify(active.messages)) {
+                    return prevMessages;
+                }
+                return active.messages?.length ? active.messages : [createWelcomeMessage()];
+            });
             return;
         }
 
@@ -1719,33 +1739,38 @@ const NormalChatSidebar: React.FC<NormalChatSidebarProps> = (props) => {
         let needsSummary = false;
         let substantialQuestion: string | undefined;
 
-        setSessions(prev => prev.map(session => {
-            if (session.id !== activeSessionId) return session;
-
-            // 避免完全一致时的多余渲染
-            if (JSON.stringify(session.messages) === JSON.stringify(messages)) return session;
-
-            const firstSubstantial = getFirstSubstantialQuestion(messages);
-            let updatedTitle = session.title;
-            let customTitle = session.customTitle;
-
-            // 发现第一个实质性提问且标题未锁定时，立刻生成本地临时标题并锁定 customTitle
-            if (firstSubstantial && !customTitle) {
-                const cleanedText = cleanGreeting(firstSubstantial.content);
-                updatedTitle = cleanedText.slice(0, 16) || '新对话';
-                customTitle = true; // 锁定标题，后面就算问什么内容都不会被影响
-                needsSummary = true;
-                substantialQuestion = firstSubstantial.content;
+        setSessions(prev => {
+            const active = prev.find(s => s.id === activeSessionId);
+            // 简体中文：如果活动会话不存在或者内容没有变化，直接返回原数组引用，防止产生新数组引用触发外部副作用
+            if (!active || JSON.stringify(active.messages) === JSON.stringify(messages)) {
+                return prev;
             }
 
-            return {
-                ...session,
-                messages,
-                title: updatedTitle,
-                customTitle,
-                updatedAt: Date.now()
-            };
-        }));
+            return prev.map(session => {
+                if (session.id !== activeSessionId) return session;
+
+                const firstSubstantial = getFirstSubstantialQuestion(messages);
+                let updatedTitle = session.title;
+                let customTitle = session.customTitle;
+
+                // 发现第一个实质性提问且标题未锁定时，立刻生成本地临时标题并锁定 customTitle
+                if (firstSubstantial && !customTitle) {
+                    const cleanedText = cleanGreeting(firstSubstantial.content);
+                    updatedTitle = cleanedText.slice(0, 16) || '新对话';
+                    customTitle = true; // 锁定标题，后面就算问什么内容都不会被影响
+                    needsSummary = true;
+                    substantialQuestion = firstSubstantial.content;
+                }
+
+                return {
+                    ...session,
+                    messages,
+                    title: updatedTitle,
+                    customTitle,
+                    updatedAt: Date.now()
+                };
+            });
+        });
 
         // 2. 发起大模型异步标题总结
         if (needsSummary && substantialQuestion && selectedModel && !summarizingSessionIdsRef.current.has(activeSessionId)) {

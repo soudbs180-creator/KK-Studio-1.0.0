@@ -368,20 +368,20 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       console.error('[BillingContext] Failed to load credit balance from canonical API:', error);
       return undefined;
     }
-  }, [billingRuntime.shouldBootstrapBilling, user, isTempUser, canStartBillingBootstrap]);
+  }, [billingRuntime.shouldBootstrapBilling, user?.id, isTempUser, canStartBillingBootstrap]);
 
   const loadCreditTransactions = useCallback(async (updateBalance = true): Promise<number | undefined> => {
     if (!billingRuntime.shouldBootstrapBilling) {
-      setBillingLogs([]);
-      setUsageLogs([]);
-      setLogsLoaded(false);
+      setBillingLogs((prev) => prev.length === 0 ? prev : []);
+      setUsageLogs((prev) => prev.length === 0 ? prev : []);
+      setLogsLoaded((prev) => prev === false ? prev : false);
       return undefined;
     }
 
     if (!user || isTempUser) {
-      setBillingLogs([]);
-      setUsageLogs([]);
-      setLogsLoaded(false);
+      setBillingLogs((prev) => prev.length === 0 ? prev : []);
+      setUsageLogs((prev) => prev.length === 0 ? prev : []);
+      setLogsLoaded((prev) => prev === false ? prev : false);
       return undefined;
     }
 
@@ -426,7 +426,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       console.error('[BillingContext] Failed to load credit transactions from canonical API:', error);
       return undefined;
     }
-  }, [billingRuntime.shouldBootstrapBilling, user, isTempUser, applyTransactionRows, canStartBillingBootstrap]);
+  }, [billingRuntime.shouldBootstrapBilling, user?.id, isTempUser, applyTransactionRows, canStartBillingBootstrap]);
 
   const refreshBalanceOnly = useCallback(async (): Promise<number | undefined> => {
     if (balanceRefreshPromiseRef.current) {
@@ -504,16 +504,21 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return refreshPromise;
   }, [billingRuntime.shouldBootstrapBilling, refreshBalanceOnly, loadCreditTransactions, canStartBillingBootstrap, hasVisibleBillingSeed]);
 
+  const refreshBillingRef = useRef(refreshBilling);
+  useEffect(() => {
+    refreshBillingRef.current = refreshBilling;
+  }, [refreshBilling]);
+
   const fetchLogs = useCallback(async () => {
     if (!billingRuntime.shouldBootstrapBilling || !user || isTempUser) {
-      setBillingLogs([]);
-      setUsageLogs([]);
-      setLogsLoaded(false);
+      setBillingLogs((prev) => prev.length === 0 ? prev : []);
+      setUsageLogs((prev) => prev.length === 0 ? prev : []);
+      setLogsLoaded((prev) => prev === false ? prev : false);
       return;
     }
 
-    await refreshBilling({ includeTransactions: true });
-  }, [billingRuntime.shouldBootstrapBilling, user, isTempUser, refreshBilling]);
+    await refreshBillingRef.current({ includeTransactions: true });
+  }, [billingRuntime.shouldBootstrapBilling, user?.id, isTempUser]);
 
   const scheduleRealtimeRefresh = useCallback((delayMs = 120, mode: 'balance' | 'full' = 'balance') => {
     if (!billingRuntime.shouldBootstrapBilling || !user || isTempUser || typeof window === 'undefined') {
@@ -531,19 +536,19 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       if (mode === 'full' && logsLoadedRef.current) {
-        void refreshBilling({
+        void refreshBillingRef.current({
           includeTransactions: true,
           silent: true,
         });
         return;
       }
 
-      void refreshBilling({
+      void refreshBillingRef.current({
         includeTransactions: false,
         silent: true,
       });
     }, delayMs);
-  }, [billingRuntime.shouldBootstrapBilling, user, isTempUser, refreshBilling, canStartBillingBootstrap]);
+  }, [billingRuntime.shouldBootstrapBilling, user?.id, isTempUser, canStartBillingBootstrap]);
 
   useEffect(() => {
     refreshPromiseRef.current = null;
@@ -611,13 +616,13 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const init = async () => {
       if (!billingRuntime.shouldBootstrapBilling || !user || isTempUser) {
-        setHydratedUserId(null);
-        setBalance(0);
-        setBillingLogs([]);
-        setUsageLogs([]);
-        setLogsLoaded(false);
-        setLoading(false);
-        setRefreshing(false);
+        setHydratedUserId((prev) => prev === null ? prev : null);
+        setBalance((prev) => prev === 0 ? prev : 0);
+        setBillingLogs((prev) => prev.length === 0 ? prev : []);
+        setUsageLogs((prev) => prev.length === 0 ? prev : []);
+        setLogsLoaded((prev) => prev === false ? prev : false);
+        setLoading((prev) => prev === false ? prev : false);
+        setRefreshing((prev) => prev === false ? prev : false);
         return;
       }
 
@@ -645,7 +650,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => {
       cancelled = true;
     };
-  }, [billingRuntime.shouldBootstrapBilling, activeBillingUserId, user, isTempUser, refreshBilling, canStartBillingBootstrap]);
+  }, [billingRuntime.shouldBootstrapBilling, activeBillingUserId, user?.id, isTempUser, canStartBillingBootstrap]);
 
   useEffect(() => {
     const userId = String(user?.id || '').trim();
@@ -759,7 +764,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return { success: false, message: 'Credit debit failed' };
       }
     },
-    [billingRuntime.billingEnabled, user, isTempUser, apiAccessToken, loadCreditTransactions],
+    [billingRuntime.billingEnabled, user?.id, isTempUser, apiAccessToken, loadCreditTransactions],
   );
 
   const consumeCredits = useCallback(
@@ -819,7 +824,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return { success: false, message: 'Credit refund failed' };
       }
     },
-    [billingRuntime.billingEnabled, user, isTempUser, apiAccessToken, loadCreditTransactions],
+    [billingRuntime.billingEnabled, user?.id, isTempUser, apiAccessToken, loadCreditTransactions],
   );
 
   const recharge = useCallback(

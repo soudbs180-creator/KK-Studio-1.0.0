@@ -462,7 +462,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     void refreshDashboard();
     const unsubscribe = keyManager.subscribe(() => void refreshDashboard());
     return unsubscribe;
-  }, [billingLoading, billingLogs.length, refreshDashboard, usageLogs.length]);
+  }, [refreshDashboard]);
 
   useEffect(() => {
     setLogs(getTodayLogs());

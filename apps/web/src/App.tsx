@@ -5948,6 +5948,18 @@ const AppKkUIProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
   );
 };
 
+const AdminLayoutSuspended: React.FC<any> = (props) => (
+  <React.Suspense fallback={<div className="fixed inset-0 z-[10005] flex items-center justify-center bg-black text-white"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>}>
+    <AdminLayout {...props} />
+  </React.Suspense>
+);
+
+const SettingsPageRootSuspended: React.FC<any> = (props) => (
+  <React.Suspense fallback={<div className="fixed inset-0 z-[10005] flex items-center justify-center bg-black text-white"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>}>
+    <SettingsPageRoot {...props} />
+  </React.Suspense>
+);
+
 const App: React.FC = () => {
   const [showCostEstimation, setShowCostEstimation] = useState(false);
   const rootMode = createAppRootMode({ pathname: window.location.pathname });
@@ -5985,17 +5997,9 @@ const App: React.FC = () => {
                 showStartupBanner={rootMode === 'workspace'}
                 AppContentComponent={
                   rootMode === 'admin'
-                    ? (props: any) => (
-                        <React.Suspense fallback={<div className="fixed inset-0 z-[10005] flex items-center justify-center bg-black text-white"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>}>
-                          <AdminLayout {...props} />
-                        </React.Suspense>
-                      )
+                    ? AdminLayoutSuspended
                     : rootMode === 'settings'
-                      ? (props: any) => (
-                          <React.Suspense fallback={<div className="fixed inset-0 z-[10005] flex items-center justify-center bg-black text-white"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>}>
-                            <SettingsPageRoot {...props} />
-                          </React.Suspense>
-                        )
+                      ? SettingsPageRootSuspended
                       : AppContent
                 }
               />

@@ -851,6 +851,9 @@ export class KeyManager {
     }
 
     setStartupStage(stage: AppStartupStage): void {
+        if (this.startupStage === stage) {
+            return;
+        }
         this.startupStage = stage;
 
         if (!this.userId) {
