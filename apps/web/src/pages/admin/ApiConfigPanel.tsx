@@ -1,27 +1,16 @@
-// 职责：管理员维护供应商、预设 API、Key 和基础模型积分；高级能力开关迁移到 AI 管理页面。
+// 职责：管理员维护供应商、预设 API、Key、模型 ID 和基础积分费用。
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Edit, ExternalLink, Globe, Plus, RefreshCw, Save, Shield } from "lucide-react";
-import type {
-  AdminCreditProviderDto,
-  SaveAdminCreditProviderRequestDto,
-} from "../../../../../packages/shared/src/index.ts";
+import type { AdminCreditProviderDto } from "../../../../../packages/shared/src/index.ts";
 import { kkWebApiClient } from "../../services/api/kkApiClient.ts";
 import {
-  ADMIN_MODEL_QUALITY_KEYS,
-  createDefaultAdminQualityPricing,
-  type AdminModelQualityKey,
-  type AdminModelQualityPricing,
-} from "../../services/model/adminModelQuality.ts";
-import {
   adminModelService,
-  type AdminModelConfig,
   type AdminProvider,
 } from "../../services/model/adminModelService.ts";
 import { safeOpenLink } from "../../utils/browserUtils";
 
 type AdminPresetKind = "official" | "relay";
-type DraftPricing = Record<AdminModelQualityKey, string>;
 
 type AdminApiPreset = {
   name: string;
@@ -165,7 +154,7 @@ const ADMIN_API_PRESETS: AdminApiPreset[] = [
     requestProfileId: "apimart-openai-compatible",
     color: "#9333ea",
     website: "https://docs.apimart.ai/cn",
-    note: "APIMart 返回 { code, data } 包装结构，必须使用专用 adapter。",
+    note: "专用返回结构，使用 APIMart 预设保存。",
   },
   {
     name: "12AI",
@@ -176,7 +165,7 @@ const ADMIN_API_PRESETS: AdminApiPreset[] = [
     requestProfileId: "12ai-documented-multi-protocol",
     color: "#06b6d4",
     website: "https://doc.12ai.org/docs/api",
-    note: "12AI 独立多协议预设，按模型自动走 OpenAI Chat / Claude Messages / Gemini Generate Content。",
+    note: "独立多协议预设，按模型自动选择 12AI 文档协议。",
   },
   {
     name: "Wuyin / 速创",
@@ -187,7 +176,7 @@ const ADMIN_API_PRESETS: AdminApiPreset[] = [
     requestProfileId: "wuyin-suchuang-form",
     color: "#f59e0b",
     website: "https://api.wuyinkeji.com/type/all",
-    note: "Wuyin 必须按每个模型文档执行；图片/视频/音频/工具由后端 strict router 接管。",
+    note: "按每个 Wuyin 模型文档执行。",
   },
   {
     name: "One API / New API",
@@ -222,17 +211,10 @@ type AdminProviderDraft = {
   apiKey: string;
   color: string;
   kind: AdminPresetKind;
+  creditCost: string;
   isEditing?: boolean;
   originalModels?: any[];
   retainApiKeyFingerprints?: string[];
-};
-
-const toDraftPricing = (pricing?: AdminModelQualityPricing, fallbackCost = 1): DraftPricing => {
-  const normalized = pricing || createDefaultAdminQualityPricing(fallbackCost);
-  return ADMIN_MODEL_QUALITY_KEYS.reduce((draft, key) => {
-    draft[key] = String(normalized[key]?.creditCost || 1);
-    return draft;
-  }, {} as DraftPricing);
 };
 
 const parseHost = (url: string): string => {
@@ -243,12 +225,7 @@ const parseHost = (url: string): string => {
   }
 };
 
-const formatPricingSummary = (pricing?: AdminModelQualityPricing, fallbackCost = 1): string => {
-  const normalized = pricing || createDefaultAdminQualityPricing(fallbackCost);
-  return `1K ${normalized["1K"]?.creditCost || 1} 分 · 4K ${normalized["4K"]?.creditCost || 1} 分`;
-};
-
-const normalizeCreditCost = (value: string): number => {
+const normalizeCreditCost = (value: string | number | undefined): number => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.max(1, parsed) : 1;
 };
@@ -270,6 +247,7 @@ const createDraftFromPreset = (preset: AdminApiPreset): AdminProviderDraft => ({
   apiKey: "",
   color: preset.color,
   kind: preset.kind,
+  creditCost: "1",
 });
 
 const createEmptyDraft = (): AdminProviderDraft => ({
@@ -283,41 +261,37 @@ const createEmptyDraft = (): AdminProviderDraft => ({
   apiKey: "",
   color: "#3B82F6",
   kind: "relay",
+  creditCost: "1",
 });
 
-const buildSavePayload = (
-  provider: AdminCreditProviderDto,
-  selectedModel: AdminModelConfig,
-  nextPricing: AdminModelQualityPricing,
-): SaveAdminCreditProviderRequestDto => ({
-  providerName: provider.providerName,
-  baseUrl: provider.baseUrl,
-  providerKind: provider.providerKind || "relay",
-  apiKeys: [],
-  retainApiKeyFingerprints: (provider.apiKeyEntries || []).map((entry) => entry.fingerprint).filter(Boolean),
-  models: provider.models.map((model) => {
-    const isTarget = model.modelId === selectedModel.id;
-    const qualityPricing = isTarget ? nextPricing : model.qualityPricing || createDefaultAdminQualityPricing(model.creditCost || 1);
-
-    return {
-      modelId: model.modelId,
-      displayName: model.displayName || model.modelId,
-      description: model.description || "",
-      endpointType: model.endpointType || selectedModel.endpoint || "openai_chat_completions",
-      requestProfileId: model.requestProfileId || selectedModel.requestProfileId || "",
-      creditCost: isTarget ? nextPricing["1K"].creditCost : Math.max(1, Number(model.creditCost || 1)),
-      advancedEnabled: Boolean(model.advancedEnabled),
-      mixWithSameModel: Boolean(model.mixWithSameModel),
-      qualityPricing,
-      priority: Number(model.priority || 0),
-      weight: Number(model.weight || 0),
-      isActive: model.isActive !== false,
-      color: model.color || selectedModel.colorStart || "#3B82F6",
-      colorSecondary: model.colorSecondary || selectedModel.colorSecondary || null,
-      textColor: model.textColor === "black" ? "black" : "white",
-      maxCallsLimit: model.maxCallsLimit ?? null,
-    };
-  }),
+const buildModelPayload = (model: {
+  modelId: string;
+  displayName: string;
+  description?: string;
+  endpointType: string;
+  requestProfileId?: string;
+  creditCost: number;
+  priority?: number;
+  weight?: number;
+  isActive?: boolean;
+  color?: string;
+  colorSecondary?: string | null;
+  textColor?: "white" | "black";
+  maxCallsLimit?: number | null;
+}) => ({
+  modelId: model.modelId,
+  displayName: model.displayName || model.modelId,
+  description: model.description || "",
+  endpointType: model.endpointType || "openai_chat_completions",
+  requestProfileId: model.requestProfileId || "",
+  creditCost: normalizeCreditCost(model.creditCost),
+  priority: Number(model.priority || 0),
+  weight: Number(model.weight || 1),
+  isActive: model.isActive !== false,
+  color: model.color || "#3B82F6",
+  colorSecondary: model.colorSecondary || null,
+  textColor: model.textColor === "black" ? "black" : "white",
+  maxCallsLimit: model.maxCallsLimit ?? null,
 });
 
 export const ApiConfigPanel: React.FC = () => {
@@ -327,7 +301,7 @@ export const ApiConfigPanel: React.FC = () => {
   const [selectedProviderId, setSelectedProviderId] = useState<string>("");
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [providerDraft, setProviderDraft] = useState<AdminProviderDraft | null>(null);
-  const [draftPricing, setDraftPricing] = useState<DraftPricing>(() => toDraftPricing());
+  const [draftCreditCost, setDraftCreditCost] = useState<string>("1");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string>("");
@@ -338,7 +312,6 @@ export const ApiConfigPanel: React.FC = () => {
       setAdminProviders(response.data.items || []);
       return;
     }
-
     setMessage(response.error?.message || "无法读取管理员供应商详情。");
   }, []);
 
@@ -367,91 +340,74 @@ export const ApiConfigPanel: React.FC = () => {
   }, [selectedModelId, selectedProvider]);
 
   useEffect(() => {
-    if (!selectedProvider && providers[0]) {
-      setSelectedProviderId(providers[0].providerId);
-    }
+    if (!selectedProvider && providers[0]) setSelectedProviderId(providers[0].providerId);
   }, [providers, selectedProvider]);
 
   useEffect(() => {
     if (!selectedModel) return;
-    setDraftPricing(toDraftPricing(selectedModel.qualityPricing, selectedModel.creditCost));
+    setDraftCreditCost(String(selectedModel.creditCost || 1));
   }, [selectedModel]);
 
   const filteredPresets = ADMIN_API_PRESETS.filter((preset) => preset.kind === presetTab);
 
   const handlePreset = (preset: AdminApiPreset) => {
     setProviderDraft(createDraftFromPreset(preset));
-    setDraftPricing(toDraftPricing(undefined, 1));
-    setMessage(`${preset.name} 已载入。填写 API Key 和模型积分费用后即可保存。`);
+    setDraftCreditCost("1");
+    setMessage(`${preset.name} 已载入。填写 API Key、模型 ID 和基础积分费用后即可保存。`);
   };
 
   const handleCreateCustomDraft = () => {
     setProviderDraft(createEmptyDraft());
-    setDraftPricing(toDraftPricing(undefined, 1));
-    setMessage("自定义供应商草稿已创建。填写 Base URL、模型 ID、API Key 和积分费用后保存。");
+    setDraftCreditCost("1");
+    setMessage("自定义供应商草稿已创建。填写 Base URL、模型 ID、API Key 和基础积分费用后保存。");
   };
 
   const handleEditProvider = (provider: AdminProvider) => {
     const providerDetail = adminProviders.find((p) => p.providerId === provider.providerId);
-    const baseUrl = providerDetail?.baseUrl || "";
-    const providerKind = provider.providerKind || providerDetail?.providerKind || "relay";
-
     const firstModel = provider.models[0];
-    const modelId = firstModel?.id || "";
-    const displayName = firstModel?.displayName || "";
-    const endpointType = firstModel?.endpoint || "openai_chat_completions";
-    const requestProfileId = firstModel?.requestProfileId || providerDetail?.models[0]?.requestProfileId || "";
-    const color = firstModel?.colorStart || "#3B82F6";
+    const detailModel = providerDetail?.models[0];
+    const modelId = firstModel?.id || detailModel?.modelId || "";
+    const creditCost = firstModel?.creditCost || detailModel?.creditCost || 1;
 
-    const modelsForDraft = providerDetail ? providerDetail.models.map(m => ({
-      modelId: m.modelId,
-      displayName: m.displayName || m.modelId,
-      description: m.description || "",
-      endpointType: m.endpointType || "openai_chat_completions",
-      requestProfileId: m.requestProfileId || "",
-      creditCost: m.creditCost,
-      advancedEnabled: m.advancedEnabled,
-      mixWithSameModel: m.mixWithSameModel,
-      qualityPricing: m.qualityPricing || createDefaultAdminQualityPricing(m.creditCost || 1),
-      priority: m.priority,
-      weight: m.weight,
-      isActive: m.isActive,
-      color: m.color || "#3B82F6",
-      colorSecondary: m.colorSecondary || null,
-      textColor: m.textColor || "white",
-      maxCallsLimit: m.maxCallsLimit || null,
+    const originalModels = providerDetail ? providerDetail.models.map((model) => buildModelPayload({
+      modelId: model.modelId,
+      displayName: model.displayName || model.modelId,
+      description: model.description || "",
+      endpointType: model.endpointType || "openai_chat_completions",
+      requestProfileId: model.requestProfileId || "",
+      creditCost: model.creditCost || 1,
+      priority: model.priority || 0,
+      weight: model.weight || 1,
+      isActive: model.isActive,
+      color: model.color || "#3B82F6",
+      colorSecondary: model.colorSecondary || null,
+      textColor: model.textColor || "white",
+      maxCallsLimit: model.maxCallsLimit || null,
     })) : [];
 
     setProviderDraft({
       providerId: provider.providerId,
       providerName: provider.name,
-      baseUrl,
+      baseUrl: providerDetail?.baseUrl || "",
       modelId,
-      displayName,
-      endpointType,
-      requestProfileId,
+      displayName: firstModel?.displayName || detailModel?.displayName || modelId,
+      endpointType: firstModel?.endpoint || detailModel?.endpointType || "openai_chat_completions",
+      requestProfileId: firstModel?.requestProfileId || detailModel?.requestProfileId || "",
       apiKey: "",
-      color,
-      kind: providerKind,
+      color: firstModel?.colorStart || detailModel?.color || "#3B82F6",
+      kind: provider.providerKind || providerDetail?.providerKind || "relay",
+      creditCost: String(creditCost),
       isEditing: true,
-      originalModels: modelsForDraft,
+      originalModels,
       retainApiKeyFingerprints: (providerDetail?.apiKeyEntries || []).map((entry) => entry.fingerprint).filter(Boolean),
     });
-    setDraftPricing(toDraftPricing(firstModel?.qualityPricing, firstModel?.creditCost || 1));
+    setDraftCreditCost(String(creditCost));
     setMessage(`已载入供应商 ${provider.name} 的配置以供修改。`);
   };
 
   const handleDraftChange = (patch: Partial<AdminProviderDraft>) => {
     setProviderDraft((current) => current ? { ...current, ...patch } : current);
   };
-
-  const buildDraftPricing = (): AdminModelQualityPricing => ADMIN_MODEL_QUALITY_KEYS.reduce((pricing, key) => {
-    pricing[key] = {
-      enabled: true,
-      creditCost: normalizeCreditCost(draftPricing[key]),
-    };
-    return pricing;
-  }, {} as AdminModelQualityPricing);
 
   const handleSaveDraftProvider = async () => {
     if (!providerDraft) return;
@@ -463,41 +419,31 @@ export const ApiConfigPanel: React.FC = () => {
       return;
     }
 
-    const nextPricing = buildDraftPricing();
-    const providerId = providerDraft.isEditing && providerDraft.providerId
-      ? providerDraft.providerId
-      : buildProviderId(providerName, baseUrl);
-
-    const nextModel = {
+    const creditCost = normalizeCreditCost(providerDraft.creditCost || draftCreditCost);
+    const providerId = providerDraft.isEditing && providerDraft.providerId ? providerDraft.providerId : buildProviderId(providerName, baseUrl);
+    const nextModel = buildModelPayload({
       modelId,
       displayName: providerDraft.displayName.trim() || modelId,
       description: providerDraft.kind === "relay" ? "中转站模型通道" : "官方模型通道",
       endpointType: providerDraft.endpointType.trim() || "openai_chat_completions",
       requestProfileId: providerDraft.requestProfileId.trim(),
-      creditCost: nextPricing["1K"].creditCost,
-      advancedEnabled: false,
-      mixWithSameModel: false,
-      qualityPricing: nextPricing,
+      creditCost,
       priority: 0,
       weight: 1,
       isActive: true,
       color: providerDraft.color || "#3B82F6",
       colorSecondary: null,
-      textColor: "white" as const,
+      textColor: "white",
       maxCallsLimit: null,
-    };
+    });
 
     let finalModels: any[] = [];
     if (providerDraft.isEditing && providerDraft.originalModels && providerDraft.originalModels.length > 0) {
-      finalModels = providerDraft.originalModels.map((m, index) => {
-        if (index === 0 || m.modelId === providerDraft.modelId) {
-          return { ...m, ...nextModel };
-        }
-        return m;
+      finalModels = providerDraft.originalModels.map((model, index) => {
+        if (index === 0 || model.modelId === modelId) return { ...model, ...nextModel };
+        return model;
       });
-      if (!finalModels.some(m => m.modelId === modelId)) {
-        finalModels.unshift(nextModel);
-      }
+      if (!finalModels.some((model) => model.modelId === modelId)) finalModels.unshift(nextModel);
     } else {
       finalModels = [nextModel];
     }
@@ -511,7 +457,7 @@ export const ApiConfigPanel: React.FC = () => {
         apiKeys: providerDraft.apiKey.trim() ? [providerDraft.apiKey.trim()] : [],
         retainApiKeyFingerprints: providerDraft.isEditing ? (providerDraft.retainApiKeyFingerprints || []) : [],
         models: finalModels,
-      });
+      } as any);
 
       if (!response.success) {
         setMessage(response.error?.message || "保存供应商失败，请稍后重试。");
@@ -532,41 +478,50 @@ export const ApiConfigPanel: React.FC = () => {
 
   const handleSavePricing = async () => {
     if (!selectedProvider || !selectedModel) return;
-
     const providerDetail = adminProviders.find((provider) => provider.providerId === selectedProvider.providerId);
     if (!providerDetail) {
       setMessage("无法找到该供应商的管理员详情，请刷新后重试。");
       return;
     }
 
-    const targetModel = providerDetail.models.find((model) => model.modelId === selectedModel.id);
-    if (!targetModel) {
-      setMessage("无法找到该模型的管理员详情，请刷新后重试。");
-      return;
-    }
-
-    const nextPricing = buildDraftPricing();
-
+    const creditCost = normalizeCreditCost(draftCreditCost);
     setSaving(true);
     try {
-      const response = await kkWebApiClient.saveAdminCreditProvider(
-        providerDetail.providerId,
-        buildSavePayload(providerDetail, selectedModel, nextPricing),
-      );
+      const response = await kkWebApiClient.saveAdminCreditProvider(providerDetail.providerId, {
+        providerName: providerDetail.providerName,
+        baseUrl: providerDetail.baseUrl,
+        providerKind: providerDetail.providerKind || "relay",
+        apiKeys: [],
+        retainApiKeyFingerprints: (providerDetail.apiKeyEntries || []).map((entry) => entry.fingerprint).filter(Boolean),
+        models: providerDetail.models.map((model) => buildModelPayload({
+          modelId: model.modelId,
+          displayName: model.displayName || model.modelId,
+          description: model.description || "",
+          endpointType: model.endpointType || selectedModel.endpoint || "openai_chat_completions",
+          requestProfileId: model.requestProfileId || selectedModel.requestProfileId || "",
+          creditCost: model.modelId === selectedModel.id ? creditCost : model.creditCost || 1,
+          priority: model.priority || 0,
+          weight: model.weight || 1,
+          isActive: model.isActive,
+          color: model.color || selectedModel.colorStart || "#3B82F6",
+          colorSecondary: model.colorSecondary || selectedModel.colorSecondary || null,
+          textColor: model.textColor || "white",
+          maxCallsLimit: model.maxCallsLimit || null,
+        })),
+      } as any);
 
       if (!response.success) {
-        setMessage(response.error?.message || "保存积分参数失败，请稍后重试。");
+        setMessage(response.error?.message || "保存积分费用失败，请稍后重试。");
         return;
       }
 
-      selectedModel.qualityPricing = nextPricing;
-      selectedModel.creditCost = nextPricing["1K"].creditCost;
+      selectedModel.creditCost = creditCost;
       setProviders([...providers]);
-      setMessage(`${selectedModel.displayName} 的积分费用已保存到供应商配置。`);
+      setMessage(`${selectedModel.displayName} 的基础积分费用已保存。`);
       await refreshAdminProviders();
       await adminModelService.broadcastCatalogUpdate("admin-pricing-saved");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "保存积分参数失败，请稍后重试。");
+      setMessage(error instanceof Error ? error.message : "保存积分费用失败，请稍后重试。");
     } finally {
       setSaving(false);
     }
@@ -578,7 +533,7 @@ export const ApiConfigPanel: React.FC = () => {
         <div className="admin-api-nexus__header">
           <div>
             <h2>API 供应商配置</h2>
-            <p>这里只添加供应商、选择预设 API、填写地址 / Key，并维护基础模型积分费用；高级能力到 AI 管理页面配置。</p>
+            <p>这里只添加供应商、选择预设 API、填写地址 / Key、模型 ID 和基础积分费用。</p>
           </div>
           <button type="button" onClick={() => void adminModelService.forceLoadAdminModels()}>
             <RefreshCw size={15} />
@@ -589,7 +544,7 @@ export const ApiConfigPanel: React.FC = () => {
         {message ? <div className="admin-api-nexus__message">{message}</div> : null}
 
         <div className="admin-api-nexus__provider-grid">
-          {providers.filter((p) => (p.providerKind || "relay") === presetTab).map((provider) => (
+          {providers.filter((provider) => (provider.providerKind || "relay") === presetTab).map((provider) => (
             <div
               key={provider.providerId}
               className={`admin-api-nexus__provider-card ${selectedProvider?.providerId === provider.providerId ? "is-active" : ""}`}
@@ -605,8 +560,8 @@ export const ApiConfigPanel: React.FC = () => {
               {selectedProvider?.providerId === provider.providerId && (
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  onClick={(event) => {
+                    event.stopPropagation();
                     handleEditProvider(provider);
                   }}
                   className="admin-api-nexus__provider-card-edit"
@@ -631,7 +586,7 @@ export const ApiConfigPanel: React.FC = () => {
               )}
             </div>
           ))}
-          {!loading && providers.filter((p) => (p.providerKind || "relay") === presetTab).length === 0 ? (
+          {!loading && providers.filter((provider) => (provider.providerKind || "relay") === presetTab).length === 0 ? (
             <div className="admin-api-nexus__empty">此分类下暂无已发布的模型供应商。先从右侧目录添加。</div>
           ) : null}
         </div>
@@ -647,30 +602,26 @@ export const ApiConfigPanel: React.FC = () => {
               <span>{model.endpoint || "openai_chat_completions"}</span>
               <strong>{model.displayName}</strong>
               <small>{model.id}</small>
-              <em>{formatPricingSummary(model.qualityPricing, model.creditCost)}</em>
+              <em>{model.creditCost || 1} 积分 / 次</em>
             </button>
           ))}
         </div>
 
         <div className="admin-api-nexus__pricing">
           <div>
-            <h3>模型积分费用</h3>
-            <p>{selectedModel ? `${selectedProvider?.name || selectedModel.providerName} · ${selectedModel.id}` : "选择一个模型后调整供应商基础积分费用。"}</p>
+            <h3>基础积分费用</h3>
+            <p>{selectedModel ? `${selectedProvider?.name || selectedModel.providerName} · ${selectedModel.id}` : "选择一个模型后调整基础积分费用。"}</p>
           </div>
-          <div className="admin-api-nexus__pricing-grid">
-            {ADMIN_MODEL_QUALITY_KEYS.map((key) => (
-              <label key={key}>
-                <span>{key}</span>
-                <input
-                  type="number"
-                  min={1}
-                  value={draftPricing[key]}
-                  onChange={(event) => setDraftPricing((current) => ({ ...current, [key]: event.target.value }))}
-                  disabled={!selectedModel || saving}
-                />
-              </label>
-            ))}
-          </div>
+          <label>
+            <span>每次调用积分</span>
+            <input
+              type="number"
+              min={1}
+              value={draftCreditCost}
+              onChange={(event) => setDraftCreditCost(event.target.value)}
+              disabled={!selectedModel || saving}
+            />
+          </label>
           <button type="button" className="admin-api-nexus__save" disabled={!selectedModel || saving} onClick={handleSavePricing}>
             <Save size={15} />
             <span>{saving ? "保存中" : "保存积分费用"}</span>
@@ -762,20 +713,19 @@ export const ApiConfigPanel: React.FC = () => {
               <span>API Key</span>
               <input type="password" value={providerDraft.apiKey} onChange={(event) => handleDraftChange({ apiKey: event.target.value })} placeholder="可稍后补充" />
             </label>
-            <div className="admin-api-nexus__pricing-grid">
-              {ADMIN_MODEL_QUALITY_KEYS.map((key) => (
-                <label key={key}>
-                  <span>{key} 积分</span>
-                  <input
-                    type="number"
-                    min={1}
-                    value={draftPricing[key]}
-                    onChange={(event) => setDraftPricing((current) => ({ ...current, [key]: event.target.value }))}
-                    disabled={saving}
-                  />
-                </label>
-              ))}
-            </div>
+            <label>
+              <span>每次调用积分</span>
+              <input
+                type="number"
+                min={1}
+                value={providerDraft.creditCost}
+                onChange={(event) => {
+                  handleDraftChange({ creditCost: event.target.value });
+                  setDraftCreditCost(event.target.value);
+                }}
+                disabled={saving}
+              />
+            </label>
             <small>协议预设：{providerDraft.requestProfileId || "generic-openai-compatible"} · {providerDraft.endpointType}</small>
             <button type="button" className="admin-api-nexus__save" disabled={saving} onClick={handleSaveDraftProvider}>
               <Save size={15} />
