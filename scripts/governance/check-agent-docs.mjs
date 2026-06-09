@@ -3,6 +3,8 @@ import path from "node:path";
 
 const root = process.cwd();
 const failures = [];
+const releaseManifest = JSON.parse(fs.readFileSync(path.join(root, "config", "release-manifest.json"), "utf8"));
+const currentDisplayVersion = releaseManifest.displayVersion || `v${releaseManifest.version}`;
 
 function exists(relativePath) {
   return fs.existsSync(path.join(root, relativePath));
@@ -51,18 +53,6 @@ function expectNoDuplicateHeadings(content, relativePath) {
   }
 }
 
-function extractVersionTuple(content) {
-  const titleMatch = content.match(/^# .* v(\d+\.\d+)/m);
-  const footerMatch = content.match(/^\*\*.* v(\d+\.\d+)\*\*$/m);
-  const dateMatch = content.match(/^Last updated:\s+(\d{4}-\d{2}-\d{2})$/m);
-
-  return {
-    titleVersion: titleMatch?.[1] || "",
-    footerVersion: footerMatch?.[1] || "",
-    updatedDate: dateMatch?.[1] || "",
-  };
-}
-
 const files = {
   readme: "docs/README.md",
   rootGuide: "docs/PROJECT_ROOT_GUIDE.md",
@@ -88,7 +78,6 @@ const aiAssistantDocs = {
   sessionMemory: "docs/ai-assistant/session-memory.md"
 };
 
-// 检查每个文件是否存在
 for (const relativePath of [...Object.values(files), ...Object.values(aiAssistantDocs)]) {
   expectFile(relativePath);
 }
@@ -109,21 +98,21 @@ const skills = exists(aiAssistantDocs.skills) ? read(aiAssistantDocs.skills) : "
 const safetyPolicy = exists(aiAssistantDocs.safetyPolicy) ? read(aiAssistantDocs.safetyPolicy) : "";
 const sessionMemory = exists(aiAssistantDocs.sessionMemory) ? read(aiAssistantDocs.sessionMemory) : "";
 
-// 校验各个文件的关键标志，保证文档对齐
 expectIncludes(readme, files.readme, "Tech Layout & Runtime");
 expectIncludes(rootGuide, files.rootGuide, "Runtime Layout");
 expectIncludes(structure, files.structure, "## Runtime truth table");
 expectIncludes(handoff, files.handoff, "AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md");
 expectIncludes(agents, files.agents, "AGENTS.md - AI Agent 项目总指导文件");
-expectIncludes(agents, files.agents, "KK Studio v1.5.5");
+expectIncludes(agents, files.agents, `KK Studio ${currentDisplayVersion}`);
 expectIncludes(agents, files.agents, "AI_ASSISTANT_CAPABILITY_OPTIMIZATION.md");
 expectIncludes(agents, files.agents, "ToolRegistry");
 expectIncludes(agents, files.agents, "CanvasRuntimeState");
-expectIncludes(assistantPlan, files.assistantPlan, "KK Studio v1.5.5");
+expectIncludes(agents, files.agents, "config/release-manifest.json");
+expectIncludes(assistantPlan, files.assistantPlan, "KK Studio");
 expectIncludes(assistantPlan, files.assistantPlan, "ToolRegistry");
 expectIncludes(assistantPlan, files.assistantPlan, "CanvasRuntimeState");
 expectIncludes(assistantPlan, files.assistantPlan, "DurableGenerationQueue");
-expectIncludes(aiReadme, aiAssistantDocs.readme, "KK Studio v1.5.5");
+expectIncludes(aiReadme, aiAssistantDocs.readme, "KK Studio");
 expectIncludes(moduleMap, aiAssistantDocs.moduleMap, "AI Takeover Module");
 expectIncludes(flowMap, aiAssistantDocs.flowMap, "assets.zipOriginals");
 expectIncludes(toolRegistry, aiAssistantDocs.toolRegistry, "generation.createBatchJob");
@@ -133,6 +122,14 @@ expectIncludes(skills, aiAssistantDocs.skills, "download-selected-originals");
 expectIncludes(safetyPolicy, aiAssistantDocs.safetyPolicy, "API Key");
 expectIncludes(sessionMemory, aiAssistantDocs.sessionMemory, "session-handoff.md");
 
+for (const [relativePath, content] of [
+  [files.agents, agents],
+  [files.readme, readme],
+  [files.handoff, handoff],
+]) {
+  expectNoDuplicateHeadings(content, relativePath);
+}
+
 if (failures.length > 0) {
   for (const failure of failures) {
     console.error(failure);
@@ -140,5 +137,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log("[agent-docs:check] 所有规范文档和根目录执行文档校验通过，符合严格 AGENTS 路线。");
-
+console.log(`[agent-docs:check] 所有规范文档和根目录执行文档校验通过，当前版本 ${currentDisplayVersion}。`);
